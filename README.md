@@ -54,8 +54,22 @@ Crop steering is a precision agriculture technique that strategically manages ir
 - [P1 to P2 Transition Details](docs/p1_to_p2_transition_details.md) - Advanced information on irrigation phase transitions
 
 ## Screenshots
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+  <a href="https://github.com/user-attachments/assets/1d778889-f311-49fa-b424-0fb7ae080d8a" target="_blank">
+    <img width="200" alt="Screenshot 1" src="https://github.com/user-attachments/assets/1d778889-f311-49fa-b424-0fb7ae080d8a" />
+  </a>
+  <a href="https://github.com/user-attachments/assets/c9ab8576-6b49-4e1d-adb4-39f586150fc2" target="_blank">
+    <img width="200" alt="Screenshot 2" src="https://github.com/user-attachments/assets/c9ab8576-6b49-4e1d-adb4-39f586150fc2" />
+  </a>
+  <a href="https://github.com/user-attachments/assets/79e4e608-4fa2-42e2-ab95-3e779fc9f199" target="_blank">
+    <img width="200" alt="Screenshot 3" src="https://github.com/user-attachments/assets/79e4e608-4fa2-42e2-ab95-3e779fc9f199" />
+  </a>
+  <a href="https://github.com/user-attachments/assets/1fbd603b-e10f-4acc-8c59-4510014f4cf5" target="_blank">
+    <img width="200" alt="Screenshot 4" src="https://github.com/user-attachments/assets/1fbd603b-e10f-4acc-8c59-4510014f4cf5" />
+  </a>
+</div>
 
-[Screenshots will be added later]
+Screenshots are not true reflections of desired parameters. Dashboard is not operational until the next grow starts so missing data and parameters are not accurate. 
 
 ## Requirements
 
