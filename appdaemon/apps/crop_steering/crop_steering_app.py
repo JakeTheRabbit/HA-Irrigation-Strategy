@@ -210,7 +210,7 @@ class CropSteeringApp(hass.Hass):
                 min_vwc = self._get_setting("min_valid_vwc", 0.0)
                 max_vwc = self._get_setting("max_valid_vwc", 100.0)
                 min_ec = self._get_setting("min_valid_ec", 0.0)
-                max_ec = self._get_setting("max_valid_ec", 10.0)
+                max_ec = self._get_setting("max_ec", 10.0)
 
                 is_vwc = entity in self.vwc_sensor_entities # More efficient check
                 is_ec = entity in self.ec_sensor_entities # More efficient check
@@ -453,11 +453,9 @@ class CropSteeringApp(hass.Hass):
         indices_to_remove = []
         for i, handle in enumerate(self.listener_handles):
              try:
-                 handle_info = self.get_listener_info(handle)
-                 # Check if it's a sensor listener before cancelling
-                 if handle_info and handle_info['entity'].startswith('sensor.'):
-                     self.cancel_listen_state(handle)
-                     indices_to_remove.append(i)
+                 # Simplified listener cancellation
+                 self.cancel_listen_state(handle)
+                 indices_to_remove.append(i)
              except Exception as e:
                  self.log(f"Error cancelling listener handle {handle}: {e}", level="WARNING")
                  indices_to_remove.append(i) # Remove potentially invalid handle
@@ -497,7 +495,7 @@ class CropSteeringApp(hass.Hass):
 
          self.ec_stacking_enabled = self.get_state(ec_stacking_enabled_entity) == 'on'
          phases_str = self.get_state(ec_stacking_phases_entity)
-         self.ec_stacking_active_phases = [p.strip().upper() for p in phases_str.split(',')] if phases_str else []
+         self.ec_stacking_active_phases = [p.strip().upper() for p in phases_str.split(',') if p.strip()] if phases_str else []
 
          # Ensure defaults if state is invalid
          if not self.current_phase: self.current_phase = P0
@@ -765,7 +763,7 @@ class CropSteeringApp(hass.Hass):
     def is_irrigation_running(self):
         """Check if the configured pump switch is on."""
         # Use the actual pump entity from config helper
-        real_pump_entity = self.get_state(self.config_helpers.get("config_pump_switch_input"))
+        real_pump_entity = self.get_state(self.config_helpers.get("config_pump_switch_entity"))
         if real_pump_entity:
              try:
                  return self.get_state(real_pump_entity) == 'on'
@@ -1023,7 +1021,7 @@ class CropSteeringApp(hass.Hass):
             del self.timer_handles['irrigation_off']
 
         # 1. Turn off waste valve (if configured)
-        real_waste_switch = self.get_state(self.config_helpers.get("config_waste_switch_input"))
+        real_waste_switch = self.get_state(self.config_helpers.get("config_waste_switch_entity", "input_text.cs_config_waste_switch_entity"))
         if real_waste_switch:
             self.log(f"Turning off waste valve: {real_waste_switch}")
             self.call_service("switch/turn_off", entity_id=real_waste_switch)
@@ -1069,8 +1067,8 @@ class CropSteeringApp(hass.Hass):
         if 'irrigation_off' in self.timer_handles: # Clear timer handle
              del self.timer_handles['irrigation_off']
 
-        real_pump_entity = self.get_state(self.config_helpers.get("config_pump_switch_input"))
-        zone_switch_list = self._get_entity_list_from_helper("config_zone_switches_input")
+        real_pump_entity = self.get_state(self.config_helpers.get("config_pump_switch_entity", "input_text.cs_config_pump_switch_entity"))
+        zone_switch_list = self._get_entity_list_from_helper("config_zone_switch_entities", "input_text.cs_config_zone_switch_entities")
 
         # 1. Turn off zone valves
         if zone_switch_list:
@@ -1191,7 +1189,7 @@ class CropSteeringApp(hass.Hass):
                  self.log(f"Adjusted threshold ({adjusted_threshold}%) was below critical VWC ({critical_vwc}%). Using critical VWC as threshold.", level="DEBUG")
 
              return round(final_threshold, 2)
-        except Exception as e: # Catch potential errors during conversion/comparison
+        except Exception as e:
              self.log(f"Could not calculate adjusted threshold using EC Ratio '{ec_ratio}': {e}", level="WARNING")
              return round(base_threshold, 2) # Fallback to base
 
