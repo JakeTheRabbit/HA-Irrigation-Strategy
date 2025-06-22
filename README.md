@@ -8,11 +8,11 @@
 ![Status](https://img.shields.io/badge/Status-Validated%20✓-28A745?logo=checkmarx&logoColor=white)
 
 <!-- Clickable thumbnails that open full-size in a new tab -->
-[<img src="https://github.com/user-attachments/assets/6c48967a-1f5d-486c-8fb6-dbad207f158c" width="20"/>](https://github.com/user-attachments/assets/6c48967a-1f5d-486c-8fb6-dbad207f158c)
+[<img src="https://github.com/user-attachments/assets/6c48967a-1f5d-486c-8fb6-dbad207f158c" width="20"/>](https://github.com/user-attachments/assets/6c48967a-1f5d-486c-8fb6-dbad207f158c) [<img src="https://github.com/user-attachments/assets/ff514550-e6c8-4dc0-a7fe-1fb3bdbecf47" width="250"/>](https://github.com/user-attachments/assets/ff514550-e6c8-4dc0-a7fe-1fb3bdbecf47) [<img src="https://github.com/user-attachments/assets/a2138083-1196-4167-92d4-dc193526594a" width="250"/>](https://github.com/user-attachments/assets/a2138083-1196-4167-92d4-dc193526594a)
 
-[<img src="https://github.com/user-attachments/assets/ff514550-e6c8-4dc0-a7fe-1fb3bdbecf47" width="250"/>](https://github.com/user-attachments/assets/ff514550-e6c8-4dc0-a7fe-1fb3bdbecf47)
 
-[<img src="https://github.com/user-attachments/assets/a2138083-1196-4167-92d4-dc193526594a" width="250"/>](https://github.com/user-attachments/assets/a2138083-1196-4167-92d4-dc193526594a)
+
+
 
 
 ## 🎯 What This System Does
