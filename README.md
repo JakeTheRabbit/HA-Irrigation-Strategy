@@ -7,6 +7,9 @@
 ![Quality](https://img.shields.io/badge/Quality-Production%20Ready-00C851?logo=github&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-Validated%20✓-28A745?logo=checkmarx&logoColor=white)
 
+![image](https://github.com/user-attachments/assets/6c48967a-1f5d-486c-8fb6-dbad207f158c)
+
+
 ## 🎯 What This System Does
 
 **Transform your Home Assistant into a professional-grade crop steering platform** that automatically manages irrigation with artificial intelligence. This system replaces manual irrigation decisions with smart AI that learns your plants' needs and optimizes water delivery for maximum growth and yield.
