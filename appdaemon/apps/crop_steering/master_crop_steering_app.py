@@ -1057,13 +1057,12 @@ class MasterCropSteeringApp(hass.Hass):
             
             # Alert via configured notification service
             notification_service = self.config.get('notification_service', 'notify.persistent_notification')
-            try:
-                if notification_service and notification_service.startswith('notify.'):
-                    service_name = notification_service.replace('.', '/')
-                    self.call_service(service_name, 
-                                    message=f"🚨 Critical EC level detected: {ec_level:.2f} mS/cm")
-                else:
-                    self.log(f"📱 Critical EC Alert: {ec_level:.2f} mS/cm")
+            if notification_service and notification_service.startswith('notify.'):
+                service_name = notification_service.replace('.', '/')
+                await self.call_service(service_name, 
+                                message=f"🚨 Critical EC level detected: {ec_level:.2f} mS/cm")
+            else:
+                self.log(f"📱 Critical EC Alert: {ec_level:.2f} mS/cm")
             
         except Exception as e:
             self.log(f"❌ Error handling critical EC: {e}", level='ERROR')
@@ -1077,8 +1076,75 @@ class MasterCropSteeringApp(hass.Hass):
     def _get_irrigation_count_24h(self) -> int:
         """Get irrigation count in last 24 hours."""
         # This would typically query a database or entity history
-        # For now, return a reasonable estimate
-        return 8  # Placeholder
+
+    def _calculate_next_irrigation_time(self) -> datetime | None:
+        """Calculate when next irrigation should occur."""
+        try:
+            now = datetime.now()
+            
+            # If irrigation is currently in progress, return None
+            if self.irrigation_in_progress:
+                return None
+            
+            # Phase-based logic
+            if self.current_phase == "P0":
+                # Morning dryback - next irrigation depends on dryback detection
+                # For now, estimate 2-4 hours
+                return now + timedelta(hours=3)
+            
+            elif self.current_phase == "P1":
+                # Ramp-up phase - frequent small irrigations
+                # Next irrigation in 30-60 minutes
+                return now + timedelta(minutes=45)
+            
+            elif self.current_phase == "P2":
+                # Maintenance phase - based on VWC thresholds
+                # Check current VWC vs threshold
+                current_vwc = self._get_average_vwc()
+                if current_vwc is not None:
+                    threshold = self._get_number_entity_value("number.crop_steering_p2_vwc_threshold", 60.0)
+                    if current_vwc < threshold:
+                        # Needs irrigation soon
+                        return now + timedelta(minutes=15)
+                    else:
+                        # Can wait longer
+                        return now + timedelta(hours=2)
+                else:
+                    # No VWC data, conservative estimate
+                    return now + timedelta(hours=1)
+            
+            elif self.current_phase == "P3":
+                # Pre-lights-off - final irrigation before night
+                # Calculate time until lights off
+                lights_off_time = self._get_lights_off_time()
+                if lights_off_time:
+                    return lights_off_time - timedelta(minutes=30)
+                else:
+                    # Default to 1 hour if no lights schedule
+                    return now + timedelta(hours=1)
+            
+            # Default fallback
+            return now + timedelta(hours=1)
+            
+        except Exception as e:
+            self.log(f"❌ Error calculating next irrigation time: {e}", level='ERROR')
+            return None
+
+    def _get_lights_off_time(self) -> datetime | None:
+        """Get the time when lights turn off."""
+        try:
+            # This would typically read from a schedule or light entity
+            # For now, assume lights off at 22:00
+            now = datetime.now()
+            lights_off = now.replace(hour=22, minute=0, second=0, microsecond=0)
+            
+            # If already past lights off time, assume next day
+            if lights_off <= now:
+                lights_off += timedelta(days=1)
+            
+            return lights_off
+        except Exception:
+            return None
 
     async def _add_ml_training_sample(self, decision: Dict, irrigation_result: Dict):
         """Add irrigation result to ML training data."""
@@ -1289,6 +1355,36 @@ class MasterCropSteeringApp(hass.Hass):
                               'average_vwc': current_state['average_vwc'],
                               'average_ec': current_state['average_ec']
                           })
+            
+            # Create dedicated sensors for integration compatibility
+            self.set_state('sensor.crop_steering_app_current_phase',
+                          state=self.current_phase,
+                          attributes={
+                              'friendly_name': 'Current Irrigation Phase',
+                              'icon': 'mdi:water-circle',
+                              'updated': datetime.now().isoformat()
+                          })
+            
+            # Calculate and set next irrigation time
+            next_irrigation = self._calculate_next_irrigation_time()
+            if next_irrigation:
+                self.set_state('sensor.crop_steering_app_next_irrigation',
+                              state=next_irrigation.isoformat(),
+                              attributes={
+                                  'friendly_name': 'Next Irrigation Time',
+                                  'icon': 'mdi:clock-outline',
+                                  'device_class': 'timestamp',
+                                  'updated': datetime.now().isoformat()
+                              })
+            else:
+                self.set_state('sensor.crop_steering_app_next_irrigation',
+                              state='unknown',
+                              attributes={
+                                  'friendly_name': 'Next Irrigation Time',
+                                  'icon': 'mdi:clock-outline',
+                                  'device_class': 'timestamp',
+                                  'updated': datetime.now().isoformat()
+                              })
             
         except Exception as e:
             self.log(f"❌ Error updating decision tracking: {e}", level='ERROR')

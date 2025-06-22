@@ -342,6 +342,10 @@ class CropSteeringSensor(SensorEntity):
             return self._calculate_avg_vwc()
         elif self.entity_description.key == "configured_avg_ec":
             return self._calculate_avg_ec()
+        elif self.entity_description.key == "current_phase":
+            return self._get_current_phase()
+        elif self.entity_description.key == "next_irrigation_time":
+            return self._get_next_irrigation_time()
         else:
             # Other sensors return None (placeholder)
             return None
@@ -559,6 +563,36 @@ class CropSteeringSensor(SensorEntity):
             return 3.0  # Default fallback
         except Exception:
             return 3.0
+
+    def _get_current_phase(self) -> str:
+        """Get current irrigation phase from AppDaemon sensor."""
+        try:
+            # Check if there's a sensor from AppDaemon
+            phase_sensor = self.hass.states.get("sensor.crop_steering_app_current_phase")
+            if phase_sensor and phase_sensor.state not in ['unknown', 'unavailable']:
+                return phase_sensor.state
+            
+            # Fallback to integration select entity
+            phase_select = self.hass.states.get("select.crop_steering_irrigation_phase")
+            if phase_select and phase_select.state not in ['unknown', 'unavailable']:
+                return phase_select.state
+            
+            return "P2"  # Default to maintenance phase
+        except Exception:
+            return "P2"
+
+    def _get_next_irrigation_time(self) -> str | None:
+        """Get next irrigation time from AppDaemon sensor."""
+        try:
+            # Check if there's a sensor from AppDaemon
+            time_sensor = self.hass.states.get("sensor.crop_steering_app_next_irrigation")
+            if time_sensor and time_sensor.state not in ['unknown', 'unavailable']:
+                return time_sensor.state
+            
+            # If no specific time available, return None
+            return None
+        except Exception:
+            return None
 
     @property
     def available(self) -> bool:
