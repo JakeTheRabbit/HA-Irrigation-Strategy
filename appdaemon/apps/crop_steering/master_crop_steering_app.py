@@ -1662,10 +1662,40 @@ class MasterCropSteeringApp(hass.Hass):
                 # Check if we can irrigate (not on cooldown)
                 time_since_last = self._get_time_since_last_irrigation()
                 if time_since_last > 300:  # 5 minutes minimum for emergency
-                    await self._execute_irrigation_shot(1, 60, shot_type='emergency')
+                    # Select zone with lowest VWC for emergency irrigation
+                    emergency_zone = await self._select_emergency_zone()
+                    if emergency_zone:
+                        await self._execute_irrigation_shot(emergency_zone, 60, shot_type='emergency')
+                    else:
+                        # Fallback to zone 1 if selection fails
+                        await self._execute_irrigation_shot(1, 60, shot_type='emergency')
                 
         except Exception as e:
             self.log(f"❌ Error checking emergency conditions: {e}", level='ERROR')
+
+    async def _select_emergency_zone(self) -> Optional[int]:
+        """Select zone with lowest VWC for emergency irrigation."""
+        try:
+            zone_vwc = {}
+            
+            # Check VWC for each zone
+            for zone_num in range(1, self.num_zones + 1):
+                vwc = self._get_zone_vwc(zone_num)
+                if vwc is not None:
+                    zone_vwc[zone_num] = vwc
+            
+            if zone_vwc:
+                # Select zone with lowest VWC (most critical)
+                emergency_zone = min(zone_vwc, key=zone_vwc.get)
+                lowest_vwc = zone_vwc[emergency_zone]
+                self.log(f"🚨 Emergency zone selected: Zone {emergency_zone} with {lowest_vwc:.1f}% VWC")
+                return emergency_zone
+            
+            return None
+            
+        except Exception as e:
+            self.log(f"❌ Error selecting emergency zone: {e}", level='ERROR')
+            return None
 
     async def _handle_critical_ec(self, ec_level: float):
         """Handle critical EC levels."""
@@ -1745,6 +1775,19 @@ class MasterCropSteeringApp(hass.Hass):
         except Exception as e:
             self.log(f"❌ Error getting zone {zone_num} VWC: {e}", level='ERROR')
             return None
+
+    def _get_number_entity_value(self, entity_id: str, default: float) -> float:
+        """Get value from number entity with fallback to default."""
+        try:
+            state = self.get_state(entity_id)
+            if state not in ['unknown', 'unavailable', None]:
+                # Handle async Task objects
+                if hasattr(state, '__await__'):
+                    return default
+                return float(state)
+            return default
+        except (ValueError, TypeError):
+            return default
 
     def _get_number_of_zones(self) -> int:
         """Get number of zones from integration configuration."""
