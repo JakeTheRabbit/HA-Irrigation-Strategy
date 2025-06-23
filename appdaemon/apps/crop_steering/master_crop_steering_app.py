@@ -1012,6 +1012,10 @@ class MasterCropSteeringApp(hass.Hass):
             for sensor in self.config['sensors']['vwc']:
                 try:
                     value = self.get_state(sensor)
+                    # Handle async Task objects properly
+                    if hasattr(value, '__await__'):
+                        self.log(f"⚠️ Skipping async task from VWC sensor {sensor}")
+                        continue
                     self.log(f"🔍 DEBUG: Reading VWC sensor {sensor} = {value} (type: {type(value)})")
                     if value not in ['unavailable', 'unknown', None, '']:
                         vwc_sensors[sensor] = float(value)
@@ -1024,6 +1028,10 @@ class MasterCropSteeringApp(hass.Hass):
             for sensor in self.config['sensors']['ec']:
                 try:
                     value = self.get_state(sensor)
+                    # Handle async Task objects properly
+                    if hasattr(value, '__await__'):
+                        self.log(f"⚠️ Skipping async task from EC sensor {sensor}")
+                        continue
                     self.log(f"🔍 DEBUG: Reading EC sensor {sensor} = {value} (type: {type(value)})")
                     if value not in ['unavailable', 'unknown', None, '']:
                         ec_sensors[sensor] = float(value)
