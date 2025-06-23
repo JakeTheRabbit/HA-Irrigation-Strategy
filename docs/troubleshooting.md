@@ -86,15 +86,15 @@ Use this checklist to diagnose system status:
 #### 2. AppDaemon Status
 ```bash
 # Check AppDaemon logs
-tail -f /config/appdaemon/logs/appdaemon.log
+tail -f /addon_configs/a0d7b954_appdaemon/logs/appdaemon.log
 
 # Look for startup messages:
 # "Master Crop Steering Application with Advanced AI Features initialized!"
 # "Advanced AI modules initialized successfully"
 
 # Check specific app logs
-tail -f /config/appdaemon/logs/crop_steering_master.log
-tail -f /config/appdaemon/logs/crop_steering_dashboard.log
+tail -f /addon_configs/a0d7b954_appdaemon/logs/crop_steering_master.log
+tail -f /addon_configs/a0d7b954_appdaemon/logs/crop_steering_dashboard.log
 ```
 
 #### 3. Sensor Validation
@@ -163,15 +163,11 @@ sensor.crop_steering_ml_model_accuracy: should increase with training
 # ML models will restart learning from scratch
 ```
 
-**Install missing dependencies:**
+**Verify AppDaemon dependencies:**
 ```bash
-# Install required Python packages
-pip install numpy pandas plotly scikit-learn scipy
-
-# For Home Assistant OS/Docker:
-docker exec homeassistant pip install numpy pandas plotly scikit-learn scipy
-
-# Restart AppDaemon after installation
+# Dependencies are automatically managed by the AppDaemon add-on
+# Check AppDaemon logs for any missing dependency errors
+# Restart AppDaemon add-on if needed through Home Assistant UI
 ```
 
 ### Sensor Fusion Problems
@@ -643,9 +639,9 @@ Emergency Shutdown: Physical main breaker location
 ### Log File Locations
 ```bash
 Home Assistant: /config/home-assistant.log
-AppDaemon: /config/appdaemon/logs/appdaemon.log
-Crop Steering: /config/appdaemon/logs/crop_steering_master.log
-Dashboard: /config/appdaemon/logs/crop_steering_dashboard.log
+AppDaemon: /addon_configs/a0d7b954_appdaemon/logs/appdaemon.log
+Crop Steering: /addon_configs/a0d7b954_appdaemon/logs/crop_steering_master.log
+Dashboard: /addon_configs/a0d7b954_appdaemon/logs/crop_steering_dashboard.log
 ```
 
 ---

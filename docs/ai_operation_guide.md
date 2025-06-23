@@ -100,16 +100,13 @@ Add the integration and configure sensors:
 
 Install AI modules:
 
-```bash
-# Install required packages
-pip install numpy pandas plotly scikit-learn scipy
+> **📝 Note:** AI modules are automatically installed via AppDaemon add-on configuration. No manual package installation required.
 
-# Copy AppDaemon apps
-cp -r appdaemon/apps/ /config/appdaemon/
-
-# Restart AppDaemon
-# Check logs: /config/appdaemon/logs/
-```
+**AppDaemon Setup:**
+1. Install AppDaemon 4 add-on from Home Assistant
+2. Configure with required Python packages (handled automatically)
+3. Copy AI modules to `/addon_configs/a0d7b954_appdaemon/apps/`
+4. Check logs: `/addon_configs/a0d7b954_appdaemon/logs/`
 
 ### 4. Crop Profile Selection
 

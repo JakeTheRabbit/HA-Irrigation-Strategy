@@ -265,7 +265,7 @@ Action: Review adapted parameters
 **Solutions:**
 ```bash
 # Check AppDaemon status
-tail -f /config/appdaemon/logs/crop_steering_dashboard.log
+tail -f /addon_configs/a0d7b954_appdaemon/logs/crop_steering_dashboard.log
 
 # Restart AppDaemon if needed
 # Home Assistant > Settings > Add-ons > AppDaemon > Restart

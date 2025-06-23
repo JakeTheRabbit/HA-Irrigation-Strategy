@@ -442,11 +442,11 @@ Adjust zone settings in integration configuration:
    - Ensure Python packages listed:
      ```yaml
      python_packages:
-       - numpy
-       - pandas
-       - plotly
-       - scikit-learn
-       - scipy
+       - numpy>=1.21.0
+       - pandas>=1.3.0
+       - plotly>=5.0.0
+       - scipy>=1.7.0
+       - requests>=2.25.0
      ```
 2. **Restart AppDaemon** after config changes
 3. **Check logs again** for "Master Crop Steering" startup message
@@ -464,7 +464,7 @@ Adjust zone settings in integration configuration:
    - AppDaemon log should show "Connected to Home Assistant"
 3. **Verify long-lived token is correct**
 4. **Check AI files were copied:**
-   - File Editor → `/config/appdaemon/apps/crop_steering/`
+   - File Editor → `/addon_configs/a0d7b954_appdaemon/apps/crop_steering/`
    - Should contain `.py` files
 
 ### ❌ Sensors Not Working
