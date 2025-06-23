@@ -1669,14 +1669,52 @@ class MasterCropSteeringApp(hass.Hass):
                 # Check if we can irrigate (not on cooldown)
                 time_since_last = self._get_time_since_last_irrigation()
                 if time_since_last > 600:  # 10 minutes minimum for emergency (was 5)
-                    # TEMPORARY FIX: Since sensors return async Tasks, hardcode to zone 3 for now
-                    # TODO: Fix async Task sensor issue
-                    emergency_zone = 3  # Based on user feedback that zone 3 has the problem
-                    self.log(f"🚨 TEMPORARY: Hardcoded emergency irrigation to Zone {emergency_zone} (sensor async Task workaround)")
-                    await self._execute_irrigation_shot(emergency_zone, 60, shot_type='emergency')
+                    # Use integration sensors which are working properly
+                    emergency_zone = await self._select_emergency_zone_from_integration()
+                    if emergency_zone:
+                        await self._execute_irrigation_shot(emergency_zone, 60, shot_type='emergency')
+                    else:
+                        # Fallback to zone 3 based on user feedback
+                        self.log("⚠️ Integration sensor selection failed, using Zone 3 fallback")
+                        await self._execute_irrigation_shot(3, 60, shot_type='emergency')
                 
         except Exception as e:
             self.log(f"❌ Error checking emergency conditions: {e}", level='ERROR')
+
+    async def _select_emergency_zone_from_integration(self) -> Optional[int]:
+        """Select zone with lowest VWC using integration sensors that actually work."""
+        try:
+            zone_vwc = {}
+            
+            # Check integration sensors which are working properly
+            for zone_num in range(1, self.num_zones + 1):
+                integration_sensor = f"sensor.crop_steering_zone_{zone_num}_vwc"
+                try:
+                    value = self.get_state(integration_sensor)
+                    if value not in ['unknown', 'unavailable', None] and not hasattr(value, '__await__'):
+                        vwc = float(value)
+                        zone_vwc[zone_num] = vwc
+                        self.log(f"🔍 Zone {zone_num} integration VWC: {vwc:.1f}%")
+                    else:
+                        self.log(f"⚠️ Zone {zone_num} integration sensor unavailable: {value}")
+                except (ValueError, TypeError) as e:
+                    self.log(f"❌ Error reading zone {zone_num} integration sensor: {e}")
+                    continue
+            
+            if zone_vwc:
+                # Select zone with lowest VWC (most critical)
+                emergency_zone = min(zone_vwc, key=zone_vwc.get)
+                lowest_vwc = zone_vwc[emergency_zone]
+                self.log(f"🚨 Emergency zone selected from integration: Zone {emergency_zone} with {lowest_vwc:.1f}% VWC")
+                self.log(f"📊 All zone VWCs: {zone_vwc}")
+                return emergency_zone
+            else:
+                self.log("⚠️ No integration sensor data available for emergency selection")
+                return None
+            
+        except Exception as e:
+            self.log(f"❌ Error selecting emergency zone from integration: {e}", level='ERROR')
+            return None
 
     async def _select_emergency_zone(self) -> Optional[int]:
         """Select zone with lowest VWC for emergency irrigation."""
