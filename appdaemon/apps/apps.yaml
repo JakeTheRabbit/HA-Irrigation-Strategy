@@ -9,18 +9,17 @@
 master_crop_steering:
   module: crop_steering.master_crop_steering_app
   class: MasterCropSteeringApp
-  dependencies:
-    - crop_steering_dashboard
   log: crop_steering_master
   log_level: INFO
 
 # Advanced Dashboard Application  
 # Provides real-time Athena-style monitoring and analytics
-crop_steering_dashboard:
-  module: crop_steering.advanced_crop_steering_dashboard
-  class: AdvancedCropSteeringDashboard
-  log: crop_steering_dashboard
-  log_level: INFO
+# DISABLED: Requires plotly/pandas dependencies not available in AppDaemon
+# crop_steering_dashboard:
+#   module: crop_steering.advanced_crop_steering_dashboard
+#   class: AdvancedCropSteeringDashboard
+#   log: crop_steering_dashboard
+#   log_level: INFO
 
 # Individual Advanced Modules (Optional - included in master app)
 # These can be enabled for standalone testing or modular operation

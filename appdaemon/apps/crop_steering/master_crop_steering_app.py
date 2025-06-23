@@ -9,6 +9,7 @@ import logging
 import asyncio
 import threading
 import os
+import pickle
 from datetime import datetime, timedelta, time
 from typing import Dict, List, Optional, Any
 import numpy as np
@@ -96,8 +97,14 @@ class MasterCropSteeringApp(hass.Hass):
         # Initialize crop profile
         self._initialize_default_crop_profile()
         
+        # Load persistent state from file
+        self._load_persistent_state()
+        
         # Create initial sensors for integration compatibility
         self.run_in(self._create_initial_sensors, 2)
+        
+        # Save state periodically
+        self.run_every(self._save_persistent_state, 'now+60', 300)  # Every 5 minutes
         
         self.log("🚀 Master Crop Steering Application with Advanced AI Features initialized!")
         self.log(f"📊 Modules: Dryback Detection ✓, Sensor Fusion ✓, ML Prediction ✓, Crop Profiles ✓, Dashboard ✓")
@@ -609,6 +616,175 @@ class MasterCropSteeringApp(hass.Hass):
             
         except Exception as e:
             self.log(f"❌ Error updating zone {zone_num} water sensors: {e}", level='ERROR')
+
+    def _get_state_file_path(self) -> str:
+        """Get the path for persistent state file."""
+        # Use AppDaemon's config directory
+        config_dir = self.config.get('config_dir', '/config')
+        return os.path.join(config_dir, 'crop_steering_state.pkl')
+
+    def _save_persistent_state(self, kwargs=None):
+        """Save critical system state to file for restart recovery."""
+        try:
+            state_data = {
+                'timestamp': datetime.now().isoformat(),
+                'zone_phases': self.zone_phases.copy(),
+                'zone_phase_data': {},
+                'zone_water_usage': {},
+                'last_irrigation_time': self.last_irrigation_time.isoformat() if self.last_irrigation_time else None,
+                'version': '2.1.0'
+            }
+            
+            # Convert datetime objects to ISO strings for JSON serialization
+            for zone_num, data in self.zone_phase_data.items():
+                state_data['zone_phase_data'][zone_num] = {
+                    'p0_start_time': data['p0_start_time'].isoformat() if data['p0_start_time'] else None,
+                    'p0_peak_vwc': data['p0_peak_vwc'],
+                    'last_irrigation_time': data['last_irrigation_time'].isoformat() if data['last_irrigation_time'] else None
+                }
+            
+            # Convert date objects for water usage
+            for zone_num, data in self.zone_water_usage.items():
+                state_data['zone_water_usage'][zone_num] = {
+                    'daily_total': data['daily_total'],
+                    'weekly_total': data['weekly_total'],
+                    'daily_count': data['daily_count'],
+                    'last_reset_daily': data['last_reset_daily'].isoformat() if data['last_reset_daily'] else None,
+                    'last_reset_weekly': data['last_reset_weekly'].isoformat() if data['last_reset_weekly'] else None
+                }
+            
+            # Save to file
+            state_file = self._get_state_file_path()
+            with open(state_file, 'w') as f:
+                json.dump(state_data, f, indent=2)
+            
+            self.log(f"💾 State saved to {state_file}")
+            
+        except Exception as e:
+            self.log(f"❌ Error saving persistent state: {e}", level='ERROR')
+
+    def _load_persistent_state(self):
+        """Load system state from file after restart."""
+        try:
+            state_file = self._get_state_file_path()
+            
+            if not os.path.exists(state_file):
+                self.log("📂 No existing state file found - using defaults")
+                return
+            
+            with open(state_file, 'r') as f:
+                state_data = json.load(f)
+            
+            # Check version compatibility
+            saved_version = state_data.get('version', '1.0.0')
+            self.log(f"📂 Loading state from version {saved_version}")
+            
+            # Restore zone phases
+            if 'zone_phases' in state_data:
+                self.zone_phases.update(state_data['zone_phases'])
+                self.log(f"✅ Restored zone phases: {self.zone_phases}")
+            else:
+                # Fallback: try to get phases from HA sensors
+                self._restore_phases_from_ha()
+            
+            # Validate phase data consistency
+            self._validate_restored_state()
+            
+            # Restore zone phase data
+            if 'zone_phase_data' in state_data:
+                for zone_str, data in state_data['zone_phase_data'].items():
+                    zone_num = int(zone_str)
+                    self.zone_phase_data[zone_num] = {
+                        'p0_start_time': datetime.fromisoformat(data['p0_start_time']) if data['p0_start_time'] else None,
+                        'p0_peak_vwc': data['p0_peak_vwc'],
+                        'last_irrigation_time': datetime.fromisoformat(data['last_irrigation_time']) if data['last_irrigation_time'] else None
+                    }
+                self.log(f"✅ Restored zone phase data for {len(state_data['zone_phase_data'])} zones")
+            
+            # Restore water usage (check if data is from today/this week)
+            if 'zone_water_usage' in state_data:
+                today = datetime.now().date()
+                for zone_str, data in state_data['zone_water_usage'].items():
+                    zone_num = int(zone_str)
+                    last_daily_reset = datetime.fromisoformat(data['last_reset_daily']).date() if data['last_reset_daily'] else today
+                    last_weekly_reset = datetime.fromisoformat(data['last_reset_weekly']).date() if data['last_reset_weekly'] else today
+                    
+                    # Only restore if from same day/week
+                    daily_total = data['daily_total'] if last_daily_reset == today else 0.0
+                    daily_count = data['daily_count'] if last_daily_reset == today else 0
+                    weekly_total = data['weekly_total'] if (today - last_weekly_reset).days < 7 else 0.0
+                    
+                    self.zone_water_usage[zone_num] = {
+                        'daily_total': daily_total,
+                        'weekly_total': weekly_total,
+                        'daily_count': daily_count,
+                        'last_reset_daily': today,
+                        'last_reset_weekly': last_weekly_reset
+                    }
+                self.log(f"✅ Restored water usage for {len(state_data['zone_water_usage'])} zones")
+            
+            # Restore last irrigation time
+            if state_data.get('last_irrigation_time'):
+                self.last_irrigation_time = datetime.fromisoformat(state_data['last_irrigation_time'])
+                self.log(f"✅ Restored last irrigation time: {self.last_irrigation_time}")
+            
+            # Calculate recovery time
+            saved_time = datetime.fromisoformat(state_data['timestamp'])
+            downtime = datetime.now() - saved_time
+            self.log(f"🔄 System recovered after {downtime.total_seconds():.0f} seconds of downtime")
+            
+        except Exception as e:
+            self.log(f"❌ Error loading persistent state: {e}", level='ERROR')
+            self.log("⚠️ Using default state values")
+
+    def _restore_phases_from_ha(self):
+        """Fallback: Restore zone phases from HA sensors."""
+        try:
+            self.log("🔄 Attempting to restore phases from HA sensors...")
+            for zone_num in range(1, self.num_zones + 1):
+                sensor_id = f"sensor.crop_steering_zone_{zone_num}_phase"
+                phase = self.get_state(sensor_id)
+                if phase and phase in ['P0', 'P1', 'P2', 'P3']:
+                    self.zone_phases[zone_num] = phase
+                    self.log(f"✅ Zone {zone_num}: Restored phase {phase} from HA sensor")
+        except Exception as e:
+            self.log(f"❌ Error restoring from HA sensors: {e}", level='ERROR')
+
+    def _validate_restored_state(self):
+        """Validate that restored state makes sense."""
+        try:
+            now = datetime.now()
+            current_time = now.time()
+            
+            # Check if any zones are in impossible states
+            for zone_num in range(1, self.num_zones + 1):
+                zone_schedule = self._get_zone_schedule(zone_num)
+                lights_on = self._are_lights_on(current_time, zone_schedule['lights_on'], zone_schedule['lights_off'])
+                zone_phase = self.zone_phases.get(zone_num, 'P2')
+                
+                # If lights are off but zone isn't in P0, fix it
+                if not lights_on and zone_phase != 'P0':
+                    self.log(f"🔧 Zone {zone_num}: Lights off but phase is {zone_phase}, correcting to P0")
+                    self.zone_phases[zone_num] = 'P0'
+                    # Record current VWC as peak for dryback calculations
+                    zone_vwc = self._get_zone_vwc(zone_num)
+                    if zone_vwc:
+                        self.zone_phase_data[zone_num]['p0_start_time'] = now
+                        self.zone_phase_data[zone_num]['p0_peak_vwc'] = zone_vwc
+                
+                # If lights are on but zone is in P0 and dryback is done, fix it
+                elif lights_on and zone_phase == 'P0':
+                    zone_data = self.zone_phase_data.get(zone_num, {})
+                    if zone_data.get('p0_start_time'):
+                        elapsed = (now - zone_data['p0_start_time']).total_seconds() / 60
+                        if elapsed > 120:  # More than 2 hours in P0
+                            self.log(f"🔧 Zone {zone_num}: Lights on and long P0 duration, moving to P1")
+                            self.zone_phases[zone_num] = 'P1'
+            
+            self.log("✅ State validation complete")
+            
+        except Exception as e:
+            self.log(f"❌ Error validating state: {e}", level='ERROR')
 
     async def _on_vwc_sensor_update(self, entity, attribute, old, new, kwargs):
         """Handle VWC sensor updates with advanced processing."""
@@ -1399,6 +1575,9 @@ class MasterCropSteeringApp(hass.Hass):
             # Update water usage tracking
             await self._update_zone_water_usage(zone, duration)
             
+            # Save state after irrigation (critical event)
+            self._save_persistent_state()
+            
             # Fire irrigation event
             self.fire_event('crop_steering_irrigation_shot', irrigation_result)
             
@@ -1922,6 +2101,9 @@ class MasterCropSteeringApp(hass.Hass):
             self.zone_phases[zone_num] = new_phase
             
             self.log(f"🔄 Zone {zone_num} transition: {old_phase} → {new_phase} ({reason})")
+            
+            # Save state after phase change (critical event)
+            self._save_persistent_state()
             
             # Update zone-specific sensor
             await self.set_state(f'sensor.crop_steering_zone_{zone_num}_phase',
