@@ -1669,13 +1669,11 @@ class MasterCropSteeringApp(hass.Hass):
                 # Check if we can irrigate (not on cooldown)
                 time_since_last = self._get_time_since_last_irrigation()
                 if time_since_last > 600:  # 10 minutes minimum for emergency (was 5)
-                    # Select zone with lowest VWC for emergency irrigation
-                    emergency_zone = await self._select_emergency_zone()
-                    if emergency_zone:
-                        await self._execute_irrigation_shot(emergency_zone, 60, shot_type='emergency')
-                    else:
-                        # Fallback to zone 1 if selection fails
-                        await self._execute_irrigation_shot(1, 60, shot_type='emergency')
+                    # TEMPORARY FIX: Since sensors return async Tasks, hardcode to zone 3 for now
+                    # TODO: Fix async Task sensor issue
+                    emergency_zone = 3  # Based on user feedback that zone 3 has the problem
+                    self.log(f"🚨 TEMPORARY: Hardcoded emergency irrigation to Zone {emergency_zone} (sensor async Task workaround)")
+                    await self._execute_irrigation_shot(emergency_zone, 60, shot_type='emergency')
                 
         except Exception as e:
             self.log(f"❌ Error checking emergency conditions: {e}", level='ERROR')
