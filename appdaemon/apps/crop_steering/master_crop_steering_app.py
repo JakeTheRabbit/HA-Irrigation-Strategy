@@ -1489,6 +1489,10 @@ class MasterCropSteeringApp(hass.Hass):
                     for sensor in zone_vwc_sensors:
                         value = self.get_state(sensor)
                         if value not in ['unavailable', 'unknown', None]:
+                            # Ensure value is a string or number, not an async Task
+                            if hasattr(value, '__await__'):
+                                self.log(f"⚠️ Skipping async task from sensor {sensor}")
+                                continue
                             zone_vwc_values.append(float(value))
                     
                     if zone_vwc_values:
@@ -1690,7 +1694,11 @@ class MasterCropSteeringApp(hass.Hass):
             integration_sensor = f"sensor.crop_steering_vwc_zone_{zone_num}"
             state = self.get_state(integration_sensor)
             if state not in ['unknown', 'unavailable', None]:
-                return float(state)
+                # Ensure state is a string or number, not an async Task
+                if hasattr(state, '__await__'):
+                    self.log(f"⚠️ Skipping async task from integration sensor {integration_sensor}")
+                else:
+                    return float(state)
             
             # Fallback to direct sensor configuration
             zone_vwc_sensors = []
@@ -1712,8 +1720,13 @@ class MasterCropSteeringApp(hass.Hass):
                     try:
                         state = self.get_state(sensor)
                         if state not in ['unknown', 'unavailable', None]:
+                            # Ensure state is a string or number, not an async Task
+                            if hasattr(state, '__await__'):
+                                self.log(f"⚠️ Skipping async task from sensor {sensor}")
+                                continue
                             values.append(float(state))
-                    except (ValueError, TypeError):
+                    except (ValueError, TypeError) as e:
+                        self.log(f"⚠️ Error reading sensor {sensor}: {e}")
                         continue
                 
                 if values:
