@@ -1668,7 +1668,8 @@ class MasterCropSteeringApp(hass.Hass):
                 
                 # Check if we can irrigate (not on cooldown)
                 time_since_last = self._get_time_since_last_irrigation()
-                if time_since_last > 600:  # 10 minutes minimum for emergency (was 5)
+                cooldown_seconds = 300  # 5 minutes for testing (was 600)
+                if time_since_last > cooldown_seconds:
                     # Use integration sensors which are working properly
                     emergency_zone = await self._select_emergency_zone_from_integration()
                     if emergency_zone:
@@ -1677,6 +1678,9 @@ class MasterCropSteeringApp(hass.Hass):
                         # Fallback to zone 3 based on user feedback
                         self.log("⚠️ Integration sensor selection failed, using Zone 3 fallback")
                         await self._execute_irrigation_shot(3, 60, shot_type='emergency')
+                else:
+                    remaining_cooldown = cooldown_seconds - time_since_last
+                    self.log(f"⏱️ Emergency irrigation on cooldown: {remaining_cooldown:.0f}s remaining")
                 
         except Exception as e:
             self.log(f"❌ Error checking emergency conditions: {e}", level='ERROR')
