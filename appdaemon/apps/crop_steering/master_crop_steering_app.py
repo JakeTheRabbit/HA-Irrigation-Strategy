@@ -1668,7 +1668,7 @@ class MasterCropSteeringApp(hass.Hass):
                 
                 # Check if we can irrigate (not on cooldown)
                 time_since_last = self._get_time_since_last_irrigation()
-                if time_since_last > 300:  # 5 minutes minimum for emergency
+                if time_since_last > 600:  # 10 minutes minimum for emergency (was 5)
                     # Select zone with lowest VWC for emergency irrigation
                     emergency_zone = await self._select_emergency_zone()
                     if emergency_zone:
@@ -1685,11 +1685,25 @@ class MasterCropSteeringApp(hass.Hass):
         try:
             zone_vwc = {}
             
-            # Check VWC for each zone
+            # Try to get zone VWC from sensor fusion results instead of direct sensor reading
+            # Look for zone-specific sensor fusion data
             for zone_num in range(1, self.num_zones + 1):
-                vwc = self._get_zone_vwc(zone_num)
-                if vwc is not None:
-                    zone_vwc[zone_num] = vwc
+                zone_sensors = [s for s in self.config['sensors']['vwc'] if f'r{zone_num}' in s or f'z{zone_num}' in s]
+                zone_values = []
+                
+                for sensor in zone_sensors:
+                    # Try to get the latest sensor reading that isn't an async Task
+                    try:
+                        value = self.get_state(sensor)
+                        if value not in ['unknown', 'unavailable', None] and not hasattr(value, '__await__'):
+                            zone_values.append(float(value))
+                    except (ValueError, TypeError):
+                        continue
+                
+                if zone_values:
+                    avg_vwc = sum(zone_values) / len(zone_values)
+                    zone_vwc[zone_num] = avg_vwc
+                    self.log(f"🔍 Zone {zone_num} emergency VWC: {avg_vwc:.1f}% (from {len(zone_values)} sensors)")
             
             if zone_vwc:
                 # Select zone with lowest VWC (most critical)
@@ -1697,8 +1711,9 @@ class MasterCropSteeringApp(hass.Hass):
                 lowest_vwc = zone_vwc[emergency_zone]
                 self.log(f"🚨 Emergency zone selected: Zone {emergency_zone} with {lowest_vwc:.1f}% VWC")
                 return emergency_zone
-            
-            return None
+            else:
+                self.log("⚠️ No zone VWC data available for emergency selection")
+                return None
             
         except Exception as e:
             self.log(f"❌ Error selecting emergency zone: {e}", level='ERROR')
