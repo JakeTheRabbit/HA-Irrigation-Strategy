@@ -472,7 +472,7 @@ class MasterCropSteeringApp(hass.Hass):
                                attributes={
                                    'friendly_name': 'Zone Phases',
                                    'icon': 'mdi:water-circle',
-                                   'zone_phases': self.zone_phases.copy(),
+                                   'zone_phases': {str(k): v for k, v in self.zone_phases.items()},
                                    'updated': datetime.now().isoformat()
                                })
             
@@ -786,7 +786,7 @@ class MasterCropSteeringApp(hass.Hass):
         except Exception as e:
             self.log(f"❌ Error validating state: {e}", level='ERROR')
 
-    async def _on_vwc_sensor_update(self, entity, attribute, old, new, kwargs):
+    def _on_vwc_sensor_update(self, entity, attribute, old, new, kwargs):
         """Handle VWC sensor updates with advanced processing."""
         try:
             if new in ['unavailable', 'unknown', None]:
@@ -821,16 +821,10 @@ class MasterCropSteeringApp(hass.Hass):
                 # Update fusion entities
                 self._update_sensor_fusion_entities(entity, fusion_result)
                 
-                # Get current sensor data for emergency check
-                sensor_data = self._get_current_sensor_data()
-                if sensor_data:
-                    # Use direct average instead of fusion result for now
-                    direct_vwc = sensor_data['average_vwc']
-                    self.log(f"🔍 DEBUG Emergency check: fusion={fusion_result['fused_value']:.1f}%, direct={direct_vwc:.1f}%")
-                    await self._check_emergency_conditions(direct_vwc)
-                else:
-                    # Fallback to fusion result
-                    await self._check_emergency_conditions(fusion_result['fused_value'])
+                # Use fusion result for emergency check
+                self.log(f"🔍 DEBUG Emergency check: fusion={fusion_result['fused_value']:.1f}%")
+                # Schedule async emergency check
+                self.run_in(self._run_emergency_check, 0, vwc_value=fusion_result['fused_value'])
                 
                 # Log significant changes
                 if fusion_result['is_outlier']:
@@ -839,7 +833,15 @@ class MasterCropSteeringApp(hass.Hass):
         except Exception as e:
             self.log(f"❌ Error processing VWC update: {e}", level='ERROR')
 
-    async def _on_ec_sensor_update(self, entity, attribute, old, new, kwargs):
+    async def _run_emergency_check(self, kwargs):
+        """Helper method to run emergency check asynchronously."""
+        try:
+            vwc_value = kwargs.get('vwc_value', 50.0)
+            await self._check_emergency_conditions(vwc_value)
+        except Exception as e:
+            self.log(f"❌ Error in emergency check: {e}", level='ERROR')
+
+    def _on_ec_sensor_update(self, entity, attribute, old, new, kwargs):
         """Handle EC sensor updates with advanced processing."""
         try:
             if new in ['unavailable', 'unknown', None]:
