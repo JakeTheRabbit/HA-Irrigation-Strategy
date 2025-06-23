@@ -762,6 +762,8 @@ class MasterCropSteeringApp(hass.Hass):
                 lights_on = self._are_lights_on(current_time, zone_schedule['lights_on'], zone_schedule['lights_off'])
                 zone_phase = self.zone_phases.get(zone_num, 'P2')
                 
+                self.log(f"🔧 Zone {zone_num}: Time {current_time}, Lights ON: {zone_schedule['lights_on']}-{zone_schedule['lights_off']}, Currently: {'ON' if lights_on else 'OFF'}, Phase: {zone_phase}")
+                
                 # If lights are on but zone isn't in P0, start P0 (morning dryback)
                 if lights_on and zone_phase not in ['P0', 'P1', 'P2', 'P3']:
                     self.log(f"🔧 Zone {zone_num}: Lights on but phase is {zone_phase}, starting P0 morning dryback")
@@ -780,6 +782,11 @@ class MasterCropSteeringApp(hass.Hass):
                         if elapsed > 120:  # More than 2 hours in P0
                             self.log(f"🔧 Zone {zone_num}: Lights on and long P0 duration, moving to P1")
                             self.zone_phases[zone_num] = 'P1'
+                
+                # If lights are OFF, zone should be in P3 (waiting period before lights on)
+                elif not lights_on and zone_phase not in ['P3']:
+                    self.log(f"🔧 Zone {zone_num}: Lights off but phase is {zone_phase}, correcting to P3 (waiting)")
+                    self.zone_phases[zone_num] = 'P3'
             
             self.log("✅ State validation complete")
             
