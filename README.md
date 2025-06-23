@@ -95,10 +95,10 @@
 
 The system automatically moves through phases based on plant conditions, not arbitrary timers:
 
-**P3 → P0: Lights Out**
-- **When:** Lights turn off (default 12am midnight)
-- **Logic:** Plants go to sleep, start controlled dryback
-- **Simple:** When lights off = start drying phase
+**P3 → P0: Lights On**
+- **When:** Lights turn on (default 12pm noon)
+- **Logic:** Plants wake up, start controlled dryback
+- **Simple:** When lights on = start drying phase
 
 **P0 → P1: Dryback Complete**
 - **When:** Plants reach target dryness OR safety timeout
@@ -110,19 +110,19 @@ The system automatically moves through phases based on plant conditions, not arb
 - **Logic:** Slowly add water back until plants are satisfied
 - **Entities:** `number.crop_steering_p1_target_vwc` (65% target moisture)
 
-**P2 → P3: Bedtime Prep**
-- **When:** 1 hour before lights off (11pm)
-- **Logic:** Final drink before bedtime
-- **Simple:** 11pm = give plants bedtime drink
+**P2 → P3: Pre-Lights-Off Final Watering**
+- **When:** ML-predicted timing before lights off
+- **Logic:** Final irrigation before lights-off dark period
+- **Simple:** Give plants last drink before sleep
 
-**In Plain English:** Let them get thirsty → water them slowly until happy → keep them happy all day → final drink before bed → repeat. Just like caring for plants manually, but perfectly timed by AI.
+**In Plain English:** Lights on = start getting thirsty → water them slowly until happy → keep them happy all day → final drink before sleep → repeat. Just like caring for plants manually, but perfectly timed by AI.
 
 ### **📊 Detailed Entity Configuration & Triggers**
 
-#### **P3 → P0 Transition (Lights Out → Start Drying)**
-**Trigger:** Time-based - when lights turn off
+#### **P3 → P0 Transition (Lights On → Start Drying)**
+**Trigger:** Time-based - when lights turn on
 - **Light Schedule:** Hardcoded 12pm-12am (12-hour cycle)
-- **No entities needed** - system automatically detects when lights should be off
+- **No entities needed** - system automatically detects when lights should be on
 - **Action:** Records current VWC as "peak" for dryback calculations
 
 #### **P0 → P1 Transition (Dryback Complete → Start Recovery)**

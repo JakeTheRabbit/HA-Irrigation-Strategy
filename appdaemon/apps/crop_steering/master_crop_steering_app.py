@@ -762,9 +762,9 @@ class MasterCropSteeringApp(hass.Hass):
                 lights_on = self._are_lights_on(current_time, zone_schedule['lights_on'], zone_schedule['lights_off'])
                 zone_phase = self.zone_phases.get(zone_num, 'P2')
                 
-                # If lights are off but zone isn't in P0, fix it
-                if not lights_on and zone_phase != 'P0':
-                    self.log(f"🔧 Zone {zone_num}: Lights off but phase is {zone_phase}, correcting to P0")
+                # If lights are on but zone isn't in P0, start P0 (morning dryback)
+                if lights_on and zone_phase not in ['P0', 'P1', 'P2', 'P3']:
+                    self.log(f"🔧 Zone {zone_num}: Lights on but phase is {zone_phase}, starting P0 morning dryback")
                     self.zone_phases[zone_num] = 'P0'
                     # Record current VWC as peak for dryback calculations
                     zone_vwc = self._get_zone_vwc(zone_num)
@@ -1840,11 +1840,11 @@ class MasterCropSteeringApp(hass.Hass):
                 reason = ""
                 
                 # Phase transition logic PER ZONE
-                if not lights_on:
-                    # Lights off - zone should be in P0 (night dryback)
-                    if current_phase != 'P0':
-                        target_phase = 'P0'
-                        reason = f"Zone {zone_num}: Lights off - night dryback phase"
+                if lights_on and current_phase != 'P0':
+                    # Lights on - zone should start P0 (morning dryback)
+                    # P0 begins when lights turn on (plants wake up and start using water)
+                    target_phase = 'P0'
+                    reason = f"Zone {zone_num}: Lights on - starting morning dryback phase"
                     
                 elif lights_on and current_phase == 'P0':
                     # Check P0 → P1 transition conditions for this zone
@@ -1867,10 +1867,9 @@ class MasterCropSteeringApp(hass.Hass):
                         reason = f"Zone {zone_num}: Starting final dryback period to achieve target by morning"
                         
                 elif current_phase == 'P3':
-                    # P3 → P0 when lights turn off
-                    if not lights_on:
-                        target_phase = 'P0'
-                        reason = f"Zone {zone_num}: Lights off - starting night dryback"
+                    # P3 continues until lights turn off, then system waits for lights on to start P0
+                    # No transition needed here - P3 → P0 happens when lights turn on (handled above)
+                    pass
                 
                 # Execute transition if needed for this zone
                 if target_phase and target_phase != current_phase:
