@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_NUM_ZONES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,6 +32,14 @@ NUMBER_DESCRIPTIONS = [
         native_max_value=20.0,
         native_step=0.1,
         native_unit_of_measurement="L/hr",
+    ),
+    NumberEntityDescription(
+        key="drippers_per_zone",
+        name="Drippers Per Zone",
+        icon="mdi:sprinkler",
+        native_min_value=1,
+        native_max_value=20,
+        native_step=1,
     ),
     NumberEntityDescription(
         key="field_capacity",
@@ -323,8 +331,78 @@ async def async_setup_entry(
     """Set up Crop Steering number entities."""
     numbers = []
     
+    # Add main number entities
     for description in NUMBER_DESCRIPTIONS:
         numbers.append(CropSteeringNumber(entry, description))
+    
+    # Get number of zones from config
+    config_data = hass.data[DOMAIN][entry.entry_id]
+    num_zones = config_data.get(CONF_NUM_ZONES, 1)
+    
+    # Add zone-specific number entities
+    for zone_num in range(1, num_zones + 1):
+        # Zone-specific light schedule
+        numbers.append(CropSteeringNumber(
+            entry,
+            NumberEntityDescription(
+                key=f"zone_{zone_num}_lights_on_hour",
+                name=f"Zone {zone_num} Lights On Hour",
+                icon="mdi:weather-sunny",
+                native_min_value=0,
+                native_max_value=23,
+                native_step=1,
+                native_unit_of_measurement="hour",
+            ),
+            zone_num=zone_num,
+            default_value=12  # Default noon
+        ))
+        
+        numbers.append(CropSteeringNumber(
+            entry,
+            NumberEntityDescription(
+                key=f"zone_{zone_num}_lights_off_hour",
+                name=f"Zone {zone_num} Lights Off Hour",
+                icon="mdi:weather-night",
+                native_min_value=0,
+                native_max_value=23,
+                native_step=1,
+                native_unit_of_measurement="hour",
+            ),
+            zone_num=zone_num,
+            default_value=0  # Default midnight
+        ))
+        
+        # Zone water limits
+        numbers.append(CropSteeringNumber(
+            entry,
+            NumberEntityDescription(
+                key=f"zone_{zone_num}_max_daily_volume",
+                name=f"Zone {zone_num} Max Daily Volume",
+                icon="mdi:water-check",
+                native_min_value=0,
+                native_max_value=100,
+                native_step=0.5,
+                native_unit_of_measurement=UnitOfVolume.LITERS,
+            ),
+            zone_num=zone_num,
+            default_value=20.0
+        ))
+        
+        # Zone-specific shot sizes
+        numbers.append(CropSteeringNumber(
+            entry,
+            NumberEntityDescription(
+                key=f"zone_{zone_num}_shot_size_multiplier",
+                name=f"Zone {zone_num} Shot Size Multiplier",
+                icon="mdi:multiplication",
+                native_min_value=0.5,
+                native_max_value=2.0,
+                native_step=0.1,
+                native_unit_of_measurement=PERCENTAGE,
+            ),
+            zone_num=zone_num,
+            default_value=1.0
+        ))
     
     async_add_entities(numbers)
 
@@ -335,10 +413,13 @@ class CropSteeringNumber(NumberEntity):
         self,
         entry: ConfigEntry,
         description: NumberEntityDescription,
+        zone_num: int = None,
+        default_value: float = None,
     ) -> None:
         """Initialize the number entity."""
         self.entity_description = description
         self._entry = entry
+        self._zone_num = zone_num
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{description.key}"
         self._attr_name = f"Crop Steering {description.name}"
         
@@ -346,6 +427,7 @@ class CropSteeringNumber(NumberEntity):
         default_values = {
             "substrate_volume": 10.0,
             "dripper_flow_rate": 2.0,
+            "drippers_per_zone": 4,
             "field_capacity": 70.0,
             "max_ec": 9.0,
             "veg_dryback_target": 50.0,
@@ -384,18 +466,34 @@ class CropSteeringNumber(NumberEntity):
             "ec_target_gen_p3": 4.5,
         }
         
-        self._attr_native_value = default_values.get(description.key, description.native_min_value)
+        # Use provided default or lookup from dict
+        if default_value is not None:
+            self._attr_native_value = default_value
+        else:
+            self._attr_native_value = default_values.get(description.key, description.native_min_value)
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.entry_id)},
-            name="Crop Steering System",
-            manufacturer="Home Assistant Community",
-            model="Professional Irrigation Controller",
-            sw_version="2.0.0",
-        )
+        if self._zone_num is not None:
+            # Zone-specific device
+            return DeviceInfo(
+                identifiers={(DOMAIN, f"{self._entry.entry_id}_zone_{self._zone_num}")},
+                name=f"Crop Steering Zone {self._zone_num}",
+                manufacturer="Home Assistant Community",
+                model="Zone Controller",
+                sw_version="2.0.0",
+                via_device=(DOMAIN, self._entry.entry_id),
+            )
+        else:
+            # Main device
+            return DeviceInfo(
+                identifiers={(DOMAIN, self._entry.entry_id)},
+                name="Crop Steering System",
+                manufacturer="Home Assistant Community",
+                model="Professional Irrigation Controller",
+                sw_version="2.0.0",
+            )
 
     async def async_set_native_value(self, value: float) -> None:
         """Update the value."""

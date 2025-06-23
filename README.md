@@ -91,6 +91,181 @@
 - **P2 (Maintenance)**: Intelligent EC-based irrigation decisions
 - **P3 (Pre-Lights-Off)**: Predictive final dryback management
 
+### **🔄 Automatic Phase Transitions (How It Actually Works)**
+
+The system automatically moves through phases based on plant conditions, not arbitrary timers:
+
+**P3 → P0: Lights Out**
+- **When:** Lights turn off (default 12am midnight)
+- **Logic:** Plants go to sleep, start controlled dryback
+- **Simple:** When lights off = start drying phase
+
+**P0 → P1: Dryback Complete**
+- **When:** Plants reach target dryness OR safety timeout
+- **Logic:** Let plants get thirsty, then start rehydrating
+- **Entities:** `number.crop_steering_veg_dryback_target` (50% drydown), `number.crop_steering_p0_max_wait_time` (45min safety)
+
+**P1 → P2: Recovery Complete**
+- **When:** Plants recover to healthy moisture level
+- **Logic:** Slowly add water back until plants are satisfied
+- **Entities:** `number.crop_steering_p1_target_vwc` (65% target moisture)
+
+**P2 → P3: Bedtime Prep**
+- **When:** 1 hour before lights off (11pm)
+- **Logic:** Final drink before bedtime
+- **Simple:** 11pm = give plants bedtime drink
+
+**In Plain English:** Let them get thirsty → water them slowly until happy → keep them happy all day → final drink before bed → repeat. Just like caring for plants manually, but perfectly timed by AI.
+
+### **📊 Detailed Entity Configuration & Triggers**
+
+#### **P3 → P0 Transition (Lights Out → Start Drying)**
+**Trigger:** Time-based - when lights turn off
+- **Light Schedule:** Hardcoded 12pm-12am (12-hour cycle)
+- **No entities needed** - system automatically detects when lights should be off
+- **Action:** Records current VWC as "peak" for dryback calculations
+
+#### **P0 → P1 Transition (Dryback Complete → Start Recovery)**
+**Trigger:** Condition-based - dryback target achieved OR safety timeout
+
+**Primary Trigger (Dryback %):**
+- **Entity:** `number.crop_steering_veg_dryback_target` (default: 50%)
+- **Logic:** Calculate `((peak_vwc - current_vwc) / peak_vwc) * 100`
+- **Example:** Peak 70% → Current 35% = 50% dryback achieved
+
+**Safety Trigger (Timeout):**
+- **Entity:** `number.crop_steering_p0_max_wait_time` (default: 45 minutes)
+- **Logic:** If dryback takes too long, exit P0 anyway
+- **Purpose:** Prevents plants from getting too dry
+
+**Data Tracking:**
+- `self.p0_start_time` - When P0 phase began
+- `self.p0_peak_vwc` - VWC level when P0 started
+
+#### **P1 → P2 Transition (Recovery Complete → Maintenance)**
+**Trigger:** Condition-based - VWC recovery target achieved
+
+**VWC Recovery:**
+- **Entity:** `number.crop_steering_p1_target_vwc` (default: 65%)
+- **Logic:** `current_vwc >= target_vwc`
+- **Data Source:** `sensor.crop_steering_configured_avg_vwc` (average across all zones)
+- **Example:** When average VWC reaches 65%, move to maintenance
+
+#### **P2 → P3 Transition (Maintenance → Bedtime Prep)**
+**Trigger:** ML-predicted optimal timing based on dryback analysis
+
+**ML Prediction Logic:**
+- **AI Analysis:** Uses `advanced_dryback_detection.py` to predict when target dryback will be achieved
+- **Calculation:** `predict_target_dryback_time()` analyzes current dryback rate from recent VWC data
+- **Timing:** Starts P3 at `(lights_off - predicted_dryback_time - 30min_buffer)`
+- **Entities:** Uses `number.crop_steering_veg_dryback_target` as overnight dryback goal
+
+**Intelligent Safeguards:**
+- **Minimum Window:** P3 can't start more than 2 hours before lights off
+- **Maximum Window:** P3 must start at least 30 minutes before lights off
+- **Fallback:** If ML unavailable, uses historical patterns based on substrate volume
+
+**How It Adapts:**
+- **Day 1:** Uses default timing (historical estimate)
+- **Day 2+:** ML learns actual dryback speed from previous nights
+- **Continuous:** Each day, timing becomes more precise based on plant response
+
+#### **🎛️ Key Monitoring Entities**
+
+**Current Phase Status:**
+- `sensor.crop_steering_current_phase` - Shows active phase (P0/P1/P2/P3)
+- `sensor.crop_steering_app_current_phase` - AppDaemon phase sensor
+- `select.crop_steering_irrigation_phase` - Manual phase override
+
+**VWC Monitoring:**
+- `sensor.crop_steering_configured_avg_vwc` - Average moisture across all zones
+- `sensor.crop_steering_vwc_zone_X` - Individual zone moisture levels
+- `sensor.crop_steering_dryback_percentage` - Current dryback progress
+
+**System Status:**
+- `sensor.crop_steering_system_state` - Overall system status
+- `sensor.crop_steering_next_irrigation_time` - When next irrigation is planned
+- `sensor.crop_steering_current_decision` - Last AI irrigation decision
+
+#### **🔧 Configuration Tips**
+
+**For Faster Cycles:**
+- Lower `number.crop_steering_veg_dryback_target` (e.g., 30% instead of 50%)
+- Lower `number.crop_steering_p1_target_vwc` (e.g., 60% instead of 65%)
+
+**For Safety:**
+- Lower `number.crop_steering_p0_max_wait_time` (e.g., 30min instead of 45min)
+- Monitor `sensor.crop_steering_sensor_health` for sensor reliability
+
+**For Different Strains:**
+- Use `number.crop_steering_gen_dryback_target` for flowering plants
+- Adjust EC targets: `number.crop_steering_ec_target_veg_pX` / `number.crop_steering_ec_target_gen_pX`
+
+### **🎯 Per-Zone Phase & Irrigation System**
+
+**Each zone operates independently through its own phase cycle:**
+
+#### **Independent Zone Phases**
+- **Each zone tracks its own phase** (P0, P1, P2, P3)
+- **Zones transition independently** based on their individual conditions
+- **Mixed phases supported** - Zone 1 can be in P2 while Zone 2 is still in P1
+- **Shared setpoints** - All zones use same thresholds but progress at their own pace
+
+#### **Example Scenario:**
+```
+Zone 1: P2 (65% VWC) - Maintenance, satisfied
+Zone 2: P1 (58% VWC) - Still ramping up, needs irrigation  
+Zone 3: P3 (42% VWC) - Emergency phase, urgent irrigation
+Zone 4: P0 (Dryback)  - No irrigation, letting it dry
+```
+
+#### **Per-Zone Phase Transitions:**
+- **P0 → P1**: Each zone exits dryback when IT reaches target or timeout
+- **P1 → P2**: Each zone moves to maintenance when IT hits recovery VWC
+- **P2 → P3**: Zones enter pre-lights-off based on individual ML predictions
+- **P3 → P0**: All zones sync to P0 when lights turn off
+
+#### **Zone Phase Sensors:**
+- `sensor.crop_steering_zone_1_phase` - Zone 1 current phase
+- `sensor.crop_steering_zone_2_phase` - Zone 2 current phase
+- `sensor.crop_steering_app_current_phase` - Summary: "Z1:P2, Z2:P1, Z3:P3, Z4:P0"
+
+### **🎯 Per-Zone Irrigation Logic**
+
+**All phase irrigation decisions are made PER ZONE, not globally:**
+
+#### **P1 Ramp-Up (Per Zone)**
+**Logic:** `zone_vwc < (p1_target_vwc × 0.9)`
+- **Entity:** `number.crop_steering_p1_target_vwc` (default: 65%)
+- **Trigger:** 90% of target (58.5% for default)
+- **Shot Size:** `number.crop_steering_p1_initial_shot_size` (default: 2%)
+- **Example Decision:** `"P1 ramp-up zones [1,3]: Z1:55.2%, Z3:56.8% < 58.5%"`
+
+#### **P2 Maintenance (Per Zone)**
+**Logic:** `zone_vwc < p2_vwc_threshold`
+- **Entity:** `number.crop_steering_p2_vwc_threshold` (default: 60%)
+- **Shot Size:** `number.crop_steering_p2_shot_size` (default: 5%)
+- **Example Decision:** `"P2 maintenance zones [2]: Z2:58.1% < 60.0%"`
+
+#### **P3 Emergency (Per Zone)**
+**Logic:** `zone_vwc < p3_emergency_vwc_threshold`
+- **Entity:** `number.crop_steering_p3_emergency_vwc_threshold` (default: 45%)
+- **Shot Size:** `number.crop_steering_p3_emergency_shot_size` (default: 2%)
+- **Example Decision:** `"P3 emergency zones [1,2,4]: Z1:42.3%, Z2:41.8%, Z4:44.1% < 45.0%"`
+
+#### **Multi-Zone Execution**
+**How it works:**
+1. **Zone Analysis:** System checks each zone's VWC individually
+2. **Zone Selection:** Only zones below threshold are selected for irrigation
+3. **Simultaneous Irrigation:** All selected zones irrigated concurrently
+4. **Individual Tracking:** Each zone's irrigation is logged separately for ML training
+
+**Benefits:**
+- **No waste** - Only thirsty zones get water
+- **Individual care** - Each zone gets exactly what it needs
+- **Faster cycles** - No waiting for slowest zone
+- **Better data** - ML learns each zone's specific behavior
+
 ### **Advanced Safety Systems**
 - **Emergency AI**: Critical VWC detection with immediate response
 - **Thread-Safe Operation**: Concurrent processing with proper synchronization
@@ -367,6 +542,39 @@ This project is licensed under the MIT License.
 - **Crop Steering Research**: Scientific foundation and principles
 - **Machine Learning Community**: Algorithms and techniques
 - **Beta Testers**: Validation and real-world testing
+
+## 🆕 Advanced Zone Features (NEW!)
+
+### **Zone Grouping for Simultaneous Irrigation**
+- Group zones (A-D) for synchronized irrigation
+- When 50% of group needs water, entire group irrigates
+- Perfect for clones or identical genetics
+- `select.crop_steering_zone_X_group`
+
+### **Zone-Specific Crop Profiles**
+- Each zone can use different strain/crop settings
+- Mix indica, sativa, tomatoes in same system
+- Independent VWC/EC targets per zone
+- `select.crop_steering_zone_X_crop_profile`
+
+### **Individual Zone Scheduling**
+- Independent light schedules per zone
+- 12/12 flowering, 18/6 veg, 20/4 auto, 24/0 continuous
+- Phase transitions respect each zone's timing
+- `select.crop_steering_zone_X_schedule`
+
+### **Zone Priority Configuration**
+- Critical → High → Normal → Low priority
+- Higher priority zones irrigate first
+- Emergency override for critical plants
+- `select.crop_steering_zone_X_priority`
+
+### **Water Usage Tracking Per Zone**
+- Daily/weekly water consumption monitoring
+- Configurable daily limits per zone
+- Irrigation event counting
+- Automatic resets and warnings
+- `sensor.crop_steering_zone_X_daily_water_usage`
 
 ## 🌟 Transform Your Growing Operation
 

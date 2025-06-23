@@ -9,7 +9,7 @@ import logging
 import asyncio
 import threading
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from typing import Dict, List, Optional, Any
 import numpy as np
 
@@ -55,9 +55,36 @@ class MasterCropSteeringApp(hass.Hass):
         
         # System state
         self.system_enabled = True
-        self.current_phase = 'P2'  # Default to maintenance phase
         self.irrigation_in_progress = False
         self.last_irrigation_time = None
+        
+        # Get number of zones from integration or config
+        self.num_zones = self._get_number_of_zones()
+        
+        # Per-zone phase tracking
+        self.zone_phases = {}  # {zone_num: phase}
+        self.zone_phase_data = {}  # {zone_num: {'p0_start_time': ..., 'p0_peak_vwc': ...}}
+        
+        # Initialize per-zone tracking
+        self.zone_water_usage = {}  # Track water usage per zone
+        self.zone_profiles = {}     # Zone-specific crop profiles
+        self.zone_schedules = {}    # Zone-specific light schedules
+        
+        for zone_num in range(1, self.num_zones + 1):
+            self.zone_phases[zone_num] = 'P2'  # Default to maintenance phase
+            self.zone_phase_data[zone_num] = {
+                'p0_start_time': None,
+                'p0_peak_vwc': None,
+                'last_irrigation_time': None
+            }
+            # Initialize water tracking
+            self.zone_water_usage[zone_num] = {
+                'daily_total': 0.0,
+                'weekly_total': 0.0,
+                'daily_count': 0,
+                'last_reset_daily': datetime.now().date(),
+                'last_reset_weekly': datetime.now().date()
+            }
         
         # Initialize all advanced modules
         self._initialize_advanced_modules()
@@ -68,6 +95,9 @@ class MasterCropSteeringApp(hass.Hass):
         
         # Initialize crop profile
         self._initialize_default_crop_profile()
+        
+        # Create initial sensors for integration compatibility
+        self.run_in(self._create_initial_sensors, 2)
         
         self.log("🚀 Master Crop Steering Application with Advanced AI Features initialized!")
         self.log(f"📊 Modules: Dryback Detection ✓, Sensor Fusion ✓, ML Prediction ✓, Crop Profiles ✓, Dashboard ✓")
@@ -334,6 +364,13 @@ class MasterCropSteeringApp(hass.Hass):
             'now+20',
             300  # Every 5 minutes
         )
+        
+        # Automatic phase transition checking
+        self.run_every(
+            self._check_phase_transitions,
+            'now+30',
+            300  # Check every 5 minutes for phase transitions
+        )
 
     def _initialize_default_crop_profile(self):
         """Initialize with default crop profile."""
@@ -351,6 +388,227 @@ class MasterCropSteeringApp(hass.Hass):
                 
         except Exception as e:
             self.log(f"❌ Error initializing crop profile: {e}", level='ERROR')
+
+    def _get_phase_icon(self, phase: str) -> str:
+        """Get icon for irrigation phase."""
+        phase_icons = {
+            'P0': 'mdi:weather-night',
+            'P1': 'mdi:arrow-up-thick',
+            'P2': 'mdi:water-check',
+            'P3': 'mdi:weather-sunset-down'
+        }
+        return phase_icons.get(phase, 'mdi:water')
+    
+    def _get_zone_group(self, zone_num: int) -> str:
+        """Get the group assignment for a zone."""
+        try:
+            group_entity = f"select.crop_steering_zone_{zone_num}_group"
+            state = self.get_state(group_entity)
+            return state if state and state != 'unknown' else 'Ungrouped'
+        except Exception:
+            return 'Ungrouped'
+    
+    def _get_zone_priority(self, zone_num: int) -> str:
+        """Get the priority level for a zone."""
+        try:
+            priority_entity = f"select.crop_steering_zone_{zone_num}_priority"
+            state = self.get_state(priority_entity)
+            return state if state and state != 'unknown' else 'Normal'
+        except Exception:
+            return 'Normal'
+    
+    def _get_zone_profile(self, zone_num: int) -> str:
+        """Get the crop profile for a zone."""
+        try:
+            profile_entity = f"select.crop_steering_zone_{zone_num}_crop_profile"
+            state = self.get_state(profile_entity)
+            if state and state != 'unknown' and state != 'Follow Main':
+                return state
+            # Fall back to main profile
+            return self.get_state('select.crop_steering_crop_type', default='Cannabis_Athena')
+        except Exception:
+            return 'Cannabis_Athena'
+    
+    def _get_zone_schedule(self, zone_num: int) -> Dict[str, time]:
+        """Get the light schedule for a zone."""
+        try:
+            schedule_entity = f"select.crop_steering_zone_{zone_num}_schedule"
+            schedule = self.get_state(schedule_entity, default='Main Schedule')
+            
+            if schedule == 'Main Schedule' or schedule == 'unknown':
+                # Use default 12pm-12am
+                return {'lights_on': time(12, 0), 'lights_off': time(0, 0)}
+            elif schedule == '12/12 Flowering':
+                return {'lights_on': time(6, 0), 'lights_off': time(18, 0)}
+            elif schedule == '18/6 Vegetative':
+                return {'lights_on': time(6, 0), 'lights_off': time(0, 0)}
+            elif schedule == '20/4 Auto':
+                return {'lights_on': time(2, 0), 'lights_off': time(22, 0)}
+            elif schedule == '24/0 Continuous':
+                return {'lights_on': time(0, 0), 'lights_off': time(23, 59)}
+            else:  # Custom
+                # Get custom hours from number entities
+                on_hour = int(self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_lights_on_hour", 12))
+                off_hour = int(self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_lights_off_hour", 0))
+                return {'lights_on': time(on_hour, 0), 'lights_off': time(off_hour, 0)}
+        except Exception as e:
+            self.log(f"❌ Error getting zone {zone_num} schedule: {e}", level='ERROR')
+            return {'lights_on': time(12, 0), 'lights_off': time(0, 0)}
+
+    async def _create_initial_sensors(self, kwargs):
+        """Create initial sensors for HA integration compatibility."""
+        try:
+            # Create zone phase summary
+            phase_summary = ", ".join([f"Z{z}:{p}" for z, p in self.zone_phases.items()])
+            await self.set_state('sensor.crop_steering_app_current_phase',
+                               state=phase_summary,
+                               attributes={
+                                   'friendly_name': 'Zone Phases',
+                                   'icon': 'mdi:water-circle',
+                                   'zone_phases': self.zone_phases.copy(),
+                                   'updated': datetime.now().isoformat()
+                               })
+            
+            # Create next irrigation time sensor
+            next_irrigation = self._calculate_next_irrigation_time()
+            if next_irrigation:
+                await self.set_state('sensor.crop_steering_app_next_irrigation',
+                                   state=next_irrigation.isoformat(),
+                                   attributes={
+                                       'friendly_name': 'Next Irrigation Time',
+                                       'icon': 'mdi:clock-outline',
+                                       'device_class': 'timestamp',
+                                       'updated': datetime.now().isoformat()
+                                   })
+            else:
+                await self.set_state('sensor.crop_steering_app_next_irrigation',
+                                   state='unknown',
+                                   attributes={
+                                       'friendly_name': 'Next Irrigation Time',
+                                       'icon': 'mdi:clock-outline',
+                                       'device_class': 'timestamp',
+                                       'reason': 'Calculating...',
+                                       'updated': datetime.now().isoformat()
+                                   })
+            
+            # Create individual zone phase sensors
+            for zone_num in range(1, self.num_zones + 1):
+                phase = self.zone_phases.get(zone_num, 'P2')
+                await self.set_state(f'sensor.crop_steering_zone_{zone_num}_phase',
+                                   state=phase,
+                                   attributes={
+                                       'friendly_name': f'Zone {zone_num} Phase',
+                                       'icon': self._get_phase_icon(phase),
+                                       'updated': datetime.now().isoformat()
+                                   })
+            
+            # Create water usage sensors
+            for zone_num in range(1, self.num_zones + 1):
+                await self._update_zone_water_sensors(zone_num)
+            
+            self.log("✅ Initial sensors created for HA integration")
+            
+        except Exception as e:
+            self.log(f"❌ Error creating initial sensors: {e}", level='ERROR')
+
+    async def _update_zone_water_usage(self, zone_num: int, duration_seconds: float):
+        """Update water usage tracking for a zone."""
+        try:
+            # Calculate water volume used
+            dripper_flow = self._get_number_entity_value("number.crop_steering_dripper_flow_rate", 2.0)  # L/hour
+            drippers_per_zone = self._get_number_entity_value("number.crop_steering_drippers_per_zone", 4)
+            shot_multiplier = self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_shot_size_multiplier", 1.0)
+            
+            # Calculate volume: (flow rate * drippers * hours * multiplier)
+            hours = duration_seconds / 3600
+            volume_liters = dripper_flow * drippers_per_zone * hours * shot_multiplier
+            
+            # Update tracking data
+            today = datetime.now().date()
+            zone_data = self.zone_water_usage.get(zone_num, {})
+            
+            # Reset daily counter if new day
+            if zone_data.get('last_reset_daily') != today:
+                zone_data['daily_total'] = 0
+                zone_data['daily_count'] = 0
+                zone_data['last_reset_daily'] = today
+            
+            # Reset weekly counter if new week (Monday)
+            if today.weekday() == 0 and zone_data.get('last_reset_weekly') != today:
+                zone_data['weekly_total'] = 0
+                zone_data['last_reset_weekly'] = today
+            
+            # Update totals
+            zone_data['daily_total'] += volume_liters
+            zone_data['weekly_total'] += volume_liters
+            zone_data['daily_count'] += 1
+            
+            self.zone_water_usage[zone_num] = zone_data
+            
+            # Update sensors
+            await self._update_zone_water_sensors(zone_num)
+            
+            # Check daily limit
+            max_daily = self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_max_daily_volume", 20.0)
+            if zone_data['daily_total'] >= max_daily:
+                self.log(f"⚠️ Zone {zone_num} daily water limit reached: {zone_data['daily_total']:.1f}L >= {max_daily}L", 
+                        level='WARNING')
+            
+        except Exception as e:
+            self.log(f"❌ Error updating zone {zone_num} water usage: {e}", level='ERROR')
+    
+    async def _update_zone_water_sensors(self, zone_num: int):
+        """Update water usage sensors for a zone."""
+        try:
+            zone_data = self.zone_water_usage.get(zone_num, {})
+            
+            # Daily water usage
+            await self.set_state(f'sensor.crop_steering_zone_{zone_num}_daily_water_app',
+                               state=round(zone_data.get('daily_total', 0), 2),
+                               attributes={
+                                   'friendly_name': f'Zone {zone_num} Daily Water',
+                                   'unit_of_measurement': 'L',
+                                   'icon': 'mdi:water',
+                                   'device_class': 'volume',
+                                   'state_class': 'total_increasing',
+                                   'last_reset': str(zone_data.get('last_reset_daily', datetime.now().date()))
+                               })
+            
+            # Weekly water usage
+            await self.set_state(f'sensor.crop_steering_zone_{zone_num}_weekly_water_app',
+                               state=round(zone_data.get('weekly_total', 0), 2),
+                               attributes={
+                                   'friendly_name': f'Zone {zone_num} Weekly Water',
+                                   'unit_of_measurement': 'L',
+                                   'icon': 'mdi:water-outline',
+                                   'device_class': 'volume',
+                                   'state_class': 'total_increasing',
+                                   'last_reset': str(zone_data.get('last_reset_weekly', datetime.now().date()))
+                               })
+            
+            # Irrigation count today
+            await self.set_state(f'sensor.crop_steering_zone_{zone_num}_irrigation_count_app',
+                               state=zone_data.get('daily_count', 0),
+                               attributes={
+                                   'friendly_name': f'Zone {zone_num} Irrigations Today',
+                                   'icon': 'mdi:counter',
+                                   'state_class': 'total_increasing',
+                                   'last_reset': str(zone_data.get('last_reset_daily', datetime.now().date()))
+                               })
+            
+            # Last irrigation time
+            last_irrigation = self.zone_phase_data.get(zone_num, {}).get('last_irrigation_time')
+            if last_irrigation:
+                await self.set_state(f'sensor.crop_steering_zone_{zone_num}_last_irrigation_app',
+                                   state=last_irrigation.isoformat(),
+                                   attributes={
+                                       'friendly_name': f'Zone {zone_num} Last Irrigation',
+                                       'device_class': 'timestamp',
+                                       'icon': 'mdi:history'
+                                   })
+            
+        except Exception as e:
+            self.log(f"❌ Error updating zone {zone_num} water sensors: {e}", level='ERROR')
 
     async def _on_vwc_sensor_update(self, entity, attribute, old, new, kwargs):
         """Handle VWC sensor updates with advanced processing."""
@@ -472,13 +730,14 @@ class MasterCropSteeringApp(hass.Hass):
             self.log(f"❌ Error handling system toggle: {e}", level='ERROR')
 
     async def _on_phase_change(self, entity, attribute, old, new, kwargs):
-        """Handle irrigation phase changes."""
+        """Handle manual irrigation phase changes (legacy compatibility)."""
         try:
-            self.current_phase = new
-            self.log(f"📊 Phase transition: {old} → {new}")
+            # Manual phase change applies to all zones
+            self.log(f"📊 Manual phase transition requested: {old} → {new}")
             
-            # Update crop profile parameters if needed
-            await self._update_phase_parameters()
+            # Apply to all zones
+            for zone_num in range(1, self.num_zones + 1):
+                await self._transition_zone_to_phase(zone_num, new, "Manual phase change")
             
         except Exception as e:
             self.log(f"❌ Error handling phase change: {e}", level='ERROR')
@@ -625,7 +884,7 @@ class MasterCropSteeringApp(hass.Hass):
                 'temperature': temperature,
                 'humidity': humidity,
                 'vpd': vpd,
-                'current_phase': self.current_phase,
+                'zone_phases': self.zone_phases.copy(),
                 'lights_on': self.get_state('sun.sun', attribute='elevation', default=0) > 0,
                 'timestamp': datetime.now()
             }
@@ -759,44 +1018,166 @@ class MasterCropSteeringApp(hass.Hass):
             return {'action': 'wait', 'reason': f'Decision error: {e}', 'confidence': 0.0}
 
     def _evaluate_phase_requirements(self, current_state: Dict, profile_params: Dict) -> Dict:
-        """Evaluate irrigation needs based on current phase."""
-        phase = current_state['current_phase']
-        vwc = current_state['average_vwc']
+        """Evaluate irrigation needs based on per-zone phases with grouping and priority."""
+        # Collect zones needing irrigation across all phases
+        zones_by_priority = {'Critical': [], 'High': [], 'Normal': [], 'Low': []}
+        zone_decisions = {}
+        groups_needing_water = {}  # Track which groups need water
         
-        if phase == 'P0':  # Morning dryback - no irrigation
-            return {'action': 'wait', 'reason': 'P0 phase - allowing dryback'}
+        # Check each zone's phase and needs
+        for zone_num in range(1, self.num_zones + 1):
+            zone_phase = self.zone_phases.get(zone_num, 'P2')
+            zone_group = self._get_zone_group(zone_num)
+            zone_priority = self._get_zone_priority(zone_num)
+            zone_profile = self._get_zone_profile(zone_num)
+            
+            # Get zone-specific profile parameters
+            if zone_profile != self.get_state('select.crop_steering_crop_type'):
+                # Load zone-specific profile
+                zone_profile_params = self.crop_profiles.get_profile_parameters(zone_profile)
+            else:
+                zone_profile_params = profile_params
+                
+            if zone_phase == 'P0':  # Dryback - no irrigation
+                continue
+                
+            elif zone_phase == 'P1':  # Ramp-up phase
+                decision = self._evaluate_zone_p1_needs(zone_num, zone_profile_params)
+                if decision['needs_irrigation']:
+                    zone_decisions[zone_num] = decision
+                    zones_by_priority[zone_priority].append(zone_num)
+                    if zone_group != 'Ungrouped':
+                        groups_needing_water.setdefault(zone_group, []).append(zone_num)
+                    
+            elif zone_phase == 'P2':  # Maintenance phase
+                decision = self._evaluate_zone_p2_needs(zone_num, zone_profile_params)
+                if decision['needs_irrigation']:
+                    zone_decisions[zone_num] = decision
+                    zones_by_priority[zone_priority].append(zone_num)
+                    if zone_group != 'Ungrouped':
+                        groups_needing_water.setdefault(zone_group, []).append(zone_num)
+                    
+            elif zone_phase == 'P3':  # Pre-lights-off emergency
+                decision = self._evaluate_zone_p3_needs(zone_num)
+                if decision['needs_irrigation']:
+                    zone_decisions[zone_num] = decision
+                    zones_by_priority[zone_priority].append(zone_num)
+                    if zone_group != 'Ungrouped':
+                        groups_needing_water.setdefault(zone_group, []).append(zone_num)
         
-        elif phase == 'P1':  # Ramp-up phase
-            target_vwc = profile_params.get('p1_target_vwc', 65)
-            if vwc < target_vwc * 0.9:
-                return {
-                    'action': 'irrigate',
-                    'reason': f'P1 ramp-up: {vwc:.1f}% < {target_vwc}%',
-                    'duration': 30,
-                    'confidence': 0.8
-                }
+        # Process grouped zones
+        all_zones_to_irrigate = []
         
-        elif phase == 'P2':  # Maintenance phase
-            vwc_threshold = profile_params.get('p2_vwc_threshold', 60)
-            if vwc < vwc_threshold:
-                return {
-                    'action': 'irrigate',
-                    'reason': f'P2 maintenance: {vwc:.1f}% < {vwc_threshold}%',
-                    'duration': 25,
-                    'confidence': 0.7
-                }
+        # Add all zones from groups where at least one zone needs water
+        for group, zones_in_group in groups_needing_water.items():
+            # Get all zones in this group
+            all_group_zones = []
+            for zone_num in range(1, self.num_zones + 1):
+                if self._get_zone_group(zone_num) == group:
+                    all_group_zones.append(zone_num)
+            
+            # Check if enough zones in group need water (>50% threshold)
+            if len(zones_in_group) >= len(all_group_zones) * 0.5:
+                # Add all zones in the group
+                for zone in all_group_zones:
+                    if zone not in all_zones_to_irrigate:
+                        all_zones_to_irrigate.append(zone)
+                        # Add dummy decision if zone didn't originally need water
+                        if zone not in zone_decisions:
+                            zone_vwc = self._get_zone_vwc(zone)
+                            zone_decisions[zone] = {
+                                'needs_irrigation': True,
+                                'vwc': zone_vwc if zone_vwc else 50,
+                                'reason': f'Group {group} irrigation',
+                                'confidence': 0.5
+                            }
         
-        elif phase == 'P3':  # Pre-lights-off
-            emergency_threshold = profile_params.get('p3_emergency_threshold', 45)
-            if vwc < emergency_threshold:
-                return {
-                    'action': 'irrigate',
-                    'reason': f'P3 emergency: {vwc:.1f}% < {emergency_threshold}%',
-                    'duration': 40,
-                    'confidence': 0.9
-                }
+        # Add ungrouped zones by priority
+        for priority in ['Critical', 'High', 'Normal', 'Low']:
+            for zone_num in zones_by_priority[priority]:
+                if zone_num not in all_zones_to_irrigate and self._get_zone_group(zone_num) == 'Ungrouped':
+                    all_zones_to_irrigate.append(zone_num)
         
-        return {'action': 'wait', 'reason': f'Phase {phase} requirements met'}
+        # If any zones need irrigation, return a multi-zone decision
+        if all_zones_to_irrigate:
+            # Sort by zone number for consistent ordering
+            all_zones_to_irrigate.sort()
+            
+            # Combine zone details into a single decision
+            zone_details = []
+            combined_confidence = 0
+            for zone_num in all_zones_to_irrigate:
+                decision = zone_decisions[zone_num]
+                zone_details.append(f"Z{zone_num}[{self.zone_phases[zone_num]}]:{decision['vwc']:.1f}%")
+                combined_confidence = max(combined_confidence, decision['confidence'])
+            
+            return {
+                'action': 'irrigate',
+                'reason': f'Multi-zone irrigation {all_zones_to_irrigate}: {", ".join(zone_details)}',
+                'duration': 30,  # Standard duration
+                'confidence': combined_confidence,
+                'zones': all_zones_to_irrigate,
+                'zone_decisions': zone_decisions
+            }
+        
+        return {'action': 'wait', 'reason': 'All zones satisfied in their current phases'}
+
+    def _evaluate_zone_p1_needs(self, zone_num: int, profile_params: Dict) -> Dict:
+        """Evaluate if a specific zone in P1 needs irrigation."""
+        target_vwc = self._get_number_entity_value("number.crop_steering_p1_target_vwc", 65)
+        zone_vwc = self._get_zone_vwc(zone_num)
+        
+        if zone_vwc is not None and zone_vwc < target_vwc * 0.9:
+            shot_size = self._get_number_entity_value("number.crop_steering_p1_initial_shot_size", 2.0)
+            return {
+                'needs_irrigation': True,
+                'vwc': zone_vwc,
+                'threshold': target_vwc * 0.9,
+                'shot_size': shot_size,
+                'confidence': 0.8
+            }
+        
+        return {'needs_irrigation': False, 'vwc': zone_vwc}
+
+    def _evaluate_zone_p2_needs(self, zone_num: int, profile_params: Dict) -> Dict:
+        """Evaluate if a specific zone in P2 needs irrigation."""
+        vwc_threshold = self._get_number_entity_value("number.crop_steering_p2_vwc_threshold", 60)
+        zone_vwc = self._get_zone_vwc(zone_num)
+        
+        if zone_vwc is not None and zone_vwc < vwc_threshold:
+            shot_size = self._get_number_entity_value("number.crop_steering_p2_shot_size", 5.0)
+            return {
+                'needs_irrigation': True,
+                'vwc': zone_vwc,
+                'threshold': vwc_threshold,
+                'shot_size': shot_size,
+                'confidence': 0.7
+            }
+        
+        return {'needs_irrigation': False, 'vwc': zone_vwc}
+
+    def _evaluate_zone_p3_needs(self, zone_num: int) -> Dict:
+        """P3 is the final dryback period - NO irrigation unless true emergency."""
+        zone_vwc = self._get_zone_vwc(zone_num)
+        
+        # P3 should normally have NO irrigation - it's the dryback period
+        # Only irrigate if there's a critical emergency (plant wilting risk)
+        critical_threshold = 35.0  # Much lower than P3 emergency threshold
+        
+        if zone_vwc is not None and zone_vwc < critical_threshold:
+            # This is a true emergency - plant health at risk
+            shot_size = self._get_number_entity_value("number.crop_steering_p3_emergency_shot_size", 1.0)
+            return {
+                'needs_irrigation': True,
+                'vwc': zone_vwc,
+                'threshold': critical_threshold,
+                'shot_size': shot_size,
+                'confidence': 1.0,
+                'emergency': True
+            }
+        
+        # Normal P3 operation - no irrigation, let it dry back
+        return {'needs_irrigation': False, 'vwc': zone_vwc}
 
     def _evaluate_dryback_decision(self, dryback_status: Dict, profile_params: Dict) -> Dict:
         """Evaluate irrigation based on dryback analysis."""
@@ -856,6 +1237,33 @@ class MasterCropSteeringApp(hass.Hass):
     async def _execute_intelligent_irrigation(self, decision: Dict):
         """Execute irrigation with intelligent zone selection and monitoring."""
         try:
+            # Check if this is multi-zone emergency irrigation
+            zones = decision.get('zones', [])
+            if zones:
+                # Multi-zone emergency irrigation
+                duration = decision.get('duration', 40)
+                reason = decision.get('reason', 'Emergency irrigation')
+                shot_size = decision.get('shot_size_percent', 2.0)
+                
+                self.log(f"🚨 Executing emergency irrigation: Zones {zones}, {duration}s - {reason}")
+                
+                # Execute irrigation for each zone that needs it
+                for zone in zones:
+                    try:
+                        zone_result = await self._execute_irrigation_shot(zone, duration, shot_type='emergency')
+                        self.log(f"💧 Emergency irrigation completed for zone {zone}")
+                        
+                        # Add to ML training data
+                        zone_decision = decision.copy()
+                        zone_decision['zone'] = zone
+                        await self._add_ml_training_sample(zone_decision, zone_result)
+                        
+                    except Exception as zone_error:
+                        self.log(f"❌ Error irrigating zone {zone}: {zone_error}", level='ERROR')
+                
+                return
+                
+            # Standard single-zone irrigation
             zone = decision.get('zone', 1)
             duration = decision.get('duration', 30)
             reason = decision.get('reason', 'Intelligent irrigation')
@@ -984,6 +1392,13 @@ class MasterCropSteeringApp(hass.Hass):
             self.last_irrigation_time = end_time
             self.irrigation_in_progress = False
             
+            # Update zone-specific last irrigation time
+            if zone in self.zone_phase_data:
+                self.zone_phase_data[zone]['last_irrigation_time'] = end_time
+            
+            # Update water usage tracking
+            await self._update_zone_water_usage(zone, duration)
+            
             # Fire irrigation event
             self.fire_event('crop_steering_irrigation_shot', irrigation_result)
             
@@ -1076,9 +1491,75 @@ class MasterCropSteeringApp(hass.Hass):
     def _get_irrigation_count_24h(self) -> int:
         """Get irrigation count in last 24 hours."""
         # This would typically query a database or entity history
+        return 8  # Placeholder
+
+    def _get_zone_vwc(self, zone_num: int) -> float | None:
+        """Get VWC value for specific zone from configured sensors."""
+        try:
+            # Try integration sensor first (preferred method)
+            integration_sensor = f"sensor.crop_steering_vwc_zone_{zone_num}"
+            state = self.get_state(integration_sensor)
+            if state not in ['unknown', 'unavailable', None]:
+                return float(state)
+            
+            # Fallback to direct sensor configuration
+            zone_vwc_sensors = []
+            
+            # Look for zone-specific sensors in VWC sensor list
+            if 'sensors' in self.config and 'vwc' in self.config['sensors']:
+                for sensor in self.config['sensors']['vwc']:
+                    # Check if sensor belongs to this zone (various naming patterns)
+                    if (f'_zone_{zone_num}_' in sensor or 
+                        f'_z{zone_num}_' in sensor or 
+                        f'_r{zone_num}_' in sensor or
+                        f'zone{zone_num}' in sensor.lower()):
+                        zone_vwc_sensors.append(sensor)
+            
+            # Average values from zone sensors
+            if zone_vwc_sensors:
+                values = []
+                for sensor in zone_vwc_sensors:
+                    try:
+                        state = self.get_state(sensor)
+                        if state not in ['unknown', 'unavailable', None]:
+                            values.append(float(state))
+                    except (ValueError, TypeError):
+                        continue
+                
+                if values:
+                    return round(sum(values) / len(values), 2)
+            
+            return None
+            
+        except Exception as e:
+            self.log(f"❌ Error getting zone {zone_num} VWC: {e}", level='ERROR')
+            return None
+
+    def _get_number_of_zones(self) -> int:
+        """Get number of zones from integration configuration."""
+        try:
+            # Try to get from integration number entity
+            zones_entity = self.get_state("number.crop_steering_substrate_volume")  # This exists, so integration is loaded
+            if zones_entity:
+                # Check for zone entities to count them
+                zone_count = 0
+                for i in range(1, 11):  # Check up to 10 zones
+                    zone_sensor = f"sensor.crop_steering_vwc_zone_{i}"
+                    if self.entity_exists(zone_sensor):
+                        zone_count = i
+                return max(zone_count, 1)  # At least 1 zone
+            
+            # Fallback to configuration
+            if 'hardware' in self.config and 'zone_valves' in self.config['hardware']:
+                return len(self.config['hardware']['zone_valves'])
+            
+            return 1  # Default single zone
+        except Exception as e:
+            self.log(f"❌ Error getting number of zones: {e}", level='ERROR')
+            return 1
 
     def _calculate_next_irrigation_time(self) -> datetime | None:
-        """Calculate when next irrigation should occur."""
+        """Calculate when next irrigation should occur based on zone phases."""
         try:
             now = datetime.now()
             
@@ -1086,45 +1567,51 @@ class MasterCropSteeringApp(hass.Hass):
             if self.irrigation_in_progress:
                 return None
             
-            # Phase-based logic
-            if self.current_phase == "P0":
-                # Morning dryback - next irrigation depends on dryback detection
-                # For now, estimate 2-4 hours
-                return now + timedelta(hours=3)
+            # Find the soonest irrigation needed across all zones
+            earliest_time = None
             
-            elif self.current_phase == "P1":
-                # Ramp-up phase - frequent small irrigations
-                # Next irrigation in 30-60 minutes
-                return now + timedelta(minutes=45)
-            
-            elif self.current_phase == "P2":
-                # Maintenance phase - based on VWC thresholds
-                # Check current VWC vs threshold
-                current_vwc = self._get_average_vwc()
-                if current_vwc is not None:
-                    threshold = self._get_number_entity_value("number.crop_steering_p2_vwc_threshold", 60.0)
-                    if current_vwc < threshold:
-                        # Needs irrigation soon
-                        return now + timedelta(minutes=15)
+            for zone_num in range(1, self.num_zones + 1):
+                zone_phase = self.zone_phases.get(zone_num, 'P2')
+                zone_vwc = self._get_zone_vwc(zone_num)
+                
+                zone_next_time = None
+                
+                if zone_phase == "P0":
+                    # No irrigation during dryback
+                    continue
+                    
+                elif zone_phase == "P1":
+                    # Ramp-up phase - frequent small irrigations
+                    zone_next_time = now + timedelta(minutes=45)
+                    
+                elif zone_phase == "P2":
+                    # Maintenance phase - based on VWC thresholds
+                    if zone_vwc is not None:
+                        threshold = self._get_number_entity_value("number.crop_steering_p2_vwc_threshold", 60.0)
+                        if zone_vwc < threshold:
+                            # Needs irrigation soon
+                            zone_next_time = now + timedelta(minutes=15)
+                        else:
+                            # Can wait longer
+                            zone_next_time = now + timedelta(hours=2)
                     else:
-                        # Can wait longer
-                        return now + timedelta(hours=2)
-                else:
-                    # No VWC data, conservative estimate
-                    return now + timedelta(hours=1)
+                        # No VWC data, conservative estimate
+                        zone_next_time = now + timedelta(hours=1)
+                    
+                elif zone_phase == "P3":
+                    # Pre-lights-off - check emergency threshold
+                    emergency_threshold = self._get_number_entity_value("number.crop_steering_p3_emergency_vwc_threshold", 45)
+                    if zone_vwc and zone_vwc < emergency_threshold:
+                        # Emergency irrigation needed
+                        zone_next_time = now + timedelta(minutes=5)
+                    else:
+                        zone_next_time = now + timedelta(minutes=30)
+                
+                # Keep track of earliest time needed
+                if zone_next_time and (earliest_time is None or zone_next_time < earliest_time):
+                    earliest_time = zone_next_time
             
-            elif self.current_phase == "P3":
-                # Pre-lights-off - final irrigation before night
-                # Calculate time until lights off
-                lights_off_time = self._get_lights_off_time()
-                if lights_off_time:
-                    return lights_off_time - timedelta(minutes=30)
-                else:
-                    # Default to 1 hour if no lights schedule
-                    return now + timedelta(hours=1)
-            
-            # Default fallback
-            return now + timedelta(hours=1)
+            return earliest_time
             
         except Exception as e:
             self.log(f"❌ Error calculating next irrigation time: {e}", level='ERROR')
@@ -1145,6 +1632,345 @@ class MasterCropSteeringApp(hass.Hass):
             return lights_off
         except Exception:
             return None
+
+    async def _check_phase_transitions(self, kwargs):
+        """Check and handle automatic phase transitions PER ZONE based on conditions."""
+        try:
+            now = datetime.now()
+            current_time = now.time()
+            
+            # Get configuration values from existing entities
+            p0_max_duration = self._get_number_entity_value("number.crop_steering_p0_max_wait_time", 45)
+            p1_recovery_target = self._get_number_entity_value("number.crop_steering_p1_target_vwc", 65)
+            dryback_target = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50)
+            
+            # Check each zone independently with its own schedule
+            for zone_num in range(1, self.num_zones + 1):
+                current_phase = self.zone_phases.get(zone_num, 'P2')
+                zone_vwc = self._get_zone_vwc(zone_num)
+                
+                # Get zone-specific schedule
+                zone_schedule = self._get_zone_schedule(zone_num)
+                lights_on_time = zone_schedule['lights_on']
+                lights_off_time = zone_schedule['lights_off']
+                
+                # Check if lights are currently on for this zone
+                lights_on = self._are_lights_on(current_time, lights_on_time, lights_off_time)
+                
+                target_phase = None
+                reason = ""
+                
+                # Phase transition logic PER ZONE
+                if not lights_on:
+                    # Lights off - zone should be in P0 (night dryback)
+                    if current_phase != 'P0':
+                        target_phase = 'P0'
+                        reason = f"Zone {zone_num}: Lights off - night dryback phase"
+                    
+                elif lights_on and current_phase == 'P0':
+                    # Check P0 → P1 transition conditions for this zone
+                    if self._should_zone_exit_p0(zone_num, zone_vwc, dryback_target, p0_max_duration):
+                        target_phase = 'P1'
+                        reason = f"Zone {zone_num}: P0 dryback target achieved or max duration reached"
+                        
+                elif current_phase == 'P1':
+                    # Check P1 → P2 transition conditions for this zone
+                    if zone_vwc and zone_vwc >= p1_recovery_target:
+                        target_phase = 'P2'
+                        reason = f"Zone {zone_num}: P1 recovery target achieved: {zone_vwc:.1f}% >= {p1_recovery_target}%"
+                        
+                elif current_phase == 'P2':
+                    # Check P2 → P3 transition based on ML-predicted last irrigation timing
+                    # P3 starts AFTER the last P2 shot, when we begin final dryback to morning
+                    should_transition = await self._should_zone_start_p3(zone_num, lights_on_time, lights_off_time)
+                    if should_transition:
+                        target_phase = 'P3'
+                        reason = f"Zone {zone_num}: Starting final dryback period to achieve target by morning"
+                        
+                elif current_phase == 'P3':
+                    # P3 → P0 when lights turn off
+                    if not lights_on:
+                        target_phase = 'P0'
+                        reason = f"Zone {zone_num}: Lights off - starting night dryback"
+                
+                # Execute transition if needed for this zone
+                if target_phase and target_phase != current_phase:
+                    await self._transition_zone_to_phase(zone_num, target_phase, reason)
+                    
+        except Exception as e:
+            self.log(f"❌ Error checking phase transitions: {e}", level='ERROR')
+
+    def _add_minutes_to_time(self, time_obj: time, minutes: float) -> time:
+        """Add minutes to a time object."""
+        dt = datetime.combine(datetime.today(), time_obj)
+        dt += timedelta(minutes=minutes)
+        return dt.time()
+
+    def _time_is_between(self, current: time, start: time, end: time) -> bool:
+        """Check if current time is between start and end times."""
+        if start <= end:
+            return start <= current <= end
+        else:
+            # Handle overnight periods (e.g., 22:00 to 06:00)
+            return current >= start or current <= end
+
+    def _are_lights_on(self, current_time: time, lights_on: time, lights_off: time) -> bool:
+        """Check if lights should be on at current time."""
+        if lights_on <= lights_off:
+            # Normal day schedule (e.g., 12pm to 12am)
+            return lights_on <= current_time <= lights_off
+        else:
+            # Overnight schedule (e.g., 6pm to 6am)
+            return current_time >= lights_on or current_time <= lights_off
+
+    def _time_is_near(self, current: time, target: time, tolerance_minutes: int = 5) -> bool:
+        """Check if current time is within tolerance of target time."""
+        current_minutes = current.hour * 60 + current.minute
+        target_minutes = target.hour * 60 + target.minute
+        
+        # Handle day boundary
+        if abs(current_minutes - target_minutes) > 12 * 60:  # More than 12 hours apart
+            if current_minutes < target_minutes:
+                current_minutes += 24 * 60
+            else:
+                target_minutes += 24 * 60
+        
+        return abs(current_minutes - target_minutes) <= tolerance_minutes
+
+    def _should_zone_exit_p0(self, zone_num: int, zone_vwc: float, dryback_target: float, max_duration_minutes: float) -> bool:
+        """Check if zone's P0 phase should end based on dryback progress and max duration."""
+        try:
+            zone_data = self.zone_phase_data.get(zone_num, {})
+            
+            # Check max duration first (safety limit)
+            if zone_data.get('p0_start_time'):
+                elapsed_minutes = (datetime.now() - zone_data['p0_start_time']).total_seconds() / 60
+                if elapsed_minutes >= max_duration_minutes:
+                    self.log(f"🕐 Zone {zone_num}: P0 max duration reached: {elapsed_minutes:.1f}min >= {max_duration_minutes}min")
+                    return True
+            
+            # Check dryback target (if we have VWC data)
+            if zone_vwc and zone_data.get('p0_peak_vwc'):
+                dryback_percent = ((zone_data['p0_peak_vwc'] - zone_vwc) / zone_data['p0_peak_vwc']) * 100
+                if dryback_percent >= dryback_target:
+                    self.log(f"🎯 Zone {zone_num}: P0 dryback target achieved: {dryback_percent:.1f}% >= {dryback_target}%")
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            self.log(f"❌ Error checking zone {zone_num} P0 exit conditions: {e}", level='ERROR')
+            return False
+
+    async def _calculate_optimal_p3_timing(self, lights_off_time: time) -> time | None:
+        """Calculate optimal P3 start time using ML dryback prediction."""
+        try:
+            # Get target dryback for overnight period
+            target_dryback = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50)
+            
+            # Get current dryback status from advanced detector
+            if hasattr(self, 'dryback_detector') and self.dryback_detector:
+                # Get dryback prediction for target percentage
+                prediction = await self.dryback_detector.predict_target_dryback_time(target_dryback)
+                
+                if prediction.get('prediction_available'):
+                    predicted_minutes = prediction.get('predicted_minutes_remaining', 60)
+                    confidence = prediction.get('confidence', 0.5)
+                    
+                    self.log(f"🧠 ML Dryback Prediction: {predicted_minutes:.1f}min to reach {target_dryback}% (confidence: {confidence:.2f})")
+                    
+                    # Calculate when to start P3 to achieve target dryback by lights off
+                    lights_off_dt = datetime.combine(datetime.today(), lights_off_time)
+                    optimal_p3_start = lights_off_dt - timedelta(minutes=predicted_minutes + 30)  # +30min buffer for P3 irrigation
+                    
+                    # Ensure P3 doesn't start too early (minimum 2 hours before lights off)
+                    earliest_p3 = lights_off_dt - timedelta(hours=2)
+                    if optimal_p3_start < earliest_p3:
+                        optimal_p3_start = earliest_p3
+                        self.log(f"⚠️ P3 timing adjusted to minimum 2-hour window")
+                    
+                    # Ensure P3 doesn't start too late (minimum 30 minutes before lights off)  
+                    latest_p3 = lights_off_dt - timedelta(minutes=30)
+                    if optimal_p3_start > latest_p3:
+                        optimal_p3_start = latest_p3
+                        self.log(f"⚠️ P3 timing adjusted to ensure 30min minimum window")
+                    
+                    return optimal_p3_start.time()
+            
+            # Fallback to historical average if ML prediction unavailable
+            return await self._calculate_historical_p3_timing(lights_off_time)
+            
+        except Exception as e:
+            self.log(f"❌ Error calculating optimal P3 timing: {e}", level='ERROR')
+            # Ultimate fallback - 1 hour before lights off
+            fallback_dt = datetime.combine(datetime.today(), lights_off_time) - timedelta(hours=1)
+            return fallback_dt.time()
+
+    async def _calculate_historical_p3_timing(self, lights_off_time: time) -> time | None:
+        """Calculate P3 timing based on historical dryback patterns."""
+        try:
+            # Get historical dryback data from the last 7 days
+            # This would query ML training data or stored dryback patterns
+            
+            # For now, use intelligent defaults based on typical dryback rates
+            target_dryback = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50)
+            substrate_volume = self._get_number_entity_value("number.crop_steering_substrate_volume", 10)
+            
+            # Estimate dryback time based on substrate size and target
+            # Larger substrates = slower dryback, higher targets = longer time
+            base_dryback_minutes = 120  # 2 hours base
+            volume_factor = substrate_volume / 10  # Normalize to 10L baseline
+            target_factor = target_dryback / 50    # Normalize to 50% baseline
+            
+            estimated_dryback_minutes = base_dryback_minutes * volume_factor * target_factor
+            
+            # Add buffer for P3 irrigation (30 minutes)
+            total_minutes_needed = estimated_dryback_minutes + 30
+            
+            # Calculate optimal P3 start time
+            lights_off_dt = datetime.combine(datetime.today(), lights_off_time)
+            optimal_p3_start = lights_off_dt - timedelta(minutes=total_minutes_needed)
+            
+            self.log(f"📊 Historical P3 timing: {total_minutes_needed:.0f}min before lights off (est. dryback: {estimated_dryback_minutes:.0f}min)")
+            
+            return optimal_p3_start.time()
+            
+        except Exception as e:
+            self.log(f"❌ Error calculating historical P3 timing: {e}", level='ERROR')
+            return None
+
+    async def _should_zone_start_p3(self, zone_num: int, lights_on_time: time, lights_off_time: time) -> bool:
+        """Determine if zone should transition to P3 (start final dryback period)."""
+        try:
+            now = datetime.now()
+            zone_vwc = self._get_zone_vwc(zone_num)
+            if zone_vwc is None:
+                return False
+            
+            # Calculate hours until next lights-on
+            next_lights_on = datetime.combine(datetime.today(), lights_on_time)
+            if next_lights_on <= now:
+                next_lights_on += timedelta(days=1)
+            hours_until_lights_on = (next_lights_on - now).total_seconds() / 3600
+            
+            # Get target dryback for overnight
+            target_dryback = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50)
+            
+            # Get ML-predicted dryback rate for this zone
+            predicted_dryback_rate = await self._get_zone_dryback_rate(zone_num)
+            if predicted_dryback_rate is None:
+                # Fallback: estimate based on substrate volume
+                substrate_volume = self._get_number_entity_value("number.crop_steering_substrate_volume", 10)
+                predicted_dryback_rate = 2.0 / substrate_volume  # %/hour, smaller = slower
+            
+            # Calculate how many hours needed to achieve target dryback
+            hours_needed_for_dryback = target_dryback / predicted_dryback_rate
+            
+            # If we've reached the point where we need to start drying back
+            if hours_until_lights_on <= hours_needed_for_dryback:
+                self.log(f"🎯 Zone {zone_num}: Time to start P3 dryback. "
+                        f"Need {hours_needed_for_dryback:.1f}h to dry {target_dryback}% "
+                        f"({predicted_dryback_rate:.2f}%/h rate), "
+                        f"have {hours_until_lights_on:.1f}h until lights on")
+                return True
+            
+            # Also check if zone just got irrigated and won't need water again before morning
+            zone_data = self.zone_phase_data.get(zone_num, {})
+            if zone_data.get('last_irrigation_time'):
+                time_since_irrigation = (now - zone_data['last_irrigation_time']).total_seconds() / 60
+                if time_since_irrigation < 5:  # Just irrigated in last 5 minutes
+                    # Check if this VWC level will last until morning
+                    p2_threshold = self._get_number_entity_value("number.crop_steering_p2_vwc_threshold", 60)
+                    vwc_buffer = zone_vwc - p2_threshold
+                    hours_until_dry = vwc_buffer / predicted_dryback_rate if predicted_dryback_rate > 0 else 999
+                    
+                    if hours_until_dry >= hours_until_lights_on:
+                        self.log(f"💧 Zone {zone_num}: Last P2 irrigation complete. "
+                                f"VWC {zone_vwc:.1f}% will last {hours_until_dry:.1f}h until threshold. "
+                                f"Starting P3 dryback period.")
+                        return True
+            
+            return False
+            
+        except Exception as e:
+            self.log(f"❌ Error checking zone {zone_num} P3 transition: {e}", level='ERROR')
+            return False
+
+    async def _get_zone_dryback_rate(self, zone_num: int) -> float | None:
+        """Get ML-predicted or historical dryback rate for a specific zone."""
+        try:
+            # Try to get from dryback detector if available
+            if hasattr(self, 'dryback_detector') and self.dryback_detector:
+                # For now, use overall dryback rate
+                # TODO: Implement per-zone dryback tracking
+                status = await self.dryback_detector.get_current_status()
+                if status and status.get('current_dryback_rate'):
+                    return abs(status['current_dryback_rate'])
+            
+            # Fallback to historical estimate based on zone characteristics
+            # Could be enhanced with zone-specific ML model
+            return None
+            
+        except Exception as e:
+            self.log(f"❌ Error getting zone {zone_num} dryback rate: {e}", level='ERROR')
+            return None
+
+    async def _transition_zone_to_phase(self, zone_num: int, new_phase: str, reason: str):
+        """Transition a specific zone to a new irrigation phase."""
+        try:
+            old_phase = self.zone_phases.get(zone_num, 'P2')
+            self.zone_phases[zone_num] = new_phase
+            
+            self.log(f"🔄 Zone {zone_num} transition: {old_phase} → {new_phase} ({reason})")
+            
+            # Update zone-specific sensor
+            await self.set_state(f'sensor.crop_steering_zone_{zone_num}_phase',
+                               state=new_phase,
+                               attributes={
+                                   'friendly_name': f'Zone {zone_num} Phase',
+                                   'icon': self._get_phase_icon(new_phase),
+                                   'transition_reason': reason,
+                                   'transition_time': datetime.now().isoformat()
+                               })
+            
+            # Update zone phase data
+            zone_data = self.zone_phase_data.get(zone_num, {})
+            
+            if new_phase == 'P0':
+                self.log(f"🌅 Zone {zone_num}: Starting dryback phase")
+                zone_data['p0_start_time'] = datetime.now()
+                # Record peak VWC at start of P0 for dryback calculation
+                zone_vwc = self._get_zone_vwc(zone_num)
+                if zone_vwc:
+                    zone_data['p0_peak_vwc'] = zone_vwc
+                    self.log(f"📊 Zone {zone_num}: P0 peak VWC recorded: {zone_vwc:.1f}%")
+            elif new_phase == 'P1':
+                self.log(f"⬆️ Zone {zone_num}: Starting ramp-up phase")
+                # Reset P0 tracking
+                zone_data['p0_start_time'] = None
+                zone_data['p0_peak_vwc'] = None
+            elif new_phase == 'P2':
+                self.log(f"⚖️ Zone {zone_num}: Starting maintenance phase")
+            elif new_phase == 'P3':
+                self.log(f"🌙 Zone {zone_num}: Starting pre-lights-off phase")
+            
+            self.zone_phase_data[zone_num] = zone_data
+            
+            # Update crop profile parameters if needed (could be zone-specific in future)
+            await self._update_phase_parameters()
+            
+        except Exception as e:
+            self.log(f"❌ Error transitioning zone {zone_num} to phase {new_phase}: {e}", level='ERROR')
+
+    def _get_phase_icon(self, phase: str) -> str:
+        """Get icon for phase."""
+        phase_icons = {
+            'P0': 'mdi:water-minus',
+            'P1': 'mdi:water-plus', 
+            'P2': 'mdi:water-check',
+            'P3': 'mdi:water-alert'
+        }
+        return phase_icons.get(phase, 'mdi:water')
 
     async def _add_ml_training_sample(self, decision: Dict, irrigation_result: Dict):
         """Add irrigation result to ML training data."""
@@ -1349,7 +2175,7 @@ class MasterCropSteeringApp(hass.Hass):
             self.set_state('sensor.crop_steering_system_state',
                           state='active' if self.system_enabled else 'disabled',
                           attributes={
-                              'current_phase': self.current_phase,
+                              'zone_phases': self.zone_phases.copy(),
                               'irrigation_in_progress': self.irrigation_in_progress,
                               'time_since_last_irrigation': self._get_time_since_last_irrigation(),
                               'average_vwc': current_state['average_vwc'],
@@ -1357,11 +2183,14 @@ class MasterCropSteeringApp(hass.Hass):
                           })
             
             # Create dedicated sensors for integration compatibility
+            # Create a summary of all zone phases
+            phase_summary = ", ".join([f"Z{z}:{p}" for z, p in self.zone_phases.items()])
             self.set_state('sensor.crop_steering_app_current_phase',
-                          state=self.current_phase,
+                          state=phase_summary,
                           attributes={
-                              'friendly_name': 'Current Irrigation Phase',
+                              'friendly_name': 'Zone Phases',
                               'icon': 'mdi:water-circle',
+                              'zone_phases': self.zone_phases.copy(),
                               'updated': datetime.now().isoformat()
                           })
             
@@ -1406,7 +2235,7 @@ class MasterCropSteeringApp(hass.Hass):
                     entity_id = f'sensor.crop_steering_{param}'
                     self.set_state(entity_id, state=value)
                 
-                self.log(f"📊 Phase {self.current_phase} parameters updated")
+                self.log(f"📊 Phase parameters updated for zones: {list(self.zone_phases.values())}")
             
         except Exception as e:
             self.log(f"❌ Error updating phase parameters: {e}", level='ERROR')
@@ -1431,7 +2260,7 @@ class MasterCropSteeringApp(hass.Hass):
         try:
             return {
                 'system_enabled': self.system_enabled,
-                'current_phase': self.current_phase,
+                'zone_phases': self.zone_phases.copy(),
                 'irrigation_in_progress': self.irrigation_in_progress,
                 'last_irrigation': self.last_irrigation_time.isoformat() if self.last_irrigation_time else None,
                 'modules': {

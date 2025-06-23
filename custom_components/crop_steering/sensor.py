@@ -160,6 +160,38 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
                 icon="mdi:history",
             )
         )
+        
+        # Zone water usage tracking
+        zone_sensors.append(
+            SensorEntityDescription(
+                key=f"zone_{zone_num}_daily_water_usage",
+                name=f"Zone {zone_num} Daily Water Usage",
+                device_class=SensorDeviceClass.VOLUME,
+                state_class=SensorStateClass.TOTAL_INCREASING,
+                native_unit_of_measurement=UnitOfVolume.LITERS,
+                icon="mdi:water",
+            )
+        )
+        
+        zone_sensors.append(
+            SensorEntityDescription(
+                key=f"zone_{zone_num}_weekly_water_usage",
+                name=f"Zone {zone_num} Weekly Water Usage",
+                device_class=SensorDeviceClass.VOLUME,
+                state_class=SensorStateClass.TOTAL_INCREASING,
+                native_unit_of_measurement=UnitOfVolume.LITERS,
+                icon="mdi:water-outline",
+            )
+        )
+        
+        zone_sensors.append(
+            SensorEntityDescription(
+                key=f"zone_{zone_num}_irrigation_count_today",
+                name=f"Zone {zone_num} Irrigations Today",
+                state_class=SensorStateClass.TOTAL_INCREASING,
+                icon="mdi:counter",
+            )
+        )
     
     return zone_sensors
 
@@ -326,6 +358,12 @@ class CropSteeringSensor(SensorEntity):
                 return self._get_zone_status(self._zone_number)
             elif f"zone_{self._zone_number}_last_irrigation" == self.entity_description.key:
                 return self._get_zone_last_irrigation(self._zone_number)
+            elif f"zone_{self._zone_number}_daily_water_usage" == self.entity_description.key:
+                return self._get_zone_daily_water_usage(self._zone_number)
+            elif f"zone_{self._zone_number}_weekly_water_usage" == self.entity_description.key:
+                return self._get_zone_weekly_water_usage(self._zone_number)
+            elif f"zone_{self._zone_number}_irrigation_count_today" == self.entity_description.key:
+                return self._get_zone_irrigation_count_today(self._zone_number)
         
         # Implement critical calculations ported from template entities
         if self.entity_description.key == "p1_shot_duration_seconds":
@@ -475,9 +513,44 @@ class CropSteeringSensor(SensorEntity):
             
     def _get_zone_last_irrigation(self, zone_num: int) -> str | None:
         """Get last irrigation time for zone."""
-        # This would be tracked by the AppDaemon app
-        # For now, return None (will be implemented later)
+        # Check AppDaemon sensor for zone last irrigation
+        last_irrigation_sensor = self.hass.states.get(f"sensor.crop_steering_zone_{zone_num}_last_irrigation_app")
+        if last_irrigation_sensor and last_irrigation_sensor.state not in ['unknown', 'unavailable']:
+            return last_irrigation_sensor.state
         return None
+    
+    def _get_zone_daily_water_usage(self, zone_num: int) -> float:
+        """Get daily water usage for zone."""
+        # Check AppDaemon sensor for daily usage
+        usage_sensor = self.hass.states.get(f"sensor.crop_steering_zone_{zone_num}_daily_water_app")
+        if usage_sensor and usage_sensor.state not in ['unknown', 'unavailable']:
+            try:
+                return float(usage_sensor.state)
+            except ValueError:
+                pass
+        return 0.0
+    
+    def _get_zone_weekly_water_usage(self, zone_num: int) -> float:
+        """Get weekly water usage for zone."""
+        # Check AppDaemon sensor for weekly usage
+        usage_sensor = self.hass.states.get(f"sensor.crop_steering_zone_{zone_num}_weekly_water_app")
+        if usage_sensor and usage_sensor.state not in ['unknown', 'unavailable']:
+            try:
+                return float(usage_sensor.state)
+            except ValueError:
+                pass
+        return 0.0
+    
+    def _get_zone_irrigation_count_today(self, zone_num: int) -> int:
+        """Get today's irrigation count for zone."""
+        # Check AppDaemon sensor for count
+        count_sensor = self.hass.states.get(f"sensor.crop_steering_zone_{zone_num}_irrigation_count_app")
+        if count_sensor and count_sensor.state not in ['unknown', 'unavailable']:
+            try:
+                return int(count_sensor.state)
+            except ValueError:
+                pass
+        return 0
     
     def _average_sensor_values(self, sensor_ids: list[str]) -> float | None:
         """Average values from multiple sensors."""
