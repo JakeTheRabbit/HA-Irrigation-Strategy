@@ -841,6 +841,14 @@ class MasterCropSteeringApp(hass.Hass):
         except Exception as e:
             self.log(f"❌ Error in emergency check: {e}", level='ERROR')
 
+    async def _run_critical_ec_check(self, kwargs):
+        """Helper method to run critical EC check asynchronously."""
+        try:
+            ec_value = kwargs.get('ec_value', 3.0)
+            await self._handle_critical_ec(ec_value)
+        except Exception as e:
+            self.log(f"❌ Error in critical EC check: {e}", level='ERROR')
+
     def _on_ec_sensor_update(self, entity, attribute, old, new, kwargs):
         """Handle EC sensor updates with advanced processing."""
         try:
@@ -871,7 +879,8 @@ class MasterCropSteeringApp(hass.Hass):
                 # Check for critical EC levels (using direct value)
                 if ec_value > self.config['thresholds']['critical_ec']:
                     self.log(f"🚨 Critical EC level detected: {ec_value:.2f} mS/cm", level='WARNING')
-                    await self._handle_critical_ec(ec_value)
+                    # Schedule async critical EC handling
+                    self.run_in(self._run_critical_ec_check, 0, ec_value=ec_value)
                 
                 # Log outliers
                 if fusion_result['is_outlier']:
