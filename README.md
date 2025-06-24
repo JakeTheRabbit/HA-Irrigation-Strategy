@@ -1,8 +1,8 @@
-# 🧠 Advanced AI Crop Steering System
+# 🌱 Advanced Automated Crop Steering System
 
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)
-![AI](https://img.shields.io/badge/AI-Machine%20Learning-FF6B6B?logo=tensorflow&logoColor=white)
+![Automation](https://img.shields.io/badge/Automation-Rule%20Based-4CAF50?logo=homeassistant&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Quality](https://img.shields.io/badge/Quality-Production%20Ready-00C851?logo=github&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-Validated%20✓-28A745?logo=checkmarx&logoColor=white)
@@ -17,9 +17,9 @@
 
 ## 🎯 What This System Does
 
-**Transform your Home Assistant into a professional-grade crop steering platform** that automatically manages irrigation with artificial intelligence. This system replaces manual irrigation decisions with smart AI that learns your plants' needs and optimizes water delivery for maximum growth and yield.
+**Transform your Home Assistant into a professional-grade crop steering platform** that automatically manages precision irrigation using advanced rule-based logic and sensor-driven automation. This system replaces manual irrigation guesswork with intelligent threshold-based decisions optimized for plant health and maximum yields.
 
-### 🧠 The Logic Behind AI Crop Steering
+### 🔬 The Logic Behind Automated Crop Steering
 
 **Traditional Problem:** Manual irrigation timing leads to:
 - Over/under-watering from guesswork
@@ -28,68 +28,61 @@
 - Wasted water and nutrients
 - Suboptimal yields
 
-**AI Solution:** Our system uses:
-- **Multi-sensor fusion** to get accurate substrate moisture readings
-- **Machine learning** to predict optimal irrigation timing 2+ hours ahead
-- **Real-time dryback detection** to monitor plant water uptake patterns
-- **Intelligent crop profiles** that adapt to your specific plant genetics
-- **Professional analytics** to optimize efficiency over time
+**Automated Solution:** Our system uses:
+- **Statistical sensor validation** to get accurate substrate moisture readings
+- **Rule-based logic** to determine optimal irrigation timing based on thresholds
+- **Real-time dryback detection** using peak detection algorithms
+- **Intelligent crop profiles** with strain-specific parameters
+- **Professional monitoring** to track efficiency and performance
 
-**The Result:** 15-30% better yields, 20-40% water savings, and hands-off precision irrigation that gets better every day.
+**The Result:** Consistent irrigation timing, reduced water waste, and precision automation that maintains optimal growing conditions.
 
 ### 🔬 How It Works
 
 1. **Sensors collect data** - VWC and EC sensors monitor substrate conditions
-2. **AI analyzes patterns** - Machine learning identifies optimal irrigation timing
-3. **Smart decisions execute** - System automatically waters at perfect moments
-4. **Performance improves** - AI learns and adapts to your specific setup
-5. **You get results** - Better plants, less work, maximum yields
+2. **System analyzes patterns** - Statistical algorithms identify dryback patterns and trends
+3. **Rule-based decisions execute** - System automatically waters based on threshold logic
+4. **Performance tracked** - System monitors efficiency and maintains detailed logs
+5. **You get results** - Consistent plants, less work, optimized resource usage
 
-## 🚀 Revolutionary Features
+## 🚀 Advanced Features
 
-### 🧠 **Advanced AI & Machine Learning**
-- **ML Ensemble Models**: Random Forest + Neural Network prediction with 99% potential accuracy
-- **Real-Time Learning**: Continuous model adaptation based on your growing conditions
-- **Predictive Analytics**: 2-hour irrigation need forecasting with confidence intervals
-- **Intelligent Decision Making**: AI-driven irrigation timing optimization
-- **Pattern Recognition**: Automatic detection of plant response patterns
-
-### 🔬 **Scientific Sensor Fusion**
-- **IQR-Based Outlier Detection**: Intelligent filtering of sensor anomalies
-- **Multi-Sensor Validation**: Weighted fusion with reliability scoring
-- **Kalman Filtering**: Noise reduction for smooth, accurate readings
+### 🔬 **Statistical Sensor Processing**
+- **IQR-Based Outlier Detection**: Mathematical filtering of sensor anomalies
+- **Multi-Sensor Validation**: Statistical validation with reliability scoring
+- **Data Smoothing**: Moving averages for stable, accurate readings
 - **Health Monitoring**: Automatic sensor reliability assessment
-- **Adaptive Thresholds**: Dynamic adjustment based on data variability
+- **Threshold Management**: Configurable limits based on crop requirements
 
-### 📊 **Real-Time Advanced Analytics**
-- **Multi-Scale Peak Detection**: Research-grade dryback analysis algorithms
-- **Confidence Scoring**: Statistical validation of all measurements
-- **Performance Tracking**: Irrigation efficiency and water usage optimization
-- **Trend Forecasting**: Predictive trend analysis with uncertainty quantification
-- **Professional Metrics**: Research-quality data analysis and reporting
+### 📊 **Real-Time Analytics**
+- **Peak Detection Algorithms**: Multi-scale dryback analysis using scipy.signal
+- **Statistical Validation**: Mathematical confidence scoring for measurements
+- **Performance Tracking**: Irrigation efficiency and water usage monitoring
+- **Trend Analysis**: Statistical trend detection using linear regression
+- **Professional Metrics**: Comprehensive data logging and reporting
 
 ### 🌱 **Intelligent Crop Profiles**
-- **Strain-Specific Optimization**: Cannabis genetics-based parameter sets (Indica/Sativa/Hybrid)
-- **Adaptive Learning**: Parameters automatically adjust based on plant response
-- **Growth Stage Intelligence**: Automatic vegetative/flowering optimization
+- **Strain-Specific Parameters**: Cannabis genetics-based settings (Indica/Sativa/Hybrid)
+- **Growth Stage Optimization**: Automatic vegetative/flowering parameter adjustment
 - **Athena Methodology**: Optimized for 3.0 EC baseline with strategic EC stacking
 - **Multi-Crop Support**: Cannabis, Tomato, Lettuce, and custom crop profiles
+- **Configurable Thresholds**: User-adjustable parameters for different growing styles
 
-### 📈 **Athena-Style Dashboard**
-- **Real-Time Plotly Visualizations**: Professional-grade graphs and analytics
-- **VWC Trending**: Multi-sensor fusion with confidence bands and outlier markers
-- **EC Monitoring**: Target zones, stacking visualization, and trend analysis
-- **ML Predictions**: Irrigation probability forecasts with uncertainty bounds
-- **Dryback Analysis**: Peak/valley detection with timing predictions
-- **Sensor Health**: Reliability heatmaps and performance monitoring
+### 📈 **Professional Dashboard**
+- **Real-Time Monitoring**: AppDaemon YAML dashboards with professional styling
+- **VWC Trending**: Multi-sensor displays with color-coded status indicators
+- **EC Monitoring**: Target zones, current readings, and trend tracking
+- **Phase Indicators**: Current irrigation phase display and navigation
+- **System Controls**: Manual overrides, safety limits, and configuration access
+- **Performance Analytics**: Water usage tracking and efficiency metrics
 
-## 🎯 Core Irrigation Intelligence
+## 🎯 Core Irrigation Logic
 
-### **4-Phase AI-Optimized Cycle**
-- **P0 (Morning Dryback)**: AI-predicted optimal drying duration
-- **P1 (Ramp-Up)**: ML-guided progressive rehydration
-- **P2 (Maintenance)**: Intelligent EC-based irrigation decisions
-- **P3 (Pre-Lights-Off)**: Predictive final dryback management
+### **4-Phase Rule-Based Cycle**
+- **P0 (Morning Dryback)**: Controlled drying phase with configurable target thresholds
+- **P1 (Ramp-Up)**: Progressive rehydration with increasing shot sizes
+- **P2 (Maintenance)**: VWC and EC threshold-based irrigation decisions
+- **P3 (Pre-Lights-Off)**: Final dryback management with emergency-only irrigation
 
 ### **🔄 Automatic Phase Transitions (How It Actually Works)**
 
@@ -111,11 +104,11 @@ The system automatically moves through phases based on plant conditions, not arb
 - **Entities:** `number.crop_steering_p1_target_vwc` (65% target moisture)
 
 **P2 → P3: Pre-Lights-Off Final Watering**
-- **When:** ML-predicted timing before lights off
+- **When:** Calculated timing based on dryback rate analysis
 - **Logic:** Final irrigation before lights-off dark period
 - **Simple:** Give plants last drink before sleep
 
-**In Plain English:** Lights on = start getting thirsty → water them slowly until happy → keep them happy all day → final drink before sleep → repeat. Just like caring for plants manually, but perfectly timed by AI.
+**In Plain English:** Lights on = start getting thirsty → water them slowly until happy → keep them happy all day → final drink before sleep → repeat. Just like caring for plants manually, but perfectly timed by rule-based automation.
 
 ### **📊 Detailed Entity Configuration & Triggers**
 
@@ -152,23 +145,23 @@ The system automatically moves through phases based on plant conditions, not arb
 - **Example:** When average VWC reaches 65%, move to maintenance
 
 #### **P2 → P3 Transition (Maintenance → Bedtime Prep)**
-**Trigger:** ML-predicted optimal timing based on dryback analysis
+**Trigger:** Calculated timing based on dryback rate analysis
 
-**ML Prediction Logic:**
-- **AI Analysis:** Uses `advanced_dryback_detection.py` to predict when target dryback will be achieved
-- **Calculation:** `predict_target_dryback_time()` analyzes current dryback rate from recent VWC data
+**Statistical Analysis Logic:**
+- **Trend Analysis:** Uses `advanced_dryback_detection.py` to calculate dryback rates from recent VWC data
+- **Calculation:** `predict_target_dryback_time()` analyzes current dryback trend using linear regression
 - **Timing:** Starts P3 at `(lights_off - predicted_dryback_time - 30min_buffer)`
 - **Entities:** Uses `number.crop_steering_veg_dryback_target` as overnight dryback goal
 
-**Intelligent Safeguards:**
+**Safety Safeguards:**
 - **Minimum Window:** P3 can't start more than 2 hours before lights off
 - **Maximum Window:** P3 must start at least 30 minutes before lights off
-- **Fallback:** If ML unavailable, uses historical patterns based on substrate volume
+- **Fallback:** If analysis unavailable, uses default timing based on substrate volume
 
-**How It Adapts:**
-- **Day 1:** Uses default timing (historical estimate)
-- **Day 2+:** ML learns actual dryback speed from previous nights
-- **Continuous:** Each day, timing becomes more precise based on plant response
+**How It Improves:**
+- **Day 1:** Uses default timing (conservative estimate)
+- **Day 2+:** System calculates actual dryback speed from previous nights
+- **Continuous:** Each day, timing becomes more accurate based on measured plant response
 
 #### **🎛️ Key Monitoring Entities**
 
@@ -267,11 +260,11 @@ Zone 4: P0 (Dryback)  - No irrigation, letting it dry
 - **Better data** - ML learns each zone's specific behavior
 
 ### **Advanced Safety Systems**
-- **Emergency AI**: Critical VWC detection with immediate response
+- **Emergency Irrigation**: Critical VWC threshold detection with immediate response
 - **Thread-Safe Operation**: Concurrent processing with proper synchronization
-- **Hardware Sequencing**: Intelligent pump → main line → zone valve control
+- **Hardware Sequencing**: Controlled pump → main line → zone valve operation
 - **Redundant Validation**: Multi-layer safety checks with failover systems
-- **Outlier Protection**: Automatic filtering of sensor anomalies
+- **Outlier Protection**: Statistical filtering of sensor anomalies
 
 ## 📦 Installation
 
@@ -306,12 +299,12 @@ Zone 4: P0 (Dryback)  - No irrigation, letting it dry
    - Search "Crop Steering" in HACS
    - Download and restart Home Assistant
 
-3. **Configure AppDaemon (Required for AI):**
+3. **Configure AppDaemon (Required for Advanced Features):**
    - Install AppDaemon 4 add-on
    - **NEW v15+ Path:** `/addon_configs/a0d7b954_appdaemon/`
    - Follow our [Installation Guide](docs/installation_guide.md) for complete setup
 
-**⚠️ Important:** HACS only installs the basic integration. The AI features require AppDaemon configuration with updated v15+ directory paths.
+**⚠️ Important:** HACS only installs the basic integration. The advanced automation features require AppDaemon configuration with updated v15+ directory paths.
 
 ## ⚙️ Configuration
 
@@ -345,10 +338,10 @@ Zone 4: P0 (Dryback)  - No irrigation, letting it dry
    - Apps directory: `/addon_configs/a0d7b954_appdaemon/apps/`
    - Access via Samba: `\\YOUR_HA_IP\addon_configs\a0d7b954_appdaemon`
 3. **Restart AppDaemon add-on**
-4. **AI Features Activate Automatically:**
-   - Machine learning models start learning immediately
-   - Sensor fusion begins with first readings
-   - Dashboard becomes available
+4. **Advanced Features Activate Automatically:**
+   - Statistical analysis modules start processing sensor data
+   - Sensor validation begins with first readings
+   - Professional dashboard becomes available
 
 ### 🔧 New Configuration Tools (v2.1.0)
 
@@ -403,55 +396,55 @@ Once configured, the system runs automatically:
 ### **Monitor Your System**
 
 **Key entities to watch:**
-- `sensor.crop_steering_ml_irrigation_need` - AI prediction (0-100%)
-- `sensor.crop_steering_fused_vwc` - Smart sensor readings
+- `sensor.crop_steering_irrigation_recommendation` - System recommendation based on thresholds
+- `sensor.crop_steering_fused_vwc` - Validated sensor readings
 - `sensor.crop_steering_current_phase` - Current irrigation phase
 - `sensor.crop_steering_system_state` - Overall system status
 
-### **AI Learning Timeline**
+### **System Optimization Timeline**
 
-- **Week 1**: System learns basic patterns (50-60% accuracy)
-- **Week 2**: Pattern recognition improves (70-80% accuracy)
-- **Week 3+**: Peak performance achieved (85-95% accuracy)
+- **Week 1**: System establishes baseline patterns and thresholds
+- **Week 2**: Statistical analysis improves timing accuracy
+- **Week 3+**: Optimal performance achieved with fine-tuned parameters
 
-**📈 Detailed operation:** Read our [AI Operation Guide](docs/ai_operation_guide.md) for complete usage instructions.
+**📈 Detailed operation:** Read our [Operation Guide](docs/operation_guide.md) for complete usage instructions.
 
-## 🧠 AI System Components
+## 🔧 Automation System Components
 
-### **Smart Features You Get**
+### **Advanced Features You Get**
 
-**🧠 Machine Learning Engine**
-- Predicts irrigation needs 2+ hours in advance
-- Learns from your specific plants and conditions
-- Continuously improves accuracy over time
+**📊 Statistical Analysis Engine**
+- Calculates irrigation timing based on threshold analysis
+- Processes sensor data using proven mathematical methods
+- Maintains consistent performance over time
 
-**🔍 Advanced Sensor Fusion**
-- Combines multiple sensors for accuracy
-- Automatically filters out bad readings
-- Provides smooth, reliable measurements
+**🔍 Sensor Validation System**
+- Combines multiple sensors for accuracy using IQR outlier detection
+- Automatically filters out bad readings using statistical methods
+- Provides smooth, reliable measurements with moving averages
 
 **📈 Real-Time Dryback Detection**
-- Monitors plant water uptake patterns
-- Identifies optimal irrigation timing
-- Prevents over/under-watering
+- Monitors plant water uptake patterns using peak detection algorithms
+- Identifies optimal irrigation timing based on configurable thresholds
+- Prevents over/under-watering through safety limits
 
 **🌱 Intelligent Crop Profiles**
-- Optimized settings for different plant types
-- Automatically adjusts to growth stages
-- Adapts parameters based on plant response
+- Optimized parameter sets for different plant types
+- Automatically adjusts to growth stages based on configured schedules
+- Maintains consistent parameters optimized for each crop type
 
 **📊 Professional Dashboard**
-- Real-time monitoring and analytics
-- Performance tracking and optimization
-- Athena-style professional interface
+- Real-time monitoring with AppDaemon YAML interface
+- Performance tracking and water usage analytics
+- Professional styling with intuitive navigation
 
 ## 📊 What Results to Expect
 
 ### **Performance Improvements**
-- **15-30% Better Yields**: Optimal irrigation timing maximizes growth
-- **20-40% Water Savings**: AI prevents waste through precision timing
-- **85-95% Accuracy**: Machine learning reaches high precision in 2-3 weeks
-- **24/7 Monitoring**: Continuous optimization without manual intervention
+- **Consistent Irrigation**: Optimal timing through threshold-based automation
+- **Water Conservation**: Rule-based logic prevents waste through precision timing
+- **Reliable Operation**: Statistical analysis provides consistent performance
+- **24/7 Monitoring**: Continuous automation without manual intervention
 
 ### **System Capabilities**
 - **Dynamic Multi-Zone Support**: 1-6 independent irrigation zones with automatic configuration
@@ -489,7 +482,7 @@ This system has undergone comprehensive testing and validation:
 
 ### **Complete Guides Available**
 - 📖 [Installation Guide](docs/installation_guide.md) - Complete step-by-step setup
-- 🧠 [AI Operation Guide](docs/ai_operation_guide.md) - How to use the intelligent features
+- 🔧 [Operation Guide](docs/operation_guide.md) - How to use the automation features
 - 📊 [Dashboard Guide](docs/dashboard_guide.md) - Understanding the monitoring interface
 - 🎯 [Dynamic Zones Guide](docs/dynamic_zones_guide.md) - Configure 1-6 zones easily (NEW)
 - 🔄 [AppDaemon v15+ Migration](docs/appdaemon_v15_migration.md) - Updated directory paths (NEW)
@@ -507,21 +500,21 @@ Once installed, you can customize the system through the Home Assistant integrat
 - **Tomato_Hydroponic**: Continuous production vegetables
 - **Lettuce_Leafy_Greens**: Low-stress leafy green cultivation
 
-### **AI Features You Get**
-- **Smart Sensor Fusion**: Combines multiple sensors for accuracy
-- **Predictive ML Models**: 2+ hour irrigation forecasting
-- **Adaptive Learning**: System improves performance over time
-- **Real-Time Analytics**: Professional monitoring dashboard
-- **Emergency AI**: Automatic response to critical conditions
+### **Automation Features You Get**
+- **Statistical Sensor Fusion**: Combines multiple sensors using mathematical validation
+- **Trend Analysis Models**: Irrigation timing based on dryback rate calculations
+- **Parameter Optimization**: System maintains optimal thresholds over time
+- **Real-Time Analytics**: Professional monitoring dashboard with AppDaemon
+- **Emergency Response**: Automatic irrigation response to critical VWC conditions
 
 ## 🤝 Contributing
 
 We welcome contributions to advance precision agriculture technology!
 
 ### **Development Areas**
-- **ML Models**: New algorithms and improvements
-- **Sensor Fusion**: Advanced validation techniques
-- **Crop Profiles**: New strain and crop data
+- **Statistical Algorithms**: New analysis methods and improvements
+- **Sensor Validation**: Advanced filtering techniques
+- **Crop Profiles**: New strain and crop parameter sets
 - **Dashboard**: Visualization enhancements
 - **Hardware Support**: New sensor integrations
 
@@ -540,7 +533,7 @@ This project is licensed under the MIT License.
 - **Home Assistant Community**: Excellent automation platform
 - **AppDaemon Developers**: Powerful Python automation framework  
 - **Crop Steering Research**: Scientific foundation and principles
-- **Machine Learning Community**: Algorithms and techniques
+- **Scientific Community**: Statistical algorithms and techniques
 - **Beta Testers**: Validation and real-world testing
 
 ## 🆕 Advanced Zone Features (NEW!)
@@ -578,10 +571,10 @@ This project is licensed under the MIT License.
 
 ## 🌟 Transform Your Growing Operation
 
-Experience **research-grade precision agriculture** with advanced AI, machine learning, and professional analytics. From hobby grows to commercial operations, this system delivers the intelligence and control needed for optimal plant health and maximum yields.
+Experience **research-grade precision agriculture** with advanced automation, statistical analysis, and professional monitoring. From hobby grows to commercial operations, this system delivers the intelligence and control needed for optimal plant health and maximum yields.
 
-**Ready for the future of precision irrigation?** Install now and experience the power of AI-driven crop steering!
+**Ready for the future of precision irrigation?** Install now and experience the power of rule-based automated crop steering!
 
 ---
 
-*Revolutionizing precision agriculture with artificial intelligence* 🧠🌱
+*Advancing precision agriculture with intelligent automation* 🌱🔧
