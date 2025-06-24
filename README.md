@@ -246,11 +246,53 @@ Zone 4: P0 (Dryback)  - No irrigation, letting it dry
 - **Shot Size:** `number.crop_steering_p1_initial_shot_size` (default: 2%)
 - **Example Decision:** `"P1 ramp-up zones [1,3]: Z1:55.2%, Z3:56.8% < 58.5%"`
 
-#### **P2 Maintenance (Per Zone)**
-**Logic:** `zone_vwc < p2_vwc_threshold`
-- **Entity:** `number.crop_steering_p2_vwc_threshold` (default: 60%)
-- **Shot Size:** `number.crop_steering_p2_shot_size` (default: 5%)
-- **Example Decision:** `"P2 maintenance zones [2]: Z2:58.1% < 60.0%"`
+#### **P2 Maintenance - Core Crop Steering Logic (Per Zone)**
+
+**The Heart of Crop Steering:** P2 manages both VWC (water stress) and pwEC (salt stress) simultaneously.
+
+**Crop Steering Terminology:**
+- **Field Capacity:** Maximum VWC substrate can hold (auto-detected in P1)
+- **VWC:** Volumetric Water Content - water percentage in substrate  
+- **pwEC:** Pore water electrical conductivity - salt concentration
+- **EC Ratio:** `current_pwEC / target_pwEC` (0.8-1.2 = optimal range)
+
+**Dual Decision Logic:**
+1. **VWC Dryback Management:**
+   - **Veg Steering:** Allow 10% dryback from field capacity → irrigate back to field capacity
+   - **Gen Steering:** Allow 15% dryback from field capacity → more stress for flowering
+   - **Example:** Field capacity 70% → Veg irrigates at 63%, Gen at 59.5%
+
+2. **EC Salt Management:**
+   - **High EC (>1.2 ratio):** Too salty → Larger shots to dilute
+   - **Low EC (<0.8 ratio):** Too dilute → Smaller shots to concentrate  
+   - **Shot Adjustment:** `base_shot × min(2.0, current_EC / target_EC)`
+
+**Veg vs Gen EC Targets:**
+- **Vegetative:** P2 target = 3.2 mS/cm (comfortable growth)
+- **Generative:** P2 target = 6.0 mS/cm (stress for flowering)
+
+**Irrigation Triggers:** Irrigate if EITHER condition met:
+- VWC below dryback threshold OR EC ratio outside 0.8-1.2 range
+
+**Real-World P2 Examples:**
+
+*Scenario 1 - Vegetative Zone:*
+- Field Capacity: 72%, Current VWC: 62%, Current EC: 2.8 mS/cm, Target: 3.2 mS/cm
+- VWC Check: 62% < (72% - 10%) = 62% → At threshold, needs irrigation
+- EC Check: 2.8/3.2 = 0.875 ratio → Slightly low but acceptable
+- **Decision:** IRRIGATE normal shot to restore field capacity
+
+*Scenario 2 - Generative Zone with High Salt:*
+- Field Capacity: 68%, Current VWC: 60%, Current EC: 7.5 mS/cm, Target: 6.0 mS/cm
+- VWC Check: 60% > (68% - 15%) = 53% → VWC still good
+- EC Check: 7.5/6.0 = 1.25 ratio → HIGH EC, needs dilution
+- **Decision:** IRRIGATE larger shot (1.25x normal) to dilute salt buildup
+
+*Scenario 3 - No Irrigation Needed:*
+- Field Capacity: 70%, Current VWC: 65%, Current EC: 5.8 mS/cm, Target: 6.0 mS/cm
+- VWC Check: 65% > (70% - 15%) = 55% → VWC good
+- EC Check: 5.8/6.0 = 0.97 ratio → EC perfect
+- **Decision:** NO irrigation, let plants naturally uptake water and concentrate EC
 
 #### **P3 Emergency (Per Zone)**
 **Logic:** `zone_vwc < p3_emergency_vwc_threshold`
