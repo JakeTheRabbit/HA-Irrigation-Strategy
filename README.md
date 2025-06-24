@@ -4,8 +4,20 @@
 ![Python](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)
 ![Automation](https://img.shields.io/badge/Automation-Rule%20Based-4CAF50?logo=homeassistant&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
-![Quality](https://img.shields.io/badge/Quality-Production%20Ready-00C851?logo=github&logoColor=white)
-![Status](https://img.shields.io/badge/Status-Validated%20✓-28A745?logo=checkmarx&logoColor=white)
+![Status](https://img.shields.io/badge/Status-Heavy%20Development-orange?logo=github&logoColor=white)
+![Warning](https://img.shields.io/badge/⚠️-Experimental-red)
+
+## ⚠️ **DEVELOPMENT STATUS WARNING**
+
+**This system is heavily under development and should be considered experimental.** 
+
+- 🚧 **Vibe coded** - Built based on irrigation theory but not extensively tested in real growing conditions
+- 🧪 **Experimental features** - Complex automation logic that may need tuning for your specific setup
+- 🌱 **Use at your own risk** - Monitor your plants closely and have backup irrigation methods ready
+- 📝 **Heavy development** - Code and functionality subject to significant changes
+- 🔧 **Not production ready** - Expect bugs, issues, and the need for manual intervention
+
+**Recommendation:** Start with manual overrides enabled and gradually trust the automation as you validate it works with your specific hardware and plants.
 
 <!-- Clickable thumbnails that open full-size in a new tab -->
 [<img src="https://github.com/user-attachments/assets/6c48967a-1f5d-486c-8fb6-dbad207f158c" width="20"/>](https://github.com/user-attachments/assets/6c48967a-1f5d-486c-8fb6-dbad207f158c) [<img src="https://github.com/user-attachments/assets/ff514550-e6c8-4dc0-a7fe-1fb3bdbecf47" width="250"/>](https://github.com/user-attachments/assets/ff514550-e6c8-4dc0-a7fe-1fb3bdbecf47) [<img src="https://github.com/user-attachments/assets/a2138083-1196-4167-92d4-dc193526594a" width="250"/>](https://github.com/user-attachments/assets/a2138083-1196-4167-92d4-dc193526594a)
@@ -272,8 +284,8 @@ Zone 4: P0 (Dryback)  - No irrigation, letting it dry
 
 **👉 [Follow our Complete Installation Guide](docs/installation_guide.md)** - designed for beginners!
 
-> **✅ SYSTEM STATUS: PRODUCTION READY - v2.1.0**  
-> This system has undergone comprehensive quality assurance testing and all critical issues have been resolved. Now includes dynamic zone configuration and improved AppDaemon compatibility. The codebase is validated, optimized, and ready for deployment.
+> **⚠️ SYSTEM STATUS: EXPERIMENTAL DEVELOPMENT**  
+> This system is experimental and under heavy development. Use with caution and close monitoring. While the logic is based on proven crop steering principles, real-world testing is limited. Expect to need manual intervention and parameter tuning for your specific setup.
 
 ### 📋 What You Need
 
@@ -467,16 +479,16 @@ Once configured, the system runs automatically:
 - **Proactive Alerts**: Notifies you of issues before they become problems
 - **Graceful Degradation**: Reduces features rather than failing completely
 
-### **✅ Quality Assurance Validated**
+### **🧪 Current Development Status**
 
-This system has undergone comprehensive testing and validation:
+This system represents sophisticated automation logic but should be considered experimental:
 
-- **✅ Thread Safety**: Verified concurrent operation with proper locking
-- **✅ Memory Management**: Bounded data structures prevent memory leaks
-- **✅ Error Handling**: Comprehensive exception handling with graceful degradation
-- **✅ Code Quality**: All critical bugs resolved, optimized for production
-- **✅ Configuration Management**: Robust environment file integration
-- **✅ Import Validation**: All dependencies verified and functional
+- **🚧 Limited Testing**: Theoretical implementation needs real-world validation
+- **⚠️ Complex Logic**: Multi-phase automation may need tuning for your specific plants
+- **🔧 Parameter Sensitivity**: VWC/EC thresholds may need adjustment for your growing medium
+- **📊 Sensor Dependency**: Requires reliable VWC/EC sensors for proper operation
+- **🌱 Plant Variability**: Different genetics may respond differently to automation
+- **💡 User Expertise**: Best results require understanding of crop steering principles
 
 ## 📚 Documentation
 
