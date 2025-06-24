@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN, CONF_NUM_ZONES
 
@@ -67,6 +68,12 @@ SELECT_DESCRIPTIONS = [
             "Basil",
             "Custom"
         ],
+    ),
+    SelectEntityDescription(
+        key="growth_stage",
+        name="Growth Stage",
+        icon="mdi:timeline",
+        options=["Vegetative", "Generative", "Transition"],
     ),
     SelectEntityDescription(
         key="steering_mode",
@@ -150,8 +157,8 @@ async def async_setup_entry(
     
     async_add_entities(selects)
 
-class CropSteeringSelect(SelectEntity):
-    """Crop Steering select entity."""
+class CropSteeringSelect(SelectEntity, RestoreEntity):
+    """Crop Steering select entity with state restoration."""
 
     def __init__(
         self,
@@ -176,8 +183,17 @@ class CropSteeringSelect(SelectEntity):
             self._attr_current_option = "Follow Main"
         elif "schedule" in description.key:
             self._attr_current_option = "Main Schedule"
+        elif description.key == "growth_stage":
+            self._attr_current_option = "Vegetative"
         else:
             self._attr_current_option = description.options[0] if description.options else None
+
+    async def async_added_to_hass(self) -> None:
+        """Restore state when added to hass."""
+        await super().async_added_to_hass()
+        if (last_state := await self.async_get_last_state()) is not None:
+            if last_state.state in self.options:
+                self._attr_current_option = last_state.state
 
     @property
     def device_info(self) -> DeviceInfo:

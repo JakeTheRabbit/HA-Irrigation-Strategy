@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN, CONF_NUM_ZONES
 
@@ -86,8 +87,8 @@ async def async_setup_entry(
     
     async_add_entities(switches)
 
-class CropSteeringSwitch(SwitchEntity):
-    """Crop Steering switch."""
+class CropSteeringSwitch(SwitchEntity, RestoreEntity):
+    """Crop Steering switch with state restoration."""
 
     def __init__(
         self,
@@ -109,6 +110,12 @@ class CropSteeringSwitch(SwitchEntity):
             self._attr_is_on = True  # Zones enabled by default
         else:
             self._attr_is_on = False
+
+    async def async_added_to_hass(self) -> None:
+        """Restore state when added to hass."""
+        await super().async_added_to_hass()
+        if (last_state := await self.async_get_last_state()) is not None:
+            self._attr_is_on = last_state.state == "on"
 
     @property
     def device_info(self) -> DeviceInfo:

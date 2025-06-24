@@ -39,6 +39,12 @@ def get_irrigation_shot_schema(hass: HomeAssistant) -> vol.Schema:
         vol.Optional("shot_type"): vol.In(["P1", "P2", "P3_emergency"]),
     })
 
+MANUAL_OVERRIDE_SCHEMA = vol.Schema({
+    vol.Required("zone"): vol.Range(min=MIN_ZONES, max=MAX_ZONES),
+    vol.Optional("timeout_minutes"): vol.Range(min=1, max=1440),  # Max 24 hours
+    vol.Optional("enable"): cv.boolean,
+})
+
 SERVICES = {
     "transition_phase": {
         "schema": PHASE_TRANSITION_SCHEMA,
@@ -52,6 +58,10 @@ SERVICES = {
     "check_transition_conditions": {
         "schema": vol.Schema({}),
         "method": "async_check_transition_conditions",
+    },
+    "set_manual_override": {
+        "schema": MANUAL_OVERRIDE_SCHEMA,
+        "method": "async_set_manual_override",
     },
 }
 
@@ -172,6 +182,46 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             
         except Exception as e:
             _LOGGER.error(f"Error checking transition conditions: {e}")
+
+    async def async_set_manual_override(call: ServiceCall) -> None:
+        """Service to set manual override for a zone with optional timeout."""
+        zone = call.data["zone"]
+        timeout_minutes = call.data.get("timeout_minutes", 60)  # Default 1 hour
+        enable = call.data.get("enable", True)
+        
+        _LOGGER.info(f"Manual override requested: Zone {zone}, Enable: {enable}, Timeout: {timeout_minutes}min")
+        
+        # Set the manual override switch
+        override_entity = f"switch.crop_steering_zone_{zone}_manual_override"
+        await hass.services.async_call(
+            "switch",
+            "turn_on" if enable else "turn_off",
+            {"entity_id": override_entity},
+            blocking=True,
+        )
+        
+        # Fire event for AppDaemon to handle timeout logic
+        if enable and timeout_minutes:
+            hass.bus.async_fire(
+                "crop_steering_manual_override",
+                {
+                    "zone": zone,
+                    "action": "enable_with_timeout",
+                    "timeout_minutes": timeout_minutes,
+                    "timestamp": hass.helpers.template.now().isoformat(),
+                },
+            )
+        else:
+            hass.bus.async_fire(
+                "crop_steering_manual_override",
+                {
+                    "zone": zone,
+                    "action": "disable" if not enable else "enable_permanent",
+                    "timestamp": hass.helpers.template.now().isoformat(),
+                },
+            )
+        
+        _LOGGER.info(f"Manual override set for Zone {zone}: {'Enabled' if enable else 'Disabled'}")
 
     # Register services
     for service_name, service_config in SERVICES.items():
