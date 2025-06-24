@@ -1,0 +1,29 @@
+secrets: /config/secrets.yaml
+appdaemon:
+  latitude: 40.8939
+  longitude: -74.0455
+  elevation: 100
+  time_zone: Pacific/Auckland
+  plugins:
+    HASS:
+      type: hass
+      ha_url: http://homeassistant:8123
+      token: !secret ha_token
+http:
+  url: http://0.0.0.0:5050
+admin:
+api:
+hadashboard:
+  dash_url: http://0.0.0.0:5050
+  dash_dir: /config/dashboards
+  dash_compile_on_start: True
+  dash_force_compile: False
+  dash_ssl_certificate: 
+  dash_ssl_key:
+logs:
+  crop_steering_master:
+    name: crop_steering_master
+    level: INFO
+  crop_steering_dashboard:
+    name: crop_steering_dashboard
+    level: INFO
