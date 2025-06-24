@@ -9,7 +9,7 @@ import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from collections import defaultdict, deque
-import numpy as np
+import statistics
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,6 +26,12 @@ class IntelligentCropProfiles:
     - Performance tracking and profile optimization
     - Custom profile creation and modification
     """
+    
+    def _mean(self, data):
+        """Calculate mean of data."""
+        if not data:
+            return 0
+        return sum(data) / len(data)
     
     def __init__(self, profiles_file: str = None):
         """
@@ -550,9 +556,9 @@ class IntelligentCropProfiles:
         
         # Analyze recent performance (last 20 samples)
         recent_performance = profile_history[-20:]
-        avg_efficiency = np.mean([p['irrigation_efficiency'] for p in recent_performance])
-        avg_response = np.mean([p['vwc_response'] for p in recent_performance])
-        target_hit_rate = np.mean([p['target_achievement'] for p in recent_performance])
+        avg_efficiency = self._mean([p['irrigation_efficiency'] for p in recent_performance])
+        avg_response = self._mean([p['vwc_response'] for p in recent_performance])
+        target_hit_rate = self._mean([p['target_achievement'] for p in recent_performance])
         
         adaptations = {}
         
@@ -574,7 +580,7 @@ class IntelligentCropProfiles:
         
         # Adapt EC based on plant response
         plant_response_scores = [p['plant_response_score'] for p in recent_performance]
-        avg_plant_response = np.mean(plant_response_scores)
+        avg_plant_response = self._mean(plant_response_scores)
         
         if avg_plant_response < 0.4:  # Poor plant response
             # Reduce EC stress
@@ -696,7 +702,7 @@ class IntelligentCropProfiles:
             if profile_name in self.profile_performance_history:
                 history = self.profile_performance_history[profile_name]
                 if len(history) >= 10:
-                    avg_performance = np.mean([h['irrigation_efficiency'] for h in history[-10:]])
+                    avg_performance = self._mean([h['irrigation_efficiency'] for h in history[-10:]])
                     suitability_score += avg_performance * 0.1
                     factors.append(f"Proven performance ({avg_performance:.2f})")
             

@@ -4,16 +4,13 @@ Implements multi-scale peak detection and real-time dryback analysis
 Based on research: MSPD (Multi-Scale Peak Detection) algorithms
 """
 
-import numpy as np
-import pandas as pd
 from collections import deque
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime, timedelta
 import asyncio
 import logging
-from scipy import signal
-from scipy.stats import zscore
 import math
+import statistics
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +25,111 @@ class AdvancedDrybackDetector:
     - Pattern recognition for irrigation timing optimization
     - Adaptive thresholds based on historical data
     """
+    
+    def _mean(self, data):
+        """Calculate mean of data."""
+        if not data:
+            return 0
+        return sum(data) / len(data)
+    
+    def _std(self, data):
+        """Calculate standard deviation of data."""
+        if len(data) < 2:
+            return 0
+        mean_val = self._mean(data)
+        variance = sum((x - mean_val) ** 2 for x in data) / (len(data) - 1)
+        return variance ** 0.5
+    
+    def _min(self, data):
+        """Get minimum value from data."""
+        return min(data) if data else 0
+    
+    def _max(self, data):
+        """Get maximum value from data."""
+        return max(data) if data else 0
+    
+    def _find_peaks(self, data, height=None, distance=None, prominence=None):
+        """Simple peak finding algorithm."""
+        if len(data) < 3:
+            return [], {}
+        
+        peaks = []
+        prominences = []
+        
+        for i in range(1, len(data) - 1):
+            # Check if it's a local maximum
+            if data[i] > data[i-1] and data[i] > data[i+1]:
+                # Check height threshold
+                if height is not None and data[i] < height:
+                    continue
+                
+                # Check distance constraint
+                if distance is not None and peaks:
+                    if i - peaks[-1] < distance:
+                        continue
+                
+                # Calculate prominence (simplified)
+                left_min = min(data[max(0, i-10):i]) if i >= 10 else min(data[:i])
+                right_min = min(data[i+1:min(len(data), i+11)]) if i < len(data)-10 else min(data[i+1:])
+                prom = data[i] - max(left_min, right_min)
+                
+                # Check prominence threshold
+                if prominence is not None and prom < prominence:
+                    continue
+                
+                peaks.append(i)
+                prominences.append(prom)
+        
+        return peaks, {'prominences': prominences}
+    
+    def _apply_savgol_filter(self, data, window_length, polyorder):
+        """Simplified Savitzky-Golay filter implementation."""
+        if len(data) < window_length:
+            return data
+        
+        # Simple smoothing using moving average as fallback
+        result = []
+        half_window = window_length // 2
+        
+        for i in range(len(data)):
+            start = max(0, i - half_window)
+            end = min(len(data), i + half_window + 1)
+            result.append(self._mean(data[start:end]))
+        
+        return result
+    
+    def _moving_average(self, data, window):
+        """Calculate moving average."""
+        if len(data) < window:
+            return data
+        
+        result = []
+        for i in range(len(data)):
+            start = max(0, i - window + 1)
+            end = i + 1
+            result.append(self._mean(data[start:end]))
+        
+        return result
+    
+    def _polyfit(self, x, y, degree):
+        """Simple linear regression for degree 1."""
+        if degree != 1 or len(x) != len(y) or len(x) < 2:
+            return [0, 0]
+        
+        n = len(x)
+        sum_x = sum(x)
+        sum_y = sum(y)
+        sum_xy = sum(x[i] * y[i] for i in range(n))
+        sum_x2 = sum(x[i] ** 2 for i in range(n))
+        
+        denominator = n * sum_x2 - sum_x ** 2
+        if denominator == 0:
+            return [0, sum_y / n]
+        
+        slope = (n * sum_xy - sum_x * sum_y) / denominator
+        intercept = (sum_y - slope * sum_x) / n
+        
+        return [slope, intercept]
     
     def __init__(self, window_size: int = 100, min_peak_distance: int = 10, 
                  noise_threshold: float = 0.5, confidence_threshold: float = 0.7):
@@ -117,30 +219,30 @@ class AdvancedDrybackDetector:
         if len(self.vwc_history) < self.min_peak_distance * 2:
             return [], []
         
-        # Convert to numpy array for analysis
-        vwc_data = np.array(list(self.vwc_history))
+        # Convert to list for analysis
+        vwc_data = list(self.vwc_history)
         timestamps = list(self.timestamp_history)
         
         # Apply smoothing to reduce noise
         smoothed_data = self._apply_smoothing(vwc_data)
         
         # Calculate adaptive threshold
-        std_dev = np.std(smoothed_data[-self.window_size:]) if len(smoothed_data) >= self.window_size else np.std(smoothed_data)
+        std_dev = self._std(smoothed_data[-self.window_size:]) if len(smoothed_data) >= self.window_size else self._std(smoothed_data)
         threshold = std_dev * self.adaptive_threshold_multiplier
         
         # Detect peaks (irrigation events)
-        peak_indices, peak_properties = signal.find_peaks(
+        peak_indices, peak_properties = self._find_peaks(
             smoothed_data,
-            height=np.mean(smoothed_data) + threshold,
+            height=self._mean(smoothed_data) + threshold,
             distance=self.min_peak_distance,
             prominence=self.noise_threshold
         )
         
         # Detect valleys (dryback bottoms)
-        inverted_data = -smoothed_data
-        valley_indices, valley_properties = signal.find_peaks(
+        inverted_data = [-x for x in smoothed_data]
+        valley_indices, valley_properties = self._find_peaks(
             inverted_data,
-            height=-np.mean(smoothed_data) + threshold,
+            height=-self._mean(smoothed_data) + threshold,
             distance=self.min_peak_distance,
             prominence=self.noise_threshold
         )
@@ -172,7 +274,7 @@ class AdvancedDrybackDetector:
         
         return new_peaks, new_valleys
 
-    def _apply_smoothing(self, data: np.ndarray, method: str = 'savgol') -> np.ndarray:
+    def _apply_smoothing(self, data: List[float], method: str = 'savgol') -> List[float]:
         """
         Apply smoothing to reduce noise while preserving peaks.
         
@@ -192,21 +294,21 @@ class AdvancedDrybackDetector:
             if window_length % 2 == 0:
                 window_length += 1
             if window_length >= 3:
-                return signal.savgol_filter(data, window_length, 2)
+                return self._apply_savgol_filter(data, window_length, 2)
                 
         elif method == 'gaussian':
-            # Gaussian filter
-            sigma = max(1, len(data) // 20)
-            return signal.gaussian_filter1d(data, sigma)
+            # Simplified gaussian-like smoothing using moving average
+            window = max(1, len(data) // 20)
+            return self._moving_average(data, window)
             
         elif method == 'moving_avg':
             # Simple moving average
             window = min(len(data) // 5, self.moving_average_window)
-            return np.convolve(data, np.ones(window)/window, mode='same')
+            return self._moving_average(data, window)
         
         return data
 
-    def _calculate_peak_confidence(self, peak_idx: int, data: np.ndarray, 
+    def _calculate_peak_confidence(self, peak_idx: int, data: List[float], 
                                    properties: Dict) -> float:
         """
         Calculate confidence score for detected peak/valley.
@@ -233,7 +335,7 @@ class AdvancedDrybackDetector:
         
         # 2. Local variance factor (stability around peak)
         local_data = data[max(0, peak_idx-5):min(len(data), peak_idx+6)]
-        local_std = np.std(local_data)
+        local_std = self._std(local_data)
         variance_factor = max(0, 1 - (local_std / self.noise_threshold))
         factors.append(variance_factor * 0.2)
         
@@ -245,7 +347,7 @@ class AdvancedDrybackDetector:
         
         # 4. Amplitude factor (relative to recent data)
         recent_data = data[-min(len(data), 30):]
-        amplitude_factor = (data[peak_idx] - np.min(recent_data)) / (np.max(recent_data) - np.min(recent_data) + 0.001)
+        amplitude_factor = (data[peak_idx] - self._min(recent_data)) / (self._max(recent_data) - self._min(recent_data) + 0.001)
         factors.append(min(amplitude_factor, 1.0) * 0.3)
         
         return min(sum(factors), 1.0)
@@ -299,13 +401,13 @@ class AdvancedDrybackDetector:
             recent_peaks = [p for p in self.peaks if 
                            (self.timestamp_history[-1] - p['timestamp']).total_seconds() < 3600]
             if recent_peaks:
-                avg_peak_confidence = np.mean([p['confidence'] for p in recent_peaks])
+                avg_peak_confidence = self._mean([p['confidence'] for p in recent_peaks])
                 factors.append(avg_peak_confidence * 0.4)
         
         # Data consistency (low noise)
         if len(self.vwc_history) >= 10:
             recent_data = list(self.vwc_history)[-10:]
-            noise_level = np.std(recent_data) / np.mean(recent_data) if np.mean(recent_data) > 0 else 1.0
+            noise_level = self._std(recent_data) / self._mean(recent_data) if self._mean(recent_data) > 0 else 1.0
             consistency_factor = max(0, 1 - noise_level)
             factors.append(consistency_factor * 0.3)
         
@@ -361,7 +463,7 @@ class AdvancedDrybackDetector:
         
         # Linear regression for trend
         if len(time_points) >= 2:
-            slope = np.polyfit(time_points, vwc_points, 1)[0]  # VWC change per minute
+            slope = self._polyfit(time_points, vwc_points, 1)[0]  # VWC change per minute
             dryback_rate = abs(slope) / self.last_peak_vwc * 100 if self.last_peak_vwc else 0  # % per minute
             
             if target_percentage and dryback_rate > 0:

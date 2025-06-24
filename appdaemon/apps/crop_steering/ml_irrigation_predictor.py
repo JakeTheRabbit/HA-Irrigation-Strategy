@@ -4,8 +4,6 @@ Mathematical prediction model without external ML dependencies
 Compatible with Home Assistant OS - no compilation required
 """
 
-import numpy as np
-import pandas as pd
 from collections import deque, defaultdict
 from typing import Dict, List, Tuple, Optional, Any
 from datetime import datetime, timedelta
@@ -13,26 +11,56 @@ import logging
 import json
 import math
 import asyncio
-from scipy import stats
-from scipy.signal import find_peaks
-import warnings
-warnings.filterwarnings('ignore')
+import statistics
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class SimplifiedIrrigationPredictor:
     """
-    Simplified mathematical irrigation predictor using scipy only.
+    Simplified mathematical irrigation predictor using standard library only.
     
     Features:
-    - Mathematical trend analysis using scipy.stats
+    - Mathematical trend analysis using statistics module
     - Real-time VWC trend forecasting 
-    - Pattern recognition without ML compilation
+    - Pattern recognition without external dependencies
     - Irrigation efficiency scoring and optimization
     - Adaptive learning from historical irrigation outcomes
     - Dynamic threshold adjustments based on patterns
     """
+    
+    def _mean(self, data):
+        """Calculate mean of data."""
+        if not data:
+            return 0
+        return sum(data) / len(data)
+    
+    def _std(self, data):
+        """Calculate standard deviation of data."""
+        if len(data) < 2:
+            return 0
+        mean_val = self._mean(data)
+        variance = sum((x - mean_val) ** 2 for x in data) / (len(data) - 1)
+        return variance ** 0.5
+    
+    def _correlation(self, x, y):
+        """Calculate correlation coefficient between two datasets."""
+        if len(x) != len(y) or len(x) < 2:
+            return 0
+        
+        mean_x = self._mean(x)
+        mean_y = self._mean(y)
+        
+        numerator = sum((x[i] - mean_x) * (y[i] - mean_y) for i in range(len(x)))
+        sum_sq_x = sum((x[i] - mean_x) ** 2 for i in range(len(x)))
+        sum_sq_y = sum((y[i] - mean_y) ** 2 for i in range(len(y)))
+        
+        denominator = (sum_sq_x * sum_sq_y) ** 0.5
+        
+        if denominator == 0:
+            return 0
+        
+        return numerator / denominator
     
     def __init__(self, history_window: int = 500, prediction_horizon: int = 120,
                  update_frequency: int = 50, min_training_samples: int = 30):
@@ -304,17 +332,18 @@ class SimplifiedIrrigationPredictor:
             if len(self.feature_history) < self.min_training_samples:
                 return
                 
-            # Convert to arrays
-            features_array = np.array(list(self.feature_history))
-            targets_array = np.array(list(self.target_history))
+            # Convert to lists
+            features_list = list(self.feature_history)
+            targets_list = list(self.target_history)
             
             # Calculate correlations to update feature weights
             correlations = []
-            for i in range(features_array.shape[1]):
-                feature_col = features_array[:, i]
-                if np.std(feature_col) > 0:  # Avoid division by zero
-                    corr = np.corrcoef(feature_col, targets_array)[0, 1]
-                    correlations.append(abs(corr) if not np.isnan(corr) else 0.1)
+            num_features = len(features_list[0]) if features_list else 4
+            for i in range(num_features):
+                feature_col = [feat[i] for feat in features_list]
+                if self._std(feature_col) > 0:  # Avoid division by zero
+                    corr = self._correlation(feature_col, targets_list)
+                    correlations.append(abs(corr) if corr == corr else 0.1)  # Check for NaN
                 else:
                     correlations.append(0.1)
             
@@ -336,8 +365,9 @@ class SimplifiedIrrigationPredictor:
             
             if recent_predictions:
                 # Calculate R-squared equivalent
-                ss_res = sum((np.array(recent_targets) - np.array(recent_predictions)) ** 2)
-                ss_tot = sum((np.array(recent_targets) - np.mean(recent_targets)) ** 2)
+                ss_res = sum((recent_targets[i] - recent_predictions[i]) ** 2 for i in range(len(recent_targets)))
+                targets_mean = self._mean(recent_targets)
+                ss_tot = sum((target - targets_mean) ** 2 for target in recent_targets)
                 
                 if ss_tot > 0:
                     r_squared = 1 - (ss_res / ss_tot)
@@ -411,7 +441,7 @@ class SimplifiedIrrigationPredictor:
             'feature_weights': self.feature_weights.copy(),
             'last_update': self.last_update_time.isoformat() if self.last_update_time else None,
             'prediction_horizon': self.prediction_horizon,
-            'dependencies': ['numpy', 'pandas', 'scipy'],
+            'dependencies': ['statistics'],
             'compilation_required': False
         }
 

@@ -10,11 +10,10 @@ import logging
 import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
-import numpy as np
+import statistics
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
-import pandas as pd
 
 # Import our advanced modules with fallback
 try:
@@ -46,6 +45,28 @@ class AdvancedCropSteeringDashboard(hass.Hass):
     - Phase transition timeline
     - Water efficiency analytics
     """
+    
+    def _mean(self, data):
+        """Calculate mean of data."""
+        if not data:
+            return 0
+        return sum(data) / len(data)
+    
+    def _std(self, data):
+        """Calculate standard deviation of data."""
+        if len(data) < 2:
+            return 0
+        mean_val = self._mean(data)
+        variance = sum((x - mean_val) ** 2 for x in data) / (len(data) - 1)
+        return variance ** 0.5
+    
+    def _min(self, data):
+        """Get minimum value from data."""
+        return min(data) if data else 0
+    
+    def _max(self, data):
+        """Get maximum value from data."""
+        return max(data) if data else 0
 
     def initialize(self):
         """Initialize the advanced dashboard system."""
@@ -368,8 +389,14 @@ class AdvancedCropSteeringDashboard(hass.Hass):
                 return ""
             
             # Prepare data
-            df = pd.DataFrame(self.dashboard_data['vwc_history'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            vwc_data = self.dashboard_data['vwc_history']
+            if not vwc_data:
+                return ""
+            
+            # Convert timestamps to datetime objects
+            for entry in vwc_data:
+                if isinstance(entry['timestamp'], str):
+                    entry['timestamp'] = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00'))
             
             # Create subplot with secondary y-axis
             fig = make_subplots(
@@ -381,12 +408,15 @@ class AdvancedCropSteeringDashboard(hass.Hass):
             )
             
             # Main VWC trend (fused values)
-            fused_data = df[df['fused_value'].notna()]
-            if not fused_data.empty:
+            fused_data = [entry for entry in vwc_data if entry.get('fused_value') is not None]
+            if fused_data:
+                fused_timestamps = [entry['timestamp'] for entry in fused_data]
+                fused_values = [entry['fused_value'] for entry in fused_data]
+                
                 fig.add_trace(
                     go.Scatter(
-                        x=fused_data['timestamp'],
-                        y=fused_data['fused_value'],
+                        x=fused_timestamps,
+                        y=fused_values,
                         mode='lines',
                         name='Fused VWC',
                         line=dict(color=self.dashboard_config['colors']['primary'], width=3),
@@ -398,12 +428,15 @@ class AdvancedCropSteeringDashboard(hass.Hass):
             # Individual sensors (lighter traces)
             sensor_colors = px.colors.qualitative.Set3
             for i, sensor in enumerate(self.sensor_entities['vwc_sensors']):
-                sensor_data = df[df['sensor_id'] == sensor]
-                if not sensor_data.empty:
+                sensor_data = [entry for entry in vwc_data if entry.get('sensor_id') == sensor]
+                if sensor_data:
+                    sensor_timestamps = [entry['timestamp'] for entry in sensor_data]
+                    sensor_values = [entry['raw_value'] for entry in sensor_data]
+                    
                     fig.add_trace(
                         go.Scatter(
-                            x=sensor_data['timestamp'],
-                            y=sensor_data['raw_value'],
+                            x=sensor_timestamps,
+                            y=sensor_values,
                             mode='lines',
                             name=sensor.split('.')[-1],
                             line=dict(color=sensor_colors[i % len(sensor_colors)], width=1, dash='dot'),
@@ -414,12 +447,15 @@ class AdvancedCropSteeringDashboard(hass.Hass):
                     )
             
             # Outliers
-            outliers = df[df['is_outlier'] == True]
-            if not outliers.empty:
+            outliers = [entry for entry in vwc_data if entry.get('is_outlier') == True]
+            if outliers:
+                outlier_timestamps = [entry['timestamp'] for entry in outliers]
+                outlier_values = [entry['raw_value'] for entry in outliers]
+                
                 fig.add_trace(
                     go.Scatter(
-                        x=outliers['timestamp'],
-                        y=outliers['raw_value'],
+                        x=outlier_timestamps,
+                        y=outlier_values,
                         mode='markers',
                         name='Outliers',
                         marker=dict(color='red', size=8, symbol='x'),
@@ -430,26 +466,33 @@ class AdvancedCropSteeringDashboard(hass.Hass):
             
             # Dryback markers
             if self.dashboard_data['dryback_history']:
-                dryback_df = pd.DataFrame(self.dashboard_data['dryback_history'])
-                dryback_df['timestamp'] = pd.to_datetime(dryback_df['timestamp'])
-                active_dryback = dryback_df[dryback_df['dryback_in_progress'] == True]
+                dryback_data = self.dashboard_data['dryback_history']
                 
-                if not active_dryback.empty:
+                # Convert timestamps
+                for entry in dryback_data:
+                    if isinstance(entry['timestamp'], str):
+                        entry['timestamp'] = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00'))
+                
+                active_dryback = [entry for entry in dryback_data if entry.get('dryback_in_progress') == True]
+                
+                if active_dryback:
                     # Add dryback regions
-                    for _, row in active_dryback.iterrows():
+                    for entry in active_dryback:
                         fig.add_vline(
-                            x=row['timestamp'],
+                            x=entry['timestamp'],
                             line=dict(color='orange', width=1, dash='dash'),
-                            annotation_text=f"Dryback: {row['dryback_percentage']:.1f}%",
+                            annotation_text=f"Dryback: {entry['dryback_percentage']:.1f}%",
                             row=1, col=1
                         )
             
             # Confidence score subplot
-            if not fused_data.empty:
+            if fused_data:
+                fused_confidence = [entry['fusion_confidence'] for entry in fused_data]
+                
                 fig.add_trace(
                     go.Scatter(
-                        x=fused_data['timestamp'],
-                        y=fused_data['fusion_confidence'],
+                        x=fused_timestamps,
+                        y=fused_confidence,
                         mode='lines+markers',
                         name='Fusion Confidence',
                         line=dict(color=self.dashboard_config['colors']['accent'], width=2),
@@ -504,18 +547,25 @@ class AdvancedCropSteeringDashboard(hass.Hass):
             if not self.dashboard_data['ec_history']:
                 return ""
             
-            df = pd.DataFrame(self.dashboard_data['ec_history'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            ec_data = self.dashboard_data['ec_history']
+            
+            # Convert timestamps to datetime objects
+            for entry in ec_data:
+                if isinstance(entry['timestamp'], str):
+                    entry['timestamp'] = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00'))
             
             fig = go.Figure()
             
             # Fused EC values
-            fused_data = df[df['fused_value'].notna()]
-            if not fused_data.empty:
+            fused_data = [entry for entry in ec_data if entry.get('fused_value') is not None]
+            if fused_data:
+                fused_timestamps = [entry['timestamp'] for entry in fused_data]
+                fused_values = [entry['fused_value'] for entry in fused_data]
+                
                 fig.add_trace(
                     go.Scatter(
-                        x=fused_data['timestamp'],
-                        y=fused_data['fused_value'],
+                        x=fused_timestamps,
+                        y=fused_values,
                         mode='lines',
                         name='Fused EC',
                         line=dict(color=self.dashboard_config['colors']['secondary'], width=3),
@@ -526,12 +576,15 @@ class AdvancedCropSteeringDashboard(hass.Hass):
             # Individual sensors
             sensor_colors = px.colors.qualitative.Pastel
             for i, sensor in enumerate(self.sensor_entities['ec_sensors']):
-                sensor_data = df[df['sensor_id'] == sensor]
-                if not sensor_data.empty:
+                sensor_data = [entry for entry in ec_data if entry.get('sensor_id') == sensor]
+                if sensor_data:
+                    sensor_timestamps = [entry['timestamp'] for entry in sensor_data]
+                    sensor_values = [entry['raw_value'] for entry in sensor_data]
+                    
                     fig.add_trace(
                         go.Scatter(
-                            x=sensor_data['timestamp'],
-                            y=sensor_data['raw_value'],
+                            x=sensor_timestamps,
+                            y=sensor_values,
                             mode='lines',
                             name=sensor.split('.')[-1],
                             line=dict(color=sensor_colors[i % len(sensor_colors)], width=1, dash='dot'),
@@ -577,8 +630,12 @@ class AdvancedCropSteeringDashboard(hass.Hass):
             if not self.dashboard_data['dryback_history']:
                 return ""
             
-            df = pd.DataFrame(self.dashboard_data['dryback_history'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            dryback_data = self.dashboard_data['dryback_history']
+            
+            # Convert timestamps
+            for entry in dryback_data:
+                if isinstance(entry['timestamp'], str):
+                    entry['timestamp'] = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00'))
             
             fig = make_subplots(
                 rows=2, cols=1,
@@ -587,11 +644,16 @@ class AdvancedCropSteeringDashboard(hass.Hass):
                 vertical_spacing=0.15
             )
             
+            # Extract data for plotting
+            timestamps = [entry['timestamp'] for entry in dryback_data]
+            dryback_percentages = [entry['dryback_percentage'] for entry in dryback_data]
+            confidences = [entry['confidence'] for entry in dryback_data]
+            
             # Dryback percentage
             fig.add_trace(
                 go.Scatter(
-                    x=df['timestamp'],
-                    y=df['dryback_percentage'],
+                    x=timestamps,
+                    y=dryback_percentages,
                     mode='lines+markers',
                     name='Dryback %',
                     line=dict(color=self.dashboard_config['colors']['accent'], width=2),
@@ -605,8 +667,8 @@ class AdvancedCropSteeringDashboard(hass.Hass):
             # Confidence score
             fig.add_trace(
                 go.Scatter(
-                    x=df['timestamp'],
-                    y=df['confidence'],
+                    x=timestamps,
+                    y=confidences,
                     mode='lines',
                     name='Detection Confidence',
                     line=dict(color='lightblue', width=2),
@@ -653,16 +715,23 @@ class AdvancedCropSteeringDashboard(hass.Hass):
                 return ""
             
             pred_data = predictions['predictions']
-            df = pd.DataFrame(pred_data)
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            
+            # Convert timestamps
+            for entry in pred_data:
+                if isinstance(entry['timestamp'], str):
+                    entry['timestamp'] = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00'))
             
             fig = go.Figure()
+            
+            # Extract data for plotting
+            timestamps = [entry['timestamp'] for entry in pred_data]
+            irrigation_probs = [entry['irrigation_probability'] for entry in pred_data]
             
             # Irrigation probability prediction
             fig.add_trace(
                 go.Scatter(
-                    x=df['timestamp'],
-                    y=df['irrigation_probability'],
+                    x=timestamps,
+                    y=irrigation_probs,
                     mode='lines+markers',
                     name='Irrigation Need Probability',
                     line=dict(color=self.dashboard_config['colors']['primary'], width=3),
@@ -673,12 +742,12 @@ class AdvancedCropSteeringDashboard(hass.Hass):
             
             # Confidence bands
             model_confidence = predictions.get('model_confidence', 0.5)
-            upper_bound = df['irrigation_probability'] + (1 - model_confidence) * 0.2
-            lower_bound = df['irrigation_probability'] - (1 - model_confidence) * 0.2
+            upper_bound = [prob + (1 - model_confidence) * 0.2 for prob in irrigation_probs]
+            lower_bound = [prob - (1 - model_confidence) * 0.2 for prob in irrigation_probs]
             
             fig.add_trace(
                 go.Scatter(
-                    x=df['timestamp'],
+                    x=timestamps,
                     y=upper_bound,
                     mode='lines',
                     name='Confidence Upper',
@@ -689,7 +758,7 @@ class AdvancedCropSteeringDashboard(hass.Hass):
             
             fig.add_trace(
                 go.Scatter(
-                    x=df['timestamp'],
+                    x=timestamps,
                     y=lower_bound,
                     mode='lines',
                     name='Confidence Lower',
@@ -800,8 +869,12 @@ class AdvancedCropSteeringDashboard(hass.Hass):
             if not self.dashboard_data['phase_history']:
                 return ""
             
-            df = pd.DataFrame(self.dashboard_data['phase_history'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            phase_data = self.dashboard_data['phase_history']
+            
+            # Convert timestamps
+            for entry in phase_data:
+                if isinstance(entry['timestamp'], str):
+                    entry['timestamp'] = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00'))
             
             # Create Gantt-style chart
             fig = go.Figure()
@@ -814,10 +887,10 @@ class AdvancedCropSteeringDashboard(hass.Hass):
             }
             
             # Create phase blocks
-            for i in range(len(df) - 1):
-                phase = df.iloc[i]['phase']
-                start_time = df.iloc[i]['timestamp']
-                end_time = df.iloc[i + 1]['timestamp']
+            for i in range(len(phase_data) - 1):
+                phase = phase_data[i]['phase']
+                start_time = phase_data[i]['timestamp']
+                end_time = phase_data[i + 1]['timestamp']
                 duration = (end_time - start_time).total_seconds() / 60  # minutes
                 
                 fig.add_trace(
@@ -829,7 +902,7 @@ class AdvancedCropSteeringDashboard(hass.Hass):
                         line=dict(color=phase_colors.get(phase, '#cccccc')),
                         name=f'Phase {phase}',
                         hovertemplate=f'Phase {phase}<br>Duration: {duration:.1f} min<extra></extra>',
-                        showlegend=True if i == 0 or df.iloc[i-1]['phase'] != phase else False
+                        showlegend=True if i == 0 or phase_data[i-1]['phase'] != phase else False
                     )
                 )
             
@@ -892,13 +965,22 @@ class AdvancedCropSteeringDashboard(hass.Hass):
             # Water usage trends (if available)
             if 'water_usage_history' in metrics:
                 usage_data = metrics['water_usage_history']
-                df_usage = pd.DataFrame(usage_data)
-                df_usage['timestamp'] = pd.to_datetime(df_usage['timestamp'])
+                
+                # Convert timestamps and extract data
+                usage_timestamps = []
+                daily_usage = []
+                for entry in usage_data:
+                    if isinstance(entry['timestamp'], str):
+                        timestamp = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00'))
+                    else:
+                        timestamp = entry['timestamp']
+                    usage_timestamps.append(timestamp)
+                    daily_usage.append(entry['daily_usage'])
                 
                 fig.add_trace(
                     go.Scatter(
-                        x=df_usage['timestamp'],
-                        y=df_usage['daily_usage'],
+                        x=usage_timestamps,
+                        y=daily_usage,
                         mode='lines+markers',
                         name='Daily Water Usage',
                         line=dict(color=self.dashboard_config['colors']['secondary'])
@@ -995,7 +1077,7 @@ class AdvancedCropSteeringDashboard(hass.Hass):
                 last_irrigation = max(recent_irrigations, key=lambda x: x['timestamp'])
                 time_since = (datetime.now() - datetime.fromisoformat(last_irrigation['timestamp'])).total_seconds() / 60
                 features['time_since_last_irrigation'] = time_since
-                features['avg_irrigation_duration'] = np.mean([i['duration'] for i in recent_irrigations])
+                features['avg_irrigation_duration'] = self._mean([i['duration'] for i in recent_irrigations])
             else:
                 features['time_since_last_irrigation'] = 1440  # 24 hours
                 features['avg_irrigation_duration'] = 0
@@ -1098,7 +1180,7 @@ class AdvancedCropSteeringDashboard(hass.Hass):
                                 if (datetime.now() - datetime.fromisoformat(e['timestamp'])).total_seconds() < 86400]
             
             if recent_irrigations:
-                avg_efficiency = np.mean([i.get('efficiency', 0.5) for i in recent_irrigations])
+                avg_efficiency = self._mean([i.get('efficiency', 0.5) for i in recent_irrigations])
                 metrics['irrigation_efficiency'] = avg_efficiency
             
             # Calculate target achievement rate

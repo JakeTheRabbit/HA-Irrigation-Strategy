@@ -10,9 +10,10 @@ import asyncio
 import threading
 import os
 import pickle
+import statistics
+import math
 from datetime import datetime, timedelta, time
 from typing import Dict, List, Optional, Any
-import numpy as np
 
 # Import our advanced modules with fallback
 try:
@@ -1090,8 +1091,8 @@ class MasterCropSteeringApp(hass.Hass):
             except (ValueError, TypeError):
                 vpd = 1.0
             
-            avg_vwc = np.mean(list(vwc_sensors.values())) if vwc_sensors else 0
-            avg_ec = np.mean(list(ec_sensors.values())) if ec_sensors else 3.0
+            avg_vwc = statistics.mean(list(vwc_sensors.values())) if vwc_sensors else 0
+            avg_ec = statistics.mean(list(ec_sensors.values())) if ec_sensors else 3.0
             
             self.log(f"🔍 DEBUG Calculated averages: VWC={avg_vwc:.2f}%, EC={avg_ec:.2f} mS/cm")
             self.log(f"🔍 DEBUG VWC values: {list(vwc_sensors.values())}")
@@ -1873,8 +1874,8 @@ class MasterCropSteeringApp(hass.Hass):
                             zone_vwc_values.append(float(value))
                     
                     if zone_vwc_values:
-                        avg_vwc = np.mean(zone_vwc_values)
-                        vwc_std = np.std(zone_vwc_values)
+                        avg_vwc = statistics.mean(zone_vwc_values)
+                        vwc_std = statistics.stdev(zone_vwc_values) if len(zone_vwc_values) > 1 else 0
                         
                         # Score based on need (lower VWC = higher score) and reliability (lower std = higher score)
                         need_score = max(0, (70 - avg_vwc) / 70)  # Higher score for lower VWC
@@ -2062,7 +2063,7 @@ class MasterCropSteeringApp(hass.Hass):
                 if value not in ['unavailable', 'unknown', None]:
                     vwc_values.append(float(value))
             
-            return np.mean(vwc_values) if vwc_values else None
+            return statistics.mean(vwc_values) if vwc_values else None
             
         except Exception as e:
             self.log(f"❌ Error getting zone VWC: {e}", level='ERROR')

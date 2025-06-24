@@ -4,20 +4,65 @@ Implements IQR-based outlier detection and multi-sensor validation
 Based on research: Generalized ESD + weighted outlier-robust Kalman filter
 """
 
-import numpy as np
-import pandas as pd
+import statistics
+import math
 from collections import deque, defaultdict
 from typing import Dict, List, Tuple, Optional, Any
 from datetime import datetime, timedelta
 import logging
-from scipy import stats
-from scipy.stats import iqr
-import math
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class IntelligentSensorFusion:
+    
+    def _percentile(self, data, p):
+        """Calculate percentile of data."""
+        if not data:
+            return 0
+        data_sorted = sorted(data)
+        n = len(data_sorted)
+        k = (n - 1) * p / 100
+        f = int(k)
+        c = k - f
+        if f + 1 < n:
+            return data_sorted[f] * (1 - c) + data_sorted[f + 1] * c
+        else:
+            return data_sorted[f]
+    
+    def _mean(self, data):
+        """Calculate mean of data."""
+        if not data:
+            return 0
+        return sum(data) / len(data)
+    
+    def _std(self, data):
+        """Calculate standard deviation of data."""
+        if len(data) < 2:
+            return 0
+        mean_val = self._mean(data)
+        variance = sum((x - mean_val) ** 2 for x in data) / (len(data) - 1)
+        return variance ** 0.5
+    
+    def _correlation(self, x, y):
+        """Calculate correlation coefficient between two datasets."""
+        if len(x) != len(y) or len(x) < 2:
+            return 0
+        
+        mean_x = self._mean(x)
+        mean_y = self._mean(y)
+        
+        numerator = sum((x[i] - mean_x) * (y[i] - mean_y) for i in range(len(x)))
+        sum_sq_x = sum((x[i] - mean_x) ** 2 for i in range(len(x)))
+        sum_sq_y = sum((y[i] - mean_y) ** 2 for i in range(len(y)))
+        
+        denominator = (sum_sq_x * sum_sq_y) ** 0.5
+        
+        if denominator == 0:
+            return 0
+        
+        return numerator / denominator
+    
     """
     Advanced sensor fusion system with intelligent outlier detection and validation.
     
@@ -136,13 +181,13 @@ class IntelligentSensorFusion:
             return False
         
         # Calculate IQR bounds
-        q1 = np.percentile(sensor_history, 25)
-        q3 = np.percentile(sensor_history, 75)
+        q1 = self._percentile(sensor_history, 25)
+        q3 = self._percentile(sensor_history, 75)
         iqr_value = q3 - q1
         
         # Adaptive multiplier based on data variability
-        data_std = np.std(sensor_history)
-        data_mean = np.mean(sensor_history)
+        data_std = self._std(sensor_history)
+        data_mean = self._mean(sensor_history)
         cv = data_std / data_mean if data_mean > 0 else 1.0  # Coefficient of variation
         
         # Adjust multiplier based on data stability
@@ -157,14 +202,14 @@ class IntelligentSensorFusion:
         upper_bound = q3 + (adaptive_multiplier * iqr_value)
         
         # Additional checks for extreme values
-        z_score = abs(stats.zscore([value], ddof=1)[0]) if len(sensor_history) > 2 else 0
+        z_score = abs((value - data_mean) / data_std) if data_std > 0 and len(sensor_history) > 2 else 0
         extreme_outlier = z_score > 3.5  # Very extreme values
         
         # Check temporal consistency (rapid changes)
         temporal_outlier = False
         if len(sensor_history) >= 3:
             recent_values = sensor_history[-3:]
-            recent_mean = np.mean(recent_values)
+            recent_mean = self._mean(recent_values)
             if abs(value - recent_mean) > (2 * data_std):
                 temporal_outlier = True
         
@@ -205,10 +250,10 @@ class IntelligentSensorFusion:
             window_size = min(10, len(sensor_history) // 4)
             for i in range(window_size, len(sensor_history)):
                 window_data = sensor_history[i-window_size:i]
-                rolling_std.append(np.std(window_data))
+                rolling_std.append(self._std(window_data))
             
             if rolling_std:
-                consistency_factor = max(0, 1 - (np.mean(rolling_std) / np.mean(sensor_history)))
+                consistency_factor = max(0, 1 - (self._mean(rolling_std) / self._mean(sensor_history)))
                 factors.append(consistency_factor * 0.3)
         
         # 3. Temporal stability factor
@@ -216,8 +261,8 @@ class IntelligentSensorFusion:
             timestamps = list(self.sensor_timestamps[sensor_id])[-10:]
             time_diffs = [(timestamps[i] - timestamps[i-1]).total_seconds() 
                          for i in range(1, len(timestamps))]
-            avg_interval = np.mean(time_diffs)
-            interval_std = np.std(time_diffs)
+            avg_interval = self._mean(time_diffs)
+            interval_std = self._std(time_diffs)
             
             # Stable reading intervals indicate good sensor health
             stability_factor = max(0, 1 - (interval_std / max(avg_interval, 1)))
@@ -240,8 +285,8 @@ class IntelligentSensorFusion:
         if len(reference_data) < 5:
             return False
         
-        q1 = np.percentile(reference_data, 25)
-        q3 = np.percentile(reference_data, 75)
+        q1 = self._percentile(reference_data, 25)
+        q3 = self._percentile(reference_data, 75)
         iqr_val = q3 - q1
         lower_bound = q1 - (1.5 * iqr_val)
         upper_bound = q3 + (1.5 * iqr_val)
@@ -366,7 +411,7 @@ class IntelligentSensorFusion:
             return weighted_sum / total_weight
         else:
             # Fallback to simple average
-            return np.mean([s['value'] for s in sensors])
+            return self._mean([s['value'] for s in sensors])
 
     def _is_current_value_outlier(self, sensor_id: str, value: float) -> bool:
         """Check if current value is outlier for specific sensor."""
@@ -393,14 +438,14 @@ class IntelligentSensorFusion:
         factors.append(sensor_count_factor * 0.3)
         
         # 2. Average reliability factor
-        avg_reliability = np.mean([s['reliability'] for s in sensors])
+        avg_reliability = self._mean([s['reliability'] for s in sensors])
         factors.append(avg_reliability * 0.4)
         
         # 3. Value agreement factor
         values = [s['value'] for s in sensors]
         if len(values) > 1:
-            value_std = np.std(values)
-            value_mean = np.mean(values)
+            value_std = self._std(values)
+            value_mean = self._mean(values)
             cv = value_std / value_mean if value_mean > 0 else 1.0
             agreement_factor = max(0, 1 - (cv * 2))  # Good agreement if CV < 0.5
             factors.append(agreement_factor * 0.2)
