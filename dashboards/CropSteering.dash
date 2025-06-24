@@ -1,0 +1,188 @@
+##
+## Crop Steering System - Main Dashboard
+## Professional irrigation monitoring and control
+##
+
+title: Crop Steering System
+widget_dimensions: [120, 120]
+widget_margins: [5, 5]
+columns: 12
+global_parameters:
+    use_comma: 0
+    precision: 1
+    shorten: 1
+
+# System Status Section
+system_status:
+    widget_type: sensor
+    title: System Status
+    entity: sensor.crop_steering_system_health_score
+    text_style: "color: white; font-size: 150%;"
+    value_style: "color: #00ff00; font-size: 200%;"
+    unit_style: "color: #888888;"
+    widget_style: "background-color: #1e1e1e;"
+    
+system_enabled:
+    widget_type: switch
+    title: System Power
+    entity: switch.crop_steering_system_enabled
+    icon_on: mdi-power
+    icon_off: mdi-power-off
+    
+auto_irrigation:
+    widget_type: switch
+    title: Auto Irrigation
+    entity: switch.crop_steering_auto_irrigation_enabled
+    icon_on: mdi-water-check
+    icon_off: mdi-water-off
+
+current_phase:
+    widget_type: sensor
+    title: Current Phase
+    entity: select.crop_steering_irrigation_phase
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #00ccff; font-size: 180%;"
+    widget_style: "background-color: #1e1e1e;"
+
+# Zone Monitoring Section
+zone1_vwc:
+    widget_type: sensor
+    title: Zone 1 VWC
+    entity: sensor.crop_steering_vwc_zone_1
+    text_style: "color: white;"
+    value_style: "color: #00ff88;"
+    units: "%"
+    
+zone1_ec:
+    widget_type: sensor
+    title: Zone 1 EC
+    entity: sensor.crop_steering_ec_zone_1
+    text_style: "color: white;"
+    value_style: "color: #ffaa00;"
+    units: "mS/cm"
+
+zone1_status:
+    widget_type: sensor
+    title: Zone 1 Status
+    entity: sensor.crop_steering_zone_1_status
+    text_style: "color: white;"
+    value_style: "color: #ffffff;"
+
+zone2_vwc:
+    widget_type: sensor
+    title: Zone 2 VWC
+    entity: sensor.crop_steering_vwc_zone_2
+    text_style: "color: white;"
+    value_style: "color: #00ff88;"
+    units: "%"
+    
+zone2_ec:
+    widget_type: sensor
+    title: Zone 2 EC
+    entity: sensor.crop_steering_ec_zone_2
+    text_style: "color: white;"
+    value_style: "color: #ffaa00;"
+    units: "mS/cm"
+
+zone2_status:
+    widget_type: sensor
+    title: Zone 2 Status
+    entity: sensor.crop_steering_zone_2_status
+    text_style: "color: white;"
+    value_style: "color: #ffffff;"
+
+zone3_vwc:
+    widget_type: sensor
+    title: Zone 3 VWC
+    entity: sensor.crop_steering_vwc_zone_3
+    text_style: "color: white;"
+    value_style: "color: #00ff88;"
+    units: "%"
+    
+zone3_ec:
+    widget_type: sensor
+    title: Zone 3 EC
+    entity: sensor.crop_steering_ec_zone_3
+    text_style: "color: white;"
+    value_style: "color: #ffaa00;"
+    units: "mS/cm"
+
+zone3_status:
+    widget_type: sensor
+    title: Zone 3 Status
+    entity: sensor.crop_steering_zone_3_status
+    text_style: "color: white;"
+    value_style: "color: #ffffff;"
+
+# System Metrics
+daily_water:
+    widget_type: sensor
+    title: Daily Water Usage
+    entity: sensor.crop_steering_daily_water_usage
+    text_style: "color: white;"
+    value_style: "color: #00aaff;"
+    units: "L"
+
+efficiency:
+    widget_type: sensor
+    title: System Efficiency
+    entity: sensor.crop_steering_system_efficiency
+    text_style: "color: white;"
+    value_style: "color: #00ff00;"
+    units: "%"
+
+safety_status:
+    widget_type: sensor
+    title: Safety Status
+    entity: sensor.crop_steering_system_safety_status
+    text_style: "color: white;"
+    value_style: "color: #ffffff;"
+
+avg_vwc:
+    widget_type: sensor
+    title: Average VWC
+    entity: sensor.crop_steering_configured_avg_vwc
+    text_style: "color: white;"
+    value_style: "color: #00ff88;"
+    units: "%"
+
+avg_ec:
+    widget_type: sensor
+    title: Average EC
+    entity: sensor.crop_steering_configured_avg_ec
+    text_style: "color: white;"
+    value_style: "color: #ffaa00;"
+    units: "mS/cm"
+
+# Navigation
+zone_detail:
+    widget_type: navigate
+    title: Zone Details
+    dashboard: ZoneDetail
+    icon: mdi-view-dashboard
+    widget_style: "background-color: #2d5aa0;"
+
+controls:
+    widget_type: navigate
+    title: Controls
+    dashboard: Controls
+    icon: mdi-cog
+    widget_style: "background-color: #2d5aa0;"
+
+analytics:
+    widget_type: navigate
+    title: Analytics
+    dashboard: Analytics
+    icon: mdi-chart-line
+    widget_style: "background-color: #2d5aa0;"
+
+# Layout
+layout:
+    - system_status(2x1), system_enabled, auto_irrigation, current_phase(2x1)
+    - spacer(12x1)
+    - zone1_vwc, zone1_ec, zone1_status, zone2_vwc, zone2_ec, zone2_status, zone3_vwc, zone3_ec, zone3_status
+    - spacer(12x1)
+    - daily_water, efficiency, safety_status, avg_vwc, avg_ec
+    - spacer(12x1)
+    - zone_detail, controls, analytics
+    - spacer(12x1)

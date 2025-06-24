@@ -1,0 +1,236 @@
+##
+## System Controls Dashboard
+## Configuration and manual operation controls
+##
+
+title: System Controls & Configuration
+widget_dimensions: [120, 120]
+widget_margins: [5, 5]
+columns: 12
+global_parameters:
+    use_comma: 0
+    precision: 1
+    shorten: 1
+
+# System Control Section
+system_title:
+    widget_type: label
+    text: "SYSTEM CONTROLS"
+    text_style: "color: #ff6600; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+system_enabled:
+    widget_type: switch
+    title: System Power
+    entity: switch.crop_steering_system_enabled
+    icon_on: mdi-power
+    icon_off: mdi-power-off
+    widget_style: "background-color: #2d4d2d;"
+
+auto_irrigation:
+    widget_type: switch
+    title: Auto Irrigation
+    entity: switch.crop_steering_auto_irrigation_enabled
+    icon_on: mdi-water-check
+    icon_off: mdi-water-off
+    widget_style: "background-color: #2d4d2d;"
+
+ec_stacking:
+    widget_type: switch
+    title: EC Stacking
+    entity: switch.crop_steering_ec_stacking_enabled
+    icon_on: mdi-chart-line
+    icon_off: mdi-chart-line-stacked
+
+ml_enabled:
+    widget_type: switch
+    title: ML Features
+    entity: switch.crop_steering_ml_enabled
+    icon_on: mdi-brain
+    icon_off: mdi-brain
+
+debug_mode:
+    widget_type: switch
+    title: Debug Mode
+    entity: switch.crop_steering_debug_mode
+    icon_on: mdi-bug
+    icon_off: mdi-bug-outline
+
+# Phase Control Section
+phase_title:
+    widget_type: label
+    text: "PHASE CONTROL"
+    text_style: "color: #00ccff; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+current_phase:
+    widget_type: select
+    title: Irrigation Phase
+    entity: select.crop_steering_irrigation_phase
+    widget_style: "background-color: #2d2d4d;"
+
+crop_type:
+    widget_type: select
+    title: Crop Type
+    entity: select.crop_steering_crop_type
+    widget_style: "background-color: #2d2d4d;"
+
+growth_stage:
+    widget_type: select
+    title: Growth Stage
+    entity: select.crop_steering_growth_stage
+    widget_style: "background-color: #2d2d4d;"
+
+steering_mode:
+    widget_type: select
+    title: Steering Mode
+    entity: select.crop_steering_steering_mode
+    widget_style: "background-color: #2d2d4d;"
+
+# Timing Controls
+timing_title:
+    widget_type: label
+    text: "LIGHT SCHEDULE"
+    text_style: "color: #ffaa00; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+lights_on:
+    widget_type: input_number
+    title: Lights On Hour
+    entity: number.crop_steering_lights_on_hour
+    step: 1
+    widget_style: "background-color: #4d4d2d;"
+
+lights_off:
+    widget_type: input_number
+    title: Lights Off Hour
+    entity: number.crop_steering_lights_off_hour
+    step: 1
+    widget_style: "background-color: #4d4d2d;"
+
+# Safety Limits
+safety_title:
+    widget_type: label
+    text: "SAFETY LIMITS"
+    text_style: "color: #ff4444; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+field_capacity:
+    widget_type: input_number
+    title: Field Capacity
+    entity: number.crop_steering_field_capacity
+    step: 1
+    units: "%"
+    widget_style: "background-color: #4d2d2d;"
+
+max_ec:
+    widget_type: input_number
+    title: Max EC Limit
+    entity: number.crop_steering_max_ec
+    step: 0.1
+    units: "mS/cm"
+    widget_style: "background-color: #4d2d2d;"
+
+# Key Parameters
+params_title:
+    widget_type: label
+    text: "KEY PARAMETERS"
+    text_style: "color: #00ff88; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+p1_target:
+    widget_type: input_number
+    title: P1 Target VWC
+    entity: number.crop_steering_p1_target_vwc
+    step: 1
+    units: "%"
+    widget_style: "background-color: #2d4d2d;"
+
+p2_threshold:
+    widget_type: input_number
+    title: P2 Threshold
+    entity: number.crop_steering_p2_vwc_threshold
+    step: 1
+    units: "%"
+    widget_style: "background-color: #2d4d2d;"
+
+substrate_volume:
+    widget_type: input_number
+    title: Substrate Volume
+    entity: number.crop_steering_substrate_volume
+    step: 0.5
+    units: "L"
+    widget_style: "background-color: #2d4d2d;"
+
+dripper_flow:
+    widget_type: input_number
+    title: Dripper Flow
+    entity: number.crop_steering_dripper_flow_rate
+    step: 0.1
+    units: "L/hr"
+    widget_style: "background-color: #2d4d2d;"
+
+# Manual Override Controls
+override_title:
+    widget_type: label
+    text: "MANUAL OVERRIDES"
+    text_style: "color: #ff6600; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+zone1_override:
+    widget_type: switch
+    title: Zone 1 Override
+    entity: switch.crop_steering_zone_1_manual_override
+    icon_on: mdi-hand-back-right
+    icon_off: mdi-hand-back-right-off
+    widget_style: "background-color: #4d2d2d;"
+
+zone2_override:
+    widget_type: switch
+    title: Zone 2 Override
+    entity: switch.crop_steering_zone_2_manual_override
+    icon_on: mdi-hand-back-right
+    icon_off: mdi-hand-back-right-off
+    widget_style: "background-color: #4d2d2d;"
+
+zone3_override:
+    widget_type: switch
+    title: Zone 3 Override
+    entity: switch.crop_steering_zone_3_manual_override
+    icon_on: mdi-hand-back-right
+    icon_off: mdi-hand-back-right-off
+    widget_style: "background-color: #4d2d2d;"
+
+# Navigation
+back_main:
+    widget_type: navigate
+    title: Main Dashboard
+    dashboard: CropSteering
+    icon: mdi-home
+    widget_style: "background-color: #2d5aa0;"
+
+zones_nav:
+    widget_type: navigate
+    title: Zone Details
+    dashboard: ZoneDetail
+    icon: mdi-view-dashboard
+    widget_style: "background-color: #2d5aa0;"
+
+analytics_nav:
+    widget_type: navigate
+    title: Analytics
+    dashboard: Analytics
+    icon: mdi-chart-line
+    widget_style: "background-color: #2d5aa0;"
+
+# Layout
+layout:
+    - system_title(4x1), phase_title(4x1), timing_title(4x1)
+    - system_enabled, auto_irrigation, ec_stacking, current_phase, crop_type, growth_stage, lights_on, lights_off
+    - ml_enabled, debug_mode, spacer(2x1), steering_mode, spacer(3x1)
+    - spacer(12x1)
+    - safety_title(4x1), params_title(4x1), override_title(4x1)
+    - field_capacity, max_ec, spacer(2x1), p1_target, p2_threshold, spacer(2x1), zone1_override, zone2_override, zone3_override
+    - spacer(4x1), substrate_volume, dripper_flow, spacer(6x1)
+    - spacer(12x1)
+    - back_main, zones_nav, analytics_nav

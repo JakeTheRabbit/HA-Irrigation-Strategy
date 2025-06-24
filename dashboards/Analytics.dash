@@ -1,0 +1,275 @@
+##
+## Analytics Dashboard
+## Performance metrics and system analytics
+##
+
+title: System Analytics & Performance
+widget_dimensions: [120, 120]
+widget_margins: [5, 5]
+columns: 12
+global_parameters:
+    use_comma: 0
+    precision: 1
+    shorten: 1
+
+# System Performance Section
+performance_title:
+    widget_type: label
+    text: "SYSTEM PERFORMANCE"
+    text_style: "color: #00ff88; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+system_health:
+    widget_type: sensor
+    title: System Health
+    entity: sensor.crop_steering_system_health_score
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #00ff00; font-size: 200%;"
+    units: "%"
+    widget_style: "background-color: #1e1e1e;"
+
+system_efficiency:
+    widget_type: sensor
+    title: System Efficiency
+    entity: sensor.crop_steering_system_efficiency
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #00ff00; font-size: 200%;"
+    units: "%"
+    widget_style: "background-color: #1e1e1e;"
+
+water_efficiency:
+    widget_type: sensor
+    title: Water Efficiency
+    entity: sensor.crop_steering_water_efficiency
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #00aaff; font-size: 200%;"
+    widget_style: "background-color: #1e1e1e;"
+
+sensor_health:
+    widget_type: sensor
+    title: Sensor Health
+    entity: sensor.crop_steering_sensor_health
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #ffaa00; font-size: 200%;"
+    units: "%"
+    widget_style: "background-color: #1e1e1e;"
+
+# Water Usage Section
+water_title:
+    widget_type: label
+    text: "WATER USAGE"
+    text_style: "color: #00aaff; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+daily_water:
+    widget_type: sensor
+    title: Daily Total
+    entity: sensor.crop_steering_daily_water_usage
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #00aaff; font-size: 200%;"
+    units: "L"
+    widget_style: "background-color: #1e1e1e;"
+
+zone1_daily:
+    widget_type: sensor
+    title: Zone 1 Daily
+    entity: sensor.crop_steering_zone_1_daily_water_usage
+    text_style: "color: white;"
+    value_style: "color: #00aaff;"
+    units: "L"
+
+zone2_daily:
+    widget_type: sensor
+    title: Zone 2 Daily
+    entity: sensor.crop_steering_zone_2_daily_water_usage
+    text_style: "color: white;"
+    value_style: "color: #00aaff;"
+    units: "L"
+
+zone3_daily:
+    widget_type: sensor
+    title: Zone 3 Daily
+    entity: sensor.crop_steering_zone_3_daily_water_usage
+    text_style: "color: white;"
+    value_style: "color: #00aaff;"
+    units: "L"
+
+zone1_weekly:
+    widget_type: sensor
+    title: Zone 1 Weekly
+    entity: sensor.crop_steering_zone_1_weekly_water_usage
+    text_style: "color: white;"
+    value_style: "color: #0088ff;"
+    units: "L"
+
+zone2_weekly:
+    widget_type: sensor
+    title: Zone 2 Weekly
+    entity: sensor.crop_steering_zone_2_weekly_water_usage
+    text_style: "color: white;"
+    value_style: "color: #0088ff;"
+    units: "L"
+
+zone3_weekly:
+    widget_type: sensor
+    title: Zone 3 Weekly
+    entity: sensor.crop_steering_zone_3_weekly_water_usage
+    text_style: "color: white;"
+    value_style: "color: #0088ff;"
+    units: "L"
+
+# Zone Health Section
+health_title:
+    widget_type: label
+    text: "ZONE HEALTH SCORES"
+    text_style: "color: #ff6600; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+zone1_health:
+    widget_type: sensor
+    title: Zone 1 Health
+    entity: sensor.crop_steering_zone_1_health_score
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #00ff00; font-size: 180%;"
+    widget_style: "background-color: #1e1e1e;"
+
+zone2_health:
+    widget_type: sensor
+    title: Zone 2 Health
+    entity: sensor.crop_steering_zone_2_health_score
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #00ff00; font-size: 180%;"
+    widget_style: "background-color: #1e1e1e;"
+
+zone3_health:
+    widget_type: sensor
+    title: Zone 3 Health
+    entity: sensor.crop_steering_zone_3_health_score
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #00ff00; font-size: 180%;"
+    widget_style: "background-color: #1e1e1e;"
+
+zone1_efficiency:
+    widget_type: sensor
+    title: Zone 1 Efficiency
+    entity: sensor.crop_steering_zone_1_efficiency
+    text_style: "color: white;"
+    value_style: "color: #00ff88;"
+
+zone2_efficiency:
+    widget_type: sensor
+    title: Zone 2 Efficiency
+    entity: sensor.crop_steering_zone_2_efficiency
+    text_style: "color: white;"
+    value_style: "color: #00ff88;"
+
+zone3_efficiency:
+    widget_type: sensor
+    title: Zone 3 Efficiency
+    entity: sensor.crop_steering_zone_3_efficiency
+    text_style: "color: white;"
+    value_style: "color: #00ff88;"
+
+# Safety Status Section
+safety_title:
+    widget_type: label
+    text: "SAFETY STATUS"
+    text_style: "color: #ff4444; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+system_safety:
+    widget_type: sensor
+    title: System Safety
+    entity: sensor.crop_steering_system_safety_status
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #ffffff; font-size: 180%;"
+    widget_style: "background-color: #1e1e1e;"
+
+zone1_safety:
+    widget_type: sensor
+    title: Zone 1 Safety
+    entity: sensor.crop_steering_zone_1_safety_status
+    text_style: "color: white;"
+    value_style: "color: #ffffff;"
+
+zone2_safety:
+    widget_type: sensor
+    title: Zone 2 Safety
+    entity: sensor.crop_steering_zone_2_safety_status
+    text_style: "color: white;"
+    value_style: "color: #ffffff;"
+
+zone3_safety:
+    widget_type: sensor
+    title: Zone 3 Safety
+    entity: sensor.crop_steering_zone_3_safety_status
+    text_style: "color: white;"
+    value_style: "color: #ffffff;"
+
+# Current Averages
+averages_title:
+    widget_type: label
+    text: "CURRENT AVERAGES"
+    text_style: "color: #00ccff; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+avg_vwc:
+    widget_type: sensor
+    title: Average VWC
+    entity: sensor.crop_steering_configured_avg_vwc
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #00ff88; font-size: 200%;"
+    units: "%"
+    widget_style: "background-color: #1e1e1e;"
+
+avg_ec:
+    widget_type: sensor
+    title: Average EC
+    entity: sensor.crop_steering_configured_avg_ec
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #ffaa00; font-size: 200%;"
+    units: "mS/cm"
+    widget_style: "background-color: #1e1e1e;"
+
+ec_ratio:
+    widget_type: sensor
+    title: EC Ratio
+    entity: sensor.crop_steering_ec_ratio
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #ffcc00; font-size: 200%;"
+    widget_style: "background-color: #1e1e1e;"
+
+# Navigation
+back_main:
+    widget_type: navigate
+    title: Main Dashboard
+    dashboard: CropSteering
+    icon: mdi-home
+    widget_style: "background-color: #2d5aa0;"
+
+zones_nav:
+    widget_type: navigate
+    title: Zone Details
+    dashboard: ZoneDetail
+    icon: mdi-view-dashboard
+    widget_style: "background-color: #2d5aa0;"
+
+controls_nav:
+    widget_type: navigate
+    title: Controls
+    dashboard: Controls
+    icon: mdi-cog
+    widget_style: "background-color: #2d5aa0;"
+
+# Layout
+layout:
+    - performance_title(3x1), water_title(3x1), health_title(3x1), safety_title(3x1)
+    - system_health, system_efficiency, daily_water, zone1_daily, zone1_health, zone1_efficiency, system_safety, zone1_safety
+    - water_efficiency, sensor_health, zone2_daily, zone3_daily, zone2_health, zone2_efficiency, zone2_safety, zone3_safety
+    - spacer(4x1), zone1_weekly, zone2_weekly, zone3_health, zone3_efficiency, spacer(4x1)
+    - spacer(4x1), zone3_weekly, spacer(7x1)
+    - spacer(12x1)
+    - averages_title(3x1), spacer(9x1)
+    - avg_vwc, avg_ec, ec_ratio, spacer(9x1)
+    - spacer(12x1)
+    - back_main, zones_nav, controls_nav

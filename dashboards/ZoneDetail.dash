@@ -1,0 +1,250 @@
+##
+## Zone Detail Dashboard
+## Detailed monitoring and control for each irrigation zone
+##
+
+title: Zone Details & Control
+widget_dimensions: [120, 120]
+widget_margins: [5, 5]
+columns: 12
+global_parameters:
+    use_comma: 0
+    precision: 1
+    shorten: 1
+
+# Zone 1 Section
+zone1_title:
+    widget_type: label
+    text: "ZONE 1"
+    text_style: "color: #00ccff; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+zone1_enable:
+    widget_type: switch
+    title: Zone 1 Enable
+    entity: switch.crop_steering_zone_1_enabled
+    icon_on: mdi-water
+    icon_off: mdi-water-off
+
+zone1_override:
+    widget_type: switch
+    title: Zone 1 Override
+    entity: switch.crop_steering_zone_1_manual_override
+    icon_on: mdi-hand-back-right
+    icon_off: mdi-hand-back-right-off
+
+zone1_vwc_big:
+    widget_type: sensor
+    title: VWC
+    entity: sensor.crop_steering_vwc_zone_1
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #00ff88; font-size: 200%;"
+    units: "%"
+    widget_style: "background-color: #1e1e1e;"
+
+zone1_ec_big:
+    widget_type: sensor
+    title: EC
+    entity: sensor.crop_steering_ec_zone_1
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #ffaa00; font-size: 200%;"
+    units: "mS/cm"
+    widget_style: "background-color: #1e1e1e;"
+
+zone1_group:
+    widget_type: select
+    title: Zone 1 Group
+    entity: select.crop_steering_zone_1_group
+
+zone1_priority:
+    widget_type: select
+    title: Zone 1 Priority
+    entity: select.crop_steering_zone_1_priority
+
+zone1_health:
+    widget_type: sensor
+    title: Health Score
+    entity: sensor.crop_steering_zone_1_health_score
+    text_style: "color: white;"
+    value_style: "color: #00ff00;"
+
+zone1_daily_water:
+    widget_type: sensor
+    title: Daily Water
+    entity: sensor.crop_steering_zone_1_daily_water_usage
+    text_style: "color: white;"
+    value_style: "color: #00aaff;"
+    units: "L"
+
+zone1_safety:
+    widget_type: sensor
+    title: Safety Status
+    entity: sensor.crop_steering_zone_1_safety_status
+    text_style: "color: white;"
+    value_style: "color: #ffffff;"
+
+# Zone 2 Section
+zone2_title:
+    widget_type: label
+    text: "ZONE 2"
+    text_style: "color: #00ccff; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+zone2_enable:
+    widget_type: switch
+    title: Zone 2 Enable
+    entity: switch.crop_steering_zone_2_enabled
+    icon_on: mdi-water
+    icon_off: mdi-water-off
+
+zone2_override:
+    widget_type: switch
+    title: Zone 2 Override
+    entity: switch.crop_steering_zone_2_manual_override
+    icon_on: mdi-hand-back-right
+    icon_off: mdi-hand-back-right-off
+
+zone2_vwc_big:
+    widget_type: sensor
+    title: VWC
+    entity: sensor.crop_steering_vwc_zone_2
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #00ff88; font-size: 200%;"
+    units: "%"
+    widget_style: "background-color: #1e1e1e;"
+
+zone2_ec_big:
+    widget_type: sensor
+    title: EC
+    entity: sensor.crop_steering_ec_zone_2
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #ffaa00; font-size: 200%;"
+    units: "mS/cm"
+    widget_style: "background-color: #1e1e1e;"
+
+zone2_group:
+    widget_type: select
+    title: Zone 2 Group
+    entity: select.crop_steering_zone_2_group
+
+zone2_priority:
+    widget_type: select
+    title: Zone 2 Priority
+    entity: select.crop_steering_zone_2_priority
+
+zone2_health:
+    widget_type: sensor
+    title: Health Score
+    entity: sensor.crop_steering_zone_2_health_score
+    text_style: "color: white;"
+    value_style: "color: #00ff00;"
+
+zone2_daily_water:
+    widget_type: sensor
+    title: Daily Water
+    entity: sensor.crop_steering_zone_2_daily_water_usage
+    text_style: "color: white;"
+    value_style: "color: #00aaff;"
+    units: "L"
+
+zone2_safety:
+    widget_type: sensor
+    title: Safety Status
+    entity: sensor.crop_steering_zone_2_safety_status
+    text_style: "color: white;"
+    value_style: "color: #ffffff;"
+
+# Zone 3 Section
+zone3_title:
+    widget_type: label
+    text: "ZONE 3"
+    text_style: "color: #00ccff; font-size: 150%; font-weight: bold;"
+    widget_style: "background-color: #1e1e1e; text-align: center;"
+
+zone3_enable:
+    widget_type: switch
+    title: Zone 3 Enable
+    entity: switch.crop_steering_zone_3_enabled
+    icon_on: mdi-water
+    icon_off: mdi-water-off
+
+zone3_override:
+    widget_type: switch
+    title: Zone 3 Override
+    entity: switch.crop_steering_zone_3_manual_override
+    icon_on: mdi-hand-back-right
+    icon_off: mdi-hand-back-right-off
+
+zone3_vwc_big:
+    widget_type: sensor
+    title: VWC
+    entity: sensor.crop_steering_vwc_zone_3
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #00ff88; font-size: 200%;"
+    units: "%"
+    widget_style: "background-color: #1e1e1e;"
+
+zone3_ec_big:
+    widget_type: sensor
+    title: EC
+    entity: sensor.crop_steering_ec_zone_3
+    text_style: "color: white; font-size: 120%;"
+    value_style: "color: #ffaa00; font-size: 200%;"
+    units: "mS/cm"
+    widget_style: "background-color: #1e1e1e;"
+
+zone3_group:
+    widget_type: select
+    title: Zone 3 Group
+    entity: select.crop_steering_zone_3_group
+
+zone3_priority:
+    widget_type: select
+    title: Zone 3 Priority
+    entity: select.crop_steering_zone_3_priority
+
+zone3_health:
+    widget_type: sensor
+    title: Health Score
+    entity: sensor.crop_steering_zone_3_health_score
+    text_style: "color: white;"
+    value_style: "color: #00ff00;"
+
+zone3_daily_water:
+    widget_type: sensor
+    title: Daily Water
+    entity: sensor.crop_steering_zone_3_daily_water_usage
+    text_style: "color: white;"
+    value_style: "color: #00aaff;"
+    units: "L"
+
+zone3_safety:
+    widget_type: sensor
+    title: Safety Status
+    entity: sensor.crop_steering_zone_3_safety_status
+    text_style: "color: white;"
+    value_style: "color: #ffffff;"
+
+# Navigation
+back_main:
+    widget_type: navigate
+    title: Main Dashboard
+    dashboard: CropSteering
+    icon: mdi-home
+    widget_style: "background-color: #2d5aa0;"
+
+controls_nav:
+    widget_type: navigate
+    title: Controls
+    dashboard: Controls
+    icon: mdi-cog
+    widget_style: "background-color: #2d5aa0;"
+
+# Layout
+layout:
+    - zone1_title(3x1), zone2_title(3x1), zone3_title(3x1)
+    - zone1_enable, zone1_override, zone1_vwc_big, zone2_enable, zone2_override, zone2_vwc_big, zone3_enable, zone3_override, zone3_vwc_big
+    - zone1_group, zone1_priority, zone1_ec_big, zone2_group, zone2_priority, zone2_ec_big, zone3_group, zone3_priority, zone3_ec_big
+    - zone1_health, zone1_daily_water, zone1_safety, zone2_health, zone2_daily_water, zone2_safety, zone3_health, zone3_daily_water, zone3_safety
+    - spacer(12x1)
+    - back_main, controls_nav
