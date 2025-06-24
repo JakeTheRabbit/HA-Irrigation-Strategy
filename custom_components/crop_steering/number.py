@@ -356,6 +356,27 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement="mS/cm",
         mode="box",
     ),
+    # System-wide Light Schedule (NOT per-zone)
+    NumberEntityDescription(
+        key="lights_on_hour",
+        name="Lights On Hour",
+        icon="mdi:weather-sunny",
+        native_min_value=0,
+        native_max_value=23,
+        native_step=1,
+        native_unit_of_measurement="hour",
+        mode="box",
+    ),
+    NumberEntityDescription(
+        key="lights_off_hour",
+        name="Lights Off Hour",
+        icon="mdi:weather-night",
+        native_min_value=0,
+        native_max_value=23,
+        native_step=1,
+        native_unit_of_measurement="hour",
+        mode="box",
+    ),
 ]
 
 async def async_setup_entry(
@@ -376,39 +397,6 @@ async def async_setup_entry(
     
     # Add zone-specific number entities
     for zone_num in range(1, num_zones + 1):
-        # Zone-specific light schedule
-        numbers.append(CropSteeringNumber(
-            entry,
-            NumberEntityDescription(
-                key=f"zone_{zone_num}_lights_on_hour",
-                name=f"Zone {zone_num} Lights On Hour",
-                icon="mdi:weather-sunny",
-                native_min_value=0,
-                native_max_value=23,
-                native_step=1,
-                native_unit_of_measurement="hour",
-                mode="box",
-            ),
-            zone_num=zone_num,
-            default_value=12  # Default noon
-        ))
-        
-        numbers.append(CropSteeringNumber(
-            entry,
-            NumberEntityDescription(
-                key=f"zone_{zone_num}_lights_off_hour",
-                name=f"Zone {zone_num} Lights Off Hour",
-                icon="mdi:weather-night",
-                native_min_value=0,
-                native_max_value=23,
-                native_step=1,
-                native_unit_of_measurement="hour",
-                mode="box",
-            ),
-            zone_num=zone_num,
-            default_value=0  # Default midnight
-        ))
-        
         # Zone water limits
         numbers.append(CropSteeringNumber(
             entry,
@@ -503,6 +491,9 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             "ec_target_gen_p1": 5.0,
             "ec_target_gen_p2": 6.0,
             "ec_target_gen_p3": 4.5,
+            # System-wide light schedule (NOT per-zone)
+            "lights_on_hour": 12,  # Default noon
+            "lights_off_hour": 0,  # Default midnight
         }
         
         # Use provided default or lookup from dict

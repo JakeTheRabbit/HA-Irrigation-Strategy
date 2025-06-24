@@ -43,15 +43,7 @@ ZONE_CROP_PROFILES = [
     "Custom"
 ]
 
-# Zone-specific schedules
-ZONE_SCHEDULE_OPTIONS = [
-    "Main Schedule",
-    "12/12 Flowering",
-    "18/6 Vegetative",
-    "20/4 Auto",
-    "24/0 Continuous",
-    "Custom"
-]
+# Note: Light schedules are now system-wide, not per-zone
 
 SELECT_DESCRIPTIONS = [
     SelectEntityDescription(
@@ -139,18 +131,6 @@ async def async_setup_entry(
                 name=f"Zone {zone_num} Crop Profile",
                 options=ZONE_CROP_PROFILES,
                 icon="mdi:sprout",
-            ),
-            zone_num=zone_num
-        ))
-        
-        # Zone Schedule
-        selects.append(CropSteeringSelect(
-            entry,
-            SelectEntityDescription(
-                key=f"zone_{zone_num}_schedule",
-                name=f"Zone {zone_num} Schedule",
-                options=ZONE_SCHEDULE_OPTIONS,
-                icon="mdi:calendar-clock",
             ),
             zone_num=zone_num
         ))

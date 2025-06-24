@@ -470,29 +470,15 @@ class MasterCropSteeringApp(hass.Hass):
             return 'Cannabis_Athena'
     
     def _get_zone_schedule(self, zone_num: int) -> Dict[str, time]:
-        """Get the light schedule for a zone."""
+        """Get the light schedule - SYSTEM-WIDE not per-zone (zones share same lights)."""
         try:
-            schedule_entity = f"select.crop_steering_zone_{zone_num}_schedule"
-            schedule = self.get_state(schedule_entity, default='Main Schedule')
-            
-            if schedule == 'Main Schedule' or schedule == 'unknown':
-                # Use default 12pm-12am
-                return {'lights_on': time(12, 0), 'lights_off': time(0, 0)}
-            elif schedule == '12/12 Flowering':
-                return {'lights_on': time(6, 0), 'lights_off': time(18, 0)}
-            elif schedule == '18/6 Vegetative':
-                return {'lights_on': time(6, 0), 'lights_off': time(0, 0)}
-            elif schedule == '20/4 Auto':
-                return {'lights_on': time(2, 0), 'lights_off': time(22, 0)}
-            elif schedule == '24/0 Continuous':
-                return {'lights_on': time(0, 0), 'lights_off': time(23, 59)}
-            else:  # Custom
-                # Get custom hours from number entities
-                on_hour = int(self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_lights_on_hour", 12))
-                off_hour = int(self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_lights_off_hour", 0))
-                return {'lights_on': time(on_hour, 0), 'lights_off': time(off_hour, 0)}
+            # All zones use the same system-wide light schedule
+            # Get system-wide light hours from number entities
+            on_hour = int(self._get_number_entity_value("number.crop_steering_lights_on_hour", 12))
+            off_hour = int(self._get_number_entity_value("number.crop_steering_lights_off_hour", 0))
+            return {'lights_on': time(on_hour, 0), 'lights_off': time(off_hour, 0)}
         except Exception as e:
-            self.log(f"❌ Error getting zone {zone_num} schedule: {e}", level='ERROR')
+            self.log(f"❌ Error getting system light schedule: {e}", level='ERROR')
             return {'lights_on': time(12, 0), 'lights_off': time(0, 0)}
 
     async def _create_initial_sensors(self, kwargs):

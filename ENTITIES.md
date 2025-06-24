@@ -138,12 +138,17 @@ This document lists every single entity created by the Crop Steering System with
 | `number.crop_steering_ec_target_gen_p2` | EC Target Gen P2 | 0.5-20.0 | mS/cm | EC target for generative P2 phase |
 | `number.crop_steering_ec_target_gen_p3` | EC Target Gen P3 | 0.5-20.0 | mS/cm | EC target for generative P3 phase |
 
+### System Light Schedule
+
+| Entity ID | Name | Range | Unit | Description |
+|-----------|------|-------|------|-------------|
+| `number.crop_steering_lights_on_hour` | Lights On Hour | 0-23 | hour | Hour when lights turn on for the entire system |
+| `number.crop_steering_lights_off_hour` | Lights Off Hour | 0-23 | hour | Hour when lights turn off for the entire system |
+
 ### Zone-Specific Numbers (Per Zone 1-N)
 
 | Entity ID Pattern | Name Pattern | Range | Unit | Description |
 |-------------------|--------------|-------|------|-------------|
-| `number.crop_steering_zone_{N}_lights_on_hour` | Zone {N} Lights On Hour | 0-23 | hour | Hour when lights turn on for zone N |
-| `number.crop_steering_zone_{N}_lights_off_hour` | Zone {N} Lights Off Hour | 0-23 | hour | Hour when lights turn off for zone N |
 | `number.crop_steering_zone_{N}_max_daily_volume` | Zone {N} Max Daily Volume | 0-200 | L | Maximum daily water volume for zone N |
 | `number.crop_steering_zone_{N}_shot_size_multiplier` | Zone {N} Shot Size Multiplier | 0.1-5.0 | factor | Shot size adjustment factor for zone N |
 
@@ -165,7 +170,6 @@ This document lists every single entity created by the Crop Steering System with
 | `select.crop_steering_zone_{N}_group` | Zone {N} Group | Ungrouped, Group A, Group B, Group C, Group D | Zone grouping for coordination |
 | `select.crop_steering_zone_{N}_priority` | Zone {N} Priority | Critical, High, Normal, Low | Zone irrigation priority level |
 | `select.crop_steering_zone_{N}_crop_profile` | Zone {N} Crop Profile | Follow Main, Cannabis_Athena, Cannabis_Indica_Dominant, Cannabis_Sativa_Dominant, Cannabis_Balanced_Hybrid, Tomato_Hydroponic, Lettuce_Leafy_Greens, Custom | Zone-specific crop profile |
-| `select.crop_steering_zone_{N}_schedule` | Zone {N} Schedule | Main Schedule, 12/12 Flowering, 18/6 Vegetative, 20/4 Auto, 24/0 Continuous, Custom | Zone-specific light schedule |
 
 ## 🔘 SWITCHES
 
