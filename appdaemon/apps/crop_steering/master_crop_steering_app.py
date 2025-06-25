@@ -933,10 +933,43 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     self.log(f"🔧 Zone {zone_num}: Lights off but phase is {zone_phase}, correcting to P3 (waiting)")
                     self.zone_phases[zone_num] = 'P3'
             
+            # Update sensors after phase corrections
+            self._update_phase_sensors()
+            
             self.log("✅ State validation complete")
             
         except Exception as e:
             self.log(f"❌ Error validating state: {e}", level='ERROR')
+
+    def _update_phase_sensors(self):
+        """Update phase sensors after phase changes."""
+        try:
+            # Update the main phase summary sensor
+            phase_summary = ", ".join([f"Z{z}:{p}" for z, p in self.zone_phases.items()])
+            self.set_entity_value('sensor.crop_steering_app_current_phase',
+                          phase_summary,
+                          attributes={
+                              'friendly_name': 'Zone Phases',
+                              'icon': 'mdi:water-circle',
+                              'zone_phases': {str(k): str(v) for k, v in self.zone_phases.items()},
+                              'updated': datetime.now().isoformat()
+                          })
+            
+            # Update individual zone phase sensors
+            for zone_num, phase in self.zone_phases.items():
+                self.run_in(self._async_set_entity_wrapper, 0, 
+                           entity_id=f'sensor.crop_steering_zone_{zone_num}_phase',
+                           value=phase,
+                           attributes={
+                               'friendly_name': f'Zone {zone_num} Phase',
+                               'icon': 'mdi:state-machine',
+                               'updated': datetime.now().isoformat()
+                           })
+            
+            self.log(f"📊 Updated phase sensors: {phase_summary}")
+            
+        except Exception as e:
+            self.log(f"❌ Error updating phase sensors: {e}", level='ERROR')
 
     def _on_vwc_sensor_update(self, entity, attribute, old, new, kwargs):
         """Handle VWC sensor updates with advanced processing."""
@@ -3658,7 +3691,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Create a summary of all zone phases
             phase_summary = ", ".join([f"Z{z}:{p}" for z, p in self.zone_phases.items()])
             self.set_entity_value('sensor.crop_steering_app_current_phase',
-                          state=phase_summary,
+                          phase_summary,
                           attributes={
                               'friendly_name': 'Zone Phases',
                               'icon': 'mdi:water-circle',
