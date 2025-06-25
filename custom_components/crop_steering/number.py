@@ -37,11 +37,11 @@ NUMBER_DESCRIPTIONS = [
         mode="box",
     ),
     NumberEntityDescription(
-        key="drippers_per_zone",
-        name="Drippers Per Zone",
+        key="drippers_per_plant",
+        name="Drippers Per Plant",
         icon="mdi:sprinkler",
         native_min_value=1,
-        native_max_value=50,
+        native_max_value=6,
         native_step=1,
         mode="box",
     ),
@@ -397,6 +397,22 @@ async def async_setup_entry(
     
     # Add zone-specific number entities
     for zone_num in range(1, num_zones + 1):
+        # Zone plant count
+        numbers.append(CropSteeringNumber(
+            entry,
+            NumberEntityDescription(
+                key=f"zone_{zone_num}_plant_count",
+                name=f"Zone {zone_num} Plant Count",
+                icon="mdi:sprout",
+                native_min_value=1,
+                native_max_value=50,
+                native_step=1,
+                mode="box",
+            ),
+            zone_num=zone_num,
+            default_value=4
+        ))
+        
         # Zone water limits
         numbers.append(CropSteeringNumber(
             entry,
@@ -453,8 +469,8 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         # Set default values based on Athena methodology
         default_values = {
             "substrate_volume": 10.0,
-            "dripper_flow_rate": 2.0,
-            "drippers_per_zone": 4,
+            "dripper_flow_rate": 1.2,
+            "drippers_per_plant": 2,
             "field_capacity": 70.0,
             "max_ec": 9.0,
             "veg_dryback_target": 50.0,

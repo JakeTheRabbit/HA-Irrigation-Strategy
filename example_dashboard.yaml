@@ -1773,8 +1773,8 @@ sections:
             - font-size: 16px
             - color: rgba(59, 130, 246, 0.9)
       - type: custom:button-card
-        entity: number.crop_steering_drippers_per_zone
-        name: Drippers Per Zone
+        entity: number.crop_steering_drippers_per_plant
+        name: Drippers Per Plant
         icon: mdi:sprinkler
         show_state: true
         tap_action:
@@ -2625,6 +2625,95 @@ sections:
           state:
             - font-size: 16px
             - color: rgba(168, 85, 247, 0.9)
+
+  # ZONE PLANT COUNTS SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: Zone Plant Counts
+        styles:
+          card:
+            - background-color: rgba(34, 197, 94, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(34, 197, 94, 1)
+      - type: custom:button-card
+        entity: number.crop_steering_zone_1_plant_count
+        name: Zone 1 Plant Count
+        icon: mdi:sprout
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_zone_2_plant_count
+        name: Zone 2 Plant Count
+        icon: mdi:sprout
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_zone_3_plant_count
+        name: Zone 3 Plant Count
+        icon: mdi:sprout
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
 
   # ZONE SHOT SIZE MULTIPLIERS SECTION
   - type: grid

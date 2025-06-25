@@ -69,8 +69,8 @@ This document lists every single entity created by the Crop Steering System with
 | Entity ID | Name | Range | Unit | Description |
 |-----------|------|-------|------|-------------|
 | `number.crop_steering_substrate_volume` | Substrate Volume | 1.0-200.0 | L | Volume of growing medium per zone |
-| `number.crop_steering_dripper_flow_rate` | Dripper Flow Rate | 0.1-50.0 | L/hr | Flow rate of irrigation drippers |
-| `number.crop_steering_drippers_per_zone` | Drippers Per Zone | 1-50 | count | Number of drippers per irrigation zone |
+| `number.crop_steering_dripper_flow_rate` | Dripper Flow Rate | 0.1-50.0 | L/hr | Flow rate per individual dripper |
+| `number.crop_steering_drippers_per_plant` | Drippers Per Plant | 1-6 | count | Number of drippers per individual plant |
 | `number.crop_steering_field_capacity` | Field Capacity | 20.0-100.0 | % | Maximum safe VWC (over-watering protection) |
 | `number.crop_steering_max_ec` | Maximum EC | 1.0-20.0 | mS/cm | Maximum safe EC (nutrient burn protection) |
 
@@ -149,6 +149,7 @@ This document lists every single entity created by the Crop Steering System with
 
 | Entity ID Pattern | Name Pattern | Range | Unit | Description |
 |-------------------|--------------|-------|------|-------------|
+| `number.crop_steering_zone_{N}_plant_count` | Zone {N} Plant Count | 1-50 | count | Number of plants in zone N |
 | `number.crop_steering_zone_{N}_max_daily_volume` | Zone {N} Max Daily Volume | 0-200 | L | Maximum daily water volume for zone N |
 | `number.crop_steering_zone_{N}_shot_size_multiplier` | Zone {N} Shot Size Multiplier | 0.1-5.0 | factor | Shot size adjustment factor for zone N |
 
@@ -210,7 +211,7 @@ This document lists every single entity created by the Crop Steering System with
 
 ### Total Entity Count by Type:
 - **Sensors**: 70+ (varies by zone count)
-- **Numbers**: 45+ (varies by zone count)  
+- **Numbers**: 46+ (varies by zone count, includes per-zone plant counts)  
 - **Selects**: 20+ (varies by zone count)
 - **Switches**: 10+ (varies by zone count)
 - **Services**: 4
