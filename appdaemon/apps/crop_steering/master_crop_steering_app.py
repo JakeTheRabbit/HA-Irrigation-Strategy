@@ -595,6 +595,17 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self.log(f"❌ Error getting system light schedule: {e}", level='ERROR')
             return {'lights_on': time(12, 0), 'lights_off': time(0, 0)}
 
+    async def _async_set_entity_wrapper(self, kwargs):
+        """Async wrapper for set_entity_value calls."""
+        try:
+            entity_id = kwargs.get('entity_id')
+            value = kwargs.get('value')
+            attributes = kwargs.get('attributes', {})
+            
+            await self.async_set_entity_value(entity_id, value, attributes=attributes)
+        except Exception as e:
+            self.log(f"❌ Error in async entity wrapper: {e}", level='ERROR')
+
     async def _create_initial_sensors(self, kwargs):
         """Create initial sensors for HA integration compatibility."""
         try:
@@ -2298,9 +2309,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 if value is None:
                     try:
                         if hasattr(self, 'AD') and hasattr(self.AD, 'state'):
-                            state_obj = self.AD.state.get_state('default', integration_sensor)
-                            if state_obj and 'state' in state_obj:
-                                value = state_obj['state']
+                            value = self.get_state(integration_sensor)
+                            if value is not None:
                                 self.log(f"🔍 Zone {zone_num} via AD.state: {value}")
                     except:
                         pass
@@ -3584,13 +3594,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _update_dryback_entities(self, dryback_result: Dict):
         """Update Home Assistant entities with dryback data."""
         try:
-            self.set_entity_value('sensor.crop_steering_dryback_percentage',
-                          state=dryback_result['dryback_percentage'],
-                          attributes=dryback_result)
+            self.run_in(self._async_set_entity_wrapper, 0,
+                       entity_id='sensor.crop_steering_dryback_percentage',
+                       value=dryback_result['dryback_percentage'],
+                       attributes=dryback_result)
             
-            self.set_entity_value('binary_sensor.crop_steering_dryback_in_progress',
-                          state='on' if dryback_result['dryback_in_progress'] else 'off',
-                          attributes={'confidence': dryback_result['confidence_score']})
+            self.run_in(self._async_set_entity_wrapper, 0,
+                       entity_id='binary_sensor.crop_steering_dryback_in_progress',
+                       value='on' if dryback_result['dryback_in_progress'] else 'off',
+                       attributes={'confidence': dryback_result['confidence_score']})
             
         except Exception as e:
             self.log(f"❌ Error updating dryback entities: {e}", level='ERROR')
@@ -3601,18 +3613,20 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Update individual sensor status
             entity_base = sensor_id.replace('.', '_')
             
-            self.set_entity_value(f'sensor.{entity_base}_reliability',
-                          state=fusion_result['sensor_reliability'],
-                          attributes={'health': fusion_result['sensor_health'],
-                                    'outlier_rate': fusion_result['outlier_rate']})
+            self.run_in(self._async_set_entity_wrapper, 0,
+                       entity_id=f'sensor.{entity_base}_reliability',
+                       value=fusion_result['sensor_reliability'],
+                       attributes={'health': fusion_result['sensor_health'],
+                                 'outlier_rate': fusion_result['outlier_rate']})
             
             # Update fused values if this was the latest update
             if fusion_result['fused_value'] is not None:
                 sensor_type = 'vwc' if 'vwc' in sensor_id else 'ec'
-                self.set_entity_value(f'sensor.crop_steering_fused_{sensor_type}',
-                              state=fusion_result['fused_value'],
-                              attributes={'confidence': fusion_result['fusion_confidence'],
-                                        'active_sensors': fusion_result['active_sensors']})
+                self.run_in(self._async_set_entity_wrapper, 0,
+                           entity_id=f'sensor.crop_steering_fused_{sensor_type}',
+                           value=fusion_result['fused_value'],
+                           attributes={'confidence': fusion_result['fusion_confidence'],
+                                     'active_sensors': fusion_result['active_sensors']})
             
         except Exception as e:
             self.log(f"❌ Error updating sensor fusion entities: {e}", level='ERROR')
