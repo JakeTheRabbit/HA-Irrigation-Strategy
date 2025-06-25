@@ -96,6 +96,9 @@ class IntelligentSensorFusion:
         self.sensor_reliability_scores = defaultdict(float)
         self.sensor_health_status = defaultdict(str)
         
+        # Track sensor types to avoid mixing VWC and EC
+        self.sensor_types = {}  # sensor_id -> sensor_type mapping
+        
         # Fusion results
         self.fused_values = deque(maxlen=history_window)
         self.fusion_timestamps = deque(maxlen=history_window)
@@ -136,6 +139,9 @@ class IntelligentSensorFusion:
         self.sensor_timestamps[sensor_id].append(timestamp)
         self.total_readings[sensor_id] += 1
         
+        # Track sensor type to avoid mixing VWC and EC
+        self.sensor_types[sensor_id] = sensor_type
+        
         # Update sensor reliability
         self._update_sensor_reliability(sensor_id)
         
@@ -174,6 +180,19 @@ class IntelligentSensorFusion:
         Returns:
             True if value is considered an outlier
         """
+        # First check absolute bounds based on sensor type
+        sensor_type = self.sensor_types.get(sensor_id, 'unknown')
+        if sensor_type == 'vwc':
+            # VWC must be 0-100%
+            if value < 0 or value > 100:
+                _LOGGER.warning(f"VWC value {value} outside valid range [0-100] for {sensor_id}")
+                return True
+        elif sensor_type == 'ec':
+            # EC typically 0-10 mS/cm, but can go higher in extreme cases
+            if value < 0 or value > 20:
+                _LOGGER.warning(f"EC value {value} outside valid range [0-20] for {sensor_id}")
+                return True
+        
         sensor_history = list(self.sensor_data[sensor_id])
         
         # Need minimum data for outlier detection
@@ -332,7 +351,9 @@ class IntelligentSensorFusion:
         current_time = datetime.now()
         
         for sensor_id in self.sensor_data:
-            if (len(self.sensor_data[sensor_id]) > 0 and 
+            # CRITICAL: Only include sensors of the matching type to avoid mixing VWC and EC
+            if (self.sensor_types.get(sensor_id) == sensor_type and
+                len(self.sensor_data[sensor_id]) > 0 and 
                 len(self.sensor_timestamps[sensor_id]) > 0):
                 
                 last_reading_age = (current_time - self.sensor_timestamps[sensor_id][-1]).total_seconds() / 60
@@ -550,7 +571,52 @@ class IntelligentSensorFusion:
         self.fusion_confidence.clear()
         self.outlier_counts.clear()
         self.total_readings.clear()
+        self.sensor_types.clear()
         self.kalman_state = None
         self.kalman_covariance = 1.0
         
         _LOGGER.info("Sensor Fusion system reset")
+    
+    def get_fused_vwc(self) -> Optional[float]:
+        """
+        Get the latest fused VWC value.
+        
+        Returns:
+            Latest fused VWC value or None if not available
+        """
+        # Perform fusion for VWC sensors only
+        result = self._perform_sensor_fusion('vwc', datetime.now())
+        return result.get('value')
+    
+    def get_fused_ec(self) -> Optional[float]:
+        """
+        Get the latest fused EC value.
+        
+        Returns:
+            Latest fused EC value or None if not available
+        """
+        # Perform fusion for EC sensors only
+        result = self._perform_sensor_fusion('ec', datetime.now())
+        return result.get('value')
+    
+    def get_sensor_count_by_type(self, sensor_type: str) -> int:
+        """
+        Get count of active sensors for a specific type.
+        
+        Args:
+            sensor_type: Type of sensor ('vwc' or 'ec')
+            
+        Returns:
+            Number of active sensors of this type
+        """
+        count = 0
+        current_time = datetime.now()
+        
+        for sensor_id, s_type in self.sensor_types.items():
+            if s_type == sensor_type and sensor_id in self.sensor_data:
+                if len(self.sensor_timestamps[sensor_id]) > 0:
+                    last_reading_age = (current_time - self.sensor_timestamps[sensor_id][-1]).total_seconds() / 60
+                    if last_reading_age <= 10:  # Active within last 10 minutes
+                        count += 1
+        
+        return count

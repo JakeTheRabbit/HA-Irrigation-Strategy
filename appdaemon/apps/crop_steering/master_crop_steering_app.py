@@ -3,7 +3,7 @@ Master Crop Steering Application with Advanced AI Features
 Coordinates all advanced modules: dryback detection, sensor fusion, ML prediction, crop profiles, and dashboard
 """
 
-import appdaemon.plugins.hass.hassapi as hass
+# Removed - now inheriting from BaseAsyncApp which provides all needed functionality
 import json
 import logging
 import asyncio
@@ -21,17 +21,19 @@ try:
     from .intelligent_sensor_fusion import IntelligentSensorFusion
     from .ml_irrigation_predictor import SimplifiedIrrigationPredictor
     from .intelligent_crop_profiles import IntelligentCropProfiles
+    from .base_async_app import BaseAsyncApp
 except ImportError:
     # Fallback for direct execution or import issues
     from advanced_dryback_detection import AdvancedDrybackDetector
     from intelligent_sensor_fusion import IntelligentSensorFusion
     from ml_irrigation_predictor import SimplifiedIrrigationPredictor
     from intelligent_crop_profiles import IntelligentCropProfiles
+    from base_async_app import BaseAsyncApp
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class MasterCropSteeringApp(hass.Hass):
+class MasterCropSteeringApp(BaseAsyncApp):
     """
     Master application that coordinates all advanced crop steering modules.
     
@@ -48,6 +50,8 @@ class MasterCropSteeringApp(hass.Hass):
 
     def initialize(self):
         """Initialize the master crop steering application."""
+        # Initialize parent class for async-safe entity access
+        super().initialize()
         
         # Load configuration
         self.config = self._load_configuration()
@@ -197,8 +201,8 @@ class MasterCropSteeringApp(hass.Hass):
             # Test reading one sensor directly for debugging
             if config['sensors']['vwc']:
                 test_sensor = config['sensors']['vwc'][0]
-                test_value = self.get_state(test_sensor)
-                self.log(f"🔍 DEBUG Test read {test_sensor}: {test_value}")
+                test_value = self.get_entity_value(test_sensor)
+                self.log(f"DEBUG Test read {test_sensor}: {test_value}")
             
             return config
             
@@ -417,8 +421,8 @@ class MasterCropSteeringApp(hass.Hass):
         """Initialize with default crop profile."""
         try:
             # Try to get current crop from HA, default to Cannabis_Athena
-            current_crop = self.get_state('select.crop_steering_crop_type', default='Cannabis_Athena')
-            current_stage = self.get_state('select.crop_steering_growth_stage', default='vegetative')
+            current_crop = self.get_entity_value('select.crop_steering_crop_type', default='Cannabis_Athena')
+            current_stage = self.get_entity_value('select.crop_steering_growth_stage', default='vegetative')
             
             profile_result = self.crop_profiles.select_profile(current_crop, current_stage)
             
@@ -444,7 +448,7 @@ class MasterCropSteeringApp(hass.Hass):
         """Get the group assignment for a zone."""
         try:
             group_entity = f"select.crop_steering_zone_{zone_num}_group"
-            state = self.get_state(group_entity)
+            state = self.get_entity_value(group_entity)
             return state if state and state != 'unknown' else 'Ungrouped'
         except Exception:
             return 'Ungrouped'
@@ -453,7 +457,7 @@ class MasterCropSteeringApp(hass.Hass):
         """Get the priority level for a zone."""
         try:
             priority_entity = f"select.crop_steering_zone_{zone_num}_priority"
-            state = self.get_state(priority_entity)
+            state = self.get_entity_value(priority_entity)
             return state if state and state != 'unknown' else 'Normal'
         except Exception:
             return 'Normal'
@@ -462,11 +466,11 @@ class MasterCropSteeringApp(hass.Hass):
         """Get the crop profile for a zone."""
         try:
             profile_entity = f"select.crop_steering_zone_{zone_num}_crop_profile"
-            state = self.get_state(profile_entity)
+            state = self.get_entity_value(profile_entity)
             if state and state != 'unknown' and state != 'Follow Main':
                 return state
             # Fall back to main profile
-            return self.get_state('select.crop_steering_crop_type', default='Cannabis_Athena')
+            return self.get_entity_value('select.crop_steering_crop_type', default='Cannabis_Athena')
         except Exception:
             return 'Cannabis_Athena'
     
@@ -487,7 +491,7 @@ class MasterCropSteeringApp(hass.Hass):
         try:
             # Create zone phase summary
             phase_summary = ", ".join([f"Z{z}:{p}" for z, p in self.zone_phases.items()])
-            await self.set_state('sensor.crop_steering_app_current_phase',
+            await self.async_set_entity_value('sensor.crop_steering_app_current_phase',
                                state=phase_summary,
                                attributes={
                                    'friendly_name': 'Zone Phases',
@@ -499,7 +503,7 @@ class MasterCropSteeringApp(hass.Hass):
             # Create next irrigation time sensor
             next_irrigation = self._calculate_next_irrigation_time()
             if next_irrigation:
-                await self.set_state('sensor.crop_steering_app_next_irrigation',
+                await self.async_set_entity_value('sensor.crop_steering_app_next_irrigation',
                                    state=next_irrigation.isoformat(),
                                    attributes={
                                        'friendly_name': 'Next Irrigation Time',
@@ -508,7 +512,7 @@ class MasterCropSteeringApp(hass.Hass):
                                        'updated': datetime.now().isoformat()
                                    })
             else:
-                await self.set_state('sensor.crop_steering_app_next_irrigation',
+                await self.async_set_entity_value('sensor.crop_steering_app_next_irrigation',
                                    state='unknown',
                                    attributes={
                                        'friendly_name': 'Next Irrigation Time',
@@ -521,7 +525,7 @@ class MasterCropSteeringApp(hass.Hass):
             # Create individual zone phase sensors
             for zone_num in range(1, self.num_zones + 1):
                 phase = self.zone_phases.get(zone_num, 'P2')
-                await self.set_state(f'sensor.crop_steering_zone_{zone_num}_phase',
+                await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_phase',
                                    state=phase,
                                    attributes={
                                        'friendly_name': f'Zone {zone_num} Phase',
@@ -590,7 +594,7 @@ class MasterCropSteeringApp(hass.Hass):
             zone_data = self.zone_water_usage.get(zone_num, {})
             
             # Daily water usage
-            await self.set_state(f'sensor.crop_steering_zone_{zone_num}_daily_water_app',
+            await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_daily_water_app',
                                state=round(zone_data.get('daily_total', 0), 2),
                                attributes={
                                    'friendly_name': f'Zone {zone_num} Daily Water',
@@ -602,7 +606,7 @@ class MasterCropSteeringApp(hass.Hass):
                                })
             
             # Weekly water usage
-            await self.set_state(f'sensor.crop_steering_zone_{zone_num}_weekly_water_app',
+            await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_weekly_water_app',
                                state=round(zone_data.get('weekly_total', 0), 2),
                                attributes={
                                    'friendly_name': f'Zone {zone_num} Weekly Water',
@@ -614,7 +618,7 @@ class MasterCropSteeringApp(hass.Hass):
                                })
             
             # Irrigation count today
-            await self.set_state(f'sensor.crop_steering_zone_{zone_num}_irrigation_count_app',
+            await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_irrigation_count_app',
                                state=zone_data.get('daily_count', 0),
                                attributes={
                                    'friendly_name': f'Zone {zone_num} Irrigations Today',
@@ -626,7 +630,7 @@ class MasterCropSteeringApp(hass.Hass):
             # Last irrigation time
             last_irrigation = self.zone_phase_data.get(zone_num, {}).get('last_irrigation_time')
             if last_irrigation:
-                await self.set_state(f'sensor.crop_steering_zone_{zone_num}_last_irrigation_app',
+                await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_last_irrigation_app',
                                    state=last_irrigation.isoformat(),
                                    attributes={
                                        'friendly_name': f'Zone {zone_num} Last Irrigation',
@@ -763,7 +767,7 @@ class MasterCropSteeringApp(hass.Hass):
             self.log("🔄 Attempting to restore phases from HA sensors...")
             for zone_num in range(1, self.num_zones + 1):
                 sensor_id = f"sensor.crop_steering_zone_{zone_num}_phase"
-                phase = self.get_state(sensor_id)
+                phase = self.get_entity_value(sensor_id)
                 if phase and phase in ['P0', 'P1', 'P2', 'P3']:
                     self.zone_phases[zone_num] = phase
                     self.log(f"✅ Zone {zone_num}: Restored phase {phase} from HA sensor")
@@ -823,19 +827,13 @@ class MasterCropSteeringApp(hass.Hass):
                 vwc_value = float(new)
                 timestamp = datetime.now()
                 
-                # TEMPORARILY BYPASS sensor fusion - it's mixing VWC and EC values
-                # Just use the direct sensor value
-                fusion_result = {
-                    'sensor_id': entity,
-                    'value': vwc_value,
-                    'is_outlier': False,
-                    'sensor_reliability': 0.9,
-                    'sensor_health': 'good',
-                    'fused_value': vwc_value,  # Use direct value
-                    'fusion_confidence': 0.9,
-                    'active_sensors': 1,
-                    'outlier_rate': 0.0
-                }
+                # Process VWC sensor through fusion system
+                fusion_result = self.sensor_fusion.add_reading(
+                    sensor_id=entity,
+                    value=vwc_value,
+                    timestamp=timestamp,
+                    sensor_type='vwc'  # Explicitly mark as VWC sensor
+                )
                 
                 # Add to dryback detector (use direct value)
                 dryback_result = self.dryback_detector.add_vwc_reading(
@@ -886,19 +884,13 @@ class MasterCropSteeringApp(hass.Hass):
                 ec_value = float(new)
                 timestamp = datetime.now()
                 
-                # TEMPORARILY BYPASS sensor fusion - it's mixing VWC and EC values
-                # Just use the direct sensor value
-                fusion_result = {
-                    'sensor_id': entity,
-                    'value': ec_value,
-                    'is_outlier': False,
-                    'sensor_reliability': 0.9,
-                    'sensor_health': 'good',
-                    'fused_value': ec_value,  # Use direct value
-                    'fusion_confidence': 0.9,
-                    'active_sensors': 1,
-                    'outlier_rate': 0.0
-                }
+                # Process EC sensor through fusion system
+                fusion_result = self.sensor_fusion.add_reading(
+                    sensor_id=entity,
+                    value=ec_value,
+                    timestamp=timestamp,
+                    sensor_type='ec'  # Explicitly mark as EC sensor
+                )
                 
                 # Update fusion entities
                 self._update_sensor_fusion_entities(entity, fusion_result)
@@ -959,7 +951,7 @@ class MasterCropSteeringApp(hass.Hass):
     async def _on_crop_profile_change(self, entity, attribute, old, new, kwargs):
         """Handle crop profile changes."""
         try:
-            current_stage = self.get_state('select.crop_steering_growth_stage', default='vegetative')
+            current_stage = self.get_entity_value('select.crop_steering_growth_stage', default='vegetative')
             profile_result = self.crop_profiles.select_profile(new, current_stage)
             
             if profile_result['status'] == 'success':
@@ -1038,7 +1030,7 @@ class MasterCropSteeringApp(hass.Hass):
             
             for sensor in self.config['sensors']['vwc']:
                 try:
-                    value = self.get_state(sensor)
+                    value = self.get_entity_value(sensor)
                     # Handle async Task objects properly
                     if hasattr(value, '__await__'):
                         self.log(f"⚠️ Skipping async task from VWC sensor {sensor}")
@@ -1054,7 +1046,7 @@ class MasterCropSteeringApp(hass.Hass):
             
             for sensor in self.config['sensors']['ec']:
                 try:
-                    value = self.get_state(sensor)
+                    value = self.get_entity_value(sensor)
                     # Handle async Task objects properly
                     if hasattr(value, '__await__'):
                         self.log(f"⚠️ Skipping async task from EC sensor {sensor}")
@@ -1074,29 +1066,36 @@ class MasterCropSteeringApp(hass.Hass):
             
             # Get environmental data - handle async properly
             try:
-                temp_state = self.get_state(self.config['sensors']['environmental']['temperature'])
+                temp_state = self.get_entity_value(self.config['sensors']['environmental']['temperature'])
                 temperature = float(temp_state) if temp_state not in ['unavailable', 'unknown', None] else 25.0
             except (ValueError, TypeError):
                 temperature = 25.0
                 
             try:
-                hum_state = self.get_state(self.config['sensors']['environmental']['humidity'])
+                hum_state = self.get_entity_value(self.config['sensors']['environmental']['humidity'])
                 humidity = float(hum_state) if hum_state not in ['unavailable', 'unknown', None] else 60.0
             except (ValueError, TypeError):
                 humidity = 60.0
                 
             try:
-                vpd_state = self.get_state(self.config['sensors']['environmental']['vpd'])
+                vpd_state = self.get_entity_value(self.config['sensors']['environmental']['vpd'])
                 vpd = float(vpd_state) if vpd_state not in ['unavailable', 'unknown', None] else 1.0
             except (ValueError, TypeError):
                 vpd = 1.0
             
-            avg_vwc = statistics.mean(list(vwc_sensors.values())) if vwc_sensors else 0
-            avg_ec = statistics.mean(list(ec_sensors.values())) if ec_sensors else 3.0
+            # Get fused values from sensor fusion system (properly separated by type)
+            fused_vwc = self.sensor_fusion.get_fused_vwc()
+            fused_ec = self.sensor_fusion.get_fused_ec()
             
-            self.log(f"🔍 DEBUG Calculated averages: VWC={avg_vwc:.2f}%, EC={avg_ec:.2f} mS/cm")
-            self.log(f"🔍 DEBUG VWC values: {list(vwc_sensors.values())}")
-            self.log(f"🔍 DEBUG EC values: {list(ec_sensors.values())}")
+            # Fallback to simple average if fusion not available
+            avg_vwc = fused_vwc if fused_vwc is not None else (statistics.mean(list(vwc_sensors.values())) if vwc_sensors else 0)
+            avg_ec = fused_ec if fused_ec is not None else (statistics.mean(list(ec_sensors.values())) if ec_sensors else 3.0)
+            
+            self.log(f"DEBUG Fused values: VWC={avg_vwc:.2f}% (fusion: {fused_vwc}), EC={avg_ec:.2f} mS/cm (fusion: {fused_ec})")
+            self.log(f"DEBUG Raw VWC values: {list(vwc_sensors.values())}")
+            self.log(f"DEBUG Raw EC values: {list(ec_sensors.values())}")
+            self.log(f"DEBUG Active VWC sensors: {self.sensor_fusion.get_sensor_count_by_type('vwc')}")
+            self.log(f"DEBUG Active EC sensors: {self.sensor_fusion.get_sensor_count_by_type('ec')}")
             
             return {
                 'vwc_sensors': vwc_sensors,
@@ -1107,7 +1106,7 @@ class MasterCropSteeringApp(hass.Hass):
                 'humidity': humidity,
                 'vpd': vpd,
                 'zone_phases': self.zone_phases.copy(),
-                'lights_on': self.get_state('sun.sun', attribute='elevation', default=0) > 0,
+                'lights_on': self.get_entity_value('sun.sun', attribute='elevation', default=0) > 0,
                 'timestamp': datetime.now()
             }
             
@@ -1129,7 +1128,7 @@ class MasterCropSteeringApp(hass.Hass):
                 'lights_on': current_state['lights_on'],
                 'time_since_last_irrigation': self._get_time_since_last_irrigation(),
                 'irrigation_count_24h': self._get_irrigation_count_24h(),
-                'steering_mode': self.get_state('select.crop_steering_steering_mode', default='Vegetative')
+                'steering_mode': self.get_entity_value('select.crop_steering_steering_mode', default='Vegetative')
             }
             
             # Add dryback features if available
@@ -1254,7 +1253,7 @@ class MasterCropSteeringApp(hass.Hass):
             zone_profile = self._get_zone_profile(zone_num)
             
             # Get zone-specific profile parameters
-            if zone_profile != self.get_state('select.crop_steering_crop_type'):
+            if zone_profile != self.get_entity_value('select.crop_steering_crop_type'):
                 # Load zone-specific profile
                 zone_profile_params = self.crop_profiles.get_profile_parameters(zone_profile)
             else:
@@ -1865,7 +1864,7 @@ class MasterCropSteeringApp(hass.Hass):
                 if zone_vwc_sensors:
                     zone_vwc_values = []
                     for sensor in zone_vwc_sensors:
-                        value = self.get_state(sensor)
+                        value = self.get_entity_value(sensor)
                         if value not in ['unavailable', 'unknown', None]:
                             # Ensure value is a string or number, not an async Task
                             if hasattr(value, '__await__'):
@@ -2059,7 +2058,7 @@ class MasterCropSteeringApp(hass.Hass):
             vwc_values = []
             
             for sensor in zone_sensors:
-                value = self.get_state(sensor)
+                value = self.get_entity_value(sensor)
                 if value not in ['unavailable', 'unknown', None]:
                     vwc_values.append(float(value))
             
@@ -2187,7 +2186,7 @@ class MasterCropSteeringApp(hass.Hass):
                 if value is None:
                     try:
                         if self.entity_exists(integration_sensor):
-                            test_value = self.get_state(integration_sensor)
+                            test_value = self.get_entity_value(integration_sensor)
                             if test_value and not hasattr(test_value, '__await__'):
                                 value = test_value
                                 self.log(f"🔍 Zone {zone_num} via get_state: {value}")
@@ -2241,7 +2240,7 @@ class MasterCropSteeringApp(hass.Hass):
                 for sensor in zone_sensors:
                     # Try to get the latest sensor reading that isn't an async Task
                     try:
-                        value = self.get_state(sensor)
+                        value = self.get_entity_value(sensor)
                         if value not in ['unknown', 'unavailable', None] and not hasattr(value, '__await__'):
                             zone_values.append(float(value))
                     except (ValueError, TypeError):
@@ -2299,7 +2298,7 @@ class MasterCropSteeringApp(hass.Hass):
         try:
             # Try integration sensor first (preferred method)
             integration_sensor = f"sensor.crop_steering_vwc_zone_{zone_num}"
-            state = self.get_state(integration_sensor)
+            state = self.get_entity_value(integration_sensor)
             if state not in ['unknown', 'unavailable', None]:
                 # Ensure state is a string or number, not an async Task
                 if hasattr(state, '__await__'):
@@ -2325,7 +2324,7 @@ class MasterCropSteeringApp(hass.Hass):
                 values = []
                 for sensor in zone_vwc_sensors:
                     try:
-                        state = self.get_state(sensor)
+                        state = self.get_entity_value(sensor)
                         if state not in ['unknown', 'unavailable', None]:
                             # Ensure state is a string or number, not an async Task
                             if hasattr(state, '__await__'):
@@ -2348,7 +2347,7 @@ class MasterCropSteeringApp(hass.Hass):
     def _get_number_entity_value(self, entity_id: str, default: float) -> float:
         """Get value from number entity with fallback to default."""
         try:
-            state = self.get_state(entity_id)
+            state = self.get_entity_value(entity_id)
             self.log(f"🔍 DEBUG: Number {entity_id} state: {state} (type: {type(state)})")
             if state not in ['unknown', 'unavailable', None]:
                 # Handle async Task objects
@@ -2366,7 +2365,7 @@ class MasterCropSteeringApp(hass.Hass):
     def _get_select_entity_value(self, entity_id: str, default: str) -> str:
         """Get value from select entity with fallback to default."""
         try:
-            state = self.get_state(entity_id)
+            state = self.get_entity_value(entity_id)
             self.log(f"🔍 DEBUG: Select {entity_id} state: {state} (type: {type(state)})")
             if state not in ['unknown', 'unavailable', None]:
                 # Handle async Task objects
@@ -2388,7 +2387,7 @@ class MasterCropSteeringApp(hass.Hass):
             if not zone_sensors:
                 # Try integration sensor as fallback
                 integration_sensor = f"sensor.crop_steering_ec_zone_{zone_num}"
-                state = self.get_state(integration_sensor)
+                state = self.get_entity_value(integration_sensor)
                 if state not in ['unknown', 'unavailable', None]:
                     return float(state)
                 return None
@@ -2396,7 +2395,7 @@ class MasterCropSteeringApp(hass.Hass):
             ec_values = []
             for sensor in zone_sensors:
                 try:
-                    value = self.get_state(sensor)
+                    value = self.get_entity_value(sensor)
                     if value not in ['unknown', 'unavailable', None] and not hasattr(value, '__await__'):
                         ec_values.append(float(value))
                 except (ValueError, TypeError):
@@ -2646,7 +2645,7 @@ class MasterCropSteeringApp(hass.Hass):
         """Get number of zones from integration configuration."""
         try:
             # Try to get from integration number entity
-            zones_entity = self.get_state("number.crop_steering_substrate_volume")  # This exists, so integration is loaded
+            zones_entity = self.get_entity_value("number.crop_steering_substrate_volume")  # This exists, so integration is loaded
             if zones_entity:
                 # Check for zone entities to count them
                 zone_count = 0
@@ -3146,7 +3145,7 @@ class MasterCropSteeringApp(hass.Hass):
             self._save_persistent_state()
             
             # Update zone-specific sensor
-            await self.set_state(f'sensor.crop_steering_zone_{zone_num}_phase',
+            await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_phase',
                                state=new_phase,
                                attributes={
                                    'friendly_name': f'Zone {zone_num} Phase',
@@ -3262,11 +3261,11 @@ class MasterCropSteeringApp(hass.Hass):
                 # Update HA entities with predictions
                 analysis = predictions.get('analysis', {})
                 
-                self.set_state('sensor.crop_steering_ml_irrigation_need',
+                self.set_entity_value('sensor.crop_steering_ml_irrigation_need',
                               state=analysis.get('max_irrigation_need', 0),
                               attributes=predictions)
                 
-                self.set_state('sensor.crop_steering_ml_confidence',
+                self.set_entity_value('sensor.crop_steering_ml_confidence',
                               state=predictions.get('model_confidence', 0))
                 
                 # Log significant predictions
@@ -3284,7 +3283,7 @@ class MasterCropSteeringApp(hass.Hass):
             health_report = self.sensor_fusion.get_sensor_health_report()
             
             # Update HA entities
-            self.set_state('sensor.crop_steering_sensor_health',
+            self.set_entity_value('sensor.crop_steering_sensor_health',
                           state=health_report['healthy_sensors'],
                           attributes=health_report)
             
@@ -3298,7 +3297,7 @@ class MasterCropSteeringApp(hass.Hass):
             # Update individual sensor entities
             for sensor_id, sensor_data in health_report['sensors'].items():
                 entity_id = f"sensor.{sensor_id.replace('.', '_')}_health"
-                self.set_state(entity_id,
+                self.set_entity_value(entity_id,
                               state=sensor_data['health_status'],
                               attributes=sensor_data)
             
@@ -3335,7 +3334,7 @@ class MasterCropSteeringApp(hass.Hass):
             # Update HA entities
             for metric_name, value in metrics.items():
                 entity_id = f'sensor.crop_steering_{metric_name}'
-                self.set_state(entity_id, state=value, 
+                self.set_entity_value(entity_id, state=value, 
                               attributes={'last_updated': datetime.now().isoformat()})
             
             self.log(f"📊 Performance updated - ML: {metrics['ml_model_accuracy']:.2f}, "
@@ -3347,11 +3346,11 @@ class MasterCropSteeringApp(hass.Hass):
     def _update_dryback_entities(self, dryback_result: Dict):
         """Update Home Assistant entities with dryback data."""
         try:
-            self.set_state('sensor.crop_steering_dryback_percentage',
+            self.set_entity_value('sensor.crop_steering_dryback_percentage',
                           state=dryback_result['dryback_percentage'],
                           attributes=dryback_result)
             
-            self.set_state('binary_sensor.crop_steering_dryback_in_progress',
+            self.set_entity_value('binary_sensor.crop_steering_dryback_in_progress',
                           state='on' if dryback_result['dryback_in_progress'] else 'off',
                           attributes={'confidence': dryback_result['confidence_score']})
             
@@ -3364,7 +3363,7 @@ class MasterCropSteeringApp(hass.Hass):
             # Update individual sensor status
             entity_base = sensor_id.replace('.', '_')
             
-            self.set_state(f'sensor.{entity_base}_reliability',
+            self.set_entity_value(f'sensor.{entity_base}_reliability',
                           state=fusion_result['sensor_reliability'],
                           attributes={'health': fusion_result['sensor_health'],
                                     'outlier_rate': fusion_result['outlier_rate']})
@@ -3372,7 +3371,7 @@ class MasterCropSteeringApp(hass.Hass):
             # Update fused values if this was the latest update
             if fusion_result['fused_value'] is not None:
                 sensor_type = 'vwc' if 'vwc' in sensor_id else 'ec'
-                self.set_state(f'sensor.crop_steering_fused_{sensor_type}',
+                self.set_entity_value(f'sensor.crop_steering_fused_{sensor_type}',
                               state=fusion_result['fused_value'],
                               attributes={'confidence': fusion_result['fusion_confidence'],
                                         'active_sensors': fusion_result['active_sensors']})
@@ -3384,7 +3383,7 @@ class MasterCropSteeringApp(hass.Hass):
         """Update decision tracking and system state entities."""
         try:
             # Update current decision entity
-            self.set_state('sensor.crop_steering_current_decision',
+            self.set_entity_value('sensor.crop_steering_current_decision',
                           state=decision['action'],
                           attributes={
                               'reason': str(decision['reason']),
@@ -3394,7 +3393,7 @@ class MasterCropSteeringApp(hass.Hass):
                           })
             
             # Update system state entity
-            self.set_state('sensor.crop_steering_system_state',
+            self.set_entity_value('sensor.crop_steering_system_state',
                           state='active' if self.system_enabled else 'disabled',
                           attributes={
                               'zone_phases': {str(k): str(v) for k, v in self.zone_phases.items()},
@@ -3407,7 +3406,7 @@ class MasterCropSteeringApp(hass.Hass):
             # Create dedicated sensors for integration compatibility
             # Create a summary of all zone phases
             phase_summary = ", ".join([f"Z{z}:{p}" for z, p in self.zone_phases.items()])
-            self.set_state('sensor.crop_steering_app_current_phase',
+            self.set_entity_value('sensor.crop_steering_app_current_phase',
                           state=phase_summary,
                           attributes={
                               'friendly_name': 'Zone Phases',
@@ -3419,7 +3418,7 @@ class MasterCropSteeringApp(hass.Hass):
             # Calculate and set next irrigation time
             next_irrigation = self._calculate_next_irrigation_time()
             if next_irrigation:
-                self.set_state('sensor.crop_steering_app_next_irrigation',
+                self.set_entity_value('sensor.crop_steering_app_next_irrigation',
                               state=next_irrigation.isoformat(),
                               attributes={
                                   'friendly_name': 'Next Irrigation Time',
@@ -3428,7 +3427,7 @@ class MasterCropSteeringApp(hass.Hass):
                                   'updated': datetime.now().isoformat()
                               })
             else:
-                self.set_state('sensor.crop_steering_app_next_irrigation',
+                self.set_entity_value('sensor.crop_steering_app_next_irrigation',
                               state='unknown',
                               attributes={
                                   'friendly_name': 'Next Irrigation Time',
@@ -3455,7 +3454,7 @@ class MasterCropSteeringApp(hass.Hass):
                 
                 for param, value in phase_params.items():
                     entity_id = f'sensor.crop_steering_{param}'
-                    self.set_state(entity_id, state=value)
+                    self.set_entity_value(entity_id, state=value)
                 
                 self.log(f"📊 Phase parameters updated for zones: {list(self.zone_phases.values())}")
             
@@ -3480,7 +3479,7 @@ class MasterCropSteeringApp(hass.Hass):
     def _get_switch_state(self, entity_id: str, default: bool = False) -> bool:
         """Get switch state with error handling."""
         try:
-            state = self.get_state(entity_id)
+            state = self.get_entity_value(entity_id)
             self.log(f"🔍 DEBUG: Switch {entity_id} state: {state} (type: {type(state)})")
             if state in ['on', True, 'true', '1']:
                 return True
@@ -3746,7 +3745,7 @@ class MasterCropSteeringApp(hass.Hass):
         """Get zone group from integration entity."""
         try:
             group_entity = f"select.crop_steering_zone_{zone_num}_group"
-            group_state = self.get_state(group_entity)
+            group_state = self.get_entity_value(group_entity)
             
             if group_state and group_state not in ['unknown', 'unavailable']:
                 # Handle async task case
@@ -3763,7 +3762,7 @@ class MasterCropSteeringApp(hass.Hass):
         """Get zone priority from integration entity."""
         try:
             priority_entity = f"select.crop_steering_zone_{zone_num}_priority"
-            priority_state = self.get_state(priority_entity)
+            priority_state = self.get_entity_value(priority_entity)
             
             if priority_state and priority_state not in ['unknown', 'unavailable']:
                 # Handle async task case
@@ -3831,7 +3830,7 @@ class MasterCropSteeringApp(hass.Hass):
             for zone in zones_in_group:
                 zone_valve_entity = self.config['hardware']['zone_valves'].get(zone)
                 if zone_valve_entity:
-                    valve_state = self.get_state(zone_valve_entity)
+                    valve_state = self.get_entity_value(zone_valve_entity)
                     if valve_state == 'on':
                         self.log(f"🚦 Group {group_name}: Zone {zone} already irrigating - blocking other zones in group")
                         return False
@@ -3905,7 +3904,7 @@ class MasterCropSteeringApp(hass.Hass):
             for zone_num in range(1, self.num_zones + 1):
                 zone_valve_entity = self.config['hardware']['zone_valves'].get(zone_num)
                 if zone_valve_entity:
-                    valve_state = self.get_state(zone_valve_entity)
+                    valve_state = self.get_entity_value(zone_valve_entity)
                     if valve_state == 'on':
                         active_irrigation_count += 1
             
@@ -3954,7 +3953,7 @@ class MasterCropSteeringApp(hass.Hass):
                         # Irrigation status
                         zone_valve_entity = self.config['hardware']['zone_valves'].get(zone)
                         if zone_valve_entity:
-                            valve_state = self.get_state(zone_valve_entity)
+                            valve_state = self.get_entity_value(zone_valve_entity)
                             if valve_state == 'on':
                                 irrigating_zones += 1
                     
@@ -4167,13 +4166,13 @@ class MasterCropSteeringApp(hass.Hass):
             
             # Check VWC sensor status
             for sensor in self.config['sensors']['vwc']:
-                state = self.get_state(sensor)
+                state = self.get_entity_value(sensor)
                 if state not in ['unknown', 'unavailable', None]:
                     vwc_sensors_online += 1
             
             # Check EC sensor status
             for sensor in self.config['sensors']['ec']:
-                state = self.get_state(sensor)
+                state = self.get_entity_value(sensor)
                 if state not in ['unknown', 'unavailable', None]:
                     ec_sensors_online += 1
             
@@ -4285,7 +4284,7 @@ class MasterCropSteeringApp(hass.Hass):
         try:
             # System performance entities
             perf = analytics_data.get('system_performance', {})
-            self.set_state('sensor.crop_steering_system_health_score',
+            self.set_entity_value('sensor.crop_steering_system_health_score',
                           state=perf.get('system_health_score', 0),
                           attributes={
                               'uptime_hours': perf.get('uptime_hours', 0),
@@ -4295,19 +4294,19 @@ class MasterCropSteeringApp(hass.Hass):
             
             # Irrigation analytics entities
             irrig = analytics_data.get('irrigation_analytics', {})
-            self.set_state('sensor.crop_steering_daily_water_usage',
+            self.set_entity_value('sensor.crop_steering_daily_water_usage',
                           state=irrig.get('total_daily_water_liters', 0),
                           attributes=irrig)
             
             # Sensor analytics entities
             sensor = analytics_data.get('sensor_analytics', {})
-            self.set_state('sensor.crop_steering_sensor_health',
+            self.set_entity_value('sensor.crop_steering_sensor_health',
                           state=sensor.get('overall_sensor_health', 0),
                           attributes=sensor)
             
             # Efficiency metrics entities
             efficiency = analytics_data.get('efficiency_metrics', {})
-            self.set_state('sensor.crop_steering_system_efficiency',
+            self.set_entity_value('sensor.crop_steering_system_efficiency',
                           state=efficiency.get('system_efficiency_score', 0),
                           attributes=efficiency)
             
@@ -4317,12 +4316,12 @@ class MasterCropSteeringApp(hass.Hass):
                 zone_num = zone_key.split('_')[1]
                 
                 # Create zone health sensor
-                self.set_state(f'sensor.crop_steering_zone_{zone_num}_health_score',
+                self.set_entity_value(f'sensor.crop_steering_zone_{zone_num}_health_score',
                               state=zone_data.get('health_score', 0),
                               attributes=zone_data)
                 
                 # Create zone efficiency sensor
-                self.set_state(f'sensor.crop_steering_zone_{zone_num}_efficiency',
+                self.set_entity_value(f'sensor.crop_steering_zone_{zone_num}_efficiency',
                               state=zone_data.get('efficiency_score', 0),
                               attributes={
                                   'daily_water': zone_data.get('daily_water_liters', 0),
@@ -4340,7 +4339,7 @@ class MasterCropSteeringApp(hass.Hass):
             # Sensor availability factor
             vwc_sensors_working = 0
             for sensor in self.config['sensors']['vwc']:
-                if self.get_state(sensor) not in ['unknown', 'unavailable', None]:
+                if self.get_entity_value(sensor) not in ['unknown', 'unavailable', None]:
                     vwc_sensors_working += 1
             sensor_health = vwc_sensors_working / max(len(self.config['sensors']['vwc']), 1)
             health_factors.append(sensor_health)
@@ -4371,7 +4370,7 @@ class MasterCropSteeringApp(hass.Hass):
         try:
             zone_valve_entity = self.config['hardware']['zone_valves'].get(zone_num)
             if zone_valve_entity:
-                valve_state = self.get_state(zone_valve_entity)
+                valve_state = self.get_entity_value(zone_valve_entity)
                 return valve_state == 'on'
             return False
         except Exception:
@@ -4424,7 +4423,7 @@ class MasterCropSteeringApp(hass.Hass):
             efficiency = analytics_data.get('efficiency_metrics', {})
             
             # Update water efficiency sensor
-            self.set_state('sensor.crop_steering_water_efficiency',
+            self.set_entity_value('sensor.crop_steering_water_efficiency',
                           state=efficiency.get('water_use_efficiency', 0),
                           attributes={
                               'automation_rate': efficiency.get('automation_rate_percent', 0),
@@ -4443,7 +4442,7 @@ class MasterCropSteeringApp(hass.Hass):
             # Update prediction sensors
             for key, value in predictions.items():
                 if isinstance(value, (int, float)):
-                    self.set_state(f'sensor.crop_steering_prediction_{key}',
+                    self.set_entity_value(f'sensor.crop_steering_prediction_{key}',
                                   state=value,
                                   attributes={
                                       'updated': datetime.now().isoformat(),
@@ -4663,7 +4662,7 @@ class MasterCropSteeringApp(hass.Hass):
                 }
                 
                 # Create individual zone safety sensor
-                self.set_state(f'sensor.crop_steering_zone_{zone_num}_safety_status',
+                self.set_entity_value(f'sensor.crop_steering_zone_{zone_num}_safety_status',
                               state=status,
                               attributes={
                                   'vwc': zone_vwc,
@@ -4686,7 +4685,7 @@ class MasterCropSteeringApp(hass.Hass):
             elif warning_zones > 0:
                 system_safety_status = 'warning'
             
-            self.set_state('sensor.crop_steering_system_safety_status',
+            self.set_entity_value('sensor.crop_steering_system_safety_status',
                           state=system_safety_status,
                           attributes={
                               'unsafe_zones': unsafe_zones,
