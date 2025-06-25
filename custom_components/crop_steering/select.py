@@ -152,8 +152,8 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         self._zone_num = zone_num
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{description.key}"
         self._attr_name = description.name
-        # Ensure entity_id includes crop_steering prefix
-        self._attr_entity_id = f"select.{DOMAIN}_{description.key}"
+        # Set object_id to include crop_steering prefix for entity_id generation
+        self._attr_object_id = f"{DOMAIN}_{description.key}"
         self._attr_options = description.options
         
         # Set default values based on entity type
