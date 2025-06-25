@@ -54,21 +54,15 @@ The Crop Steering System now supports dynamic zone configuration, allowing you t
    - Search for "Crop Steering"
    - Select "Load from crop_steering.env"
 
-### Method 2: Manual UI Configuration
+### GUI Setup Benefits
 
-1. **Add Integration**
-   - Go to Settings → Devices & Services
-   - Click "Add Integration"
-   - Search for "Crop Steering"
-   - Select "Manual Zone Configuration"
-
-2. **Select Number of Zones**
-   - Choose how many zones you want (1-6)
-   - Click Continue
-
-3. **Configure Zone Switches**
-   - Enter switch entity IDs for each zone
-   - These control your irrigation valves
+- **No command line access required**
+- **Entity validation during setup**
+- **Auto-complete for entity selection**
+- **Preview sensor values during configuration**
+- **Step-by-step guided setup**
+- **Sensor configuration for each zone**
+- **Environmental sensor support**
 
 ## Created Entities
 

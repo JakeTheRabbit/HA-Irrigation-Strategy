@@ -29,11 +29,12 @@ _LOGGER = logging.getLogger(__name__)
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_NAME, default="Crop Steering System"): str,
-        vol.Required("installation_mode", default="auto"): selector.SelectSelector(
+        vol.Required("installation_mode", default="advanced"): selector.SelectSelector(
             selector.SelectSelectorConfig(
                 options=[
-                    {"value": "auto", "label": "Load from crop_steering.env (Recommended)"},
-                    {"value": "manual", "label": "Manual Zone Configuration"},
+                    {"value": "advanced", "label": "Advanced Setup with Sensors (Recommended)"},
+                    {"value": "basic", "label": "Basic Setup (Switches Only)"},
+                    {"value": "auto", "label": "Load from crop_steering.env file"},
                 ]
             )
         ),
@@ -76,6 +77,76 @@ STEP_ZONE_COUNT_SCHEMA = vol.Schema(
     }
 )
 
+def get_zone_sensor_schema(zone_num: int) -> vol.Schema:
+    """Generate sensor configuration schema for a specific zone."""
+    return vol.Schema({
+        vol.Optional(
+            f"vwc_front",
+            description={"suggested_value": f"sensor.z{zone_num}_vwc_front"}
+        ): selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor",
+                device_class="moisture",
+            )
+        ),
+        vol.Optional(
+            f"vwc_back",
+            description={"suggested_value": f"sensor.z{zone_num}_vwc_back"}
+        ): selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor",
+                device_class="moisture",
+            )
+        ),
+        vol.Optional(
+            f"ec_front",
+            description={"suggested_value": f"sensor.z{zone_num}_ec_front"}
+        ): selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor",
+            )
+        ),
+        vol.Optional(
+            f"ec_back",
+            description={"suggested_value": f"sensor.z{zone_num}_ec_back"}
+        ): selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor",
+            )
+        ),
+    })
+
+def get_environmental_schema() -> vol.Schema:
+    """Generate environmental sensor configuration schema."""
+    return vol.Schema({
+        vol.Optional(
+            "temperature_sensor",
+            description={"suggested_value": "sensor.grow_room_temperature"}
+        ): selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor",
+                device_class="temperature",
+            )
+        ),
+        vol.Optional(
+            "humidity_sensor",
+            description={"suggested_value": "sensor.grow_room_humidity"}
+        ): selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor",
+                device_class="humidity",
+            )
+        ),
+        vol.Optional(
+            "vpd_sensor",
+            description={"suggested_value": "sensor.grow_room_vpd"}
+        ): selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor",
+            )
+        ),
+    })
+
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Crop Steering System."""
 
@@ -86,6 +157,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._data = {}
         self._zone_parser = None
         self._num_zones = DEFAULT_NUM_ZONES
+        self._current_zone = 1
+        self._zone_sensors = {}
+        self._zone_switches = {}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -136,8 +210,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         data_schema=STEP_USER_DATA_SCHEMA,
                         errors=errors,
                     )
+            elif user_input["installation_mode"] == "basic":
+                # Basic setup - just switches
+                return await self.async_step_zone_count()
             else:
-                # Go to manual configuration - first ask for number of zones
+                # Advanced setup with sensors
                 return await self.async_step_zone_count()
 
         return self.async_show_form(
@@ -173,39 +250,49 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     errors[key] = "entity_not_found"
             
             if not errors:
-                # Build zone configuration from user input
-                zones = {}
-                hardware = {
+                # Store hardware configuration
+                self._data["hardware"] = {
                     "pump_switch": user_input["pump_switch"],
                     "main_line_switch": user_input["main_line_switch"],
                 }
                 
+                # Store zone switches temporarily
+                self._zone_switches = {}
                 for i in range(1, self._num_zones + 1):
                     zone_switch = user_input.get(f"zone_{i}_switch")
                     if zone_switch:
+                        self._zone_switches[i] = zone_switch
+                
+                # If advanced mode, go to sensor configuration
+                if self._data.get("installation_mode") == "advanced":
+                    self._current_zone = 1
+                    self._zone_sensors = {}
+                    return await self.async_step_zone_sensors()
+                else:
+                    # Basic mode - create zones without sensors
+                    zones = {}
+                    for i, switch in self._zone_switches.items():
                         zones[i] = {
                             "zone_number": i,
-                            "zone_switch": zone_switch,
-                            # Manual config doesn't include sensors
+                            "zone_switch": switch,
                             "vwc_front": "",
                             "vwc_back": "",
                             "ec_front": "",
                             "ec_back": "",
                         }
-                
-                # Install files and create entry
-                await self._install_integration_files()
-                
-                self._data.update({
-                    "installation_mode": "manual",
-                    "zones": zones,
-                    "hardware": hardware,
-                })
-                
-                return self.async_create_entry(
-                    title=self._data.get(CONF_NAME, "Crop Steering System"),
-                    data=self._data,
-                )
+                    
+                    # Install files and create entry
+                    await self._install_integration_files()
+                    
+                    self._data.update({
+                        "installation_mode": "basic",
+                        "zones": zones,
+                    })
+                    
+                    return self.async_create_entry(
+                        title=self._data.get(CONF_NAME, "Crop Steering System"),
+                        data=self._data,
+                    )
 
         # Generate schema for configured number of zones
         zone_schema = get_zone_schema(self._num_zones)
@@ -213,6 +300,105 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="manual",
             data_schema=zone_schema,
+            errors=errors,
+        )
+
+    async def async_step_zone_sensors(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Configure sensors for each zone."""
+        errors: dict[str, str] = {}
+        
+        if user_input is not None:
+            # Validate sensor entities if provided
+            for key, entity_id in user_input.items():
+                if entity_id:
+                    state = self.hass.states.get(entity_id)
+                    if not state:
+                        errors[key] = "entity_not_found"
+                    elif "vwc" in key:
+                        # Validate moisture sensor has proper unit
+                        if state.attributes.get("unit_of_measurement") not in ["%", "percent"]:
+                            errors[key] = "invalid_moisture_sensor"
+            
+            if not errors:
+                # Store sensor configuration for this zone
+                self._zone_sensors[self._current_zone] = {
+                    "vwc_front": user_input.get("vwc_front", ""),
+                    "vwc_back": user_input.get("vwc_back", ""),
+                    "ec_front": user_input.get("ec_front", ""),
+                    "ec_back": user_input.get("ec_back", ""),
+                }
+                
+                # Move to next zone or environmental sensors
+                if self._current_zone < self._num_zones:
+                    self._current_zone += 1
+                    return await self.async_step_zone_sensors()
+                else:
+                    return await self.async_step_environmental()
+        
+        # Show current sensor values if available
+        schema = get_zone_sensor_schema(self._current_zone)
+        
+        return self.async_show_form(
+            step_id="zone_sensors",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "zone_number": str(self._current_zone),
+                "zone_total": str(self._num_zones),
+            }
+        )
+
+    async def async_step_environmental(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Configure environmental sensors."""
+        errors: dict[str, str] = {}
+        
+        if user_input is not None:
+            # Validate environmental sensors if provided
+            for key, entity_id in user_input.items():
+                if entity_id:
+                    state = self.hass.states.get(entity_id)
+                    if not state:
+                        errors[key] = "entity_not_found"
+            
+            if not errors:
+                # Build complete zone configuration
+                zones = {}
+                for zone_id, switch in self._zone_switches.items():
+                    sensors = self._zone_sensors.get(zone_id, {})
+                    zones[zone_id] = {
+                        "zone_number": zone_id,
+                        "zone_switch": switch,
+                        "vwc_front": sensors.get("vwc_front", ""),
+                        "vwc_back": sensors.get("vwc_back", ""),
+                        "ec_front": sensors.get("ec_front", ""),
+                        "ec_back": sensors.get("ec_back", ""),
+                    }
+                
+                # Add environmental sensors to hardware config
+                self._data["hardware"]["temperature_sensor"] = user_input.get("temperature_sensor", "")
+                self._data["hardware"]["humidity_sensor"] = user_input.get("humidity_sensor", "")
+                self._data["hardware"]["vpd_sensor"] = user_input.get("vpd_sensor", "")
+                
+                # Install files and create entry
+                await self._install_integration_files()
+                
+                self._data.update({
+                    "installation_mode": "advanced",
+                    "zones": zones,
+                })
+                
+                return self.async_create_entry(
+                    title=self._data.get(CONF_NAME, "Crop Steering System"),
+                    data=self._data,
+                )
+        
+        return self.async_show_form(
+            step_id="environmental",
+            data_schema=get_environmental_schema(),
             errors=errors,
         )
 

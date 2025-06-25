@@ -369,25 +369,37 @@ Zone 4: P0 (Dryback)  - No irrigation, letting it dry
 
 ## Configuration
 
-### Two Easy Setup Methods (NEW in v2.1.0)
+### Two Setup Methods
 
-#### **Method 1: Automatic Configuration (Recommended)**
-1. **Configure Your Zones:**
-   ```bash
-   python3 zone_configuration_helper.py
-   ```
-   This interactive tool helps you set up 1-6 irrigation zones with all sensors.
-
-2. **Add the Integration:**
-   - Settings → Devices & Services → Add Integration
-   - Search "Crop Steering" → Select "Load from crop_steering.env"
-   - System automatically creates all zone entities
-
-#### **Method 2: Manual UI Configuration**
+#### **Method 1: GUI Configuration (Recommended)**
 1. **Add the Integration:**
    - Settings → Devices & Services → Add Integration
-   - Search "Crop Steering" → Select "Manual Zone Configuration"
-   - Choose number of zones (1-6) → Configure zone switches
+   - Search "Crop Steering" and click on it
+   - Choose your setup method:
+     - **Advanced Setup (Recommended)** - Configure all sensors through the GUI
+     - **Basic Setup** - Only configure switches (no sensor monitoring)
+     - **Load from file** - Use existing crop_steering.env file
+
+2. **Advanced Setup Flow:**
+   - **Step 1:** Choose number of zones (1-6)
+   - **Step 2:** Configure hardware (pump, main valve, zone valves)
+   - **Step 3:** Configure sensors for each zone:
+     - Front/back VWC sensors (moisture)
+     - Front/back EC sensors (nutrients)
+     - All sensors are optional but recommended
+   - **Step 4:** Configure environmental sensors (optional):
+     - Room temperature
+     - Room humidity
+     - VPD sensor
+   - **Step 5:** Review and save configuration
+
+**Note:** No command line access required! Everything is configured through the Home Assistant GUI.
+
+#### **Method 2: Environment File (Legacy)**
+For users with existing crop_steering.env files:
+1. Ensure your crop_steering.env file is properly configured
+2. Add integration and select "Load from crop_steering.env file"
+3. System validates and imports your configuration
 
 ### AppDaemon Setup (v15+ Updated Paths)
 1. **Fix Requirements (Critical!):**
@@ -404,42 +416,34 @@ Zone 4: P0 (Dryback)  - No irrigation, letting it dry
    - Sensor validation begins with first readings
    - Professional dashboard becomes available
 
-### New Configuration Tools (v2.1.0)
+### AppDaemon Configuration Tools
 
-**Zone Configuration Helper:** `zone_configuration_helper.py`
-- Interactive zone setup wizard
-- Supports 1-6 irrigation zones
-- Validates sensor and switch entities
-- Auto-updates crop_steering.env file
+**Note:** The only command line tool still needed is for fixing AppDaemon dependencies. All zone configuration is now done through the GUI!
 
-```bash
-# Interactive zone configuration
-python3 zone_configuration_helper.py
-```
+#### AppDaemon Fix Script
 
-**AppDaemon Fix Script:** `fix_appdaemon_requirements.sh`
-- Resolves scikit-learn installation issues
-- Installs scipy-based dependencies only
-- Ensures AppDaemon compatibility
+If you're using AppDaemon for advanced features, you may need to run this script:
 
 ```bash
-# Fix AppDaemon requirements
-./fix_appdaemon_requirements.sh
+cd /config
+bash fix_appdaemon_requirements.sh
 ```
 
-**Configuration Validation Script:** `configure_crop_steering.py`
-- Validates all entity configurations
-- Checks numeric parameter ranges
-- Ensures system completeness
-- Provides detailed error reporting
+This script:
+- Removes heavy dependencies (numpy, pandas, scipy)
+- Ensures AppDaemon can start properly
+- Only needed if AppDaemon fails to start
 
-```bash
-# Validate your configuration
-python3 configure_crop_steering.py
+#### Accessing the Command Line (Only for AppDaemon Fix):
 
-# Validate specific file
-python3 configure_crop_steering.py my_config.env
-```
+1. **SSH Addon:**
+   - Install "SSH & Web Terminal" addon
+   - Run the fix script
+
+2. **File Editor Terminal:**
+   - Install "File editor" addon
+   - Click terminal icon
+   - Run the fix script
 
 **Detailed setup instructions:** See our [Installation Guide](docs/installation_guide.md) for step-by-step configuration with screenshots.
 

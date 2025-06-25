@@ -1,0 +1,71 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Crop Steering Setup",
+        "description": "Choose your setup method",
+        "data": {
+          "name": "System Name",
+          "installation_mode": "Setup Method"
+        }
+      },
+      "zone_count": {
+        "title": "Number of Zones",
+        "description": "How many irrigation zones will you control?",
+        "data": {
+          "num_zones": "Number of zones"
+        }
+      },
+      "manual": {
+        "title": "Hardware Configuration",
+        "description": "Configure your irrigation hardware",
+        "data": {
+          "pump_switch": "Pump switch",
+          "main_line_switch": "Main line valve",
+          "zone_1_switch": "Zone 1 valve",
+          "zone_2_switch": "Zone 2 valve",
+          "zone_3_switch": "Zone 3 valve",
+          "zone_4_switch": "Zone 4 valve",
+          "zone_5_switch": "Zone 5 valve",
+          "zone_6_switch": "Zone 6 valve"
+        }
+      },
+      "zone_sensors": {
+        "title": "Zone {zone_number} Sensors",
+        "description": "Configure sensors for zone {zone_number} of {zone_total}",
+        "data": {
+          "vwc_front": "Front moisture sensor (VWC)",
+          "vwc_back": "Back moisture sensor (VWC)",
+          "ec_front": "Front nutrient sensor (EC)",
+          "ec_back": "Back nutrient sensor (EC)"
+        }
+      },
+      "environmental": {
+        "title": "Environmental Sensors",
+        "description": "Configure room sensors (optional)",
+        "data": {
+          "temperature_sensor": "Room temperature",
+          "humidity_sensor": "Room humidity",
+          "vpd_sensor": "VPD sensor"
+        }
+      }
+    },
+    "error": {
+      "entity_not_found": "Entity not found",
+      "invalid_moisture_sensor": "Invalid moisture sensor - must report in %",
+      "env_file_not_found": "crop_steering.env file not found",
+      "missing_entities": "Some entities are missing"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Crop Steering Options",
+        "description": "Configure your crop steering settings"
+      }
+    }
+  }
+}

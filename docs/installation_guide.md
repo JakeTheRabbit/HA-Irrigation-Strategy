@@ -237,10 +237,9 @@ This step-by-step guide will help you install the Advanced AI Crop Steering Syst
 
 **Method B: Manual UI Configuration**
 1. Follow steps 1-5 above
-2. **Select "Manual Zone Configuration"**
-3. Choose number of zones (1-6)
-4. Enter switch entity IDs for each zone
-5. System creates basic entities (sensors configured separately)
+2. **The system creates all entities automatically**
+3. Entities are created based on your configuration
+4. No additional manual configuration needed
 
 **4.2: Verify Entities Created**
 After integration setup, check that entities were created:
