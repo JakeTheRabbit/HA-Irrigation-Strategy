@@ -12,6 +12,5 @@
   "config_flow": true,
   "integration_type": "hub",
   "iot_class": "local_polling",
-  "homeassistant": "2024.3.0",
-  "after_dependencies": ["appdaemon"]
+  "homeassistant": "2024.3.0"
 }
