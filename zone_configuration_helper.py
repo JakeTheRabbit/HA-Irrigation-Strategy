@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """
-Zone Configuration Helper for Crop Steering System
-Helps users configure dynamic zones in their crop_steering.env file
+Zone Configuration Helper for Crop Steering System (DEPRECATED)
+
+DEPRECATED: This tool is no longer needed! 
+Use the Home Assistant GUI configuration instead:
+- Settings → Devices & Services → Add Integration → Crop Steering
+- Select "Advanced Setup" for full sensor configuration through the GUI
+- No command line access required!
+
+This script is kept for backwards compatibility only.
 """
 
 import os
@@ -13,7 +20,18 @@ def print_banner():
     """Print welcome banner."""
     print("=" * 60)
     print("🌱 Crop Steering System - Zone Configuration Helper")
+    print("⚠️  DEPRECATED - Use GUI configuration instead!")
     print("=" * 60)
+    print()
+    print("This tool is deprecated. Please use the GUI configuration:")
+    print("Settings → Devices & Services → Add Integration → Crop Steering")
+    print("Select 'Advanced Setup' for full sensor configuration")
+    print()
+    
+    response = input("Continue with deprecated tool? (y/n): ")
+    if response.lower() != 'y':
+        print("Exiting. Please use the GUI configuration instead.")
+        sys.exit(0)
     print()
 
 def get_user_input(prompt: str, default: str = "", valid_options: List[str] = None) -> str:
