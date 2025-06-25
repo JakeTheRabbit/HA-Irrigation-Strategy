@@ -322,7 +322,7 @@ class CropSteeringSensor(SensorEntity):
         self._zones_config = zones_config
         self._hardware_config = hardware_config
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{description.key}"
-        self._attr_name = f"Crop Steering {description.name}"
+        self._attr_name = description.name
         
         # Extract zone number from key if this is a zone sensor
         self._zone_number = None

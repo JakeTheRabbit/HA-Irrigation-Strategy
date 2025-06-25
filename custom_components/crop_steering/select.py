@@ -151,7 +151,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         self._entry = entry
         self._zone_num = zone_num
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{description.key}"
-        self._attr_name = f"Crop Steering {description.name}"
+        self._attr_name = description.name
         self._attr_options = description.options
         
         # Set default values based on entity type
@@ -182,7 +182,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
             # Zone-specific device
             return DeviceInfo(
                 identifiers={(DOMAIN, f"{self._entry.entry_id}_zone_{self._zone_num}")},
-                name=f"Crop Steering Zone {self._zone_num}",
+                name=f"Zone {self._zone_num}",
                 manufacturer="Home Assistant Community",
                 model="Zone Controller",
                 sw_version="2.0.0",

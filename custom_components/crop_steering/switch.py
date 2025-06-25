@@ -99,7 +99,7 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
         self.entity_description = description
         self._entry = entry
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{description.key}"
-        self._attr_name = f"Crop Steering {description.name}"
+        self._attr_name = description.name
         
         # Set default states based on switch type
         if description.key == "system_enabled":
