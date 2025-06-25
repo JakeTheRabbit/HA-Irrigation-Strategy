@@ -43,8 +43,20 @@ This guide covers two installation methods: HACS (recommended) or manual install
    - **Basic Setup** - Just switches, no sensors
    - **Load from file** - If you have an existing crop_steering.env
 
-### Step 4: Install AppDaemon Apps (Optional)
-If you want advanced features like sensor fusion and analytics:
+### Step 4: Install AppDaemon Apps (Optional for Automation)
+**What AppDaemon adds:**
+- Automatic phase transitions (P0→P1→P2→P3)
+- Sensor fusion (multiple sensors per zone)
+- Automated irrigation decisions
+- Analytics and monitoring dashboards
+
+**Without AppDaemon you get:**
+- Manual control of all zones
+- All entities (sensors, switches, controls)
+- Services for manual irrigation
+- Basic monitoring
+
+If you want full automation:
 
 1. Navigate to the AppDaemon apps directory:
    - Path: `/addon_configs/a0d7b954_appdaemon/apps/`
@@ -151,9 +163,10 @@ In Developer Tools → States, filter by "crop_steering" to see:
 - Check logs for errors: Settings → System → Logs
 
 ### AppDaemon Errors
-- The system works without AppDaemon (basic features only)
-- If AppDaemon fails to start, it's likely a configuration issue
-- Check your token and URL in appdaemon.yaml
+- **Without AppDaemon**: You get manual control only (switches, sensors, manual services)
+- **With AppDaemon**: You get full automation (automatic phase transitions, sensor fusion, analytics)
+- If AppDaemon fails to start, check your token and URL in appdaemon.yaml
+- The integration works fine without AppDaemon for manual irrigation control
 
 ### Missing Entities
 - Entities are created based on your configuration
