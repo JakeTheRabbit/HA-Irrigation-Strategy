@@ -17,6 +17,12 @@
 - **Heavy development** - Code and functionality subject to significant changes
 - **Not production ready** - Expect bugs, issues, and the need for manual intervention
 
+**Recent Improvements (v2.2.0):**
+- Fixed async/await issues - No more runtime warnings about unawaited coroutines
+- Fixed sensor fusion - VWC and EC values no longer mixed (was causing incorrect readings)
+- Implemented clean state machine - Phase transitions now properly tracked and validated
+- Improved reliability - Thread-safe operation with proper error handling
+
 **Recommendation:** Start with manual overrides enabled and gradually trust the automation as you validate it works with your specific hardware and plants.
 
 <!-- Clickable thumbnails that open full-size in a new tab -->

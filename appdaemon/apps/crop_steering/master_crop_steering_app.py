@@ -22,6 +22,7 @@ try:
     from .ml_irrigation_predictor import SimplifiedIrrigationPredictor
     from .intelligent_crop_profiles import IntelligentCropProfiles
     from .base_async_app import BaseAsyncApp
+    from .phase_state_machine import ZoneStateMachine, IrrigationPhase, PhaseTransition
 except ImportError:
     # Fallback for direct execution or import issues
     from advanced_dryback_detection import AdvancedDrybackDetector
@@ -29,6 +30,7 @@ except ImportError:
     from ml_irrigation_predictor import SimplifiedIrrigationPredictor
     from intelligent_crop_profiles import IntelligentCropProfiles
     from base_async_app import BaseAsyncApp
+    from phase_state_machine import ZoneStateMachine, IrrigationPhase, PhaseTransition
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,6 +49,53 @@ class MasterCropSteeringApp(BaseAsyncApp):
     The system operates autonomously while providing detailed monitoring,
     predictions, and recommendations through the dashboard interface.
     """
+    
+    @property
+    def zone_phases(self) -> Dict[int, str]:
+        """Backward compatibility property for zone phases"""
+        return {zone_id: machine.get_phase_string() 
+                for zone_id, machine in self.zone_state_machines.items()}
+    
+    @property
+    def zone_phase_data(self) -> Dict[int, Dict]:
+        """Backward compatibility property for zone phase data"""
+        result = {}
+        for zone_id, machine in self.zone_state_machines.items():
+            state = machine.state
+            phase_data = state.get_current_phase_data()
+            
+            # Convert to legacy format
+            legacy_data = {
+                'last_irrigation_time': None,
+                'p0_start_time': None,
+                'p0_peak_vwc': None,
+                'p1_start_time': None,
+                'p1_shot_count': 0,
+                'p1_current_shot_size': None,
+                'p1_last_shot_time': None,
+                'p1_vwc_at_start': None,
+                'p1_shot_history': []
+            }
+            
+            # Map current phase data to legacy format
+            if state.current_phase == IrrigationPhase.P0_MORNING_DRYBACK and state.p0_data:
+                legacy_data['p0_start_time'] = state.p0_data.entry_time
+                legacy_data['p0_peak_vwc'] = state.p0_data.peak_vwc
+            elif state.current_phase == IrrigationPhase.P1_RAMP_UP and state.p1_data:
+                legacy_data['p1_start_time'] = state.p1_data.entry_time
+                legacy_data['p1_shot_count'] = state.p1_data.shot_count
+                legacy_data['p1_current_shot_size'] = state.p1_data.current_shot_size
+                legacy_data['p1_vwc_at_start'] = state.p1_data.vwc_at_start
+                legacy_data['p1_shot_history'] = [(s['timestamp'], s['size'], s['vwc_before'], s['vwc_after']) 
+                                                 for s in state.p1_data.shot_history]
+                if state.p1_data.shot_history:
+                    legacy_data['p1_last_shot_time'] = state.p1_data.shot_history[-1]['timestamp']
+            elif state.current_phase == IrrigationPhase.P2_MAINTENANCE and state.p2_data:
+                legacy_data['last_irrigation_time'] = state.p2_data.last_irrigation_time
+            
+            result[zone_id] = legacy_data
+        
+        return result
 
     def initialize(self):
         """Initialize the master crop steering application."""
@@ -67,39 +116,30 @@ class MasterCropSteeringApp(BaseAsyncApp):
         # Get number of zones from integration or config
         self.num_zones = self._get_number_of_zones()
         
-        # Per-zone phase tracking
-        self.zone_phases = {}  # {zone_num: phase}
-        self.zone_phase_data = {}  # {zone_num: {'p0_start_time': ..., 'p0_peak_vwc': ...}}
+        # Per-zone state machines
+        self.zone_state_machines = {}  # {zone_num: ZoneStateMachine}
+        
+        # Legacy compatibility - provide zone_phases property
+        self._zone_phases_compat = {}  # For backward compatibility
         
         # Initialize per-zone tracking
-        self.zone_water_usage = {}  # Track water usage per zone
         self.zone_profiles = {}     # Zone-specific crop profiles
         self.zone_schedules = {}    # Zone-specific light schedules
         self.emergency_attempts = {}  # Track emergency irrigation attempts per zone
         self.manual_overrides = {}  # Track manual override timeouts per zone
         
         for zone_num in range(1, self.num_zones + 1):
-            self.zone_phases[zone_num] = 'P2'  # Default to maintenance phase
-            self.zone_phase_data[zone_num] = {
-                'p0_start_time': None,
-                'p0_peak_vwc': None,
-                'last_irrigation_time': None,
-                # P1 progression tracking
-                'p1_start_time': None,
-                'p1_shot_count': 0,
-                'p1_current_shot_size': None,
-                'p1_last_shot_time': None,
-                'p1_vwc_at_start': None,
-                'p1_shot_history': []  # List of (timestamp, shot_size, vwc_before, vwc_after)
-            }
-            # Initialize water tracking
-            self.zone_water_usage[zone_num] = {
-                'daily_total': 0.0,
-                'weekly_total': 0.0,
-                'daily_count': 0,
-                'last_reset_daily': datetime.now().date(),
-                'last_reset_weekly': datetime.now().date()
-            }
+            # Create state machine for each zone
+            state_machine = ZoneStateMachine(
+                zone_id=zone_num,
+                initial_phase=IrrigationPhase.P2_MAINTENANCE,  # Default to maintenance
+                logger=self
+            )
+            
+            # Register phase callbacks
+            self._register_phase_callbacks(zone_num, state_machine)
+            
+            self.zone_state_machines[zone_num] = state_machine
             # Initialize emergency attempt tracking
             self.emergency_attempts[zone_num] = {
                 'attempts': [],  # List of (timestamp, vwc_before, vwc_after)
@@ -307,6 +347,74 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'min_irrigation_interval': 900
             }
         }
+
+    def _register_phase_callbacks(self, zone_num: int, state_machine: ZoneStateMachine):
+        """Register callbacks for phase transitions and state changes."""
+        
+        # P0 Entry - Start morning dryback
+        state_machine.register_on_enter(
+            IrrigationPhase.P0_MORNING_DRYBACK,
+            lambda **kwargs: self._on_enter_p0(zone_num)
+        )
+        
+        # P1 Entry - Start ramp-up
+        state_machine.register_on_enter(
+            IrrigationPhase.P1_RAMP_UP,
+            lambda **kwargs: self._on_enter_p1(zone_num)
+        )
+        
+        # P2 Entry - Start maintenance
+        state_machine.register_on_enter(
+            IrrigationPhase.P2_MAINTENANCE,
+            lambda **kwargs: self._on_enter_p2(zone_num)
+        )
+        
+        # P3 Entry - Start pre-lights-off
+        state_machine.register_on_enter(
+            IrrigationPhase.P3_PRE_LIGHTS_OFF,
+            lambda **kwargs: self._on_enter_p3(zone_num)
+        )
+        
+        # P0 Exit - Clean up dryback data
+        state_machine.register_on_exit(
+            IrrigationPhase.P0_MORNING_DRYBACK,
+            lambda **kwargs: self.log(f"Zone {zone_num}: Exiting P0 dryback phase")
+        )
+        
+        # P1 Exit - Log ramp-up summary
+        state_machine.register_on_exit(
+            IrrigationPhase.P1_RAMP_UP,
+            lambda **kwargs: self._on_exit_p1(zone_num)
+        )
+    
+    def _on_enter_p0(self, zone_num: int):
+        """Handle P0 phase entry."""
+        self.log(f"Zone {zone_num}: Entering P0 Morning Dryback phase")
+        # Record current VWC as peak
+        current_vwc = self._get_zone_average_vwc(zone_num)
+        if current_vwc and self.zone_state_machines[zone_num].state.p0_data:
+            self.zone_state_machines[zone_num].state.p0_data.peak_vwc = current_vwc
+    
+    def _on_enter_p1(self, zone_num: int):
+        """Handle P1 phase entry."""
+        self.log(f"Zone {zone_num}: Entering P1 Ramp-Up phase")
+        # Record starting VWC
+        current_vwc = self._get_zone_average_vwc(zone_num)
+        self.zone_state_machines[zone_num].update_p1_progress(current_vwc)
+    
+    def _on_enter_p2(self, zone_num: int):
+        """Handle P2 phase entry."""
+        self.log(f"Zone {zone_num}: Entering P2 Maintenance phase")
+    
+    def _on_enter_p3(self, zone_num: int):
+        """Handle P3 phase entry."""
+        self.log(f"Zone {zone_num}: Entering P3 Pre-Lights-Off phase")
+    
+    def _on_exit_p1(self, zone_num: int):
+        """Handle P1 phase exit."""
+        machine = self.zone_state_machines[zone_num]
+        if machine.state.p1_data:
+            self.log(f"Zone {zone_num}: P1 Summary - {machine.state.p1_data.shot_count} shots administered")
 
     def _initialize_advanced_modules(self):
         """Initialize all advanced AI modules."""
@@ -986,6 +1094,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 return
             
             with self.lock:
+                # Check phase transitions for all zones
+                await self._check_all_zone_phase_transitions()
+                
                 # Get current system state
                 current_state = await self._get_current_system_state()
                 
@@ -1371,22 +1482,22 @@ class MasterCropSteeringApp(BaseAsyncApp):
         max_shots = self._get_number_entity_value("number.crop_steering_p1_max_shots", 6.0)
         time_between_shots = self._get_number_entity_value("number.crop_steering_p1_time_between_shots", 15.0)
         
-        # Get current P1 progression data
-        zone_data = self.zone_phase_data[zone_num]
-        current_shot_count = zone_data.get('p1_shot_count', 0)
-        last_shot_time = zone_data.get('p1_last_shot_time')
-        p1_start_time = zone_data.get('p1_start_time')
-        current_shot_size = zone_data.get('p1_current_shot_size', initial_shot_size)
+        # Get current P1 progression data from state machine
+        machine = self.zone_state_machines.get(zone_num)
+        if not machine or machine.state.current_phase != IrrigationPhase.P1_RAMP_UP:
+            return {'needs_irrigation': False, 'reason': 'Not in P1 phase'}
         
-        # Initialize P1 progression if just entered P1
-        if p1_start_time is None:
-            zone_data['p1_start_time'] = datetime.now()
-            zone_data['p1_shot_count'] = 0
-            zone_data['p1_current_shot_size'] = initial_shot_size
-            zone_data['p1_vwc_at_start'] = zone_vwc
-            zone_data['p1_shot_history'] = []
-            current_shot_count = 0
-            current_shot_size = initial_shot_size
+        p1_data = machine.state.p1_data
+        if not p1_data:
+            return {'needs_irrigation': False, 'reason': 'No P1 data'}
+        
+        current_shot_count = p1_data.shot_count
+        last_shot_time = p1_data.shot_history[-1]['timestamp'] if p1_data.shot_history else None
+        p1_start_time = p1_data.entry_time
+        current_shot_size = p1_data.current_shot_size or initial_shot_size
+        
+        # Update P1 progress with current VWC if needed
+        machine.update_p1_progress(zone_vwc)
         
         # Check if we need to continue P1 progression
         vwc_needs_irrigation = zone_vwc is not None and zone_vwc < target_vwc
@@ -2030,6 +2141,17 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Update zone-specific last irrigation time
             if zone in self.zone_phase_data:
                 self.zone_phase_data[zone]['last_irrigation_time'] = end_time
+            
+            # Record P1 shot if in P1 phase
+            machine = self.zone_state_machines.get(zone)
+            if machine and machine.state.current_phase == IrrigationPhase.P1_RAMP_UP:
+                # Calculate shot size as % of substrate volume
+                shot_size = (duration / 60.0) * 2.0  # Rough estimate: 2% per minute
+                machine.record_p1_shot(shot_size, pre_vwc or 0, post_vwc or 0)
+            elif machine and machine.state.current_phase == IrrigationPhase.P2_MAINTENANCE:
+                machine.record_p2_irrigation()
+            elif machine and machine.state.current_phase == IrrigationPhase.P3_PRE_LIGHTS_OFF:
+                machine.record_p3_emergency()
             
             # Update water usage tracking
             await self._update_zone_water_usage(zone, duration)
@@ -3136,10 +3258,50 @@ class MasterCropSteeringApp(BaseAsyncApp):
     async def _transition_zone_to_phase(self, zone_num: int, new_phase: str, reason: str):
         """Transition a specific zone to a new irrigation phase."""
         try:
-            old_phase = self.zone_phases.get(zone_num, 'P2')
-            self.zone_phases[zone_num] = new_phase
+            machine = self.zone_state_machines.get(zone_num)
+            if not machine:
+                self.log(f"Error: No state machine for zone {zone_num}", level='ERROR')
+                return
             
-            self.log(f"🔄 Zone {zone_num} transition: {old_phase} → {new_phase} ({reason})")
+            # Map string phase to enum
+            phase_map = {
+                'P0': IrrigationPhase.P0_MORNING_DRYBACK,
+                'P1': IrrigationPhase.P1_RAMP_UP,
+                'P2': IrrigationPhase.P2_MAINTENANCE,
+                'P3': IrrigationPhase.P3_PRE_LIGHTS_OFF
+            }
+            
+            target_phase = phase_map.get(new_phase)
+            if not target_phase:
+                self.log(f"Error: Invalid phase {new_phase}", level='ERROR')
+                return
+            
+            # Determine appropriate transition type
+            transition_type = PhaseTransition.MANUAL_OVERRIDE  # Default for manual changes
+            current_phase = machine.state.current_phase
+            
+            # Map specific transitions
+            if current_phase == IrrigationPhase.P0_MORNING_DRYBACK and target_phase == IrrigationPhase.P1_RAMP_UP:
+                if "dryback complete" in reason.lower():
+                    transition_type = PhaseTransition.DRYBACK_COMPLETE
+                elif "timeout" in reason.lower():
+                    transition_type = PhaseTransition.DRYBACK_TIMEOUT
+            elif current_phase == IrrigationPhase.P1_RAMP_UP and target_phase == IrrigationPhase.P2_MAINTENANCE:
+                if "target reached" in reason.lower():
+                    transition_type = PhaseTransition.RAMP_UP_COMPLETE
+            elif target_phase == IrrigationPhase.P3_PRE_LIGHTS_OFF:
+                if "lights off" in reason.lower() or "ml" in reason.lower():
+                    transition_type = PhaseTransition.LIGHTS_OFF_APPROACHING
+            elif target_phase == IrrigationPhase.P0_MORNING_DRYBACK:
+                if "lights on" in reason.lower():
+                    transition_type = PhaseTransition.LIGHTS_ON
+            
+            # Execute transition
+            success = machine.transition(transition_type, target_phase, reason=reason)
+            
+            if not success:
+                self.log(f"Zone {zone_num}: Failed to transition to {new_phase}", level='WARNING')
+                return
             
             # Save state after phase change (critical event)
             self._save_persistent_state()
@@ -3154,34 +3316,109 @@ class MasterCropSteeringApp(BaseAsyncApp):
                                    'transition_time': datetime.now().isoformat()
                                })
             
-            # Update zone phase data
-            zone_data = self.zone_phase_data.get(zone_num, {})
-            
-            if new_phase == 'P0':
-                self.log(f"🌅 Zone {zone_num}: Starting dryback phase")
-                zone_data['p0_start_time'] = datetime.now()
-                # Record peak VWC at start of P0 for dryback calculation
-                zone_vwc = self._get_zone_vwc(zone_num)
-                if zone_vwc:
-                    zone_data['p0_peak_vwc'] = zone_vwc
-                    self.log(f"📊 Zone {zone_num}: P0 peak VWC recorded: {zone_vwc:.1f}%")
-            elif new_phase == 'P1':
-                self.log(f"⬆️ Zone {zone_num}: Starting ramp-up phase")
-                # Reset P0 tracking
-                zone_data['p0_start_time'] = None
-                zone_data['p0_peak_vwc'] = None
-            elif new_phase == 'P2':
-                self.log(f"⚖️ Zone {zone_num}: Starting maintenance phase")
-            elif new_phase == 'P3':
-                self.log(f"🌙 Zone {zone_num}: Starting pre-lights-off phase")
-            
-            self.zone_phase_data[zone_num] = zone_data
-            
             # Update crop profile parameters if needed (could be zone-specific in future)
             await self._update_phase_parameters()
             
         except Exception as e:
             self.log(f"❌ Error transitioning zone {zone_num} to phase {new_phase}: {e}", level='ERROR')
+    
+    async def _check_all_zone_phase_transitions(self):
+        """Check all zones for phase transition conditions."""
+        try:
+            current_time = datetime.now().time()
+            lights_on_time = self._get_zone_schedule(1)['lights_on']  # System-wide schedule
+            lights_off_time = self._get_zone_schedule(1)['lights_off']
+            
+            # Check if lights just turned on
+            lights_just_on = self._is_time_between(
+                current_time,
+                lights_on_time,
+                (datetime.combine(datetime.today(), lights_on_time) + timedelta(minutes=5)).time()
+            )
+            
+            for zone_num in range(1, self.num_zones + 1):
+                machine = self.zone_state_machines.get(zone_num)
+                if not machine:
+                    continue
+                
+                current_phase = machine.state.current_phase
+                zone_vwc = self._get_zone_average_vwc(zone_num)
+                
+                # P3/P2 → P0: Lights turned on
+                if lights_just_on and current_phase in [IrrigationPhase.P3_PRE_LIGHTS_OFF, IrrigationPhase.P2_MAINTENANCE]:
+                    await self._transition_zone_to_phase(zone_num, 'P0', 'Lights on - starting morning dryback')
+                
+                # P0 → P1: Dryback complete or timeout
+                elif current_phase == IrrigationPhase.P0_MORNING_DRYBACK:
+                    p0_data = machine.state.p0_data
+                    if p0_data and zone_vwc is not None:
+                        # Update dryback progress
+                        machine.update_p0_dryback(zone_vwc, p0_data.peak_vwc or zone_vwc)
+                        
+                        # Check dryback completion
+                        dryback_target = p0_data.target_dryback_percentage
+                        current_dryback = p0_data.current_dryback_percentage
+                        phase_duration = machine.get_phase_duration().total_seconds() / 60  # minutes
+                        
+                        if current_dryback >= dryback_target:
+                            await self._transition_zone_to_phase(zone_num, 'P1', f'Dryback complete: {current_dryback:.1f}%')
+                        elif phase_duration >= p0_data.max_duration_minutes:
+                            await self._transition_zone_to_phase(zone_num, 'P1', f'P0 timeout: {phase_duration:.0f} minutes')
+                
+                # P1 → P2: Recovery complete
+                elif current_phase == IrrigationPhase.P1_RAMP_UP:
+                    p1_data = machine.state.p1_data
+                    if p1_data and zone_vwc is not None:
+                        if zone_vwc >= p1_data.target_vwc:
+                            await self._transition_zone_to_phase(zone_num, 'P2', f'Recovery complete: {zone_vwc:.1f}%')
+                
+                # P2 → P3: ML-based or time-based transition
+                elif current_phase == IrrigationPhase.P2_MAINTENANCE:
+                    # Check if it's time to transition to P3
+                    should_start_p3 = await self._should_zone_start_p3(zone_num)
+                    if should_start_p3:
+                        await self._transition_zone_to_phase(zone_num, 'P3', 'ML predicted lights-off approaching')
+        
+        except Exception as e:
+            self.log(f"Error checking phase transitions: {e}", level='ERROR')
+    
+    def _is_time_between(self, check_time: time, start_time: time, end_time: time) -> bool:
+        """Check if a time is between two times (handles midnight wrap)."""
+        if start_time <= end_time:
+            return start_time <= check_time <= end_time
+        else:
+            return check_time >= start_time or check_time <= end_time
+    
+    async def _should_zone_start_p3(self, zone_num: int) -> bool:
+        """Determine if zone should transition to P3 based on ML predictions."""
+        try:
+            # Get lights-off time
+            lights_off_time = self._get_zone_schedule(zone_num)['lights_off']
+            now = datetime.now()
+            
+            # Calculate time until lights off
+            lights_off_datetime = datetime.combine(now.date(), lights_off_time)
+            if lights_off_datetime < now:
+                lights_off_datetime += timedelta(days=1)
+            
+            time_until_lights_off = (lights_off_datetime - now).total_seconds() / 3600  # hours
+            
+            # Get dryback rate prediction
+            dryback_rate = await self._get_zone_dryback_rate(zone_num)
+            if dryback_rate and dryback_rate > 0:
+                # Calculate time needed to achieve overnight dryback
+                target_dryback = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50.0)
+                time_needed = target_dryback / dryback_rate + 0.5  # Add 30min buffer
+                
+                # Start P3 if we need to begin final dryback
+                return time_until_lights_off <= time_needed
+            else:
+                # Fallback: Start P3 2 hours before lights off
+                return time_until_lights_off <= 2.0
+                
+        except Exception as e:
+            self.log(f"Error checking P3 transition for zone {zone_num}: {e}", level='ERROR')
+            return False
 
     def _get_phase_icon(self, phase: str) -> str:
         """Get icon for phase."""
