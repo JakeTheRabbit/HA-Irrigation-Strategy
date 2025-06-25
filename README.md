@@ -407,51 +407,23 @@ For users with existing crop_steering.env files:
 2. Add integration and select "Load from crop_steering.env file"
 3. System validates and imports your configuration
 
-### AppDaemon Setup (v15+ Updated Paths)
-1. **Fix Requirements (Critical!):**
-   ```bash
-   ./fix_appdaemon_requirements.sh
-   ```
-2. **Configure with NEW paths:**
-   - AppDaemon config: `/addon_configs/a0d7b954_appdaemon/appdaemon.yaml`
+### AppDaemon Setup (Optional for Advanced Features)
+
+**Note:** The Crop Steering system uses NO external Python dependencies! Everything runs with standard Python libraries.
+
+1. **Install AppDaemon 4 add-on** from the Add-on Store
+2. **Configure AppDaemon** with NEW v15+ paths:
+   - Config file: `/addon_configs/a0d7b954_appdaemon/appdaemon.yaml`
    - Apps directory: `/addon_configs/a0d7b954_appdaemon/apps/`
    - Access via Samba: `\\YOUR_HA_IP\addon_configs\a0d7b954_appdaemon`
-3. **Restart AppDaemon add-on**
-4. **Advanced Features Activate Automatically:**
+3. **Copy AppDaemon apps** from the integration to the AppDaemon directory
+4. **Restart AppDaemon add-on**
+5. **Advanced Features Activate Automatically:**
    - Statistical analysis modules start processing sensor data
    - Sensor validation begins with first readings
-   - Professional dashboard becomes available
+   - YAML dashboards become available
 
-### AppDaemon Configuration Tools
-
-**Note:** The only command line tool still needed is for fixing AppDaemon dependencies. All zone configuration is now done through the GUI!
-
-#### AppDaemon Fix Script
-
-If you're using AppDaemon for advanced features, you may need to run this script:
-
-```bash
-cd /config
-bash fix_appdaemon_requirements.sh
-```
-
-This script:
-- Removes heavy dependencies (numpy, pandas, scipy)
-- Ensures AppDaemon can start properly
-- Only needed if AppDaemon fails to start
-
-#### Accessing the Command Line (Only for AppDaemon Fix):
-
-1. **SSH Addon:**
-   - Install "SSH & Web Terminal" addon
-   - Run the fix script
-
-2. **File Editor Terminal:**
-   - Install "File editor" addon
-   - Click terminal icon
-   - Run the fix script
-
-**Detailed setup instructions:** See our [Installation Guide](docs/installation_guide.md) for step-by-step configuration with screenshots.
+**Detailed setup instructions:** See our [Installation Guide](docs/installation_guide.md) for step-by-step AppDaemon configuration.
 
 ## How to Use
 
