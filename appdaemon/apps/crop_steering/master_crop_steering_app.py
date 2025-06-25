@@ -2173,7 +2173,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self._save_persistent_state()
             
             # Fire irrigation event
-            self.fire_event('crop_steering_irrigation_shot', irrigation_result)
+            self.fire_event('crop_steering_irrigation_shot', **irrigation_result)
             
             self.log(f"✅ Irrigation completed: Zone {zone}, {actual_duration:.1f}s, "
                     f"VWC: {pre_vwc:.1f}% → {post_vwc:.1f}%")
@@ -3255,9 +3255,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
             if hasattr(self, 'dryback_detector') and self.dryback_detector:
                 # For now, use overall dryback rate
                 # TODO: Implement per-zone dryback tracking
-                status = await self.dryback_detector.get_current_status()
-                if status and status.get('current_dryback_rate'):
-                    return abs(status['current_dryback_rate'])
+                status = self.dryback_detector._get_status_dict()
+                if status and status.get('dryback_percentage') is not None:
+                    return abs(status['dryback_percentage'])
             
             # Fallback to historical estimate based on zone characteristics
             # Could be enhanced with zone-specific ML model
@@ -3546,9 +3546,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Update individual sensor entities
             for sensor_id, sensor_data in health_report['sensors'].items():
                 entity_id = f"sensor.{sensor_id.replace('.', '_')}_health"
-                self.set_entity_value(entity_id,
-                              state=sensor_data['health_status'],
-                              attributes=sensor_data)
+                self.set_entity_value(entity_id, sensor_data['health_status'], attributes=sensor_data)
             
         except Exception as e:
             self.log(f"❌ Error monitoring sensor health: {e}", level='ERROR')
@@ -3583,7 +3581,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Update HA entities
             for metric_name, value in metrics.items():
                 entity_id = f'sensor.crop_steering_{metric_name}'
-                self.set_entity_value(entity_id, state=value, 
+                self.set_entity_value(entity_id, value, 
                               attributes={'last_updated': datetime.now().isoformat()})
             
             self.log(f"📊 Performance updated - ML: {metrics['ml_model_accuracy']:.2f}, "
@@ -3707,7 +3705,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 
                 for param, value in phase_params.items():
                     entity_id = f'sensor.crop_steering_{param}'
-                    self.set_entity_value(entity_id, state=value)
+                    self.set_entity_value(entity_id, value)
                 
                 self.log(f"📊 Phase parameters updated for zones: {list(self.zone_phases.values())}")
             
