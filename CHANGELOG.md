@@ -1,9 +1,41 @@
 # Changelog
 
-All notable changes to the Advanced AI Crop Steering System will be documented in this file.
+All notable changes to the Advanced Automated Crop Steering System will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.3.0] - 2024-12-26
+
+### 🚀 Major Features
+- **Full GUI Configuration** - Complete zone and sensor setup through Home Assistant UI
+- **Zero Dependencies** - Removed ALL external Python packages (numpy, pandas, scipy, plotly)
+- **Clean Architecture** - Removed all redundant scripts and command line tools
+- **Fixed Phase Logic** - P3 now correctly persists through entire lights-off period
+- **System-wide Light Controls** - Removed illogical per-zone light controls
+
+### 🗑️ Removed (Cleanup)
+- `fix_appdaemon_requirements.sh` - No longer needed, zero dependencies
+- `requirements.txt` - System uses only standard Python libraries
+- `configure_crop_steering.py` - Replaced by GUI configuration
+- `advanced_crop_steering_dashboard.py` - Uses YAML dashboards instead
+- Command line dependency for zone configuration
+
+### ✨ Improvements
+- **GUI Config Flow** - Advanced setup with sensor configuration for each zone
+- **YAML Dashboards** - AppDaemon native dashboards without Plotly
+- **Async/Await Fixes** - Proper coroutine handling in AppDaemon
+- **Sensor Fusion** - Fixed VWC/EC mixing issue
+- **State Machine** - Clean phase management implementation
+
+### 📝 Documentation
+- Updated README to v2.3.0 with GUI configuration
+- Removed all references to deprecated scripts
+- Added proper crop steering terminology explanations
+- Marked zone_configuration_helper.py as deprecated
+
+### ⚠️ Breaking Changes
+- None - existing configurations continue to work
 
 ## [2.1.1] - 2024-12-21
 
