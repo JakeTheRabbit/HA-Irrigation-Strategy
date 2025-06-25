@@ -665,14 +665,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
     async def _update_zone_water_usage(self, zone_num: int, duration_seconds: float):
         """Update water usage tracking for a zone."""
         try:
-            # Calculate water volume used
-            dripper_flow = self._get_number_entity_value("number.crop_steering_dripper_flow_rate", 2.0)  # L/hour
-            drippers_per_zone = self._get_number_entity_value("number.crop_steering_drippers_per_zone", 4)
+            # Calculate water volume used: num_plants * drippers_per_plant * dripper_flow_rate * hours
+            dripper_flow_rate = self._get_number_entity_value("number.crop_steering_dripper_flow_rate", 1.2)  # L/hour per dripper
+            drippers_per_plant = self._get_number_entity_value("number.crop_steering_drippers_per_plant", 2)
+            num_plants = self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_plant_count", 4)
             shot_multiplier = self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_shot_size_multiplier", 1.0)
             
-            # Calculate volume: (flow rate * drippers * hours * multiplier)
+            # Calculate volume: (plants * drippers_per_plant * flow_rate_per_dripper * hours * multiplier)
             hours = duration_seconds / 3600
-            volume_liters = dripper_flow * drippers_per_zone * hours * shot_multiplier
+            volume_liters = num_plants * drippers_per_plant * dripper_flow_rate * hours * shot_multiplier
             
             # Update tracking data
             today = datetime.now().date()
@@ -2305,13 +2306,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 except:
                     pass
                 
-                # Method 2: Direct AppDaemon internal state cache
+                # Method 2: Direct get_state with sync call
                 if value is None:
                     try:
-                        if hasattr(self, 'AD') and hasattr(self.AD, 'state'):
-                            value = self.get_state(integration_sensor)
-                            if value is not None:
-                                self.log(f"🔍 Zone {zone_num} via AD.state: {value}")
+                        state_value = self.get_state(integration_sensor)
+                        if state_value not in ['unknown', 'unavailable', None] and not hasattr(state_value, '__await__'):
+                            value = state_value
+                            self.log(f"🔍 Zone {zone_num} via get_state: {value}")
                     except:
                         pass
                 
