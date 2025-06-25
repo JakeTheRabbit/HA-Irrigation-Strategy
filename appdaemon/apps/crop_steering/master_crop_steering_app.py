@@ -3344,8 +3344,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 current_phase = machine.state.current_phase
                 zone_vwc = self._get_zone_average_vwc(zone_num)
                 
-                # P3/P2 → P0: Lights turned on
-                if lights_just_on and current_phase in [IrrigationPhase.P3_PRE_LIGHTS_OFF, IrrigationPhase.P2_MAINTENANCE]:
+                # P3 → P0: Lights turned on (only from P3, not P2)
+                if lights_just_on and current_phase == IrrigationPhase.P3_PRE_LIGHTS_OFF:
                     await self._transition_zone_to_phase(zone_num, 'P0', 'Lights on - starting morning dryback')
                 
                 # P0 → P1: Dryback complete or timeout

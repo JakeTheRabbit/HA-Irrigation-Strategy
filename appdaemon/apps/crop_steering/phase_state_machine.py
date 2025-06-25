@@ -162,6 +162,7 @@ class ZoneStateMachine:
         IrrigationPhase.P3_PRE_LIGHTS_OFF: [
             (PhaseTransition.LIGHTS_ON, IrrigationPhase.P0_MORNING_DRYBACK),
             (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P2_MAINTENANCE),
+            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P1_RAMP_UP),
         ]
     }
     

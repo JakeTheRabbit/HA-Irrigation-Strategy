@@ -108,8 +108,8 @@ The system automatically moves through phases based on plant conditions, not arb
 
 **P3 → P0: Lights On**
 - **When:** Lights turn on (default 12pm noon)
-- **Logic:** Plants wake up, start controlled dryback
-- **Simple:** When lights on = start drying phase
+- **Logic:** P3 continues through entire lights-off period, then transitions to P0 when lights turn on
+- **Simple:** P3 overnight → P0 when lights on
 
 **P0 → P1: Dryback Complete**
 - **When:** Plants reach target dryness OR safety timeout
@@ -126,7 +126,7 @@ The system automatically moves through phases based on plant conditions, not arb
 - **Logic:** Final irrigation before lights-off dark period
 - **Simple:** Give plants last drink before sleep
 
-**In Plain English:** Lights on = start getting thirsty → water them slowly until happy → keep them happy all day → final drink before sleep → repeat. Just like caring for plants manually, but perfectly timed by rule-based automation.
+**In Plain English:** Lights on = start getting thirsty → water them slowly until happy → keep them happy all day → final drink before sleep → stay in overnight dryback until lights on again → repeat. Just like caring for plants manually, but perfectly timed by rule-based automation.
 
 ### **Detailed Entity Configuration & Triggers**
 
@@ -221,6 +221,7 @@ The system automatically moves through phases based on plant conditions, not arb
 - **Zones transition independently** based on their individual conditions
 - **Mixed phases supported** - Zone 1 can be in P2 while Zone 2 is still in P1
 - **Shared setpoints** - All zones use same thresholds but progress at their own pace
+- **P3 persists overnight** - Zones remain in P3 through entire lights-off period
 
 #### **Example Scenario:**
 ```
@@ -234,7 +235,7 @@ Zone 4: P0 (Dryback)  - No irrigation, letting it dry
 - **P0 → P1**: Each zone exits dryback when IT reaches target or timeout
 - **P1 → P2**: Each zone moves to maintenance when IT hits recovery VWC
 - **P2 → P3**: Zones enter pre-lights-off based on individual ML predictions
-- **P3 → P0**: All zones sync to P0 when lights turn off
+- **P3 → P0**: Zones transition from P3 to P0 when lights turn ON (not off)
 
 #### **Zone Phase Sensors:**
 - `sensor.crop_steering_zone_1_phase` - Zone 1 current phase
