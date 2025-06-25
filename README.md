@@ -17,11 +17,14 @@
 - **Heavy development** - Code and functionality subject to significant changes
 - **Not production ready** - Expect bugs, issues, and the need for manual intervention
 
-**Recent Improvements (v2.2.0):**
+**Recent Improvements (v2.3.0):**
+- **NEW: Full GUI Configuration** - No command line needed! Configure everything through Home Assistant UI
 - Fixed async/await issues - No more runtime warnings about unawaited coroutines
 - Fixed sensor fusion - VWC and EC values no longer mixed (was causing incorrect readings)
 - Implemented clean state machine - Phase transitions now properly tracked and validated
 - Improved reliability - Thread-safe operation with proper error handling
+- Fixed P3 phase logic - Now correctly persists through entire lights-off period
+- Removed hardcoded Zone 3 emergency irrigation - Uses proper phase-based logic
 
 **Recommendation:** Start with manual overrides enabled and gradually trust the automation as you validate it works with your specific hardware and plants.
 
@@ -132,8 +135,10 @@ The system automatically moves through phases based on plant conditions, not arb
 
 #### **P3 → P0 Transition (Lights On → Start Drying)**
 **Trigger:** Time-based - when lights turn on
-- **Light Schedule:** Hardcoded 12pm-12am (12-hour cycle)
-- **No entities needed** - system automatically detects when lights should be on
+- **Light Schedule:** Configurable via entities
+- **Light Control Entities:** 
+  - `datetime.crop_steering_lights_on_time` (default: 12:00 PM)
+  - `datetime.crop_steering_lights_off_time` (default: 12:00 AM)
 - **Action:** Records current VWC as "peak" for dryback calculations
 
 #### **P0 → P1 Transition (Dryback Complete → Start Recovery)**
@@ -339,15 +344,16 @@ Zone 4: P0 (Dryback)  - No irrigation, letting it dry
 ### 📋 What You Need
 
 **Hardware:**
-- VWC sensors (2+ per zone recommended for AI sensor fusion)
+- VWC sensors (2+ per zone recommended for sensor fusion)
 - EC sensors (2+ per zone recommended for nutrient monitoring)
 - Irrigation pump with Home Assistant control
 - Main line valve and zone valves
+- Grow light controls (for phase timing)
 - Home Assistant 2024.3.0+
 
 **Software:**
-- AppDaemon 4 add-on (required for AI features)
-- File Editor add-on (for easy configuration)
+- AppDaemon 4 add-on (required for advanced features)
+- File Editor add-on (optional for manual configuration)
 
 ### HACS Installation (Recommended)
 
