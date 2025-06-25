@@ -1,0 +1,2716 @@
+type: sections
+max_columns: 4
+title: Crop Steering System
+path: crop-steering
+sections:
+  # SYSTEM OVERVIEW SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: System Overview
+        styles:
+          card:
+            - background-color: rgba(59, 130, 246, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(59, 130, 246, 1)
+      - type: custom:button-card
+        entity: sensor.crop_steering_current_phase
+        name: Current Phase
+        icon: mdi:state-machine
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  const phaseColors = {
+                    'P0': 'rgba(251, 191, 36, 0.9)',
+                    'P1': 'rgba(34, 197, 94, 0.9)',
+                    'P2': 'rgba(59, 130, 246, 0.9)',
+                    'P3': 'rgba(168, 85, 247, 0.9)'
+                  };
+                  return phaseColors[entity.state] || 'var(--disabled-text-color)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: |
+                [[[
+                  const phaseColors = {
+                    'P0': 'rgba(251, 191, 36, 0.9)',
+                    'P1': 'rgba(34, 197, 94, 0.9)',
+                    'P2': 'rgba(59, 130, 246, 0.9)',
+                    'P3': 'rgba(168, 85, 247, 0.9)'
+                  };
+                  return phaseColors[entity.state] || 'var(--disabled-text-color)';
+                ]]]
+      - type: custom:button-card
+        entity: sensor.crop_steering_irrigation_efficiency
+        name: Irrigation Efficiency
+        icon: mdi:water-check
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_water_usage_daily
+        name: Daily Water Usage
+        icon: mdi:water
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_dryback_percentage
+        name: Dryback Percentage
+        icon: mdi:water-minus
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_next_irrigation_time
+        name: Next Irrigation
+        icon: mdi:clock-time-four
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 12px
+            - color: rgba(34, 197, 94, 0.9)
+
+  # ZONE MONITORING SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: Zone Monitoring
+        styles:
+          card:
+            - background-color: rgba(34, 197, 94, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(34, 197, 94, 1)
+
+  # ZONE 1 CARDS
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: Zone 1
+        styles:
+          card:
+            - background-color: rgba(34, 197, 94, 0.2)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 1)
+      - type: custom:button-card
+        entity: sensor.crop_steering_vwc_zone_1
+        name: Zone 1 VWC
+        icon: mdi:water-percent
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_ec_zone_1
+        name: Zone 1 EC
+        icon: mdi:lightning-bolt
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_1_status
+        name: Zone 1 Status
+        icon: mdi:check-circle
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  const statusColors = {
+                    'Optimal': 'rgba(34, 197, 94, 0.9)',
+                    'Dry': 'rgba(251, 191, 36, 0.9)',
+                    'Saturated': 'rgba(239, 68, 68, 0.9)',
+                    'Error': 'rgba(127, 29, 29, 0.9)'
+                  };
+                  return statusColors[entity.state] || 'var(--disabled-text-color)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: |
+                [[[
+                  const statusColors = {
+                    'Optimal': 'rgba(34, 197, 94, 0.9)',
+                    'Dry': 'rgba(251, 191, 36, 0.9)',
+                    'Saturated': 'rgba(239, 68, 68, 0.9)',
+                    'Error': 'rgba(127, 29, 29, 0.9)'
+                  };
+                  return statusColors[entity.state] || 'var(--disabled-text-color)';
+                ]]]
+      - type: custom:button-card
+        entity: switch.crop_steering_zone_1_enabled
+        name: Zone 1 Enabled
+        icon: mdi:water-pump
+        show_state: true
+        tap_action:
+          action: toggle
+        styles:
+          card:
+            - background-color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(127, 29, 29, 0.2)';
+                ]]]
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.9)' : 'rgba(127, 29, 29, 0.9)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+      - type: custom:button-card
+        entity: switch.crop_steering_zone_1_manual_override
+        name: Zone 1 Manual Override
+        icon: mdi:hand-water
+        show_state: true
+        tap_action:
+          action: toggle
+        styles:
+          card:
+            - background-color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(251, 191, 36, 0.2)' : 'var(--card-background-color)';
+                ]]]
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(251, 191, 36, 0.9)' : 'var(--disabled-text-color)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+
+  # ZONE 2 CARDS
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: Zone 2
+        styles:
+          card:
+            - background-color: rgba(34, 197, 94, 0.2)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 1)
+      - type: custom:button-card
+        entity: sensor.crop_steering_vwc_zone_2
+        name: Zone 2 VWC
+        icon: mdi:water-percent
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_ec_zone_2
+        name: Zone 2 EC
+        icon: mdi:lightning-bolt
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_2_status
+        name: Zone 2 Status
+        icon: mdi:check-circle
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  const statusColors = {
+                    'Optimal': 'rgba(34, 197, 94, 0.9)',
+                    'Dry': 'rgba(251, 191, 36, 0.9)',
+                    'Saturated': 'rgba(239, 68, 68, 0.9)',
+                    'Error': 'rgba(127, 29, 29, 0.9)'
+                  };
+                  return statusColors[entity.state] || 'var(--disabled-text-color)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: |
+                [[[
+                  const statusColors = {
+                    'Optimal': 'rgba(34, 197, 94, 0.9)',
+                    'Dry': 'rgba(251, 191, 36, 0.9)',
+                    'Saturated': 'rgba(239, 68, 68, 0.9)',
+                    'Error': 'rgba(127, 29, 29, 0.9)'
+                  };
+                  return statusColors[entity.state] || 'var(--disabled-text-color)';
+                ]]]
+      - type: custom:button-card
+        entity: switch.crop_steering_zone_2_enabled
+        name: Zone 2 Enabled
+        icon: mdi:water-pump
+        show_state: true
+        tap_action:
+          action: toggle
+        styles:
+          card:
+            - background-color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(127, 29, 29, 0.2)';
+                ]]]
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.9)' : 'rgba(127, 29, 29, 0.9)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+      - type: custom:button-card
+        entity: switch.crop_steering_zone_2_manual_override
+        name: Zone 2 Manual Override
+        icon: mdi:hand-water
+        show_state: true
+        tap_action:
+          action: toggle
+        styles:
+          card:
+            - background-color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(251, 191, 36, 0.2)' : 'var(--card-background-color)';
+                ]]]
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(251, 191, 36, 0.9)' : 'var(--disabled-text-color)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+
+  # ZONE 3 CARDS
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: Zone 3
+        styles:
+          card:
+            - background-color: rgba(34, 197, 94, 0.2)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 1)
+      - type: custom:button-card
+        entity: sensor.crop_steering_vwc_zone_3
+        name: Zone 3 VWC
+        icon: mdi:water-percent
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_ec_zone_3
+        name: Zone 3 EC
+        icon: mdi:lightning-bolt
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_3_status
+        name: Zone 3 Status
+        icon: mdi:check-circle
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  const statusColors = {
+                    'Optimal': 'rgba(34, 197, 94, 0.9)',
+                    'Dry': 'rgba(251, 191, 36, 0.9)',
+                    'Saturated': 'rgba(239, 68, 68, 0.9)',
+                    'Error': 'rgba(127, 29, 29, 0.9)'
+                  };
+                  return statusColors[entity.state] || 'var(--disabled-text-color)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: |
+                [[[
+                  const statusColors = {
+                    'Optimal': 'rgba(34, 197, 94, 0.9)',
+                    'Dry': 'rgba(251, 191, 36, 0.9)',
+                    'Saturated': 'rgba(239, 68, 68, 0.9)',
+                    'Error': 'rgba(127, 29, 29, 0.9)'
+                  };
+                  return statusColors[entity.state] || 'var(--disabled-text-color)';
+                ]]]
+      - type: custom:button-card
+        entity: switch.crop_steering_zone_3_enabled
+        name: Zone 3 Enabled
+        icon: mdi:water-pump
+        show_state: true
+        tap_action:
+          action: toggle
+        styles:
+          card:
+            - background-color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(127, 29, 29, 0.2)';
+                ]]]
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.9)' : 'rgba(127, 29, 29, 0.9)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+      - type: custom:button-card
+        entity: switch.crop_steering_zone_3_manual_override
+        name: Zone 3 Manual Override
+        icon: mdi:hand-water
+        show_state: true
+        tap_action:
+          action: toggle
+        styles:
+          card:
+            - background-color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(251, 191, 36, 0.2)' : 'var(--card-background-color)';
+                ]]]
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(251, 191, 36, 0.9)' : 'var(--disabled-text-color)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+
+  # ZONE ANALYTICS SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: Zone Analytics
+        styles:
+          card:
+            - background-color: rgba(168, 85, 247, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(168, 85, 247, 1)
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_1_last_irrigation
+        name: Zone 1 Last Irrigation
+        icon: mdi:clock-time-four
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 12px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_2_last_irrigation
+        name: Zone 2 Last Irrigation
+        icon: mdi:clock-time-four
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 12px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_3_last_irrigation
+        name: Zone 3 Last Irrigation
+        icon: mdi:clock-time-four
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 12px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_1_daily_water_usage
+        name: Zone 1 Daily Usage
+        icon: mdi:water
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_2_daily_water_usage
+        name: Zone 2 Daily Usage
+        icon: mdi:water
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_3_daily_water_usage 
+        name: Zone 3 Daily Usage
+        icon: mdi:water
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_1_irrigation_count_today
+        name: Zone 1 Irrigations Today
+        icon: mdi:counter
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_2_irrigation_count_today
+        name: Zone 2 Irrigations Today
+        icon: mdi:counter
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_3_irrigation_count_today
+        name: Zone 3 Irrigations Today
+        icon: mdi:counter
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+
+  # SYSTEM CONTROL SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: System Control
+        styles:
+          card:
+            - background-color: rgba(239, 68, 68, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(239, 68, 68, 1)
+      - type: custom:button-card
+        entity: switch.crop_steering_system_enabled
+        name: System Enabled
+        icon: mdi:power
+        show_state: true
+        tap_action:
+          action: toggle
+        styles:
+          card:
+            - background-color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(127, 29, 29, 0.2)';
+                ]]]
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.9)' : 'rgba(127, 29, 29, 0.9)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+      - type: custom:button-card
+        entity: switch.crop_steering_auto_irrigation_enabled
+        name: Auto Irrigation
+        icon: mdi:auto-mode
+        show_state: true
+        tap_action:
+          action: toggle
+        styles:
+          card:
+            - background-color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(127, 29, 29, 0.2)';
+                ]]]
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.9)' : 'rgba(127, 29, 29, 0.9)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+      - type: custom:button-card
+        entity: switch.crop_steering_ec_stacking_enabled
+        name: EC Stacking
+        icon: mdi:chemistry-bottle
+        show_state: true
+        tap_action:
+          action: toggle
+        styles:
+          card:
+            - background-color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.2)' : 'var(--card-background-color)';
+                ]]]
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.9)' : 'var(--disabled-text-color)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+      - type: custom:button-card
+        entity: switch.crop_steering_analytics_enabled
+        name: Analytics
+        icon: mdi:chart-line
+        show_state: true
+        tap_action:
+          action: toggle
+        styles:
+          card:
+            - background-color: |
+                [[[
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.2)' : 'var(--card-background-color)';
+                ]]]
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[  
+                  return entity.state === 'on' ? 'rgba(34, 197, 94, 0.9)' : 'var(--disabled-text-color)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+
+  # PHASE CONTROLS SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: Phase Controls
+        styles:
+          card:
+            - background-color: rgba(251, 191, 36, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(251, 191, 36, 1)
+      - type: custom:button-card
+        entity: select.crop_steering_irrigation_phase
+        name: Manual Phase Select
+        icon: mdi:water-circle
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_p1_shot_duration_seconds
+        name: P1 Shot Duration
+        icon: mdi:timer
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_p2_shot_duration_seconds
+        name: P2 Shot Duration
+        icon: mdi:timer
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_p3_shot_duration_seconds
+        name: P3 Emergency Duration
+        icon: mdi:timer-alert
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(168, 85, 247, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(168, 85, 247, 0.9)
+
+  # CONFIGURATION SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: Configuration
+        styles:
+          card:
+            - background-color: rgba(168, 85, 247, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(168, 85, 247, 1)
+      - type: custom:button-card
+        entity: select.crop_steering_crop_type
+        name: Crop Type
+        icon: mdi:sprout
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: select.crop_steering_growth_stage
+        name: Growth Stage
+        icon: mdi:timeline
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: select.crop_steering_steering_mode
+        name: Steering Mode
+        icon: mdi:steering
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_lights_on_hour
+        name: Lights On Hour
+        icon: mdi:weather-sunny
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_lights_off_hour
+        name: Lights Off Hour
+        icon: mdi:weather-night
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(127, 29, 29, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(127, 29, 29, 0.9)
+
+  # ZONE CONFIGURATION SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: Zone Configuration
+        styles:
+          card:
+            - background-color: rgba(168, 85, 247, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(168, 85, 247, 1)
+      - type: custom:button-card
+        entity: select.crop_steering_zone_1_group
+        name: Zone 1 Group
+        icon: mdi:group
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: select.crop_steering_zone_2_group
+        name: Zone 2 Group
+        icon: mdi:group
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: select.crop_steering_zone_3_group
+        name: Zone 3 Group
+        icon: mdi:group
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: select.crop_steering_zone_1_priority
+        name: Zone 1 Priority
+        icon: mdi:priority-high
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(239, 68, 68, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: rgba(239, 68, 68, 0.9)
+      - type: custom:button-card
+        entity: select.crop_steering_zone_2_priority
+        name: Zone 2 Priority
+        icon: mdi:priority-high
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(239, 68, 68, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: rgba(239, 68, 68, 0.9)
+      - type: custom:button-card
+        entity: select.crop_steering_zone_3_priority
+        name: Zone 3 Priority
+        icon: mdi:priority-high
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(239, 68, 68, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 14px
+            - color: rgba(239, 68, 68, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_zone_1_max_daily_volume
+        name: Zone 1 Max Daily Volume
+        icon: mdi:water-check
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_zone_2_max_daily_volume
+        name: Zone 2 Max Daily Volume
+        icon: mdi:water-check
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_zone_3_max_daily_volume
+        name: Zone 3 Max Daily Volume
+        icon: mdi:water-check
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+
+  # ADVANCED ANALYTICS SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: Advanced Analytics
+        styles:
+          card:
+            - background-color: rgba(168, 85, 247, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(168, 85, 247, 1)
+      - type: custom:button-card
+        entity: sensor.crop_steering_configured_avg_vwc
+        name: Average VWC All Zones
+        icon: mdi:water-percent
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_configured_avg_ec
+        name: Average EC All Zones
+        icon: mdi:lightning-bolt
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_ec_ratio
+        name: EC Ratio
+        icon: mdi:percent
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_p2_vwc_threshold_adjusted
+        name: P2 VWC Threshold Adjusted
+        icon: mdi:water-alert
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: sensor.crop_steering_system_health_score
+        name: System Health Score
+        icon: mdi:heart-pulse
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  const score = parseFloat(entity.state);
+                  if (score >= 80) return 'rgba(34, 197, 94, 0.9)';
+                  if (score >= 60) return 'rgba(251, 191, 36, 0.9)';
+                  return 'rgba(239, 68, 68, 0.9)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: |
+                [[[
+                  const score = parseFloat(entity.state);
+                  if (score >= 80) return 'rgba(34, 197, 94, 0.9)';
+                  if (score >= 60) return 'rgba(251, 191, 36, 0.9)';
+                  return 'rgba(239, 68, 68, 0.9)';
+                ]]]
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_1_health_score
+        name: Zone 1 Health Score
+        icon: mdi:heart-pulse
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  const score = parseFloat(entity.state);
+                  if (score >= 0.8) return 'rgba(34, 197, 94, 0.9)';
+                  if (score >= 0.6) return 'rgba(251, 191, 36, 0.9)';
+                  return 'rgba(239, 68, 68, 0.9)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: |
+                [[[
+                  const score = parseFloat(entity.state);
+                  if (score >= 0.8) return 'rgba(34, 197, 94, 0.9)';
+                  if (score >= 0.6) return 'rgba(251, 191, 36, 0.9)';
+                  return 'rgba(239, 68, 68, 0.9)';
+                ]]]
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_2_health_score
+        name: Zone 2 Health Score
+        icon: mdi:heart-pulse
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  const score = parseFloat(entity.state);
+                  if (score >= 0.8) return 'rgba(34, 197, 94, 0.9)';
+                  if (score >= 0.6) return 'rgba(251, 191, 36, 0.9)';
+                  return 'rgba(239, 68, 68, 0.9)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: |
+                [[[
+                  const score = parseFloat(entity.state);
+                  if (score >= 0.8) return 'rgba(34, 197, 94, 0.9)';
+                  if (score >= 0.6) return 'rgba(251, 191, 36, 0.9)';
+                  return 'rgba(239, 68, 68, 0.9)';
+                ]]]
+      - type: custom:button-card
+        entity: sensor.crop_steering_zone_3_health_score
+        name: Zone 3 Health Score
+        icon: mdi:heart-pulse
+        show_state: true
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: |
+                [[[
+                  const score = parseFloat(entity.state);
+                  if (score >= 0.8) return 'rgba(34, 197, 94, 0.9)';
+                  if (score >= 0.6) return 'rgba(251, 191, 36, 0.9)';
+                  return 'rgba(239, 68, 68, 0.9)';
+                ]]]
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: |
+                [[[
+                  const score = parseFloat(entity.state);
+                  if (score >= 0.8) return 'rgba(34, 197, 94, 0.9)';
+                  if (score >= 0.6) return 'rgba(251, 191, 36, 0.9)';
+                  return 'rgba(239, 68, 68, 0.9)';
+                ]]]
+
+  # SYSTEM PARAMETERS SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: System Parameters
+        styles:
+          card:
+            - background-color: rgba(127, 29, 29, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(127, 29, 29, 1)
+      - type: custom:button-card
+        entity: number.crop_steering_substrate_volume
+        name: Substrate Volume
+        icon: mdi:cube-outline
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_dripper_flow_rate
+        name: Dripper Flow Rate
+        icon: mdi:water-pump
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_drippers_per_zone
+        name: Drippers Per Zone
+        icon: mdi:sprinkler
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_field_capacity
+        name: Field Capacity
+        icon: mdi:water-percent
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(239, 68, 68, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(239, 68, 68, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_max_ec
+        name: Maximum EC
+        icon: mdi:lightning-bolt
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(239, 68, 68, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(239, 68, 68, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_veg_dryback_target
+        name: Vegetative Dryback Target
+        icon: mdi:water-minus
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_gen_dryback_target
+        name: Generative Dryback Target
+        icon: mdi:water-minus
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(168, 85, 247, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(168, 85, 247, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p1_target_vwc
+        name: P1 Target VWC
+        icon: mdi:target
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p2_vwc_threshold
+        name: P2 VWC Threshold
+        icon: mdi:water-alert
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+
+  # P0 PHASE PARAMETERS SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: P0 Phase Parameters
+        styles:
+          card:
+            - background-color: rgba(251, 191, 36, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(251, 191, 36, 1)
+      - type: custom:button-card
+        entity: number.crop_steering_p0_min_wait_time
+        name: P0 Minimum Wait Time
+        icon: mdi:timer
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p0_max_wait_time
+        name: P0 Maximum Wait Time
+        icon: mdi:timer-alert
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(239, 68, 68, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(239, 68, 68, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p0_dryback_drop_percent
+        name: P0 Dryback Drop Percent
+        icon: mdi:water-minus
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+
+  # P1 PHASE PARAMETERS SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: P1 Phase Parameters
+        styles:
+          card:
+            - background-color: rgba(34, 197, 94, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(34, 197, 94, 1)
+      - type: custom:button-card
+        entity: number.crop_steering_p1_initial_shot_size
+        name: P1 Initial Shot Size
+        icon: mdi:water-pump
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p1_shot_increment
+        name: P1 Shot Size Increment
+        icon: mdi:plus
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p1_max_shot_size
+        name: P1 Maximum Shot Size
+        icon: mdi:water-pump-off
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(239, 68, 68, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(239, 68, 68, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p1_time_between_shots
+        name: P1 Time Between Shots
+        icon: mdi:timer-outline
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p1_max_shots
+        name: P1 Maximum Shots
+        icon: mdi:counter
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(239, 68, 68, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(239, 68, 68, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p1_min_shots
+        name: P1 Minimum Shots
+        icon: mdi:counter
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+
+  # P2 PHASE PARAMETERS SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: P2 Phase Parameters
+        styles:
+          card:
+            - background-color: rgba(59, 130, 246, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(59, 130, 246, 1)
+      - type: custom:button-card
+        entity: number.crop_steering_p2_shot_size
+        name: P2 Shot Size
+        icon: mdi:water-pump
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p2_ec_high_threshold
+        name: P2 EC High Threshold
+        icon: mdi:arrow-up-bold
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(239, 68, 68, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(239, 68, 68, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p2_ec_low_threshold
+        name: P2 EC Low Threshold
+        icon: mdi:arrow-down-bold
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+
+  # P3 PHASE PARAMETERS SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: P3 Phase Parameters
+        styles:
+          card:
+            - background-color: rgba(168, 85, 247, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(168, 85, 247, 1)
+      - type: custom:button-card
+        entity: number.crop_steering_p3_veg_last_irrigation
+        name: P3 Veg Last Irrigation
+        icon: mdi:timer-sand
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p3_gen_last_irrigation
+        name: P3 Gen Last Irrigation
+        icon: mdi:timer-sand
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(168, 85, 247, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(168, 85, 247, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p3_emergency_vwc_threshold
+        name: P3 Emergency VWC Threshold
+        icon: mdi:alert
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(239, 68, 68, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(239, 68, 68, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_p3_emergency_shot_size
+        name: P3 Emergency Shot Size
+        icon: mdi:water-alert
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(168, 85, 247, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(168, 85, 247, 0.9)
+
+  # EC TARGET PARAMETERS SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: EC Target Parameters
+        styles:
+          card:
+            - background-color: rgba(251, 191, 36, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(251, 191, 36, 1)
+      - type: custom:button-card
+        entity: number.crop_steering_ec_target_flush
+        name: EC Target Flush  
+        icon: mdi:flash
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(59, 130, 246, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(59, 130, 246, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_ec_target_veg_p0
+        name: EC Target Veg P0
+        icon: mdi:lightning-bolt
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_ec_target_veg_p1
+        name: EC Target Veg P1
+        icon: mdi:lightning-bolt
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_ec_target_veg_p2
+        name: EC Target Veg P2
+        icon: mdi:lightning-bolt
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_ec_target_veg_p3
+        name: EC Target Veg P3
+        icon: mdi:lightning-bolt
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(251, 191, 36, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(251, 191, 36, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_ec_target_gen_p0
+        name: EC Target Gen P0
+        icon: mdi:lightning-bolt
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(168, 85, 247, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(168, 85, 247, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_ec_target_gen_p1
+        name: EC Target Gen P1
+        icon: mdi:lightning-bolt
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(168, 85, 247, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(168, 85, 247, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_ec_target_gen_p2
+        name: EC Target Gen P2
+        icon: mdi:lightning-bolt
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(168, 85, 247, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(168, 85, 247, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_ec_target_gen_p3
+        name: EC Target Gen P3
+        icon: mdi:lightning-bolt
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(168, 85, 247, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(168, 85, 247, 0.9)
+
+  # ZONE SHOT SIZE MULTIPLIERS SECTION
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        name: Zone Shot Size Multipliers
+        styles:
+          card:
+            - background-color: rgba(59, 130, 246, 0.1)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px 12px
+          name:
+            - font-weight: bold
+            - font-size: 18px
+            - color: rgba(59, 130, 246, 1)
+      - type: custom:button-card
+        entity: number.crop_steering_zone_1_shot_size_multiplier
+        name: Zone 1 Shot Size Multiplier
+        icon: mdi:multiplication
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_zone_2_shot_size_multiplier
+        name: Zone 2 Shot Size Multiplier
+        icon: mdi:multiplication
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)
+      - type: custom:button-card
+        entity: number.crop_steering_zone_3_shot_size_multiplier
+        name: Zone 3 Shot Size Multiplier
+        icon: mdi:multiplication
+        show_state: true
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+            - border-radius: var(--ha-card-border-radius)
+            - padding: 8px
+          grid:
+            - grid-template-areas: '"i n" "i s"'
+            - grid-template-columns: 40% 60%
+            - grid-template-rows: 1fr 1fr
+          icon:
+            - color: rgba(34, 197, 94, 0.9)
+          name:
+            - font-size: 14px
+            - font-weight: bold
+          state:
+            - font-size: 16px
+            - color: rgba(34, 197, 94, 0.9)

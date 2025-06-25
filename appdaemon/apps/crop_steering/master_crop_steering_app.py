@@ -127,6 +127,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self.zone_schedules = {}    # Zone-specific light schedules
         self.emergency_attempts = {}  # Track emergency irrigation attempts per zone
         self.manual_overrides = {}  # Track manual override timeouts per zone
+        self.zone_water_usage = {}  # Track water usage per zone
         
         for zone_num in range(1, self.num_zones + 1):
             # Create state machine for each zone
@@ -600,7 +601,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Create zone phase summary
             phase_summary = ", ".join([f"Z{z}:{p}" for z, p in self.zone_phases.items()])
             await self.async_set_entity_value('sensor.crop_steering_app_current_phase',
-                               state=phase_summary,
+                               phase_summary,
                                attributes={
                                    'friendly_name': 'Zone Phases',
                                    'icon': 'mdi:water-circle',
@@ -612,7 +613,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             next_irrigation = self._calculate_next_irrigation_time()
             if next_irrigation:
                 await self.async_set_entity_value('sensor.crop_steering_app_next_irrigation',
-                                   state=next_irrigation.isoformat(),
+                                   next_irrigation.isoformat(),
                                    attributes={
                                        'friendly_name': 'Next Irrigation Time',
                                        'icon': 'mdi:clock-outline',
@@ -621,7 +622,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                                    })
             else:
                 await self.async_set_entity_value('sensor.crop_steering_app_next_irrigation',
-                                   state='unknown',
+                                   'unknown',
                                    attributes={
                                        'friendly_name': 'Next Irrigation Time',
                                        'icon': 'mdi:clock-outline',
@@ -634,7 +635,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             for zone_num in range(1, self.num_zones + 1):
                 phase = self.zone_phases.get(zone_num, 'P2')
                 await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_phase',
-                                   state=phase,
+                                   phase,
                                    attributes={
                                        'friendly_name': f'Zone {zone_num} Phase',
                                        'icon': self._get_phase_icon(phase),
@@ -703,7 +704,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Daily water usage
             await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_daily_water_app',
-                               state=round(zone_data.get('daily_total', 0), 2),
+                               round(zone_data.get('daily_total', 0), 2),
                                attributes={
                                    'friendly_name': f'Zone {zone_num} Daily Water',
                                    'unit_of_measurement': 'L',
@@ -715,7 +716,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Weekly water usage
             await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_weekly_water_app',
-                               state=round(zone_data.get('weekly_total', 0), 2),
+                               round(zone_data.get('weekly_total', 0), 2),
                                attributes={
                                    'friendly_name': f'Zone {zone_num} Weekly Water',
                                    'unit_of_measurement': 'L',
@@ -727,7 +728,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Irrigation count today
             await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_irrigation_count_app',
-                               state=zone_data.get('daily_count', 0),
+                               zone_data.get('daily_count', 0),
                                attributes={
                                    'friendly_name': f'Zone {zone_num} Irrigations Today',
                                    'icon': 'mdi:counter',
@@ -739,7 +740,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             last_irrigation = self.zone_phase_data.get(zone_num, {}).get('last_irrigation_time')
             if last_irrigation:
                 await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_last_irrigation_app',
-                                   state=last_irrigation.isoformat(),
+                                   last_irrigation.isoformat(),
                                    attributes={
                                        'friendly_name': f'Zone {zone_num} Last Irrigation',
                                        'device_class': 'timestamp',
@@ -936,7 +937,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 timestamp = datetime.now()
                 
                 # Process VWC sensor through fusion system
-                fusion_result = self.sensor_fusion.add_reading(
+                fusion_result = self.sensor_fusion.add_sensor_reading(
                     sensor_id=entity,
                     value=vwc_value,
                     timestamp=timestamp,
@@ -993,7 +994,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 timestamp = datetime.now()
                 
                 # Process EC sensor through fusion system
-                fusion_result = self.sensor_fusion.add_reading(
+                fusion_result = self.sensor_fusion.add_sensor_reading(
                     sensor_id=entity,
                     value=ec_value,
                     timestamp=timestamp,
@@ -3308,7 +3309,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Update zone-specific sensor
             await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_phase',
-                               state=new_phase,
+                               new_phase,
                                attributes={
                                    'friendly_name': f'Zone {zone_num} Phase',
                                    'icon': self._get_phase_icon(new_phase),
