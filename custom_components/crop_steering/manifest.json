@@ -1,7 +1,7 @@
 {
   "domain": "crop_steering",
   "name": "Crop Steering System",
-  "version": "2.1.1",
+  "version": "2.3.1",
   "documentation": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy",
   "issue_tracker": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues",
   "dependencies": [],
