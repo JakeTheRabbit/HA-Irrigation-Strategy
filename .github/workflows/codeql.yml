@@ -1,0 +1,19 @@
+name: CodeQL (disabled)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: none
+  security-events: none
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  noop:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "CodeQL workflow is disabled"

@@ -1,0 +1,18 @@
+name: Deploy to Home Assistant (disabled)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: none
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  noop:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Deploy workflow is disabled"

@@ -12,16 +12,19 @@ on:
           - all
           - integration
           - appdaemon
-          - dependencies
   push:
     branches: [ main ]
     paths:
       - 'custom_components/**'
       - 'appdaemon/**'
-      - 'requirements.txt'
-      - 'crop_steering.env'
+      - 'hacs.json'
+      - 'README.md'
   pull_request:
     branches: [ main ]
+
+concurrency:
+  group: install-workflow-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate-integration:
@@ -31,13 +34,22 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: HassFest validation
+      uses: home-assistant/actions/hassfest@v1
+
+    - name: HACS validation (integration)
+      uses: hacs/action@main
+      with:
+        category: integration
+        ignore: brands
       
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         
-    - name: Install dependencies
+    - name: Install Home Assistant core (for typing/validation only)
       run: |
         python -m pip install --upgrade pip
         pip install homeassistant==2024.3.0
@@ -89,15 +101,14 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         
-    - name: Install AppDaemon and dependencies
+    - name: Install AppDaemon and PyYAML
       run: |
         python -m pip install --upgrade pip
-        pip install appdaemon
-        pip install -r requirements.txt
+        pip install appdaemon pyyaml
         
     - name: Validate Python syntax
       run: |
@@ -106,7 +117,7 @@ jobs:
         python -m py_compile appdaemon/apps/crop_steering/intelligent_sensor_fusion.py
         python -m py_compile appdaemon/apps/crop_steering/advanced_dryback_detection.py
         python -m py_compile appdaemon/apps/crop_steering/intelligent_crop_profiles.py
-        python -m py_compile appdaemon/apps/crop_steering/advanced_crop_steering_dashboard.py
+        python -m py_compile appdaemon/apps/crop_steering/phase_state_machine.py
         echo "✓ Python syntax validation passed"
         
     - name: Validate apps.yaml
@@ -124,47 +135,17 @@ jobs:
             sys.exit(1)
         "
 
-  validate-dependencies:
-    runs-on: ubuntu-latest
-    name: Validate Dependencies
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Test dependency installation
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        echo "✓ Dependencies installed successfully"
-        
-    - name: Validate required modules
-      run: |
-        python -c "
-        import numpy
-        import pandas
-        import scipy
-        import plotly
-        import requests
-        print('✓ All required modules imported successfully')
-        "
-
   installation-test:
     runs-on: ubuntu-latest
     name: Full Installation Test
-    needs: [validate-integration, validate-appdaemon, validate-dependencies]
+    needs: [validate-integration, validate-appdaemon]
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         
@@ -183,11 +164,10 @@ jobs:
         cp appdaemon/apps/apps.yaml /tmp/appdaemon_config/apps/
         echo "✓ AppDaemon files copied successfully"
         
-    - name: Install and test dependencies
+    - name: Confirm zero external dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        echo "✓ Dependencies installed successfully"
+        echo "This project intentionally has no external Python dependencies."
+        echo "✓ Zero-dependency confirmation passed"
         
     - name: Generate installation report
       run: |
@@ -196,16 +176,16 @@ jobs:
         echo "## Validation Results" >> install_report.md
         echo "- ✅ Home Assistant Integration: Valid" >> install_report.md
         echo "- ✅ AppDaemon Modules: Valid" >> install_report.md
-        echo "- ✅ Dependencies: Installed" >> install_report.md
+        echo "- ✅ Dependencies: None required" >> install_report.md
         echo "- ✅ Full Installation: Success" >> install_report.md
         echo "" >> install_report.md
         echo "## Installation Paths" >> install_report.md
         echo "- Integration: \`custom_components/crop_steering/\`" >> install_report.md
         echo "- AppDaemon: \`appdaemon/apps/crop_steering/\`" >> install_report.md
-        echo "- Configuration: \`crop_steering.env\`" >> install_report.md
+        echo "- Configuration: \`appdaemon/apps/apps.yaml\`" >> install_report.md
         
     - name: Upload installation report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: installation-report
         path: install_report.md

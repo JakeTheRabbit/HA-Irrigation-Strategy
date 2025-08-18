@@ -62,9 +62,9 @@ If you want full automation:
    - Path: `/addon_configs/a0d7b954_appdaemon/apps/`
    - Samba: `\\YOUR_HA_IP\addon_configs\a0d7b954_appdaemon\apps\`
 
-2. Copy these files from the integration:
+2. Copy these files from this repository (folder `appdaemon/apps/`):
    ```
-   custom_components/crop_steering/appdaemon/apps/
+   appdaemon/apps/
    ├── apps.yaml
    └── crop_steering/
        ├── master_crop_steering_app.py
@@ -72,7 +72,8 @@ If you want full automation:
        ├── phase_state_machine.py
        ├── intelligent_sensor_fusion.py
        ├── advanced_dryback_detection.py
-       └── intelligent_crop_profiles.py
+       ├── intelligent_crop_profiles.py
+       └── ml_irrigation_predictor.py
    ```
 
 3. Configure AppDaemon:

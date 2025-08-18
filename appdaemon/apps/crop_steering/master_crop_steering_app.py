@@ -176,178 +176,30 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self.log(f"📊 Modules: Dryback Detection ✓, Sensor Fusion ✓, ML Prediction ✓, Crop Profiles ✓, Dashboard ✓")
 
     def _load_configuration(self) -> Dict:
-        """Load system configuration from crop_steering.env file and defaults."""
+        """Load system configuration from AppDaemon args."""
         try:
-            # Load from environment file
-            env_config = self._load_env_file()
-            
-            # Build configuration with environment values or fallbacks
+            # Build configuration with values from apps.yaml or fallbacks
             config = {
-                'hardware': {
-                    'pump_master': env_config.get('PUMP_SWITCH', 'switch.crop_steering_pump'),
-                    'main_line': env_config.get('MAIN_LINE_SWITCH', 'switch.crop_steering_main_line'),
-                    'zone_valves': {}
-                },
-                'sensors': {
-                    'vwc': [],
-                    'ec': [],
-                    'environmental': {
-                        'temperature': env_config.get('TEMPERATURE_SENSOR', 'sensor.grow_room_temperature'),
-                        'humidity': env_config.get('HUMIDITY_SENSOR', 'sensor.grow_room_humidity'),
-                        'vpd': env_config.get('VPD_SENSOR', 'sensor.grow_room_vpd')
-                    }
-                },
-                'timing': {
-                    'phase_check_interval': int(env_config.get('PHASE_CHECK_INTERVAL', '30')),
-                    'ml_prediction_interval': int(env_config.get('ML_PREDICTION_INTERVAL', '60')),
-                    'sensor_health_interval': int(env_config.get('SENSOR_HEALTH_INTERVAL', '120')),
-                    'dashboard_update_interval': int(env_config.get('DASHBOARD_UPDATE_INTERVAL', '30'))
-                },
-                'thresholds': {
-                    'emergency_vwc': float(env_config.get('EMERGENCY_VWC_THRESHOLD', '40')),
-                    'critical_ec': float(env_config.get('MAX_EC_THRESHOLD', '8.0')),
-                    'max_irrigation_duration': int(env_config.get('MAX_IRRIGATION_DURATION', '300')),
-                    'min_irrigation_interval': int(env_config.get('MIN_IRRIGATION_INTERVAL', '900'))
-                },
-                'notification_service': env_config.get('NOTIFICATION_SERVICE', 'notify.persistent_notification')
+                'hardware': self.args.get('hardware', {}),
+                'sensors': self.args.get('sensors', {}),
+                'timing': self.args.get('timing', {}),
+                'thresholds': self.args.get('thresholds', {}),
+                'notification_service': self.args.get('notification_service', 'notify.persistent_notification')
             }
             
-            # Load zone configurations dynamically from new format
-            for key, value in env_config.items():
-                # Zone switches (ZONE_1_SWITCH, ZONE_2_SWITCH, etc.)
-                if key.startswith('ZONE_') and key.endswith('_SWITCH') and value:
-                    zone_num = key.split('_')[1]
-                    if zone_num.isdigit():
-                        config['hardware']['zone_valves'][int(zone_num)] = value
-                
-                # VWC sensors (ZONE_1_VWC_FRONT, ZONE_1_VWC_BACK, etc.)
-                elif key.startswith('ZONE_') and '_VWC_' in key and value:
-                    config['sensors']['vwc'].append(value)
-                
-                # EC sensors (ZONE_1_EC_FRONT, ZONE_1_EC_BACK, etc.)
-                elif key.startswith('ZONE_') and '_EC_' in key and value:
-                    config['sensors']['ec'].append(value)
-            
-            # Sort sensor lists for consistency
-            config['sensors']['vwc'].sort()
-            config['sensors']['ec'].sort()
-            
-            self.log(f"Configuration loaded: {len(config['sensors']['vwc'])} VWC sensors, "
-                    f"{len(config['sensors']['ec'])} EC sensors, "
-                    f"{len(config['hardware']['zone_valves'])} zones")
-            self.log(f"🔍 DEBUG VWC Sensors: {config['sensors']['vwc']}")
-            self.log(f"🔍 DEBUG EC Sensors: {config['sensors']['ec']}")
-            self.log(f"🔍 DEBUG Zone Valves: {config['hardware']['zone_valves']}")
-            
-            # Test reading one sensor directly for debugging
-            if config['sensors']['vwc']:
-                test_sensor = config['sensors']['vwc'][0]
-                test_value = self.get_entity_value(test_sensor)
-                self.log(f"DEBUG Test read {test_sensor}: {test_value}")
-            
+            self.log(f"Configuration loaded from apps.yaml")
             return config
             
         except Exception as e:
-            self.log(f"Error loading configuration: {e}", level="ERROR")
-            return self._get_fallback_configuration()
-
-    def _load_env_file(self) -> Dict[str, str]:
-        """
-        Load environment variables from crop_steering.env file.
-        
-        Searches multiple possible locations for the configuration file:
-        1. /config/crop_steering.env (default HA config path)
-        2. /homeassistant/crop_steering.env (alternative HA path)
-        3. /usr/share/hassio/homeassistant/crop_steering.env (HASSIO path)
-        4. ./crop_steering.env (current directory)
-        
-        Returns:
-            Dict[str, str]: Configuration key-value pairs from env file
-            
-        Note:
-            Skips comment lines (starting with #) and empty lines
-            Strips quotes from values and handles KEY=value format
-        """
-        env_config = {}
-        env_path = "/config/crop_steering.env"  # Default Home Assistant config path
-        
-        try:
-            if not os.path.exists(env_path):
-                # Try alternative paths
-                alt_paths = [
-                    "/homeassistant/crop_steering.env",
-                    "/usr/share/hassio/homeassistant/crop_steering.env",
-                    "./crop_steering.env"
-                ]
-                
-                for alt_path in alt_paths:
-                    if os.path.exists(alt_path):
-                        env_path = alt_path
-                        break
-                else:
-                    self.log("crop_steering.env not found, using defaults", level="WARNING")
-                    return env_config
-            
-            with open(env_path, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, value = line.split('=', 1)
-                        key = key.strip()
-                        value = value.strip().strip('"\'')
-                        if value:
-                            env_config[key] = value
-            
-            self.log(f"Loaded {len(env_config)} configuration values from {env_path}")
-            
-        except Exception as e:
-            self.log(f"Error reading environment file: {e}", level="ERROR")
-        
-        return env_config
-
-    def _get_fallback_configuration(self) -> Dict:
-        """
-        Get fallback configuration when env file loading fails.
-        
-        Provides minimal working configuration with generic entity names
-        that allow the system to start even without proper configuration.
-        
-        Returns:
-            Dict: Minimal configuration with generic entity names
-            
-        Warning:
-            This configuration uses placeholder entities that likely don't exist.
-            Users should configure crop_steering.env for proper operation.
-        """
-        self.log("Using fallback configuration", level="WARNING")
-        return {
-            'hardware': {
-                'pump_master': 'switch.crop_steering_pump',
-                'main_line': 'switch.crop_steering_main_line',
-                'zone_valves': {1: 'switch.crop_steering_zone_1'}
-            },
-            'sensors': {
-                'vwc': ['sensor.crop_steering_vwc_1'],
-                'ec': ['sensor.crop_steering_ec_1'],
-                'environmental': {
-                    'temperature': 'sensor.grow_room_temperature',
-                    'humidity': 'sensor.grow_room_humidity',
-                    'vpd': 'sensor.grow_room_vpd'
-                }
-            },
-            'timing': {
-                'phase_check_interval': 30,
-                'ml_prediction_interval': 60,
-                'sensor_health_interval': 120,
-                'dashboard_update_interval': 30
-            },
-            'thresholds': {
-                'emergency_vwc': 40,
-                'critical_ec': 8.0,
-                'max_irrigation_duration': 300,
-                'min_irrigation_interval': 900
+            self.log(f"Error loading configuration from apps.yaml: {e}", level="ERROR")
+            # Fallback to empty config
+            return {
+                'hardware': {},
+                'sensors': {},
+                'timing': {},
+                'thresholds': {},
+                'notification_service': 'notify.persistent_notification'
             }
-        }
 
     def _register_phase_callbacks(self, zone_num: int, state_machine: ZoneStateMachine):
         """Register callbacks for phase transitions and state changes."""

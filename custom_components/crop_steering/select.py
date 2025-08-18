@@ -187,7 +187,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
                 name=f"Zone {self._zone_num}",
                 manufacturer="Home Assistant Community",
                 model="Zone Controller",
-                sw_version="2.0.0",
+                sw_version="2.3.0",
                 via_device=(DOMAIN, self._entry.entry_id),
             )
         else:
@@ -197,7 +197,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
                 name="Crop Steering System",
                 manufacturer="Home Assistant Community",
                 model="Professional Irrigation Controller", 
-                sw_version="2.0.0",
+                sw_version="2.3.0",
             )
 
     async def async_select_option(self, option: str) -> None:

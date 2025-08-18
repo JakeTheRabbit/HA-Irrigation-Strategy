@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Crop Steering System now supports dynamic zone configuration, allowing you to configure anywhere from 1 to 6 irrigation zones based on your actual setup. The system automatically creates all necessary entities and adjusts its operation based on your configured zones.
+The Crop Steering System supports dynamic zone configuration, allowing you to configure anywhere from 1 to 6 irrigation zones based on your actual setup. The system automatically creates all necessary entities and adjusts its operation based on your configured zones.
 
 ## Key Features
 
@@ -13,8 +13,8 @@ The Crop Steering System now supports dynamic zone configuration, allowing you t
 - Intelligent zone selection for optimal irrigation
 
 ### 🔧 Flexible Configuration
-- Load zones from `crop_steering.env` file
-- Manual configuration through UI setup wizard
+- Recommended: Configure through the GUI setup wizard
+- Optional: Load zones from an existing `crop_steering.env` file
 - Per-zone sensor configuration (front/back VWC and EC)
 - Zone enable/disable switches for seasonal adjustments
 
@@ -26,43 +26,34 @@ The Crop Steering System now supports dynamic zone configuration, allowing you t
 
 ## Configuration Methods
 
-### Method 1: Automatic Configuration (Recommended)
+### Method 1: GUI Configuration (Recommended)
 
-1. **Edit crop_steering.env**
-   ```bash
-   # Configure your zones in crop_steering.env
-   ZONE_1_SWITCH=switch.zone_1_valve
-   ZONE_1_VWC_FRONT=sensor.z1_vwc_front
-   ZONE_1_VWC_BACK=sensor.z1_vwc_back
-   ZONE_1_EC_FRONT=sensor.z1_ec_front
-   ZONE_1_EC_BACK=sensor.z1_ec_back
-   
-   # Add more zones as needed
-   ZONE_2_SWITCH=switch.zone_2_valve
-   # ... etc
-   ```
+1. Go to Settings → Devices & Services
+2. Add the “Crop Steering System” integration
+3. Choose “Advanced Setup”
+4. Configure hardware and zones:
+   - Pump and main line entities
+   - Zone valve entities
+   - Optional per-zone sensors: VWC (front/back), EC (front/back)
+5. Finish and reload Home Assistant if prompted
 
-2. **Use Configuration Helper**
-   ```bash
-   python zone_configuration_helper.py
-   ```
-   This interactive script helps you configure zones easily.
+### Method 2: Load from crop_steering.env (Existing setups)
 
-3. **Add Integration**
-   - Go to Settings → Devices & Services
-   - Click "Add Integration"
-   - Search for "Crop Steering"
-   - Select "Load from crop_steering.env"
+1. Place `crop_steering.env` in your Home Assistant config directory
+2. Start the integration setup and choose “Load from file”
+3. The integration will parse zones and sensors from the file
 
-### GUI Setup Benefits
+Example entries:
+```env
+ZONE_1_SWITCH=switch.zone_1_valve
+ZONE_1_VWC_FRONT=sensor.z1_vwc_front
+ZONE_1_VWC_BACK=sensor.z1_vwc_back
+ZONE_1_EC_FRONT=sensor.z1_ec_front
+ZONE_1_EC_BACK=sensor.z1_ec_back
 
-- **No command line access required**
-- **Entity validation during setup**
-- **Auto-complete for entity selection**
-- **Preview sensor values during configuration**
-- **Step-by-step guided setup**
-- **Sensor configuration for each zone**
-- **Environmental sensor support**
+ZONE_2_SWITCH=switch.zone_2_valve
+# ... etc
+```
 
 ## Created Entities
 
@@ -86,26 +77,26 @@ For each configured zone, the system creates:
 
 The system intelligently selects which zone to irrigate based on:
 
-1. **Zone Enable Status** - Only enabled zones are considered
-2. **VWC Need Score** - Zones with lower VWC get higher priority
-3. **Sensor Reliability** - Zones with consistent sensor readings preferred
-4. **Last Irrigation Time** - Prevents over-watering single zones
+1. Zone Enable Status
+2. VWC Need Score
+3. Sensor Reliability
+4. Last Irrigation Time
 
-### Selection Algorithm
+Selection Algorithm:
 ```python
-need_score = (70 - avg_vwc) / 70  # Lower VWC = higher score
-reliability_score = 1 - (sensor_variance / 10)  # Lower variance = higher score
+need_score = (70 - avg_vwc) / 70
+reliability_score = 1 - (sensor_variance / 10)
 zone_score = need_score * 0.7 + reliability_score * 0.3
 ```
 
-## Service Updates
+## Services
 
 ### execute_irrigation_shot
-Now accepts dynamic zone numbers:
+Accepts dynamic zone numbers:
 ```yaml
 service: crop_steering.execute_irrigation_shot
 data:
-  zone: 2  # Any configured zone (1-6)
+  zone: 2
   duration_seconds: 300
   shot_type: P2
 ```
@@ -113,31 +104,28 @@ data:
 ## AppDaemon Integration
 
 The AppDaemon modules automatically detect and use configured zones:
-
-- **master_crop_steering_app.py** - Uses zone configuration from env file
-- **intelligent_sensor_fusion.py** - Validates sensors for each zone
-- **advanced_crop_steering_dashboard.py** - Displays all configured zones
+- `master_crop_steering_app.py` – uses zone configuration from env/GUI
+- `intelligent_sensor_fusion.py` – validates sensors per zone
+- `advanced_dryback_detection.py` – dryback and trend analysis
+- `intelligent_crop_profiles.py` – profile parameters
 
 ## Troubleshooting
 
 ### Missing Zone Entities
-If zone entities aren't created:
-1. Check `crop_steering.env` has correct entity IDs
+1. Ensure entity IDs are correct in GUI or env file
 2. Verify referenced entities exist in Home Assistant
 3. Restart Home Assistant after configuration changes
 
 ### Zone Not Irrigating
-If a specific zone won't irrigate:
-1. Check zone is enabled: `switch.crop_steering_zone_X_enabled`
-2. Verify zone has valid VWC and EC sensor readings
-3. Check zone valve entity is responding to commands
-4. Review logs for zone selection reasoning
+1. Check `switch.crop_steering_zone_X_enabled`
+2. Verify zone sensors return numeric values
+3. Confirm zone valve entity responds to commands
+4. Review logs for zone selection details
 
 ### Sensor Validation Errors
-If getting sensor errors:
 1. Ensure sensor entities return numeric values
 2. Check sensor units (VWC: %, EC: mS/cm)
-3. Verify sensors aren't returning 'unavailable' or 'unknown'
+3. Verify sensors aren’t `unavailable` or `unknown`
 
 ## Best Practices
 
@@ -148,15 +136,15 @@ If getting sensor errors:
 - Calibrate sensors before use
 
 ### AppDaemon v15+ File Locations
-- **AI Modules**: `/addon_configs/a0d7b954_appdaemon/apps/crop_steering/`
-- **Configuration**: `/addon_configs/a0d7b954_appdaemon/appdaemon.yaml`
-- **Apps Config**: `/addon_configs/a0d7b954_appdaemon/apps/apps.yaml`
-- **Samba Access**: `\\YOUR_HA_IP\addon_configs\a0d7b954_appdaemon`
+- AI Modules: `/addon_configs/a0d7b954_appdaemon/apps/crop_steering/`
+- Configuration: `/addon_configs/a0d7b954_appdaemon/appdaemon.yaml`
+- Apps Config: `/addon_configs/a0d7b954_appdaemon/apps/apps.yaml`
+- Samba Access: `\\YOUR_HA_IP\addon_configs\a0d7b954_appdaemon`
 
 ### Zone Configuration
 - Start with fewer zones and expand as needed
 - Group plants with similar water needs in same zone
-- Consider different growth stages when zoning
+- Consider growth stages when zoning
 - Use zone enable switches for seasonal changes
 
 ### Monitoring
@@ -176,20 +164,17 @@ ZONE_1_EC_FRONT=sensor.teros12_ec
 
 ### Three Zone Setup
 ```env
-# Veg Table
 ZONE_1_SWITCH=switch.veg_table_valve
 ZONE_1_VWC_FRONT=sensor.veg_vwc_1
 ZONE_1_VWC_BACK=sensor.veg_vwc_2
 ZONE_1_EC_FRONT=sensor.veg_ec_1
 
-# Flower Room 1
 ZONE_2_SWITCH=switch.flower1_valve
 ZONE_2_VWC_FRONT=sensor.f1_vwc_front
 ZONE_2_VWC_BACK=sensor.f1_vwc_back
 ZONE_2_EC_FRONT=sensor.f1_ec_front
 ZONE_2_EC_BACK=sensor.f1_ec_back
 
-# Flower Room 2
 ZONE_3_SWITCH=switch.flower2_valve
 ZONE_3_VWC_FRONT=sensor.f2_vwc_front
 ZONE_3_EC_FRONT=sensor.f2_ec_front
@@ -197,19 +182,4 @@ ZONE_3_EC_FRONT=sensor.f2_ec_front
 
 ## AppDaemon v15+ Compatibility
 
-The system is fully compatible with AppDaemon v15+ directory changes:
-
-- **Updated paths** automatically detected
-- **Migration tools** available for upgrading
-- **Backward compatibility** with older AppDaemon versions
-- **Fix script** handles both old and new directory structures
-
-See [AppDaemon v15+ Migration Guide](appdaemon_v15_migration.md) for detailed migration instructions.
-
-## Future Enhancements
-
-- Zone grouping for simultaneous irrigation
-- Zone-specific crop profiles
-- Individual zone scheduling
-- Zone priority configuration
-- Water usage tracking per zone
+Fully compatible with AppDaemon v15+ directory changes.

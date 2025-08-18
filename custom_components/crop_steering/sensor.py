@@ -344,7 +344,7 @@ class CropSteeringSensor(SensorEntity):
             name="Crop Steering System",
             manufacturer="Home Assistant Community",
             model="Professional Irrigation Controller",
-            sw_version="2.0.0",
+            sw_version="2.3.0",
         )
 
     @property

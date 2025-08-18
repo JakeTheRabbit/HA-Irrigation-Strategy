@@ -1,0 +1,54 @@
+name: Release packaging
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Build release artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Create archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # Custom Component package (HACS)
+          zip -r dist/custom_components_crop_steering.zip custom_components/crop_steering \
+            -x "**/__pycache__/**" "**/*.pyc" "**/.mypy_cache/**" "**/.pytest_cache/**" "**/.DS_Store" "**/.git/**"
+          # AppDaemon app package
+          zip -r dist/appdaemon_apps_crop_steering.zip appdaemon/apps/crop_steering \
+            -x "**/__pycache__/**" "**/*.pyc" "**/.mypy_cache/**" "**/.pytest_cache/**" "**/.DS_Store" "**/.git/**"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach assets to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/custom_components_crop_steering.zip
+            dist/appdaemon_apps_crop_steering.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

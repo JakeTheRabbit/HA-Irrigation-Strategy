@@ -1,0 +1,81 @@
+name: Validate
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-validate:
+    name: Lint (ruff/black/yamllint) and HA validations
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ '3.11', '3.12' ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install linters
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff==0.5.5 black==24.4.2 yamllint==1.35.1
+
+      - name: Ruff (lint)
+        run: |
+          ruff --version
+          ruff check .
+
+      - name: Black (format check)
+        run: |
+          black --version
+          black --check .
+
+      - name: Yamllint
+        run: |
+          yamllint --version
+          # Lint YAML and Home Assistant dashboard files
+          yamllint -s . || (echo "YAML lint found issues" && exit 1)
+
+      - name: Hassfest
+        uses: home-assistant/actions/hassfest@v2
+
+      - name: HACS Validation (integration)
+        uses: hacs/action@v25
+        with:
+          category: integration
+
+  dependency-review:
+    name: Dependency Review (PR only)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high

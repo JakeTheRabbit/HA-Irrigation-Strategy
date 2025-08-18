@@ -13,7 +13,14 @@ from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.SELECT, Platform.NUMBER]
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR, 
+    Platform.SWITCH, 
+    Platform.SELECT, 
+    Platform.NUMBER,
+    Platform.INPUT_BOOLEAN,
+    Platform.INPUT_NUMBER,
+]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Crop Steering System from a config entry."""

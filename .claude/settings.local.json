@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(tree:*)",
+      "Bash(ls:*)",
+      "WebFetch(domain:appdaemon.readthedocs.io)",
+      "Bash(git remote get-url:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "WebFetch(domain:www.home-assistant.io)",
+      "Bash(sed:*)",
+      "Bash(echo:*)",
+      "Bash(python3:*)",
+      "Bash(git rm:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "Bash(python:*)",
+      "Bash(chmod:*)",
+      "Bash(git reset:*)",
+      "Bash(cat:*)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:developers.home-assistant.io)",
+      "Bash(rg -n \"self\\.zone_phases|self\\.zone_phase_data\" appdaemon/apps/crop_steering/master_crop_steering_app.py)",
+      "Bash(git check-ignore:*)"
+    ],
+    "deny": []
+  }
+}
