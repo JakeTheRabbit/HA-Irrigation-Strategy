@@ -1,16 +1,17 @@
-# Crop Steering System for Home Assistant (v2.3.0)
+# Crop Steering System for Home Assistant (v2.3.1)
 
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![Zones](https://img.shields.io/badge/Zones-1%E2%80%936-blue)
-![Dependencies](https://img.shields.io/badge/Dependencies-None-brightgreen)
+![Dependencies](https://img.shields.io/badge/Dependencies-AppDaemon%20(optional)-blue)
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 Turn Home Assistant into a professional crop‑steering controller. This project combines a lightweight HA integration (entities, services) with optional AppDaemon modules (advanced analytics, phase state machine) to automate precision irrigation using VWC/EC sensors.
 
-Highlights in v2.3.0:
-- Zero external Python dependencies for the integration
+Highlights in v2.3.1:
+- **Requires AppDaemon for advanced automation features**
+- Zero external Python dependencies for the core integration
 - Dynamic multi‑zone (1–6) entity generation via GUI setup
 - Built‑in calculations (P1/P2/P3 shot durations, EC ratio, adjusted thresholds)
 - Services for phase transitions, manual shots, and manual override

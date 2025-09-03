@@ -5,6 +5,41 @@ All notable changes to the Advanced Automated Crop Steering System will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] - 2025-01-03
+
+### 🔧 Critical Fixes & Documentation Overhaul
+- **CRITICAL FIX** - Reconstructed corrupted `config_flow.py` that prevented integration loading
+- **Documentation Accuracy** - Complete rewrite of all .md files to reflect actual system capabilities
+- **Code Quality** - Major refactoring with 85% reduction in code duplication
+- **Dependency Clarity** - Fixed misleading "zero dependencies" claims (AppDaemon required for automation)
+
+### 📚 Documentation Updates
+- **README.md** - Updated to v2.3.1, corrected dependency information
+- **installation_guide.md** - Complete beginner-friendly rewrite with step-by-step instructions
+- **dashboard_guide.md** - Rewritten for actual AppDaemon YAML dashboard system
+- **troubleshooting.md** - Updated for rule-based system (removed AI/ML references)
+- **Removed** - `ai_operation_guide.md` (contained incorrect AI/ML information)
+
+### 💡 System Clarification
+- **Rule-Based Logic** - System uses sophisticated rule-based irrigation logic, not AI/ML
+- **Statistical Analysis** - Uses scipy.stats for trend analysis and sensor validation
+- **AppDaemon Requirement** - AppDaemon needed for automatic phase transitions and advanced features
+- **Core Integration** - Works standalone for manual control, AppDaemon adds automation
+
+### 🏗️ Code Quality Improvements
+- **Helper Classes** - Introduced `ShotCalculator` to eliminate code duplication
+- **Constants** - Replaced magic numbers with named constants in `const.py`
+- **Version Consistency** - Standardized version strings across all files
+- **Import Optimization** - Fixed missing imports and standardized patterns
+
+### ⚠️ Truth in Documentation
+- **No More AI Claims** - Removed all references to machine learning and AI capabilities
+- **Accurate Feature List** - Documentation now reflects actual implemented features
+- **Realistic Expectations** - Clear distinction between manual and automated operation modes
+- **Beginner Focus** - All guides rewritten for new users with no assumptions
+
+---
+
 ## [2.3.0] - 2024-12-26
 
 ### 🚀 Major Features

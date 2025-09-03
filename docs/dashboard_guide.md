@@ -1,415 +1,258 @@
 # 📊 Dashboard Usage Guide
 
-This guide covers how to use the Advanced AI Crop Steering Dashboard for monitoring, analysis, and optimization of your irrigation system.
+This guide covers how to use the AppDaemon YAML dashboards for monitoring and controlling your crop steering system.
 
 ## 🎯 Dashboard Overview
 
-The Advanced Dashboard provides real-time visualization of your crop steering system with professional-grade analytics and Athena-style monitoring.
+The system uses professional AppDaemon YAML dashboards that provide real-time monitoring and control of your irrigation system through a clean, intuitive interface.
 
 ### Key Features
 
-- **Real-Time VWC/EC Trending**: Multi-sensor fusion with confidence bands
-- **Dryback Analysis**: Peak/valley detection with timing predictions
-- **ML Predictions**: Irrigation probability forecasts with uncertainty bounds
-- **Sensor Health**: Reliability monitoring and performance assessment
-- **Performance Analytics**: Efficiency metrics and optimization insights
+- **Real-Time Status Monitoring**: Live system status, phase information, and zone status
+- **Zone Control**: Individual zone enable/disable controls with visual status indicators  
+- **Parameter Adjustment**: Easy access to key irrigation parameters
+- **Phase Management**: Clear display of current phase (P0/P1/P2/P3) with transition controls
+- **Safety Monitoring**: Emergency status, overrides, and system health indicators
 
 ## 📈 Dashboard Components
 
-### 1. VWC Trending Graph (Main Display)
+### 1. System Status Panel
 
 **What it shows:**
-- **Fused VWC Line**: Combined reading from all sensors (thick green line)
-- **Individual Sensors**: Raw sensor readings (lighter dotted lines)
-- **Confidence Bands**: Shaded areas showing fusion reliability
-- **Outlier Markers**: Red X marks indicating rejected sensor readings
-- **Target Zones**: Colored bands showing optimal VWC ranges
-- **Dryback Markers**: Vertical lines indicating dryback events
+- **Current Phase**: P0 (Morning Dryback), P1 (Ramp-Up), P2 (Maintenance), P3 (Pre-Lights-Off)
+- **System Health**: Overall system status and any active alerts
+- **Global Controls**: System enable/disable, auto irrigation toggle
+- **Emergency Status**: Any emergency conditions or manual overrides
 
-**How to read it:**
+### 2. Zone Status Grid
+
+**What it shows:**
+- **Per-Zone Status**: Visual indicators for each configured zone (1-6)
+- **Zone Controls**: Individual enable/disable switches for each zone
+- **VWC/EC Readings**: Current sensor values for each zone
+- **Zone Health**: Status indicators (Optimal/Dry/Saturated/Disabled/Sensor Error)
+
+**Status Color Coding:**
 ```yaml
-Green Line:    Fused VWC value (most reliable)
-Dotted Lines:  Individual sensor readings
-Red X Marks:   Outliers filtered out by AI
-Shaded Areas:  Target VWC zones from crop profile
-Orange Lines:  Dryback detection events
+Green:    Optimal conditions
+Yellow:   Attention needed (dry/saturated)
+Red:      Error or critical condition
+Gray:     Disabled or offline
 ```
 
-**Interpretation:**
-- **Thick green line trending up**: Recent irrigation
-- **Thick green line trending down**: Active dryback
-- **Multiple red X marks**: Sensor calibration needed
-- **Wide confidence bands**: Poor sensor agreement
-- **Narrow confidence bands**: Excellent sensor reliability
+### 3. Control Panel
 
-### 2. EC Monitoring Graph
+**Key Controls:**
+- **Phase Transition**: Manual phase control when needed
+- **Manual Override**: Per-zone override controls
+- **Irrigation Shot**: Emergency manual irrigation controls
+- **Parameter Adjustment**: Quick access to critical settings
 
-**What it shows:**
-- **EC Trending**: Real-time electrical conductivity levels
-- **Target Lines**: Baseline and maximum EC thresholds
-- **Stacking Zones**: Strategic nutrient accumulation areas
-- **Multi-Sensor Fusion**: Combined EC readings with reliability
+### 4. Monitoring Panel
 
-**Key Indicators:**
-```yaml
-Green Dashed Line:  EC Baseline (target feeding level)
-Red Dashed Line:    EC Maximum (caution threshold)
-Thick Line:         Fused EC reading
-Background Zones:   Optimal EC ranges
-```
+**Live Data:**
+- **VWC Trends**: Current volumetric water content readings
+- **EC Monitoring**: Electrical conductivity levels
+- **Irrigation History**: Recent irrigation events and timing
+- **System Performance**: Efficiency metrics and water usage
 
-**Athena Methodology Integration:**
-- **3.0 EC Baseline**: Standard Athena feeding concentration
-- **4.0-6.0 EC Range**: Vegetative growth targets
-- **6.0-9.0 EC Range**: Generative (flowering) targets
-- **Strategic Stacking**: Controlled nutrient accumulation
+## 🎮 Using the Dashboard
 
-### 3. Dryback Analysis Graph
+### Daily Operation
 
-**What it shows:**
-- **Dryback Percentage**: Real-time calculation of substrate drying
-- **Detection Confidence**: AI confidence in dryback measurements
-- **Target Lines**: Optimal dryback percentages for current growth stage
-- **Timing Predictions**: Forecasted completion times
+**Morning Routine:**
+1. **Check System Status**: Verify all green indicators
+2. **Review Zone Status**: Ensure all zones are optimal or as expected
+3. **Monitor Phase Transition**: P0 should start automatically at lights-on
+4. **Verify Sensors**: All zone sensors showing reasonable readings
 
-**Understanding Dryback:**
-- **10-15% Vegetative**: Aggressive growth promotion
-- **15-20% Early Flower**: Transition to generative
-- **20-25% Late Flower**: Maximum generative stress
-- **25%+ Critical**: Emergency irrigation threshold
+**Throughout the Day:**
+1. **Phase Monitoring**: Watch automatic P0→P1→P2→P3 transitions
+2. **Zone Performance**: Monitor individual zone responses
+3. **Parameter Adjustment**: Fine-tune settings based on plant response
+4. **Alert Response**: Address any yellow/red status indicators
 
-### 4. ML Predictions Graph
+**Evening Check:**
+1. **P3 Phase**: Verify pre-lights-off phase is active
+2. **Final Irrigation**: Ensure appropriate final watering
+3. **Overnight Setup**: System ready for lights-off period
+4. **Performance Review**: Check day's irrigation efficiency
 
-**What it shows:**
-- **Irrigation Probability**: 0-100% likelihood of irrigation need
-- **Prediction Horizon**: 2+ hours into the future
-- **Confidence Intervals**: Uncertainty bounds around predictions
-- **Critical Thresholds**: Alert levels for immediate action
+### Zone Management
 
-**Interpretation Guide:**
-```yaml
-0-30%:    Low irrigation need (system stable)
-30-50%:   Moderate need (monitor closely)
-50-70%:   High need (irrigation likely soon)
-70-90%:   Critical need (irrigation recommended)
-90-100%:  Emergency (immediate irrigation required)
-```
+**Individual Zone Control:**
+- **Enable/Disable**: Toggle zones on/off as needed
+- **Manual Override**: Take direct control when necessary  
+- **Status Monitoring**: Watch for sensor errors or calibration needs
+- **Parameter Override**: Adjust zone-specific settings
 
-### 5. Sensor Health Heatmap
+**Multi-Zone Coordination:**
+- **Group Operations**: Manage related zones together
+- **Priority Settings**: Set irrigation priority for each zone
+- **Load Balancing**: Distribute irrigation timing across zones
 
-**What it shows:**
-- **Reliability Scores**: 0-1.0 reliability rating per sensor
-- **Outlier Rates**: Percentage of readings rejected
-- **Health Status**: Color-coded sensor condition
-- **Performance Trends**: Historical reliability changes
+### Parameter Adjustment
 
-**Health Status Colors:**
-- **Green**: Excellent (>90% reliability)
-- **Yellow**: Good (70-90% reliability)
-- **Orange**: Degraded (50-70% reliability)
-- **Red**: Faulty (<50% reliability)
-- **Gray**: Offline (no recent data)
+**Quick Access Controls:**
+- **VWC Targets**: Adjust moisture targets per phase
+- **Shot Sizes**: Modify irrigation volumes
+- **Timing Controls**: Adjust phase durations and intervals
+- **Safety Thresholds**: Set emergency irrigation triggers
 
-### 6. Performance Analytics Dashboard
+## 📊 Monitoring and Analysis
 
-**What it shows:**
-- **Irrigation Efficiency**: Success rate of irrigation events
-- **Water Usage Trends**: Historical consumption analysis
-- **Target Achievement**: How often system hits goals
-- **System Health Score**: Overall system performance
+### Real-Time Indicators
+
+**System Health Monitoring:**
+- **Green Status**: All systems operating normally
+- **Yellow Warnings**: Attention needed, but not critical
+- **Red Alerts**: Immediate action required
+- **Gray Offline**: Components not responding
+
+### Performance Tracking
 
 **Key Metrics:**
+- **Irrigation Efficiency**: Success rate of irrigation events
+- **Water Usage**: Daily/weekly consumption tracking
+- **Target Achievement**: How often system hits VWC/EC goals
+- **Phase Timing**: Accuracy of phase transitions
+
+### Troubleshooting Indicators
+
+**Common Issues:**
 ```yaml
-Irrigation Efficiency:  80%+ is excellent
-Target Achievement:     85%+ indicates good tuning
-System Health:         90%+ shows stable operation
-Water Usage Trend:     Should show optimization over time
+Sensor Error:     Check calibration, connections
+Phase Stuck:      Manual phase transition may be needed  
+High Water Usage: Review shot sizes and frequencies
+Low Efficiency:   Check sensor accuracy, hardware function
 ```
 
-## 🎮 Interactive Features
+## 🔧 Configuration Through Dashboard
 
-### Real-Time Updates
+### Basic Settings
 
-The dashboard updates every 30 seconds with:
-- **Live sensor readings**
-- **Updated ML predictions**
-- **Refresh dryback analysis**
-- **Current system status**
+**System Configuration:**
+- **Zone Count**: Select number of active zones (1-6)
+- **Light Schedule**: Set lights-on/lights-off times
+- **Crop Profile**: Select plant type and growth stage
+- **Safety Settings**: Configure emergency thresholds
 
-### Time Range Selection
+### Advanced Parameters
 
-Adjust viewing window:
-- **Last 1 Hour**: Detailed recent activity
-- **Last 6 Hours**: Half-day irrigation cycle
-- **Last 24 Hours**: Full daily cycle (default)
-- **Last 7 Days**: Weekly trends and patterns
+**Irrigation Timing:**
+- **P0 Settings**: Morning dryback parameters
+- **P1 Controls**: Ramp-up shot sizes and timing
+- **P2 Thresholds**: Maintenance phase triggers
+- **P3 Timing**: Pre-lights-off irrigation controls
 
-### Zoom and Pan
+**Sensor Configuration:**
+- **VWC Calibration**: Adjust moisture sensor readings
+- **EC Calibration**: Set conductivity sensor parameters
+- **Averaging Settings**: Configure multi-sensor fusion
+- **Error Handling**: Set sensor failure responses
 
-Navigate graphs:
-- **Mouse Wheel**: Zoom in/out on specific time periods
-- **Click and Drag**: Pan across time ranges
-- **Double Click**: Reset to full view
-- **Hover**: View exact values at specific times
+## 🚨 Alert Management
 
-## 📊 Monitoring Best Practices
+### Alert Types
 
-### Daily Monitoring Routine
+**Critical Alerts (Red):**
+- **Emergency VWC Low**: Immediate irrigation needed
+- **Sensor Failure**: Hardware malfunction detected
+- **System Offline**: Core components not responding
+- **Safety Override Active**: Manual intervention in progress
 
-**Morning Check (Lights On):**
-1. **Review overnight stability**: VWC should be stable
-2. **Check sensor health**: All sensors green/yellow status
-3. **Verify dryback start**: P0 phase beginning properly
-4. **Monitor ML confidence**: Should be >70% after learning period
+**Warning Alerts (Yellow):**
+- **High VWC**: Possible overwatering
+- **Low Efficiency**: System performance degraded
+- **Sensor Drift**: Calibration may be needed
+- **Phase Timing**: Unexpected phase duration
 
-**Midday Review (Peak Activity):**
-1. **VWC trending**: Oscillating between shots
-2. **EC levels**: Within target ranges
-3. **Irrigation efficiency**: Recent shots achieving targets
-4. **Phase transitions**: P1→P2 happening automatically
+**Info Alerts (Blue):**
+- **Phase Transition**: Normal phase change completed
+- **Irrigation Complete**: Scheduled watering finished
+- **Parameter Change**: Settings updated successfully
+- **System Ready**: All systems operational
 
-**Evening Assessment (Pre-Lights Off):**
-1. **Final dryback**: P3 phase progressing correctly
-2. **Performance metrics**: Day's efficiency calculation
-3. **Sensor reliability**: No degraded sensors
-4. **ML predictions**: Confident forecasts for tomorrow
+### Alert Response
 
-### Weekly Analysis
+**Immediate Actions:**
+1. **Read Alert Message**: Understand the specific issue
+2. **Check System Status**: Verify current system state
+3. **Review Recent Changes**: Identify potential causes
+4. **Take Corrective Action**: Follow alert-specific guidance
 
-**Performance Review:**
-- **Average irrigation efficiency**: Should trend upward
-- **ML model accuracy**: Should improve over time
-- **Sensor health trends**: Identify failing sensors early
-- **Water usage optimization**: Track consumption reduction
+## 📱 Mobile Access
 
-**System Optimization:**
-- **Crop profile adjustments**: Based on plant response
-- **ML parameter tuning**: If confidence is consistently low
-- **Sensor calibration**: For sensors with high outlier rates
-- **Hardware maintenance**: Based on reliability trends
+### Responsive Design
 
-## 🚨 Alert Interpretation
+The dashboard is fully responsive and works on:
+- **Desktop Computers**: Full featured experience
+- **Tablets**: Touch-optimized interface
+- **Mobile Phones**: Essential controls and monitoring
+- **Different Browsers**: Chrome, Firefox, Safari, Edge
 
-### Critical Alerts (Red)
+### Mobile-Specific Features
 
-**Emergency VWC Low (<35%)**
-```yaml
-Immediate Action: Manual irrigation required
-Check: Sensor calibration, hardware failure
-System Response: Emergency irrigation if enabled
-```
+**Quick Access:**
+- **Zone Status**: Swipe through zone status cards
+- **Emergency Controls**: Large, easy-to-tap emergency buttons  
+- **Status Indicators**: High-contrast visual indicators
+- **Alert Notifications**: Clear alert messages and actions
 
-**Sensor System Failure**
-```yaml
-Immediate Action: Check hardware connections
-Check: Power supply, network connectivity
-System Response: Fallback to single-sensor operation
-```
+## 🔧 Dashboard Customization
 
-**ML Confidence Collapsed (<30%)**
-```yaml
-Immediate Action: Review recent changes
-Check: Sensor data quality, parameter changes
-System Response: Conservative irrigation decisions
-```
+### Layout Options
 
-### Warning Alerts (Orange)
+**Panel Arrangements:**
+- **Standard Layout**: Balanced view of all components
+- **Monitoring Focus**: Larger status displays
+- **Control Focus**: Emphasized control panels
+- **Mobile Layout**: Optimized for small screens
 
-**High Outlier Rate (>20%)**
-```yaml
-Action: Calibrate affected sensors
-Check: Sensor placement, environmental factors
-System Response: Reduced weight in sensor fusion
-```
+### Color Themes
 
-**Irrigation Efficiency Low (<60%)**
-```yaml
-Action: Review irrigation parameters
-Check: Hardware function, sensor accuracy
-System Response: Parameter adjustment recommendations
-```
+**Available Themes:**
+- **Professional**: Clean, modern appearance
+- **High Contrast**: Enhanced visibility
+- **Crop Green**: Plant-focused color scheme
+- **Custom**: User-defined colors and styling
 
-**Dryback Target Missed**
-```yaml
-Action: Check crop profile settings
-Check: Environmental conditions, plant response
-System Response: Adaptive profile adjustments
-```
+## 📞 Support and Troubleshooting
 
-### Info Alerts (Blue)
+### Common Issues
 
-**ML Model Retrained**
-```yaml
-Information: New training completed
-Impact: Potentially improved predictions
-Action: Monitor confidence improvement
-```
+**Dashboard Not Loading:**
+1. Check AppDaemon is running
+2. Verify network connectivity
+3. Clear browser cache
+4. Check for JavaScript errors
 
-**Profile Parameters Adapted**
-```yaml
-Information: Automatic optimization occurred
-Impact: Better plant-specific parameters
-Action: Review adapted parameters
-```
+**Controls Not Responding:**
+1. Verify Home Assistant connection
+2. Check integration status
+3. Restart AppDaemon if needed
+4. Review entity configurations
 
-## 🔧 Troubleshooting Dashboard Issues
+**Missing Data:**
+1. Check sensor connectivity
+2. Verify entity names in configuration
+3. Review AppDaemon logs
+4. Test individual entities in HA
 
-### Graph Not Updating
+### Getting Help
 
-**Possible Causes:**
-1. **AppDaemon not running**: Check AppDaemon status
-2. **Sensor data issues**: Verify sensor connectivity
-3. **Browser cache**: Refresh page or clear cache
-4. **Network issues**: Check Home Assistant connectivity
-
-**Solutions:**
-```bash
-# Check AppDaemon status
-tail -f /addon_configs/a0d7b954_appdaemon/logs/crop_steering_dashboard.log
-
-# Restart AppDaemon if needed
-# Home Assistant > Settings > Add-ons > AppDaemon > Restart
-
-# Clear browser cache
-# Browser > Settings > Clear Cache
-```
-
-### Missing Data Points
-
-**Possible Causes:**
-1. **Sensor offline**: Individual sensor failure
-2. **Fusion failure**: Insufficient reliable sensors
-3. **Data storage**: History buffer overflow
-4. **Configuration error**: Wrong entity names
-
-**Solutions:**
-```bash
-# Check sensor entities
-# Developer Tools > States > Filter by sensor names
-
-# Verify entity configuration
-# Settings > Devices & Services > Crop Steering System
-```
-
-### Performance Slow
-
-**Possible Causes:**
-1. **High update frequency**: Too many updates
-2. **Large data sets**: Excessive history retention
-3. **Complex graphs**: Too many data series
-4. **System resources**: Insufficient CPU/RAM
-
-**Solutions:**
-```yaml
-# Reduce update frequency in AppDaemon configuration
-update_interval: 60  # Increase from 30 seconds
-
-# Reduce history retention
-max_data_points: 1440  # Reduce from 2880
-
-# Simplify graphs
-# Remove unused sensor traces
-```
-
-## 📈 Advanced Dashboard Features
-
-### Custom Graph Creation
-
-Create specialized monitoring views:
-
-```python
-# Example: Custom VWC analysis
-custom_graph = {
-    'data': [
-        {
-            'x': timestamps,
-            'y': vwc_values,
-            'type': 'scatter',
-            'mode': 'lines',
-            'name': 'Custom VWC Analysis'
-        }
-    ],
-    'layout': {
-        'title': 'Custom Crop Analysis',
-        'xaxis': {'title': 'Time'},
-        'yaxis': {'title': 'VWC (%)'}
-    }
-}
-```
-
-### Data Export
-
-Export dashboard data for analysis:
-
-```yaml
-# Available export formats
-CSV Export:     Raw sensor data
-JSON Export:    Complete system state
-PDF Reports:    Dashboard snapshots
-Excel Format:   Analysis-ready datasets
-```
-
-### Integration with External Tools
-
-Connect to external analytics:
-
-```yaml
-InfluxDB:       Time-series database integration
-Grafana:        Advanced visualization platform
-Excel:          Spreadsheet analysis
-Python/R:       Custom data science workflows
-```
-
-## 🎯 Optimization Strategies
-
-### Performance Tuning
-
-**High-Performance Setup:**
-- **Dedicated hardware**: Separate machine for AI processing
-- **SSD storage**: Fast data access for ML operations
-- **Sufficient RAM**: 8GB+ for optimal AI performance
-- **Stable network**: Reliable sensor data collection
-
-**Resource Conservation:**
-- **Reduce update frequency**: 60-120 second intervals
-- **Limit history retention**: 24-48 hours of data
-- **Selective monitoring**: Focus on critical metrics
-- **Efficient sensors**: Use high-quality, stable sensors
-
-### Data Quality Improvement
-
-**Sensor Calibration:**
-- **Regular calibration**: Monthly sensor verification
-- **Cross-validation**: Compare sensors against standards
-- **Environmental stability**: Minimize external disturbances
-- **Proper installation**: Follow manufacturer guidelines
-
-**Noise Reduction:**
-- **Stable power supply**: Clean electrical connections
-- **EMI shielding**: Protect from electromagnetic interference
-- **Temperature stability**: Control sensor environment
-- **Mechanical isolation**: Prevent vibration effects
-
-## 📞 Support and Resources
-
-### Documentation Links
-- [AI Operation Guide](ai_operation_guide.md) - Complete operational procedures
-- [Installation Guide](installation_guide.md) - Setup and configuration
+**Documentation Resources:**
+- [Installation Guide](installation_guide.md) - Setup instructions
+- [Operation Guide](operation_guide.md) - Daily operation procedures  
 - [Troubleshooting Guide](troubleshooting.md) - Problem resolution
 
-### Community Resources
+**Community Support:**
 - **GitHub Issues**: [Technical support](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues)
 - **Home Assistant Forum**: Community discussions
 - **AppDaemon Discord**: Real-time help
-
-### Professional Support
-- **System Integration**: Custom installation services
-- **Performance Optimization**: Advanced tuning services
-- **Training Programs**: Operational training courses
-- **Custom Development**: Specialized feature development
 
 ---
 
 **Master Your Dashboard!** 📊
 
-With proper understanding and regular monitoring, the Advanced AI Dashboard becomes your command center for precision irrigation and optimal plant health.
+The AppDaemon YAML dashboard provides professional-grade monitoring and control for your crop steering system. With proper setup and regular monitoring, it becomes your central command center for precision irrigation.

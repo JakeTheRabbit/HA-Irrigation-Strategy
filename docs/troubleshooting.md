@@ -1,6 +1,6 @@
 # 🔧 Troubleshooting Guide
 
-This comprehensive guide helps resolve common issues with the Advanced AI Crop Steering System.
+This guide helps resolve common issues with the Crop Steering System. Since this is a **rule-based irrigation controller** (not AI/ML), troubleshooting focuses on sensor readings, hardware control, and system logic.
 
 ## 🚨 Emergency Procedures
 
@@ -9,30 +9,24 @@ This comprehensive guide helps resolve common issues with the Advanced AI Crop S
 #### System Not Irrigating During Emergency
 
 **Symptoms:**
-- VWC below 35% (critical level)
+- VWC below emergency threshold (default 35%)
 - No automatic irrigation response
 - Plants showing stress signs
 
 **Immediate Actions:**
-1. **Manual irrigation**: Turn on pump and zones manually
-2. **Check hardware**: Verify pump and valve operation
-3. **Disable automation**: Prevent conflicting commands
-4. **Monitor plants**: Watch for recovery signs
+1. **Manual irrigation**: Use service `crop_steering.execute_irrigation_shot`
+2. **Check system enabled**: Verify `switch.crop_steering_system_enabled` is ON
+3. **Check zone enabled**: Verify `switch.crop_steering_zone_X_enabled` is ON  
+4. **Check manual override**: Ensure `switch.crop_steering_zone_X_manual_override` is OFF
 
-**Diagnostic Steps:**
-```bash
-# Check system status
-# Go to Developer Tools > States
-sensor.crop_steering_system_state: should be "active"
-
-# Check emergency thresholds
-sensor.crop_steering_fused_vwc: should show current VWC
-sensor.crop_steering_ml_irrigation_need: should be >0.9
-
-# Manual hardware test
-service: switch.turn_on
-target:
-  entity_id: switch.f1_irrigation_pump_master_switch
+**Quick Manual Irrigation:**
+```yaml
+# In Developer Tools > Services
+service: crop_steering.execute_irrigation_shot
+data:
+  zone: 1
+  duration_seconds: 60
+  shot_type: "P3_emergency"
 ```
 
 #### Runaway Irrigation (Won't Stop)
@@ -40,610 +34,307 @@ target:
 **Symptoms:**
 - Irrigation running continuously
 - VWC above target ranges
-- System not responding to automation
+- System not responding to commands
 
 **Immediate Actions:**
-1. **Emergency stop**: Turn off main electrical supply
-2. **Manual shutoff**: Close manual valves if available
-3. **Disable system**: Turn off crop steering automation
-4. **Check for hardware faults**: Inspect relays and valves
+1. **Turn off system**: Set `switch.crop_steering_system_enabled` to OFF
+2. **Turn off pump**: Manually turn off your pump entity
+3. **Turn off valves**: Manually turn off all valve entities
+4. **Check hardware**: Inspect physical relays and valves
 
-**Recovery Steps:**
+## 🔍 System Diagnostic Checklist
+
+### 1. Integration Status Check
 ```bash
-# Emergency shutdown all irrigation
-service: switch.turn_off
-target:
-  entity_id: 
-    - switch.f1_irrigation_pump_master_switch
-    - switch.espoe_irrigation_relay_1_2
-    - switch.f1_irrigation_relays_relay_1
-    - switch.f1_irrigation_relays_relay_2
-    - switch.f1_irrigation_relays_relay_3
-
-# Disable automation
-service: switch.turn_off
-target:
-  entity_id: switch.crop_steering_system_enabled
+# Go to Settings > Devices & Services
+# Look for "Crop Steering System" - should show "Connected"
+# Click on device to see all entities
 ```
 
-## 🔍 Diagnostic Procedures
-
-### System Health Check
-
-Use this checklist to diagnose system status:
-
-#### 1. Integration Status
+### 2. Basic Entity Check  
 ```bash
-# Check integration is loaded
-# Settings > Devices & Services > Crop Steering System
-# Should show "Configured" status
+# Go to Developer Tools > States
+# Filter by "crop_steering"
+# Verify these key entities exist and have recent timestamps:
 
-# Verify entities exist
-# Developer Tools > States
-# Filter by "crop_steering" - should show multiple entities
+sensor.crop_steering_current_phase: "P0" | "P1" | "P2" | "P3" | "Manual"
+sensor.crop_steering_configured_avg_vwc: 45-70% (reasonable range)
+sensor.crop_steering_configured_avg_ec: 2.0-8.0 mS/cm
+switch.crop_steering_system_enabled: on | off
 ```
 
-#### 2. AppDaemon Status
+### 3. AppDaemon Status Check (if using automation)
 ```bash
-# Check AppDaemon logs
-tail -f /addon_configs/a0d7b954_appdaemon/logs/appdaemon.log
-
-# Look for startup messages:
-# "Master Crop Steering Application with Advanced AI Features initialized!"
-# "Advanced AI modules initialized successfully"
-
-# Check specific app logs
-tail -f /addon_configs/a0d7b954_appdaemon/logs/crop_steering_master.log
-tail -f /addon_configs/a0d7b954_appdaemon/logs/crop_steering_dashboard.log
+# Go to Settings > Add-ons > AppDaemon 4 > Log
+# Look for: "Master Crop Steering Application initialized"
+# If errors, check your AppDaemon configuration
 ```
 
-#### 3. Sensor Validation
-```bash
-# Check all sensors are reporting
-# Developer Tools > States
-# Look for recent timestamps and valid values:
-
-sensor.vwc_r1_front: 45-70% (valid range)
-sensor.ec_r1_front: 2.0-8.0 mS/cm (valid range)
-sensor.grow_room_temperature: 15-35°C (valid range)
-
-# Check for "unavailable" or "unknown" states
-```
-
-#### 4. Hardware Status
-```bash
-# Test hardware manually
+### 4. Hardware Test
+```yaml
+# Test your hardware entities manually:
 # Developer Tools > Services
 
 # Test pump
 service: switch.turn_on
 target:
-  entity_id: switch.f1_irrigation_pump_master_switch
+  entity_id: switch.YOUR_PUMP_ENTITY
 
-# Verify pump actually turns on (check physical hardware)
-# Turn off after test:
-service: switch.turn_off
+# Verify pump actually turns on physically
+# Turn off after test
+service: switch.turn_off  
 target:
-  entity_id: switch.f1_irrigation_pump_master_switch
+  entity_id: switch.YOUR_PUMP_ENTITY
 ```
 
-## 🤖 AI System Issues
+## 🌡️ Sensor Issues
 
-### ML Models Not Learning
+### VWC Sensor Problems
 
-**Symptoms:**
-- ML confidence stays below 0.6
-- No model retraining messages in logs
-- Predictions remain at 0.5 (default)
+**Readings Show "Unknown" or "None":**
+- Check entity exists: Developer Tools > States
+- Verify entity name matches your configuration
+- Check physical sensor connections
+- Verify sensor is powered and communicating
 
-**Causes:**
-1. **Insufficient training data**: Less than 50 samples
-2. **Poor data quality**: Too many outliers or missing values
-3. **Feature extraction issues**: Sensor data not being processed
-4. **Python dependencies missing**: ML libraries not installed
+**Erratic/Impossible Readings:**
+- Check sensor calibration (should read 0-100%)
+- Ensure stable sensor placement in substrate
+- Look for electrical interference sources
+- Verify consistent power supply
 
-**Solutions:**
-
-**Check training data:**
-```python
-# Access through AppDaemon logs
-# Look for messages like:
-# "ML models retrained - R² performance: 0.850"
-# "Training samples: X" (should be >50)
-
-# Check ML status entity
-sensor.crop_steering_ml_confidence: should improve over time
-sensor.crop_steering_ml_model_accuracy: should increase with training
-```
-
-**Reset ML models if needed:**
-```python
-# This would need to be done through AppDaemon
-# Check logs for reset confirmation
-# ML models will restart learning from scratch
-```
-
-**Verify AppDaemon dependencies:**
+**Multiple Sensors Don't Match:**
 ```bash
-# Dependencies are automatically managed by the AppDaemon add-on
-# Check AppDaemon logs for any missing dependency errors
-# Restart AppDaemon add-on if needed through Home Assistant UI
+# For zone with front/back sensors:
+sensor.crop_steering_vwc_zone_1: 55% (averaged value)
+
+# Individual sensors should be reasonably close:
+YOUR_FRONT_VWC_SENSOR: 53%
+YOUR_BACK_VWC_SENSOR: 57%
+
+# Large differences (>15%) indicate calibration or placement issues
 ```
 
-### Sensor Fusion Problems
-
-**Symptoms:**
-- Fused VWC/EC values showing as None
-- High outlier rates (>30%)
-- Sensor health degrading rapidly
-
-**Causes:**
-1. **Sensor calibration drift**: Sensors reading incorrectly
-2. **Electrical interference**: EMI affecting readings
-3. **Network issues**: Sensors disconnecting frequently
-4. **Threshold settings**: Fusion parameters too sensitive
-
-**Solutions:**
-
-**Check sensor health:**
-```bash
-# Review sensor health report
-sensor.crop_steering_sensor_health: shows healthy sensor count
-
-# Check individual sensor reliability
-# Look for entities like:
-sensor.vwc_r1_front_reliability: should be >0.7
-```
-
-**Calibrate sensors:**
-```bash
-# Cross-validate sensors against known standards
-# All VWC sensors in same substrate should read similarly
-# EC sensors should match when measuring same solution
-
-# Check for obvious outliers:
-sensor.vwc_r1_front: 45%
-sensor.vwc_r1_back: 67%  # Potential calibration issue
-```
-
-**Adjust fusion parameters:**
-```python
-# If sensors are frequently marked as outliers
-# Increase outlier threshold in sensor fusion settings
-# This would be done through AppDaemon configuration
-```
-
-### Dryback Detection Issues
-
-**Symptoms:**
-- No dryback events detected
-- Confidence scores below 0.5
-- Irrigation timing seems random
-
-**Causes:**
-1. **Insufficient VWC variation**: Too much irrigation, no dryback
-2. **Noisy sensor data**: Too much fluctuation to detect patterns
-3. **Short data history**: Not enough data for pattern recognition
-4. **Incorrect calibration**: Sensors not accurately tracking substrate moisture
-
-**Solutions:**
-
-**Verify dryback is occurring:**
-```bash
-# Check VWC trends manually
-# VWC should show declining patterns between irrigations
-# Look for sawtooth pattern: irrigation spike → gradual decline
-
-# Check current dryback status
-sensor.crop_steering_dryback_percentage: should show >0 when drying
-binary_sensor.crop_steering_dryback_in_progress: should cycle on/off
-```
-
-**Improve data quality:**
-```bash
-# Reduce irrigation frequency temporarily
-# Allow longer dryback periods (20-30 minutes between shots)
-# Ensure stable environment (minimal disturbances)
-```
-
-**Check detection parameters:**
-```python
-# Dryback detection requires:
-# - Minimum 10 data points
-# - Clear peak/valley patterns
-# - Stable sensor readings
-```
-
-## 🔌 Hardware Troubleshooting
-
-### Sensor Issues
-
-#### VWC Sensor Problems
-
-**Erratic Readings:**
-```bash
-Symptoms: Wild fluctuations, impossible values
-Causes: Poor calibration, substrate movement, electrical interference
-Solutions:
-- Recalibrate in known moisture levels
-- Ensure stable sensor placement
-- Check electrical connections
-- Move away from electrical interference sources
-```
-
-**Stuck Readings:**
-```bash
-Symptoms: Same value for extended periods
-Causes: Sensor failure, poor connection, calibration drift
-Solutions:
-- Check physical connections
-- Test sensor with multimeter
-- Replace if confirmed faulty
-- Verify power supply voltage
-```
-
-**Inconsistent Between Sensors:**
-```bash
-Symptoms: Large differences between sensors in same zone
-Causes: Different calibrations, uneven substrate, placement issues
-Solutions:
-- Cross-calibrate all sensors
-- Ensure uniform substrate mixture
-- Check sensor placement depth/position
-- Replace outlier sensors
-```
-
-#### EC Sensor Problems
+### EC Sensor Problems
 
 **High Noise/Fluctuation:**
-```bash
-Symptoms: Constant variation, noisy readings
-Causes: Temperature effects, poor electrical isolation, flow issues
-Solutions:
-- Enable temperature compensation
-- Check electrical grounding
-- Ensure steady solution flow
-- Clean sensor electrodes
-```
+- Enable temperature compensation if available
+- Check electrical grounding and isolation
+- Ensure steady solution flow past sensor
+- Clean sensor electrodes regularly
 
-**Drift Over Time:**
-```bash
-Symptoms: Gradual reading changes, calibration loss
-Causes: Electrode fouling, reference drift, aging
-Solutions:
-- Regular calibration with standards
+**Readings Drift Over Time:**
+- Calibrate sensors monthly with standard solutions
 - Clean electrodes with appropriate solutions
-- Replace aging sensors
-- Use high-quality calibration solutions
-```
+- Replace aging sensors (typically 2-3 years)
 
-### Irrigation Hardware
+## ⚙️ System Configuration Issues
 
-#### Pump Issues
+### Wrong Entity Names
+
+**Symptoms:** Integration shows errors, sensors read as None
+**Solution:**
+1. Go to Developer Tools > States
+2. Find correct entity names for your hardware
+3. Reconfigure integration: Settings > Devices & Services > Crop Steering > Configure
+4. Update entity names to match exactly
+
+### Missing Zones
+
+**Symptoms:** Only see some zones, missing expected entities
+**Solution:**
+1. Entities are only created for configured zones
+2. To add zones: Reconfigure integration
+3. Increase zone count and add hardware entities
+
+### Phase Not Changing
+
+**Without AppDaemon:**
+- Phases must be changed manually using service `crop_steering.transition_phase`
+- Or by setting `select.crop_steering_irrigation_phase` directly
+
+**With AppDaemon:**
+- Check AppDaemon is running and logs show no errors
+- Verify light schedule: `number.crop_steering_lights_on_hour` and `lights_off_hour`
+- Check that system isn't in manual override
+
+## 🔌 Hardware Troubleshooting  
+
+### Pump Issues
 
 **Pump Won't Start:**
-```bash
-Check: Power supply, relay operation, pump condition
-Test: Manual relay activation, voltage at pump
-Solutions:
-- Verify 24VAC supply
-- Test relay with multimeter
-- Check pump for mechanical binding
-- Inspect wiring connections
-```
+1. Check power supply (typically 24VAC)
+2. Test pump entity manually: `switch.YOUR_PUMP_ENTITY`
+3. Verify relay is working (hear click when switching)
+4. Check physical pump for binding or blockages
 
-**Pump Runs But No Pressure:**
-```bash
-Check: Prime status, valve positions, blockages
-Test: Manual valve operation, flow observation
-Solutions:
-- Prime pump system
-- Check for air leaks
-- Clear blockages in lines
-- Verify valve operations
-```
+**Pump Runs But No Flow:**
+1. Check pump prime/pressure
+2. Look for air leaks in lines
+3. Verify valve positions (main valve open)
+4. Clear any blockages in irrigation lines
 
-#### Valve Problems
+### Valve Problems
 
 **Valve Won't Open:**
-```bash
-Check: Power supply, solenoid condition, manual override
-Test: Voltage at valve, manual activation
-Solutions:
-- Check 24VAC supply to valve
-- Test solenoid coil resistance
-- Use manual override if available
-- Replace faulty solenoid
-```
+1. Check power supply to valve (typically 24VAC)
+2. Test valve entity manually
+3. Listen for solenoid click when activating
+4. Use manual valve override if available
 
 **Valve Won't Close:**
-```bash
-Check: Debris in valve seat, spring failure, electrical issues
-Test: Manual closure, power cycling
-Solutions:
-- Clean valve seat and diaphragm
-- Check return spring
-- Power cycle valve
-- Replace if mechanically failed
-```
+1. Check for debris in valve seat
+2. Power cycle valve (off then on)
+3. Inspect return spring mechanism
+4. Replace solenoid if mechanically failed
 
-## 📡 Network and Connectivity
+## 📡 Network and Communication
 
-### Sensor Communication Issues
+### Sensors Going Offline
 
-**Sensors Going Offline:**
-```bash
-Symptoms: "unavailable" or "unknown" states
-Causes: WiFi issues, power problems, device failures
-Solutions:
-- Check WiFi signal strength
+**Symptoms:** Entities show "unavailable" or "unknown"
+**Solutions:**
+- Check WiFi signal strength at sensor locations
 - Verify power supply stability
 - Restart sensor devices
-- Check Home Assistant device status
-```
+- Check Home Assistant device status page
 
-**Intermittent Connections:**
-```bash
-Symptoms: Sporadic data loss, reconnection messages
-Causes: Network congestion, interference, marginal signal
-Solutions:
-- Improve WiFi coverage
-- Reduce 2.4GHz interference
-- Use dedicated IoT network
-- Consider wired connections
-```
+### AppDaemon Communication Issues
 
-### Home Assistant Integration
+**Symptoms:** Automation not working, AppDaemon errors
+**Solutions:**
+- Verify long-lived access token is valid
+- Check AppDaemon can reach Home Assistant (same network)
+- Restart AppDaemon add-on
+- Review AppDaemon configuration file
 
-**Entities Not Updating:**
-```bash
-Check: Integration status, entity configuration, polling intervals
-Test: Manual entity refresh, restart integration
-Solutions:
-- Restart Crop Steering integration
-- Check entity polling frequency
-- Verify entity names in configuration
-- Check Home Assistant logs for errors
-```
+## 📊 Performance and Logic Issues
 
-**AppDaemon Communication:**
-```bash
-Check: AppDaemon connection to HA, token validity, network access
-Test: AppDaemon logs, manual API calls
-Solutions:
-- Verify long-lived access token
-- Check network connectivity
-- Restart AppDaemon
-- Review AppDaemon configuration
-```
+### Irrigation Too Frequent
 
-## ⚙️ Configuration Issues
+**Symptoms:** System watering too often, VWC staying too high
+**Solutions:**
+- Increase P2 VWC threshold: `number.crop_steering_p2_vwc_threshold`  
+- Reduce shot sizes: `number.crop_steering_p1_initial_shot_size`
+- Increase time between shots: `number.crop_steering_p1_time_between_shots`
 
-### Integration Configuration
+### Irrigation Not Frequent Enough
 
-**Wrong Entity Names:**
-```bash
-Symptoms: Entities not found, integration errors
-Check: Entity IDs in Home Assistant, spelling/case sensitivity
-Solutions:
-- Use Developer Tools > States to find correct names
-- Update integration configuration
-- Check for entity naming changes
-- Verify entity domains (sensor, switch, etc.)
-```
+**Symptoms:** VWC dropping too low, plants stressed
+**Solutions:**
+- Lower P2 VWC threshold  
+- Increase shot sizes
+- Reduce dryback targets: `number.crop_steering_veg_dryback_target`
 
-**Missing Configuration Options:**
-```bash
-Symptoms: Expected settings not available, limited functionality
-Check: Integration version, configuration completeness
-Solutions:
-- Update to latest integration version
-- Reconfigure integration from scratch
-- Check for configuration schema changes
-- Review installation documentation
-```
+### Wrong Phase Behavior
 
-### AppDaemon Configuration
+**P0 (Morning Dryback) Issues:**
+- Check dryback drop percentage: `number.crop_steering_p0_dryback_drop_percent`
+- Verify min/max wait times: `p0_min_wait_time`, `p0_max_wait_time`
 
-**Apps Not Loading:**
-```bash
-Check: apps.yaml syntax, module paths, dependencies
-Test: AppDaemon startup logs, manual app loading
-Solutions:
-- Validate YAML syntax
-- Check file permissions
-- Verify Python dependencies
-- Review module import paths
-```
+**P1 (Ramp-Up) Issues:**
+- Adjust target VWC: `number.crop_steering_p1_target_vwc`
+- Modify shot progression: `p1_initial_shot_size`, `p1_shot_increment`, `p1_max_shots`
 
-**Incorrect Parameters:**
-```bash
-Symptoms: Unexpected behavior, poor performance
-Check: Parameter values, units, ranges
-Solutions:
-- Review parameter documentation
-- Use recommended default values
-- Gradually adjust from defaults
-- Monitor system response to changes
-```
-
-## 📊 Performance Issues
-
-### System Running Slowly
-
-**High CPU Usage:**
-```bash
-Causes: Frequent updates, complex calculations, insufficient resources
-Solutions:
-- Reduce update intervals
-- Limit data history retention
-- Optimize sensor polling
-- Upgrade hardware if needed
-```
-
-**Memory Issues:**
-```bash
-Symptoms: System slowdowns, app crashes, swap usage
-Causes: Large data sets, memory leaks, insufficient RAM
-Solutions:
-- Reduce data retention periods
-- Clear old training data
-- Restart AppDaemon periodically
-- Add more RAM if possible
-```
-
-**Network Latency:**
-```bash
-Symptoms: Delayed responses, timeouts, communication errors
-Causes: Network congestion, poor WiFi, interference
-Solutions:
-- Optimize network infrastructure
-- Use wired connections where possible
-- Reduce network traffic
-- Upgrade network equipment
-```
-
-### AI Performance Issues
-
-**Slow ML Processing:**
-```bash
-Causes: Large datasets, complex models, insufficient CPU
-Solutions:
-- Reduce model complexity
-- Limit training data size
-- Increase retrain intervals
-- Use more powerful hardware
-```
-
-**Poor Prediction Accuracy:**
-```bash
-Causes: Insufficient training, poor data quality, wrong parameters
-Solutions:
-- Allow longer learning period
-- Improve sensor calibration
-- Increase training data quantity
-- Adjust model parameters
-```
+**P2 (Maintenance) Issues:**
+- Fine-tune VWC threshold: `p2_vwc_threshold`
+- Adjust EC thresholds: `p2_ec_high_threshold`, `p2_ec_low_threshold`
 
 ## 🛠️ Maintenance Procedures
 
-### Regular Maintenance Schedule
+### Daily Checks
+- **System Status**: All switches enabled, no error messages
+- **Sensor Readings**: Values within expected ranges
+- **Phase Transitions**: Automatic progression through daily cycle
+- **Irrigation Events**: Appropriate watering frequency
 
-#### Daily Checks
-- **System status**: Verify all components active
-- **Sensor readings**: Check for reasonable values
-- **Irrigation events**: Confirm proper operation
-- **Error logs**: Review for any issues
+### Weekly Maintenance  
+- **Sensor Validation**: Cross-check sensors for accuracy
+- **Parameter Tuning**: Adjust based on plant response
+- **Hardware Inspection**: Visual check of pumps, valves, sensors
+- **Performance Review**: Analyze irrigation efficiency
 
-#### Weekly Maintenance
-- **Sensor calibration**: Cross-check sensor accuracy
-- **Performance review**: Analyze efficiency metrics
-- **Data backup**: Export important system data
-- **Hardware inspection**: Visual check of all components
+### Monthly Procedures
+- **Sensor Calibration**: Recalibrate with known standards
+- **System Backup**: Export configuration and settings
+- **Software Updates**: Check for integration updates
+- **Deep Clean**: Clean sensor electrodes and housings
 
-#### Monthly Procedures
-- **Deep calibration**: Full sensor recalibration
-- **Software updates**: Check for system updates
-- **Performance optimization**: Tune system parameters
-- **Documentation update**: Record any changes
+## 🆘 When to Get Help
 
-### Preventive Measures
-
-**Sensor Longevity:**
-- **Regular cleaning**: Keep sensors free of debris
-- **Stable environment**: Minimize vibration and temperature swings
-- **Quality power**: Use stable, clean power supplies
-- **Proper installation**: Follow manufacturer guidelines
-
-**System Reliability:**
-- **Backup configuration**: Export system settings regularly
-- **Redundancy**: Use multiple sensors where possible
-- **Monitoring**: Set up comprehensive alerting
-- **Documentation**: Keep detailed change logs
-
-## 📞 Getting Help
-
-### Self-Service Resources
-
-**Documentation:**
-- [Installation Guide](installation_guide.md)
-- [AI Operation Guide](ai_operation_guide.md)
-- [Dashboard Guide](dashboard_guide.md)
-
-**Diagnostic Tools:**
-- Home Assistant logs
-- AppDaemon logs
-- Integration device page
-- Developer Tools
+### Self-Service First
+1. **Check this guide** for your specific issue
+2. **Review logs**: Home Assistant logs and AppDaemon logs (if applicable)
+3. **Test systematically**: Start with manual hardware tests
+4. **Check configuration**: Verify entity names and settings
 
 ### Community Support
+- **GitHub Issues**: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues
+- **Home Assistant Forum**: Search for "Crop Steering"
+- **Discord**: Join Home Assistant Discord, ask in #custom-components
 
-**GitHub Issues:**
-- [Report bugs](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues)
-- Search existing issues
-- Provide detailed error logs
-- Include system configuration
+### Information to Provide When Asking for Help
+1. **Describe the problem**: What's happening vs. what should happen
+2. **System details**: Home Assistant version, AppDaemon version (if used)
+3. **Configuration**: Number of zones, hardware types
+4. **Error logs**: Copy relevant error messages
+5. **Troubleshooting tried**: What you've already attempted
 
-**Forums:**
-- Home Assistant Community
-- AppDaemon Discord
-- Reddit r/homeassistant
+## 📋 Quick Reference Commands
 
-### Professional Support
-
-**Paid Support Options:**
-- System diagnosis and optimization
-- Custom configuration assistance
-- Hardware troubleshooting
-- Training and education
-
-**When to Seek Professional Help:**
-- Repeated hardware failures
-- Persistent software issues
-- Performance optimization needs
-- Custom feature requirements
-
-## 📋 Quick Reference
-
-### Common Entity Names
+### Manual Controls
 ```yaml
-System Status:
-- sensor.crop_steering_system_state
-- sensor.crop_steering_current_phase
-- sensor.crop_steering_current_decision
+# Manual irrigation shot
+service: crop_steering.execute_irrigation_shot
+data:
+  zone: 1
+  duration_seconds: 60
 
-AI Status:
-- sensor.crop_steering_ml_confidence
-- sensor.crop_steering_ml_irrigation_need
-- sensor.crop_steering_sensor_health
-
-Measurements:
-- sensor.crop_steering_fused_vwc
-- sensor.crop_steering_fused_ec
-- sensor.crop_steering_dryback_percentage
-
-Hardware:
-- switch.f1_irrigation_pump_master_switch
-- switch.espoe_irrigation_relay_1_2
-- switch.f1_irrigation_relays_relay_1
+# Change phase manually  
+service: crop_steering.transition_phase
+data:
+  target_phase: "P2"
+  
+# Enable manual override
+service: crop_steering.set_manual_override
+data:
+  zone: 1
+  enable: true
 ```
 
-### Emergency Contacts
+### Key Entities to Monitor
 ```yaml
-# Replace with your actual contact information
-System Administrator: your-admin@email.com
-Hardware Technician: tech-support@company.com
-Emergency Shutdown: Physical main breaker location
+# System Status
+sensor.crop_steering_current_phase
+switch.crop_steering_system_enabled
+switch.crop_steering_auto_irrigation_enabled
+
+# Zone Status (replace X with zone number)
+switch.crop_steering_zone_X_enabled
+sensor.crop_steering_zone_X_status
+sensor.crop_steering_vwc_zone_X
+
+# Measurements  
+sensor.crop_steering_configured_avg_vwc
+sensor.crop_steering_configured_avg_ec
+sensor.crop_steering_ec_ratio
 ```
 
-### Log File Locations
-```bash
-Home Assistant: /config/home-assistant.log
-AppDaemon: /addon_configs/a0d7b954_appdaemon/logs/appdaemon.log
-Crop Steering: /addon_configs/a0d7b954_appdaemon/logs/crop_steering_master.log
-Dashboard: /addon_configs/a0d7b954_appdaemon/logs/crop_steering_dashboard.log
+### Important Parameters
+```yaml
+# VWC Targets
+number.crop_steering_p1_target_vwc: 60%
+number.crop_steering_p2_vwc_threshold: 58%
+
+# Shot Sizes
+number.crop_steering_p1_initial_shot_size: 5%
+number.crop_steering_p2_shot_size: 3%
+
+# Emergency Settings
+number.crop_steering_p3_emergency_vwc_threshold: 35%
+number.crop_steering_p3_emergency_shot_size: 8%
 ```
 
 ---
 
-**Remember**: Most issues can be resolved by checking logs, verifying configuration, and ensuring all components are properly connected and calibrated. When in doubt, start with the basics and work systematically through the diagnostic procedures.
+**Remember**: This system uses rule-based logic, not AI/ML. Most issues are related to configuration, hardware, or sensor problems. Start with the basics and work systematically through the diagnostic steps.

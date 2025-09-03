@@ -1,89 +1,187 @@
-# Installation Guide
+# 🚀 Installation Guide - Beginner Friendly
 
-This guide covers two installation methods: HACS (recommended) or manual installation.
+This step-by-step guide will walk you through installing the Crop Steering System, even if you're new to Home Assistant. We'll cover everything you need to know!
 
-## Prerequisites
+## 📋 What You'll Need Before Starting
 
-### Required Add-ons
-1. **AppDaemon 4** (optional but recommended for advanced features)
-   - Settings → Add-ons → Add-on Store
-   - Search "AppDaemon 4" and install
-   - Don't start yet - we'll configure it after installation
+### ✅ Required Items
+**Home Assistant Setup:**
+- Home Assistant installed and running (any installation method works)
+- Access to Home Assistant web interface
+- Basic familiarity with Home Assistant (know how to navigate to Settings)
 
-### Hardware Requirements
-- VWC sensors (moisture sensors) - at least 1 per zone
-- EC sensors (nutrient sensors) - at least 1 per zone  
-- Irrigation pump controlled by Home Assistant
-- Main line valve (solenoid)
-- Zone valves (1-6 zones supported)
+**Physical Hardware:**
+- At least 1 moisture sensor (VWC) per growing area
+- At least 1 nutrient sensor (EC) per growing area  
+- Water pump that can be controlled by Home Assistant
+- Solenoid valve for main water line
+- Individual zone valves (up to 6 zones supported)
 - Grow lights controlled by Home Assistant
 
-## Method 1: HACS Installation (Recommended)
+### 🔧 Optional But Recommended
+**AppDaemon Add-on** - Enables full automation:
+- Automatic phase transitions throughout the day
+- Smart sensor data processing
+- Professional monitoring dashboards
+- Advanced irrigation decisions
 
-### Step 1: Add Custom Repository
-1. Open HACS in your sidebar
-2. Click **Integrations**
-3. Click the 3-dot menu (⋮) → **Custom repositories**
-4. Add:
-   - Repository: `https://github.com/JakeTheRabbit/HA-Irrigation-Strategy`
-   - Category: `Integration`
-5. Click **ADD**
+**Without AppDaemon:** You get manual control and basic monitoring
+**With AppDaemon:** You get full autonomous operation
 
-### Step 2: Install the Integration
-1. In HACS → Integrations, search for "Crop Steering"
-2. Click on it and press **DOWNLOAD**
+### 🏠 Home Assistant Knowledge Check
+Before proceeding, make sure you can:
+- Navigate to Settings → Devices & Services
+- Restart Home Assistant when needed
+- Find entities in Developer Tools → States
+
+**New to Home Assistant?** Check out the [official documentation](https://www.home-assistant.io/getting-started/) first!
+
+## 🎯 Installation Methods
+
+**Choose Your Method:**
+
+### Method 1: HACS Installation (Easiest - Recommended)
+✅ **Best for beginners**  
+✅ **Automatic updates**  
+✅ **One-click installation**
+
+### Step 1: Install HACS (If Not Already Installed)
+**Already have HACS?** Skip to Step 2!
+
+**Don't have HACS yet?**
+1. Follow the official HACS installation guide: https://hacs.xyz/docs/setup/download
+2. This usually involves downloading a script and running it
 3. Restart Home Assistant
+4. HACS will appear in your sidebar
 
-### Step 3: Configure the Integration
-1. Go to Settings → Devices & Services
-2. Click **+ ADD INTEGRATION**
-3. Search for "Crop Steering"
-4. Choose your setup method:
-   - **Advanced Setup** (recommended) - Configure zones and sensors through GUI
-   - **Basic Setup** - Just switches, no sensors
-   - **Load from file** - If you have an existing crop_steering.env
+### Step 2: Add Our Repository to HACS
+1. **Open HACS** from your Home Assistant sidebar
+2. **Click "Integrations"** tab at the top
+3. **Click the three dots (⋮)** in the top right
+4. **Select "Custom repositories"**
+5. **Fill out the form:**
+   - Repository URL: `https://github.com/JakeTheRabbit/HA-Irrigation-Strategy`
+   - Category: Select `Integration`
+6. **Click "ADD"**
 
-### Step 4: Install AppDaemon Apps (Optional for Automation)
-**What AppDaemon adds:**
-- Automatic phase transitions (P0→P1→P2→P3)
-- Sensor fusion (multiple sensors per zone)
-- Automated irrigation decisions
-- Analytics and monitoring dashboards
+✅ **Success Check:** You should see a confirmation that the repository was added
 
-**Without AppDaemon you get:**
-- Manual control of all zones
-- All entities (sensors, switches, controls)
-- Services for manual irrigation
-- Basic monitoring
+### Step 3: Download the Integration
+1. **Stay in HACS → Integrations**
+2. **Search for "Crop Steering"** in the search box
+3. **Click on "Crop Steering System"** when it appears
+4. **Click "DOWNLOAD"** (blue button)
+5. **Wait for download** (you'll see a progress indicator)
+6. **When complete, restart Home Assistant:**
+   - Settings → System → Restart (red "Restart" button)
+   - Wait 2-3 minutes for restart to complete
 
-If you want full automation:
+✅ **Success Check:** After restart, continue to Step 4
 
-1. Navigate to the AppDaemon apps directory:
-   - Path: `/addon_configs/a0d7b954_appdaemon/apps/`
-   - Samba: `\\YOUR_HA_IP\addon_configs\a0d7b954_appdaemon\apps\`
+### Step 4: Add the Integration to Your System
+1. **Navigate to Settings → Devices & Services**
+2. **Click the blue "+ ADD INTEGRATION" button** (bottom right)
+3. **Search for "Crop Steering"** and select it
+4. **Choose your setup method** (pick what matches your situation):
 
-2. Copy these files from this repository (folder `appdaemon/apps/`):
+   **🌟 Advanced Setup (Recommended for most users):**
+   - Configure zones and sensors through easy forms
+   - Best for complete systems with sensors
+   
+   **🔧 Basic Setup:**
+   - Just creates switches for manual control
+   - Good for testing or simple setups
+   
+   **📁 Load from file:**
+   - Only if you have an existing crop_steering.env file
+   - For users upgrading from older versions
+
+**Follow the setup wizard** - it will ask you step-by-step for:
+- Number of zones (1-6)
+- Your pump and valve entities
+- Your sensor entities (if any)
+
+✅ **Success Check:** You should see "Crop Steering System" in your device list
+
+### Step 5: Add Full Automation (Optional but Recommended)
+
+**🤔 Do I need this step?**
+- **Skip if:** You want manual control only
+- **Do this if:** You want the system to run automatically
+
+**What you get with automation:**
+- ✅ Automatic phase transitions throughout the day (P0→P1→P2→P3)
+- ✅ Smart decisions about when to water
+- ✅ Professional monitoring dashboards
+- ✅ Combines data from multiple sensors intelligently
+- ✅ No daily maintenance required
+
+#### 5a: Install AppDaemon Add-on
+1. **Go to Settings → Add-ons → Add-on Store**
+2. **Search for "AppDaemon 4"**
+3. **Click on AppDaemon 4** and click **INSTALL**
+4. **DON'T START IT YET** - we need to configure it first
+
+#### 5b: Get the Automation Files
+**Option A: Download via GitHub (Easiest)**
+1. Go to https://github.com/JakeTheRabbit/HA-Irrigation-Strategy
+2. Click the green **"Code"** button → **"Download ZIP"**
+3. Extract the ZIP file on your computer
+4. Look for the `appdaemon/apps/` folder
+
+**Option B: Use Git (Advanced Users)**
+```bash
+git clone https://github.com/JakeTheRabbit/HA-Irrigation-Strategy.git
+```
+
+#### 5c: Copy Files to AppDaemon
+**Find your AppDaemon folder:**
+- **File Manager:** Browse to `/addon_configs/a0d7b954_appdaemon/apps/`
+- **Samba/SMB:** `\\YOUR_HA_IP\addon_configs\a0d7b954_appdaemon\apps\`
+- **SSH/Terminal:** `/addon_configs/a0d7b954_appdaemon/apps/`
+
+**Copy these files:**
+From the downloaded files, copy:
+```
+appdaemon/apps/apps.yaml → /addon_configs/a0d7b954_appdaemon/apps/
+appdaemon/apps/crop_steering/ → /addon_configs/a0d7b954_appdaemon/apps/crop_steering/
+```
+
+#### 5d: Configure AppDaemon
+1. **Edit the main config file:** `/addon_configs/a0d7b954_appdaemon/appdaemon.yaml`
+2. **Add your Home Assistant details:**
+   ```yaml
+   appdaemon:
+     latitude: YOUR_LATITUDE
+     longitude: YOUR_LONGITUDE
+     elevation: YOUR_ELEVATION
+     time_zone: YOUR_TIMEZONE
+     plugins:
+       HASS:
+         type: hass
+         ha_url: http://YOUR_HA_IP:8123
+         token: YOUR_LONG_LIVED_ACCESS_TOKEN
    ```
-   appdaemon/apps/
-   ├── apps.yaml
-   └── crop_steering/
-       ├── master_crop_steering_app.py
-       ├── base_async_app.py
-       ├── phase_state_machine.py
-       ├── intelligent_sensor_fusion.py
-       ├── advanced_dryback_detection.py
-       ├── intelligent_crop_profiles.py
-       └── ml_irrigation_predictor.py
-   ```
 
-3. Configure AppDaemon:
-   - Edit `/addon_configs/a0d7b954_appdaemon/appdaemon.yaml`
-   - Add your Home Assistant URL and Long-Lived Access Token
-   - Update timezone and location
+**Need a token?**
+- Go to your Profile in Home Assistant (click your username)
+- Scroll down to "Long-Lived Access Tokens"
+- Click "CREATE TOKEN"
+- Copy the token and paste it in the config
 
-4. Start AppDaemon add-on
+#### 5e: Start AppDaemon
+1. **Go to Settings → Add-ons → AppDaemon 4**
+2. **Click "START"**
+3. **Wait 30 seconds, then check the log**
+4. **Look for:** "Master Crop Steering Application initialized"
 
-## Method 2: Manual Installation
+✅ **Success Check:** If you see that message, automation is working!
+
+---
+
+## Method 2: Manual Installation (Advanced Users)
+
+⚠️ **Use HACS instead if possible** - it's much easier and provides automatic updates!
 
 ### Step 1: Download the Repository
 1. Go to https://github.com/JakeTheRabbit/HA-Irrigation-Strategy
@@ -112,72 +210,139 @@ If you want full automation:
 3. Restart Home Assistant
 
 ### Step 3: Add the Integration
-Same as HACS Step 3 above - use the GUI to configure
+Same as HACS Step 4 above - use the GUI to configure
 
 ### Step 4: Install AppDaemon Apps (Optional)
-Same as HACS Step 4 above
+Same as HACS Step 5 above
 
-## Configuration
+## 🎛️ System Configuration
 
-### GUI Configuration (Recommended)
-When you add the integration and select "Advanced Setup":
+### 🎯 Basic Configuration (Required)
+The setup wizard will walk you through this:
 
-1. **Choose number of zones** (1-6)
-2. **Configure hardware**:
-   - Pump switch entity
-   - Main line valve entity
-   - Zone valve entities
-3. **Configure sensors per zone** (all optional):
-   - Front VWC sensor
-   - Back VWC sensor
-   - Front EC sensor
-   - Back EC sensor
-4. **Configure environmental sensors** (optional):
-   - Temperature sensor
-   - Humidity sensor
-   - VPD sensor
+**Zone Setup:**
+- How many growing areas do you have? (1-6 zones)
+- Each zone can have its own sensors and controls
+
+**Hardware Mapping:**
+- **Water Pump:** The entity that turns your pump on/off
+- **Main Valve:** The solenoid that controls your main water line
+- **Zone Valves:** Individual valves for each growing area
+
+*Don't know your entity names?* Check Developer Tools → States
+
+### 🌡️ Sensor Configuration (Optional)
+For each zone, you can add:
+
+**Moisture Monitoring:**
+- **Front VWC Sensor:** Moisture sensor at front of growing area
+- **Back VWC Sensor:** Second moisture sensor for better accuracy
+
+**Nutrient Monitoring:**
+- **Front EC Sensor:** Nutrient/salt level sensor at front
+- **Back EC Sensor:** Second EC sensor for better accuracy
+
+**Environmental Sensors (system-wide):**
+- **Temperature Sensor:** Air temperature
+- **Humidity Sensor:** Relative humidity
+- **VPD Sensor:** Vapor Pressure Deficit (if available)
+
+**💡 Pro Tip:** You can always add more sensors later by reconfiguring the integration
 
 ### Legacy Configuration (crop_steering.env)
 If you have an existing setup, you can load from your crop_steering.env file by selecting "Load from file" during setup.
 
-## Verify Installation
+## ✅ Test Your Installation
 
-### Check Integration
-1. Go to Settings → Devices & Services
-2. You should see "Crop Steering System" with all your zones
+### 🔍 Quick System Check
 
-### Check Entities
-In Developer Tools → States, filter by "crop_steering" to see:
-- `sensor.crop_steering_system_state`
-- `sensor.crop_steering_current_phase`
-- `switch.crop_steering_zone_X_enabled` (for each zone)
-- And many more!
+**1. Check Integration Status**
+- Go to **Settings → Devices & Services**
+- Look for **"Crop Steering System"** device
+- Should show green "Connected" status
+- Click on it to see all your zones
 
-### Check AppDaemon (if installed)
-1. Go to AppDaemon add-on → Log
-2. Look for "Master Crop Steering Application initialized"
+**2. Verify Entities Were Created**
+- Go to **Developer Tools → States**
+- Type **"crop_steering"** in the filter box
+- You should see many entities like:
+  - `sensor.crop_steering_current_phase`
+  - `switch.crop_steering_system_enabled`
+  - `switch.crop_steering_zone_1_enabled` (for each zone)
+  - `number.crop_steering_p1_target_vwc`
+  - And many more!
 
-## Troubleshooting
+**3. Test Basic Control**
+- Find `switch.crop_steering_system_enabled`
+- Try turning it OFF and ON
+- The state should change immediately
 
-### Integration Not Showing
-- Ensure you restarted Home Assistant after installation
-- Check logs for errors: Settings → System → Logs
+**4. Check AppDaemon (if installed)**
+- Go to **Settings → Add-ons → AppDaemon 4**
+- Click the **"Log"** tab
+- Look for: `Master Crop Steering Application initialized`
+- **If you see errors:** Double-check your token and configuration
 
-### AppDaemon Errors
-- **Without AppDaemon**: You get manual control only (switches, sensors, manual services)
-- **With AppDaemon**: You get full automation (automatic phase transitions, sensor fusion, analytics)
-- If AppDaemon fails to start, check your token and URL in appdaemon.yaml
-- The integration works fine without AppDaemon for manual irrigation control
+### 🚨 Troubleshooting Quick Fixes
 
-### Missing Entities
-- Entities are created based on your configuration
-- If you configured 3 zones, you'll only see entities for zones 1-3
+**Problem: "I don't see Crop Steering in Add Integration"**
+- ✅ **Solution:** Restart Home Assistant and wait 2-3 minutes
+- ✅ **Check:** Settings → System → Logs for any error messages
 
-## Next Steps
+**Problem: "AppDaemon won't start or shows errors"**
+- ✅ **Check your token:** Go to your Profile → Long-Lived Access Tokens
+- ✅ **Verify URL:** Should be `http://192.168.1.XXX:8123` (use your HA IP)
+- ✅ **Check timezone:** Must match your Home Assistant timezone
+- ✅ **Remember:** The integration works fine without AppDaemon for manual control
 
-1. **Configure your crop profile**: Settings → Devices & Services → Crop Steering → Configure
-2. **Set up automations**: The system runs automatically once configured
-3. **Monitor operation**: Check the phase transitions and irrigation events
-4. **Join the community**: Report issues on GitHub if you encounter problems
+**Problem: "I only see some of my zones"**
+- ✅ **This is normal:** Entities are only created for the zones you configured
+- ✅ **Want more zones?** Reconfigure the integration to add them
 
-That's it! Your crop steering system is now installed and ready to optimize your irrigation.
+**Problem: "My sensors show 'Unknown' or 'None'"**
+- ✅ **Check entity names:** Go to Developer Tools → States and verify your sensor entity names
+- ✅ **Check sensor status:** Make sure your physical sensors are working
+
+## 🎉 You're Done! What's Next?
+
+### 🌱 First-Time Setup
+1. **Choose your crop profile:**
+   - Settings → Devices & Services → Crop Steering System → Configure
+   - Select your plant type (Cannabis, Tomato, Lettuce, etc.)
+   - Choose growth stage (Vegetative or Generative)
+
+2. **Set your light schedule:**
+   - Look for `number.crop_steering_lights_on_hour` entity
+   - Set when your lights turn on (0-23 hours)
+   - Set when lights turn off with `number.crop_steering_lights_off_hour`
+
+3. **Test manual control:**
+   - Try the service `crop_steering.execute_irrigation_shot`
+   - Set zone=1, duration_seconds=30 for a quick test
+
+### 🤖 If You Installed AppDaemon
+**Your system will now:**
+- Automatically transition through phases each day (P0→P1→P2→P3)
+- Make smart irrigation decisions based on your sensors
+- Provide professional monitoring dashboards
+- Run completely autonomously
+
+**Just watch it work!** 📊
+
+### 📚 Learn More
+- **[Operation Guide](operation_guide.md)** - How to use your system day-to-day
+- **[Dashboard Guide](dashboard_guide.md)** - Understanding the monitoring interface
+- **[Troubleshooting Guide](troubleshooting.md)** - Solutions to common issues
+
+### 🆘 Need Help?
+- **GitHub Issues:** https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues
+- **Home Assistant Forum:** Search for "Crop Steering"
+- **Discord:** Join the Home Assistant Discord and ask in #custom-components
+
+### 🎯 Pro Tips
+- **Start conservative:** Use smaller shot sizes and longer intervals initially
+- **Monitor closely:** Watch how your plants respond for the first few days
+- **Adjust gradually:** Small parameter changes work better than big ones
+- **Use test helpers:** The system creates test entities you can use for learning
+
+**Congratulations! Your advanced crop steering system is ready to optimize your garden! 🌿🚰**
