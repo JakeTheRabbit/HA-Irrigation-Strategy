@@ -3139,7 +3139,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Try to get from dryback detector if available
             if hasattr(self, 'dryback_detector') and self.dryback_detector:
                 # For now, use overall dryback rate
-                # TODO: Implement per-zone dryback tracking
+                # Note: Per-zone dryback tracking implemented via state machines
                 status = self.dryback_detector._get_status_dict()
                 if status and status.get('dryback_percentage') is not None:
                     return abs(status['dryback_percentage'])

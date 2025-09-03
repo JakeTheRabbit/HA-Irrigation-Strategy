@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, CONF_NUM_ZONES
+from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
             name="Crop Steering System",
             manufacturer="Home Assistant Community", 
             model="Professional Irrigation Controller",
-            sw_version="2.0.0",
+            sw_version=SOFTWARE_VERSION,
         )
 
     async def async_turn_on(self, **kwargs: Any) -> None:

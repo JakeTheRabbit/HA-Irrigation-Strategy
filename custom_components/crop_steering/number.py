@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, CONF_NUM_ZONES
+from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -540,7 +540,7 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
                 name=f"Zone {self._zone_num}",
                 manufacturer="Home Assistant Community",
                 model="Zone Controller",
-                sw_version="2.3.0",
+                sw_version=SOFTWARE_VERSION,
                 via_device=(DOMAIN, self._entry.entry_id),
             )
         else:
@@ -550,7 +550,7 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
                 name="Crop Steering System",
                 manufacturer="Home Assistant Community",
                 model="Professional Irrigation Controller",
-                sw_version="2.3.0",
+                sw_version=SOFTWARE_VERSION,
             )
 
     async def async_set_native_value(self, value: float) -> None:

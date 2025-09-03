@@ -21,9 +21,30 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DOMAIN, CONF_NUM_ZONES
+from .const import (
+    DOMAIN, CONF_NUM_ZONES, SECONDS_PER_HOUR, PERCENTAGE_TO_RATIO,
+    DEFAULT_EC_RATIO, DEFAULT_EC_FALLBACK, VWC_ADJUSTMENT_PERCENT,
+    VWC_DRY_THRESHOLD, VWC_SATURATED_THRESHOLD, SOFTWARE_VERSION
+)
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class ShotCalculator:
+    """Helper class for irrigation shot calculations."""
+    
+    @staticmethod
+    def calculate_shot_duration(dripper_flow: float, substrate_vol: float, shot_size: float) -> float:
+        """Calculate irrigation shot duration in seconds."""
+        try:
+            if dripper_flow > 0:
+                volume_to_add = substrate_vol * (shot_size * PERCENTAGE_TO_RATIO)
+                duration_hours = volume_to_add / dripper_flow
+                return round(duration_hours * SECONDS_PER_HOUR, 1)
+            return 0.0
+        except Exception:
+            return 0.0
+
 
 # Base sensor descriptions (non-zone specific)
 BASE_SENSOR_DESCRIPTIONS = [
@@ -210,91 +231,8 @@ async def async_setup_entry(
     zones_config = config_data.get("zones", {})
     hardware_config = config_data.get("hardware", {})
     
-    # Add base sensors
+    # Use base sensors - no duplication needed
     sensor_descriptions = BASE_SENSOR_DESCRIPTIONS.copy()
-    
-    # Add other non-zone sensors
-    sensor_descriptions.extend([
-        SensorEntityDescription(
-            key="irrigation_efficiency",
-            name="Irrigation Efficiency",
-            state_class=SensorStateClass.MEASUREMENT,
-            native_unit_of_measurement=PERCENTAGE,
-            icon="mdi:water-check",
-        ),
-        SensorEntityDescription(
-            key="water_usage_daily",
-            name="Daily Water Usage",
-            device_class=SensorDeviceClass.VOLUME,
-            state_class=SensorStateClass.TOTAL_INCREASING,
-            native_unit_of_measurement=UnitOfVolume.LITERS,
-            icon="mdi:water",
-        ),
-        SensorEntityDescription(
-            key="dryback_percentage",
-            name="Dryback Percentage",
-            state_class=SensorStateClass.MEASUREMENT,
-            native_unit_of_measurement=PERCENTAGE,
-            icon="mdi:water-minus",
-        ),
-        SensorEntityDescription(
-            key="next_irrigation_time",
-            name="Next Irrigation Time",
-            device_class=SensorDeviceClass.TIMESTAMP,
-            icon="mdi:clock-outline",
-        ),
-        # Critical Template Calculations - Ported from packages
-        SensorEntityDescription(
-            key="p1_shot_duration_seconds",
-            name="P1 Shot Duration",
-            state_class=SensorStateClass.MEASUREMENT,
-            native_unit_of_measurement=UnitOfTime.SECONDS,
-            icon="mdi:timer-sand",
-        ),
-        SensorEntityDescription(
-            key="p2_shot_duration_seconds",
-            name="P2 Shot Duration",
-            state_class=SensorStateClass.MEASUREMENT,
-            native_unit_of_measurement=UnitOfTime.SECONDS,
-            icon="mdi:timer-sand",
-        ),
-        SensorEntityDescription(
-            key="p3_shot_duration_seconds",
-            name="P3 Emergency Shot Duration",
-            state_class=SensorStateClass.MEASUREMENT,
-            native_unit_of_measurement=UnitOfTime.SECONDS,
-            icon="mdi:timer-sand",
-        ),
-        SensorEntityDescription(
-            key="ec_ratio",
-            name="EC Ratio",
-            state_class=SensorStateClass.MEASUREMENT,
-            icon="mdi:division",
-        ),
-        SensorEntityDescription(
-            key="p2_vwc_threshold_adjusted",
-            name="P2 VWC Threshold Adjusted",
-            state_class=SensorStateClass.MEASUREMENT,
-            native_unit_of_measurement=PERCENTAGE,
-            icon="mdi:water-alert",
-        ),
-        SensorEntityDescription(
-            key="configured_avg_vwc",
-            name="Average VWC All Zones",
-            device_class=SensorDeviceClass.MOISTURE,
-            state_class=SensorStateClass.MEASUREMENT,
-            native_unit_of_measurement=PERCENTAGE,
-            icon="mdi:water-percent",
-        ),
-        SensorEntityDescription(
-            key="configured_avg_ec",
-            name="Average EC All Zones",
-            device_class=SensorDeviceClass.VOLTAGE,
-            state_class=SensorStateClass.MEASUREMENT,
-            native_unit_of_measurement="mS/cm",
-            icon="mdi:flash",
-        ),
-    ])
     
     # Add zone-specific sensors
     zone_sensors = create_zone_sensor_descriptions(num_zones)
@@ -344,7 +282,7 @@ class CropSteeringSensor(SensorEntity):
             name="Crop Steering System",
             manufacturer="Home Assistant Community",
             model="Professional Irrigation Controller",
-            sw_version="2.3.0",
+            sw_version=SOFTWARE_VERSION,
         )
 
     @property
@@ -392,49 +330,24 @@ class CropSteeringSensor(SensorEntity):
     
     def _calculate_p1_shot_duration(self) -> float:
         """Calculate P1 shot duration in seconds."""
-        try:
-            # Get configuration values
-            dripper_flow = self._get_number_value("dripper_flow_rate")
-            substrate_vol = self._get_number_value("substrate_volume") 
-            shot_size = self._get_number_value("p1_initial_shot_size")  # Simplified for now
-            
-            if dripper_flow > 0:
-                volume_to_add = substrate_vol * (shot_size / 100)
-                duration_hours = volume_to_add / dripper_flow
-                return round(duration_hours * 3600, 1)
-            return 0.0
-        except Exception:
-            return 0.0
+        dripper_flow = self._get_number_value("dripper_flow_rate")
+        substrate_vol = self._get_number_value("substrate_volume") 
+        shot_size = self._get_number_value("p1_initial_shot_size")  # Simplified for now
+        return ShotCalculator.calculate_shot_duration(dripper_flow, substrate_vol, shot_size)
     
     def _calculate_p2_shot_duration(self) -> float:
         """Calculate P2 shot duration in seconds."""
-        try:
-            dripper_flow = self._get_number_value("dripper_flow_rate")
-            substrate_vol = self._get_number_value("substrate_volume")
-            shot_size = self._get_number_value("p2_shot_size")
-            
-            if dripper_flow > 0:
-                volume_to_add = substrate_vol * (shot_size / 100)
-                duration_hours = volume_to_add / dripper_flow
-                return round(duration_hours * 3600, 1)
-            return 0.0
-        except Exception:
-            return 0.0
+        dripper_flow = self._get_number_value("dripper_flow_rate")
+        substrate_vol = self._get_number_value("substrate_volume")
+        shot_size = self._get_number_value("p2_shot_size")
+        return ShotCalculator.calculate_shot_duration(dripper_flow, substrate_vol, shot_size)
     
     def _calculate_p3_shot_duration(self) -> float:
         """Calculate P3 emergency shot duration in seconds."""
-        try:
-            dripper_flow = self._get_number_value("dripper_flow_rate")
-            substrate_vol = self._get_number_value("substrate_volume")
-            shot_size = self._get_number_value("p3_emergency_shot_size")
-            
-            if dripper_flow > 0:
-                volume_to_add = substrate_vol * (shot_size / 100)
-                duration_hours = volume_to_add / dripper_flow
-                return round(duration_hours * 3600, 1)
-            return 0.0
-        except Exception:
-            return 0.0
+        dripper_flow = self._get_number_value("dripper_flow_rate")
+        substrate_vol = self._get_number_value("substrate_volume")
+        shot_size = self._get_number_value("p3_emergency_shot_size")
+        return ShotCalculator.calculate_shot_duration(dripper_flow, substrate_vol, shot_size)
     
     def _calculate_ec_ratio(self) -> float:
         """Calculate current EC ratio vs target."""
@@ -445,9 +358,9 @@ class CropSteeringSensor(SensorEntity):
             
             if target_ec > 0 and current_ec is not None:
                 return round(current_ec / target_ec, 2)
-            return 1.0
+            return DEFAULT_EC_RATIO
         except Exception:
-            return 1.0
+            return DEFAULT_EC_RATIO
     
     def _calculate_adjusted_p2_threshold(self) -> float:
         """Calculate P2 VWC threshold adjusted for EC ratio."""
@@ -457,11 +370,11 @@ class CropSteeringSensor(SensorEntity):
             ec_high_threshold = self._get_number_value("p2_ec_high_threshold")
             ec_low_threshold = self._get_number_value("p2_ec_low_threshold")
             
-            # Simplified adjustment logic (5% adjustment)
+            # Simplified adjustment logic
             if ec_ratio > ec_high_threshold:
-                return round(base_threshold + 5.0, 2)  # Raise threshold when EC high
+                return round(base_threshold + VWC_ADJUSTMENT_PERCENT, 2)  # Raise threshold when EC high
             elif ec_ratio < ec_low_threshold:
-                return round(base_threshold - 5.0, 2)  # Lower threshold when EC low
+                return round(base_threshold - VWC_ADJUSTMENT_PERCENT, 2)  # Lower threshold when EC low
             else:
                 return round(base_threshold, 2)
         except Exception:
@@ -506,9 +419,9 @@ class CropSteeringSensor(SensorEntity):
             return "Sensor Error"
             
         # Basic status based on VWC
-        if vwc < 40:
+        if vwc < VWC_DRY_THRESHOLD:
             return "Dry - Needs Water"
-        elif vwc > 70:
+        elif vwc > VWC_SATURATED_THRESHOLD:
             return "Saturated"
         else:
             return "Optimal"
@@ -610,7 +523,7 @@ class CropSteeringSensor(SensorEntity):
             mode_state = self.hass.states.get("select.crop_steering_steering_mode")
             
             if not phase_state or not mode_state:
-                return 3.0  # Default fallback
+                return DEFAULT_EC_FALLBACK  # Default fallback
             
             phase = phase_state.state
             mode = mode_state.state.lower()
@@ -635,9 +548,9 @@ class CropSteeringSensor(SensorEntity):
                 elif phase == "P3":
                     return self._get_number_value("ec_target_gen_p3")
             
-            return 3.0  # Default fallback
+            return DEFAULT_EC_FALLBACK  # Default fallback
         except Exception:
-            return 3.0
+            return DEFAULT_EC_FALLBACK
 
     def _get_current_phase(self) -> str:
         """Get current irrigation phase from AppDaemon sensor."""

@@ -1,3 +1,71 @@
+"""Config flow for Crop Steering System integration."""
+from __future__ import annotations
+
+import logging
+import os
+import yaml
+from typing import Any
+
+import voluptuous as vol
+from homeassistant import config_entries
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResult
+from homeassistant.exceptions import HomeAssistantError
+
+from .const import DOMAIN, CONF_NUM_ZONES, MIN_ZONES, MAX_ZONES, DEFAULT_NUM_ZONES
+
+_LOGGER = logging.getLogger(__name__)
+
+STEP_USER_DATA_SCHEMA = vol.Schema(
+    {
+        vol.Required("name", default="Crop Steering System"): str,
+        vol.Required(CONF_NUM_ZONES, default=DEFAULT_NUM_ZONES): vol.All(
+            vol.Coerce(int), vol.Range(min=MIN_ZONES, max=MAX_ZONES)
+        ),
+    }
+)
+
+
+class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Crop Steering System."""
+
+    VERSION = 1
+    
+    def __init__(self):
+        """Initialize config flow."""
+        self._data = {}
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle the initial step."""
+        if user_input is None:
+            return self.async_show_form(
+                step_id="user", data_schema=STEP_USER_DATA_SCHEMA
+            )
+
+        errors = {}
+
+        if user_input is not None:
+            # Store user input
+            self._data.update(user_input)
+            
+            # Check if there's an existing entry
+            await self.async_set_unique_id(DOMAIN)
+            self._abort_if_unique_id_configured()
+
+            # Check for YAML configuration first
+            config_path = os.path.join(self.hass.config.config_dir, "config.yaml")
+            if os.path.exists(config_path):
+                return await self.async_step_load_yaml()
+            else:
+                # Proceed with manual configuration
+                return await self.async_step_zones()
+
+        return self.async_show_form(
+            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+        )
+
     async def async_step_load_yaml(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Load configuration from config.yaml."""
         config_path = os.path.join(self.hass.config.config_dir, "config.yaml")
@@ -58,15 +126,40 @@
         
         data = {
             "installation_mode": "yaml",
-            "name": self._data.get(CONF_NAME, "Crop Steering System"),
+            "name": self._data.get("name", "Crop Steering System"),
             CONF_NUM_ZONES: len(zones_config),
             "zones": zones_config,
             "hardware": hardware_config,
             "config_yaml": config, # Store the full yaml config
         }
         
-        await self._install_integration_files()
         return self.async_create_entry(
             title=data["name"],
             data=data,
         )
+
+    async def async_step_zones(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Configure zones manually."""
+        # For now, create a basic configuration without detailed zone setup
+        # This can be expanded in the future for manual configuration
+        
+        data = {
+            "installation_mode": "manual",
+            "name": self._data.get("name", "Crop Steering System"),
+            CONF_NUM_ZONES: self._data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES),
+            "zones": {},
+            "hardware": {},
+        }
+        
+        return self.async_create_entry(
+            title=data["name"],
+            data=data,
+        )
+
+
+class CannotConnect(HomeAssistantError):
+    """Error to indicate we cannot connect."""
+
+
+class InvalidAuth(HomeAssistantError):
+    """Error to indicate there is invalid auth."""

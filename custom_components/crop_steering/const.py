@@ -27,6 +27,20 @@ DEFAULT_GEN_DRYBACK_TARGET = 40.0
 DEFAULT_P1_TARGET_VWC = 65.0
 DEFAULT_P2_VWC_THRESHOLD = 60.0
 
+# Calculation constants
+SECONDS_PER_HOUR = 3600
+PERCENTAGE_TO_RATIO = 0.01
+DEFAULT_EC_RATIO = 1.0
+DEFAULT_EC_FALLBACK = 3.0
+VWC_ADJUSTMENT_PERCENT = 5.0
+
+# Status thresholds
+VWC_DRY_THRESHOLD = 40
+VWC_SATURATED_THRESHOLD = 70
+
+# Software version - single source of truth
+SOFTWARE_VERSION = "2.3.1"
+
 # Crop steering phases
 PHASES = ["P0", "P1", "P2", "P3", "Manual"]
 STEERING_MODES = ["Vegetative", "Generative"]
