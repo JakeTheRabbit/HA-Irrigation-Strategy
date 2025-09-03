@@ -181,7 +181,7 @@ This document lists every single entity created by the Crop Steering System with
 | `switch.crop_steering_system_enabled` | System Enabled | Master system enable/disable switch |
 | `switch.crop_steering_auto_irrigation_enabled` | Auto Irrigation Enabled | Enable/disable automatic irrigation |
 | `switch.crop_steering_ec_stacking_enabled` | EC Stacking Enabled | Enable EC-based shot stacking |
-| `switch.crop_steering_ml_enabled` | ML Enabled | Enable machine learning features |
+| `switch.crop_steering_analytics_enabled` | Analytics Enabled | Enable advanced statistical analysis features |
 | `switch.crop_steering_debug_mode` | Debug Mode | Enable debug logging and verbose output |
 
 ### Zone Control Switches (Per Zone 1-N)
@@ -233,4 +233,4 @@ This document lists every single entity created by the Crop Steering System with
 5. **Analytics Entities**: Performance metrics and predictive data
 6. **Zone Entities**: Per-zone controls and monitoring
 
-This comprehensive entity system provides complete control over a professional-grade crop steering irrigation system with advanced AI features, safety systems, and real-time monitoring capabilities.
+This comprehensive entity system provides complete control over a professional-grade crop steering irrigation system with rule-based automation, safety systems, and real-time monitoring capabilities.

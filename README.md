@@ -15,7 +15,7 @@ Highlights in v2.3.1:
 - Dynamic multi‑zone (1–6) entity generation via GUI setup
 - Built‑in calculations (P1/P2/P3 shot durations, EC ratio, adjusted thresholds)
 - Services for phase transitions, manual shots, and manual override
-- Optional AppDaemon suite: dryback detection, sensor fusion, state machine, ML predictor
+- Optional AppDaemon suite: dryback detection, sensor validation, phase state machine, trend analysis
 
 —
 
@@ -26,7 +26,7 @@ Highlights in v2.3.1:
   - Performs core calculations in sensors
   - Exposes services and fires events for orchestration/hardware
 - AppDaemon (optional, appdaemon/apps/crop_steering)
-  - Advanced logic: dryback analysis, state machine, predictions, analytics
+  - Rule-based automation: dryback detection, phase transitions, sensor processing
   - Listens to integration events and HA entity changes
 
 This separation keeps the HA integration simple and robust while enabling powerful automation when AppDaemon is installed.
@@ -250,12 +250,12 @@ flowchart LR
   I --> SVC
   I <--> BUS
 
-  subgraph AD[AppDaemon (optional)]
-    M[MasterCropSteeringApp]
-    D[AdvancedDrybackDetector]
-    F[IntelligentSensorFusion]
-    P[ML Irrigation Predictor]
-    SM[Zone State Machine]
+  subgraph AD[AppDaemon - Optional]
+    M[Master Crop Steering App]
+    D[Dryback Detection]
+    F[Sensor Validation]
+    P[Statistical Analysis]
+    SM[Phase State Machine]
   end
 
   BUS <--> M
@@ -263,7 +263,16 @@ flowchart LR
   M --> F
   M --> P
   M --> SM
-  M --> HW[(Pump/Main/Zone Valves)]
+  M --> HW[(Hardware Control<br/>Pumps/Valves)]
+  
+  subgraph HW_DETAIL[Physical Hardware]
+    PUMP[Water Pump]
+    MAIN[Main Valve]
+    ZONES[Zone Valves 1-6]
+    SENSORS[VWC/EC Sensors]
+  end
+  
+  HW --> HW_DETAIL
 ```
 
 ## Modules & key classes
@@ -278,11 +287,11 @@ flowchart LR
 
 - appdaemon/apps/crop_steering (optional)
   - master_crop_steering_app.py — MasterCropSteeringApp (orchestrates modules, listens to HA)
-  - advanced_dryback_detection.py — AdvancedDrybackDetector
-  - intelligent_sensor_fusion.py — IntelligentSensorFusion
-  - ml_irrigation_predictor.py — SimplifiedIrrigationPredictor
-  - phase_state_machine.py — ZoneStateMachine, IrrigationPhase, PhaseTransition
-  - intelligent_crop_profiles.py — IntelligentCropProfiles
+  - advanced_dryback_detection.py — Peak/valley detection for moisture patterns
+  - intelligent_sensor_fusion.py — Multi-sensor averaging and validation
+  - ml_irrigation_predictor.py — Statistical trend analysis for irrigation timing
+  - phase_state_machine.py — 4-phase irrigation cycle automation (P0-P3)
+  - intelligent_crop_profiles.py — Plant-specific parameter management
 
 ## Screenshots
 

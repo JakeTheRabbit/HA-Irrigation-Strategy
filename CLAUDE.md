@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is an **Advanced Automated Crop Steering System** for Home Assistant that uses rule-based logic, statistical analysis, and sensor-driven automation to optimize precision irrigation. The system implements a sophisticated 4-phase irrigation cycle (P0-P3) with real-time decision making based on VWC and EC sensor data.
 
-## Current Architecture (v2.0)
+## Current Architecture (v2.3.1)
 
 ### Core Components
 - **Home Assistant Integration**: `custom_components/crop_steering/` - Main HA integration with UI configuration

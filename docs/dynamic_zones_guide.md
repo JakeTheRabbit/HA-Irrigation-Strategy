@@ -136,7 +136,7 @@ The AppDaemon modules automatically detect and use configured zones:
 - Calibrate sensors before use
 
 ### AppDaemon v15+ File Locations
-- AI Modules: `/addon_configs/a0d7b954_appdaemon/apps/crop_steering/`
+- Automation Modules: `/addon_configs/a0d7b954_appdaemon/apps/crop_steering/`
 - Configuration: `/addon_configs/a0d7b954_appdaemon/appdaemon.yaml`
 - Apps Config: `/addon_configs/a0d7b954_appdaemon/apps/apps.yaml`
 - Samba Access: `\\YOUR_HA_IP\addon_configs\a0d7b954_appdaemon`
