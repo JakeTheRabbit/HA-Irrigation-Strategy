@@ -1983,9 +1983,46 @@ class MasterCropSteeringApp(BaseAsyncApp):
             pre_vwc = self._get_zone_average_vwc(zone)
             
             # Hardware sequence: Pump -> Main Line -> Zone Valve
-            pump_entity = self.config['hardware']['pump_master']
-            main_line_entity = self.config['hardware']['main_line']
-            zone_entity = self.config['hardware']['zone_valves'][zone]
+            # Check hardware configuration with error handling
+            try:
+                pump_entity = self.config['hardware']['pump_master']
+                main_line_entity = self.config['hardware']['main_line']
+                zone_entity = self.config['hardware']['zone_valves'][zone]
+                
+                # Validate entities exist and are not None/empty
+                if not pump_entity or not main_line_entity or not zone_entity:
+                    missing_entities = []
+                    if not pump_entity:
+                        missing_entities.append('pump_master')
+                    if not main_line_entity:
+                        missing_entities.append('main_line')
+                    if not zone_entity:
+                        missing_entities.append(f'zone_{zone}_valve')
+                    
+                    self.log(f"🚨 Hardware configuration error: Missing entities {missing_entities}", level="ERROR")
+                    return {
+                        'status': 'error',
+                        'reason': 'hardware_configuration_missing',
+                        'zone': zone,
+                        'message': f'Hardware entities not configured: {missing_entities}. Please check crop_steering.env configuration.'
+                    }
+                    
+            except KeyError as e:
+                self.log(f"🚨 Hardware configuration error: Missing key {e}", level="ERROR")
+                return {
+                    'status': 'error',
+                    'reason': 'hardware_configuration_incomplete',
+                    'zone': zone,
+                    'message': f'Hardware configuration incomplete: {e}. Please check crop_steering.env configuration.'
+                }
+            except Exception as e:
+                self.log(f"🚨 Hardware configuration error: {e}", level="ERROR")
+                return {
+                    'status': 'error',
+                    'reason': 'hardware_configuration_error',
+                    'zone': zone,
+                    'message': f'Hardware configuration error: {e}'
+                }
             
             # Turn on pump
             await self.call_service('switch/turn_on', entity_id=pump_entity)
@@ -2091,20 +2128,38 @@ class MasterCropSteeringApp(BaseAsyncApp):
     async def _emergency_stop(self):
         """Emergency stop all irrigation hardware."""
         try:
-            hardware = self.config['hardware']
+            hardware = self.config.get('hardware', {})
             
-            # Turn off all zone valves
-            for zone_entity in hardware['zone_valves'].values():
-                await self.call_service('switch/turn_off', entity_id=zone_entity)
+            # Safely turn off all zone valves
+            zone_valves = hardware.get('zone_valves', {})
+            for zone_id, zone_entity in zone_valves.items():
+                if zone_entity:
+                    try:
+                        await self.call_service('switch/turn_off', entity_id=zone_entity)
+                        self.log(f"🛑 Emergency stop: Zone {zone_id} valve {zone_entity} turned off")
+                    except Exception as e:
+                        self.log(f"⚠️ Emergency stop: Failed to turn off zone {zone_id} valve: {e}", level="WARNING")
             
-            # Turn off main line
-            await self.call_service('switch/turn_off', entity_id=hardware['main_line'])
+            # Safely turn off main line
+            main_line_entity = hardware.get('main_line')
+            if main_line_entity:
+                try:
+                    await self.call_service('switch/turn_off', entity_id=main_line_entity)
+                    self.log(f"🛑 Emergency stop: Main line {main_line_entity} turned off")
+                except Exception as e:
+                    self.log(f"⚠️ Emergency stop: Failed to turn off main line: {e}", level="WARNING")
             
-            # Turn off pump
-            await self.call_service('switch/turn_off', entity_id=hardware['pump_master'])
+            # Safely turn off pump
+            pump_entity = hardware.get('pump_master')
+            if pump_entity:
+                try:
+                    await self.call_service('switch/turn_off', entity_id=pump_entity)
+                    self.log(f"🛑 Emergency stop: Pump {pump_entity} turned off")
+                except Exception as e:
+                    self.log(f"⚠️ Emergency stop: Failed to turn off pump: {e}", level="WARNING")
             
             self.irrigation_in_progress = False
-            self.log("🛑 Emergency stop executed - all irrigation hardware turned off")
+            self.log("🛑 Emergency stop executed - all available irrigation hardware turned off")
             
         except Exception as e:
             self.log(f"❌ Error during emergency stop: {e}", level='ERROR')
@@ -2177,7 +2232,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # WORKAROUND: Multiple strategies to bypass AppDaemon async Task issue
             for zone_num in range(1, self.num_zones + 1):
-                integration_sensor = f"sensor.crop_steering_zone_{zone_num}_vwc"
+                integration_sensor = f"sensor.crop_steering_vwc_zone_{zone_num}"
                 value = None
                 
                 try:
@@ -2321,7 +2376,17 @@ class MasterCropSteeringApp(BaseAsyncApp):
             if state not in ['unknown', 'unavailable', None]:
                 # Ensure state is a string or number, not an async Task
                 if hasattr(state, '__await__'):
-                    self.log(f"⚠️ Skipping async task from integration sensor {integration_sensor}")
+                    self.log(f"⚠️ Async context detected for {integration_sensor}, falling back to safe method")
+                    # Try alternative methods to get the value safely
+                    try:
+                        # Use entity_exists check first
+                        if self.entity_exists(integration_sensor):
+                            # Try get_state directly as a last resort
+                            alt_state = self.get_state(integration_sensor)
+                            if alt_state and not hasattr(alt_state, '__await__') and alt_state not in ['unknown', 'unavailable']:
+                                return float(alt_state)
+                    except Exception:
+                        pass
                 else:
                     return float(state)
             
@@ -2347,7 +2412,14 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         if state not in ['unknown', 'unavailable', None]:
                             # Ensure state is a string or number, not an async Task
                             if hasattr(state, '__await__'):
-                                self.log(f"⚠️ Skipping async task from sensor {sensor}")
+                                self.log(f"⚠️ Async task from sensor {sensor}, trying alternative method")
+                                # Try direct get_state as fallback
+                                try:
+                                    alt_state = self.get_state(sensor)
+                                    if alt_state and not hasattr(alt_state, '__await__') and alt_state not in ['unknown', 'unavailable']:
+                                        values.append(float(alt_state))
+                                except Exception:
+                                    pass
                                 continue
                             values.append(float(state))
                     except (ValueError, TypeError) as e:
@@ -4838,15 +4910,33 @@ class MasterCropSteeringApp(BaseAsyncApp):
         try:
             # Emergency stop irrigation - sync version for shutdown
             try:
-                pump_entity = self.config['hardware']['pump_master']
-                main_line_entity = self.config['hardware']['main_line']
+                # Safely access hardware entities with error handling
+                hardware = self.config.get('hardware', {})
                 
-                # Turn off hardware synchronously during shutdown
-                self.turn_off(pump_entity)
-                self.turn_off(main_line_entity)
+                pump_entity = hardware.get('pump_master')
+                main_line_entity = hardware.get('main_line')
+                zone_valves = hardware.get('zone_valves', {})
                 
-                for zone_valve in self.config['hardware']['zone_valves'].values():
-                    self.turn_off(zone_valve)
+                # Turn off hardware synchronously during shutdown (only if configured)
+                if pump_entity:
+                    self.turn_off(pump_entity)
+                    self.log(f"🛑 Emergency stop: Turned off pump {pump_entity}")
+                else:
+                    self.log("⚠️ Emergency stop: Pump entity not configured")
+                    
+                if main_line_entity:
+                    self.turn_off(main_line_entity)
+                    self.log(f"🛑 Emergency stop: Turned off main line {main_line_entity}")
+                else:
+                    self.log("⚠️ Emergency stop: Main line entity not configured")
+                
+                if zone_valves:
+                    for zone_id, zone_valve in zone_valves.items():
+                        if zone_valve:
+                            self.turn_off(zone_valve)
+                            self.log(f"🛑 Emergency stop: Turned off zone {zone_id} valve {zone_valve}")
+                else:
+                    self.log("⚠️ Emergency stop: No zone valves configured")
                     
                 self.log("🛑 Emergency stop executed during shutdown")
                     
