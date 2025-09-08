@@ -9,11 +9,9 @@ import logging
 import asyncio
 import threading
 import os
-import pickle
 import statistics
-import math
 from datetime import datetime, timedelta, time
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 
 # Import our advanced modules with fallback
 try:
@@ -116,6 +114,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
         # Get number of zones from integration or config
         self.num_zones = self._get_number_of_zones()
         
+        # Validate required entities exist
+        if not self._validate_required_entities():
+            self.log("⚠️ WARNING: Some required entities are missing. The app will continue but some features may not work.", level="WARNING")
+        
         # Per-zone state machines
         self.zone_state_machines = {}  # {zone_num: ZoneStateMachine}
         
@@ -173,7 +175,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self.run_every(self._save_persistent_state, 'now+60', 300)  # Every 5 minutes
         
         self.log("🚀 Master Crop Steering Application with Advanced AI Features initialized!")
-        self.log(f"📊 Modules: Dryback Detection ✓, Sensor Fusion ✓, ML Prediction ✓, Crop Profiles ✓, Dashboard ✓")
+        self.log("📊 Modules: Dryback Detection ✓, Sensor Fusion ✓, ML Prediction ✓, Crop Profiles ✓, Dashboard ✓")
 
     def _load_configuration(self) -> Dict:
         """Load system configuration from AppDaemon args."""
@@ -187,7 +189,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'notification_service': self.args.get('notification_service', 'notify.persistent_notification')
             }
             
-            self.log(f"Configuration loaded from apps.yaml")
+            self.log("Configuration loaded from apps.yaml")
             return config
             
         except Exception as e:
@@ -332,6 +334,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         # Listen to manual override events
         self.listen_event(self._on_manual_override_event, 'crop_steering_manual_override')
+        
+        # Listen to phase transition service calls from HA integration
+        self.listen_event(self._on_phase_transition_service, 'crop_steering_phase_transition')
+        
+        # Listen to manual override service calls from HA integration
+        self.listen_event(self._on_set_manual_override_service, 'crop_steering_set_manual_override')
 
     def _setup_timers(self):
         """Set up periodic processing timers."""
@@ -446,6 +454,81 @@ class MasterCropSteeringApp(BaseAsyncApp):
         except Exception as e:
             self.log(f"❌ Error getting system light schedule: {e}", level='ERROR')
             return {'lights_on': time(12, 0), 'lights_off': time(0, 0)}
+
+    def _validate_required_entities(self) -> bool:
+        """Validate that all required entities exist before startup."""
+        missing_entities = []
+        warnings = []
+        
+        # Check critical hardware entities if configured
+        if 'hardware' in self.config:
+            hw = self.config['hardware']
+            critical_hardware = [
+                ('pump_master', hw.get('pump_master')),
+                ('main_line', hw.get('main_line'))
+            ]
+            for name, entity_id in critical_hardware:
+                if entity_id and not self.entity_exists(entity_id):
+                    missing_entities.append(f"Hardware {name}: {entity_id}")
+        
+        # Check global control entities
+        global_entities = [
+            'switch.crop_steering_system_enabled',
+            'select.crop_steering_crop_type',
+            'select.crop_steering_growth_stage',
+            'number.crop_steering_lights_on_hour',
+            'number.crop_steering_lights_off_hour'
+        ]
+        for entity_id in global_entities:
+            if not self.entity_exists(entity_id):
+                warnings.append(f"Global entity: {entity_id}")
+        
+        # Check per-zone entities
+        for zone_num in range(1, self.num_zones + 1):
+            # Check zone hardware
+            if 'hardware' in self.config:
+                zone_switches = self.config['hardware'].get('zone_switches', [])
+                if zone_num <= len(zone_switches):
+                    zone_switch = zone_switches[zone_num - 1]
+                    if zone_switch and not self.entity_exists(zone_switch):
+                        missing_entities.append(f"Zone {zone_num} valve: {zone_switch}")
+            
+            # Check zone control entities
+            zone_entities = [
+                f'switch.crop_steering_zone_{zone_num}_enabled',
+                f'select.crop_steering_zone_{zone_num}_group',
+                f'select.crop_steering_zone_{zone_num}_priority',
+                f'number.crop_steering_zone_{zone_num}_area'
+            ]
+            for entity_id in zone_entities:
+                if not self.entity_exists(entity_id):
+                    warnings.append(f"Zone {zone_num} entity: {entity_id}")
+            
+            # Check sensor entities if configured
+            if 'sensors' in self.config:
+                sensors = self.config['sensors']
+                for sensor_type in ['vwc_front', 'vwc_back', 'ec_front', 'ec_back', 'temp']:
+                    sensor_list = sensors.get(sensor_type, [])
+                    if zone_num <= len(sensor_list):
+                        sensor_id = sensor_list[zone_num - 1]
+                        if sensor_id and not self.entity_exists(sensor_id):
+                            warnings.append(f"Zone {zone_num} sensor {sensor_type}: {sensor_id}")
+        
+        # Log results
+        if missing_entities:
+            self.log("❌ CRITICAL: Missing required entities:", level="ERROR")
+            for entity in missing_entities:
+                self.log(f"  - {entity}", level="ERROR")
+        
+        if warnings:
+            self.log("⚠️ WARNING: Missing optional entities:", level="WARNING")
+            for entity in warnings[:5]:  # Limit to first 5 to avoid spam
+                self.log(f"  - {entity}", level="WARNING")
+            if len(warnings) > 5:
+                self.log(f"  ... and {len(warnings) - 5} more", level="WARNING")
+        
+        # Return False only if critical entities are missing
+        return len(missing_entities) == 0
 
     async def _async_set_entity_wrapper(self, kwargs):
         """Async wrapper for set_entity_value calls."""
@@ -616,9 +699,32 @@ class MasterCropSteeringApp(BaseAsyncApp):
 
     def _get_state_file_path(self) -> str:
         """Get the path for persistent state file."""
-        # Use AppDaemon's config directory
-        config_dir = self.config.get('config_dir', '/config')
-        return os.path.join(config_dir, 'crop_steering_state.pkl')
+        try:
+            # Try to get AppDaemon's config directory
+            config_dir = self.config.get('config_dir', '/config')
+            
+            # Ensure directory exists
+            if not os.path.exists(config_dir):
+                # Fallback to temp directory if config dir doesn't exist
+                config_dir = '/tmp'
+                self.log(f"⚠️ Config directory not found, using temp: {config_dir}", level='WARNING')
+            
+            state_file = os.path.join(config_dir, 'crop_steering_state.json')
+            
+            # Ensure we have write permissions
+            test_file = os.path.join(config_dir, '.crop_steering_test')
+            try:
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+            except (IOError, OSError):
+                self.log(f"⚠️ No write permission to {config_dir}, using /tmp", level='WARNING')
+                state_file = '/tmp/crop_steering_state.json'
+            
+            return state_file
+        except Exception as e:
+            self.log(f"❌ Error getting state file path: {e}", level='ERROR')
+            return '/tmp/crop_steering_state.json'
 
     def _save_persistent_state(self, kwargs=None):
         """Save critical system state to file for restart recovery."""
@@ -650,12 +756,26 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     'last_reset_weekly': data['last_reset_weekly'].isoformat() if data['last_reset_weekly'] else None
                 }
             
-            # Save to file
+            # Save to file with atomic write (write to temp then rename)
             state_file = self._get_state_file_path()
-            with open(state_file, 'w') as f:
-                json.dump(state_data, f, indent=2)
-            
-            self.log(f"💾 State saved to {state_file}")
+            temp_file = state_file + '.tmp'
+            try:
+                with open(temp_file, 'w') as f:
+                    json.dump(state_data, f, indent=2)
+                
+                # Atomic rename (prevents corruption if interrupted)
+                os.replace(temp_file, state_file)
+                
+                self.log(f"💾 State saved to {state_file}", level='DEBUG')
+                
+            except (IOError, OSError) as e:
+                self.log(f"❌ Error writing state file: {e}", level='ERROR')
+                # Try to clean up temp file if it exists
+                if os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                    except Exception:
+                        pass
             
         except Exception as e:
             self.log(f"❌ Error saving persistent state: {e}", level='ERROR')
@@ -669,8 +789,26 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 self.log("📂 No existing state file found - using defaults")
                 return
             
-            with open(state_file, 'r') as f:
-                state_data = json.load(f)
+            # Check file size to avoid loading corrupt/huge files
+            file_size = os.path.getsize(state_file)
+            if file_size > 10 * 1024 * 1024:  # 10MB limit
+                self.log(f"⚠️ State file too large ({file_size} bytes), skipping load", level='WARNING')
+                return
+            
+            # Load with error handling for corrupt JSON
+            try:
+                with open(state_file, 'r') as f:
+                    state_data = json.load(f)
+            except json.JSONDecodeError as e:
+                self.log(f"❌ Corrupt state file, cannot load: {e}", level='ERROR')
+                # Try to backup corrupt file
+                backup_file = state_file + '.corrupt.' + datetime.now().strftime('%Y%m%d_%H%M%S')
+                try:
+                    os.rename(state_file, backup_file)
+                    self.log(f"📦 Backed up corrupt state to {backup_file}")
+                except Exception:
+                    pass
+                return
             
             # Check version compatibility
             saved_version = state_data.get('version', '1.0.0')
@@ -687,38 +825,61 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Validate phase data consistency
             self._validate_restored_state()
             
-            # Restore zone phase data
+            # Restore zone phase data with validation
             if 'zone_phase_data' in state_data:
+                restored_count = 0
                 for zone_str, data in state_data['zone_phase_data'].items():
-                    zone_num = int(zone_str)
-                    self.zone_phase_data[zone_num] = {
-                        'p0_start_time': datetime.fromisoformat(data['p0_start_time']) if data['p0_start_time'] else None,
-                        'p0_peak_vwc': data['p0_peak_vwc'],
-                        'last_irrigation_time': datetime.fromisoformat(data['last_irrigation_time']) if data['last_irrigation_time'] else None
-                    }
-                self.log(f"✅ Restored zone phase data for {len(state_data['zone_phase_data'])} zones")
+                    try:
+                        zone_num = int(zone_str)
+                        if zone_num < 1 or zone_num > self.num_zones:
+                            self.log(f"⚠️ Skipping invalid zone {zone_num} in state data", level='WARNING')
+                            continue
+                        
+                        self.zone_phase_data[zone_num] = {
+                            'p0_start_time': datetime.fromisoformat(data['p0_start_time']) if data.get('p0_start_time') else None,
+                            'p0_peak_vwc': data.get('p0_peak_vwc'),
+                            'last_irrigation_time': datetime.fromisoformat(data['last_irrigation_time']) if data.get('last_irrigation_time') else None
+                        }
+                        restored_count += 1
+                    except (ValueError, TypeError, KeyError) as e:
+                        self.log(f"⚠️ Error restoring zone {zone_str} phase data: {e}", level='WARNING')
+                        continue
+                
+                if restored_count > 0:
+                    self.log(f"✅ Restored zone phase data for {restored_count} zones")
             
             # Restore water usage (check if data is from today/this week)
             if 'zone_water_usage' in state_data:
                 today = datetime.now().date()
+                restored_count = 0
                 for zone_str, data in state_data['zone_water_usage'].items():
-                    zone_num = int(zone_str)
-                    last_daily_reset = datetime.fromisoformat(data['last_reset_daily']).date() if data['last_reset_daily'] else today
-                    last_weekly_reset = datetime.fromisoformat(data['last_reset_weekly']).date() if data['last_reset_weekly'] else today
-                    
-                    # Only restore if from same day/week
-                    daily_total = data['daily_total'] if last_daily_reset == today else 0.0
-                    daily_count = data['daily_count'] if last_daily_reset == today else 0
-                    weekly_total = data['weekly_total'] if (today - last_weekly_reset).days < 7 else 0.0
-                    
-                    self.zone_water_usage[zone_num] = {
-                        'daily_total': daily_total,
-                        'weekly_total': weekly_total,
-                        'daily_count': daily_count,
-                        'last_reset_daily': today,
-                        'last_reset_weekly': last_weekly_reset
-                    }
-                self.log(f"✅ Restored water usage for {len(state_data['zone_water_usage'])} zones")
+                    try:
+                        zone_num = int(zone_str)
+                        if zone_num < 1 or zone_num > self.num_zones:
+                            continue
+                        
+                        last_daily_reset = datetime.fromisoformat(data['last_reset_daily']).date() if data.get('last_reset_daily') else today
+                        last_weekly_reset = datetime.fromisoformat(data['last_reset_weekly']).date() if data.get('last_reset_weekly') else today
+                        
+                        # Only restore if from same day/week
+                        daily_total = data.get('daily_total', 0.0) if last_daily_reset == today else 0.0
+                        daily_count = data.get('daily_count', 0) if last_daily_reset == today else 0
+                        weekly_total = data.get('weekly_total', 0.0) if (today - last_weekly_reset).days < 7 else 0.0
+                        
+                        self.zone_water_usage[zone_num] = {
+                            'daily_total': daily_total,
+                            'weekly_total': weekly_total,
+                            'daily_count': daily_count,
+                            'last_reset_daily': today,
+                            'last_reset_weekly': last_weekly_reset
+                        }
+                        restored_count += 1
+                    except (ValueError, TypeError, KeyError) as e:
+                        self.log(f"⚠️ Error restoring zone {zone_str} water usage: {e}", level='WARNING')
+                        continue
+                
+                if restored_count > 0:
+                    self.log(f"✅ Restored water usage for {restored_count} zones")
             
             # Restore last irrigation time
             if state_data.get('last_irrigation_time'):
@@ -2109,20 +2270,50 @@ class MasterCropSteeringApp(BaseAsyncApp):
             return {'status': 'error', 'error': str(e)}
 
     def _get_zone_average_vwc(self, zone: int) -> Optional[float]:
-        """Get average VWC for specific zone."""
+        """Get average VWC for specific zone with robust error handling."""
         try:
-            zone_sensors = [s for s in self.config['sensors']['vwc'] if f'r{zone}' in s]
+            # Get configured sensors for this zone
+            sensors_config = self.config.get('sensors', {})
+            vwc_sensors = sensors_config.get('vwc', [])
+            
+            if not vwc_sensors:
+                self.log(f"⚠️ No VWC sensors configured for zone {zone}", level='WARNING')
+                return None
+            
+            zone_sensors = [s for s in vwc_sensors if f'r{zone}' in s]
+            
+            if not zone_sensors:
+                self.log(f"⚠️ No VWC sensors found for zone {zone}", level='DEBUG')
+                return None
+            
             vwc_values = []
             
             for sensor in zone_sensors:
-                value = self.get_entity_value(sensor)
-                if value not in ['unavailable', 'unknown', None]:
-                    vwc_values.append(float(value))
+                # Check if entity exists first
+                if not self.entity_exists(sensor):
+                    self.log(f"⚠️ VWC sensor {sensor} does not exist", level='DEBUG')
+                    continue
+                
+                try:
+                    value = self.get_float_value(sensor, default=None)
+                    if value is not None and 0 <= value <= 100:  # Validate VWC range
+                        vwc_values.append(value)
+                    elif value is not None:
+                        self.log(f"⚠️ VWC value {value} from {sensor} out of range (0-100)", level='WARNING')
+                except Exception as e:
+                    self.log(f"⚠️ Error reading sensor {sensor}: {e}", level='DEBUG')
+                    continue
             
-            return statistics.mean(vwc_values) if vwc_values else None
+            if vwc_values:
+                avg_vwc = statistics.mean(vwc_values)
+                self.log(f"Zone {zone} VWC: {avg_vwc:.1f}% from {len(vwc_values)} sensors", level='DEBUG')
+                return avg_vwc
+            else:
+                self.log(f"⚠️ No valid VWC readings for zone {zone}", level='DEBUG')
+                return None
             
         except Exception as e:
-            self.log(f"❌ Error getting zone VWC: {e}", level='ERROR')
+            self.log(f"❌ Error getting zone {zone} VWC: {e}", level='ERROR')
             return None
 
     async def _emergency_stop(self):
@@ -2243,7 +2434,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         if hasattr(last_state, 'state') and last_state.state not in ['unknown', 'unavailable']:
                             value = last_state.state
                             self.log(f"🔍 Zone {zone_num} via history: {value}")
-                except:
+                except Exception:
                     pass
                 
                 # Method 2: Direct get_state with sync call
@@ -2253,7 +2444,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         if state_value not in ['unknown', 'unavailable', None] and not hasattr(state_value, '__await__'):
                             value = state_value
                             self.log(f"🔍 Zone {zone_num} via get_state: {value}")
-                    except:
+                    except Exception:
                         pass
                 
                 # Method 3: Use get_state with async check
@@ -2264,7 +2455,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                             if test_value and not hasattr(test_value, '__await__'):
                                 value = test_value
                                 self.log(f"🔍 Zone {zone_num} via get_state: {value}")
-                    except:
+                    except Exception:
                         pass
                 
                 # Method 4: Fallback to raw sensor calculation
@@ -2436,39 +2627,48 @@ class MasterCropSteeringApp(BaseAsyncApp):
             return None
 
     def _get_number_entity_value(self, entity_id: str, default: float) -> float:
-        """Get value from number entity with fallback to default."""
+        """Get value from number entity with robust error handling."""
         try:
-            state = self.get_entity_value(entity_id)
-            self.log(f"🔍 DEBUG: Number {entity_id} state: {state} (type: {type(state)})")
-            if state not in ['unknown', 'unavailable', None]:
-                # Handle async Task objects
-                if hasattr(state, '__await__'):
-                    self.log(f"⚠️ Number {entity_id} async Task detected, using default: {default}")
-                    return default
-                return float(state)
-            else:
-                self.log(f"⚠️ Number {entity_id} unavailable state: {state}, using default: {default}")
+            # Check if entity exists first
+            if not self.entity_exists(entity_id):
+                self.log(f"⚠️ Number entity {entity_id} does not exist, using default: {default}", level='DEBUG')
                 return default
+            
+            # Use get_float_value which has built-in error handling
+            value = self.get_float_value(entity_id, default=default)
+            
+            # Validate the value is reasonable
+            if value < -1000 or value > 10000:
+                self.log(f"⚠️ Number entity {entity_id} has unreasonable value {value}, using default: {default}", level='WARNING')
+                return default
+            
+            return value
         except (ValueError, TypeError) as e:
             self.log(f"❌ Error reading number {entity_id}: {e}, using default: {default}")
             return default
 
     def _get_select_entity_value(self, entity_id: str, default: str) -> str:
-        """Get value from select entity with fallback to default."""
+        """Get value from select entity with robust error handling."""
         try:
-            state = self.get_entity_value(entity_id)
-            self.log(f"🔍 DEBUG: Select {entity_id} state: {state} (type: {type(state)})")
+            # Check if entity exists first
+            if not self.entity_exists(entity_id):
+                self.log(f"⚠️ Select entity {entity_id} does not exist, using default: {default}", level='DEBUG')
+                return default
+            
+            state = self.get_entity_value(entity_id, default=default)
+            
+            # Handle async Task objects
+            if hasattr(state, '__await__'):
+                self.log(f"⚠️ Select {entity_id} async Task detected, using default: {default}", level='DEBUG')
+                return default
+            
             if state not in ['unknown', 'unavailable', None]:
-                # Handle async Task objects
-                if hasattr(state, '__await__'):
-                    self.log(f"⚠️ Select {entity_id} async Task detected, using default: {default}")
-                    return default
                 return str(state)
             else:
-                self.log(f"⚠️ Select {entity_id} unavailable state: {state}, using default: {default}")
+                self.log(f"⚠️ Select {entity_id} unavailable, using default: {default}", level='DEBUG')
                 return default
         except Exception as e:
-            self.log(f"❌ Error reading select {entity_id}: {e}, using default: {default}")
+            self.log(f"❌ Error reading select {entity_id}: {e}, using default: {default}", level='WARNING')
             return default
 
     def _get_zone_ec(self, zone_num: int) -> Optional[float]:
@@ -3096,13 +3296,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     earliest_p3 = lights_off_dt - timedelta(hours=2)
                     if optimal_p3_start < earliest_p3:
                         optimal_p3_start = earliest_p3
-                        self.log(f"⚠️ P3 timing adjusted to minimum 2-hour window")
+                        self.log("⚠️ P3 timing adjusted to minimum 2-hour window")
                     
                     # Ensure P3 doesn't start too late (minimum 30 minutes before lights off)  
                     latest_p3 = lights_off_dt - timedelta(minutes=30)
                     if optimal_p3_start > latest_p3:
                         optimal_p3_start = latest_p3
-                        self.log(f"⚠️ P3 timing adjusted to ensure 30min minimum window")
+                        self.log("⚠️ P3 timing adjusted to ensure 30min minimum window")
                     
                     return optimal_p3_start.time()
             
@@ -3449,7 +3649,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             update_result = self.crop_profiles.update_performance(performance_data)
             
             if update_result.get('adaptations_applied', {}).get('status') == 'adaptations_applied':
-                self.log(f"🌱 Crop profile adapted based on performance feedback")
+                self.log("🌱 Crop profile adapted based on performance feedback")
             
         except Exception as e:
             self.log(f"❌ Error updating crop profile performance: {e}", level='ERROR')
@@ -3909,6 +4109,64 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 
         except Exception as e:
             self.log(f"❌ Error auto-disabling manual override: {e}", level='ERROR')
+
+    async def _on_phase_transition_service(self, event_name, data, kwargs):
+        """Handle phase transition service calls from HA integration."""
+        try:
+            target_phase = data.get('target_phase')
+            reason = data.get('reason', 'Manual transition')
+            forced = data.get('forced', False)
+            
+            self.log(f"📡 Service: Phase transition to {target_phase} requested - {reason}")
+            
+            # Map phase names to phase enum values
+            phase_map = {
+                'P0': IrrigationPhase.P0_MORNING_DRYBACK,
+                'P1': IrrigationPhase.P1_RAMP_UP,
+                'P2': IrrigationPhase.P2_MAINTENANCE,
+                'P3': IrrigationPhase.P3_PRE_LIGHTS_OFF
+            }
+            
+            if target_phase not in phase_map:
+                self.log(f"❌ Invalid phase: {target_phase}", level='ERROR')
+                return
+            
+            # Transition all zones to the new phase
+            for zone_num, machine in self.zone_state_machines.items():
+                if forced:
+                    # Force transition regardless of conditions
+                    machine.force_phase(phase_map[target_phase])
+                    self.log(f"Zone {zone_num}: Forced transition to {target_phase}")
+                else:
+                    # Try normal transition
+                    success = machine.try_transition_to(phase_map[target_phase])
+                    if success:
+                        self.log(f"Zone {zone_num}: Transitioned to {target_phase}")
+                    else:
+                        self.log(f"Zone {zone_num}: Could not transition to {target_phase} - conditions not met", level='WARNING')
+            
+        except Exception as e:
+            self.log(f"❌ Error handling phase transition service: {e}", level='ERROR')
+    
+    async def _on_set_manual_override_service(self, event_name, data, kwargs):
+        """Handle manual override service calls from HA integration."""
+        try:
+            zone = data.get('zone', 1)
+            enable = data.get('enable', True)
+            timeout_minutes = data.get('timeout_minutes')
+            
+            self.log(f"📡 Service: Manual override for Zone {zone} - enable={enable}, timeout={timeout_minutes}")
+            
+            if enable:
+                if timeout_minutes:
+                    await self._enable_manual_override_with_timeout(zone, timeout_minutes)
+                else:
+                    await self._enable_manual_override_permanent(zone)
+            else:
+                await self._disable_manual_override(zone)
+                
+        except Exception as e:
+            self.log(f"❌ Error handling manual override service: {e}", level='ERROR')
 
     def get_system_status(self) -> Dict:
         """Get comprehensive system status."""

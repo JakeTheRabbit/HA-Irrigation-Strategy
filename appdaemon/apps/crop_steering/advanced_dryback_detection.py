@@ -5,12 +5,9 @@ Based on research: MSPD (Multi-Scale Peak Detection) algorithms
 """
 
 from collections import deque
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 from datetime import datetime, timedelta
-import asyncio
 import logging
-import math
-import statistics
 
 _LOGGER = logging.getLogger(__name__)
 

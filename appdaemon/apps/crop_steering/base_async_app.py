@@ -14,8 +14,7 @@ for cases where it's needed (e.g., interfacing with async libraries).
 """
 
 import appdaemon.plugins.hass.hassapi as hass
-import asyncio
-from typing import Any, Optional, Union
+from typing import Any, Optional
 import time
 
 
@@ -226,6 +225,10 @@ class BaseAsyncApp(hass.Hass):
             return state is not None and not hasattr(state, '__await__')
         except Exception:
             return False
+    
+    def entity_exists(self, entity_id: str) -> bool:
+        """Alias for entity_exists_sync for backward compatibility."""
+        return self.entity_exists_sync(entity_id)
     
     def clear_cache(self, entity_id: Optional[str] = None) -> None:
         """Clear entity cache."""

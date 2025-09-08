@@ -4,14 +4,11 @@ Mathematical prediction model without external ML dependencies
 Compatible with Home Assistant OS - no compilation required
 """
 
-from collections import deque, defaultdict
-from typing import Dict, List, Tuple, Optional, Any
-from datetime import datetime, timedelta
+from collections import deque
+from typing import Dict, List, Optional
+from datetime import datetime
 import logging
-import json
 import math
-import asyncio
-import statistics
 
 _LOGGER = logging.getLogger(__name__)
 

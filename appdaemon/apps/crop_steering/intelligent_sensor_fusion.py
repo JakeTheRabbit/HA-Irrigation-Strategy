@@ -4,10 +4,8 @@ Implements IQR-based outlier detection and multi-sensor validation
 Based on research: Generalized ESD + weighted outlier-robust Kalman filter
 """
 
-import statistics
-import math
 from collections import deque, defaultdict
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 import logging
 

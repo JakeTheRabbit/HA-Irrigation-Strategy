@@ -6,10 +6,9 @@ Based on research: Indica/Sativa/Hybrid specific VWC and EC targeting
 
 import json
 import logging
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
-from collections import defaultdict, deque
-import statistics
+from typing import Dict, List, Optional
+from datetime import datetime
+from collections import defaultdict
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -683,7 +682,7 @@ class IntelligentCropProfiles:
                 factors.append(f"Perfect genetics match ({genetics})")
             elif genetics in profile_genetics or profile_genetics in genetics:
                 suitability_score += 0.2
-                factors.append(f"Partial genetics match")
+                factors.append("Partial genetics match")
             
             # Environmental suitability
             env_factors = profile_data.get('environmental_factors', {})
