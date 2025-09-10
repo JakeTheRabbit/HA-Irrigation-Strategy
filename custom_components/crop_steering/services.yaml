@@ -1,0 +1,105 @@
+# Crop Steering System Services
+
+transition_phase:
+  name: Transition Phase
+  description: Manually transition the irrigation system to a specific phase
+  fields:
+    target_phase:
+      name: Target Phase
+      description: The phase to transition to
+      required: true
+      selector:
+        select:
+          options:
+            - P0
+            - P1
+            - P2
+            - P3
+    reason:
+      name: Reason
+      description: Reason for the phase transition
+      required: false
+      default: "Manual transition"
+      selector:
+        text:
+    forced:
+      name: Forced
+      description: Force the transition even if conditions are not met
+      required: false
+      default: false
+      selector:
+        boolean:
+
+execute_irrigation_shot:
+  name: Execute Irrigation Shot
+  description: Manually trigger an irrigation shot for a specific zone
+  fields:
+    zone:
+      name: Zone
+      description: The zone number to irrigate
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 6
+          step: 1
+          mode: box
+    duration_seconds:
+      name: Duration (seconds)
+      description: How long to run the irrigation (1-3600 seconds)
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 3600
+          step: 1
+          mode: box
+    shot_type:
+      name: Shot Type
+      description: Type of irrigation shot
+      required: false
+      default: "manual"
+      selector:
+        select:
+          options:
+            - P1
+            - P2
+            - P3_emergency
+            - manual
+
+check_transition_conditions:
+  name: Check Transition Conditions
+  description: Check if conditions are met for phase transitions
+  fields: {}
+
+set_manual_override:
+  name: Set Manual Override
+  description: Enable or disable manual override for a zone with optional timeout
+  fields:
+    zone:
+      name: Zone
+      description: The zone number to control
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 6
+          step: 1
+          mode: box
+    enable:
+      name: Enable
+      description: Enable or disable manual override
+      required: false
+      default: true
+      selector:
+        boolean:
+    timeout_minutes:
+      name: Timeout (minutes)
+      description: Auto-disable after this many minutes (optional, max 24 hours)
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 1440
+          step: 1
+          mode: box

@@ -13,7 +13,6 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
-    UnitOfElectricPotential,
     UnitOfTime,
     UnitOfVolume,
 )
@@ -127,7 +126,6 @@ BASE_SENSOR_DESCRIPTIONS = [
     SensorEntityDescription(
         key="configured_avg_ec",
         name="Average EC All Zones",
-        device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="mS/cm",
         icon="mdi:flash",
@@ -156,7 +154,6 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
             SensorEntityDescription(
                 key=f"ec_zone_{zone_num}",
                 name=f"Zone {zone_num} EC",
-                device_class=SensorDeviceClass.VOLTAGE,
                 state_class=SensorStateClass.MEASUREMENT,
                 native_unit_of_measurement="mS/cm",
                 icon="mdi:lightning-bolt",

@@ -7,7 +7,7 @@
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-Turn Home Assistant into a professional crop‑steering controller. This project combines a lightweight HA integration (entities, services) with optional AppDaemon modules (advanced analytics, phase state machine) to automate precision irrigation using VWC/EC sensors.
+Turn Home Assistant into a professional crop‑steering controller with **GPT-5 AI intelligence**. This project combines a lightweight HA integration (entities, services) with optional AppDaemon modules (advanced analytics, phase state machine, and GPT-5-powered decisions) to automate precision irrigation using VWC/EC sensors at ultra-low cost ($0.10-0.50/day).
 
 ## How This System Works - Complete Overview
 

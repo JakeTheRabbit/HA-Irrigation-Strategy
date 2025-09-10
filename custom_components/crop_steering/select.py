@@ -10,7 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, CONF_NUM_ZONES, PHASES, STEERING_MODES, CROP_TYPES, SOFTWARE_VERSION
+from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
                 name=f"Zone {self._zone_num}",
                 manufacturer="Home Assistant Community",
                 model="Zone Controller",
-                sw_version="2.3.0",
+                sw_version=SOFTWARE_VERSION,
                 via_device=(DOMAIN, self._entry.entry_id),
             )
         else:
@@ -197,7 +197,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
                 name="Crop Steering System",
                 manufacturer="Home Assistant Community",
                 model="Professional Irrigation Controller", 
-                sw_version="2.3.0",
+                sw_version=SOFTWARE_VERSION,
             )
 
     async def async_select_option(self, option: str) -> None:

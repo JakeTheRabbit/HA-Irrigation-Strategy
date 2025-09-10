@@ -395,7 +395,7 @@ class CostOptimizer:
             
             # Use cheaper models and lower token limits
             recommendations.update({
-                "suggested_model": "claude-3-haiku-20240307",  # Cheapest Claude model
+                "suggested_model": "gpt-5-nano",  # Ultra-cheap GPT-5 model
                 "max_tokens": 1000,  # Reduced token limit
                 "temperature": 0.3,  # Lower temperature for more deterministic output
                 "reason": "Economy tier - using cost-optimized settings"
@@ -415,7 +415,7 @@ class CostOptimizer:
         elif self._config.cost_tier == CostTier.STANDARD:
             if daily_pct > 0.9:
                 recommendations.update({
-                    "suggested_model": "claude-3-haiku-20240307",
+                    "suggested_model": "gpt-5-nano",
                     "max_tokens": 2000,
                     "reason": "Approaching daily budget - using cheaper model"
                 })

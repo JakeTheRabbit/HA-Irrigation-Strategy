@@ -8,7 +8,6 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
@@ -55,7 +54,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
 
             # Check for YAML configuration first
-            config_path = os.path.join(self.hass.config.config_dir, "config.yaml")
+            config_path = os.path.join(self.hass.config.config_dir, "crop_steering.yaml")
             if os.path.exists(config_path):
                 return await self.async_step_load_yaml()
             else:
@@ -67,8 +66,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_load_yaml(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Load configuration from config.yaml."""
-        config_path = os.path.join(self.hass.config.config_dir, "config.yaml")
+        """Load configuration from crop_steering.yaml."""
+        config_path = os.path.join(self.hass.config.config_dir, "crop_steering.yaml")
 
         if not os.path.exists(config_path):
             return self.async_abort(reason="yaml_not_found")
@@ -130,7 +129,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_NUM_ZONES: len(zones_config),
             "zones": zones_config,
             "hardware": hardware_config,
-            "config_yaml": config, # Store the full yaml config
+            "config_yaml": config, # Store the full crop_steering.yaml config
         }
         
         return self.async_create_entry(

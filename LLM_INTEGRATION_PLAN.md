@@ -55,10 +55,10 @@ flowchart TB
 #### Budget Tiers
 | Tier | Daily Budget | Model | Use Case | Features |
 |------|-------------|-------|----------|----------|
-| **Minimal** | $1 | Haiku/3.5-Turbo | Emergency only | Rules + AI emergencies |
-| **Economy** | $2-3 | Haiku/3.5-Turbo | Basic AI | Simple prompts, frequent fallbacks |
-| **Standard** | $5-8 | Sonnet/GPT-4 | Balanced | Standard analysis, good LLM/rule mix |
-| **Premium** | $10-25 | Opus/GPT-4 | Advanced | Detailed analysis, research insights |
+| **Minimal** | $0.10 | GPT-5-nano | Emergency only | Rules + AI emergencies |
+| **Economy** | $0.50 | GPT-5-nano | Basic AI | Simple prompts, 90% cache hit rate |
+| **Standard** | $2-3 | GPT-5-nano + mini | Balanced | Nano for routine, mini for complex |
+| **Premium** | $5-10 | All GPT-5 models | Advanced | Full GPT-5 suite with reasoning control |
 
 #### Cost Optimization Features
 - **Real-time budget tracking** with token counting
@@ -153,9 +153,9 @@ docs/
 crop_steering:
   llm:
     enabled: true
-    provider: "claude"  # or "openai"
-    model: "claude-3-haiku-20240307"
-    daily_budget: 5.00
+    provider: "openai"  # GPT-5 models (2025)
+    model: "gpt-5-nano"  # Ultra cost-effective at $0.05/1M tokens
+    daily_budget: 2.00   # Much lower budget needed with GPT-5!
     confidence_threshold: 0.8
     fallback_enabled: true
     cache_duration: 1440  # minutes (24 hours)
@@ -167,18 +167,19 @@ crop_steering:
 llm_enhanced_crop_steering:
   module: llm_enhanced_app
   class: LLMEnhancedCropSteering
-  llm_provider: "claude"
-  api_key: !secret claude_api_key
-  budget_tier: "standard"
+  llm_provider: "openai"     # GPT-5 provider
+  api_key: !secret openai_api_key
+  model: "gpt-5-nano"        # Default to ultra-cheap nano model
+  budget_tier: "economy"     # Lower tier needed with GPT-5 pricing
   decision_interval: 180  # 3 minutes
   emergency_override: true
 ```
 
 #### Secrets
 ```yaml
-# secrets.yaml
-claude_api_key: "your_anthropic_api_key_here"
-openai_api_key: "your_openai_api_key_here"
+# secrets.yaml - GPT-5 API Keys (2025)
+openai_api_key: "sk-proj-YOUR_GPT5_API_KEY_HERE"  # Primary
+claude_api_key: "sk-ant-YOUR_CLAUDE_KEY_HERE"     # Backup (optional)
 ```
 
 ### 🚀 Implementation Phases

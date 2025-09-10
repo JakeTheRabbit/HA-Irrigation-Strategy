@@ -1,17 +1,18 @@
 # GPT-5 Configuration for Crop Steering System
 # 2025 API Configuration
 
-# Model Selection Strategy
+# GPT-5 Model Selection Strategy (2025)
 models:
-  # Primary model for routine decisions (90% of calls)
+  # Primary model for routine decisions (90% of calls) - Ultra cost-effective
   default:
-    name: "gpt-5-nano"
+    name: "gpt-5-nano"          # 50x cheaper than GPT-4!
     max_tokens: 500
-    temperature: 0.1  # Low for consistent decisions
-    reasoning_effort: "minimal"  # Fast, efficient
-    verbosity: "low"  # Concise responses
-    cost_per_1m_input: 0.05
-    cost_per_1m_output: 0.40
+    temperature: 0.1            # Low for consistent decisions
+    reasoning_effort: "minimal" # Fast, efficient
+    verbosity: "low"           # Concise responses  
+    cost_per_1m_input: 0.05    # $0.05 per 1M tokens
+    cost_per_1m_output: 0.40   # $0.40 per 1M tokens
+    cache_discount: 0.90       # 90% discount on cached tokens!
     
   # Enhanced model for complex analysis (8% of calls)
   enhanced:

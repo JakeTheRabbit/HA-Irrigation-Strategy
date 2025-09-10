@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, MIN_ZONES, MAX_ZONES
 
@@ -36,7 +36,7 @@ def get_irrigation_shot_schema(hass: HomeAssistant) -> vol.Schema:
     return vol.Schema({
         vol.Required("zone"): vol.In(zones),
         vol.Required("duration_seconds"): vol.Range(min=1, max=3600),
-        vol.Optional("shot_type"): vol.In(["P1", "P2", "P3_emergency"]),
+        vol.Optional("shot_type"): vol.In(["P1", "P2", "P3_emergency", "manual"]),
     })
 
 MANUAL_OVERRIDE_SCHEMA = vol.Schema({
@@ -98,7 +98,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "target_phase": target_phase,
                 "reason": reason,
                 "forced": forced,
-                "timestamp": hass.helpers.template.now().isoformat(),
+                "timestamp": dt_util.utcnow().isoformat(),
             },
         )
 
@@ -117,7 +117,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "zone": zone,
                 "duration_seconds": duration,
                 "shot_type": shot_type,
-                "timestamp": hass.helpers.template.now().isoformat(),
+                "timestamp": dt_util.utcnow().isoformat(),
             },
         )
         
@@ -174,7 +174,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     "ec_ratio": ec_ratio,
                     "transition_reasons": transition_reasons,
                     "conditions_met": len(transition_reasons) > 0,
-                    "timestamp": hass.helpers.template.now().isoformat(),
+                    "timestamp": dt_util.utcnow().isoformat(),
                 },
             )
             
@@ -208,7 +208,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     "zone": zone,
                     "action": "enable_with_timeout",
                     "timeout_minutes": timeout_minutes,
-                    "timestamp": hass.helpers.template.now().isoformat(),
+                    "timestamp": dt_util.utcnow().isoformat(),
                 },
             )
         else:
@@ -217,7 +217,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 {
                     "zone": zone,
                     "action": "disable" if not enable else "enable_permanent",
-                    "timestamp": hass.helpers.template.now().isoformat(),
+                    "timestamp": dt_util.utcnow().isoformat(),
                 },
             )
         

@@ -10,6 +10,7 @@ import asyncio
 import threading
 import os
 import statistics
+import yaml
 from datetime import datetime, timedelta, time
 from typing import Dict, List, Optional
 
@@ -178,23 +179,105 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self.log("📊 Modules: Dryback Detection ✓, Sensor Fusion ✓, ML Prediction ✓, Crop Profiles ✓, Dashboard ✓")
 
     def _load_configuration(self) -> Dict:
-        """Load system configuration from AppDaemon args."""
+        """Load system configuration from crop_steering.yaml or AppDaemon args."""
         try:
-            # Build configuration with values from apps.yaml or fallbacks
-            config = {
-                'hardware': self.args.get('hardware', {}),
-                'sensors': self.args.get('sensors', {}),
-                'timing': self.args.get('timing', {}),
-                'thresholds': self.args.get('thresholds', {}),
-                'notification_service': self.args.get('notification_service', 'notify.persistent_notification')
+            # First check if args are provided in apps.yaml
+            if self.args and any(key in self.args for key in ['hardware', 'sensors']):
+                config = {
+                    'hardware': self.args.get('hardware', {}),
+                    'sensors': self.args.get('sensors', {}),
+                    'timing': self.args.get('timing', {}),
+                    'thresholds': self.args.get('thresholds', {}),
+                    'notification_service': self.args.get('notification_service', 'notify.persistent_notification')
+                }
+                self.log("Configuration loaded from apps.yaml")
+                return config
+            
+            # Try to load from crop_steering.yaml
+            config_path = '/config/crop_steering.yaml'
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    yaml_config = yaml.safe_load(f)
+                
+                # Translate crop_steering.yaml format to expected format
+                config = self._translate_yaml_config(yaml_config)
+                self.log(f"Configuration loaded from {config_path}")
+                return config
+            
+            # Fallback to empty config
+            self.log("No configuration found, using defaults", level="WARNING")
+            return {
+                'hardware': {},
+                'sensors': {},
+                'timing': {},
+                'thresholds': {},
+                'notification_service': 'notify.persistent_notification'
             }
             
-            self.log("Configuration loaded from apps.yaml")
-            return config
+        except Exception as e:
+            self.log(f"Error loading configuration: {e}", level="ERROR")
+            # Fallback to empty config
+            return {
+                'hardware': {},
+                'sensors': {},
+                'timing': {},
+                'thresholds': {},
+                'notification_service': 'notify.persistent_notification'
+            }
+    
+    def _translate_yaml_config(self, yaml_config: Dict) -> Dict:
+        """Translate crop_steering.yaml format to internal format."""
+        try:
+            # Extract hardware configuration
+            hardware = {}
+            if 'irrigation_hardware' in yaml_config:
+                hw = yaml_config['irrigation_hardware']
+                hardware['pump_master'] = hw.get('pump_switch')
+                hardware['main_line'] = hw.get('main_line_switch')
+                hardware['waste_valve'] = hw.get('waste_valve_switch')
+                
+                # Build zone switches mapping
+                zone_switches = []
+                if 'zones' in yaml_config:
+                    for zone in yaml_config['zones']:
+                        zone_switches.append(zone.get('switch'))
+                hardware['zone_switches'] = zone_switches
+            
+            # Extract sensor configuration
+            sensors = {'vwc': [], 'ec': [], 'environmental': {}}
+            if 'zones' in yaml_config:
+                for zone in yaml_config['zones']:
+                    zone_sensors = zone.get('sensors', {})
+                    if 'vwc_front' in zone_sensors:
+                        sensors['vwc'].append(zone_sensors['vwc_front'])
+                    if 'vwc_back' in zone_sensors:
+                        sensors['vwc'].append(zone_sensors['vwc_back'])
+                    if 'ec_front' in zone_sensors:
+                        sensors['ec'].append(zone_sensors['ec_front'])
+                    if 'ec_back' in zone_sensors:
+                        sensors['ec'].append(zone_sensors['ec_back'])
+            
+            # Environmental sensors
+            if 'environmental_sensors' in yaml_config:
+                env = yaml_config['environmental_sensors']
+                sensors['environmental'] = {
+                    'temperature': env.get('temperature'),
+                    'humidity': env.get('humidity'),
+                    'vpd': env.get('vpd'),
+                    'water_level': env.get('water_level')
+                }
+            
+            return {
+                'hardware': hardware,
+                'sensors': sensors,
+                'timing': {},
+                'thresholds': {},
+                'notification_service': 'notify.persistent_notification',
+                'config_yaml': yaml_config  # Keep original for reference
+            }
             
         except Exception as e:
-            self.log(f"Error loading configuration from apps.yaml: {e}", level="ERROR")
-            # Fallback to empty config
+            self.log(f"Error translating yaml config: {e}", level="ERROR")
             return {
                 'hardware': {},
                 'sensors': {},

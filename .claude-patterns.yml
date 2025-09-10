@@ -1,0 +1,347 @@
+# Claude Patterns for HA-Irrigation-Strategy
+version: "1.0"
+learning_mode: false
+confidence_threshold: 0.9
+project_type: "ha-crop-steering-ai-system"
+
+# LLM Integration Architecture Patterns
+patterns:
+  - id: "safety-first-llm-architecture"
+    category: "ai-safety"
+    confidence: 1.0
+    pattern:
+      DO: |
+        # Always implement critical condition overrides
+        if vwc < 40 or vwc > 80 or ec > 5.0:
+            return emergency_fallback_decision()
+        
+        # Use confidence thresholds for AI decisions
+        if llm_confidence < confidence_threshold:
+            return rule_based_fallback()
+      DONT: |
+        # Never trust AI decisions for critical safety conditions
+        if critical_condition:
+            return llm_decision  # DANGEROUS
+      explanation: "Safety-first design prevents catastrophic irrigation failures"
+      applies_to:
+        files: ["**/decision_engine.py", "**/llm_enhanced_app.py"]
+        conditions: ["agricultural automation", "critical infrastructure"]
+
+  - id: "multi-provider-api-abstraction"
+    category: "api-design"
+    confidence: 1.0
+    pattern:
+      DO: |
+        class LLMClient:
+            def __init__(self, provider="anthropic", fallback_provider="openai"):
+                self.provider = provider
+                self.fallback = fallback_provider
+            
+            async def get_decision(self, prompt, fallback_on_error=True):
+                try:
+                    return await self._call_primary(prompt)
+                except Exception as e:
+                    if fallback_on_error:
+                        return await self._call_fallback(prompt)
+                    raise
+      DONT: |
+        # Hard-coded single provider without fallback
+        response = await anthropic_client.messages.create(...)
+      explanation: "Multi-provider abstraction ensures reliability and cost optimization"
+      applies_to:
+        files: ["**/client.py", "**/llm_*.py"]
+
+  - id: "budget-tier-cost-optimization"
+    category: "cost-management"
+    confidence: 1.0
+    pattern:
+      DO: |
+        BUDGET_TIERS = {
+            "minimal": {"daily": 1, "model": "haiku", "complexity": "simple"},
+            "standard": {"daily": 10, "model": "sonnet", "complexity": "standard"},
+            "premium": {"daily": 25, "model": "opus", "complexity": "detailed"},
+            "research": {"daily": 50, "model": "opus", "complexity": "expert"}
+        }
+        
+        def select_prompt_complexity(self, budget_tier):
+            return BUDGET_TIERS[budget_tier]["complexity"]
+      DONT: |
+        # Fixed expensive model usage without budget consideration
+        model = "claude-3-opus-20240229"  # Always expensive
+      explanation: "Budget-aware model selection optimizes cost vs. capability"
+      applies_to:
+        files: ["**/cost_optimizer.py", "**/config.py"]
+
+  - id: "prompt-engineering-tiered-system"
+    category: "prompt-design"
+    confidence: 1.0
+    pattern:
+      DO: |
+        PROMPT_TEMPLATES = {
+            "simple": "VWC: {vwc}%, EC: {ec} - Irrigate? (yes/no)",
+            "standard": """Crop Phase: {phase}
+                VWC: {vwc}% (Target: {target_vwc}%)
+                EC Ratio: {ec_ratio} (Target: 1.0)
+                Recommend irrigation decision with confidence.""",
+            "detailed": """Multi-factor analysis with full context...""",
+            "expert": """Advanced agricultural analysis with statistical modeling..."""
+        }
+      DONT: |
+        # Single complex prompt for all budget tiers
+        prompt = long_expensive_expert_prompt_for_everything
+      explanation: "Tiered prompts match budget to required complexity"
+      applies_to:
+        files: ["**/prompts.py"]
+
+  - id: "circuit-breaker-error-handling"
+    category: "reliability"
+    confidence: 1.0
+    pattern:
+      DO: |
+        class CircuitBreaker:
+            def __init__(self, failure_threshold=5, reset_timeout=300):
+                self.failure_count = 0
+                self.failure_threshold = failure_threshold
+                self.last_failure_time = None
+                self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
+            
+            async def call(self, func, *args, **kwargs):
+                if self.state == "OPEN":
+                    if time.time() - self.last_failure_time > self.reset_timeout:
+                        self.state = "HALF_OPEN"
+                    else:
+                        raise CircuitBreakerOpenError()
+      DONT: |
+        # Unlimited retries without circuit breaking
+        while True:
+            try:
+                return await llm_call()
+            except:
+                continue  # Infinite loop on persistent failures
+      explanation: "Circuit breaker prevents cascade failures in LLM services"
+      applies_to:
+        files: ["**/client.py", "**/decision_engine.py"]
+
+  - id: "modular-component-structure"
+    category: "architecture"
+    confidence: 1.0
+    pattern:
+      DO: |
+        # File structure for LLM integration
+        custom_components/crop_steering/llm/
+        ├── __init__.py
+        ├── client.py           # API abstraction
+        ├── cost_optimizer.py   # Budget management
+        ├── prompts.py         # Prompt engineering
+        ├── decision_engine.py # Core AI logic
+        └── config.py          # Configuration management
+        
+        appdaemon/apps/crop_steering/
+        ├── llm_enhanced_app.py  # AppDaemon integration
+        └── traditional_app.py   # Fallback logic
+      DONT: |
+        # Monolithic LLM integration in single file
+        crop_steering_with_ai_everything_in_one_file.py
+      explanation: "Modular design enables testing, maintenance, and selective deployment"
+      applies_to:
+        files: ["**/__init__.py", "**/config.py"]
+
+  - id: "ha-integration-extension-pattern"
+    category: "home-assistant"
+    confidence: 1.0
+    pattern:
+      DO: |
+        # Extend existing entities with LLM capabilities
+        class CropSteeringSensor(Entity):
+            def __init__(self, ...):
+                super().__init__()
+                self.llm_enabled = config.get("llm_enabled", False)
+                if self.llm_enabled:
+                    self.decision_engine = DecisionEngine(config)
+        
+            async def async_update(self):
+                # Traditional calculation
+                self._attr_native_value = traditional_calculation()
+                
+                # Optional LLM enhancement
+                if self.llm_enabled:
+                    llm_recommendation = await self.decision_engine.get_decision()
+                    self._attr_extra_state_attributes["llm_recommendation"] = llm_recommendation
+      DONT: |
+        # Replace existing logic entirely with LLM
+        def calculate_irrigation():
+            return llm_decision()  # No traditional fallback
+      explanation: "Extend, don't replace - maintain traditional functionality"
+      applies_to:
+        files: ["custom_components/crop_steering/*.py"]
+
+  - id: "event-driven-automation-pattern"
+    category: "automation"
+    confidence: 1.0
+    pattern:
+      DO: |
+        # Use Home Assistant events for LLM decisions
+        self.hass.bus.async_fire("crop_steering_llm_decision", {
+            "zone": zone_id,
+            "decision": decision,
+            "confidence": confidence,
+            "reasoning": reasoning,
+            "cost": api_cost,
+            "provider": provider_used
+        })
+        
+        # AppDaemon listens and acts on high-confidence decisions
+        @ad.listen_event(self.handle_llm_decision, "crop_steering_llm_decision")
+        def handle_llm_decision(self, event_name, data, kwargs):
+            if data["confidence"] > self.confidence_threshold:
+                self.execute_irrigation(data)
+      DONT: |
+        # Direct coupling between LLM and irrigation hardware
+        llm_decision = await get_llm_decision()
+        activate_pump()  # No confidence check or event system
+      explanation: "Event-driven design enables monitoring, logging, and intervention"
+      applies_to:
+        files: ["**/services.py", "**/llm_enhanced_app.py"]
+
+# Cost Management Patterns
+cost_patterns:
+  - id: "daily-budget-tracking"
+    pattern: "Track API costs per day with automatic tier degradation"
+    implementation: |
+      class CostOptimizer:
+          def check_budget_status(self, tier):
+              daily_spent = self.get_daily_cost()
+              budget_limit = BUDGET_TIERS[tier]["daily"]
+              remaining_percentage = (budget_limit - daily_spent) / budget_limit
+              
+              if remaining_percentage < 0.1:  # Less than 10% budget remaining
+                  return "degrade_to_lower_tier"
+              elif remaining_percentage < 0.25:  # Less than 25% budget remaining
+                  return "reduce_frequency"
+              return "normal_operation"
+
+# Safety Mechanisms Documentation
+safety_mechanisms:
+  critical_overrides:
+    vwc_low_threshold: 40  # Emergency irrigation required
+    vwc_high_threshold: 80  # Stop all irrigation
+    ec_critical_threshold: 5.0  # Salt stress prevention
+    
+  confidence_requirements:
+    irrigation_decision: 0.8  # 80% confidence minimum
+    phase_transition: 0.9    # 90% confidence for major changes
+    emergency_action: 0.95   # 95% confidence for safety overrides
+    
+  fallback_hierarchy:
+    1. "Rule-based traditional logic (always available)"
+    2. "Statistical analysis fallback"
+    3. "Manual operator intervention"
+    4. "Emergency safe-state (all irrigation off)"
+
+# Integration Points
+integration_points:
+  home_assistant:
+    - "Extend existing sensor entities with LLM attributes"
+    - "Add new services for LLM-based decisions"
+    - "Create configuration options in config_flow"
+    - "Implement cost tracking entities"
+    
+  appdaemon:
+    - "Enhance master_crop_steering_app with LLM module"
+    - "Add decision confidence logging"
+    - "Implement provider switching logic"
+    - "Create cost monitoring dashboards"
+    
+  configuration_management:
+    secrets_required:
+      - "anthropic_api_key"
+      - "openai_api_key" 
+      - "budget_tier_setting"
+      - "llm_enabled_zones"
+
+# Documentation of Key Components Created
+key_components:
+  client_py:
+    purpose: "Multi-provider LLM API abstraction with fallback logic"
+    critical_features:
+      - "Provider switching (Anthropic ↔ OpenAI)"
+      - "Cost tracking per API call"
+      - "Circuit breaker for reliability"
+      - "Async operation with timeout handling"
+      
+  cost_optimizer_py:
+    purpose: "Budget management and usage analytics"
+    critical_features:
+      - "Daily/monthly cost tracking"
+      - "Automatic tier degradation"
+      - "Usage pattern analysis"
+      - "Cost prediction algorithms"
+      
+  prompts_py:
+    purpose: "Tiered prompt engineering system"
+    critical_features:
+      - "Complexity tiers (Simple→Expert)"
+      - "Context-aware prompt selection"
+      - "Agricultural domain expertise"
+      - "Response parsing and validation"
+      
+  decision_engine_py:
+    purpose: "Core AI decision logic with safety integration"
+    critical_features:
+      - "Multi-factor agricultural analysis"
+      - "Confidence scoring system"
+      - "Safety override integration"
+      - "Traditional logic fallback"
+      
+  llm_enhanced_app_py:
+    purpose: "AppDaemon integration for autonomous operation"
+    critical_features:
+      - "Event-driven LLM consultations"
+      - "Real-time decision monitoring"
+      - "Cost-aware operation scheduling"
+      - "Emergency response protocols"
+
+# Project Context
+project_context:
+  system_type: "Agricultural Automation with AI Enhancement"
+  safety_criticality: "HIGH - Crop damage prevention required"
+  cost_sensitivity: "HIGH - Budget-conscious implementation"
+  reliability_requirements: "99.9% uptime for irrigation decisions"
+  
+  primary_sensors:
+    - "Volumetric Water Content (VWC) sensors"
+    - "Electrical Conductivity (EC) sensors" 
+    - "Temperature and environmental sensors"
+    
+  controlled_hardware:
+    - "Irrigation pumps and valves"
+    - "Zone-specific water distribution"
+    - "Fertilizer injection systems"
+    
+  decision_factors:
+    - "Crop growth phase (P0-P3)"
+    - "Environmental conditions"
+    - "Historical performance data"
+    - "Cost optimization requirements"
+
+# Version Information
+version_info:
+  crop_steering_system: "v2.3.1"
+  llm_integration: "v1.0.0"
+  home_assistant_minimum: "2024.3.0"
+  pattern_confidence: 1.0
+  last_updated: "2025-09-10"
+  
+documentation_sources:
+  - url: "https://docs.anthropic.com/claude/reference"
+    type: "API Reference"
+    confidence: 1.0
+    
+  - url: "https://platform.openai.com/docs/api-reference"
+    type: "API Reference" 
+    confidence: 1.0
+    
+  - source: "User Implementation Requirements"
+    type: "Direct Instructions"
+    confidence: 1.0
+    verified: true
