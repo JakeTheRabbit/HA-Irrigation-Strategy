@@ -1,0 +1,175 @@
+# GPT-5 Configuration for Crop Steering System
+# 2025 API Configuration
+
+# Model Selection Strategy
+models:
+  # Primary model for routine decisions (90% of calls)
+  default:
+    name: "gpt-5-nano"
+    max_tokens: 500
+    temperature: 0.1  # Low for consistent decisions
+    reasoning_effort: "minimal"  # Fast, efficient
+    verbosity: "low"  # Concise responses
+    cost_per_1m_input: 0.05
+    cost_per_1m_output: 0.40
+    
+  # Enhanced model for complex analysis (8% of calls)
+  enhanced:
+    name: "gpt-5-mini"
+    max_tokens: 1000
+    temperature: 0.3
+    reasoning_effort: "medium"
+    verbosity: "medium"
+    cost_per_1m_input: 0.25
+    cost_per_1m_output: 2.00
+    
+  # Premium model for emergencies (2% of calls)
+  emergency:
+    name: "gpt-5"
+    max_tokens: 2000
+    temperature: 0.5
+    reasoning_effort: "high"  # Maximum intelligence
+    verbosity: "high"  # Detailed explanations
+    cost_per_1m_input: 1.25
+    cost_per_1m_output: 10.00
+
+# Decision Routing Rules
+routing:
+  # Conditions that trigger model selection
+  emergency_conditions:
+    - vwc_below: 35  # Critical low moisture
+    - vwc_above: 85  # Oversaturation
+    - ec_above: 6.0  # Dangerous salt levels
+    - sensor_failure: true
+    - multiple_zones_critical: true
+    
+  enhanced_conditions:
+    - phase_transition: true
+    - weekly_analysis: true
+    - threshold_optimization: true
+    - troubleshooting_mode: true
+    - confidence_below: 0.7
+    
+  # Everything else uses default (nano)
+
+# Cost Management
+budget:
+  daily_limit: 5.00  # USD
+  weekly_limit: 35.00
+  monthly_limit: 150.00
+  
+  # Automatic tier degradation
+  tier_thresholds:
+    economy: 1.00  # Under $1/day: nano only
+    standard: 3.00  # Under $3/day: nano + mini
+    premium: 5.00  # Under $5/day: all models
+    
+  # Emergency reserve (always available)
+  emergency_reserve: 2.00  # Extra $2/day for true emergencies
+
+# API Configuration
+api:
+  base_url: "https://api.openai.com/v1"
+  timeout: 30  # seconds
+  retry_attempts: 3
+  retry_delay: 2  # seconds
+  
+  # Headers configuration
+  headers:
+    model_version: "2025-08-01"  # GPT-5 release version
+    
+# Caching Strategy (90% discount on cached tokens!)
+caching:
+  enabled: true
+  ttl_minutes: 1440  # 24 hours
+  similarity_threshold: 0.95  # For semantic caching
+  
+  # Cache these decision types aggressively
+  cache_priorities:
+    - irrigation_decision_normal
+    - threshold_check
+    - sensor_validation
+    - phase_evaluation
+    
+# Context Window Management
+context:
+  max_input_tokens: 8000  # Keep well under 272K limit
+  max_history_events: 50
+  include_sensor_history: true
+  include_environmental: true
+  
+# Reasoning Control (GPT-5 specific)
+reasoning:
+  # Map urgency to reasoning effort
+  effort_mapping:
+    routine: "minimal"      # Fast, basic logic
+    normal: "low"          # Standard analysis
+    complex: "medium"      # Deeper thinking
+    critical: "high"       # Maximum intelligence
+    
+# Verbosity Control (GPT-5 specific)
+verbosity:
+  # Map context to verbosity level
+  level_mapping:
+    decision_only: "low"    # Just YES/NO + duration
+    with_reasoning: "medium"  # Include explanation
+    full_analysis: "high"   # Detailed breakdown
+
+# Performance Monitoring
+monitoring:
+  track_token_usage: true
+  track_response_time: true
+  track_decision_accuracy: true
+  log_all_decisions: true
+  
+  # Alert thresholds
+  alerts:
+    daily_spend_exceeded: true
+    error_rate_high: 0.1  # >10% errors
+    response_time_slow: 5  # >5 seconds
+    
+# Fallback Configuration
+fallback:
+  enabled: true
+  trigger_conditions:
+    - api_timeout: true
+    - rate_limit_exceeded: true
+    - budget_exhausted: true
+    - low_confidence: 0.6
+    
+  # Fallback order
+  cascade:
+    1: "gpt-5-nano"     # Try cheapest first
+    2: "gpt-5-mini"     # Then mid-tier
+    3: "rule_based"     # Finally, use original logic
+
+# Custom Tools (GPT-5 feature)
+tools:
+  irrigation_calculator:
+    type: "plaintext"
+    grammar: |
+      decision ::= "IRRIGATE" | "SKIP"
+      duration ::= [0-9]+ "s"
+      confidence ::= [0-9] | "10"
+      
+# Integration with Crop Steering
+crop_steering:
+  # Map phases to reasoning requirements
+  phase_reasoning:
+    P0: "minimal"  # Simple dryback check
+    P1: "low"      # Progressive shots
+    P2: "medium"   # Threshold analysis
+    P3: "low"      # Emergency only
+    
+  # Decision frequency by phase (seconds)
+  decision_interval:
+    P0: 900    # 15 minutes
+    P1: 300    # 5 minutes
+    P2: 180    # 3 minutes
+    P3: 600    # 10 minutes
+    
+  # Confidence requirements
+  min_confidence:
+    irrigation: 0.7
+    phase_transition: 0.8
+    emergency: 0.9
