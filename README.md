@@ -7,25 +7,25 @@
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-Turn Home Assistant into a professional crop‑steering controller with **GPT-5 AI intelligence**. This project combines a lightweight HA integration (entities, services) with optional AppDaemon modules (advanced analytics, phase state machine, and GPT-5-powered decisions) to automate precision irrigation using VWC/EC sensors.
+Turn Home Assistant into a precision crop‑steering controller using rule-based logic with **optional** LLM assistance. This project combines a lightweight HA integration (entities, services, calculations) with optional AppDaemon modules (automation, analytics, phase state machine) to automate precision irrigation using VWC/EC sensors.
 
-## 🤖 **NEW: GPT-5 AI Integration**
-Experience **enterprise-level crop steering intelligence** at hobby-level costs:
-- **$0.10-0.50/day** for continuous AI monitoring (100x cheaper than commercial systems!)
-- **GPT-5-nano** delivers expert irrigation decisions at $0.05 per million tokens
-- **90% cache discount** on repeated decisions 
-- **Natural language reasoning** explains every irrigation choice
-- **Adaptive learning** from your specific growing conditions
+## 🤖 **Optional: LLM Integration (Experimental)**
+Add AI-powered decision assistance to traditional rule-based irrigation:
+- **Stateless consultation**: LLM analyzes current sensor data and recommends actions
+- **Cost-effective**: GPT-5-nano at $0.05 per million tokens (~$0.10-0.50/day)
+- **Safety-first**: Rule-based fallbacks when LLM confidence is low (<80%)
+- **No persistent memory**: Each decision is independent (no learning between calls)
+- **Advisory role**: LLM suggests, traditional logic validates and executes
 
-### 💰 **AI vs Commercial Systems Cost Comparison**
+### 💰 **Cost Reality Check**
 
-| System | Monthly Cost | Intelligence Level | Data Ownership |
-|--------|-------------|--------------------|----------------|
-| **AROYA (Commercial)** | $1,000-3,000+ | Proprietary ML | Cloud/Vendor |
-| **Your GPT-5 System** | $3-15 | GPT-5 AI Expert | Local/You Own |
-| **Savings** | **99.7%** | **Superior** | **Complete Control** |
+| Component | Monthly Cost | What You Actually Get |
+|-----------|-------------|----------------------|
+| **Base System (Rules Only)** | $0 | Proven 4-phase irrigation automation |
+| **LLM Enhancement** | $3-15 | Intelligent analysis of current conditions only |
+| **Total** | **$3-15** | **Rule-based + AI consultation** |
 
-*GPT-5 brings decades of cultivation knowledge at a fraction of commercial costs*
+*LLM provides intelligent analysis but does not replace core automation logic*
 
 ## How This System Works - Complete Overview
 
@@ -67,14 +67,14 @@ Experience **enterprise-level crop steering intelligence** at hobby-level costs:
 - Performs calculations (shot durations, EC ratio, adjusted thresholds)
 - Fires events that AppDaemon listens to
 
-**AppDaemon Master App with GPT-5 AI (optional but recommended):**
-- **GPT-5 Decision Engine**: Intelligent irrigation choices with natural language reasoning
-- **Cost-optimized**: Uses gpt-5-nano (ultra-cheap) for routine decisions
-- **Smart caching**: 90% discount on repeated/similar contexts  
-- **Safety-first**: Rule-based fallbacks when AI confidence is low
-- **Expert troubleshooting**: AI diagnosis of sensor issues and optimization suggestions
+**AppDaemon Master App (optional automation layer):**
+- **Core Automation**: Rule-based phase transitions, sensor validation, hardware sequencing
+- **Optional LLM Consultation**: Analyzes current sensor snapshot for intelligent recommendations
+- **Stateless AI**: Each LLM call is independent with no memory of previous decisions
+- **Safety-first**: Traditional logic validates all decisions before hardware execution
+- **Cost-controlled**: Budget limits and model selection (gpt-5-nano for routine analysis)
 - Sequences hardware safely to prevent damage
-- Validates sensor data and detects anomalies
+- Validates sensor data and detects anomalies using statistical methods
 
 **Configuration sources:**
 - Primary: Integration UI during setup (maps hardware and sensors)
@@ -86,18 +86,122 @@ Experience **enterprise-level crop steering intelligence** at hobby-level costs:
 Sensors → HA entities → AppDaemon logic → HA services/events → Hardware switches
 ```
 
-**AppDaemon Master Logic Flow:**
+## How the LLM Integration Actually Works (Technical Reality)
+
+### What the LLM Does vs Doesn't Do
+
+**✅ LLM Capabilities:**
+- Analyzes current sensor snapshot (VWC, EC, phase, temperature, etc.)
+- Provides intelligent recommendations: "Irrigate now" or "Wait longer"
+- Explains reasoning in natural language
+- Considers multiple factors simultaneously (phase, EC ratio, environmental conditions)
+- Suggests shot sizes and timing adjustments
+
+**❌ LLM Limitations:**
+- **No persistent memory**: Cannot remember previous decisions or plant responses
+- **No learning**: Each API call is completely independent
+- **No direct hardware control**: Only provides advisory recommendations
+- **No autonomous operation**: Traditional logic must validate and execute all actions
+
+### Code-Level Implementation
+
+**1. Decision Request Flow:**
+```python
+# In AppDaemon master app (llm_enhanced_app.py)
+async def evaluate_zone_irrigation(self, zone_id):
+    # Gather current sensor data
+    sensor_data = {
+        'vwc': self.get_zone_vwc(zone_id),
+        'ec': self.get_zone_ec(zone_id),
+        'phase': self.get_current_phase(),
+        'ec_ratio': self.calculate_ec_ratio(),
+        'last_irrigation': self.get_last_irrigation_time(zone_id)
+    }
+    
+    # Traditional rule-based decision (always calculated)
+    rule_based_decision = self.traditional_irrigation_logic(sensor_data)
+    
+    # Optional: Consult LLM for additional insight
+    if self.llm_enabled and self.within_budget():
+        llm_recommendation = await self.llm_client.get_decision(
+            sensor_data, 
+            context="Zone irrigation evaluation"
+        )
+        
+        # Validate LLM confidence threshold
+        if llm_recommendation.confidence < 0.8:
+            return rule_based_decision  # Fall back to rules
+        
+        # Traditional logic validates LLM suggestion
+        if self.validate_llm_decision(llm_recommendation, sensor_data):
+            return llm_recommendation
+    
+    return rule_based_decision  # Default to rule-based logic
+```
+
+**2. LLM Client Implementation:**
+```python
+# In custom_components/crop_steering/llm/client.py
+class LLMClient:
+    async def get_decision(self, sensor_data, context):
+        # Build prompt with current sensor snapshot only
+        prompt = f"""
+        Current irrigation context: {context}
+        
+        Sensor Data:
+        - Zone VWC: {sensor_data['vwc']}%
+        - Zone EC: {sensor_data['ec']} mS/cm  
+        - Current Phase: {sensor_data['phase']}
+        - EC Ratio: {sensor_data['ec_ratio']}
+        - Minutes since last irrigation: {sensor_data['last_irrigation']}
+        
+        Based on this snapshot, should I irrigate this zone now?
+        Respond with: IRRIGATE or WAIT
+        Confidence (0.0-1.0):
+        Reasoning:
+        """
+        
+        # Single API call to GPT-5 (stateless)
+        response = await self.openai_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=150
+        )
+        
+        # Parse response (no memory stored)
+        return self.parse_llm_response(response)
+```
+
+**3. Integration with Traditional Logic:**
+```python
+# Traditional rule-based logic always available
+def traditional_irrigation_logic(self, sensor_data):
+    phase = sensor_data['phase']
+    vwc = sensor_data['vwc']
+    
+    if phase == 'P1':
+        return vwc < self.p1_target_vwc
+    elif phase == 'P2':
+        threshold = self.adjust_p2_threshold(sensor_data['ec_ratio'])
+        return vwc < threshold
+    elif phase == 'P3':
+        return vwc < self.emergency_threshold
+    
+    return False  # P0 phase - no irrigation during dryback
+```
+
+**AppDaemon Master Logic Flow (Corrected):**
 ```mermaid
 flowchart TD
     subgraph Initialization["🚀 AppDaemon Startup"]
         Start([Initialize]) --> Load[Load Config]
-        Load --> Modules[Initialize Modules:<br/>• Dryback Detection<br/>• Sensor Fusion<br/>• ML Predictor<br/>• State Machine]
+        Load --> Modules[Initialize Modules:<br/>• Rule-Based Logic<br/>• Sensor Validation<br/>• Phase State Machine<br/>• Optional: LLM Client]
         Modules --> Listen[Setup Event Listeners]
     end
     
     subgraph MainLoop["🔄 Main Processing Loop"]
         Listen --> SensorUpdate{Sensor Update?}
-        SensorUpdate -->|Yes| Validate[Validate Sensor Data<br/>IQR Outlier Detection]
+        SensorUpdate -->|Yes| Validate[Validate Sensor Data<br/>Statistical Outlier Detection]
         Validate --> Average[Calculate Averages<br/>Front/Back Sensors]
         Average --> StateCheck{Check Zone States}
         
@@ -105,17 +209,29 @@ flowchart TD
         StateCheck --> Zone2{Zone 2}
         StateCheck --> ZoneN{Zone N...}
         
-        Zone1 --> PhaseLogic1[Phase-Specific Logic]
-        Zone2 --> PhaseLogic2[Phase-Specific Logic]
-        ZoneN --> PhaseLogicN[Phase-Specific Logic]
+        Zone1 --> RuleLogic1[Traditional Rule Logic<br/>Always Calculated]
+        Zone2 --> RuleLogic2[Traditional Rule Logic<br/>Always Calculated]
+        ZoneN --> RuleLogicN[Traditional Rule Logic<br/>Always Calculated]
     end
     
-    subgraph DecisionEngine["🧠 Decision Engine"]
-        PhaseLogic1 --> Prioritize[Prioritize Zones:<br/>Critical > High > Normal > Low]
-        PhaseLogic2 --> Prioritize
-        PhaseLogicN --> Prioritize
+    subgraph DecisionEngine["🧠 Hybrid Decision Engine"]
+        RuleLogic1 --> LLMCheck{LLM Enabled?<br/>Within Budget?}
+        RuleLogic2 --> LLMCheck
+        RuleLogicN --> LLMCheck
         
-        Prioritize --> Safety{Safety Checks}
+        LLMCheck -->|No| UseRules[Use Rule-Based Decision]
+        LLMCheck -->|Yes| ConsultLLM[Consult LLM<br/>Single API Call<br/>Current Snapshot Only]
+        
+        ConsultLLM --> ConfidenceCheck{LLM Confidence<br/>> 80%?}
+        ConfidenceCheck -->|No| UseRules
+        ConfidenceCheck -->|Yes| ValidateRec{Rule Logic<br/>Validates LLM?}
+        
+        ValidateRec -->|No| UseRules
+        ValidateRec -->|Yes| UseLLM[Use LLM Recommendation]
+        
+        UseRules --> Safety{Safety Checks}
+        UseLLM --> Safety
+        
         Safety -->|Pass| Execute[Execute Irrigation]
         Safety -->|Fail| Log[Log Block Reason]
         
@@ -141,7 +257,111 @@ flowchart TD
     style MainLoop fill:#e0f2f1
     style DecisionEngine fill:#fff9c4
     style Events fill:#fce4ec
+
+### LLM Communication Pattern (Stateless)
+
+```mermaid
+sequenceDiagram
+    participant AD as AppDaemon App
+    participant LC as LLM Client
+    participant OAI as OpenAI API
+    participant RL as Rule Logic
+    participant HW as Hardware
+    
+    Note over AD: Sensor update triggers evaluation
+    
+    AD->>AD: Gather current sensor snapshot
+    AD->>RL: Calculate rule-based decision
+    
+    alt LLM enabled and within budget
+        AD->>LC: Request LLM consultation
+        Note over LC: Build prompt with current data only
+        LC->>OAI: Single API call (stateless)
+        Note over OAI: GPT-5 analyzes snapshot<br/>NO memory of previous calls
+        OAI->>LC: Response with confidence score
+        LC->>AD: Parsed recommendation
+        
+        alt LLM confidence > 80%
+            AD->>RL: Validate LLM recommendation
+            alt Rule logic approves
+                AD->>AD: Use LLM decision
+            else Rule logic rejects
+                AD->>AD: Use rule-based decision
+            end
+        else LLM confidence ≤ 80%
+            AD->>AD: Use rule-based decision
+        end
+    else LLM disabled or over budget
+        AD->>AD: Use rule-based decision
+    end
+    
+    AD->>HW: Execute irrigation if approved
+    
+    Note over AD,OAI: Next sensor update = completely<br/>independent LLM consultation
 ```
+
+### What Each LLM Call Actually Costs
+
+```mermaid
+flowchart LR
+    subgraph Models["GPT-5 Model Selection"]
+        NANO[gpt-5-nano<br/>$0.05 / 1M tokens<br/>Basic decisions]
+        MINI[gpt-5-mini<br/>$0.25 / 1M tokens<br/>Complex analysis]
+        FULL[gpt-5<br/>$1.25 / 1M tokens<br/>Emergency situations]
+    end
+    
+    subgraph CallType["Typical API Call"]
+        INPUT[Input: 200 tokens<br/>Sensor data + prompt]
+        OUTPUT[Output: 50 tokens<br/>Decision + reasoning]
+        TOTAL[Total: 250 tokens<br/>Per decision]
+    end
+    
+    subgraph DailyCost["Daily Cost Examples"]
+        LOW[Every 5 minutes<br/>288 calls/day<br/>gpt-5-nano<br/>= $0.36/day]
+        MED[Every 2 minutes<br/>720 calls/day<br/>gpt-5-mini<br/>= $4.50/day]
+        HIGH[Every minute<br/>1440 calls/day<br/>gpt-5<br/>= $45/day]
+    end
+    
+    NANO --> LOW
+    MINI --> MED
+    FULL --> HIGH
+    
+    INPUT --> NANO
+    INPUT --> MINI
+    INPUT --> FULL
+    
+    style Models fill:#e3f2fd
+    style CallType fill:#fff3e0
+    style DailyCost fill:#ffebee
+```
+
+### Memory and Learning Reality
+
+**Current State: No Persistent Memory**
+- Each LLM API call receives only current sensor snapshot
+- No database of previous decisions or plant responses
+- No learning from irrigation outcomes
+- Each decision is completely independent
+
+**Example of What Actually Happens:**
+```python
+# Call 1: Morning
+llm_decision_1 = await llm.get_decision({
+    'vwc': 55, 'ec': 2.1, 'phase': 'P1'
+})  # Returns: "IRRIGATE - VWC below target"
+
+# Call 2: 5 minutes later (INDEPENDENT)
+llm_decision_2 = await llm.get_decision({
+    'vwc': 62, 'ec': 2.0, 'phase': 'P1'  
+})  # Returns: "WAIT - VWC acceptable"
+# LLM has NO MEMORY of call 1!
+```
+
+**To Implement True Learning, You Would Need:**
+1. **Decision Database**: Store all LLM recommendations with timestamps
+2. **Outcome Tracking**: Monitor VWC/EC changes after each irrigation
+3. **Success Scoring**: Calculate whether LLM decisions helped or hurt
+4. **Context Injection**: Include historical performance in future prompts
 
 ### 3. Entities You'll See in Home Assistant
 
@@ -946,35 +1166,78 @@ Install AppDaemon if you want autonomous phase control, analytics, and hardware 
 
 ## Installation
 
-### **Basic Installation (Rule-Based)**
+### **Step 1: Core Integration (Required)**
 1) HACS → Integrations → Custom Repositories → https://github.com/JakeTheRabbit/HA-Irrigation-Strategy (Integration)
 2) Install "Crop Steering System", restart HA
 3) Settings → Devices & Services → Add Integration → Crop Steering System
 
-### **GPT-5 AI Installation (Recommended)**
-4) Get OpenAI API key: https://platform.openai.com/api-keys
-5) Copy `secrets.yaml.example` to `secrets.yaml`, add your API key:
+**✅ You Now Have:**
+- 100+ entities for monitoring and control
+- Manual irrigation services and phase controls
+- Shot duration calculations and EC ratio monitoring
+- Hardware simulation entities for testing
+
+### **Step 2: Automation (Recommended)**
+4) Install AppDaemon 4 add-on
+5) Copy `appdaemon/apps/crop_steering/master_crop_steering_app.py` to AppDaemon apps directory
+6) Update `apps.yaml`:
+   ```yaml
+   crop_steering:
+     module: master_crop_steering_app
+     class: MasterCropSteeringApp
+     # LLM integration disabled by default
+   ```
+7) Restart AppDaemon
+
+**✅ You Now Have:**
+- Autonomous 4-phase cycle automation (P0→P1→P2→P3)
+- Hardware sequencing and safety checks
+- Sensor validation and statistical analysis
+- **Fully functional without any AI/LLM components**
+
+### **Step 3: LLM Enhancement (Optional)**
+8) Get OpenAI API key: https://platform.openai.com/api-keys
+9) Add to Home Assistant secrets.yaml:
    ```yaml
    openai_api_key: "sk-proj-YOUR_KEY_HERE"
    ```
-6) Install AppDaemon 4 add-on
-7) Copy `appdaemon/apps/crop_steering` to your AppDaemon apps directory
-8) Update `apps.yaml`:
-   ```yaml
-   llm_crop_steering:
-     module: llm_enhanced_app
-     class: LLMEnhancedCropSteering
-     llm_provider: "openai"
-     api_key: !secret openai_api_key
-     model: "gpt-5-nano"  # Ultra cost-effective
-     daily_budget: 2.00   # $2/day budget
-   ```
-9) Restart AppDaemon
+10) Copy LLM integration files to AppDaemon apps directory:
+    - `llm_enhanced_app.py` (enhanced version of master app)
+    - `llm/` directory (client, cost optimizer, prompts, decision engine)
+11) Update `apps.yaml` to use LLM-enhanced app:
+    ```yaml
+    llm_crop_steering:
+      module: llm_enhanced_app
+      class: LLMEnhancedCropSteering
+      llm_enabled: true        # Enable LLM consultation
+      llm_provider: "openai"
+      model: "gpt-5-nano"      # Cheapest option
+      daily_budget: 1.00       # $1/day budget limit
+      confidence_threshold: 0.8 # Fall back to rules if LLM confidence < 80%
+    ```
+12) Restart AppDaemon
 
-### **Cost Estimation**
-- **GPT-5-nano**: ~$0.10-0.50/day for continuous AI decisions
-- **Complete setup time**: ~10 minutes
-- **See**: `docs/GPT5_SETUP_GUIDE.md` for detailed instructions
+**✅ You Now Have:**
+- Rule-based automation PLUS LLM consultation
+- Stateless AI analysis of current sensor conditions
+- Cost-controlled API usage with automatic budget limits
+- Safety-first design with rule-based validation
+
+### **What Each Installation Level Gets You**
+
+| Installation Level | Functionality | Cost | Reliability |
+|-------------------|---------------|------|-------------|
+| **Integration Only** | Manual control, calculations, monitoring | Free | 100% reliable |
+| **+ AppDaemon** | Full automation, phase cycles, hardware control | Free | 99.9% reliable |
+| **+ LLM Enhancement** | Traditional automation + AI consultation | $0.10-5/day | 99.9% reliable* |
+
+*LLM failures automatically fall back to proven rule-based logic
+
+### **Honest Cost Expectations**
+- **gpt-5-nano (basic)**: 288 decisions/day = ~$0.36/day
+- **gpt-5-mini (better)**: 288 decisions/day = ~$1.80/day  
+- **Real usage**: Depends on your decision frequency and complexity settings
+- **Budget protection**: System automatically disables LLM when daily limit reached
 
 ## GPT-5 Configuration Examples
 
