@@ -66,6 +66,63 @@ Turn Home Assistant into a professional crop‑steering controller. This project
 Sensors → HA entities → AppDaemon logic → HA services/events → Hardware switches
 ```
 
+**AppDaemon Master Logic Flow:**
+```mermaid
+flowchart TD
+    subgraph Initialization["🚀 AppDaemon Startup"]
+        Start([Initialize]) --> Load[Load Config]
+        Load --> Modules[Initialize Modules:<br/>• Dryback Detection<br/>• Sensor Fusion<br/>• ML Predictor<br/>• State Machine]
+        Modules --> Listen[Setup Event Listeners]
+    end
+    
+    subgraph MainLoop["🔄 Main Processing Loop"]
+        Listen --> SensorUpdate{Sensor Update?}
+        SensorUpdate -->|Yes| Validate[Validate Sensor Data<br/>IQR Outlier Detection]
+        Validate --> Average[Calculate Averages<br/>Front/Back Sensors]
+        Average --> StateCheck{Check Zone States}
+        
+        StateCheck --> Zone1{Zone 1}
+        StateCheck --> Zone2{Zone 2}
+        StateCheck --> ZoneN{Zone N...}
+        
+        Zone1 --> PhaseLogic1[Phase-Specific Logic]
+        Zone2 --> PhaseLogic2[Phase-Specific Logic]
+        ZoneN --> PhaseLogicN[Phase-Specific Logic]
+    end
+    
+    subgraph DecisionEngine["🧠 Decision Engine"]
+        PhaseLogic1 --> Prioritize[Prioritize Zones:<br/>Critical > High > Normal > Low]
+        PhaseLogic2 --> Prioritize
+        PhaseLogicN --> Prioritize
+        
+        Prioritize --> Safety{Safety Checks}
+        Safety -->|Pass| Execute[Execute Irrigation]
+        Safety -->|Fail| Log[Log Block Reason]
+        
+        Execute --> Hardware[Hardware Sequence:<br/>Pump → Main → Zone]
+        Hardware --> Update[Update States]
+    end
+    
+    subgraph Events["📨 Event Handlers"]
+        Listen --> EventRcv{Event Received?}
+        EventRcv -->|phase_transition| PhaseHandler[Update Phase<br/>Reset Counters]
+        EventRcv -->|irrigation_shot| ShotHandler[Queue Shot<br/>Check Lock]
+        EventRcv -->|manual_override| OverrideHandler[Set Override<br/>Start Timer]
+        
+        PhaseHandler --> StateCheck
+        ShotHandler --> Safety
+        OverrideHandler --> Log
+    end
+    
+    Update --> SensorUpdate
+    Log --> SensorUpdate
+    
+    style Initialization fill:#e8eaf6
+    style MainLoop fill:#e0f2f1
+    style DecisionEngine fill:#fff9c4
+    style Events fill:#fce4ec
+```
+
 ### 3. Entities You'll See in Home Assistant
 
 **Input entities (you provide/map these):**
@@ -87,6 +144,49 @@ Sensors → HA entities → AppDaemon logic → HA services/events → Hardware 
 - Zone status sensors: `sensor.crop_steering_zone_1_status` (Optimal/Dry/Saturated/etc.)
 
 **Naming convention:** All created entities start with `crop_steering_` for easy identification
+
+**Entity Relationship Flow:**
+```mermaid
+graph TB
+    subgraph Inputs["📥 Input Entities (User Provides)"]
+        VWC[VWC Sensors<br/>zone_1_vwc_front/back]
+        EC[EC Sensors<br/>zone_1_ec_front/back]
+        HW[Hardware Switches<br/>pump, main_valve, zone_valves]
+        ENV[Environment Sensors<br/>temp, humidity, VPD]
+    end
+    
+    subgraph Integration["⚙️ Integration Processing"]
+        CALC[Calculations<br/>Shot Duration<br/>EC Ratio<br/>Thresholds]
+        AVG[Averaging<br/>Zone VWC/EC<br/>System Averages]
+    end
+    
+    subgraph Outputs["📤 Created Entities"]
+        PHASE[Phase Select<br/>P0/P1/P2/P3]
+        SENSORS[Calculated Sensors<br/>ec_ratio, adjusted_threshold]
+        NUMBERS[Config Numbers<br/>targets, shot_sizes, timing]
+        SWITCHES[Control Switches<br/>enabled, override, ec_stacking]
+    end
+    
+    subgraph Services["🔧 Services"]
+        SVC1[transition_phase]
+        SVC2[execute_irrigation_shot]
+        SVC3[check_conditions]
+        SVC4[set_manual_override]
+    end
+    
+    VWC --> AVG
+    EC --> AVG
+    AVG --> CALC
+    CALC --> SENSORS
+    HW --> Services
+    PHASE --> Services
+    Services --> AppDaemon[AppDaemon Automation]
+    
+    style Inputs fill:#e3f2fd
+    style Integration fill:#fff3e0
+    style Outputs fill:#e8f5e9
+    style Services fill:#fce4ec
+```
 
 ### 4. How a Typical Day Flows
 
@@ -118,6 +218,83 @@ Sensors → HA entities → AppDaemon logic → HA services/events → Hardware 
 **Vegetative vs Generative modes:**
 - Vegetative: Higher VWC targets (65-70%), lower EC targets (1.5-2.0 mS/cm), more frequent irrigation
 - Generative: Lower VWC targets (55-60%), higher EC targets (2.5-3.5 mS/cm), controlled stress
+
+**Daily Phase Cycle Visualization:**
+```mermaid
+graph LR
+    subgraph Night["🌙 Night Period"]
+        P3N[P3: Pre-Lights-Off<br/>Emergency Only]
+    end
+    
+    subgraph Morning["🌅 Morning"]
+        LO[Lights On<br/>6:00 AM] --> P0[P0: Dryback<br/>Wait 30-180 min<br/>Target: -15% VWC]
+    end
+    
+    subgraph Day["☀️ Day Period"]
+        P0 --> P1[P1: Ramp-Up<br/>Progressive Shots<br/>2% → 10%]
+        P1 --> P2[P2: Maintenance<br/>Threshold-Based<br/>5% shots @ <60% VWC]
+        P2 --> P3[P3: Wind-Down<br/>90 min before lights-off]
+    end
+    
+    subgraph Evening["🌆 Evening"]
+        P3 --> LF[Lights Off<br/>10:00 PM]
+    end
+    
+    LF --> P3N
+    P3N --> LO
+
+    style P0 fill:#ffeb3b
+    style P1 fill:#4caf50
+    style P2 fill:#2196f3
+    style P3 fill:#ff9800
+```
+
+**Phase State Machine Logic:**
+```mermaid
+stateDiagram-v2
+    [*] --> P0: Lights On
+    
+    P0 --> P1: Dryback Complete<br/>OR Max Wait Time
+    note right of P0
+        Conditions:
+        - Min wait: 30 min
+        - Max wait: 180 min
+        - Target: -15% VWC
+    end note
+    
+    P1 --> P2: VWC Target Reached
+    note right of P1
+        Progressive Shots:
+        - Start: 2% volume
+        - Increment: +0.5%
+        - Max: 10% volume
+    end note
+    
+    P2 --> P3: Time Before Lights Off
+    note right of P2
+        Threshold Irrigation:
+        - Base: 60% VWC
+        - Adjust by EC ratio
+        - Fixed shot size: 5%
+    end note
+    
+    P3 --> P0: Lights On
+    note right of P3
+        Emergency Only:
+        - Threshold: <40% VWC
+        - Small shots: 3%
+        - 90 min before lights off
+    end note
+    
+    P0 --> Manual: Manual Override
+    P1 --> Manual: Manual Override
+    P2 --> Manual: Manual Override
+    P3 --> Manual: Manual Override
+    Manual --> P0: Resume Auto
+    Manual --> P1: Resume Auto
+    Manual --> P2: Resume Auto
+    Manual --> P3: Resume Auto
+```
 
 ### 5. What Actually Triggers Things
 
@@ -157,6 +334,92 @@ Sensors → HA entities → AppDaemon logic → HA services/events → Hardware 
 
 **These events are the communication bridge between the HA integration and AppDaemon automation**
 
+**Irrigation Decision Tree:**
+```mermaid
+flowchart TD
+    Start([Sensor Update]) --> Check{System Enabled?}
+    Check -->|No| Stop([No Action])
+    Check -->|Yes| Phase{Current Phase?}
+    
+    Phase -->|P0| Dryback{Dryback<br/>Complete?}
+    Dryback -->|No| Wait[Wait More]
+    Dryback -->|Yes| TransP1[Transition to P1]
+    
+    Phase -->|P1| VWCTarget{VWC Reached<br/>Target?}
+    VWCTarget -->|No| CalcShot1[Calculate Progressive Shot]
+    VWCTarget -->|Yes| TransP2[Transition to P2]
+    CalcShot1 --> Execute1[Execute Shot]
+    
+    Phase -->|P2| Threshold{VWC Below<br/>Threshold?}
+    Threshold -->|No| ECCheck{EC Ratio<br/>Check}
+    Threshold -->|Yes| CalcShot2[Calculate P2 Shot]
+    ECCheck -->|High >1.3| AdjustUp[Increase Threshold +5%]
+    ECCheck -->|Low <0.7| AdjustDown[Decrease Threshold -5%]
+    ECCheck -->|Normal| Stop
+    CalcShot2 --> Execute2[Execute Shot]
+    
+    Phase -->|P3| Emergency{VWC < 40%?}
+    Emergency -->|No| Stop
+    Emergency -->|Yes| EmShot[Emergency Shot]
+    EmShot --> Execute3[Execute Shot]
+    
+    style Start fill:#e1f5fe
+    style Stop fill:#ffebee
+    style Execute1 fill:#c8e6c9
+    style Execute2 fill:#c8e6c9
+    style Execute3 fill:#ffccbc
+```
+
+**Event Flow and Communication:**
+```mermaid
+flowchart LR
+    subgraph User["👤 User Actions"]
+        UI[HA Dashboard<br/>Buttons/Selects]
+        API[Service Calls<br/>Developer Tools]
+    end
+    
+    subgraph HACore["🏠 Home Assistant Core"]
+        SVC[Services<br/>crop_steering.*]
+        EVENT[Event Bus]
+        STATE[State Machine]
+    end
+    
+    subgraph Events["📡 Events Fired"]
+        E1[crop_steering_phase_transition]
+        E2[crop_steering_irrigation_shot]
+        E3[crop_steering_transition_check]
+        E4[crop_steering_manual_override]
+    end
+    
+    subgraph AppD["🤖 AppDaemon"]
+        LISTEN[Event Listeners]
+        LOGIC[Decision Logic]
+        ACTION[Hardware Control]
+    end
+    
+    UI --> SVC
+    API --> SVC
+    SVC --> EVENT
+    EVENT --> E1
+    EVENT --> E2
+    EVENT --> E3
+    EVENT --> E4
+    
+    E1 --> LISTEN
+    E2 --> LISTEN
+    E3 --> LISTEN
+    E4 --> LISTEN
+    
+    LISTEN --> LOGIC
+    LOGIC --> ACTION
+    ACTION --> STATE
+    STATE --> UI
+    
+    style Events fill:#ffecb3
+    style HACore fill:#e1bee7
+    style AppD fill:#c5e1a5
+```
+
 ### 6. How an Irrigation Shot Actually Runs
 
 **Safe sequencing for each shot:**
@@ -185,6 +448,96 @@ Sensors → HA entities → AppDaemon logic → HA services/events → Hardware 
 - P3 Emergency: Uses `p3_emergency_shot_size` (e.g., 3%)
 - Per-zone multiplier allows individual adjustment
 
+**Hardware Sequencing Diagram:**
+```mermaid
+sequenceDiagram
+    participant AD as AppDaemon
+    participant HA as Home Assistant
+    participant P as Pump
+    participant M as Main Valve
+    participant Z as Zone Valve
+    
+    AD->>AD: Check safety conditions
+    AD->>P: Turn ON pump
+    P-->>AD: Pump running
+    Note over P: 2 sec prime time
+    
+    AD->>M: Open main valve
+    M-->>AD: Main valve open
+    Note over M: 1 sec stabilization
+    
+    AD->>Z: Open Zone 1 valve
+    Z-->>AD: Zone valve open
+    Note over Z: Irrigate for 60 seconds
+    
+    AD->>Z: Close Zone 1 valve
+    Z-->>AD: Zone valve closed
+    
+    AD->>AD: Check other zones
+    alt No other zones active
+        AD->>M: Close main valve
+        M-->>AD: Main valve closed
+        AD->>P: Turn OFF pump
+        P-->>AD: Pump stopped
+    else Other zones pending
+        AD->>Z: Open next zone
+    end
+    
+    AD->>HA: Log irrigation complete
+```
+
+**Shot Calculation Flow:**
+```mermaid
+flowchart LR
+    subgraph Inputs["📊 Input Parameters"]
+        POT[Pot Volume<br/>10L]
+        FLOW[Flow Rate<br/>2L/hr]
+        DRIP[Drippers<br/>2 per plant]
+        PHASE[Current Phase<br/>P1/P2/P3]
+    end
+    
+    subgraph P1Calc["P1 Calculation"]
+        P1S[Shot Size %] --> P1M[2% → 2.5% → 3%<br/>Progressive]
+        P1M --> P1D[Duration = Volume × % ÷ Flow × 3600]
+    end
+    
+    subgraph P2Calc["P2 Calculation"]
+        P2S[Fixed Shot Size<br/>5%] --> P2D[Duration = 10L × 5% ÷ 2L/hr × 3600<br/>= 900 seconds]
+    end
+    
+    subgraph P3Calc["P3 Emergency"]
+        P3S[Emergency Size<br/>3%] --> P3D[Duration = 10L × 3% ÷ 2L/hr × 3600<br/>= 540 seconds]
+    end
+    
+    subgraph Modifiers["⚙️ Adjustments"]
+        MULT[Zone Multiplier<br/>0.8x - 1.2x]
+        ECADJ[EC Ratio Adjust<br/>±20% duration]
+    end
+    
+    POT --> P1Calc
+    POT --> P2Calc
+    POT --> P3Calc
+    FLOW --> P1Calc
+    FLOW --> P2Calc
+    FLOW --> P3Calc
+    
+    PHASE -->|P1| P1Calc
+    PHASE -->|P2| P2Calc
+    PHASE -->|P3| P3Calc
+    
+    P1D --> MULT
+    P2D --> MULT
+    P3D --> MULT
+    
+    MULT --> ECADJ
+    ECADJ --> Output[Final Duration<br/>45-120 seconds]
+    
+    style Inputs fill:#e3f2fd
+    style P1Calc fill:#c8e6c9
+    style P2Calc fill:#bbdefb
+    style P3Calc fill:#ffccbc
+```
+
 ### 7. Safety, Limits, and Overrides
 
 **Safety checks before irrigation:**
@@ -204,6 +557,64 @@ Sensors → HA entities → AppDaemon logic → HA services/events → Hardware 
 - Manual overrides bypass normal phase logic
 - Safety checks still apply where possible
 - All manual actions logged for troubleshooting
+
+**Safety Checks and Override Logic:**
+```mermaid
+flowchart TD
+    Request([Irrigation Request]) --> SystemCheck{System<br/>Enabled?}
+    SystemCheck -->|No| Block1[❌ Block:<br/>System Disabled]
+    SystemCheck -->|Yes| AutoCheck{Auto Mode<br/>Enabled?}
+    
+    AutoCheck -->|No| ManualCheck{Manual<br/>Override?}
+    ManualCheck -->|No| Block2[❌ Block:<br/>No Manual Override]
+    ManualCheck -->|Yes| SafetyChecks
+    AutoCheck -->|Yes| SafetyChecks
+    
+    subgraph SafetyChecks["🛡️ Safety Validation"]
+        VWCCheck{VWC > 75%?}
+        VWCCheck -->|Yes| Block3[❌ Block:<br/>Saturated]
+        VWCCheck -->|No| ECCheck{EC > Max?}
+        
+        ECCheck -->|Yes| FlushCheck{Flush Mode?}
+        FlushCheck -->|No| Block4[❌ Block:<br/>EC Too High]
+        FlushCheck -->|Yes| LockCheck
+        ECCheck -->|No| LockCheck
+        
+        LockCheck{Irrigation<br/>Lock Active?}
+        LockCheck -->|Yes| Block5[❌ Block:<br/>Already Running]
+        LockCheck -->|No| TimeCheck
+        
+        TimeCheck{Min Time<br/>Between Shots<br/>Elapsed?}
+        TimeCheck -->|No| Block6[❌ Block:<br/>Too Soon]
+        TimeCheck -->|Yes| ZoneCheck
+        
+        ZoneCheck{Zone<br/>Abandoned?}
+        ZoneCheck -->|Yes| Block7[❌ Block:<br/>Zone Unresponsive]
+        ZoneCheck -->|No| Proceed
+    end
+    
+    subgraph OverrideTypes["🔧 Override Modes"]
+        Temp[Temporary Override<br/>• 1-1440 minutes<br/>• Auto-disable after timeout]
+        Perm[Permanent Override<br/>• Manual control<br/>• Until disabled]
+        Emergency[Emergency Override<br/>• Bypass most checks<br/>• Log all actions]
+    end
+    
+    Proceed([✅ Execute Irrigation]) --> SetLock[Set Irrigation Lock]
+    SetLock --> RunSequence[Run Hardware Sequence]
+    RunSequence --> ReleaseLock[Release Lock]
+    
+    ManualCheck -.-> OverrideTypes
+    
+    style Block1 fill:#ffcdd2
+    style Block2 fill:#ffcdd2
+    style Block3 fill:#ffcdd2
+    style Block4 fill:#ffcdd2
+    style Block5 fill:#ffcdd2
+    style Block6 fill:#ffcdd2
+    style Block7 fill:#ffcdd2
+    style Proceed fill:#c8e6c9
+    style SafetyChecks fill:#fff3e0
+```
 
 ### 8. Configuration the User Actually Does
 
