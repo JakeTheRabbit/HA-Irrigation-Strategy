@@ -7,7 +7,25 @@
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-Turn Home Assistant into a professional crop‑steering controller with **GPT-5 AI intelligence**. This project combines a lightweight HA integration (entities, services) with optional AppDaemon modules (advanced analytics, phase state machine, and GPT-5-powered decisions) to automate precision irrigation using VWC/EC sensors at ultra-low cost ($0.10-0.50/day).
+Turn Home Assistant into a professional crop‑steering controller with **GPT-5 AI intelligence**. This project combines a lightweight HA integration (entities, services) with optional AppDaemon modules (advanced analytics, phase state machine, and GPT-5-powered decisions) to automate precision irrigation using VWC/EC sensors.
+
+## 🤖 **NEW: GPT-5 AI Integration**
+Experience **enterprise-level crop steering intelligence** at hobby-level costs:
+- **$0.10-0.50/day** for continuous AI monitoring (100x cheaper than commercial systems!)
+- **GPT-5-nano** delivers expert irrigation decisions at $0.05 per million tokens
+- **90% cache discount** on repeated decisions 
+- **Natural language reasoning** explains every irrigation choice
+- **Adaptive learning** from your specific growing conditions
+
+### 💰 **AI vs Commercial Systems Cost Comparison**
+
+| System | Monthly Cost | Intelligence Level | Data Ownership |
+|--------|-------------|--------------------|----------------|
+| **AROYA (Commercial)** | $1,000-3,000+ | Proprietary ML | Cloud/Vendor |
+| **Your GPT-5 System** | $3-15 | GPT-5 AI Expert | Local/You Own |
+| **Savings** | **99.7%** | **Superior** | **Complete Control** |
+
+*GPT-5 brings decades of cultivation knowledge at a fraction of commercial costs*
 
 ## How This System Works - Complete Overview
 
@@ -49,11 +67,13 @@ Turn Home Assistant into a professional crop‑steering controller with **GPT-5 
 - Performs calculations (shot durations, EC ratio, adjusted thresholds)
 - Fires events that AppDaemon listens to
 
-**AppDaemon Master App (optional but recommended for automation):**
-- Listens to sensor updates and integration events
-- Makes irrigation decisions based on phase logic and thresholds
+**AppDaemon Master App with GPT-5 AI (optional but recommended):**
+- **GPT-5 Decision Engine**: Intelligent irrigation choices with natural language reasoning
+- **Cost-optimized**: Uses gpt-5-nano (ultra-cheap) for routine decisions
+- **Smart caching**: 90% discount on repeated/similar contexts  
+- **Safety-first**: Rule-based fallbacks when AI confidence is low
+- **Expert troubleshooting**: AI diagnosis of sensor issues and optimization suggestions
 - Sequences hardware safely to prevent damage
-- Manages phase transitions automatically
 - Validates sensor data and detects anomalies
 
 **Configuration sources:**
@@ -926,18 +946,74 @@ Install AppDaemon if you want autonomous phase control, analytics, and hardware 
 
 ## Installation
 
-- Integration (HACS recommended)
-  1) HACS → Integrations → Custom Repositories → https://github.com/JakeTheRabbit/HA-Irrigation-Strategy (Integration)
-  2) Install "Crop Steering System", restart HA
-  3) Settings → Devices & Services → Add Integration → Crop Steering System
+### **Basic Installation (Rule-Based)**
+1) HACS → Integrations → Custom Repositories → https://github.com/JakeTheRabbit/HA-Irrigation-Strategy (Integration)
+2) Install "Crop Steering System", restart HA
+3) Settings → Devices & Services → Add Integration → Crop Steering System
 
-- AppDaemon (optional, for advanced features)
-  1) Install AppDaemon 4 add‑on
-  2) Use v15+ paths (supervised HA): /addon_configs/a0d7b954_appdaemon/
-  3) Copy appdaemon/apps/crop_steering to your AppDaemon apps dir, include apps.yaml
-  4) Restart AppDaemon
+### **GPT-5 AI Installation (Recommended)**
+4) Get OpenAI API key: https://platform.openai.com/api-keys
+5) Copy `secrets.yaml.example` to `secrets.yaml`, add your API key:
+   ```yaml
+   openai_api_key: "sk-proj-YOUR_KEY_HERE"
+   ```
+6) Install AppDaemon 4 add-on
+7) Copy `appdaemon/apps/crop_steering` to your AppDaemon apps directory
+8) Update `apps.yaml`:
+   ```yaml
+   llm_crop_steering:
+     module: llm_enhanced_app
+     class: LLMEnhancedCropSteering
+     llm_provider: "openai"
+     api_key: !secret openai_api_key
+     model: "gpt-5-nano"  # Ultra cost-effective
+     daily_budget: 2.00   # $2/day budget
+   ```
+9) Restart AppDaemon
 
-See docs/installation_guide.md for step‑by‑step details.
+### **Cost Estimation**
+- **GPT-5-nano**: ~$0.10-0.50/day for continuous AI decisions
+- **Complete setup time**: ~10 minutes
+- **See**: `docs/GPT5_SETUP_GUIDE.md` for detailed instructions
+
+## GPT-5 Configuration Examples
+
+### **Budget-Conscious Setup ($0.50/day)**
+```yaml
+# AppDaemon configuration
+llm_crop_steering:
+  module: llm_enhanced_app
+  class: LLMEnhancedCropSteering
+  llm_provider: "openai"
+  model: "gpt-5-nano"      # Cheapest option
+  daily_budget: 1.50       # Conservative budget
+  decision_interval: 300   # Every 5 minutes
+  cache_ttl: 1440         # 24-hour cache (90% discount)
+```
+
+### **Performance-Optimized Setup ($2-3/day)**
+```yaml
+llm_crop_steering:
+  llm_provider: "openai" 
+  model: "gpt-5-nano"      # Routine decisions
+  enhanced_model: "gpt-5-mini"  # Complex analysis
+  daily_budget: 3.00
+  decision_interval: 180   # Every 3 minutes
+  reasoning_effort: "low"  # Faster responses
+  enable_troubleshooting: true
+```
+
+### **Research-Grade Setup ($5-10/day)**
+```yaml
+llm_crop_steering:
+  model: "gpt-5-mini"      # Primary model
+  emergency_model: "gpt-5" # Full intelligence for emergencies
+  daily_budget: 8.00
+  decision_interval: 120   # Every 2 minutes  
+  reasoning_effort: "medium"
+  verbosity: "high"        # Detailed explanations
+  enable_weekly_analysis: true
+```
 
 ## Testing & Hardware Simulation
 
@@ -1024,20 +1100,32 @@ flowchart LR
   I --> SVC
   I <--> BUS
 
-  subgraph AD[AppDaemon - Optional]
+  subgraph AD[AppDaemon with GPT-5 AI]
     M[Master Crop Steering App]
+    AI[🤖 GPT-5 Decision Engine<br/>gpt-5-nano: $0.05/1M tokens<br/>90% cache discount]
     D[Dryback Detection]
-    F[Sensor Validation]
+    F[Sensor Validation] 
     P[Statistical Analysis]
     SM[Phase State Machine]
+    COST[Cost Optimizer<br/>$0.10-0.50/day]
   end
 
   BUS <--> M
+  M <--> AI
+  AI --> COST
   M --> D
   M --> F
   M --> P
   M --> SM
   M --> HW[(Hardware Control<br/>Pumps/Valves)]
+  
+  subgraph API[OpenAI GPT-5 API]
+    NANO[gpt-5-nano<br/>Routine Decisions]
+    MINI[gpt-5-mini<br/>Complex Analysis]
+    FULL[gpt-5<br/>Emergency Intelligence]
+  end
+  
+  AI <--> API
   
   subgraph HW_DETAIL[Physical Hardware]
     PUMP[Water Pump]
@@ -1047,6 +1135,10 @@ flowchart LR
   end
   
   HW --> HW_DETAIL
+  
+  style AI fill:#e8f5e9
+  style COST fill:#fff3e0
+  style API fill:#e3f2fd
 ```
 
 ## Modules & key classes
