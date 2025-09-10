@@ -1,16 +1,38 @@
-# AppDaemon Apps Configuration
-# Advanced Crop Steering System with AI Features
-# 
-# This configuration sets up the complete AI-powered crop steering system
-# All modules work together to provide intelligent irrigation automation
+# AppDaemon Apps Configuration for Crop Steering System
+# ====================================================
 
-# Master Crop Steering Application
-# Coordinates all advanced modules and handles irrigation decisions
-master_crop_steering:
-  module: crop_steering.master_crop_steering_app
-  class: MasterCropSteeringApp
-  log: crop_steering_master
-  log_level: INFO
+# Smart Irrigation Learning System
+# Main learning system that characterizes zones and optimizes irrigation
+smart_irrigation_learning:
+  module: smart_irrigation_learning
+  class: SmartIrrigationLearning
+  
+  # System Configuration - ADJUST FOR YOUR SETUP
+  zones: [1, 2, 3, 4, 5, 6]  # Active zones in your system
+  dripper_rate: 1.2           # L/hr per pressure-compensating dripper
+  drippers_per_plant: 2       # Number of drippers per plant
+  plants_per_zone: 4          # Number of plants per zone
+  substrate_volume: 3.0       # Liters of substrate per plant
+  
+  # Learning Parameters (Advanced - leave defaults unless experienced)
+  field_capacity_efficiency_threshold: 0.3   # 30% efficiency = field capacity
+  min_efficiency_for_good_absorption: 0.7    # 70% = good absorption
+  shot_test_duration: 30                     # seconds for test shots
+  absorption_wait_time: 120                  # seconds to wait after irrigation
+
+# Learning Dashboard Helper
+# Creates Home Assistant entities and services for monitoring learning progress
+learning_dashboard:
+  module: learning_dashboard
+  class: LearningDashboard
+
+# Original Master Crop Steering Application (Optional - can run alongside)
+# Uncomment if you want to keep existing automation running
+# master_crop_steering:
+#   module: crop_steering.master_crop_steering_app
+#   class: MasterCropSteeringApp
+#   log: crop_steering_master
+#   log_level: INFO
 
 # Advanced Dashboard Application  
 # Provides real-time Athena-style monitoring and analytics
