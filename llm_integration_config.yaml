@@ -1,0 +1,161 @@
+# LLM Integration Configuration Template for Crop Steering System
+# Copy and modify this configuration for your setup
+
+# AppDaemon App Configuration
+# Add this to your appdaemon/apps/apps.yaml file:
+
+llm_enhanced_crop_steering:
+  module: crop_steering.llm.llm_enhanced_app
+  class: LLMEnhancedCropSteering
+  
+  # Basic Configuration
+  zones: [1, 2, 3]  # Your active zones
+  enable_llm: true  # Set to false to disable LLM features
+  
+  # LLM Provider Configuration
+  llm_config:
+    provider: "claude"  # "claude" or "openai"
+    model: "claude-3-5-sonnet-20241022"  # Claude: claude-3-5-sonnet-20241022, claude-3-haiku-20240307
+                                         # OpenAI: gpt-4, gpt-4-turbo, gpt-3.5-turbo
+    api_key: "your-api-key-here"  # Your API key (use secrets.yaml recommended)
+    timeout: 30
+    max_retries: 3
+    
+  # Alternative: Use secrets file (recommended)
+  # llm_config:
+  #   provider: "claude"
+  #   model: "claude-3-5-sonnet-20241022"
+  #   api_key: !secret claude_api_key
+  
+  # Budget Control Configuration
+  budget_config:
+    daily_limit: 5.0      # $5.00 daily limit
+    weekly_limit: 25.0    # $25.00 weekly limit  
+    monthly_limit: 100.0  # $100.00 monthly limit
+    emergency_reserve: 10.0  # $10.00 emergency reserve
+    cost_tier: "standard"    # "economy", "standard", "premium", "emergency"
+    enable_alerts: true
+    
+    # Alert thresholds (percentage of budget)
+    alert_thresholds:
+      daily_warning: 0.7     # 70% of daily budget
+      daily_critical: 0.9    # 90% of daily budget  
+      weekly_warning: 0.8    # 80% of weekly budget
+      monthly_warning: 0.8   # 80% of monthly budget
+  
+  # Decision Engine Configuration
+  llm_confidence_threshold: 70.0  # Minimum confidence to trust LLM decision
+  enable_llm_phase_transitions: true  # Allow LLM to suggest phase changes
+  
+  # Safety Configuration
+  safety_thresholds:
+    min_confidence: 70.0      # Minimum LLM confidence
+    max_vwc_critical: 80.0    # Critical high VWC level
+    min_vwc_critical: 40.0    # Critical low VWC level  
+    max_ec_critical: 5.0      # Critical EC level
+    emergency_response_time: 300  # 5 minutes for emergency response
+
+---
+
+# Home Assistant Integration Configuration
+# Add this to your Home Assistant configuration.yaml:
+
+# Crop Steering System (if not already configured)
+# The LLM components will be automatically available once the integration is installed
+
+# Optional: Create input helpers for manual LLM control
+input_boolean:
+  crop_steering_llm_enabled:
+    name: "Crop Steering LLM Enabled"
+    initial: true
+    icon: mdi:brain
+
+input_select:
+  crop_steering_llm_cost_tier:
+    name: "LLM Cost Tier"
+    options:
+      - economy
+      - standard  
+      - premium
+    initial: standard
+    icon: mdi:currency-usd
+
+input_number:
+  crop_steering_llm_daily_budget:
+    name: "LLM Daily Budget"
+    min: 1.0
+    max: 50.0
+    step: 1.0
+    initial: 5.0
+    unit_of_measurement: "$"
+    icon: mdi:currency-usd
+
+---
+
+# Secrets Configuration (secrets.yaml)
+# Add your API keys to secrets.yaml:
+
+# Claude API Key (get from https://console.anthropic.com/)
+claude_api_key: "sk-ant-api03-..."
+
+# OpenAI API Key (get from https://platform.openai.com/api-keys)  
+openai_api_key: "sk-..."
+
+---
+
+# Cost Tier Explanations:
+
+# ECONOMY TIER:
+# - Strict budget controls ($1-2/day typical)
+# - Uses cheapest models (Claude Haiku, GPT-3.5)
+# - Limited token usage
+# - Falls back to rules frequently
+# - Best for: Testing, low-budget operations
+
+# STANDARD TIER:
+# - Balanced approach ($3-8/day typical)
+# - Uses mid-tier models (Claude Sonnet, GPT-4)
+# - Reasonable token limits
+# - Good balance of LLM and rule-based decisions
+# - Best for: Most production environments
+
+# PREMIUM TIER:
+# - Higher budgets allowed ($10-25/day typical)
+# - Uses best models with higher token limits
+# - More detailed analysis and recommendations
+# - Best for: Research, high-value crops, optimization
+
+# EMERGENCY TIER:
+# - LLM usage only for true emergencies
+# - Minimal daily budget
+# - Rule-based decisions for normal operations
+# - Best for: Systems with very tight budgets
+
+---
+
+# Model Recommendations:
+
+# CLAUDE MODELS:
+# - claude-3-5-sonnet-20241022: Best balance of performance and cost
+# - claude-3-haiku-20240307: Fastest and cheapest, good for simple decisions
+# - claude-3-opus-20240229: Most capable but expensive (not recommended for irrigation)
+
+# OPENAI MODELS:
+# - gpt-4-turbo: Good performance, reasonable cost
+# - gpt-4: High quality but expensive
+# - gpt-3.5-turbo: Cheapest option, adequate for basic decisions
+
+---
+
+# Usage Monitoring:
+
+# The system automatically tracks:
+# - Daily/weekly/monthly costs
+# - Token usage per operation
+# - Decision success rates
+# - LLM vs rule-based decision ratios
+
+# Access reports via:
+# - AppDaemon logs
+# - Home Assistant notifications
+# - Service calls: crop_steering.get_llm_usage_report
