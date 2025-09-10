@@ -11,7 +11,8 @@ secrets.yaml
 deps/
 tts/
 www/
-custom_components/
+# Note: custom_components/ commented out because this IS the custom component repo
+# custom_components/
 
 # Temporary files
 *.tmp
