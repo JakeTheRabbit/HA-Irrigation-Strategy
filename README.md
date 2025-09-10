@@ -257,6 +257,7 @@ flowchart TD
     style MainLoop fill:#e0f2f1
     style DecisionEngine fill:#fff9c4
     style Events fill:#fce4ec
+```
 
 ### LLM Communication Pattern (Stateless)
 
