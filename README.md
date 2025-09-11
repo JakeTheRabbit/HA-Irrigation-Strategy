@@ -1,242 +1,117 @@
-# Intelligent Crop Steering System for Home Assistant
+# Crop Steering for Home Assistant
 
-![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
-![Zones](https://img.shields.io/badge/Zones-1%E2%80%936-blue)
-![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
-![License](https://img.shields.io/badge/License-MIT-green)
+Automated irrigation system that controls water and nutrient timing based on sensor readings. Monitors soil moisture (VWC) and nutrient concentration (EC) to decide when and how much to irrigate each zone.
 
-**Open source crop steering system for Home Assistant** with precision irrigation automation, intelligent learning optimization, and optional AI decision assistance.
+## What is Crop Steering?
 
-> **New Users**: Start with our [Getting Started Guide](docs/user-guides/01-getting-started.md) | **Experienced**: Jump to [Complete Installation](docs/user-guides/02-installation.md)
+**The Problem**: Plants need different amounts of water at different times. Too much water = weak plants and nutrient runoff. Too little = stress and poor growth. Manual watering is inconsistent and time-consuming.
 
-## 🌟 What This System Does
+**The Solution**: Monitor soil moisture and nutrient levels continuously. Automatically irrigate when thresholds are reached. Adjust irrigation based on plant growth phase and environmental conditions.
 
-**Core Automation**
-- 4-phase daily irrigation cycles (P0→P1→P2→P3) synchronized with grow lights
-- Precision VWC (moisture) and EC (nutrient) monitoring with multi-sensor validation
-- Safety-first hardware control with comprehensive error handling and emergency stops
-- Real-time dashboard with 100+ entities for complete system visibility
+**4-Phase Daily Cycle**:
+- **P0 (Morning)**: Wait for soil to dry back to target moisture level
+- **P1 (Ramp-up)**: Small frequent irrigations to reach ideal moisture
+- **P2 (Maintenance)**: Maintain moisture at target level throughout day
+- **P3 (Evening)**: Minimal irrigation before lights turn off
 
-**Intelligent Learning** ⭐ *Unique Feature*
-- Zero-hardware learning system using pressure-compensating dripper precision
-- Automatic field capacity detection and zone characterization 
-- Adaptive shot sizing based on each zone's learned absorption patterns
-- Channeling detection and substrate optimization over time
+## Will This Work For Your Setup?
 
-**Optional AI Enhancement**
-- GPT-5 consultation for complex irrigation decisions ($0.05-1.25/day)
-- Stateless analysis with rule-based safety validation
-- Natural language explanations of irrigation recommendations
+**You Need**:
+- Home Assistant server running 2024.3.0+
+- Soil moisture sensors (VWC) - one per zone minimum
+- Nutrient sensors (EC) - one per zone minimum  
+- Water pump and zone valves controlled by Home Assistant
+- Pressure-compensating drippers (1-2 L/hr recommended)
 
-## 🛠️ Installation Options
+**Works With**:
+- Coco coir, rockwool, perlite, soil - any substrate
+- 1-6 growing zones
+- Any pump/valve hardware controllable by HA
+- ESPHome sensors, commercial sensors, or manual test entities
 
-### Basic Integration Only
-Install the Home Assistant custom component to get monitoring and manual control:
+**Won't Work If**:
+- You can't measure soil moisture electronically
+- Your irrigation system can't be controlled by Home Assistant
+- You need more than 6 zones (current limit)
 
-- 100+ entities for zone monitoring and system status
-- Manual irrigation services you can call from automations
-- VWC/EC calculations and phase tracking display
-- Safety interlocks and shot duration calculations
-- Test entities for hardware-free development
+## What You Get
 
-[Quick Installation Guide](docs/user-guides/02-installation.md#quick-start) - 15 minute setup
+### Just Home Assistant Integration
+Install the custom component:
+- Dashboard showing all sensor readings and calculations
+- Manual irrigation services you trigger yourself
+- Safety checks (won't run multiple zones simultaneously)
+- No automatic decisions - you control everything
 
-### Add AppDaemon Automation
-Install additional Python apps to get autonomous operation:
+### Add AppDaemon (Full Automation)  
+Install Python automation scripts:
+- Automatically transitions between P0→P1→P2→P3 phases
+- Makes irrigation decisions based on sensor readings
+- Handles pump priming, valve sequencing, timing delays
+- Statistical analysis of sensor data for validation
 
-- Automatic P0→P1→P2→P3 phase transitions based on sensor readings
-- Sensor validation and statistical processing 
-- Hardware sequencing (pump priming, valve timing, safety delays)
-- Scheduling and threshold-based irrigation decisions
+### Add Learning System (Optional)
+Uses your existing drippers to learn each zone:
+- Detects true field capacity (when soil is saturated)
+- Learns how efficiently each zone absorbs water
+- Adapts irrigation timing to each zone's characteristics
+- No additional hardware required
 
-[Complete Installation Guide](docs/user-guides/02-installation.md#complete-setup) - 2-4 hour setup
+### Add AI Consultation (Optional)
+Integrates with OpenAI for complex decisions:
+- GPT-5 analyzes sensor data and recommends actions
+- All AI suggestions validated by rule-based safety checks
+- Costs ~$0.05-1.25/day depending on usage
+- Completely optional - system works fine without it
 
-### Add Learning System
-Install smart learning module for adaptive behavior:
+## Quick Setup Check
 
-- Field capacity detection using pressure-compensating dripper precision
-- Zone efficiency characterization and channeling detection
-- Adaptive shot sizing based on substrate absorption patterns
-- SQLite database for persistent learning data storage
+**Can you answer yes to these?**
+- ✅ I have Home Assistant running and can install custom components
+- ✅ I can measure soil moisture and EC electronically in each zone
+- ✅ I have a water pump and valves controllable by Home Assistant
+- ✅ I want to automate irrigation timing decisions
 
-[Smart Learning System](docs/advanced-features/smart-learning-system.md) - Setup guide
+**If yes**: [Installation Guide](docs/user-guides/02-installation.md)
 
-### Add AI Consultation
-Configure OpenAI API integration for decision assistance:
+**If no**: This system probably isn't right for your setup
 
-- GPT-5 consultation for complex irrigation decisions
-- Rule-based validation of all AI recommendations
-- Natural language explanations of irrigation reasoning
-- Cost management and caching for API efficiency
+## Example Hardware Setup
 
-[LLM Integration Guide](docs/advanced-features/llm-integration.md) - Setup and costs
+```
+Zone 1: Coco + Perlite
+├── VWC Sensor (front) → ESPHome → HA
+├── VWC Sensor (back) → ESPHome → HA  
+├── EC Sensor → ESPHome → HA
+└── Zone Valve → Relay → ESPHome → HA
 
-## 🏗️ System Architecture
-
-```mermaid
-graph LR
-    subgraph HA[Home Assistant]
-        I[Crop Steering Integration]
-        E[100+ Entities]
-        S[Services & Events]
-    end
-    
-    subgraph AD[AppDaemon]
-        M[Master Automation]
-        L[Smart Learning]
-        AI[Optional: AI Layer]
-    end
-    
-    subgraph HW[Hardware]
-        P[Pumps & Valves]
-        VWC[VWC Sensors]
-        EC[EC Sensors]
-    end
-    
-    I --> E
-    I --> S
-    S <--> M
-    M --> L
-    L --> AI
-    M --> P
-    VWC --> I
-    EC --> I
+Water System:
+├── Pump → Relay → ESPHome → HA
+├── Main Line Valve → Relay → ESPHome → HA
+└── Pressure-compensating drippers (1.2 L/hr)
 ```
 
-## 📊 Feature Comparison
+## Documentation
 
-| Feature | Basic Integration | + AppDaemon | + Smart Learning | + AI Enhancement |
-|---------|------------------|-------------|------------------|------------------|
-| **Manual Control** | ✅ Full | ✅ Full | ✅ Full | ✅ Full |
-| **Automated Cycles** | ❌ | ✅ P0-P3 | ✅ P0-P3 | ✅ P0-P3 |
-| **Safety Systems** | ✅ Basic | ✅ Advanced | ✅ Advanced | ✅ Advanced |
-| **Zone Learning** | ❌ | ❌ | ✅ Adaptive | ✅ AI-Enhanced |
-| **Field Capacity Detection** | ❌ | ❌ | ✅ Automatic | ✅ Intelligent |
-| **Decision Assistance** | ❌ | ❌ | ❌ | ✅ GPT-5 |
-| **Setup Time** | 30 min | 2-4 hours | +1 week learning | +Setup costs |
-| **Hardware Required** | Basic sensors | Same | Same | Same |
-| **Monthly Cost** | Free | Free | Free | $5-45 (optional) |
+**Start Here**: [Getting Started Guide](docs/user-guides/01-getting-started.md)
+**Install**: [Installation Guide](docs/user-guides/02-installation.md)  
+**Configure**: [Configuration Guide](docs/user-guides/03-configuration.md)
+**Operate**: [Daily Operation Guide](docs/user-guides/04-daily-operation.md)
+**Troubleshoot**: [Troubleshooting Guide](docs/user-guides/05-troubleshooting.md)
 
-## 🚀 Quick Start Examples
+**Advanced Features**:
+- [Smart Learning System](docs/advanced-features/smart-learning-system.md)
+- [LLM Integration](docs/advanced-features/llm-integration.md)
 
-### Pressure-Compensating Dripper Setup
-```yaml
-# Your existing hardware is perfect for intelligent learning!
-dripper_specs:
-  flow_rate: 1.2  # L/hr per dripper (pressure compensating)
-  drippers_per_plant: 2
-  plants_per_zone: 4
-  
-# System calculates exact water delivery:
-# 30 seconds = (1.2 × 8 × 30) ÷ 3600 = 0.08L precisely
-```
+**Technical Reference**:
+- [System Architecture](docs/technical/architecture.md)
+- [Entity Reference](docs/technical/entity-reference.md) 
+- [Service Reference](docs/technical/service-reference.md)
 
-### Smart Learning Configuration
-```yaml
-# AppDaemon apps.yaml
-smart_irrigation_learning:
-  module: smart_irrigation_learning
-  class: SmartIrrigationLearning
-  zones: [1, 2, 3, 4, 5, 6]
-  dripper_rate: 1.2           # Your PC dripper specs
-  substrate_volume: 3.0       # Liters per plant
-```
+## License
 
-### AI Consultation Setup
-```yaml
-# Optional: AI decision assistance
-llm_crop_steering:
-  module: llm_enhanced_app
-  class: LLMEnhancedCropSteering
-  model: "gpt-5-nano"         # Cost-effective option ($0.05/$0.40 per 1M tokens)
-  daily_budget: 1.00          # $1/day limit
-  confidence_threshold: 0.8   # Safety validation
-```
+MIT License - use for hobby or commercial growing operations.
 
-## 💡 System Design Philosophy
+## Contributing
 
-### **Hardware-Efficient Intelligence**
-The smart learning system uses **pressure-compensating dripper precision** to achieve field capacity detection and efficiency optimization without additional sensors, flow meters, or complex equipment.
-
-### **Safety-First Architecture**
-- **Rule-based validation** of all AI decisions
-- **Multiple fallback layers** prevent crop damage
-- **Emergency stop systems** with manual override capability
-- **Comprehensive logging** for complete traceability
-
-### **Open Source Approach**
-- **Modular design** allows using components independently
-- **Standard irrigation methods** with EC ratio management  
-- **Home Assistant integration** leverages existing ecosystem
-- **MIT licensed** for both hobby and commercial use
-
-## 📖 Documentation Guide
-
-### User Guides (Start Here)
-- **[01 - Getting Started](docs/user-guides/01-getting-started.md)** - System fundamentals and concepts
-- **[02 - Installation](docs/user-guides/02-installation.md)** - Progressive setup guide (Basic → Complete → Advanced)
-- **[03 - Configuration](docs/user-guides/03-configuration.md)** - Dashboard setup and system tuning
-- **[04 - Daily Operation](docs/user-guides/04-daily-operation.md)** - Monitoring and maintenance procedures
-- **[05 - Troubleshooting](docs/user-guides/05-troubleshooting.md)** - Common issues and solutions
-
-### Advanced Features
-- **[Smart Learning System](docs/advanced-features/smart-learning-system.md)** - Intelligent optimization without additional hardware
-- **[LLM Integration](docs/advanced-features/llm-integration.md)** - AI decision assistance and cost management
-
-### Technical Reference
-- **[Entity Reference](docs/technical/entity-reference.md)** - Complete entity documentation
-- **[Service Reference](docs/technical/service-reference.md)** - API and service documentation  
-- **[System Architecture](docs/technical/architecture.md)** - Technical implementation details
-
-### Examples & Patterns
-- **[Automation Examples](docs/examples/automation-examples.md)** - Advanced automation patterns
-- **[Dashboard Examples](docs/examples/dashboard-examples.md)** - Dashboard layouts
-
-## 🛠️ Hardware Requirements
-
-### Minimum (Basic Integration)
-- **Home Assistant** server (Raspberry Pi 4+ or x86)
-- **VWC sensors** (capacitive soil moisture sensors)
-- **EC sensors** (electrical conductivity probes)
-- **Irrigation hardware** (pumps, valves, drippers)
-
-### Recommended (Complete System)
-- **Pressure-compensating drippers** (1-2 L/hr rated)
-- **Dual sensors per zone** (front/back placement for averaging)
-- **Environmental sensors** (temperature, humidity, VPD - optional)
-- **UPS power backup** for reliability during outages
-
-### Advanced (AI Enhancement)
-- **Enhanced server** (16GB RAM recommended for AI processing)
-- **Stable internet** for LLM API access
-- **Flow monitoring** (optional - PC drippers provide precision)
-
-## 🤝 Community & Support
-
-### Getting Help
-- **[Troubleshooting Guide](docs/user-guides/05-troubleshooting.md)** - Solve common issues
-- **[GitHub Issues](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues)** - Report bugs or request features
-- **[Home Assistant Community](https://community.home-assistant.io/)** - General HA support
-
-### Contributing
-- **[Contributing Guidelines](CONTRIBUTING.md)** - How to help improve the system
-- **[Development Setup](CONTRIBUTING.md)** - Set up development environment
-- **Code of Conduct** - Be respectful and inclusive
-
-### Commercial Use
-This system is MIT licensed and suitable for both hobby and commercial growing operations.
-
-## ⚡ Getting Started
-
-- **New to crop steering?** → [Getting Started Guide](docs/user-guides/01-getting-started.md)
-- **Ready to install?** → [Installation Guide](docs/user-guides/02-installation.md)
-- **Want advanced features?** → [Smart Learning System](docs/advanced-features/smart-learning-system.md)
-- **Technical questions?** → [Technical Reference](docs/technical/)
-
----
-
-<p align="center">
-  <strong>Open source crop steering automation for Home Assistant</strong><br>
-  <em>MIT Licensed • Community Driven • Production Ready</em>
-</p>
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
