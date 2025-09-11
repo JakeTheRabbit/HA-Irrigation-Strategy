@@ -29,7 +29,8 @@
       "Bash(git check-ignore:*)",
       "Read(//c//**)",
       "Bash(ruff check:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:openai.com)"
     ],
     "deny": []
   }

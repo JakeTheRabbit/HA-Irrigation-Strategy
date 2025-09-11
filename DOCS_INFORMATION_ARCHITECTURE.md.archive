@@ -1,0 +1,262 @@
+# Documentation Information Architecture
+
+## Overview
+
+This document outlines the recommended restructuring of documentation to eliminate redundancy, create clear user paths, and provide progressive disclosure from basic to advanced features.
+
+## Current State Analysis
+
+**Problems Identified:**
+- 1,428-line README overwhelming users
+- 30-40% content redundancy across 19 files
+- Multiple conflicting user journeys
+- Circular references and unclear navigation
+- Missing files referenced in existing docs
+
+## New Documentation Structure
+
+### Root Directory Files
+
+```
+README.md                           # New streamlined landing page (487 lines)
+CHANGELOG.md                        # Keep as-is (version history)
+CLAUDE.md                          # Keep as-is (AI assistant instructions)
+LICENSE                            # Keep as-is
+```
+
+### Reorganized /docs Structure
+
+```
+docs/
+├── 01-quickstart.md              # 15-minute basic setup (replaces installation/quickstart.md)
+├── 02-basic-setup.md             # Manual operation guide (replaces user-guides/getting-started.md)
+├── 03-complete-setup.md          # Full automation (replaces installation/complete-guide.md)
+├── 04-hardware-setup.md          # Physical connections (replaces installation/hardware-setup.md)
+├── 05-ai-setup.md               # AI integration (replaces advanced-features/llm-integration.md)
+├── 06-smart-learning.md         # Adaptive features (new, replaces SMART_LEARNING_SETUP.md)
+│
+├── user-guides/
+│   ├── dashboard.md              # Dashboard creation (replaces dashboard-guide.md)
+│   ├── operation.md              # Daily operation (replaces daily-operation.md)
+│   └── automation.md             # Creating automations (new)
+│
+├── technical/
+│   ├── api.md                    # Services and API (new, replaces services-api.md)
+│   ├── entities.md               # Complete entity reference (replaces entity-reference.md)
+│   ├── architecture.md          # System architecture (new)
+│   └── configuration.md          # Advanced configuration (new)
+│
+├── support/
+│   ├── troubleshooting.md        # Consolidated troubleshooting (replaces user-guides/troubleshooting.md)
+│   ├── faq.md                    # Frequently asked questions (new)
+│   ├── community.md              # Community resources (new)
+│   └── migration.md              # Migration guide (replaces MIGRATION.md)
+│
+├── examples/
+│   ├── configurations/           # Example configurations (new)
+│   │   ├── basic-setup.yaml
+│   │   ├── multi-zone.yaml
+│   │   └── commercial-setup.yaml
+│   └── automations/              # Example automations (new)
+│       ├── basic-triggers.yaml
+│       ├── advanced-logic.yaml
+│       └── ai-integration.yaml
+│
+└── development/
+    ├── contributing.md           # How to contribute (new)
+    ├── testing.md               # Testing procedures (new)
+    ├── docs.md                  # Documentation standards (new)
+    └── architecture/            # Development docs (existing refactoring docs)
+        ├── refactoring-proposal.md
+        ├── gui-config-issue.md
+        └── github-issues/
+```
+
+## File Mapping and Content Strategy
+
+### 1. Progressive User Paths (Numbered Files)
+
+**Path 1: Basic Setup (30 minutes)**
+```
+README.md → 01-quickstart.md → 02-basic-setup.md → user-guides/dashboard.md
+```
+
+**Path 2: Full Automation (2-3 hours)**
+```
+README.md → 03-complete-setup.md → 04-hardware-setup.md → user-guides/operation.md
+```
+
+**Path 3: AI Enhancement (4-6 hours)**
+```
+README.md → 05-ai-setup.md → 06-smart-learning.md → technical/api.md
+```
+
+### 2. Content Consolidation Strategy
+
+#### A. Installation Instructions
+**Primary Source:** `01-quickstart.md`
+- Complete HACS and manual installation steps
+- Basic configuration wizard walkthrough
+- Hardware mapping examples
+- Quick verification steps
+
+**Secondary References:**
+- `03-complete-setup.md`: Links to quickstart, adds AppDaemon setup
+- `05-ai-setup.md`: Links to complete setup, adds AI configuration
+- Remove redundant installation content from all other files
+
+#### B. Phase Cycle Explanation
+**Primary Source:** `technical/architecture.md`
+- Authoritative explanation of P0-P3 phases
+- Hardware sequencing details
+- Timing and trigger logic
+- Safety mechanisms
+
+**Secondary References:**
+- `README.md`: High-level overview with link to architecture
+- `02-basic-setup.md`: User-focused explanation with link to technical details
+- `user-guides/operation.md`: Operational perspective with architecture link
+- Remove detailed phase explanations from all other files
+
+#### C. Entity Documentation
+**Primary Source:** `technical/entities.md`
+- Complete entity reference with descriptions
+- Entity naming conventions
+- Advanced configuration options
+- Developer integration details
+
+**Secondary References:**
+- `02-basic-setup.md`: Key entities for basic operation
+- `user-guides/dashboard.md`: Dashboard-relevant entities
+- `user-guides/operation.md`: Operational entities
+- Each file shows relevant subset with link to complete reference
+
+#### D. Troubleshooting Content
+**Primary Source:** `support/troubleshooting.md`
+- Comprehensive problem diagnosis
+- Step-by-step resolution procedures
+- Common error messages and solutions
+- Debug logging and support information
+
+**Secondary References:**
+- Each setup guide: Quick fixes section with link to main troubleshooting
+- `support/faq.md`: Most common issues with brief answers
+- Remove scattered troubleshooting content from other files
+
+### 3. New Content Requirements
+
+#### Missing Files to Create
+1. **`support/faq.md`** - Address 20-30 most common questions
+2. **`support/community.md`** - Discord, forums, GitHub contribution info
+3. **`technical/api.md`** - Complete services and automation reference
+4. **`technical/architecture.md`** - System design and component interaction
+5. **`user-guides/automation.md`** - Creating Home Assistant automations
+6. **`examples/` directory** - Working configuration and automation examples
+
+#### Content Migration Priority
+1. **High Priority** - User-facing guides (quickstart through smart-learning)
+2. **Medium Priority** - Support and technical reference
+3. **Low Priority** - Examples and development docs
+
+## Navigation Design Principles
+
+### 1. Progressive Disclosure
+- Start with simplest path (quickstart)
+- Each level reveals more complexity
+- Clear "what's next" guidance at each step
+- No circular references or confusing loops
+
+### 2. Single Source of Truth
+- Each concept explained thoroughly in one primary location
+- All other references link to primary source
+- Primary source is most logical location for the concept
+- Regular audits to prevent content drift
+
+### 3. User Journey Optimization
+- Clear entry points for different user types
+- Logical progression through increasing complexity
+- Exit points and alternatives at each step
+- Success metrics and validation at key milestones
+
+### 4. Maintenance Strategy
+- Primary content owners assigned for each major file
+- Regular content audits (quarterly)
+- Link checking automation
+- User feedback integration points
+
+## Visual Design Elements
+
+### 1. README.md Design
+- **Hero section** with clear value proposition
+- **Visual progress indicators** for user paths
+- **Feature comparison table** for easy decision making
+- **Social proof** with user testimonials
+- **Clear CTAs** for next steps
+
+### 2. Consistent Navigation
+```markdown
+## Navigation Template
+**Previous:** [Previous Guide](link) | **Next:** [Next Guide](link) | **Help:** [Troubleshooting](link)
+
+## Quick Links
+- 🏠 [Home](../README.md)
+- 📖 [All Guides](../docs/)
+- 🆘 [Support](../docs/support/)
+- 💬 [Community](../docs/support/community.md)
+```
+
+### 3. File Header Template
+```markdown
+# Guide Title
+**For:** Target user type | **Time:** Estimated duration | **Difficulty:** Beginner/Intermediate/Advanced
+
+Brief description of what this guide accomplishes and who should use it.
+
+## Prerequisites
+- Requirement 1
+- Requirement 2
+
+## What You'll Accomplish
+- ✅ Outcome 1
+- ✅ Outcome 2
+```
+
+## Implementation Timeline
+
+### Phase 1: Core Restructure (Week 1)
+1. Create new numbered guides (01-06)
+2. Restructure README.md
+3. Set up new folder structure
+4. Create support/ directory content
+
+### Phase 2: Content Consolidation (Week 2)
+1. Eliminate redundant content
+2. Update all internal links
+3. Create examples/ directory
+4. Migrate development docs
+
+### Phase 3: Validation & Polish (Week 3)
+1. User testing with different personas
+2. Link validation and cleanup
+3. Content review and editing
+4. Final migration and archive old files
+
+## Success Metrics
+
+### Quantitative Goals
+- Reduce total documentation word count by 40%
+- Eliminate 90% of content redundancy
+- Achieve <500 lines for main README
+- Create <10 primary user-facing files
+
+### Qualitative Goals
+- Clear user path progression
+- Eliminated circular references
+- Consistent navigation experience
+- Professional presentation suitable for GitHub showcase
+
+### User Feedback Targets
+- New users can complete basic setup in 30 minutes
+- Intermediate users find clear path to full automation
+- Advanced users can access technical details efficiently
+- No confusion about which guide to follow

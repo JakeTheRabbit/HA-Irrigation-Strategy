@@ -1,0 +1,299 @@
+# User Journey Flow Diagram
+
+## Overview
+This document maps the three primary user journeys through the documentation, showing entry points, decision gates, and progression paths.
+
+## User Persona Definitions
+
+### 🌱 Beginner User
+- **Profile:** New to crop steering, wants to see if system works
+- **Goals:** Quick setup, basic functionality, minimal complexity
+- **Time Budget:** 30-60 minutes
+- **Technical Level:** Basic Home Assistant knowledge
+- **Hardware:** May not have sensors yet, testing with manual controls
+
+### 🔧 Intermediate User  
+- **Profile:** Experienced grower ready for automation
+- **Goals:** Full autonomous operation, professional monitoring
+- **Time Budget:** 2-4 hours over multiple sessions
+- **Technical Level:** Comfortable with Home Assistant, basic YAML
+- **Hardware:** Has or plans to get VWC/EC sensors and irrigation hardware
+
+### 🚀 Advanced User
+- **Profile:** Tech-savvy grower wanting cutting-edge features
+- **Goals:** AI optimization, experimental features, system customization
+- **Time Budget:** 4-8 hours over multiple sessions
+- **Technical Level:** Advanced Home Assistant, comfortable with APIs
+- **Hardware:** Full sensor suite, automated grow environment
+
+## Journey Flow Diagrams
+
+### Journey 1: Beginner Path (🌱)
+
+```mermaid
+graph TD
+    A[README.md Landing] --> B{What's your experience?}
+    B --> B1[🌱 Just Getting Started?]
+    B1 --> C[01-quickstart.md]
+    C --> D{Installation Success?}
+    D -->|No| T1[support/troubleshooting.md]
+    T1 --> C
+    D -->|Yes| E[02-basic-setup.md]
+    E --> F{Have Real Hardware?}
+    F -->|No| G[Test with Helper Entities]
+    F -->|Yes| H[04-hardware-setup.md]
+    G --> I[user-guides/dashboard.md]
+    H --> I
+    I --> J[user-guides/operation.md]
+    J --> K{Want Automation?}
+    K -->|No| END1[✅ Manual Operation Success]
+    K -->|Yes| L[Transition to Journey 2]
+    
+    style A fill:#e1f5fe
+    style END1 fill:#c8e6c9
+    style T1 fill:#ffecb3
+```
+
+**Key Success Points:**
+- ✅ Integration installed and configured (15 min)
+- ✅ First manual irrigation executed (25 min)
+- ✅ Dashboard created and monitoring data (45 min)
+- ✅ Comfortable with daily operation (60 min)
+
+### Journey 2: Intermediate Path (🔧)
+
+```mermaid
+graph TD
+    A[README.md Landing] --> B{What's your experience?}
+    B --> B2[🔧 Want Full Automation?]
+    B2 --> C[03-complete-setup.md]
+    C --> D{Already have basic setup?}
+    D -->|No| E[01-quickstart.md]
+    E --> F[02-basic-setup.md]
+    F --> G[Back to complete setup]
+    G --> C
+    D -->|Yes| H[AppDaemon Installation]
+    H --> I{Installation Success?}
+    I -->|No| T2[support/troubleshooting.md]
+    T2 --> H
+    I -->|Yes| J[04-hardware-setup.md]
+    J --> K[Configure Physical Sensors]
+    K --> L[Test Autonomous Phases]
+    L --> M{Phases Working?}
+    M -->|No| T3[support/troubleshooting.md]
+    T3 --> L
+    M -->|Yes| N[user-guides/operation.md]
+    N --> O[Fine-tune Parameters]
+    O --> P{Want AI Features?}
+    P -->|No| END2[✅ Full Automation Success]
+    P -->|Yes| Q[Transition to Journey 3]
+    
+    style A fill:#e1f5fe
+    style END2 fill:#c8e6c9
+    style T2 fill:#ffecb3
+    style T3 fill:#ffecb3
+```
+
+**Key Success Points:**
+- ✅ AppDaemon installed and configured (45 min)
+- ✅ Physical sensors connected and reading (90 min)
+- ✅ First autonomous phase transition (120 min)
+- ✅ 24-hour autonomous operation (180 min)
+
+### Journey 3: Advanced Path (🚀)
+
+```mermaid
+graph TD
+    A[README.md Landing] --> B{What's your experience?}
+    B --> B3[🚀 Ready for AI Intelligence?]
+    B3 --> C[05-ai-setup.md]
+    C --> D{Have Complete Setup?}
+    D -->|No| E[03-complete-setup.md]
+    E --> F[Complete Journey 2]
+    F --> G[Return to AI setup]
+    G --> C
+    D -->|Yes| H[OpenAI API Configuration]
+    H --> I[Budget and Usage Limits]
+    I --> J[06-smart-learning.md]
+    J --> K[Enable Learning Mode]
+    K --> L{AI Responding?}
+    L -->|No| T4[support/troubleshooting.md]
+    T4 --> K
+    L -->|Yes| M[Monitor AI Decisions]
+    M --> N[Review Learning Patterns]
+    N --> O[technical/api.md]
+    O --> P[Custom Automations]
+    P --> Q[Advanced Configuration]
+    Q --> R{Want to Contribute?}
+    R -->|No| END3[✅ AI-Enhanced Success]
+    R -->|Yes| S[development/contributing.md]
+    S --> END4[✅ Community Contributor]
+    
+    style A fill:#e1f5fe
+    style END3 fill:#c8e6c9
+    style END4 fill:#4caf50
+    style T4 fill:#ffecb3
+```
+
+**Key Success Points:**
+- ✅ OpenAI API configured and tested (60 min)
+- ✅ Smart learning enabled and training (180 min)
+- ✅ AI making irrigation decisions (240 min)
+- ✅ System learning and adapting (360 min)
+
+## Cross-Journey Navigation
+
+### Entry Point Decision Matrix
+
+| User Question | Answer | Journey |
+|---------------|--------|---------|
+| "I want to test this quickly" | 15-minute setup → | 🌱 Beginner |
+| "I need reliable automation" | Full setup with AppDaemon → | 🔧 Intermediate |
+| "I want the latest AI features" | Complete + AI → | 🚀 Advanced |
+| "I don't have sensors yet" | Test with helpers → | 🌱 Beginner |
+| "I have a commercial operation" | Professional automation → | 🔧 Intermediate |
+| "I want to experiment" | Cutting-edge features → | 🚀 Advanced |
+
+### Journey Transition Points
+
+**Beginner → Intermediate:**
+- Trigger: User comfortable with manual operation, wants automation
+- Bridge: "Ready for full automation?" section in operation guide
+- Requirements check: Hardware availability, time commitment
+- Smooth transition: Builds on existing basic setup
+
+**Intermediate → Advanced:**
+- Trigger: User wants optimization beyond rule-based logic
+- Bridge: "Want AI intelligence?" section in operation guide  
+- Requirements check: API budget, experimental mindset
+- Smooth transition: Builds on existing complete setup
+
+**Direct Advanced Entry:**
+- Trigger: User already familiar with crop steering, wants cutting-edge
+- Validation: Ensures complete setup prerequisites are met
+- Fast track: Links to prerequisite completion, then returns to AI setup
+
+## Documentation Navigation Elements
+
+### Header Navigation Template
+```markdown
+**🏠 [Home](../README.md)** | **📖 [All Guides](../docs/)** | **🆘 [Support](../docs/support/)** | **💬 [Community](../docs/support/community.md)**
+
+---
+
+# Guide Title
+**For:** [User Type] | **Time:** [Duration] | **Difficulty:** [Level]
+
+**Previous:** [Previous Step](link) | **Next:** [Next Step](link)
+```
+
+### Footer Navigation Template
+```markdown
+---
+
+## ✅ Checkpoint: What You've Accomplished
+- [ ] Task 1 completed
+- [ ] Task 2 verified
+- [ ] Task 3 tested
+
+## 🔄 What's Next?
+- **Continue this path:** [Next guide in sequence](link)
+- **Need help?** [Troubleshooting guide](../support/troubleshooting.md)
+- **Want different path?** [Back to overview](../README.md#choose-your-path)
+
+## 📊 Progress Tracker
+**Journey Progress:** [●●●○○] 60% Complete
+```
+
+### Cross-References Design
+```markdown
+## 💡 Related Topics
+- **For basics:** [Basic Setup Guide](02-basic-setup.md)
+- **For hardware:** [Hardware Setup Guide](04-hardware-setup.md)  
+- **For troubleshooting:** [Common Issues](../support/troubleshooting.md)
+- **For advanced features:** [AI Integration](05-ai-setup.md)
+```
+
+## Decision Gates and Validation
+
+### Technical Readiness Gates
+
+**Before Journey 2 (Full Automation):**
+```markdown
+## ✅ Prerequisites Checklist
+- [ ] Home Assistant 2024.3.0+ running
+- [ ] Basic integration installed and tested
+- [ ] Manual irrigation successfully executed
+- [ ] AppDaemon available (add-on or standalone)
+- [ ] 2-3 hours available for setup
+```
+
+**Before Journey 3 (AI Enhancement):**
+```markdown
+## ✅ Prerequisites Checklist  
+- [ ] Full automation setup complete and tested
+- [ ] OpenAI API key with GPT-4/5 access
+- [ ] $3-15/month budget allocated
+- [ ] Comfortable with experimental features
+- [ ] 4-6 hours available for setup and tuning
+```
+
+### Success Validation Points
+
+**Journey 1 Success Criteria:**
+- Integration entities visible in Home Assistant
+- Manual irrigation shot executes successfully
+- Dashboard shows real-time or simulated data
+- User comfortable with basic operation
+
+**Journey 2 Success Criteria:**
+- AppDaemon automation running and logs clean
+- Autonomous phase transitions occurring
+- Sensors reading and being processed
+- 24-hour autonomous operation achieved
+
+**Journey 3 Success Criteria:**
+- AI API calls succeeding and within budget
+- Smart learning system making recommendations
+- Decision logs showing AI inputs to irrigation choices
+- System adapting behavior based on outcomes
+
+## User Experience Optimization
+
+### Cognitive Load Reduction
+- **Progressive disclosure:** Each guide reveals only necessary complexity
+- **Clear checkpoints:** Regular validation of progress
+- **Alternative paths:** Options when prerequisites not met
+- **Exit ramps:** Clear stopping points for different goals
+
+### Error Recovery Design
+- **Troubleshooting hooks:** Links to help at every potential failure point
+- **Rollback instructions:** How to undo changes if problems occur
+- **Community support:** Multiple channels for getting help
+- **Known issues:** Proactive disclosure of common problems
+
+### Mobile-Friendly Design
+- **Concise sections:** Readable on small screens
+- **Clear headings:** Easy scanning and navigation
+- **Minimal horizontal scrolling:** Code blocks and tables optimized
+- **Touch-friendly links:** Adequate spacing for mobile interaction
+
+## Analytics and Improvement
+
+### User Journey Metrics
+- **Completion rates** by journey path
+- **Drop-off points** and common failure modes
+- **Time to completion** vs. estimated times
+- **Support request patterns** by journey stage
+
+### Content Optimization Indicators
+- **High support ticket areas:** Indicate documentation gaps
+- **User feedback patterns:** Common confusion points
+- **Community questions:** Repetitive issues in Discord/forums
+- **Search patterns:** What users look for but can't find
+
+### Continuous Improvement Process
+1. **Monthly analytics review:** Journey completion and drop-off analysis
+2. **Quarterly user surveys:** Direct feedback on documentation experience
+3. **Community feedback integration:** Regular review of Discord/GitHub feedback
+4. **Content audits:** Ensure links work and information stays current

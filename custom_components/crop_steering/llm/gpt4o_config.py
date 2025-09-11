@@ -1,7 +1,7 @@
-"""GPT-5 Configuration and Integration for Crop Steering System.
+"""GPT-4o Configuration and Integration for Crop Steering System.
 
-Implements GPT-5 specific features including reasoning effort control,
-verbosity management, and optimized pricing for 2025 models.
+Implements GPT-4o specific features including temperature control,
+verbosity management, and optimized pricing for 2024 models.
 """
 from __future__ import annotations
 
@@ -13,41 +13,37 @@ from typing import Dict, Optional, Any
 _LOGGER = logging.getLogger(__name__)
 
 
-class GPT5Model(Enum):
-    """GPT-5 model variants with 2025 pricing."""
-    NANO = "gpt-5-nano"      # $0.05/1M input, $0.40/1M output
-    MINI = "gpt-5-mini"      # $0.25/1M input, $2.00/1M output  
-    STANDARD = "gpt-5"       # $1.25/1M input, $10.00/1M output
+class GPT4oModel(Enum):
+    """GPT-4o model variants with 2024 pricing."""
+    MINI = "gpt-4o-mini"     # $0.15/1M input, $0.60/1M output
+    STANDARD = "gpt-4o"      # $2.50/1M input, $10.00/1M output
 
 
-class ReasoningEffort(Enum):
-    """GPT-5 reasoning effort levels."""
-    MINIMAL = "minimal"      # Fast, basic logic
-    LOW = "low"             # Standard analysis
-    MEDIUM = "medium"       # Deeper thinking
-    HIGH = "high"           # Maximum intelligence
+class AnalysisDepth(Enum):
+    """GPT-4o analysis depth levels."""
+    BASIC = "basic"         # Fast, basic logic
+    STANDARD = "standard"   # Standard analysis
+    DETAILED = "detailed"   # Deeper analysis
 
 
 class Verbosity(Enum):
-    """GPT-5 verbosity control."""
+    """GPT-4o verbosity control."""
     LOW = "low"             # Concise responses
     MEDIUM = "medium"       # Include explanations
     HIGH = "high"           # Detailed analysis
 
 
 @dataclass
-class GPT5Config:
-    """GPT-5 specific configuration."""
+class GPT4oConfig:
+    """GPT-4o specific configuration."""
     
     # Model selection
-    default_model: GPT5Model = GPT5Model.NANO
-    enhanced_model: GPT5Model = GPT5Model.MINI
-    emergency_model: GPT5Model = GPT5Model.STANDARD
+    default_model: GPT4oModel = GPT4oModel.MINI
+    emergency_model: GPT4oModel = GPT4oModel.STANDARD
     
-    # Reasoning configuration
-    default_reasoning: ReasoningEffort = ReasoningEffort.MINIMAL
-    enhanced_reasoning: ReasoningEffort = ReasoningEffort.MEDIUM
-    emergency_reasoning: ReasoningEffort = ReasoningEffort.HIGH
+    # Analysis configuration
+    default_analysis: AnalysisDepth = AnalysisDepth.BASIC
+    emergency_analysis: AnalysisDepth = AnalysisDepth.DETAILED
     
     # Verbosity configuration
     default_verbosity: Verbosity = Verbosity.LOW
@@ -68,36 +64,35 @@ class GPT5Config:
     cache_ttl_minutes: int = 1440     # 24 hours
     similarity_threshold: float = 0.95
     
-    # Custom tools (GPT-5 feature)
-    enable_plaintext_tools: bool = True
-    tool_grammar: Optional[str] = None
+    # Function calling (GPT-4o feature)
+    enable_function_calling: bool = True
+    function_schema: Optional[str] = None
 
 
-class GPT5CostCalculator:
-    """Calculate costs for GPT-5 models."""
+class GPT4oCostCalculator:
+    """Calculate costs for GPT-4o models."""
     
-    # 2025 Pricing (per million tokens)
+    # 2024 Pricing (per million tokens)
     PRICING = {
-        GPT5Model.NANO: {"input": 0.05, "output": 0.40},
-        GPT5Model.MINI: {"input": 0.25, "output": 2.00},
-        GPT5Model.STANDARD: {"input": 1.25, "output": 10.00}
+        GPT4oModel.MINI: {"input": 0.15, "output": 0.60},
+        GPT4oModel.STANDARD: {"input": 2.50, "output": 10.00}
     }
     
     @classmethod
     def calculate_cost(
         cls,
-        model: GPT5Model,
+        model: GPT4oModel,
         input_tokens: int,
         output_tokens: int,
         cached_tokens: int = 0
     ) -> float:
-        """Calculate cost for a GPT-5 API call.
+        """Calculate cost for a GPT-4o API call.
         
         Args:
-            model: GPT-5 model variant
+            model: GPT-4o model variant
             input_tokens: Number of input tokens
             output_tokens: Number of output tokens
-            cached_tokens: Number of cached input tokens (90% discount)
+            cached_tokens: Number of cached input tokens
             
         Returns:
             Total cost in USD
@@ -121,16 +116,16 @@ class GPT5CostCalculator:
     @classmethod
     def estimate_daily_cost(
         cls,
-        model: GPT5Model,
+        model: GPT4oModel,
         calls_per_day: int,
         avg_input_tokens: int = 1000,
         avg_output_tokens: int = 200,
         cache_hit_rate: float = 0.5
     ) -> float:
-        """Estimate daily cost for GPT-5 usage.
+        """Estimate daily cost for GPT-4o usage.
         
         Args:
-            model: GPT-5 model variant
+            model: GPT-4o model variant
             calls_per_day: Number of API calls per day
             avg_input_tokens: Average input tokens per call
             avg_output_tokens: Average output tokens per call
@@ -155,14 +150,14 @@ class GPT5CostCalculator:
         return uncached_cost + cached_cost
 
 
-class GPT5DecisionRouter:
-    """Route decisions to appropriate GPT-5 models based on urgency."""
+class GPT4oDecisionRouter:
+    """Route decisions to appropriate GPT-4o models based on urgency."""
     
-    def __init__(self, config: GPT5Config):
+    def __init__(self, config: GPT4oConfig):
         """Initialize the decision router.
         
         Args:
-            config: GPT-5 configuration
+            config: GPT-4o configuration
         """
         self.config = config
     
@@ -172,7 +167,7 @@ class GPT5DecisionRouter:
         vwc: float = None,
         ec: float = None,
         confidence_required: float = 0.7
-    ) -> Tuple[GPT5Model, ReasoningEffort, Verbosity]:
+    ) -> Tuple[GPT4oModel, AnalysisDepth, Verbosity]:
         """Select appropriate model based on conditions.
         
         Args:
@@ -182,28 +177,28 @@ class GPT5DecisionRouter:
             confidence_required: Required confidence level
             
         Returns:
-            Tuple of (model, reasoning_effort, verbosity)
+            Tuple of (model, analysis_depth, verbosity)
         """
         # Emergency conditions - use best model
         if self._is_emergency(vwc, ec):
             return (
                 self.config.emergency_model,
-                self.config.emergency_reasoning,
+                self.config.emergency_analysis,
                 self.config.emergency_verbosity
             )
         
-        # Enhanced conditions - use mid-tier model
+        # Enhanced conditions - use standard model
         if urgency in ["high", "complex"] or confidence_required > 0.8:
             return (
-                self.config.enhanced_model,
-                self.config.enhanced_reasoning,
-                self.config.enhanced_verbosity
+                self.config.emergency_model,
+                self.config.emergency_analysis,
+                self.config.emergency_verbosity
             )
         
-        # Default conditions - use nano model
+        # Default conditions - use mini model
         return (
             self.config.default_model,
-            self.config.default_reasoning,
+            self.config.default_analysis,
             self.config.default_verbosity
         )
     
@@ -228,26 +223,26 @@ class GPT5DecisionRouter:
         return False
 
 
-def create_gpt5_prompt(
+def create_gpt4o_prompt(
     context: Dict[str, Any],
-    model: GPT5Model,
-    reasoning: ReasoningEffort,
+    model: GPT4oModel,
+    analysis_depth: AnalysisDepth,
     verbosity: Verbosity
 ) -> str:
-    """Create optimized prompt for GPT-5.
+    """Create optimized prompt for GPT-4o.
     
     Args:
         context: Irrigation context data
-        model: GPT-5 model being used
-        reasoning: Reasoning effort level
+        model: GPT-4o model being used
+        analysis_depth: Analysis depth level
         verbosity: Response verbosity level
         
     Returns:
         Formatted prompt string
     """
     # Adjust prompt based on model capabilities
-    if model == GPT5Model.NANO:
-        # Simple, direct prompt for nano
+    if model == GPT4oModel.MINI:
+        # Simple, direct prompt for mini
         prompt = f"""
 Irrigation Decision (Quick Analysis):
 VWC: {context.get('vwc', 0)}%
@@ -257,26 +252,7 @@ Phase: {context.get('phase', 'Unknown')}
 Should irrigate? Reply: YES/NO, duration (seconds), confidence (0-1)
 """
     
-    elif model == GPT5Model.MINI:
-        # More detailed prompt for mini
-        prompt = f"""
-Crop Steering Irrigation Analysis:
-
-Current Conditions:
-- VWC: {context.get('vwc', 0)}% (target: {context.get('vwc_target', 60)}%)
-- EC: {context.get('ec', 0)} mS/cm (target: {context.get('ec_target', 2.0)})
-- Phase: {context.get('phase', 'Unknown')}
-- Growth Stage: {context.get('growth_stage', 'Unknown')}
-
-Recent Trends:
-- VWC trend: {context.get('vwc_trend', 'stable')}
-- Last irrigation: {context.get('last_irrigation', 'Unknown')}
-
-Provide irrigation decision with reasoning.
-Format: Decision (YES/NO), Duration (seconds), Reasoning (1-2 sentences), Confidence (0-1)
-"""
-    
-    else:  # GPT5Model.STANDARD
+    else:  # GPT4oModel.STANDARD
         # Comprehensive prompt for standard
         prompt = f"""
 Expert Crop Steering Irrigation Analysis
@@ -295,17 +271,17 @@ Analyze all factors and provide:
 Consider plant physiology, environmental conditions, and optimization goals.
 """
     
-    # Add reasoning and verbosity hints
-    prompt += f"\n[Reasoning: {reasoning.value}, Verbosity: {verbosity.value}]"
+    
+    # Add analysis depth and verbosity hints
+    prompt += f"\n[Analysis: {analysis_depth.value}, Verbosity: {verbosity.value}]"
     
     return prompt
 
 
 # Example usage configuration
-DEFAULT_GPT5_CONFIG = GPT5Config(
-    default_model=GPT5Model.NANO,
-    enhanced_model=GPT5Model.MINI,
-    emergency_model=GPT5Model.STANDARD,
+DEFAULT_GPT4O_CONFIG = GPT4oConfig(
+    default_model=GPT4oModel.MINI,
+    emergency_model=GPT4oModel.STANDARD,
     max_input_tokens=8000,
     enable_caching=True,
     cache_ttl_minutes=1440  # 24 hours
