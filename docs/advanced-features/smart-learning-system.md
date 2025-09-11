@@ -1,6 +1,6 @@
 # Smart Learning System Setup Guide
 
-**Transform your crop steering system into an intelligent, adaptive platform** that optimizes water delivery for each zone using zero additional hardware - just smarter software!
+**Learning system for crop steering automation** that optimizes water delivery for each zone using existing pressure-compensating drippers without additional hardware.
 
 > **Prerequisites**: Complete [installation guide](../user-guides/02-installation.md) with working automation before enabling learning features.
 

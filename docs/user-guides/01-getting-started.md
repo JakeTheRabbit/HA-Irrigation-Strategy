@@ -226,7 +226,7 @@ Turn off `switch.crop_steering_system_enabled`
 Once you're comfortable with basic operation:
 
 1. **[Daily Operation Guide](daily-operation.md)** - Master day-to-day monitoring
-2. **[Dashboard Guide](dashboard-guide.md)** - Set up professional monitoring cards
+2. **[Dashboard Guide](dashboard-guide.md)** - Set up monitoring cards
 3. **[Complete Installation](../installation/complete-guide.md)** - Add full automation with AppDaemon
 
 ### Advanced Features
@@ -249,7 +249,7 @@ Once you're comfortable with basic operation:
 
 ### Week 3+: Optimize
 - Add AppDaemon for full automation
-- Set up professional monitoring dashboards
+- Set up monitoring dashboards
 - Consider AI enhancement for complex decisions
 - Share your setup with the community
 

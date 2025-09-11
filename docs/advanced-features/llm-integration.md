@@ -1,6 +1,6 @@
 # LLM Integration Guide
 
-**Add cutting-edge AI intelligence to your crop steering system** while maintaining 100% safety through rule-based validation. This guide covers setup, optimization, and cost management for GPT-5 powered decision assistance.
+**Optional AI integration for the crop steering system** with rule-based safety validation. This guide covers setup, configuration, and cost management for GPT-5 powered decision assistance.
 
 > **Prerequisites**: Complete [full automation setup](../user-guides/02-installation.md#complete-setup) with working AppDaemon before adding LLM features.
 
@@ -49,7 +49,7 @@ flowchart TD
 
 ## Cost Reality & Budget Planning
 
-### Honest Cost Expectations
+### Cost Expectations
 
 **GPT-5 Model Pricing (2025)**:
 - **gpt-5-nano**: $0.05/$0.40 per 1M tokens input/output (ultra cost-effective for routine decisions)
@@ -73,10 +73,10 @@ flowchart TD
 720 calls/day × 250 tokens × $0.05/1M = $0.90/day
 ```
 
-**With 90% Caching Discount**:
+**With Caching Enabled**:
 - First week: Full cost while building cache
-- After week 1: ~10% of full cost for routine decisions
-- Steady state: $0.05-0.15/day for most users
+- After week 1: Reduced cost for routine decisions based on cache hit rate
+- Typical usage: $0.05-0.15/day with good caching
 
 ## Setup Guide
 
@@ -472,4 +472,4 @@ llm_crop_steering:
 
 ---
 
-**🤖 LLM Integration Complete!** Start conservative and gradually increase usage as you build confidence in the system. Remember: the rule-based logic is always there as a safety net.
+The LLM integration is optional and can be enabled gradually. The rule-based logic continues to operate as the primary control system with AI consultation as an additional input.

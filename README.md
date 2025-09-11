@@ -6,7 +6,7 @@
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-**Transform your Home Assistant into a professional crop steering controller** with precision irrigation automation, intelligent learning optimization, and optional AI decision assistance.
+**Open source crop steering system for Home Assistant** with precision irrigation automation, intelligent learning optimization, and optional AI decision assistance.
 
 > **New Users**: Start with our [Getting Started Guide](docs/user-guides/01-getting-started.md) | **Experienced**: Jump to [Complete Installation](docs/user-guides/02-installation.md)
 
@@ -157,22 +157,22 @@ llm_crop_steering:
   confidence_threshold: 0.8   # Safety validation
 ```
 
-## 💡 Why This System is Unique
+## 💡 System Design Philosophy
 
-### **Zero Additional Hardware Intelligence**
-Unlike expensive commercial systems, our smart learning uses **pressure-compensating dripper precision** to achieve field capacity detection and efficiency optimization without flow sensors, load cells, or complex equipment.
+### **Hardware-Efficient Intelligence**
+The smart learning system uses **pressure-compensating dripper precision** to achieve field capacity detection and efficiency optimization without additional sensors, flow meters, or complex equipment.
 
-### **Safety-First Design**
+### **Safety-First Architecture**
 - **Rule-based validation** of all AI decisions
 - **Multiple fallback layers** prevent crop damage
 - **Emergency stop systems** with manual override capability
 - **Comprehensive logging** for complete traceability
 
-### **Professional Features at Hobby Cost**
-- **AROYA-style automation** without $3,000/month subscriptions
-- **Athena method compatibility** with proper EC ratio management  
-- **Complete system integration** with Home Assistant ecosystem
-- **Open source flexibility** with commercial-grade reliability
+### **Open Source Approach**
+- **Modular design** allows using components independently
+- **Standard irrigation methods** with EC ratio management  
+- **Home Assistant integration** leverages existing ecosystem
+- **MIT licensed** for both hobby and commercial use
 
 ## 📖 Documentation Guide
 
@@ -217,11 +217,11 @@ Unlike expensive commercial systems, our smart learning uses **pressure-compensa
 
 ## 🏆 Success Stories
 
-> *"Reduced water usage by 30% while improving plant health. The learning system adapted to each zone's unique characteristics within 2 weeks."* - Advanced User
+> *"The learning system adapted to each zone's characteristics within 2 weeks, improving both water efficiency and plant health."* - Advanced User
 
-> *"Perfect for beginners - the step-by-step guides had me running in 30 minutes. Added AppDaemon automation later when I was ready."* - New User
+> *"Step-by-step guides made setup straightforward. Added AppDaemon automation when I was ready for full automation."* - New User
 
-> *"The AI consultation catches edge cases my rules miss. Worth the $0.50/day for the natural language explanations alone."* - AI Integration User
+> *"AI consultation provides helpful insights for complex growing situations."* - AI Integration User
 
 ## 🤝 Community & Support
 
@@ -236,7 +236,7 @@ Unlike expensive commercial systems, our smart learning uses **pressure-compensa
 - **Code of Conduct** - Be respectful and inclusive
 
 ### Commercial Use
-This system is MIT licensed and suitable for commercial growing operations. Many users scale from hobby grows to professional operations using the same foundation.
+This system is MIT licensed and suitable for both hobby and commercial growing operations.
 
 ## 📈 What's Next
 
@@ -263,11 +263,9 @@ The system is designed for easy expansion:
 - **Want advanced features?** → [Smart Learning System](docs/advanced-features/smart-learning-system.md)
 - **Technical questions?** → [Technical Reference](docs/technical/)
 
-**Start your intelligent crop steering journey today!** 🌱→🌿→🌳
-
 ---
 
 <p align="center">
-  <strong>Transform your growing operation with professional automation and intelligent optimization</strong><br>
-  <em>Built for Home Assistant • Open Source • Production Ready</em>
+  <strong>Open source crop steering automation for Home Assistant</strong><br>
+  <em>MIT Licensed • Community Driven • Production Ready</em>
 </p>

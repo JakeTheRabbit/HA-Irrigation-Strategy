@@ -1,6 +1,6 @@
 # Dashboard Examples
 
-**Professional dashboard layouts** for monitoring and controlling your Crop Steering System in Home Assistant.
+**Dashboard layouts** for monitoring and controlling your Crop Steering System in Home Assistant.
 
 > **Prerequisites**: Complete [installation](../user-guides/02-installation.md) and have basic understanding of Home Assistant dashboards.
 
@@ -46,7 +46,7 @@ entities:
 show_header_toggle: false
 ```
 
-## Professional Monitoring Dashboard
+## Monitoring Dashboard
 
 ### System Health Overview
 ```yaml
