@@ -230,26 +230,8 @@ The smart learning system uses **pressure-compensating dripper precision** to ac
 ### Commercial Use
 This system is MIT licensed and suitable for both hobby and commercial growing operations.
 
-## 📈 What's Next
+## ⚡ Getting Started
 
-### Planned Features
-- **Mobile app integration** for remote monitoring
-- **Weather API integration** for environmental optimization
-- **Multi-facility management** for commercial operators
-- **Advanced ML models** for predictive scheduling
-
-### Upgrade Path
-The system is designed for easy expansion:
-1. **Start simple** with basic integration
-2. **Add automation** when comfortable with concepts  
-3. **Enable learning** for optimization without new hardware
-4. **Enhance with AI** for cutting-edge decision assistance
-
----
-
-## ⚡ Ready to Get Started?
-
-### Quick Decision Tree:
 - **New to crop steering?** → [Getting Started Guide](docs/user-guides/01-getting-started.md)
 - **Ready to install?** → [Installation Guide](docs/user-guides/02-installation.md)
 - **Want advanced features?** → [Smart Learning System](docs/advanced-features/smart-learning-system.md)
