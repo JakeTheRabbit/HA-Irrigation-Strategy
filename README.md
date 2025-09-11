@@ -29,51 +29,48 @@
 - Stateless analysis with rule-based safety validation
 - Natural language explanations of irrigation recommendations
 
-## 🎯 Choose Your Path
+## 🛠️ Installation Options
 
-### 🌱 **Beginner Path** (30-60 minutes)
-Perfect for first-time users wanting reliable automation:
+### Basic Integration Only
+Install the Home Assistant custom component to get monitoring and manual control:
 
-**What You Get:** Basic crop steering with manual control
-- ✅ Home Assistant integration with dashboard
-- ✅ Manual irrigation services and monitoring
-- ✅ VWC/EC calculations and phase tracking
-- ✅ Hardware simulation for testing
+- 100+ entities for zone monitoring and system status
+- Manual irrigation services you can call from automations
+- VWC/EC calculations and phase tracking display
+- Safety interlocks and shot duration calculations
+- Test entities for hardware-free development
 
-**Next Steps:**
-1. [Getting Started Guide](docs/user-guides/01-getting-started.md) - Learn the fundamentals
-2. [Quick Installation](docs/user-guides/02-installation.md#quick-start) - 15-minute setup
-3. [Basic Configuration](docs/user-guides/03-configuration.md) - Set up monitoring
+[Quick Installation Guide](docs/user-guides/02-installation.md#quick-start) - 15 minute setup
 
-### 🔧 **Intermediate Path** (2-4 hours)
-For users wanting full automation with AppDaemon:
+### Add AppDaemon Automation
+Install additional Python apps to get autonomous operation:
 
-**What You Get:** Complete hands-off irrigation system
-- ✅ Everything from Beginner Path
-- ✅ Autonomous 4-phase cycle automation
-- ✅ Sensor validation and statistical analysis
-- ✅ Hardware sequencing and safety protocols
-- ✅ Advanced scheduling and optimization
+- Automatic P0→P1→P2→P3 phase transitions based on sensor readings
+- Sensor validation and statistical processing 
+- Hardware sequencing (pump priming, valve timing, safety delays)
+- Scheduling and threshold-based irrigation decisions
 
-**Next Steps:**
-1. [Complete Installation](docs/user-guides/02-installation.md#complete-setup) - Full automation
-2. [Daily Operation Guide](docs/user-guides/04-daily-operation.md) - System management
-3. [Automation Examples](docs/examples/automation-examples.md) - Advanced patterns
+[Complete Installation Guide](docs/user-guides/02-installation.md#complete-setup) - 2-4 hour setup
 
-### 🚀 **Advanced Path** (4-8 hours)
-For power users wanting cutting-edge intelligence:
+### Add Learning System
+Install smart learning module for adaptive behavior:
 
-**What You Get:** AI-enhanced adaptive irrigation
-- ✅ Everything from Intermediate Path  
-- ✅ Intelligent learning optimization (no additional hardware!)
-- ✅ Automatic field capacity detection per zone
-- ✅ Adaptive parameter tuning based on plant responses
-- ✅ Optional: GPT-5 AI consultation and analysis
+- Field capacity detection using pressure-compensating dripper precision
+- Zone efficiency characterization and channeling detection
+- Adaptive shot sizing based on substrate absorption patterns
+- SQLite database for persistent learning data storage
 
-**Next Steps:**
-1. [Smart Learning System](docs/advanced-features/smart-learning-system.md) - Zero-hardware intelligence
-2. [LLM Integration](docs/advanced-features/llm-integration.md) - AI decision assistance
-3. [Technical Reference](docs/technical/) - Complete system documentation
+[Smart Learning System](docs/advanced-features/smart-learning-system.md) - Setup guide
+
+### Add AI Consultation
+Configure OpenAI API integration for decision assistance:
+
+- GPT-5 consultation for complex irrigation decisions
+- Rule-based validation of all AI recommendations
+- Natural language explanations of irrigation reasoning
+- Cost management and caching for API efficiency
+
+[LLM Integration Guide](docs/advanced-features/llm-integration.md) - Setup and costs
 
 ## 🏗️ System Architecture
 
