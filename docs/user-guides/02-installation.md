@@ -554,7 +554,7 @@ Depending on how far you've progressed:
 
 ### For Daily Operation
 - **[Daily Operation Guide](04-daily-operation.md)** - Learn to monitor and maintain your system
-- **[Dashboard Guide](dashboard-guide.md)** - Set up professional monitoring displays
+- **[Dashboard Guide](03-configuration.md)** - Set up monitoring displays
 
 ### For Advanced Features
 - **[LLM Integration](../advanced-features/llm-integration.md)** - Add AI decision assistance

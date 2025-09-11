@@ -2,7 +2,7 @@
 
 **Welcome to precision crop steering!** This guide will help you understand the system, configure it for your setup, and start your first irrigation cycles with confidence.
 
-> **Just installed?** Make sure you've completed the [15-minute quickstart](../installation/quickstart.md) first.
+> **Just installed?** Make sure you've completed the [15-minute quickstart](02-installation.md#quick-start) first.
 
 ## Understanding Crop Steering
 
@@ -225,13 +225,13 @@ Turn off `switch.crop_steering_system_enabled`
 
 Once you're comfortable with basic operation:
 
-1. **[Daily Operation Guide](daily-operation.md)** - Master day-to-day monitoring
-2. **[Dashboard Guide](dashboard-guide.md)** - Set up monitoring cards
-3. **[Complete Installation](../installation/complete-guide.md)** - Add full automation with AppDaemon
+1. **[Daily Operation Guide](04-daily-operation.md)** - Master day-to-day monitoring
+2. **[Dashboard Guide](03-configuration.md)** - Set up monitoring cards
+3. **[Complete Installation](02-installation.md#complete-setup)** - Add full automation with AppDaemon
 
 ### Advanced Features
 - **[LLM Integration](../advanced-features/llm-integration.md)** - Add AI decision assistance
-- **[Smart Learning](../advanced-features/smart-learning.md)** - Enable adaptive optimization
+- **[Smart Learning](../advanced-features/smart-learning-system.md)** - Enable adaptive optimization
 
 ## Tips for Success
 

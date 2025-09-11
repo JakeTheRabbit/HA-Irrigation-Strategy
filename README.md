@@ -191,7 +191,7 @@ The smart learning system uses **pressure-compensating dripper precision** to ac
 
 ### Examples & Patterns
 - **[Automation Examples](docs/examples/automation-examples.md)** - Advanced automation patterns
-- **[Dashboard Examples](docs/examples/dashboard-examples.md)** - Professional dashboard layouts
+- **[Dashboard Examples](docs/examples/dashboard-examples.md)** - Dashboard layouts
 
 ## 🛠️ Hardware Requirements
 
@@ -221,7 +221,7 @@ The smart learning system uses **pressure-compensating dripper precision** to ac
 
 ### Contributing
 - **[Contributing Guidelines](CONTRIBUTING.md)** - How to help improve the system
-- **[Development Setup](docs/development/)** - Set up development environment
+- **[Development Setup](CONTRIBUTING.md)** - Set up development environment
 - **Code of Conduct** - Be respectful and inclusive
 
 ### Commercial Use
