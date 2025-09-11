@@ -25,7 +25,7 @@
 - Channeling detection and substrate optimization over time
 
 **Optional AI Enhancement**
-- GPT-4o consultation for complex irrigation decisions ($0.15-1.50/day)
+- GPT-5 consultation for complex irrigation decisions ($0.05-1.25/day)
 - Stateless analysis with rule-based safety validation
 - Natural language explanations of irrigation recommendations
 
@@ -152,7 +152,7 @@ smart_irrigation_learning:
 llm_crop_steering:
   module: llm_enhanced_app
   class: LLMEnhancedCropSteering
-  model: "gpt-4o-mini"        # Cost-effective option ($0.15/$0.60 per 1M tokens)
+  model: "gpt-5-nano"         # Cost-effective option ($0.05/$0.40 per 1M tokens)
   daily_budget: 1.00          # $1/day limit
   confidence_threshold: 0.8   # Safety validation
 ```

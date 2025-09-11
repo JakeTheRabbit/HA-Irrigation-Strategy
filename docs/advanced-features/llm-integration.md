@@ -1,6 +1,6 @@
 # LLM Integration Guide
 
-**Add cutting-edge AI intelligence to your crop steering system** while maintaining 100% safety through rule-based validation. This guide covers setup, optimization, and cost management for GPT-4o powered decision assistance.
+**Add cutting-edge AI intelligence to your crop steering system** while maintaining 100% safety through rule-based validation. This guide covers setup, optimization, and cost management for GPT-5 powered decision assistance.
 
 > **Prerequisites**: Complete [full automation setup](../user-guides/02-installation.md#complete-setup) with working AppDaemon before adding LLM features.
 
@@ -51,10 +51,10 @@ flowchart TD
 
 ### Honest Cost Expectations
 
-**GPT-4o Model Pricing (2024-2025)**:
-- **gpt-4o-mini**: $0.15/$0.60 per 1M tokens input/output (recommended for routine decisions)
-- **gpt-4o**: $2.50/$10.00 per 1M tokens input/output (complex analysis)
-- **o1-mini**: $3/$12 per 1M tokens (reasoning tasks)
+**GPT-5 Model Pricing (2025)**:
+- **gpt-5-nano**: $0.05/$0.40 per 1M tokens input/output (ultra cost-effective for routine decisions)
+- **gpt-5-mini**: $0.25/$2.00 per 1M tokens input/output (standard analysis)
+- **gpt-5**: $1.25/$10.00 per 1M tokens input/output (complex reasoning)
 
 **Typical API Call**:
 - Input: 200 tokens (sensor data + prompt)
@@ -118,7 +118,7 @@ flowchart TD
      # LLM Settings
      llm_enabled: true
      llm_provider: "openai"
-     model: "gpt-4o-mini"
+     model: "gpt-5-nano"
      api_key: !secret openai_api_key
      
      # Budget Control
@@ -155,7 +155,7 @@ flowchart TD
 **Economy Tier ($0.50-1.00/day)**:
 ```yaml
 llm_crop_steering:
-  model: "gpt-4o-mini"
+  model: "gpt-5-nano"
   daily_budget: 1.00
   decision_interval: 600  # 10 minutes
   confidence_threshold: 0.9  # High bar for LLM decisions
@@ -165,8 +165,8 @@ llm_crop_steering:
 **Standard Tier ($1.00-3.00/day)**:
 ```yaml
 llm_crop_steering:
-  model: "gpt-4o-mini"
-  enhanced_model: "gpt-4o"  # For complex situations
+  model: "gpt-5-nano"
+  enhanced_model: "gpt-5"  # For complex situations
   daily_budget: 3.00
   decision_interval: 180  # 3 minutes
   confidence_threshold: 0.8
@@ -176,8 +176,8 @@ llm_crop_steering:
 **Premium Tier ($3.00-8.00/day)**:
 ```yaml
 llm_crop_steering:
-  model: "gpt-4o"
-  emergency_model: "o1-mini"
+  model: "gpt-5"
+  emergency_model: "gpt-5"
   daily_budget: 8.00
   decision_interval: 120  # 2 minutes
   reasoning_effort: "medium"
@@ -233,17 +233,17 @@ sensor.crop_steering_llm_decisions_today # Monitor frequency
 **Automatic Model Routing**:
 ```yaml
 model_routing:
-  default: "gpt-4o-mini"
+  default: "gpt-5-nano"
   
   # Use better models for specific conditions
   complex_conditions:
-    - high_ec_ratio: "gpt-4o"  # EC > 1.5
-    - phase_transition: "gpt-4o"  # P0→P1, P2→P3
-    - sensor_disagreement: "gpt-4o"  # Front/back mismatch
+    - high_ec_ratio: "gpt-5"  # EC > 1.5
+    - phase_transition: "gpt-5"  # P0→P1, P2→P3
+    - sensor_disagreement: "gpt-5"  # Front/back mismatch
   
   emergency_conditions:
-    - critical_vwc: "o1-mini"  # VWC < 30%
-    - sensor_failure: "o1-mini"  # Multiple sensors offline
+    - critical_vwc: "gpt-5"  # VWC < 30%
+    - sensor_failure: "gpt-5"  # Multiple sensors offline
 ```
 
 ### Prompt Optimization
@@ -327,7 +327,7 @@ cards:
 ```yaml
 weekly_analysis:
   enabled: true
-  model: "gpt-4o"  # More capable model for analysis
+  model: "gpt-5"  # More capable model for analysis
   schedule: "sunday 23:00"  # Weekly at 11 PM Sunday
   
   analysis_includes:
@@ -384,7 +384,7 @@ predictive_features:
 **Immediate Actions**:
 1. **Check call frequency**: May be calling too often
 2. **Verify caching**: Cache hit rate should be >60%
-3. **Review model usage**: Ensure using gpt-4o-mini for routine decisions
+3. **Review model usage**: Ensure using gpt-5-nano for routine decisions
 4. **Set stricter budget**: Lower daily limit
 
 **Configuration Fixes**:
