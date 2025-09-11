@@ -87,7 +87,7 @@
 - **Grow lights** with Home Assistant control (for phase synchronization)
 
 ### For AI Features
-- **OpenAI API key** with GPT-4 or GPT-5 access
+- **OpenAI API key** with GPT-5 access
 - **Internet connection** for API calls
 - **Budget allocation** of $3-15/month for API usage
 

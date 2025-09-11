@@ -68,7 +68,7 @@ For power users wanting cutting-edge intelligence:
 - ✅ Intelligent learning optimization (no additional hardware!)
 - ✅ Automatic field capacity detection per zone
 - ✅ Adaptive parameter tuning based on plant responses
-- ✅ Optional: GPT-4o AI consultation and analysis
+- ✅ Optional: GPT-5 AI consultation and analysis
 
 **Next Steps:**
 1. [Smart Learning System](docs/advanced-features/smart-learning-system.md) - Zero-hardware intelligence
@@ -116,7 +116,7 @@ graph LR
 | **Safety Systems** | ✅ Basic | ✅ Advanced | ✅ Advanced | ✅ Advanced |
 | **Zone Learning** | ❌ | ❌ | ✅ Adaptive | ✅ AI-Enhanced |
 | **Field Capacity Detection** | ❌ | ❌ | ✅ Automatic | ✅ Intelligent |
-| **Decision Assistance** | ❌ | ❌ | ❌ | ✅ GPT-4o |
+| **Decision Assistance** | ❌ | ❌ | ❌ | ✅ GPT-5 |
 | **Setup Time** | 30 min | 2-4 hours | +1 week learning | +Setup costs |
 | **Hardware Required** | Basic sensors | Same | Same | Same |
 | **Monthly Cost** | Free | Free | Free | $5-45 (optional) |
@@ -214,14 +214,6 @@ The smart learning system uses **pressure-compensating dripper precision** to ac
 - **Enhanced server** (16GB RAM recommended for AI processing)
 - **Stable internet** for LLM API access
 - **Flow monitoring** (optional - PC drippers provide precision)
-
-## 🏆 Success Stories
-
-> *"The learning system adapted to each zone's characteristics within 2 weeks, improving both water efficiency and plant health."* - Advanced User
-
-> *"Step-by-step guides made setup straightforward. Added AppDaemon automation when I was ready for full automation."* - New User
-
-> *"AI consultation provides helpful insights for complex growing situations."* - AI Integration User
 
 ## 🤝 Community & Support
 
