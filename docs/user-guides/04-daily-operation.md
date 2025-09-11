@@ -2,7 +2,7 @@
 
 **Master the day-to-day monitoring and management** of your crop steering system. This guide covers dashboard interpretation, routine maintenance, and optimization techniques.
 
-> **Prerequisites**: Complete [getting started guide](getting-started.md) and have your system running for at least 24 hours.
+> **Prerequisites**: Complete [getting started guide](01-getting-started.md) and have your system running for at least 24 hours.
 
 ## Dashboard Overview
 

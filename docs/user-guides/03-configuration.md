@@ -2,7 +2,7 @@
 
 **Create professional monitoring dashboards** for your crop steering system. This guide shows you how to build effective visualization and control interfaces using Home Assistant's dashboard tools.
 
-> **Prerequisites**: Complete [getting started guide](getting-started.md) and have entities visible in Home Assistant.
+> **Prerequisites**: Complete [getting started guide](01-getting-started.md) and have entities visible in Home Assistant.
 
 ## Essential Dashboard Cards
 
