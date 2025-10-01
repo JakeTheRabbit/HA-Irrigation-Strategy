@@ -6,11 +6,8 @@ This document maps the old documentation structure to the new organized layout f
 
 ### Moved Files
 - `ENTITIES.md` → `docs/technical/entity-reference.md`
-- `docs/installation_guide.md` → Split into:
-  - `docs/installation/quickstart.md`
-  - `docs/installation/complete-guide.md`
-  - `docs/installation/hardware-setup.md`
-- `docs/troubleshooting.md` → `docs/user-guides/troubleshooting.md` (enhanced)
+- `docs/installation_guide.md` → `docs/user-guides/02-installation.md`
+- `docs/troubleshooting.md` → `docs/user-guides/05-troubleshooting.md` (enhanced)
 - `docs/LLM_INTEGRATION.md` → `docs/advanced-features/llm-integration.md` (rewritten)
 - `docs/GPT5_SETUP_GUIDE.md` → Merged into `docs/advanced-features/llm-integration.md`
 
@@ -30,28 +27,23 @@ This document maps the old documentation structure to the new organized layout f
 
 ```
 docs/
-├── installation/
-│   ├── quickstart.md          # 15-minute setup (NEW)
-│   ├── complete-guide.md      # Full installation with AppDaemon (ENHANCED)
-│   └── hardware-setup.md      # Physical hardware guide (NEW)
 ├── user-guides/
-│   ├── getting-started.md     # First-time user journey (NEW)
-│   ├── daily-operation.md     # Day-to-day usage (NEW)
-│   ├── dashboard-guide.md     # UI setup and monitoring (NEW)
-│   └── troubleshooting.md     # Comprehensive problem solving (ENHANCED)
+│   ├── 01-getting-started.md  # First-time user journey
+│   ├── 02-installation.md     # Complete installation guide
+│   ├── 03-configuration.md    # Configuration and setup
+│   ├── 04-daily-operation.md  # Day-to-day usage
+│   └── 05-troubleshooting.md  # Comprehensive problem solving
 ├── advanced-features/
-│   ├── llm-integration.md     # AI enhancement setup (REWRITTEN)
-│   ├── smart-learning.md      # Adaptive optimization (PLANNED)
-│   └── automation-advanced.md # Complex scenarios (PLANNED)
+│   ├── llm-integration.md     # GPT-5 AI enhancement setup
+│   └── smart-learning-system.md # Adaptive optimization
 ├── technical/
-│   ├── entity-reference.md    # Complete entity docs (MOVED)
-│   ├── services-api.md        # Service calls & events (PLANNED)
-│   ├── architecture.md        # System design (PLANNED)
-│   └── configuration.md       # Advanced settings (PLANNED)
+│   ├── entity-reference.md    # Complete entity documentation
+│   ├── service-reference.md   # Service calls & events
+│   └── architecture.md        # System design details
 ├── examples/
-│   ├── configurations/        # Sample configs (PLANNED)
-│   └── automations/          # Example automations (PLANNED)
-└── development/              # Internal development docs
+│   ├── automation-examples.md # Example automations
+│   └── dashboard-examples.md  # Dashboard configurations
+└── development/               # Internal development docs
     ├── github_issue_gui_config.md
     ├── github_issue_refactoring.md
     └── REFACTORING_PROPOSAL.md
