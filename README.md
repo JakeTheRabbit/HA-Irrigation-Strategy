@@ -1,5 +1,7 @@
 # Crop Steering System for Home Assistant (v2.3.1)
 
+THIS PROJECT IS NOT READY YET - INSTALL AT OWN RISK
+
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![Zones](https://img.shields.io/badge/Zones-1%E2%80%936-blue)
@@ -1070,3 +1072,4 @@ flowchart LR
 ## Screenshots
 
 ![Dashboard Screenshot](screenshot.jpeg)
+
