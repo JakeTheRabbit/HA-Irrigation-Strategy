@@ -9,13 +9,13 @@ import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 
-from .const import DOMAIN, MIN_ZONES, MAX_ZONES
+from .const import DOMAIN, MIN_ZONES, MAX_ZONES, PHASES
 
 _LOGGER = logging.getLogger(__name__)
 
 # Service schemas
 PHASE_TRANSITION_SCHEMA = vol.Schema({
-    vol.Required("target_phase"): vol.In(["P0", "P1", "P2", "P3"]),
+    vol.Required("target_phase"): vol.In(PHASES),  # Use PHASES constant (P0-P3 only)
     vol.Optional("reason"): cv.string,
     vol.Optional("forced"): cv.boolean,
 })

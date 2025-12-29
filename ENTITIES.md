@@ -8,7 +8,7 @@ This document lists every single entity created by the Crop Steering System with
 
 | Entity ID | Name | Description |
 |-----------|------|-------------|
-| `sensor.crop_steering_current_phase` | Current Phase | Shows current irrigation phase (P0/P1/P2/P3/Manual) |
+| `sensor.crop_steering_current_phase` | Current Phase | Shows current irrigation phase (P0/P1/P2/P3) |
 | `sensor.crop_steering_irrigation_efficiency` | Irrigation Efficiency | System irrigation efficiency percentage |
 | `sensor.crop_steering_water_usage_daily` | Daily Water Usage | Total daily water consumption across all zones (Liters) |
 | `sensor.crop_steering_dryback_percentage` | Dryback Percentage | Current dryback percentage from peak VWC |
@@ -162,7 +162,7 @@ This document lists every single entity created by the Crop Steering System with
 | `select.crop_steering_crop_type` | Crop Type | Cannabis_Athena, Cannabis_Hybrid, Cannabis_Indica, Cannabis_Sativa, Tomato, Lettuce, Basil, Custom | Type of crop being grown |
 | `select.crop_steering_growth_stage` | Growth Stage | Vegetative, Generative, Transition | Current growth stage |
 | `select.crop_steering_steering_mode` | Steering Mode | Vegetative, Generative | Active steering mode |
-| `select.crop_steering_irrigation_phase` | Irrigation Phase | P0, P1, P2, P3, Manual | Current irrigation phase |
+| `select.crop_steering_irrigation_phase` | Irrigation Phase | P0, P1, P2, P3 | Current irrigation phase (automatic phase control) |
 
 ### Zone-Specific Selects (Per Zone 1-N)
 
@@ -197,7 +197,7 @@ This document lists every single entity created by the Crop Steering System with
 
 | Service ID | Parameters | Description |
 |------------|------------|-------------|
-| `crop_steering.transition_phase` | `target_phase`, `reason`, `forced` | Manually transition to specified irrigation phase |
+| `crop_steering.transition_phase` | `target_phase` (P0-P3), `reason`, `forced` | Manually transition to specified irrigation phase |
 | `crop_steering.check_transition_conditions` | None | Check if phase transition conditions are met |
 
 ### Irrigation Control Services

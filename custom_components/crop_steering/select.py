@@ -10,7 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, CONF_NUM_ZONES, PHASES, STEERING_MODES, CROP_TYPES, SOFTWARE_VERSION
+from .const import DOMAIN, CONF_NUM_ZONES, PHASES, STEERING_MODES, CROP_TYPES, GROWTH_STAGES, SOFTWARE_VERSION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,34 +50,25 @@ SELECT_DESCRIPTIONS = [
         key="crop_type",
         name="Crop Type",
         icon="mdi:sprout",
-        options=[
-            "Cannabis_Athena",
-            "Cannabis_Hybrid", 
-            "Cannabis_Indica",
-            "Cannabis_Sativa",
-            "Tomato",
-            "Lettuce",
-            "Basil",
-            "Custom"
-        ],
+        options=CROP_TYPES,  # Use constant from const.py
     ),
     SelectEntityDescription(
         key="growth_stage",
         name="Growth Stage",
         icon="mdi:timeline",
-        options=["Vegetative", "Generative", "Transition"],
+        options=GROWTH_STAGES,  # Use constant from const.py
     ),
     SelectEntityDescription(
         key="steering_mode",
         name="Steering Mode",
         icon="mdi:steering",
-        options=["Vegetative", "Generative"],
+        options=STEERING_MODES,  # Use constant from const.py
     ),
     SelectEntityDescription(
         key="irrigation_phase",
         name="Irrigation Phase",
         icon="mdi:water-circle",
-        options=["P0", "P1", "P2", "P3", "Manual"],
+        options=PHASES,  # Use constant from const.py (P0-P3 only)
     ),
 ]
 

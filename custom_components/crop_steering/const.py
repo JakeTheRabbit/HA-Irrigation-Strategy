@@ -41,9 +41,12 @@ VWC_SATURATED_THRESHOLD = 70
 # Software version - single source of truth
 SOFTWARE_VERSION = "2.3.1"
 
-# Crop steering phases
-PHASES = ["P0", "P1", "P2", "P3", "Manual"]
+# Crop steering phases (P0-P3 only, Manual removed)
+PHASES = ["P0", "P1", "P2", "P3"]
 STEERING_MODES = ["Vegetative", "Generative"]
+
+# Growth stages (for growth_stage select entity)
+GROWTH_STAGES = ["Vegetative", "Generative", "Transition"]
 
 # Crop types (updated with Athena)
 CROP_TYPES = [
