@@ -157,9 +157,37 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
+    async def _validate_entities(self, user_input: dict) -> dict:
+        """Validate that entity IDs exist in Home Assistant."""
+        errors = {}
+
+        # List of entity keys to validate
+        entity_keys = [
+            "zone_switch",
+            "vwc_front",
+            "vwc_back",
+            "ec_front",
+            "ec_back",
+            CONF_PUMP_SWITCH,
+            CONF_MAIN_LINE_SWITCH,
+        ]
+
+        for key in entity_keys:
+            entity_id = user_input.get(key, "").strip()
+            if entity_id and not self.hass.states.get(entity_id):
+                _LOGGER.warning(f"Entity ID not found: {entity_id}")
+                errors[key] = "entity_not_found"
+
+        return errors
+
+
 class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect."""
 
 
 class InvalidAuth(HomeAssistantError):
     """Error to indicate there is invalid auth."""
+
+
+class EntityNotFound(HomeAssistantError):
+    """Error to indicate entity ID does not exist."""

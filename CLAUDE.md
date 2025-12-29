@@ -64,11 +64,14 @@ docker logs addon_a0d7b954_appdaemon -f
    - Real-time decision making
 
 ### Critical Files
-- `custom_components/crop_steering/config_flow.py` - Integration setup wizard
+- `custom_components/crop_steering/config_flow.py` - Integration setup wizard (GUI configuration)
 - `custom_components/crop_steering/sensor.py` - Core calculations (shot durations, EC ratio, thresholds)
 - `custom_components/crop_steering/services.py` - Service handlers and event dispatching
+- `custom_components/crop_steering/zone_config.py` - Zone entity mapping and management
+- `custom_components/crop_steering/const.py` - Constants and default values (single source of truth)
 - `appdaemon/apps/crop_steering/master_crop_steering_app.py` - Main automation coordinator
 - `appdaemon/apps/apps.yaml` - AppDaemon app configuration
+- `crop_steering.env` - Optional hardware entity mapping (alternative to config flow)
 
 ## Implementation Details
 
@@ -117,3 +120,24 @@ Entities follow predictable naming:
 - Input_boolean entities simulate hardware (pumps, valves)
 - Input_number entities simulate sensors (VWC, EC, temperature)
 - No real hardware required for development/testing
+- Test helpers appear under "Crop Steering Test Helpers" device
+- All test entities created during integration setup, no cleanup needed
+
+### Event-Driven Communication
+- Integration fires events → AppDaemon listens → triggers automation
+- Events are the bridge between HA integration (entities/services) and AppDaemon (logic/hardware)
+- AppDaemon subscribes to both entity state changes and custom events
+- Hardware control happens in AppDaemon, not in integration (separation of concerns)
+
+### Development Workflow
+1. **Modify integration code**: Edit files in `custom_components/crop_steering/`
+2. **Reload integration**: Developer Tools → YAML → Reload Custom Components (no restart)
+3. **Test with manual service calls**: Use Developer Tools → Services
+4. **Monitor events**: Developer Tools → Events → Listen to `crop_steering_*`
+5. **View AppDaemon logs**: `docker logs addon_a0d7b954_appdaemon -f`
+
+### Common Development Tasks
+- **Add new entity**: Create in appropriate platform file (sensor.py, number.py, etc.), update const.py if needed
+- **Modify service**: Edit services.py, update event payload if needed
+- **Change AppDaemon logic**: Edit master_crop_steering_app.py or specific module, restart AppDaemon
+- **Update version**: Edit SOFTWARE_VERSION in const.py and manifest.json (single source is const.py)
