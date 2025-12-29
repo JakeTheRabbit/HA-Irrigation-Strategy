@@ -13,16 +13,51 @@ You can mix both: Use .env for initial setup, then tweak parameters via UI!
 
 ## Quick Start with .env File
 
-### Step 1: Create crop_steering.env
+### Step 0: Choose a Template (Easiest!)
 
-Copy the `crop_steering.env` file to your Home Assistant config directory:
+**NEW:** Use pre-configured templates for instant setup!
+
+```bash
+# Pick your template based on zone count:
+templates/crop_steering.2zone.env  # For 2 zones (quickest setup)
+templates/crop_steering.4zone.env  # For 4 zones (most common)
+templates/crop_steering.6zone.env  # For 6+ zones (scalable)
+
+# Or use the comprehensive example:
+crop_steering.env.example  # Fully documented with all options
+```
+
+**What's in the templates?**
+- Pre-filled with Athena method defaults
+- Commented placeholders for entity IDs
+- Common naming pattern examples
+- Ready to edit and deploy in minutes
+
+**Quick template setup:**
+```bash
+# 1. Copy template to config directory
+cp templates/crop_steering.4zone.env /config/crop_steering.env
+
+# 2. Edit entity IDs (replace placeholders)
+nano /config/crop_steering.env
+
+# 3. Install integration → Choose "Load from .env file" → Done!
+```
+
+See [templates/README.md](templates/README.md) for full template documentation.
+
+---
+
+### Step 1: Create crop_steering.env (Manual Method)
+
+If not using templates, create the file manually:
 
 ```bash
 # Location: /config/crop_steering.env
 # Or on Docker: /addon_configs/a0d7b954_appdaemon/crop_steering.env
 ```
 
-###Step 2: Configure Your Zones
+### Step 2: Configure Your Zones
 
 The system **automatically detects zones** by looking for `ZONE_N_SWITCH` entries:
 
