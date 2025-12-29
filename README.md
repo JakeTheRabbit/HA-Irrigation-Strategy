@@ -9,7 +9,18 @@ THIS PROJECT IS NOT READY YET - INSTALL AT OWN RISK
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-Turn Home Assistant into a professional crop‑steering controller. This project combines a lightweight HA integration (entities, services) with optional AppDaemon modules (advanced analytics, phase state machine) to automate precision irrigation using VWC/EC sensors.
+Turn Home Assistant into a professional crop‑steering controller. This project combines a lightweight HA integration (entities, services, calculations) with **required AppDaemon modules** (automation logic, hardware control, phase state machine) to automate precision irrigation using VWC/EC sensors.
+
+## ⚠️ IMPORTANT: AppDaemon is REQUIRED for Automation
+
+The Home Assistant integration creates entities and fires events, but **AppDaemon is required** to:
+- Control hardware (pumps, valves)
+- Make irrigation decisions
+- Execute phase transitions
+- Perform hardware sequencing
+
+**Without AppDaemon:** You get entities and manual service calls only.
+**With AppDaemon:** Full autonomous irrigation automation.
 
 ## How This System Works - Complete Overview
 

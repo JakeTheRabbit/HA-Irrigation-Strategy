@@ -469,17 +469,29 @@ class CropSteeringSensor(SensorEntity):
     
     def _average_sensor_values(self, sensor_ids: list[str]) -> float | None:
         """Average values from multiple sensors."""
+        if not sensor_ids:
+            _LOGGER.debug("No sensor IDs provided for averaging")
+            return None
+
         values = []
         for sensor_id in sensor_ids:
+            if not sensor_id:
+                continue
             try:
                 state = self.hass.states.get(sensor_id)
-                if state and state.state not in ['unknown', 'unavailable']:
+                if state is None:
+                    _LOGGER.warning(f"Sensor entity not found: {sensor_id}")
+                    continue
+                if state.state not in ['unknown', 'unavailable', 'none', None]:
                     values.append(float(state.state))
-            except (ValueError, TypeError):
+            except (ValueError, TypeError) as e:
+                _LOGGER.debug(f"Could not parse sensor value for {sensor_id}: {e}")
                 continue
-                
+
         if values:
             return round(sum(values) / len(values), 2)
+
+        _LOGGER.debug(f"No valid sensor values found from {len(sensor_ids)} sensors")
         return None
     
     def _calculate_avg_vwc(self) -> float | None:
@@ -509,10 +521,14 @@ class CropSteeringSensor(SensorEntity):
         try:
             entity_id = f"number.crop_steering_{key}"
             state = self.hass.states.get(entity_id)
-            if state and state.state not in ['unknown', 'unavailable']:
+            if state is None:
+                _LOGGER.debug(f"Number entity not found: {entity_id}")
+                return 0.0
+            if state.state not in ['unknown', 'unavailable', 'none', None]:
                 return float(state.state)
             return 0.0
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            _LOGGER.warning(f"Could not parse number value for {key}: {e}")
             return 0.0
     
     def _get_current_ec_target(self) -> float:
