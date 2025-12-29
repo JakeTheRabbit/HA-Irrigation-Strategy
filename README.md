@@ -147,7 +147,7 @@ flowchart TD
 - Optional environment: temperature, humidity, VPD, tank level sensors
 
 **Output entities (created by the integration):**
-- Phase select: `select.crop_steering_irrigation_phase` (P0/P1/P2/P3/Manual)
+- Phase select: `select.crop_steering_irrigation_phase` (P0/P1/P2/P3)
 - Average sensors: `sensor.crop_steering_configured_avg_vwc`, `sensor.crop_steering_configured_avg_ec`
 - EC ratio: `sensor.crop_steering_ec_ratio` (current EC ÷ target EC)
 - Adjusted threshold: `sensor.crop_steering_p2_vwc_threshold_adjusted`
@@ -830,7 +830,7 @@ Entity IDs follow the pattern crop_steering_<key> with per‑zone suffixes where
   - crop_type (Cannabis_Athena, Cannabis_Hybrid, Cannabis_Indica, Cannabis_Sativa, Tomato, Lettuce, Basil, Custom)
   - growth_stage (Vegetative, Generative, Transition)
   - steering_mode (Vegetative, Generative)
-  - irrigation_phase (P0, P1, P2, P3, Manual)
+  - irrigation_phase (P0, P1, P2, P3)
   - Per‑zone: zone_X_group (Ungrouped, Group A–D), zone_X_priority (Critical/High/Normal/Low), zone_X_crop_profile (Follow Main, …)
 
 - Numbers (globals)
