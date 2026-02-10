@@ -9,6 +9,7 @@ import logging
 import asyncio
 import threading
 import os
+import re
 import statistics
 from datetime import datetime, timedelta, time
 from typing import Dict, List, Optional
@@ -99,6 +100,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         """Initialize the master crop steering application."""
         # Initialize parent class for async-safe entity access
         super().initialize()
+        self._irrigation_lock = asyncio.Lock()
         
         # Load configuration
         self.config = self._load_configuration()
@@ -110,6 +112,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self.system_enabled = True
         self.irrigation_in_progress = False
         self.last_irrigation_time = None
+        self._last_status_snapshot = {'status': None, 'message': None}
         
         # Get number of zones from integration or config
         self.num_zones = self._get_number_of_zones()
@@ -167,6 +170,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         # Load persistent state from file
         self._load_persistent_state()
+
+        # Safety sweep after startup/restart to guarantee known-safe hardware state
+        self.run_in(self._startup_safety_sweep, 1)
+
+        # Publish initial runtime status for HA dashboards
+        self.run_in(self._publish_status, 1, status='initializing', message='App initialized, safety sweep scheduled')
         
         # Create initial sensors for integration compatibility
         self.run_in(self._create_initial_sensors, 2)
@@ -180,14 +189,57 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _load_configuration(self) -> Dict:
         """Load system configuration from AppDaemon args."""
         try:
-            # Build configuration with values from apps.yaml or fallbacks
-            config = {
-                'hardware': self.args.get('hardware', {}),
-                'sensors': self.args.get('sensors', {}),
-                'timing': self.args.get('timing', {}),
-                'thresholds': self.args.get('thresholds', {}),
-                'notification_service': self.args.get('notification_service', 'notify.persistent_notification')
+            config = self._get_default_config()
+
+            # Merge user args from apps.yaml into defaults
+            config['hardware'].update(self.args.get('hardware', {}) or {})
+            config['sensors'].update(self.args.get('sensors', {}) or {})
+            config['timing'].update(self.args.get('timing', {}) or {})
+            config['thresholds'].update(self.args.get('thresholds', {}) or {})
+            config['notification_service'] = self.args.get(
+                'notification_service',
+                config['notification_service']
+            )
+
+            # Backward-compatibility normalization for older key naming
+            if 'zone_switches' in config['hardware'] and 'zone_valves' not in config['hardware']:
+                zone_switches = config['hardware'].get('zone_switches', [])
+                if isinstance(zone_switches, list):
+                    config['hardware']['zone_valves'] = {
+                        idx: entity for idx, entity in enumerate(zone_switches, start=1) if entity
+                    }
+
+            # Guarantee required nested structures
+            config['hardware'].setdefault('zone_valves', {})
+            config['sensors'].setdefault('vwc', [])
+            config['sensors'].setdefault('ec', [])
+            config['sensors'].setdefault('environmental', {})
+
+            # Sanitize sensor lists/maps (drop empty/non-string entries)
+            config['sensors']['vwc'] = [
+                sensor_id for sensor_id in config['sensors']['vwc']
+                if isinstance(sensor_id, str) and sensor_id.strip()
+            ]
+            config['sensors']['ec'] = [
+                sensor_id for sensor_id in config['sensors']['ec']
+                if isinstance(sensor_id, str) and sensor_id.strip()
+            ]
+            config['sensors']['environmental'] = {
+                key: sensor_id
+                for key, sensor_id in config['sensors']['environmental'].items()
+                if isinstance(sensor_id, str) and sensor_id.strip()
             }
+
+            # Normalize zone valve keys to ints for consistent lookups
+            zone_valves_raw = config['hardware'].get('zone_valves', {})
+            if isinstance(zone_valves_raw, dict):
+                normalized_zone_valves = {}
+                for key, entity_id in zone_valves_raw.items():
+                    normalized_key = key
+                    if isinstance(key, str) and key.isdigit():
+                        normalized_key = int(key)
+                    normalized_zone_valves[normalized_key] = entity_id
+                config['hardware']['zone_valves'] = normalized_zone_valves
             
             self.log("Configuration loaded from apps.yaml")
             return config
@@ -196,12 +248,122 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self.log(f"Error loading configuration from apps.yaml: {e}", level="ERROR")
             # Fallback to empty config
             return {
-                'hardware': {},
-                'sensors': {},
-                'timing': {},
-                'thresholds': {},
+                **self._get_default_config(),
                 'notification_service': 'notify.persistent_notification'
             }
+
+    def _get_default_config(self) -> Dict:
+        """Get safe default configuration values to prevent KeyErrors."""
+        return {
+            'hardware': {
+                'pump_master': None,
+                'main_line': None,
+                'zone_valves': {}
+            },
+            'sensors': {
+                'vwc': [],
+                'ec': [],
+                'environmental': {}
+            },
+            'timing': {
+                'phase_check_interval': 60,
+                'ml_prediction_interval': 300,
+                'sensor_health_interval': 120
+            },
+            'thresholds': {
+                'emergency_vwc': 40.0
+            },
+            'notification_service': 'notify.persistent_notification'
+        }
+
+    async def _startup_safety_sweep(self, kwargs):
+        """Ensure all irrigation actuators are OFF on startup/restart."""
+        try:
+            self.log("🛡️ Running startup safety sweep (turning off irrigation hardware)")
+            await self._emergency_stop()
+            await self._publish_status(status='safe_idle', message='Startup safety sweep completed')
+        except Exception as e:
+            self.log(f"❌ Startup safety sweep failed: {e}", level='ERROR')
+            await self._publish_status(status='error', message=f'Startup safety sweep failed: {e}')
+
+    async def _publish_status(self, kwargs=None, status: Optional[str] = None, message: Optional[str] = None):
+        """Publish app runtime status to Home Assistant for observability."""
+        try:
+            payload = kwargs if isinstance(kwargs, dict) else {}
+            current_status = status or payload.get('status', 'unknown')
+            current_message = message or payload.get('message', 'No details')
+
+            # Avoid excessive state churn by skipping duplicate status/message payloads
+            if (
+                self._last_status_snapshot.get('status') == current_status
+                and self._last_status_snapshot.get('message') == current_message
+            ):
+                return
+
+            await self.async_set_entity_value(
+                'sensor.crop_steering_app_status',
+                current_status,
+                attributes={
+                    'friendly_name': 'Crop Steering App Status',
+                    'icon': 'mdi:water-sync',
+                    'message': current_message,
+                    'irrigation_in_progress': self.irrigation_in_progress,
+                    'updated': datetime.now().isoformat()
+                }
+            )
+
+            self._last_status_snapshot = {
+                'status': current_status,
+                'message': current_message
+            }
+        except Exception as e:
+            self.log(f"❌ Error publishing app status: {e}", level='ERROR')
+
+    def _is_any_irrigation_hardware_on(self) -> bool:
+        """Check whether any irrigation actuator is currently ON."""
+        try:
+            hardware = self.config.get('hardware', {})
+            entities_to_check = [
+                hardware.get('pump_master'),
+                hardware.get('main_line')
+            ]
+            zone_valves = hardware.get('zone_valves', {})
+            entities_to_check.extend([entity for entity in zone_valves.values() if entity])
+
+            for entity_id in entities_to_check:
+                if entity_id and self.get_entity_value(entity_id) == 'on':
+                    return True
+            return False
+        except Exception:
+            return False
+
+    def _get_zone_valve_entity(self, zone: int) -> Optional[str]:
+        """Get zone valve entity ID with robust int/string key handling."""
+        try:
+            zone_valves = self.config.get('hardware', {}).get('zone_valves', {})
+            entity_id = zone_valves.get(zone)
+            if entity_id:
+                return entity_id
+
+            # Fallback for older configs that may still have string keys
+            return zone_valves.get(str(zone))
+        except Exception:
+            return None
+
+    def _sensor_matches_zone(self, sensor_id: str, zone_num: int) -> bool:
+        """Return True when a sensor entity ID appears to belong to a zone."""
+        if not isinstance(sensor_id, str) or not sensor_id.strip():
+            return False
+
+        sensor = sensor_id.lower()
+        # Use token-aware matching to avoid false positives (e.g., zone_1 matching zone_10)
+        token_patterns = [
+            rf"(?:^|[^a-z0-9])zone_{zone_num}(?:[^a-z0-9]|$)",
+            rf"(?:^|[^a-z0-9])zone{zone_num}(?:[^a-z0-9]|$)",
+            rf"(?:^|[^a-z0-9])z{zone_num}(?:[^a-z0-9]|$)",
+            rf"(?:^|[^a-z0-9])r{zone_num}(?:[^a-z0-9]|$)",
+        ]
+        return any(re.search(pattern, sensor) for pattern in token_patterns)
 
     def _register_phase_callbacks(self, zone_num: int, state_machine: ZoneStateMachine):
         """Register callbacks for phase transitions and state changes."""
@@ -311,15 +473,24 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         # Listen to all VWC sensors
         for sensor in self.config['sensors']['vwc']:
-            self.listen_state(self._on_vwc_sensor_update, sensor)
+            if sensor:
+                self.listen_state(self._on_vwc_sensor_update, sensor)
+            else:
+                self.log("⚠️ Skipping empty VWC sensor entry in configuration", level='WARNING')
         
         # Listen to all EC sensors
         for sensor in self.config['sensors']['ec']:
-            self.listen_state(self._on_ec_sensor_update, sensor)
+            if sensor:
+                self.listen_state(self._on_ec_sensor_update, sensor)
+            else:
+                self.log("⚠️ Skipping empty EC sensor entry in configuration", level='WARNING')
         
         # Listen to environmental sensors
-        for sensor in self.config['sensors']['environmental'].values():
-            self.listen_state(self._on_environmental_update, sensor)
+        for sensor_name, sensor in self.config['sensors']['environmental'].items():
+            if sensor:
+                self.listen_state(self._on_environmental_update, sensor)
+            else:
+                self.log(f"⚠️ Skipping empty environmental sensor '{sensor_name}' in configuration", level='WARNING')
         
         # Listen to system control entities
         self.listen_state(self._on_system_toggle, 'switch.crop_steering_system_enabled')
@@ -363,6 +534,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self._monitor_sensor_health,
             'now+15',
             self.config['timing']['sensor_health_interval']
+        )
+
+        # Runtime watchdog (fail-safe for desynced state/hardware)
+        self.run_every(
+            self._watchdog_check,
+            'now+20',
+            60
         )
         
         # Performance analytics
@@ -487,11 +665,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
         for zone_num in range(1, self.num_zones + 1):
             # Check zone hardware
             if 'hardware' in self.config:
-                zone_switches = self.config['hardware'].get('zone_switches', [])
-                if zone_num <= len(zone_switches):
-                    zone_switch = zone_switches[zone_num - 1]
-                    if zone_switch and not self.entity_exists(zone_switch):
-                        missing_entities.append(f"Zone {zone_num} valve: {zone_switch}")
+                zone_valves = self.config['hardware'].get('zone_valves', {})
+                zone_switch = zone_valves.get(zone_num)
+                if zone_switch and not self.entity_exists(zone_switch):
+                    missing_entities.append(f"Zone {zone_num} valve: {zone_switch}")
             
             # Check zone control entities
             zone_entities = [
@@ -507,10 +684,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Check sensor entities if configured
             if 'sensors' in self.config:
                 sensors = self.config['sensors']
-                for sensor_type in ['vwc_front', 'vwc_back', 'ec_front', 'ec_back', 'temp']:
+                for sensor_type in ['vwc', 'ec']:
                     sensor_list = sensors.get(sensor_type, [])
-                    if zone_num <= len(sensor_list):
-                        sensor_id = sensor_list[zone_num - 1]
+                    zone_sensor_ids = [
+                        sensor_id for sensor_id in sensor_list
+                        if self._sensor_matches_zone(sensor_id, zone_num)
+                    ]
+                    for sensor_id in zone_sensor_ids:
                         if sensor_id and not self.entity_exists(sensor_id):
                             warnings.append(f"Zone {zone_num} sensor {sensor_type}: {sensor_id}")
         
@@ -2011,8 +2191,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 zone_group = self._get_zone_group(selected_zone)
                 zone_priority = self._get_zone_priority(selected_zone)
                 zone_vwc = self._get_zone_vwc(selected_zone)
+                zone_vwc_str = f"{zone_vwc:.1f}%" if zone_vwc is not None else "N/A"
                 
-                self.log(f"🎯 Optimal zone selected: Zone {selected_zone} (Group: {zone_group}, Priority: {zone_priority}, VWC: {zone_vwc:.1f}%)")
+                self.log(f"🎯 Optimal zone selected: Zone {selected_zone} (Group: {zone_group}, Priority: {zone_priority}, VWC: {zone_vwc_str})")
                 return selected_zone
             
             # Fallback to original VWC-based selection if priority selection fails
@@ -2029,7 +2210,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             zone_scores = {}
             
             for zone in candidate_zones:
-                zone_vwc_sensors = [s for s in self.config['sensors']['vwc'] if f'r{zone}' in s or f'z{zone}' in s]
+                zone_vwc_sensors = [s for s in self.config['sensors']['vwc'] if self._sensor_matches_zone(s, zone)]
                 
                 if zone_vwc_sensors:
                     zone_vwc_values = []
@@ -2065,93 +2246,107 @@ class MasterCropSteeringApp(BaseAsyncApp):
 
     async def _execute_irrigation_shot(self, zone: int, duration: int, shot_type: str = 'manual') -> Dict:
         """Execute irrigation shot with proper sequencing and monitoring."""
-        try:
-            if self.irrigation_in_progress:
-                self.log("⚠️ Irrigation already in progress - skipping")
-                return {'status': 'skipped', 'reason': 'already_in_progress'}
-            
-            # MANUAL OVERRIDE CHECKS - Critical user control functionality
-            # Zone-level manual override
-            zone_manual_override = self._get_switch_state(f"switch.crop_steering_zone_{zone}_manual_override", False)
-            if zone_manual_override:
-                self.log(f"🛑 Zone {zone} irrigation blocked: Manual override active")
-                return {
-                    'status': 'blocked',
-                    'reason': 'manual_override',
-                    'zone': zone,
-                    'message': f'Zone {zone} manual override is active - irrigation bypassed'
-                }
-            
-            # System-level controls
-            system_enabled = self._get_switch_state("switch.crop_steering_system_enabled", True)
-            auto_irrigation_enabled = self._get_switch_state("switch.crop_steering_auto_irrigation_enabled", True)
-            zone_enabled = self._get_switch_state(f"switch.crop_steering_zone_{zone}_enabled", True)
-            
-            if not system_enabled:
-                self.log(f"🛑 Zone {zone} irrigation blocked: System disabled")
-                return {
-                    'status': 'blocked',
-                    'reason': 'system_disabled',
-                    'zone': zone,
-                    'message': 'Crop steering system is disabled'
-                }
-            
-            if not auto_irrigation_enabled and shot_type != 'manual':
-                self.log(f"🛑 Zone {zone} irrigation blocked: Auto irrigation disabled")
-                return {
-                    'status': 'blocked',
-                    'reason': 'auto_irrigation_disabled',
-                    'zone': zone,
-                    'message': 'Automatic irrigation is disabled'
-                }
-            
-            if not zone_enabled:
-                self.log(f"🛑 Zone {zone} irrigation blocked: Zone disabled")
-                return {
-                    'status': 'blocked',
-                    'reason': 'zone_disabled',
-                    'zone': zone,
-                    'message': f'Zone {zone} is disabled'
-                }
-            
-            # Tank filling conflict check
-            tank_filling = self._get_switch_state("switch.tank_filling", False)
-            if tank_filling:
-                self.log(f"🛑 Zone {zone} irrigation blocked: Tank filling in progress")
-                return {
-                    'status': 'blocked',
-                    'reason': 'tank_filling',
-                    'zone': zone,
-                    'message': 'Tank filling in progress - irrigation blocked to prevent conflicts'
-                }
-            
-            # CRITICAL SAFETY CHECKS - HIGH PRIORITY 7
-            safety_check = self._check_irrigation_safety_limits(zone, shot_type)
-            if safety_check['blocked']:
-                self.log(f"🚨 Zone {zone} irrigation blocked: {safety_check['reason']}")
-                return {
-                    'status': 'blocked',
-                    'reason': safety_check['reason'],
-                    'zone': zone,
-                    'message': safety_check['message']
-                }
-            
-            # All override checks passed - proceed with irrigation
-            self.irrigation_in_progress = True
-            start_time = datetime.now()
-            
-            # Record pre-irrigation VWC
-            pre_vwc = self._get_zone_average_vwc(zone)
-            
-            # Hardware sequence: Pump -> Main Line -> Zone Valve
-            # Check hardware configuration with error handling
+        async with self._irrigation_lock:
+            pump_entity = None
+            main_line_entity = None
+            zone_entity = None
+            pump_on = False
+            main_line_on = False
+            zone_on = False
+
             try:
-                pump_entity = self.config['hardware']['pump_master']
-                main_line_entity = self.config['hardware']['main_line']
-                zone_entity = self.config['hardware']['zone_valves'][zone]
-                
-                # Validate entities exist and are not None/empty
-                if not pump_entity or not main_line_entity or not zone_entity:
+                if self.irrigation_in_progress:
+                    self.log("⚠️ Irrigation already in progress - skipping")
+                    return {'status': 'skipped', 'reason': 'already_in_progress'}
+
+                has_conflicts = await self._check_zone_conflicts(zone)
+                if has_conflicts:
+                    self.log(f"🚫 Zone {zone} irrigation blocked: conflict detected")
+                    return {
+                        'status': 'blocked',
+                        'reason': 'zone_conflict',
+                        'zone': zone,
+                        'message': f'Zone {zone} conflicts with active irrigation constraints'
+                    }
+
+                # MANUAL OVERRIDE CHECKS - Critical user control functionality
+                zone_manual_override = self._get_switch_state(f"switch.crop_steering_zone_{zone}_manual_override", False)
+                if zone_manual_override:
+                    self.log(f"🛑 Zone {zone} irrigation blocked: Manual override active")
+                    return {
+                        'status': 'blocked',
+                        'reason': 'manual_override',
+                        'zone': zone,
+                        'message': f'Zone {zone} manual override is active - irrigation bypassed'
+                    }
+
+                # System-level controls
+                system_enabled = self._get_switch_state("switch.crop_steering_system_enabled", True)
+                auto_irrigation_enabled = self._get_switch_state("switch.crop_steering_auto_irrigation_enabled", True)
+                zone_enabled = self._get_switch_state(f"switch.crop_steering_zone_{zone}_enabled", True)
+
+                if not system_enabled:
+                    self.log(f"🛑 Zone {zone} irrigation blocked: System disabled")
+                    return {
+                        'status': 'blocked',
+                        'reason': 'system_disabled',
+                        'zone': zone,
+                        'message': 'Crop steering system is disabled'
+                    }
+
+                if not auto_irrigation_enabled and shot_type != 'manual':
+                    self.log(f"🛑 Zone {zone} irrigation blocked: Auto irrigation disabled")
+                    return {
+                        'status': 'blocked',
+                        'reason': 'auto_irrigation_disabled',
+                        'zone': zone,
+                        'message': 'Automatic irrigation is disabled'
+                    }
+
+                if not zone_enabled:
+                    self.log(f"🛑 Zone {zone} irrigation blocked: Zone disabled")
+                    return {
+                        'status': 'blocked',
+                        'reason': 'zone_disabled',
+                        'zone': zone,
+                        'message': f'Zone {zone} is disabled'
+                    }
+
+                # Tank filling conflict check
+                tank_filling = self._get_switch_state("switch.tank_filling", False)
+                if tank_filling:
+                    self.log(f"🛑 Zone {zone} irrigation blocked: Tank filling in progress")
+                    return {
+                        'status': 'blocked',
+                        'reason': 'tank_filling',
+                        'zone': zone,
+                        'message': 'Tank filling in progress - irrigation blocked to prevent conflicts'
+                    }
+
+                # Safety checks
+                safety_check = self._check_irrigation_safety_limits(zone, shot_type)
+                if safety_check['blocked']:
+                    self.log(f"🚨 Zone {zone} irrigation blocked: {safety_check['reason']}")
+                    return {
+                        'status': 'blocked',
+                        'reason': safety_check['reason'],
+                        'zone': zone,
+                        'message': safety_check['message']
+                    }
+
+                self.irrigation_in_progress = True
+                await self._publish_status(
+                    status='irrigating',
+                    message=f'Zone {zone} irrigation started ({duration}s, {shot_type})'
+                )
+                start_time = datetime.now()
+                pre_vwc = self._get_zone_average_vwc(zone)
+
+                try:
+                    pump_entity = self.config['hardware']['pump_master']
+                    main_line_entity = self.config['hardware']['main_line']
+                    zone_entity = self._get_zone_valve_entity(zone)
+
                     missing_entities = []
                     if not pump_entity:
                         missing_entities.append('pump_master')
@@ -2159,115 +2354,126 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         missing_entities.append('main_line')
                     if not zone_entity:
                         missing_entities.append(f'zone_{zone}_valve')
-                    
-                    self.log(f"🚨 Hardware configuration error: Missing entities {missing_entities}", level="ERROR")
+                    if missing_entities:
+                        self.log(f"🚨 Hardware configuration error: Missing entities {missing_entities}", level="ERROR")
+                        return {
+                            'status': 'error',
+                            'reason': 'hardware_configuration_missing',
+                            'zone': zone,
+                            'message': f'Hardware entities not configured: {missing_entities}. Please check crop_steering.env configuration.'
+                        }
+
+                except KeyError as e:
+                    self.log(f"🚨 Hardware configuration error: Missing key {e}", level="ERROR")
                     return {
                         'status': 'error',
-                        'reason': 'hardware_configuration_missing',
+                        'reason': 'hardware_configuration_incomplete',
                         'zone': zone,
-                        'message': f'Hardware entities not configured: {missing_entities}. Please check crop_steering.env configuration.'
+                        'message': f'Hardware configuration incomplete: {e}. Please check crop_steering.env configuration.'
                     }
-                    
-            except KeyError as e:
-                self.log(f"🚨 Hardware configuration error: Missing key {e}", level="ERROR")
-                return {
-                    'status': 'error',
-                    'reason': 'hardware_configuration_incomplete',
+
+                # Turn on sequence
+                await self.call_service('switch/turn_on', entity_id=pump_entity)
+                pump_on = True
+                await asyncio.sleep(2)
+
+                await self.call_service('switch/turn_on', entity_id=main_line_entity)
+                main_line_on = True
+                await asyncio.sleep(1)
+
+                await self.call_service('switch/turn_on', entity_id=zone_entity)
+                zone_on = True
+
+                self.log(f"💧 Irrigation started: Zone {zone}, {duration}s, Type: {shot_type}")
+                await asyncio.sleep(duration)
+
+                # Turn off sequence
+                await self.call_service('switch/turn_off', entity_id=zone_entity)
+                zone_on = False
+                await asyncio.sleep(1)
+
+                await self.call_service('switch/turn_off', entity_id=main_line_entity)
+                main_line_on = False
+                await asyncio.sleep(1)
+
+                await self.call_service('switch/turn_off', entity_id=pump_entity)
+                pump_on = False
+
+                end_time = datetime.now()
+                actual_duration = (end_time - start_time).total_seconds()
+
+                await asyncio.sleep(30)
+                post_vwc = self._get_zone_average_vwc(zone)
+
+                irrigation_result = {
+                    'status': 'completed',
                     'zone': zone,
-                    'message': f'Hardware configuration incomplete: {e}. Please check crop_steering.env configuration.'
+                    'duration_requested': duration,
+                    'duration_actual': actual_duration,
+                    'shot_type': shot_type,
+                    'start_time': start_time.isoformat(),
+                    'end_time': end_time.isoformat(),
+                    'pre_vwc': pre_vwc,
+                    'post_vwc': post_vwc,
+                    'vwc_improvement': post_vwc - pre_vwc if pre_vwc is not None and post_vwc is not None else 0,
+                    'efficiency': min((post_vwc - pre_vwc) / duration * 100, 1.0) if pre_vwc is not None and post_vwc is not None else 0.5
                 }
+
+                self.last_irrigation_time = end_time
+                self.irrigation_in_progress = False
+
+                if zone in self.zone_phase_data:
+                    self.zone_phase_data[zone]['last_irrigation_time'] = end_time
+
+                machine = self.zone_state_machines.get(zone)
+                if machine and machine.state.current_phase == IrrigationPhase.P1_RAMP_UP:
+                    shot_size = (duration / 60.0) * 2.0
+                    machine.record_p1_shot(shot_size, pre_vwc or 0, post_vwc or 0)
+                elif machine and machine.state.current_phase == IrrigationPhase.P2_MAINTENANCE:
+                    machine.record_p2_irrigation()
+                elif machine and machine.state.current_phase == IrrigationPhase.P3_PRE_LIGHTS_OFF:
+                    machine.record_p3_emergency()
+
+                await self._update_zone_water_usage(zone, duration)
+                self._save_persistent_state()
+                self.fire_event('crop_steering_irrigation_shot', **irrigation_result)
+
+                pre_vwc_str = f"{pre_vwc:.1f}%" if pre_vwc is not None else "N/A"
+                post_vwc_str = f"{post_vwc:.1f}%" if post_vwc is not None else "N/A"
+                self.log(f"✅ Irrigation completed: Zone {zone}, {actual_duration:.1f}s, VWC: {pre_vwc_str} → {post_vwc_str}")
+                await self._publish_status(
+                    status='safe_idle',
+                    message=f'Zone {zone} irrigation completed ({actual_duration:.1f}s)'
+                )
+
+                return irrigation_result
+
             except Exception as e:
-                self.log(f"🚨 Hardware configuration error: {e}", level="ERROR")
-                return {
-                    'status': 'error',
-                    'reason': 'hardware_configuration_error',
-                    'zone': zone,
-                    'message': f'Hardware configuration error: {e}'
-                }
-            
-            # Turn on pump
-            await self.call_service('switch/turn_on', entity_id=pump_entity)
-            await asyncio.sleep(2)  # Allow pump to prime
-            
-            # Turn on main line
-            await self.call_service('switch/turn_on', entity_id=main_line_entity)
-            await asyncio.sleep(1)  # Allow pressure to build
-            
-            # Turn on zone valve
-            await self.call_service('switch/turn_on', entity_id=zone_entity)
-            
-            # Log irrigation start
-            self.log(f"💧 Irrigation started: Zone {zone}, {duration}s, Type: {shot_type}")
-            
-            # Wait for irrigation duration
-            await asyncio.sleep(duration)
-            
-            # Turn off in reverse order: Zone -> Main Line -> Pump
-            await self.call_service('switch/turn_off', entity_id=zone_entity)
-            await asyncio.sleep(1)
-            await self.call_service('switch/turn_off', entity_id=main_line_entity)
-            await asyncio.sleep(1)
-            await self.call_service('switch/turn_off', entity_id=pump_entity)
-            
-            end_time = datetime.now()
-            actual_duration = (end_time - start_time).total_seconds()
-            
-            # Record post-irrigation VWC (wait a bit for absorption)
-            await asyncio.sleep(30)
-            post_vwc = self._get_zone_average_vwc(zone)
-            
-            # Calculate results
-            irrigation_result = {
-                'status': 'completed',
-                'zone': zone,
-                'duration_requested': duration,
-                'duration_actual': actual_duration,
-                'shot_type': shot_type,
-                'start_time': start_time.isoformat(),
-                'end_time': end_time.isoformat(),
-                'pre_vwc': pre_vwc,
-                'post_vwc': post_vwc,
-                'vwc_improvement': post_vwc - pre_vwc if pre_vwc and post_vwc else 0,
-                'efficiency': min((post_vwc - pre_vwc) / duration * 100, 1.0) if pre_vwc and post_vwc else 0.5
-            }
-            
-            self.last_irrigation_time = end_time
-            self.irrigation_in_progress = False
-            
-            # Update zone-specific last irrigation time
-            if zone in self.zone_phase_data:
-                self.zone_phase_data[zone]['last_irrigation_time'] = end_time
-            
-            # Record P1 shot if in P1 phase
-            machine = self.zone_state_machines.get(zone)
-            if machine and machine.state.current_phase == IrrigationPhase.P1_RAMP_UP:
-                # Calculate shot size as % of substrate volume
-                shot_size = (duration / 60.0) * 2.0  # Rough estimate: 2% per minute
-                machine.record_p1_shot(shot_size, pre_vwc or 0, post_vwc or 0)
-            elif machine and machine.state.current_phase == IrrigationPhase.P2_MAINTENANCE:
-                machine.record_p2_irrigation()
-            elif machine and machine.state.current_phase == IrrigationPhase.P3_PRE_LIGHTS_OFF:
-                machine.record_p3_emergency()
-            
-            # Update water usage tracking
-            await self._update_zone_water_usage(zone, duration)
-            
-            # Save state after irrigation (critical event)
-            self._save_persistent_state()
-            
-            # Fire irrigation event
-            self.fire_event('crop_steering_irrigation_shot', **irrigation_result)
-            
-            self.log(f"✅ Irrigation completed: Zone {zone}, {actual_duration:.1f}s, "
-                    f"VWC: {pre_vwc:.1f}% → {post_vwc:.1f}%")
-            
-            return irrigation_result
-            
-        except Exception as e:
-            self.irrigation_in_progress = False
-            await self._emergency_stop()
-            self.log(f"❌ Error during irrigation: {e}", level='ERROR')
-            return {'status': 'error', 'error': str(e)}
+                self.irrigation_in_progress = False
+                await self._emergency_stop()
+                self.log(f"❌ Error during irrigation: {e}", level='ERROR')
+                await self._publish_status(status='error', message=f'Irrigation error in zone {zone}: {e}')
+                return {'status': 'error', 'error': str(e)}
+
+            finally:
+                self.irrigation_in_progress = False
+                try:
+                    if zone_on and zone_entity:
+                        await self.call_service('switch/turn_off', entity_id=zone_entity)
+                except Exception as off_error:
+                    self.log(f"⚠️ Failed to force-off zone valve in finally: {off_error}", level='WARNING')
+
+                try:
+                    if main_line_on and main_line_entity:
+                        await self.call_service('switch/turn_off', entity_id=main_line_entity)
+                except Exception as off_error:
+                    self.log(f"⚠️ Failed to force-off main line in finally: {off_error}", level='WARNING')
+
+                try:
+                    if pump_on and pump_entity:
+                        await self.call_service('switch/turn_off', entity_id=pump_entity)
+                except Exception as off_error:
+                    self.log(f"⚠️ Failed to force-off pump in finally: {off_error}", level='WARNING')
 
     def _get_zone_average_vwc(self, zone: int) -> Optional[float]:
         """Get average VWC for specific zone with robust error handling."""
@@ -2280,7 +2486,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 self.log(f"⚠️ No VWC sensors configured for zone {zone}", level='WARNING')
                 return None
             
-            zone_sensors = [s for s in vwc_sensors if f'r{zone}' in s]
+            zone_sensors = [s for s in vwc_sensors if self._sensor_matches_zone(s, zone)]
             
             if not zone_sensors:
                 self.log(f"⚠️ No VWC sensors found for zone {zone}", level='DEBUG')
@@ -2499,7 +2705,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Try to get zone VWC from sensor fusion results instead of direct sensor reading
             # Look for zone-specific sensor fusion data
             for zone_num in range(1, self.num_zones + 1):
-                zone_sensors = [s for s in self.config['sensors']['vwc'] if f'r{zone_num}' in s or f'z{zone_num}' in s]
+                zone_sensors = [s for s in self.config['sensors']['vwc'] if self._sensor_matches_zone(s, zone_num)]
                 zone_values = []
                 
                 for sensor in zone_sensors:
@@ -2588,10 +2794,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             if 'sensors' in self.config and 'vwc' in self.config['sensors']:
                 for sensor in self.config['sensors']['vwc']:
                     # Check if sensor belongs to this zone (various naming patterns)
-                    if (f'_zone_{zone_num}_' in sensor or 
-                        f'_z{zone_num}_' in sensor or 
-                        f'_r{zone_num}_' in sensor or
-                        f'zone{zone_num}' in sensor.lower()):
+                    if self._sensor_matches_zone(sensor, zone_num):
                         zone_vwc_sensors.append(sensor)
             
             # Average values from zone sensors
@@ -2674,7 +2877,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _get_zone_ec(self, zone_num: int) -> Optional[float]:
         """Get average EC for specific zone."""
         try:
-            zone_sensors = [s for s in self.config['sensors']['ec'] if f'r{zone_num}' in s or f'z{zone_num}' in s or f'zone_{zone_num}' in s.lower()]
+            zone_sensors = [s for s in self.config['sensors']['ec'] if self._sensor_matches_zone(s, zone_num)]
             if not zone_sensors:
                 # Try integration sensor as fallback
                 integration_sensor = f"sensor.crop_steering_ec_zone_{zone_num}"
@@ -2902,7 +3105,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
             zone_data['p1_shot_history'] = shot_history
             
             # Log progression
-            self.log(f"📊 Zone {zone_num} P1 progression updated: shot {zone_data['p1_shot_count']}, size {shot_size:.1f}%, VWC before: {vwc_before:.1f}%")
+            vwc_before_str = f"{vwc_before:.1f}%" if vwc_before is not None else "N/A"
+            self.log(f"📊 Zone {zone_num} P1 progression updated: shot {zone_data['p1_shot_count']}, size {shot_size:.1f}%, VWC before: {vwc_before_str}")
             
         except Exception as e:
             self.log(f"❌ Error updating P1 progression: {e}", level='ERROR')
@@ -3668,11 +3872,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 analysis = predictions.get('analysis', {})
                 
                 self.set_entity_value('sensor.crop_steering_ml_irrigation_need',
-                              state=analysis.get('max_irrigation_need', 0),
+                              analysis.get('max_irrigation_need', 0),
                               attributes=predictions)
                 
                 self.set_entity_value('sensor.crop_steering_ml_confidence',
-                              state=predictions.get('model_confidence', 0))
+                              predictions.get('model_confidence', 0))
                 
                 # Log significant predictions
                 urgency = analysis.get('irrigation_urgency', 'moderate')
@@ -3690,7 +3894,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Update HA entities
             self.set_entity_value('sensor.crop_steering_sensor_health',
-                          state=health_report['healthy_sensors'],
+                          health_report['healthy_sensors'],
                           attributes=health_report)
             
             # Alert on issues
@@ -3699,6 +3903,23 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             if faulty_sensors > 0 or offline_sensors > 0:
                 self.log(f"⚠️ Sensor issues: {faulty_sensors} faulty, {offline_sensors} offline", level='WARNING')
+
+            # Fail-safe: if all VWC sensors are offline while irrigation hardware is active, emergency stop
+            configured_vwc_sensors = self.config.get('sensors', {}).get('vwc', [])
+            vwc_total = len(configured_vwc_sensors)
+            vwc_online = 0
+            for sensor in configured_vwc_sensors:
+                sensor_state = self.get_entity_value(sensor)
+                if sensor_state not in ['unknown', 'unavailable', None]:
+                    vwc_online += 1
+
+            if vwc_total > 0 and vwc_online == 0 and self._is_any_irrigation_hardware_on():
+                self.log("🚨 Watchdog fail-safe: all sensors offline while hardware is ON, executing emergency stop", level='ERROR')
+                await self._publish_status(
+                    status='error',
+                    message='All sensors offline while irrigation active; emergency stop executed'
+                )
+                await self._emergency_stop()
             
             # Update individual sensor entities
             for sensor_id, sensor_data in health_report['sensors'].items():
@@ -3707,6 +3928,34 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
         except Exception as e:
             self.log(f"❌ Error monitoring sensor health: {e}", level='ERROR')
+
+    async def _watchdog_check(self, kwargs):
+        """Periodic watchdog to catch state/hardware mismatches and enforce safe state."""
+        try:
+            hardware_on = self._is_any_irrigation_hardware_on()
+            if self.irrigation_in_progress and not hardware_on:
+                self.log("⚠️ Watchdog: irrigation_in_progress=True but all hardware OFF. Resetting state.", level='WARNING')
+                self.irrigation_in_progress = False
+                await self._publish_status(status='safe_idle', message='Watchdog corrected stale irrigation state')
+                return
+
+            if (not self.irrigation_in_progress) and hardware_on:
+                self.log("🚨 Watchdog: hardware ON while irrigation_in_progress=False. Executing emergency stop.", level='ERROR')
+                await self._publish_status(
+                    status='error',
+                    message='Hardware on outside irrigation context; emergency stop executed'
+                )
+                await self._emergency_stop()
+                return
+
+            # Healthy idle/running status heartbeat
+            if hardware_on:
+                await self._publish_status(status='irrigating', message='Watchdog heartbeat: hardware active')
+            else:
+                await self._publish_status(status='safe_idle', message='Watchdog heartbeat: all hardware off')
+
+        except Exception as e:
+            self.log(f"❌ Error in watchdog check: {e}", level='ERROR')
 
     async def _update_performance_analytics(self, kwargs):
         """Update system performance analytics."""
@@ -3792,7 +4041,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         try:
             # Update current decision entity
             self.set_entity_value('sensor.crop_steering_current_decision',
-                          state=decision['action'],
+                          decision['action'],
                           attributes={
                               'reason': str(decision['reason']),
                               'confidence': float(decision['confidence']),
@@ -3802,7 +4051,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Update system state entity
             self.set_entity_value('sensor.crop_steering_system_state',
-                          state='active' if self.system_enabled else 'disabled',
+                          'active' if self.system_enabled else 'disabled',
                           attributes={
                               'zone_phases': {str(k): str(v) for k, v in self.zone_phases.items()},
                               'irrigation_in_progress': self.irrigation_in_progress,
@@ -3827,7 +4076,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             next_irrigation = self._calculate_next_irrigation_time()
             if next_irrigation:
                 self.set_entity_value('sensor.crop_steering_app_next_irrigation',
-                              state=next_irrigation.isoformat(),
+                              next_irrigation.isoformat(),
                               attributes={
                                   'friendly_name': 'Next Irrigation Time',
                                   'icon': 'mdi:clock-outline',
@@ -3836,7 +4085,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                               })
             else:
                 self.set_entity_value('sensor.crop_steering_app_next_irrigation',
-                              state='unknown',
+                              'unknown',
                               attributes={
                                   'friendly_name': 'Next Irrigation Time',
                                   'icon': 'mdi:clock-outline',
@@ -4294,7 +4543,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Check if any zone in group is already irrigating
             for zone in zones_in_group:
-                zone_valve_entity = self.config['hardware']['zone_valves'].get(zone)
+                zone_valve_entity = self._get_zone_valve_entity(zone)
                 if zone_valve_entity:
                     valve_state = self.get_entity_value(zone_valve_entity)
                     if valve_state == 'on':
@@ -4341,7 +4590,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 total_score = (priority_score * 0.4) + (vwc_need_score * 0.4) + (phase_urgency * 0.2)
                 zone_scores[zone] = total_score
                 
-                self.log(f"🎯 Zone {zone}: Priority={priority} ({priority_score}), VWC={zone_vwc:.1f}% (need={vwc_need_score:.2f}), Phase={zone_phase} (urgency={phase_urgency:.2f}) → Score={total_score:.2f}")
+                zone_vwc_str = f"{zone_vwc:.1f}%" if zone_vwc is not None else "N/A"
+                self.log(f"🎯 Zone {zone}: Priority={priority} ({priority_score}), VWC={zone_vwc_str} (need={vwc_need_score:.2f}), Phase={zone_phase} (urgency={phase_urgency:.2f}) → Score={total_score:.2f}")
             
             # Select zone with highest score
             selected_zone = max(zone_scores, key=zone_scores.get)
@@ -4368,7 +4618,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Check system-wide irrigation limit (prevent too many zones irrigating simultaneously)
             active_irrigation_count = 0
             for zone_num in range(1, self.num_zones + 1):
-                zone_valve_entity = self.config['hardware']['zone_valves'].get(zone_num)
+                zone_valve_entity = self._get_zone_valve_entity(zone_num)
                 if zone_valve_entity:
                     valve_state = self.get_entity_value(zone_valve_entity)
                     if valve_state == 'on':
@@ -4417,7 +4667,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         group_phases.append(f"Z{zone}:{zone_phase}")
                         
                         # Irrigation status
-                        zone_valve_entity = self.config['hardware']['zone_valves'].get(zone)
+                        zone_valve_entity = self._get_zone_valve_entity(zone)
                         if zone_valve_entity:
                             valve_state = self.get_entity_value(zone_valve_entity)
                             if valve_state == 'on':
@@ -4751,7 +5001,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # System performance entities
             perf = analytics_data.get('system_performance', {})
             self.set_entity_value('sensor.crop_steering_system_health_score',
-                          state=perf.get('system_health_score', 0),
+                          perf.get('system_health_score', 0),
                           attributes={
                               'uptime_hours': perf.get('uptime_hours', 0),
                               'active_zones': perf.get('active_zones', 0),
@@ -4761,19 +5011,19 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Irrigation analytics entities
             irrig = analytics_data.get('irrigation_analytics', {})
             self.set_entity_value('sensor.crop_steering_daily_water_usage',
-                          state=irrig.get('total_daily_water_liters', 0),
+                          irrig.get('total_daily_water_liters', 0),
                           attributes=irrig)
             
             # Sensor analytics entities
             sensor = analytics_data.get('sensor_analytics', {})
             self.set_entity_value('sensor.crop_steering_sensor_health',
-                          state=sensor.get('overall_sensor_health', 0),
+                          sensor.get('overall_sensor_health', 0),
                           attributes=sensor)
             
             # Efficiency metrics entities
             efficiency = analytics_data.get('efficiency_metrics', {})
             self.set_entity_value('sensor.crop_steering_system_efficiency',
-                          state=efficiency.get('system_efficiency_score', 0),
+                          efficiency.get('system_efficiency_score', 0),
                           attributes=efficiency)
             
             # Zone analytics entities
@@ -4783,12 +5033,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 
                 # Create zone health sensor
                 self.set_entity_value(f'sensor.crop_steering_zone_{zone_num}_health_score',
-                              state=zone_data.get('health_score', 0),
+                              zone_data.get('health_score', 0),
                               attributes=zone_data)
                 
                 # Create zone efficiency sensor
                 self.set_entity_value(f'sensor.crop_steering_zone_{zone_num}_efficiency',
-                              state=zone_data.get('efficiency_score', 0),
+                              zone_data.get('efficiency_score', 0),
                               attributes={
                                   'daily_water': zone_data.get('daily_water_liters', 0),
                                   'irrigation_count': zone_data.get('daily_irrigation_count', 0)
@@ -4834,7 +5084,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _is_zone_irrigating(self, zone_num: int) -> bool:
         """Check if a zone is currently irrigating."""
         try:
-            zone_valve_entity = self.config['hardware']['zone_valves'].get(zone_num)
+            zone_valve_entity = self._get_zone_valve_entity(zone_num)
             if zone_valve_entity:
                 valve_state = self.get_entity_value(zone_valve_entity)
                 return valve_state == 'on'
@@ -4890,7 +5140,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Update water efficiency sensor
             self.set_entity_value('sensor.crop_steering_water_efficiency',
-                          state=efficiency.get('water_use_efficiency', 0),
+                          efficiency.get('water_use_efficiency', 0),
                           attributes={
                               'automation_rate': efficiency.get('automation_rate_percent', 0),
                               'auto_irrigations': efficiency.get('auto_irrigations_today', 0),
@@ -4909,7 +5159,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             for key, value in predictions.items():
                 if isinstance(value, (int, float)):
                     self.set_entity_value(f'sensor.crop_steering_prediction_{key}',
-                                  state=value,
+                                  value,
                                   attributes={
                                       'updated': datetime.now().isoformat(),
                                       'prediction_type': 'automated'
@@ -5129,7 +5379,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 
                 # Create individual zone safety sensor
                 self.set_entity_value(f'sensor.crop_steering_zone_{zone_num}_safety_status',
-                              state=status,
+                              status,
                               attributes={
                                   'vwc': zone_vwc,
                                   'ec': zone_ec,
@@ -5152,7 +5402,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 system_safety_status = 'warning'
             
             self.set_entity_value('sensor.crop_steering_system_safety_status',
-                          state=system_safety_status,
+                          system_safety_status,
                           attributes={
                               'unsafe_zones': unsafe_zones,
                               'warning_zones': warning_zones,

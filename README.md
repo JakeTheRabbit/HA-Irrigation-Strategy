@@ -62,12 +62,18 @@ The Home Assistant integration creates entities and fires events, but **AppDaemo
 - Performs calculations (shot durations, EC ratio, adjusted thresholds)
 - Fires events that AppDaemon listens to
 
+> **Important integration note:** This repository currently uses a custom integration
+> service/event handshake as the primary GUI↔automation contract. Home Assistant
+> Blueprints are not required for core operation in the current architecture.
+
 **AppDaemon Master App (optional but recommended for automation):**
 - Listens to sensor updates and integration events
 - Makes irrigation decisions based on phase logic and thresholds
 - Sequences hardware safely to prevent damage
 - Manages phase transitions automatically
 - Validates sensor data and detects anomalies
+- Publishes runtime status (`sensor.crop_steering_app_status`) and enforces
+  watchdog fail-safes to force hardware OFF on desync/error conditions
 
 **Configuration sources:**
 - Primary: Integration UI during setup (maps hardware and sensors)
