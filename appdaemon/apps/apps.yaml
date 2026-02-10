@@ -11,6 +11,22 @@ master_crop_steering:
   class: MasterCropSteeringApp
   log: crop_steering_master
   log_level: INFO
+  # Optional explicit config. Safe defaults exist in code, but defining these
+  # keys avoids schema ambiguity and documents expected AppDaemon args.
+  hardware:
+    pump_master: null
+    main_line: null
+    zone_valves: {}
+  sensors:
+    vwc: []
+    ec: []
+    environmental: {}
+  timing:
+    phase_check_interval: 60
+    ml_prediction_interval: 300
+    sensor_health_interval: 120
+  thresholds:
+    emergency_vwc: 40.0
 
 # Advanced Dashboard Application  
 # Provides real-time Athena-style monitoring and analytics
