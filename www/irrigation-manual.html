@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Irrigation System Manual</title>
+<style>
+  @media print {
+    body { font-size: 11pt; color: #000; background: #fff; }
+    .no-print { display: none; }
+    h1 { font-size: 18pt; }
+    h2 { font-size: 14pt; page-break-before: always; }
+    h2:first-of-type { page-break-before: avoid; }
+    h3 { font-size: 12pt; }
+    .card { border: 1px solid #999; page-break-inside: avoid; }
+    a { color: #000; text-decoration: underline; }
+    @page { size: A4; margin: 15mm; }
+  }
+  @media screen {
+    body {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 { color: #4fc3f7; border-bottom: 2px solid #4fc3f7; padding-bottom: 10px; }
+    h2 { color: #81c784; border-bottom: 1px solid #81c784; padding-bottom: 6px; margin-top: 40px; }
+    h3 { color: #ffb74d; }
+    a { color: #4fc3f7; }
+    .card {
+      background: #16213e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 12px 0;
+    }
+    code {
+      background: #0f3460;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    pre {
+      background: #0f3460;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.85em;
+    }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    th, td { border: 1px solid #444; padding: 8px 12px; text-align: left; }
+    th { background: #0f3460; color: #4fc3f7; }
+    tr:nth-child(even) { background: #16213e; }
+    .warning { background: #4a1c1c; border-left: 4px solid #f44336; padding: 12px; margin: 12px 0; border-radius: 4px; }
+    .info { background: #1a3a2a; border-left: 4px solid #4caf50; padding: 12px; margin: 12px 0; border-radius: 4px; }
+    .tip { background: #3a3a1a; border-left: 4px solid #ffb74d; padding: 12px; margin: 12px 0; border-radius: 4px; }
+    .step { counter-increment: step; margin: 8px 0; }
+    .step::before { content: counter(step) ". "; font-weight: bold; color: #4fc3f7; }
+    .steps { counter-reset: step; }
+    .toc a { display: block; padding: 4px 0; text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    .print-btn {
+      position: fixed; bottom: 20px; right: 20px;
+      background: #4fc3f7; color: #000; border: none;
+      padding: 12px 24px; border-radius: 6px; cursor: pointer;
+      font-size: 16px; font-weight: bold; z-index: 100;
+    }
+    .print-btn:hover { background: #81d4fa; }
+  }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">Print Manual</button>
+
+<h1>Irrigation System Manual</h1>
+<p><strong>Version 2.3.1</strong> — Last updated March 2026</p>
+
+<div class="card toc no-print">
+  <h3>Table of Contents</h3>
+  <a href="#overview">1. System Overview</a>
+  <a href="#hardware">2. Hardware Setup</a>
+  <a href="#how-it-works">3. How It All Works</a>
+  <a href="#phases">4. Crop Steering Phases (P0–P3)</a>
+  <a href="#commissioning">5. Commissioning Guide</a>
+  <a href="#daily">6. Day-to-Day Operation</a>
+  <a href="#dashboard">7. Dashboard Guide</a>
+  <a href="#tuning">8. Tuning Your Parameters</a>
+  <a href="#appdaemon">9. AppDaemon Setup (Advanced)</a>
+  <a href="#safety">10. Safety Systems</a>
+  <a href="#troubleshooting">11. Troubleshooting</a>
+  <a href="#entity-ref">12. Entity Reference</a>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="overview">1. System Overview</h2>
+
+<p>The irrigation system automates irrigation for 6 grow tables using sensor-driven decisions. It has three layers:</p>
+
+<div class="card">
+  <h3>Layer 1 — Irrigation Package (runs now)</h3>
+  <p>Time-based irrigation scheduling, environment control (AC, humidity, CO2), and safety watchdogs. This is the production workhorse. It runs entirely inside Home Assistant — no extra software needed.</p>
+</div>
+
+<div class="card">
+  <h3>Layer 2 — Crop Steering Integration (runs now)</h3>
+  <p>Adds 90+ entities for sensor-driven irrigation decisions. Calculates shot sizes, tracks EC ratios, and provides per-zone controls. Installed as a custom component.</p>
+</div>
+
+<div class="card">
+  <h3>Layer 3 — AppDaemon (optional, not yet deployed)</h3>
+  <p>Autonomous phase transitions, advanced dryback detection, and ML-based irrigation prediction. Needs separate setup (see <a href="#appdaemon">Section 9</a>).</p>
+</div>
+
+<h3>The Data Flow</h3>
+<pre>
+Physical probes (ESPHome)
+    ↓
+Raw sensor entities (e.g. sensor.substrate_1_substrate_1_vwc_coco_coir)
+    ↓  [10_mapping.yaml averages + rounds values]
+GW contract entities (e.g. sensor.gw_table_1_vwc)
+    ↓  [crop_steering.env tells the integration where to look]
+Crop Steering entities (e.g. sensor.zone_1_vwc)
+</pre>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="hardware">2. Hardware Setup</h2>
+
+<h3>What's Connected</h3>
+<table>
+  <tr><th>Device</th><th>What It Does</th><th>Connection</th></tr>
+  <tr><td>KC868 E16S relay board</td><td>Controls all valves (6 tables + mains + mainline + manifold)</td><td>Ethernet (ESPHome)</td></tr>
+  <tr><td>6x Substrate probes</td><td>Measure VWC, EC, and temperature per table</td><td>SDI-12 via Ethernet (ESPHome)</td></tr>
+  <tr><td>4x Environmental sensors</td><td>Room temperature and humidity</td><td>Ethernet (ESPHome)</td></tr>
+  <tr><td>3x CO2 sensors</td><td>CO2 levels + VPD</td><td>Ethernet (ESPHome)</td></tr>
+  <tr><td>4x AC units</td><td>Temperature control</td><td>IR via ESPHome</td></tr>
+  <tr><td>CO2 solenoid</td><td>CO2 injection during lights-on</td><td>Solid state relay (ESPHome)</td></tr>
+  <tr><td>Humidifier</td><td>Raise humidity</td><td>Solid state relay (ESPHome)</td></tr>
+  <tr><td>4x Dehumidifier relays</td><td>Lower humidity</td><td>Relay board (ESPHome)</td></tr>
+  <tr><td>Grow lights</td><td>Light group for all tables</td><td>ESPHome</td></tr>
+</table>
+
+<h3>Water Flow Path</h3>
+<pre>
+Nutrient Tank
+    ↓
+[switch.mainline opens] → Pressure switch auto-starts pump
+    ↓
+Mainline pipe
+    ↓
+[switch.table_N opens] → Water flows to table N's drippers
+    ↓
+Drippers → Plants → Substrate → Runoff
+</pre>
+
+<div class="info">
+  <strong>No pump switch needed.</strong> The pump starts automatically when the mainline valve opens (pressure switch). That's why <code>PUMP_SWITCH</code> is blank in the config.
+</div>
+
+<h3>Not Yet Connected</h3>
+<table>
+  <tr><th>Sensor/Device</th><th>What It Does</th><th>Impact If Missing</th></tr>
+  <tr><td>Tank low float switch</td><td>Detects low water level</td><td style="color:#f44336">Tank-low safety abort won't trigger</td></tr>
+  <tr><td>Leak sensor</td><td>Detects water leaks</td><td style="color:#f44336">Leak safety abort won't trigger</td></tr>
+  <tr><td>Tank pH probe</td><td>Monitors nutrient pH</td><td>pH shows "Unavailable" on dashboard</td></tr>
+  <tr><td>Tank EC probe</td><td>Monitors nutrient EC</td><td>EC shows "Unavailable" on dashboard</td></tr>
+  <tr><td>Leaf temp sensor</td><td>Accurate VPD calculation</td><td>Falls back to room air temp</td></tr>
+</table>
+
+<div class="warning">
+  <strong>Safety Warning:</strong> Until the tank float switch and leak sensor are installed, the emergency abort automations for tank-low and leak detection are disabled (hardcoded to "safe"). Install these sensors before relying on the system unattended.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="how-it-works">3. How It All Works</h2>
+
+<h3>The Irrigation Cycle</h3>
+<p>Every cycle follows this sequence:</p>
+
+<div class="steps card">
+  <div class="step">The scheduler checks: Is the system enabled? Is it within the irrigation window? Has enough time passed since the last run?</div>
+  <div class="step">If yes, it opens the <strong>mainline valve</strong> (which auto-starts the pump via the pressure switch) and waits 2 seconds.</div>
+  <div class="step">For each enabled table (1 through 6, one at a time): opens the table valve, runs water for the configured duration, closes the valve, waits 3 seconds.</div>
+  <div class="step">After all tables are done, closes the mainline valve (pump stops).</div>
+</div>
+
+<div class="info">
+  <strong>Mains water</strong> and <strong>manifold</strong> are for <em>tank filling and mixing only</em> — they are NOT part of the irrigation cycle. Only the mainline valve opens during feeding.
+</div>
+
+<h3>What Controls the Cycle</h3>
+<table>
+  <tr><th>Setting</th><th>Where to Change It</th><th>Default</th></tr>
+  <tr><td>Irrigation window start</td><td>Schedule tab → Window Start</td><td>Set in HA</td></tr>
+  <tr><td>Irrigation window end</td><td>Schedule tab → Window End</td><td>Set in HA</td></tr>
+  <tr><td>Time between cycles</td><td>Schedule tab → Interval</td><td>60 minutes</td></tr>
+  <tr><td>Duration per table</td><td>Schedule tab → Duration</td><td>60 seconds</td></tr>
+  <tr><td>Which tables are active</td><td>Zone Control tab → Enabled toggle per table</td><td>All off</td></tr>
+  <tr><td>Master on/off</td><td>Command Center → GW System</td><td>Off</td></tr>
+</table>
+
+<h3>Environment Control</h3>
+<p>The system also manages grow room climate:</p>
+<ul>
+  <li><strong>Dehumidifiers:</strong> Turn on when humidity is 5% above target, off when 2% below target. 4 relays stagger on with 10-second delays.</li>
+  <li><strong>Humidifier:</strong> Turns on when humidity is 5% below target, off when 2% above.</li>
+  <li><strong>CO2:</strong> Injects when CO2 is 50ppm below target, stops at 50ppm above. Only during lights-on. Auto-closes at lights-off.</li>
+  <li><strong>Temperature:</strong> Managed by AC units. Day and night targets are separate.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="phases">4. Crop Steering Phases (P0–P3)</h2>
+
+<p>Crop steering divides each day into 4 phases based on substrate moisture and light cycle. The goal is to control how plants use water and nutrients.</p>
+
+<div class="card">
+  <h3>P0 — Morning Dryback</h3>
+  <p><strong>When:</strong> Lights turn on → First irrigation shot</p>
+  <p><strong>What happens:</strong> No watering. The substrate dries down from overnight levels.</p>
+  <p><strong>Why:</strong> A controlled dry-down signals the plant to focus on root growth (vegetative) or fruit production (generative).</p>
+  <p><strong>Moves to P1 when:</strong> VWC drops by the target percentage (vegetative: 50%, generative: 40%), or max wait time (120 min) expires.</p>
+</div>
+
+<div class="card">
+  <h3>P1 — Ramp-Up</h3>
+  <p><strong>When:</strong> After dryback target reached → VWC reaches field capacity target</p>
+  <p><strong>What happens:</strong> Progressive irrigation shots. Starts small (2% of substrate volume), increases by 0.5% each shot.</p>
+  <p><strong>Why:</strong> Gradually rehydrates the substrate without causing runoff or flushing nutrients.</p>
+  <p><strong>Settings:</strong> 15 min between shots, max 10 shots, target VWC 65%.</p>
+  <p><strong>Moves to P2 when:</strong> Target VWC reached or max shots hit.</p>
+</div>
+
+<div class="card">
+  <h3>P2 — Maintenance</h3>
+  <p><strong>When:</strong> Field capacity reached → Before lights-off</p>
+  <p><strong>What happens:</strong> Fixed-size maintenance shots whenever VWC drops below threshold (60%).</p>
+  <p><strong>Smart EC adjustment:</strong> If EC is too high (ratio &gt; 1.2), the threshold rises — triggering more frequent irrigation to flush salts. If EC is too low (ratio &lt; 0.8), threshold drops — letting the substrate dry more to concentrate nutrients.</p>
+  <p><strong>Moves to P3 when:</strong> Approaching lights-off time.</p>
+</div>
+
+<div class="card">
+  <h3>P3 — Pre-Lights-Off</h3>
+  <p><strong>When:</strong> 2–3 hours before lights off → Lights off</p>
+  <p><strong>What happens:</strong> No scheduled irrigation. Emergency-only shots if VWC drops below 40%.</p>
+  <p><strong>Why:</strong> Allows a controlled overnight dryback for the next day's P0.</p>
+  <p><strong>Moves to P0 when:</strong> Lights turn on next day.</p>
+</div>
+
+<div class="tip">
+  <strong>Vegetative vs Generative steering:</strong> Vegetative mode uses longer drybacks and lower EC targets — encouraging root and leaf growth. Generative mode uses shorter drybacks and higher EC — pushing the plant toward flowering and fruit production.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="commissioning">5. Commissioning Guide</h2>
+
+<p>Follow these steps to get the system running from scratch.</p>
+
+<h3>Step 1: Verify Hardware Connections</h3>
+<div class="steps card">
+  <div class="step">Go to <strong>Settings → Devices &amp; Services → ESPHome</strong>. Confirm all 6 substrate sensors, KC868 relay board, environmental sensors, and CO2 sensors show as "Online".</div>
+  <div class="step">Go to <strong>Developer Tools → States</strong>. Search for <code>sensor.gw_table_1_vwc</code>. You should see a number (e.g. 47.4). Check all 6 tables.</div>
+  <div class="step">Search for <code>sensor.gw_room_1_temp</code>. Should show room temperature. Also check <code>sensor.gw_room_1_rh</code> and <code>sensor.gw_room_1_co2</code>.</div>
+  <div class="step">Test each valve manually: Go to <strong>Developer Tools → Services</strong>, select <code>switch.turn_on</code>, target <code>switch.gw_table_1_valve</code>. You should hear the valve click. Turn it off immediately after confirming. Repeat for all 6 tables.</div>
+  <div class="step">Test infrastructure: Briefly toggle <code>switch.gw_mainline</code> on — you should hear the pump start. Turn off immediately.</div>
+</div>
+
+<div class="warning">
+  <strong>Before testing valves:</strong> Make sure your nutrient tank has water and the system is plumbed correctly. Have someone at the tables to confirm water is reaching the right place.
+</div>
+
+<h3>Step 2: Configure the Irrigation Window</h3>
+<div class="steps card">
+  <div class="step">Go to the <strong>Irrigation → Schedule</strong> tab.</div>
+  <div class="step">Set <strong>Window Start</strong> to when you want irrigation to be allowed (e.g. 08:30 — 30 min after lights on).</div>
+  <div class="step">Set <strong>Window End</strong> to when irrigation should stop (e.g. 18:00 — 2 hours before lights off).</div>
+  <div class="step">Set <strong>Interval</strong> to how often cycles run (start with 60 minutes).</div>
+  <div class="step">Set <strong>Duration</strong> to how long each table runs per cycle (start with 60 seconds).</div>
+</div>
+
+<h3>Step 3: Enable the System</h3>
+<div class="steps card">
+  <div class="step">Go to the <strong>Command Center</strong> tab.</div>
+  <div class="step">Turn <strong>Maintenance Mode OFF</strong> (the toggle should be off/grey).</div>
+  <div class="step">Turn <strong>GW System ON</strong>.</div>
+  <div class="step">Go to <strong>Zone Control</strong> tab. Enable each table you want to irrigate by toggling <strong>Enabled</strong> on.</div>
+  <div class="step">Watch the <strong>System Ready</strong> indicator on the Command Center. It should show a green check mark.</div>
+</div>
+
+<h3>Step 4: Test an Irrigation Cycle</h3>
+<div class="steps card">
+  <div class="step">Go to <strong>Developer Tools → Services</strong>.</div>
+  <div class="step">Select service <code>script.gw_run_irrigation_cycle</code>.</div>
+  <div class="step">Click <strong>Call Service</strong>.</div>
+  <div class="step">Watch the <strong>Zone Control</strong> tab — you should see valves open and close one by one.</div>
+  <div class="step">Check that water reached each enabled table.</div>
+</div>
+
+<h3>Step 5: Set Environment Targets</h3>
+<div class="steps card">
+  <div class="step">Go to the <strong>Environment</strong> tab.</div>
+  <div class="step">Set <strong>Day/Night Temperature targets</strong> (e.g. Day: 26°C, Night: 22°C).</div>
+  <div class="step">Set <strong>Day/Night Humidity targets</strong> (e.g. Day: 60%, Night: 55%).</div>
+  <div class="step">Set <strong>CO2 target</strong> (e.g. 1200 ppm).</div>
+  <div class="step">Verify the AC units, dehumidifiers, and CO2 solenoid respond correctly.</div>
+</div>
+
+<h3>Step 6: Configure Crop Steering (Optional)</h3>
+<div class="steps card">
+  <div class="step">Go to <strong>Command Center → Crop Steering</strong> section.</div>
+  <div class="step">Set <strong>Steering Mode</strong>: "Vegetative" for veg growth, "Generative" for flower.</div>
+  <div class="step">Set <strong>Crop Type</strong>: "Cannabis_Athena" is preconfigured with Athena nutrient targets.</div>
+  <div class="step">Review shot calculations — P1/P2/P3 durations should show non-zero values. If they show 0.0s, check that substrate volume and dripper flow rate are set (see <a href="#tuning">Tuning</a>).</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="daily">6. Day-to-Day Operation</h2>
+
+<h3>Normal Operation Checklist</h3>
+<ul>
+  <li>Check the <strong>Command Center</strong> — all 6 tables should show VWC values between 30-70%.</li>
+  <li>EC values should be in your target range (typically 2-6 mS/cm depending on stage).</li>
+  <li>Substrate temps should be 20-26°C.</li>
+  <li>Safety indicators should all be green/OK.</li>
+  <li>Check the <strong>Trends</strong> tab — VWC graphs should show a sawtooth pattern (gradual drop, sharp rise from irrigation).</li>
+</ul>
+
+<h3>Changing What Gets Watered</h3>
+<p>Go to <strong>Zone Control</strong> and toggle the <strong>Enabled</strong> switch for each table. Disabled tables are skipped during irrigation cycles.</p>
+
+<h3>Emergency Stop</h3>
+<p>If anything goes wrong:</p>
+<ul>
+  <li>Toggle <strong>Maintenance Mode ON</strong> in the Command Center — this immediately closes all valves.</li>
+  <li>Or call the <code>script.gw_emergency_stop</code> service from Developer Tools.</li>
+  <li>Or physically switch off the pump/relay board.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="dashboard">7. Dashboard Guide</h2>
+
+<table>
+  <tr><th>Tab</th><th>What It Shows</th><th>When To Use It</th></tr>
+  <tr><td>Command Center</td><td>System status, crop steering settings, safety, infrastructure controls, all-table overview</td><td>Daily check-in, system on/off, changing steering mode</td></tr>
+  <tr><td>Zone Control</td><td>Per-table detail: sensors, valves, irrigation stats, crop profiles</td><td>Enabling/disabling tables, checking individual table health</td></tr>
+  <tr><td>Trends</td><td>24-hour graphs: VWC, EC, substrate temp, room environment</td><td>Spotting problems, checking irrigation patterns</td></tr>
+  <tr><td>Environment</td><td>Room climate gauges, temperature/humidity/CO2 targets, hardware switches</td><td>Adjusting climate targets, checking HVAC status</td></tr>
+  <tr><td>Schedule</td><td>Irrigation timing, valve controls, table enables, scripts</td><td>Changing irrigation timing, manual valve control</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="tuning">8. Tuning Your Parameters</h2>
+
+<h3>Substrate &amp; Hardware</h3>
+<p>These must match your physical setup. Find them in <strong>Settings → Devices → Crop Steering System</strong> or edit <code>/config/crop_steering.env</code>.</p>
+
+<table>
+  <tr><th>Parameter</th><th>What It Means</th><th>Default</th><th>How To Measure</th></tr>
+  <tr><td>Substrate Volume</td><td>Volume of growing media per pot (litres)</td><td>10.0 L</td><td>Check your pot size</td></tr>
+  <tr><td>Dripper Flow Rate</td><td>How fast each dripper delivers water (L/hr)</td><td>2.0 L/hr</td><td>Time how long to fill a measuring cup</td></tr>
+  <tr><td>Drippers Per Plant</td><td>Number of drippers in each pot</td><td>2</td><td>Count them</td></tr>
+  <tr><td>Field Capacity</td><td>Maximum VWC your substrate can hold</td><td>70%</td><td>Saturate substrate, read VWC when dripping stops</td></tr>
+</table>
+
+<h3>EC Targets (Athena Defaults)</h3>
+<table>
+  <tr><th>Phase</th><th>Vegetative</th><th>Generative</th></tr>
+  <tr><td>P0 (Dryback)</td><td>3.0 mS/cm</td><td>4.0 mS/cm</td></tr>
+  <tr><td>P1 (Ramp-Up)</td><td>3.0 mS/cm</td><td>5.0 mS/cm</td></tr>
+  <tr><td>P2 (Maintenance)</td><td>3.2 mS/cm</td><td>6.0 mS/cm</td></tr>
+  <tr><td>P3 (Pre-Off)</td><td>3.0 mS/cm</td><td>4.5 mS/cm</td></tr>
+</table>
+
+<div class="tip">
+  <strong>Start conservative.</strong> Run the time-based scheduler for a week while monitoring VWC trends. Once you're confident in the sensor readings and hardware, switch to crop-steering-driven irrigation.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="appdaemon">9. AppDaemon Setup (Advanced)</h2>
+
+<p>AppDaemon adds autonomous phase transitions — the system automatically moves through P0→P1→P2→P3 based on live sensor data instead of requiring manual phase selection.</p>
+
+<div class="info">
+  <strong>You don't need AppDaemon to use the system.</strong> The GW Package handles time-based irrigation and the Crop Steering integration provides all the sensor entities and calculations. AppDaemon just adds autonomous decision-making.
+</div>
+
+<h3>Installation Steps</h3>
+<div class="steps card">
+  <div class="step">Install the <strong>AppDaemon</strong> add-on from <strong>Settings → Add-ons → Add-on Store</strong>. Search for "AppDaemon".</div>
+  <div class="step">In the AppDaemon add-on config, add Python packages: <code>scipy</code>, <code>numpy</code>.</div>
+  <div class="step">Start the AppDaemon add-on.</div>
+  <div class="step">Copy the app files from the repo to your AppDaemon apps directory:
+    <pre>cp -r /config/repos/HA-Irrigation-Strategy/appdaemon/apps/crop_steering /config/appdaemon/apps/</pre>
+  </div>
+  <div class="step">Copy the AppDaemon configuration:
+    <pre>cp /config/repos/HA-Irrigation-Strategy/appdaemon/apps/crop_steering/apps.yaml /config/appdaemon/apps/crop_steering/</pre>
+  </div>
+  <div class="step">Edit <code>/config/appdaemon/apps/crop_steering/apps.yaml</code> and verify the entity IDs match your setup (they should reference <code>gw_*</code> entities).</div>
+  <div class="step">Restart AppDaemon from the add-on page.</div>
+  <div class="step">Check the AppDaemon log for errors: <strong>Settings → Add-ons → AppDaemon → Log</strong>.</div>
+  <div class="step">Once running, new sensors will appear: <code>sensor.crop_steering_app_status</code>, <code>sensor.crop_steering_app_current_phase</code>, etc.</div>
+</div>
+
+<h3>Verifying AppDaemon is Working</h3>
+<ul>
+  <li>Check <strong>Developer Tools → States</strong> for <code>sensor.crop_steering_app_status</code> — should show "running".</li>
+  <li>The phase should auto-transition based on sensor data (watch for P0→P1 transition after lights-on dryback).</li>
+  <li>The AppDaemon log will show detailed decision-making output.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="safety">10. Safety Systems</h2>
+
+<p>The system has multiple layers of protection. These run independently — if one fails, others still protect your grow.</p>
+
+<table>
+  <tr><th>Protection</th><th>What It Does</th><th>Automatic?</th></tr>
+  <tr><td>Master Gate</td><td>Irrigation only runs when: system enabled + not in maintenance + no leak + tank OK + within time window</td><td>Yes</td></tr>
+  <tr><td>Valve Watchdog</td><td>If any table valve stays open longer than 3 minutes, force-closes it and alerts you</td><td>Yes</td></tr>
+  <tr><td>Mains Water Watchdog</td><td>Kills mains water if open for 24 minutes (8x valve limit)</td><td>Yes</td></tr>
+  <tr><td>Leak Abort</td><td>Emergency stop on leak detection (needs sensor installed)</td><td>Yes*</td></tr>
+  <tr><td>Tank Low Abort</td><td>Closes all valves if tank is low (needs float switch installed)</td><td>Yes*</td></tr>
+  <tr><td>Maintenance Mode</td><td>Closes all valves immediately when toggled on</td><td>Manual</td></tr>
+  <tr><td>Sensor Offline Alert</td><td>Alerts if temp/RH/CO2 sensors go offline for 10 min. Also closes CO2 if CO2 sensor lost.</td><td>Yes</td></tr>
+  <tr><td>Valve-Without-Permission</td><td>If the master gate goes false while valves are open, closes everything</td><td>Yes</td></tr>
+  <tr><td>Daily Audit (3 AM)</td><td>Force-closes all valves and CO2 solenoid as a safety reset</td><td>Yes</td></tr>
+  <tr><td>CO2 Lights-Off</td><td>CO2 solenoid always closes when lights turn off</td><td>Yes</td></tr>
+</table>
+
+<p>* Requires physical sensor to be installed and mapped.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="troubleshooting">11. Troubleshooting</h2>
+
+<div class="card">
+  <h3>Irrigation won't run</h3>
+  <ol>
+    <li>Check <strong>Command Center → GW System</strong> is ON.</li>
+    <li>Check <strong>Maintenance Mode</strong> is OFF.</li>
+    <li>Check the current time is within your irrigation window (Schedule tab).</li>
+    <li>Check at least one table is enabled (Zone Control tab).</li>
+    <li>Check <strong>Developer Tools → States</strong> for <code>binary_sensor.gw_irrigation_allowed</code> — should be "on". If "off", check each condition above.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h3>VWC/EC shows "Unavailable"</h3>
+  <ol>
+    <li>Go to <strong>Settings → Devices → ESPHome</strong>. Is the substrate sensor device online?</li>
+    <li>Check <strong>Developer Tools → States</strong> for the raw entity (e.g. <code>sensor.substrate_1_substrate_1_vwc_coco_coir</code>). If this shows a value but the <code>gw_table_1_vwc</code> doesn't, reload template entities: <strong>Developer Tools → YAML → Template Entities → Reload</strong>.</li>
+    <li>If the raw entity is also unavailable, the ESPHome device has lost connection. Check network/power to the probe.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h3>Shot durations show 0.0 seconds</h3>
+  <ol>
+    <li>Check <code>number.substrate_volume</code> — should be your pot volume (e.g. 10.0 L).</li>
+    <li>Check <code>number.dripper_flow_rate</code> — should be your dripper output (e.g. 2.0 L/hr).</li>
+    <li>If these show values but shots are still 0.0, the integration has a known bug where it looks for entities with a <code>crop_steering_</code> prefix. This will be fixed in a future update.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h3>Valves won't close / stuck open</h3>
+  <ol>
+    <li><strong>Immediate:</strong> Toggle <strong>Maintenance Mode ON</strong>. This force-closes everything.</li>
+    <li>If that doesn't work: Go to <strong>Developer Tools → Services</strong>, call <code>switch.turn_off</code> targeting the specific valve entity (e.g. <code>switch.table_1</code>).</li>
+    <li>If the valve won't respond to software commands, physically disconnect power to the relay board.</li>
+    <li>The valve watchdog should have caught this — check <strong>Settings → Automations</strong> for the watchdog automation and verify it's enabled.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h3>Dashboard shows "Entity not found"</h3>
+  <ol>
+    <li>Check if the Crop Steering integration is loaded: <strong>Settings → Devices &amp; Services</strong>, look for "Crop Steering System".</li>
+    <li>If it's there but entities are missing, try removing and re-adding the integration.</li>
+    <li>If it's not there, add it: <strong>Add Integration → Search "Crop Steering"</strong>. Choose "Load from .env file".</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h3>Environmental controls not working</h3>
+  <ol>
+    <li>Check that temperature, humidity, and CO2 targets are set (Environment tab).</li>
+    <li>Verify the relay/switch entities are online in Developer Tools.</li>
+    <li>For CO2: Confirm lights are ON — CO2 injection is disabled during lights-off.</li>
+    <li>Check the automations are enabled: <strong>Settings → Automations</strong>, search for "gw_".</li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="entity-ref">12. Entity Reference</h2>
+
+<h3>Key Sensors</h3>
+<table>
+  <tr><th>Entity</th><th>What It Shows</th></tr>
+  <tr><td><code>sensor.gw_table_N_vwc</code></td><td>Table N volumetric water content (%)</td></tr>
+  <tr><td><code>sensor.gw_table_N_ec</code></td><td>Table N pore water EC (mS/cm)</td></tr>
+  <tr><td><code>sensor.gw_table_N_substrate_temp</code></td><td>Table N substrate temperature (°C)</td></tr>
+  <tr><td><code>sensor.gw_room_1_temp</code></td><td>Room temperature (averaged from 4 sensors)</td></tr>
+  <tr><td><code>sensor.gw_room_1_rh</code></td><td>Room humidity (averaged)</td></tr>
+  <tr><td><code>sensor.gw_room_1_co2</code></td><td>Room CO2 (averaged from 3 sensors)</td></tr>
+  <tr><td><code>sensor.gw_room_1_vpd</code></td><td>Room VPD (averaged)</td></tr>
+  <tr><td><code>sensor.gw_average_vwc</code></td><td>Average VWC across all tables</td></tr>
+  <tr><td><code>sensor.gw_average_ec</code></td><td>Average EC across all tables</td></tr>
+</table>
+
+<h3>Key Switches</h3>
+<table>
+  <tr><th>Entity</th><th>What It Controls</th></tr>
+  <tr><td><code>input_boolean.gw_enable</code></td><td>Master system on/off</td></tr>
+  <tr><td><code>input_boolean.gw_maintenance_mode</code></td><td>Maintenance mode (closes all valves)</td></tr>
+  <tr><td><code>input_boolean.gw_table_N_enabled</code></td><td>Enable/disable table N for irrigation</td></tr>
+  <tr><td><code>switch.gw_table_N_valve</code></td><td>Table N solenoid valve</td></tr>
+  <tr><td><code>switch.gw_mainline</code></td><td>Mainline valve (starts pump)</td></tr>
+  <tr><td><code>switch.gw_mains_water</code></td><td>Mains water solenoid</td></tr>
+  <tr><td><code>switch.gw_manifold</code></td><td>Manifold valve</td></tr>
+</table>
+
+<h3>Key Scripts</h3>
+<table>
+  <tr><th>Script</th><th>What It Does</th></tr>
+  <tr><td><code>script.gw_run_irrigation_cycle</code></td><td>Runs a full irrigation cycle (all enabled tables)</td></tr>
+  <tr><td><code>script.gw_run_table</code></td><td>Runs a single table for configured duration</td></tr>
+  <tr><td><code>script.gw_emergency_stop</code></td><td>Emergency stop — closes ALL valves, disables system</td></tr>
+</table>
+
+<hr>
+<p style="text-align:center; opacity:0.5; font-size:0.9em;">Irrigation System Manual v2.3.1 — Generated March 2026</p>
+
+</body>
+</html>
