@@ -276,7 +276,10 @@ Full entity reference: `ENTITIES.md` and the [System Guide](https://jaketherabbi
 
 ## Screenshots
 
-![Dashboard](screenshot.jpeg)
+![Dashboard Overview](img/Dashboard%201.png)
+![Crop Steering Controls](img/Dashboard%202.png)
+![Zone Detail](img/Dashboard%203.png)
+![Environment Monitoring](img/Dashboard%204.png)
 ![Integration Device Page](img/Integration%20Device%20Page.png)
 ![Dashboard Entities](img/Dashboard%20Entities.png)
 
