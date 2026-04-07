@@ -121,7 +121,7 @@ Physical probes (ESPHome)
     ↓
 Raw sensor entities (e.g. sensor.substrate_1_substrate_1_vwc_coco_coir)
     ↓  [10_mapping.yaml averages + rounds values]
-GW contract entities (e.g. sensor.gw_table_1_vwc)
+GW contract entities (e.g. sensor.irrigation_table_1_vwc)
     ↓  [crop_steering.env tells the integration where to look]
 Crop Steering entities (e.g. sensor.zone_1_vwc)
 </pre>
@@ -261,10 +261,10 @@ Drippers → Plants → Substrate → Runoff
 <h3>Step 1: Verify Hardware Connections</h3>
 <div class="steps card">
   <div class="step">Go to <strong>Settings → Devices &amp; Services → ESPHome</strong>. Confirm all 6 substrate sensors, KC868 relay board, environmental sensors, and CO2 sensors show as "Online".</div>
-  <div class="step">Go to <strong>Developer Tools → States</strong>. Search for <code>sensor.gw_table_1_vwc</code>. You should see a number (e.g. 47.4). Check all 6 tables.</div>
-  <div class="step">Search for <code>sensor.gw_room_1_temp</code>. Should show room temperature. Also check <code>sensor.gw_room_1_rh</code> and <code>sensor.gw_room_1_co2</code>.</div>
-  <div class="step">Test each valve manually: Go to <strong>Developer Tools → Services</strong>, select <code>switch.turn_on</code>, target <code>switch.gw_table_1_valve</code>. You should hear the valve click. Turn it off immediately after confirming. Repeat for all 6 tables.</div>
-  <div class="step">Test infrastructure: Briefly toggle <code>switch.gw_mainline</code> on — you should hear the pump start. Turn off immediately.</div>
+  <div class="step">Go to <strong>Developer Tools → States</strong>. Search for <code>sensor.irrigation_table_1_vwc</code>. You should see a number (e.g. 47.4). Check all 6 tables.</div>
+  <div class="step">Search for <code>sensor.irrigation_room_1_temp</code>. Should show room temperature. Also check <code>sensor.irrigation_room_1_rh</code> and <code>sensor.irrigation_room_1_co2</code>.</div>
+  <div class="step">Test each valve manually: Go to <strong>Developer Tools → Services</strong>, select <code>switch.turn_on</code>, target <code>switch.irrigation_table_1_valve</code>. You should hear the valve click. Turn it off immediately after confirming. Repeat for all 6 tables.</div>
+  <div class="step">Test infrastructure: Briefly toggle <code>switch.irrigation_mainline</code> on — you should hear the pump start. Turn off immediately.</div>
 </div>
 
 <div class="warning">
@@ -292,7 +292,7 @@ Drippers → Plants → Substrate → Runoff
 <h3>Step 4: Test an Irrigation Cycle</h3>
 <div class="steps card">
   <div class="step">Go to <strong>Developer Tools → Services</strong>.</div>
-  <div class="step">Select service <code>script.gw_run_irrigation_cycle</code>.</div>
+  <div class="step">Select service <code>script.irrigation_run_irrigation_cycle</code>.</div>
   <div class="step">Click <strong>Call Service</strong>.</div>
   <div class="step">Watch the <strong>Zone Control</strong> tab — you should see valves open and close one by one.</div>
   <div class="step">Check that water reached each enabled table.</div>
@@ -334,7 +334,7 @@ Drippers → Plants → Substrate → Runoff
 <p>If anything goes wrong:</p>
 <ul>
   <li>Toggle <strong>Maintenance Mode ON</strong> in the Command Center — this immediately closes all valves.</li>
-  <li>Or call the <code>script.gw_emergency_stop</code> service from Developer Tools.</li>
+  <li>Or call the <code>script.irrigation_emergency_stop</code> service from Developer Tools.</li>
   <li>Or physically switch off the pump/relay board.</li>
 </ul>
 
@@ -397,7 +397,7 @@ Drippers → Plants → Substrate → Runoff
   <div class="step">Copy the AppDaemon configuration:
     <pre>cp /config/repos/HA-Irrigation-Strategy/appdaemon/apps/crop_steering/apps.yaml /config/appdaemon/apps/crop_steering/</pre>
   </div>
-  <div class="step">Edit <code>/config/appdaemon/apps/crop_steering/apps.yaml</code> and verify the entity IDs match your setup (they should reference <code>gw_*</code> entities).</div>
+  <div class="step">Edit <code>/config/appdaemon/apps/crop_steering/apps.yaml</code> and verify the entity IDs match your setup (they should reference <code>irrigation_*</code> entities).</div>
   <div class="step">Restart AppDaemon from the add-on page.</div>
   <div class="step">Check the AppDaemon log for errors: <strong>Settings → Add-ons → AppDaemon → Log</strong>.</div>
   <div class="step">Once running, new sensors will appear: <code>sensor.crop_steering_app_status</code>, <code>sensor.crop_steering_app_current_phase</code>, etc.</div>
@@ -441,7 +441,7 @@ Drippers → Plants → Substrate → Runoff
     <li>Check <strong>Maintenance Mode</strong> is OFF.</li>
     <li>Check the current time is within your irrigation window (Schedule tab).</li>
     <li>Check at least one table is enabled (Zone Control tab).</li>
-    <li>Check <strong>Developer Tools → States</strong> for <code>binary_sensor.gw_irrigation_allowed</code> — should be "on". If "off", check each condition above.</li>
+    <li>Check <strong>Developer Tools → States</strong> for <code>binary_sensor.irrigation_irrigation_allowed</code> — should be "on". If "off", check each condition above.</li>
   </ol>
 </div>
 
@@ -449,7 +449,7 @@ Drippers → Plants → Substrate → Runoff
   <h3>VWC/EC shows "Unavailable"</h3>
   <ol>
     <li>Go to <strong>Settings → Devices → ESPHome</strong>. Is the substrate sensor device online?</li>
-    <li>Check <strong>Developer Tools → States</strong> for the raw entity (e.g. <code>sensor.substrate_1_substrate_1_vwc_coco_coir</code>). If this shows a value but the <code>gw_table_1_vwc</code> doesn't, reload template entities: <strong>Developer Tools → YAML → Template Entities → Reload</strong>.</li>
+    <li>Check <strong>Developer Tools → States</strong> for the raw entity (e.g. <code>sensor.substrate_1_substrate_1_vwc_coco_coir</code>). If this shows a value but the <code>irrigation_table_1_vwc</code> doesn't, reload template entities: <strong>Developer Tools → YAML → Template Entities → Reload</strong>.</li>
     <li>If the raw entity is also unavailable, the ESPHome device has lost connection. Check network/power to the probe.</li>
   </ol>
 </div>
@@ -488,7 +488,7 @@ Drippers → Plants → Substrate → Runoff
     <li>Check that temperature, humidity, and CO2 targets are set (Environment tab).</li>
     <li>Verify the relay/switch entities are online in Developer Tools.</li>
     <li>For CO2: Confirm lights are ON — CO2 injection is disabled during lights-off.</li>
-    <li>Check the automations are enabled: <strong>Settings → Automations</strong>, search for "gw_".</li>
+    <li>Check the automations are enabled: <strong>Settings → Automations</strong>, search for "irrigation_".</li>
   </ol>
 </div>
 
@@ -498,35 +498,35 @@ Drippers → Plants → Substrate → Runoff
 <h3>Key Sensors</h3>
 <table>
   <tr><th>Entity</th><th>What It Shows</th></tr>
-  <tr><td><code>sensor.gw_table_N_vwc</code></td><td>Table N volumetric water content (%)</td></tr>
-  <tr><td><code>sensor.gw_table_N_ec</code></td><td>Table N pore water EC (mS/cm)</td></tr>
-  <tr><td><code>sensor.gw_table_N_substrate_temp</code></td><td>Table N substrate temperature (°C)</td></tr>
-  <tr><td><code>sensor.gw_room_1_temp</code></td><td>Room temperature (averaged from 4 sensors)</td></tr>
-  <tr><td><code>sensor.gw_room_1_rh</code></td><td>Room humidity (averaged)</td></tr>
-  <tr><td><code>sensor.gw_room_1_co2</code></td><td>Room CO2 (averaged from 3 sensors)</td></tr>
-  <tr><td><code>sensor.gw_room_1_vpd</code></td><td>Room VPD (averaged)</td></tr>
-  <tr><td><code>sensor.gw_average_vwc</code></td><td>Average VWC across all tables</td></tr>
-  <tr><td><code>sensor.gw_average_ec</code></td><td>Average EC across all tables</td></tr>
+  <tr><td><code>sensor.irrigation_table_N_vwc</code></td><td>Table N volumetric water content (%)</td></tr>
+  <tr><td><code>sensor.irrigation_table_N_ec</code></td><td>Table N pore water EC (mS/cm)</td></tr>
+  <tr><td><code>sensor.irrigation_table_N_substrate_temp</code></td><td>Table N substrate temperature (°C)</td></tr>
+  <tr><td><code>sensor.irrigation_room_1_temp</code></td><td>Room temperature (averaged from 4 sensors)</td></tr>
+  <tr><td><code>sensor.irrigation_room_1_rh</code></td><td>Room humidity (averaged)</td></tr>
+  <tr><td><code>sensor.irrigation_room_1_co2</code></td><td>Room CO2 (averaged from 3 sensors)</td></tr>
+  <tr><td><code>sensor.irrigation_room_1_vpd</code></td><td>Room VPD (averaged)</td></tr>
+  <tr><td><code>sensor.irrigation_average_vwc</code></td><td>Average VWC across all tables</td></tr>
+  <tr><td><code>sensor.irrigation_average_ec</code></td><td>Average EC across all tables</td></tr>
 </table>
 
 <h3>Key Switches</h3>
 <table>
   <tr><th>Entity</th><th>What It Controls</th></tr>
-  <tr><td><code>input_boolean.gw_enable</code></td><td>Master system on/off</td></tr>
-  <tr><td><code>input_boolean.gw_maintenance_mode</code></td><td>Maintenance mode (closes all valves)</td></tr>
-  <tr><td><code>input_boolean.gw_table_N_enabled</code></td><td>Enable/disable table N for irrigation</td></tr>
-  <tr><td><code>switch.gw_table_N_valve</code></td><td>Table N solenoid valve</td></tr>
-  <tr><td><code>switch.gw_mainline</code></td><td>Mainline valve (starts pump)</td></tr>
-  <tr><td><code>switch.gw_mains_water</code></td><td>Mains water solenoid</td></tr>
-  <tr><td><code>switch.gw_manifold</code></td><td>Manifold valve</td></tr>
+  <tr><td><code>input_boolean.irrigation_enable</code></td><td>Master system on/off</td></tr>
+  <tr><td><code>input_boolean.irrigation_maintenance_mode</code></td><td>Maintenance mode (closes all valves)</td></tr>
+  <tr><td><code>input_boolean.irrigation_table_N_enabled</code></td><td>Enable/disable table N for irrigation</td></tr>
+  <tr><td><code>switch.irrigation_table_N_valve</code></td><td>Table N solenoid valve</td></tr>
+  <tr><td><code>switch.irrigation_mainline</code></td><td>Mainline valve (starts pump)</td></tr>
+  <tr><td><code>switch.irrigation_mains_water</code></td><td>Mains water solenoid</td></tr>
+  <tr><td><code>switch.irrigation_manifold</code></td><td>Manifold valve</td></tr>
 </table>
 
 <h3>Key Scripts</h3>
 <table>
   <tr><th>Script</th><th>What It Does</th></tr>
-  <tr><td><code>script.gw_run_irrigation_cycle</code></td><td>Runs a full irrigation cycle (all enabled tables)</td></tr>
-  <tr><td><code>script.gw_run_table</code></td><td>Runs a single table for configured duration</td></tr>
-  <tr><td><code>script.gw_emergency_stop</code></td><td>Emergency stop — closes ALL valves, disables system</td></tr>
+  <tr><td><code>script.irrigation_run_irrigation_cycle</code></td><td>Runs a full irrigation cycle (all enabled tables)</td></tr>
+  <tr><td><code>script.irrigation_run_table</code></td><td>Runs a single table for configured duration</td></tr>
+  <tr><td><code>script.irrigation_emergency_stop</code></td><td>Emergency stop — closes ALL valves, disables system</td></tr>
 </table>
 
 <hr>
