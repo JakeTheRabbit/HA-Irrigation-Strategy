@@ -6,6 +6,11 @@
 ![AppDaemon](https://img.shields.io/badge/AppDaemon-Required-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+![Dashboard Overview](img/Dashboard%201.png)
+![Crop Steering Controls](img/Dashboard%202.png)
+![Zone Detail](img/Dashboard%203.png)
+![Environment Monitoring](img/Dashboard%204.png)
+
 Turn Home Assistant into a professional crop-steering controller. This system combines a custom HA integration (entities, services, calculations) with AppDaemon modules (automation logic, hardware control, phase state machine) to automate precision irrigation using VWC/EC sensors across 1-6 independent zones.
 
 > **[Interactive System Guide](https://jaketherabbit.github.io/HA-Irrigation-Strategy/www/SYSTEM_GUIDE.html)** | **[Irrigation Manual](https://jaketherabbit.github.io/HA-Irrigation-Strategy/www/irrigation-manual.html)**
@@ -276,10 +281,6 @@ Full entity reference: `ENTITIES.md` and the [System Guide](https://jaketherabbi
 
 ## Screenshots
 
-![Dashboard Overview](img/Dashboard%201.png)
-![Crop Steering Controls](img/Dashboard%202.png)
-![Zone Detail](img/Dashboard%203.png)
-![Environment Monitoring](img/Dashboard%204.png)
 ![Integration Device Page](img/Integration%20Device%20Page.png)
 ![Dashboard Entities](img/Dashboard%20Entities.png)
 
