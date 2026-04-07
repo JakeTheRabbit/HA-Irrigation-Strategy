@@ -1,0 +1,221 @@
+title: "CO2 & Environment"
+views:
+  - title: CO2 & Environment
+    path: co2-environment
+    icon: mdi:molecule-co2
+    type: sections
+    max_columns: 4
+    sections:
+
+      # ── How This System Works ────────────────────────────────────────────
+      - type: grid
+        column_span: 4
+        cards:
+          - type: markdown
+            content: >
+              ## CO2 & Environment — How It Works
+
+
+              This dashboard controls **CO2 injection** and **temperature /
+              humidity regulation**. These are two independent subsystems that
+              can each be enabled or disabled without affecting the other or
+              irrigation.
+
+
+              ---
+
+
+              ### CO2 Injection
+
+
+              **Strategy**: Bang-bang with hysteresis (pulsed).
+
+              - When room CO2 drops below **1100 ppm**, the automation starts a
+              pulse loop: solenoid ON for 1 min, OFF for 4 min, repeat.
+
+              - The loop stops when CO2 reaches **1400 ppm** (or lights go off,
+              or CO2 hits 1800 ppm emergency).
+
+              - **Emergency shutoff** at 1800 ppm — solenoid closes, alert sent.
+
+              - CO2 is **always off when lights are off** (plants don't use CO2
+              in the dark).
+
+              - The 1100/1400 thresholds are currently hardcoded in the
+              automation. The `CO2 Target` input below is used by alert logic
+              only.
+
+
+              **Enable**: `GW CO2 Enabled` must be ON. Independent of irrigation
+              and environment.
+
+
+              ---
+
+
+              ### Temperature & Humidity
+
+
+              **Strategy**: Bang-bang with hysteresis.
+
+              - **Dehumidify**: ON when RH > day target + 5%, OFF when RH < day
+              target - 2%. Relays 1-4 stagger on with 10s delays.
+
+              - **Humidify**: ON when RH < day target - 5%, OFF when RH > day
+              target + 2%.
+
+              - Day/night targets switch automatically based on `Lights On`
+              state. Currently automations reference the day target only —
+              night target is for your reference / future use.
+
+
+              **Enable**: `GW Environment Enabled` must be ON. Independent of
+              irrigation and CO2.
+
+
+              ---
+
+
+              ### Relationship to Other Systems
+
+
+              | System | Enable Flag | What It Controls |
+              |--------|------------|-----------------|
+              | CO2 | `GW CO2 Enabled` | CO2 solenoid injection |
+              | Environment | `GW Environment Enabled` | Dehumidifiers, humidifier |
+              | GW Irrigation | `GW Irrigation Enabled` | Timer-based table watering |
+              | Crop Steering | `CS System Enabled` | AI-driven table watering |
+
+
+              All four are independent. `GW Master Enable` is the panic button —
+              the emergency stop script turns it OFF and closes all valves
+              including CO2.
+
+
+              ---
+
+
+              ### Maintenance Mode
+
+
+              Turning on `Maintenance Mode` blocks irrigation (both GW and CS)
+              and closes all valves. It does NOT automatically stop CO2 or
+              environment control, but it's good practice to disable those
+              manually if you're working in the room.
+
+      # ── CO2 Enable ──────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "CO2 Control"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_co2_enabled
+                name: "CO2 Enabled"
+                secondary_info: "Master enable for CO2 injection automation"
+              - entity: switch.irrigation_co2
+                name: "CO2 Solenoid"
+                secondary_info: "Direct relay — automation normally handles this"
+              - entity: sensor.irrigation_room_1_co2
+                name: "Room CO2 (ppm)"
+                secondary_info: "Averaged from sensors 2 & 4"
+              - entity: binary_sensor.irrigation_lights_on
+                name: "Lights On"
+                secondary_info: "CO2 only injects when lights are on"
+
+      # ── CO2 Targets & Alerts ─────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "CO2 Targets & Alerts"
+            show_header_toggle: false
+            entities:
+              - entity: input_number.irrigation_co2_target
+                name: "CO2 Target (ppm)"
+                secondary_info: "Used by alert logic. Injection uses hardcoded 1100/1400."
+              - entity: input_number.irrigation_co2_high_alert
+                name: "High Alert (ppm)"
+                secondary_info: "Alert + solenoid close if CO2 exceeds this"
+              - entity: input_number.irrigation_co2_low_alert
+                name: "Low Alert (ppm)"
+                secondary_info: "Alert if CO2 drops below this during lights-on"
+
+      # ── Environment Enable ───────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Environment Control"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_environment_enabled
+                name: "Environment Enabled"
+                secondary_info: "Master enable for dehumidifier/humidifier automation"
+              - entity: sensor.irrigation_room_1_temp
+                name: "Room Temperature"
+              - entity: sensor.irrigation_room_1_rh
+                name: "Room Humidity"
+              - entity: sensor.irrigation_room_1_vpd
+                name: "Room VPD"
+
+      # ── Environment Targets ──────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Environment Targets"
+            show_header_toggle: false
+            entities:
+              - entity: input_number.irrigation_temp_target_day
+                name: "Temp Target Day"
+              - entity: input_number.irrigation_temp_target_night
+                name: "Temp Target Night"
+              - entity: input_number.irrigation_temp_high_alert
+                name: "Temp High Alert"
+              - entity: input_number.irrigation_rh_target_day
+                name: "RH Target Day"
+                secondary_info: "Dehumidify at +5%, humidify at -5%"
+              - entity: input_number.irrigation_rh_target_night
+                name: "RH Target Night"
+              - entity: input_number.irrigation_rh_high_alert
+                name: "RH High Alert"
+
+      # ── Environment Hardware ─────────────────────────────────────────────
+      - type: grid
+        column_span: 4
+        cards:
+          - type: entities
+            title: "Environment Hardware — Direct Relay Control"
+            show_header_toggle: false
+            entities:
+              - entity: switch.irrigation_humidifier
+                name: "Humidifier"
+              - entity: switch.irrigation_dehumidifier_1
+                name: "Dehumidifier Unit"
+              - entity: switch.irrigation_dehumidifier_relay_1
+                name: "Dehumidifier Relay 1"
+              - entity: switch.irrigation_dehumidifier_relay_2
+                name: "Dehumidifier Relay 2"
+              - entity: switch.irrigation_dehumidifier_relay_3
+                name: "Dehumidifier Relay 3"
+              - entity: switch.irrigation_dehumidifier_relay_4
+                name: "Dehumidifier Relay 4"
+              - entity: switch.irrigation_ceiling_vent
+                name: "Ceiling Vent"
+
+      # ── Global Safety ────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Global Safety"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_enable
+                name: "GW Master Enable"
+                secondary_info: "Panic button — OFF closes all valves including CO2"
+              - entity: input_boolean.irrigation_maintenance_mode
+                name: "Maintenance Mode"
+                secondary_info: "Blocks irrigation, closes valves"

@@ -96,9 +96,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     }
                 )
 
-            # Validate entity IDs
+            # Validate entity IDs (skip if user chose to ignore missing)
+            ignore_missing = user_input.get("ignore_missing", False) if user_input else False
             missing_entities = await self._validate_env_entities(env_config)
-            if missing_entities:
+            if missing_entities and not ignore_missing:
                 return self.async_show_form(
                     step_id="load_env",
                     data_schema=vol.Schema({

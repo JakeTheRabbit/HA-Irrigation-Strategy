@@ -84,44 +84,70 @@ class ZoneConfigParser:
         self.hardware_config['water_level_sensor'] = config.get('WATER_LEVEL_SENSOR', '')
         
     def _parse_zone_config(self, config: Dict[str, str]) -> None:
-        """Parse zone configuration from config dict."""
+        """Parse zone configuration from config dict.
+
+        Supports two sensor formats per zone:
+          - Flexible:  ZONE_N_VWC_SENSORS=sensor.a,sensor.b,sensor.c
+          - Legacy:    ZONE_N_VWC_FRONT=sensor.a / ZONE_N_VWC_BACK=sensor.b
+        If VWC_SENSORS/EC_SENSORS is present it takes priority.
+        """
         # Find all configured zones
         zone_pattern = re.compile(r'ZONE_(\d+)_')
         zone_numbers = set()
-        
+
         for key in config.keys():
             match = zone_pattern.match(key)
             if match:
                 zone_numbers.add(int(match.group(1)))
-                
+
         # Parse each zone's configuration
         for zone_num in sorted(zone_numbers):
             zone_config = {}
-            
+
             # Zone switch
             zone_switch = config.get(f'ZONE_{zone_num}_SWITCH', '')
             if not zone_switch:
                 continue  # Skip zones without switches
-                
+
             zone_config['zone_switch'] = zone_switch
             zone_config['zone_number'] = zone_num
-            
-            # VWC sensors
-            zone_config['vwc_front'] = config.get(f'ZONE_{zone_num}_VWC_FRONT', '')
-            zone_config['vwc_back'] = config.get(f'ZONE_{zone_num}_VWC_BACK', '')
-            
-            # EC sensors
-            zone_config['ec_front'] = config.get(f'ZONE_{zone_num}_EC_FRONT', '')
-            zone_config['ec_back'] = config.get(f'ZONE_{zone_num}_EC_BACK', '')
-            
+
+            # --- VWC sensors (flexible list OR legacy front/back) ---
+            vwc_sensors_raw = config.get(f'ZONE_{zone_num}_VWC_SENSORS', '')
+            if vwc_sensors_raw:
+                vwc_list = [s.strip() for s in vwc_sensors_raw.split(',') if s.strip()]
+            else:
+                vwc_list = []
+                if config.get(f'ZONE_{zone_num}_VWC_FRONT', ''):
+                    vwc_list.append(config[f'ZONE_{zone_num}_VWC_FRONT'])
+                if config.get(f'ZONE_{zone_num}_VWC_BACK', ''):
+                    vwc_list.append(config[f'ZONE_{zone_num}_VWC_BACK'])
+
+            # --- EC sensors (flexible list OR legacy front/back) ---
+            ec_sensors_raw = config.get(f'ZONE_{zone_num}_EC_SENSORS', '')
+            if ec_sensors_raw:
+                ec_list = [s.strip() for s in ec_sensors_raw.split(',') if s.strip()]
+            else:
+                ec_list = []
+                if config.get(f'ZONE_{zone_num}_EC_FRONT', ''):
+                    ec_list.append(config[f'ZONE_{zone_num}_EC_FRONT'])
+                if config.get(f'ZONE_{zone_num}_EC_BACK', ''):
+                    ec_list.append(config[f'ZONE_{zone_num}_EC_BACK'])
+
+            # Store as lists (new format)
+            zone_config['vwc_sensors'] = vwc_list
+            zone_config['ec_sensors'] = ec_list
+            # Legacy keys for backwards compat with sensor.py
+            zone_config['vwc_front'] = vwc_list[0] if vwc_list else ''
+            zone_config['vwc_back'] = vwc_list[1] if len(vwc_list) > 1 else ''
+            zone_config['ec_front'] = ec_list[0] if ec_list else ''
+            zone_config['ec_back'] = ec_list[1] if len(ec_list) > 1 else ''
+
             # Validate zone has at least one VWC and one EC sensor
-            has_vwc = zone_config['vwc_front'] or zone_config['vwc_back']
-            has_ec = zone_config['ec_front'] or zone_config['ec_back']
-            
-            if has_vwc and has_ec:
+            if vwc_list and ec_list:
                 self.zones[zone_num] = zone_config
             else:
-                _LOGGER.warning(f"Zone {zone_num} missing required sensors (VWC: {has_vwc}, EC: {has_ec})")
+                _LOGGER.warning(f"Zone {zone_num} missing required sensors (VWC: {bool(vwc_list)}, EC: {bool(ec_list)})")
                 
     def get_active_zones(self) -> List[int]:
         """Get list of active zone numbers.
@@ -155,27 +181,30 @@ class ZoneConfigParser:
         
     def get_zone_sensors(self, zone_num: int) -> Dict[str, List[str]]:
         """Get all sensors for a specific zone.
-        
+
         Args:
             zone_num: Zone number
-            
+
         Returns:
             Dict with 'vwc' and 'ec' sensor lists
         """
         zone = self.zones.get(zone_num, {})
-        
-        vwc_sensors = []
-        if zone.get('vwc_front'):
-            vwc_sensors.append(zone['vwc_front'])
-        if zone.get('vwc_back'):
-            vwc_sensors.append(zone['vwc_back'])
-            
-        ec_sensors = []
-        if zone.get('ec_front'):
-            ec_sensors.append(zone['ec_front'])
-        if zone.get('ec_back'):
-            ec_sensors.append(zone['ec_back'])
-            
+
+        # Prefer the new list format, fall back to legacy front/back
+        vwc_sensors = list(zone.get('vwc_sensors', []))
+        if not vwc_sensors:
+            if zone.get('vwc_front'):
+                vwc_sensors.append(zone['vwc_front'])
+            if zone.get('vwc_back'):
+                vwc_sensors.append(zone['vwc_back'])
+
+        ec_sensors = list(zone.get('ec_sensors', []))
+        if not ec_sensors:
+            if zone.get('ec_front'):
+                ec_sensors.append(zone['ec_front'])
+            if zone.get('ec_back'):
+                ec_sensors.append(zone['ec_back'])
+
         return {
             'vwc': vwc_sensors,
             'ec': ec_sensors

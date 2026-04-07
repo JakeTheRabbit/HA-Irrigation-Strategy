@@ -14,13 +14,34 @@ master_crop_steering:
   # Optional explicit config. Safe defaults exist in code, but defining these
   # keys avoids schema ambiguity and documents expected AppDaemon args.
   hardware:
-    pump_master: null
-    main_line: null
-    zone_valves: {}
+    pump_master: null  # No pump entity — constant pressure switch auto-starts when mainline opens
+    main_line: switch.irrigation_mainline
+    zone_valves:
+      1: switch.irrigation_table_1_valve
+      2: switch.irrigation_table_2_valve
+      3: switch.irrigation_table_3_valve
+      4: switch.irrigation_table_4_valve
+      5: switch.irrigation_table_5_valve
+      6: switch.irrigation_table_6_valve
   sensors:
-    vwc: []
-    ec: []
-    environmental: {}
+    vwc:
+      - sensor.substrate_1_substrate_1_vwc_coco_coir
+      - sensor.substrate_2_substrate_2_vwc_coco_coir
+      - sensor.substrate_3_substrate_3_vwc_coco_coir
+      - sensor.substrate_4_substrate_4_vwc_coco_coir
+      - sensor.substrate_5_substrate_5_vwc_coco_coir
+      - sensor.substrate_6_substrate_6_vwc_coco_coir
+    ec:
+      - sensor.substrate_1_substrate_1_pwec
+      - sensor.substrate_2_substrate_2_pwec
+      - sensor.substrate_3_substrate_3_pwec
+      - sensor.substrate_4_substrate_4_pwec
+      - sensor.substrate_5_substrate_5_pwec
+      - sensor.substrate_6_substrate_6_pwec
+    environmental:
+      temperature: sensor.irrigation_room_1_temp
+      humidity: sensor.irrigation_room_1_rh
+      vpd: sensor.irrigation_room_1_vpd
   timing:
     phase_check_interval: 60
     ml_prediction_interval: 300

@@ -1,146 +1,79 @@
 
-# Crop Steering System Configuration
-# ==================================
-# This file configures the AppDaemon automation and Home Assistant integration entities.
+# Loads default set of integrations. Do not remove.
+default_config:
 
-# Irrigation Hardware
-# ===================
-# Main pump and water line controls
-irrigation_hardware:
-  pump_switch: switch.f1_irrigation_pump_master_switch
-  main_line_switch: switch.espoe_irrigation_relay_1_2
-  waste_switch: null
+# ── Irrigation Grow Pack ──────────────────────────────────────────────────────
+# Packages directory – load all subdirectory YAML files as packages.
+# Each subdirectory key becomes a package namespace.
+# See: https://www.home-assistant.io/docs/configuration/packages/
+homeassistant:
+  packages: !include_dir_named packages
 
-# Zone Configuration
-# ==================
-# Define each irrigation zone, its switch, and its sensors.
-zones:
-  - zone_id: 1
-    switch: switch.f1_irrigation_relays_relay_1
-    sensors:
-      vwc_front: sensor.vwc_r1_front
-      vwc_back: sensor.vwc_r1_back
-      ec_front: sensor.ec_r1_front
-      ec_back: sensor.ec_r1_back
-    plant_count: 4
-    max_daily_volume: 20.0
-    shot_multiplier: 1.0
-  - zone_id: 2
-    switch: switch.f1_irrigation_relays_relay_2
-    sensors:
-      vwc_front: sensor.vwc_r2_front
-      vwc_back: sensor.vwc_r2_back
-      ec_front: sensor.ec_r2_front
-      ec_back: sensor.ec_r2_back
-    plant_count: 4
-    max_daily_volume: 20.0
-    shot_multiplier: 1.0
-  - zone_id: 3
-    switch: switch.f1_irrigation_relays_relay_3
-    sensors:
-      vwc_front: sensor.vwc_r3_front
-      vwc_back: sensor.vwc_r3_back
-      ec_front: sensor.ec_r3_front
-      ec_back: sensor.ec_r3_back
-    plant_count: 4
-    max_daily_volume: 20.0
-    shot_multiplier: 1.0
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
 
-# Lighting System (Optional)
-# ==========================
-# For automatic phase timing
-lighting_system:
-  light_entity: light.f1_light_group
-  lights_on_time: input_datetime.f1_lights_on_time
-  lights_off_time: input_datetime.f1_lights_off_time
-  lights_on_hour: 12
-  lights_off_hour: 0
+lovelace:
+  mode: storage
+  dashboards:
+    irrigation:
+      mode: yaml
+      title: Irrigation
+      icon: mdi:sprinkler
+      show_in_sidebar: true
+      filename: dashboards/legacy_irrigation.yaml
+    crop-steering:
+      mode: yaml
+      title: Crop Steering AI
+      icon: mdi:brain
+      show_in_sidebar: true
+      filename: dashboards/crop_steering.yaml
+    co2-environment:
+      mode: yaml
+      title: CO2 & Environment
+      icon: mdi:molecule-co2
+      show_in_sidebar: true
+      filename: dashboards/co2_environment.yaml
 
-# Environmental Sensors (Optional)
-# ================================
-# For analytics
-environmental_sensors:
-  temperature_sensor: sensor.f1_scd41_back_right_temperature
-  humidity_sensor: sensor.f1_scd41_back_right_humidity
-  vpd_sensor: sensor.middle_leaf_vpd
-  water_level_sensor: sensor.tank_percentage_full
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
 
-# Crop Profile Settings
-# =====================
-crop_profile:
-  default_crop_type: Cannabis_Athena  # Options: Cannabis_Athena, Cannabis_Hybrid, Cannabis_Indica, Cannabis_Sativa, Tomato, Lettuce
-  default_steering_mode: Vegetative # Options: Vegetative, Generative
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 172.30.33.0/24
 
-# System Features
-# ===============
-system_features:
-  enable_ec_stacking: false
-  enable_analytics: true
-  enable_ml_features: false
-  enable_mqtt_monitoring: false
-
-# Substrate Properties
-# ====================
-# CRITICAL - MEASURE ACCURATELY
-substrate:
-  volume_liters: 3.0
-  dripper_flow_rate_lph: 2.4
-  drippers_per_plant: 2
-  field_capacity_percent: 70.0
-  max_ec_limit: 9.0
-
-# Irrigation Parameters
-# =====================
-# Fine-tune via dashboard later
-irrigation_parameters:
-  p0_phase: # Morning Dryback
-    veg_dryback_target: 50
-    gen_dryback_target: 40
-    min_wait_time: 30
-    max_wait_time: 120
-  p1_phase: # Ramp-Up
-    initial_shot_size_percent: 2.0
-    shot_size_increment: 0.5
-    max_shot_size_percent: 10.0
-    time_between_shots: 15
-    target_vwc: 65
-    max_shots: 10
-    min_shots: 3
-  p2_phase: # Maintenance
-    shot_size_percent: 2.0
-    vwc_threshold: 60
-    ec_high_threshold: 1.2
-    ec_low_threshold: 0.8
-  p3_phase: # Pre-Lights-Off
-    veg_last_irrigation: 120
-    gen_last_irrigation: 180
-    emergency_vwc_threshold: 40
-    emergency_shot_size_percent: 2.0
-
-# EC Targets (Athena Method)
-# ==========================
-# 3.0 baseline, up to 6.0 generative
-ec_targets:
-  vegetative:
-    p0: 3.0
-    p1: 3.0
-    p2: 3.2
-    p3: 3.0
-  generative:
-    p0: 4.0
-    p1: 5.0
-    p2: 6.0
-    p3: 4.5
-
-# Notification Service
-# ====================
-notification_service: notify.mobile_app_s23ultra
-
-# Existing Home Assistant Entities
-# ================================
-# Map your existing HA entities to the crop steering system
-existing_entities:
-  tank_filling_switch: switch.tank_filling
-  system_override_switch: input_boolean.irrigation_system_override
-  auto_irrigation_switch: input_boolean.auto_irrigation_enabled
-  debug_mode_switch: input_boolean.crop_steering_debug
+template:
+  - trigger:
+      - trigger: time_pattern
+        minutes: "/1"
+    sensor:
+      - name: "Grow Room Light Timer"
+        unique_id: grow_room_light_timer
+        icon: >
+          {% set now_m = now().hour * 60 + now().minute %}
+          {% if now_m >= 480 and now_m < 1200 %}
+            mdi:lightbulb-on
+          {% else %}
+            mdi:lightbulb-off
+          {% endif %}
+        state: >
+          {% set now_m = now().hour * 60 + now().minute %}
+          {% set on_m = 480 %}
+          {% set off_m = 1200 %}
+          {% if now_m >= on_m and now_m < off_m %}
+            {% set remain = off_m - now_m %}
+            {% set h = remain // 60 %}
+            {% set m = remain % 60 %}
+            Lights OFF in {{ h }}h {{ m }}m
+          {% else %}
+            {% if now_m >= off_m %}
+              {% set remain = 1440 - now_m + on_m %}
+            {% else %}
+              {% set remain = on_m - now_m %}
+            {% endif %}
+            {% set h = remain // 60 %}
+            {% set m = remain % 60 %}
+            Lights ON in {{ h }}h {{ m }}m
+          {% endif %}

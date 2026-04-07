@@ -13,7 +13,7 @@ CONF_ENV_FILE_PATH = "env_file_path"
 
 # Zone configuration
 MIN_ZONES = 1
-MAX_ZONES = 6
+MAX_ZONES = 24  # No practical limit — env parser auto-detects zones
 DEFAULT_NUM_ZONES = 1
 
 # Default values (Athena method)

@@ -1,0 +1,1044 @@
+###############################################################################
+# Irrigation GROW PACK — SITE MAPPING FILE
+# /config/packages/irrigation/10_mapping.yaml
+#
+# PURPOSE  : Wrap this site's raw entity_ids into the stable internal
+#            irrigation_* contract.  This is THE ONLY FILE that contains raw
+#            entity references.  All other pack files use irrigation_* names only.
+#
+# SITE     : your-grow-room  (update per deployment)
+# GENERATED: 2026-03-02
+# HA ver   : detected integrations - ESPHome, ZHA, Z-Wave JS, Shelly, TP-Link
+#
+# INTERNAL CONTRACT SUMMARY
+# -------------------------
+#  Sensors (read-only):
+#    sensor.irrigation_room_1_temp          - grow room air temperature (C)
+#    sensor.irrigation_room_1_rh            - grow room relative humidity (%)
+#    sensor.irrigation_room_1_co2           - grow room CO2 level (ppm)
+#    sensor.irrigation_room_1_vpd           - grow room VPD (kPa)
+#
+#  Binary sensors:
+#    binary_sensor.irrigation_tank_low      - nutrient tank float low
+#    binary_sensor.irrigation_leak          - leak/flood sensor anywhere under tables
+#    binary_sensor.irrigation_lights_on     - true when any grow light is on
+#
+#  Switches (actuators):
+#    switch.irrigation_table_1_valve ... switch.irrigation_table_6_valve
+#    switch.irrigation_mains_water          - mains water solenoid
+#    switch.irrigation_mainline             - mainline solenoid
+#    switch.irrigation_manifold             - manifold solenoid
+#    switch.irrigation_co2                  - CO2 relay
+#    switch.irrigation_humidifier           - humidifier relay
+#    switch.irrigation_dehumidifier_1       - dehumidifier 1 plug
+#    switch.irrigation_dehumidifier_relay_1 ... relay_4
+#
+#  Climate (AC units):
+#    climate.irrigation_ac_1 ... irrigation_ac_4    - air conditioning units
+#
+#  Lights:
+#    light.irrigation_light_group           - main grow light group
+#
+#  Master helpers (defined here so mapping file is self-contained):
+#    input_boolean.irrigation_enable              - master enable for irrigation pack
+#    input_boolean.irrigation_maintenance_mode    - blocks all irrigation when on
+#    input_boolean.irrigation_table_1_enabled ... irrigation_table_6_enabled
+###############################################################################
+
+# ---------------------------------------------------------------------------
+# SECTION 1 - MASTER HELPERS
+# These are declared here (not in 20_model.yaml) so this file is the single
+# source for site-level on/off switches.
+# ---------------------------------------------------------------------------
+input_boolean:
+  # Master on/off for the entire irrigation pack
+  irrigation_enable:
+    name: "GW Master Enable"
+    icon: mdi:power
+
+  # GW timer-based irrigation on/off (independent of CO2 and environment).
+  # Turn OFF when using Crop Steering AI for irrigation instead.
+  irrigation_irrigation_enabled:
+    name: "GW Irrigation Enabled"
+    icon: mdi:water-sync
+
+  # CO2 injection on/off (independent of irrigation and environment).
+  irrigation_co2_enabled:
+    name: "GW CO2 Enabled"
+    icon: mdi:molecule-co2
+
+  # Temperature and humidity control on/off (independent of irrigation and CO2).
+  irrigation_environment_enabled:
+    name: "GW Environment Enabled"
+    icon: mdi:thermometer
+
+  # Suspend all irrigation without disabling sensors / alerts
+  irrigation_maintenance_mode:
+    name: "GW Maintenance Mode"
+    icon: mdi:wrench
+
+  # Per-table enable flags - logic pack ignores disabled tables
+  irrigation_table_1_enabled:
+    name: "GW Table 1 Enabled"
+    icon: mdi:numeric-1-circle
+  irrigation_table_2_enabled:
+    name: "GW Table 2 Enabled"
+    icon: mdi:numeric-2-circle
+  irrigation_table_3_enabled:
+    name: "GW Table 3 Enabled"
+    icon: mdi:numeric-3-circle
+  irrigation_table_4_enabled:
+    name: "GW Table 4 Enabled"
+    icon: mdi:numeric-4-circle
+  irrigation_table_5_enabled:
+    name: "GW Table 5 Enabled"
+    icon: mdi:numeric-5-circle
+  irrigation_table_6_enabled:
+    name: "GW Table 6 Enabled"
+    icon: mdi:numeric-6-circle
+
+# ---------------------------------------------------------------------------
+# SECTION 2 - TEMPLATE ENTITIES (the mapping layer)
+#
+# Each block wraps a raw entity into the irrigation_* contract.
+# unique_id values are stable strings - do NOT change after first deploy.
+# ---------------------------------------------------------------------------
+template:
+  # -- 2a. ENVIRONMENTAL SENSORS -----------------------------------------
+  - sensor:
+      # ROOM 1 TEMPERATURE
+      # Source: averaged Environmentals calibrated sensors (ESPHome)
+      - unique_id: irrigation_room_1_temp
+        name: "GW Room 1 Temp"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:thermometer
+        state: >
+          {% set sensors = [
+            states('sensor.environmentals_1_calibrated_temperature'),
+            states('sensor.environmentals_2_calibrated_temperature'),
+            states('sensor.environmentals_3_calibrated_temperature'),
+            states('sensor.environmentals_4_calibrated_temperature')
+          ] %}
+          {% set vals = sensors | reject('in', ['unknown','unavailable']) | map('float', none) | reject('none') | list %}
+          {{ (vals | sum / vals | length) | round(2) if vals | length > 0 else 'unavailable' }}
+        availability: >
+          {% set sensors = [
+            states('sensor.environmentals_1_calibrated_temperature'),
+            states('sensor.environmentals_2_calibrated_temperature'),
+            states('sensor.environmentals_3_calibrated_temperature'),
+            states('sensor.environmentals_4_calibrated_temperature')
+          ] %}
+          {{ (sensors | reject('in', ['unknown','unavailable']) | list | length) > 0 }}
+
+      # ROOM 1 RELATIVE HUMIDITY
+      # Source: averaged Environmentals calibrated humidity sensors (ESPHome)
+      - unique_id: irrigation_room_1_rh
+        name: "GW Room 1 RH"
+        unit_of_measurement: "%"
+        device_class: humidity
+        state_class: measurement
+        icon: mdi:water-percent
+        state: >
+          {% set sensors = [
+            states('sensor.environmentals_1_calibrated_humidity'),
+            states('sensor.environmentals_2_calibrated_humidity'),
+            states('sensor.environmentals_3_calibrated_humidity'),
+            states('sensor.environmentals_4_calibrated_humidity')
+          ] %}
+          {% set vals = sensors | reject('in', ['unknown','unavailable']) | map('float', none) | reject('none') | list %}
+          {{ (vals | sum / vals | length) | round(2) if vals | length > 0 else 'unavailable' }}
+        availability: >
+          {% set sensors = [
+            states('sensor.environmentals_1_calibrated_humidity'),
+            states('sensor.environmentals_2_calibrated_humidity'),
+            states('sensor.environmentals_3_calibrated_humidity'),
+            states('sensor.environmentals_4_calibrated_humidity')
+          ] %}
+          {{ (sensors | reject('in', ['unknown','unavailable']) | list | length) > 0 }}
+
+      # ROOM 1 CO2
+      # Source: averaged CO2 sensors (ESPHome)
+      - unique_id: irrigation_room_1_co2
+        name: "GW Room 1 CO2"
+        unit_of_measurement: "ppm"
+        device_class: carbon_dioxide
+        state_class: measurement
+        icon: mdi:molecule-co2
+        state: >
+          {% set sensors = [
+            states('sensor.co2_1_co2'),
+            states('sensor.co2_2_co2'),
+            states('sensor.co2_3_co2'),
+            states('sensor.co2_4_co2')
+          ] %}
+          {% set vals = sensors | reject('in', ['unknown','unavailable']) | map('float', none) | reject('none') | list %}
+          {{ (vals | sum / vals | length) | round(0) if vals | length > 0 else 'unavailable' }}
+        availability: >
+          {% set sensors = [
+            states('sensor.co2_1_co2'),
+            states('sensor.co2_2_co2'),
+            states('sensor.co2_3_co2'),
+            states('sensor.co2_4_co2')
+          ] %}
+          {{ (sensors | reject('in', ['unknown','unavailable']) | list | length) > 0 }}
+
+      # ROOM 1 VPD
+      # Source: averaged VPD from CO2 sensors (ESPHome)
+      - unique_id: irrigation_room_1_vpd
+        name: "GW Room 1 VPD"
+        unit_of_measurement: "kPa"
+        state_class: measurement
+        icon: mdi:leaf
+        state: >
+          {% set sensors = [
+            states('sensor.co2_1_vpd'),
+            states('sensor.co2_2_vpd'),
+            states('sensor.co2_3_vpd'),
+            states('sensor.co2_4_vpd')
+          ] %}
+          {% set vals = sensors | reject('in', ['unknown','unavailable']) | map('float', none) | reject('none') | list %}
+          {{ (vals | sum / vals | length) | round(3) if vals | length > 0 else 'unavailable' }}
+        availability: >
+          {% set sensors = [
+            states('sensor.co2_1_vpd'),
+            states('sensor.co2_2_vpd'),
+            states('sensor.co2_3_vpd'),
+            states('sensor.co2_4_vpd')
+          ] %}
+          {{ (sensors | reject('in', ['unknown','unavailable']) | list | length) > 0 }}
+
+      ###################################################################
+      # TODO: UNMAPPED SENSORS - Need real entity IDs from Irrigation
+      ###################################################################
+      # LEAF TEMPERATURE SENSOR
+      # Required for: VPD-based dehumidifier targeting, AC RH guard
+      # Replace 'unavailable' with real sensor entity once installed
+      - unique_id: irrigation_leaf_temp
+        name: "GW Leaf Temperature"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:leaf
+        state: >
+          {{ states('sensor.irrigation_room_1_temp') | float(0) }}
+        availability: >
+          {{ states('sensor.irrigation_room_1_temp') not in ['unknown','unavailable'] }}
+        # NOTE: Falls back to air temp until a dedicated leaf temp sensor is installed.
+        # Replace the state template with your leaf temp sensor entity_id.
+
+      # ==============================================================
+      # PER-TABLE VWC SENSORS (for Crop Steering)
+      # Required for: 4-phase crop steering, dryback monitoring
+      # TODO: Replace each 'unavailable' state with real TEROS 12 or
+      #       equivalent VWC sensor entity_id per table.
+      #
+      # Example with TEROS 12 probes (front + back per table):
+      #   state: >
+      #     {% set f = states('sensor.teros_table1_front_vwc') | float(none) %}
+      #     {% set b = states('sensor.teros_table1_back_vwc') | float(none) %}
+      #     {% set vals = [f,b] | reject('none') | list %}
+      #     {{ (vals | sum / vals | length) | round(1) if vals else 'unavailable' }}
+      # ==============================================================
+      - unique_id: irrigation_table_1_vwc
+        name: "GW Table 1 VWC"
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:water-percent
+        state: >
+          {{ states('sensor.substrate_1_substrate_1_vwc_coco_coir') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_1_substrate_1_vwc_coco_coir') not in ['unknown','unavailable'] }}
+        # MAPPED - sensor.substrate_1_substrate_1_vwc_coco_coir
+
+      - unique_id: irrigation_table_2_vwc
+        name: "GW Table 2 VWC"
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:water-percent
+        state: >
+          {{ states('sensor.substrate_2_substrate_2_vwc_coco_coir') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_2_substrate_2_vwc_coco_coir') not in ['unknown','unavailable'] }}
+        # MAPPED - sensor.substrate_2_substrate_2_vwc_coco_coir
+
+      - unique_id: irrigation_table_3_vwc
+        name: "GW Table 3 VWC"
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:water-percent
+        state: >
+          {{ states('sensor.substrate_3_substrate_3_vwc_coco_coir') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_3_substrate_3_vwc_coco_coir') not in ['unknown','unavailable'] }}
+        # MAPPED - sensor.substrate_3_substrate_3_vwc_coco_coir
+
+      - unique_id: irrigation_table_4_vwc
+        name: "GW Table 4 VWC"
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:water-percent
+        state: >
+          {{ states('sensor.substrate_4_substrate_4_vwc_coco_coir') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_4_substrate_4_vwc_coco_coir') not in ['unknown','unavailable'] }}
+        # MAPPED - sensor.substrate_4_substrate_4_vwc_coco_coir
+
+      - unique_id: irrigation_table_5_vwc
+        name: "GW Table 5 VWC"
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:water-percent
+        state: >
+          {{ states('sensor.substrate_5_substrate_5_vwc_coco_coir') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_5_substrate_5_vwc_coco_coir') not in ['unknown','unavailable'] }}
+        # MAPPED - sensor.substrate_5_substrate_5_vwc_coco_coir
+
+      - unique_id: irrigation_table_6_vwc
+        name: "GW Table 6 VWC"
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:water-percent
+        state: >
+          {{ states('sensor.substrate_6_substrate_6_vwc_coco_coir') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_6_substrate_6_vwc_coco_coir') not in ['unknown','unavailable'] }}
+        # MAPPED - sensor.substrate_6_substrate_6_vwc_coco_coir
+
+      # AVERAGE VWC (aggregate across all tables with valid readings)
+      # This drives P0/P1/P2/P3 phase transitions in crop steering
+      - unique_id: irrigation_average_vwc
+        name: "GW Average VWC"
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:water-percent
+        state: >
+          {% set sensors = [
+            states('sensor.irrigation_table_1_vwc'),
+            states('sensor.irrigation_table_2_vwc'),
+            states('sensor.irrigation_table_3_vwc'),
+            states('sensor.irrigation_table_4_vwc'),
+            states('sensor.irrigation_table_5_vwc'),
+            states('sensor.irrigation_table_6_vwc')
+          ] %}
+          {% set vals = sensors | reject('in', ['unknown','unavailable']) | map('float', none) | reject('none') | list %}
+          {% if vals | length > 0 %}
+            {{ (vals | sum / vals | length) | round(1) }}
+          {% else %}
+            unavailable
+          {% endif %}
+
+      # ==============================================================
+      # PER-TABLE EC SENSORS (for Crop Steering)
+      # Required for: EC-adjusted irrigation thresholds, nutrient monitoring
+      # TODO: Replace with real EC probe entity IDs
+      # ==============================================================
+      - unique_id: irrigation_table_1_ec
+        name: "GW Table 1 EC"
+        unit_of_measurement: "mS/cm"
+        state_class: measurement
+        icon: mdi:flash
+        state: >
+          {{ states('sensor.substrate_1_substrate_1_pwec') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_1_substrate_1_pwec') not in ['unknown','unavailable'] }}
+        # MAPPED - sensor.substrate_1_substrate_1_pwec
+
+      - unique_id: irrigation_table_2_ec
+        name: "GW Table 2 EC"
+        unit_of_measurement: "mS/cm"
+        state_class: measurement
+        icon: mdi:flash
+        state: >
+          {{ states('sensor.substrate_2_substrate_2_pwec') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_2_substrate_2_pwec') not in ['unknown','unavailable'] }}
+        # MAPPED - sensor.substrate_2_substrate_2_pwec
+
+      - unique_id: irrigation_table_3_ec
+        name: "GW Table 3 EC"
+        unit_of_measurement: "mS/cm"
+        state_class: measurement
+        icon: mdi:flash
+        state: >
+          {{ states('sensor.substrate_3_substrate_3_pwec') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_3_substrate_3_pwec') not in ['unknown','unavailable'] }}
+        # MAPPED - sensor.substrate_3_substrate_3_pwec
+
+      - unique_id: irrigation_table_4_ec
+        name: "GW Table 4 EC"
+        unit_of_measurement: "mS/cm"
+        state_class: measurement
+        icon: mdi:flash
+        state: >
+          {{ states('sensor.substrate_4_substrate_4_pwec') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_4_substrate_4_pwec') not in ['unknown','unavailable'] }}
+        # MAPPED - sensor.substrate_4_substrate_4_pwec
+
+      - unique_id: irrigation_table_5_ec
+        name: "GW Table 5 EC"
+        unit_of_measurement: "mS/cm"
+        state_class: measurement
+        icon: mdi:flash
+        state: >
+          {{ states('sensor.substrate_5_substrate_5_pwec') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_5_substrate_5_pwec') not in ['unknown','unavailable'] }}
+        # MAPPED - sensor.substrate_5_substrate_5_pwec
+
+      - unique_id: irrigation_table_6_ec
+        name: "GW Table 6 EC"
+        unit_of_measurement: "mS/cm"
+        state_class: measurement
+        icon: mdi:flash
+        state: >
+          {{ states('sensor.substrate_6_substrate_6_pwec') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_6_substrate_6_pwec') not in ['unknown','unavailable'] }}
+        # MAPPED - sensor.substrate_6_substrate_6_pwec
+
+      # AVERAGE EC (aggregate across all tables with valid readings)
+      - unique_id: irrigation_average_ec
+        name: "GW Average EC"
+        unit_of_measurement: "mS/cm"
+        state_class: measurement
+        icon: mdi:flash
+        state: >
+          {% set sensors = [
+            states('sensor.irrigation_table_1_ec'),
+            states('sensor.irrigation_table_2_ec'),
+            states('sensor.irrigation_table_3_ec'),
+            states('sensor.irrigation_table_4_ec'),
+            states('sensor.irrigation_table_5_ec'),
+            states('sensor.irrigation_table_6_ec')
+          ] %}
+          {% set vals = sensors | reject('in', ['unknown','unavailable']) | map('float', none) | reject('none') | list %}
+          {% if vals | length > 0 %}
+            {{ (vals | sum / vals | length) | round(2) }}
+          {% else %}
+            unavailable
+          {% endif %}
+
+      # ==============================================================
+      # SUBSTRATE TEMPERATURE SENSORS (passthrough)
+      # Added from discovered ESPHome/repurposed substrate probes
+      # ==============================================================
+
+      - unique_id: irrigation_table_1_substrate_temp
+        name: "GW Table 1 Substrate Temp"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:thermometer
+        state: >
+          {{ states('sensor.substrate_1_substrate_1_temperature') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_1_substrate_1_temperature') not in ['unknown','unavailable'] }}
+
+      - unique_id: irrigation_table_2_substrate_temp
+        name: "GW Table 2 Substrate Temp"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:thermometer
+        state: >
+          {{ states('sensor.substrate_2_substrate_2_temperature') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_2_substrate_2_temperature') not in ['unknown','unavailable'] }}
+
+      - unique_id: irrigation_table_3_substrate_temp
+        name: "GW Table 3 Substrate Temp"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:thermometer
+        state: >
+          {{ states('sensor.substrate_3_substrate_3_temperature') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_3_substrate_3_temperature') not in ['unknown','unavailable'] }}
+
+      - unique_id: irrigation_table_4_substrate_temp
+        name: "GW Table 4 Substrate Temp"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:thermometer
+        state: >
+          {{ states('sensor.substrate_4_substrate_4_temperature') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_4_substrate_4_temperature') not in ['unknown','unavailable'] }}
+
+      - unique_id: irrigation_table_5_substrate_temp
+        name: "GW Table 5 Substrate Temp"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:thermometer
+        state: >
+          {{ states('sensor.substrate_5_substrate_5_temperature') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_5_substrate_5_temperature') not in ['unknown','unavailable'] }}
+
+      - unique_id: irrigation_table_6_substrate_temp
+        name: "GW Table 6 Substrate Temp"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:thermometer
+        state: >
+          {{ states('sensor.substrate_6_substrate_6_temperature') | float(0) | round(1) }}
+        availability: >
+          {{ states('sensor.substrate_6_substrate_6_temperature') not in ['unknown','unavailable'] }}
+
+      # Raw/repurposed substrate probe passthroughs
+      - unique_id: irrigation_substrate_probe_a_vwc
+        name: "GW Substrate Probe A vWC"
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:water-percent
+        state: >
+          {{ states('sensor.co2_2_substrate_3_vwc') | float(0) }}
+        availability: >
+          {{ states('sensor.co2_2_substrate_3_vwc') not in ['unknown','unavailable'] }}
+
+      - unique_id: irrigation_substrate_probe_a_ec
+        name: "GW Substrate Probe A EC"
+        unit_of_measurement: "EC (ppm500)"
+        state_class: measurement
+        icon: mdi:flash
+        state: >
+          {{ states('sensor.co2_2_substrate_3_pwec') | float(0) }}
+        availability: >
+          {{ states('sensor.co2_2_substrate_3_pwec') not in ['unknown','unavailable'] }}
+
+      - unique_id: irrigation_substrate_probe_a_temp
+        name: "GW Substrate Probe A Temp"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:thermometer
+        state: >
+          {{ states('sensor.co2_2_substrate_3_temperature') | float(0) }}
+        availability: >
+          {{ states('sensor.co2_2_substrate_3_temperature') not in ['unknown','unavailable'] }}
+
+      # TANK pH SENSOR
+      # Required for: Tank refill and dose pH verification
+      # TODO: Replace with real pH sensor entity_id
+      - unique_id: irrigation_tank_ph
+        name: "GW Tank pH"
+        state_class: measurement
+        icon: mdi:flask
+        state: "unavailable"
+        availability: "{{ false }}"
+        # UNMAPPED - Needs pH probe entity ID
+
+      # TANK EC SENSOR
+      # Required for: Tank refill and dose EC verification
+      # TODO: Replace with real EC sensor entity_id
+      - unique_id: irrigation_tank_ec
+        name: "GW Tank EC"
+        unit_of_measurement: "mS/cm"
+        state_class: measurement
+        icon: mdi:flash
+        state: "unavailable"
+        availability: "{{ false }}"
+        # UNMAPPED - Needs EC probe entity ID
+
+  # -- 2b. BINARY SENSORS ------------------------------------------------
+  - binary_sensor:
+      # LIGHTS ON STATE
+      # Source: light.grow_room_all_lights (HA light group)
+      - unique_id: irrigation_lights_on
+        name: "GW Lights On"
+        device_class: light
+        icon: mdi:lightbulb-group
+        state: >
+          {{ is_state('light.grow_room_all_lights', 'on') }}
+
+      # TANK LOW
+      # !! UNMAPPED - DEFAULT SAFE (false = tank OK) !!
+      # [AUDIT] CRITICAL: irrigation_abort_on_tank_low will NEVER fire until this is
+      # mapped to a real float switch sensor. Map BEFORE production deployment.
+      - unique_id: irrigation_tank_low
+        name: "GW Tank Low"
+        device_class: problem
+        icon: mdi:water-off
+        state: >
+          {{ false }}
+        # UNMAPPED - DEFAULT SAFE
+        # TODO: Replace with float switch sensor, e.g.:
+        # {{ is_state('binary_sensor.input_9', 'on') }}
+
+      # LEAK SENSOR
+      # !! UNMAPPED - DEFAULT SAFE (false = no leak) !!
+      # [AUDIT] CRITICAL: irrigation_abort_on_leak will NEVER fire until this is
+      # mapped to a real leak/moisture sensor. Map BEFORE production deployment.
+      - unique_id: irrigation_leak
+        name: "GW Leak Detected"
+        device_class: moisture
+        icon: mdi:water-alert
+        state: >
+          {{ false }}
+        # UNMAPPED - DEFAULT SAFE
+        # TODO: Replace with leak sensor entity, e.g.:
+        # {{ is_state('binary_sensor.input_10', 'on') }}
+
+      - unique_id: irrigation_system_ready
+        name: "GW System Ready"
+        device_class: running
+        icon: mdi:check-circle-outline
+        state: >
+          {{ not 'TODO' in states('input_text.irrigation_ac_unit_1')
+             and not 'TODO' in states('input_text.irrigation_doser_mqtt_topic')
+             and states('sensor.irrigation_room_1_temp') not in ['unknown','unavailable']
+             and states('sensor.irrigation_room_1_rh') not in ['unknown','unavailable']
+             and states('sensor.irrigation_room_1_co2') not in ['unknown','unavailable']
+             and not is_state('binary_sensor.irrigation_leak', 'unavailable')
+             and not is_state('binary_sensor.irrigation_tank_low', 'unavailable') }}
+
+  # -- 2c. TEMPLATE SWITCHES - TABLE VALVES -------------------------------
+  - switch:
+      # TABLE 1 VALVE - MAPPED to switch.table_1 (KC868 E16S Output 1)
+      - unique_id: irrigation_table_1_valve
+        name: "GW Table 1 Valve"
+        icon: mdi:valve
+        state: >
+          {{ is_state('switch.table_1', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.table_1
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.table_1
+        availability: >
+          {{ states('switch.table_1') not in ['unknown','unavailable'] }}
+
+      # TABLE 2 VALVE - MAPPED to switch.table_2 (KC868 E16S Output 2)
+      - unique_id: irrigation_table_2_valve
+        name: "GW Table 2 Valve"
+        icon: mdi:valve
+        state: >
+          {{ is_state('switch.table_2', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.table_2
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.table_2
+        availability: >
+          {{ states('switch.table_2') not in ['unknown','unavailable'] }}
+
+      # TABLE 3 VALVE - MAPPED to switch.table_3 (KC868 E16S Output 3)
+      - unique_id: irrigation_table_3_valve
+        name: "GW Table 3 Valve"
+        icon: mdi:valve
+        state: >
+          {{ is_state('switch.table_3', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.table_3
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.table_3
+        availability: >
+          {{ states('switch.table_3') not in ['unknown','unavailable'] }}
+
+      # TABLE 4 VALVE - MAPPED to switch.table_4 (KC868 E16S Output 4)
+      - unique_id: irrigation_table_4_valve
+        name: "GW Table 4 Valve"
+        icon: mdi:valve
+        state: >
+          {{ is_state('switch.table_4', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.table_4
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.table_4
+        availability: >
+          {{ states('switch.table_4') not in ['unknown','unavailable'] }}
+
+      # TABLE 5 VALVE - MAPPED to switch.table_5 (KC868 E16S Output 5)
+      - unique_id: irrigation_table_5_valve
+        name: "GW Table 5 Valve"
+        icon: mdi:valve
+        state: >
+          {{ is_state('switch.table_5', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.table_5
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.table_5
+        availability: >
+          {{ states('switch.table_5') not in ['unknown','unavailable'] }}
+
+      # TABLE 6 VALVE - MAPPED to switch.table_6 (KC868 E16S Output 6)
+      - unique_id: irrigation_table_6_valve
+        name: "GW Table 6 Valve"
+        icon: mdi:valve
+        state: >
+          {{ is_state('switch.table_6', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.table_6
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.table_6
+        availability: >
+          {{ states('switch.table_6') not in ['unknown','unavailable'] }}
+
+      # MAINS WATER SOLENOID - MAPPED to switch.mains_water (KC868 Output 7)
+      - unique_id: irrigation_mains_water
+        name: "GW Mains Water"
+        icon: mdi:pipe-valve
+        state: >
+          {{ is_state('switch.mains_water', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.mains_water
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.mains_water
+        availability: >
+          {{ states('switch.mains_water') not in ['unknown','unavailable'] }}
+
+      # MAINLINE SOLENOID - MAPPED to switch.mainline (KC868 Output 8)
+      - unique_id: irrigation_mainline
+        name: "GW Mainline"
+        icon: mdi:pipe
+        state: >
+          {{ is_state('switch.mainline', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.mainline
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.mainline
+        availability: >
+          {{ states('switch.mainline') not in ['unknown','unavailable'] }}
+
+      # MANIFOLD SOLENOID - MAPPED to switch.manifold (KC868 Output 9)
+      - unique_id: irrigation_manifold
+        name: "GW Manifold"
+        icon: mdi:pipe-disconnected
+        state: >
+          {{ is_state('switch.manifold', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.manifold
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.manifold
+        availability: >
+          {{ states('switch.manifold') not in ['unknown','unavailable'] }}
+
+      # CO2 RELAY - MAPPED to switch.solidstate_relay_co2_1_co2_relay_1
+      - unique_id: irrigation_co2
+        name: "GW CO2"
+        icon: mdi:molecule-co2
+        state: >
+          {{ is_state('switch.solidstate_relay_co2_1_co2_relay_1', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.solidstate_relay_co2_1_co2_relay_1
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.solidstate_relay_co2_1_co2_relay_1
+        availability: >
+          {{ states('switch.solidstate_relay_co2_1_co2_relay_1') not in ['unknown','unavailable'] }}
+
+      # HUMIDIFIER RELAY - MAPPED to switch.solidstate_relay_humidifier_1_humidifier_relay_1
+      - unique_id: irrigation_humidifier
+        name: "GW Humidifier"
+        icon: mdi:air-humidifier
+        state: >
+          {{ is_state('switch.solidstate_relay_humidifier_1_humidifier_relay_1', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.solidstate_relay_humidifier_1_humidifier_relay_1
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.solidstate_relay_humidifier_1_humidifier_relay_1
+        availability: >
+          {{ states('switch.solidstate_relay_humidifier_1_humidifier_relay_1') not in ['unknown','unavailable'] }}
+
+      # DEHUMIDIFIER 1 PLUG - MAPPED to switch.dehumidifier_1_plug (TP-Link Kasa)
+      - unique_id: irrigation_dehumidifier_1
+        name: "GW Dehumidifier 1"
+        icon: mdi:air-humidifier-off
+        state: >
+          {{ is_state('switch.dehumidifier_1_plug', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.dehumidifier_1_plug
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.dehumidifier_1_plug
+        availability: >
+          {{ states('switch.dehumidifier_1_plug') not in ['unknown', 'unavailable'] }}
+
+      # DEHUMIDIFIER RELAY 1
+      - unique_id: irrigation_dehumidifier_relay_1
+        name: "GW Dehumidifier Relay 1"
+        icon: mdi:air-humidifier-off
+        state: >
+          {{ is_state('switch.left_dehumidifier_1_relay_1', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.left_dehumidifier_1_relay_1
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.left_dehumidifier_1_relay_1
+        availability: >
+          {{ states('switch.left_dehumidifier_1_relay_1') not in ['unknown', 'unavailable'] }}
+
+      # DEHUMIDIFIER RELAY 2
+      - unique_id: irrigation_dehumidifier_relay_2
+        name: "GW Dehumidifier Relay 2"
+        icon: mdi:air-humidifier-off
+        state: >
+          {{ is_state('switch.left_dehumidifier_1_relay_2', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.left_dehumidifier_1_relay_2
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.left_dehumidifier_1_relay_2
+        availability: >
+          {{ states('switch.left_dehumidifier_1_relay_2') not in ['unknown', 'unavailable'] }}
+
+      # DEHUMIDIFIER RELAY 3
+      - unique_id: irrigation_dehumidifier_relay_3
+        name: "GW Dehumidifier Relay 3"
+        icon: mdi:air-humidifier-off
+        state: >
+          {{ is_state('switch.left_dehumidifier_1_relay_3', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.left_dehumidifier_1_relay_3
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.left_dehumidifier_1_relay_3
+        availability: >
+          {{ states('switch.left_dehumidifier_1_relay_3') not in ['unknown', 'unavailable'] }}
+
+      # DEHUMIDIFIER RELAY 4
+      - unique_id: irrigation_dehumidifier_relay_4
+        name: "GW Dehumidifier Relay 4"
+        icon: mdi:air-humidifier-off
+        state: >
+          {{ is_state('switch.left_dehumidifier_1_relay_4', 'on') }}
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.left_dehumidifier_1_relay_4
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.left_dehumidifier_1_relay_4
+        availability: >
+          {{ states('switch.left_dehumidifier_1_relay_4') not in ['unknown', 'unavailable'] }}
+
+      ###################################################################
+      # TODO: UNMAPPED SWITCHES - Need real entity IDs from Irrigation
+      ###################################################################
+      # TANK FILL VALVE
+      # Required for: Tank refill and dose automation
+      # TODO: Replace 'switch.TODO_tank_fill_valve' with real entity
+      - unique_id: irrigation_tank_fill_valve
+        name: "GW Tank Fill Valve"
+        icon: mdi:pipe-valve
+        state: "{{ false }}"
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.mains_water
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.mains_water
+        # UNMAPPED - Needs real entity ID
+
+      # RECIRCULATION VALVE
+      # Required for: Tank mixing during dose cycles
+      # TODO: Replace 'switch.TODO_recirculation_valve' with real entity
+      - unique_id: irrigation_recirculation_valve
+        name: "GW Recirculation Valve"
+        icon: mdi:pipe-valve
+        state: "{{ false }}"
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.manifold
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.manifold
+        # UNMAPPED - Needs real entity ID
+
+      # WASTE/DRAIN VALVE
+      # Required for: Tank management
+      # TODO: Replace with real entity
+      - unique_id: irrigation_waste_valve
+        name: "GW Waste Valve"
+        icon: mdi:pipe-valve
+        state: "{{ false }}"
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.TODO_waste_valve
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.TODO_waste_valve
+        # UNMAPPED - Needs real entity ID
+
+      # CEILING VENT CONTROL
+      # Required for: Night-time high CO2 exhaust
+      # TODO: Replace with real entity
+      - unique_id: irrigation_ceiling_vent
+        name: "GW Ceiling Vent"
+        icon: mdi:fan
+        state: "{{ false }}"
+        turn_on:
+          action: switch.turn_on
+          target:
+            entity_id: switch.TODO_ceiling_vent
+        turn_off:
+          action: switch.turn_off
+          target:
+            entity_id: switch.TODO_ceiling_vent
+        # UNMAPPED - Needs real entity ID
+
+  # -- 2d. CLIMATE (AC UNITS) -------------------------------------------
+  # Irrigation has 4 AC units. These need climate.* entity IDs.
+  #
+  # TODO: Replace ALL 'climate.TODO_ac_*' with the real climate entity IDs
+  #       from Irrigation's HA instance. Check for:
+  #       - climate.mitsubishi_* or climate.daikin_* or climate.fujitsu_*
+  #       - climate.ac_* or climate.air_conditioner_*
+  #       - Any climate.* entities in the grow room
+  #
+  # IMPORTANT: The AC automations will NOT function until these are mapped.
+  # You can verify available entities by running in HA Developer Tools:
+  #   {{ states.climate | list }}
+  # ---------------------------------------------------------------------------
+
+  # NOTE: AC units use the climate domain directly (not template switches)
+  # because climate entities need set_temperature, set_hvac_mode, set_fan_mode
+  # which template switches cannot proxy. The irrigation_ac_* names below are just
+  # input_text helpers holding the real entity IDs, referenced by automations.
+
+  # (AC mapping is done via input_text helpers in Section 3 below)
+
+# ---------------------------------------------------------------------------
+# SECTION 3 - AC & LIGHT ENTITY MAP (input_text based)
+# These input_texts hold the real entity IDs for climate/light entities
+# that need full domain access (not just on/off like template switches).
+# Set these values in the HA UI after deployment.
+# ---------------------------------------------------------------------------
+input_text:
+  # AC UNIT 1
+  # TODO: Set to your real climate entity, e.g. climate.grow_room_ac_1
+  irrigation_ac_unit_1:
+    name: "GW AC Unit 1 Entity ID"
+    max: 255
+    initial: "climate.ac_1_ac_1_2"
+    icon: mdi:air-conditioner
+
+  # AC UNIT 2
+  irrigation_ac_unit_2:
+    name: "GW AC Unit 2 Entity ID"
+    max: 255
+    initial: "climate.ac_2_ac_2"
+    icon: mdi:air-conditioner
+
+  # AC UNIT 3
+  irrigation_ac_unit_3:
+    name: "GW AC Unit 3 Entity ID"
+    max: 255
+    initial: "climate.ac_3_ac_3"
+    icon: mdi:air-conditioner
+
+  # AC UNIT 4
+  irrigation_ac_unit_4:
+    name: "GW AC Unit 4 Entity ID"
+    max: 255
+    initial: "climate.ac_4_ac_4"
+    icon: mdi:air-conditioner
+
+  # LIGHT GROUP
+  # The light group entity for brightness control (light.turn_on with brightness)
+  # Default matches existing binary_sensor source
+  irrigation_light_group:
+    name: "GW Light Group Entity ID"
+    max: 255
+    initial: "light.grow_room_all_lights"
+    icon: mdi:lightbulb-group
+
+  # EXHAUST FAN SPEED (number entity for variable speed)
+  # TODO: Replace with real entity - e.g. number.exhaust_fan_speed
+  irrigation_exhaust_fan_speed:
+    name: "GW Exhaust Fan Speed Entity ID"
+    max: 255
+    initial: "number.TODO_exhaust_fan_speed"
+    icon: mdi:fan
+
+  # NIGHT HEATING UNIT
+  # Which AC unit is designated for night heating (set to one of irrigation_ac_unit_*)
+  irrigation_night_heat_unit:
+    name: "GW Night Heating Unit Entity ID"
+    max: 255
+    initial: "climate.ac_1_ac_1_2"
+    icon: mdi:radiator
+
+  # DOSER MQTT TOPIC (for peristaltic dosing pump)
+  # TODO: Replace with your dosing system MQTT topic
+  irrigation_doser_mqtt_topic:
+    name: "GW Doser MQTT Topic"
+    max: 255
+    initial: "TODO/doser/command"
+    icon: mdi:flask
+
+  # DOSER SERIAL NUMBER
+  irrigation_doser_serial:
+    name: "GW Doser Serial Number"
+    max: 255
+    initial: "TODO_SERIAL"
+    icon: mdi:barcode

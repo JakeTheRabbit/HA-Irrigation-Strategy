@@ -107,8 +107,9 @@ class IntelligentSensorFusion:
         self.total_readings = defaultdict(int)
         
         # Kalman filter parameters
-        self.kalman_state = None
-        self.kalman_covariance = 1.0
+        # Separate Kalman filters per sensor type to avoid mixing VWC and EC
+        self.kalman_states = {}      # sensor_type -> state
+        self.kalman_covariances = {} # sensor_type -> covariance
         self.process_noise = 0.1
         self.measurement_noise = 0.5
         
@@ -132,22 +133,22 @@ class IntelligentSensorFusion:
         if timestamp is None:
             timestamp = datetime.now()
         
-        # Add raw reading
-        self.sensor_data[sensor_id].append(value)
-        self.sensor_timestamps[sensor_id].append(timestamp)
-        self.total_readings[sensor_id] += 1
-        
         # Track sensor type to avoid mixing VWC and EC
         self.sensor_types[sensor_id] = sensor_type
-        
-        # Update sensor reliability
-        self._update_sensor_reliability(sensor_id)
-        
-        # Perform outlier detection
+        self.total_readings[sensor_id] += 1
+
+        # Perform outlier detection BEFORE storing
         is_outlier = self._detect_outlier(sensor_id, value)
         if is_outlier:
             self.outlier_counts[sensor_id] += 1
-            _LOGGER.warning(f"Outlier detected: {sensor_id} = {value}")
+            _LOGGER.warning(f"Outlier rejected: {sensor_id} = {value} (type={sensor_type})")
+        else:
+            # Only store non-outlier readings
+            self.sensor_data[sensor_id].append(value)
+            self.sensor_timestamps[sensor_id].append(timestamp)
+
+        # Update sensor reliability
+        self._update_sensor_reliability(sensor_id)
         
         # Update sensor health status
         self._update_sensor_health(sensor_id)
@@ -192,53 +193,33 @@ class IntelligentSensorFusion:
                 return True
         
         sensor_history = list(self.sensor_data[sensor_id])
-        
+
         # Need minimum data for outlier detection
         if len(sensor_history) < 10:
             return False
-        
-        # Calculate IQR bounds
-        q1 = self._percentile(sensor_history, 25)
-        q3 = self._percentile(sensor_history, 75)
-        iqr_value = q3 - q1
-        
-        # Adaptive multiplier based on data variability
-        data_std = self._std(sensor_history)
+
+        # Minimum acceptable deviation by sensor type - substrate probes have
+        # on-board calibration so normal fluctuations should never be outliers
+        sensor_type = self.sensor_types.get(sensor_id, 'unknown')
+        min_deviation = {'vwc': 5.0, 'ec': 1.0}.get(sensor_type, 3.0)
+
         data_mean = self._mean(sensor_history)
-        cv = data_std / data_mean if data_mean > 0 else 1.0  # Coefficient of variation
-        
-        # Adjust multiplier based on data stability
-        adaptive_multiplier = self.outlier_multiplier
-        if cv < 0.1:  # Very stable data
-            adaptive_multiplier *= 0.8  # More sensitive to outliers
-        elif cv > 0.3:  # Highly variable data
-            adaptive_multiplier *= 1.5  # Less sensitive to outliers
-        
-        # IQR bounds
-        lower_bound = q1 - (adaptive_multiplier * iqr_value)
-        upper_bound = q3 + (adaptive_multiplier * iqr_value)
-        
-        # Additional checks for extreme values
-        z_score = abs((value - data_mean) / data_std) if data_std > 0 and len(sensor_history) > 2 else 0
-        extreme_outlier = z_score > 3.5  # Very extreme values
-        
-        # Check temporal consistency (rapid changes)
-        temporal_outlier = False
-        if len(sensor_history) >= 3:
-            recent_values = sensor_history[-3:]
-            recent_mean = self._mean(recent_values)
-            if abs(value - recent_mean) > (2 * data_std):
-                temporal_outlier = True
-        
-        is_outlier = (value < lower_bound or value > upper_bound) or extreme_outlier or temporal_outlier
-        
-        # Log detailed outlier analysis
-        if is_outlier:
-            _LOGGER.debug(f"Outlier Analysis - {sensor_id}: value={value:.2f}, "
-                         f"bounds=[{lower_bound:.2f}, {upper_bound:.2f}], "
-                         f"z_score={z_score:.2f}, CV={cv:.3f}")
-        
-        return is_outlier
+        data_std = self._std(sensor_history)
+
+        # Simple outlier: reject values more than min_deviation from recent mean
+        # This avoids the IQR trap where stable data makes bounds impossibly tight
+        if abs(value - data_mean) <= min_deviation:
+            return False
+
+        # For larger deviations, use z-score (only if we have meaningful std)
+        if data_std > 0.01:
+            z_score = abs((value - data_mean) / data_std)
+            if z_score > 4.0:  # Very extreme - 4 sigma
+                _LOGGER.debug(f"Outlier: {sensor_id} value={value:.2f}, mean={data_mean:.2f}, "
+                             f"z={z_score:.1f}")
+                return True
+
+        return False
 
     def _update_sensor_reliability(self, sensor_id: str):
         """
@@ -380,11 +361,12 @@ class IntelligentSensorFusion:
             fused_value = self._weighted_fusion(active_sensors)
             confidence = self._calculate_fusion_confidence(active_sensors)
         
-        # Apply Kalman filtering for smoothing
-        if self.kalman_state is not None:
-            fused_value = self._apply_kalman_filter(fused_value)
+        # Apply Kalman filtering for smoothing (per sensor type)
+        if sensor_type in self.kalman_states:
+            fused_value = self._apply_kalman_filter(fused_value, sensor_type)
         else:
-            self.kalman_state = fused_value
+            self.kalman_states[sensor_type] = fused_value
+            self.kalman_covariances[sensor_type] = 1.0
         
         # Store fusion results
         self.fused_values.append(fused_value)
@@ -477,26 +459,27 @@ class IntelligentSensorFusion:
         
         return min(sum(factors), 1.0)
 
-    def _apply_kalman_filter(self, measurement: float) -> float:
+    def _apply_kalman_filter(self, measurement: float, sensor_type: str) -> float:
         """
-        Apply Kalman filter for noise reduction.
-        
+        Apply Kalman filter for noise reduction (per sensor type).
+
         Args:
             measurement: Current measurement value
-            
+            sensor_type: Type of sensor ('vwc' or 'ec')
+
         Returns:
             Filtered value
         """
         # Prediction step
-        predicted_state = self.kalman_state
-        predicted_covariance = self.kalman_covariance + self.process_noise
-        
+        predicted_state = self.kalman_states[sensor_type]
+        predicted_covariance = self.kalman_covariances[sensor_type] + self.process_noise
+
         # Update step
         kalman_gain = predicted_covariance / (predicted_covariance + self.measurement_noise)
-        self.kalman_state = predicted_state + kalman_gain * (measurement - predicted_state)
-        self.kalman_covariance = (1 - kalman_gain) * predicted_covariance
-        
-        return self.kalman_state
+        self.kalman_states[sensor_type] = predicted_state + kalman_gain * (measurement - predicted_state)
+        self.kalman_covariances[sensor_type] = (1 - kalman_gain) * predicted_covariance
+
+        return self.kalman_states[sensor_type]
 
     def get_sensor_health_report(self) -> Dict:
         """Get comprehensive sensor health report."""
@@ -570,9 +553,9 @@ class IntelligentSensorFusion:
         self.outlier_counts.clear()
         self.total_readings.clear()
         self.sensor_types.clear()
-        self.kalman_state = None
-        self.kalman_covariance = 1.0
-        
+        self.kalman_states = {}
+        self.kalman_covariances = {}
+
         _LOGGER.info("Sensor Fusion system reset")
     
     def get_fused_vwc(self) -> Optional[float]:

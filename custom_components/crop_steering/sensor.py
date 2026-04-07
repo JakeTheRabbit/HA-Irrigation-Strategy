@@ -381,27 +381,39 @@ class CropSteeringSensor(SensorEntity):
             return self._get_number_value("p2_vwc_threshold")
     
     def _get_zone_vwc(self, zone_num: int) -> float | None:
-        """Get VWC value for specific zone from configured sensors."""
+        """Get VWC value for specific zone from configured sensors.
+
+        Supports N sensors per zone (new vwc_sensors list) with
+        fallback to legacy vwc_front/vwc_back pair.
+        """
         zone_config = self._zones_config.get(zone_num, {})
-        vwc_sensors = []
-        
-        if zone_config.get('vwc_front'):
-            vwc_sensors.append(zone_config['vwc_front'])
-        if zone_config.get('vwc_back'):
-            vwc_sensors.append(zone_config['vwc_back'])
-            
+
+        # Prefer new list format
+        vwc_sensors = list(zone_config.get('vwc_sensors', []))
+        if not vwc_sensors:
+            # Legacy fallback
+            if zone_config.get('vwc_front'):
+                vwc_sensors.append(zone_config['vwc_front'])
+            if zone_config.get('vwc_back'):
+                vwc_sensors.append(zone_config['vwc_back'])
+
         return self._average_sensor_values(vwc_sensors)
-        
+
     def _get_zone_ec(self, zone_num: int) -> float | None:
-        """Get EC value for specific zone from configured sensors."""
+        """Get EC value for specific zone from configured sensors.
+
+        Supports N sensors per zone (new ec_sensors list) with
+        fallback to legacy ec_front/ec_back pair.
+        """
         zone_config = self._zones_config.get(zone_num, {})
-        ec_sensors = []
-        
-        if zone_config.get('ec_front'):
-            ec_sensors.append(zone_config['ec_front'])
-        if zone_config.get('ec_back'):
-            ec_sensors.append(zone_config['ec_back'])
-            
+
+        ec_sensors = list(zone_config.get('ec_sensors', []))
+        if not ec_sensors:
+            if zone_config.get('ec_front'):
+                ec_sensors.append(zone_config['ec_front'])
+            if zone_config.get('ec_back'):
+                ec_sensors.append(zone_config['ec_back'])
+
         return self._average_sensor_values(ec_sensors)
         
     def _get_zone_status(self, zone_num: int) -> str:
@@ -498,22 +510,30 @@ class CropSteeringSensor(SensorEntity):
         """Calculate average VWC from all configured zone sensors."""
         all_sensors = []
         for zone_config in self._zones_config.values():
-            if zone_config.get('vwc_front'):
-                all_sensors.append(zone_config['vwc_front'])
-            if zone_config.get('vwc_back'):
-                all_sensors.append(zone_config['vwc_back'])
-                
+            sensors = list(zone_config.get('vwc_sensors', []))
+            if sensors:
+                all_sensors.extend(sensors)
+            else:
+                if zone_config.get('vwc_front'):
+                    all_sensors.append(zone_config['vwc_front'])
+                if zone_config.get('vwc_back'):
+                    all_sensors.append(zone_config['vwc_back'])
+
         return self._average_sensor_values(all_sensors)
-    
+
     def _calculate_avg_ec(self) -> float | None:
         """Calculate average EC from all configured zone sensors."""
         all_sensors = []
         for zone_config in self._zones_config.values():
-            if zone_config.get('ec_front'):
-                all_sensors.append(zone_config['ec_front'])
-            if zone_config.get('ec_back'):
-                all_sensors.append(zone_config['ec_back'])
-                
+            sensors = list(zone_config.get('ec_sensors', []))
+            if sensors:
+                all_sensors.extend(sensors)
+            else:
+                if zone_config.get('ec_front'):
+                    all_sensors.append(zone_config['ec_front'])
+                if zone_config.get('ec_back'):
+                    all_sensors.append(zone_config['ec_back'])
+
         return self._average_sensor_values(all_sensors)
     
     def _get_number_value(self, key: str) -> float:

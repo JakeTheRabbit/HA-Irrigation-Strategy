@@ -1,0 +1,288 @@
+###############################################################################
+# Irrigation GROW PACK — 30 IRRIGATION
+# /config/packages/irrigation/30_irrigation.yaml
+#
+# PURPOSE : All irrigation scripts and automations.  Uses irrigation_* entities only.
+#           Supports tables 1–6 with per-table enable flags.
+#           Sequential table cycling (one table at a time per run).
+#
+# DESIGN  :
+#   1. irrigation_run_irrigation_cycle script – opens mains+mainline+manifold then
+#      iterates over each enabled table sequentially.
+#   2. irrigation_irrigation_scheduler automation – fires on interval during window.
+#   3. Watchdog in 50_alerts_watchdogs.yaml enforces max runtime.
+###############################################################################
+
+
+script:
+
+  # ── SINGLE TABLE RUN ──────────────────────────────────────────────────────
+  # Opens one table valve for irrigation_irrigate_duration_sec seconds.
+  # Infrastructure solenoids (mains/mainline/manifold) must already be open.
+  irrigation_run_table:
+    alias: "GW Run Table"
+    icon: mdi:water
+    fields:
+      table_valve:
+        description: "entity_id of the table valve switch (irrigation_table_N_valve)"
+        required: true
+      table_timer:
+        description: "entity_id of the matching run timer (irrigation_table_N_run_timer)"
+        required: true
+    sequence:
+      - alias: "Open valve"
+        action: switch.turn_on
+        target:
+          entity_id: "{{ table_valve }}"
+      - alias: "Start run timer"
+        action: timer.start
+        target:
+          entity_id: "{{ table_timer }}"
+        data:
+          duration: "{{ states('input_number.irrigation_irrigate_duration_sec') | int(60) }}"
+      - alias: "Wait for duration"
+        delay:
+          seconds: "{{ states('input_number.irrigation_irrigate_duration_sec') | int(60) }}"
+      - alias: "Close valve"
+        action: switch.turn_off
+        target:
+          entity_id: "{{ table_valve }}"
+      - alias: "Cancel timer"
+        action: timer.cancel
+        target:
+          entity_id: "{{ table_timer }}"
+
+
+  # ── FULL IRRIGATION CYCLE ─────────────────────────────────────────────────
+  # Opens infrastructure, cycles all enabled tables, closes infrastructure.
+  irrigation_run_irrigation_cycle:
+    alias: "GW Run Irrigation Cycle"
+    icon: mdi:water-sync
+    description: >
+      Opens mainline (pump auto-starts via pressure switch) then runs each
+      enabled table valve sequentially for irrigation_irrigate_duration_sec seconds.
+      Mains water and manifold are for tank filling only — not used during feeding.
+    sequence:
+      - alias: "Guard – check irrigation allowed"
+        condition: state
+        entity_id: binary_sensor.irrigation_irrigation_allowed
+        state: "on"
+
+      - alias: "Open mainline (starts pump)"
+        action: switch.turn_on
+        target:
+          entity_id:
+            - switch.irrigation_mainline
+
+      - alias: "Short settle delay"
+        delay:
+          seconds: 2
+
+      # Table 1
+      - alias: "Run Table 1 if enabled"
+        if:
+          - condition: state
+            entity_id: input_boolean.irrigation_table_1_enabled
+            state: "on"
+          - condition: state
+            entity_id: binary_sensor.irrigation_irrigation_allowed
+            state: "on"
+        then:
+          - action: script.irrigation_run_table
+            data:
+              table_valve: switch.irrigation_table_1_valve
+              table_timer: timer.irrigation_table_1_run_timer
+          - delay:
+              seconds: 3
+
+      # Table 2
+      - alias: "Run Table 2 if enabled"
+        if:
+          - condition: state
+            entity_id: input_boolean.irrigation_table_2_enabled
+            state: "on"
+          - condition: state
+            entity_id: binary_sensor.irrigation_irrigation_allowed
+            state: "on"
+        then:
+          - action: script.irrigation_run_table
+            data:
+              table_valve: switch.irrigation_table_2_valve
+              table_timer: timer.irrigation_table_2_run_timer
+          - delay:
+              seconds: 3
+
+      # Table 3
+      - alias: "Run Table 3 if enabled"
+        if:
+          - condition: state
+            entity_id: input_boolean.irrigation_table_3_enabled
+            state: "on"
+          - condition: state
+            entity_id: binary_sensor.irrigation_irrigation_allowed
+            state: "on"
+        then:
+          - action: script.irrigation_run_table
+            data:
+              table_valve: switch.irrigation_table_3_valve
+              table_timer: timer.irrigation_table_3_run_timer
+          - delay:
+              seconds: 3
+
+      # Table 4
+      - alias: "Run Table 4 if enabled"
+        if:
+          - condition: state
+            entity_id: input_boolean.irrigation_table_4_enabled
+            state: "on"
+          - condition: state
+            entity_id: binary_sensor.irrigation_irrigation_allowed
+            state: "on"
+        then:
+          - action: script.irrigation_run_table
+            data:
+              table_valve: switch.irrigation_table_4_valve
+              table_timer: timer.irrigation_table_4_run_timer
+          - delay:
+              seconds: 3
+
+      # Table 5
+      - alias: "Run Table 5 if enabled"
+        if:
+          - condition: state
+            entity_id: input_boolean.irrigation_table_5_enabled
+            state: "on"
+          - condition: state
+            entity_id: binary_sensor.irrigation_irrigation_allowed
+            state: "on"
+        then:
+          - action: script.irrigation_run_table
+            data:
+              table_valve: switch.irrigation_table_5_valve
+              table_timer: timer.irrigation_table_5_run_timer
+          - delay:
+              seconds: 3
+
+      # Table 6
+      - alias: "Run Table 6 if enabled"
+        if:
+          - condition: state
+            entity_id: input_boolean.irrigation_table_6_enabled
+            state: "on"
+          - condition: state
+            entity_id: binary_sensor.irrigation_irrigation_allowed
+            state: "on"
+        then:
+          - action: script.irrigation_run_table
+            data:
+              table_valve: switch.irrigation_table_6_valve
+              table_timer: timer.irrigation_table_6_run_timer
+          - delay:
+              seconds: 3
+
+      - alias: "Close mainline (stops pump)"
+        action: switch.turn_off
+        target:
+          entity_id:
+            - switch.irrigation_mainline
+
+
+automation:
+
+  # ── SCHEDULED IRRIGATION ──────────────────────────────────────────────────
+  - id: irrigation_irrigation_scheduler
+    alias: "GW Irrigation Scheduler"
+    description: >
+      Triggers irrigation cycle every irrigation_irrigate_interval_min minutes
+      while irrigation_irrigation_allowed is true.
+    trigger:
+      - trigger: time_pattern
+        minutes: "/5"        # Check every 5 min; interval enforced in condition
+    condition:
+      - condition: state
+        entity_id: binary_sensor.irrigation_irrigation_allowed
+        state: "on"
+      # Only run if the script is not already running
+      - condition: template
+        value_template: >
+          {{ not is_state('script.irrigation_run_irrigation_cycle', 'on') }}
+      # Throttle to configured interval by checking last run time
+      - condition: template
+        value_template: >
+          {% set last = states.script.irrigation_run_irrigation_cycle.last_changed %}
+          {% set interval = states('input_number.irrigation_irrigate_interval_min') | int(60) %}
+          {% if last is none %}
+            true
+          {% else %}
+            {{ (now() - last).total_seconds() >= interval * 60 }}
+          {% endif %}
+    action:
+      - action: script.irrigation_run_irrigation_cycle
+
+  # ── ABORT ON LEAK ─────────────────────────────────────────────────────────
+  - id: irrigation_abort_on_leak
+    alias: "GW Abort On Leak"
+    description: "Immediately close all valves when a leak is detected"
+    trigger:
+      - trigger: state
+        entity_id: binary_sensor.irrigation_leak
+        to: "on"
+    action:
+      - action: script.irrigation_emergency_stop
+        data:
+          trigger:
+            description: "Leak sensor triggered"
+
+  # ── ABORT ON TANK LOW ─────────────────────────────────────────────────────
+  - id: irrigation_abort_on_tank_low
+    alias: "GW Abort On Tank Low"
+    description: "Close all valves and disable pack when tank runs low"
+    trigger:
+      - trigger: state
+        entity_id: binary_sensor.irrigation_tank_low
+        to: "on"
+    action:
+      - action: switch.turn_off
+        target:
+          entity_id:
+            - switch.irrigation_table_1_valve
+            - switch.irrigation_table_2_valve
+            - switch.irrigation_table_3_valve
+            - switch.irrigation_table_4_valve
+            - switch.irrigation_table_5_valve
+            - switch.irrigation_table_6_valve
+            - switch.irrigation_mains_water
+            - switch.irrigation_mainline
+            - switch.irrigation_manifold
+      - action: script.irrigation_send_alert
+        data:
+          title: "⚠️ GW Tank Low"
+          message: "Nutrient tank is low – irrigation suspended."
+          level: "warning"
+
+  # ── MAINTENANCE MODE NOTICE ───────────────────────────────────────────────
+  - id: irrigation_maintenance_mode_activated
+    alias: "GW Maintenance Mode Activated"
+    trigger:
+      - trigger: state
+        entity_id: input_boolean.irrigation_maintenance_mode
+        to: "on"
+    action:
+      - alias: "Close all valves for safety"
+        action: switch.turn_off
+        target:
+          entity_id:
+            - switch.irrigation_table_1_valve
+            - switch.irrigation_table_2_valve
+            - switch.irrigation_table_3_valve
+            - switch.irrigation_table_4_valve
+            - switch.irrigation_table_5_valve
+            - switch.irrigation_table_6_valve
+            - switch.irrigation_mains_water
+            - switch.irrigation_mainline
+            - switch.irrigation_manifold
+      - action: script.irrigation_send_alert
+        data:
+          title: "🔧 GW Maintenance Mode ON"
+          message: "Irrigation suspended for maintenance. All valves closed."
+          level: "warning"
