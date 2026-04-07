@@ -104,48 +104,48 @@
 <p>This system automates irrigation and climate control for a 6-table cannabis grow room running coco coir with Athena nutrients and GroundWork substrate probes. Two layers run simultaneously:</p>
 <div class="box ok"><h4>Irrigation Package <span class="tag tag-gw">GW</span></h4><p>Time-based irrigation scheduler (should be OFF when crop steering is active), environment control (CO2, dehumidifiers, humidifier), and safety watchdogs. Runs in HA via YAML packages at <code>/config/packages/irrigation/</code>.</p></div>
 <div class="box info"><h4>Crop Steering AI <span class="tag tag-cs">CS</span></h4><p>Sensor-driven 4-phase irrigation (P0&ndash;P3) with per-zone control, EC ratio logic, ML prediction, dryback detection, and emergency management. Runs as AppDaemon app + HA custom component. <strong>This is the active irrigation brain.</strong></p></div>
-<div class="box warn"><strong>To prevent double-watering:</strong> Set <code>input_boolean.gw_irrigation_enabled</code> to OFF when crop steering is handling irrigation. GW environment controls remain active independently.</div>
+<div class="box warn"><strong>To prevent double-watering:</strong> Set <code>input_boolean.irrigation_irrigation_enabled</code> to OFF when crop steering is handling irrigation. GW environment controls remain active independently.</div>
 
 <hr>
 <h2 id="s2">2. Hardware Map</h2>
 <h3>Irrigation</h3>
 <table>
 <tr><th>Component</th><th>GW Entity</th><th>Raw Entity</th><th>Physical</th></tr>
-<tr><td>Main Line</td><td><code>switch.gw_mainline</code></td><td><code>switch.mainline</code></td><td>Mainline solenoid (KC868)</td></tr>
-<tr><td>Zone 1&ndash;6 Valves</td><td><code>switch.gw_table_N_valve</code></td><td><code>switch.table_N</code></td><td>Table solenoids (KC868)</td></tr>
+<tr><td>Main Line</td><td><code>switch.irrigation_mainline</code></td><td><code>switch.mainline</code></td><td>Mainline solenoid (KC868)</td></tr>
+<tr><td>Zone 1&ndash;6 Valves</td><td><code>switch.irrigation_table_N_valve</code></td><td><code>switch.table_N</code></td><td>Table solenoids (KC868)</td></tr>
 <tr><td>Pump</td><td colspan="2">None &mdash; auto-start</td><td>Constant pressure switch</td></tr>
-<tr><td>Mains Water</td><td><code>switch.gw_mains_water</code></td><td><code>switch.mains_water</code></td><td>Tank fill only (NOT irrigation)</td></tr>
-<tr><td>Manifold</td><td><code>switch.gw_manifold</code></td><td><code>switch.manifold</code></td><td>Tank mixing only (NOT irrigation)</td></tr>
+<tr><td>Mains Water</td><td><code>switch.irrigation_mains_water</code></td><td><code>switch.mains_water</code></td><td>Tank fill only (NOT irrigation)</td></tr>
+<tr><td>Manifold</td><td><code>switch.irrigation_manifold</code></td><td><code>switch.manifold</code></td><td>Tank mixing only (NOT irrigation)</td></tr>
 </table>
 <h3>Sensors (1 probe per zone)</h3>
 <table>
 <tr><th>Zone</th><th>VWC</th><th>EC</th></tr>
 <tr><td>1&ndash;6</td><td><code>sensor.substrate_N_substrate_N_vwc_coco_coir</code></td><td><code>sensor.substrate_N_substrate_N_pwec</code></td></tr>
 </table>
-<p>GW mapping layer creates aliases: <code>sensor.gw_table_N_vwc</code> / <code>_ec</code> / <code>_substrate_temp</code>. Crop steering reads the raw entities directly.</p>
+<p>GW mapping layer creates aliases: <code>sensor.irrigation_table_N_vwc</code> / <code>_ec</code> / <code>_substrate_temp</code>. Crop steering reads the raw entities directly.</p>
 <h3>Environment</h3>
 <table>
 <tr><th>Sensor</th><th>Entity</th><th>Source</th></tr>
-<tr><td>Room temp</td><td><code>sensor.gw_room_1_temp</code></td><td>Avg of 4 calibrated sensors</td></tr>
-<tr><td>Room RH</td><td><code>sensor.gw_room_1_rh</code></td><td>Avg of 4 sensors</td></tr>
-<tr><td>Room CO2</td><td><code>sensor.gw_room_1_co2</code></td><td>Avg of 3&ndash;4 CO2 sensors</td></tr>
-<tr><td>Room VPD</td><td><code>sensor.gw_room_1_vpd</code></td><td>Avg from CO2 sensors</td></tr>
+<tr><td>Room temp</td><td><code>sensor.irrigation_room_1_temp</code></td><td>Avg of 4 calibrated sensors</td></tr>
+<tr><td>Room RH</td><td><code>sensor.irrigation_room_1_rh</code></td><td>Avg of 4 sensors</td></tr>
+<tr><td>Room CO2</td><td><code>sensor.irrigation_room_1_co2</code></td><td>Avg of 3&ndash;4 CO2 sensors</td></tr>
+<tr><td>Room VPD</td><td><code>sensor.irrigation_room_1_vpd</code></td><td>Avg from CO2 sensors</td></tr>
 </table>
 <table>
 <tr><th>Device</th><th>Entity</th><th>Notes</th></tr>
-<tr><td>CO2 solenoid</td><td><code>switch.gw_co2</code></td><td>Solid state relay</td></tr>
-<tr><td>Humidifier</td><td><code>switch.gw_humidifier</code></td><td>Solid state relay</td></tr>
-<tr><td>Dehumidifier (plug)</td><td><code>switch.gw_dehumidifier_1</code></td><td>TP-Link Kasa WiFi plug</td></tr>
-<tr><td>Dehumidifier relays 1&ndash;4</td><td><code>switch.gw_dehumidifier_relay_1</code>&ndash;<code>4</code></td><td>Staggered 10s apart</td></tr>
+<tr><td>CO2 solenoid</td><td><code>switch.irrigation_co2</code></td><td>Solid state relay</td></tr>
+<tr><td>Humidifier</td><td><code>switch.irrigation_humidifier</code></td><td>Solid state relay</td></tr>
+<tr><td>Dehumidifier (plug)</td><td><code>switch.irrigation_dehumidifier_1</code></td><td>TP-Link Kasa WiFi plug</td></tr>
+<tr><td>Dehumidifier relays 1&ndash;4</td><td><code>switch.irrigation_dehumidifier_relay_1</code>&ndash;<code>4</code></td><td>Staggered 10s apart</td></tr>
 <tr><td>AC 1&ndash;4</td><td><code>climate.ac_*</code></td><td>IR via ESPHome. <strong>Mapped, NOT automated.</strong></td></tr>
 <tr><td>Lights</td><td><code>light.grow_room_all_lights</code></td><td>ESPHome group</td></tr>
 </table>
 <div class="box unmapped"><strong>Unmapped / not installed:</strong>
 <ul>
-<li><code>binary_sensor.gw_leak</code> &mdash; <strong>hardcoded false</strong>. Leak abort won't fire.</li>
-<li><code>binary_sensor.gw_tank_low</code> &mdash; <strong>hardcoded false</strong>. Tank-low abort won't fire.</li>
+<li><code>binary_sensor.irrigation_leak</code> &mdash; <strong>hardcoded false</strong>. Leak abort won't fire.</li>
+<li><code>binary_sensor.irrigation_tank_low</code> &mdash; <strong>hardcoded false</strong>. Tank-low abort won't fire.</li>
 <li>Tank pH/EC probes &mdash; unavailable</li>
-<li><code>switch.gw_waste_valve</code>, <code>switch.gw_ceiling_vent</code> &mdash; TODO placeholders</li>
+<li><code>switch.irrigation_waste_valve</code>, <code>switch.irrigation_ceiling_vent</code> &mdash; TODO placeholders</li>
 <li>AC control automations &mdash; entities mapped, no logic</li>
 </ul></div>
 
@@ -155,7 +155,7 @@
     |
 Raw entities (sensor.substrate_N_substrate_N_vwc_coco_coir)
     |   [10_mapping.yaml]
-GW contract entities (sensor.gw_table_N_vwc)
+GW contract entities (sensor.irrigation_table_N_vwc)
     |
     +-- crop_steering.env
     |
@@ -171,7 +171,7 @@ Hardware (valve switches via HA services)</code></pre>
 <table>
 <tr><th>File</th><th>Purpose</th></tr>
 <tr><td><code>00_core.yaml</code></td><td>Emergency stop script, alert helper</td></tr>
-<tr><td><code>10_mapping.yaml</code></td><td>Raw ESPHome &rarr; <code>gw_*</code> contract aliases</td></tr>
+<tr><td><code>10_mapping.yaml</code></td><td>Raw ESPHome &rarr; <code>irrigation_*</code> contract aliases</td></tr>
 <tr><td><code>20_model.yaml</code></td><td>Input helpers (schedules, targets, timers)</td></tr>
 <tr><td><code>30_irrigation.yaml</code></td><td>Time-based scheduler + abort automations</td></tr>
 <tr><td><code>40_environment.yaml</code></td><td>Dehumidifier, humidifier, CO2 automations</td></tr>
@@ -268,19 +268,19 @@ flowchart TD
 
 <hr>
 <h2 id="s6">6. GW Time-Based Scheduler <span class="tag tag-gw">GW</span></h2>
-<div class="box warn"><strong>Must be OFF when crop steering is active.</strong> Set <code>input_boolean.gw_irrigation_enabled</code> to OFF.</div>
+<div class="box warn"><strong>Must be OFF when crop steering is active.</strong> Set <code>input_boolean.irrigation_irrigation_enabled</code> to OFF.</div>
 <p>Checks every 5 min: system enabled, irrigation enabled, not maintenance, no leak, no tank low, within time window, interval elapsed. Opens mainline, runs each enabled table for configured duration sequentially, closes mainline.</p>
 <table>
 <tr><th>Setting</th><th>Entity</th><th>Default</th></tr>
-<tr><td>Window start/end</td><td><code>input_datetime.gw_irrigate_start/end_time</code></td><td>Set in HA</td></tr>
-<tr><td>Interval</td><td><code>input_number.gw_irrigate_interval_min</code></td><td>60 min</td></tr>
-<tr><td>Duration</td><td><code>input_number.gw_irrigate_duration_sec</code></td><td>60s</td></tr>
-<tr><td>Table N</td><td><code>input_boolean.gw_table_N_enabled</code></td><td>OFF</td></tr>
+<tr><td>Window start/end</td><td><code>input_datetime.irrigation_irrigate_start/end_time</code></td><td>Set in HA</td></tr>
+<tr><td>Interval</td><td><code>input_number.irrigation_irrigate_interval_min</code></td><td>60 min</td></tr>
+<tr><td>Duration</td><td><code>input_number.irrigation_irrigate_duration_sec</code></td><td>60s</td></tr>
+<tr><td>Table N</td><td><code>input_boolean.irrigation_table_N_enabled</code></td><td>OFF</td></tr>
 </table>
 
 <hr>
 <h2 id="s7">7. Environment Control <span class="tag tag-gw">GW</span></h2>
-<p>Gated by <code>input_boolean.gw_environment_enabled</code>.</p>
+<p>Gated by <code>input_boolean.irrigation_environment_enabled</code>.</p>
 <h3>Dehumidifiers</h3>
 <p>4 relays stagger ON 10s apart. <strong>ON:</strong> RH &gt; target + 5% for 3 min. <strong>OFF:</strong> RH &lt; target &minus; 2% for 2 min. TP-Link plug has separate UI automations at 75%/65%.</p>
 <h3>Humidifier</h3>
@@ -291,11 +291,11 @@ flowchart TD
 <p>4 units mapped. <strong>No automated control yet</strong> &mdash; manual or separate automations.</p>
 <table>
 <tr><th>Entity</th><th>Default</th><th>Range</th><th>Unit</th><th>What It Controls</th></tr>
-<tr><td><code>input_number.gw_temp_target_day</code></td><td>26</td><td>18–32</td><td>&deg;C</td><td>Reference day temperature target (lights-on). AC units are mapped but <strong>not yet automated</strong> — this value is used for VPD reference calculations and future AC logic. Set it to match your AC manual setpoint so dashboards display correctly.</td></tr>
-<tr><td><code>input_number.gw_temp_target_night</code></td><td>22</td><td>15–28</td><td>&deg;C</td><td>Reference night temperature target (lights-off). Cannabis typically runs 2–4&deg;C cooler at night. Not currently driving AC automation.</td></tr>
-<tr><td><code>input_number.gw_rh_target_day</code></td><td>55</td><td>40–75</td><td>%RH</td><td>Target RH during lights-on. <strong>ON rule:</strong> RH &gt; target + 5% for 3 min &rarr; all 4 dehumidifier relays stagger on (10s apart). <strong>OFF rule:</strong> RH &lt; target &minus; 2% for 2 min &rarr; relays off. Hysteresis band prevents rapid cycling. Typical veg: 55–65%, flower: 45–55%.</td></tr>
-<tr><td><code>input_number.gw_rh_target_night</code></td><td>50</td><td>40–70</td><td>%RH</td><td>Target RH during lights-off. Night targets are usually 5–10% lower than day to reduce mold risk — transpiration slows at night and moisture can accumulate on leaves. Dehumidifier and humidifier both switch to this target at <code>lights_off_hour</code>.</td></tr>
-<tr><td><code>input_number.gw_co2_target</code></td><td>1200</td><td>800–1600</td><td>ppm</td><td>Target CO2 concentration during lights-on. <strong>Inject:</strong> ppm &lt; this value. <strong>Stop:</strong> ppm &ge; this value + 200 (e.g. 1400). <strong>Emergency off:</strong> &ge; 1800 ppm always. CO2 solenoid pulses 1 min on / 4 min off to avoid overshooting. Always off at lights-off. Ambient is ~420 ppm; enriched growing targets 1000–1400 ppm. Above 1600 ppm provides diminishing returns and wastes CO2.</td></tr>
+<tr><td><code>input_number.irrigation_temp_target_day</code></td><td>26</td><td>18–32</td><td>&deg;C</td><td>Reference day temperature target (lights-on). AC units are mapped but <strong>not yet automated</strong> — this value is used for VPD reference calculations and future AC logic. Set it to match your AC manual setpoint so dashboards display correctly.</td></tr>
+<tr><td><code>input_number.irrigation_temp_target_night</code></td><td>22</td><td>15–28</td><td>&deg;C</td><td>Reference night temperature target (lights-off). Cannabis typically runs 2–4&deg;C cooler at night. Not currently driving AC automation.</td></tr>
+<tr><td><code>input_number.irrigation_rh_target_day</code></td><td>55</td><td>40–75</td><td>%RH</td><td>Target RH during lights-on. <strong>ON rule:</strong> RH &gt; target + 5% for 3 min &rarr; all 4 dehumidifier relays stagger on (10s apart). <strong>OFF rule:</strong> RH &lt; target &minus; 2% for 2 min &rarr; relays off. Hysteresis band prevents rapid cycling. Typical veg: 55–65%, flower: 45–55%.</td></tr>
+<tr><td><code>input_number.irrigation_rh_target_night</code></td><td>50</td><td>40–70</td><td>%RH</td><td>Target RH during lights-off. Night targets are usually 5–10% lower than day to reduce mold risk — transpiration slows at night and moisture can accumulate on leaves. Dehumidifier and humidifier both switch to this target at <code>lights_off_hour</code>.</td></tr>
+<tr><td><code>input_number.irrigation_co2_target</code></td><td>1200</td><td>800–1600</td><td>ppm</td><td>Target CO2 concentration during lights-on. <strong>Inject:</strong> ppm &lt; this value. <strong>Stop:</strong> ppm &ge; this value + 200 (e.g. 1400). <strong>Emergency off:</strong> &ge; 1800 ppm always. CO2 solenoid pulses 1 min on / 4 min off to avoid overshooting. Always off at lights-off. Ambient is ~420 ppm; enriched growing targets 1000–1400 ppm. Above 1600 ppm provides diminishing returns and wastes CO2.</td></tr>
 </table>
 
 <hr>
@@ -356,11 +356,11 @@ flowchart TD
 <h3>GW Toggles</h3>
 <table>
 <tr><th>Entity</th><th>Purpose &amp; Detail</th></tr>
-<tr><td><code>input_boolean.gw_enable</code></td><td>GW package master switch. Disabling stops the GW time-based scheduler and all GW environment automations simultaneously. Does not affect Crop Steering.</td></tr>
-<tr><td><code>input_boolean.gw_irrigation_enabled</code></td><td><strong>Must be OFF when Crop Steering is active.</strong> Enables the GW time-based irrigation scheduler. When ON, GW will open valves on its own timer regardless of what Crop Steering is doing, causing double-watering.</td></tr>
-<tr><td><code>input_boolean.gw_maintenance_mode</code></td><td>Emergency close. When toggled ON, immediately closes all valve switches and blocks any further GW irrigation. Use when you need to physically work on the water system and want a software-level guarantee nothing opens. Turn OFF to resume normal operation.</td></tr>
-<tr><td><code>input_boolean.gw_co2_enabled</code></td><td>Enables the CO2 injection automation. When OFF, the CO2 solenoid will not open regardless of room ppm. Use to disable CO2 without touching the <code>gw_co2_target</code> setting.</td></tr>
-<tr><td><code>input_boolean.gw_environment_enabled</code></td><td>Gates all GW climate automations: dehumidifiers, humidifier, and CO2 (CO2 also requires its own toggle). Turn OFF to fully disable climate control, e.g. during HVAC maintenance or when running the room manually.</td></tr>
+<tr><td><code>input_boolean.irrigation_enable</code></td><td>GW package master switch. Disabling stops the GW time-based scheduler and all GW environment automations simultaneously. Does not affect Crop Steering.</td></tr>
+<tr><td><code>input_boolean.irrigation_irrigation_enabled</code></td><td><strong>Must be OFF when Crop Steering is active.</strong> Enables the GW time-based irrigation scheduler. When ON, GW will open valves on its own timer regardless of what Crop Steering is doing, causing double-watering.</td></tr>
+<tr><td><code>input_boolean.irrigation_maintenance_mode</code></td><td>Emergency close. When toggled ON, immediately closes all valve switches and blocks any further GW irrigation. Use when you need to physically work on the water system and want a software-level guarantee nothing opens. Turn OFF to resume normal operation.</td></tr>
+<tr><td><code>input_boolean.irrigation_co2_enabled</code></td><td>Enables the CO2 injection automation. When OFF, the CO2 solenoid will not open regardless of room ppm. Use to disable CO2 without touching the <code>irrigation_co2_target</code> setting.</td></tr>
+<tr><td><code>input_boolean.irrigation_environment_enabled</code></td><td>Gates all GW climate automations: dehumidifiers, humidifier, and CO2 (CO2 also requires its own toggle). Turn OFF to fully disable climate control, e.g. during HVAC maintenance or when running the room manually.</td></tr>
 </table>
 
 <h3>Read-Only Sensors: What the Numbers Mean</h3>
@@ -520,7 +520,7 @@ flowchart TD
 <hr>
 <h2 id="s9">9. Configuration Files</h2>
 <h3>crop_steering.env</h3>
-<pre><code>ZONE_1_SWITCH=switch.gw_table_1_valve
+<pre><code>ZONE_1_SWITCH=switch.irrigation_table_1_valve
 ZONE_1_VWC_SENSORS=sensor.substrate_1_substrate_1_vwc_coco_coir
 ZONE_1_EC_SENSORS=sensor.substrate_1_substrate_1_pwec
 ZONE_1_PLANT_COUNT=4
@@ -532,8 +532,8 @@ ZONE_1_SHOT_MULTIPLIER=1.0</code></pre>
   class: MasterCropSteeringApp
   hardware:
     pump_master: null
-    main_line: switch.gw_mainline
-    zone_valves: {1: switch.gw_table_1_valve, ...}
+    main_line: switch.irrigation_mainline
+    zone_valves: {1: switch.irrigation_table_1_valve, ...}
   timing: {phase_check_interval: 60}
   thresholds: {emergency_vwc: 40.0}</code></pre>
 <p><strong>Lights:</strong> <code>lights_on_hour</code> = 8, <code>lights_off_hour</code> = 20.</p>
@@ -771,17 +771,17 @@ flowchart LR
 <h2 id="s22">22. Commissioning</h2>
 <h3>1. Verify Hardware</h3>
 <ol><li>ESPHome devices online: <strong>Settings &rarr; Devices &rarr; ESPHome</strong></li>
-<li><code>sensor.gw_table_1_vwc</code> shows number. Check all 6.</li>
+<li><code>sensor.irrigation_table_1_vwc</code> shows number. Check all 6.</li>
 <li>Test each valve via Developer Tools. Listen for click. Off immediately.</li>
 <li>Test mainline briefly &mdash; pump should start.</li></ol>
 <h3>2. Configure Crop Steering</h3>
 <ol><li>Verify <code>crop_steering.env</code> entity IDs</li>
 <li>Add integration: Settings &rarr; Integrations &rarr; Crop Steering &rarr; Load from .env</li>
 <li>Set lights_on=8, lights_off=20</li>
-<li><strong>Set <code>gw_irrigation_enabled</code> OFF</strong></li></ol>
+<li><strong>Set <code>irrigation_irrigation_enabled</code> OFF</strong></li></ol>
 <h3>3. Environment</h3>
 <ol><li>Set temp/RH/CO2 targets on CO2 &amp; Environment dashboard</li>
-<li>Enable <code>gw_co2_enabled</code> and <code>gw_environment_enabled</code></li></ol>
+<li>Enable <code>irrigation_co2_enabled</code> and <code>irrigation_environment_enabled</code></li></ol>
 <h3>4. Start</h3>
 <ol><li><code>crop_steering_system_enabled</code> ON</li>
 <li>Check <code>app_status</code> = <code>safe_idle</code></li>
@@ -798,12 +798,12 @@ flowchart LR
 <tr><td>Phase changes ignored</td><td>Zone phase override must be "Auto".</td></tr>
 <tr><td>"Entity not found"</td><td>Entities have <code>crop_steering_</code> prefix.</td></tr>
 <tr><td>VWC "Unavailable"</td><td>ESPHome device offline. Check network.</td></tr>
-<tr><td>Double watering</td><td><code>gw_irrigation_enabled</code> must be OFF.</td></tr>
-<tr><td>CO2 not injecting</td><td>Lights must be on + <code>gw_co2_enabled</code> ON.</td></tr>
-<tr><td>Valves stuck</td><td><code>gw_maintenance_mode</code> ON, or <code>script.gw_emergency_stop</code>, or power off relay.</td></tr>
+<tr><td>Double watering</td><td><code>irrigation_irrigation_enabled</code> must be OFF.</td></tr>
+<tr><td>CO2 not injecting</td><td>Lights must be on + <code>irrigation_co2_enabled</code> ON.</td></tr>
+<tr><td>Valves stuck</td><td><code>irrigation_maintenance_mode</code> ON, or <code>script.irrigation_emergency_stop</code>, or power off relay.</td></tr>
 </table>
 <h3>Emergency Stop</h3>
-<ol><li><code>gw_maintenance_mode</code> ON</li><li><code>script.gw_emergency_stop</code></li><li><code>crop_steering_system_enabled</code> OFF</li><li>Power off relay board</li></ol>
+<ol><li><code>irrigation_maintenance_mode</code> ON</li><li><code>script.irrigation_emergency_stop</code></li><li><code>crop_steering_system_enabled</code> OFF</li><li>Power off relay board</li></ol>
 
 <hr>
 <h2 id="s24">24. Known Issues &amp; Unmapped Hardware</h2>
