@@ -1,0 +1,273 @@
+###############################################################################
+# Irrigation GROW PACK — 40 ENVIRONMENT
+# /config/packages/irrigation/40_environment.yaml
+#
+# PURPOSE : Temperature, RH, CO2, and VPD monitoring automations.
+#           Controls dehumidifiers, humidifier, and CO2 based on targets
+#           defined in 20_model.yaml.  Uses irrigation_* entities only.
+#
+# STRATEGY (bang-bang with hysteresis):
+#   - Dehumidify  when RH > target + 5%  →  off when RH < target - 2%
+#   - Humidify    when RH < target - 5%  →  off when RH > target + 2%
+#   - CO2 inject  when CO2 < target - 50 →  off when CO2 > target + 50
+###############################################################################
+
+automation:
+  # ── DEHUMIDIFIER CONTROL ──────────────────────────────────────────────────
+  - id: irrigation_dehumidifier_on
+    alias: "GW Dehumidifier On"
+    description: "Turn on dehumidifiers when RH exceeds target + 5 %"
+    trigger:
+      - trigger: template
+        value_template: >
+          {{ states('sensor.irrigation_room_1_rh') | is_number and
+             (states('sensor.irrigation_room_1_rh') | float
+             > (states('input_number.irrigation_rh_target_day') | float(60) + 5)) }}
+        for:
+          minutes: 3
+    condition:
+      - condition: state
+        entity_id: input_boolean.irrigation_maintenance_mode
+        state: "off"
+      - condition: state
+        entity_id: input_boolean.irrigation_environment_enabled
+        state: "on"
+    action:
+      - action: switch.turn_on
+        target:
+          entity_id: switch.irrigation_dehumidifier_relay_1
+      - delay:
+          seconds: 10
+      - action: switch.turn_on
+        target:
+          entity_id: switch.irrigation_dehumidifier_relay_2
+      - delay:
+          seconds: 10
+      - action: switch.turn_on
+        target:
+          entity_id: switch.irrigation_dehumidifier_relay_3
+      - delay:
+          seconds: 10
+      - action: switch.turn_on
+        target:
+          entity_id: switch.irrigation_dehumidifier_relay_4
+
+  - id: irrigation_dehumidifier_off
+    alias: "GW Dehumidifier Off"
+    description: "Turn off dehumidifiers when RH drops to target - 2 %"
+    trigger:
+      - trigger: template
+        value_template: >
+          {{ states('sensor.irrigation_room_1_rh') | is_number and
+             (states('sensor.irrigation_room_1_rh') | float
+             < (states('input_number.irrigation_rh_target_day') | float(60) - 2)) }}
+        for:
+          minutes: 2
+    action:
+      - action: switch.turn_off
+        target:
+          entity_id:
+            - switch.irrigation_dehumidifier_relay_1
+            - switch.irrigation_dehumidifier_relay_2
+            - switch.irrigation_dehumidifier_relay_3
+            - switch.irrigation_dehumidifier_relay_4
+
+  # ── HUMIDIFIER CONTROL ────────────────────────────────────────────────────
+  - id: irrigation_humidifier_on
+    alias: "GW Humidifier On"
+    description: "Turn on humidifier when RH drops below target - 5 %"
+    trigger:
+      - trigger: template
+        value_template: >
+          {{ states('sensor.irrigation_room_1_rh') | is_number and
+             (states('sensor.irrigation_room_1_rh') | float
+             < (states('input_number.irrigation_rh_target_day') | float(60) - 5)) }}
+        for:
+          minutes: 3
+    condition:
+      - condition: state
+        entity_id: input_boolean.irrigation_maintenance_mode
+        state: "off"
+      - condition: state
+        entity_id: input_boolean.irrigation_environment_enabled
+        state: "on"
+    action:
+      - action: switch.turn_on
+        target:
+          entity_id: switch.irrigation_humidifier
+
+  - id: irrigation_humidifier_off
+    alias: "GW Humidifier Off"
+    description: "Turn off humidifier when RH reaches target + 2 %"
+    trigger:
+      - trigger: template
+        value_template: >
+          {{ states('sensor.irrigation_room_1_rh') | is_number and
+             (states('sensor.irrigation_room_1_rh') | float
+             > (states('input_number.irrigation_rh_target_day') | float(60) + 2)) }}
+        for:
+          minutes: 2
+    action:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.irrigation_humidifier
+
+  # ── CO2 CONTROL (pulsed injection) ────────────────────────────────────────
+  # Strategy: when CO2 < 1100, inject in 5-min interval pulses until 1400.
+  #           If CO2 > 1800, emergency shutoff.
+  - id: irrigation_co2_pulsed_inject
+    alias: "GW CO2 Pulsed Injection"
+    description: "Inject CO2 in 5-min interval pulses when below 1100, target 1400"
+    trigger:
+      - trigger: numeric_state
+        entity_id: sensor.irrigation_room_1_co2
+        below: 1100
+    condition:
+      - condition: state
+        entity_id: input_boolean.irrigation_maintenance_mode
+        state: "off"
+      - condition: state
+        entity_id: input_boolean.irrigation_co2_enabled
+        state: "on"
+      - condition: state
+        entity_id: binary_sensor.irrigation_lights_on
+        state: "on"
+    action:
+      - repeat:
+          while:
+            - condition: numeric_state
+              entity_id: sensor.irrigation_room_1_co2
+              below: 1400
+            - condition: state
+              entity_id: binary_sensor.irrigation_lights_on
+              state: "on"
+            - condition: numeric_state
+              entity_id: sensor.irrigation_room_1_co2
+              below: 1800
+          sequence:
+            - action: switch.turn_on
+              target:
+                entity_id: switch.irrigation_co2
+            - delay:
+                minutes: 1
+            - action: switch.turn_off
+              target:
+                entity_id: switch.irrigation_co2
+            - delay:
+                minutes: 4
+      - action: switch.turn_off
+        target:
+          entity_id: switch.irrigation_co2
+    mode: single
+
+  # Emergency shutoff at 1800 ppm
+  - id: irrigation_co2_emergency_off
+    alias: "GW CO2 Emergency Off at 1800 ppm"
+    description: "Force close CO2 solenoid when CO2 exceeds 1800 ppm"
+    trigger:
+      - trigger: numeric_state
+        entity_id: sensor.irrigation_room_1_co2
+        above: 1800
+    action:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.irrigation_co2
+      - action: script.irrigation_send_alert
+        data:
+          title: "⚠️ CO2 Emergency Shutoff"
+          message: >
+            CO2 reached {{ states('sensor.irrigation_room_1_co2') }} ppm.
+            Solenoid closed. Check regulator.
+          level: "critical"
+    mode: single
+
+  # Safety: always close CO2 at lights-off
+  - id: irrigation_co2_lights_off_stop
+    alias: "GW CO2 Off at Lights Off"
+    trigger:
+      - trigger: state
+        entity_id: binary_sensor.irrigation_lights_on
+        to: "off"
+    action:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.irrigation_co2
+
+  # ── HIGH TEMPERATURE ALERT ────────────────────────────────────────────────
+  - id: irrigation_high_temp_alert
+    alias: "GW High Temp Alert"
+    trigger:
+      - trigger: numeric_state
+        entity_id: sensor.irrigation_room_1_temp
+        above: input_number.irrigation_temp_high_alert
+        for:
+          minutes: 5
+    action:
+      - action: script.irrigation_send_alert
+        data:
+          title: "🌡️ GW High Temp"
+          message: >
+            Room 1 temperature is {{ states('sensor.irrigation_room_1_temp') }}°C
+            (alert threshold: {{ states('input_number.irrigation_temp_high_alert') }}°C).
+          level: "warning"
+
+  # ── HIGH RH ALERT ─────────────────────────────────────────────────────────
+  - id: irrigation_high_rh_alert
+    alias: "GW High RH Alert"
+    trigger:
+      - trigger: numeric_state
+        entity_id: sensor.irrigation_room_1_rh
+        above: input_number.irrigation_rh_high_alert
+        for:
+          minutes: 10
+    action:
+      - action: script.irrigation_send_alert
+        data:
+          title: "💧 GW High RH"
+          message: >
+            Room 1 RH is {{ states('sensor.irrigation_room_1_rh') }}%
+            (alert threshold: {{ states('input_number.irrigation_rh_high_alert') }}%).
+          level: "warning"
+
+  # ── CO2 ALERTS ────────────────────────────────────────────────────────────
+  - id: irrigation_co2_too_high_alert
+    alias: "GW CO2 Too High Alert"
+    trigger:
+      - trigger: numeric_state
+        entity_id: sensor.irrigation_room_1_co2
+        above: input_number.irrigation_co2_high_alert
+        for:
+          minutes: 5
+    action:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.irrigation_co2
+      - action: script.irrigation_send_alert
+        data:
+          title: "⚠️ GW CO2 Too High"
+          message: >
+            Room 1 CO2 is {{ states('sensor.irrigation_room_1_co2') }} ppm
+            (alert threshold: {{ states('input_number.irrigation_co2_high_alert') }} ppm).
+            CO2 solenoid closed.
+          level: "critical"
+
+  - id: irrigation_co2_too_low_alert
+    alias: "GW CO2 Too Low Alert"
+    trigger:
+      - trigger: numeric_state
+        entity_id: sensor.irrigation_room_1_co2
+        below: input_number.irrigation_co2_low_alert
+        for:
+          minutes: 10
+    condition:
+      - condition: state
+        entity_id: binary_sensor.irrigation_lights_on
+        state: "on"
+    action:
+      - action: script.irrigation_send_alert
+        data:
+          title: "⚠️ GW CO2 Low"
+          message: >
+            Room 1 CO2 is {{ states('sensor.irrigation_room_1_co2') }} ppm —
+            check CO2 cylinder supply.
+          level: "warning"

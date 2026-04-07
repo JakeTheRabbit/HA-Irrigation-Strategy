@@ -25,7 +25,50 @@ class BaseAsyncApp(hass.Hass):
         """Base initialization - subclasses should call super().initialize()"""
         self.entity_cache = {}
         self.cache_timeout = 60  # seconds
-        
+
+    # Standard logging interface so 'self' can be passed as a logger to modules
+    def info(self, msg, *args, **kwargs):
+        self.log(msg, level='INFO')
+
+    def warning(self, msg, *args, **kwargs):
+        self.log(msg, level='WARNING')
+
+    def error(self, msg, *args, **kwargs):
+        self.log(msg, level='ERROR')
+
+    def debug(self, msg, *args, **kwargs):
+        self.log(msg, level='DEBUG')
+
+    def _check_ha_entity_state(self, entity_id, attribute="state"):
+        """Query HA REST API directly, bypassing AppDaemon state cache.
+
+        Use for safety-critical reads where get_state() returns None
+        because AppDaemon cannot see the custom component entity.
+        """
+        try:
+            import urllib.request
+            import json as _json
+
+            plugin_config = self.get_plugin_config()
+            token = plugin_config.get("token") or plugin_config.get("ha_token")
+            if not token:
+                self.log(f"REST API: No token found in plugin config keys: {list(plugin_config.keys())}", level="DEBUG")
+                return None
+
+            url = f"http://homeassistant:8123/api/states/{entity_id}"
+            req = urllib.request.Request(url, headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            })
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = _json.loads(resp.read().decode())
+                if attribute == "state":
+                    return data.get("state")
+                return data.get("attributes", {}).get(attribute)
+        except Exception as e:
+            self.log(f"REST API check failed for {entity_id}: {e}", level="DEBUG")
+            return None
+
     def get_entity_value(self, entity_id: str, attribute: str = "state", default: Any = None) -> Any:
         """
         Synchronous wrapper for safe entity access.
@@ -175,11 +218,11 @@ class BaseAsyncApp(hass.Hass):
     def set_entity_value(self, entity_id: str, value: Any, **kwargs) -> None:
         """
         Synchronous wrapper for setting entity state.
-        
+
         Based on AppDaemon best practices:
         - Uses set_state directly (AppDaemon handles async internally)
         - Clears cache after state change
-        
+
         Args:
             entity_id: The entity to set
             value: The value to set
@@ -190,20 +233,22 @@ class BaseAsyncApp(hass.Hass):
             for key in list(self.entity_cache.keys()):
                 if key.startswith(f"{entity_id}:"):
                     del self.entity_cache[key]
-            
-            # Set state directly - AppDaemon handles the async conversion
-            self.set_state(entity_id, state=value, **kwargs)
-            
+
+            # HA requires state as non-None string in POST body;
+            # AppDaemon strips None/False before sending
+            state_val = str(value) if value is not None else "unknown"
+            self.set_state(entity_id, state=state_val, **kwargs)
+
         except Exception as e:
             self.log(f"Error setting {entity_id} to {value}: {e}", level="ERROR")
-    
+
     async def async_set_entity_value(self, entity_id: str, value: Any, **kwargs) -> None:
         """
         Async method to set entity state - use this in async callbacks.
-        
+
         Args:
             entity_id: The entity to set
-            value: The value to set  
+            value: The value to set
             **kwargs: Additional arguments for set_state
         """
         try:
@@ -211,8 +256,9 @@ class BaseAsyncApp(hass.Hass):
             for key in list(self.entity_cache.keys()):
                 if key.startswith(f"{entity_id}:"):
                     del self.entity_cache[key]
-            
-            await self.set_state(entity_id, state=value, **kwargs)
+
+            state_val = str(value) if value is not None else "unknown"
+            await self.set_state(entity_id, state=state_val, **kwargs)
         except Exception as e:
             self.log(f"Async error setting {entity_id}: {e}", level="ERROR")
     

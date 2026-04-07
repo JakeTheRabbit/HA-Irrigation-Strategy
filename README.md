@@ -1,13 +1,13 @@
 # Crop Steering System for Home Assistant (v2.3.1)
 
-THIS PROJECT IS NOT READY YET - INSTALL AT OWN RISK
-
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![Zones](https://img.shields.io/badge/Zones-1%E2%80%936-blue)
 ![Dependencies](https://img.shields.io/badge/Dependencies-AppDaemon%20(optional)-blue)
-![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
+![Status](https://img.shields.io/badge/Status-Beta-yellow)
 ![License](https://img.shields.io/badge/License-MIT-green)
+
+> **[Interactive System Guide](https://jaketherabbit.github.io/HA-Irrigation-Strategy/www/SYSTEM_GUIDE.html)** | **[Irrigation Manual](https://jaketherabbit.github.io/HA-Irrigation-Strategy/www/irrigation-manual.html)** — Full visual documentation with flowcharts, graphs, and configuration reference.
 
 Turn Home Assistant into a professional crop‑steering controller. This project combines a lightweight HA integration (entities, services, calculations) with **required AppDaemon modules** (automation logic, hardware control, phase state machine) to automate precision irrigation using VWC/EC sensors.
 
@@ -62,18 +62,12 @@ The Home Assistant integration creates entities and fires events, but **AppDaemo
 - Performs calculations (shot durations, EC ratio, adjusted thresholds)
 - Fires events that AppDaemon listens to
 
-> **Important integration note:** This repository currently uses a custom integration
-> service/event handshake as the primary GUI↔automation contract. Home Assistant
-> Blueprints are not required for core operation in the current architecture.
-
 **AppDaemon Master App (optional but recommended for automation):**
 - Listens to sensor updates and integration events
 - Makes irrigation decisions based on phase logic and thresholds
 - Sequences hardware safely to prevent damage
 - Manages phase transitions automatically
 - Validates sensor data and detects anomalies
-- Publishes runtime status (`sensor.crop_steering_app_status`) and enforces
-  watchdog fail-safes to force hardware OFF on desync/error conditions
 
 **Configuration sources:**
 - Primary: Integration UI during setup (maps hardware and sensors)

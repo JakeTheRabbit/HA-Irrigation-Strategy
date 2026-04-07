@@ -14,7 +14,7 @@ from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.SELECT, Platform.NUMBER]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.SELECT, Platform.NUMBER, Platform.BUTTON]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Crop Steering System from a config entry."""
@@ -24,8 +24,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = entry.data
 
-    # Create test helper entities for hardware simulation
-    await _create_test_helpers(hass, entry)
+    # Only create test helper entities when using manual config (no .env file)
+    # Production systems with real sensors should NOT get test helpers
+    if entry.data.get("config_method") != "env":
+        await _create_test_helpers(hass, entry)
 
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

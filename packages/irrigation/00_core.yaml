@@ -1,0 +1,97 @@
+###############################################################################
+# Irrigation GROW PACK — 00 CORE
+# /config/packages/irrigation/00_core.yaml
+#
+# PURPOSE : Global notification groups, emergency stop script, and pack-level
+#           constants.  This file is stable across sites — do not put raw
+#           entity_ids here; use irrigation_* names only.
+#
+# NOTE    : Notification targets use the notify domain.  Adjust the target
+#           service names to match this site's mobile_app or other notify
+#           integration (search for "# SITE:" comments).
+###############################################################################
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SCRIPTS
+# ─────────────────────────────────────────────────────────────────────────────
+script:
+
+  # EMERGENCY STOP
+  # Closes every valve and disables the pack immediately.
+  # Called by watchdog automations and can be triggered manually.
+  irrigation_emergency_stop:
+    alias: "GW Emergency Stop"
+    icon: mdi:stop-circle-outline
+    description: >
+      Immediately close all valves, turn off mains water, and disable the
+      irrigation pack.  Safe to call at any time.
+    sequence:
+      - alias: "Close all table valves"
+        action: switch.turn_off
+        target:
+          entity_id:
+            - switch.irrigation_table_1_valve
+            - switch.irrigation_table_2_valve
+            - switch.irrigation_table_3_valve
+            - switch.irrigation_table_4_valve
+            - switch.irrigation_table_5_valve
+            - switch.irrigation_table_6_valve
+      - alias: "Close infrastructure solenoids"
+        action: switch.turn_off
+        target:
+          entity_id:
+            - switch.irrigation_mains_water
+            - switch.irrigation_mainline
+            - switch.irrigation_manifold
+      - alias: "Disable master enable"
+        action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.irrigation_enable
+      - alias: "Notify operators"
+        action: notify.notify              # SITE: replace with your notify target
+        data:
+          title: "🚨 GW EMERGENCY STOP"
+          message: >
+            All Irrigation valves closed and pack disabled at
+            {{ now().strftime('%H:%M:%S %d/%m/%Y') }}.
+            Reason: {{ trigger.description | default('manual') }}
+
+  # SEND ALERT (reusable helper for all automations)
+  irrigation_send_alert:
+    alias: "GW Send Alert"
+    icon: mdi:bell-alert
+    fields:
+      title:
+        description: "Alert title"
+        default: "GW Alert"
+      message:
+        description: "Alert body"
+        default: ""
+      level:
+        description: "warning | critical"
+        default: "warning"
+    sequence:
+      - action: notify.notify             # SITE: replace with your notify target
+        data:
+          title: "{{ title }}"
+          message: "{{ message }}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AUTOMATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+automation:
+
+  # Pack startup – log that the pack loaded successfully
+  - id: irrigation_pack_startup
+    alias: "GW Pack Startup"
+    description: "Fires once on HA start to confirm pack is active"
+    trigger:
+      - trigger: homeassistant
+        event: start
+    action:
+      - action: system_log.write
+        data:
+          message: "Irrigation Grow Pack loaded – site your-grow-room"
+          level: info

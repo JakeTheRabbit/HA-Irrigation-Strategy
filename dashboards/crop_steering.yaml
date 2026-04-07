@@ -1,0 +1,1046 @@
+title: "Crop Steering AI"
+views:
+  - title: Crop Steering
+    path: crop-steering
+    icon: mdi:brain
+    type: sections
+    max_columns: 4
+    sections:
+
+      # ══════════════════════════════════════════════════════════════════════
+      # ROW 1 — System Controls + Infrastructure + Valves (quick monitoring)
+      # ══════════════════════════════════════════════════════════════════════
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "System Controls"
+            show_header_toggle: false
+            entities:
+              - entity: switch.system_enabled
+                name: "System"
+              - entity: switch.auto_irrigation_enabled
+                name: "Auto Irrigation"
+              - entity: switch.ec_stacking_enabled
+                name: "EC Stacking"
+              - entity: switch.analytics_enabled
+                name: "Analytics"
+              - entity: select.crop_type
+                name: "Crop Type"
+              - entity: select.growth_stage
+                name: "Growth Stage"
+              - entity: select.irrigation_phase
+                name: "Phase Override"
+              - entity: number.lights_on_hour
+                name: "Lights On Hour"
+              - entity: number.lights_off_hour
+                name: "Lights Off Hour"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Infrastructure"
+            show_header_toggle: false
+            entities:
+              - entity: switch.irrigation_mainline
+                name: "Mainline"
+                secondary_info: last-changed
+              - entity: switch.irrigation_mains_water
+                name: "Mains Water"
+                secondary_info: last-changed
+              - entity: switch.irrigation_manifold
+                name: "Manifold"
+                secondary_info: last-changed
+              - entity: switch.irrigation_tank_fill_valve
+                name: "Tank Fill"
+                secondary_info: last-changed
+              - entity: switch.irrigation_waste_valve
+                name: "Waste"
+                secondary_info: last-changed
+              - entity: switch.irrigation_recirculation_valve
+                name: "Recirculation"
+                secondary_info: last-changed
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Valves"
+            show_header_toggle: false
+            entities:
+              - entity: switch.irrigation_table_1_valve
+                name: "Table 1"
+                secondary_info: last-changed
+              - entity: switch.irrigation_table_2_valve
+                name: "Table 2"
+                secondary_info: last-changed
+              - entity: switch.irrigation_table_3_valve
+                name: "Table 3"
+                secondary_info: last-changed
+              - entity: switch.irrigation_table_4_valve
+                name: "Table 4"
+                secondary_info: last-changed
+              - entity: switch.irrigation_table_5_valve
+                name: "Table 5"
+                secondary_info: last-changed
+              - entity: switch.irrigation_table_6_valve
+                name: "Table 6"
+                secondary_info: last-changed
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "AI Status"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_app_status
+                name: "Status"
+              - entity: sensor.crop_steering_app_current_phase
+                name: "Zone Phases"
+              - entity: sensor.crop_steering_app_next_irrigation
+                name: "Next Irrigation"
+              - entity: sensor.crop_steering_system_safety_status
+                name: "Safety"
+              - entity: sensor.crop_steering_system_uptime
+                name: "Uptime"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # ROW 2 — Live Sensors + Zone Phase Override + Trigger Shots
+      # ══════════════════════════════════════════════════════════════════════
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "VWC (%)"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.substrate_1_substrate_1_vwc_coco_coir
+                name: "Table 1"
+                secondary_info: last-changed
+              - entity: sensor.substrate_2_substrate_2_vwc_coco_coir
+                name: "Table 2"
+                secondary_info: last-changed
+              - entity: sensor.substrate_3_substrate_3_vwc_coco_coir
+                name: "Table 3"
+                secondary_info: last-changed
+              - entity: sensor.substrate_4_substrate_4_vwc_coco_coir
+                name: "Table 4"
+                secondary_info: last-changed
+              - entity: sensor.substrate_5_substrate_5_vwc_coco_coir
+                name: "Table 5"
+                secondary_info: last-changed
+              - entity: sensor.substrate_6_substrate_6_vwc_coco_coir
+                name: "Table 6"
+                secondary_info: last-changed
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "pwEC (mS/cm)"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.substrate_1_substrate_1_pwec
+                name: "Table 1"
+                secondary_info: last-changed
+              - entity: sensor.substrate_2_substrate_2_pwec
+                name: "Table 2"
+                secondary_info: last-changed
+              - entity: sensor.substrate_3_substrate_3_pwec
+                name: "Table 3"
+                secondary_info: last-changed
+              - entity: sensor.substrate_4_substrate_4_pwec
+                name: "Table 4"
+                secondary_info: last-changed
+              - entity: sensor.substrate_5_substrate_5_pwec
+                name: "Table 5"
+                secondary_info: last-changed
+              - entity: sensor.substrate_6_substrate_6_pwec
+                name: "Table 6"
+                secondary_info: last-changed
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Zone Phase Override"
+            show_header_toggle: false
+            entities:
+              - entity: select.zone_1_phase_override
+                name: "Zone 1"
+              - entity: select.zone_2_phase_override
+                name: "Zone 2"
+              - entity: select.zone_3_phase_override
+                name: "Zone 3"
+              - entity: select.zone_4_phase_override
+                name: "Zone 4"
+              - entity: select.zone_5_phase_override
+                name: "Zone 5"
+              - entity: select.zone_6_phase_override
+                name: "Zone 6"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Trigger Shot"
+            show_header_toggle: false
+            entities:
+              - entity: button.zone_1_trigger_shot
+                name: "Zone 1"
+              - entity: button.zone_2_trigger_shot
+                name: "Zone 2"
+              - entity: button.zone_3_trigger_shot
+                name: "Zone 3"
+              - entity: button.zone_4_trigger_shot
+                name: "Zone 4"
+              - entity: button.zone_5_trigger_shot
+                name: "Zone 5"
+              - entity: button.zone_6_trigger_shot
+                name: "Zone 6"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # ROW 3 — System Health + Manual Override + Zone Safety + AI Oversight
+      # ══════════════════════════════════════════════════════════════════════
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "System Health"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_system_health_score
+                name: "Health Score"
+              - entity: sensor.crop_steering_sensor_health
+                name: "Sensor Health"
+              - entity: sensor.crop_steering_daily_water_usage
+                name: "Water Today (L)"
+              - entity: sensor.crop_steering_fused_vwc
+                name: "Fused VWC"
+              - entity: sensor.crop_steering_fused_ec
+                name: "Fused EC"
+              - entity: sensor.crop_steering_dryback_percentage
+                name: "Dryback %"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Manual Override"
+            show_header_toggle: false
+            entities:
+              - entity: switch.zone_1_manual_override
+                name: "Zone 1"
+              - entity: switch.zone_2_manual_override
+                name: "Zone 2"
+              - entity: switch.zone_3_manual_override
+                name: "Zone 3"
+              - entity: switch.zone_4_manual_override
+                name: "Zone 4"
+              - entity: switch.zone_5_manual_override
+                name: "Zone 5"
+              - entity: switch.zone_6_manual_override
+                name: "Zone 6"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Zone Safety"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_zone_1_safety_status
+                name: "Zone 1"
+              - entity: sensor.crop_steering_zone_2_safety_status
+                name: "Zone 2"
+              - entity: sensor.crop_steering_zone_3_safety_status
+                name: "Zone 3"
+              - entity: sensor.crop_steering_zone_4_safety_status
+                name: "Zone 4"
+              - entity: sensor.crop_steering_zone_5_safety_status
+                name: "Zone 5"
+              - entity: sensor.crop_steering_zone_6_safety_status
+                name: "Zone 6"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "AI Oversight"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_ai_heartbeat
+                name: "Heartbeat"
+              - entity: sensor.crop_steering_ai_last_action
+                name: "Last Action"
+              - entity: sensor.crop_steering_irrigation_efficiency
+                name: "Irrigation Eff."
+              - entity: sensor.crop_steering_water_efficiency
+                name: "Water Efficiency"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # ROW 4 — Water Usage + Zone Health
+      # ══════════════════════════════════════════════════════════════════════
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Daily Water (L)"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_zone_1_daily_water_app
+                name: "Zone 1"
+              - entity: sensor.crop_steering_zone_2_daily_water_app
+                name: "Zone 2"
+              - entity: sensor.crop_steering_zone_3_daily_water_app
+                name: "Zone 3"
+              - entity: sensor.crop_steering_zone_4_daily_water_app
+                name: "Zone 4"
+              - entity: sensor.crop_steering_zone_5_daily_water_app
+                name: "Zone 5"
+              - entity: sensor.crop_steering_zone_6_daily_water_app
+                name: "Zone 6"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Irrigations Today"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_zone_1_irrigation_count_app
+                name: "Zone 1"
+              - entity: sensor.crop_steering_zone_2_irrigation_count_app
+                name: "Zone 2"
+              - entity: sensor.crop_steering_zone_3_irrigation_count_app
+                name: "Zone 3"
+              - entity: sensor.crop_steering_zone_4_irrigation_count_app
+                name: "Zone 4"
+              - entity: sensor.crop_steering_zone_5_irrigation_count_app
+                name: "Zone 5"
+              - entity: sensor.crop_steering_zone_6_irrigation_count_app
+                name: "Zone 6"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Zone Health"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_zone_1_health_score
+                name: "Zone 1"
+              - entity: sensor.crop_steering_zone_2_health_score
+                name: "Zone 2"
+              - entity: sensor.crop_steering_zone_3_health_score
+                name: "Zone 3"
+              - entity: sensor.crop_steering_zone_4_health_score
+                name: "Zone 4"
+              - entity: sensor.crop_steering_zone_5_health_score
+                name: "Zone 5"
+              - entity: sensor.crop_steering_zone_6_health_score
+                name: "Zone 6"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Zone Efficiency"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_zone_1_efficiency
+                name: "Zone 1"
+              - entity: sensor.crop_steering_zone_2_efficiency
+                name: "Zone 2"
+              - entity: sensor.crop_steering_zone_3_efficiency
+                name: "Zone 3"
+              - entity: sensor.crop_steering_zone_4_efficiency
+                name: "Zone 4"
+              - entity: sensor.crop_steering_zone_5_efficiency
+                name: "Zone 5"
+              - entity: sensor.crop_steering_zone_6_efficiency
+                name: "Zone 6"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # ROW 5 — Phase Parameters (P0-P3 side by side)
+      # ══════════════════════════════════════════════════════════════════════
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "P0 Dryback"
+            show_header_toggle: false
+            entities:
+              - entity: number.vegetative_dryback_target
+                name: "Veg Target VWC"
+              - entity: number.generative_dryback_target
+                name: "Gen Target VWC"
+              - entity: number.p0_minimum_wait_time
+                name: "Min Wait (min)"
+              - entity: number.p0_maximum_wait_time
+                name: "Max Wait (min)"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "P1 Ramp-Up"
+            show_header_toggle: false
+            entities:
+              - entity: number.p1_target_vwc
+                name: "Target VWC"
+              - entity: number.p1_initial_shot_size
+                name: "Initial Shot %"
+              - entity: number.p1_shot_size_increment
+                name: "Increment %"
+              - entity: number.p1_maximum_shot_size
+                name: "Max Shot %"
+              - entity: number.p1_time_between_shots
+                name: "Between Shots (min)"
+              - entity: number.p1_minimum_shots
+                name: "Min Shots"
+              - entity: number.p1_maximum_shots
+                name: "Max Shots"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "P2 Maintenance"
+            show_header_toggle: false
+            entities:
+              - entity: number.p2_vwc_threshold
+                name: "VWC Threshold %"
+              - entity: number.p2_shot_size
+                name: "Shot Size %"
+              - entity: number.p2_ec_high_threshold
+                name: "EC High Ratio"
+              - entity: number.p2_ec_low_threshold
+                name: "EC Low Ratio"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "P3 Pre-Off"
+            show_header_toggle: false
+            entities:
+              - entity: number.p3_emergency_vwc_threshold
+                name: "Emergency VWC %"
+              - entity: number.p3_emergency_shot_size
+                name: "Emergency Shot %"
+              - entity: number.p3_veg_last_irrigation
+                name: "Veg Last Irrig (min)"
+              - entity: number.p3_gen_last_irrigation
+                name: "Gen Last Irrig (min)"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # ROW 6 — EC Targets + Hardware Config
+      # ══════════════════════════════════════════════════════════════════════
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "EC Veg (mS/cm)"
+            show_header_toggle: false
+            entities:
+              - entity: number.ec_target_veg_p0
+                name: "P0"
+              - entity: number.ec_target_veg_p1
+                name: "P1"
+              - entity: number.ec_target_veg_p2
+                name: "P2"
+              - entity: number.ec_target_veg_p3
+                name: "P3"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "EC Gen (mS/cm)"
+            show_header_toggle: false
+            entities:
+              - entity: number.ec_target_gen_p0
+                name: "P0"
+              - entity: number.ec_target_gen_p1
+                name: "P1"
+              - entity: number.ec_target_gen_p2
+                name: "P2"
+              - entity: number.ec_target_gen_p3
+                name: "P3"
+              - entity: number.maximum_ec
+                name: "Absolute Max"
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Hardware Config"
+            show_header_toggle: false
+            entities:
+              - entity: number.substrate_volume
+                name: "Substrate Volume (L)"
+              - entity: number.dripper_flow_rate
+                name: "Dripper Flow (L/hr)"
+              - entity: number.drippers_per_plant
+                name: "Drippers/Plant"
+              - entity: number.field_capacity
+                name: "Field Capacity %"
+              - entity: number.lights_on_hour
+                name: "Lights On Hour"
+              - entity: number.lights_off_hour
+                name: "Lights Off Hour"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # ROW 7 — Zone Tuning (6 zones across 3 columns x 2 rows)
+      # ══════════════════════════════════════════════════════════════════════
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Zone 1 Config"
+            show_header_toggle: false
+            entities:
+              - entity: select.zone_1_group
+                name: "Group"
+              - entity: select.zone_1_priority
+                name: "Priority"
+              - entity: select.zone_1_crop_profile
+                name: "Profile"
+              - entity: number.zone_1_shot_size_multiplier
+                name: "Shot Mult."
+              - entity: number.zone_1_plant_count
+                name: "Plants"
+              - entity: number.zone_1_max_daily_volume
+                name: "Max Daily (L)"
+              - entity: number.zone_1_dryback_target
+                name: "Dryback % (0=sys)"
+              - entity: number.zone_1_p1_target_vwc
+                name: "P1 Target (0=sys)"
+              - entity: number.zone_1_p2_vwc_threshold
+                name: "P2 Thresh (0=sys)"
+              - entity: number.zone_1_p3_emergency_vwc
+                name: "P3 Emerg (0=sys)"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Zone 2 Config"
+            show_header_toggle: false
+            entities:
+              - entity: select.zone_2_group
+                name: "Group"
+              - entity: select.zone_2_priority
+                name: "Priority"
+              - entity: select.zone_2_crop_profile
+                name: "Profile"
+              - entity: number.zone_2_shot_size_multiplier
+                name: "Shot Mult."
+              - entity: number.zone_2_plant_count
+                name: "Plants"
+              - entity: number.zone_2_max_daily_volume
+                name: "Max Daily (L)"
+              - entity: number.zone_2_dryback_target
+                name: "Dryback % (0=sys)"
+              - entity: number.zone_2_p1_target_vwc
+                name: "P1 Target (0=sys)"
+              - entity: number.zone_2_p2_vwc_threshold
+                name: "P2 Thresh (0=sys)"
+              - entity: number.zone_2_p3_emergency_vwc
+                name: "P3 Emerg (0=sys)"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Zone 3 Config"
+            show_header_toggle: false
+            entities:
+              - entity: select.zone_3_group
+                name: "Group"
+              - entity: select.zone_3_priority
+                name: "Priority"
+              - entity: select.zone_3_crop_profile
+                name: "Profile"
+              - entity: number.zone_3_shot_size_multiplier
+                name: "Shot Mult."
+              - entity: number.zone_3_plant_count
+                name: "Plants"
+              - entity: number.zone_3_max_daily_volume
+                name: "Max Daily (L)"
+              - entity: number.zone_3_dryback_target
+                name: "Dryback % (0=sys)"
+              - entity: number.zone_3_p1_target_vwc
+                name: "P1 Target (0=sys)"
+              - entity: number.zone_3_p2_vwc_threshold
+                name: "P2 Thresh (0=sys)"
+              - entity: number.zone_3_p3_emergency_vwc
+                name: "P3 Emerg (0=sys)"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Zone 4 Config"
+            show_header_toggle: false
+            entities:
+              - entity: select.zone_4_group
+                name: "Group"
+              - entity: select.zone_4_priority
+                name: "Priority"
+              - entity: select.zone_4_crop_profile
+                name: "Profile"
+              - entity: number.zone_4_shot_size_multiplier
+                name: "Shot Mult."
+              - entity: number.zone_4_plant_count
+                name: "Plants"
+              - entity: number.zone_4_max_daily_volume
+                name: "Max Daily (L)"
+              - entity: number.zone_4_dryback_target
+                name: "Dryback % (0=sys)"
+              - entity: number.zone_4_p1_target_vwc
+                name: "P1 Target (0=sys)"
+              - entity: number.zone_4_p2_vwc_threshold
+                name: "P2 Thresh (0=sys)"
+              - entity: number.zone_4_p3_emergency_vwc
+                name: "P3 Emerg (0=sys)"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Zone 5 Config"
+            show_header_toggle: false
+            entities:
+              - entity: select.zone_5_group
+                name: "Group"
+              - entity: select.zone_5_priority
+                name: "Priority"
+              - entity: select.zone_5_crop_profile
+                name: "Profile"
+              - entity: number.zone_5_shot_size_multiplier
+                name: "Shot Mult."
+              - entity: number.zone_5_plant_count
+                name: "Plants"
+              - entity: number.zone_5_max_daily_volume
+                name: "Max Daily (L)"
+              - entity: number.zone_5_dryback_target
+                name: "Dryback % (0=sys)"
+              - entity: number.zone_5_p1_target_vwc
+                name: "P1 Target (0=sys)"
+              - entity: number.zone_5_p2_vwc_threshold
+                name: "P2 Thresh (0=sys)"
+              - entity: number.zone_5_p3_emergency_vwc
+                name: "P3 Emerg (0=sys)"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: "Zone 6 Config"
+            show_header_toggle: false
+            entities:
+              - entity: select.zone_6_group
+                name: "Group"
+              - entity: select.zone_6_priority
+                name: "Priority"
+              - entity: select.zone_6_crop_profile
+                name: "Profile"
+              - entity: number.zone_6_shot_size_multiplier
+                name: "Shot Mult."
+              - entity: number.zone_6_plant_count
+                name: "Plants"
+              - entity: number.zone_6_max_daily_volume
+                name: "Max Daily (L)"
+              - entity: number.zone_6_dryback_target
+                name: "Dryback % (0=sys)"
+              - entity: number.zone_6_p1_target_vwc
+                name: "P1 Target (0=sys)"
+              - entity: number.zone_6_p2_vwc_threshold
+                name: "P2 Thresh (0=sys)"
+              - entity: number.zone_6_p3_emergency_vwc
+                name: "P3 Emerg (0=sys)"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # ROW 8 — Current Zone Phases (read-only)
+      # ══════════════════════════════════════════════════════════════════════
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Current Zone Phases"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_zone_1_phase
+                name: "Zone 1"
+              - entity: sensor.crop_steering_zone_2_phase
+                name: "Zone 2"
+              - entity: sensor.crop_steering_zone_3_phase
+                name: "Zone 3"
+              - entity: sensor.crop_steering_zone_4_phase
+                name: "Zone 4"
+              - entity: sensor.crop_steering_zone_5_phase
+                name: "Zone 5"
+              - entity: sensor.crop_steering_zone_6_phase
+                name: "Zone 6"
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Zone Efficiency"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_zone_1_efficiency
+                name: "Zone 1"
+              - entity: sensor.crop_steering_zone_2_efficiency
+                name: "Zone 2"
+              - entity: sensor.crop_steering_zone_3_efficiency
+                name: "Zone 3"
+              - entity: sensor.crop_steering_zone_4_efficiency
+                name: "Zone 4"
+              - entity: sensor.crop_steering_zone_5_efficiency
+                name: "Zone 5"
+              - entity: sensor.crop_steering_zone_6_efficiency
+                name: "Zone 6"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # ROW 9 — Sensor Reliability
+      # ══════════════════════════════════════════════════════════════════════
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Sensor Reliability"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.sensor_substrate_1_substrate_1_vwc_coco_coir_reliability
+                name: "T1 VWC"
+              - entity: sensor.sensor_substrate_2_substrate_2_vwc_coco_coir_reliability
+                name: "T2 VWC"
+              - entity: sensor.sensor_substrate_3_substrate_3_vwc_coco_coir_reliability
+                name: "T3 VWC"
+              - entity: sensor.sensor_substrate_4_substrate_4_vwc_coco_coir_reliability
+                name: "T4 VWC"
+              - entity: sensor.sensor_substrate_5_substrate_5_vwc_coco_coir_reliability
+                name: "T5 VWC"
+              - entity: sensor.sensor_substrate_6_substrate_6_vwc_coco_coir_reliability
+                name: "T6 VWC"
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Sensor Health"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.sensor_substrate_1_substrate_1_vwc_coco_coir_health
+                name: "T1 VWC"
+              - entity: sensor.sensor_substrate_2_substrate_2_vwc_coco_coir_health
+                name: "T2 VWC"
+              - entity: sensor.sensor_substrate_3_substrate_3_vwc_coco_coir_health
+                name: "T3 VWC"
+              - entity: sensor.sensor_substrate_4_substrate_4_vwc_coco_coir_health
+                name: "T4 VWC"
+              - entity: sensor.sensor_substrate_5_substrate_5_vwc_coco_coir_health
+                name: "T5 VWC"
+              - entity: sensor.sensor_substrate_6_substrate_6_vwc_coco_coir_health
+                name: "T6 VWC"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # INSTRUCTION MANUAL
+      # ══════════════════════════════════════════════════════════════════════
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: markdown
+            content: >
+              ---
+
+
+              # Crop Steering AI — Complete Guide
+
+
+              ## How It Works
+
+
+              This system automates irrigation using a **4-phase daily cycle** tied to
+              your light schedule. Each "zone" is one table with its own substrate probe
+              (VWC + EC sensor) and solenoid valve. The AI reads sensor data every few
+              seconds and decides when, how much, and which zone to water.
+
+
+              ---
+
+
+              ## The 4 Phases
+
+
+              ### P0 — Morning Dryback
+
+              **When:** Lights turn ON. **What:** No watering. The substrate dries down
+              from overnight saturation. The AI waits for VWC to drop by the **Dryback
+              Target** (Veg: 50%, Gen: 40%) or until **Max Wait** time expires.
+
+
+              **Why it matters:** Dryback creates a water-stress signal that tells the
+              plant to shift between vegetative growth (leafy) and generative growth
+              (flowers/fruit). More dryback = more generative steering.
+
+
+              **Controls:**
+
+              - `Veg Dryback Target` — VWC % the substrate must reach (lower = more stress)
+
+              - `Gen Dryback Target` — Same but for flowering. Default 40% is aggressive.
+
+              - `Min Wait (min)` — Don't check dryback before this time (prevents false triggers). Default: 30 min.
+
+              - `Max Wait (min)` — Force move to P1 after this time even if target not hit. Default: 120 min.
+
+
+              ### P1 — Ramp-Up
+
+              **When:** P0 dryback achieved. **What:** Progressive irrigation shots that
+              increase in size until VWC reaches **P1 Target VWC** (default 65%).
+
+
+              **How shots work:** First shot = `Initial Shot %` of substrate volume. Each
+              subsequent shot adds `Increment %`. Shots are spaced `Between Shots` minutes
+              apart. Minimum `Min Shots` must fire before P2 can start. Maximum `Max Shots`
+              before the system forces P2.
+
+
+              **Controls:**
+
+              - `Target VWC` — Stop P1 when VWC reaches this. Default: 65%.
+
+              - `Initial Shot %` — First shot size as % of substrate. Default: 2% (0.2L in a 10L pot).
+
+              - `Increment %` — Each shot grows by this. Default: 0.5%.
+
+              - `Max Shot %` — Cap on shot size. Default: 10%.
+
+              - `Between Shots (min)` — Wait time between shots. Default: 15 min. Shorter = faster ramp.
+
+              - `Min/Max Shots` — Guardrails. Default: 3 min, 10 max.
+
+
+              ### P2 — Maintenance
+
+              **When:** P1 target VWC reached. **What:** Holds VWC steady with small
+              maintenance shots whenever VWC drops below the **P2 Threshold** (default 60%).
+              EC ratio adjusts shot size — high EC means bigger flush shot, low EC means
+              smaller shot.
+
+
+              **Controls:**
+
+              - `VWC Threshold %` — Trigger point for maintenance shots. Default: 60%.
+
+              - `Shot Size %` — Base maintenance shot. Default: 2% (5% in some configs).
+
+              - `EC High Ratio` — If substrate EC is this many times above target, increase shot. Default: 1.2x.
+
+              - `EC Low Ratio` — If substrate EC is this fraction of target, decrease shot. Default: 0.8x.
+
+
+              ### P3 — Pre-Lights-Off
+
+              **When:** Approaching lights-off time (calculated from dryback rate).
+              **What:** Final dryback period. NO irrigation unless VWC drops to emergency
+              level (wilt risk). Prepares the plant for the dark period.
+
+
+              **Controls:**
+
+              - `Emergency VWC %` — Below this, emergency watering fires to prevent wilting. Default: 40%.
+
+              - `Emergency Shot %` — Small rescue shot. Default: 2%.
+
+              - `Veg Last Irrig (min)` — Minutes before lights-off to transition. Default: 120 min.
+
+              - `Gen Last Irrig (min)` — Same for flowering. Default: 180 min.
+
+
+              ---
+
+
+              ## EC Targets (Nutrient Concentration)
+
+
+              EC targets tell the system what nutrient concentration to maintain in the
+              substrate during each phase. The system uses the **EC ratio** (actual EC /
+              target EC) to adjust irrigation behavior:
+
+
+              - **Ratio > EC High Threshold (1.2x):** Substrate is too salty. System increases
+              shot size to flush excess nutrients.
+
+              - **Ratio < EC Low Threshold (0.8x):** Substrate EC is low. System decreases shots
+              to allow concentration to build.
+
+              - **Ratio near 1.0:** On target. Normal shot sizes.
+
+
+              **Vegetative targets** are lower (3.0-3.2 mS/cm) because plants focus on
+              leaf growth. **Generative targets** are higher (4.0-6.0 mS/cm) to drive
+              flower/fruit production. The Athena methodology ramps EC through phases:
+              P0 baseline → P1 baseline → P2 peak → P3 taper.
+
+
+              ---
+
+
+              ## Zone Configuration
+
+
+              Each zone (table) can be configured independently:
+
+
+              - **Enabled** — Master on/off for this zone. Disabled zones get no water.
+
+              - **Manual Override** — When ON, blocks all AI irrigation for this zone. Use when
+              you want to water by hand or do maintenance. **Critical safety feature.**
+
+              - **Group** (A/B/C/D) — Zones in the same group coordinate watering. When 50%+
+              of a group needs water, the whole group waters together. Use for tables fed by
+              the same reservoir.
+
+              - **Priority** (Critical/High/Normal/Low) — When multiple zones need water
+              simultaneously, higher priority zones go first. Set Critical for motherplants
+              or stressed zones.
+
+              - **Crop Profile** — Per-zone crop type. "Follow Main" uses the global Crop Type.
+              Set individually if running different strains/crops per table.
+
+              - **Shot Multiplier** — Scales ALL shot sizes for this zone. 1.0 = normal,
+              1.5 = 50% bigger shots, 0.5 = half shots. Useful for zones with different
+              pot sizes or plant sizes.
+
+              - **Plant Count** — Number of plants. Affects total water calculations.
+
+              - **Max Daily Volume (L)** — Hard safety limit. System will not deliver more
+              than this per day to this zone, regardless of what the AI wants.
+
+
+              ---
+
+
+              ## Hardware Configuration
+
+
+              - **Substrate Volume (L)** — Total substrate per pot. All shot sizes are
+              calculated as a % of this. 10L = 1 coco bag.
+
+              - **Dripper Flow Rate (L/hr)** — Flow per dripper. Used to convert shot
+              volume to duration (seconds of valve open time).
+
+              - **Drippers/Plant** — Number of drippers per plant.
+
+              - **Field Capacity %** — Maximum VWC the substrate can hold. Coco = 70%.
+              System won't try to push VWC above this.
+
+              - **Lights On/Off Hour** — Light schedule (24h format). Phase transitions
+              are tied to this. P0 starts at lights-on, P3 ends at lights-off.
+
+
+              ---
+
+
+              ## Safety Features
+
+
+              The system has multiple safety layers:
+
+
+              1. **System Enabled** — Master kill switch. OFF = nothing waters.
+
+              2. **Auto Irrigation** — OFF = no AI-driven shots. Manual shots still work.
+
+              3. **Zone Enabled** — Per-zone on/off.
+
+              4. **Manual Override** — Per-zone AI block.
+
+              5. **Max Daily Volume** — Per-zone hard limit in liters.
+
+              6. **Emergency VWC** — Below 40% triggers rescue watering to prevent wilting.
+
+              7. **Startup Grace Period** — 120 seconds after restart, no emergency irrigation
+              fires (prevents false triggers from partial sensor data).
+
+              8. **Watchdog** — Detects hardware/state mismatches and executes emergency stop.
+
+              9. **Sensor Health Monitoring** — Tracks sensor reliability and flags degraded probes.
+
+
+              ---
+
+
+              ## Crop Profiles
+
+
+              | Profile | Dryback | EC Range | Best For |
+              |---------|---------|----------|----------|
+              | **Cannabis_Athena** | Moderate (15-25%) | 3.0-9.0 | Athena nutrient line, balanced hybrid |
+              | **Cannabis_Indica** | Light (12-22%) | 2.8-8.0 | Indica-dominant, prefer moisture |
+              | **Cannabis_Sativa** | Aggressive (18-30%) | 3.2-9.5 | Sativa-dominant, prefer dry |
+              | **Cannabis_Hybrid** | Moderate (15-25%) | 3.0-8.5 | General hybrid |
+              | **Tomato** | Very light (8-15%) | 2.0-4.5 | Hydroponic tomatoes |
+              | **Lettuce** | Minimal (5-10%) | 1.2-2.5 | Leafy greens |
+
+
+              ---
+
+
+              ## Quick Start Checklist
+
+
+              1. Set **Lights On/Off Hour** to match your light schedule
+
+              2. Set **Substrate Volume** to your pot size in liters
+
+              3. Set **Dripper Flow Rate** and **Drippers/Plant** to match your hardware
+
+              4. Choose your **Crop Type** (Cannabis_Athena is recommended for Athena nutrients)
+
+              5. Set **Growth Stage** (Vegetative or Generative)
+
+              6. Enable zones you want the AI to control
+
+              7. Turn ON **System Enabled** and **Auto Irrigation**
+
+              8. Watch the system cycle through P0 → P1 → P2 → P3 → P0...
+
+              9. Adjust P1/P2 thresholds based on how your plants respond
+
+
+              ---
+
+
+              ## Troubleshooting
+
+
+              | Problem | Check |
+              |---------|-------|
+              | Zone not watering | Is it Enabled? Is Manual Override OFF? Is System ON? |
+              | Over-watering | Reduce P2 Shot Size, increase P2 VWC Threshold |
+              | Under-watering | Increase P1 Target VWC, reduce P2 VWC Threshold |
+              | Plants too vegetative | Increase dryback targets, increase EC targets, switch to Generative stage |
+              | Plants too generative | Decrease dryback targets, decrease EC targets, switch to Vegetative stage |
+              | EC too high | System will auto-flush with larger shots when EC High Ratio exceeded |
+              | Sensor showing "degraded" | Check probe connection, may need recalibration |
+              | Zone shows "safe" but no water | Check VWC — if above threshold, system is correctly holding |

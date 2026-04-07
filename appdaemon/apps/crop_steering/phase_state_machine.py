@@ -146,23 +146,33 @@ class ZoneStateMachine:
         IrrigationPhase.P0_MORNING_DRYBACK: [
             (PhaseTransition.DRYBACK_COMPLETE, IrrigationPhase.P1_RAMP_UP),
             (PhaseTransition.DRYBACK_TIMEOUT, IrrigationPhase.P1_RAMP_UP),
+            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P0_MORNING_DRYBACK),
             (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P1_RAMP_UP),
             (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P2_MAINTENANCE),
+            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P3_PRE_LIGHTS_OFF),
         ],
         IrrigationPhase.P1_RAMP_UP: [
             (PhaseTransition.RAMP_UP_COMPLETE, IrrigationPhase.P2_MAINTENANCE),
             (PhaseTransition.LIGHTS_OFF_APPROACHING, IrrigationPhase.P3_PRE_LIGHTS_OFF),
+            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P0_MORNING_DRYBACK),
+            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P1_RAMP_UP),
             (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P2_MAINTENANCE),
+            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P3_PRE_LIGHTS_OFF),
         ],
         IrrigationPhase.P2_MAINTENANCE: [
             (PhaseTransition.LIGHTS_OFF_APPROACHING, IrrigationPhase.P3_PRE_LIGHTS_OFF),
             (PhaseTransition.LIGHTS_ON, IrrigationPhase.P0_MORNING_DRYBACK),
+            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P0_MORNING_DRYBACK),
+            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P1_RAMP_UP),
+            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P2_MAINTENANCE),
             (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P3_PRE_LIGHTS_OFF),
         ],
         IrrigationPhase.P3_PRE_LIGHTS_OFF: [
             (PhaseTransition.LIGHTS_ON, IrrigationPhase.P0_MORNING_DRYBACK),
-            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P2_MAINTENANCE),
+            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P0_MORNING_DRYBACK),
             (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P1_RAMP_UP),
+            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P2_MAINTENANCE),
+            (PhaseTransition.MANUAL_OVERRIDE, IrrigationPhase.P3_PRE_LIGHTS_OFF),
         ]
     }
     

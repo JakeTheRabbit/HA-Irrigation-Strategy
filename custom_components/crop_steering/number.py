@@ -405,7 +405,7 @@ async def async_setup_entry(
                 name=f"Zone {zone_num} Plant Count",
                 icon="mdi:sprout",
                 native_min_value=1,
-                native_max_value=50,
+                native_max_value=200,
                 native_step=1,
                 mode="box",
             ),
@@ -421,7 +421,7 @@ async def async_setup_entry(
                 name=f"Zone {zone_num} Max Daily Volume",
                 icon="mdi:water-check",
                 native_min_value=0,
-                native_max_value=200,
+                native_max_value=500,
                 native_step=0.5,
                 native_unit_of_measurement=UnitOfVolume.LITERS,
                 mode="box",
@@ -446,7 +446,69 @@ async def async_setup_entry(
             zone_num=zone_num,
             default_value=1.0
         ))
-    
+
+        # Per-zone phase targets (0 = use system-wide default)
+        numbers.append(CropSteeringNumber(
+            entry,
+            NumberEntityDescription(
+                key=f"zone_{zone_num}_dryback_target",
+                name=f"Zone {zone_num} Dryback Target",
+                icon="mdi:target",
+                native_min_value=0,
+                native_max_value=80.0,
+                native_step=1.0,
+                native_unit_of_measurement="%",
+                mode="box",
+            ),
+            zone_num=zone_num,
+            default_value=0
+        ))
+        numbers.append(CropSteeringNumber(
+            entry,
+            NumberEntityDescription(
+                key=f"zone_{zone_num}_p1_target_vwc",
+                name=f"Zone {zone_num} P1 Target VWC",
+                icon="mdi:target",
+                native_min_value=0,
+                native_max_value=95.0,
+                native_step=1.0,
+                native_unit_of_measurement="%",
+                mode="box",
+            ),
+            zone_num=zone_num,
+            default_value=0
+        ))
+        numbers.append(CropSteeringNumber(
+            entry,
+            NumberEntityDescription(
+                key=f"zone_{zone_num}_p2_vwc_threshold",
+                name=f"Zone {zone_num} P2 VWC Threshold",
+                icon="mdi:target",
+                native_min_value=0,
+                native_max_value=85.0,
+                native_step=1.0,
+                native_unit_of_measurement="%",
+                mode="box",
+            ),
+            zone_num=zone_num,
+            default_value=0
+        ))
+        numbers.append(CropSteeringNumber(
+            entry,
+            NumberEntityDescription(
+                key=f"zone_{zone_num}_p3_emergency_vwc",
+                name=f"Zone {zone_num} P3 Emergency VWC",
+                icon="mdi:alert",
+                native_min_value=0,
+                native_max_value=65.0,
+                native_step=1.0,
+                native_unit_of_measurement="%",
+                mode="box",
+            ),
+            zone_num=zone_num,
+            default_value=0
+        ))
+
     async_add_entities(numbers)
 
 class CropSteeringNumber(NumberEntity, RestoreEntity):

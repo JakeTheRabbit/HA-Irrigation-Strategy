@@ -1,0 +1,1166 @@
+title: "Irrigation"
+views:
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  VIEW 1 — COMMAND CENTER
+  # ═══════════════════════════════════════════════════════════════════════════
+  - title: Command Center
+    path: command-center
+    icon: mdi:view-dashboard
+    type: sections
+    max_columns: 4
+    sections:
+      # ── System Controls ───────────────────────────────────────────────────
+      - type: grid
+        column_span: 4
+        cards:
+          - type: entities
+            title: "System Controls"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_enable
+                name: GW System
+                icon: mdi:power
+              - entity: input_boolean.irrigation_maintenance_mode
+                name: Maintenance
+                icon: mdi:wrench
+              - entity: binary_sensor.irrigation_system_ready
+                name: System Ready
+                icon: mdi:check-circle
+              - entity: binary_sensor.irrigation_lights_on
+                name: Lights
+                icon: mdi:lightbulb
+              - entity: sensor.grow_room_light_timer
+                name: Light Timer
+                icon: mdi:timer
+              - entity: switch.irrigation_co2
+                name: CO2
+                icon: mdi:molecule-co2
+              - entity: sensor.irrigation_room_1_co2
+                name: CO2 Level
+                icon: mdi:gauge
+
+      # ── Crop Steering Status ──────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Crop Steering"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_app_status
+                name: App Status
+                icon: mdi:application
+              - entity: sensor.crop_steering_app_current_phase
+                name: Zone Phases
+                icon: mdi:chart-timeline-variant
+              - entity: sensor.crop_steering_app_next_irrigation
+                name: Next Irrigation
+                icon: mdi:clock-outline
+              - entity: select.irrigation_phase
+                name: Target Phase
+                icon: mdi:target
+              - entity: select.steering_mode
+                name: Steering Mode
+                icon: mdi:tune
+              - entity: select.crop_type
+                name: Crop Type
+                icon: mdi:sprout
+              - entity: binary_sensor.crop_steering_dryback_in_progress
+                name: Dryback In Progress
+                icon: mdi:water-minus
+              - entity: sensor.crop_steering_system_uptime
+                name: Uptime (hours)
+                icon: mdi:clock-check
+
+          - type: entities
+            title: "System Health"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_system_health_score
+                name: Health Score
+                icon: mdi:heart-pulse
+              - entity: sensor.crop_steering_system_safety_status
+                name: Safety Status
+                icon: mdi:shield-check
+              - entity: sensor.crop_steering_sensor_health
+                name: Active Sensors
+                icon: mdi:access-point
+              - entity: sensor.crop_steering_sensor_fusion_confidence
+                name: Fusion Confidence
+                icon: mdi:brain
+              - entity: sensor.crop_steering_fused_vwc
+                name: Fused VWC
+                icon: mdi:water-percent
+              - entity: sensor.crop_steering_fused_ec
+                name: Fused EC
+                icon: mdi:flash
+              - entity: switch.ec_stacking_enabled
+                name: EC Stacking
+                icon: mdi:layers
+              - entity: switch.analytics_enabled
+                name: Analytics
+                icon: mdi:chart-bar
+
+          - type: entities
+            title: "Shot Calculations"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.p1_shot_duration
+                name: P1 Shot Duration
+                icon: mdi:timer-sand
+              - entity: sensor.p2_shot_duration
+                name: P2 Shot Duration
+                icon: mdi:timer-sand
+              - entity: sensor.p3_emergency_shot_duration
+                name: P3 Emergency Duration
+                icon: mdi:timer-sand
+              - entity: sensor.p2_vwc_threshold_adjusted
+                name: P2 VWC Threshold (adj)
+                icon: mdi:water-alert
+              - entity: sensor.irrigation_average_vwc
+                name: Average VWC
+                icon: mdi:water-percent
+              - entity: sensor.irrigation_average_ec
+                name: Average EC
+                icon: mdi:flash
+
+      # ── Safety & Infrastructure ──────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: glance
+            title: "Safety"
+            show_state: true
+            columns: 3
+            entities:
+              - entity: binary_sensor.irrigation_irrigation_allowed
+                name: Irrigation OK
+              - entity: binary_sensor.irrigation_tank_low
+                name: Tank Low
+              - entity: binary_sensor.irrigation_leak_detected
+                name: Leak Detect
+
+          - type: glance
+            title: "Tank"
+            show_state: true
+            columns: 2
+            entities:
+              - entity: sensor.irrigation_tank_ph
+                name: pH
+              - entity: sensor.irrigation_tank_ec
+                name: EC
+
+          - type: entities
+            title: "Infrastructure"
+            show_header_toggle: false
+            entities:
+              - entity: switch.irrigation_mainline
+                name: Mainline (opens pump)
+                icon: mdi:pipe-valve
+              - entity: switch.irrigation_manifold
+                name: Manifold (tank/mix)
+                icon: mdi:pipe
+              - entity: switch.irrigation_mains_water
+                name: Mains Water (tank fill)
+                icon: mdi:water-pump
+              - entity: switch.irrigation_waste_valve
+                name: Waste Valve
+                icon: mdi:pipe-disconnected
+              - entity: switch.irrigation_recirculation_valve
+                name: Recirculation
+                icon: mdi:recycle
+              - entity: switch.irrigation_tank_fill_valve
+                name: Tank Fill Valve
+                icon: mdi:valve
+
+      # ── All Zones At A Glance ─────────────────────────────────────────────
+      - type: grid
+        column_span: 4
+        cards:
+          - type: glance
+            title: "VWC — All Tables"
+            columns: 6
+            show_state: true
+            entities:
+              - entity: sensor.irrigation_table_1_vwc
+                name: T1
+              - entity: sensor.irrigation_table_2_vwc
+                name: T2
+              - entity: sensor.irrigation_table_3_vwc
+                name: T3
+              - entity: sensor.irrigation_table_4_vwc
+                name: T4
+              - entity: sensor.irrigation_table_5_vwc
+                name: T5
+              - entity: sensor.irrigation_table_6_vwc
+                name: T6
+
+          - type: glance
+            title: "EC — All Tables"
+            columns: 6
+            show_state: true
+            entities:
+              - entity: sensor.irrigation_table_1_ec
+                name: T1
+              - entity: sensor.irrigation_table_2_ec
+                name: T2
+              - entity: sensor.irrigation_table_3_ec
+                name: T3
+              - entity: sensor.irrigation_table_4_ec
+                name: T4
+              - entity: sensor.irrigation_table_5_ec
+                name: T5
+              - entity: sensor.irrigation_table_6_ec
+                name: T6
+
+          - type: glance
+            title: "Substrate Temp"
+            columns: 6
+            show_state: true
+            entities:
+              - entity: sensor.irrigation_table_1_substrate_temp
+                name: T1
+              - entity: sensor.irrigation_table_2_substrate_temp
+                name: T2
+              - entity: sensor.irrigation_table_3_substrate_temp
+                name: T3
+              - entity: sensor.irrigation_table_4_substrate_temp
+                name: T4
+              - entity: sensor.irrigation_table_5_substrate_temp
+                name: T5
+              - entity: sensor.irrigation_table_6_substrate_temp
+                name: T6
+
+          - type: glance
+            title: "Zone Phase"
+            columns: 6
+            show_state: true
+            entities:
+              - entity: sensor.crop_steering_zone_1_phase
+                name: T1
+              - entity: sensor.crop_steering_zone_2_phase
+                name: T2
+              - entity: sensor.crop_steering_zone_3_phase
+                name: T3
+              - entity: sensor.crop_steering_zone_4_phase
+                name: T4
+              - entity: sensor.crop_steering_zone_5_phase
+                name: T5
+              - entity: sensor.crop_steering_zone_6_phase
+                name: T6
+
+          - type: glance
+            title: "Zone Efficiency"
+            columns: 6
+            show_state: true
+            entities:
+              - entity: sensor.crop_steering_zone_1_efficiency
+                name: T1
+              - entity: sensor.crop_steering_zone_2_efficiency
+                name: T2
+              - entity: sensor.crop_steering_zone_3_efficiency
+                name: T3
+              - entity: sensor.crop_steering_zone_4_efficiency
+                name: T4
+              - entity: sensor.crop_steering_zone_5_efficiency
+                name: T5
+              - entity: sensor.crop_steering_zone_6_efficiency
+                name: T6
+
+          - type: glance
+            title: "Zone Safety"
+            columns: 6
+            show_state: true
+            entities:
+              - entity: sensor.crop_steering_zone_1_safety_status
+                name: T1
+              - entity: sensor.crop_steering_zone_2_safety_status
+                name: T2
+              - entity: sensor.crop_steering_zone_3_safety_status
+                name: T3
+              - entity: sensor.crop_steering_zone_4_safety_status
+                name: T4
+              - entity: sensor.crop_steering_zone_5_safety_status
+                name: T5
+              - entity: sensor.crop_steering_zone_6_safety_status
+                name: T6
+
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  VIEW 2 — ZONE CONTROL (per-table detail)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - title: Zone Control
+    path: zone-control
+    icon: mdi:sprinkler-variant
+    type: sections
+    max_columns: 3
+    sections:
+      # ── Table 1 ───────────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table 1"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_table_1_enabled
+                name: Enabled
+              - entity: switch.zone_1_enabled
+                name: Crop Steering
+              - entity: switch.zone_1_manual_override
+                name: Manual Override
+              - type: divider
+              - entity: sensor.irrigation_table_1_vwc
+                name: VWC
+                icon: mdi:water-percent
+              - entity: sensor.irrigation_table_1_ec
+                name: EC
+                icon: mdi:flash
+              - entity: sensor.irrigation_table_1_substrate_temp
+                name: Substrate Temp
+                icon: mdi:thermometer
+              - entity: sensor.zone_1_status
+                name: Status
+              - type: divider
+              - entity: switch.irrigation_table_1_valve
+                name: Valve
+                icon: mdi:pipe-valve
+              - entity: timer.irrigation_table_1_run_timer
+                name: Run Timer
+              - entity: sensor.zone_1_last_irrigation
+                name: Last Irrigation
+              - entity: sensor.zone_1_irrigations_today
+                name: Shots Today
+              - entity: sensor.zone_1_daily_water_usage
+                name: Daily Water
+              - type: divider
+              - entity: select.zone_1_group
+                name: Group
+              - entity: select.zone_1_priority
+                name: Priority
+              - entity: select.zone_1_crop_profile
+                name: Crop Profile
+              - entity: number.zone_1_plant_count
+                name: Plant Count
+              - entity: number.zone_1_max_daily_volume
+                name: Max Daily Volume
+              - entity: number.zone_1_shot_size_multiplier
+                name: Shot Multiplier
+
+      # ── Table 2 ───────────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table 2"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_table_2_enabled
+                name: Enabled
+              - entity: switch.zone_2_enabled
+                name: Crop Steering
+              - entity: switch.zone_2_manual_override
+                name: Manual Override
+              - type: divider
+              - entity: sensor.irrigation_table_2_vwc
+                name: VWC
+                icon: mdi:water-percent
+              - entity: sensor.irrigation_table_2_ec
+                name: EC
+                icon: mdi:flash
+              - entity: sensor.irrigation_table_2_substrate_temp
+                name: Substrate Temp
+                icon: mdi:thermometer
+              - entity: sensor.zone_2_status
+                name: Status
+              - type: divider
+              - entity: switch.irrigation_table_2_valve
+                name: Valve
+                icon: mdi:pipe-valve
+              - entity: timer.irrigation_table_2_run_timer
+                name: Run Timer
+              - entity: sensor.zone_2_last_irrigation
+                name: Last Irrigation
+              - entity: sensor.zone_2_irrigations_today
+                name: Shots Today
+              - entity: sensor.zone_2_daily_water_usage
+                name: Daily Water
+              - type: divider
+              - entity: select.zone_2_group
+                name: Group
+              - entity: select.zone_2_priority
+                name: Priority
+              - entity: select.zone_2_crop_profile
+                name: Crop Profile
+              - entity: number.zone_2_plant_count
+                name: Plant Count
+              - entity: number.zone_2_max_daily_volume
+                name: Max Daily Volume
+              - entity: number.zone_2_shot_size_multiplier
+                name: Shot Multiplier
+
+      # ── Table 3 ───────────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table 3"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_table_3_enabled
+                name: Enabled
+              - entity: switch.zone_3_enabled
+                name: Crop Steering
+              - entity: switch.zone_3_manual_override
+                name: Manual Override
+              - type: divider
+              - entity: sensor.irrigation_table_3_vwc
+                name: VWC
+                icon: mdi:water-percent
+              - entity: sensor.irrigation_table_3_ec
+                name: EC
+                icon: mdi:flash
+              - entity: sensor.irrigation_table_3_substrate_temp
+                name: Substrate Temp
+                icon: mdi:thermometer
+              - entity: sensor.zone_3_status
+                name: Status
+              - type: divider
+              - entity: switch.irrigation_table_3_valve
+                name: Valve
+                icon: mdi:pipe-valve
+              - entity: timer.irrigation_table_3_run_timer
+                name: Run Timer
+              - entity: sensor.zone_3_last_irrigation
+                name: Last Irrigation
+              - entity: sensor.zone_3_irrigations_today
+                name: Shots Today
+              - entity: sensor.zone_3_daily_water_usage
+                name: Daily Water
+              - type: divider
+              - entity: select.zone_3_group
+                name: Group
+              - entity: select.zone_3_priority
+                name: Priority
+              - entity: select.zone_3_crop_profile
+                name: Crop Profile
+              - entity: number.zone_3_plant_count
+                name: Plant Count
+              - entity: number.zone_3_max_daily_volume
+                name: Max Daily Volume
+              - entity: number.zone_3_shot_size_multiplier
+                name: Shot Multiplier
+
+      # ── Table 4 ───────────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table 4"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_table_4_enabled
+                name: Enabled
+              - entity: switch.zone_4_enabled
+                name: Crop Steering
+              - entity: switch.zone_4_manual_override
+                name: Manual Override
+              - type: divider
+              - entity: sensor.irrigation_table_4_vwc
+                name: VWC
+                icon: mdi:water-percent
+              - entity: sensor.irrigation_table_4_ec
+                name: EC
+                icon: mdi:flash
+              - entity: sensor.irrigation_table_4_substrate_temp
+                name: Substrate Temp
+                icon: mdi:thermometer
+              - entity: sensor.zone_4_status
+                name: Status
+              - type: divider
+              - entity: switch.irrigation_table_4_valve
+                name: Valve
+                icon: mdi:pipe-valve
+              - entity: timer.irrigation_table_4_run_timer
+                name: Run Timer
+              - entity: sensor.zone_4_last_irrigation
+                name: Last Irrigation
+              - entity: sensor.zone_4_irrigations_today
+                name: Shots Today
+              - entity: sensor.zone_4_daily_water_usage
+                name: Daily Water
+              - type: divider
+              - entity: select.zone_4_group
+                name: Group
+              - entity: select.zone_4_priority
+                name: Priority
+              - entity: select.zone_4_crop_profile
+                name: Crop Profile
+              - entity: number.zone_4_plant_count
+                name: Plant Count
+              - entity: number.zone_4_max_daily_volume
+                name: Max Daily Volume
+              - entity: number.zone_4_shot_size_multiplier
+                name: Shot Multiplier
+
+      # ── Table 5 ───────────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table 5"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_table_5_enabled
+                name: Enabled
+              - entity: switch.zone_5_enabled
+                name: Crop Steering
+              - entity: switch.zone_5_manual_override
+                name: Manual Override
+              - type: divider
+              - entity: sensor.irrigation_table_5_vwc
+                name: VWC
+                icon: mdi:water-percent
+              - entity: sensor.irrigation_table_5_ec
+                name: EC
+                icon: mdi:flash
+              - entity: sensor.irrigation_table_5_substrate_temp
+                name: Substrate Temp
+                icon: mdi:thermometer
+              - entity: sensor.zone_5_status
+                name: Status
+              - type: divider
+              - entity: switch.irrigation_table_5_valve
+                name: Valve
+                icon: mdi:pipe-valve
+              - entity: timer.irrigation_table_5_run_timer
+                name: Run Timer
+              - entity: sensor.zone_5_last_irrigation
+                name: Last Irrigation
+              - entity: sensor.zone_5_irrigations_today
+                name: Shots Today
+              - entity: sensor.zone_5_daily_water_usage
+                name: Daily Water
+              - type: divider
+              - entity: select.zone_5_group
+                name: Group
+              - entity: select.zone_5_priority
+                name: Priority
+              - entity: select.zone_5_crop_profile
+                name: Crop Profile
+              - entity: number.zone_5_plant_count
+                name: Plant Count
+              - entity: number.zone_5_max_daily_volume
+                name: Max Daily Volume
+              - entity: number.zone_5_shot_size_multiplier
+                name: Shot Multiplier
+
+      # ── Table 6 ───────────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table 6"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_table_6_enabled
+                name: Enabled
+              - entity: switch.zone_6_enabled
+                name: Crop Steering
+              - entity: switch.zone_6_manual_override
+                name: Manual Override
+              - type: divider
+              - entity: sensor.irrigation_table_6_vwc
+                name: VWC
+                icon: mdi:water-percent
+              - entity: sensor.irrigation_table_6_ec
+                name: EC
+                icon: mdi:flash
+              - entity: sensor.irrigation_table_6_substrate_temp
+                name: Substrate Temp
+                icon: mdi:thermometer
+              - entity: sensor.zone_6_status
+                name: Status
+              - type: divider
+              - entity: switch.irrigation_table_6_valve
+                name: Valve
+                icon: mdi:pipe-valve
+              - entity: timer.irrigation_table_6_run_timer
+                name: Run Timer
+              - entity: sensor.zone_6_last_irrigation
+                name: Last Irrigation
+              - entity: sensor.zone_6_irrigations_today
+                name: Shots Today
+              - entity: sensor.zone_6_daily_water_usage
+                name: Daily Water
+              - type: divider
+              - entity: select.zone_6_group
+                name: Group
+              - entity: select.zone_6_priority
+                name: Priority
+              - entity: select.zone_6_crop_profile
+                name: Crop Profile
+              - entity: number.zone_6_plant_count
+                name: Plant Count
+              - entity: number.zone_6_max_daily_volume
+                name: Max Daily Volume
+              - entity: number.zone_6_shot_size_multiplier
+                name: Shot Multiplier
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  VIEW 3 — TRENDS (history graphs)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - title: Trends
+    path: trends
+    icon: mdi:chart-line
+    type: sections
+    max_columns: 3
+    sections:
+      # ── VWC Trend ─────────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: history-graph
+            title: "VWC — All Tables (24h)"
+            hours_to_show: 24
+            entities:
+              - entity: sensor.irrigation_table_1_vwc
+                name: T1
+              - entity: sensor.irrigation_table_2_vwc
+                name: T2
+              - entity: sensor.irrigation_table_3_vwc
+                name: T3
+              - entity: sensor.irrigation_table_4_vwc
+                name: T4
+              - entity: sensor.irrigation_table_5_vwc
+                name: T5
+              - entity: sensor.irrigation_table_6_vwc
+                name: T6
+              - entity: sensor.irrigation_average_vwc
+                name: Avg
+
+      # ── EC Trend ──────────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: history-graph
+            title: "EC — All Tables (24h)"
+            hours_to_show: 24
+            entities:
+              - entity: sensor.irrigation_table_1_ec
+                name: T1
+              - entity: sensor.irrigation_table_2_ec
+                name: T2
+              - entity: sensor.irrigation_table_3_ec
+                name: T3
+              - entity: sensor.irrigation_table_4_ec
+                name: T4
+              - entity: sensor.irrigation_table_5_ec
+                name: T5
+              - entity: sensor.irrigation_table_6_ec
+                name: T6
+              - entity: sensor.irrigation_average_ec
+                name: Avg
+
+      # ── Substrate Temp ────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: history-graph
+            title: "Substrate Temp (24h)"
+            hours_to_show: 24
+            entities:
+              - entity: sensor.irrigation_table_1_substrate_temp
+                name: T1
+              - entity: sensor.irrigation_table_2_substrate_temp
+                name: T2
+              - entity: sensor.irrigation_table_3_substrate_temp
+                name: T3
+              - entity: sensor.irrigation_table_4_substrate_temp
+                name: T4
+              - entity: sensor.irrigation_table_5_substrate_temp
+                name: T5
+              - entity: sensor.irrigation_table_6_substrate_temp
+                name: T6
+
+      # ── Room Environment ──────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: history-graph
+            title: "Temp & VPD (24h)"
+            hours_to_show: 24
+            entities:
+              - entity: sensor.irrigation_room_1_temp
+                name: Room Temp
+              - entity: sensor.irrigation_leaf_temperature
+                name: Leaf Temp
+              - entity: sensor.irrigation_room_1_vpd
+                name: VPD
+
+      # ── RH & CO2 ────────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: history-graph
+            title: "RH & CO2 (24h)"
+            hours_to_show: 24
+            entities:
+              - entity: sensor.irrigation_room_1_rh
+                name: RH
+              - entity: sensor.irrigation_room_1_co2
+                name: CO2
+
+      # ── Tank ─────────────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: history-graph
+            title: "Tank pH & EC (24h)"
+            hours_to_show: 24
+            entities:
+              - entity: sensor.irrigation_tank_ph
+                name: pH
+              - entity: sensor.irrigation_tank_ec
+                name: EC
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  VIEW 4 — ENVIRONMENT
+  # ═══════════════════════════════════════════════════════════════════════════
+  - title: Environment
+    path: environment
+    icon: mdi:thermometer
+    type: sections
+    max_columns: 3
+    sections:
+      # ── Live Gauges ───────────────────────────────────────────────────────
+      - type: grid
+        column_span: 3
+        cards:
+          - type: gauge
+            entity: sensor.irrigation_room_1_temp
+            name: Temperature
+            min: 10
+            max: 45
+            severity:
+              green: 20
+              yellow: 30
+              red: 35
+          - type: gauge
+            entity: sensor.irrigation_room_1_rh
+            name: Humidity
+            min: 0
+            max: 100
+            severity:
+              green: 40
+              yellow: 65
+              red: 80
+          - type: gauge
+            entity: sensor.irrigation_room_1_co2
+            name: CO2
+            min: 0
+            max: 2000
+            severity:
+              green: 400
+              yellow: 1200
+              red: 1600
+          - type: gauge
+            entity: sensor.irrigation_room_1_vpd
+            name: VPD
+            min: 0
+            max: 3
+            severity:
+              green: 0.8
+              yellow: 1.4
+              red: 2.0
+
+      # ── Temperature Targets ───────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Temperature"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.irrigation_room_1_temp
+                name: Current
+              - entity: sensor.irrigation_temp_target
+                name: Active Target
+              - entity: input_number.irrigation_temp_target_day
+                name: Day Target
+              - entity: input_number.irrigation_temp_target_night
+                name: Night Target
+              - entity: input_number.irrigation_temp_high_alert
+                name: High Alert
+              - entity: sensor.irrigation_leaf_temperature
+                name: Leaf Temp
+
+      # ── Humidity Targets ──────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Humidity"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.irrigation_room_1_rh
+                name: Current
+              - entity: sensor.irrigation_rh_target
+                name: Active Target
+              - entity: input_number.irrigation_rh_target_day
+                name: Day Target
+              - entity: input_number.irrigation_rh_target_night
+                name: Night Target
+              - entity: input_number.irrigation_rh_high_alert
+                name: High Alert
+
+      # ── CO2 Targets ──────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "CO2"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.irrigation_room_1_co2
+                name: Current
+              - entity: input_number.irrigation_co2_target
+                name: Target
+              - entity: input_number.irrigation_co2_high_alert
+                name: High Alert
+              - entity: input_number.irrigation_co2_low_alert
+                name: Low Alert
+
+      # ── Hardware Switches ─────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Climate Hardware"
+            show_header_toggle: false
+            entities:
+              - entity: switch.irrigation_co2
+                name: CO2 Injection
+                icon: mdi:molecule-co2
+              - entity: switch.irrigation_humidifier
+                name: Humidifier
+                icon: mdi:air-humidifier
+              - entity: switch.irrigation_dehumidifier_1
+                name: Dehumidifier
+                icon: mdi:air-humidifier-off
+              - entity: switch.irrigation_ceiling_vent
+                name: Ceiling Vent
+                icon: mdi:fan
+
+      - type: grid
+        cards:
+          - type: entities
+            title: "Dehumidifier Relays"
+            show_header_toggle: false
+            entities:
+              - entity: switch.irrigation_dehumidifier_relay_1
+                name: Relay 1
+              - entity: switch.irrigation_dehumidifier_relay_2
+                name: Relay 2
+              - entity: switch.irrigation_dehumidifier_relay_3
+                name: Relay 3
+              - entity: switch.irrigation_dehumidifier_relay_4
+                name: Relay 4
+
+      # ── HVAC Entity References ────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "HVAC Entity Refs"
+            show_header_toggle: false
+            entities:
+              - entity: input_text.irrigation_ac_unit_1
+                name: AC Unit 1
+              - entity: input_text.irrigation_ac_unit_2
+                name: AC Unit 2
+              - entity: input_text.irrigation_ac_unit_3
+                name: AC Unit 3
+              - entity: input_text.irrigation_ac_unit_4
+                name: AC Unit 4
+              - entity: input_text.irrigation_exhaust_fan_speed
+                name: Exhaust Fan
+              - entity: input_text.irrigation_night_heat_unit
+                name: Night Heater
+              - entity: input_text.irrigation_light_group
+                name: Light Group
+
+      # ── Substrate Probe Raw ───────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Raw Substrate Probe A"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.irrigation_substrate_probe_a_vwc
+                name: VWC
+              - entity: sensor.irrigation_substrate_probe_a_ec
+                name: EC
+              - entity: sensor.irrigation_substrate_probe_a_temp
+                name: Temp
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  VIEW 5 — SCHEDULE & IRRIGATION CONFIG
+  # ═══════════════════════════════════════════════════════════════════════════
+  - title: Schedule
+    path: schedule
+    icon: mdi:calendar-clock
+    type: sections
+    max_columns: 2
+    sections:
+      # ── Irrigation Window ─────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Irrigation Window"
+            show_header_toggle: false
+            entities:
+              - entity: binary_sensor.irrigation_irrigation_allowed
+                name: Currently Allowed
+              - entity: input_datetime.irrigation_irrigate_start_time
+                name: Window Start
+              - entity: input_datetime.irrigation_irrigate_end_time
+                name: Window End
+              - entity: input_number.irrigation_irrigate_interval_min
+                name: Interval (min)
+              - entity: input_number.irrigation_irrigate_duration_sec
+                name: Duration (sec)
+              - entity: input_number.irrigation_valve_max_runtime_sec
+                name: Valve Max Runtime (sec)
+
+      # ── Doser ─────────────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Doser Config"
+            show_header_toggle: false
+            entities:
+              - entity: input_text.irrigation_doser_mqtt_topic
+                name: MQTT Topic
+              - entity: input_text.irrigation_doser_serial
+                name: Serial Number
+
+      # ── Table Enables ─────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table Enable/Disable"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_table_1_enabled
+                name: Table 1
+              - entity: input_boolean.irrigation_table_2_enabled
+                name: Table 2
+              - entity: input_boolean.irrigation_table_3_enabled
+                name: Table 3
+              - entity: input_boolean.irrigation_table_4_enabled
+                name: Table 4
+              - entity: input_boolean.irrigation_table_5_enabled
+                name: Table 5
+              - entity: input_boolean.irrigation_table_6_enabled
+                name: Table 6
+
+      # ── Run Timers ────────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Run Timers"
+            show_header_toggle: false
+            entities:
+              - entity: timer.irrigation_table_1_run_timer
+                name: Table 1
+              - entity: timer.irrigation_table_2_run_timer
+                name: Table 2
+              - entity: timer.irrigation_table_3_run_timer
+                name: Table 3
+              - entity: timer.irrigation_table_4_run_timer
+                name: Table 4
+              - entity: timer.irrigation_table_5_run_timer
+                name: Table 5
+              - entity: timer.irrigation_table_6_run_timer
+                name: Table 6
+
+      # ── Valve Controls ────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "All Valves"
+            show_header_toggle: false
+            entities:
+              - entity: switch.irrigation_mainline
+                name: Mainline (opens pump)
+                icon: mdi:pipe-valve
+              - entity: switch.irrigation_manifold
+                name: Manifold (tank/mix)
+                icon: mdi:pipe
+              - entity: switch.irrigation_mains_water
+                name: Mains Water
+                icon: mdi:water-pump
+              - entity: switch.irrigation_tank_fill_valve
+                name: Tank Fill
+                icon: mdi:valve
+              - entity: switch.irrigation_recirculation_valve
+                name: Recirculation
+                icon: mdi:recycle
+              - entity: switch.irrigation_waste_valve
+                name: Waste
+                icon: mdi:pipe-disconnected
+              - type: divider
+              - entity: switch.irrigation_table_1_valve
+                name: Table 1 Valve
+              - entity: switch.irrigation_table_2_valve
+                name: Table 2 Valve
+              - entity: switch.irrigation_table_3_valve
+                name: Table 3 Valve
+              - entity: switch.irrigation_table_4_valve
+                name: Table 4 Valve
+              - entity: switch.irrigation_table_5_valve
+                name: Table 5 Valve
+              - entity: switch.irrigation_table_6_valve
+                name: Table 6 Valve
+
+      # ── Scripts ───────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Scripts"
+            show_header_toggle: false
+            entities:
+              - entity: script.irrigation_run_irrigation_cycle
+                name: Run Irrigation Cycle
+                icon: mdi:play
+              - entity: script.irrigation_run_table
+                name: Run Single Table
+                icon: mdi:table
+              - entity: script.irrigation_emergency_stop
+                name: EMERGENCY STOP
+                icon: mdi:alert-octagon
+              - entity: script.irrigation_send_alert
+                name: Send Alert
+                icon: mdi:bell
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  VIEW 6 — SENSOR HEALTH
+  # ═══════════════════════════════════════════════════════════════════════════
+  - title: Sensor Health
+    path: sensor-health
+    icon: mdi:heart-pulse
+    type: sections
+    max_columns: 2
+    sections:
+      # ── Global Sensor Status ──────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Global Sensor Health"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.crop_steering_sensor_health
+                name: Active Sensors
+                icon: mdi:access-point
+              - entity: sensor.crop_steering_sensor_fusion_confidence
+                name: Fusion Confidence
+                icon: mdi:brain
+              - entity: sensor.crop_steering_fused_vwc
+                name: Fused VWC
+              - entity: sensor.crop_steering_fused_ec
+                name: Fused EC
+
+      # ── Table 1 Health ────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table 1 Sensor Health"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.sensor_gw_table_1_vwc_health
+                name: VWC Health
+              - entity: sensor.sensor_gw_table_1_vwc_reliability
+                name: VWC Reliability
+              - entity: sensor.sensor_gw_table_1_ec_health
+                name: EC Health
+              - entity: sensor.sensor_gw_table_1_ec_reliability
+                name: EC Reliability
+
+      # ── Table 2 Health ────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table 2 Sensor Health"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.sensor_gw_table_2_vwc_health
+                name: VWC Health
+              - entity: sensor.sensor_gw_table_2_vwc_reliability
+                name: VWC Reliability
+              - entity: sensor.sensor_gw_table_2_ec_health
+                name: EC Health
+              - entity: sensor.sensor_gw_table_2_ec_reliability
+                name: EC Reliability
+
+      # ── Table 3 Health ────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table 3 Sensor Health"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.sensor_gw_table_3_vwc_health
+                name: VWC Health
+              - entity: sensor.sensor_gw_table_3_vwc_reliability
+                name: VWC Reliability
+              - entity: sensor.sensor_gw_table_3_ec_health
+                name: EC Health
+              - entity: sensor.sensor_gw_table_3_ec_reliability
+                name: EC Reliability
+
+      # ── Table 4 Health ────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table 4 Sensor Health"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.sensor_gw_table_4_vwc_health
+                name: VWC Health
+              - entity: sensor.sensor_gw_table_4_vwc_reliability
+                name: VWC Reliability
+              - entity: sensor.sensor_gw_table_4_ec_health
+                name: EC Health
+              - entity: sensor.sensor_gw_table_4_ec_reliability
+                name: EC Reliability
+
+      # ── Table 5 Health ────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table 5 Sensor Health"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.sensor_gw_table_5_vwc_health
+                name: VWC Health
+              - entity: sensor.sensor_gw_table_5_vwc_reliability
+                name: VWC Reliability
+              - entity: sensor.sensor_gw_table_5_ec_health
+                name: EC Health
+              - entity: sensor.sensor_gw_table_5_ec_reliability
+                name: EC Reliability
+
+      # ── Table 6 Health ────────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: entities
+            title: "Table 6 Sensor Health"
+            show_header_toggle: false
+            entities:
+              - entity: sensor.sensor_gw_table_6_vwc_health
+                name: VWC Health
+              - entity: sensor.sensor_gw_table_6_vwc_reliability
+                name: VWC Reliability
+              - entity: sensor.sensor_gw_table_6_ec_health
+                name: EC Health
+              - entity: sensor.sensor_gw_table_6_ec_reliability
+                name: EC Reliability
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  VIEW 7 — SYSTEM MANUAL
+  # ═══════════════════════════════════════════════════════════════════════════
+  - title: Manual
+    path: manual
+    icon: mdi:book-open-variant
+    type: panel
+    cards:
+      - type: iframe
+        url: /local/irrigation-manual.html
+        aspect_ratio: 100%

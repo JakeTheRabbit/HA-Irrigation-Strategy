@@ -36,12 +36,14 @@ ZONE_CROP_PROFILES = [
     "Follow Main",
     "Cannabis_Athena",
     "Cannabis_Indica_Dominant",
-    "Cannabis_Sativa_Dominant", 
+    "Cannabis_Sativa_Dominant",
     "Cannabis_Balanced_Hybrid",
     "Tomato_Hydroponic",
     "Lettuce_Leafy_Greens",
     "Custom"
 ]
+
+ZONE_PHASE_OVERRIDE_OPTIONS = ["Auto", "P0", "P1", "P2", "P3"]
 
 # Note: Light schedules are now system-wide, not per-zone
 
@@ -125,7 +127,19 @@ async def async_setup_entry(
             ),
             zone_num=zone_num
         ))
-    
+
+        # Zone Phase Override
+        selects.append(CropSteeringSelect(
+            entry,
+            SelectEntityDescription(
+                key=f"zone_{zone_num}_phase_override",
+                name=f"Zone {zone_num} Phase Override",
+                options=ZONE_PHASE_OVERRIDE_OPTIONS,
+                icon="mdi:state-machine",
+            ),
+            zone_num=zone_num
+        ))
+
     async_add_entities(selects)
 
 class CropSteeringSelect(SelectEntity, RestoreEntity):
@@ -154,6 +168,8 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
             self._attr_current_option = "Normal"
         elif "crop_profile" in description.key:
             self._attr_current_option = "Follow Main"
+        elif "phase_override" in description.key:
+            self._attr_current_option = "Auto"
         elif "schedule" in description.key:
             self._attr_current_option = "Main Schedule"
         elif description.key == "growth_stage":

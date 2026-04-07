@@ -107,11 +107,14 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         # Initialize thread lock for thread safety
         self.lock = threading.RLock()
-        
+        self._startup_time = datetime.now()
+
         # System state
         self.system_enabled = True
         self.irrigation_in_progress = False
         self.last_irrigation_time = None
+        # Switch state cache - populated by listen_state callbacks since get_state() returns None
+        self.switch_state_cache = {}  # {entity_id: 'on'/'off'}
         self._last_status_snapshot = {'status': None, 'message': None}
         
         # Get number of zones from integration or config
@@ -126,7 +129,14 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         # Legacy compatibility - provide zone_phases property
         self._zone_phases_compat = {}  # For backward compatibility
-        
+
+        # Track manual phase holds - when set, automatic transitions are blocked
+        self.manual_phase_hold = {}  # {zone_num: datetime} - expiry time of hold
+
+        # AI heartbeat tracking
+        self.heartbeat_history = []  # Rolling list of heartbeat reports (last 96 = 24h)
+        self.heartbeat_ec_history = {}  # {zone_num: [ec_values]} for trend detection
+
         # Initialize per-zone tracking
         self.zone_profiles = {}     # Zone-specific crop profiles
         self.zone_schedules = {}    # Zone-specific light schedules
@@ -146,10 +156,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self._register_phase_callbacks(zone_num, state_machine)
             
             self.zone_state_machines[zone_num] = state_machine
-            # Initialize emergency attempt tracking
+            # Initialize emergency attempt tracking with escalating backoff
             self.emergency_attempts[zone_num] = {
                 'attempts': [],  # List of (timestamp, vwc_before, vwc_after)
-                'abandoned_until': None  # Timestamp when abandonment expires
+                'abandoned_until': None,  # Timestamp when abandonment expires
+                'abandonment_count': 0,  # Escalation counter (2h, 4h, 8h, permanent)
+                'effective_vwc_ceiling': None  # Adaptive target when sensor can't reach system target
             }
             # Initialize manual override tracking
             self.manual_overrides[zone_num] = {
@@ -170,6 +182,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         # Load persistent state from file
         self._load_persistent_state()
+
+        # Warm switch state cache from HA REST API (get_state returns None for these)
+        self.run_in(self._warm_switch_cache, 2)
 
         # Safety sweep after startup/restart to guarantee known-safe hardware state
         self.run_in(self._startup_safety_sweep, 1)
@@ -271,7 +286,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'sensor_health_interval': 120
             },
             'thresholds': {
-                'emergency_vwc': 40.0
+                'emergency_vwc': 40.0,
+                'critical_ec': 8.0,
+                'min_irrigation_interval': 120  # seconds between irrigation shots
             },
             'notification_service': 'notify.persistent_notification'
         }
@@ -493,10 +510,26 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 self.log(f"⚠️ Skipping empty environmental sensor '{sensor_name}' in configuration", level='WARNING')
         
         # Listen to system control entities
-        self.listen_state(self._on_system_toggle, 'switch.crop_steering_system_enabled')
-        self.listen_state(self._on_phase_change, 'select.crop_steering_irrigation_phase')
-        self.listen_state(self._on_crop_profile_change, 'select.crop_steering_crop_type')
-        
+        self.listen_state(self._on_system_toggle, 'switch.system_enabled')
+        self.listen_state(self._on_switch_state_update, 'switch.system_enabled')
+        self.listen_state(self._on_switch_state_update, 'switch.auto_irrigation_enabled')
+        self.listen_state(self._on_switch_state_update, 'switch.tank_filling')
+        self.listen_state(self._on_phase_change, 'select.irrigation_phase')
+        self.listen_state(self._on_crop_profile_change, 'select.crop_type')
+
+        # Listen to per-zone manual override switches toggled in HA UI
+        for zone_num in range(1, self.num_zones + 1):
+            self.listen_state(
+                self._on_manual_override_switch_change,
+                f"switch.zone_{zone_num}_manual_override"
+            )
+            self.listen_state(self._on_switch_state_update, f"switch.zone_{zone_num}_enabled")
+            self.listen_state(self._on_switch_state_update, f"switch.zone_{zone_num}_manual_override")
+            self.listen_state(self._on_zone_phase_override_change, f"select.zone_{zone_num}_phase_override")
+
+        # Listen to trigger shot button events
+        self.listen_event(self._on_trigger_zone_shot, 'crop_steering_trigger_zone_shot')
+
         # Listen to manual irrigation triggers
         self.listen_event(self._on_manual_irrigation, 'crop_steering_manual_irrigation')
         
@@ -505,6 +538,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         # Listen to manual override events
         self.listen_event(self._on_manual_override_event, 'crop_steering_manual_override')
+
+        # Listen to emergency reset events (clear lockouts for a zone)
+        self.listen_event(self._on_reset_emergency, 'crop_steering_reset_emergency')
         
         # Listen to phase transition service calls from HA integration
         self.listen_event(self._on_phase_transition_service, 'crop_steering_phase_transition')
@@ -557,19 +593,26 @@ class MasterCropSteeringApp(BaseAsyncApp):
             120  # Every 2 minutes for detailed analytics
         )
         
-        # Automatic phase transition checking
+        # Automatic phase transition checking (DISABLED — handled by _check_all_zone_phase_transitions)
         self.run_every(
             self._check_phase_transitions,
             'now+30',
             300  # Check every 5 minutes for phase transitions
         )
 
+        # AI heartbeat — system oversight every 15 minutes
+        self.run_every(
+            self._ai_heartbeat,
+            'now+60',
+            900  # Every 15 minutes
+        )
+
     def _initialize_default_crop_profile(self):
         """Initialize with default crop profile."""
         try:
             # Try to get current crop from HA, default to Cannabis_Athena
-            current_crop = self.get_entity_value('select.crop_steering_crop_type', default='Cannabis_Athena')
-            current_stage = self.get_entity_value('select.crop_steering_growth_stage', default='vegetative')
+            current_crop = self.get_entity_value('select.crop_type', default='Cannabis_Athena')
+            current_stage = self.get_entity_value('select.growth_stage', default='vegetative')
             
             profile_result = self.crop_profiles.select_profile(current_crop, current_stage)
             
@@ -594,7 +637,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _get_zone_group(self, zone_num: int) -> str:
         """Get the group assignment for a zone."""
         try:
-            group_entity = f"select.crop_steering_zone_{zone_num}_group"
+            group_entity = f"select.zone_{zone_num}_group"
             state = self.get_entity_value(group_entity)
             return state if state and state != 'unknown' else 'Ungrouped'
         except Exception:
@@ -603,7 +646,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _get_zone_priority(self, zone_num: int) -> str:
         """Get the priority level for a zone."""
         try:
-            priority_entity = f"select.crop_steering_zone_{zone_num}_priority"
+            priority_entity = f"select.zone_{zone_num}_priority"
             state = self.get_entity_value(priority_entity)
             return state if state and state != 'unknown' else 'Normal'
         except Exception:
@@ -612,22 +655,33 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _get_zone_profile(self, zone_num: int) -> str:
         """Get the crop profile for a zone."""
         try:
-            profile_entity = f"select.crop_steering_zone_{zone_num}_crop_profile"
+            profile_entity = f"select.zone_{zone_num}_crop_profile"
             state = self.get_entity_value(profile_entity)
             if state and state != 'unknown' and state != 'Follow Main':
                 return state
             # Fall back to main profile
-            return self.get_entity_value('select.crop_steering_crop_type', default='Cannabis_Athena')
+            return self.get_entity_value('select.crop_type', default='Cannabis_Athena')
         except Exception:
             return 'Cannabis_Athena'
     
+    def _get_zone_target(self, zone_num: int, target_key: str, system_entity: str, default: float) -> float:
+        """Get zone-specific target, falling back to system-wide value.
+
+        Per-zone entities use 0 as sentinel for 'use system default'.
+        """
+        zone_entity = f"number.zone_{zone_num}_{target_key}"
+        zone_value = self._get_number_entity_value(zone_entity, 0)
+        if zone_value > 0:
+            return zone_value
+        return self._get_number_entity_value(system_entity, default)
+
     def _get_zone_schedule(self, zone_num: int) -> Dict[str, time]:
         """Get the light schedule - SYSTEM-WIDE not per-zone (zones share same lights)."""
         try:
             # All zones use the same system-wide light schedule
             # Get system-wide light hours from number entities
-            on_hour = int(self._get_number_entity_value("number.crop_steering_lights_on_hour", 12))
-            off_hour = int(self._get_number_entity_value("number.crop_steering_lights_off_hour", 0))
+            on_hour = int(self._get_number_entity_value("number.lights_on_hour", 12))
+            off_hour = int(self._get_number_entity_value("number.lights_off_hour", 0))
             return {'lights_on': time(on_hour, 0), 'lights_off': time(off_hour, 0)}
         except Exception as e:
             self.log(f"❌ Error getting system light schedule: {e}", level='ERROR')
@@ -651,11 +705,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         # Check global control entities
         global_entities = [
-            'switch.crop_steering_system_enabled',
-            'select.crop_steering_crop_type',
-            'select.crop_steering_growth_stage',
-            'number.crop_steering_lights_on_hour',
-            'number.crop_steering_lights_off_hour'
+            'switch.system_enabled',
+            'select.crop_type',
+            'select.growth_stage',
+            'number.lights_on_hour',
+            'number.lights_off_hour'
         ]
         for entity_id in global_entities:
             if not self.entity_exists(entity_id):
@@ -672,10 +726,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Check zone control entities
             zone_entities = [
-                f'switch.crop_steering_zone_{zone_num}_enabled',
-                f'select.crop_steering_zone_{zone_num}_group',
-                f'select.crop_steering_zone_{zone_num}_priority',
-                f'number.crop_steering_zone_{zone_num}_area'
+                f'switch.zone_{zone_num}_enabled',
+                f'select.zone_{zone_num}_group',
+                f'select.zone_{zone_num}_priority',
+                f'number.zone_{zone_num}_plant_count'
             ]
             for entity_id in zone_entities:
                 if not self.entity_exists(entity_id):
@@ -781,10 +835,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
         """Update water usage tracking for a zone."""
         try:
             # Calculate water volume used: num_plants * drippers_per_plant * dripper_flow_rate * hours
-            dripper_flow_rate = self._get_number_entity_value("number.crop_steering_dripper_flow_rate", 1.2)  # L/hour per dripper
-            drippers_per_plant = self._get_number_entity_value("number.crop_steering_drippers_per_plant", 2)
-            num_plants = self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_plant_count", 4)
-            shot_multiplier = self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_shot_size_multiplier", 1.0)
+            dripper_flow_rate = self._get_number_entity_value("number.dripper_flow_rate", 1.2)  # L/hour per dripper
+            drippers_per_plant = self._get_number_entity_value("number.drippers_per_plant", 2)
+            num_plants = self._get_number_entity_value(f"number.zone_{zone_num}_plant_count", 4)
+            shot_multiplier = self._get_number_entity_value(f"number.zone_{zone_num}_shot_size_multiplier", 1.0)
             
             # Calculate volume: (plants * drippers_per_plant * flow_rate_per_dripper * hours * multiplier)
             hours = duration_seconds / 3600
@@ -792,19 +846,29 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Update tracking data
             today = datetime.now().date()
-            zone_data = self.zone_water_usage.get(zone_num, {})
-            
+            zone_data = self.zone_water_usage.get(zone_num, {
+                'daily_total': 0, 'weekly_total': 0, 'daily_count': 0,
+                'last_reset_daily': today, 'last_reset_weekly': today
+            })
+
+            # Ensure all keys exist (handles partially-restored data)
+            zone_data.setdefault('daily_total', 0)
+            zone_data.setdefault('weekly_total', 0)
+            zone_data.setdefault('daily_count', 0)
+            zone_data.setdefault('last_reset_daily', today)
+            zone_data.setdefault('last_reset_weekly', today)
+
             # Reset daily counter if new day
             if zone_data.get('last_reset_daily') != today:
                 zone_data['daily_total'] = 0
                 zone_data['daily_count'] = 0
                 zone_data['last_reset_daily'] = today
-            
+
             # Reset weekly counter if new week (Monday)
             if today.weekday() == 0 and zone_data.get('last_reset_weekly') != today:
                 zone_data['weekly_total'] = 0
                 zone_data['last_reset_weekly'] = today
-            
+
             # Update totals
             zone_data['daily_total'] += volume_liters
             zone_data['weekly_total'] += volume_liters
@@ -816,7 +880,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             await self._update_zone_water_sensors(zone_num)
             
             # Check daily limit
-            max_daily = self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_max_daily_volume", 20.0)
+            max_daily = self._get_number_entity_value(f"number.zone_{zone_num}_max_daily_volume", 20.0)
             if zone_data['daily_total'] >= max_daily:
                 self.log(f"⚠️ Zone {zone_num} daily water limit reached: {zone_data['daily_total']:.1f}L >= {max_daily}L", 
                         level='WARNING')
@@ -835,32 +899,24 @@ class MasterCropSteeringApp(BaseAsyncApp):
                                attributes={
                                    'friendly_name': f'Zone {zone_num} Daily Water',
                                    'unit_of_measurement': 'L',
-                                   'icon': 'mdi:water',
-                                   'device_class': 'volume',
-                                   'state_class': 'total_increasing',
-                                   'last_reset': str(zone_data.get('last_reset_daily', datetime.now().date()))
+                                   'icon': 'mdi:water'
                                })
-            
+
             # Weekly water usage
             await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_weekly_water_app',
                                round(zone_data.get('weekly_total', 0), 2),
                                attributes={
                                    'friendly_name': f'Zone {zone_num} Weekly Water',
                                    'unit_of_measurement': 'L',
-                                   'icon': 'mdi:water-outline',
-                                   'device_class': 'volume',
-                                   'state_class': 'total_increasing',
-                                   'last_reset': str(zone_data.get('last_reset_weekly', datetime.now().date()))
+                                   'icon': 'mdi:water-outline'
                                })
-            
+
             # Irrigation count today
             await self.async_set_entity_value(f'sensor.crop_steering_zone_{zone_num}_irrigation_count_app',
                                zone_data.get('daily_count', 0),
                                attributes={
                                    'friendly_name': f'Zone {zone_num} Irrigations Today',
-                                   'icon': 'mdi:counter',
-                                   'state_class': 'total_increasing',
-                                   'last_reset': str(zone_data.get('last_reset_daily', datetime.now().date()))
+                                   'icon': 'mdi:counter'
                                })
             
             # Last irrigation time
@@ -914,6 +970,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'zone_phases': self.zone_phases.copy(),
                 'zone_phase_data': {},
                 'zone_water_usage': {},
+                'manual_overrides': {
+                    str(z): {
+                        'enabled_time': d['enabled_time'].isoformat() if d.get('enabled_time') else None,
+                        'timeout_minutes': d.get('timeout_minutes')
+                    }
+                    for z, d in self.manual_overrides.items()
+                },
                 'last_irrigation_time': self.last_irrigation_time.isoformat() if self.last_irrigation_time else None,
                 'version': '2.1.0'
             }
@@ -1061,11 +1124,59 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 if restored_count > 0:
                     self.log(f"✅ Restored water usage for {restored_count} zones")
             
+            # Restore manual override state
+            if 'manual_overrides' in state_data:
+                restored_overrides = 0
+                for zone_str, data in state_data['manual_overrides'].items():
+                    try:
+                        zone_num = int(zone_str)
+                        if zone_num < 1 or zone_num > self.num_zones:
+                            continue
+                        enabled_time_str = data.get('enabled_time')
+                        if not enabled_time_str:
+                            continue
+
+                        enabled_time = datetime.fromisoformat(enabled_time_str)
+                        timeout_minutes = data.get('timeout_minutes')
+
+                        if timeout_minutes:
+                            # Timed override - check if expired
+                            expiry = enabled_time + timedelta(minutes=timeout_minutes)
+                            if datetime.now() > expiry:
+                                self.log(f"Zone {zone_num} timed override expired during downtime, skipping")
+                                continue
+                            remaining_seconds = (expiry - datetime.now()).total_seconds()
+                            timeout_handle = self.run_in(
+                                self._auto_disable_manual_override,
+                                int(remaining_seconds),
+                                zone=zone_num
+                            )
+                            self.manual_overrides[zone_num].update({
+                                'timeout_handle': timeout_handle,
+                                'enabled_time': enabled_time,
+                                'timeout_minutes': timeout_minutes
+                            })
+                            self.log(f"✅ Restored timed override for zone {zone_num}, {remaining_seconds/60:.1f} min remaining")
+                        else:
+                            # Permanent override
+                            self.manual_overrides[zone_num].update({
+                                'timeout_handle': None,
+                                'enabled_time': enabled_time,
+                                'timeout_minutes': None
+                            })
+                            self.log(f"✅ Restored permanent override for zone {zone_num}")
+                        restored_overrides += 1
+                    except (ValueError, TypeError, KeyError) as e:
+                        self.log(f"⚠️ Error restoring override for zone {zone_str}: {e}", level='WARNING')
+
+                if restored_overrides > 0:
+                    self.log(f"✅ Restored manual overrides for {restored_overrides} zones")
+
             # Restore last irrigation time
             if state_data.get('last_irrigation_time'):
                 self.last_irrigation_time = datetime.fromisoformat(state_data['last_irrigation_time'])
                 self.log(f"✅ Restored last irrigation time: {self.last_irrigation_time}")
-            
+
             # Calculate recovery time
             saved_time = datetime.fromisoformat(state_data['timestamp'])
             downtime = datetime.now() - saved_time
@@ -1079,12 +1190,21 @@ class MasterCropSteeringApp(BaseAsyncApp):
         """Fallback: Restore zone phases from HA sensors."""
         try:
             self.log("🔄 Attempting to restore phases from HA sensors...")
+            phase_map = {
+                'P0': IrrigationPhase.P0_MORNING_DRYBACK,
+                'P1': IrrigationPhase.P1_RAMP_UP,
+                'P2': IrrigationPhase.P2_MAINTENANCE,
+                'P3': IrrigationPhase.P3_PRE_LIGHTS_OFF
+            }
             for zone_num in range(1, self.num_zones + 1):
                 sensor_id = f"sensor.crop_steering_zone_{zone_num}_phase"
                 phase = self.get_entity_value(sensor_id)
-                if phase and phase in ['P0', 'P1', 'P2', 'P3']:
-                    self.zone_phases[zone_num] = phase
-                    self.log(f"✅ Zone {zone_num}: Restored phase {phase} from HA sensor")
+                if phase and phase in phase_map:
+                    machine = self.zone_state_machines.get(zone_num)
+                    if machine:
+                        machine.state.current_phase = phase_map[phase]
+                        machine._initialize_phase_data(phase_map[phase])
+                        self.log(f"✅ Zone {zone_num}: Restored phase {phase} from HA sensor")
         except Exception as e:
             self.log(f"❌ Error restoring from HA sensors: {e}", level='ERROR')
 
@@ -1093,53 +1213,61 @@ class MasterCropSteeringApp(BaseAsyncApp):
         try:
             now = datetime.now()
             current_time = now.time()
-            
+            phase_map = {
+                'P0': IrrigationPhase.P0_MORNING_DRYBACK,
+                'P1': IrrigationPhase.P1_RAMP_UP,
+                'P2': IrrigationPhase.P2_MAINTENANCE,
+                'P3': IrrigationPhase.P3_PRE_LIGHTS_OFF
+            }
+
             # Check if any zones are in impossible states
             for zone_num in range(1, self.num_zones + 1):
                 zone_schedule = self._get_zone_schedule(zone_num)
                 lights_on = self._are_lights_on(current_time, zone_schedule['lights_on'], zone_schedule['lights_off'])
                 zone_phase = self.zone_phases.get(zone_num, 'P2')
-                
+                machine = self.zone_state_machines.get(zone_num)
+
                 self.log(f"🔧 Zone {zone_num}: Time {current_time}, Lights ON: {zone_schedule['lights_on']}-{zone_schedule['lights_off']}, Currently: {'ON' if lights_on else 'OFF'}, Phase: {zone_phase}")
-                
-                # If lights are on but zone isn't in P0, start P0 (morning dryback)
+
+                if not machine:
+                    continue
+
+                # If lights are on but zone isn't in a valid phase, start P0
                 if lights_on and zone_phase not in ['P0', 'P1', 'P2', 'P3']:
                     self.log(f"🔧 Zone {zone_num}: Lights on but phase is {zone_phase}, starting P0 morning dryback")
-                    self.zone_phases[zone_num] = 'P0'
-                    # Record current VWC as peak for dryback calculations
+                    machine.state.current_phase = IrrigationPhase.P0_MORNING_DRYBACK
+                    machine._initialize_phase_data(IrrigationPhase.P0_MORNING_DRYBACK)
                     zone_vwc = self._get_zone_vwc(zone_num)
-                    if zone_vwc:
-                        self.zone_phase_data[zone_num]['p0_start_time'] = now
-                        self.zone_phase_data[zone_num]['p0_peak_vwc'] = zone_vwc
-                
-                # If lights are on but zone is in P0 and dryback is done, fix it
+                    if zone_vwc and machine.state.p0_data:
+                        machine.state.p0_data.peak_vwc = zone_vwc
+
+                # If lights are on but zone is in P0 for over 2 hours, move to P1
                 elif lights_on and zone_phase == 'P0':
-                    zone_data = self.zone_phase_data.get(zone_num, {})
-                    if zone_data.get('p0_start_time'):
-                        elapsed = (now - zone_data['p0_start_time']).total_seconds() / 60
-                        if elapsed > 120:  # More than 2 hours in P0
-                            self.log(f"🔧 Zone {zone_num}: Lights on and long P0 duration, moving to P1")
-                            self.zone_phases[zone_num] = 'P1'
-                
-                # If lights are OFF, zone should be in P3 (waiting period before lights on)
+                    phase_duration = machine.get_phase_duration().total_seconds() / 60
+                    if phase_duration > 120:
+                        self.log(f"🔧 Zone {zone_num}: Lights on and long P0 duration, moving to P1")
+                        machine.state.current_phase = IrrigationPhase.P1_RAMP_UP
+                        machine._initialize_phase_data(IrrigationPhase.P1_RAMP_UP)
+
+                # If lights are OFF, zone should be in P3
                 elif not lights_on and zone_phase not in ['P3']:
                     self.log(f"🔧 Zone {zone_num}: Lights off but phase is {zone_phase}, correcting to P3 (waiting)")
-                    self.zone_phases[zone_num] = 'P3'
-            
-            # Update sensors after phase corrections
-            self._update_phase_sensors()
-            
+                    machine.state.current_phase = IrrigationPhase.P3_PRE_LIGHTS_OFF
+                    machine._initialize_phase_data(IrrigationPhase.P3_PRE_LIGHTS_OFF)
+
+            # Update sensors after phase corrections (schedule async)
+            self.run_in(lambda kwargs: self.create_task(self._update_phase_sensors()), 0)
+
             self.log("✅ State validation complete")
-            
+
         except Exception as e:
             self.log(f"❌ Error validating state: {e}", level='ERROR')
 
-    def _update_phase_sensors(self):
-        """Update phase sensors after phase changes."""
+    async def _update_phase_sensors(self):
+        """Update phase sensors after phase changes (immediate, not deferred)."""
         try:
-            # Update the main phase summary sensor
             phase_summary = ", ".join([f"Z{z}:{p}" for z, p in self.zone_phases.items()])
-            self.set_entity_value('sensor.crop_steering_app_current_phase',
+            await self.async_set_entity_value('sensor.crop_steering_app_current_phase',
                           phase_summary,
                           attributes={
                               'friendly_name': 'Zone Phases',
@@ -1147,20 +1275,19 @@ class MasterCropSteeringApp(BaseAsyncApp):
                               'zone_phases': {str(k): str(v) for k, v in self.zone_phases.items()},
                               'updated': datetime.now().isoformat()
                           })
-            
-            # Update individual zone phase sensors
+
             for zone_num, phase in self.zone_phases.items():
-                self.run_in(self._async_set_entity_wrapper, 0, 
-                           entity_id=f'sensor.crop_steering_zone_{zone_num}_phase',
-                           value=phase,
-                           attributes={
-                               'friendly_name': f'Zone {zone_num} Phase',
-                               'icon': 'mdi:state-machine',
-                               'updated': datetime.now().isoformat()
-                           })
-            
-            self.log(f"📊 Updated phase sensors: {phase_summary}")
-            
+                await self.async_set_entity_value(
+                    f'sensor.crop_steering_zone_{zone_num}_phase',
+                    phase,
+                    attributes={
+                        'friendly_name': f'Zone {zone_num} Phase',
+                        'icon': 'mdi:state-machine',
+                        'updated': datetime.now().isoformat()
+                    })
+
+            self.log(f"📊 Phase sensors updated: {phase_summary}")
+
         except Exception as e:
             self.log(f"❌ Error updating phase sensors: {e}", level='ERROR')
 
@@ -1169,11 +1296,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
         try:
             if new in ['unavailable', 'unknown', None]:
                 return
-            
+
             with self.lock:
                 vwc_value = float(new)
                 timestamp = datetime.now()
-                
+
                 # Process VWC sensor through fusion system
                 fusion_result = self.sensor_fusion.add_sensor_reading(
                     sensor_id=entity,
@@ -1181,22 +1308,22 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     timestamp=timestamp,
                     sensor_type='vwc'  # Explicitly mark as VWC sensor
                 )
-                
+
                 # Add to dryback detector (use direct value)
                 dryback_result = self.dryback_detector.add_vwc_reading(
                     vwc_value, timestamp
                 )
-                
+
                 # Update HA entities with dryback data
                 self._update_dryback_entities(dryback_result)
-                
+
                 # Update fusion entities
                 self._update_sensor_fusion_entities(entity, fusion_result)
-                
-                # Use fusion result for emergency check
-                self.log(f"🔍 DEBUG Emergency check: fusion={fusion_result['fused_value']:.1f}%")
-                # Schedule async emergency check
-                self.run_in(self._run_emergency_check, 0, vwc_value=fusion_result['fused_value'])
+
+                # Use DIRECT VWC value for emergency check (not fusion —
+                # fusion Kalman state is shared with EC and produces bogus values)
+                self.log(f"🔍 VWC update: {entity} = {vwc_value:.1f}%")
+                self.run_in(self._run_emergency_check, 0, vwc_value=vwc_value)
                 
                 # Log significant changes
                 if fusion_result['is_outlier']:
@@ -1226,9 +1353,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
         try:
             if new in ['unavailable', 'unknown', None]:
                 return
-            
+
             with self.lock:
                 ec_value = float(new)
+
+                # Reject clearly invalid EC values (pore water EC should be 0-15 mS/cm)
+                if ec_value < 0 or ec_value > 15:
+                    self.log(f"⚠️ Rejecting invalid EC reading: {entity} = {ec_value:.2f} mS/cm", level='WARNING')
+                    return
+
                 timestamp = datetime.now()
                 
                 # Process EC sensor through fusion system
@@ -1268,37 +1401,100 @@ class MasterCropSteeringApp(BaseAsyncApp):
         except Exception as e:
             self.log(f"❌ Error processing environmental update: {e}", level='ERROR')
 
+    async def _on_switch_state_update(self, entity, attribute, old, new, kwargs):
+        """Cache switch state from listen_state callback (get_state returns None for these)."""
+        if new in ['on', 'off']:
+            self.switch_state_cache[entity] = new
+
     async def _on_system_toggle(self, entity, attribute, old, new, kwargs):
         """Handle system enable/disable."""
         try:
             self.system_enabled = new == 'on'
             status = "enabled" if self.system_enabled else "disabled"
             self.log(f"🔄 Crop steering system {status}")
-            
+
             if not self.system_enabled:
                 # Emergency stop all irrigation
                 await self._emergency_stop()
-                
+
         except Exception as e:
             self.log(f"❌ Error handling system toggle: {e}", level='ERROR')
 
     async def _on_phase_change(self, entity, attribute, old, new, kwargs):
-        """Handle manual irrigation phase changes (legacy compatibility)."""
+        """Handle system-wide phase changes — only applies to zones set to 'Auto'."""
         try:
-            # Manual phase change applies to all zones
-            self.log(f"📊 Manual phase transition requested: {old} → {new}")
-            
-            # Apply to all zones
+            self.log(f"📊 System-wide phase transition requested: {old} → {new}")
+
+            hold_until = datetime.now() + timedelta(hours=2)
+            applied = []
             for zone_num in range(1, self.num_zones + 1):
-                await self._transition_zone_to_phase(zone_num, new, "Manual phase change")
-            
+                # Only apply to zones with "Auto" phase override
+                zone_override = self.get_entity_value(f'select.zone_{zone_num}_phase_override', default='Auto')
+                if zone_override in [None, 'Auto', 'unknown', 'unavailable']:
+                    await self._transition_zone_to_phase(zone_num, new, "System-wide phase change")
+                    self.manual_phase_hold[zone_num] = hold_until
+                    applied.append(zone_num)
+
+            if applied:
+                self.log(f"🔒 Phase {new} applied to zones {applied} (hold until {hold_until.strftime('%H:%M')})")
+            else:
+                self.log(f"⚠️ No zones in Auto mode — system-wide phase change had no effect")
+
         except Exception as e:
             self.log(f"❌ Error handling phase change: {e}", level='ERROR')
+
+    async def _on_zone_phase_override_change(self, entity, attribute, old, new, kwargs):
+        """Handle per-zone phase override changes."""
+        try:
+            # Extract zone number from entity_id: select.zone_N_phase_override
+            zone_num = int(entity.split('zone_')[1].split('_')[0])
+
+            if new in ['P0', 'P1', 'P2', 'P3']:
+                await self._transition_zone_to_phase(zone_num, new, f"Zone {zone_num} manual override to {new}")
+                self.manual_phase_hold[zone_num] = datetime.max  # Permanent hold until set back to Auto
+                self.log(f"🔒 Zone {zone_num}: Phase locked to {new} (manual override)")
+            elif new == 'Auto':
+                if zone_num in self.manual_phase_hold:
+                    del self.manual_phase_hold[zone_num]
+                self.log(f"🔓 Zone {zone_num}: Phase returned to automatic control")
+
+        except Exception as e:
+            self.log(f"❌ Error handling zone phase override: {e}", level='ERROR')
+
+    async def _on_trigger_zone_shot(self, event_name, data, kwargs):
+        """Handle manual trigger shot button press for a zone."""
+        try:
+            zone = data.get('zone')
+            if not zone:
+                return
+
+            self.log(f"🔧 Trigger shot requested for Zone {zone}")
+
+            # Respect manual override
+            override_active, override_source = self._is_zone_override_active(zone)
+            if override_active:
+                self.log(f"🛑 Trigger shot blocked: Zone {zone} manual override active ({override_source})")
+                return
+
+            # Calculate shot duration from P2 shot size as default
+            shot_size_pct = self._get_number_entity_value("number.p2_shot_size", 5.0)
+            substrate_vol = self._get_number_entity_value("number.substrate_volume", 3.0)
+            dripper_flow = self._get_number_entity_value("number.dripper_flow_rate", 2.0)
+            drippers = self._get_number_entity_value("number.drippers_per_plant", 2)
+
+            shot_volume_ml = (shot_size_pct / 100.0) * substrate_vol * 1000
+            flow_rate_ml_s = (dripper_flow * drippers * 1000) / 3600
+            duration = max(5, int(shot_volume_ml / flow_rate_ml_s)) if flow_rate_ml_s > 0 else 30
+
+            await self._execute_irrigation_shot(zone, duration, shot_type='manual_trigger')
+
+        except Exception as e:
+            self.log(f"❌ Error handling trigger shot: {e}", level='ERROR')
 
     async def _on_crop_profile_change(self, entity, attribute, old, new, kwargs):
         """Handle crop profile changes."""
         try:
-            current_stage = self.get_entity_value('select.crop_steering_growth_stage', default='vegetative')
+            current_stage = self.get_entity_value('select.growth_stage', default='vegetative')
             profile_result = self.crop_profiles.select_profile(new, current_stage)
             
             if profile_result['status'] == 'success':
@@ -1345,8 +1541,18 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 # Get crop profile parameters
                 profile_params = self.crop_profiles.get_current_parameters()
                 if not profile_params:
-                    self.log("⚠️ No active crop profile - using defaults", level='WARNING')
-                    return
+                    # Force-select default profile if none active
+                    self.crop_profiles.select_profile('Cannabis_Athena', 'vegetative')
+                    profile_params = self.crop_profiles.get_current_parameters()
+                if not profile_params:
+                    # Hardcoded fallback - never bail out of the decision loop
+                    profile_params = {
+                        'vwc_target_min': 50, 'vwc_target_max': 70,
+                        'dryback_target': 15, 'ec_baseline': 3.0, 'ec_max': 6.0,
+                        'p1_target_vwc': 65, 'p2_vwc_threshold': 60,
+                        'p3_emergency_threshold': 45, 'substrate_field_capacity': 70
+                    }
+                    self.log("⚠️ Using hardcoded Athena defaults for crop profile", level='WARNING')
                 
                 # Check dryback status
                 dryback_status = self._get_latest_dryback_status()
@@ -1380,33 +1586,38 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             for sensor in self.config['sensors']['vwc']:
                 try:
+                    # Read from sensor fusion cache (populated by listen_state callbacks)
+                    # get_state() returns None for substrate entities in AppDaemon
+                    if (sensor in self.sensor_fusion.sensor_data and
+                            len(self.sensor_fusion.sensor_data[sensor]) > 0 and
+                            self.sensor_fusion.sensor_types.get(sensor) == 'vwc'):
+                        last_ts = self.sensor_fusion.sensor_timestamps[sensor][-1]
+                        age_seconds = (datetime.now() - last_ts).total_seconds()
+                        if age_seconds < 600:
+                            vwc_sensors[sensor] = float(self.sensor_fusion.sensor_data[sensor][-1])
+                            continue
+                    # Fallback to get_state (works for non-custom-component entities)
                     value = self.get_entity_value(sensor)
-                    # Handle async Task objects properly
-                    if hasattr(value, '__await__'):
-                        self.log(f"⚠️ Skipping async task from VWC sensor {sensor}")
-                        continue
-                    self.log(f"🔍 DEBUG: Reading VWC sensor {sensor} = {value} (type: {type(value)})")
-                    if value not in ['unavailable', 'unknown', None, '']:
+                    if value not in ['unavailable', 'unknown', None, ''] and not hasattr(value, '__await__'):
                         vwc_sensors[sensor] = float(value)
-                        self.log(f"✓ VWC sensor {sensor}: {value}")
-                    else:
-                        self.log(f"⚠️ VWC sensor {sensor} unavailable: {value}", level='WARNING')
                 except Exception as e:
                     self.log(f"❌ Error reading VWC sensor {sensor}: {e}", level='ERROR')
-            
+
             for sensor in self.config['sensors']['ec']:
                 try:
+                    # Read from sensor fusion cache (populated by listen_state callbacks)
+                    if (sensor in self.sensor_fusion.sensor_data and
+                            len(self.sensor_fusion.sensor_data[sensor]) > 0 and
+                            self.sensor_fusion.sensor_types.get(sensor) == 'ec'):
+                        last_ts = self.sensor_fusion.sensor_timestamps[sensor][-1]
+                        age_seconds = (datetime.now() - last_ts).total_seconds()
+                        if age_seconds < 600:
+                            ec_sensors[sensor] = float(self.sensor_fusion.sensor_data[sensor][-1])
+                            continue
+                    # Fallback to get_state
                     value = self.get_entity_value(sensor)
-                    # Handle async Task objects properly
-                    if hasattr(value, '__await__'):
-                        self.log(f"⚠️ Skipping async task from EC sensor {sensor}")
-                        continue
-                    self.log(f"🔍 DEBUG: Reading EC sensor {sensor} = {value} (type: {type(value)})")
-                    if value not in ['unavailable', 'unknown', None, '']:
+                    if value not in ['unavailable', 'unknown', None, ''] and not hasattr(value, '__await__'):
                         ec_sensors[sensor] = float(value)
-                        self.log(f"✓ EC sensor {sensor}: {value}")
-                    else:
-                        self.log(f"⚠️ EC sensor {sensor} unavailable: {value}", level='WARNING')
                 except Exception as e:
                     self.log(f"❌ Error reading EC sensor {sensor}: {e}", level='ERROR')
             
@@ -1441,11 +1652,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             avg_vwc = fused_vwc if fused_vwc is not None else (statistics.mean(list(vwc_sensors.values())) if vwc_sensors else 0)
             avg_ec = fused_ec if fused_ec is not None else (statistics.mean(list(ec_sensors.values())) if ec_sensors else 3.0)
             
-            self.log(f"DEBUG Fused values: VWC={avg_vwc:.2f}% (fusion: {fused_vwc}), EC={avg_ec:.2f} mS/cm (fusion: {fused_ec})")
-            self.log(f"DEBUG Raw VWC values: {list(vwc_sensors.values())}")
-            self.log(f"DEBUG Raw EC values: {list(ec_sensors.values())}")
-            self.log(f"DEBUG Active VWC sensors: {self.sensor_fusion.get_sensor_count_by_type('vwc')}")
-            self.log(f"DEBUG Active EC sensors: {self.sensor_fusion.get_sensor_count_by_type('ec')}")
+            self.log(f"📊 System state: VWC={avg_vwc:.1f}% ({len(vwc_sensors)} sensors), EC={avg_ec:.2f} mS/cm ({len(ec_sensors)} sensors)")
             
             return {
                 'vwc_sensors': vwc_sensors,
@@ -1474,11 +1681,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'temperature': current_state['temperature'],
                 'humidity': current_state['humidity'],
                 'vpd': current_state['vpd'],
-                'current_phase': current_state['current_phase'],
+                'current_phase': next(iter(current_state.get('zone_phases', {}).values()), 'P2'),
                 'lights_on': current_state['lights_on'],
                 'time_since_last_irrigation': self._get_time_since_last_irrigation(),
                 'irrigation_count_24h': self._get_irrigation_count_24h(),
-                'steering_mode': self.get_entity_value('select.crop_steering_steering_mode', default='Vegetative')
+                'steering_mode': self.get_entity_value('select.steering_mode', default='Vegetative')
             }
             
             # Add dryback features if available
@@ -1597,18 +1804,19 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         # Check each zone's phase and needs
         for zone_num in range(1, self.num_zones + 1):
+            # Skip zones with manual override — absolute lockout
+            override_active, _ = self._is_zone_override_active(zone_num)
+            if override_active:
+                continue
+
             zone_phase = self.zone_phases.get(zone_num, 'P2')
             zone_group = self._get_zone_group(zone_num)
             zone_priority = self._get_zone_priority(zone_num)
             zone_profile = self._get_zone_profile(zone_num)
-            
-            # Get zone-specific profile parameters
-            if zone_profile != self.get_entity_value('select.crop_steering_crop_type'):
-                # Load zone-specific profile
-                zone_profile_params = self.crop_profiles.get_profile_parameters(zone_profile)
-            else:
-                zone_profile_params = profile_params
-                
+
+            # Get zone-specific profile parameters (fall back to system profile)
+            zone_profile_params = profile_params
+
             if zone_phase == 'P0':  # Dryback phase - check for emergencies only
                 decision = self._evaluate_zone_p0_needs(zone_num)
                 if decision['needs_irrigation']:
@@ -1700,26 +1908,26 @@ class MasterCropSteeringApp(BaseAsyncApp):
 
     def _evaluate_zone_p1_needs(self, zone_num: int, profile_params: Dict) -> Dict:
         """Evaluate P1 progressive irrigation needs with EC-based logic."""
-        target_vwc = self._get_number_entity_value("number.crop_steering_p1_target_vwc", 65)
+        target_vwc = self._get_zone_target(zone_num, "p1_target_vwc", "number.p1_target_vwc", 65)
         zone_vwc = self._get_zone_vwc(zone_num)
         zone_ec = self._get_zone_ec(zone_num)
         
         # Get growth stage for EC target selection
-        growth_stage = self._get_select_entity_value("select.crop_steering_growth_stage", "Vegetative")
+        growth_stage = self._get_select_entity_value("select.growth_stage", "Vegetative")
         
         # Get EC target for P1 based on growth stage
         if growth_stage.lower() == "vegetative":
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_veg_p1", 3.0)
+            ec_target = self._get_number_entity_value("number.ec_target_veg_p1", 3.0)
         else:  # Generative
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_gen_p1", 5.0)
+            ec_target = self._get_number_entity_value("number.ec_target_gen_p1", 5.0)
         
         # Get P1 progression parameters
-        initial_shot_size = self._get_number_entity_value("number.crop_steering_p1_initial_shot_size", 2.0)
-        shot_increment = self._get_number_entity_value("number.crop_steering_p1_shot_increment", 0.5)
-        max_shot_size = self._get_number_entity_value("number.crop_steering_p1_max_shot_size", 10.0)
-        min_shots = self._get_number_entity_value("number.crop_steering_p1_min_shots", 3.0)
-        max_shots = self._get_number_entity_value("number.crop_steering_p1_max_shots", 6.0)
-        time_between_shots = self._get_number_entity_value("number.crop_steering_p1_time_between_shots", 15.0)
+        initial_shot_size = self._get_number_entity_value("number.p1_initial_shot_size", 2.0)
+        shot_increment = self._get_number_entity_value("number.p1_shot_increment", 0.5)
+        max_shot_size = self._get_number_entity_value("number.p1_max_shot_size", 10.0)
+        min_shots = self._get_number_entity_value("number.p1_min_shots", 3.0)
+        max_shots = self._get_number_entity_value("number.p1_max_shots", 6.0)
+        time_between_shots = self._get_number_entity_value("number.p1_time_between_shots", 15.0)
         
         # Get current P1 progression data from state machine
         machine = self.zone_state_machines.get(zone_num)
@@ -1856,22 +2064,22 @@ class MasterCropSteeringApp(BaseAsyncApp):
 
     def _evaluate_zone_p2_needs(self, zone_num: int, profile_params: Dict) -> Dict:
         """Evaluate if a specific zone in P2 needs irrigation with EC-based logic."""
-        vwc_threshold = self._get_number_entity_value("number.crop_steering_p2_vwc_threshold", 60)
+        vwc_threshold = self._get_zone_target(zone_num, "p2_vwc_threshold", "number.p2_vwc_threshold", 60)
         zone_vwc = self._get_zone_vwc(zone_num)
         zone_ec = self._get_zone_ec(zone_num)
         
         # Get growth stage for EC target selection
-        growth_stage = self._get_select_entity_value("select.crop_steering_growth_stage", "Vegetative")
+        growth_stage = self._get_select_entity_value("select.growth_stage", "Vegetative")
         
         # Get EC target and thresholds for P2
         if growth_stage.lower() == "vegetative":
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_veg_p2", 3.2)
+            ec_target = self._get_number_entity_value("number.ec_target_veg_p2", 3.2)
         else:  # Generative
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_gen_p2", 6.0)
+            ec_target = self._get_number_entity_value("number.ec_target_gen_p2", 6.0)
         
         # Get P2 EC thresholds for ratio-based irrigation
-        ec_high_threshold = self._get_number_entity_value("number.crop_steering_p2_ec_high_threshold", 1.2)
-        ec_low_threshold = self._get_number_entity_value("number.crop_steering_p2_ec_low_threshold", 0.8)
+        ec_high_threshold = self._get_number_entity_value("number.p2_ec_high_threshold", 1.2)
+        ec_low_threshold = self._get_number_entity_value("number.p2_ec_low_threshold", 0.8)
         
         # Check VWC condition
         vwc_needs_irrigation = zone_vwc is not None and zone_vwc < vwc_threshold
@@ -1889,7 +2097,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         if needs_irrigation:
             # Calculate shot size with EC-based adjustments
-            base_shot_size = self._get_number_entity_value("number.crop_steering_p2_shot_size", 5.0)
+            base_shot_size = self._get_number_entity_value("number.p2_shot_size", 5.0)
             
             # Use EC ratio decision if it's the primary driver
             if ec_ratio_decision['needs_irrigation']:
@@ -1937,17 +2145,17 @@ class MasterCropSteeringApp(BaseAsyncApp):
         zone_vwc = self._get_zone_vwc(zone_num)
         zone_ec = self._get_zone_ec(zone_num)
         
-        # Get emergency threshold from entity
-        emergency_threshold = self._get_number_entity_value("number.crop_steering_p3_emergency_vwc_threshold", 40)
+        # Get emergency threshold (per-zone if set, else system-wide)
+        emergency_threshold = self._get_zone_target(zone_num, "p3_emergency_vwc", "number.p3_emergency_vwc_threshold", 40)
         
         # Get growth stage for EC target selection
-        growth_stage = self._get_select_entity_value("select.crop_steering_growth_stage", "Vegetative")
+        growth_stage = self._get_select_entity_value("select.growth_stage", "Vegetative")
         
         # Get EC target for P3 based on growth stage
         if growth_stage.lower() == "vegetative":
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_veg_p3", 3.0)
+            ec_target = self._get_number_entity_value("number.ec_target_veg_p3", 3.0)
         else:  # Generative
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_gen_p3", 4.5)
+            ec_target = self._get_number_entity_value("number.ec_target_gen_p3", 4.5)
         
         # P3 should normally have NO irrigation - it's the dryback period
         # Only irrigate if there's a critical emergency (plant wilting risk)
@@ -1965,7 +2173,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         if vwc_emergency or ec_emergency:
             # This is a true emergency - plant health at risk
-            shot_size = self._get_number_entity_value("number.crop_steering_p3_emergency_shot_size", 1.0)
+            shot_size = self._get_number_entity_value("number.p3_emergency_shot_size", 1.0)
             
             # Adjust shot size for EC emergency
             if ec_emergency and zone_ec is not None:
@@ -2006,13 +2214,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
         zone_ec = self._get_zone_ec(zone_num)
         
         # Get growth stage for EC target selection
-        growth_stage = self._get_select_entity_value("select.crop_steering_growth_stage", "Vegetative")
+        growth_stage = self._get_select_entity_value("select.growth_stage", "Vegetative")
         
         # Get EC target for P0 based on growth stage
         if growth_stage.lower() == "vegetative":
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_veg_p0", 3.0)
+            ec_target = self._get_number_entity_value("number.ec_target_veg_p0", 3.0)
         else:  # Generative
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_gen_p0", 4.0)
+            ec_target = self._get_number_entity_value("number.ec_target_gen_p0", 4.0)
         
         # P0 is for dryback - typically NO irrigation allowed
         # Only exception: extreme EC emergencies that threaten plant health
@@ -2025,7 +2233,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         if ec_emergency:
             # Emergency flush needed even during dryback
-            flush_target = self._get_number_entity_value("number.crop_steering_ec_target_flush", 0.8)
+            flush_target = self._get_number_entity_value("number.ec_target_flush", 0.8)
             flush_shot_size = 10.0  # Large flush shot
             
             return {
@@ -2169,15 +2377,20 @@ class MasterCropSteeringApp(BaseAsyncApp):
             candidate_zones = []
             for zone in configured_zones:
                 # Check if zone is enabled
-                zone_enabled = self._get_switch_state(f"switch.crop_steering_zone_{zone}_enabled", True)
+                zone_enabled = self._get_switch_state(f"switch.zone_{zone}_enabled", True)
                 if not zone_enabled:
                     continue
-                
-                # Check for conflicts (group conflicts, manual overrides, etc.)
+
+                # Check manual override (in-memory + AD state + HA REST API)
+                override_active, _ = self._is_zone_override_active(zone)
+                if override_active:
+                    continue
+
+                # Check for conflicts (group conflicts, etc.)
                 has_conflicts = await self._check_zone_conflicts(zone)
                 if has_conflicts:
                     continue
-                
+
                 candidate_zones.append(zone)
             
             if not candidate_zones:
@@ -2270,9 +2483,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     }
 
                 # MANUAL OVERRIDE CHECKS - Critical user control functionality
-                zone_manual_override = self._get_switch_state(f"switch.crop_steering_zone_{zone}_manual_override", False)
-                if zone_manual_override:
-                    self.log(f"🛑 Zone {zone} irrigation blocked: Manual override active")
+                # Checks in-memory dict, AppDaemon state, and HA REST API
+                override_active, override_source = self._is_zone_override_active(zone)
+                if override_active:
+                    self.log(f"🛑 Zone {zone} irrigation blocked: Manual override active ({override_source})")
                     return {
                         'status': 'blocked',
                         'reason': 'manual_override',
@@ -2281,9 +2495,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     }
 
                 # System-level controls
-                system_enabled = self._get_switch_state("switch.crop_steering_system_enabled", True)
-                auto_irrigation_enabled = self._get_switch_state("switch.crop_steering_auto_irrigation_enabled", True)
-                zone_enabled = self._get_switch_state(f"switch.crop_steering_zone_{zone}_enabled", True)
+                system_enabled = self._get_switch_state("switch.system_enabled", True)
+                auto_irrigation_enabled = self._get_switch_state("switch.auto_irrigation_enabled", True)
+                zone_enabled = self._get_switch_state(f"switch.zone_{zone}_enabled", True)
 
                 if not system_enabled:
                     self.log(f"🛑 Zone {zone} irrigation blocked: System disabled")
@@ -2348,8 +2562,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     zone_entity = self._get_zone_valve_entity(zone)
 
                     missing_entities = []
-                    if not pump_entity:
-                        missing_entities.append('pump_master')
+                    # pump_master is optional — pressure switch auto-starts pump when mainline opens
                     if not main_line_entity:
                         missing_entities.append('main_line')
                     if not zone_entity:
@@ -2372,10 +2585,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         'message': f'Hardware configuration incomplete: {e}. Please check crop_steering.env configuration.'
                     }
 
-                # Turn on sequence
-                await self.call_service('switch/turn_on', entity_id=pump_entity)
-                pump_on = True
-                await asyncio.sleep(2)
+                # Turn on sequence (pump is optional — pressure switch auto-starts)
+                if pump_entity:
+                    await self.call_service('switch/turn_on', entity_id=pump_entity)
+                    pump_on = True
+                    await asyncio.sleep(2)
 
                 await self.call_service('switch/turn_on', entity_id=main_line_entity)
                 main_line_on = True
@@ -2396,8 +2610,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 main_line_on = False
                 await asyncio.sleep(1)
 
-                await self.call_service('switch/turn_off', entity_id=pump_entity)
-                pump_on = False
+                if pump_entity:
+                    await self.call_service('switch/turn_off', entity_id=pump_entity)
+                    pump_on = False
 
                 end_time = datetime.now()
                 actual_duration = (end_time - start_time).total_seconds()
@@ -2564,12 +2779,18 @@ class MasterCropSteeringApp(BaseAsyncApp):
     async def _check_emergency_conditions(self, fused_vwc: float):
         """Check for emergency irrigation conditions."""
         try:
+            # Skip emergency checks during startup — sensors need time to stabilize
+            startup_elapsed = (datetime.now() - self._startup_time).total_seconds()
+            if startup_elapsed < 120:
+                self.log(f"⏳ Startup grace period: {120 - startup_elapsed:.0f}s remaining, skipping emergency check")
+                return
+
             if fused_vwc and fused_vwc < self.config['thresholds']['emergency_vwc']:
                 self.log(f"🚨 Emergency VWC condition: {fused_vwc:.1f}%", level='WARNING')
                 
                 # Check if system is enabled and auto irrigation is enabled
-                system_enabled = self._get_switch_state("switch.crop_steering_system_enabled", True)
-                auto_irrigation_enabled = self._get_switch_state("switch.crop_steering_auto_irrigation_enabled", True)
+                system_enabled = self._get_switch_state("switch.system_enabled", True)
+                auto_irrigation_enabled = self._get_switch_state("switch.auto_irrigation_enabled", True)
                 
                 if not system_enabled:
                     self.log("🛑 Emergency irrigation blocked: System disabled")
@@ -2592,29 +2813,35 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     # Use integration sensors which are working properly
                     emergency_zone = await self._select_emergency_zone_from_integration()
                     if emergency_zone:
+                        # Check effective VWC ceiling (adaptive target for non-responding sensors)
+                        ceiling = self.emergency_attempts[emergency_zone].get('effective_vwc_ceiling')
+                        zone_vwc = self._get_zone_vwc(emergency_zone)
+                        if ceiling and zone_vwc and zone_vwc >= ceiling:
+                            return  # VWC is at or above what this sensor can reach
+
                         # Check if zone is enabled
-                        zone_enabled = self._get_switch_state(f"switch.crop_steering_zone_{emergency_zone}_enabled", True)
+                        zone_enabled = self._get_switch_state(f"switch.zone_{emergency_zone}_enabled", True)
                         if not zone_enabled:
                             self.log(f"🛑 Emergency irrigation blocked: Zone {emergency_zone} disabled")
                             return
-                        
-                        # Track emergency attempts for abandonment logic
-                        await self._track_emergency_attempt(emergency_zone, fused_vwc)
-                        
+
+                        # Check manual override
+                        override_active, override_source = self._is_zone_override_active(emergency_zone)
+                        if override_active:
+                            self.log(f"🛑 Emergency irrigation blocked: Zone {emergency_zone} manual override active ({override_source})")
+                            return
+
                         # Check if we should abandon this zone (blocked dripper protection)
                         if await self._should_abandon_emergency_zone(emergency_zone):
                             self.log(f"🚫 Abandoning emergency irrigation for Zone {emergency_zone} - possible blocked dripper")
                             return
-                        
+
+                        # Track emergency attempts for abandonment logic
+                        await self._track_emergency_attempt(emergency_zone, fused_vwc)
+
                         await self._execute_irrigation_shot(emergency_zone, 60, shot_type='emergency')
                     else:
-                        # Fallback to zone 3 based on user feedback
-                        self.log("⚠️ Integration sensor selection failed, using Zone 3 fallback")
-                        zone_3_enabled = self._get_switch_state("switch.crop_steering_zone_3_enabled", True)
-                        if zone_3_enabled:
-                            await self._execute_irrigation_shot(3, 60, shot_type='emergency')
-                        else:
-                            self.log("🛑 Emergency irrigation blocked: Zone 3 disabled")
+                        self.log("⚠️ No sensor data available to select emergency zone - skipping blind irrigation", level='WARNING')
                 else:
                     remaining_cooldown = cooldown_seconds - time_since_last
                     self.log(f"⏱️ Emergency irrigation on cooldown: {remaining_cooldown:.0f}s remaining")
@@ -2623,79 +2850,60 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self.log(f"❌ Error checking emergency conditions: {e}", level='ERROR')
 
     async def _select_emergency_zone_from_integration(self) -> Optional[int]:
-        """Select zone with lowest VWC using multiple fallback methods."""
+        """Select zone with lowest VWC using sensor fusion cached data.
+
+        Uses the sensor fusion's in-memory data (populated by listen_state
+        callbacks) instead of get_state() which can't see these entities.
+        """
         try:
             zone_vwc = {}
-            
-            # WORKAROUND: Multiple strategies to bypass AppDaemon async Task issue
+
+            # Get VWC sensors from config (maps zone index to sensor ID)
+            vwc_sensors = self.config.get('sensors', {}).get('vwc', [])
+
             for zone_num in range(1, self.num_zones + 1):
-                integration_sensor = f"sensor.crop_steering_vwc_zone_{zone_num}"
-                value = None
-                
-                try:
-                    # Method 1: Use get_history to get last known good value
-                    history = self.get_history(entity_id=integration_sensor, duration=1)
-                    if history and len(history) > 0 and len(history[0]) > 0:
-                        last_state = history[0][-1]
-                        if hasattr(last_state, 'state') and last_state.state not in ['unknown', 'unavailable']:
-                            value = last_state.state
-                            self.log(f"🔍 Zone {zone_num} via history: {value}")
-                except Exception:
-                    pass
-                
-                # Method 2: Direct get_state with sync call
-                if value is None:
-                    try:
-                        state_value = self.get_state(integration_sensor)
-                        if state_value not in ['unknown', 'unavailable', None] and not hasattr(state_value, '__await__'):
-                            value = state_value
-                            self.log(f"🔍 Zone {zone_num} via get_state: {value}")
-                    except Exception:
-                        pass
-                
-                # Method 3: Use get_state with async check
-                if value is None:
-                    try:
-                        if self.entity_exists(integration_sensor):
-                            test_value = self.get_entity_value(integration_sensor)
-                            if test_value and not hasattr(test_value, '__await__'):
-                                value = test_value
-                                self.log(f"🔍 Zone {zone_num} via get_state: {value}")
-                    except Exception:
-                        pass
-                
-                # Method 4: Fallback to raw sensor calculation
-                if value is None:
-                    zone_vwc_calc = self._get_zone_vwc(zone_num)
-                    if zone_vwc_calc:
-                        value = zone_vwc_calc
-                        self.log(f"🔍 Zone {zone_num} via _get_zone_vwc: {value}")
-                
-                # Parse the value if we got one
-                if value and value not in ['unknown', 'unavailable', None]:
-                    try:
-                        vwc = float(value)
+                # Skip zones with manual override — absolute lockout
+                override_active, _ = self._is_zone_override_active(zone_num)
+                if override_active:
+                    continue
+
+                # Get the sensor entity for this zone (0-indexed in list)
+                sensor_idx = zone_num - 1
+                if sensor_idx >= len(vwc_sensors):
+                    continue
+                sensor_id = vwc_sensors[sensor_idx]
+                if not sensor_id:
+                    continue
+
+                # Read from sensor fusion's cached data (populated by listen_state)
+                if (sensor_id in self.sensor_fusion.sensor_data and
+                        len(self.sensor_fusion.sensor_data[sensor_id]) > 0 and
+                        self.sensor_fusion.sensor_types.get(sensor_id) == 'vwc'):
+                    # Check data freshness (within last 10 minutes)
+                    last_ts = self.sensor_fusion.sensor_timestamps[sensor_id][-1]
+                    age_seconds = (datetime.now() - last_ts).total_seconds()
+                    if age_seconds < 600:
+                        vwc = self.sensor_fusion.sensor_data[sensor_id][-1]
                         zone_vwc[zone_num] = vwc
-                        self.log(f"✅ Zone {zone_num} VWC: {vwc:.1f}%")
-                    except (ValueError, TypeError):
-                        self.log(f"❌ Zone {zone_num} invalid value: {value}")
+                        self.log(f"✅ Zone {zone_num} VWC: {vwc:.1f}% (age: {age_seconds:.0f}s)")
+                    else:
+                        self.log(f"⚠️ Zone {zone_num} stale data ({age_seconds:.0f}s old)")
                 else:
-                    self.log(f"❌ Zone {zone_num} unavailable: {value}")
-            
+                    self.log(f"❌ Zone {zone_num} no fusion data for {sensor_id}")
+
             if zone_vwc:
-                # Select zone with lowest VWC (most critical)
                 emergency_zone = min(zone_vwc, key=zone_vwc.get)
                 lowest_vwc = zone_vwc[emergency_zone]
                 self.log(f"🚨 Emergency zone selected: Zone {emergency_zone} with {lowest_vwc:.1f}% VWC")
                 self.log(f"📊 All zone VWCs: {zone_vwc}")
                 return emergency_zone
             else:
-                self.log("⚠️ CRITICAL: All sensors unavailable - using user-specified Zone 3 override")
-                return 3  # Manual override based on user feedback
-            
+                self.log("⚠️ No recent VWC data from sensor fusion - cannot select emergency zone", level='WARNING')
+                return None
+
         except Exception as e:
             self.log(f"❌ Error selecting emergency zone: {e}", level='ERROR')
-            return 3  # Emergency fallback to zone 3
+            return None
 
     async def _select_emergency_zone(self) -> Optional[int]:
         """Select zone with lowest VWC for emergency irrigation."""
@@ -2765,66 +2973,31 @@ class MasterCropSteeringApp(BaseAsyncApp):
         return 8  # Placeholder
 
     def _get_zone_vwc(self, zone_num: int) -> float | None:
-        """Get VWC value for specific zone from configured sensors."""
+        """Get VWC value for specific zone from sensor fusion cache.
+
+        Uses in-memory data from listen_state callbacks (reliable) instead
+        of get_state() which can't see these entities in AppDaemon.
+        """
         try:
-            # Try integration sensor first (preferred method)
-            integration_sensor = f"sensor.crop_steering_vwc_zone_{zone_num}"
-            state = self.get_entity_value(integration_sensor)
-            if state not in ['unknown', 'unavailable', None]:
-                # Ensure state is a string or number, not an async Task
-                if hasattr(state, '__await__'):
-                    self.log(f"⚠️ Async context detected for {integration_sensor}, falling back to safe method")
-                    # Try alternative methods to get the value safely
-                    try:
-                        # Use entity_exists check first
-                        if self.entity_exists(integration_sensor):
-                            # Try get_state directly as a last resort
-                            alt_state = self.get_state(integration_sensor)
-                            if alt_state and not hasattr(alt_state, '__await__') and alt_state not in ['unknown', 'unavailable']:
-                                return float(alt_state)
-                    except Exception:
-                        pass
-                else:
-                    return float(state)
-            
-            # Fallback to direct sensor configuration
-            zone_vwc_sensors = []
-            
-            # Look for zone-specific sensors in VWC sensor list
-            if 'sensors' in self.config and 'vwc' in self.config['sensors']:
-                for sensor in self.config['sensors']['vwc']:
-                    # Check if sensor belongs to this zone (various naming patterns)
-                    if self._sensor_matches_zone(sensor, zone_num):
-                        zone_vwc_sensors.append(sensor)
-            
-            # Average values from zone sensors
-            if zone_vwc_sensors:
-                values = []
-                for sensor in zone_vwc_sensors:
-                    try:
-                        state = self.get_entity_value(sensor)
-                        if state not in ['unknown', 'unavailable', None]:
-                            # Ensure state is a string or number, not an async Task
-                            if hasattr(state, '__await__'):
-                                self.log(f"⚠️ Async task from sensor {sensor}, trying alternative method")
-                                # Try direct get_state as fallback
-                                try:
-                                    alt_state = self.get_state(sensor)
-                                    if alt_state and not hasattr(alt_state, '__await__') and alt_state not in ['unknown', 'unavailable']:
-                                        values.append(float(alt_state))
-                                except Exception:
-                                    pass
-                                continue
-                            values.append(float(state))
-                    except (ValueError, TypeError) as e:
-                        self.log(f"⚠️ Error reading sensor {sensor}: {e}")
-                        continue
-                
-                if values:
-                    return round(sum(values) / len(values), 2)
-            
+            vwc_sensors = self.config.get('sensors', {}).get('vwc', [])
+            sensor_idx = zone_num - 1
+            if sensor_idx >= len(vwc_sensors):
+                return None
+            sensor_id = vwc_sensors[sensor_idx]
+            if not sensor_id:
+                return None
+
+            # Read from sensor fusion's cached data
+            if (sensor_id in self.sensor_fusion.sensor_data and
+                    len(self.sensor_fusion.sensor_data[sensor_id]) > 0 and
+                    self.sensor_fusion.sensor_types.get(sensor_id) == 'vwc'):
+                last_ts = self.sensor_fusion.sensor_timestamps[sensor_id][-1]
+                age_seconds = (datetime.now() - last_ts).total_seconds()
+                if age_seconds < 600:  # Within 10 minutes
+                    return round(self.sensor_fusion.sensor_data[sensor_id][-1], 2)
+
             return None
-            
+
         except Exception as e:
             self.log(f"❌ Error getting zone {zone_num} VWC: {e}", level='ERROR')
             return None
@@ -2875,30 +3048,31 @@ class MasterCropSteeringApp(BaseAsyncApp):
             return default
 
     def _get_zone_ec(self, zone_num: int) -> Optional[float]:
-        """Get average EC for specific zone."""
+        """Get EC value for specific zone from sensor fusion cache.
+
+        Uses in-memory data from listen_state callbacks (reliable) instead
+        of get_state() which can't see these entities in AppDaemon.
+        """
         try:
-            zone_sensors = [s for s in self.config['sensors']['ec'] if self._sensor_matches_zone(s, zone_num)]
-            if not zone_sensors:
-                # Try integration sensor as fallback
-                integration_sensor = f"sensor.crop_steering_ec_zone_{zone_num}"
-                state = self.get_entity_value(integration_sensor)
-                if state not in ['unknown', 'unavailable', None]:
-                    return float(state)
+            ec_sensors = self.config.get('sensors', {}).get('ec', [])
+            sensor_idx = zone_num - 1
+            if sensor_idx >= len(ec_sensors):
                 return None
-            
-            ec_values = []
-            for sensor in zone_sensors:
-                try:
-                    value = self.get_entity_value(sensor)
-                    if value not in ['unknown', 'unavailable', None] and not hasattr(value, '__await__'):
-                        ec_values.append(float(value))
-                except (ValueError, TypeError):
-                    continue
-            
-            if ec_values:
-                return sum(ec_values) / len(ec_values)
+            sensor_id = ec_sensors[sensor_idx]
+            if not sensor_id:
+                return None
+
+            # Read from sensor fusion's cached data
+            if (sensor_id in self.sensor_fusion.sensor_data and
+                    len(self.sensor_fusion.sensor_data[sensor_id]) > 0 and
+                    self.sensor_fusion.sensor_types.get(sensor_id) == 'ec'):
+                last_ts = self.sensor_fusion.sensor_timestamps[sensor_id][-1]
+                age_seconds = (datetime.now() - last_ts).total_seconds()
+                if age_seconds < 600:  # Within 10 minutes
+                    return round(self.sensor_fusion.sensor_data[sensor_id][-1], 2)
+
             return None
-            
+
         except Exception as e:
             self.log(f"❌ Error getting zone {zone_num} EC: {e}", level='ERROR')
             return None
@@ -2918,7 +3092,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             ec_ratio = current_ec / target_ec if target_ec > 0 else 0
             
             # Check if EC stacking is enabled
-            ec_stacking_enabled = self._get_switch_state("switch.crop_steering_ec_stacking_enabled", False)
+            ec_stacking_enabled = self._get_switch_state("switch.ec_stacking_enabled", False)
             
             if not ec_stacking_enabled:
                 # Standard EC evaluation - irrigate if EC is too high
@@ -2982,7 +3156,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 }
             
             ec_ratio = current_ec / target_ec if target_ec > 0 else 0
-            base_shot_size = self._get_number_entity_value("number.crop_steering_p2_shot_size", 5.0)
+            base_shot_size = self._get_number_entity_value("number.p2_shot_size", 5.0)
             
             if ec_ratio > high_threshold:
                 # EC too high - irrigate with larger shot to dilute
@@ -3071,7 +3245,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             progressive_size = min(progressive_size, max_shot_size)
             
             # Apply zone-specific shot size multiplier
-            zone_multiplier = self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_shot_size_multiplier", 1.0)
+            zone_multiplier = self._get_number_entity_value(f"number.zone_{zone_num}_shot_size_multiplier", 1.0)
             final_size = progressive_size * zone_multiplier
             
             self.log(f"📈 Zone {zone_num} P1 shot progression: base={initial_shot_size:.1f}% + increment={shot_increment:.1f}% * {current_shot_count} = {progressive_size:.1f}% * multiplier={zone_multiplier:.1f} = {final_size:.1f}%")
@@ -3137,24 +3311,23 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self.log(f"❌ Error resetting P1 progression: {e}", level='ERROR')
 
     def _get_number_of_zones(self) -> int:
-        """Get number of zones from integration configuration."""
+        """Get number of zones from apps.yaml configuration."""
         try:
-            # Try to get from integration number entity
-            zones_entity = self.get_entity_value("number.crop_steering_substrate_volume")  # This exists, so integration is loaded
-            if zones_entity:
-                # Check for zone entities to count them
-                zone_count = 0
-                for i in range(1, 11):  # Check up to 10 zones
-                    zone_sensor = f"sensor.crop_steering_vwc_zone_{i}"
-                    if self.entity_exists(zone_sensor):
-                        zone_count = i
-                return max(zone_count, 1)  # At least 1 zone
-            
-            # Fallback to configuration
+            # Primary: count zone_valves from apps.yaml config
             if 'hardware' in self.config and 'zone_valves' in self.config['hardware']:
-                return len(self.config['hardware']['zone_valves'])
-            
-            return 1  # Default single zone
+                count = len(self.config['hardware']['zone_valves'])
+                self.log(f"✅ Detected {count} zones from zone_valves configuration")
+                return count
+
+            # Fallback: count VWC sensors
+            vwc_sensors = self.config.get('sensors', {}).get('vwc', [])
+            if vwc_sensors:
+                count = len(vwc_sensors)
+                self.log(f"✅ Detected {count} zones from VWC sensor configuration")
+                return count
+
+            self.log("⚠️ No zone configuration found, defaulting to 1 zone", level='WARNING')
+            return 1
         except Exception as e:
             self.log(f"❌ Error getting number of zones: {e}", level='ERROR')
             return 1
@@ -3188,7 +3361,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 elif zone_phase == "P2":
                     # Maintenance phase - based on VWC thresholds
                     if zone_vwc is not None:
-                        threshold = self._get_number_entity_value("number.crop_steering_p2_vwc_threshold", 60.0)
+                        threshold = self._get_number_entity_value("number.p2_vwc_threshold", 60.0)
                         if zone_vwc < threshold:
                             # Needs irrigation soon
                             zone_next_time = now + timedelta(minutes=15)
@@ -3201,7 +3374,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     
                 elif zone_phase == "P3":
                     # Pre-lights-off - check emergency threshold
-                    emergency_threshold = self._get_number_entity_value("number.crop_steering_p3_emergency_vwc_threshold", 45)
+                    emergency_threshold = self._get_number_entity_value("number.p3_emergency_vwc_threshold", 45)
                     if zone_vwc and zone_vwc < emergency_threshold:
                         # Emergency irrigation needed
                         zone_next_time = now + timedelta(minutes=5)
@@ -3235,70 +3408,157 @@ class MasterCropSteeringApp(BaseAsyncApp):
             return None
 
     async def _check_phase_transitions(self, kwargs):
-        """Check and handle automatic phase transitions PER ZONE based on conditions."""
+        """DISABLED: Duplicate phase checker — all logic in _check_all_zone_phase_transitions."""
+        pass
+
+    async def _ai_heartbeat(self, kwargs):
+        """15-minute AI oversight heartbeat — checks system health and takes corrective actions."""
         try:
-            now = datetime.now()
-            current_time = now.time()
-            
-            # Get configuration values from existing entities
-            p0_max_duration = self._get_number_entity_value("number.crop_steering_p0_max_wait_time", 45)
-            p1_recovery_target = self._get_number_entity_value("number.crop_steering_p1_target_vwc", 65)
-            dryback_target = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50)
-            
-            # Check each zone independently with its own schedule
+            report = {
+                'timestamp': datetime.now(),
+                'zones': {},
+                'anomalies': [],
+                'actions_taken': []
+            }
+
+            current_time = datetime.now().time()
+            zone_schedule = self._get_zone_schedule(1)
+            lights_on = self._are_lights_on(current_time, zone_schedule['lights_on'], zone_schedule['lights_off'])
+
             for zone_num in range(1, self.num_zones + 1):
-                current_phase = self.zone_phases.get(zone_num, 'P2')
+                machine = self.zone_state_machines.get(zone_num)
+                if not machine:
+                    continue
+
                 zone_vwc = self._get_zone_vwc(zone_num)
-                
-                # Get zone-specific schedule
-                zone_schedule = self._get_zone_schedule(zone_num)
-                lights_on_time = zone_schedule['lights_on']
-                lights_off_time = zone_schedule['lights_off']
-                
-                # Check if lights are currently on for this zone
-                lights_on = self._are_lights_on(current_time, lights_on_time, lights_off_time)
-                
-                target_phase = None
-                reason = ""
-                
-                # Phase transition logic PER ZONE
-                if lights_on and current_phase != 'P0':
-                    # Lights on - zone should start P0 (morning dryback)
-                    # P0 begins when lights turn on (plants wake up and start using water)
-                    target_phase = 'P0'
-                    reason = f"Zone {zone_num}: Lights on - starting morning dryback phase"
-                    
-                elif lights_on and current_phase == 'P0':
-                    # Check P0 → P1 transition conditions for this zone
-                    if self._should_zone_exit_p0(zone_num, zone_vwc, dryback_target, p0_max_duration):
-                        target_phase = 'P1'
-                        reason = f"Zone {zone_num}: P0 dryback target achieved or max duration reached"
-                        
-                elif current_phase == 'P1':
-                    # Check P1 → P2 transition conditions for this zone
-                    if zone_vwc and zone_vwc >= p1_recovery_target:
-                        target_phase = 'P2'
-                        reason = f"Zone {zone_num}: P1 recovery target achieved: {zone_vwc:.1f}% >= {p1_recovery_target}%"
-                        
-                elif current_phase == 'P2':
-                    # Check P2 → P3 transition based on ML-predicted last irrigation timing
-                    # P3 starts AFTER the last P2 shot, when we begin final dryback to morning
-                    should_transition = await self._should_zone_start_p3(zone_num, lights_on_time, lights_off_time)
-                    if should_transition:
-                        target_phase = 'P3'
-                        reason = f"Zone {zone_num}: Starting final dryback period to achieve target by morning"
-                        
-                elif current_phase == 'P3':
-                    # P3 continues until lights turn off, then system waits for lights on to start P0
-                    # No transition needed here - P3 → P0 happens when lights turn on (handled above)
-                    pass
-                
-                # Execute transition if needed for this zone
-                if target_phase and target_phase != current_phase:
-                    await self._transition_zone_to_phase(zone_num, target_phase, reason)
-                    
+                zone_ec = self._get_zone_ec(zone_num)
+                phase = self.zone_phases.get(zone_num, 'P2')
+                phase_duration_min = machine.get_phase_duration().total_seconds() / 60
+                daily_shots = machine.state.daily_irrigation_count
+                daily_water = machine.state.daily_water_ml
+                override_active, _ = self._is_zone_override_active(zone_num)
+                emergency_data = self.emergency_attempts.get(zone_num, {})
+
+                # Check sensor freshness
+                vwc_sensors = self.config.get('sensors', {}).get('vwc', [])
+                sensor_idx = zone_num - 1
+                sensor_stale = True
+                if sensor_idx < len(vwc_sensors):
+                    sid = vwc_sensors[sensor_idx]
+                    if sid in self.sensor_fusion.sensor_timestamps and len(self.sensor_fusion.sensor_timestamps[sid]) > 0:
+                        age = (datetime.now() - self.sensor_fusion.sensor_timestamps[sid][-1]).total_seconds()
+                        sensor_stale = age > 900  # 15 minutes
+
+                zone_report = {
+                    'vwc': zone_vwc, 'ec': zone_ec, 'phase': phase,
+                    'phase_duration_min': round(phase_duration_min, 1),
+                    'daily_shots': daily_shots, 'daily_water_ml': round(daily_water, 1),
+                    'override_active': override_active, 'sensor_stale': sensor_stale,
+                    'status': 'ok'
+                }
+
+                # Track EC for trend detection
+                if zone_ec is not None:
+                    if zone_num not in self.heartbeat_ec_history:
+                        self.heartbeat_ec_history[zone_num] = []
+                    self.heartbeat_ec_history[zone_num].append(zone_ec)
+                    self.heartbeat_ec_history[zone_num] = self.heartbeat_ec_history[zone_num][-12:]  # 3 hours
+
+                # --- Anomaly Detection ---
+
+                # 1. Phase stuck >4 hours during lights-on
+                if lights_on and phase_duration_min > 240 and phase == 'P0':
+                    report['anomalies'].append(f"Zone {zone_num}: Stuck in P0 for {phase_duration_min:.0f}min")
+                    zone_report['status'] = 'stuck_p0'
+                    # Auto-correct: force to P1
+                    hold = self.manual_phase_hold.get(zone_num)
+                    if not hold or datetime.now() >= hold:
+                        await self._transition_zone_to_phase(zone_num, 'P1', 'AI heartbeat: P0 stuck >4h, forcing P1')
+                        report['actions_taken'].append(f"Zone {zone_num}: Forced P0→P1 (stuck >4h)")
+
+                # 2. Sensor stale >15 minutes
+                if sensor_stale:
+                    report['anomalies'].append(f"Zone {zone_num}: VWC sensor stale >15min")
+                    zone_report['status'] = 'sensor_stale'
+
+                # 3. VWC not responding to irrigation
+                attempts = emergency_data.get('attempts', [])
+                recent = [a for a in attempts if a[0] > datetime.now() - timedelta(hours=1)]
+                effective = [a for a in recent if a[2] is not None]
+                if len(effective) >= 3:
+                    avg_lift = statistics.mean([a[2] - a[1] for a in effective])
+                    if avg_lift < 1.0:
+                        report['anomalies'].append(f"Zone {zone_num}: VWC not responding (avg lift {avg_lift:.1f}%)")
+                        zone_report['status'] = 'non_responsive'
+                        # Set ceiling if not already set
+                        if not emergency_data.get('effective_vwc_ceiling'):
+                            max_vwc = max([a[1] for a in effective])
+                            emergency_data['effective_vwc_ceiling'] = max_vwc + 2.0
+                            report['actions_taken'].append(f"Zone {zone_num}: Set VWC ceiling to {max_vwc + 2:.1f}%")
+
+                # 4. EC trending up across 3 heartbeats
+                ec_hist = self.heartbeat_ec_history.get(zone_num, [])
+                if len(ec_hist) >= 3:
+                    recent_3 = ec_hist[-3:]
+                    if recent_3[0] < recent_3[1] < recent_3[2] and (recent_3[2] - recent_3[0]) > 1.0:
+                        report['anomalies'].append(f"Zone {zone_num}: EC rising ({recent_3[0]:.1f}→{recent_3[2]:.1f} mS/cm)")
+
+                # 5. Excessive irrigation (>20 shots today)
+                if daily_shots > 20:
+                    report['anomalies'].append(f"Zone {zone_num}: {daily_shots} shots today (excessive)")
+                    zone_report['status'] = 'excessive_irrigation'
+
+                # 6. Manual override active >24 hours
+                if override_active:
+                    enabled_time = self.manual_overrides.get(zone_num, {}).get('enabled_time')
+                    if enabled_time and (datetime.now() - enabled_time).total_seconds() > 86400:
+                        report['anomalies'].append(f"Zone {zone_num}: Manual override active >24h (forgotten?)")
+
+                report['zones'][zone_num] = zone_report
+
+            # Publish heartbeat sensor
+            status = 'healthy' if not report['anomalies'] else 'anomaly_detected'
+            await self.async_set_entity_value(
+                'sensor.crop_steering_ai_heartbeat',
+                status,
+                attributes={
+                    'friendly_name': 'AI Heartbeat',
+                    'icon': 'mdi:heart-pulse',
+                    'last_check': report['timestamp'].isoformat(),
+                    'anomaly_count': len(report['anomalies']),
+                    'anomalies': report['anomalies'][:10],  # Limit attribute size
+                    'actions_taken': report['actions_taken'][:10],
+                    'zone_summary': {str(z): r.get('status', 'unknown') for z, r in report['zones'].items()},
+                }
+            )
+
+            if report['actions_taken']:
+                await self.async_set_entity_value(
+                    'sensor.crop_steering_ai_last_action',
+                    report['actions_taken'][-1] if report['actions_taken'] else 'None',
+                    attributes={
+                        'friendly_name': 'AI Last Action',
+                        'icon': 'mdi:robot',
+                        'all_actions': report['actions_taken'],
+                        'timestamp': report['timestamp'].isoformat()
+                    }
+                )
+
+            self.heartbeat_history.append(report)
+            self.heartbeat_history = self.heartbeat_history[-96:]
+
+            if report['anomalies']:
+                self.log(f"💓 AI Heartbeat: {len(report['anomalies'])} anomalies, "
+                        f"{len(report['actions_taken'])} actions taken")
+                for anomaly in report['anomalies']:
+                    self.log(f"  ⚠️ {anomaly}")
+                for action in report['actions_taken']:
+                    self.log(f"  🔧 {action}")
+            else:
+                self.log(f"💓 AI Heartbeat: All zones healthy")
+
         except Exception as e:
-            self.log(f"❌ Error checking phase transitions: {e}", level='ERROR')
+            self.log(f"❌ Error in AI heartbeat: {e}", level='ERROR')
 
     def _add_minutes_to_time(self, time_obj: time, minutes: float) -> time:
         """Add minutes to a time object."""
@@ -3344,8 +3604,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
             now = datetime.now()
             
             # Get P0 timing parameters
-            min_wait_time = self._get_number_entity_value("number.crop_steering_p0_min_wait_time", 30.0)
-            dryback_drop_percent = self._get_number_entity_value("number.crop_steering_p0_dryback_drop_percent", 15.0)
+            min_wait_time = self._get_number_entity_value("number.p0_min_wait_time", 30.0)
+            dryback_drop_percent = self._get_number_entity_value("number.p0_dryback_drop_percent", 15.0)
             
             # Check if P0 phase has been initialized
             if not zone_data.get('p0_start_time'):
@@ -3479,7 +3739,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         """Calculate optimal P3 start time using ML dryback prediction."""
         try:
             # Get target dryback for overnight period
-            target_dryback = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50)
+            target_dryback = self._get_number_entity_value("number.vegetative_dryback_target", 50)
             
             # Get current dryback status from advanced detector
             if hasattr(self, 'dryback_detector') and self.dryback_detector:
@@ -3526,8 +3786,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # This would query ML training data or stored dryback patterns
             
             # For now, use intelligent defaults based on typical dryback rates
-            target_dryback = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50)
-            substrate_volume = self._get_number_entity_value("number.crop_steering_substrate_volume", 10)
+            target_dryback = self._get_number_entity_value("number.vegetative_dryback_target", 50)
+            substrate_volume = self._get_number_entity_value("number.substrate_volume", 10)
             
             # Estimate dryback time based on substrate size and target
             # Larger substrates = slower dryback, higher targets = longer time
@@ -3567,15 +3827,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
             hours_until_lights_on = (next_lights_on - now).total_seconds() / 3600
             
             # Get target dryback for overnight
-            target_dryback = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50)
+            target_dryback = self._get_number_entity_value("number.vegetative_dryback_target", 50)
             
             # Get ML-predicted dryback rate for this zone
             predicted_dryback_rate = await self._get_zone_dryback_rate(zone_num)
-            if predicted_dryback_rate is None:
+            if not predicted_dryback_rate or predicted_dryback_rate <= 0:
                 # Fallback: estimate based on substrate volume
-                substrate_volume = self._get_number_entity_value("number.crop_steering_substrate_volume", 10)
-                predicted_dryback_rate = 2.0 / substrate_volume  # %/hour, smaller = slower
-            
+                substrate_volume = self._get_number_entity_value("number.substrate_volume", 10)
+                predicted_dryback_rate = max(2.0 / substrate_volume, 0.1)  # %/hour, min 0.1
+
             # Calculate how many hours needed to achieve target dryback
             hours_needed_for_dryback = target_dryback / predicted_dryback_rate
             
@@ -3593,7 +3853,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 time_since_irrigation = (now - zone_data['last_irrigation_time']).total_seconds() / 60
                 if time_since_irrigation < 5:  # Just irrigated in last 5 minutes
                     # Check if this VWC level will last until morning
-                    p2_threshold = self._get_number_entity_value("number.crop_steering_p2_vwc_threshold", 60)
+                    p2_threshold = self._get_number_entity_value("number.p2_vwc_threshold", 60)
                     vwc_buffer = zone_vwc - p2_threshold
                     hours_until_dry = vwc_buffer / predicted_dryback_rate if predicted_dryback_rate > 0 else 999
                     
@@ -3713,10 +3973,19 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 machine = self.zone_state_machines.get(zone_num)
                 if not machine:
                     continue
-                
+
+                # Skip zones with active manual phase hold
+                hold_expiry = self.manual_phase_hold.get(zone_num)
+                if hold_expiry and datetime.now() < hold_expiry:
+                    continue
+                elif hold_expiry:
+                    # Hold expired, clean up
+                    del self.manual_phase_hold[zone_num]
+                    self.log(f"🔓 Zone {zone_num}: Manual phase hold expired, resuming automatic transitions")
+
                 current_phase = machine.state.current_phase
                 zone_vwc = self._get_zone_average_vwc(zone_num)
-                
+
                 # P3 → P0: Lights turned on (only from P3, not P2)
                 if lights_just_on and current_phase == IrrigationPhase.P3_PRE_LIGHTS_OFF:
                     await self._transition_zone_to_phase(zone_num, 'P0', 'Lights on - starting morning dryback')
@@ -3748,7 +4017,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 # P2 → P3: ML-based or time-based transition
                 elif current_phase == IrrigationPhase.P2_MAINTENANCE:
                     # Check if it's time to transition to P3
-                    should_start_p3 = await self._should_zone_start_p3(zone_num)
+                    should_start_p3 = await self._should_zone_start_p3(zone_num, lights_on_time, lights_off_time)
                     if should_start_p3:
                         await self._transition_zone_to_phase(zone_num, 'P3', 'ML predicted lights-off approaching')
         
@@ -3762,37 +4031,6 @@ class MasterCropSteeringApp(BaseAsyncApp):
         else:
             return check_time >= start_time or check_time <= end_time
     
-    async def _should_zone_start_p3(self, zone_num: int) -> bool:
-        """Determine if zone should transition to P3 based on ML predictions."""
-        try:
-            # Get lights-off time
-            lights_off_time = self._get_zone_schedule(zone_num)['lights_off']
-            now = datetime.now()
-            
-            # Calculate time until lights off
-            lights_off_datetime = datetime.combine(now.date(), lights_off_time)
-            if lights_off_datetime < now:
-                lights_off_datetime += timedelta(days=1)
-            
-            time_until_lights_off = (lights_off_datetime - now).total_seconds() / 3600  # hours
-            
-            # Get dryback rate prediction
-            dryback_rate = await self._get_zone_dryback_rate(zone_num)
-            if dryback_rate and dryback_rate > 0:
-                # Calculate time needed to achieve overnight dryback
-                target_dryback = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50.0)
-                time_needed = target_dryback / dryback_rate + 0.5  # Add 30min buffer
-                
-                # Start P3 if we need to begin final dryback
-                return time_until_lights_off <= time_needed
-            else:
-                # Fallback: Start P3 2 hours before lights off
-                return time_until_lights_off <= 2.0
-                
-        except Exception as e:
-            self.log(f"Error checking P3 transition for zone {zone_num}: {e}", level='ERROR')
-            return False
-
     def _get_phase_icon(self, phase: str) -> str:
         """Get icon for phase."""
         phase_icons = {
@@ -3905,6 +4143,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 self.log(f"⚠️ Sensor issues: {faulty_sensors} faulty, {offline_sensors} offline", level='WARNING')
 
             # Fail-safe: if all VWC sensors are offline while irrigation hardware is active, emergency stop
+            # Skip during startup — sensors and hardware states are still settling
+            startup_elapsed = (datetime.now() - self._startup_time).total_seconds()
+            if startup_elapsed < 120:
+                return
             configured_vwc_sensors = self.config.get('sensors', {}).get('vwc', [])
             vwc_total = len(configured_vwc_sensors)
             vwc_online = 0
@@ -3932,6 +4174,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
     async def _watchdog_check(self, kwargs):
         """Periodic watchdog to catch state/hardware mismatches and enforce safe state."""
         try:
+            # Skip during startup grace period
+            startup_elapsed = (datetime.now() - self._startup_time).total_seconds()
+            if startup_elapsed < 120:
+                return
             hardware_on = self._is_any_irrigation_hardware_on()
             if self.irrigation_in_progress and not hardware_on:
                 self.log("⚠️ Watchdog: irrigation_in_progress=True but all hardware OFF. Resetting state.", level='WARNING')
@@ -3987,8 +4233,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Update HA entities
             for metric_name, value in metrics.items():
                 entity_id = f'sensor.crop_steering_{metric_name}'
-                self.set_entity_value(entity_id, value, 
-                              attributes={'last_updated': datetime.now().isoformat()})
+                self.set_entity_value(entity_id, value)
             
             self.log(f"📊 Performance updated - ML: {metrics['ml_model_accuracy']:.2f}, "
                     f"Sensors: {metrics['sensor_fusion_confidence']:.2f}")
@@ -3999,10 +4244,18 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _update_dryback_entities(self, dryback_result: Dict):
         """Update Home Assistant entities with dryback data."""
         try:
+            # Only pass simple scalar attributes (HA rejects complex/nested ones)
+            safe_attrs = {
+                'friendly_name': 'Dryback Percentage',
+                'unit_of_measurement': '%',
+                'icon': 'mdi:water-percent',
+                'dryback_rate': dryback_result.get('dryback_rate'),
+                'confidence_score': dryback_result.get('confidence_score'),
+            }
             self.run_in(self._async_set_entity_wrapper, 0,
                        entity_id='sensor.crop_steering_dryback_percentage',
                        value=dryback_result['dryback_percentage'],
-                       attributes=dryback_result)
+                       attributes=safe_attrs)
             
             self.run_in(self._async_set_entity_wrapper, 0,
                        entity_id='binary_sensor.crop_steering_dryback_in_progress',
@@ -4133,21 +4386,118 @@ class MasterCropSteeringApp(BaseAsyncApp):
         except Exception as e:
             self.log(f"❌ Error updating system for new profile: {e}", level='ERROR')
 
-    def _get_switch_state(self, entity_id: str, default: bool = False) -> bool:
-        """Get switch state with error handling."""
+    def _is_zone_override_active(self, zone: int) -> tuple:
+        """Check manual override using all available sources.
+
+        Returns (active: bool, source: str).
+        Four layers checked in order:
+          1. In-memory dict  (fastest, set by events/listeners)
+          2. switch_state_cache (populated by listen_state callbacks)
+          3. AppDaemon get_state  (works if entity is visible)
+          4. Direct HA REST API  (bypasses AppDaemon entirely)
+        """
+        # Layer 1: in-memory dict
+        if self.manual_overrides.get(zone, {}).get('enabled_time') is not None:
+            return (True, "in-memory")
+
+        entity = f"switch.zone_{zone}_manual_override"
+
+        # Layer 2: switch_state_cache (populated by listen_state callbacks)
+        cached = self.switch_state_cache.get(entity)
+        if cached == 'on':
+            self._sync_override_to_memory(zone)
+            return (True, "switch_cache")
+
+        # Layer 3: AppDaemon state cache
+        ad_state = None
         try:
+            ad_state = self.get_state(entity)
+            if ad_state == 'on':
+                self._sync_override_to_memory(zone)
+                return (True, "AD state")
+        except Exception:
+            pass
+
+        # Layer 4: Direct HA REST API
+        ha_state = None
+        try:
+            ha_state = self._check_ha_entity_state(entity)
+            if ha_state == 'on':
+                self._sync_override_to_memory(zone)
+                return (True, "HA REST API")
+        except Exception:
+            pass
+
+        return (False, "none")
+
+    def _sync_override_to_memory(self, zone: int):
+        """Sync override-active state into in-memory dict."""
+        if self.manual_overrides.get(zone, {}).get('enabled_time') is None:
+            self.manual_overrides[zone].update({
+                'enabled_time': datetime.now(),
+                'timeout_minutes': None
+            })
+
+    def _get_switch_state(self, entity_id: str, default: bool = False) -> bool:
+        """Get switch state from cache (populated by listen_state) or get_state fallback."""
+        try:
+            # First check the listen_state cache (works for entities where get_state returns None)
+            cached = self.switch_state_cache.get(entity_id)
+            if cached is not None:
+                return cached == 'on'
+
+            # Fallback to get_state
             state = self.get_entity_value(entity_id)
-            self.log(f"🔍 DEBUG: Switch {entity_id} state: {state} (type: {type(state)})")
             if state in ['on', True, 'true', '1']:
                 return True
             elif state in ['off', False, 'false', '0']:
                 return False
             else:
-                self.log(f"⚠️ Switch {entity_id} unknown state: {state}, using default: {default}")
                 return default
         except Exception as e:
             self.log(f"❌ Error reading switch {entity_id}: {e}, using default: {default}")
             return default
+
+    async def _warm_switch_cache(self, kwargs):
+        """Pre-populate switch_state_cache from HA REST API on startup."""
+        try:
+            # Try both naming conventions — some entities have crop_steering_ prefix
+            switch_pairs = [
+                ('switch.system_enabled', 'switch.crop_steering_system_enabled'),
+                ('switch.auto_irrigation_enabled', 'switch.crop_steering_auto_irrigation_enabled'),
+                ('switch.tank_filling', 'switch.crop_steering_tank_filling'),
+            ]
+            for zone_num in range(1, self.num_zones + 1):
+                switch_pairs.append((f"switch.zone_{zone_num}_enabled",
+                                    f"switch.crop_steering_zone_{zone_num}_enabled"))
+                switch_pairs.append((f"switch.zone_{zone_num}_manual_override",
+                                    f"switch.crop_steering_zone_{zone_num}_manual_override"))
+
+            warmed = 0
+            for short_id, prefixed_id in switch_pairs:
+                try:
+                    state = self._check_ha_entity_state(short_id)
+                    if state not in ['on', 'off']:
+                        state = self._check_ha_entity_state(prefixed_id)
+                        if state in ['on', 'off']:
+                            # Use the short name in the cache (what AppDaemon code uses)
+                            self.switch_state_cache[short_id] = state
+                            warmed += 1
+                            self.log(f"  📡 {prefixed_id} = {state}")
+                    else:
+                        self.switch_state_cache[short_id] = state
+                        warmed += 1
+
+                    if 'manual_override' in short_id and self.switch_state_cache.get(short_id) == 'on':
+                        zone = int(short_id.split('zone_')[1].split('_')[0])
+                        self._sync_override_to_memory(zone)
+                        self.log(f"  🔒 Zone {zone} manual override detected ON at startup")
+                except Exception as e:
+                    self.log(f"  ❌ Failed to read {short_id}: {e}", level='DEBUG')
+
+            self.log(f"🔄 Warmed switch cache: {warmed}/{len(switch_pairs)} switches read from HA")
+        except Exception as e:
+            self.log(f"❌ Error warming switch cache: {e}", level='ERROR')
 
     async def _track_emergency_attempt(self, zone_num: int, vwc_before: float):
         """Track emergency irrigation attempts for abandonment logic."""
@@ -4168,43 +4518,105 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self.log(f"❌ Error tracking emergency attempt: {e}", level='ERROR')
 
     async def _should_abandon_emergency_zone(self, zone_num: int) -> bool:
-        """Check if we should abandon emergency irrigation for a zone (blocked dripper protection)."""
+        """Check if we should abandon emergency irrigation for a zone.
+
+        Uses escalating backoff: 2h → 4h → 8h → permanent lockout.
+        Also tracks VWC response — if shots aren't raising VWC, sets an
+        adaptive ceiling so the system stops chasing an unreachable target.
+        """
         try:
+            zone_data = self.emergency_attempts[zone_num]
+
             # Check if zone is already abandoned
-            abandoned_until = self.emergency_attempts[zone_num].get('abandoned_until')
-            if abandoned_until and datetime.now() < abandoned_until:
-                return True
-            
-            attempts = self.emergency_attempts[zone_num]['attempts']
+            abandoned_until = zone_data.get('abandoned_until')
+            if abandoned_until:
+                if abandoned_until == datetime.max:
+                    # Permanent lockout — requires manual reset
+                    return True
+                if datetime.now() < abandoned_until:
+                    return True
+                # Lockout expired — clear it but keep the count
+                zone_data['abandoned_until'] = None
+                self.log(f"🔓 Zone {zone_num}: Emergency lockout expired (count={zone_data['abandonment_count']})")
+
+            attempts = zone_data['attempts']
             now = datetime.now()
-            
+
             # Look for recent attempts (last 30 minutes)
             recent_cutoff = now - timedelta(minutes=30)
-            recent_attempts = [attempt for attempt in attempts if attempt[0] > recent_cutoff]
-            
-            # If we've had 4+ emergency shots in 30 minutes, consider abandoning
+            recent_attempts = [a for a in attempts if a[0] > recent_cutoff]
+
+            # If we've had 4+ emergency shots in 30 minutes, escalate
             if len(recent_attempts) >= 4:
-                self.log(f"🚫 Zone {zone_num}: {len(recent_attempts)} emergency shots in 30min - likely blocked dripper")
-                
-                # Abandon for 2 hours
-                self.emergency_attempts[zone_num]['abandoned_until'] = now + timedelta(hours=2)
-                
-                # Send notification if configured
+                zone_data['abandonment_count'] = zone_data.get('abandonment_count', 0) + 1
+                count = zone_data['abandonment_count']
+
+                # Check VWC response — did any shot actually raise VWC?
+                effective_attempts = [a for a in recent_attempts if a[2] is not None]
+                if len(effective_attempts) >= 2:
+                    avg_lift = statistics.mean([a[2] - a[1] for a in effective_attempts])
+                    if avg_lift < 1.0:
+                        # Sensor not responding — set adaptive ceiling
+                        max_observed = max([a[1] for a in effective_attempts])
+                        zone_data['effective_vwc_ceiling'] = max_observed + 2.0
+                        self.log(f"📉 Zone {zone_num}: VWC not responding (avg lift {avg_lift:.1f}%), "
+                                f"setting effective ceiling to {zone_data['effective_vwc_ceiling']:.1f}%")
+
+                # Escalating backoff: 2h, 4h, 8h, then permanent
+                if count >= 4:
+                    zone_data['abandoned_until'] = datetime.max
+                    lockout_msg = "PERMANENT (manual reset required)"
+                else:
+                    hours = 2 * (2 ** (count - 1))  # 2, 4, 8
+                    zone_data['abandoned_until'] = now + timedelta(hours=hours)
+                    lockout_msg = f"{hours}h"
+
+                self.log(f"🚫 Zone {zone_num}: {len(recent_attempts)} emergency shots in 30min — "
+                        f"abandonment #{count}, lockout: {lockout_msg}")
+
+                # Notify
                 notification_service = self.config.get('notification_service')
                 if notification_service and notification_service.startswith('notify.'):
                     await self.call_service(
                         notification_service.replace('notify.', 'notify/'),
-                        message=f"⚠️ Zone {zone_num} emergency irrigation abandoned - possible blocked dripper. Will retry in 2 hours.",
+                        message=f"⚠️ Zone {zone_num} emergency abandoned (attempt #{count}). "
+                               f"Lockout: {lockout_msg}. "
+                               f"VWC ceiling: {zone_data.get('effective_vwc_ceiling', 'N/A')}%",
                         title="Crop Steering Alert"
                     )
-                
+
                 return True
-            
+
             return False
-            
+
         except Exception as e:
             self.log(f"❌ Error checking abandonment: {e}", level='ERROR')
             return False
+
+    async def _on_reset_emergency(self, event_name, data, kwargs):
+        """Handle emergency lockout reset for a zone."""
+        try:
+            zone = data.get('zone')
+            if zone and zone in self.emergency_attempts:
+                self.emergency_attempts[zone] = {
+                    'attempts': [],
+                    'abandoned_until': None,
+                    'abandonment_count': 0,
+                    'effective_vwc_ceiling': None
+                }
+                self.log(f"🔓 Zone {zone}: Emergency lockout cleared by manual reset")
+            elif not zone:
+                # Reset all zones
+                for z in self.emergency_attempts:
+                    self.emergency_attempts[z] = {
+                        'attempts': [],
+                        'abandoned_until': None,
+                        'abandonment_count': 0,
+                        'effective_vwc_ceiling': None
+                    }
+                self.log("🔓 All zones: Emergency lockouts cleared by manual reset")
+        except Exception as e:
+            self.log(f"❌ Error resetting emergency: {e}", level='ERROR')
 
     async def _on_manual_irrigation_shot(self, event_name, data, kwargs):
         """Handle manual irrigation shot service calls."""
@@ -4227,6 +4639,35 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 
         except Exception as e:
             self.log(f"❌ Error handling manual irrigation shot: {e}", level='ERROR')
+
+    async def _on_manual_override_switch_change(self, entity, attribute, old, new, kwargs):
+        """Handle manual override switch toggled in HA UI."""
+        try:
+            # Extract zone number from entity_id: switch.zone_3_manual_override
+            import re
+            match = re.search(r'zone_(\d+)_manual_override', entity)
+            if not match:
+                return
+            zone = int(match.group(1))
+
+            if new == 'on':
+                self.log(f"🛑 Zone {zone} manual override ENABLED via HA switch")
+                self.manual_overrides[zone].update({
+                    'timeout_handle': None,
+                    'enabled_time': datetime.now(),
+                    'timeout_minutes': None  # Permanent until toggled off
+                })
+            elif new == 'off':
+                self.log(f"🔓 Zone {zone} manual override DISABLED via HA switch")
+                if self.manual_overrides[zone]['timeout_handle']:
+                    self.cancel_timer(self.manual_overrides[zone]['timeout_handle'])
+                self.manual_overrides[zone].update({
+                    'timeout_handle': None,
+                    'enabled_time': None,
+                    'timeout_minutes': None
+                })
+        except Exception as e:
+            self.log(f"❌ Error handling manual override switch change: {e}", level='ERROR')
 
     async def _on_manual_override_event(self, event_name, data, kwargs):
         """Handle manual override events with timeout functionality."""
@@ -4336,7 +4777,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Turn off the manual override switch
             await self.call_service('switch/turn_off', 
-                                   entity_id=f"switch.crop_steering_zone_{zone}_manual_override")
+                                   entity_id=f"switch.zone_{zone}_manual_override")
             
             # Update tracking
             self.manual_overrides[zone].update({
@@ -4380,19 +4821,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 self.log(f"❌ Invalid phase: {target_phase}", level='ERROR')
                 return
             
-            # Transition all zones to the new phase
-            for zone_num, machine in self.zone_state_machines.items():
-                if forced:
-                    # Force transition regardless of conditions
-                    machine.force_phase(phase_map[target_phase])
-                    self.log(f"Zone {zone_num}: Forced transition to {target_phase}")
-                else:
-                    # Try normal transition
-                    success = machine.try_transition_to(phase_map[target_phase])
-                    if success:
-                        self.log(f"Zone {zone_num}: Transitioned to {target_phase}")
-                    else:
-                        self.log(f"Zone {zone_num}: Could not transition to {target_phase} - conditions not met", level='WARNING')
+            # Transition all zones to the new phase and set manual hold
+            hold_until = datetime.now() + timedelta(hours=2)
+            for zone_num in list(self.zone_state_machines.keys()):
+                await self._transition_zone_to_phase(zone_num, target_phase, reason)
+                self.manual_phase_hold[zone_num] = hold_until
+
+            self.log(f"🔒 Manual phase hold active until {hold_until.strftime('%H:%M')} (2 hours)")
             
         except Exception as e:
             self.log(f"❌ Error handling phase transition service: {e}", level='ERROR')
@@ -4459,7 +4894,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _get_zone_group(self, zone_num: int) -> str:
         """Get zone group from integration entity."""
         try:
-            group_entity = f"select.crop_steering_zone_{zone_num}_group"
+            group_entity = f"select.zone_{zone_num}_group"
             group_state = self.get_entity_value(group_entity)
             
             if group_state and group_state not in ['unknown', 'unavailable']:
@@ -4476,7 +4911,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _get_zone_priority(self, zone_num: int) -> str:
         """Get zone priority from integration entity."""
         try:
-            priority_entity = f"select.crop_steering_zone_{zone_num}_priority"
+            priority_entity = f"select.zone_{zone_num}_priority"
             priority_state = self.get_entity_value(priority_entity)
             
             if priority_state and priority_state not in ['unknown', 'unavailable']:
@@ -4732,7 +5167,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'uptime_hours': (now - getattr(self, 'start_time', now)).total_seconds() / 3600,
                 'total_zones': self.num_zones,
                 'active_zones': len([z for z in range(1, self.num_zones + 1) 
-                                   if self._get_switch_state(f"switch.crop_steering_zone_{z}_enabled", True)]),
+                                   if self._get_switch_state(f"switch.zone_{z}_enabled", True)]),
                 'zones_irrigating': len([z for z in range(1, self.num_zones + 1) 
                                        if self._is_zone_irrigating(z)]),
                 'system_health_score': self._calculate_system_health_score()
@@ -4880,17 +5315,21 @@ class MasterCropSteeringApp(BaseAsyncApp):
             ec_sensors_online = 0
             ec_sensors_total = len(self.config['sensors']['ec'])
             
-            # Check VWC sensor status
+            # Check VWC sensor status (use fusion cache, not get_state)
             for sensor in self.config['sensors']['vwc']:
-                state = self.get_entity_value(sensor)
-                if state not in ['unknown', 'unavailable', None]:
-                    vwc_sensors_online += 1
-            
-            # Check EC sensor status
+                if (sensor in self.sensor_fusion.sensor_data and
+                        len(self.sensor_fusion.sensor_data[sensor]) > 0):
+                    last_ts = self.sensor_fusion.sensor_timestamps[sensor][-1]
+                    if (datetime.now() - last_ts).total_seconds() < 600:
+                        vwc_sensors_online += 1
+
+            # Check EC sensor status (use fusion cache, not get_state)
             for sensor in self.config['sensors']['ec']:
-                state = self.get_entity_value(sensor)
-                if state not in ['unknown', 'unavailable', None]:
-                    ec_sensors_online += 1
+                if (sensor in self.sensor_fusion.sensor_data and
+                        len(self.sensor_fusion.sensor_data[sensor]) > 0):
+                    last_ts = self.sensor_fusion.sensor_timestamps[sensor][-1]
+                    if (datetime.now() - last_ts).total_seconds() < 600:
+                        ec_sensors_online += 1
             
             vwc_availability = (vwc_sensors_online / max(vwc_sensors_total, 1)) * 100
             ec_availability = (ec_sensors_online / max(ec_sensors_total, 1)) * 100
@@ -4967,7 +5406,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         next_irrigation_hours = 1.0  # Soon for P1
                     elif zone_phase == 'P2':
                         # Based on VWC threshold
-                        threshold = self._get_number_entity_value("number.crop_steering_p2_vwc_threshold", 60.0)
+                        threshold = self._get_number_entity_value("number.p2_vwc_threshold", 60.0)
                         if zone_vwc < threshold:
                             next_irrigation_hours = 0.5  # Soon
                         else:
@@ -5012,34 +5451,43 @@ class MasterCropSteeringApp(BaseAsyncApp):
             irrig = analytics_data.get('irrigation_analytics', {})
             self.set_entity_value('sensor.crop_steering_daily_water_usage',
                           irrig.get('total_daily_water_liters', 0),
-                          attributes=irrig)
-            
+                          attributes={
+                              'friendly_name': 'Daily Water Usage',
+                              'unit_of_measurement': 'L',
+                              'icon': 'mdi:water'
+                          })
+
             # Sensor analytics entities
-            sensor = analytics_data.get('sensor_analytics', {})
+            sensor_data = analytics_data.get('sensor_analytics', {})
             self.set_entity_value('sensor.crop_steering_sensor_health',
-                          sensor.get('overall_sensor_health', 0),
-                          attributes=sensor)
-            
+                          sensor_data.get('overall_sensor_health', 0),
+                          attributes={
+                              'friendly_name': 'Sensor Health',
+                              'unit_of_measurement': '%'
+                          })
+
             # Efficiency metrics entities
             efficiency = analytics_data.get('efficiency_metrics', {})
             self.set_entity_value('sensor.crop_steering_system_efficiency',
                           efficiency.get('system_efficiency_score', 0),
-                          attributes=efficiency)
-            
+                          attributes={
+                              'friendly_name': 'System Efficiency',
+                              'unit_of_measurement': '%'
+                          })
+
             # Zone analytics entities
             zone_analytics = analytics_data.get('zone_analytics', {})
             for zone_key, zone_data in zone_analytics.items():
                 zone_num = zone_key.split('_')[1]
-                
-                # Create zone health sensor
+
                 self.set_entity_value(f'sensor.crop_steering_zone_{zone_num}_health_score',
                               zone_data.get('health_score', 0),
-                              attributes=zone_data)
-                
-                # Create zone efficiency sensor
+                              attributes={'friendly_name': f'Zone {zone_num} Health'})
+
                 self.set_entity_value(f'sensor.crop_steering_zone_{zone_num}_efficiency',
                               zone_data.get('efficiency_score', 0),
                               attributes={
+                                  'friendly_name': f'Zone {zone_num} Efficiency',
                                   'daily_water': zone_data.get('daily_water_liters', 0),
                                   'irrigation_count': zone_data.get('daily_irrigation_count', 0)
                               })
@@ -5052,11 +5500,14 @@ class MasterCropSteeringApp(BaseAsyncApp):
         try:
             health_factors = []
             
-            # Sensor availability factor
+            # Sensor availability factor (use fusion cache, not get_state)
             vwc_sensors_working = 0
             for sensor in self.config['sensors']['vwc']:
-                if self.get_entity_value(sensor) not in ['unknown', 'unavailable', None]:
-                    vwc_sensors_working += 1
+                if (sensor in self.sensor_fusion.sensor_data and
+                        len(self.sensor_fusion.sensor_data[sensor]) > 0):
+                    last_ts = self.sensor_fusion.sensor_timestamps[sensor][-1]
+                    if (datetime.now() - last_ts).total_seconds() < 600:
+                        vwc_sensors_working += 1
             sensor_health = vwc_sensors_working / max(len(self.config['sensors']['vwc']), 1)
             health_factors.append(sensor_health)
             
@@ -5193,11 +5644,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
             zone_ec = self._get_zone_ec(zone)
             
             # Get safety limits from integration entities
-            field_capacity = self._get_number_entity_value("number.crop_steering_field_capacity", 80.0)
-            max_ec_limit = self._get_number_entity_value("number.crop_steering_max_ec", 8.0)
+            field_capacity = self._get_number_entity_value("number.field_capacity", 80.0)
+            max_ec_limit = self._get_number_entity_value("number.max_ec", 8.0)
             
             # Get zone-specific daily limits
-            max_daily_volume = self._get_number_entity_value(f"number.crop_steering_zone_{zone}_max_daily_volume", 20.0)
+            max_daily_volume = self._get_number_entity_value(f"number.zone_{zone}_max_daily_volume", 20.0)
             
             # Check field capacity safety (prevent over-watering)
             if zone_vwc is not None and zone_vwc >= field_capacity:
@@ -5308,8 +5759,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
         try:
             zone_phase = self.zone_phases.get(zone, 'P2')
             
-            # P0 phase safety - should not irrigate during dryback
+            # P0 phase safety - should not irrigate during dryback UNLESS emergency
             if zone_phase == 'P0':
+                # Allow emergency irrigation even during P0
+                if zone_vwc is not None and zone_vwc < self.config['thresholds']['emergency_vwc']:
+                    self.log(f"⚠️ Zone {zone}: Emergency VWC ({zone_vwc:.1f}%) overrides P0 dryback block")
+                    return {'blocked': False}
                 return {
                     'blocked': True,
                     'reason': 'p0_phase_irrigation',
@@ -5318,7 +5773,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # P1 phase safety - check VWC not too high for progressive irrigation
             if zone_phase == 'P1' and zone_vwc is not None:
-                p1_target = self._get_number_entity_value("number.crop_steering_p1_target_vwc", 65.0)
+                p1_target = self._get_number_entity_value("number.p1_target_vwc", 65.0)
                 if zone_vwc >= p1_target + 10:  # Allow 10% buffer above target
                     return {
                         'blocked': True,
@@ -5329,7 +5784,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # P3 phase safety - check if final dryback period
             if zone_phase == 'P3':
                 # Allow emergency irrigation but warn
-                emergency_threshold = self._get_number_entity_value("number.crop_steering_p3_emergency_vwc_threshold", 45.0)
+                emergency_threshold = self._get_number_entity_value("number.p3_emergency_vwc_threshold", 45.0)
                 if zone_vwc is not None and zone_vwc > emergency_threshold + 5:  # 5% buffer
                     return {
                         'blocked': True,
@@ -5351,8 +5806,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
             for zone_num in range(1, self.num_zones + 1):
                 zone_vwc = self._get_zone_vwc(zone_num)
                 zone_ec = self._get_zone_ec(zone_num)
-                field_capacity = self._get_number_entity_value("number.crop_steering_field_capacity", 80.0)
-                max_ec_limit = self._get_number_entity_value("number.crop_steering_max_ec", 8.0)
+                field_capacity = self._get_number_entity_value("number.field_capacity", 80.0)
+                max_ec_limit = self._get_number_entity_value("number.max_ec", 8.0)
                 
                 # Calculate safety margins
                 vwc_margin = field_capacity - zone_vwc if zone_vwc else None
@@ -5406,8 +5861,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                           attributes={
                               'unsafe_zones': unsafe_zones,
                               'warning_zones': warning_zones,
-                              'safe_zones': self.num_zones - unsafe_zones - warning_zones,
-                              'zone_details': safety_status
+                              'safe_zones': self.num_zones - unsafe_zones - warning_zones
                           })
             
         except Exception as e:
