@@ -3055,6 +3055,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
 
         Uses in-memory data from listen_state callbacks (reliable) instead
         of get_state() which can't see these entities in AppDaemon.
+
+        Returns None (not the stale cached value) when the sensor appears to be
+        in a persistent outlier-rejection loop.  Using a stale low reading in
+        that scenario causes repeated irrigation shots that flood the zone.
         """
         try:
             vwc_sensors = self.config.get('sensors', {}).get('vwc', [])
@@ -3065,14 +3069,30 @@ class MasterCropSteeringApp(BaseAsyncApp):
             if not sensor_id:
                 return None
 
-            # Read from sensor fusion's cached data
-            if (sensor_id in self.sensor_fusion.sensor_data and
+            if not (sensor_id in self.sensor_fusion.sensor_data and
                     len(self.sensor_fusion.sensor_data[sensor_id]) > 0 and
                     self.sensor_fusion.sensor_types.get(sensor_id) == 'vwc'):
-                last_ts = self.sensor_fusion.sensor_timestamps[sensor_id][-1]
-                age_seconds = (datetime.now() - last_ts).total_seconds()
-                if age_seconds < 600:  # Within 10 minutes
-                    return round(self.sensor_fusion.sensor_data[sensor_id][-1], 2)
+                return None
+
+            # Guard: if the sensor has been rejecting a high proportion of its
+            # recent readings, the cached value is unreliable — return None so
+            # the caller treats this zone as having unknown VWC rather than
+            # acting on a potentially stale (and dangerously low) reading.
+            total = self.sensor_fusion.total_readings.get(sensor_id, 0)
+            rejected = self.sensor_fusion.outlier_counts.get(sensor_id, 0)
+            if total >= 20 and (rejected / total) > 0.5:
+                self.log(
+                    f"⚠️ Zone {zone_num} VWC suppressed: sensor {sensor_id} rejecting "
+                    f"{rejected}/{total} readings ({rejected/total*100:.0f}%) — "
+                    f"treating as unknown to prevent spurious irrigation",
+                    level='WARNING'
+                )
+                return None
+
+            last_ts = self.sensor_fusion.sensor_timestamps[sensor_id][-1]
+            age_seconds = (datetime.now() - last_ts).total_seconds()
+            if age_seconds < 600:  # Within 10 minutes
+                return round(self.sensor_fusion.sensor_data[sensor_id][-1], 2)
 
             return None
 
