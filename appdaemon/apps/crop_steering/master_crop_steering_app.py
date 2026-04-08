@@ -116,6 +116,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         # Switch state cache - populated by listen_state callbacks since get_state() returns None
         self.switch_state_cache = {}  # {entity_id: 'on'/'off'}
         self._last_status_snapshot = {'status': None, 'message': None}
+        self._last_emergency_check_scheduled = 0.0  # epoch seconds, for debounce
         
         # Get number of zones from integration or config
         self.num_zones = self._get_number_of_zones()
@@ -337,7 +338,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self.log(f"❌ Error publishing app status: {e}", level='ERROR')
 
     def _is_any_irrigation_hardware_on(self) -> bool:
-        """Check whether any irrigation actuator is currently ON."""
+        """Check whether any irrigation actuator is currently ON.
+
+        Uses _get_switch_state (cache-aware) so that custom-component switch
+        entities — which get_state() cannot see — are resolved correctly from
+        the listen_state-populated switch_state_cache.
+        """
         try:
             hardware = self.config.get('hardware', {})
             entities_to_check = [
@@ -348,7 +354,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             entities_to_check.extend([entity for entity in zone_valves.values() if entity])
 
             for entity_id in entities_to_check:
-                if entity_id and self.get_entity_value(entity_id) == 'on':
+                if entity_id and self._get_switch_state(entity_id, False):
                     return True
             return False
         except Exception:
@@ -526,6 +532,21 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self.listen_state(self._on_switch_state_update, f"switch.zone_{zone_num}_enabled")
             self.listen_state(self._on_switch_state_update, f"switch.zone_{zone_num}_manual_override")
             self.listen_state(self._on_zone_phase_override_change, f"select.zone_{zone_num}_phase_override")
+
+        # Listen to hardware switches so switch_state_cache is populated for them.
+        # _is_any_irrigation_hardware_on uses _get_switch_state which checks this cache first,
+        # allowing the watchdog to correctly detect hardware state for custom-component entities.
+        hardware = self.config.get('hardware', {})
+        hardware_switch_entities = [
+            hardware.get('pump_master'),
+            hardware.get('main_line'),
+        ]
+        hardware_switch_entities.extend(
+            entity for entity in hardware.get('zone_valves', {}).values() if entity
+        )
+        for hw_entity in hardware_switch_entities:
+            if hw_entity:
+                self.listen_state(self._on_switch_state_update, hw_entity)
 
         # Listen to trigger shot button events
         self.listen_event(self._on_trigger_zone_shot, 'crop_steering_trigger_zone_shot')
@@ -1323,7 +1344,21 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 # Use DIRECT VWC value for emergency check (not fusion —
                 # fusion Kalman state is shared with EC and produces bogus values)
                 self.log(f"🔍 VWC update: {entity} = {vwc_value:.1f}%")
-                self.run_in(self._run_emergency_check, 0, vwc_value=vwc_value)
+
+                # Determine which zone this sensor belongs to (0-indexed list → 1-indexed zone)
+                vwc_sensors = self.config.get('sensors', {}).get('vwc', [])
+                zone_hint = None
+                if entity in vwc_sensors:
+                    zone_hint = vwc_sensors.index(entity) + 1
+
+                # Debounce: only schedule an emergency check every 15s to prevent
+                # queue flooding (6 sensors × every ~30s was saturating the AD queue)
+                import time as _time
+                now_epoch = _time.monotonic()
+                if now_epoch - self._last_emergency_check_scheduled >= 15:
+                    self._last_emergency_check_scheduled = now_epoch
+                    self.run_in(self._run_emergency_check, 0,
+                                vwc_value=vwc_value, zone_hint=zone_hint)
                 
                 # Log significant changes
                 if fusion_result['is_outlier']:
@@ -1336,7 +1371,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
         """Helper method to run emergency check asynchronously."""
         try:
             vwc_value = kwargs.get('vwc_value', 50.0)
-            await self._check_emergency_conditions(vwc_value)
+            zone_hint = kwargs.get('zone_hint')
+            await self._check_emergency_conditions(vwc_value, zone_hint=zone_hint)
         except Exception as e:
             self.log(f"❌ Error in emergency check: {e}", level='ERROR')
 
@@ -2776,8 +2812,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
         except Exception as e:
             self.log(f"❌ Error during emergency stop: {e}", level='ERROR')
 
-    async def _check_emergency_conditions(self, fused_vwc: float):
-        """Check for emergency irrigation conditions."""
+    async def _check_emergency_conditions(self, fused_vwc: float, zone_hint: Optional[int] = None):
+        """Check for emergency irrigation conditions.
+
+        zone_hint: the zone whose sensor fired this check — used as a fallback
+        when sensor-fusion cache data is unavailable or stale.
+        """
         try:
             # Skip emergency checks during startup — sensors need time to stabilize
             startup_elapsed = (datetime.now() - self._startup_time).total_seconds()
@@ -2812,6 +2852,20 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 if time_since_last > cooldown_seconds:
                     # Use integration sensors which are working properly
                     emergency_zone = await self._select_emergency_zone_from_integration()
+
+                    # Fallback: if fusion cache has no fresh data, trust the zone whose
+                    # sensor actually fired this check — we KNOW it is low.
+                    if emergency_zone is None and zone_hint is not None:
+                        override_active, _ = self._is_zone_override_active(zone_hint)
+                        zone_enabled = self._get_switch_state(f"switch.zone_{zone_hint}_enabled", True)
+                        if not override_active and zone_enabled:
+                            self.log(
+                                f"⚠️ Fusion cache miss — falling back to triggering zone {zone_hint} "
+                                f"(VWC {fused_vwc:.1f}%)",
+                                level='WARNING'
+                            )
+                            emergency_zone = zone_hint
+
                     if emergency_zone:
                         # Check effective VWC ceiling (adaptive target for non-responding sensors)
                         ceiling = self.emergency_attempts[emergency_zone].get('effective_vwc_ceiling')
@@ -2879,10 +2933,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 if (sensor_id in self.sensor_fusion.sensor_data and
                         len(self.sensor_fusion.sensor_data[sensor_id]) > 0 and
                         self.sensor_fusion.sensor_types.get(sensor_id) == 'vwc'):
-                    # Check data freshness (within last 10 minutes)
+                    # Check data freshness — allow up to 15 min to tolerate thread-
+                    # starvation periods where callbacks are delayed but not lost.
                     last_ts = self.sensor_fusion.sensor_timestamps[sensor_id][-1]
                     age_seconds = (datetime.now() - last_ts).total_seconds()
-                    if age_seconds < 600:
+                    if age_seconds < 900:
                         vwc = self.sensor_fusion.sensor_data[sensor_id][-1]
                         zone_vwc[zone_num] = vwc
                         self.log(f"✅ Zone {zone_num} VWC: {vwc:.1f}% (age: {age_seconds:.0f}s)")
