@@ -171,52 +171,65 @@ class IntelligentSensorFusion:
     def _detect_outlier(self, sensor_id: str, value: float) -> bool:
         """
         Detect outliers using IQR method with adaptive thresholds.
-        
+
+        For VWC sensors the only true outliers are:
+          - Physically impossible values (< 0 % or > 100 %)
+          - Sudden *downward* spikes well below the recent mean (sensor dropout /
+            disconnection).
+
+        Upward VWC jumps are NEVER outliers — they are the normal irrigation
+        response.  Rejecting them and falling back to the stale pre-irrigation
+        reading causes the system to "see" a dry zone and keep irrigating.
+
         Args:
             sensor_id: Sensor identifier
             value: Current sensor value
-            
+
         Returns:
             True if value is considered an outlier
         """
-        # First check absolute bounds based on sensor type
         sensor_type = self.sensor_types.get(sensor_id, 'unknown')
+
+        # Absolute physical bounds — only hard-reject truly impossible values
         if sensor_type == 'vwc':
-            # VWC must be 0-100%
             if value < 0 or value > 100:
                 _LOGGER.warning(f"VWC value {value} outside valid range [0-100] for {sensor_id}")
                 return True
         elif sensor_type == 'ec':
-            # EC typically 0-10 mS/cm, but can go higher in extreme cases
             if value < 0 or value > 20:
                 _LOGGER.warning(f"EC value {value} outside valid range [0-20] for {sensor_id}")
                 return True
-        
+
         sensor_history = list(self.sensor_data[sensor_id])
 
-        # Need minimum data for outlier detection
+        # Need minimum history for statistics
         if len(sensor_history) < 10:
             return False
-
-        # Minimum acceptable deviation by sensor type - substrate probes have
-        # on-board calibration so normal fluctuations should never be outliers
-        sensor_type = self.sensor_types.get(sensor_id, 'unknown')
-        min_deviation = {'vwc': 5.0, 'ec': 1.0}.get(sensor_type, 3.0)
 
         data_mean = self._mean(sensor_history)
         data_std = self._std(sensor_history)
 
-        # Simple outlier: reject values more than min_deviation from recent mean
-        # This avoids the IQR trap where stable data makes bounds impossibly tight
+        # ── VWC-specific logic ────────────────────────────────────────────────
+        # An upward jump (value > mean) is physically valid: it is the substrate
+        # absorbing water after an irrigation shot.  Never classify it as an
+        # outlier regardless of magnitude.
+        if sensor_type == 'vwc' and value >= data_mean:
+            return False
+
+        # For downward deviations apply a generous dead-band before flagging.
+        # Substrate probes are stable so we use 5 % for VWC and 1 mS/cm for EC.
+        min_deviation = {'vwc': 5.0, 'ec': 1.0}.get(sensor_type, 3.0)
         if abs(value - data_mean) <= min_deviation:
             return False
 
-        # For larger deviations, use z-score (only if we have meaningful std)
+        # Downward z-score check — only flag extreme drops (sensor fault / air gap)
         if data_std > 0.01:
             z_score = abs((value - data_mean) / data_std)
-            if z_score > 4.0:  # Very extreme - 4 sigma
-                _LOGGER.debug(f"Outlier: {sensor_id} value={value:.2f}, mean={data_mean:.2f}, "
-                             f"z={z_score:.1f}")
+            if z_score > 4.0:
+                _LOGGER.debug(
+                    f"Outlier (downward spike): {sensor_id} value={value:.2f}, "
+                    f"mean={data_mean:.2f}, z={z_score:.1f}"
+                )
                 return True
 
         return False
