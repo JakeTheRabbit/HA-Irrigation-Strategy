@@ -117,6 +117,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self.switch_state_cache = {}  # {entity_id: 'on'/'off'}
         self._last_status_snapshot = {'status': None, 'message': None}
         self._last_emergency_check_scheduled = 0.0  # epoch seconds, for debounce
+        self._decision_loop_running = False  # reentrancy guard for _irrigation_decision_loop
         
         # Get number of zones from integration or config
         self.num_zones = self._get_number_of_zones()
@@ -1560,10 +1561,18 @@ class MasterCropSteeringApp(BaseAsyncApp):
 
     async def _irrigation_decision_loop(self, kwargs):
         """Main irrigation decision logic with AI integration."""
+        # Reentrancy guard: skip if a previous invocation is still running (e.g., sleeping
+        # through a 60-second irrigation shot).  Without this, the 60-second run_every timer
+        # queues a new call every minute while the current call is blocked, causing the
+        # AppDaemon queue to grow without bound.
+        if self._decision_loop_running:
+            self.log("⏭️ Decision loop already running — skipping this cycle", level='DEBUG')
+            return
         try:
+            self._decision_loop_running = True
             if not self.system_enabled:
                 return
-            
+
             with self.lock:
                 # Check phase transitions for all zones
                 await self._check_all_zone_phase_transitions()
@@ -1609,9 +1618,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 
                 # Update performance tracking
                 await self._update_decision_tracking(current_state, decision)
-                
+
         except Exception as e:
             self.log(f"❌ Error in irrigation decision loop: {e}", level='ERROR')
+        finally:
+            self._decision_loop_running = False
 
     async def _get_current_system_state(self) -> Optional[Dict]:
         """Get comprehensive current system state."""
@@ -3871,19 +3882,37 @@ class MasterCropSteeringApp(BaseAsyncApp):
         """Determine if zone should transition to P3 (start final dryback period)."""
         try:
             now = datetime.now()
+
+            # Startup grace period — dryback detector has no history immediately after
+            # restart and will return a near-zero rate, causing hours_needed to be
+            # hundreds of hours and triggering an instant P3 transition for every zone.
+            startup_elapsed = (now - self._startup_time).total_seconds()
+            if startup_elapsed < 600:  # 10-minute grace period
+                return False
+
             zone_vwc = self._get_zone_vwc(zone_num)
             if zone_vwc is None:
                 return False
-            
+
+            # Never go to P3 while the zone is in an emergency VWC state.
+            emergency_threshold = self.config['thresholds']['emergency_vwc']
+            if zone_vwc < emergency_threshold:
+                self.log(
+                    f"🛑 Zone {zone_num}: Blocking P3 transition — VWC {zone_vwc:.1f}% "
+                    f"is below emergency threshold {emergency_threshold}%",
+                    level='WARNING'
+                )
+                return False
+
             # Calculate hours until next lights-on
             next_lights_on = datetime.combine(datetime.today(), lights_on_time)
             if next_lights_on <= now:
                 next_lights_on += timedelta(days=1)
             hours_until_lights_on = (next_lights_on - now).total_seconds() / 3600
-            
+
             # Get target dryback for overnight
             target_dryback = self._get_number_entity_value("number.vegetative_dryback_target", 50)
-            
+
             # Get ML-predicted dryback rate for this zone
             predicted_dryback_rate = await self._get_zone_dryback_rate(zone_num)
             if not predicted_dryback_rate or predicted_dryback_rate <= 0:
@@ -3893,7 +3922,19 @@ class MasterCropSteeringApp(BaseAsyncApp):
 
             # Calculate how many hours needed to achieve target dryback
             hours_needed_for_dryback = target_dryback / predicted_dryback_rate
-            
+
+            # Sanity check: if the model says we need more than 12 hours to dry back,
+            # the dryback rate is unreliable (e.g., freshly-started detector with no
+            # history returning a near-zero rate).  Refuse the transition rather than
+            # immediately locking all zones into P3.
+            if hours_needed_for_dryback > 12:
+                self.log(
+                    f"⚠️ Zone {zone_num}: P3 suppressed — dryback rate {predicted_dryback_rate:.3f}%/h "
+                    f"implies {hours_needed_for_dryback:.0f}h needed (implausible, likely no detector history yet)",
+                    level='WARNING'
+                )
+                return False
+
             # If we've reached the point where we need to start drying back
             if hours_until_lights_on <= hours_needed_for_dryback:
                 self.log(f"🎯 Zone {zone_num}: Time to start P3 dryback. "
@@ -3901,7 +3942,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         f"({predicted_dryback_rate:.2f}%/h rate), "
                         f"have {hours_until_lights_on:.1f}h until lights on")
                 return True
-            
+
             # Also check if zone just got irrigated and won't need water again before morning
             zone_data = self.zone_phase_data.get(zone_num, {})
             if zone_data.get('last_irrigation_time'):
@@ -3911,15 +3952,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     p2_threshold = self._get_number_entity_value("number.p2_vwc_threshold", 60)
                     vwc_buffer = zone_vwc - p2_threshold
                     hours_until_dry = vwc_buffer / predicted_dryback_rate if predicted_dryback_rate > 0 else 999
-                    
+
                     if hours_until_dry >= hours_until_lights_on:
                         self.log(f"💧 Zone {zone_num}: Last P2 irrigation complete. "
                                 f"VWC {zone_vwc:.1f}% will last {hours_until_dry:.1f}h until threshold. "
                                 f"Starting P3 dryback period.")
                         return True
-            
+
             return False
-            
+
         except Exception as e:
             self.log(f"❌ Error checking zone {zone_num} P3 transition: {e}", level='ERROR')
             return False
@@ -4099,12 +4140,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
     async def _add_ml_training_sample(self, decision: Dict, irrigation_result: Dict):
         """Add irrigation result to ML training data."""
         try:
-            if irrigation_result['status'] != 'completed':
+            if irrigation_result.get('status') != 'completed':
                 return
-            
+
+            pre_vwc = irrigation_result.get('pre_vwc')
+            post_vwc = irrigation_result.get('post_vwc')
+
             # Prepare features (simplified)
             features = {
-                'current_vwc': irrigation_result.get('pre_vwc', 50),
+                'current_vwc': pre_vwc if pre_vwc is not None else 50,
                 'irrigation_efficiency': irrigation_result.get('efficiency', 0.5),
                 'duration': irrigation_result.get('duration_actual', 30),
                 'decision_confidence': decision.get('confidence', 0.5)
@@ -4120,8 +4164,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Add training sample
             result = self.ml_predictor.add_training_sample(features, outcome)
             
-            if result['status'] == 'retrained':
-                performance = result['performance']['ensemble']['r2']
+            if result.get('status') == 'retrained':
+                performance = result.get('performance', {}).get('ensemble', {}).get('r2', 0)
                 self.log(f"🎓 ML models retrained - R² performance: {performance:.3f}")
             
         except Exception as e:
@@ -4130,7 +4174,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
     async def _update_crop_profile_performance(self, irrigation_result: Dict):
         """Update crop profile with irrigation performance data."""
         try:
-            if irrigation_result['status'] != 'completed':
+            if irrigation_result.get('status') != 'completed':
                 return
             
             # Prepare performance data
