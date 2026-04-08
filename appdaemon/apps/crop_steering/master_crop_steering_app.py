@@ -2838,7 +2838,19 @@ class MasterCropSteeringApp(BaseAsyncApp):
 
             if fused_vwc and fused_vwc < self.config['thresholds']['emergency_vwc']:
                 self.log(f"🚨 Emergency VWC condition: {fused_vwc:.1f}%", level='WARNING')
-                
+
+                # If the triggering zone is already in P1 (ramp-up), the decision loop
+                # is actively irrigating it — no need for a separate emergency override.
+                if zone_hint is not None:
+                    machine = self.zone_state_machines.get(zone_hint)
+                    if machine and machine.state.current_phase == IrrigationPhase.P1_RAMP_UP:
+                        self.log(
+                            f"ℹ️ Zone {zone_hint} VWC {fused_vwc:.1f}% is low but zone is in P1 "
+                            f"— letting P1 ramp-up handle it",
+                            level='INFO'
+                        )
+                        return
+
                 # Check if system is enabled and auto irrigation is enabled
                 system_enabled = self._get_switch_state("switch.system_enabled", True)
                 auto_irrigation_enabled = self._get_switch_state("switch.auto_irrigation_enabled", True)
