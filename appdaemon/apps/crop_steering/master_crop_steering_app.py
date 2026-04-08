@@ -118,6 +118,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self._last_status_snapshot = {'status': None, 'message': None}
         self._last_emergency_check_scheduled = 0.0  # epoch seconds, for debounce
         self._decision_loop_running = False  # reentrancy guard for _irrigation_decision_loop
+        # Tracks zones currently running on a neighbour's sensor.
+        # {zone_num: {'since': datetime, 'fallback_zone': int, 'reason': str}}
+        self._zone_sensor_failover: Dict[int, Dict] = {}
         
         # Get number of zones from integration or config
         self.num_zones = self._get_number_of_zones()
@@ -3056,49 +3059,152 @@ class MasterCropSteeringApp(BaseAsyncApp):
         Uses in-memory data from listen_state callbacks (reliable) instead
         of get_state() which can't see these entities in AppDaemon.
 
-        Returns None (not the stale cached value) when the sensor appears to be
-        in a persistent outlier-rejection loop.  Using a stale low reading in
-        that scenario causes repeated irrigation shots that flood the zone.
+        When the zone's own sensor is unavailable (stale or persistent outlier
+        rejection), the method automatically falls back to the nearest adjacent
+        zone's reading so irrigation can continue safely.  A one-time HA
+        notification is fired when failover starts and again when it clears.
         """
         try:
             vwc_sensors = self.config.get('sensors', {}).get('vwc', [])
             sensor_idx = zone_num - 1
-            if sensor_idx >= len(vwc_sensors):
-                return None
-            sensor_id = vwc_sensors[sensor_idx]
-            if not sensor_id:
-                return None
+            sensor_id = vwc_sensors[sensor_idx] if sensor_idx < len(vwc_sensors) else None
 
+            own_vwc = self._read_sensor_vwc(sensor_id) if sensor_id else None
+            failover_reason = None
+
+            if own_vwc is None and sensor_id:
+                # Decide why it failed
+                total = self.sensor_fusion.total_readings.get(sensor_id, 0)
+                rejected = self.sensor_fusion.outlier_counts.get(sensor_id, 0)
+                if total >= 20 and (rejected / total) > 0.5:
+                    failover_reason = (
+                        f"sensor rejecting {rejected}/{total} readings "
+                        f"({rejected/total*100:.0f}%)"
+                    )
+                else:
+                    failover_reason = "sensor stale or no data"
+
+            if own_vwc is not None:
+                # Sensor healthy — clear any active failover for this zone
+                if zone_num in self._zone_sensor_failover:
+                    prev = self._zone_sensor_failover.pop(zone_num)
+                    duration_min = (datetime.now() - prev['since']).total_seconds() / 60
+                    self.log(
+                        f"✅ Zone {zone_num} sensor restored after {duration_min:.0f} min "
+                        f"(was using Zone {prev['fallback_zone']} as proxy)",
+                        level='WARNING'
+                    )
+                    self.run_in(
+                        self._send_sensor_alert, 0,
+                        zone_num=zone_num,
+                        message=(
+                            f"Zone {zone_num} (Table {zone_num}) sensor restored — "
+                            f"back to own readings after {duration_min:.0f} min on "
+                            f"Zone {prev['fallback_zone']} proxy."
+                        ),
+                        title=f"✅ Zone {zone_num} Sensor Restored"
+                    )
+                return own_vwc
+
+            # ── Sensor unavailable — try adjacent zones ───────────────────────
+            fallback_vwc = None
+            fallback_zone = None
+            for candidate in [zone_num - 1, zone_num + 1]:
+                if candidate < 1 or candidate > self.num_zones:
+                    continue
+                candidate_sensors = self.config.get('sensors', {}).get('vwc', [])
+                candidate_id = (candidate_sensors[candidate - 1]
+                                if (candidate - 1) < len(candidate_sensors) else None)
+                if not candidate_id:
+                    continue
+                candidate_vwc = self._read_sensor_vwc(candidate_id)
+                if candidate_vwc is not None:
+                    fallback_vwc = candidate_vwc
+                    fallback_zone = candidate
+                    break
+
+            # Fire a notification the first time we enter failover
+            if zone_num not in self._zone_sensor_failover:
+                self._zone_sensor_failover[zone_num] = {
+                    'since': datetime.now(),
+                    'fallback_zone': fallback_zone,
+                    'reason': failover_reason,
+                }
+                proxy_msg = (
+                    f"Using Zone {fallback_zone} as proxy."
+                    if fallback_zone else
+                    "No adjacent sensor available — irrigation paused for this zone."
+                )
+                self.log(
+                    f"🚨 Zone {zone_num} sensor DOWN ({failover_reason}). {proxy_msg}",
+                    level='WARNING'
+                )
+                self.run_in(
+                    self._send_sensor_alert, 0,
+                    zone_num=zone_num,
+                    message=(
+                        f"Zone {zone_num} (Table {zone_num}) sensor failed: {failover_reason}. "
+                        f"{proxy_msg} Check the sensor and substrate."
+                    ),
+                    title=f"⚠️ Zone {zone_num} Sensor Down"
+                )
+            else:
+                # Update the fallback zone in case it changed
+                self._zone_sensor_failover[zone_num]['fallback_zone'] = fallback_zone
+
+            if fallback_vwc is not None:
+                self.log(
+                    f"🔀 Zone {zone_num} using Zone {fallback_zone} VWC "
+                    f"({fallback_vwc:.1f}%) as proxy",
+                    level='INFO'
+                )
+            return fallback_vwc
+
+        except Exception as e:
+            self.log(f"❌ Error getting zone {zone_num} VWC: {e}", level='ERROR')
+            return None
+
+    def _read_sensor_vwc(self, sensor_id: str) -> float | None:
+        """Read a single VWC sensor from the fusion cache.
+
+        Returns the cached value if fresh and not in an outlier-rejection loop,
+        otherwise None.
+        """
+        try:
             if not (sensor_id in self.sensor_fusion.sensor_data and
                     len(self.sensor_fusion.sensor_data[sensor_id]) > 0 and
                     self.sensor_fusion.sensor_types.get(sensor_id) == 'vwc'):
                 return None
 
-            # Guard: if the sensor has been rejecting a high proportion of its
-            # recent readings, the cached value is unreliable — return None so
-            # the caller treats this zone as having unknown VWC rather than
-            # acting on a potentially stale (and dangerously low) reading.
+            # Reject if the sensor is stuck in an outlier loop
             total = self.sensor_fusion.total_readings.get(sensor_id, 0)
             rejected = self.sensor_fusion.outlier_counts.get(sensor_id, 0)
             if total >= 20 and (rejected / total) > 0.5:
-                self.log(
-                    f"⚠️ Zone {zone_num} VWC suppressed: sensor {sensor_id} rejecting "
-                    f"{rejected}/{total} readings ({rejected/total*100:.0f}%) — "
-                    f"treating as unknown to prevent spurious irrigation",
-                    level='WARNING'
-                )
                 return None
 
             last_ts = self.sensor_fusion.sensor_timestamps[sensor_id][-1]
             age_seconds = (datetime.now() - last_ts).total_seconds()
-            if age_seconds < 600:  # Within 10 minutes
+            if age_seconds < 600:
                 return round(self.sensor_fusion.sensor_data[sensor_id][-1], 2)
 
             return None
-
-        except Exception as e:
-            self.log(f"❌ Error getting zone {zone_num} VWC: {e}", level='ERROR')
+        except Exception:
             return None
+
+    async def _send_sensor_alert(self, kwargs):
+        """Send a HA notification for a sensor failure or recovery event."""
+        try:
+            zone_num = kwargs.get('zone_num')
+            message = kwargs.get('message', f'Zone {zone_num} sensor alert')
+            title = kwargs.get('title', f'Crop Steering — Zone {zone_num}')
+            notification_service = self.config.get(
+                'notification_service', 'notify.persistent_notification'
+            )
+            service_path = notification_service.replace('.', '/', 1)
+            await self.call_service(service_path, title=title, message=message)
+            self.log(f"📱 Notification sent: {title}")
+        except Exception as e:
+            self.log(f"❌ Error sending sensor alert: {e}", level='ERROR')
 
     def _get_number_entity_value(self, entity_id: str, default: float) -> float:
         """Get value from number entity with robust error handling."""
