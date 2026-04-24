@@ -20,7 +20,7 @@ script:
   # Opens one table valve for irrigation_irrigate_duration_sec seconds.
   # Infrastructure solenoids (mains/mainline/manifold) must already be open.
   irrigation_run_table:
-    alias: "GW Run Table"
+    alias: "Irrigation Run Table"
     icon: mdi:water
     fields:
       table_valve:
@@ -56,7 +56,7 @@ script:
   # ── FULL IRRIGATION CYCLE ─────────────────────────────────────────────────
   # Opens infrastructure, cycles all enabled tables, closes infrastructure.
   irrigation_run_irrigation_cycle:
-    alias: "GW Run Irrigation Cycle"
+    alias: "Irrigation Run Irrigation Cycle"
     icon: mdi:water-sync
     description: >
       Opens mainline (pump auto-starts via pressure switch) then runs each
@@ -191,7 +191,7 @@ automation:
 
   # ── SCHEDULED IRRIGATION ──────────────────────────────────────────────────
   - id: irrigation_irrigation_scheduler
-    alias: "GW Irrigation Scheduler"
+    alias: "Irrigation Scheduler"
     description: >
       Triggers irrigation cycle every irrigation_irrigate_interval_min minutes
       while irrigation_irrigation_allowed is true.
@@ -221,7 +221,7 @@ automation:
 
   # ── ABORT ON LEAK ─────────────────────────────────────────────────────────
   - id: irrigation_abort_on_leak
-    alias: "GW Abort On Leak"
+    alias: "Irrigation Abort On Leak"
     description: "Immediately close all valves when a leak is detected"
     trigger:
       - trigger: state
@@ -235,7 +235,7 @@ automation:
 
   # ── ABORT ON TANK LOW ─────────────────────────────────────────────────────
   - id: irrigation_abort_on_tank_low
-    alias: "GW Abort On Tank Low"
+    alias: "Irrigation Abort On Tank Low"
     description: "Close all valves and disable pack when tank runs low"
     trigger:
       - trigger: state
@@ -256,13 +256,13 @@ automation:
             - switch.irrigation_manifold
       - action: script.irrigation_send_alert
         data:
-          title: "⚠️ GW Tank Low"
+          title: "⚠️ Irrigation Tank Low"
           message: "Nutrient tank is low – irrigation suspended."
           level: "warning"
 
   # ── MAINTENANCE MODE NOTICE ───────────────────────────────────────────────
   - id: irrigation_maintenance_mode_activated
-    alias: "GW Maintenance Mode Activated"
+    alias: "Irrigation Maintenance Mode Activated"
     trigger:
       - trigger: state
         entity_id: input_boolean.irrigation_maintenance_mode
@@ -283,6 +283,6 @@ automation:
             - switch.irrigation_manifold
       - action: script.irrigation_send_alert
         data:
-          title: "🔧 GW Maintenance Mode ON"
+          title: "🔧 Irrigation Maintenance Mode ON"
           message: "Irrigation suspended for maintenance. All valves closed."
           level: "warning"

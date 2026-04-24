@@ -15,7 +15,7 @@
 automation:
   # ── DEHUMIDIFIER CONTROL ──────────────────────────────────────────────────
   - id: irrigation_dehumidifier_on
-    alias: "GW Dehumidifier On"
+    alias: "Irrigation Dehumidifier On"
     description: "Turn on dehumidifiers when RH exceeds target + 5 %"
     trigger:
       - trigger: template
@@ -53,7 +53,7 @@ automation:
           entity_id: switch.irrigation_dehumidifier_relay_4
 
   - id: irrigation_dehumidifier_off
-    alias: "GW Dehumidifier Off"
+    alias: "Irrigation Dehumidifier Off"
     description: "Turn off dehumidifiers when RH drops to target - 2 %"
     trigger:
       - trigger: template
@@ -74,7 +74,7 @@ automation:
 
   # ── HUMIDIFIER CONTROL ────────────────────────────────────────────────────
   - id: irrigation_humidifier_on
-    alias: "GW Humidifier On"
+    alias: "Irrigation Humidifier On"
     description: "Turn on humidifier when RH drops below target - 5 %"
     trigger:
       - trigger: template
@@ -97,7 +97,7 @@ automation:
           entity_id: switch.irrigation_humidifier
 
   - id: irrigation_humidifier_off
-    alias: "GW Humidifier Off"
+    alias: "Irrigation Humidifier Off"
     description: "Turn off humidifier when RH reaches target + 2 %"
     trigger:
       - trigger: template
@@ -116,7 +116,7 @@ automation:
   # Strategy: when CO2 < 1100, inject in 5-min interval pulses until 1400.
   #           If CO2 > 1800, emergency shutoff.
   - id: irrigation_co2_pulsed_inject
-    alias: "GW CO2 Pulsed Injection"
+    alias: "Irrigation CO2 Pulsed Injection"
     description: "Inject CO2 in 5-min interval pulses when below 1100, target 1400"
     trigger:
       - trigger: numeric_state
@@ -162,7 +162,7 @@ automation:
 
   # Emergency shutoff at 1800 ppm
   - id: irrigation_co2_emergency_off
-    alias: "GW CO2 Emergency Off at 1800 ppm"
+    alias: "Irrigation CO2 Emergency Off at 1800 ppm"
     description: "Force close CO2 solenoid when CO2 exceeds 1800 ppm"
     trigger:
       - trigger: numeric_state
@@ -183,7 +183,7 @@ automation:
 
   # Safety: always close CO2 at lights-off
   - id: irrigation_co2_lights_off_stop
-    alias: "GW CO2 Off at Lights Off"
+    alias: "Irrigation CO2 Off at Lights Off"
     trigger:
       - trigger: state
         entity_id: binary_sensor.irrigation_lights_on
@@ -195,7 +195,7 @@ automation:
 
   # ── HIGH TEMPERATURE ALERT ────────────────────────────────────────────────
   - id: irrigation_high_temp_alert
-    alias: "GW High Temp Alert"
+    alias: "Irrigation High Temp Alert"
     trigger:
       - trigger: numeric_state
         entity_id: sensor.irrigation_room_1_temp
@@ -205,7 +205,7 @@ automation:
     action:
       - action: script.irrigation_send_alert
         data:
-          title: "🌡️ GW High Temp"
+          title: "🌡️ Irrigation High Temp"
           message: >
             Room 1 temperature is {{ states('sensor.irrigation_room_1_temp') }}°C
             (alert threshold: {{ states('input_number.irrigation_temp_high_alert') }}°C).
@@ -213,7 +213,7 @@ automation:
 
   # ── HIGH RH ALERT ─────────────────────────────────────────────────────────
   - id: irrigation_high_rh_alert
-    alias: "GW High RH Alert"
+    alias: "Irrigation High RH Alert"
     trigger:
       - trigger: numeric_state
         entity_id: sensor.irrigation_room_1_rh
@@ -223,7 +223,7 @@ automation:
     action:
       - action: script.irrigation_send_alert
         data:
-          title: "💧 GW High RH"
+          title: "💧 Irrigation High RH"
           message: >
             Room 1 RH is {{ states('sensor.irrigation_room_1_rh') }}%
             (alert threshold: {{ states('input_number.irrigation_rh_high_alert') }}%).
@@ -231,7 +231,7 @@ automation:
 
   # ── CO2 ALERTS ────────────────────────────────────────────────────────────
   - id: irrigation_co2_too_high_alert
-    alias: "GW CO2 Too High Alert"
+    alias: "Irrigation CO2 Too High Alert"
     trigger:
       - trigger: numeric_state
         entity_id: sensor.irrigation_room_1_co2
@@ -244,7 +244,7 @@ automation:
           entity_id: switch.irrigation_co2
       - action: script.irrigation_send_alert
         data:
-          title: "⚠️ GW CO2 Too High"
+          title: "⚠️ Irrigation CO2 Too High"
           message: >
             Room 1 CO2 is {{ states('sensor.irrigation_room_1_co2') }} ppm
             (alert threshold: {{ states('input_number.irrigation_co2_high_alert') }} ppm).
@@ -252,7 +252,7 @@ automation:
           level: "critical"
 
   - id: irrigation_co2_too_low_alert
-    alias: "GW CO2 Too Low Alert"
+    alias: "Irrigation CO2 Too Low Alert"
     trigger:
       - trigger: numeric_state
         entity_id: sensor.irrigation_room_1_co2
@@ -266,7 +266,7 @@ automation:
     action:
       - action: script.irrigation_send_alert
         data:
-          title: "⚠️ GW CO2 Low"
+          title: "⚠️ Irrigation CO2 Low"
           message: >
             Room 1 CO2 is {{ states('sensor.irrigation_room_1_co2') }} ppm —
             check CO2 cylinder supply.

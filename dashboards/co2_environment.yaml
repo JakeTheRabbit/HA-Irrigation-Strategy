@@ -46,7 +46,7 @@ views:
               only.
 
 
-              **Enable**: `GW CO2 Enabled` must be ON. Independent of irrigation
+              **Enable**: `Irrigation CO2 Enabled` must be ON. Independent of irrigation
               and environment.
 
 
@@ -69,7 +69,7 @@ views:
               night target is for your reference / future use.
 
 
-              **Enable**: `GW Environment Enabled` must be ON. Independent of
+              **Enable**: `Irrigation Environment Enabled` must be ON. Independent of
               irrigation and CO2.
 
 
@@ -81,13 +81,13 @@ views:
 
               | System | Enable Flag | What It Controls |
               |--------|------------|-----------------|
-              | CO2 | `GW CO2 Enabled` | CO2 solenoid injection |
-              | Environment | `GW Environment Enabled` | Dehumidifiers, humidifier |
-              | GW Irrigation | `GW Irrigation Enabled` | Timer-based table watering |
+              | CO2 | `Irrigation CO2 Enabled` | CO2 solenoid injection |
+              | Environment | `Irrigation Environment Enabled` | Dehumidifiers, humidifier |
+              | Irrigation | `Irrigation Enabled` | Timer-based table watering |
               | Crop Steering | `CS System Enabled` | AI-driven table watering |
 
 
-              All four are independent. `GW Master Enable` is the panic button —
+              All four are independent. `Irrigation Master Enable` is the panic button —
               the emergency stop script turns it OFF and closes all valves
               including CO2.
 
@@ -98,7 +98,7 @@ views:
               ### Maintenance Mode
 
 
-              Turning on `Maintenance Mode` blocks irrigation (both GW and CS)
+              Turning on `Maintenance Mode` blocks irrigation (both Irrigation and CS)
               and closes all valves. It does NOT automatically stop CO2 or
               environment control, but it's good practice to disable those
               manually if you're working in the room.
@@ -214,7 +214,7 @@ views:
             show_header_toggle: false
             entities:
               - entity: input_boolean.irrigation_enable
-                name: "GW Master Enable"
+                name: "Irrigation Master Enable"
                 secondary_info: "Panic button — OFF closes all valves including CO2"
               - entity: input_boolean.irrigation_maintenance_mode
                 name: "Maintenance Mode"

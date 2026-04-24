@@ -53,48 +53,48 @@
 input_boolean:
   # Master on/off for the entire irrigation pack
   irrigation_enable:
-    name: "GW Master Enable"
+    name: "Irrigation Master Enable"
     icon: mdi:power
 
-  # GW timer-based irrigation on/off (independent of CO2 and environment).
+  # Irrigation timer-based irrigation on/off (independent of CO2 and environment).
   # Turn OFF when using Crop Steering AI for irrigation instead.
   irrigation_irrigation_enabled:
-    name: "GW Irrigation Enabled"
+    name: "Irrigation Enabled"
     icon: mdi:water-sync
 
   # CO2 injection on/off (independent of irrigation and environment).
   irrigation_co2_enabled:
-    name: "GW CO2 Enabled"
+    name: "Irrigation CO2 Enabled"
     icon: mdi:molecule-co2
 
   # Temperature and humidity control on/off (independent of irrigation and CO2).
   irrigation_environment_enabled:
-    name: "GW Environment Enabled"
+    name: "Irrigation Environment Enabled"
     icon: mdi:thermometer
 
   # Suspend all irrigation without disabling sensors / alerts
   irrigation_maintenance_mode:
-    name: "GW Maintenance Mode"
+    name: "Irrigation Maintenance Mode"
     icon: mdi:wrench
 
   # Per-table enable flags - logic pack ignores disabled tables
   irrigation_table_1_enabled:
-    name: "GW Table 1 Enabled"
+    name: "Irrigation Table 1 Enabled"
     icon: mdi:numeric-1-circle
   irrigation_table_2_enabled:
-    name: "GW Table 2 Enabled"
+    name: "Irrigation Table 2 Enabled"
     icon: mdi:numeric-2-circle
   irrigation_table_3_enabled:
-    name: "GW Table 3 Enabled"
+    name: "Irrigation Table 3 Enabled"
     icon: mdi:numeric-3-circle
   irrigation_table_4_enabled:
-    name: "GW Table 4 Enabled"
+    name: "Irrigation Table 4 Enabled"
     icon: mdi:numeric-4-circle
   irrigation_table_5_enabled:
-    name: "GW Table 5 Enabled"
+    name: "Irrigation Table 5 Enabled"
     icon: mdi:numeric-5-circle
   irrigation_table_6_enabled:
-    name: "GW Table 6 Enabled"
+    name: "Irrigation Table 6 Enabled"
     icon: mdi:numeric-6-circle
 
 # ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ template:
       # ROOM 1 TEMPERATURE
       # Source: averaged Environmentals calibrated sensors (ESPHome)
       - unique_id: irrigation_room_1_temp
-        name: "GW Room 1 Temp"
+        name: "Irrigation Room 1 Temp"
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -135,7 +135,7 @@ template:
       # ROOM 1 RELATIVE HUMIDITY
       # Source: averaged Environmentals calibrated humidity sensors (ESPHome)
       - unique_id: irrigation_room_1_rh
-        name: "GW Room 1 RH"
+        name: "Irrigation Room 1 RH"
         unit_of_measurement: "%"
         device_class: humidity
         state_class: measurement
@@ -161,7 +161,7 @@ template:
       # ROOM 1 CO2
       # Source: averaged CO2 sensors (ESPHome)
       - unique_id: irrigation_room_1_co2
-        name: "GW Room 1 CO2"
+        name: "Irrigation Room 1 CO2"
         unit_of_measurement: "ppm"
         device_class: carbon_dioxide
         state_class: measurement
@@ -187,7 +187,7 @@ template:
       # ROOM 1 VPD
       # Source: averaged VPD from CO2 sensors (ESPHome)
       - unique_id: irrigation_room_1_vpd
-        name: "GW Room 1 VPD"
+        name: "Irrigation Room 1 VPD"
         unit_of_measurement: "kPa"
         state_class: measurement
         icon: mdi:leaf
@@ -216,7 +216,7 @@ template:
       # Required for: VPD-based dehumidifier targeting, AC RH guard
       # Replace 'unavailable' with real sensor entity once installed
       - unique_id: irrigation_leaf_temp
-        name: "GW Leaf Temperature"
+        name: "Irrigation Leaf Temperature"
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -242,7 +242,7 @@ template:
       #     {{ (vals | sum / vals | length) | round(1) if vals else 'unavailable' }}
       # ==============================================================
       - unique_id: irrigation_table_1_vwc
-        name: "GW Table 1 VWC"
+        name: "Irrigation Table 1 VWC"
         unit_of_measurement: "%"
         state_class: measurement
         icon: mdi:water-percent
@@ -253,7 +253,7 @@ template:
         # MAPPED - sensor.substrate_1_substrate_1_vwc_coco_coir
 
       - unique_id: irrigation_table_2_vwc
-        name: "GW Table 2 VWC"
+        name: "Irrigation Table 2 VWC"
         unit_of_measurement: "%"
         state_class: measurement
         icon: mdi:water-percent
@@ -264,7 +264,7 @@ template:
         # MAPPED - sensor.substrate_2_substrate_2_vwc_coco_coir
 
       - unique_id: irrigation_table_3_vwc
-        name: "GW Table 3 VWC"
+        name: "Irrigation Table 3 VWC"
         unit_of_measurement: "%"
         state_class: measurement
         icon: mdi:water-percent
@@ -275,7 +275,7 @@ template:
         # MAPPED - sensor.substrate_3_substrate_3_vwc_coco_coir
 
       - unique_id: irrigation_table_4_vwc
-        name: "GW Table 4 VWC"
+        name: "Irrigation Table 4 VWC"
         unit_of_measurement: "%"
         state_class: measurement
         icon: mdi:water-percent
@@ -286,7 +286,7 @@ template:
         # MAPPED - sensor.substrate_4_substrate_4_vwc_coco_coir
 
       - unique_id: irrigation_table_5_vwc
-        name: "GW Table 5 VWC"
+        name: "Irrigation Table 5 VWC"
         unit_of_measurement: "%"
         state_class: measurement
         icon: mdi:water-percent
@@ -297,7 +297,7 @@ template:
         # MAPPED - sensor.substrate_5_substrate_5_vwc_coco_coir
 
       - unique_id: irrigation_table_6_vwc
-        name: "GW Table 6 VWC"
+        name: "Irrigation Table 6 VWC"
         unit_of_measurement: "%"
         state_class: measurement
         icon: mdi:water-percent
@@ -310,7 +310,7 @@ template:
       # AVERAGE VWC (aggregate across all tables with valid readings)
       # This drives P0/P1/P2/P3 phase transitions in crop steering
       - unique_id: irrigation_average_vwc
-        name: "GW Average VWC"
+        name: "Irrigation Average VWC"
         unit_of_measurement: "%"
         state_class: measurement
         icon: mdi:water-percent
@@ -336,7 +336,7 @@ template:
       # TODO: Replace with real EC probe entity IDs
       # ==============================================================
       - unique_id: irrigation_table_1_ec
-        name: "GW Table 1 EC"
+        name: "Irrigation Table 1 EC"
         unit_of_measurement: "mS/cm"
         state_class: measurement
         icon: mdi:flash
@@ -347,7 +347,7 @@ template:
         # MAPPED - sensor.substrate_1_substrate_1_pwec
 
       - unique_id: irrigation_table_2_ec
-        name: "GW Table 2 EC"
+        name: "Irrigation Table 2 EC"
         unit_of_measurement: "mS/cm"
         state_class: measurement
         icon: mdi:flash
@@ -358,7 +358,7 @@ template:
         # MAPPED - sensor.substrate_2_substrate_2_pwec
 
       - unique_id: irrigation_table_3_ec
-        name: "GW Table 3 EC"
+        name: "Irrigation Table 3 EC"
         unit_of_measurement: "mS/cm"
         state_class: measurement
         icon: mdi:flash
@@ -369,7 +369,7 @@ template:
         # MAPPED - sensor.substrate_3_substrate_3_pwec
 
       - unique_id: irrigation_table_4_ec
-        name: "GW Table 4 EC"
+        name: "Irrigation Table 4 EC"
         unit_of_measurement: "mS/cm"
         state_class: measurement
         icon: mdi:flash
@@ -380,7 +380,7 @@ template:
         # MAPPED - sensor.substrate_4_substrate_4_pwec
 
       - unique_id: irrigation_table_5_ec
-        name: "GW Table 5 EC"
+        name: "Irrigation Table 5 EC"
         unit_of_measurement: "mS/cm"
         state_class: measurement
         icon: mdi:flash
@@ -391,7 +391,7 @@ template:
         # MAPPED - sensor.substrate_5_substrate_5_pwec
 
       - unique_id: irrigation_table_6_ec
-        name: "GW Table 6 EC"
+        name: "Irrigation Table 6 EC"
         unit_of_measurement: "mS/cm"
         state_class: measurement
         icon: mdi:flash
@@ -403,7 +403,7 @@ template:
 
       # AVERAGE EC (aggregate across all tables with valid readings)
       - unique_id: irrigation_average_ec
-        name: "GW Average EC"
+        name: "Irrigation Average EC"
         unit_of_measurement: "mS/cm"
         state_class: measurement
         icon: mdi:flash
@@ -429,7 +429,7 @@ template:
       # ==============================================================
 
       - unique_id: irrigation_table_1_substrate_temp
-        name: "GW Table 1 Substrate Temp"
+        name: "Irrigation Table 1 Substrate Temp"
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -440,7 +440,7 @@ template:
           {{ states('sensor.substrate_1_substrate_1_temperature') not in ['unknown','unavailable'] }}
 
       - unique_id: irrigation_table_2_substrate_temp
-        name: "GW Table 2 Substrate Temp"
+        name: "Irrigation Table 2 Substrate Temp"
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -451,7 +451,7 @@ template:
           {{ states('sensor.substrate_2_substrate_2_temperature') not in ['unknown','unavailable'] }}
 
       - unique_id: irrigation_table_3_substrate_temp
-        name: "GW Table 3 Substrate Temp"
+        name: "Irrigation Table 3 Substrate Temp"
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -462,7 +462,7 @@ template:
           {{ states('sensor.substrate_3_substrate_3_temperature') not in ['unknown','unavailable'] }}
 
       - unique_id: irrigation_table_4_substrate_temp
-        name: "GW Table 4 Substrate Temp"
+        name: "Irrigation Table 4 Substrate Temp"
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -473,7 +473,7 @@ template:
           {{ states('sensor.substrate_4_substrate_4_temperature') not in ['unknown','unavailable'] }}
 
       - unique_id: irrigation_table_5_substrate_temp
-        name: "GW Table 5 Substrate Temp"
+        name: "Irrigation Table 5 Substrate Temp"
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -484,7 +484,7 @@ template:
           {{ states('sensor.substrate_5_substrate_5_temperature') not in ['unknown','unavailable'] }}
 
       - unique_id: irrigation_table_6_substrate_temp
-        name: "GW Table 6 Substrate Temp"
+        name: "Irrigation Table 6 Substrate Temp"
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -496,7 +496,7 @@ template:
 
       # Raw/repurposed substrate probe passthroughs
       - unique_id: irrigation_substrate_probe_a_vwc
-        name: "GW Substrate Probe A vWC"
+        name: "Irrigation Substrate Probe A vWC"
         unit_of_measurement: "%"
         state_class: measurement
         icon: mdi:water-percent
@@ -506,7 +506,7 @@ template:
           {{ states('sensor.co2_2_substrate_3_vwc') not in ['unknown','unavailable'] }}
 
       - unique_id: irrigation_substrate_probe_a_ec
-        name: "GW Substrate Probe A EC"
+        name: "Irrigation Substrate Probe A EC"
         unit_of_measurement: "EC (ppm500)"
         state_class: measurement
         icon: mdi:flash
@@ -516,7 +516,7 @@ template:
           {{ states('sensor.co2_2_substrate_3_pwec') not in ['unknown','unavailable'] }}
 
       - unique_id: irrigation_substrate_probe_a_temp
-        name: "GW Substrate Probe A Temp"
+        name: "Irrigation Substrate Probe A Temp"
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -530,7 +530,7 @@ template:
       # Required for: Tank refill and dose pH verification
       # TODO: Replace with real pH sensor entity_id
       - unique_id: irrigation_tank_ph
-        name: "GW Tank pH"
+        name: "Irrigation Tank pH"
         state_class: measurement
         icon: mdi:flask
         state: "unavailable"
@@ -541,7 +541,7 @@ template:
       # Required for: Tank refill and dose EC verification
       # TODO: Replace with real EC sensor entity_id
       - unique_id: irrigation_tank_ec
-        name: "GW Tank EC"
+        name: "Irrigation Tank EC"
         unit_of_measurement: "mS/cm"
         state_class: measurement
         icon: mdi:flash
@@ -554,7 +554,7 @@ template:
       # LIGHTS ON STATE
       # Source: light.grow_room_all_lights (HA light group)
       - unique_id: irrigation_lights_on
-        name: "GW Lights On"
+        name: "Irrigation Lights On"
         device_class: light
         icon: mdi:lightbulb-group
         state: >
@@ -565,7 +565,7 @@ template:
       # [AUDIT] CRITICAL: irrigation_abort_on_tank_low will NEVER fire until this is
       # mapped to a real float switch sensor. Map BEFORE production deployment.
       - unique_id: irrigation_tank_low
-        name: "GW Tank Low"
+        name: "Irrigation Tank Low"
         device_class: problem
         icon: mdi:water-off
         state: >
@@ -579,7 +579,7 @@ template:
       # [AUDIT] CRITICAL: irrigation_abort_on_leak will NEVER fire until this is
       # mapped to a real leak/moisture sensor. Map BEFORE production deployment.
       - unique_id: irrigation_leak
-        name: "GW Leak Detected"
+        name: "Irrigation Leak Detected"
         device_class: moisture
         icon: mdi:water-alert
         state: >
@@ -589,7 +589,7 @@ template:
         # {{ is_state('binary_sensor.input_10', 'on') }}
 
       - unique_id: irrigation_system_ready
-        name: "GW System Ready"
+        name: "Irrigation System Ready"
         device_class: running
         icon: mdi:check-circle-outline
         state: >
@@ -605,7 +605,7 @@ template:
   - switch:
       # TABLE 1 VALVE - MAPPED to switch.table_1 (KC868 E16S Output 1)
       - unique_id: irrigation_table_1_valve
-        name: "GW Table 1 Valve"
+        name: "Irrigation Table 1 Valve"
         icon: mdi:valve
         state: >
           {{ is_state('switch.table_1', 'on') }}
@@ -622,7 +622,7 @@ template:
 
       # TABLE 2 VALVE - MAPPED to switch.table_2 (KC868 E16S Output 2)
       - unique_id: irrigation_table_2_valve
-        name: "GW Table 2 Valve"
+        name: "Irrigation Table 2 Valve"
         icon: mdi:valve
         state: >
           {{ is_state('switch.table_2', 'on') }}
@@ -639,7 +639,7 @@ template:
 
       # TABLE 3 VALVE - MAPPED to switch.table_3 (KC868 E16S Output 3)
       - unique_id: irrigation_table_3_valve
-        name: "GW Table 3 Valve"
+        name: "Irrigation Table 3 Valve"
         icon: mdi:valve
         state: >
           {{ is_state('switch.table_3', 'on') }}
@@ -656,7 +656,7 @@ template:
 
       # TABLE 4 VALVE - MAPPED to switch.table_4 (KC868 E16S Output 4)
       - unique_id: irrigation_table_4_valve
-        name: "GW Table 4 Valve"
+        name: "Irrigation Table 4 Valve"
         icon: mdi:valve
         state: >
           {{ is_state('switch.table_4', 'on') }}
@@ -673,7 +673,7 @@ template:
 
       # TABLE 5 VALVE - MAPPED to switch.table_5 (KC868 E16S Output 5)
       - unique_id: irrigation_table_5_valve
-        name: "GW Table 5 Valve"
+        name: "Irrigation Table 5 Valve"
         icon: mdi:valve
         state: >
           {{ is_state('switch.table_5', 'on') }}
@@ -690,7 +690,7 @@ template:
 
       # TABLE 6 VALVE - MAPPED to switch.table_6 (KC868 E16S Output 6)
       - unique_id: irrigation_table_6_valve
-        name: "GW Table 6 Valve"
+        name: "Irrigation Table 6 Valve"
         icon: mdi:valve
         state: >
           {{ is_state('switch.table_6', 'on') }}
@@ -707,7 +707,7 @@ template:
 
       # MAINS WATER SOLENOID - MAPPED to switch.mains_water (KC868 Output 7)
       - unique_id: irrigation_mains_water
-        name: "GW Mains Water"
+        name: "Irrigation Mains Water"
         icon: mdi:pipe-valve
         state: >
           {{ is_state('switch.mains_water', 'on') }}
@@ -724,7 +724,7 @@ template:
 
       # MAINLINE SOLENOID - MAPPED to switch.mainline (KC868 Output 8)
       - unique_id: irrigation_mainline
-        name: "GW Mainline"
+        name: "Irrigation Mainline"
         icon: mdi:pipe
         state: >
           {{ is_state('switch.mainline', 'on') }}
@@ -741,7 +741,7 @@ template:
 
       # MANIFOLD SOLENOID - MAPPED to switch.manifold (KC868 Output 9)
       - unique_id: irrigation_manifold
-        name: "GW Manifold"
+        name: "Irrigation Manifold"
         icon: mdi:pipe-disconnected
         state: >
           {{ is_state('switch.manifold', 'on') }}
@@ -758,7 +758,7 @@ template:
 
       # CO2 RELAY - MAPPED to switch.solidstate_relay_co2_1_co2_relay_1
       - unique_id: irrigation_co2
-        name: "GW CO2"
+        name: "Irrigation CO2"
         icon: mdi:molecule-co2
         state: >
           {{ is_state('switch.solidstate_relay_co2_1_co2_relay_1', 'on') }}
@@ -775,7 +775,7 @@ template:
 
       # HUMIDIFIER RELAY - MAPPED to switch.solidstate_relay_humidifier_1_humidifier_relay_1
       - unique_id: irrigation_humidifier
-        name: "GW Humidifier"
+        name: "Irrigation Humidifier"
         icon: mdi:air-humidifier
         state: >
           {{ is_state('switch.solidstate_relay_humidifier_1_humidifier_relay_1', 'on') }}
@@ -792,7 +792,7 @@ template:
 
       # DEHUMIDIFIER 1 PLUG - MAPPED to switch.dehumidifier_1_plug (TP-Link Kasa)
       - unique_id: irrigation_dehumidifier_1
-        name: "GW Dehumidifier 1"
+        name: "Irrigation Dehumidifier 1"
         icon: mdi:air-humidifier-off
         state: >
           {{ is_state('switch.dehumidifier_1_plug', 'on') }}
@@ -809,7 +809,7 @@ template:
 
       # DEHUMIDIFIER RELAY 1
       - unique_id: irrigation_dehumidifier_relay_1
-        name: "GW Dehumidifier Relay 1"
+        name: "Irrigation Dehumidifier Relay 1"
         icon: mdi:air-humidifier-off
         state: >
           {{ is_state('switch.left_dehumidifier_1_relay_1', 'on') }}
@@ -826,7 +826,7 @@ template:
 
       # DEHUMIDIFIER RELAY 2
       - unique_id: irrigation_dehumidifier_relay_2
-        name: "GW Dehumidifier Relay 2"
+        name: "Irrigation Dehumidifier Relay 2"
         icon: mdi:air-humidifier-off
         state: >
           {{ is_state('switch.left_dehumidifier_1_relay_2', 'on') }}
@@ -843,7 +843,7 @@ template:
 
       # DEHUMIDIFIER RELAY 3
       - unique_id: irrigation_dehumidifier_relay_3
-        name: "GW Dehumidifier Relay 3"
+        name: "Irrigation Dehumidifier Relay 3"
         icon: mdi:air-humidifier-off
         state: >
           {{ is_state('switch.left_dehumidifier_1_relay_3', 'on') }}
@@ -860,7 +860,7 @@ template:
 
       # DEHUMIDIFIER RELAY 4
       - unique_id: irrigation_dehumidifier_relay_4
-        name: "GW Dehumidifier Relay 4"
+        name: "Irrigation Dehumidifier Relay 4"
         icon: mdi:air-humidifier-off
         state: >
           {{ is_state('switch.left_dehumidifier_1_relay_4', 'on') }}
@@ -882,7 +882,7 @@ template:
       # Required for: Tank refill and dose automation
       # TODO: Replace 'switch.TODO_tank_fill_valve' with real entity
       - unique_id: irrigation_tank_fill_valve
-        name: "GW Tank Fill Valve"
+        name: "Irrigation Tank Fill Valve"
         icon: mdi:pipe-valve
         state: "{{ false }}"
         turn_on:
@@ -899,7 +899,7 @@ template:
       # Required for: Tank mixing during dose cycles
       # TODO: Replace 'switch.TODO_recirculation_valve' with real entity
       - unique_id: irrigation_recirculation_valve
-        name: "GW Recirculation Valve"
+        name: "Irrigation Recirculation Valve"
         icon: mdi:pipe-valve
         state: "{{ false }}"
         turn_on:
@@ -916,7 +916,7 @@ template:
       # Required for: Tank management
       # TODO: Replace with real entity
       - unique_id: irrigation_waste_valve
-        name: "GW Waste Valve"
+        name: "Irrigation Waste Valve"
         icon: mdi:pipe-valve
         state: "{{ false }}"
         turn_on:
@@ -933,7 +933,7 @@ template:
       # Required for: Night-time high CO2 exhaust
       # TODO: Replace with real entity
       - unique_id: irrigation_ceiling_vent
-        name: "GW Ceiling Vent"
+        name: "Irrigation Ceiling Vent"
         icon: mdi:fan
         state: "{{ false }}"
         turn_on:
@@ -977,28 +977,28 @@ input_text:
   # AC UNIT 1
   # TODO: Set to your real climate entity, e.g. climate.grow_room_ac_1
   irrigation_ac_unit_1:
-    name: "GW AC Unit 1 Entity ID"
+    name: "Irrigation AC Unit 1 Entity ID"
     max: 255
     initial: "climate.ac_1_ac_1_2"
     icon: mdi:air-conditioner
 
   # AC UNIT 2
   irrigation_ac_unit_2:
-    name: "GW AC Unit 2 Entity ID"
+    name: "Irrigation AC Unit 2 Entity ID"
     max: 255
     initial: "climate.ac_2_ac_2"
     icon: mdi:air-conditioner
 
   # AC UNIT 3
   irrigation_ac_unit_3:
-    name: "GW AC Unit 3 Entity ID"
+    name: "Irrigation AC Unit 3 Entity ID"
     max: 255
     initial: "climate.ac_3_ac_3"
     icon: mdi:air-conditioner
 
   # AC UNIT 4
   irrigation_ac_unit_4:
-    name: "GW AC Unit 4 Entity ID"
+    name: "Irrigation AC Unit 4 Entity ID"
     max: 255
     initial: "climate.ac_4_ac_4"
     icon: mdi:air-conditioner
@@ -1007,7 +1007,7 @@ input_text:
   # The light group entity for brightness control (light.turn_on with brightness)
   # Default matches existing binary_sensor source
   irrigation_light_group:
-    name: "GW Light Group Entity ID"
+    name: "Irrigation Light Group Entity ID"
     max: 255
     initial: "light.grow_room_all_lights"
     icon: mdi:lightbulb-group
@@ -1015,7 +1015,7 @@ input_text:
   # EXHAUST FAN SPEED (number entity for variable speed)
   # TODO: Replace with real entity - e.g. number.exhaust_fan_speed
   irrigation_exhaust_fan_speed:
-    name: "GW Exhaust Fan Speed Entity ID"
+    name: "Irrigation Exhaust Fan Speed Entity ID"
     max: 255
     initial: "number.TODO_exhaust_fan_speed"
     icon: mdi:fan
@@ -1023,7 +1023,7 @@ input_text:
   # NIGHT HEATING UNIT
   # Which AC unit is designated for night heating (set to one of irrigation_ac_unit_*)
   irrigation_night_heat_unit:
-    name: "GW Night Heating Unit Entity ID"
+    name: "Irrigation Night Heating Unit Entity ID"
     max: 255
     initial: "climate.ac_1_ac_1_2"
     icon: mdi:radiator
@@ -1031,14 +1031,14 @@ input_text:
   # DOSER MQTT TOPIC (for peristaltic dosing pump)
   # TODO: Replace with your dosing system MQTT topic
   irrigation_doser_mqtt_topic:
-    name: "GW Doser MQTT Topic"
+    name: "Irrigation Doser MQTT Topic"
     max: 255
     initial: "TODO/doser/command"
     icon: mdi:flask
 
   # DOSER SERIAL NUMBER
   irrigation_doser_serial:
-    name: "GW Doser Serial Number"
+    name: "Irrigation Doser Serial Number"
     max: 255
     initial: "TODO_SERIAL"
     icon: mdi:barcode
