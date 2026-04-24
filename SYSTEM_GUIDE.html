@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GreenWave + Crop Steering — Complete System Guide</title>
+<style>
+  :root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--blue:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149;--purple:#bc8cff;--code-bg:#1c2128;--stripe:#1c2128}
+  *{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.65;max-width:1120px;margin:0 auto;padding:2rem 1.5rem}
+  h1{font-size:2.1rem;font-weight:700;color:var(--blue);border-bottom:2px solid var(--blue);padding-bottom:.5rem;margin-bottom:.3rem}
+  .sub{color:var(--muted);font-size:.92rem;margin-bottom:2rem}
+  h2{font-size:1.45rem;font-weight:600;color:var(--green);margin-top:3rem;margin-bottom:.9rem;padding-bottom:.35rem;border-bottom:1px solid var(--border)}
+  h3{font-size:1.1rem;font-weight:600;color:var(--purple);margin-top:1.6rem;margin-bottom:.6rem}
+  h4{font-size:1rem;font-weight:600;color:var(--orange);margin-top:1.2rem;margin-bottom:.4rem}
+  p{margin-bottom:.85rem}a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}strong{color:#f0f6fc}
+  code{background:var(--code-bg);padding:.12em .38em;border-radius:4px;font-size:.87em;font-family:'SF Mono','Fira Code',monospace;color:var(--orange);word-break:break-word}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:.9rem 1.1rem;overflow-x:auto;margin:1rem 0;font-size:.87em;line-height:1.45}pre code{background:none;padding:0;color:var(--text)}
+  table{width:100%;border-collapse:collapse;margin:.9rem 0 1.3rem;font-size:.88rem}
+  th{background:var(--surface);color:var(--blue);font-weight:600;text-align:left;padding:.55rem .7rem;border:1px solid var(--border);position:sticky;top:0}
+  td{padding:.45rem .7rem;border:1px solid var(--border);vertical-align:top}tr:nth-child(even) td{background:var(--stripe)}tr:hover td{background:#1f2937}
+  ul,ol{margin:.4rem 0 .9rem 1.4rem}li{margin-bottom:.25rem}hr{border:none;border-top:1px solid var(--border);margin:2.5rem 0}
+  .toc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.1rem 1.4rem;margin:1.4rem 0 2.2rem;columns:2;column-gap:2rem}
+  .toc h2{margin-top:0;font-size:1.05rem;border:none;padding:0;column-span:all}.toc ol{margin:.4rem 0 0 1.1rem}.toc li{margin-bottom:.15rem;font-size:.9rem;break-inside:avoid}.toc a{color:var(--muted)}.toc a:hover{color:var(--blue)}
+  .box{border-radius:8px;padding:.85rem 1rem;margin:1rem 0}.warn{background:#2d1b00;border:1px solid var(--orange)}.danger{background:#2d0f0f;border:1px solid var(--red)}.info{background:#0d1f3c;border:1px solid var(--blue)}.ok{background:#0f2d1b;border:1px solid var(--green)}.unmapped{background:#2a1a2a;border:1px solid var(--purple)}
+  .phase{background:var(--surface);border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:.9rem 1.1rem;margin:1rem 0}.phase.p0{border-left-color:var(--orange)}.phase.p1{border-left-color:var(--green)}.phase.p2{border-left-color:var(--blue)}.phase.p3{border-left-color:var(--red)}.phase h3{margin-top:0}
+  .cycle{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.1rem;text-align:center;font-family:'SF Mono',monospace;font-size:.93rem;margin:1.3rem 0;overflow-x:auto;white-space:nowrap}
+  .top-btn{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--blue);color:var(--bg);width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-decoration:none;font-weight:700;font-size:1.1rem;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:.8}.top-btn:hover{opacity:1;text-decoration:none}
+  .print-btn{position:fixed;bottom:1.5rem;right:4.5rem;background:var(--green);color:var(--bg);border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.4)}.print-btn:hover{background:#4fcc60}
+  .tag{display:inline-block;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:5px;vertical-align:middle}.tag-gw{background:#1a3a2a;color:var(--green);border:1px solid var(--green)}.tag-cs{background:#0d1f3c;color:var(--blue);border:1px solid var(--blue)}.tag-both{background:#2a1a2a;color:var(--purple);border:1px solid var(--purple)}
+  @media print{body{background:#fff;color:#000;max-width:100%;padding:.5cm;font-size:10pt;line-height:1.35}h1{color:#000;border-bottom-color:#000;font-size:18pt}h2{color:#222;font-size:13pt;break-after:avoid}h3{color:#333;font-size:11pt;break-after:avoid}.sub{color:#666}a{color:#000}code{background:#f0f0f0;color:#333;border:1px solid #ddd}pre{background:#f8f8f8;border-color:#ccc}pre code{color:#000;border:none}th{background:#e8e8e8;color:#000}td{border-color:#ccc}tr:nth-child(even) td{background:#f5f5f5}tr:hover td{background:#f5f5f5}.toc{background:#f8f8f8;border-color:#ccc;break-inside:avoid}.toc a{color:#333}.phase{background:#f8f8f8}.box{border-width:1px}.warn{background:#fff8e1;border-color:#f9a825}.danger{background:#ffebee;border-color:#e53935}.info{background:#e3f2fd;border-color:#1976d2}.ok{background:#e8f5e9;border-color:#4caf50}.unmapped{background:#f3e5f5;border-color:#9c27b0}.cycle{background:#f8f8f8;border-color:#ccc}.top-btn,.print-btn{display:none}.tag{border:1px solid #999;color:#333;background:#eee}table{break-inside:auto;font-size:9pt}tr{break-inside:avoid}@page{size:A4;margin:12mm}}
+  @media(max-width:768px){body{padding:1rem}h1{font-size:1.5rem}.toc{columns:1}table{font-size:.8rem}td,th{padding:.3rem .45rem}}
+</style>
+</head>
+<body id="top">
+<button class="print-btn" onclick="window.print()">Print</button>
+<a href="#top" class="top-btn" title="Top">&uarr;</a>
+
+<h1>GreenWave + Crop Steering System Guide</h1>
+<p class="sub">Version 2.3.1 &nbsp;|&nbsp; 6-Zone Coco Coir &nbsp;|&nbsp; Athena Nutrients &nbsp;|&nbsp; GroundWork Probes &nbsp;|&nbsp; April 2026</p>
+
+<nav class="toc"><h2>Contents</h2>
+<ol>
+<li><a href="#s1">System Overview</a></li>
+<li><a href="#s2">Hardware Map</a></li>
+<li><a href="#s3">Architecture &amp; Data Flow</a></li>
+<li><a href="#s4">The Four Phases (P0&ndash;P3)</a></li>
+<li><a href="#s5">Daily Cycle</a></li>
+<li><a href="#s6">GW Time-Based Scheduler</a></li>
+<li><a href="#s7">Environment Control</a></li>
+<li><a href="#s8">Entity Reference</a></li>
+<li><a href="#s9">Configuration Files</a></li>
+<li><a href="#s10">Dashboards</a></li>
+<li><a href="#s11">Zone Management</a></li>
+<li><a href="#s12">Phase Parameters</a></li>
+<li><a href="#s13">EC Targets &amp; Ratio Logic</a></li>
+<li><a href="#s14">Per-Zone Targets</a></li>
+<li><a href="#s15">Manual Override</a></li>
+<li><a href="#s16">Emergency Irrigation</a></li>
+<li><a href="#s17">AI Heartbeat</a></li>
+<li><a href="#s18">Safety Layers</a></li>
+<li><a href="#s19">Sensor Fusion</a></li>
+<li><a href="#s20">Crop Profiles</a></li>
+<li><a href="#s21">Persistent State</a></li>
+<li><a href="#s22">Commissioning</a></li>
+<li><a href="#s23">Troubleshooting</a></li>
+<li><a href="#s24">Known Issues &amp; Unmapped Hardware</a></li>
+</ol>
+</nav>
+
+<h2 id="s1">1. System Overview</h2>
+<p>This system automates irrigation and climate control for a 6-table cannabis grow room running coco coir with Athena nutrients and GroundWork substrate probes. Two layers run simultaneously:</p>
+<div class="box ok"><h4>GreenWave Package <span class="tag tag-gw">GW</span></h4><p>Time-based irrigation scheduler (should be OFF when crop steering is active), environment control (CO2, dehumidifiers, humidifier), and safety watchdogs. Runs in HA via YAML packages at <code>/config/packages/green_wave/</code>.</p></div>
+<div class="box info"><h4>Crop Steering AI <span class="tag tag-cs">CS</span></h4><p>Sensor-driven 4-phase irrigation (P0&ndash;P3) with per-zone control, EC ratio logic, ML prediction, dryback detection, and emergency management. Runs as AppDaemon app + HA custom component. <strong>This is the active irrigation brain.</strong></p></div>
+<div class="box warn"><strong>To prevent double-watering:</strong> Set <code>input_boolean.gw_irrigation_enabled</code> to OFF when crop steering is handling irrigation. GW environment controls remain active independently.</div>
+
+<hr>
+<h2 id="s2">2. Hardware Map</h2>
+<h3>Irrigation</h3>
+<table>
+<tr><th>Component</th><th>GW Entity</th><th>Raw Entity</th><th>Physical</th></tr>
+<tr><td>Main Line</td><td><code>switch.gw_mainline</code></td><td><code>switch.mainline</code></td><td>Mainline solenoid (KC868)</td></tr>
+<tr><td>Zone 1&ndash;6 Valves</td><td><code>switch.gw_table_N_valve</code></td><td><code>switch.table_N</code></td><td>Table solenoids (KC868)</td></tr>
+<tr><td>Pump</td><td colspan="2">None &mdash; auto-start</td><td>Constant pressure switch</td></tr>
+<tr><td>Mains Water</td><td><code>switch.gw_mains_water</code></td><td><code>switch.mains_water</code></td><td>Tank fill only (NOT irrigation)</td></tr>
+<tr><td>Manifold</td><td><code>switch.gw_manifold</code></td><td><code>switch.manifold</code></td><td>Tank mixing only (NOT irrigation)</td></tr>
+</table>
+<h3>Sensors (1 probe per zone)</h3>
+<table>
+<tr><th>Zone</th><th>VWC</th><th>EC</th></tr>
+<tr><td>1&ndash;6</td><td><code>sensor.substrate_N_substrate_N_vwc_coco_coir</code></td><td><code>sensor.substrate_N_substrate_N_pwec</code></td></tr>
+</table>
+<p>GW mapping layer creates aliases: <code>sensor.gw_table_N_vwc</code> / <code>_ec</code> / <code>_substrate_temp</code>. Crop steering reads the raw entities directly.</p>
+<h3>Environment</h3>
+<table>
+<tr><th>Sensor</th><th>Entity</th><th>Source</th></tr>
+<tr><td>Room temp</td><td><code>sensor.gw_room_1_temp</code></td><td>Avg of 4 calibrated sensors</td></tr>
+<tr><td>Room RH</td><td><code>sensor.gw_room_1_rh</code></td><td>Avg of 4 sensors</td></tr>
+<tr><td>Room CO2</td><td><code>sensor.gw_room_1_co2</code></td><td>Avg of 3&ndash;4 CO2 sensors</td></tr>
+<tr><td>Room VPD</td><td><code>sensor.gw_room_1_vpd</code></td><td>Avg from CO2 sensors</td></tr>
+</table>
+<table>
+<tr><th>Device</th><th>Entity</th><th>Notes</th></tr>
+<tr><td>CO2 solenoid</td><td><code>switch.gw_co2</code></td><td>Solid state relay</td></tr>
+<tr><td>Humidifier</td><td><code>switch.gw_humidifier</code></td><td>Solid state relay</td></tr>
+<tr><td>Dehumidifier (plug)</td><td><code>switch.gw_dehumidifier_1</code></td><td>TP-Link Kasa WiFi plug</td></tr>
+<tr><td>Dehumidifier relays 1&ndash;4</td><td><code>switch.gw_dehumidifier_relay_1</code>&ndash;<code>4</code></td><td>Staggered 10s apart</td></tr>
+<tr><td>AC 1&ndash;4</td><td><code>climate.ac_*</code></td><td>IR via ESPHome. <strong>Mapped, NOT automated.</strong></td></tr>
+<tr><td>Lights</td><td><code>light.grow_room_all_lights</code></td><td>ESPHome group</td></tr>
+</table>
+<div class="box unmapped"><strong>Unmapped / not installed:</strong>
+<ul>
+<li><code>binary_sensor.gw_leak</code> &mdash; <strong>hardcoded false</strong>. Leak abort won't fire.</li>
+<li><code>binary_sensor.gw_tank_low</code> &mdash; <strong>hardcoded false</strong>. Tank-low abort won't fire.</li>
+<li>Tank pH/EC probes &mdash; unavailable</li>
+<li><code>switch.gw_waste_valve</code>, <code>switch.gw_ceiling_vent</code> &mdash; TODO placeholders</li>
+<li>AC control automations &mdash; entities mapped, no logic</li>
+</ul></div>
+
+<hr>
+<h2 id="s3">3. Architecture &amp; Data Flow</h2>
+<pre><code>Physical probes (ESPHome)
+    |
+Raw entities (sensor.substrate_N_substrate_N_vwc_coco_coir)
+    |   [10_mapping.yaml]
+GW contract entities (sensor.gw_table_N_vwc)
+    |
+    +-- crop_steering.env
+    |
+Crop Steering custom component (crop_steering_ prefixed entities)
+    |
+Home Assistant (state + events)
+    |
+AppDaemon master app (listen_state + REST API fallback)
+    |
+Hardware (valve switches via HA services)</code></pre>
+<div class="box warn"><strong>Entity naming:</strong> Custom component entities have <code>crop_steering_</code> prefix (e.g. <code>switch.crop_steering_system_enabled</code>). AppDaemon tries both prefixed and unprefixed names. Sensors created by AppDaemon use exact IDs shown.</div>
+<h3>GW Package Files</h3>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>00_core.yaml</code></td><td>Emergency stop script, alert helper</td></tr>
+<tr><td><code>10_mapping.yaml</code></td><td>Raw ESPHome &rarr; <code>gw_*</code> contract aliases</td></tr>
+<tr><td><code>20_model.yaml</code></td><td>Input helpers (schedules, targets, timers)</td></tr>
+<tr><td><code>30_irrigation.yaml</code></td><td>Time-based scheduler + abort automations</td></tr>
+<tr><td><code>40_environment.yaml</code></td><td>Dehumidifier, humidifier, CO2 automations</td></tr>
+<tr><td><code>50_alerts_watchdogs.yaml</code></td><td>Valve watchdogs, sensor alerts, safety interlocks</td></tr>
+</table>
+<h3>AppDaemon Files</h3>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>master_crop_steering_app.py</code></td><td>~5900 lines. Decision loop, phases, safety, analytics</td></tr>
+<tr><td><code>phase_state_machine.py</code></td><td>Per-zone state machine</td></tr>
+<tr><td><code>intelligent_sensor_fusion.py</code></td><td>Outlier detection, Kalman filtering</td></tr>
+<tr><td><code>advanced_dryback_detection.py</code></td><td>Peak detection, rate prediction</td></tr>
+<tr><td><code>intelligent_crop_profiles.py</code></td><td>Strain profiles, adaptive learning</td></tr>
+<tr><td><code>ml_irrigation_predictor.py</code></td><td>Pure-math ML predictor</td></tr>
+</table>
+
+<hr>
+<h2 id="s4">4. The Four Phases <span class="tag tag-cs">CS</span></h2>
+<p>Each zone runs independently. Phases advance on sensor readings.</p>
+<div class="phase p0"><h3>P0 &mdash; Morning Dryback</h3><p><strong>When:</strong> Lights on (08:00). No irrigation. Records peak VWC.<br><strong>Exits:</strong> Dryback target met (50%) or min drop (15%) or max wait (120 min) or rate too slow. Min wait 30 min.<br><strong>Exception:</strong> EC &gt; 2.5x target &rarr; flush shot (10%).</p></div>
+<div class="phase p1"><h3>P1 &mdash; Ramp-Up</h3><p><strong>When:</strong> P0 ends. Progressive shots: <code>2% + 0.5% &times; count</code>, max 10%, &times; zone multiplier.<br><strong>Exits:</strong> VWC &ge; 65% + min 3 shots, or max 6 shots. 15 min cooldown. EC-adjusted.</p></div>
+<div class="phase p2"><h3>P2 &mdash; Maintenance</h3><p><strong>When:</strong> P1 target met. 5% shot when VWC &lt; 60%.<br>EC &gt; 1.2 &rarr; 1.5x shot. EC &lt; 0.8 &rarr; 0.7x shot.<br><strong>Exits:</strong> ML predicts insufficient overnight dryback time.</p></div>
+<div class="phase p3"><h3>P3 &mdash; Pre-Lights-Off</h3><p><strong>When:</strong> Dryback prediction. Emergency only: VWC &lt; 40% or EC &gt; 2.0x.<br><strong>Exits:</strong> Lights on next morning &rarr; P0.</p></div>
+<div class="cycle"><span>Lights ON</span><span style="color:var(--muted)"> &rarr; </span><span style="color:var(--orange);font-weight:700">P0</span><span style="color:var(--muted)"> &rarr; </span><span style="color:var(--green);font-weight:700">P1</span><span style="color:var(--muted)"> &rarr; </span><span style="color:var(--blue);font-weight:700">P2</span><span style="color:var(--muted)"> &rarr; </span><span style="color:var(--red);font-weight:700">P3</span><span style="color:var(--muted)"> &rarr; Lights OFF &rarr; P0</span></div>
+
+<hr>
+<h2 id="s5">5. Daily Cycle</h2>
+<p>Lights 08:00&ndash;20:00, Cannabis_Athena, vegetative:</p>
+<table>
+<tr><th>Time</th><th>Phase</th><th>What Happens</th></tr>
+<tr><td>08:00</td><td style="color:var(--orange)">P0</td><td>Lights on. Peak VWC recorded. No watering.</td></tr>
+<tr><td>~09:30</td><td style="color:var(--green)">P1</td><td>Dryback met. Progressive shots every 15 min.</td></tr>
+<tr><td>~11:00</td><td style="color:var(--blue)">P2</td><td>VWC at 65%. Maintenance shots when &lt; 60%.</td></tr>
+<tr><td>~17:00</td><td style="color:var(--red)">P3</td><td>Pre-lights-off. Emergency only.</td></tr>
+<tr><td>20:00</td><td style="color:var(--red)">P3</td><td>Lights off. P3 until morning.</td></tr>
+</table>
+<h3>Irrigation Sequence</h3>
+<ol><li>Main line on, wait 1s</li><li>Zone valve on</li><li>Wait shot duration</li><li>Zone valve off, 1s</li><li>Main line off, 1s</li><li>30s sensor stabilization</li><li>Read post-VWC</li></ol>
+<p>Max 1 concurrent zone. <code>finally</code> block ensures hardware off on error.</p>
+
+<hr>
+<h2 id="s6">6. GW Time-Based Scheduler <span class="tag tag-gw">GW</span></h2>
+<div class="box warn"><strong>Must be OFF when crop steering is active.</strong> Set <code>input_boolean.gw_irrigation_enabled</code> to OFF.</div>
+<p>Checks every 5 min: system enabled, irrigation enabled, not maintenance, no leak, no tank low, within time window, interval elapsed. Opens mainline, runs each enabled table for configured duration sequentially, closes mainline.</p>
+<table>
+<tr><th>Setting</th><th>Entity</th><th>Default</th></tr>
+<tr><td>Window start/end</td><td><code>input_datetime.gw_irrigate_start/end_time</code></td><td>Set in HA</td></tr>
+<tr><td>Interval</td><td><code>input_number.gw_irrigate_interval_min</code></td><td>60 min</td></tr>
+<tr><td>Duration</td><td><code>input_number.gw_irrigate_duration_sec</code></td><td>60s</td></tr>
+<tr><td>Table N</td><td><code>input_boolean.gw_table_N_enabled</code></td><td>OFF</td></tr>
+</table>
+
+<hr>
+<h2 id="s7">7. Environment Control <span class="tag tag-gw">GW</span></h2>
+<p>Gated by <code>input_boolean.gw_environment_enabled</code>.</p>
+<h3>Dehumidifiers</h3>
+<p>4 relays stagger ON 10s apart. <strong>ON:</strong> RH &gt; target + 5% for 3 min. <strong>OFF:</strong> RH &lt; target &minus; 2% for 2 min. TP-Link plug has separate UI automations at 75%/65%.</p>
+<h3>Humidifier</h3>
+<p><strong>ON:</strong> RH &lt; target &minus; 5% for 3 min. <strong>OFF:</strong> RH &gt; target + 2% for 2 min.</p>
+<h3>CO2</h3>
+<p>Pulsed: 1 min on / 4 min off. <strong>Inject:</strong> &lt; 1100 ppm. <strong>Stop:</strong> &ge; 1400 ppm. <strong>Emergency off:</strong> &ge; 1800 ppm. Always off at lights-off. Only during lights-on.</p>
+<h3>AC</h3>
+<p>4 units mapped. <strong>No automated control yet</strong> &mdash; manual or separate automations.</p>
+<table>
+<tr><th>Target</th><th>Entity</th></tr>
+<tr><td>Day/Night temp</td><td><code>input_number.gw_temp_target_day/night</code></td></tr>
+<tr><td>Day/Night RH</td><td><code>input_number.gw_rh_target_day/night</code></td></tr>
+<tr><td>CO2</td><td><code>input_number.gw_co2_target</code></td></tr>
+</table>
+
+<hr>
+<h2 id="s8">8. Entity Reference</h2>
+<h3>CS Switches</h3>
+<table>
+<tr><th>Entity</th><th>Default</th><th>Purpose</th></tr>
+<tr><td><code>switch.crop_steering_system_enabled</code></td><td>ON</td><td>Master kill. OFF = emergency stop.</td></tr>
+<tr><td><code>switch.crop_steering_auto_irrigation_enabled</code></td><td>ON</td><td>Auto decisions. Manual still works when OFF.</td></tr>
+<tr><td><code>switch.crop_steering_ec_stacking_enabled</code></td><td>OFF</td><td>Build EC when below target.</td></tr>
+<tr><td><code>switch.crop_steering_zone_N_enabled</code></td><td>ON</td><td>Zone included in decisions.</td></tr>
+<tr><td><code>switch.crop_steering_zone_N_manual_override</code></td><td>OFF</td><td><strong>Absolute lockout.</strong></td></tr>
+</table>
+<h3>CS Selects</h3>
+<table>
+<tr><th>Entity</th><th>Default</th><th>Purpose</th></tr>
+<tr><td><code>select.crop_steering_crop_type</code></td><td>Cannabis_Athena</td><td>Active profile</td></tr>
+<tr><td><code>select.crop_steering_growth_stage</code></td><td>Vegetative</td><td>Changes EC/dryback targets</td></tr>
+<tr><td><code>select.crop_steering_zone_N_phase_override</code></td><td>Auto</td><td>Per-zone phase lock</td></tr>
+<tr><td><code>select.crop_steering_zone_N_group</code></td><td>Ungrouped</td><td>Zone grouping (A/B/C/D)</td></tr>
+<tr><td><code>select.crop_steering_zone_N_priority</code></td><td>Normal</td><td>Critical/High/Normal/Low</td></tr>
+</table>
+<h3>Key CS Numbers</h3>
+<table>
+<tr><th>Entity</th><th>Default</th><th>Purpose</th></tr>
+<tr><td><code>..._substrate_volume</code></td><td>10 L</td><td>Pot media volume</td></tr>
+<tr><td><code>..._dripper_flow_rate</code></td><td>1.2 L/hr</td><td>Per-dripper flow</td></tr>
+<tr><td><code>..._drippers_per_plant</code></td><td>2</td><td>Drippers per pot</td></tr>
+<tr><td><code>..._field_capacity</code></td><td>70%</td><td>Max VWC</td></tr>
+<tr><td><code>..._lights_on/off_hour</code></td><td>8 / 20</td><td>Light schedule</td></tr>
+<tr><td><code>..._p1_target_vwc</code></td><td>65%</td><td>P1 exit</td></tr>
+<tr><td><code>..._p2_vwc_threshold</code></td><td>60%</td><td>P2 trigger</td></tr>
+<tr><td><code>..._p3_emergency_vwc_threshold</code></td><td>40%</td><td>P3 emergency</td></tr>
+</table>
+<p><em>All prefixed <code>number.crop_steering_</code></em></p>
+<h3>Per-Zone Numbers (0 = use system default)</h3>
+<table>
+<tr><th>Entity</th><th>Default</th></tr>
+<tr><td><code>..._zone_N_plant_count</code></td><td>4</td></tr>
+<tr><td><code>..._zone_N_max_daily_volume</code></td><td>20 L</td></tr>
+<tr><td><code>..._zone_N_shot_size_multiplier</code></td><td>1.0</td></tr>
+<tr><td><code>..._zone_N_dryback_target</code></td><td>0</td></tr>
+<tr><td><code>..._zone_N_p1_target_vwc</code></td><td>0</td></tr>
+<tr><td><code>..._zone_N_p2_vwc_threshold</code></td><td>0</td></tr>
+<tr><td><code>..._zone_N_p3_emergency_vwc</code></td><td>0</td></tr>
+</table>
+<h3>Trigger Buttons</h3>
+<p><code>button.crop_steering_zone_N_trigger_shot</code> &mdash; one P2-sized shot. Blocked by override.</p>
+<h3>Key AppDaemon Sensors</h3>
+<table>
+<tr><th>Entity</th><th>Purpose</th></tr>
+<tr><td><code>sensor.crop_steering_app_status</code></td><td>safe_idle / irrigating / error</td></tr>
+<tr><td><code>sensor.crop_steering_zone_N_phase</code></td><td>Current phase</td></tr>
+<tr><td><code>sensor.crop_steering_zone_N_daily_water_app</code></td><td>Daily water (L)</td></tr>
+<tr><td><code>sensor.crop_steering_zone_N_safety_status</code></td><td>safe / approaching_saturation / etc.</td></tr>
+<tr><td><code>sensor.crop_steering_ai_heartbeat</code></td><td>AI oversight + zone summary</td></tr>
+<tr><td><code>sensor.crop_steering_fused_vwc</code> / <code>_ec</code></td><td>Kalman-filtered averages</td></tr>
+<tr><td><code>sensor.crop_steering_system_health_score</code></td><td>0&ndash;100 health</td></tr>
+</table>
+<h3>GW Helpers</h3>
+<table>
+<tr><th>Entity</th><th>Purpose</th></tr>
+<tr><td><code>input_boolean.gw_enable</code></td><td>GW master</td></tr>
+<tr><td><code>input_boolean.gw_irrigation_enabled</code></td><td>GW scheduler (OFF when CS active)</td></tr>
+<tr><td><code>input_boolean.gw_maintenance_mode</code></td><td>Emergency close all</td></tr>
+<tr><td><code>input_boolean.gw_co2_enabled</code></td><td>CO2 on/off</td></tr>
+<tr><td><code>input_boolean.gw_environment_enabled</code></td><td>Climate on/off</td></tr>
+</table>
+<h3>Events</h3>
+<table>
+<tr><th>Event</th><th>Data</th></tr>
+<tr><td><code>crop_steering_trigger_zone_shot</code></td><td><code>{zone, source}</code></td></tr>
+<tr><td><code>crop_steering_reset_emergency</code></td><td><code>{zone}</code> (optional, omit for all)</td></tr>
+<tr><td><code>crop_steering_manual_override</code></td><td><code>{zone, action, timeout_minutes}</code></td></tr>
+</table>
+
+<hr>
+<h2 id="s9">9. Configuration Files</h2>
+<h3>crop_steering.env</h3>
+<pre><code>ZONE_1_SWITCH=switch.gw_table_1_valve
+ZONE_1_VWC_SENSORS=sensor.substrate_1_substrate_1_vwc_coco_coir
+ZONE_1_EC_SENSORS=sensor.substrate_1_substrate_1_pwec
+ZONE_1_PLANT_COUNT=4
+ZONE_1_MAX_DAILY_VOLUME=20.0
+ZONE_1_SHOT_MULTIPLIER=1.0</code></pre>
+<h3>apps.yaml</h3>
+<pre><code>master_crop_steering:
+  module: crop_steering.master_crop_steering_app
+  class: MasterCropSteeringApp
+  hardware:
+    pump_master: null
+    main_line: switch.gw_mainline
+    zone_valves: {1: switch.gw_table_1_valve, ...}
+  timing: {phase_check_interval: 60}
+  thresholds: {emergency_vwc: 40.0}</code></pre>
+<p><strong>Lights:</strong> <code>lights_on_hour</code> = 8, <code>lights_off_hour</code> = 20.</p>
+
+<hr>
+<h2 id="s10">10. Dashboards</h2>
+<table>
+<tr><th>Dashboard</th><th>Path</th><th>Purpose</th></tr>
+<tr><td>GW Irrigation</td><td><code>gw-irrigation</code></td><td>Timer scheduler, table enables, hardware, safety</td></tr>
+<tr><td>Crop Steering AI</td><td><code>crop-steering</code></td><td>Phases, VWC/EC, zone tuning, AI oversight, all parameters</td></tr>
+<tr><td>CO2 &amp; Environment</td><td><code>co2-environment</code></td><td>CO2, dehumidifier, temp/RH targets</td></tr>
+</table>
+
+<hr>
+<h2 id="s11">11. Zone Management <span class="tag tag-cs">CS</span></h2>
+<table>
+<tr><th></th><th>zone_N_enabled</th><th>zone_N_manual_override</th></tr>
+<tr><td>Purpose</td><td>Include/exclude</td><td><strong>Absolute lockout</strong></td></tr>
+<tr><td>Emergency?</td><td>Still gets emergency</td><td><strong>No. Nothing waters.</strong></td></tr>
+<tr><td>Use for</td><td>Zone unused</td><td>Maintenance, flushing</td></tr>
+</table>
+<div class="box danger"><strong>Override = absolute.</strong> No auto, no emergency, no manual trigger, no ML. Checked at selection, evaluation, and valve actuation.</div>
+<p><strong>Groups:</strong> A/B/C/D. &ge;50% needing water &rarr; all irrigate. Max 1 concurrent zone.<br><strong>Priority:</strong> Critical(4) &gt; High(3) &gt; Normal(2) &gt; Low(1). Score = Priority 40% + VWC Need 40% + Phase Urgency 20%.</p>
+
+<hr>
+<h2 id="s12">12. Phase Parameters <span class="tag tag-cs">CS</span></h2>
+<h3>P0</h3>
+<table><tr><th>Param</th><th>Default</th><th>Controls</th></tr>
+<tr><td>veg_dryback_target</td><td>50%</td><td>% peak VWC to lose</td></tr>
+<tr><td>gen_dryback_target</td><td>40%</td><td>Generative mode</td></tr>
+<tr><td>p0_min/max_wait</td><td>30/120 min</td><td>Min before exit / max forces exit</td></tr>
+<tr><td>p0_dryback_drop</td><td>15%</td><td>Min absolute VWC drop</td></tr></table>
+<h3>P1</h3>
+<table><tr><th>Param</th><th>Default</th><th>Controls</th></tr>
+<tr><td>p1_target_vwc</td><td>65%</td><td>Exit target</td></tr>
+<tr><td>p1_initial_shot</td><td>2%</td><td>First shot size</td></tr>
+<tr><td>p1_increment</td><td>0.5%</td><td>Per-shot growth</td></tr>
+<tr><td>p1_max_shot</td><td>10%</td><td>Cap</td></tr>
+<tr><td>p1_time_between</td><td>15 min</td><td>Cooldown</td></tr>
+<tr><td>p1_min/max_shots</td><td>3/6</td><td>Min for exit / max forces exit</td></tr></table>
+<h3>P2</h3>
+<table><tr><th>Param</th><th>Default</th><th>Controls</th></tr>
+<tr><td>p2_vwc_threshold</td><td>60%</td><td>Trigger</td></tr>
+<tr><td>p2_shot_size</td><td>5%</td><td>Shot size</td></tr>
+<tr><td>p2_ec_high/low</td><td>1.2/0.8</td><td>EC ratio thresholds</td></tr></table>
+<h3>P3</h3>
+<table><tr><th>Param</th><th>Default</th><th>Controls</th></tr>
+<tr><td>p3_emergency_vwc</td><td>40%</td><td>Emergency trigger</td></tr>
+<tr><td>p3_emergency_shot</td><td>2%</td><td>Shot size</td></tr></table>
+
+<hr>
+<h2 id="s13">13. EC Targets <span class="tag tag-cs">CS</span></h2>
+<table>
+<tr><th>Ratio</th><th>Response</th></tr>
+<tr><td>&lt; 0.8</td><td>Reduce shot (conserve)</td></tr>
+<tr><td>0.8&ndash;1.2</td><td>Normal</td></tr>
+<tr><td>&gt; 1.2</td><td>Increase shot (flush)</td></tr>
+<tr><td>&gt; 2.0 (P3)</td><td>Emergency shot</td></tr>
+<tr><td>&gt; 2.5 (P0)</td><td>Flush during dryback</td></tr>
+</table>
+<table>
+<tr><th>Phase</th><th>Veg</th><th>Gen</th></tr>
+<tr><td>P0</td><td>3.0</td><td>4.0</td></tr>
+<tr><td>P1</td><td>3.0</td><td>5.0</td></tr>
+<tr><td>P2</td><td>3.2</td><td>6.0</td></tr>
+<tr><td>P3</td><td>3.0</td><td>4.5</td></tr>
+<tr><td>Flush</td><td colspan="2">0.8</td></tr>
+</table>
+
+<hr>
+<h2 id="s14">14. Per-Zone Targets <span class="tag tag-cs">CS</span></h2>
+<p><strong>0 = use system default.</strong> &gt; 0 overrides for that zone.</p>
+<table>
+<tr><th>Target</th><th>System</th><th>Per-Zone</th></tr>
+<tr><td>Dryback</td><td>veg_dryback_target</td><td>zone_N_dryback_target</td></tr>
+<tr><td>P1 VWC</td><td>p1_target_vwc</td><td>zone_N_p1_target_vwc</td></tr>
+<tr><td>P2 threshold</td><td>p2_vwc_threshold</td><td>zone_N_p2_vwc_threshold</td></tr>
+<tr><td>P3 emergency</td><td>p3_emergency_vwc_threshold</td><td>zone_N_p3_emergency_vwc</td></tr>
+</table>
+
+<hr>
+<h2 id="s15">15. Manual Override <span class="tag tag-cs">CS</span></h2>
+<div class="box danger"><strong>ON = nothing waters.</strong> No auto, no emergency, no trigger. 4-layer detection. AI flags &gt;24h active. Timed overrides via event.</div>
+
+<hr>
+<h2 id="s16">16. Emergency Irrigation <span class="tag tag-cs">CS</span></h2>
+<p>VWC &lt; 40% &rarr; 60s shot. 120s startup grace. 300s cooldown. Skips overridden zones.</p>
+<table><tr><th>Count</th><th>Lockout</th></tr>
+<tr><td>1st</td><td>2h</td></tr><tr><td>2nd</td><td>4h</td></tr><tr><td>3rd</td><td>8h</td></tr><tr><td>4th+</td><td><strong>Permanent</strong></td></tr></table>
+<p>VWC lift &lt; 1% over 3+ shots &rarr; sets ceiling. <strong>Reset:</strong> <code>crop_steering_reset_emergency</code> event.</p>
+
+<hr>
+<h2 id="s17">17. AI Heartbeat <span class="tag tag-cs">CS</span></h2>
+<p>Every 15 min. 6 checks:</p>
+<table><tr><th>#</th><th>Anomaly</th><th>Action</th></tr>
+<tr><td>1</td><td>P0 stuck &gt;4h</td><td>Force P1</td></tr>
+<tr><td>2</td><td>Sensor stale &gt;15m</td><td>Warning</td></tr>
+<tr><td>3</td><td>VWC no response</td><td>Set ceiling</td></tr>
+<tr><td>4</td><td>EC trending up</td><td>Warning</td></tr>
+<tr><td>5</td><td>&gt;20 shots/day</td><td>Warning</td></tr>
+<tr><td>6</td><td>Override &gt;24h</td><td>Warning</td></tr></table>
+
+<hr>
+<h2 id="s18">18. Safety Layers <span class="tag tag-both">BOTH</span></h2>
+<h3>Crop Steering (per shot)</h3>
+<ol><li>System enabled</li><li>Auto irrigation (auto only)</li><li>Zone enabled</li><li>Override OFF</li><li>Tank not filling</li><li>VWC &lt; field capacity (80%)</li><li>EC &lt; max (9.0)</li><li>Daily volume &lt; 20L</li><li>VWC &lt; 90%</li><li>EC &lt; 15.0</li><li>&gt;10 min since last</li><li>&lt;50 shots/day</li><li>Phase-specific</li><li>Max 1 concurrent zone</li><li>Async lock</li></ol>
+<p>Watchdog (60s): flag/hardware mismatch detection. Sensor fail-safe: all offline + hardware on &rarr; stop. Clean shutdown on terminate.</p>
+<h3>GW Safety</h3>
+<table>
+<tr><th>Protection</th><th>What</th></tr>
+<tr><td>Valve watchdog</td><td>Open &gt;180s &rarr; force close + alert</td></tr>
+<tr><td>Mains watchdog</td><td>Open &gt;24 min &rarr; kill</td></tr>
+<tr><td>Leak abort</td><td>Emergency stop (sensor unmapped*)</td></tr>
+<tr><td>Tank low</td><td>Close all (sensor unmapped*)</td></tr>
+<tr><td>Maintenance mode</td><td>Close all immediately</td></tr>
+<tr><td>Sensor offline</td><td>Alert after 10 min. CO2 offline &rarr; close solenoid.</td></tr>
+<tr><td>Daily audit 3 AM</td><td>Force-close all + CO2</td></tr>
+<tr><td>CO2 lights-off</td><td>Always close at lights off</td></tr>
+</table>
+<p>* <strong>Leak and tank-low are hardcoded false. Won't fire until sensors installed.</strong></p>
+
+<hr>
+<h2 id="s19">19. Sensor Fusion <span class="tag tag-cs">CS</span></h2>
+<ol><li><strong>Outlier</strong> &mdash; VWC 0&ndash;100, EC 0&ndash;20, &gt;4 sigma. Min deviation: VWC 5%, EC 1.0.</li>
+<li><strong>Reliability</strong> &mdash; 0&ndash;1 per sensor.</li>
+<li><strong>Health</strong> &mdash; excellent/good/degraded/faulty/offline (30+ min).</li>
+<li><strong>Fusion</strong> &mdash; Weighted average. Excellent 1.2x, degraded 0.8x.</li>
+<li><strong>Kalman</strong> &mdash; Separate VWC/EC filters.</li></ol>
+<p>Stale: 600s (10m). AI flags: 900s (15m).</p>
+
+<hr>
+<h2 id="s20">20. Crop Profiles <span class="tag tag-cs">CS</span></h2>
+<table>
+<tr><th>Profile</th><th>Dryback</th><th>EC</th><th>Best For</th></tr>
+<tr><td>Cannabis_Athena</td><td>15&ndash;25%</td><td>3&ndash;9</td><td>Athena nutrients</td></tr>
+<tr><td>Cannabis_Indica</td><td>12&ndash;22%</td><td>2.8&ndash;8</td><td>Dense, short</td></tr>
+<tr><td>Cannabis_Sativa</td><td>18&ndash;30%</td><td>3.2&ndash;9.5</td><td>Tall, stretchy</td></tr>
+<tr><td>Cannabis_Hybrid</td><td>15&ndash;25%</td><td>3&ndash;8.5</td><td>General</td></tr>
+<tr><td>Tomato</td><td>8&ndash;15%</td><td>2&ndash;4.5</td><td>High-freq</td></tr>
+<tr><td>Lettuce</td><td>5&ndash;10%</td><td>1.2&ndash;2.5</td><td>Very high-freq</td></tr>
+</table>
+<p>Stages: Vegetative &rarr; Early Flower &rarr; Late Flower. Adaptive: 0.1 rate, 0.8 momentum, min 10 samples.</p>
+
+<hr>
+<h2 id="s21">21. Persistent State <span class="tag tag-cs">CS</span></h2>
+<p>Saved 5 min + on irrigation. Restores: phases (corrected for lights), P0/P1 tracking, water usage (same-day/week), overrides (with timeout), last irrigation. 10MB limit.</p>
+
+<hr>
+<h2 id="s22">22. Commissioning</h2>
+<h3>1. Verify Hardware</h3>
+<ol><li>ESPHome devices online: <strong>Settings &rarr; Devices &rarr; ESPHome</strong></li>
+<li><code>sensor.gw_table_1_vwc</code> shows number. Check all 6.</li>
+<li>Test each valve via Developer Tools. Listen for click. Off immediately.</li>
+<li>Test mainline briefly &mdash; pump should start.</li></ol>
+<h3>2. Configure Crop Steering</h3>
+<ol><li>Verify <code>crop_steering.env</code> entity IDs</li>
+<li>Add integration: Settings &rarr; Integrations &rarr; Crop Steering &rarr; Load from .env</li>
+<li>Set lights_on=8, lights_off=20</li>
+<li><strong>Set <code>gw_irrigation_enabled</code> OFF</strong></li></ol>
+<h3>3. Environment</h3>
+<ol><li>Set temp/RH/CO2 targets on CO2 &amp; Environment dashboard</li>
+<li>Enable <code>gw_co2_enabled</code> and <code>gw_environment_enabled</code></li></ol>
+<h3>4. Start</h3>
+<ol><li><code>crop_steering_system_enabled</code> ON</li>
+<li>Check <code>app_status</code> = <code>safe_idle</code></li>
+<li>Watch for P0&rarr;P1 after lights on</li></ol>
+
+<hr>
+<h2 id="s23">23. Troubleshooting</h2>
+<table>
+<tr><th>Symptom</th><th>Fix</th></tr>
+<tr><td>Zone not watering</td><td>Check override OFF, enabled ON. Reset emergency if locked out.</td></tr>
+<tr><td>Too many shots</td><td>Dripper blocked or sensor bad. Auto-lockout after 4 rapid shots.</td></tr>
+<tr><td>Stuck in P3</td><td>Check lights_on/off_hour match schedule.</td></tr>
+<tr><td>Stuck in P0</td><td>Lower dryback target. AI forces P1 after 4h.</td></tr>
+<tr><td>Phase changes ignored</td><td>Zone phase override must be "Auto".</td></tr>
+<tr><td>"Entity not found"</td><td>Entities have <code>crop_steering_</code> prefix.</td></tr>
+<tr><td>VWC "Unavailable"</td><td>ESPHome device offline. Check network.</td></tr>
+<tr><td>Double watering</td><td><code>gw_irrigation_enabled</code> must be OFF.</td></tr>
+<tr><td>CO2 not injecting</td><td>Lights must be on + <code>gw_co2_enabled</code> ON.</td></tr>
+<tr><td>Valves stuck</td><td><code>gw_maintenance_mode</code> ON, or <code>script.gw_emergency_stop</code>, or power off relay.</td></tr>
+</table>
+<h3>Emergency Stop</h3>
+<ol><li><code>gw_maintenance_mode</code> ON</li><li><code>script.gw_emergency_stop</code></li><li><code>crop_steering_system_enabled</code> OFF</li><li>Power off relay board</li></ol>
+
+<hr>
+<h2 id="s24">24. Known Issues &amp; Unmapped Hardware</h2>
+<h3>Unmapped</h3>
+<table>
+<tr><th>Item</th><th>Impact</th></tr>
+<tr><td>Leak sensor</td><td style="color:var(--red)"><strong>CRITICAL:</strong> Abort hardcoded false</td></tr>
+<tr><td>Tank float switch</td><td style="color:var(--red)"><strong>CRITICAL:</strong> Abort hardcoded false</td></tr>
+<tr><td>Tank pH/EC</td><td>Unavailable on dashboard</td></tr>
+<tr><td>Waste valve, ceiling vent</td><td>TODO placeholders</td></tr>
+<tr><td>AC automation</td><td>Entities mapped, no logic</td></tr>
+</table>
+<h3>Software</h3>
+<ul>
+<li><strong>Entity prefix mismatch</strong> &mdash; CS entities have <code>crop_steering_</code> prefix. Dashboard/AppDaemon reference some without. Dual-naming fallback in place.</li>
+<li><strong>get_state() returns None</strong> for CS entities in AppDaemon. Workaround: listen_state + REST API.</li>
+<li><strong>P3 early transition</strong> with slow dryback rate. Self-corrects with data.</li>
+<li><strong>Duplicate dehumidifier automations</strong> &mdash; GW relays + UI TP-Link plug. Different hardware.</li>
+<li><strong>Duplicate CO2 emergency</strong> &mdash; Both package and UI automation close at 1800 ppm.</li>
+</ul>
+<h3>Shot Reference</h3>
+<p>10L substrate, 2 L/hr drippers, 2 per plant, 4 plants:</p>
+<table><tr><th>Type</th><th>Size</th><th>Time</th><th>Volume</th></tr>
+<tr><td>P1 initial</td><td>2%</td><td>3 min</td><td>0.8L</td></tr>
+<tr><td>P2 maintenance</td><td>5%</td><td>7.5 min</td><td>2.0L</td></tr>
+<tr><td>P0 flush</td><td>10%</td><td>15 min</td><td>4.0L</td></tr></table>
+<p><strong>Notifications:</strong> <code>notify.mobile_app_damians_iphone</code>.</p>
+
+<hr>
+<p style="text-align:center;color:var(--muted);margin-top:2.5rem;font-size:.83rem">GreenWave + Crop Steering System Guide v2.3.1 &mdash; April 2026 &mdash; Verified from codebase audit</p>
+</body>
+</html>
