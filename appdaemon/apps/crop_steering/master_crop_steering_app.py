@@ -148,6 +148,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self.emergency_attempts = {}  # Track emergency irrigation attempts per zone
         self.manual_overrides = {}  # Track manual override timeouts per zone
         self.zone_water_usage = {}  # Track water usage per zone
+        self.zone_vwc_capacity = {}  # Track adaptive per-zone VWC max (field capacity)
         
         for zone_num in range(1, self.num_zones + 1):
             # Create state machine for each zone
@@ -173,6 +174,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'timeout_handle': None,  # Timer handle for auto-disable
                 'enabled_time': None,  # When override was enabled
                 'timeout_minutes': None  # Timeout duration
+            }
+            self.zone_vwc_capacity[zone_num] = {
+                'current_max': None,
+                'daily_peak': None,
+                'daily_peak_date': datetime.now().date().isoformat()
             }
         
         # Initialize all advanced modules
@@ -445,6 +451,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
         # Record starting VWC
         current_vwc = self._get_zone_average_vwc(zone_num)
         self.zone_state_machines[zone_num].update_p1_progress(current_vwc)
+        machine = self.zone_state_machines.get(zone_num)
+        if machine and machine.state.p1_data:
+            machine.state.p1_data.target_vwc = self._get_zone_target(
+                zone_num, "p1_target_vwc", "number.p1_target_vwc", 65.0
+            )
     
     def _on_enter_p2(self, zone_num: int):
         """Handle P2 phase entry."""
@@ -995,6 +1006,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'zone_phases': self.zone_phases.copy(),
                 'zone_phase_data': {},
                 'zone_water_usage': {},
+                'zone_vwc_capacity': self.zone_vwc_capacity,
                 'manual_overrides': {
                     str(z): {
                         'enabled_time': d['enabled_time'].isoformat() if d.get('enabled_time') else None,
@@ -1148,6 +1160,24 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 
                 if restored_count > 0:
                     self.log(f"✅ Restored water usage for {restored_count} zones")
+
+            if 'zone_vwc_capacity' in state_data:
+                restored_capacity = 0
+                for zone_str, data in state_data['zone_vwc_capacity'].items():
+                    try:
+                        zone_num = int(zone_str)
+                        if zone_num < 1 or zone_num > self.num_zones:
+                            continue
+                        self.zone_vwc_capacity[zone_num] = {
+                            'current_max': data.get('current_max'),
+                            'daily_peak': data.get('daily_peak'),
+                            'daily_peak_date': data.get('daily_peak_date', datetime.now().date().isoformat())
+                        }
+                        restored_capacity += 1
+                    except (ValueError, TypeError, KeyError):
+                        continue
+                if restored_capacity > 0:
+                    self.log(f"✅ Restored adaptive VWC max data for {restored_capacity} zones")
             
             # Restore manual override state
             if 'manual_overrides' in state_data:
@@ -3215,13 +3245,20 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _get_number_entity_value(self, entity_id: str, default: float) -> float:
         """Get value from number entity with robust error handling."""
         try:
-            # Check if entity exists first
-            if not self.entity_exists(entity_id):
-                self.log(f"⚠️ Number entity {entity_id} does not exist, using default: {default}", level='DEBUG')
-                return default
+            resolved_entity = entity_id
+            if not self.entity_exists(resolved_entity):
+                # Newer HA integration names include crop_steering_ prefix.
+                # Prefer native entity when present, but transparently fallback.
+                if entity_id.startswith("number.") and "crop_steering_" not in entity_id:
+                    candidate = entity_id.replace("number.", "number.crop_steering_", 1)
+                    if self.entity_exists(candidate):
+                        resolved_entity = candidate
+                if resolved_entity == entity_id and not self.entity_exists(resolved_entity):
+                    self.log(f"⚠️ Number entity {entity_id} does not exist, using default: {default}", level='DEBUG')
+                    return default
             
             # Use get_float_value which has built-in error handling
-            value = self.get_float_value(entity_id, default=default)
+            value = self.get_float_value(resolved_entity, default=default)
             
             # Validate the value is reasonable
             if value < -1000 or value > 10000:
@@ -3236,12 +3273,17 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _get_select_entity_value(self, entity_id: str, default: str) -> str:
         """Get value from select entity with robust error handling."""
         try:
-            # Check if entity exists first
-            if not self.entity_exists(entity_id):
-                self.log(f"⚠️ Select entity {entity_id} does not exist, using default: {default}", level='DEBUG')
-                return default
+            resolved_entity = entity_id
+            if not self.entity_exists(resolved_entity):
+                if entity_id.startswith("select.") and "crop_steering_" not in entity_id:
+                    candidate = entity_id.replace("select.", "select.crop_steering_", 1)
+                    if self.entity_exists(candidate):
+                        resolved_entity = candidate
+                if resolved_entity == entity_id and not self.entity_exists(resolved_entity):
+                    self.log(f"⚠️ Select entity {entity_id} does not exist, using default: {default}", level='DEBUG')
+                    return default
             
-            state = self.get_entity_value(entity_id, default=default)
+            state = self.get_entity_value(resolved_entity, default=default)
             
             # Handle async Task objects
             if hasattr(state, '__await__'):
@@ -3286,6 +3328,64 @@ class MasterCropSteeringApp(BaseAsyncApp):
         except Exception as e:
             self.log(f"❌ Error getting zone {zone_num} EC: {e}", level='ERROR')
             return None
+
+    def _get_zone_vwc_max(self, zone_num: int) -> float:
+        """Get adaptive per-zone VWC max (field capacity) with safe fallback."""
+        baseline = self._get_number_entity_value("number.field_capacity", 80.0)
+        zone_data = self.zone_vwc_capacity.get(zone_num, {})
+        return float(zone_data.get('current_max') or baseline)
+
+    def _update_zone_vwc_capacity(self, zone_num: int, zone_vwc: Optional[float], phase: Optional[IrrigationPhase]):
+        """Track daily peak VWC during P1/P2 and adapt per-zone max.
+
+        Rules:
+        - At day rollover, set current_max from previous day's peak (if available).
+        - During P1/P2, keep a rolling daily peak.
+        - If current VWC exceeds current_max mid-irrigation, ratchet current_max upward.
+        """
+        try:
+            if zone_num not in self.zone_vwc_capacity:
+                self.zone_vwc_capacity[zone_num] = {
+                    'current_max': self._get_number_entity_value("number.field_capacity", 80.0),
+                    'daily_peak': None,
+                    'daily_peak_date': datetime.now().date().isoformat()
+                }
+
+            data = self.zone_vwc_capacity[zone_num]
+            today_iso = datetime.now().date().isoformat()
+            tracked_date = data.get('daily_peak_date', today_iso)
+
+            # Day rollover: promote yesterday peak to today's max target.
+            if tracked_date != today_iso:
+                prior_peak = data.get('daily_peak')
+                if prior_peak is not None:
+                    data['current_max'] = float(prior_peak)
+                    self.log(
+                        f"📈 Zone {zone_num}: Adaptive VWC max set from previous day peak: {prior_peak:.1f}%",
+                        level='INFO'
+                    )
+                data['daily_peak'] = None
+                data['daily_peak_date'] = today_iso
+
+            if zone_vwc is None:
+                return
+
+            if data.get('current_max') is None:
+                data['current_max'] = self._get_number_entity_value("number.field_capacity", 80.0)
+
+            # Track daily peak only while actively rehydrating/maintaining.
+            if phase in (IrrigationPhase.P1_RAMP_UP, IrrigationPhase.P2_MAINTENANCE):
+                data['daily_peak'] = max(float(data['daily_peak']) if data.get('daily_peak') is not None else zone_vwc, zone_vwc)
+
+            # Ratchet max immediately when exceeded mid-irrigation.
+            if zone_vwc > float(data['current_max']):
+                data['current_max'] = float(zone_vwc)
+                self.log(
+                    f"📈 Zone {zone_num}: Adaptive VWC max ratcheted up to {zone_vwc:.1f}%",
+                    level='INFO'
+                )
+        except Exception as e:
+            self.log(f"❌ Error updating zone {zone_num} adaptive VWC max: {e}", level='ERROR')
 
     def _evaluate_ec_irrigation_need(self, current_ec: Optional[float], target_ec: float, phase: str) -> Dict:
         """Evaluate if irrigation is needed based on EC levels."""
@@ -4225,6 +4325,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
 
                 current_phase = machine.state.current_phase
                 zone_vwc = self._get_zone_average_vwc(zone_num)
+                self._update_zone_vwc_capacity(zone_num, zone_vwc, current_phase)
 
                 # P3 → P0: Lights turned on (only from P3, not P2)
                 if lights_just_on and current_phase == IrrigationPhase.P3_PRE_LIGHTS_OFF:
@@ -4251,8 +4352,16 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 elif current_phase == IrrigationPhase.P1_RAMP_UP:
                     p1_data = machine.state.p1_data
                     if p1_data and zone_vwc is not None:
-                        if zone_vwc >= p1_data.target_vwc:
+                        target_vwc = self._get_zone_target(zone_num, "p1_target_vwc", "number.p1_target_vwc", p1_data.target_vwc)
+                        max_shots = int(self._get_number_entity_value("number.p1_max_shots", 6.0))
+                        if zone_vwc >= target_vwc:
                             await self._transition_zone_to_phase(zone_num, 'P2', f'Recovery complete: {zone_vwc:.1f}%')
+                        elif p1_data.shot_count >= max_shots:
+                            await self._transition_zone_to_phase(
+                                zone_num,
+                                'P2',
+                                f'P1 max shots reached: {p1_data.shot_count}/{max_shots}'
+                            )
                 
                 # P2 → P3: ML-based or time-based transition
                 elif current_phase == IrrigationPhase.P2_MAINTENANCE:
@@ -5887,7 +5996,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             zone_ec = self._get_zone_ec(zone)
             
             # Get safety limits from integration entities
-            field_capacity = self._get_number_entity_value("number.field_capacity", 80.0)
+            field_capacity = self._get_zone_vwc_max(zone)
             max_ec_limit = self._get_number_entity_value("number.max_ec", 8.0)
             
             # Get zone-specific daily limits
@@ -6049,7 +6158,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             for zone_num in range(1, self.num_zones + 1):
                 zone_vwc = self._get_zone_vwc(zone_num)
                 zone_ec = self._get_zone_ec(zone_num)
-                field_capacity = self._get_number_entity_value("number.field_capacity", 80.0)
+                field_capacity = self._get_zone_vwc_max(zone_num)
                 max_ec_limit = self._get_number_entity_value("number.max_ec", 8.0)
                 
                 # Calculate safety margins
