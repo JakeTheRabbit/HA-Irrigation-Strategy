@@ -15,14 +15,14 @@ master_crop_steering:
   # keys avoids schema ambiguity and documents expected AppDaemon args.
   hardware:
     pump_master: null  # No pump entity — constant pressure switch auto-starts when mainline opens
-    main_line: switch.gw_mainline
+    main_line: switch.irrigation_mainline
     zone_valves:
-      1: switch.gw_table_1_valve
-      2: switch.gw_table_2_valve
-      3: switch.gw_table_3_valve
-      4: switch.gw_table_4_valve
-      5: switch.gw_table_5_valve
-      6: switch.gw_table_6_valve
+      1: switch.irrigation_table_1_valve
+      2: switch.irrigation_table_2_valve
+      3: switch.irrigation_table_3_valve
+      4: switch.irrigation_table_4_valve
+      5: switch.irrigation_table_5_valve
+      6: switch.irrigation_table_6_valve
   sensors:
     vwc:
       - sensor.substrate_1_substrate_1_vwc_coco_coir
@@ -39,9 +39,9 @@ master_crop_steering:
       - sensor.substrate_5_substrate_5_pwec
       - sensor.substrate_6_substrate_6_pwec
     environmental:
-      temperature: sensor.gw_room_1_temp
-      humidity: sensor.gw_room_1_rh
-      vpd: sensor.gw_room_1_vpd
+      temperature: sensor.irrigation_room_1_temp
+      humidity: sensor.irrigation_room_1_rh
+      vpd: sensor.irrigation_room_1_vpd
   timing:
     phase_check_interval: 60
     ml_prediction_interval: 300

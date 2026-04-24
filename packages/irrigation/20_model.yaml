@@ -6,7 +6,7 @@
 #           Operators tune these values in the HA UI – no YAML edits needed
 #           after commissioning.
 #
-# All entity names use the "GW …" prefix and irrigation_* entity_ids.
+# All entity names use the "Irrigation …" prefix and irrigation_* entity_ids.
 # No raw hardware entity_ids in this file.
 ###############################################################################
 
@@ -18,14 +18,14 @@ input_datetime:
 
   # Daily irrigation window start (default: 08:00 – at lights-on)
   irrigation_irrigate_start_time:
-    name: "GW Irrigate Start Time"
+    name: "Irrigation Irrigate Start Time"
     has_date: false
     has_time: true
     icon: mdi:clock-start
 
   # Daily irrigation window end (default: 20:00 – 2 h before lights-off)
   irrigation_irrigate_end_time:
-    name: "GW Irrigate End Time"
+    name: "Irrigation Irrigate End Time"
     has_date: false
     has_time: true
     icon: mdi:clock-end
@@ -35,7 +35,7 @@ input_number:
 
   # Minutes between irrigation runs (per enabled table), during window
   irrigation_irrigate_interval_min:
-    name: "GW Irrigate Interval (min)"
+    name: "Irrigation Irrigate Interval (min)"
     min: 5
     max: 240
     step: 5
@@ -45,7 +45,7 @@ input_number:
 
   # Duration each table valve stays open per run
   irrigation_irrigate_duration_sec:
-    name: "GW Irrigate Duration (s)"
+    name: "Irrigation Irrigate Duration (s)"
     min: 10
     max: 300
     step: 5
@@ -55,7 +55,7 @@ input_number:
 
   # Hard maximum any single valve can stay open (watchdog limit)
   irrigation_valve_max_runtime_sec:
-    name: "GW Valve Max Runtime (s)"
+    name: "Irrigation Valve Max Runtime (s)"
     min: 30
     max: 600
     step: 30
@@ -65,7 +65,7 @@ input_number:
 
   # Temperature targets for environment control
   irrigation_temp_target_day:
-    name: "GW Temp Target Day (°C)"
+    name: "Irrigation Temp Target Day (°C)"
     min: 18.0
     max: 32.0
     step: 0.5
@@ -74,7 +74,7 @@ input_number:
     icon: mdi:thermometer-chevron-up
 
   irrigation_temp_target_night:
-    name: "GW Temp Target Night (°C)"
+    name: "Irrigation Temp Target Night (°C)"
     min: 15.0
     max: 28.0
     step: 0.5
@@ -83,7 +83,7 @@ input_number:
     icon: mdi:thermometer-chevron-down
 
   irrigation_temp_high_alert:
-    name: "GW Temp High Alert (°C)"
+    name: "Irrigation Temp High Alert (°C)"
     min: 25.0
     max: 40.0
     step: 0.5
@@ -93,7 +93,7 @@ input_number:
 
   # RH targets
   irrigation_rh_target_day:
-    name: "GW RH Target Day (%)"
+    name: "Irrigation RH Target Day (%)"
     min: 40.0
     max: 80.0
     step: 1.0
@@ -102,7 +102,7 @@ input_number:
     icon: mdi:water-percent
 
   irrigation_rh_target_night:
-    name: "GW RH Target Night (%)"
+    name: "Irrigation RH Target Night (%)"
     min: 40.0
     max: 75.0
     step: 1.0
@@ -111,7 +111,7 @@ input_number:
     icon: mdi:water-percent
 
   irrigation_rh_high_alert:
-    name: "GW RH High Alert (%)"
+    name: "Irrigation RH High Alert (%)"
     min: 60.0
     max: 95.0
     step: 1.0
@@ -121,7 +121,7 @@ input_number:
 
   # CO2 targets (ppm)
   irrigation_co2_target:
-    name: "GW CO2 Target (ppm)"
+    name: "Irrigation CO2 Target (ppm)"
     min: 400
     max: 1500
     step: 50
@@ -130,7 +130,7 @@ input_number:
     icon: mdi:molecule-co2
 
   irrigation_co2_high_alert:
-    name: "GW CO2 High Alert (ppm)"
+    name: "Irrigation CO2 High Alert (ppm)"
     min: 800
     max: 2000
     step: 50
@@ -139,7 +139,7 @@ input_number:
     icon: mdi:molecule-co2
 
   irrigation_co2_low_alert:
-    name: "GW CO2 Low Alert (ppm)"
+    name: "Irrigation CO2 Low Alert (ppm)"
     min: 200
     max: 900
     step: 50
@@ -154,32 +154,32 @@ input_number:
 timer:
 
   irrigation_table_1_run_timer:
-    name: "GW Table 1 Run Timer"
+    name: "Irrigation Table 1 Run Timer"
     icon: mdi:timer
     restore: true
 
   irrigation_table_2_run_timer:
-    name: "GW Table 2 Run Timer"
+    name: "Irrigation Table 2 Run Timer"
     icon: mdi:timer
     restore: true
 
   irrigation_table_3_run_timer:
-    name: "GW Table 3 Run Timer"
+    name: "Irrigation Table 3 Run Timer"
     icon: mdi:timer
     restore: true
 
   irrigation_table_4_run_timer:
-    name: "GW Table 4 Run Timer"
+    name: "Irrigation Table 4 Run Timer"
     icon: mdi:timer
     restore: true
 
   irrigation_table_5_run_timer:
-    name: "GW Table 5 Run Timer"
+    name: "Irrigation Table 5 Run Timer"
     icon: mdi:timer
     restore: true
 
   irrigation_table_6_run_timer:
-    name: "GW Table 6 Run Timer"
+    name: "Irrigation Table 6 Run Timer"
     icon: mdi:timer
     restore: true
 
@@ -193,7 +193,7 @@ template:
 
       # Current active temp target (day vs night based on lights state)
       - unique_id: irrigation_temp_target
-        name: "GW Temp Target"
+        name: "Irrigation Temp Target"
         unit_of_measurement: "°C"
         icon: mdi:thermometer
         state: >
@@ -205,7 +205,7 @@ template:
 
       # Current active RH target
       - unique_id: irrigation_rh_target
-        name: "GW RH Target"
+        name: "Irrigation RH Target"
         unit_of_measurement: "%"
         icon: mdi:water-percent
         state: >
@@ -225,7 +225,7 @@ template:
       #   - tank is NOT low
       #   - current time is within the irrigation window
       - unique_id: irrigation_irrigation_allowed
-        name: "GW Irrigation Allowed"
+        name: "Irrigation Allowed"
         device_class: running
         icon: mdi:water-check
         state: >

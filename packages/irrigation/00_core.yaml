@@ -21,7 +21,7 @@ script:
   # Closes every valve and disables the pack immediately.
   # Called by watchdog automations and can be triggered manually.
   irrigation_emergency_stop:
-    alias: "GW Emergency Stop"
+    alias: "Irrigation Emergency Stop"
     icon: mdi:stop-circle-outline
     description: >
       Immediately close all valves, turn off mains water, and disable the
@@ -51,7 +51,7 @@ script:
       - alias: "Notify operators"
         action: notify.notify              # SITE: replace with your notify target
         data:
-          title: "🚨 GW EMERGENCY STOP"
+          title: "🚨 Irrigation EMERGENCY STOP"
           message: >
             All Irrigation valves closed and pack disabled at
             {{ now().strftime('%H:%M:%S %d/%m/%Y') }}.
@@ -59,12 +59,12 @@ script:
 
   # SEND ALERT (reusable helper for all automations)
   irrigation_send_alert:
-    alias: "GW Send Alert"
+    alias: "Irrigation Send Alert"
     icon: mdi:bell-alert
     fields:
       title:
         description: "Alert title"
-        default: "GW Alert"
+        default: "Irrigation Alert"
       message:
         description: "Alert body"
         default: ""
@@ -85,7 +85,7 @@ automation:
 
   # Pack startup – log that the pack loaded successfully
   - id: irrigation_pack_startup
-    alias: "GW Pack Startup"
+    alias: "Irrigation Pack Startup"
     description: "Fires once on HA start to confirm pack is active"
     trigger:
       - trigger: homeassistant

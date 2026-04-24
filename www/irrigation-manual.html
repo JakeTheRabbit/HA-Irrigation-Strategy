@@ -121,7 +121,7 @@ Physical probes (ESPHome)
     ↓
 Raw sensor entities (e.g. sensor.substrate_1_substrate_1_vwc_coco_coir)
     ↓  [10_mapping.yaml averages + rounds values]
-GW contract entities (e.g. sensor.irrigation_table_1_vwc)
+Irrigation contract entities (e.g. sensor.irrigation_table_1_vwc)
     ↓  [crop_steering.env tells the integration where to look]
 Crop Steering entities (e.g. sensor.zone_1_vwc)
 </pre>
@@ -199,7 +199,7 @@ Drippers → Plants → Substrate → Runoff
   <tr><td>Time between cycles</td><td>Schedule tab → Interval</td><td>60 minutes</td></tr>
   <tr><td>Duration per table</td><td>Schedule tab → Duration</td><td>60 seconds</td></tr>
   <tr><td>Which tables are active</td><td>Zone Control tab → Enabled toggle per table</td><td>All off</td></tr>
-  <tr><td>Master on/off</td><td>Command Center → GW System</td><td>Off</td></tr>
+  <tr><td>Master on/off</td><td>Command Center → Irrigation System</td><td>Off</td></tr>
 </table>
 
 <h3>Environment Control</h3>
@@ -284,7 +284,7 @@ Drippers → Plants → Substrate → Runoff
 <div class="steps card">
   <div class="step">Go to the <strong>Command Center</strong> tab.</div>
   <div class="step">Turn <strong>Maintenance Mode OFF</strong> (the toggle should be off/grey).</div>
-  <div class="step">Turn <strong>GW System ON</strong>.</div>
+  <div class="step">Turn <strong>Irrigation System ON</strong>.</div>
   <div class="step">Go to <strong>Zone Control</strong> tab. Enable each table you want to irrigate by toggling <strong>Enabled</strong> on.</div>
   <div class="step">Watch the <strong>System Ready</strong> indicator on the Command Center. It should show a green check mark.</div>
 </div>
@@ -383,7 +383,7 @@ Drippers → Plants → Substrate → Runoff
 <p>AppDaemon adds autonomous phase transitions — the system automatically moves through P0→P1→P2→P3 based on live sensor data instead of requiring manual phase selection.</p>
 
 <div class="info">
-  <strong>You don't need AppDaemon to use the system.</strong> The GW Package handles time-based irrigation and the Crop Steering integration provides all the sensor entities and calculations. AppDaemon just adds autonomous decision-making.
+  <strong>You don't need AppDaemon to use the system.</strong> The Irrigation Package handles time-based irrigation and the Crop Steering integration provides all the sensor entities and calculations. AppDaemon just adds autonomous decision-making.
 </div>
 
 <h3>Installation Steps</h3>
@@ -437,7 +437,7 @@ Drippers → Plants → Substrate → Runoff
 <div class="card">
   <h3>Irrigation won't run</h3>
   <ol>
-    <li>Check <strong>Command Center → GW System</strong> is ON.</li>
+    <li>Check <strong>Command Center → Irrigation System</strong> is ON.</li>
     <li>Check <strong>Maintenance Mode</strong> is OFF.</li>
     <li>Check the current time is within your irrigation window (Schedule tab).</li>
     <li>Check at least one table is enabled (Zone Control tab).</li>
