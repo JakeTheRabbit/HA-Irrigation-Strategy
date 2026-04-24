@@ -38,8 +38,8 @@ This is an automated irrigation controller for cannabis grown in coco coir. It r
 The system runs a 4-phase daily irrigation cycle (P0-P3) independently per zone. It uses sensor fusion, dryback detection, EC ratio logic, and an ML predictor to make irrigation decisions. Every decision passes through multiple safety checks before a valve opens.
 
 **Hardware controlled:**
-- 1 main line solenoid (`switch.gw_mainline`)
-- 6 zone valve solenoids (`switch.gw_table_1_valve` through `switch.gw_table_6_valve`)
+- 1 main line solenoid (`switch.irrigation_mainline`)
+- 6 zone valve solenoids (`switch.irrigation_table_1_valve` through `switch.irrigation_table_6_valve`)
 - No dedicated pump — constant-pressure switch auto-starts when the main line opens
 
 **Sensors read:**
@@ -103,7 +103,7 @@ The AppDaemon app tries both naming conventions (with and without prefix) when r
 
 Sensors **created by AppDaemon** (via `set_state`) do not have this issue — they use the exact entity ID passed (e.g., `sensor.crop_steering_zone_1_phase`).
 
-Hardware entities from other integrations keep their own naming (e.g., `switch.gw_mainline`, `sensor.substrate_1_substrate_1_vwc_coco_coir`).
+Hardware entities from other integrations keep their own naming (e.g., `switch.irrigation_mainline`, `sensor.substrate_1_substrate_1_vwc_coco_coir`).
 
 ### Communication Flow
 
@@ -219,8 +219,8 @@ The main decision loop runs every 60 seconds (`phase_check_interval`). Each cycl
 
 When a shot fires:
 
-1. Turn on main line (`switch.gw_mainline`), wait 1s
-2. Turn on zone valve (`switch.gw_table_N_valve`)
+1. Turn on main line (`switch.irrigation_mainline`), wait 1s
+2. Turn on zone valve (`switch.irrigation_table_N_valve`)
 3. Wait for shot duration
 4. Turn off zone valve, wait 1s
 5. Turn off main line, wait 1s
@@ -410,7 +410,7 @@ The primary configuration file. Located at `/config/crop_steering.env`. Parsed d
 
 **Zone definition (per zone):**
 ```
-ZONE_1_SWITCH=switch.gw_table_1_valve
+ZONE_1_SWITCH=switch.irrigation_table_1_valve
 ZONE_1_VWC_SENSORS=sensor.substrate_1_substrate_1_vwc_coco_coir
 ZONE_1_EC_SENSORS=sensor.substrate_1_substrate_1_pwec
 ZONE_1_PLANT_COUNT=4
@@ -443,10 +443,10 @@ master_crop_steering:
   class: MasterCropSteeringApp
   hardware:
     pump_master: null          # No pump — pressure switch auto-starts
-    main_line: switch.gw_mainline
+    main_line: switch.irrigation_mainline
     zone_valves:
-      1: switch.gw_table_1_valve
-      2: switch.gw_table_2_valve
+      1: switch.irrigation_table_1_valve
+      2: switch.irrigation_table_2_valve
       # ... through 6
   sensors:
     vwc:
@@ -456,9 +456,9 @@ master_crop_steering:
       - sensor.substrate_1_substrate_1_pwec
       # ... through 6
     environmental:
-      temperature: sensor.gw_room_1_temp
-      humidity: sensor.gw_room_1_rh
-      vpd: sensor.gw_room_1_vpd
+      temperature: sensor.irrigation_room_1_temp
+      humidity: sensor.irrigation_room_1_rh
+      vpd: sensor.irrigation_room_1_vpd
   timing:
     phase_check_interval: 60     # Decision loop interval (seconds)
     ml_prediction_interval: 300  # ML update interval (seconds)
@@ -961,13 +961,13 @@ The `_should_zone_start_p3()` calculation can trigger too early if the predicted
 
 | Component | Entity ID | Physical |
 |-----------|-----------|----------|
-| Main Line Valve | `switch.gw_mainline` | GroundWork mainline solenoid |
-| Zone 1 Valve | `switch.gw_table_1_valve` | Table 1 solenoid |
-| Zone 2 Valve | `switch.gw_table_2_valve` | Table 2 solenoid |
-| Zone 3 Valve | `switch.gw_table_3_valve` | Table 3 solenoid |
-| Zone 4 Valve | `switch.gw_table_4_valve` | Table 4 solenoid |
-| Zone 5 Valve | `switch.gw_table_5_valve` | Table 5 solenoid |
-| Zone 6 Valve | `switch.gw_table_6_valve` | Table 6 solenoid |
+| Main Line Valve | `switch.irrigation_mainline` | GroundWork mainline solenoid |
+| Zone 1 Valve | `switch.irrigation_table_1_valve` | Table 1 solenoid |
+| Zone 2 Valve | `switch.irrigation_table_2_valve` | Table 2 solenoid |
+| Zone 3 Valve | `switch.irrigation_table_3_valve` | Table 3 solenoid |
+| Zone 4 Valve | `switch.irrigation_table_4_valve` | Table 4 solenoid |
+| Zone 5 Valve | `switch.irrigation_table_5_valve` | Table 5 solenoid |
+| Zone 6 Valve | `switch.irrigation_table_6_valve` | Table 6 solenoid |
 | Pump | None (auto-start) | Constant pressure switch |
 | Zone 1 VWC | `sensor.substrate_1_substrate_1_vwc_coco_coir` | GroundWork substrate probe |
 | Zone 1 EC | `sensor.substrate_1_substrate_1_pwec` | GroundWork substrate probe (pore water EC) |
@@ -981,14 +981,14 @@ The `_should_zone_start_p3()` calculation can trigger too early if the predicted
 | Zone 5 EC | `sensor.substrate_5_substrate_5_pwec` | GroundWork substrate probe |
 | Zone 6 VWC | `sensor.substrate_6_substrate_6_vwc_coco_coir` | GroundWork substrate probe |
 | Zone 6 EC | `sensor.substrate_6_substrate_6_pwec` | GroundWork substrate probe |
-| Room Temp | `sensor.gw_room_1_temp` | GroundWork gateway sensor |
-| Room Humidity | `sensor.gw_room_1_rh` | GroundWork gateway sensor |
-| Room VPD | `sensor.gw_room_1_vpd` | GroundWork gateway sensor |
-| Mains Water | `switch.gw_mains_water` | Mains water valve (infrastructure) |
-| Manifold | `switch.gw_manifold` | Tank filling/mixing manifold |
-| Tank Fill | `switch.gw_tank_fill_valve` | Tank fill valve |
-| Waste Valve | `switch.gw_waste_valve` | Waste/drain valve |
-| Recirculation | `switch.gw_recirculation_valve` | Recirculation valve |
+| Room Temp | `sensor.irrigation_room_1_temp` | GroundWork gateway sensor |
+| Room Humidity | `sensor.irrigation_room_1_rh` | GroundWork gateway sensor |
+| Room VPD | `sensor.irrigation_room_1_vpd` | GroundWork gateway sensor |
+| Mains Water | `switch.irrigation_mains_water` | Mains water valve (infrastructure) |
+| Manifold | `switch.irrigation_manifold` | Tank filling/mixing manifold |
+| Tank Fill | `switch.irrigation_tank_fill_valve` | Tank fill valve |
+| Waste Valve | `switch.irrigation_waste_valve` | Waste/drain valve |
+| Recirculation | `switch.irrigation_recirculation_valve` | Recirculation valve |
 
 ### Irrigation Sequence Timing
 

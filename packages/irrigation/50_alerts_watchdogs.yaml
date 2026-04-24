@@ -19,7 +19,7 @@ automation:
   # trigger emergency stop.  Separate automation per table for clarity.
 
   - id: irrigation_watchdog_table_1_valve
-    alias: "GW Watchdog Table 1 Valve"
+    alias: "Irrigation Watchdog Table 1 Valve"
     trigger:
       - trigger: state
         entity_id: switch.irrigation_table_1_valve
@@ -38,7 +38,7 @@ automation:
             - switch.irrigation_manifold
       - action: script.irrigation_send_alert
         data:
-          title: "🚨 GW Table 1 Valve Stuck"
+          title: "🚨 Irrigation Table 1 Valve Stuck"
           message: >
             Table 1 valve exceeded max runtime
             ({{ states('input_number.irrigation_valve_max_runtime_sec') | int }}s).
@@ -46,7 +46,7 @@ automation:
           level: "critical"
 
   - id: irrigation_watchdog_table_2_valve
-    alias: "GW Watchdog Table 2 Valve"
+    alias: "Irrigation Watchdog Table 2 Valve"
     trigger:
       - trigger: state
         entity_id: switch.irrigation_table_2_valve
@@ -65,13 +65,13 @@ automation:
             - switch.irrigation_manifold
       - action: script.irrigation_send_alert
         data:
-          title: "🚨 GW Table 2 Valve Stuck"
+          title: "🚨 Irrigation Table 2 Valve Stuck"
           message: >
             Table 2 valve exceeded max runtime. Valve and infrastructure closed.
           level: "critical"
 
   - id: irrigation_watchdog_table_3_valve
-    alias: "GW Watchdog Table 3 Valve"
+    alias: "Irrigation Watchdog Table 3 Valve"
     trigger:
       - trigger: state
         entity_id: switch.irrigation_table_3_valve
@@ -90,12 +90,12 @@ automation:
             - switch.irrigation_manifold
       - action: script.irrigation_send_alert
         data:
-          title: "🚨 GW Table 3 Valve Stuck"
+          title: "🚨 Irrigation Table 3 Valve Stuck"
           message: "Table 3 valve exceeded max runtime. Valve and infrastructure closed."
           level: "critical"
 
   - id: irrigation_watchdog_table_4_valve
-    alias: "GW Watchdog Table 4 Valve"
+    alias: "Irrigation Watchdog Table 4 Valve"
     trigger:
       - trigger: state
         entity_id: switch.irrigation_table_4_valve
@@ -114,12 +114,12 @@ automation:
             - switch.irrigation_manifold
       - action: script.irrigation_send_alert
         data:
-          title: "🚨 GW Table 4 Valve Stuck"
+          title: "🚨 Irrigation Table 4 Valve Stuck"
           message: "Table 4 valve exceeded max runtime. Valve and infrastructure closed."
           level: "critical"
 
   - id: irrigation_watchdog_table_5_valve
-    alias: "GW Watchdog Table 5 Valve"
+    alias: "Irrigation Watchdog Table 5 Valve"
     trigger:
       - trigger: state
         entity_id: switch.irrigation_table_5_valve
@@ -138,12 +138,12 @@ automation:
             - switch.irrigation_manifold
       - action: script.irrigation_send_alert
         data:
-          title: "🚨 GW Table 5 Valve Stuck"
+          title: "🚨 Irrigation Table 5 Valve Stuck"
           message: "Table 5 valve exceeded max runtime. Valve and infrastructure closed."
           level: "critical"
 
   - id: irrigation_watchdog_table_6_valve
-    alias: "GW Watchdog Table 6 Valve"
+    alias: "Irrigation Watchdog Table 6 Valve"
     trigger:
       - trigger: state
         entity_id: switch.irrigation_table_6_valve
@@ -162,7 +162,7 @@ automation:
             - switch.irrigation_manifold
       - action: script.irrigation_send_alert
         data:
-          title: "🚨 GW Table 6 Valve Stuck"
+          title: "🚨 Irrigation Table 6 Valve Stuck"
           message: "Table 6 valve exceeded max runtime. Valve and infrastructure closed."
           level: "critical"
 
@@ -173,7 +173,7 @@ automation:
   # (6 tables × max_runtime + 30s settle) = irrigation_valve_max_runtime_sec × 8
   # ═══════════════════════════════════════════════════════════════════════════
   - id: irrigation_watchdog_mains_water
-    alias: "GW Watchdog Mains Water"
+    alias: "Irrigation Watchdog Mains Water"
     description: "Kill mains water if open longer than 8× valve max runtime"
     trigger:
       - trigger: state
@@ -194,7 +194,7 @@ automation:
   # Alert if the primary temp or RH sensor goes unavailable for > 10 min
   # ═══════════════════════════════════════════════════════════════════════════
   - id: irrigation_watchdog_temp_sensor
-    alias: "GW Watchdog Temp Sensor Offline"
+    alias: "Irrigation Watchdog Temp Sensor Offline"
     trigger:
       - trigger: state
         entity_id: sensor.irrigation_room_1_temp
@@ -209,12 +209,12 @@ automation:
     action:
       - action: script.irrigation_send_alert
         data:
-          title: "⚠️ GW Temp Sensor Offline"
+          title: "⚠️ Irrigation Temp Sensor Offline"
           message: "sensor.irrigation_room_1_temp has been unavailable for 10 min. Check CO2 2 device."
           level: "warning"
 
   - id: irrigation_watchdog_rh_sensor
-    alias: "GW Watchdog RH Sensor Offline"
+    alias: "Irrigation Watchdog RH Sensor Offline"
     trigger:
       - trigger: state
         entity_id: sensor.irrigation_room_1_rh
@@ -229,12 +229,12 @@ automation:
     action:
       - action: script.irrigation_send_alert
         data:
-          title: "⚠️ GW RH Sensor Offline"
+          title: "⚠️ Irrigation RH Sensor Offline"
           message: "sensor.irrigation_room_1_rh unavailable for 10 min. Check CO2 2 device."
           level: "warning"
 
   - id: irrigation_watchdog_co2_sensor
-    alias: "GW Watchdog CO2 Sensor Offline"
+    alias: "Irrigation Watchdog CO2 Sensor Offline"
     trigger:
       - trigger: state
         entity_id: sensor.irrigation_room_1_co2
@@ -252,7 +252,7 @@ automation:
           entity_id: switch.irrigation_co2
       - action: script.irrigation_send_alert
         data:
-          title: "⚠️ GW CO2 Sensor Offline"
+          title: "⚠️ Irrigation CO2 Sensor Offline"
           message: >
             sensor.irrigation_room_1_co2 unavailable for 10 min. CO2 solenoid closed as precaution.
           level: "warning"
@@ -265,7 +265,7 @@ automation:
   # maintenance mode.
   # ═══════════════════════════════════════════════════════════════════════════
   - id: irrigation_valve_open_without_permission
-    alias: "GW Valve Open Without Permission"
+    alias: "Irrigation Valve Open Without Permission"
     description: >
       Close all valves if irrigation_allowed goes false while any valve is open.
       Covers maintenance mode activation, leak trigger, tank low, etc.
@@ -301,7 +301,7 @@ automation:
       - action: system_log.write
         data:
           message: >
-            GW interlock: valves closed because irrigation_irrigation_allowed went false
+            Irrigation interlock: valves closed because irrigation_irrigation_allowed went false
           level: warning
 
 
@@ -311,7 +311,7 @@ automation:
   # Threshold: > 10 lux sustained for 1 min (avoids transient false positives).
   # ═══════════════════════════════════════════════════════════════════════════
   - id: irrigation_ambient_light_dark_period_alert
-    alias: "GW Ambient Light Detected During Dark Period"
+    alias: "Irrigation Ambient Light Detected During Dark Period"
     description: >
       Notify Stephan and Damian if DLight Ambient Light Sensor detects light
       above 10 lux while lights are off. Possible light leak or equipment left on.
@@ -345,7 +345,7 @@ automation:
   # DAILY SAFE-STATE AUDIT  (03:00 – ensure all valves closed in dark period)
   # ═══════════════════════════════════════════════════════════════════════════
   - id: irrigation_daily_safe_state_audit
-    alias: "GW Daily Safe State Audit"
+    alias: "Irrigation Daily Safe State Audit"
     trigger:
       - trigger: time
         at: "03:00:00"
@@ -366,5 +366,5 @@ automation:
             - switch.irrigation_co2
       - action: system_log.write
         data:
-          message: "GW daily safe-state audit completed at 03:00"
+          message: "Irrigation daily safe-state audit completed at 03:00"
           level: info
