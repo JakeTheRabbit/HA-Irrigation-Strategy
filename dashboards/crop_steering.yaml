@@ -44,22 +44,22 @@ views:
             title: "Infrastructure"
             show_header_toggle: false
             entities:
-              - entity: switch.gw_mainline
+              - entity: switch.irrigation_mainline
                 name: "Mainline"
                 secondary_info: last-changed
-              - entity: switch.gw_mains_water
+              - entity: switch.irrigation_mains_water
                 name: "Mains Water"
                 secondary_info: last-changed
-              - entity: switch.gw_manifold
+              - entity: switch.irrigation_manifold
                 name: "Manifold"
                 secondary_info: last-changed
-              - entity: switch.gw_tank_fill_valve
+              - entity: switch.irrigation_tank_fill_valve
                 name: "Tank Fill"
                 secondary_info: last-changed
-              - entity: switch.gw_waste_valve
+              - entity: switch.irrigation_waste_valve
                 name: "Waste"
                 secondary_info: last-changed
-              - entity: switch.gw_recirculation_valve
+              - entity: switch.irrigation_recirculation_valve
                 name: "Recirculation"
                 secondary_info: last-changed
 
@@ -70,22 +70,22 @@ views:
             title: "Valves"
             show_header_toggle: false
             entities:
-              - entity: switch.gw_table_1_valve
+              - entity: switch.irrigation_table_1_valve
                 name: "Table 1"
                 secondary_info: last-changed
-              - entity: switch.gw_table_2_valve
+              - entity: switch.irrigation_table_2_valve
                 name: "Table 2"
                 secondary_info: last-changed
-              - entity: switch.gw_table_3_valve
+              - entity: switch.irrigation_table_3_valve
                 name: "Table 3"
                 secondary_info: last-changed
-              - entity: switch.gw_table_4_valve
+              - entity: switch.irrigation_table_4_valve
                 name: "Table 4"
                 secondary_info: last-changed
-              - entity: switch.gw_table_5_valve
+              - entity: switch.irrigation_table_5_valve
                 name: "Table 5"
                 secondary_info: last-changed
-              - entity: switch.gw_table_6_valve
+              - entity: switch.irrigation_table_6_valve
                 name: "Table 6"
                 secondary_info: last-changed
 

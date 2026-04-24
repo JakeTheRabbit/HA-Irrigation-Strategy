@@ -18,7 +18,7 @@ views:
             show_header_toggle: false
             entities:
               - entity: input_boolean.irrigation_enable
-                name: GW System
+                name: Irrigation System
                 icon: mdi:power
               - entity: input_boolean.irrigation_maintenance_mode
                 name: Maintenance
@@ -1064,13 +1064,13 @@ views:
             title: "Table 1 Sensor Health"
             show_header_toggle: false
             entities:
-              - entity: sensor.sensor_gw_table_1_vwc_health
+              - entity: sensor.sensor_irrigation_table_1_vwc_health
                 name: VWC Health
-              - entity: sensor.sensor_gw_table_1_vwc_reliability
+              - entity: sensor.sensor_irrigation_table_1_vwc_reliability
                 name: VWC Reliability
-              - entity: sensor.sensor_gw_table_1_ec_health
+              - entity: sensor.sensor_irrigation_table_1_ec_health
                 name: EC Health
-              - entity: sensor.sensor_gw_table_1_ec_reliability
+              - entity: sensor.sensor_irrigation_table_1_ec_reliability
                 name: EC Reliability
 
       # ── Table 2 Health ────────────────────────────────────────────────────
@@ -1080,13 +1080,13 @@ views:
             title: "Table 2 Sensor Health"
             show_header_toggle: false
             entities:
-              - entity: sensor.sensor_gw_table_2_vwc_health
+              - entity: sensor.sensor_irrigation_table_2_vwc_health
                 name: VWC Health
-              - entity: sensor.sensor_gw_table_2_vwc_reliability
+              - entity: sensor.sensor_irrigation_table_2_vwc_reliability
                 name: VWC Reliability
-              - entity: sensor.sensor_gw_table_2_ec_health
+              - entity: sensor.sensor_irrigation_table_2_ec_health
                 name: EC Health
-              - entity: sensor.sensor_gw_table_2_ec_reliability
+              - entity: sensor.sensor_irrigation_table_2_ec_reliability
                 name: EC Reliability
 
       # ── Table 3 Health ────────────────────────────────────────────────────
@@ -1096,13 +1096,13 @@ views:
             title: "Table 3 Sensor Health"
             show_header_toggle: false
             entities:
-              - entity: sensor.sensor_gw_table_3_vwc_health
+              - entity: sensor.sensor_irrigation_table_3_vwc_health
                 name: VWC Health
-              - entity: sensor.sensor_gw_table_3_vwc_reliability
+              - entity: sensor.sensor_irrigation_table_3_vwc_reliability
                 name: VWC Reliability
-              - entity: sensor.sensor_gw_table_3_ec_health
+              - entity: sensor.sensor_irrigation_table_3_ec_health
                 name: EC Health
-              - entity: sensor.sensor_gw_table_3_ec_reliability
+              - entity: sensor.sensor_irrigation_table_3_ec_reliability
                 name: EC Reliability
 
       # ── Table 4 Health ────────────────────────────────────────────────────
@@ -1112,13 +1112,13 @@ views:
             title: "Table 4 Sensor Health"
             show_header_toggle: false
             entities:
-              - entity: sensor.sensor_gw_table_4_vwc_health
+              - entity: sensor.sensor_irrigation_table_4_vwc_health
                 name: VWC Health
-              - entity: sensor.sensor_gw_table_4_vwc_reliability
+              - entity: sensor.sensor_irrigation_table_4_vwc_reliability
                 name: VWC Reliability
-              - entity: sensor.sensor_gw_table_4_ec_health
+              - entity: sensor.sensor_irrigation_table_4_ec_health
                 name: EC Health
-              - entity: sensor.sensor_gw_table_4_ec_reliability
+              - entity: sensor.sensor_irrigation_table_4_ec_reliability
                 name: EC Reliability
 
       # ── Table 5 Health ────────────────────────────────────────────────────
@@ -1128,13 +1128,13 @@ views:
             title: "Table 5 Sensor Health"
             show_header_toggle: false
             entities:
-              - entity: sensor.sensor_gw_table_5_vwc_health
+              - entity: sensor.sensor_irrigation_table_5_vwc_health
                 name: VWC Health
-              - entity: sensor.sensor_gw_table_5_vwc_reliability
+              - entity: sensor.sensor_irrigation_table_5_vwc_reliability
                 name: VWC Reliability
-              - entity: sensor.sensor_gw_table_5_ec_health
+              - entity: sensor.sensor_irrigation_table_5_ec_health
                 name: EC Health
-              - entity: sensor.sensor_gw_table_5_ec_reliability
+              - entity: sensor.sensor_irrigation_table_5_ec_reliability
                 name: EC Reliability
 
       # ── Table 6 Health ────────────────────────────────────────────────────
@@ -1144,13 +1144,13 @@ views:
             title: "Table 6 Sensor Health"
             show_header_toggle: false
             entities:
-              - entity: sensor.sensor_gw_table_6_vwc_health
+              - entity: sensor.sensor_irrigation_table_6_vwc_health
                 name: VWC Health
-              - entity: sensor.sensor_gw_table_6_vwc_reliability
+              - entity: sensor.sensor_irrigation_table_6_vwc_reliability
                 name: VWC Reliability
-              - entity: sensor.sensor_gw_table_6_ec_health
+              - entity: sensor.sensor_irrigation_table_6_ec_health
                 name: EC Health
-              - entity: sensor.sensor_gw_table_6_ec_reliability
+              - entity: sensor.sensor_irrigation_table_6_ec_reliability
                 name: EC Reliability
 
   # ═══════════════════════════════════════════════════════════════════════════

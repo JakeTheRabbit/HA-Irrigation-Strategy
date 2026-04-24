@@ -1,7 +1,7 @@
-title: "GW Irrigation"
+title: "Irrigation"
 views:
-  - title: GW Irrigation
-    path: gw-irrigation
+  - title: Irrigation
+    path: irrigation
     icon: mdi:water-sync
     type: sections
     max_columns: 4
@@ -13,7 +13,7 @@ views:
         cards:
           - type: markdown
             content: >
-              ## GW Irrigation — How It Works
+              ## Irrigation — How It Works
 
 
               This dashboard controls the **Irrigation timer-based irrigation
@@ -24,7 +24,7 @@ views:
 
               ### How It Runs
 
-              1. The automation `GW Irrigation Scheduler` fires every 5 minutes
+              1. The automation `Irrigation Scheduler` fires every 5 minutes
               and checks if enough time has passed since the last cycle
               (controlled by **Cycle Interval**).
 
@@ -53,25 +53,24 @@ views:
               ### Relationship to Other Systems
 
               - **Crop Steering AI**: If you are using the Crop Steering
-              dashboard for irrigation, **GW Irrigation Enabled should be OFF**
+              dashboard for irrigation, **Irrigation Enabled should be OFF**
               to prevent double-watering. Both systems control the same physical
               valves.
 
-              - **CO2 & Environment**: Completely independent. Turning GW
-              Irrigation off has no effect on CO2 or temp/RH control.
+              - **CO2 & Environment**: Completely independent. Turning irrigation off has no effect on CO2 or temp/RH control.
 
-              - **GW Table Enables**: These flags are respected by BOTH this
+              - **Irrigation Table Enables**: These flags are respected by BOTH this
               system and the Crop Steering AI. Turning off a table here blocks
               it everywhere.
 
 
               ### Enable Hierarchy
 
-              For the GW scheduler to water a table, ALL of these must be true:
+              For the Irrigation scheduler to water a table, ALL of these must be true:
 
-              1. `GW Master Enable` = ON
+              1. `Irrigation Master Enable` = ON
 
-              2. `GW Irrigation Enabled` = ON
+              2. `Irrigation Enabled` = ON
 
               3. `Maintenance Mode` = OFF
 
@@ -90,10 +89,10 @@ views:
             show_header_toggle: false
             entities:
               - entity: input_boolean.irrigation_enable
-                name: "GW Master Enable"
+                name: "Irrigation Master Enable"
                 secondary_info: "Master kill switch — also affects emergency stop script"
               - entity: input_boolean.irrigation_irrigation_enabled
-                name: "GW Irrigation Enabled"
+                name: "Irrigation Enabled"
                 secondary_info: "Timer-based watering — OFF when using Crop Steering AI"
               - entity: input_boolean.irrigation_maintenance_mode
                 name: "Maintenance Mode"
