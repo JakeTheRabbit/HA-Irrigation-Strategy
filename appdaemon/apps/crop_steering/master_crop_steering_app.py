@@ -2021,6 +2021,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 }
             }
         
+        # Safe VWC string for use in reason messages (zone_vwc may be None)
+        vwc_str = f"{zone_vwc:.1f}%" if zone_vwc is not None else "N/A"
+
         # Check if we've reached target VWC
         if not vwc_needs_irrigation:
             if current_shot_count >= min_shots:
@@ -2030,7 +2033,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     'vwc': zone_vwc,
                     'ec': zone_ec,
                     'ec_target': ec_target,
-                    'reason': f"P1 complete: VWC {zone_vwc:.1f}% reached target {target_vwc}% after {current_shot_count} shots",
+                    'reason': f"P1 complete: VWC {vwc_str} reached target {target_vwc}% after {current_shot_count} shots",
                     'p1_complete': True,
                     'p1_progression': {
                         'shot_count': current_shot_count,
@@ -2040,7 +2043,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             else:
                 # Haven't reached minimum shots yet, continue
                 vwc_needs_irrigation = True
-        
+
         # Check if we've exceeded maximum shots
         if current_shot_count >= max_shots:
             return {
@@ -2048,7 +2051,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'vwc': zone_vwc,
                 'ec': zone_ec,
                 'ec_target': ec_target,
-                'reason': f"P1 max shots reached: {current_shot_count}/{max_shots} shots completed, VWC {zone_vwc:.1f}%",
+                'reason': f"P1 max shots reached: {current_shot_count}/{max_shots} shots completed, VWC {vwc_str}",
                 'p1_complete': True,
                 'p1_progression': {
                     'shot_count': current_shot_count,
@@ -2076,10 +2079,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Build reason string
             if vwc_needs_irrigation and ec_irrigation_decision['needs_irrigation']:
-                reason = f"P1 shot {current_shot_count + 1}/{max_shots}: VWC {zone_vwc:.1f}% < {target_vwc}% + {ec_irrigation_decision['reason']}"
+                reason = f"P1 shot {current_shot_count + 1}/{max_shots}: VWC {vwc_str} < {target_vwc}% + {ec_irrigation_decision['reason']}"
                 confidence = 0.9
             elif vwc_needs_irrigation:
-                reason = f"P1 shot {current_shot_count + 1}/{max_shots}: VWC {zone_vwc:.1f}% < {target_vwc}%"
+                reason = f"P1 shot {current_shot_count + 1}/{max_shots}: VWC {vwc_str} < {target_vwc}%"
                 confidence = 0.8
             else:
                 reason = f"P1 shot {current_shot_count + 1}/{max_shots}: {ec_irrigation_decision['reason']}"
@@ -2105,11 +2108,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
             }
         
         return {
-            'needs_irrigation': False, 
-            'vwc': zone_vwc, 
+            'needs_irrigation': False,
+            'vwc': zone_vwc,
             'ec': zone_ec,
             'ec_target': ec_target,
-            'reason': f"P1 shot {current_shot_count}/{max_shots}: VWC stable at {zone_vwc:.1f}%"
+            'reason': f"P1 shot {current_shot_count}/{max_shots}: VWC stable at {vwc_str}"
         }
 
     def _evaluate_zone_p2_needs(self, zone_num: int, profile_params: Dict) -> Dict:
@@ -2131,24 +2134,27 @@ class MasterCropSteeringApp(BaseAsyncApp):
         ec_high_threshold = self._get_number_entity_value("number.p2_ec_high_threshold", 1.2)
         ec_low_threshold = self._get_number_entity_value("number.p2_ec_low_threshold", 0.8)
         
+        # Safe VWC string for reason messages (zone_vwc may be None)
+        vwc_str = f"{zone_vwc:.1f}%" if zone_vwc is not None else "N/A"
+
         # Check VWC condition
         vwc_needs_irrigation = zone_vwc is not None and zone_vwc < vwc_threshold
-        
+
         # Check EC conditions
         ec_irrigation_decision = self._evaluate_ec_irrigation_need(zone_ec, ec_target, "P2")
-        
+
         # Check EC ratio conditions (P2 specific logic)
         ec_ratio_decision = self._evaluate_p2_ec_ratio_irrigation(
             zone_ec, ec_target, ec_high_threshold, ec_low_threshold
         )
-        
+
         # Combined decision logic for P2
         needs_irrigation = vwc_needs_irrigation or ec_irrigation_decision['needs_irrigation'] or ec_ratio_decision['needs_irrigation']
-        
+
         if needs_irrigation:
             # Calculate shot size with EC-based adjustments
             base_shot_size = self._get_number_entity_value("number.p2_shot_size", 5.0)
-            
+
             # Use EC ratio decision if it's the primary driver
             if ec_ratio_decision['needs_irrigation']:
                 ec_adjusted_shot_size = ec_ratio_decision['adjusted_shot_size']
@@ -2158,13 +2164,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 ec_adjusted_shot_size = self._calculate_ec_adjusted_shot_size(
                     base_shot_size, zone_ec, ec_target, ec_irrigation_decision
                 )
-                
+
                 # Determine primary reason
                 if vwc_needs_irrigation and ec_irrigation_decision['needs_irrigation']:
-                    primary_reason = f"P2: VWC {zone_vwc:.1f}% < {vwc_threshold}% + {ec_irrigation_decision['reason']}"
+                    primary_reason = f"P2: VWC {vwc_str} < {vwc_threshold}% + {ec_irrigation_decision['reason']}"
                     confidence = 0.8
                 elif vwc_needs_irrigation:
-                    primary_reason = f"P2: VWC {zone_vwc:.1f}% < {vwc_threshold}%"
+                    primary_reason = f"P2: VWC {vwc_str} < {vwc_threshold}%"
                     confidence = 0.7
                 else:
                     primary_reason = f"P2: {ec_irrigation_decision['reason']}"
