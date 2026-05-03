@@ -78,9 +78,21 @@ Your system automatically cycles through 4 phases each day when AppDaemon is ins
 - `number.crop_steering_p1_initial_shot_size`: Starting shot volume (default 5%)
 - `number.crop_steering_p2_shot_size`: Maintenance shot volume (default 3%)
 
-**Dryback Control:**
-- `number.crop_steering_veg_dryback_target`: Vegetative dryback % (default 15-20%)
-- `number.crop_steering_gen_dryback_target`: Generative dryback % (default 20-25%)
+**Dryback Control (RootSense v3):**
+
+> All "dryback" values are **% drop from peak VWC** — i.e. how much
+> the substrate dries back **by**, not what VWC value it dries back **to**.
+> Example: peak 70 %, valley 58 % → dryback = 12 (not 58).
+
+- `number.crop_steering_veg_p0_dryback_drop_pct`: Vegetative endpoint, default 12 %.
+- `number.crop_steering_gen_p0_dryback_drop_pct`: Generative endpoint, default 22 %.
+- `number.crop_steering_veg_dryback_target` / `gen_dryback_target`: legacy aliases (same semantic, kept for backward compatibility).
+- `number.crop_steering_p0_dryback_drop_percent`: interpolated current target, written by the IntentResolver every tick — read by the legacy P0-exit predicate.
+
+**Cultivator Intent (RootSense v3):**
+
+The single dial that drives all derived parameters:
+- `number.crop_steering_steering_intent`: -100 (pure generative) … +100 (pure vegetative). Default 0 = balanced.
 
 ### When to Adjust Parameters
 
@@ -129,6 +141,66 @@ data:
 - Cross-validate sensors against known standards
 - Check calibration
 - Consider sensor replacement if persistent
+
+## 🌱 RootSense v3 Daily Operation
+
+If you've enabled the RootSense pillars (see `installation_guide.md` Step 6
+and `MIGRATION.md`), the system gains substrate analytics, automated
+field-capacity detection, and an anomaly scanner that surfaces issues
+before they hit yield.
+
+### What the dashboard shows
+
+Load `dashboards/rootsense_history.yaml` for a three-tab view:
+
+- **Intent** — the cultivator-intent slider, derived steering mode,
+  pillar enable/disable switches, anomaly status.
+- **Substrate** — multi-metric history graphs per zone (VWC, EC,
+  dryback velocity, observed field capacity) plus per-zone substrate
+  intelligence cards (FC, dryback velocity, porosity estimate, EC
+  stack index).
+- **Anomalies** — recent anomaly events log + scanner status.
+
+### Daily routine with RootSense enabled
+
+1. **Morning glance at the Intent tab.** Confirm the intent slider
+   is where you left it; check `binary_sensor.crop_steering_anomaly_active`
+   is off.
+2. **Mid-morning scan of the Substrate tab.** Verify each zone's
+   `dryback_velocity_pct_per_hr` is plausible for the current phase
+   (typically 1-3 %/h during a healthy P0).
+3. **Evening review of the Anomalies tab.** If anything fired during
+   the day, the event log shows the code, evidence, and remediation
+   steps. Common codes: `emitter_blockage`, `ec_drift_high`,
+   `vwc_flat_line`, `dryback_undetected`, `peer_vwc_deviation`.
+
+### Adjusting the cultivator intent
+
+Move `number.crop_steering_steering_intent` instead of toggling
+`select.crop_steering_steering_mode`. Every derived parameter
+(P1 target VWC, P2 threshold, P0 dryback drop %, shot size, EC
+target) re-interpolates from the new intent within one tick.
+
+A change takes effect immediately for thresholds, but takes one
+full P0→P3 cycle to manifest in plant response. Don't whipsaw the
+slider — give each setting at least 24 hours.
+
+### Custom shots
+
+For one-off flushes, rescue shots, or emitter tests:
+
+```yaml
+service: crop_steering.custom_shot
+data:
+  target_zone: 1
+  intent: rescue          # or rebalance_ec, test_emitter, manual
+  volume_ml: 250
+  target_runoff_pct: 15   # optional — orchestrator stops early if reached
+  tag: "morning_check"    # logged for analytics
+```
+
+The orchestrator gates the request through anomaly suppression,
+flush cooldown, and existing safety checks before reaching hardware.
 
 ## 📈 Performance Optimization
 

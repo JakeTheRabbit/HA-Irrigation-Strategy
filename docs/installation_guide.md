@@ -177,6 +177,78 @@ appdaemon/apps/crop_steering/ → /addon_configs/a0d7b954_appdaemon/apps/crop_st
 
 ✅ **Success Check:** If you see that message, automation is working!
 
+### Step 6: Enable RootSense v3 Intelligence (Optional)
+
+The system has a four-pillar intelligence platform layered on top of the
+4-phase controller. **All pillars are opt-in and default OFF.** You can
+enable them one at a time, in any order, and disable any pillar instantly
+without breaking the rest of the system. Read `MIGRATION.md` in the repo
+root for the full rollout playbook.
+
+#### 6a: Add the AppDaemon pillars to `apps.yaml`
+
+Open `appdaemon/apps/apps.yaml` and append the blocks from
+`docs/upgrade/apps.example.yaml` in the repo. Each block is independent.
+Recommended safe rollout order:
+
+1. **`rootsense_root_zone`** (read-only — derives substrate sensors)
+2. **`rootsense_anomaly`** (read-only — surfaces alerts)
+3. **`rootsense_adaptive`** (cultivator-intent slider goes live)
+4. **`rootsense_agronomic`** (transpiration + nightly run report)
+5. **`rootsense_orchestrator`** (last — can call hardware-touching services)
+
+Restart AppDaemon after editing `apps.yaml`.
+
+#### 6b: Enable HA packages for the recorder includes (if not already)
+
+If your `configuration.yaml` doesn't already enable packages, add:
+
+```yaml
+homeassistant:
+  packages: !include_dir_named packages
+```
+
+Then restart Home Assistant. This activates `packages/rootsense/00_recorder.yaml`
+which keeps the new RootSense sensors in HA's history database.
+
+#### 6c: Toggle the pillar switches in the UI
+
+For each pillar you've added to `apps.yaml`, find its corresponding
+switch in HA and turn it on:
+
+- `switch.crop_steering_intelligence_root_zone_enabled`
+- `switch.crop_steering_intelligence_anomaly_enabled`
+- `switch.crop_steering_intelligence_adaptive_enabled`
+- `switch.crop_steering_intelligence_agronomic_enabled`
+- `switch.crop_steering_intelligence_orchestrator_enabled`
+
+The pillar starts publishing values within one tick (60 s for root zone,
+30 s for orchestrator emergency check, 5 min for agronomic transpiration).
+
+#### 6d: (Optional) Load the multi-metric dashboard
+
+`dashboards/rootsense_history.yaml` is a three-tab Lovelace dashboard
+(Intent / Substrate / Anomalies) using HA's built-in `history-graph`
+card. Add it as a new dashboard or cherry-pick views into your existing
+one.
+
+✅ **Success Check:** With `rootsense_root_zone` enabled, you should see
+`sensor.crop_steering_zone_1_dryback_velocity_pct_per_hr` populate within
+2-3 minutes once VWC samples accumulate in its rolling buffer.
+
+#### 6e: Get familiar with the cultivator intent slider
+
+The single dial that drives every derived parameter in v3:
+**`number.crop_steering_steering_intent`**, range -100 to +100.
+
+- **+100** — pure vegetative bias (high VWC target, more shots, low EC)
+- **0** — balanced midpoint (default — preserves v2.x behaviour)
+- **-100** — pure generative bias (large dryback, fewer big shots, high EC)
+
+The IntentResolver reads this every tick and re-publishes the derived
+P1 target VWC, P2 threshold, P0 dryback drop %, shot size, and EC target
+into their respective number entities.
+
 ---
 
 ## Method 2: Manual Installation (Advanced Users)
