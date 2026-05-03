@@ -43,8 +43,11 @@ class IrrigationOrchestrator(IntelligenceApp):
         self._last_flush_at: dict[int, datetime] = {}
         self._suppressed_zones: set[int] = set()
 
-        # HA service: custom shot
-        self.register_service("crop_steering/custom_shot", self._on_custom_shot_service)
+        # HA event: integration's crop_steering.custom_shot service fires
+        # `crop_steering_custom_shot` on the HA bus; we listen for that here.
+        # The integration owns the service registration so the schema is
+        # validated before we get involved.
+        self.listen_event(self._on_custom_shot_event, "crop_steering_custom_shot")
 
         # Bus subscriptions
         self.bus.subscribe("anomaly.detected", self._on_anomaly)
@@ -57,12 +60,11 @@ class IrrigationOrchestrator(IntelligenceApp):
 
     # ------------------------------------------------------------------ services
 
-    async def _on_custom_shot_service(self, namespace, domain, service, kwargs):  # noqa: D401
-        # AppDaemon service signature; payload comes via kwargs["data"].
+    def _on_custom_shot_event(self, event_name: str, data: dict[str, Any], _kwargs: Any) -> None:
+        """Handle `crop_steering_custom_shot` events from the HA service bus."""
         if not self._is_module_enabled():
             self.log("custom_shot ignored: orchestrator module disabled", level="WARNING")
             return
-        data = kwargs.get("data", {}) or kwargs
         zone = int(data.get("target_zone", 0))
         if zone <= 0:
             self.log("custom_shot ignored: invalid zone %s", zone, level="WARNING")
@@ -96,8 +98,8 @@ class IrrigationOrchestrator(IntelligenceApp):
             tag=f"{intent_label}:{tag}",
         )
 
-        # Hand off to legacy service (which talks to hardware)
-        await self.call_service(
+        # Hand off to legacy service (which talks to hardware).
+        self.call_service(
             "crop_steering/execute_irrigation_shot",
             zone=zone,
             duration_seconds=int(duration_s),

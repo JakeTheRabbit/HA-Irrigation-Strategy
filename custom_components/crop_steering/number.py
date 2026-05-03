@@ -71,6 +71,26 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement="mS/cm",
         mode="box",
     ),
+    # ----- RootSense cultivator intent (v3) -----
+    # The single dial cultivators interact with day-to-day. -100 = pure
+    # generative, +100 = pure vegetative, 0 = midpoint. The IntentResolver
+    # in adaptive_irrigation.py reads this every tick and writes the
+    # interpolated derived parameters (P1 target VWC, P2 threshold,
+    # P0 dryback drop %, shot size, EC target) into their respective
+    # number entities. The legacy `select.crop_steering_steering_mode` is
+    # preserved; it now reflects the intent rather than driving it (see
+    # number.py also publishes a derived_steering_mode select via
+    # adaptive_irrigation). Default 0 = midpoint, equivalent to "balanced".
+    NumberEntityDescription(
+        key="steering_intent",
+        name="Cultivator Intent",
+        icon="mdi:tune-variant",
+        native_min_value=-100.0,
+        native_max_value=100.0,
+        native_step=5.0,
+        native_unit_of_measurement="bias",
+        mode="slider",
+    ),
     # ----- Operator-facing P0 dryback drop sliders (RootSense v3) -----
     # Both express "percentage point drop from peak VWC" — i.e. how much the
     # substrate dries back BY, not what it dries back TO. Veg defaults small
@@ -574,6 +594,7 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             "field_capacity": 70.0,
             "max_ec": 9.0,
             # New canonical entities (RootSense v3)
+            "steering_intent": 0.0,  # midpoint = "balanced"
             "veg_p0_dryback_drop_pct": DEFAULT_VEG_P0_DRYBACK_DROP_PCT,
             "gen_p0_dryback_drop_pct": DEFAULT_GEN_P0_DRYBACK_DROP_PCT,
             # Legacy aliases — same semantic ("% drop from peak"), corrected

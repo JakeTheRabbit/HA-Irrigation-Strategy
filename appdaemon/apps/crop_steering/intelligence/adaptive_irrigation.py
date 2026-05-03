@@ -173,6 +173,9 @@ class AdaptiveIrrigation(IntelligenceApp):
             if entity and self.entity_exists(entity):
                 self.call_service("number/set_value", entity_id=entity, value=value)
 
+        # Drive the derived steering-mode select for dashboards.
+        self._publish_derived_mode(intent)
+
         # Surface the interpolated dryback as a sensor as well, so dashboards
         # can show "current P0 dryback target = 17.4% drop" without having to
         # subscribe to events.
@@ -192,6 +195,24 @@ class AdaptiveIrrigation(IntelligenceApp):
 
         self.bus.publish("intent.changed", {"intent": intent, "derived": derived})
         self.log("Intent=%s → %s", intent, derived)
+
+    def _publish_derived_mode(self, intent: float) -> None:
+        """Bucket the intent slider into a 5-point select."""
+        if intent <= -60:
+            label = "Generative"
+        elif intent <= -20:
+            label = "Mixed-generative"
+        elif intent < 20:
+            label = "Balanced"
+        elif intent < 60:
+            label = "Mixed-vegetative"
+        else:
+            label = "Vegetative"
+        self.call_service(
+            "select/select_option",
+            entity_id="select.crop_steering_steering_mode_derived",
+            option=label,
+        )
 
     def _read_intent(self) -> float:
         try:
