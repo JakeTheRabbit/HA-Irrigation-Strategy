@@ -138,6 +138,7 @@ class SensorMap:
     tank_low: str = ""
     ppfd: str | None = None
     canopy_temp: str | None = None
+    leaf_temp: str | None = None    # IR / leaf-surface sensor — supervisory variable when present
 
 
 @dataclass

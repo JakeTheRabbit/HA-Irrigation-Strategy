@@ -37,6 +37,8 @@ MODULE_SWITCH = {
     "ClimateSenseControl":      "switch.crop_steering_intelligence_climate_control_enabled",
     "ClimateSenseLights":       "switch.crop_steering_intelligence_climate_lights_enabled",
     "ClimateAnomalyScanner":    "switch.crop_steering_intelligence_climate_anomaly_enabled",
+    # LLM advisor — Phase L0 (report-builder only; no LLM call)
+    "RootSenseReportBuilder":   "switch.crop_steering_intelligence_llm_report_enabled",
 }
 
 

@@ -105,6 +105,12 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="ClimateSense — Recipe drives cultivator intent",
         icon="mdi:link-variant",
     ),
+    # ----- LLM advisor (Phase L0 — report only, no LLM calls) -----
+    SwitchEntityDescription(
+        key="intelligence_llm_report_enabled",
+        name="LLM Advisor — Report builder (L0)",
+        icon="mdi:file-document-outline",
+    ),
 ]
 
 

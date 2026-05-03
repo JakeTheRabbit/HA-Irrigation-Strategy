@@ -30,6 +30,26 @@ class HVACState:
     last_mode_change_at: datetime | None = None
 
 
+def propose_hvac_off(*, cal: HVACCalibration, state: HVACState,
+                      reason: str = "force off") -> list[Action]:
+    """Emit an explicit OFF mode action. Used by:
+    - The coordinator when maintenance mode is engaged.
+    - The watchdog when the unit is in heat mode during a high-temp
+      emergency (running heat is making things worse).
+    - The operator-facing service `crop_steering.hvac_force_off`.
+    """
+    if state.last_mode == "off":
+        return []
+    return [Action(
+        kind=ActionKind.HVAC_MODE,
+        entity=cal.entity,
+        value="off",
+        reason=reason,
+        actuator_class="hvac",
+        severity="safety",
+    )]
+
+
 def propose_hvac(
     *,
     target_c: float | None,

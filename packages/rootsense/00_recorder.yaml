@@ -38,6 +38,11 @@ recorder:
       - sensor.climate_dli_today_mol
       - sensor.climate_dli_predicted_mol
       - sensor.climate_leaf_air_dt_c
+      - sensor.climate_leaf_vpd_kpa
+      - sensor.climate_derived_rh_target_pct
+      # LLM advisor (L0)
+      - sensor.crop_steering_rootsense_report_latest
+      - sensor.crop_steering_rootsense_report_size_tokens
       # Existing zone metrics that the multi-metric history dashboard overlays
       - sensor.crop_steering_zone_*_avg_vwc
       - sensor.crop_steering_zone_*_avg_ec
@@ -61,4 +66,5 @@ recorder:
       - switch.crop_steering_intelligence_climate_lights_enabled
       - switch.crop_steering_intelligence_climate_anomaly_enabled
       - switch.crop_steering_intelligence_climate_drives_intent_enabled
+      - switch.crop_steering_intelligence_llm_report_enabled
       - number.crop_steering_climate_grow_day_offset

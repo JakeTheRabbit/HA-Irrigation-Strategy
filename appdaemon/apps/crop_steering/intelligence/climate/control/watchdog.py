@@ -23,6 +23,7 @@ def watchdog_check(
     hw: HardwareCalibration,
     sensor_state: dict[str, dict[str, Any]],   # entity → {value, last_update}
     actuator_runtime: dict[str, dict[str, Any]],  # entity → {is_on, last_on_at}
+    hvac_mode: str | None = None,              # last commanded mode; None if unknown
     now: datetime | None = None,
 ) -> tuple[list[Action], list[str]]:
     """Return (safety_actions, anomaly_codes)."""
@@ -61,6 +62,20 @@ def watchdog_check(
                 entity=hw.exhaust.entity,
                 reason=f"WATCHDOG: temp {temp_value:.1f}°C > emergency {hw.safety.emergency_temp_c:.1f}",
                 actuator_class="exhaust",
+                severity="emergency",
+            ))
+        # If HVAC is in heat mode during a high-temp emergency it is
+        # ACTIVELY making things worse — force OFF.
+        if hvac_mode == "heat" and hw.hvac_primary:
+            actions.append(Action(
+                kind=ActionKind.HVAC_MODE,
+                entity=hw.hvac_primary.entity,
+                value="off",
+                reason=(
+                    f"WATCHDOG: HVAC heating during temp emergency "
+                    f"({temp_value:.1f}°C > {hw.safety.emergency_temp_c:.1f}) — force off"
+                ),
+                actuator_class="hvac",
                 severity="emergency",
             ))
 

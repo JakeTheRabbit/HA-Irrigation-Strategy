@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 3.0.0-dev "RootSense"
 
+### Added (HVAC mode-switching hardened + LLM advisor Phase L0)
+
+#### HVAC mode-switching (operator request: explicit dispatch wiring)
+- `propose_hvac_off()` helper for explicit HVAC shutdown — used by the
+  watchdog when the unit is in heat mode during a high-temp emergency
+  (it's actively making things worse) and available to a future
+  `crop_steering.hvac_force_off` service.
+- Watchdog now receives `hvac_mode` and force-emits `HVAC_MODE=off`
+  during a temp emergency *only* when the unit is currently heating.
+  When cooling, it leaves the unit running — we want max cooling under
+  emergency.
+- Dispatch path refactored: pure `action_to_service_call(action)` helper
+  translates every Action kind to (HA-service-path, kwargs). The
+  AppDaemon adapter is now a one-liner around it. Tested for all 5
+  ActionKind variants including all 6 valid `hvac_mode` values
+  (off/cool/heat/heat_cool/dry/fan_only) — confirms the IR-blaster
+  template (better_thermostat → SmartIR) gets the right service.
+- 4 new control-loop tests covering the watchdog HVAC-off rule, the
+  `propose_hvac_off` helper, and the dispatch translator.
+
+#### LLM advisor — Phase L0 (report builder, NO LLM calls)
+- New `appdaemon/apps/crop_steering/intelligence/llm/` package.
+- `report_builder.py` — `RootSenseReportBuilder` AppDaemon app builds
+  a compact JSON snapshot every 15 min. The schema mirrors the design
+  in `LLM_HEALTHCHECK_PLAN.md`:
+  - top-level: ts, phase, intent, recipe_phase, recipe_day, climate,
+    substrate (per-zone), deltas_15m_ago, active_anomalies, triage,
+    estimated_tokens.
+  - climate: temp/rh/vpd/leaf_vpd/co2 with `_target` + `_status`
+    classification (on_target / near_target / off_target).
+  - triage tag: anomaly:* > drift:* > heartbeat > ok (local rule
+    engine, no LLM).
+- Pure helpers: `classify_status()`, `compute_deltas()`,
+  `compute_triage()`, `estimate_tokens()` — all unit-tested in
+  isolation.
+- Published as:
+  - `sensor.crop_steering_rootsense_report_latest` (state = triage tag,
+    attributes = full payload).
+  - `sensor.crop_steering_rootsense_report_size_tokens` (token estimate).
+  - Bus event `report.ready`.
+  - HA event `crop_steering_rootsense_report`.
+- Switch `switch.crop_steering_intelligence_llm_report_enabled` (default
+  OFF) gates the whole pillar.
+- 21 new unit tests covering classify_status edge cases, delta
+  threshold + nested-substrate walking, triage precedence (anomaly >
+  drift > heartbeat > ok), estimate_tokens proportionality, a realistic
+  full-payload fits-under-500-tokens guard, build_report integration
+  against synthetic state with day/night target switching, anomaly
+  inclusion, drift triage, delta vs prior history, and a guard test
+  that asserts the module imports no LLM client (anthropic / openai /
+  requests / aiohttp absent — by construction the module CANNOT call
+  an LLM).
+- Also fixed a silently-dropped field: `SensorMap` now has explicit
+  `leaf_temp` (was being filtered out by the YAML loader because the
+  dataclass field didn't exist).
+
+### Added (Dashboard wiring)
+- New "LLM Advisor" view in `dashboards/legacyag/30_intelligence.yaml`:
+  pillar status, latest triage tag, full report payload as
+  syntax-highlighted markdown, 7-day token-size + triage-history
+  graphs.
+
+### Changed (Recorder includes)
+- `packages/rootsense/00_recorder.yaml` extended for
+  `sensor.climate_leaf_vpd_kpa`, `sensor.climate_derived_rh_target_pct`,
+  the L0 report sensors, and the LLM-report-enable switch.
+
+### Tests
+- Total intelligence tests: **121** (was 95).
+- Full suite: **154 passing.**
+
 ### Changed (ClimateSense — layered control refactor + leaf VPD supervisory variable)
 
 The monolithic `control.py` (~290 lines) is replaced with a layered
