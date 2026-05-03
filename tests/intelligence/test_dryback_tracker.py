@@ -6,55 +6,11 @@ instance whose AppDaemon hooks are stubbed out.
 """
 from __future__ import annotations
 
-import sys
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import pytest
 
-# Stub AppDaemon hassapi before importing root_zone so the import path
-# resolves cleanly without a running AppDaemon.
-import types
-
-ad_module = types.ModuleType("appdaemon")
-ad_module.__path__ = []
-ad_plugins = types.ModuleType("appdaemon.plugins")
-ad_plugins.__path__ = []
-ad_hass = types.ModuleType("appdaemon.plugins.hass")
-ad_hass.__path__ = []
-ad_hassapi = types.ModuleType("appdaemon.plugins.hass.hassapi")
-
-
-class _Hass:
-    """Bare-minimum hass.Hass stand-in; the test patches all methods used."""
-
-    def __init__(self):  # noqa: D401
-        self.app_dir = "."
-        self.args = {}
-
-    # APIs touched by the modules under test — overridden in the fixture.
-    def get_state(self, *a, **kw): return None
-    def set_state(self, *a, **kw): pass
-    def listen_event(self, *a, **kw): pass
-    def listen_state(self, *a, **kw): pass
-    def run_every(self, *a, **kw): pass
-    def run_in(self, *a, **kw): pass
-    def run_daily(self, *a, **kw): pass
-    def fire_event(self, *a, **kw): pass
-    def call_service(self, *a, **kw): pass
-    def register_service(self, *a, **kw): pass
-    def log(self, *a, **kw): pass
-
-
-ad_hassapi.Hass = _Hass
-sys.modules["appdaemon"] = ad_module
-sys.modules["appdaemon.plugins"] = ad_plugins
-sys.modules["appdaemon.plugins.hass"] = ad_hass
-sys.modules["appdaemon.plugins.hass.hassapi"] = ad_hassapi
-
-# Make the appdaemon/apps directory importable.
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "appdaemon" / "apps"))
+from . import _appdaemon_stub  # noqa: F401 — installs the AppDaemon stub
 
 from crop_steering.intelligence.root_zone import (  # noqa: E402
     DEFAULT_DRYBACK_MIN_DROP_PCT,

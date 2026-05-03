@@ -23,6 +23,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   derived sensor attributes). 13 tests total in `tests/intelligence/`, all
   green.
 
+### Added (Test coverage + migration doc)
+- 26 additional unit tests across `tests/intelligence/`:
+  - `test_anomaly_scanner.py` (8) — emitter blockage, EC drift,
+    flat-line gating by photoperiod, peer-deviation, no-double-fire.
+  - `test_orchestrator.py` (7) — emergency rescue, flush trigger and
+    cooldown, anomaly suppression, custom-shot event routing.
+  - `test_agronomic.py` (11) — VPD math against published Athena
+    chart values, Penman-Monteith monotonicity, transpiration envelope
+    sanity, VPD ceiling publishing.
+- Total intelligence test count: **39 passing** (was 13).
+- Two real bugs caught and fixed in the process: missing
+  `_dryback_window` init in `AgronomicIntelligence` reproduced via
+  fixture, and an over-loose peer-deviation test data set that didn't
+  actually exercise the 2σ rule.
+- `tests/intelligence/_appdaemon_stub.py` — shared AppDaemon stub
+  module so individual test files don't duplicate ~50 lines each.
+- `MIGRATION.md` — operator-facing v2.3.x → v3.0 upgrade guide with
+  step-by-step rollout sequence, rollback path, and troubleshooting.
+
 ### Added (Polish)
 - `dashboards/rootsense_history.yaml` — three-tab dashboard (Intent /
   Substrate / Anomalies) with multi-metric history-graph cards per zone.
