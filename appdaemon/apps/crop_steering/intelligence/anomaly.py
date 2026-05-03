@@ -22,14 +22,9 @@ import logging
 import statistics
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any, Deque
 
-try:
-    import appdaemon.plugins.hass.hassapi as hass  # type: ignore
-except ImportError:  # pragma: no cover
-    hass = type("hass", (), {"Hass": object})  # type: ignore
-
+from .base import IntelligenceApp
 from .bus import RootSenseBus
 from .store import RootSenseStore
 
@@ -71,11 +66,10 @@ REMEDIATION = {
 }
 
 
-class AnomalyScanner(hass.Hass):  # type: ignore[misc]
+class AnomalyScanner(IntelligenceApp):
     def initialize(self) -> None:
         self.bus = RootSenseBus.instance()
-        db_path = Path(self.app_dir) / "crop_steering" / "state" / "rootsense.db"
-        self.store = RootSenseStore(db_path)
+        self.store = RootSenseStore(self._state_dir() / "rootsense.db")
 
         cfg = self.args or {}
         self.scan_interval_s: int = int(cfg.get("scan_interval_s", 60))
@@ -99,6 +93,8 @@ class AnomalyScanner(hass.Hass):  # type: ignore[misc]
     # ------------------------------------------------------------------ event capture
 
     def _on_shot_response(self, _topic: str, payload: dict[str, Any]) -> None:
+        if not self._is_module_enabled():
+            return
         zone = int(payload["zone"])
         delta = float(payload.get("delta") or 0.0)
         if delta < 0.3:
@@ -125,6 +121,8 @@ class AnomalyScanner(hass.Hass):  # type: ignore[misc]
     # ------------------------------------------------------------------ periodic scan
 
     def _scan(self, _kwargs: Any) -> None:
+        if not self._is_module_enabled():
+            return
         zones = self._configured_zones()
         # Sample current state into buffers
         for z in zones:
@@ -261,21 +259,4 @@ class AnomalyScanner(hass.Hass):  # type: ignore[misc]
         state = self.get_state("binary_sensor.crop_steering_lights")
         return state == "on"
 
-    def _read_float(self, entity_id: str, default: float | None = None) -> float | None:
-        try:
-            return float(self.get_state(entity_id))  # type: ignore[arg-type]
-        except (TypeError, ValueError):
-            return default
-
-    def _configured_zones(self) -> list[int]:
-        zones = []
-        for n in range(1, 25):
-            if self.entity_exists(f"sensor.crop_steering_zone_{n}_avg_vwc"):
-                zones.append(n)
-        return zones
-
-    def entity_exists(self, entity_id: str) -> bool:
-        try:
-            return super().entity_exists(entity_id)  # type: ignore[misc]
-        except AttributeError:
-            return self.get_state(entity_id) is not None
+    # _read_float / _configured_zones / entity_exists live on IntelligenceApp.

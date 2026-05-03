@@ -93,6 +93,17 @@ RootSense v3.0 turns the controller into an adaptive platform:
 The plan is broken into five phases. Each phase is independently mergeable, has
 its own test plan, and ships behind feature flags so existing users can opt in.
 
+### Status (live)
+
+| Phase | State | Landed |
+|---|---|---|
+| Phase 0 — Foundation | ✅ done | `bb97e5d` (this branch) |
+| Phase 1 — Root Zone Intelligence | 🟡 in progress | Substrate analytics sensors + dryback episode tracker + module-enable switches + recorder package shipped this commit. Multi-metric dashboard YAML still pending. |
+| Phase 2 — Adaptive Irrigation | ⬜ next | |
+| Phase 3 — Agronomic Intelligence | ⬜ planned | |
+| Phase 4 — Orchestration & Anomaly | ⬜ planned | |
+| Phase 5 — Docs / migration / release | ⬜ planned | |
+
 ### Phase 0 — Foundation (this commit)
 
 **Goal:** new directory layout, shared infrastructure, no behaviour change.
