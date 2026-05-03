@@ -22,28 +22,14 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 
 from .const import (
-    DOMAIN, CONF_NUM_ZONES, SECONDS_PER_HOUR, PERCENTAGE_TO_RATIO,
+    DOMAIN, CONF_NUM_ZONES,
     DEFAULT_EC_RATIO, DEFAULT_EC_FALLBACK, VWC_ADJUSTMENT_PERCENT,
     VWC_DRY_THRESHOLD, VWC_SATURATED_THRESHOLD, SOFTWARE_VERSION
 )
+from .calculations import ShotCalculator
 
 _LOGGER = logging.getLogger(__name__)
 
-
-class ShotCalculator:
-    """Helper class for irrigation shot calculations."""
-    
-    @staticmethod
-    def calculate_shot_duration(dripper_flow: float, substrate_vol: float, shot_size: float) -> float:
-        """Calculate irrigation shot duration in seconds."""
-        try:
-            if dripper_flow > 0:
-                volume_to_add = substrate_vol * (shot_size * PERCENTAGE_TO_RATIO)
-                duration_hours = volume_to_add / dripper_flow
-                return round(duration_hours * SECONDS_PER_HOUR, 1)
-            return 0.0
-        except Exception:
-            return 0.0
 
 
 # Base sensor descriptions (non-zone specific)
