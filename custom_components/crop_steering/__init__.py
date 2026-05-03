@@ -3,14 +3,36 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import entity_registry as er
+from typing import Any
+
+try:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.const import Platform
+    from homeassistant.core import HomeAssistant
+    from homeassistant.exceptions import ConfigEntryNotReady
+    from homeassistant.helpers import entity_registry as er
+except ImportError:  # pragma: no cover - enables non-HA unit tests
+    ConfigEntry = Any  # type: ignore
+    HomeAssistant = Any  # type: ignore
+    ConfigEntryNotReady = Exception  # type: ignore
+
+    class Platform:  # type: ignore
+        SENSOR = "sensor"
+        SWITCH = "switch"
+        SELECT = "select"
+        NUMBER = "number"
+        BUTTON = "button"
 
 from .const import DOMAIN, CONF_NUM_ZONES
-from .services import async_setup_services, async_unload_services
+
+try:
+    from .services import async_setup_services, async_unload_services
+except ImportError:  # pragma: no cover - enables non-HA unit tests
+    async def async_setup_services(_hass: HomeAssistant) -> None:
+        return None
+
+    async def async_unload_services(_hass: HomeAssistant) -> None:
+        return None
 
 _LOGGER = logging.getLogger(__name__)
 
