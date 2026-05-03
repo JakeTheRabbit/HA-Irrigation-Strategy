@@ -37,3 +37,11 @@ node_modules/
 *.key
 *.pem
 *.crt
+
+# RootSense AppDaemon SQLite analytics store — local state only
+appdaemon/apps/crop_steering/state/
+
+# Stray nested clone left over from earlier branch experiments — kept on
+# disk for safety but never committed. If this directory is no longer
+# needed it can be removed by hand.
+/HA-Irrigation-Strategy/

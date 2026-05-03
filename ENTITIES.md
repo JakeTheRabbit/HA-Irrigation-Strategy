@@ -62,6 +62,30 @@ This document lists every single entity created by the Crop Steering System with
 | `sensor.crop_steering_prediction_system_vwc_trend` | System VWC Trend | Predicted VWC trend (stable/declining/increasing) |
 | `sensor.crop_steering_prediction_estimated_daily_water_need` | Estimated Daily Water Need | Predicted daily water requirement (Liters) |
 
+### RootSense Substrate Intelligence (v3, AppDaemon Generated)
+
+Published by `intelligence/root_zone.py` when the matching module switch is on
+(see `switch.crop_steering_intelligence_root_zone_enabled`).
+
+| Entity ID Pattern | Description |
+|-------------------|-------------|
+| `sensor.crop_steering_zone_{N}_field_capacity_observed` | Auto-detected field capacity (% VWC) with `confidence` and `sample_count` attributes. Replaces the static `field_capacity` default once `confidence ≥ 0.8`. |
+| `sensor.crop_steering_zone_{N}_dryback_velocity_pct_per_hr` | Smoothed VWC dryback rate over the last hour (positive = drying). |
+| `sensor.crop_steering_zone_{N}_substrate_porosity_estimate_ml_per_pct` | mL of irrigation needed to lift VWC by 1 % (24-h median). |
+| `sensor.crop_steering_zone_{N}_ec_stack_index` | Cumulative EC drift (mS/cm) over the last 6 h. |
+
+### RootSense Adaptive Sensors (v3)
+
+| Entity ID | Description |
+|-----------|-------------|
+| `sensor.crop_steering_p0_dryback_drop_pct_current` | Interpolated P0 dryback target (current). Attributes: `veg_endpoint`, `gen_endpoint`, `intent`, `semantic`. |
+
+### RootSense Anomaly Sensor (v3)
+
+| Entity ID | Description |
+|-----------|-------------|
+| `binary_sensor.crop_steering_anomaly_active` | `on` while at least one zone has an unresolved anomaly. Attributes: `active_count`, `active_codes`. |
+
 ## 🔢 NUMBER INPUTS
 
 ### Substrate & Hardware Configuration
@@ -76,10 +100,23 @@ This document lists every single entity created by the Crop Steering System with
 
 ### Dryback Target Configuration
 
+> **Semantic clarification (RootSense v3):** all "dryback" values in this
+> system are *percentage-point drop from peak VWC* — i.e. how much the
+> substrate dries back **by**, not what VWC value it dries back **to**.
+> Example: peak 70 %, valley 58 % → dryback = 12 (not 58).
+
 | Entity ID | Name | Range | Unit | Description |
 |-----------|------|-------|------|-------------|
-| `number.crop_steering_veg_dryback_target` | Vegetative Dryback Target | 20.0-80.0 | % | Target VWC for vegetative dryback |
-| `number.crop_steering_gen_dryback_target` | Generative Dryback Target | 15.0-70.0 | % | Target VWC for generative dryback |
+| `number.crop_steering_veg_p0_dryback_drop_pct` | Vegetative P0 Dryback Drop % | 2.0-40.0 | % | Vegetative endpoint for P0 dryback drop. Read live by IntentResolver. Default 12. |
+| `number.crop_steering_gen_p0_dryback_drop_pct` | Generative P0 Dryback Drop % | 2.0-50.0 | % | Generative endpoint for P0 dryback drop. Read live by IntentResolver. Default 22. |
+| `number.crop_steering_veg_dryback_target` | Vegetative Dryback Target (legacy) | 2.0-80.0 | % | Legacy alias for veg endpoint. Same semantic ("drop %"); corrected default. |
+| `number.crop_steering_gen_dryback_target` | Generative Dryback Target (legacy) | 2.0-70.0 | % | Legacy alias for gen endpoint. Same semantic; corrected default. |
+
+### Cultivator Intent (RootSense v3)
+
+| Entity ID | Name | Range | Unit | Description |
+|-----------|------|-------|------|-------------|
+| `number.crop_steering_steering_intent` | Cultivator Intent | -100 to +100 | bias | Single dial — -100 = pure generative, +100 = pure vegetative, 0 = balanced. IntentResolver interpolates every derived parameter from this. |
 
 ### Phase Target Configuration
 
@@ -184,6 +221,19 @@ This document lists every single entity created by the Crop Steering System with
 | `switch.crop_steering_analytics_enabled` | Analytics Enabled | Enable advanced statistical analysis features |
 | `switch.crop_steering_debug_mode` | Debug Mode | Enable debug logging and verbose output |
 
+### RootSense Intelligence Module Switches (v3)
+
+Each pillar checks its switch on every iteration; OFF short-circuits all
+side effects. Default OFF so existing v2.x installs are unaffected.
+
+| Entity ID | Name | Description |
+|-----------|------|-------------|
+| `switch.crop_steering_intelligence_root_zone_enabled` | Root Zone Intelligence | Substrate analytics, FC detection, dryback episodes |
+| `switch.crop_steering_intelligence_adaptive_enabled` | Adaptive Irrigation | Cultivator-intent slider, profile interpolation, bandit optimisation |
+| `switch.crop_steering_intelligence_agronomic_enabled` | Agronomic Intelligence | Transpiration model, VPD ceiling, nightly run reports |
+| `switch.crop_steering_intelligence_orchestrator_enabled` | Orchestrator | Custom-shot service handler, emergency rescue, EC flush |
+| `switch.crop_steering_intelligence_anomaly_enabled` | Anomaly Scanner | Emitter, EC drift, sensor flat-line, peer-zone deviation |
+
 ### Zone Control Switches (Per Zone 1-N)
 
 | Entity ID Pattern | Name Pattern | Description |
@@ -206,6 +256,7 @@ This document lists every single entity created by the Crop Steering System with
 |------------|------------|-------------|
 | `crop_steering.execute_irrigation_shot` | `zone`, `duration_seconds`, `shot_type` | Execute manual irrigation shot for specified zone |
 | `crop_steering.set_manual_override` | `zone`, `timeout_minutes`, `enable` | Set manual override for zone with optional timeout |
+| `crop_steering.custom_shot` | `target_zone`, `intent` (manual/rescue/rebalance_ec/test_emitter/planned), `volume_ml`, optional `target_runoff_pct`, optional `tag` | RootSense v3 — fires `crop_steering_custom_shot` event; orchestrator applies safety gates and routes to hardware. |
 
 ## 📋 ENTITY USAGE SUMMARY
 
