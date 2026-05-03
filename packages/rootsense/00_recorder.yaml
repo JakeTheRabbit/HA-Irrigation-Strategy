@@ -32,6 +32,12 @@ recorder:
       - sensor.crop_steering_cultivar_*_vpd_ceiling_kpa
       # RootSense pillar 4 sensors
       - binary_sensor.crop_steering_anomaly_active
+      # ClimateSense (sister platform)
+      - sensor.climate_target_*
+      - sensor.climate_recipe_active_phase
+      - sensor.climate_dli_today_mol
+      - sensor.climate_dli_predicted_mol
+      - sensor.climate_leaf_air_dt_c
       # Existing zone metrics that the multi-metric history dashboard overlays
       - sensor.crop_steering_zone_*_avg_vwc
       - sensor.crop_steering_zone_*_avg_ec
@@ -49,3 +55,10 @@ recorder:
       - switch.crop_steering_intelligence_agronomic_enabled
       - switch.crop_steering_intelligence_orchestrator_enabled
       - switch.crop_steering_intelligence_anomaly_enabled
+      - switch.crop_steering_intelligence_climate_sensing_enabled
+      - switch.crop_steering_intelligence_climate_timeline_enabled
+      - switch.crop_steering_intelligence_climate_control_enabled
+      - switch.crop_steering_intelligence_climate_lights_enabled
+      - switch.crop_steering_intelligence_climate_anomaly_enabled
+      - switch.crop_steering_intelligence_climate_drives_intent_enabled
+      - number.crop_steering_climate_grow_day_offset

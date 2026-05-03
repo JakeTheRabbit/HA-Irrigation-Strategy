@@ -12,8 +12,10 @@ intelligence platform on top of the existing controller — every pillar is
 opt-in via a switch, default OFF, so existing v2.x installs are unaffected on
 upgrade.
 
-**Read this first when working on RootSense:**
-- `docs/upgrade/ROOTSENSE_v3_PLAN.md` — full design + 5-phase roadmap.
+**Read this first:**
+- `docs/SYSTEM_OVERVIEW.md` — the unified mental model of the whole stack.
+- `docs/upgrade/ROOTSENSE_v3_PLAN.md` — substrate intelligence design.
+- `docs/upgrade/CLIMATESENSE_PLAN.md` — environmental control design.
 - `docs/upgrade/RECONCILIATION.md` — maps gap-analysis items onto plan phases.
 - `docs/upgrade/LLM_ADVISOR_NOTES.md` — salvage notes from the archived
   `llm-integration` branch (now reachable via tag `archive/llm-integration-v0.1`).

@@ -91,6 +91,19 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement="bias",
         mode="slider",
     ),
+    # ClimateSense — what day-in-grow are we on. Operator hand-sets this
+    # to tell the timeline pillar where to start; thereafter it ticks
+    # forward at midnight (or via lights-on count, configurable).
+    NumberEntityDescription(
+        key="climate_grow_day_offset",
+        name="ClimateSense — Grow Day Offset",
+        icon="mdi:calendar-today",
+        native_min_value=0,
+        native_max_value=200,
+        native_step=1,
+        native_unit_of_measurement="days",
+        mode="box",
+    ),
     # ----- Operator-facing P0 dryback drop sliders (RootSense v3) -----
     # Both express "percentage point drop from peak VWC" — i.e. how much the
     # substrate dries back BY, not what it dries back TO. Veg defaults small
@@ -595,6 +608,7 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             "max_ec": 9.0,
             # New canonical entities (RootSense v3)
             "steering_intent": 0.0,  # midpoint = "balanced"
+            "climate_grow_day_offset": 0,
             "veg_p0_dryback_drop_pct": DEFAULT_VEG_P0_DRYBACK_DROP_PCT,
             "gen_p0_dryback_drop_pct": DEFAULT_GEN_P0_DRYBACK_DROP_PCT,
             # Legacy aliases — same semantic ("% drop from peak"), corrected

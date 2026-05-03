@@ -25,11 +25,18 @@ _LOGGER = logging.getLogger(__name__)
 
 #: Map app class name → switch entity that gates it.
 MODULE_SWITCH = {
-    "RootZoneIntelligence":   "switch.crop_steering_intelligence_root_zone_enabled",
-    "AdaptiveIrrigation":     "switch.crop_steering_intelligence_adaptive_enabled",
-    "AgronomicIntelligence":  "switch.crop_steering_intelligence_agronomic_enabled",
-    "IrrigationOrchestrator": "switch.crop_steering_intelligence_orchestrator_enabled",
-    "AnomalyScanner":         "switch.crop_steering_intelligence_anomaly_enabled",
+    # RootSense (substrate)
+    "RootZoneIntelligence":     "switch.crop_steering_intelligence_root_zone_enabled",
+    "AdaptiveIrrigation":       "switch.crop_steering_intelligence_adaptive_enabled",
+    "AgronomicIntelligence":    "switch.crop_steering_intelligence_agronomic_enabled",
+    "IrrigationOrchestrator":   "switch.crop_steering_intelligence_orchestrator_enabled",
+    "AnomalyScanner":           "switch.crop_steering_intelligence_anomaly_enabled",
+    # ClimateSense (environment)
+    "ClimateSenseSensing":      "switch.crop_steering_intelligence_climate_sensing_enabled",
+    "ClimateSenseTimeline":     "switch.crop_steering_intelligence_climate_timeline_enabled",
+    "ClimateSenseControl":      "switch.crop_steering_intelligence_climate_control_enabled",
+    "ClimateSenseLights":       "switch.crop_steering_intelligence_climate_lights_enabled",
+    "ClimateAnomalyScanner":    "switch.crop_steering_intelligence_climate_anomaly_enabled",
 }
 
 
