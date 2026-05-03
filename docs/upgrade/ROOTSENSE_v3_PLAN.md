@@ -479,6 +479,18 @@ Three-tier rollout:
 
 ---
 
+## Companion plans (sibling work tracked separately)
+
+- **`LLM_HEALTHCHECK_PLAN.md`** — frontier-LLM advisor that consumes a
+  15-min compact report and proposes intent/shot adjustments. Token
+  minimisation strategy: gated triage rules + prompt caching + JSON-
+  schema'd output + tiered model routing. Targets RootSense v3.3.
+- **`CLIMATESENSE_PLAN.md`** — environmental control sibling. Setpoints
+  timeline (recipe-driven temp/RH/CO₂/DLI/photoperiod), PID closed-loop
+  control, climate anomaly scanner. Mirrors RootSense's pillar
+  architecture and shares the bus/store. Optionally drives
+  `crop_steering_steering_intent` from the recipe.
+
 ## 6. Future roadmap (post-v3.0)
 
 - **v3.1 — Multi-room federation.** Treat each grow room as a
