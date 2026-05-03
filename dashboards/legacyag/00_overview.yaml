@@ -1,0 +1,181 @@
+title: "F1 Overview"
+views:
+  - title: Overview
+    path: overview
+    icon: mdi:view-dashboard-variant
+    type: sections
+    max_columns: 4
+    sections:
+
+      # ════════════════════════════════════════════════════════════════
+      # NAV — same block at the top of every F1 dashboard
+      # ════════════════════════════════════════════════════════════════
+      - type: grid
+        column_span: 4
+        cards:
+          - type: markdown
+            content: |
+              ### F1 Grow Room
+              **[Overview](/f1-overview)** ·
+              [Climate](/f1-climate) ·
+              [Substrate](/f1-substrate) ·
+              [Intelligence](/f1-intelligence) ·
+              [Setpoints](/f1-setpoints)
+
+      # ════════════════════════════════════════════════════════════════
+      # ROOM CLIMATE + SUBSTRATE AT-A-GLANCE
+      # ════════════════════════════════════════════════════════════════
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:agency-sensor-analytics-card
+            title: F1 Room 1 — last 24 h
+            subtitle: Climate (left) + substrate aggregate (right) on synced time axes
+            default_timeframe: 24h
+            refresh_seconds: 120
+            timeframes: [1h, 6h, 24h, 7d, 30d, custom]
+            overview:
+              - entity: sensor.gw_room_1_temp
+                name: Room Temp
+                color: "#ff8b7f"
+                thresholds:
+                  warning_above: 28
+                  critical_above: 30
+              - entity: sensor.gw_room_1_rh
+                name: Room RH
+                color: "#6ad6ff"
+                thresholds:
+                  warning_below: 45
+                  critical_below: 40
+                  warning_above: 70
+                  critical_above: 75
+              - entity: sensor.gw_room_1_co2
+                name: Room CO2
+                color: "#ffc86f"
+                thresholds:
+                  warning_above: 1500
+                  critical_above: 1800
+                  warning_below: 800
+              - entity: sensor.gw_room_1_vpd
+                name: VPD
+                color: "#ff9ecb"
+                thresholds:
+                  warning_above: 1.4
+                  critical_above: 1.6
+                  warning_below: 0.6
+              - entity: sensor.gw_average_vwc
+                name: Avg VWC
+                color: "#5ae0cf"
+                thresholds:
+                  warning_below: 50
+                  critical_below: 45
+              - entity: sensor.gw_average_ec
+                name: Avg EC
+                color: "#a8a5ff"
+                thresholds:
+                  warning_above: 4.5
+                  critical_above: 5.5
+            panels:
+              left:
+                title: Climate (Temp / RH / VPD)
+                series:
+                  - {entity: sensor.gw_room_1_temp, name: Temp °C, color: "#ff8b7f"}
+                  - {entity: sensor.gw_room_1_rh,   name: RH %,    color: "#6ad6ff"}
+                  - {entity: sensor.gw_room_1_vpd,  name: VPD kPa, color: "#ff9ecb"}
+              right:
+                title: Substrate (Avg VWC / EC + room CO₂)
+                series:
+                  - {entity: sensor.gw_average_vwc, name: Avg VWC %, color: "#5ae0cf"}
+                  - {entity: sensor.gw_average_ec,  name: Avg EC,    color: "#a8a5ff"}
+                  - {entity: sensor.gw_room_1_co2,  name: CO₂ ppm,   color: "#ffc86f"}
+
+      # ════════════════════════════════════════════════════════════════
+      # SYSTEM STATUS COLUMN
+      # ════════════════════════════════════════════════════════════════
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: System Status
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.gw_enable
+                name: GW Master
+              - entity: input_boolean.gw_environment_enabled
+                name: Environment Control
+              - entity: input_boolean.gw_co2_enabled
+                name: CO₂ Injection
+              - entity: input_boolean.gw_irrigation_enabled
+                name: Irrigation
+              - entity: input_boolean.gw_maintenance_mode
+                name: Maintenance Mode
+              - type: divider
+              - entity: binary_sensor.gw_lights_on
+                name: Lights
+              - entity: sensor.grow_room_light_timer
+                name: Lights timer
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: Phase + Intent
+            show_header_toggle: false
+            entities:
+              - entity: select.crop_steering_irrigation_phase
+                name: Current phase
+              - entity: number.crop_steering_steering_intent
+                name: "Intent (-100..+100)"
+              - entity: select.crop_steering_steering_mode_derived
+                name: Steering mode (derived)
+              - type: divider
+              - entity: sensor.crop_steering_p0_dryback_drop_pct_current
+                name: P0 dryback target (drop %)
+              - entity: number.crop_steering_p1_target_vwc
+                name: P1 VWC target
+              - entity: number.crop_steering_p2_vwc_threshold
+                name: P2 threshold
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: RootSense Pillars
+            show_header_toggle: false
+            entities:
+              - entity: switch.crop_steering_intelligence_root_zone_enabled
+                name: Root Zone
+              - entity: switch.crop_steering_intelligence_adaptive_enabled
+                name: Adaptive
+              - entity: switch.crop_steering_intelligence_agronomic_enabled
+                name: Agronomic
+              - entity: switch.crop_steering_intelligence_orchestrator_enabled
+                name: Orchestrator
+              - entity: switch.crop_steering_intelligence_anomaly_enabled
+                name: Anomaly Scanner
+              - type: divider
+              - entity: binary_sensor.crop_steering_anomaly_active
+                name: Active anomalies
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: Safety + Watchdogs
+            show_header_toggle: false
+            entities:
+              - entity: binary_sensor.gw_leak
+                name: Water leak
+              - entity: binary_sensor.gw_tank_low
+                name: Tank low
+              - entity: binary_sensor.gw_irrigation_allowed
+                name: Irrigation allowed
+              - type: divider
+              - entity: input_number.gw_valve_max_runtime_sec
+                name: Max valve runtime (s)
+              - entity: input_number.gw_temp_high_alert
+                name: Temp alert (°C)
+              - entity: input_number.gw_rh_high_alert
+                name: RH alert (%)
+              - entity: input_number.gw_co2_high_alert
+                name: CO₂ high alert (ppm)

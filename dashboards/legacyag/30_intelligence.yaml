@@ -1,0 +1,246 @@
+title: "F1 Intelligence"
+views:
+
+  # ════════════════════════════════════════════════════════════════
+  # VIEW 1 — Cultivator intent + derived parameters
+  # ════════════════════════════════════════════════════════════════
+  - title: Intent
+    path: intent
+    icon: mdi:tune-variant
+    type: sections
+    max_columns: 4
+    sections:
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: markdown
+            content: |
+              ### F1 Grow Room
+              [Overview](/f1-overview) ·
+              [Climate](/f1-climate) ·
+              [Substrate](/f1-substrate) ·
+              **[Intelligence](/f1-intelligence)** ·
+              [Setpoints](/f1-setpoints)
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: Cultivator intent
+            show_header_toggle: false
+            entities:
+              - entity: number.crop_steering_steering_intent
+                name: "Intent (-100..+100)"
+              - entity: select.crop_steering_steering_mode_derived
+                name: Steering mode (derived)
+              - type: divider
+              - entity: number.crop_steering_veg_p0_dryback_drop_pct
+                name: Vegetative P0 dryback %
+              - entity: number.crop_steering_gen_p0_dryback_drop_pct
+                name: Generative P0 dryback %
+              - entity: sensor.crop_steering_p0_dryback_drop_pct_current
+                name: Current P0 target (interpolated)
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: Derived parameters (read-only — IntentResolver writes these)
+            show_header_toggle: false
+            entities:
+              - entity: number.crop_steering_p1_target_vwc
+                name: P1 target VWC
+              - entity: number.crop_steering_p2_vwc_threshold
+                name: P2 VWC threshold
+              - entity: number.crop_steering_p1_initial_shot_size
+                name: Initial shot size %
+              - entity: number.crop_steering_ec_target_flush
+                name: EC target (flush)
+              - type: divider
+              - entity: select.crop_steering_irrigation_phase
+                name: Current phase
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:agency-sensor-analytics-card
+            title: Intent vs derived parameters — last 7 d
+            subtitle: See how the slider actually moves the controller
+            default_timeframe: 7d
+            refresh_seconds: 120
+            timeframes: [6h, 24h, 7d, 30d, custom]
+            overview:
+              - entity: number.crop_steering_steering_intent
+                name: Intent
+                color: "#ffc86f"
+              - entity: number.crop_steering_p1_target_vwc
+                name: P1 target
+                color: "#6ad6ff"
+              - entity: number.crop_steering_p2_vwc_threshold
+                name: P2 threshold
+                color: "#5ae0cf"
+              - entity: sensor.crop_steering_p0_dryback_drop_pct_current
+                name: P0 dryback target (drop %)
+                color: "#ff9ecb"
+            panels:
+              left:
+                title: Intent slider (-100..+100)
+                series:
+                  - {entity: number.crop_steering_steering_intent, name: Intent, color: "#ffc86f"}
+              right:
+                title: Derived VWC parameters
+                series:
+                  - {entity: number.crop_steering_p1_target_vwc,                     name: P1 target,         color: "#6ad6ff"}
+                  - {entity: number.crop_steering_p2_vwc_threshold,                  name: P2 threshold,      color: "#5ae0cf"}
+                  - {entity: sensor.crop_steering_p0_dryback_drop_pct_current,       name: P0 dryback drop %, color: "#ff9ecb"}
+
+  # ════════════════════════════════════════════════════════════════
+  # VIEW 2 — Anomalies
+  # ════════════════════════════════════════════════════════════════
+  - title: Anomalies
+    path: anomalies
+    icon: mdi:alert-decagram-outline
+    type: sections
+    max_columns: 4
+    sections:
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: markdown
+            content: |
+              ### F1 Grow Room
+              [Overview](/f1-overview) ·
+              [Climate](/f1-climate) ·
+              [Substrate](/f1-substrate) ·
+              **[Intelligence](/f1-intelligence)** ·
+              [Setpoints](/f1-setpoints)
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: Scanner status
+            show_header_toggle: false
+            entities:
+              - entity: switch.crop_steering_intelligence_anomaly_enabled
+                name: Anomaly scanner
+              - entity: binary_sensor.crop_steering_anomaly_active
+                name: Active anomalies
+              - type: divider
+              - entity: switch.crop_steering_intelligence_orchestrator_enabled
+                name: Orchestrator (handles suppression)
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: logbook-card
+            title: "Recent crop_steering_anomaly events"
+            entities:
+              - binary_sensor.crop_steering_anomaly_active
+            hours_to_show: 168
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:agency-sensor-analytics-card
+            title: Active anomaly + room climate context — last 24 h
+            subtitle: Climate above, anomaly state below — useful for "what was happening when X fired"
+            default_timeframe: 24h
+            refresh_seconds: 60
+            timeframes: [1h, 6h, 24h, 7d, 30d, custom]
+            overview:
+              - entity: binary_sensor.crop_steering_anomaly_active
+                name: Active
+                color: "#ff8b7f"
+              - entity: sensor.gw_room_1_temp
+                name: Temp
+                color: "#ffc86f"
+              - entity: sensor.gw_room_1_rh
+                name: RH
+                color: "#6ad6ff"
+              - entity: sensor.gw_room_1_vpd
+                name: VPD
+                color: "#ff9ecb"
+            panels:
+              left:
+                title: Room climate
+                series:
+                  - {entity: sensor.gw_room_1_temp, name: Temp °C, color: "#ff8b7f"}
+                  - {entity: sensor.gw_room_1_rh,   name: RH %,    color: "#6ad6ff"}
+                  - {entity: sensor.gw_room_1_vpd,  name: VPD kPa, color: "#ff9ecb"}
+              right:
+                title: Anomaly active (binary)
+                series:
+                  - {entity: binary_sensor.crop_steering_anomaly_active, name: Active, color: "#ff8b7f"}
+
+  # ════════════════════════════════════════════════════════════════
+  # VIEW 3 — Custom shot console
+  # ════════════════════════════════════════════════════════════════
+  - title: Custom shot
+    path: custom-shot
+    icon: mdi:water-pump
+    type: sections
+    max_columns: 2
+    sections:
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: markdown
+            content: |
+              ### F1 Grow Room
+              [Overview](/f1-overview) ·
+              [Climate](/f1-climate) ·
+              [Substrate](/f1-substrate) ·
+              **[Intelligence](/f1-intelligence)** ·
+              [Setpoints](/f1-setpoints)
+
+              **`crop_steering.custom_shot`** — fires `crop_steering_custom_shot`,
+              orchestrator gates and routes to hardware. Always logged to the
+              SQLite analytics store with the supplied `tag`.
+
+              Required: `target_zone`, `volume_ml`. Optional: `intent`
+              (manual / rescue / rebalance_ec / test_emitter / planned),
+              `target_runoff_pct` (planner stops early), `tag` (free text).
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: button
+            name: Test Zone 1 emitter (50 mL)
+            icon: mdi:flask-outline
+            tap_action:
+              action: call-service
+              service: crop_steering.custom_shot
+              service_data:
+                target_zone: 1
+                intent: test_emitter
+                volume_ml: 50
+                tag: "operator_test"
+          - type: button
+            name: Rescue Zone 1 (200 mL)
+            icon: mdi:lifebuoy
+            tap_action:
+              action: call-service
+              service: crop_steering.custom_shot
+              service_data:
+                target_zone: 1
+                intent: rescue
+                volume_ml: 200
+                tag: "operator_rescue"
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: Emergency thresholds
+            show_header_toggle: false
+            entities:
+              - entity: number.crop_steering_p3_emergency_vwc_threshold
+                name: Emergency VWC trigger
+              - entity: number.crop_steering_p3_emergency_shot_size
+                name: Emergency shot size %
+              - entity: input_number.gw_valve_max_runtime_sec
+                name: Max valve runtime (s)

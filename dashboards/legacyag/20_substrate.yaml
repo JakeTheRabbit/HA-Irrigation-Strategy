@@ -1,0 +1,228 @@
+title: "F1 Substrate"
+views:
+
+  # ════════════════════════════════════════════════════════════════
+  # VIEW 1 — VWC + EC across all 6 tables
+  # ════════════════════════════════════════════════════════════════
+  - title: VWC & EC
+    path: vwc-ec
+    icon: mdi:water-percent
+    type: sections
+    max_columns: 4
+    sections:
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: markdown
+            content: |
+              ### F1 Grow Room
+              [Overview](/f1-overview) ·
+              [Climate](/f1-climate) ·
+              **[Substrate](/f1-substrate)** ·
+              [Intelligence](/f1-intelligence) ·
+              [Setpoints](/f1-setpoints)
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:agency-sensor-analytics-card
+            title: All 6 tables — VWC & EC, last 24 h
+            subtitle: Per-table moisture (left) and EC (right) on synced time axes
+            default_timeframe: 24h
+            refresh_seconds: 60
+            timeframes: [1h, 6h, 24h, 7d, 30d, custom]
+            overview:
+              - entity: sensor.gw_average_vwc
+                name: Avg VWC
+                color: "#5ae0cf"
+                thresholds:
+                  warning_below: 50
+                  critical_below: 45
+              - entity: sensor.gw_average_ec
+                name: Avg EC
+                color: "#a8a5ff"
+                thresholds:
+                  warning_above: 4.5
+                  critical_above: 5.5
+              - entity: number.crop_steering_p1_target_vwc
+                name: P1 target
+                color: "#ffc86f"
+              - entity: number.crop_steering_p2_vwc_threshold
+                name: P2 threshold
+                color: "#ff9ecb"
+              - entity: sensor.crop_steering_p0_dryback_drop_pct_current
+                name: P0 dryback target (drop %)
+                color: "#ff8b7f"
+            panels:
+              left:
+                title: Root Zone VWC (per table)
+                series:
+                  - {entity: sensor.gw_table_1_vwc, name: Table 1, color: "#6ad6ff"}
+                  - {entity: sensor.gw_table_2_vwc, name: Table 2, color: "#5ae0cf"}
+                  - {entity: sensor.gw_table_3_vwc, name: Table 3, color: "#8ef0b2"}
+                  - {entity: sensor.gw_table_4_vwc, name: Table 4, color: "#f9f871"}
+                  - {entity: sensor.gw_table_5_vwc, name: Table 5, color: "#ffc86f"}
+                  - {entity: sensor.gw_table_6_vwc, name: Table 6, color: "#ff8b7f"}
+              right:
+                title: Root Zone EC (per table)
+                series:
+                  - {entity: sensor.gw_table_1_ec, name: Table 1, color: "#6ad6ff"}
+                  - {entity: sensor.gw_table_2_ec, name: Table 2, color: "#5ae0cf"}
+                  - {entity: sensor.gw_table_3_ec, name: Table 3, color: "#8ef0b2"}
+                  - {entity: sensor.gw_table_4_ec, name: Table 4, color: "#f9f871"}
+                  - {entity: sensor.gw_table_5_ec, name: Table 5, color: "#ffc86f"}
+                  - {entity: sensor.gw_table_6_ec, name: Table 6, color: "#ff8b7f"}
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: Table enables
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.gw_table_1_enabled
+                name: Table 1
+              - entity: input_boolean.gw_table_2_enabled
+                name: Table 2
+              - entity: input_boolean.gw_table_3_enabled
+                name: Table 3
+              - entity: input_boolean.gw_table_4_enabled
+                name: Table 4
+              - entity: input_boolean.gw_table_5_enabled
+                name: Table 5
+              - entity: input_boolean.gw_table_6_enabled
+                name: Table 6
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: Irrigation cadence
+            show_header_toggle: false
+            entities:
+              - entity: input_datetime.gw_irrigate_start_time
+                name: Window start
+              - entity: input_datetime.gw_irrigate_end_time
+                name: Window end
+              - entity: input_number.gw_irrigate_interval_min
+                name: Interval (min)
+              - entity: input_number.gw_irrigate_duration_sec
+                name: Duration (s)
+              - entity: input_number.gw_valve_max_runtime_sec
+                name: Max runtime (s)
+              - type: divider
+              - entity: input_boolean.gw_irrigation_enabled
+                name: Irrigation enabled
+              - entity: binary_sensor.gw_irrigation_allowed
+                name: Allowed right now
+
+  # ════════════════════════════════════════════════════════════════
+  # VIEW 2 — RootSense substrate intelligence (FC, dryback velocity, porosity, EC stack)
+  # ════════════════════════════════════════════════════════════════
+  - title: RootSense per-zone
+    path: rootsense
+    icon: mdi:brain
+    type: sections
+    max_columns: 4
+    sections:
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: markdown
+            content: |
+              ### F1 Grow Room
+              [Overview](/f1-overview) ·
+              [Climate](/f1-climate) ·
+              **[Substrate](/f1-substrate)** ·
+              [Intelligence](/f1-intelligence) ·
+              [Setpoints](/f1-setpoints)
+
+              RootSense substrate sensors below populate only when
+              `switch.crop_steering_intelligence_root_zone_enabled` is **on**.
+              Allow ~2 minutes after enabling for the rolling buffer to fill.
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:agency-sensor-analytics-card
+            title: RootSense substrate intelligence — all zones, last 7 d
+            subtitle: Field capacity & dryback velocity per zone
+            default_timeframe: 7d
+            refresh_seconds: 120
+            timeframes: [6h, 24h, 7d, 30d, custom]
+            overview:
+              - entity: sensor.crop_steering_zone_1_field_capacity_observed
+                name: Z1 FC
+                color: "#6ad6ff"
+              - entity: sensor.crop_steering_zone_2_field_capacity_observed
+                name: Z2 FC
+                color: "#5ae0cf"
+              - entity: sensor.crop_steering_zone_3_field_capacity_observed
+                name: Z3 FC
+                color: "#8ef0b2"
+              - entity: sensor.crop_steering_zone_4_field_capacity_observed
+                name: Z4 FC
+                color: "#f9f871"
+              - entity: sensor.crop_steering_zone_5_field_capacity_observed
+                name: Z5 FC
+                color: "#ffc86f"
+              - entity: sensor.crop_steering_zone_6_field_capacity_observed
+                name: Z6 FC
+                color: "#ff8b7f"
+            panels:
+              left:
+                title: Observed Field Capacity (%)
+                series:
+                  - {entity: sensor.crop_steering_zone_1_field_capacity_observed, name: Zone 1, color: "#6ad6ff"}
+                  - {entity: sensor.crop_steering_zone_2_field_capacity_observed, name: Zone 2, color: "#5ae0cf"}
+                  - {entity: sensor.crop_steering_zone_3_field_capacity_observed, name: Zone 3, color: "#8ef0b2"}
+                  - {entity: sensor.crop_steering_zone_4_field_capacity_observed, name: Zone 4, color: "#f9f871"}
+                  - {entity: sensor.crop_steering_zone_5_field_capacity_observed, name: Zone 5, color: "#ffc86f"}
+                  - {entity: sensor.crop_steering_zone_6_field_capacity_observed, name: Zone 6, color: "#ff8b7f"}
+              right:
+                title: Dryback velocity (%/h)
+                series:
+                  - {entity: sensor.crop_steering_zone_1_dryback_velocity_pct_per_hr, name: Zone 1, color: "#6ad6ff"}
+                  - {entity: sensor.crop_steering_zone_2_dryback_velocity_pct_per_hr, name: Zone 2, color: "#5ae0cf"}
+                  - {entity: sensor.crop_steering_zone_3_dryback_velocity_pct_per_hr, name: Zone 3, color: "#8ef0b2"}
+                  - {entity: sensor.crop_steering_zone_4_dryback_velocity_pct_per_hr, name: Zone 4, color: "#f9f871"}
+                  - {entity: sensor.crop_steering_zone_5_dryback_velocity_pct_per_hr, name: Zone 5, color: "#ffc86f"}
+                  - {entity: sensor.crop_steering_zone_6_dryback_velocity_pct_per_hr, name: Zone 6, color: "#ff8b7f"}
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:agency-sensor-analytics-card
+            title: Substrate porosity & EC stack — last 7 d
+            subtitle: How much water moves VWC, vs cumulative EC drift
+            default_timeframe: 7d
+            refresh_seconds: 120
+            timeframes: [6h, 24h, 7d, 30d, custom]
+            overview:
+              - entity: sensor.crop_steering_zone_1_substrate_porosity_estimate_ml_per_pct
+                name: Z1 porosity
+                color: "#6ad6ff"
+              - entity: sensor.crop_steering_zone_1_ec_stack_index
+                name: Z1 EC stack
+                color: "#a8a5ff"
+            panels:
+              left:
+                title: Substrate porosity (mL / %VWC)
+                series:
+                  - {entity: sensor.crop_steering_zone_1_substrate_porosity_estimate_ml_per_pct, name: Zone 1, color: "#6ad6ff"}
+                  - {entity: sensor.crop_steering_zone_2_substrate_porosity_estimate_ml_per_pct, name: Zone 2, color: "#5ae0cf"}
+                  - {entity: sensor.crop_steering_zone_3_substrate_porosity_estimate_ml_per_pct, name: Zone 3, color: "#8ef0b2"}
+                  - {entity: sensor.crop_steering_zone_4_substrate_porosity_estimate_ml_per_pct, name: Zone 4, color: "#f9f871"}
+                  - {entity: sensor.crop_steering_zone_5_substrate_porosity_estimate_ml_per_pct, name: Zone 5, color: "#ffc86f"}
+                  - {entity: sensor.crop_steering_zone_6_substrate_porosity_estimate_ml_per_pct, name: Zone 6, color: "#ff8b7f"}
+              right:
+                title: EC stack index (cumulative drift over 6h)
+                series:
+                  - {entity: sensor.crop_steering_zone_1_ec_stack_index, name: Zone 1, color: "#6ad6ff"}
+                  - {entity: sensor.crop_steering_zone_2_ec_stack_index, name: Zone 2, color: "#5ae0cf"}
+                  - {entity: sensor.crop_steering_zone_3_ec_stack_index, name: Zone 3, color: "#8ef0b2"}
+                  - {entity: sensor.crop_steering_zone_4_ec_stack_index, name: Zone 4, color: "#f9f871"}
+                  - {entity: sensor.crop_steering_zone_5_ec_stack_index, name: Zone 5, color: "#ffc86f"}
+                  - {entity: sensor.crop_steering_zone_6_ec_stack_index, name: Zone 6, color: "#ff8b7f"}
