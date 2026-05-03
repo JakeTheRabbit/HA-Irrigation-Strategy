@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   testing strategy, and future roadmap.
 - `docs/upgrade/apps.example.yaml` — example AppDaemon app declarations.
 
+### Fixed
+- Testability hardening: moved `ShotCalculator` into new pure helper module `custom_components/crop_steering/calculations.py` so unit tests no longer require a Home Assistant runtime during import.
+
+### Documentation
+- Added `docs/upgrade/GAP_ANALYSIS_2026-05.md` with a full module-by-module gap analysis, prioritized production backlog, and explicit To-Do sequence.
+- Updated README with a dedicated "Upgrade Gap Analysis & To-Do" section linking to the new tracker document.
+
 ### Changed
 - **P0 dryback is now unambiguously "% drop from peak VWC"**, surfaced as two
   independent operator-facing number entities:
