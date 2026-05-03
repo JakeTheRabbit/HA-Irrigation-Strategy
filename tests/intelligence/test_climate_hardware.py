@@ -67,9 +67,14 @@ def test_load_real_f1_hardware_file():
     assert cal.hvac_primary is not None
     assert cal.hvac_primary.entity == "climate.gw_ac_1"
     assert cal.hvac_primary.cool_offset_c == pytest.approx(-2.0)
-    # 4 dehumidifier relays
-    assert len(cal.dehumidifier.relays) == 4
-    assert "gw_dehumidifier_relay_1" in cal.dehumidifier.relays[0]
+    # 2 dehu units (4 relays total: 2 per unit)
+    assert len(cal.dehumidifier.units) == 2
+    assert cal.dehumidifier.units[0]["name"] == "dehu_a"
+    assert cal.dehumidifier.units[1]["name"] == "dehu_b"
+    assert len(cal.dehumidifier.units[0]["relays"]) == 2
+    assert "gw_dehumidifier_relay_1" in cal.dehumidifier.units[0]["relays"][0]
+    # 7-day lead-lag rotation
+    assert cal.dehumidifier.rotation_period_days == 7
     # CO2 hard cap matches the existing 40_environment.yaml safety
     assert cal.co2.hard_max_ppm == pytest.approx(1800.0)
     assert cal.co2.off_at_lights_off is True

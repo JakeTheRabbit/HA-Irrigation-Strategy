@@ -45,6 +45,8 @@ class HVACCalibration:
     max_setpoint_c: float = 30.0
     settle_minutes: float = 8.0
     deadband_c: float = 0.5
+    mode_change_cooldown_min: float = 30.0
+    refresh_interval_min: float = 30.0
 
     def commanded_setpoint(self, target_c: float, current_c: float) -> float:
         """Return the setpoint to actually send to the unit, accounting for
@@ -69,9 +71,18 @@ class HVACCalibration:
 
 @dataclass
 class DehumidifierCalibration:
+    # Legacy flat list — kept for backward compatibility with the older
+    # hardware.yaml format. New format uses `units`.
     relays: list[str] = field(default_factory=list)
     stagger_seconds: int = 10
     min_off_seconds: int = 120
+
+    # New: per-unit grouping for staged control + lead-lag rotation.
+    # Each entry is {"name": "dehu_a", "relays": [r1, r2]}.
+    units: list[dict] = field(default_factory=list)
+    stage_persistence_min: float = 5.0
+    hw_cooldown_min: float = 2.0
+    rotation_period_days: float = 7.0
 
 
 @dataclass
@@ -85,8 +96,35 @@ class CO2Calibration:
     solenoid: str = ""
     pulse_on_seconds: int = 60
     pulse_off_seconds: int = 240
+    pulse_off_min_seconds: int = 120
+    pulse_off_max_seconds: int = 600
     hard_max_ppm: float = 1800.0
     off_at_lights_off: bool = True
+    lights_on_lead_min: float = 30.0
+
+
+@dataclass
+class ExhaustCalibration:
+    entity: str = ""
+    emergency_temp_c: float = 32.0
+    emergency_co2_ppm: float = 1800.0
+    scheduled_enabled: bool = False
+    scheduled_period_min: float = 240.0
+    scheduled_duration_min: float = 5.0
+    max_runtime_min: float = 30.0
+
+
+@dataclass
+class SafetyConfig:
+    emergency_temp_c: float = 32.0
+    emergency_co2_ppm: float = 1800.0
+    sensor_stale_seconds: float = 90.0
+    actuator_max_runtime_min: dict[str, float] = field(default_factory=lambda: {
+        "dehumidifier": 120.0,
+        "humidifier": 60.0,
+        "co2": 30.0,
+        "exhaust": 30.0,
+    })
 
 
 @dataclass
@@ -109,6 +147,8 @@ class HardwareCalibration:
     dehumidifier: DehumidifierCalibration = field(default_factory=DehumidifierCalibration)
     humidifier: HumidifierCalibration = field(default_factory=HumidifierCalibration)
     co2: CO2Calibration = field(default_factory=CO2Calibration)
+    exhaust: ExhaustCalibration = field(default_factory=ExhaustCalibration)
+    safety: SafetyConfig = field(default_factory=SafetyConfig)
     sensors: SensorMap = field(default_factory=SensorMap)
 
 
@@ -138,6 +178,12 @@ def load_hardware_calibration(path: Path | str) -> HardwareCalibration:
     co2_raw = raw.get("co2", {}) or {}
     co2 = CO2Calibration(**_filter_keys(co2_raw, CO2Calibration))
 
+    exh_raw = raw.get("exhaust", {}) or {}
+    exh = ExhaustCalibration(**_filter_keys(exh_raw, ExhaustCalibration))
+
+    safety_raw = raw.get("safety", {}) or {}
+    safety = SafetyConfig(**_filter_keys(safety_raw, SafetyConfig))
+
     sensors_raw = raw.get("sensors", {}) or {}
     sensors = SensorMap(**_filter_keys(sensors_raw, SensorMap))
 
@@ -147,6 +193,8 @@ def load_hardware_calibration(path: Path | str) -> HardwareCalibration:
         dehumidifier=dehu,
         humidifier=humid,
         co2=co2,
+        exhaust=exh,
+        safety=safety,
         sensors=sensors,
     )
 

@@ -14,6 +14,8 @@ upgrade.
 
 **Read this first:**
 - `docs/SYSTEM_OVERVIEW.md` — the unified mental model of the whole stack.
+- `docs/upgrade/SEQUENCE_OF_OPERATIONS.md` — operator-facing contract for what every actuator does.
+- `docs/upgrade/CONTROL_THEORY.md` — design rationale for the control layer.
 - `docs/upgrade/ROOTSENSE_v3_PLAN.md` — substrate intelligence design.
 - `docs/upgrade/CLIMATESENSE_PLAN.md` — environmental control design.
 - `docs/upgrade/RECONCILIATION.md` — maps gap-analysis items onto plan phases.
