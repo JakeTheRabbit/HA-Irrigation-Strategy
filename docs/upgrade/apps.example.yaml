@@ -1,0 +1,37 @@
+# Example AppDaemon apps.yaml additions for RootSense v3.0.
+# Copy the blocks you want into appdaemon/apps/apps.yaml.
+# Each block is independent; enable pillars one at a time.
+
+rootsense_root_zone:
+  module: crop_steering.intelligence.root_zone
+  class: RootZoneIntelligence
+  response_window_sec: 600
+  saturation_delta_pct: 0.5
+  fc_ewma_alpha: 0.25
+  fc_confidence_threshold: 0.8
+
+rootsense_adaptive:
+  module: crop_steering.intelligence.adaptive_irrigation
+  class: AdaptiveIrrigation
+
+rootsense_agronomic:
+  module: crop_steering.intelligence.agronomic
+  class: AgronomicIntelligence
+  air_temp_entity: sensor.grow_room_air_temperature
+  rh_entity: sensor.grow_room_humidity
+  ppfd_entity: sensor.grow_room_ppfd
+  room_air_movement_m_s: 0.3
+
+rootsense_orchestrator:
+  module: crop_steering.intelligence.orchestration
+  class: IrrigationOrchestrator
+  flush_cooldown_min: 240
+  emergency_vwc_pct: 40
+
+rootsense_anomaly:
+  module: crop_steering.intelligence.anomaly
+  class: AnomalyScanner
+  scan_interval_s: 60
+  peer_groups:
+    flower_room_a: [1, 2, 3]
+    flower_room_b: [4, 5, 6]

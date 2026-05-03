@@ -5,6 +5,90 @@ All notable changes to the Advanced Automated Crop Steering System will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 3.0.0-dev "RootSense"
+
+### Added (Phase 1 — Root Zone Intelligence wiring)
+- New shared base `appdaemon/apps/crop_steering/intelligence/base.py` provides
+  module-enable gating and common helpers for all five pillars.
+- 5 module-enable switches in the integration so each pillar is independently
+  toggleable from the HA UI:
+  - `switch.crop_steering_intelligence_root_zone_enabled`
+  - `switch.crop_steering_intelligence_adaptive_enabled`
+  - `switch.crop_steering_intelligence_agronomic_enabled`
+  - `switch.crop_steering_intelligence_orchestrator_enabled`
+  - `switch.crop_steering_intelligence_anomaly_enabled`
+  Default OFF — existing v2.x installs are unaffected on first upgrade.
+- `RootZoneIntelligence` now publishes three live derived sensors per zone
+  (previously stubs):
+  - `sensor.crop_steering_zone_{n}_dryback_velocity_pct_per_hr`
+  - `sensor.crop_steering_zone_{n}_substrate_porosity_estimate_ml_per_pct`
+  - `sensor.crop_steering_zone_{n}_ec_stack_index`
+- Local dryback-episode tracker (`DrybackTracker`) detects peak/valley pairs
+  from the rolling per-zone VWC buffer, persists each episode to
+  `rootsense.db`, publishes `dryback.complete` on the bus, and fires the HA
+  `crop_steering_dryback_complete` event.
+- Recorder includes package: `packages/rootsense/00_recorder.yaml` ensures
+  the new sensors and module switches are kept in HA's history database.
+- Reconciliation document `docs/upgrade/RECONCILIATION.md` mapping the gap
+  analysis P1/P2 items to RootSense plan phases.
+- Unit tests: `tests/intelligence/test_dryback_tracker.py` covers the
+  episode tracker state machine (4 cases, all green).
+
+### Added (Phase 0 — scaffolding only, no behaviour change)
+- New `appdaemon/apps/crop_steering/intelligence/` package containing the four
+  RootSense intelligence pillars as opt-in AppDaemon apps:
+  - `root_zone.py` — automated field-capacity detection, dryback episodes,
+    substrate analytics sensors.
+  - `adaptive_irrigation.py` — cultivator-intent slider, profile interpolation,
+    bandit-based shot-size optimisation.
+  - `agronomic.py` — Penman-Monteith transpiration estimate, VPD ceiling per
+    cultivar, nightly run reports.
+  - `orchestration.py` — coordinator with `crop_steering.custom_shot` service,
+    emergency rescue, EC flush guardrails.
+  - `anomaly.py` — cross-cutting anomaly scanner (emitter blockage, EC drift,
+    sensor flat-line, peer-group VWC deviation).
+- Shared infrastructure:
+  - `bus.py` — in-process pub/sub (`RootSenseBus`).
+  - `store.py` — local SQLite analytics store (`rootsense.db`).
+- `docs/upgrade/ROOTSENSE_v3_PLAN.md` — full upgrade plan, feature mapping,
+  testing strategy, and future roadmap.
+- `docs/upgrade/apps.example.yaml` — example AppDaemon app declarations.
+
+### Fixed
+- Testability hardening: moved `ShotCalculator` into new pure helper module `custom_components/crop_steering/calculations.py` so unit tests no longer require a Home Assistant runtime during import.
+
+### Documentation
+- Added `docs/upgrade/GAP_ANALYSIS_2026-05.md` with a full module-by-module gap analysis, prioritized production backlog, and explicit To-Do sequence.
+- Updated README with a dedicated "Upgrade Gap Analysis & To-Do" section linking to the new tracker document.
+
+### Changed
+- **P0 dryback is now unambiguously "% drop from peak VWC"**, surfaced as two
+  independent operator-facing number entities:
+  - `number.crop_steering_veg_p0_dryback_drop_pct` (range 2–40, default 12).
+  - `number.crop_steering_gen_p0_dryback_drop_pct` (range 2–50, default 22).
+  Defaults follow Athena cannabis guidance (small drop in vegetative growth,
+  larger drop in generative). Both values are read live by the IntentResolver
+  every tick — neither is hard-coded. The interpolated current target is
+  pushed to the existing `number.crop_steering_p0_dryback_drop_percent`
+  entity that the legacy P0-exit predicate already consumes, and exposed as
+  `sensor.crop_steering_p0_dryback_drop_pct_current` for dashboards.
+- Legacy entities `number.crop_steering_veg_dryback_target` and
+  `number.crop_steering_gen_dryback_target` are retained as aliases. Their
+  default values are corrected from `50` / `40` (which were too aggressive
+  under the "drop %" semantic) to the new `12` / `22`. Their min ranges are
+  widened to `2` so existing installs that already configured them lower
+  continue to load without validation errors.
+- `DEFAULT_VEG_P0_DRYBACK_DROP_PCT` / `DEFAULT_GEN_P0_DRYBACK_DROP_PCT`
+  added to `custom_components/crop_steering/const.py` as the single source
+  of truth.
+
+### Notes
+- Existing apps (`master_crop_steering_app.py`, `phase_state_machine.py`,
+  detectors, profiles) are untouched in this commit.
+- Modules are not added to `apps.yaml` automatically; existing installs are
+  unaffected. See `docs/upgrade/apps.example.yaml` to opt in.
+- Full migration to v3.0 happens incrementally across PRs #2–#5 per the plan.
+
 ## [2.3.1] - 2025-01-03
 
 ### 🔧 Critical Fixes & Documentation Overhaul

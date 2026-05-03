@@ -11,7 +11,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
+from .const import (
+    DOMAIN,
+    CONF_NUM_ZONES,
+    SOFTWARE_VERSION,
+    DEFAULT_VEG_P0_DRYBACK_DROP_PCT,
+    DEFAULT_GEN_P0_DRYBACK_DROP_PCT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,25 +71,55 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement="mS/cm",
         mode="box",
     ),
+    # ----- Operator-facing P0 dryback drop sliders (RootSense v3) -----
+    # Both express "percentage point drop from peak VWC" — i.e. how much the
+    # substrate dries back BY, not what it dries back TO. Veg defaults small
+    # (10-15% drop), generative defaults larger (20-25% drop).
     NumberEntityDescription(
-        key="veg_dryback_target",
-        name="Vegetative Dryback Target",
+        key="veg_p0_dryback_drop_pct",
+        name="Vegetative P0 Dryback Drop %",
         icon="mdi:water-minus",
-        native_min_value=20.0,
-        native_max_value=80.0,
-        native_step=1.0,
+        native_min_value=2.0,
+        native_max_value=40.0,
+        native_step=0.5,
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
     ),
     NumberEntityDescription(
-        key="gen_dryback_target",
-        name="Generative Dryback Target", 
+        key="gen_p0_dryback_drop_pct",
+        name="Generative P0 Dryback Drop %",
         icon="mdi:water-minus",
-        native_min_value=15.0,
+        native_min_value=2.0,
+        native_max_value=50.0,
+        native_step=0.5,
+        native_unit_of_measurement=PERCENTAGE,
+        mode="box",
+    ),
+    # ----- Legacy entries kept for backward compatibility -----
+    # Read by master_crop_steering_app and legacy dashboards. Same numeric
+    # semantic ("% drop from peak"); these will be hidden in v3.1 once the
+    # new entities are in widespread use.
+    NumberEntityDescription(
+        key="veg_dryback_target",
+        name="Vegetative Dryback Target (legacy)",
+        icon="mdi:water-minus",
+        native_min_value=2.0,
+        native_max_value=80.0,
+        native_step=1.0,
+        native_unit_of_measurement=PERCENTAGE,
+        mode="box",
+        entity_registry_enabled_default=True,
+    ),
+    NumberEntityDescription(
+        key="gen_dryback_target",
+        name="Generative Dryback Target (legacy)",
+        icon="mdi:water-minus",
+        native_min_value=2.0,
         native_max_value=70.0,
         native_step=1.0,
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
+        entity_registry_enabled_default=True,
     ),
     NumberEntityDescription(
         key="p1_target_vwc",
@@ -537,8 +573,14 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             "drippers_per_plant": 2,
             "field_capacity": 70.0,
             "max_ec": 9.0,
-            "veg_dryback_target": 50.0,
-            "gen_dryback_target": 40.0,
+            # New canonical entities (RootSense v3)
+            "veg_p0_dryback_drop_pct": DEFAULT_VEG_P0_DRYBACK_DROP_PCT,
+            "gen_p0_dryback_drop_pct": DEFAULT_GEN_P0_DRYBACK_DROP_PCT,
+            # Legacy aliases — same semantic ("% drop from peak"), corrected
+            # defaults. Old defaults (50/40) were too aggressive and now
+            # follow the same Athena-style values as the new entities.
+            "veg_dryback_target": DEFAULT_VEG_P0_DRYBACK_DROP_PCT,
+            "gen_dryback_target": DEFAULT_GEN_P0_DRYBACK_DROP_PCT,
             "p1_target_vwc": 65.0,
             "p2_vwc_threshold": 60.0,
             # P0 Phase Defaults

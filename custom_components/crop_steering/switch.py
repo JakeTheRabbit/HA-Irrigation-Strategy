@@ -37,6 +37,36 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="Analytics Enabled",
         icon="mdi:chart-line",
     ),
+    # ----- RootSense intelligence module enable switches -----
+    # Each pillar reads its corresponding switch on every iteration. When OFF,
+    # the module logs "skipped" and short-circuits without touching state or
+    # publishing sensors. Defaults: all OFF so existing v2.x installs are
+    # unaffected on first upgrade. Operators opt in pillar-by-pillar.
+    SwitchEntityDescription(
+        key="intelligence_root_zone_enabled",
+        name="RootSense — Root Zone Intelligence",
+        icon="mdi:water-percent-alert",
+    ),
+    SwitchEntityDescription(
+        key="intelligence_adaptive_enabled",
+        name="RootSense — Adaptive Irrigation",
+        icon="mdi:tune-vertical-variant",
+    ),
+    SwitchEntityDescription(
+        key="intelligence_agronomic_enabled",
+        name="RootSense — Agronomic Intelligence",
+        icon="mdi:sprout",
+    ),
+    SwitchEntityDescription(
+        key="intelligence_orchestrator_enabled",
+        name="RootSense — Orchestrator",
+        icon="mdi:hub-outline",
+    ),
+    SwitchEntityDescription(
+        key="intelligence_anomaly_enabled",
+        name="RootSense — Anomaly Scanner",
+        icon="mdi:alert-decagram-outline",
+    ),
 ]
 
 
