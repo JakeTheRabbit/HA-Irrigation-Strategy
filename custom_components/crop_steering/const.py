@@ -22,8 +22,38 @@ DEFAULT_SUBSTRATE_VOLUME = 10.0
 DEFAULT_DRIPPER_FLOW_RATE = 2.0
 DEFAULT_FIELD_CAPACITY = 70.0
 DEFAULT_MAX_EC = 9.0
-DEFAULT_VEG_DRYBACK_TARGET = 50.0
-DEFAULT_GEN_DRYBACK_TARGET = 40.0
+
+# ---------------------------------------------------------------------------
+# P0 dryback configuration
+# ---------------------------------------------------------------------------
+# IMPORTANT: in this codebase "dryback" is always the *drop* from peak VWC,
+# expressed as percentage points. e.g. peak=70%, valley=58% ⇒ dryback = 12.
+# It is NOT the VWC value the substrate dries down *to*.
+#
+# The two endpoints below feed:
+#   - the legacy `master_crop_steering_app` P0 exit predicate, and
+#   - the RootSense IntentResolver, which interpolates between them via the
+#     cultivator-intent slider (-100 = pure generative ⇒ DROP_PCT_GEN,
+#     +100 = pure vegetative ⇒ DROP_PCT_VEG).
+#
+# Defaults reflect Athena cannabis guidance (10-15% veg, 20-25% gen). They are
+# *only* defaults; the values are surfaced as HA `number` entities so the
+# cultivator can override per cultivar at any time without touching code:
+#
+#   number.crop_steering_veg_p0_dryback_drop_pct   (range 5-40)
+#   number.crop_steering_gen_p0_dryback_drop_pct   (range 5-50)
+#
+# The legacy entities `number.crop_steering_veg_dryback_target` /
+# `number.crop_steering_gen_dryback_target` are kept as aliases for backward
+# compatibility (see number.py) but emit a deprecation warning in the log.
+DEFAULT_VEG_P0_DRYBACK_DROP_PCT = 12.0
+DEFAULT_GEN_P0_DRYBACK_DROP_PCT = 22.0
+
+# Legacy aliases — kept so existing dashboards / env files continue to load.
+# Numerically these used to mean "% drop from peak"; the previous defaults of
+# 50 / 40 were too aggressive under that semantic and are corrected here.
+DEFAULT_VEG_DRYBACK_TARGET = DEFAULT_VEG_P0_DRYBACK_DROP_PCT  # legacy alias
+DEFAULT_GEN_DRYBACK_TARGET = DEFAULT_GEN_P0_DRYBACK_DROP_PCT  # legacy alias
 DEFAULT_P1_TARGET_VWC = 65.0
 DEFAULT_P2_VWC_THRESHOLD = 60.0
 

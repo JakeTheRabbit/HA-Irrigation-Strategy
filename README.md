@@ -218,6 +218,11 @@ See `docs/installation_guide.md` for the full step-by-step walkthrough and the [
 
 ---
 
+
+## Upgrade Gap Analysis & To-Do
+
+For the AROYA-equivalent roadmap status, see **`docs/upgrade/GAP_ANALYSIS_2026-05.md`**. It includes a module-by-module gap breakdown, production-readiness risks, and a prioritized implementation backlog.
+
 ## Services
 
 | Service | Required Inputs | What It Does |
