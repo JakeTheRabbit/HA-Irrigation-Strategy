@@ -17,6 +17,7 @@ from crop_steering.intelligence.climate.control import (  # noqa: E402
     watchdog as watchdog_mod,
 )
 from crop_steering.intelligence.climate.control.actions import Action, ActionKind  # noqa: E402
+from crop_steering.intelligence.climate.control.app import action_to_service_call  # noqa: E402
 from crop_steering.intelligence.climate.hardware import (  # noqa: E402
     CO2Calibration,
     DehumidifierCalibration,
@@ -372,6 +373,125 @@ def test_watchdog_force_closes_co2_above_emergency():
     assert any("climate_emergency_co2" in c for c in codes)
     assert any(a.entity == "switch.co2" and a.kind == ActionKind.SWITCH_OFF
                and a.severity == "emergency" for a in actions)
+
+
+def test_watchdog_force_off_hvac_when_heating_during_temp_emergency():
+    """If HVAC is in heat mode AND temp is over emergency, force HVAC off —
+    it's actively making the problem worse."""
+    hw = HardwareCalibration(
+        room="T",
+        hvac_primary=HVACCalibration(entity="climate.gw_ac_1"),
+        exhaust=ExhaustCalibration(entity="switch.exhaust"),
+        sensors=SensorMap(temp_primary="sensor.temp"),
+        safety=SafetyConfig(emergency_temp_c=32.0),
+    )
+    now = datetime.utcnow()
+    sensor_state = {"sensor.temp": {"value": 33.5, "last_update": now}}
+    actions, codes = watchdog_mod.watchdog_check(
+        hw=hw, sensor_state=sensor_state, actuator_runtime={},
+        hvac_mode="heat", now=now,
+    )
+    assert "climate_emergency_temp" in codes
+    hvac_off = [a for a in actions
+                if a.kind == ActionKind.HVAC_MODE and a.value == "off"
+                and a.entity == "climate.gw_ac_1"]
+    assert hvac_off, "expected watchdog to force HVAC off during temp emergency in heat mode"
+    assert hvac_off[0].severity == "emergency"
+
+
+def test_watchdog_does_not_force_hvac_off_when_cooling():
+    """If HVAC is in cool mode during temp emergency, leave it running —
+    we WANT it cooling. Exhaust handles the rest."""
+    hw = HardwareCalibration(
+        room="T",
+        hvac_primary=HVACCalibration(entity="climate.gw_ac_1"),
+        exhaust=ExhaustCalibration(entity="switch.exhaust"),
+        sensors=SensorMap(temp_primary="sensor.temp"),
+        safety=SafetyConfig(emergency_temp_c=32.0),
+    )
+    now = datetime.utcnow()
+    sensor_state = {"sensor.temp": {"value": 33.5, "last_update": now}}
+    actions, _ = watchdog_mod.watchdog_check(
+        hw=hw, sensor_state=sensor_state, actuator_runtime={},
+        hvac_mode="cool", now=now,
+    )
+    hvac_actions = [a for a in actions if a.actuator_class == "hvac"]
+    assert hvac_actions == [], "expected NO HVAC action when cooling during temp emergency"
+
+
+def test_propose_hvac_off_emits_off_mode():
+    cal = HVACCalibration(entity="climate.gw_ac_1")
+    state = hvac_mod.HVACState(last_mode="cool")
+    actions = hvac_mod.propose_hvac_off(cal=cal, state=state, reason="maintenance")
+    assert len(actions) == 1
+    assert actions[0].kind == ActionKind.HVAC_MODE
+    assert actions[0].value == "off"
+
+
+def test_propose_hvac_off_idempotent_when_already_off():
+    cal = HVACCalibration(entity="climate.gw_ac_1")
+    state = hvac_mod.HVACState(last_mode="off")
+    actions = hvac_mod.propose_hvac_off(cal=cal, state=state)
+    assert actions == []
+
+
+# ════════════════════════════════════════════════════════════════════
+# DISPATCH TRANSLATION (every Action kind → correct HA service call)
+# ════════════════════════════════════════════════════════════════════
+
+def test_dispatch_switch_on_uses_switch_turn_on():
+    a = Action(kind=ActionKind.SWITCH_ON, entity="switch.gw_co2", reason="r")
+    svc, kw = action_to_service_call(a)
+    assert svc == "switch/turn_on"
+    assert kw == {"entity_id": "switch.gw_co2"}
+
+
+def test_dispatch_switch_off_uses_correct_domain():
+    """SWITCH_OFF should use the entity's own domain (switch/light/etc)
+    so e.g. light.grow_room_all_lights routes to light/turn_off."""
+    a = Action(kind=ActionKind.SWITCH_OFF, entity="light.grow_room_all_lights", reason="r")
+    svc, kw = action_to_service_call(a)
+    assert svc == "light/turn_off"
+    assert kw == {"entity_id": "light.grow_room_all_lights"}
+
+    b = Action(kind=ActionKind.SWITCH_OFF, entity="switch.gw_humidifier", reason="r")
+    svc, kw = action_to_service_call(b)
+    assert svc == "switch/turn_off"
+
+
+def test_dispatch_hvac_setpoint_uses_set_temperature():
+    a = Action(kind=ActionKind.HVAC_SETPOINT, entity="climate.gw_ac_1",
+               value=25.0, reason="r")
+    svc, kw = action_to_service_call(a)
+    assert svc == "climate/set_temperature"
+    assert kw == {"entity_id": "climate.gw_ac_1", "temperature": 25.0}
+
+
+def test_dispatch_hvac_mode_uses_set_hvac_mode():
+    """The IR-blaster climate template (better_thermostat → SmartIR)
+    responds to standard climate.set_hvac_mode. Confirm the dispatch
+    path routes through the right service with the right kwarg name."""
+    for mode in ["off", "cool", "heat", "heat_cool", "dry", "fan_only"]:
+        a = Action(kind=ActionKind.HVAC_MODE, entity="climate.gw_ac_1",
+                   value=mode, reason="r")
+        svc, kw = action_to_service_call(a)
+        assert svc == "climate/set_hvac_mode"
+        assert kw == {"entity_id": "climate.gw_ac_1", "hvac_mode": mode}
+
+
+def test_dispatch_number_set_uses_number_set_value():
+    a = Action(kind=ActionKind.NUMBER_SET, entity="number.intent",
+               value=42.0, reason="r")
+    svc, kw = action_to_service_call(a)
+    assert svc == "number/set_value"
+    assert kw == {"entity_id": "number.intent", "value": 42.0}
+
+
+def test_dispatch_noop_returns_none():
+    a = Action.noop("nothing to do")
+    svc, kw = action_to_service_call(a)
+    assert svc is None
+    assert kw == {}
 
 
 def test_watchdog_kills_runaway_actuator():

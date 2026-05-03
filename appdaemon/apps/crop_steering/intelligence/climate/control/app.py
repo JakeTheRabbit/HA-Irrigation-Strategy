@@ -33,6 +33,37 @@ from . import watchdog as watchdog_mod
 from .actions import Action, ActionKind
 
 
+def action_to_service_call(action: Action) -> tuple[str | None, dict]:
+    """Translate an Action into (HA-service-path, kwargs).
+
+    Pure function — no AppDaemon dependency, fully testable.
+    Returns (None, {}) for NOOP / unknown kinds.
+
+    The IR-blaster climate template (better_thermostat → SmartIR or
+    similar) responds to standard `climate.set_temperature` and
+    `climate.set_hvac_mode` services. `set_hvac_mode` accepts
+    "off" / "cool" / "heat" / "heat_cool" / "dry" / "fan_only".
+    """
+    if action.kind == ActionKind.SWITCH_ON:
+        return "switch/turn_on", {"entity_id": action.entity}
+    if action.kind == ActionKind.SWITCH_OFF:
+        domain = action.entity.split(".")[0]
+        return f"{domain}/turn_off", {"entity_id": action.entity}
+    if action.kind == ActionKind.HVAC_SETPOINT:
+        return "climate/set_temperature", {
+            "entity_id": action.entity, "temperature": action.value,
+        }
+    if action.kind == ActionKind.HVAC_MODE:
+        return "climate/set_hvac_mode", {
+            "entity_id": action.entity, "hvac_mode": action.value,
+        }
+    if action.kind == ActionKind.NUMBER_SET:
+        return "number/set_value", {
+            "entity_id": action.entity, "value": action.value,
+        }
+    return None, {}
+
+
 class ClimateSenseControl(IntelligenceApp):
     def initialize(self) -> None:  # noqa: D401
         self.bus = RootSenseBus.instance()
@@ -147,6 +178,7 @@ class ClimateSenseControl(IntelligenceApp):
             hw=self.hw,
             sensor_state=self._sensor_state,
             actuator_runtime=actuator_runtime,
+            hvac_mode=self.hvac_state.last_mode,
             now=now,
         )
         for code in anomaly_codes:
@@ -177,24 +209,10 @@ class ClimateSenseControl(IntelligenceApp):
 
     def _dispatch(self, action: Action, now: datetime) -> None:
         try:
-            if action.kind == ActionKind.SWITCH_ON:
-                self.call_service("switch/turn_on", entity_id=action.entity)
-            elif action.kind == ActionKind.SWITCH_OFF:
-                domain = action.entity.split(".")[0]
-                self.call_service(f"{domain}/turn_off", entity_id=action.entity)
-            elif action.kind == ActionKind.HVAC_SETPOINT:
-                self.call_service("climate/set_temperature",
-                                  entity_id=action.entity,
-                                  temperature=action.value)
-            elif action.kind == ActionKind.HVAC_MODE:
-                self.call_service("climate/set_hvac_mode",
-                                  entity_id=action.entity,
-                                  hvac_mode=action.value)
-            elif action.kind == ActionKind.NUMBER_SET:
-                self.call_service("number/set_value",
-                                  entity_id=action.entity, value=action.value)
-            else:
+            service, kwargs = action_to_service_call(action)
+            if service is None:
                 return
+            self.call_service(service, **kwargs)
 
             # Update per-actuator state
             cls = action.actuator_class

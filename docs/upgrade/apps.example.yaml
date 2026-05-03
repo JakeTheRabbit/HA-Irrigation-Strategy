@@ -75,3 +75,17 @@ climatesense_anomaly:
   class: ClimateAnomalyScanner
   scan_interval_s: 60
   hardware_file: /addon_configs/a0d7b954_appdaemon/apps/crop_steering/intelligence/climate/hardware_f1.yaml
+
+# ─────────────────────────────────────────────────────────────────
+# LLM advisor — Phase L0 only (report builder, no LLM calls)
+# ─────────────────────────────────────────────────────────────────
+# Builds a compact JSON snapshot of the room every 15 min, publishes it
+# as `sensor.crop_steering_rootsense_report_latest` (state = triage tag,
+# attributes = full payload) and fires `crop_steering_rootsense_report`
+# event. Operator review-only at this stage — no tokens spent.
+rootsense_report_builder:
+  module: crop_steering.intelligence.llm.report_builder
+  class: RootSenseReportBuilder
+  interval_minutes: 15
+  delta_threshold: 1.0
+  hardware_file: /addon_configs/a0d7b954_appdaemon/apps/crop_steering/intelligence/climate/hardware_f1.yaml
