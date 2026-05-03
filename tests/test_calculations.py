@@ -1,6 +1,6 @@
 """Unit tests for Crop Steering System calculations."""
 import pytest
-from custom_components.crop_steering.sensor import ShotCalculator
+from custom_components.crop_steering.calculations import ShotCalculator
 from custom_components.crop_steering.const import (
     SECONDS_PER_HOUR,
     PERCENTAGE_TO_RATIO,
@@ -67,13 +67,13 @@ class TestShotCalculator:
     def test_large_pot_volume(self):
         """Test calculation with large pot."""
         # 50L pot, 5 L/hr flow, 5% shot size
-        # Expected: (50 * 0.05) / 5 * 3600 = 900 seconds
+        # Expected: (50 * 0.05) / 5 * 3600 = 1800 seconds
         result = ShotCalculator.calculate_shot_duration(
             dripper_flow=5.0,
             substrate_vol=50.0,
             shot_size=5.0
         )
-        assert result == 900.0
+        assert result == 1800.0
 
     def test_zero_flow_rate(self):
         """Test calculation with zero flow rate returns 0."""
@@ -301,9 +301,9 @@ class TestEdgeCases:
             substrate_vol=11.3,
             shot_size=4.8
         )
-        # Expected: (11.3 * 0.048) / 2.7 * 3600 = 722.666... rounds to 722.7
+        # Expected: (11.3 * 0.048) / 2.7 * 3600 = 723.2
         assert isinstance(result, float)
-        assert result == 722.7
+        assert result == 723.2
 
 
 if __name__ == "__main__":
