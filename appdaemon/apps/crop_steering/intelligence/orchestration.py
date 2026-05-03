@@ -19,14 +19,9 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any
 
-try:
-    import appdaemon.plugins.hass.hassapi as hass  # type: ignore
-except ImportError:  # pragma: no cover
-    hass = type("hass", (), {"Hass": object})  # type: ignore
-
+from .base import IntelligenceApp
 from .bus import RootSenseBus
 from .store import RootSenseStore
 
@@ -36,11 +31,10 @@ DEFAULT_FLUSH_COOLDOWN_MIN = 240  # 4 hours
 DEFAULT_EMERGENCY_VWC_PCT = 40.0
 
 
-class IrrigationOrchestrator(hass.Hass):  # type: ignore[misc]
+class IrrigationOrchestrator(IntelligenceApp):
     def initialize(self) -> None:
         self.bus = RootSenseBus.instance()
-        db_path = Path(self.app_dir) / "crop_steering" / "state" / "rootsense.db"
-        self.store = RootSenseStore(db_path)
+        self.store = RootSenseStore(self._state_dir() / "rootsense.db")
 
         cfg = self.args or {}
         self.flush_cooldown = timedelta(minutes=int(cfg.get("flush_cooldown_min", DEFAULT_FLUSH_COOLDOWN_MIN)))
@@ -65,6 +59,9 @@ class IrrigationOrchestrator(hass.Hass):  # type: ignore[misc]
 
     async def _on_custom_shot_service(self, namespace, domain, service, kwargs):  # noqa: D401
         # AppDaemon service signature; payload comes via kwargs["data"].
+        if not self._is_module_enabled():
+            self.log("custom_shot ignored: orchestrator module disabled", level="WARNING")
+            return
         data = kwargs.get("data", {}) or kwargs
         zone = int(data.get("target_zone", 0))
         if zone <= 0:
@@ -134,6 +131,8 @@ class IrrigationOrchestrator(hass.Hass):  # type: ignore[misc]
     # ------------------------------------------------------------------ emergency / flush
 
     def _emergency_check(self, _kwargs: Any) -> None:
+        if not self._is_module_enabled():
+            return
         for zone in self._configured_zones():
             vwc = self._read_zone_vwc(zone)
             if vwc is None:
@@ -193,21 +192,4 @@ class IrrigationOrchestrator(hass.Hass):  # type: ignore[misc]
     def _read_intent(self) -> float:
         return self._read_float("number.crop_steering_steering_intent", default=0.0) or 0.0
 
-    def _read_float(self, entity_id: str, default: float | None = None) -> float | None:
-        try:
-            return float(self.get_state(entity_id))  # type: ignore[arg-type]
-        except (TypeError, ValueError):
-            return default
-
-    def _configured_zones(self) -> list[int]:
-        zones = []
-        for n in range(1, 25):
-            if self.entity_exists(f"sensor.crop_steering_zone_{n}_avg_vwc"):
-                zones.append(n)
-        return zones
-
-    def entity_exists(self, entity_id: str) -> bool:
-        try:
-            return super().entity_exists(entity_id)  # type: ignore[misc]
-        except AttributeError:
-            return self.get_state(entity_id) is not None
+    # _read_float / _configured_zones / entity_exists live on IntelligenceApp.

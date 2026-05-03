@@ -17,14 +17,9 @@ import statistics
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any, Deque
 
-try:
-    import appdaemon.plugins.hass.hassapi as hass  # type: ignore
-except ImportError:  # pragma: no cover
-    hass = type("hass", (), {"Hass": object})  # type: ignore
-
+from .base import IntelligenceApp
 from .bus import RootSenseBus
 from .store import RootSenseStore
 
@@ -39,11 +34,10 @@ class TranspirationSample:
     ppfd: float
 
 
-class AgronomicIntelligence(hass.Hass):  # type: ignore[misc]
+class AgronomicIntelligence(IntelligenceApp):
     def initialize(self) -> None:
         self.bus = RootSenseBus.instance()
-        db_path = Path(self.app_dir) / "crop_steering" / "state" / "rootsense.db"
-        self.store = RootSenseStore(db_path)
+        self.store = RootSenseStore(self._state_dir() / "rootsense.db")
 
         cfg = self.args or {}
         self.air_movement_m_s: float = float(cfg.get("room_air_movement_m_s", 0.3))
@@ -70,6 +64,8 @@ class AgronomicIntelligence(hass.Hass):  # type: ignore[misc]
     # ------------------------------------------------------------------ Transpiration
 
     def _publish_transpiration(self, _kwargs: Any) -> None:
+        if not self._is_module_enabled():
+            return
         vpd = self._read_vpd_kpa()
         ppfd = self._read_float(self.ppfd_entity, default=0.0) if self.ppfd_entity else 0.0
         if vpd is None:
@@ -122,6 +118,8 @@ class AgronomicIntelligence(hass.Hass):  # type: ignore[misc]
     # ------------------------------------------------------------------ Climate↔Substrate
 
     def _on_dryback_complete(self, _topic: str, payload: dict[str, Any]) -> None:
+        if not self._is_module_enabled():
+            return
         zone = int(payload.get("zone", 0))
         velocity = float(payload.get("slope_pct_h", 0.0))  # %/hour
         vpd_avg = float(payload.get("vpd_avg", 0.0))
@@ -157,6 +155,8 @@ class AgronomicIntelligence(hass.Hass):  # type: ignore[misc]
     # ------------------------------------------------------------------ Run report
 
     def _emit_run_report(self, _kwargs: Any) -> None:
+        if not self._is_module_enabled():
+            return
         run_date = datetime.utcnow().date().isoformat()
         report: dict[str, Any] = {"run_date": run_date, "zones": {}}
         for zone in self._configured_zones():
@@ -176,25 +176,12 @@ class AgronomicIntelligence(hass.Hass):  # type: ignore[misc]
     # ------------------------------------------------------------------ helpers
 
     def _read_float(self, entity_id: str | None, default: float | None = None) -> float | None:
+        # Override of base helper — accepts None entity_id (returns default).
         if not entity_id:
             return default
-        try:
-            return float(self.get_state(entity_id))  # type: ignore[arg-type]
-        except (TypeError, ValueError):
-            return default
+        return super()._read_float(entity_id, default=default)
 
     def _read_zone_cultivar(self, zone: int) -> str | None:
         return self.get_state(f"select.crop_steering_zone_{zone}_crop_type")  # type: ignore[return-value]
 
-    def _configured_zones(self) -> list[int]:
-        zones = []
-        for n in range(1, 25):
-            if self.entity_exists(f"sensor.crop_steering_zone_{n}_avg_vwc"):
-                zones.append(n)
-        return zones
-
-    def entity_exists(self, entity_id: str) -> bool:
-        try:
-            return super().entity_exists(entity_id)  # type: ignore[misc]
-        except AttributeError:
-            return self.get_state(entity_id) is not None
+    # _configured_zones / entity_exists live on IntelligenceApp.

@@ -22,15 +22,9 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass
-from datetime import datetime
-from pathlib import Path
 from typing import Any
 
-try:
-    import appdaemon.plugins.hass.hassapi as hass  # type: ignore
-except ImportError:  # pragma: no cover
-    hass = type("hass", (), {"Hass": object})  # type: ignore
-
+from .base import IntelligenceApp
 from .bus import RootSenseBus
 from .store import RootSenseStore
 
@@ -121,11 +115,10 @@ class Posterior:
         return float(rng.normal(self.mu, sigma))
 
 
-class AdaptiveIrrigation(hass.Hass):  # type: ignore[misc]
+class AdaptiveIrrigation(IntelligenceApp):
     def initialize(self) -> None:
         self.bus = RootSenseBus.instance()
-        db_path = Path(self.app_dir) / "crop_steering" / "state" / "rootsense.db"
-        self.store = RootSenseStore(db_path)
+        self.store = RootSenseStore(self._state_dir() / "rootsense.db")
         try:
             import numpy as np
             self._rng = np.random.default_rng()
@@ -148,9 +141,13 @@ class AdaptiveIrrigation(hass.Hass):  # type: ignore[misc]
     # ------------------------------------------------------------------ Intent
 
     def _on_intent_changed(self, _entity, _attr, _old, _new, _kwargs) -> None:
+        if not self._is_module_enabled():
+            return
         self._publish_intent_derived_params({})
 
     def _publish_intent_derived_params(self, _kwargs: Any) -> None:
+        if not self._is_module_enabled():
+            return
         intent = self._read_intent()
         t = (intent + 100.0) / 200.0  # 0 = pure generative, 1 = pure vegetative
 
@@ -202,11 +199,7 @@ class AdaptiveIrrigation(hass.Hass):  # type: ignore[misc]
         except (TypeError, ValueError):
             return 0.0
 
-    def _read_float(self, entity_id: str, default: float | None = None) -> float | None:
-        try:
-            return float(self.get_state(entity_id))  # type: ignore[arg-type]
-        except (TypeError, ValueError):
-            return default
+    # _read_float lives on IntelligenceApp.
 
     # ------------------------------------------------------------------ ShotPlanner
 
@@ -248,7 +241,7 @@ class AdaptiveIrrigation(hass.Hass):  # type: ignore[misc]
     # ------------------------------------------------------------------ OptimisationLoop
 
     def _on_dryback_complete(self, _topic: str, payload: dict[str, Any]) -> None:
-        if self._rng is None:
+        if self._rng is None or not self._is_module_enabled():
             return
         zone = int(payload.get("zone", 0))
         target = self._read_target_dryback(zone)
@@ -273,9 +266,4 @@ class AdaptiveIrrigation(hass.Hass):  # type: ignore[misc]
         except (TypeError, ValueError):
             return 50.0
 
-    # ------------------------------------------------------------------ shims
-    def entity_exists(self, entity_id: str) -> bool:
-        try:
-            return super().entity_exists(entity_id)  # type: ignore[misc]
-        except AttributeError:
-            return self.get_state(entity_id) is not None
+    # entity_exists lives on IntelligenceApp.

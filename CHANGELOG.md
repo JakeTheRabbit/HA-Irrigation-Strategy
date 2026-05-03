@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 3.0.0-dev "RootSense"
 
+### Added (Phase 1 — Root Zone Intelligence wiring)
+- New shared base `appdaemon/apps/crop_steering/intelligence/base.py` provides
+  module-enable gating and common helpers for all five pillars.
+- 5 module-enable switches in the integration so each pillar is independently
+  toggleable from the HA UI:
+  - `switch.crop_steering_intelligence_root_zone_enabled`
+  - `switch.crop_steering_intelligence_adaptive_enabled`
+  - `switch.crop_steering_intelligence_agronomic_enabled`
+  - `switch.crop_steering_intelligence_orchestrator_enabled`
+  - `switch.crop_steering_intelligence_anomaly_enabled`
+  Default OFF — existing v2.x installs are unaffected on first upgrade.
+- `RootZoneIntelligence` now publishes three live derived sensors per zone
+  (previously stubs):
+  - `sensor.crop_steering_zone_{n}_dryback_velocity_pct_per_hr`
+  - `sensor.crop_steering_zone_{n}_substrate_porosity_estimate_ml_per_pct`
+  - `sensor.crop_steering_zone_{n}_ec_stack_index`
+- Local dryback-episode tracker (`DrybackTracker`) detects peak/valley pairs
+  from the rolling per-zone VWC buffer, persists each episode to
+  `rootsense.db`, publishes `dryback.complete` on the bus, and fires the HA
+  `crop_steering_dryback_complete` event.
+- Recorder includes package: `packages/rootsense/00_recorder.yaml` ensures
+  the new sensors and module switches are kept in HA's history database.
+- Reconciliation document `docs/upgrade/RECONCILIATION.md` mapping the gap
+  analysis P1/P2 items to RootSense plan phases.
+- Unit tests: `tests/intelligence/test_dryback_tracker.py` covers the
+  episode tracker state machine (4 cases, all green).
+
 ### Added (Phase 0 — scaffolding only, no behaviour change)
 - New `appdaemon/apps/crop_steering/intelligence/` package containing the four
   RootSense intelligence pillars as opt-in AppDaemon apps:

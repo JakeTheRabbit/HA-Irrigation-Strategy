@@ -1,0 +1,51 @@
+###############################################################################
+# RootSense GROW PACK — 00 RECORDER INCLUDES
+# /config/packages/rootsense/00_recorder.yaml
+#
+# PURPOSE : Make sure all RootSense-published sensors are kept in HA's
+#           recorder long-term, so dashboards (especially the multi-metric
+#           history view) have data to render.
+#
+# ENABLE  : Add the following to your configuration.yaml if you have not
+#           already enabled packages:
+#             homeassistant:
+#               packages: !include_dir_named packages
+#
+# NOTE    : This file uses an `entity_globs` include — Home Assistant 2024.6+
+#           is required. The patterns intentionally do not exclude any
+#           crop_steering entities so that dryback episodes, field capacity
+#           observations, and anomaly states all appear on the history graphs.
+###############################################################################
+
+recorder:
+  include:
+    entity_globs:
+      # RootSense pillar 1 sensors
+      - sensor.crop_steering_zone_*_field_capacity_observed
+      - sensor.crop_steering_zone_*_dryback_velocity_pct_per_hr
+      - sensor.crop_steering_zone_*_substrate_porosity_estimate_ml_per_pct
+      - sensor.crop_steering_zone_*_ec_stack_index
+      # RootSense pillar 2 sensors
+      - sensor.crop_steering_p0_dryback_drop_pct_current
+      # RootSense pillar 3 sensors
+      - sensor.crop_steering_zone_*_transpiration_ml_per_hr
+      - sensor.crop_steering_cultivar_*_vpd_ceiling_kpa
+      # RootSense pillar 4 sensors
+      - binary_sensor.crop_steering_anomaly_active
+      # Existing zone metrics that the multi-metric history dashboard overlays
+      - sensor.crop_steering_zone_*_avg_vwc
+      - sensor.crop_steering_zone_*_avg_ec
+      - sensor.crop_steering_zone_*_substrate_temperature
+      - sensor.crop_steering_zone_*_ec_runoff
+      - sensor.crop_steering_zone_*_ec_feed
+    entities:
+      - select.crop_steering_irrigation_phase
+      - number.crop_steering_steering_intent
+      - number.crop_steering_p0_dryback_drop_percent
+      - number.crop_steering_veg_p0_dryback_drop_pct
+      - number.crop_steering_gen_p0_dryback_drop_pct
+      - switch.crop_steering_intelligence_root_zone_enabled
+      - switch.crop_steering_intelligence_adaptive_enabled
+      - switch.crop_steering_intelligence_agronomic_enabled
+      - switch.crop_steering_intelligence_orchestrator_enabled
+      - switch.crop_steering_intelligence_anomaly_enabled
