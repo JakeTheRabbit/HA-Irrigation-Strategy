@@ -72,6 +72,19 @@ SELECT_DESCRIPTIONS = [
         icon="mdi:water-circle",
         options=PHASES,  # Use constant from const.py (P0-P3 only)
     ),
+    # RootSense v3 — derived view of `number.crop_steering_steering_intent`.
+    # Read-mostly: kept as a Select (not a Sensor) so dashboards can use it
+    # in glance/entity cards without extra templating. The IntentResolver in
+    # the AppDaemon adaptive_irrigation app updates this on every intent
+    # change. Operators who change it manually trigger a corresponding
+    # intent slider update via the existing automation path.
+    SelectEntityDescription(
+        key="steering_mode_derived",
+        name="Steering Mode (derived)",
+        icon="mdi:tune-vertical-variant",
+        options=["Generative", "Mixed-generative", "Balanced",
+                 "Mixed-vegetative", "Vegetative"],
+    ),
 ]
 
 async def async_setup_entry(

@@ -45,6 +45,22 @@ MANUAL_OVERRIDE_SCHEMA = vol.Schema({
     vol.Optional("enable"): cv.boolean,
 })
 
+# RootSense v3 — operator and orchestrator-facing custom shot service.
+# Fires `crop_steering_custom_shot` event; the IrrigationOrchestrator
+# AppDaemon app picks it up, applies safety gates (anomaly suppression,
+# manual-override respect, flush cooldown), and routes to hardware via
+# `crop_steering_irrigation_shot`. The integration itself never touches
+# hardware — keeps the existing separation of concerns.
+CUSTOM_SHOT_SCHEMA = vol.Schema({
+    vol.Required("target_zone"): vol.Range(min=MIN_ZONES, max=MAX_ZONES),
+    vol.Optional("intent", default="manual"): vol.In([
+        "manual", "rescue", "rebalance_ec", "test_emitter", "planned",
+    ]),
+    vol.Required("volume_ml"): vol.Range(min=10.0, max=10000.0),
+    vol.Optional("target_runoff_pct"): vol.Range(min=0.0, max=50.0),
+    vol.Optional("tag"): cv.string,
+})
+
 SERVICES = {
     "transition_phase": {
         "schema": PHASE_TRANSITION_SCHEMA,
@@ -62,6 +78,10 @@ SERVICES = {
     "set_manual_override": {
         "schema": MANUAL_OVERRIDE_SCHEMA,
         "method": "async_set_manual_override",
+    },
+    "custom_shot": {
+        "schema": CUSTOM_SHOT_SCHEMA,
+        "method": "async_custom_shot",
     },
 }
 
@@ -182,6 +202,35 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             
         except Exception as e:
             _LOGGER.error(f"Error checking transition conditions: {e}")
+
+    async def async_custom_shot(call: ServiceCall) -> None:
+        """RootSense v3 — fire a custom irrigation shot.
+
+        Pure event-router: validates schema, logs intent, fires
+        `crop_steering_custom_shot`. The IrrigationOrchestrator AppDaemon
+        app applies safety gates and routes the actual hardware call.
+        """
+        zone = call.data["target_zone"]
+        intent = call.data.get("intent", "manual")
+        volume_ml = call.data["volume_ml"]
+        target_runoff_pct = call.data.get("target_runoff_pct")
+        tag = call.data.get("tag", "operator")
+
+        _LOGGER.info(
+            "custom_shot requested: zone=%s intent=%s vol=%.1fmL runoff_target=%s tag=%s",
+            zone, intent, volume_ml, target_runoff_pct, tag,
+        )
+        hass.bus.async_fire(
+            "crop_steering_custom_shot",
+            {
+                "target_zone": zone,
+                "intent": intent,
+                "volume_ml": volume_ml,
+                "target_runoff_pct": target_runoff_pct,
+                "tag": tag,
+                "timestamp": hass.helpers.template.now().isoformat(),
+            },
+        )
 
     async def async_set_manual_override(call: ServiceCall) -> None:
         """Service to set manual override for a zone with optional timeout."""
