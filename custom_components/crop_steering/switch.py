@@ -67,6 +67,44 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="RootSense — Anomaly Scanner",
         icon="mdi:alert-decagram-outline",
     ),
+    # ----- ClimateSense pillar enable switches -----
+    # Same pattern as RootSense — each pillar reads its own switch on
+    # every iteration; OFF short-circuits all side effects. Default OFF
+    # so existing GW pack remains the active climate controller until
+    # you opt in. See dashboards/legacyag/30_intelligence.yaml for a
+    # convenient toggle panel.
+    SwitchEntityDescription(
+        key="intelligence_climate_sensing_enabled",
+        name="ClimateSense — Sensing",
+        icon="mdi:thermometer-lines",
+    ),
+    SwitchEntityDescription(
+        key="intelligence_climate_timeline_enabled",
+        name="ClimateSense — Timeline",
+        icon="mdi:calendar-clock",
+    ),
+    SwitchEntityDescription(
+        key="intelligence_climate_control_enabled",
+        name="ClimateSense — Control loops",
+        icon="mdi:tune",
+    ),
+    SwitchEntityDescription(
+        key="intelligence_climate_lights_enabled",
+        name="ClimateSense — Lights manager",
+        icon="mdi:lightbulb-on-outline",
+    ),
+    SwitchEntityDescription(
+        key="intelligence_climate_anomaly_enabled",
+        name="ClimateSense — Anomaly scanner",
+        icon="mdi:alert-octagon-outline",
+    ),
+    # Optional — if ON, the timeline pillar drives
+    # number.crop_steering_steering_intent based on the active recipe phase.
+    SwitchEntityDescription(
+        key="intelligence_climate_drives_intent_enabled",
+        name="ClimateSense — Recipe drives cultivator intent",
+        icon="mdi:link-variant",
+    ),
 ]
 
 

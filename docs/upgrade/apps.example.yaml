@@ -35,3 +35,43 @@ rootsense_anomaly:
   peer_groups:
     flower_room_a: [1, 2, 3]
     flower_room_b: [4, 5, 6]
+
+# ─────────────────────────────────────────────────────────────────
+# ClimateSense — environmental control sibling
+# ─────────────────────────────────────────────────────────────────
+climatesense_sensing:
+  module: crop_steering.intelligence.climate.sensing
+  class: ClimateSenseSensing
+  sample_interval_s: 60
+  hardware_file: /addon_configs/a0d7b954_appdaemon/apps/crop_steering/intelligence/climate/hardware_f1.yaml
+
+climatesense_timeline:
+  module: crop_steering.intelligence.climate.timeline
+  class: ClimateSenseTimeline
+  recipe_dir: /config/recipes
+  default_recipe: athena_f1_default
+  day_offset_entity: number.crop_steering_climate_grow_day_offset
+  lights_on_entity: binary_sensor.gw_lights_on
+
+climatesense_control:
+  module: crop_steering.intelligence.climate.control
+  class: ClimateSenseControl
+  tick_seconds: 30
+  hardware_file: /addon_configs/a0d7b954_appdaemon/apps/crop_steering/intelligence/climate/hardware_f1.yaml
+  maintenance_entity: input_boolean.gw_maintenance_mode
+  environment_enabled_entity: input_boolean.gw_environment_enabled
+
+climatesense_lights:
+  module: crop_steering.intelligence.climate.lights
+  class: ClimateSenseLights
+  lights_master_entity: light.grow_room_all_lights
+  # dimmer_entity: number.grow_room_light_intensity_pct  # uncomment if you have one
+  lights_on_hour: 8
+  ramp_minutes: 30
+  lights_state_sensor: binary_sensor.gw_lights_on
+
+climatesense_anomaly:
+  module: crop_steering.intelligence.climate.anomaly
+  class: ClimateAnomalyScanner
+  scan_interval_s: 60
+  hardware_file: /addon_configs/a0d7b954_appdaemon/apps/crop_steering/intelligence/climate/hardware_f1.yaml

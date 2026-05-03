@@ -2,6 +2,136 @@ title: "F1 Setpoints"
 views:
 
   # ════════════════════════════════════════════════════════════════
+  # VIEW 0 — ClimateSense recipe + module switches
+  # ════════════════════════════════════════════════════════════════
+  - title: Recipe
+    path: recipe
+    icon: mdi:calendar-clock
+    type: sections
+    max_columns: 3
+    sections:
+
+      - type: grid
+        column_span: 3
+        cards:
+          - type: markdown
+            content: |
+              ### F1 Grow Room
+              [Overview](/f1-overview) ·
+              [Climate](/f1-climate) ·
+              [Substrate](/f1-substrate) ·
+              [Intelligence](/f1-intelligence) ·
+              **[Setpoints](/f1-setpoints)**
+
+              ClimateSense recipe-driven setpoints. The active phase below
+              determines every climate target in real time. Edit the recipe
+              YAML at `/config/recipes/<name>.yaml` and AppDaemon will pick
+              up changes within ~60 s.
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: Recipe state
+            show_header_toggle: false
+            entities:
+              - entity: sensor.climate_recipe_active_phase
+                name: Active phase
+                secondary_info: last-changed
+              - entity: number.crop_steering_climate_grow_day_offset
+                name: Day in grow
+              - type: divider
+              - entity: sensor.climate_dli_today_mol
+                name: DLI today
+              - entity: sensor.climate_dli_predicted_mol
+                name: DLI predicted EOD
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: ClimateSense pillars
+            show_header_toggle: false
+            entities:
+              - entity: switch.crop_steering_intelligence_climate_sensing_enabled
+                name: Sensing
+              - entity: switch.crop_steering_intelligence_climate_timeline_enabled
+                name: Timeline
+              - entity: switch.crop_steering_intelligence_climate_control_enabled
+                name: Control loops
+              - entity: switch.crop_steering_intelligence_climate_lights_enabled
+                name: Lights manager
+              - entity: switch.crop_steering_intelligence_climate_anomaly_enabled
+                name: Anomaly scanner
+              - type: divider
+              - entity: switch.crop_steering_intelligence_climate_drives_intent_enabled
+                name: Recipe drives intent
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: Current resolved targets
+            show_header_toggle: false
+            entities:
+              - entity: sensor.climate_target_day_temp_c
+                name: Day temp
+              - entity: sensor.climate_target_night_temp_c
+                name: Night temp
+              - entity: sensor.climate_target_day_rh_pct
+                name: Day RH
+              - entity: sensor.climate_target_night_rh_pct
+                name: Night RH
+              - entity: sensor.climate_target_co2_ppm
+                name: CO₂
+              - entity: sensor.climate_target_vpd_kpa
+                name: VPD
+              - entity: sensor.climate_target_ppfd_target
+                name: PPFD
+
+      - type: grid
+        column_span: 3
+        cards:
+          - type: custom:agency-sensor-analytics-card
+            title: Recipe targets vs measured — 7 d
+            subtitle: How well are we tracking the recipe right now?
+            default_timeframe: 7d
+            refresh_seconds: 120
+            timeframes: [24h, 7d, 30d, custom]
+            overview:
+              - entity: sensor.gw_room_1_temp
+                name: Temp
+                color: "#ff8b7f"
+              - entity: sensor.climate_target_day_temp_c
+                name: Day target
+                color: "#ffc86f"
+              - entity: sensor.gw_room_1_rh
+                name: RH
+                color: "#6ad6ff"
+              - entity: sensor.climate_target_day_rh_pct
+                name: RH target
+                color: "#5ae0cf"
+              - entity: sensor.gw_room_1_co2
+                name: CO₂
+                color: "#a8a5ff"
+              - entity: sensor.climate_target_co2_ppm
+                name: CO₂ target
+                color: "#8ef0b2"
+            panels:
+              left:
+                title: Temperature — measured vs recipe target
+                series:
+                  - {entity: sensor.gw_room_1_temp,                name: Measured °C, color: "#ff8b7f"}
+                  - {entity: sensor.climate_target_day_temp_c,     name: Day target,  color: "#ffc86f"}
+                  - {entity: sensor.climate_target_night_temp_c,   name: Night target, color: "#a8a5ff"}
+              right:
+                title: RH — measured vs recipe target
+                series:
+                  - {entity: sensor.gw_room_1_rh,                  name: Measured %,  color: "#6ad6ff"}
+                  - {entity: sensor.climate_target_day_rh_pct,     name: Day target,  color: "#ffc86f"}
+                  - {entity: sensor.climate_target_night_rh_pct,   name: Night target, color: "#a8a5ff"}
+
+  # ════════════════════════════════════════════════════════════════
   # VIEW 1 — All targets in one place
   # ════════════════════════════════════════════════════════════════
   - title: Targets

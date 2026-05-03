@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 3.0.0-dev "RootSense"
 
+### Added (ClimateSense — environmental control sibling)
+- New `appdaemon/apps/crop_steering/intelligence/climate/` package — five
+  pillars mirroring RootSense exactly (sensing, timeline, control,
+  lights, anomaly) plus a hardware calibration module.
+- **Hardware calibration is first-class.** A YAML file
+  (`hardware_f1.yaml` shipped) captures per-actuator quirks like
+  "set heat pump to 27 °C, room reads 29 °C". Control loops
+  command `target + offset` so the room actually hits target. Tests
+  confirm the math is right and the file shape is forward-compatible
+  with new keys.
+- Recipe-driven setpoints. A YAML at `/config/recipes/<name>.yaml`
+  describes per-phase targets across the entire grow (temp / RH /
+  CO₂ / VPD / PPFD / photoperiod). The shipped `athena_f1_default.yaml`
+  is a 7-phase ~84-day Athena cannabis recipe. The timeline pillar
+  resolves "what are my targets right now" from day-in-grow + day/night
+  state and publishes per-metric `sensor.climate_target_*` entities.
+- Closed-loop control: bang-bang temp with calibration offset and
+  deadband, RH with hysteresis matching the existing
+  `40_environment.yaml` defaults (drop-in replacement once enabled),
+  pulse-injection CO₂ with hard cap and lights-off safety, optional
+  lights manager with PPFD ramps.
+- Climate anomaly scanner: temp/RH/VPD excursions, CO₂ low during
+  photoperiod, CO₂ overshoot, DLI undershoot prediction, sensor
+  unavailability. Reuses the existing `crop_steering_anomaly` event
+  format with `code` prefixed `climate_*`.
+- 6 new switches in the integration: 5 module-enable switches mirroring
+  RootSense's pattern, plus `..._climate_drives_intent_enabled` to let
+  the recipe optionally drive the cultivator-intent slider.
+- New number entity `number.crop_steering_climate_grow_day_offset` —
+  operator hand-sets day-in-grow.
+- 12 new unit tests covering hardware calibration math (cool/heat
+  offsets, deadband, clipping, real F1 file load, forward-compat key
+  filtering) and recipe loader (phase-for-day resolution, ramp
+  defaults, validation rejection of empty phases, intent extraction).
+- Total intelligence test count: **51** (was 39); full suite **79**.
+
+### Added (Documentation)
+- `docs/SYSTEM_OVERVIEW.md` — single source of truth for how the
+  whole stack fits together. Hardware → entities → control →
+  dashboards. Includes the heat-pump calibration explanation and a
+  full reference doc index.
+- `appdaemon/apps/crop_steering/intelligence/climate/hardware_f1.yaml`
+  — F1-specific calibration file with the heat pump's `cool_offset_c:
+  -2.0` documented inline.
+
+### Added (Dashboards)
+- New `Recipe` view in `dashboards/legacyag/40_setpoints.yaml` —
+  active phase + day-in-grow + DLI today/predicted + the 5
+  ClimateSense module switches + measured-vs-recipe-target overlay.
+- Recorder package extended with all `sensor.climate_target_*`
+  globs and the new ClimateSense switches/numbers.
+
 ### Added (Phase 2 — Adaptive Irrigation goes live)
 - `number.crop_steering_steering_intent` — single -100..+100 dial that drives
   every derived parameter via the IntentResolver.

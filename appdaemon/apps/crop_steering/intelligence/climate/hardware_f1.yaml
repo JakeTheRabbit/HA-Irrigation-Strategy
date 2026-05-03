@@ -1,0 +1,69 @@
+# F1 Grow Room — hardware calibration
+# This is the per-installation calibration the user edits when their
+# real-world hardware behaviour drifts. Control loops re-read this on
+# every tick, so changes take effect without restarting AppDaemon.
+
+room: F1
+
+# ─────────────────────────────────────────────────────────────────────
+# HVAC — heat pump / mini-split
+# ─────────────────────────────────────────────────────────────────────
+# Real-world example: setpoint 27 °C → room measures 29 °C. The unit's
+# return-air sensor sits below the canopy, lights add radiant heat,
+# and the unit deadbands wider than we want. ClimateSense commands
+# `target + cool_offset_c` to land at the actual canopy target.
+hvac:
+  primary:
+    entity: climate.gw_ac_1
+    cool_offset_c: -2.0          # command 25 to actually hit 27 in cool mode
+    heat_offset_c: 0.0           # heating tracks well, no drift
+    min_setpoint_c: 16.0
+    max_setpoint_c: 30.0
+    settle_minutes: 8            # don't act on a fresh command for this long
+    deadband_c: 0.5              # ±0.5 °C deadband around target
+
+# ─────────────────────────────────────────────────────────────────────
+# DEHUMIDIFIERS — 4 staggered relays
+# ─────────────────────────────────────────────────────────────────────
+dehumidifier:
+  relays:
+    - switch.gw_dehumidifier_relay_1
+    - switch.gw_dehumidifier_relay_2
+    - switch.gw_dehumidifier_relay_3
+    - switch.gw_dehumidifier_relay_4
+  stagger_seconds: 10            # delay between bringing relays online
+  min_off_seconds: 120           # don't re-fire within 2 min of shutoff
+
+# ─────────────────────────────────────────────────────────────────────
+# HUMIDIFIER — single ultrasonic
+# ─────────────────────────────────────────────────────────────────────
+humidifier:
+  entity: switch.gw_humidifier
+  min_off_seconds: 120
+
+# ─────────────────────────────────────────────────────────────────────
+# CO2 — pulse-injection solenoid
+# ─────────────────────────────────────────────────────────────────────
+# Preserves the existing 40_environment.yaml cadence (1 min on / 4 min
+# off while CO2 < 1400, hard cap at 1800).
+co2:
+  solenoid: switch.gw_co2
+  pulse_on_seconds: 60
+  pulse_off_seconds: 240
+  hard_max_ppm: 1800             # safety cap, no override
+  off_at_lights_off: true
+
+# ─────────────────────────────────────────────────────────────────────
+# SENSOR MAP — F1 Room 1
+# ─────────────────────────────────────────────────────────────────────
+sensors:
+  temp_primary: sensor.gw_room_1_temp
+  rh_primary:   sensor.gw_room_1_rh
+  co2:          sensor.gw_room_1_co2
+  vpd:          sensor.gw_room_1_vpd
+  lights_on:    binary_sensor.gw_lights_on
+  leak:         binary_sensor.gw_leak
+  tank_low:     binary_sensor.gw_tank_low
+  # Optional — set if you have these
+  # ppfd:        sensor.gw_room_1_ppfd
+  # canopy_temp: sensor.gw_room_1_canopy_temp
