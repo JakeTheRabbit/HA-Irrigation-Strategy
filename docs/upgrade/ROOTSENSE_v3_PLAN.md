@@ -97,12 +97,12 @@ its own test plan, and ships behind feature flags so existing users can opt in.
 
 | Phase | State | Landed |
 |---|---|---|
-| Phase 0 — Foundation | ✅ done | `bb97e5d` (this branch) |
-| Phase 1 — Root Zone Intelligence | 🟡 in progress | Substrate analytics sensors + dryback episode tracker + module-enable switches + recorder package shipped this commit. Multi-metric dashboard YAML still pending. |
-| Phase 2 — Adaptive Irrigation | ⬜ next | |
-| Phase 3 — Agronomic Intelligence | ⬜ planned | |
-| Phase 4 — Orchestration & Anomaly | ⬜ planned | |
-| Phase 5 — Docs / migration / release | ⬜ planned | |
+| Phase 0 — Foundation | ✅ done | `bb97e5d` |
+| Phase 1 — Root Zone Intelligence | ✅ done | `8da1c6d` (sensors, dryback tracker, module-enable switches, recorder includes); `dashboards/rootsense_history.yaml` added in the polish commit |
+| Phase 2 — Adaptive Irrigation | ✅ done | `24d4391` (intent slider, custom_shot service, derived steering-mode select, IntentResolver test suite) |
+| Phase 3 — Agronomic Intelligence | ⬜ next | scaffold present (`intelligence/agronomic.py`) — needs sensor calibration + run-report event consumer |
+| Phase 4 — Orchestration & Anomaly | 🟡 partial | scaffold present and gated; needs hardware-control takeover + anomaly incident-report generator |
+| Phase 5 — Docs / migration / release | 🟡 partial | README RootSense section added; `MIGRATION.md` and `SOFTWARE_VERSION = 3.0.0` bump still pending |
 
 ### Phase 0 — Foundation (this commit)
 

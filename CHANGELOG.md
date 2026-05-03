@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 3.0.0-dev "RootSense"
 
+### Added (Phase 2 — Adaptive Irrigation goes live)
+- `number.crop_steering_steering_intent` — single -100..+100 dial that drives
+  every derived parameter via the IntentResolver.
+- `select.crop_steering_steering_mode_derived` — Generative / Mixed-generative
+  / Balanced / Mixed-vegetative / Vegetative bucketing of the intent slider.
+- `crop_steering.custom_shot` HA service. Pure event-router with full schema
+  validation. Orchestrator listens for the resulting event and applies safety
+  gates.
+- `IntentResolver._publish_derived_mode()` keeps the derived select in sync
+  with the intent slider on every tick.
+- 9 unit tests for IntentResolver (lerp endpoints, profile-dict consistency
+  guard, every profile key has an entity mapping, intent=0/±100 produce
+  correct values, live read of dryback sliders, 11-point bucketing matrix,
+  derived sensor attributes). 13 tests total in `tests/intelligence/`, all
+  green.
+
+### Added (Polish)
+- `dashboards/rootsense_history.yaml` — three-tab dashboard (Intent /
+  Substrate / Anomalies) with multi-metric history-graph cards per zone.
+- `ENTITIES.md` updated end-to-end with new RootSense entities and the
+  dryback semantic clarification ("% drop from peak", not "VWC value to
+  dry to").
+- `README.md` gains a RootSense v3 section with module status table and
+  opt-in steps.
+- `.gitignore` excludes `appdaemon/apps/crop_steering/state/` (local
+  SQLite) and a stray nested clone directory.
+
 ### Added (Phase 1 — Root Zone Intelligence wiring)
 - New shared base `appdaemon/apps/crop_steering/intelligence/base.py` provides
   module-enable gating and common helpers for all five pillars.

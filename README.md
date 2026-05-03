@@ -223,6 +223,29 @@ See `docs/installation_guide.md` for the full step-by-step walkthrough and the [
 
 For the AROYA-equivalent roadmap status, see **`docs/upgrade/GAP_ANALYSIS_2026-05.md`**. It includes a module-by-module gap breakdown, production-readiness risks, and a prioritized implementation backlog.
 
+## RootSense v3 — what's new (in progress)
+
+The system is being upgraded to a four-pillar adaptive platform. The v3 work is opt-in and backward compatible — every new module is gated behind its own switch (default OFF), and existing automations keep working unchanged.
+
+| Pillar | What it does | Status |
+|---|---|---|
+| **Root Zone Intelligence** | Auto-detects field capacity per zone from VWC response to shots; tracks dryback episodes (peak → valley) and exposes substrate analytics sensors (dryback velocity, porosity estimate, EC stack index). | ✅ Phase 1 |
+| **Adaptive Irrigation** | A single `number.crop_steering_steering_intent` slider (-100 generative … +100 vegetative) drives every derived parameter — P1 target, P2 threshold, P0 dryback %, shot size, EC target — via live interpolation between cultivar endpoints. | ✅ Phase 2 |
+| **Agronomic Intelligence** | Penman-Monteith transpiration estimate, VPD ceiling per cultivar, nightly run reports. | ⬜ Phase 3 |
+| **Orchestration** | New `crop_steering.custom_shot` service with safety gates. Anomaly suppression, EC flush guardrails, emergency rescue. | 🟡 partial |
+| **Anomaly Scanner** | Cross-cutting: emitter blockage, EC drift, sensor flat-line, peer-zone deviation. Surfaces `binary_sensor.crop_steering_anomaly_active`. | ✅ scaffolded |
+
+**P0 dryback semantic clarified:** all dryback values are now unambiguously *"% drop from peak VWC"* (dries-back-by, not dries-back-to). Two operator-facing sliders (`number.crop_steering_veg_p0_dryback_drop_pct` and `..._gen_p0_dryback_drop_pct`) feed the IntentResolver.
+
+To opt in:
+
+1. Copy `docs/upgrade/apps.example.yaml` blocks into your `appdaemon/apps/apps.yaml`.
+2. Add `homeassistant.packages: !include_dir_named packages` to your `configuration.yaml` if not already (enables `packages/rootsense/00_recorder.yaml`).
+3. Reload the integration; toggle the relevant `switch.crop_steering_intelligence_*_enabled` switches in the HA UI.
+4. Optionally load `dashboards/rootsense_history.yaml` for the multi-metric history view.
+
+Full roadmap: `docs/upgrade/ROOTSENSE_v3_PLAN.md`.
+
 ## Services
 
 | Service | Required Inputs | What It Does |
@@ -231,6 +254,7 @@ For the AROYA-equivalent roadmap status, see **`docs/upgrade/GAP_ANALYSIS_2026-0
 | `crop_steering.execute_irrigation_shot` | `zone`, `duration_seconds` | Fires `crop_steering_irrigation_shot` event for hardware execution |
 | `crop_steering.check_transition_conditions` | — | Evaluates current state, fires event with reasoning |
 | `crop_steering.set_manual_override` | `zone` | Toggles per-zone manual control with optional timeout |
+| `crop_steering.custom_shot` | `target_zone`, `volume_ml`, optional `intent`/`target_runoff_pct`/`tag` | RootSense v3 — fires `crop_steering_custom_shot`; orchestrator gates and routes to hardware |
 
 These services are the communication bridge between the HA integration and AppDaemon. The integration fires events, AppDaemon listens and acts.
 
