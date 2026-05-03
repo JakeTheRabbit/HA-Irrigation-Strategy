@@ -42,9 +42,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `MIGRATION.md` — operator-facing v2.3.x → v3.0 upgrade guide with
   step-by-step rollout sequence, rollback path, and troubleshooting.
 
+### Added (Linked F1 dashboard suite)
+- Five linked Lovelace dashboards under `dashboards/legacyag/`,
+  built on the existing `custom:agency-sensor-analytics-card` that
+  the live F1 install already uses. Replaces the earlier
+  history-graph-card prototype (`rootsense_history.yaml`) which
+  has been removed.
+  - `00_overview.yaml` — landing page, room climate + substrate
+    + RootSense status at a glance.
+  - `10_climate.yaml` — three views (Temp & RH / CO₂ / VPD) with
+    measured-vs-target overlays and full actuator control panels.
+  - `20_substrate.yaml` — two views (per-table VWC & EC / RootSense
+    per-zone intelligence). 7-day FC + dryback velocity + porosity
+    + EC stack.
+  - `30_intelligence.yaml` — three views (Intent / Anomalies /
+    Custom shot console). Includes one-click test-emitter and
+    rescue-shot buttons.
+  - `40_setpoints.yaml` — single page collecting every operator
+    target, plus measured-vs-target time series for climate and
+    substrate. Anchor for the future ClimateSense recipe timeline.
+- A shared markdown nav block at the top of every dashboard links
+  the five together for one-click switching.
+
+### Added (Plans)
+- `docs/upgrade/INFLUXDB_GRAPHS_PLAN.md` — how to swap the
+  agency-sensor-analytics-card's data fetch from HA's recorder
+  history API to InfluxDB v2 Flux queries. ~1.5 focused-days work.
+  Default stays HA-history; per-card opt-in via `data_source: influxdb`.
+
 ### Added (Polish)
-- `dashboards/rootsense_history.yaml` — three-tab dashboard (Intent /
-  Substrate / Anomalies) with multi-metric history-graph cards per zone.
 - `ENTITIES.md` updated end-to-end with new RootSense entities and the
   dryback semantic clarification ("% drop from peak", not "VWC value to
   dry to").

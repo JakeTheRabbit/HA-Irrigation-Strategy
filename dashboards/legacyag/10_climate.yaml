@@ -1,0 +1,266 @@
+title: "F1 Climate"
+views:
+
+  # ════════════════════════════════════════════════════════════════
+  # VIEW 1 — Temperature & Humidity
+  # ════════════════════════════════════════════════════════════════
+  - title: Temp & RH
+    path: temp-rh
+    icon: mdi:thermometer
+    type: sections
+    max_columns: 4
+    sections:
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: markdown
+            content: |
+              ### F1 Grow Room
+              [Overview](/f1-overview) ·
+              **[Climate](/f1-climate)** ·
+              [Substrate](/f1-substrate) ·
+              [Intelligence](/f1-intelligence) ·
+              [Setpoints](/f1-setpoints)
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:agency-sensor-analytics-card
+            title: Temperature & Humidity — last 24 h
+            subtitle: Tracks day/night targets via dehumidifier + humidifier loops
+            default_timeframe: 24h
+            refresh_seconds: 60
+            timeframes: [1h, 6h, 24h, 7d, 30d, custom]
+            overview:
+              - entity: sensor.gw_room_1_temp
+                name: Room Temp
+                color: "#ff8b7f"
+                thresholds:
+                  warning_above: 28
+                  critical_above: 30
+              - entity: input_number.gw_temp_target_day
+                name: Day target
+                color: "#ffc86f"
+              - entity: input_number.gw_temp_target_night
+                name: Night target
+                color: "#a8a5ff"
+              - entity: sensor.gw_room_1_rh
+                name: Room RH
+                color: "#6ad6ff"
+                thresholds:
+                  warning_below: 45
+                  critical_below: 40
+                  warning_above: 70
+                  critical_above: 75
+              - entity: input_number.gw_rh_target_day
+                name: Day target
+                color: "#ffc86f"
+              - entity: input_number.gw_rh_target_night
+                name: Night target
+                color: "#a8a5ff"
+            panels:
+              left:
+                title: Temperature (current vs targets)
+                series:
+                  - {entity: sensor.gw_room_1_temp,         name: Room temp °C, color: "#ff8b7f"}
+                  - {entity: input_number.gw_temp_target_day,   name: Day target, color: "#ffc86f"}
+                  - {entity: input_number.gw_temp_target_night, name: Night target, color: "#a8a5ff"}
+              right:
+                title: Relative humidity (current vs targets)
+                series:
+                  - {entity: sensor.gw_room_1_rh,             name: Room RH %, color: "#6ad6ff"}
+                  - {entity: input_number.gw_rh_target_day,     name: Day target, color: "#ffc86f"}
+                  - {entity: input_number.gw_rh_target_night,   name: Night target, color: "#a8a5ff"}
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: Targets
+            show_header_toggle: false
+            entities:
+              - entity: input_number.gw_temp_target_day
+                name: Temp target (day)
+              - entity: input_number.gw_temp_target_night
+                name: Temp target (night)
+              - entity: input_number.gw_temp_high_alert
+                name: Temp alert
+              - type: divider
+              - entity: input_number.gw_rh_target_day
+                name: RH target (day)
+              - entity: input_number.gw_rh_target_night
+                name: RH target (night)
+              - entity: input_number.gw_rh_high_alert
+                name: RH alert
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: Actuators
+            show_header_toggle: false
+            entities:
+              - entity: switch.gw_dehumidifier_relay_1
+                name: Dehumidifier 1
+              - entity: switch.gw_dehumidifier_relay_2
+                name: Dehumidifier 2
+              - entity: switch.gw_dehumidifier_relay_3
+                name: Dehumidifier 3
+              - entity: switch.gw_dehumidifier_relay_4
+                name: Dehumidifier 4
+              - type: divider
+              - entity: switch.gw_humidifier
+                name: Humidifier
+
+  # ════════════════════════════════════════════════════════════════
+  # VIEW 2 — CO₂
+  # ════════════════════════════════════════════════════════════════
+  - title: CO₂
+    path: co2
+    icon: mdi:molecule-co2
+    type: sections
+    max_columns: 4
+    sections:
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: markdown
+            content: |
+              ### F1 Grow Room
+              [Overview](/f1-overview) ·
+              **[Climate](/f1-climate)** ·
+              [Substrate](/f1-substrate) ·
+              [Intelligence](/f1-intelligence) ·
+              [Setpoints](/f1-setpoints)
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:agency-sensor-analytics-card
+            title: CO₂ injection — last 24 h
+            subtitle: Pulse-injection while lights ON, hard-cut at 1800 ppm
+            default_timeframe: 24h
+            refresh_seconds: 60
+            timeframes: [1h, 6h, 24h, 7d, 30d, custom]
+            overview:
+              - entity: sensor.gw_room_1_co2
+                name: Room CO₂
+                color: "#ffc86f"
+                thresholds:
+                  warning_above: 1500
+                  critical_above: 1800
+                  warning_below: 800
+              - entity: input_number.gw_co2_target
+                name: Target
+                color: "#5ae0cf"
+              - entity: input_number.gw_co2_high_alert
+                name: High alert
+                color: "#ff8b7f"
+              - entity: input_number.gw_co2_low_alert
+                name: Low alert
+                color: "#a8a5ff"
+              - entity: switch.gw_co2
+                name: Solenoid
+                color: "#8ef0b2"
+            panels:
+              left:
+                title: CO₂ ppm vs target
+                series:
+                  - {entity: sensor.gw_room_1_co2,        name: CO₂ ppm,   color: "#ffc86f"}
+                  - {entity: input_number.gw_co2_target,  name: Target,    color: "#5ae0cf"}
+                  - {entity: input_number.gw_co2_high_alert, name: High alert, color: "#ff8b7f"}
+                  - {entity: input_number.gw_co2_low_alert,  name: Low alert,  color: "#a8a5ff"}
+              right:
+                title: Solenoid + lights (state)
+                series:
+                  - {entity: switch.gw_co2,              name: CO₂ solenoid, color: "#8ef0b2"}
+                  - {entity: binary_sensor.gw_lights_on, name: Lights,       color: "#ffc86f"}
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: CO₂ targets & alerts
+            show_header_toggle: false
+            entities:
+              - entity: input_number.gw_co2_target
+                name: Target ppm
+              - entity: input_number.gw_co2_high_alert
+                name: High alert
+              - entity: input_number.gw_co2_low_alert
+                name: Low alert
+              - type: divider
+              - entity: input_boolean.gw_co2_enabled
+                name: CO₂ control enabled
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: CO₂ hardware
+            show_header_toggle: false
+            entities:
+              - entity: switch.gw_co2
+                name: CO₂ solenoid
+              - entity: binary_sensor.gw_lights_on
+                name: Lights state
+              - entity: input_boolean.gw_maintenance_mode
+                name: Maintenance lockout
+
+  # ════════════════════════════════════════════════════════════════
+  # VIEW 3 — VPD
+  # ════════════════════════════════════════════════════════════════
+  - title: VPD
+    path: vpd
+    icon: mdi:weather-windy
+    type: sections
+    max_columns: 4
+    sections:
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: markdown
+            content: |
+              ### F1 Grow Room
+              [Overview](/f1-overview) ·
+              **[Climate](/f1-climate)** ·
+              [Substrate](/f1-substrate) ·
+              [Intelligence](/f1-intelligence) ·
+              [Setpoints](/f1-setpoints)
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:agency-sensor-analytics-card
+            title: VPD over time
+            subtitle: Result of temp + RH; quality gate, not a control input
+            default_timeframe: 24h
+            refresh_seconds: 60
+            timeframes: [1h, 6h, 24h, 7d, 30d, custom]
+            overview:
+              - entity: sensor.gw_room_1_vpd
+                name: Current VPD
+                color: "#ff9ecb"
+                thresholds:
+                  warning_above: 1.4
+                  critical_above: 1.6
+                  warning_below: 0.6
+              - entity: sensor.gw_room_1_temp
+                name: Temp °C
+                color: "#ff8b7f"
+              - entity: sensor.gw_room_1_rh
+                name: RH %
+                color: "#6ad6ff"
+            panels:
+              left:
+                title: VPD trace
+                series:
+                  - {entity: sensor.gw_room_1_vpd, name: VPD kPa, color: "#ff9ecb"}
+              right:
+                title: Drivers (temp + RH)
+                series:
+                  - {entity: sensor.gw_room_1_temp, name: Temp °C, color: "#ff8b7f"}
+                  - {entity: sensor.gw_room_1_rh,   name: RH %,    color: "#6ad6ff"}

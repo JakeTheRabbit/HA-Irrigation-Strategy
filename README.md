@@ -242,7 +242,7 @@ To opt in:
 1. Copy `docs/upgrade/apps.example.yaml` blocks into your `appdaemon/apps/apps.yaml`.
 2. Add `homeassistant.packages: !include_dir_named packages` to your `configuration.yaml` if not already (enables `packages/rootsense/00_recorder.yaml`).
 3. Reload the integration; toggle the relevant `switch.crop_steering_intelligence_*_enabled` switches in the HA UI.
-4. Optionally load `dashboards/rootsense_history.yaml` for the multi-metric history view.
+4. Add the five F1 dashboards from `dashboards/legacyag/` to your `configuration.yaml` (see `dashboards/legacyag/README.md`). They use the existing `custom:agency-sensor-analytics-card` so synced hover/zoom/pan, threshold-aware overview tiles, and dual-panel layout work everywhere.
 
 Full roadmap: `docs/upgrade/ROOTSENSE_v3_PLAN.md`.
 
