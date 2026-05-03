@@ -25,6 +25,7 @@ from typing import Any, Deque
 from ..base import IntelligenceApp
 from ..bus import RootSenseBus
 from .hardware import HardwareCalibration, load_hardware_calibration
+from .leaf_vpd import air_vpd_kpa, leaf_vpd_kpa
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,16 +75,21 @@ class ClimateSenseSensing(IntelligenceApp):
         if ppfd_entity:
             self._publish_dli(ppfd_entity, snapshot["lights_on"])
 
-        # ── leaf-air ΔT ────────────────────────────────────────────────
-        if self.hw.sensors.canopy_temp:
-            canopy = self._read_float(self.hw.sensors.canopy_temp)
+        # ── Leaf VPD (the supervisory variable when leaf temp present) ──
+        leaf_entity = self.hw.sensors.leaf_temp or self.hw.sensors.canopy_temp
+        if leaf_entity:
+            leaf = self._read_float(leaf_entity)
             air = snapshot["temp_c"]
-            if canopy is not None and air is not None:
+            rh = snapshot["rh_pct"]
+            if leaf is not None and air is not None and rh is not None:
+                lvpd = leaf_vpd_kpa(leaf_temp_c=leaf, air_temp_c=air, air_rh_pct=rh)
+                avpd = air_vpd_kpa(air_temp_c=air, air_rh_pct=rh)
+                # Leaf-air ΔT
                 self.set_state(
                     "sensor.climate_leaf_air_dt_c",
-                    state=round(canopy - air, 2),
+                    state=round(leaf - air, 2),
                     attributes={
-                        "canopy_temp_c": canopy,
+                        "canopy_temp_c": leaf,
                         "air_temp_c": air,
                         "unit_of_measurement": "°C",
                         "friendly_name": "Leaf-air ΔT",
@@ -91,6 +97,28 @@ class ClimateSenseSensing(IntelligenceApp):
                         "state_class": "measurement",
                     },
                 )
+                # Leaf VPD — the actual biological measurement
+                self.set_state(
+                    "sensor.climate_leaf_vpd_kpa",
+                    state=round(lvpd, 3),
+                    attributes={
+                        "leaf_temp_c": leaf,
+                        "air_temp_c": air,
+                        "air_rh_pct": rh,
+                        "air_vpd_kpa": round(avpd, 3),
+                        "warning_negative": lvpd < 0,   # condensation risk
+                        "unit_of_measurement": "kPa",
+                        "friendly_name": "Leaf VPD",
+                        "icon": "mdi:leaf-circle",
+                        "state_class": "measurement",
+                    },
+                )
+                # Update bus snapshot with both VPDs for downstream consumers
+                snapshot["leaf_vpd_kpa"] = lvpd
+                snapshot["air_vpd_kpa"] = avpd
+                snapshot["leaf_temp_c"] = leaf
+                # re-publish with the enriched payload
+                self.bus.publish("climate.sample", snapshot)
 
     def _publish_dli(self, ppfd_entity: str, lights_on: bool) -> None:
         ppfd = self._read_float(ppfd_entity)

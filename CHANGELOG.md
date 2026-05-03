@@ -7,6 +7,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 3.0.0-dev "RootSense"
 
+### Changed (ClimateSense — layered control refactor + leaf VPD supervisory variable)
+
+The monolithic `control.py` (~290 lines) is replaced with a layered
+package mirroring commercial-BMS architecture:
+
+```
+intelligence/climate/
+  leaf_vpd.py              ← pure math (Tetens + RH inversion)
+  control/
+    actions.py             ← Action / ActionKind dataclasses
+    hvac.py                ← bang-bang + calibration + mode-switch + IR refresh
+    dehumidifier.py        ← lead-lag staging + rotation + demand persistence
+    humidifier.py          ← bang-bang with min-off
+    co2.py                 ← pulse cadence + lights-on lead time + adaptive
+    exhaust.py             ← emergency + scheduled refresh + watchdog
+    coordinator.py         ← cross-actuator conflict resolution
+    watchdog.py            ← Tier 4 safety (sensor staleness, runaway, emergency)
+    app.py                 ← thin AppDaemon adapter
+```
+
+### Added (corrected for F1 reality)
+- **Leaf VPD as the supervisory variable.** The recipe declares
+  `leaf_vpd_kpa` per phase; the control layer reads current leaf temp
+  + air temp + air RH and inverts the Tetens equation to derive the
+  required RH to hit target leaf VPD. The dehu/humid loops chase the
+  *derived* RH, not the recipe's `day_rh_pct` (kept as fallback for
+  installs without a leaf-temp sensor).
+- 22 unit tests covering Tetens math against published tables,
+  round-trip property tests on the RH inversion, and 6 cannabis-phase
+  envelope checks (transplant through ripening) where solved RH must
+  fall within published cultivation chart bands.
+
+### Added (control patterns from commercial cultivation HVAC)
+- **HVAC mode-switching** with cooldown — controller never flips
+  cool↔heat more often than `mode_change_cooldown_min` (default 30 min).
+  IR-blaster insurance: re-issue last setpoint every `refresh_interval_min`
+  to recover from lost IR commands.
+- **Lead-lag dehumidifier rotation.** F1 has 2 dehu units (4 relays as
+  contactor pairs). Lead engages first on demand persistence; lag only
+  joins if RH stays high `stage_persistence_min` after that. Reverse
+  order on release (lag off first). Lead/lag swap every 7 days for wear
+  leveling.
+- **Demand persistence** — every actuator requires the deviation to last
+  3-5 min before staging on; prevents reacting to door-open spikes.
+- **AC↔dehu cooperation** — coordinator defers staging the LAG dehu
+  while AC is already cooling AND temp is above target (AC cooling
+  is already condensing water out via condensation).
+- **Adaptive CO₂ pulse cadence** — extends/shortens pulse_off based on
+  observed ΔCO₂ during the previous rest period; clamped to
+  [pulse_off_min_seconds, pulse_off_max_seconds].
+- **Lights-on lead time for CO₂** — solenoid won't inject until lights
+  have been on for `lights_on_lead_min` (default 30 min) so stomata are
+  open and CO₂ uptake is real.
+- **Tier 4 watchdog** — runs every tick. Flags stale sensors (no update
+  in 90 s), force-closes any actuator that exceeds its
+  `actuator_max_runtime_min`, and re-asserts emergency exhaust + CO₂
+  cutoff regardless of what other layers are doing.
+- **Exhaust controller** — emergency-only by default (room is sealed).
+  Triggers on temp > 32 °C OR CO₂ > 1800 ppm; releases when both are
+  back in safe range. Optional scheduled refresh window.
+- **Severity-tiered actions** — every Action carries a severity (normal /
+  safety / emergency). Coordinator drops normal-severity proposals when a
+  critical anomaly is active; safety/emergency always emit.
+
+### Added (operator-facing docs)
+- `docs/upgrade/SEQUENCE_OF_OPERATIONS.md` — the operator-readable
+  contract describing exactly what every actuator does, when, and why.
+  Sections cover authority hierarchy, sensors, supervisory variable,
+  per-actuator sequences, cross-actuator rules, failure modes, and
+  loss-of-comms safe state.
+- `docs/upgrade/CONTROL_THEORY.md` — design rationale. Why bang-bang
+  not PID, why leaf VPD not air RH, why hardware calibration is
+  first-class, why staged with lead-lag rotation, why coordinator over
+  master controller, why severity-tiered actions, what this design
+  will NOT do.
+
+### Added (corrected hardware reality for F1)
+- `hardware_f1.yaml` updated to match operator description:
+  - 2 dehu units (was incorrectly described as 4 separate dehus); each
+    is a contactor pair driving run + fan relays.
+  - Wet-tip contactors with built-in 2-min hardware cooldown — software
+    no longer enforces min_off (the contactors do).
+  - 2× 9 kW IR-controlled AC presented as a single climate entity
+    with HVAC mode-switching support.
+  - Exhaust system added (emergency + scheduled refresh).
+  - Leaf-temp sensor present — primary supervisory variable.
+
+### Tests
+- 32 new tests in `test_control_loops.py` (HVAC, dehu, humidifier, CO2,
+  exhaust, coordinator, watchdog).
+- 22 new tests in `test_leaf_vpd.py` (Tetens, AVP, leaf VPD, RH solver,
+  cannabis-phase envelopes).
+- Total intelligence tests: 95. Full suite: **123 passing.**
+
 ### Added (ClimateSense — environmental control sibling)
 - New `appdaemon/apps/crop_steering/intelligence/climate/` package — five
   pillars mirroring RootSense exactly (sensing, timeline, control,

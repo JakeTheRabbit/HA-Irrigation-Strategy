@@ -1,69 +1,128 @@
-# F1 Grow Room — hardware calibration
-# This is the per-installation calibration the user edits when their
-# real-world hardware behaviour drifts. Control loops re-read this on
-# every tick, so changes take effect without restarting AppDaemon.
+# F1 Grow Room — hardware calibration (corrected with operator input)
+#
+# Hardware reality (from operator):
+# - 2x 9 kW high-wall AC units, controlled via IR blaster, presented to
+#   HA as a single template climate entity (climate.gw_ac_1).
+# - 2x dehumidifiers driven by wet-tip contactors with built-in 2-min
+#   auto-cooldown. We do NOT need software min_off — the contactors
+#   enforce it. We DO stage them and lead-lag rotate.
+# - 1x ultrasonic humidifier.
+# - 1x CO2 solenoid (existing pulse cadence preserved).
+# - 1x exhaust fan / damper for full room air replacement. Emergency +
+#   scheduled use only (room is sealed by default).
+# - Leaf-temp sensor present — used for LEAF VPD computation, which is
+#   the actual supervisory variable (not air VPD or air RH).
+#
+# Operators tune values here when real-world drift appears. Control loops
+# re-read this file every tick — changes take effect without restart.
 
 room: F1
 
 # ─────────────────────────────────────────────────────────────────────
-# HVAC — heat pump / mini-split
+# HVAC — 2x 9 kW high-wall AC, IR-blaster controlled, single climate entity
 # ─────────────────────────────────────────────────────────────────────
-# Real-world example: setpoint 27 °C → room measures 29 °C. The unit's
-# return-air sensor sits below the canopy, lights add radiant heat,
-# and the unit deadbands wider than we want. ClimateSense commands
-# `target + cool_offset_c` to land at the actual canopy target.
+# Operator example: setpoint 27 → room reads 29 → cool_offset_c = -2.
+# IR-blaster units sometimes lose state after power cycle; the watchdog
+# re-issues the last commanded mode + setpoint every 30 min as insurance.
 hvac:
   primary:
     entity: climate.gw_ac_1
     cool_offset_c: -2.0          # command 25 to actually hit 27 in cool mode
-    heat_offset_c: 0.0           # heating tracks well, no drift
+    heat_offset_c: 0.0           # heating tracks well
     min_setpoint_c: 16.0
     max_setpoint_c: 30.0
-    settle_minutes: 8            # don't act on a fresh command for this long
+    settle_minutes: 8            # don't issue another setpoint within this window
     deadband_c: 0.5              # ±0.5 °C deadband around target
+    mode_change_cooldown_min: 30 # don't flip cool↔heat more often than this
+    refresh_interval_min: 30     # re-issue last setpoint at this cadence (IR insurance)
 
 # ─────────────────────────────────────────────────────────────────────
-# DEHUMIDIFIERS — 4 staggered relays
+# DEHUMIDIFIERS — 2 units, wet-tip contactors, 2-min hardware cooldown
 # ─────────────────────────────────────────────────────────────────────
+# The 4 relays in the legacy 40_environment.yaml are the contactors —
+# 2 dehus × 2 relays each (typically a "run" relay and a "fan" relay,
+# wired via wet-tip contactor for arc suppression). For software
+# control we treat them as 2 logical dehus.
+#
+# Lead-lag rotation: weekly swap which dehu is "lead" so wear evens out.
+# Staging: lead fires first; lag fires only if RH still high after the
+# stage_persistence_min window.
 dehumidifier:
-  relays:
-    - switch.gw_dehumidifier_relay_1
-    - switch.gw_dehumidifier_relay_2
-    - switch.gw_dehumidifier_relay_3
-    - switch.gw_dehumidifier_relay_4
-  stagger_seconds: 10            # delay between bringing relays online
-  min_off_seconds: 120           # don't re-fire within 2 min of shutoff
+  units:
+    - name: dehu_a
+      relays: [switch.gw_dehumidifier_relay_1, switch.gw_dehumidifier_relay_2]
+    - name: dehu_b
+      relays: [switch.gw_dehumidifier_relay_3, switch.gw_dehumidifier_relay_4]
+  stagger_seconds: 10            # delay between bringing relays of a single unit online
+  stage_persistence_min: 5       # lag dehu only fires if RH still off after this
+  hw_cooldown_min: 2             # informational — built into the contactor, not enforced in software
+  rotation_period_days: 7        # swap lead/lag weekly
 
 # ─────────────────────────────────────────────────────────────────────
 # HUMIDIFIER — single ultrasonic
 # ─────────────────────────────────────────────────────────────────────
 humidifier:
   entity: switch.gw_humidifier
-  min_off_seconds: 120
+  min_off_seconds: 60            # ultrasonic; can cycle quickly
 
 # ─────────────────────────────────────────────────────────────────────
 # CO2 — pulse-injection solenoid
 # ─────────────────────────────────────────────────────────────────────
-# Preserves the existing 40_environment.yaml cadence (1 min on / 4 min
-# off while CO2 < 1400, hard cap at 1800).
+# Adaptive cadence (planned): if room responds well, extend pulse_off.
+# If room sluggish, shorten. Bounded by min/max.
 co2:
   solenoid: switch.gw_co2
   pulse_on_seconds: 60
   pulse_off_seconds: 240
+  pulse_off_min_seconds: 120
+  pulse_off_max_seconds: 600
   hard_max_ppm: 1800             # safety cap, no override
   off_at_lights_off: true
+  lights_on_lead_min: 30         # don't inject until lights have been on this long (stomata)
+
+# ─────────────────────────────────────────────────────────────────────
+# EXHAUST — emergency / scheduled air replacement only
+# ─────────────────────────────────────────────────────────────────────
+# Room is sealed under normal operation. Exhaust runs for:
+# - Emergency: temp > emergency_temp_c, CO2 > hard_max_ppm
+# - Scheduled: optional periodic refresh (e.g., 5 min every 4 h)
+exhaust:
+  entity: switch.gw_exhaust            # operator: confirm or set to your actual exhaust switch
+  emergency_temp_c: 32.0
+  emergency_co2_ppm: 1800
+  scheduled_enabled: false             # turn on for periodic refresh
+  scheduled_period_min: 240            # every 4 h if enabled
+  scheduled_duration_min: 5            # 5 min refresh
+  max_runtime_min: 30                  # watchdog hard limit
 
 # ─────────────────────────────────────────────────────────────────────
 # SENSOR MAP — F1 Room 1
 # ─────────────────────────────────────────────────────────────────────
+# leaf_temp is the canopy IR temperature sensor — when present, the
+# supervisory variable is LEAF VPD (not air VPD or air RH). Control
+# derives required RH to hit target leaf VPD given current leaf+air
+# temperatures.
 sensors:
-  temp_primary: sensor.gw_room_1_temp
-  rh_primary:   sensor.gw_room_1_rh
-  co2:          sensor.gw_room_1_co2
-  vpd:          sensor.gw_room_1_vpd
-  lights_on:    binary_sensor.gw_lights_on
-  leak:         binary_sensor.gw_leak
-  tank_low:     binary_sensor.gw_tank_low
-  # Optional — set if you have these
+  temp_primary:  sensor.gw_room_1_temp
+  rh_primary:    sensor.gw_room_1_rh
+  co2:           sensor.gw_room_1_co2
+  vpd:           sensor.gw_room_1_vpd          # air VPD; for display + cross-check
+  lights_on:     binary_sensor.gw_lights_on
+  leak:          binary_sensor.gw_leak
+  tank_low:      binary_sensor.gw_tank_low
+  leaf_temp:     sensor.gw_room_1_leaf_temp    # operator: rename to your actual leaf-temp sensor
+  # Optional
   # ppfd:        sensor.gw_room_1_ppfd
-  # canopy_temp: sensor.gw_room_1_canopy_temp
+
+# ─────────────────────────────────────────────────────────────────────
+# SAFETY THRESHOLDS — used by watchdog tier
+# ─────────────────────────────────────────────────────────────────────
+safety:
+  emergency_temp_c: 32.0           # above this → all-stop, exhaust on, alert
+  emergency_co2_ppm: 1800          # above this → solenoid hard close
+  sensor_stale_seconds: 90         # if a critical sensor hasn't updated in this long, halt that loop
+  actuator_max_runtime_min:
+    dehumidifier: 120              # 2 h max continuous run
+    humidifier: 60
+    co2: 30                        # if it stayed open this long, something's wrong
+    exhaust: 30

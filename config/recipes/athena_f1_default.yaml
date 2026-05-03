@@ -3,9 +3,13 @@
 # F1 install. Operator should tune phase durations and PPFD targets to
 # match their actual cultivars + DLI history.
 #
-# Semantic reminder: dryback values in the linked crop_steering_intent
-# field are "% drop from peak VWC" (the controller-wide convention).
-# Negative intent = generative bias, positive = vegetative bias.
+# Semantic reminder:
+# - dryback values in `crop_steering_intent` are "% drop from peak VWC"
+#   (the controller-wide convention). Negative = generative, positive = veg.
+# - LEAF VPD is the supervisory variable. The control loop derives the
+#   required RH from leaf_vpd_kpa given current leaf+air temps. The
+#   day_rh_pct / night_rh_pct fields below are FALLBACK values used only
+#   when the leaf-temp sensor is unavailable.
 
 recipe: athena_f1_default
 
@@ -25,9 +29,9 @@ phases:
     targets:
       day_temp_c:    {value: 25.0, tolerance: 1.0}
       night_temp_c:  {value: 22.5, tolerance: 1.5}
-      day_rh_pct:    {value: 72,   tolerance: 5}
+      leaf_vpd_kpa:  {value: 0.7,  tolerance: 0.15}        # supervisory
+      day_rh_pct:    {value: 72,   tolerance: 5}           # fallback
       night_rh_pct:  {value: 68,   tolerance: 5}
-      vpd_kpa:       {value: 0.7,  tolerance: 0.2}
       co2_ppm:       {value: 600,  tolerance: 100}
       ppfd_target:   {value: 350,  ramp_minutes: 30}
 
@@ -39,9 +43,9 @@ phases:
     targets:
       day_temp_c:    {value: 26.0, tolerance: 1.0}
       night_temp_c:  {value: 23.0, tolerance: 1.5}
+      leaf_vpd_kpa:  {value: 0.85, tolerance: 0.15}
       day_rh_pct:    {value: 68,   tolerance: 4}
       night_rh_pct:  {value: 62,   tolerance: 4}
-      vpd_kpa:       {value: 0.85, tolerance: 0.15}
       co2_ppm:       {value: 800,  tolerance: 100}
       ppfd_target:   {value: 600,  ramp_minutes: 30}
 
@@ -52,9 +56,9 @@ phases:
     targets:
       day_temp_c:    {value: 26.5, tolerance: 1.0}
       night_temp_c:  {value: 23.0, tolerance: 1.5}
+      leaf_vpd_kpa:  {value: 0.95, tolerance: 0.15}
       day_rh_pct:    {value: 65,   tolerance: 4}
       night_rh_pct:  {value: 60,   tolerance: 4}
-      vpd_kpa:       {value: 0.95, tolerance: 0.15}
       co2_ppm:       {value: 1000, tolerance: 100}
       ppfd_target:   {value: 750,  ramp_minutes: 30}
 
@@ -67,9 +71,9 @@ phases:
     targets:
       day_temp_c:    {value: 26.5, tolerance: 1.0}
       night_temp_c:  {value: 21.5, tolerance: 1.5}
+      leaf_vpd_kpa:  {value: 1.10, tolerance: 0.15}
       day_rh_pct:    {value: 60,   tolerance: 4}
       night_rh_pct:  {value: 55,   tolerance: 4}
-      vpd_kpa:       {value: 1.10, tolerance: 0.15}
       co2_ppm:       {value: 1200, tolerance: 100}
       ppfd_target:   {value: 850,  ramp_minutes: 45}
 
@@ -80,9 +84,9 @@ phases:
     targets:
       day_temp_c:    {value: 26.0, tolerance: 1.0}
       night_temp_c:  {value: 20.5, tolerance: 1.5}
+      leaf_vpd_kpa:  {value: 1.20, tolerance: 0.15}
       day_rh_pct:    {value: 55,   tolerance: 4}
       night_rh_pct:  {value: 50,   tolerance: 4}
-      vpd_kpa:       {value: 1.20, tolerance: 0.15}
       co2_ppm:       {value: 1300, tolerance: 100}
       ppfd_target:   {value: 950,  ramp_minutes: 45}
 
@@ -93,9 +97,9 @@ phases:
     targets:
       day_temp_c:    {value: 25.0, tolerance: 1.0}
       night_temp_c:  {value: 19.5, tolerance: 1.5}
+      leaf_vpd_kpa:  {value: 1.30, tolerance: 0.15}
       day_rh_pct:    {value: 50,   tolerance: 4}
       night_rh_pct:  {value: 48,   tolerance: 4}
-      vpd_kpa:       {value: 1.30, tolerance: 0.15}
       co2_ppm:       {value: 1300, tolerance: 100}
       ppfd_target:   {value: 950,  ramp_minutes: 45}
 
@@ -106,8 +110,8 @@ phases:
     targets:
       day_temp_c:    {value: 23.0, tolerance: 1.0}
       night_temp_c:  {value: 18.0, tolerance: 1.5}
+      leaf_vpd_kpa:  {value: 1.40, tolerance: 0.15}
       day_rh_pct:    {value: 48,   tolerance: 4}
       night_rh_pct:  {value: 45,   tolerance: 4}
-      vpd_kpa:       {value: 1.40, tolerance: 0.15}
       co2_ppm:       {value: 600,  tolerance: 100}        # ambient — saving CO2 for ripening
       ppfd_target:   {value: 750,  ramp_minutes: 45}
