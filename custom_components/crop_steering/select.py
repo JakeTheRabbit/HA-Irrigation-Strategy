@@ -104,7 +104,7 @@ async def async_setup_entry(
             entry,
             SelectEntityDescription(
                 key=f"zone_{zone_num}_group",
-                name=f"Zone {zone_num} Group",
+                name=f"Crop Steering Zone {zone_num} Group",
                 options=ZONE_GROUP_OPTIONS,
                 icon="mdi:group",
             ),
@@ -116,7 +116,7 @@ async def async_setup_entry(
             entry,
             SelectEntityDescription(
                 key=f"zone_{zone_num}_priority",
-                name=f"Zone {zone_num} Priority",
+                name=f"Crop Steering Zone {zone_num} Priority",
                 options=ZONE_PRIORITY_OPTIONS,
                 icon="mdi:priority-high",
             ),
@@ -128,13 +128,25 @@ async def async_setup_entry(
             entry,
             SelectEntityDescription(
                 key=f"zone_{zone_num}_crop_profile",
-                name=f"Zone {zone_num} Crop Profile",
+                name=f"Crop Steering Zone {zone_num} Crop Profile",
                 options=ZONE_CROP_PROFILES,
                 icon="mdi:sprout",
             ),
             zone_num=zone_num
         ))
-    
+
+        # Zone Steering Mode (per-row Vegetative/Generative; AppDaemon falls back to global)
+        selects.append(CropSteeringSelect(
+            entry,
+            SelectEntityDescription(
+                key=f"zone_{zone_num}_steering_mode",
+                name=f"Crop Steering Zone {zone_num} Steering Mode",
+                options=["Vegetative", "Generative"],
+                icon="mdi:steering",
+            ),
+            zone_num=zone_num
+        ))
+
     async_add_entities(selects)
 
 class CropSteeringSelect(SelectEntity, RestoreEntity):
@@ -184,7 +196,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
             # Zone-specific device
             return DeviceInfo(
                 identifiers={(DOMAIN, f"{self._entry.entry_id}_zone_{self._zone_num}")},
-                name=f"Zone {self._zone_num}",
+                name=f"Crop Steering Zone {self._zone_num}",
                 manufacturer="Home Assistant Community",
                 model="Zone Controller",
                 sw_version="2.3.0",
@@ -194,7 +206,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
             # Main device
             return DeviceInfo(
                 identifiers={(DOMAIN, self._entry.entry_id)},
-                name="Crop Steering System",
+                name="Crop Steering",
                 manufacturer="Home Assistant Community",
                 model="Professional Irrigation Controller", 
                 sw_version="2.3.0",
