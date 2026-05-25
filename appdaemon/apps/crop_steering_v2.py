@@ -138,6 +138,41 @@ class CropSteeringV2(hass.Hass):
             v = self.get_state("select.crop_steering_growth_stage") or "Vegetative"
         return str(v).lower().startswith("veg")
 
+    # --------------------------------------------------------------------- EC
+    def _ec_target(self, z, phase):
+        """Per-phase, per-mode EC target (mS/cm). phase in p0/p1/p2/p3."""
+        veg = self._is_veg(z)
+        dv, dg = {"p0": (3.0, 4.0), "p1": (3.0, 5.0),
+                  "p2": (3.2, 6.0), "p3": (3.0, 4.5)}.get(phase, (3.0, 4.5))
+        return self._znum(z, f"ec_target_{'veg' if veg else 'gen'}_{phase}", dv if veg else dg)
+
+    def _ec_decision(self, z, ec, target):
+        """Engine-parity EC eval -> (needs_irrigation, action).
+        dilute = EC too high (flush down); strengthen = too low (do NOT dilute
+        further); stack = build EC up below target (only if ec_stacking_enabled)."""
+        if ec is None or target <= 0:
+            return (False, "maintain")
+        ratio = ec / target
+        if self._on("switch.crop_steering_ec_stacking_enabled", False):
+            if ratio < 1.0 and (target - ec) > 0.5:
+                return (True, "stack")
+            return (False, "maintain")
+        if ratio > 1.2:
+            return (True, "dilute")
+        if ratio < 0.8:
+            return (False, "strengthen")
+        return (False, "maintain")
+
+    def _ec_shot_factor(self, action, ratio):
+        """Shot-size multiplier from EC action (bigger to dilute, smaller to conserve)."""
+        if action == "dilute":
+            return 2.0 if ratio > 1.5 else (1.5 if ratio > 1.2 else 1.2)
+        if action in ("conserve", "strengthen"):
+            return 0.5 if ratio < 0.5 else (0.7 if ratio < 0.8 else 0.9)
+        if action == "stack":
+            return 1.1
+        return 1.0
+
     def _lights_on(self):
         on_h = int(self._gnum("lights_on_hour", 10))
         off_h = int(self._gnum("lights_off_hour", 22))
@@ -173,6 +208,15 @@ class CropSteeringV2(hass.Hass):
                 return "tank_empty"  # low float reads empty -> protect the pump (dry-run)
             if not self._quality_ok:
                 return self._quality_reason or "quality_block"
+            # Overwater / EC safety caps (parity with the old engine's safety limits).
+            if self.zone[z]["water_today"] >= self._znum(z, "max_daily_volume", 1e9):
+                return "daily_volume_cap"
+            v = self._vwc(z)
+            if v is not None and v >= self._gnum("field_capacity", 101.0):
+                return "at_field_capacity"
+            e = self._ec(z)
+            if e is not None and e >= self._gnum("maximum_ec", 99.0):
+                return "max_ec_exceeded"
             if self.zone[z]["irrigating"]:
                 return "shot_in_progress"
         except Exception as e:
@@ -325,13 +369,21 @@ class CropSteeringV2(hass.Hass):
     def _do_p0(self, z, vwc, veg):
         st = self.zone[z]
         key = "vegetative_dryback_target" if veg else "generative_dryback_target"
-        target_db = self._znum(z, key, 15.0)
+        target_db = self._znum(z, key, 15.0)                       # % drop of peak
+        drop_pts = self._znum(z, "p0_dryback_drop_percent", 15.0)  # absolute VWC-point drop
         min_wait = self._znum(z, "p0_minimum_wait_time", 30.0)
+        max_wait = self._znum(z, "p0_maximum_wait_time", 120.0)
         elapsed = (self.datetime() - st["phase_start"]).total_seconds() / 60.0
         peak = st["peak_vwc"] or vwc
         drop = ((peak - vwc) / peak * 100.0) if peak else 0.0
-        if elapsed >= min_wait and drop >= target_db:
-            self.log(f"Zone {z}: P0 complete (dryback {drop:.1f}% >= {target_db:.0f}%) -> P1")
+        abs_drop = (peak - vwc) if peak else 0.0
+        if elapsed >= min_wait and (drop >= target_db or abs_drop >= drop_pts):
+            self.log(f"Zone {z}: P0 complete (dryback {drop:.1f}% of peak / {abs_drop:.1f}pts) -> P1")
+            self._set_phase(z, "P1")
+            st["p1_shots"] = 0
+        elif elapsed >= max_wait:
+            self.log(f"Zone {z}: P0 max wait {max_wait:.0f}min reached (dryback only "
+                     f"{drop:.1f}%) -> P1", level="WARNING")
             self._set_phase(z, "P1")
             st["p1_shots"] = 0
 
@@ -339,15 +391,37 @@ class CropSteeringV2(hass.Hass):
         st = self.zone[z]
         target_vwc = self._znum(z, "p1_target_vwc", 65.0)
         min_shots = int(self._znum(z, "p1_minimum_shots", 3))
+        max_shots = int(self._znum(z, "p1_maximum_shots", 6))
         tween = self._znum(z, "p1_time_between_shots", 15.0)
-        if vwc >= target_vwc and st["p1_shots"] >= min_shots:
+        vwc_need = vwc < target_vwc
+        # Target VWC reached + minimum shots done -> P2.
+        if not vwc_need and st["p1_shots"] >= min_shots:
             self.log(f"Zone {z}: P1 complete (VWC {vwc:.1f}% >= {target_vwc:.0f}%, "
                      f"{st['p1_shots']} shots) -> P2")
             self._set_phase(z, "P2")
             return
-        if self._shot_due(z, tween):
-            if self._fire_shot(z, "P1", self._znum(z, "p1_initial_shot_size", 2.0)):
-                st["p1_shots"] += 1
+        # Max-shots ceiling -> P2 (never ramp forever if target is unreachable).
+        if st["p1_shots"] >= max_shots:
+            self.log(f"Zone {z}: P1 max shots {max_shots} reached (VWC {vwc:.1f}%) -> P2")
+            self._set_phase(z, "P2")
+            return
+        if not self._shot_due(z, tween):
+            return
+        ec = self._ec(z)
+        target_ec = self._ec_target(z, "p1")
+        ec_need, action = self._ec_decision(z, ec, target_ec)
+        if not (vwc_need or ec_need):
+            return
+        # Progressive shot size: initial + increment*count, capped at max, * zone mult.
+        init = self._znum(z, "p1_initial_shot_size", 2.0)
+        inc = self._znum(z, "p1_shot_size_increment", 0.5)
+        mx = self._znum(z, "p1_maximum_shot_size", 10.0)
+        size = min(init + inc * st["p1_shots"], mx) * self._znum(z, "shot_size_multiplier", 1.0)
+        if ec is not None and target_ec > 0:
+            size *= self._ec_shot_factor(action, ec / target_ec)
+        kind = f"P1 EC-{action}" if (ec_need and not vwc_need) else "P1"
+        if self._fire_shot(z, kind, size):
+            st["p1_shots"] += 1
 
     def _do_p2(self, z, vwc, veg):
         # Enter P3 ahead of lights-off (final dryback).
@@ -357,10 +431,29 @@ class CropSteeringV2(hass.Hass):
             self.log(f"Zone {z}: within {last_irr:.0f}min of lights-off -> P3")
             self._set_phase(z, "P3")
             return
+        if not self._shot_due(z, float(self.thr.get("min_irrigation_interval", 300)) / 60.0):
+            return
         threshold = self._znum(z, "p2_vwc_threshold", 60.0)
-        min_int = float(self.thr.get("min_irrigation_interval", 300)) / 60.0
-        if vwc < threshold and self._shot_due(z, min_int):
-            self._fire_shot(z, "P2", self._znum(z, "p2_shot_size", 5.0))
+        vwc_need = vwc < threshold
+        ec = self._ec(z)
+        target_ec = self._ec_target(z, "p2")
+        base = self._znum(z, "p2_shot_size", 5.0)
+        # P2 EC ratio band (p2_ec_high/low are MULTIPLIERS on the phase EC target):
+        # ratio > high -> dilute (bigger shot); ratio < low -> conserve (smaller shot).
+        ratio = (ec / target_ec) if (ec is not None and target_ec > 0) else None
+        high = self._znum(z, "p2_ec_high_threshold", 1.2)
+        low = self._znum(z, "p2_ec_low_threshold", 0.8)
+        ec_need, action, size = False, "maintain", base
+        if ratio is not None:
+            if ratio > high:
+                ec_need, action, size = True, "dilute", base * 1.5
+            elif ratio < low:
+                ec_need, action, size = True, "conserve", base * 0.7
+        if not (vwc_need or ec_need):
+            return
+        size *= self._znum(z, "shot_size_multiplier", 1.0)
+        kind = f"P2 EC-{action}" if (ec_need and not vwc_need) else "P2"
+        self._fire_shot(z, kind, size)
 
     def _set_phase(self, z, ph):
         if self.zone[z]["phase"] != ph:
@@ -383,9 +476,12 @@ class CropSteeringV2(hass.Hass):
             self.log(f"Zone {z}: {kind} shot wanted ({shot_pct:.1f}%) but BLOCKED: {block}")
             return False
         dur = self._shot_duration_s(shot_pct)
-        if dur <= 0 or dur > 600:
+        if dur <= 0:
             self.log(f"Zone {z}: refusing shot — bad duration {dur}s", level="WARNING")
             return False
+        if dur > 600:
+            self.log(f"Zone {z}: clamping shot {dur:.0f}s -> 600s (safety cap)", level="WARNING")
+            dur = 600.0
         try:
             valve = self.hw["zone_valves"][z]
             pump = self.hw["pump_master"]
@@ -401,6 +497,12 @@ class CropSteeringV2(hass.Hass):
         self.zone[z]["water_today"] += round(flow * dur / 3600.0, 3)
         self.log(f"Zone {z}: FIRING {kind} shot {shot_pct:.1f}% -> {dur:.0f}s "
                  f"(pump->main->{valve})")
+        try:
+            self.fire_event("crop_steering_irrigation_shot", zone=z,
+                            phase=self.zone[z]["phase"], kind=kind,
+                            shot_size_percent=round(shot_pct, 2), duration_s=round(dur, 1))
+        except Exception as e:
+            self.log(f"Zone {z}: event-fire error: {e}", level="WARNING")
         try:
             self.turn_on(pump)
             self.run_in(self._seq_main, 2, z=z, pump=pump, main=main, valve=valve, dur=dur)
