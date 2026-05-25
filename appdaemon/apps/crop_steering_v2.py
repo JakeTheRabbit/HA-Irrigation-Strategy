@@ -53,13 +53,21 @@ class CropSteeringV2(hass.Hass):
         # gating on a "tank FULL" sensor is wrong — the tank drains as it waters, so it
         # would only ever allow one shot then lock out until the next refill.
         self.ent_tank_not_empty = ilk.get("tank_not_empty")
-        # pH gate: only fire when ph_min <= veg-tank pH <= ph_max; alert phone if not.
+        # Quality gate: only fire when veg-tank pH (and EC, if configured) are in range.
+        # Out of range -> block + an actionable phone alert with an "Irrigate Anyway"
+        # button; tapping it sets a timed override that bypasses THIS gate only.
         ph = self.args.get("ph", {})
         self.ph_entity = ph.get("entity")
         self.ph_min = float(ph.get("min", 5.8))
         self.ph_max = float(ph.get("max", 6.2))
+        ec = self.args.get("ec", {})
+        self.ec_entity = ec.get("entity")          # optional; configure `ec:` to enable
+        self.ec_min = float(ec.get("min", 0.0))
+        self.ec_max = float(ec.get("max", 99.0))
         self.notify_service = self.args.get("notify_service")
-        self._ph_ok, self._ph_reason, self._ph_bad_count, self._ph_last_notify = True, None, 0, None
+        self.override_minutes = float(self.args.get("override_minutes", 30))
+        self._quality_ok, self._quality_reason, self._quality_bad, self._last_notify = True, None, 0, None
+        self._override_until = None
 
         # Explicit num_zones from config avoids a startup race where integration
         # zone sensors haven't loaded yet; fall back to detection.
@@ -79,6 +87,8 @@ class CropSteeringV2(hass.Hass):
 
         interval = int(self.tcfg.get("phase_check_interval", 60))
         self.run_every(self.control_loop, now + timedelta(seconds=15), interval)
+        # "Irrigate Anyway" button taps on the phone alert arrive as this event.
+        self.listen_event(self._on_action, "mobile_app_notification_action")
         self.log(f"Crop Steering v2 initialized: {self.num_zones} zone(s), loop {interval}s. "
                  f"system_enabled gates all hardware.")
 
@@ -161,8 +171,8 @@ class CropSteeringV2(hass.Hass):
                 return "nutrient_dosing_active"
             if self.ent_tank_not_empty and not self._on(self.ent_tank_not_empty, True):
                 return "tank_empty"  # low float reads empty -> protect the pump (dry-run)
-            if not self._ph_ok:
-                return self._ph_reason or "ph_block"
+            if not self._quality_ok:
+                return self._quality_reason or "quality_block"
             if self.zone[z]["irrigating"]:
                 return "shot_in_progress"
         except Exception as e:
@@ -176,41 +186,68 @@ class CropSteeringV2(hass.Hass):
             return True
         return (self.datetime() - last).total_seconds() / 60.0 >= min_minutes
 
-    def _check_ph(self):
-        """Tank-pH gate (run once per control loop). Allow firing only when
-        ph_min <= veg-tank pH <= ph_max; otherwise set a block reason and alert the
-        phone (debounced ~2 checks, re-alert every 30 min, one notice on recovery)."""
-        if not self.ph_entity:
-            self._ph_ok, self._ph_reason = True, None
-            return
-        ph = self._float(self.ph_entity)
+    def _check_quality(self):
+        """pH + EC gate (run once per control loop). Allow firing only when veg-tank pH
+        (and EC, if configured) are in range. Out of range -> block + an actionable phone
+        alert with an "Irrigate Anyway" button. Tapping it sets a timed override that
+        bypasses THIS gate only (dosing/tank/system interlocks still apply) for
+        override_minutes. Debounced ~2 checks, re-alert every 30 min, notice on recovery."""
+        problems = []
+        if self.ph_entity:
+            ph = self._float(self.ph_entity)
+            if ph is None:
+                problems.append("pH unreadable")
+            elif ph < self.ph_min or ph > self.ph_max:
+                problems.append(f"pH {ph:.2f} (want {self.ph_min:g}-{self.ph_max:g})")
+        if self.ec_entity:
+            ec = self._float(self.ec_entity)
+            if ec is None:
+                problems.append("EC unreadable")
+            elif ec < self.ec_min or ec > self.ec_max:
+                problems.append(f"EC {ec:.2f} (want {self.ec_min:g}-{self.ec_max:g})")
         now = self.datetime()
-        if ph is None:
-            bad, self._ph_reason = True, "ph_unknown"
-            detail = f"veg-tank pH unreadable ({self.ph_entity})"
-        elif ph < self.ph_min or ph > self.ph_max:
-            bad, self._ph_reason = True, f"ph_out_of_range_{ph:.2f}"
-            detail = f"veg-tank pH {ph:.2f} outside {self.ph_min:g}-{self.ph_max:g}"
-        else:
-            bad, self._ph_reason, detail = False, None, f"veg-tank pH {ph:.2f}"
-        self._ph_ok = not bad
-        if bad:
-            self._ph_bad_count += 1
-            due = self._ph_last_notify is None or (now - self._ph_last_notify).total_seconds() >= 1800
-            if self._ph_bad_count >= 2 and due:
-                self._notify_phone(f"⚠️ F2 crop steering BLOCKED — {detail}. "
-                                   f"Irrigation paused until pH returns to {self.ph_min:g}–{self.ph_max:g}.")
-                self._ph_last_notify = now
-        else:
-            if self._ph_bad_count >= 2 and self._ph_last_notify is not None:
-                self._notify_phone(f"✅ F2 crop steering — {detail}, back in range. Irrigation re-enabled.")
-            self._ph_bad_count, self._ph_last_notify = 0, None
+        override = self._override_until is not None and now < self._override_until
 
-    def _notify_phone(self, message):
+        if not problems:
+            if self._quality_bad >= 2 and self._last_notify is not None:
+                self._notify_phone("✅ F2 crop steering — veg-tank pH/EC back in range. Irrigation re-enabled.")
+            self._quality_ok, self._quality_reason, self._quality_bad, self._last_notify = True, None, 0, None
+            self._override_until = None  # healthy again -> drop any override
+            return
+
+        self._quality_reason = "quality_block(" + "; ".join(problems) + ")"
+        if override:
+            self._quality_ok = True  # user tapped "Irrigate Anyway"
+            return
+        self._quality_ok = False
+        self._quality_bad += 1
+        due = self._last_notify is None or (now - self._last_notify).total_seconds() >= 1800
+        if self._quality_bad >= 2 and due:
+            self._notify_phone(
+                "⚠️ F2 irrigation BLOCKED — veg tank " + "; ".join(problems) + ".",
+                actions=[{"action": "CS_IRRIGATE_ANYWAY", "title": "Irrigate Anyway"}],
+            )
+            self._last_notify = now
+
+    def _on_action(self, event_name, data, kwargs):
+        """Phone-notification action handler. 'Irrigate Anyway' grants a timed override
+        of the pH/EC gate (other interlocks still apply)."""
+        if (data or {}).get("action") != "CS_IRRIGATE_ANYWAY":
+            return
+        self._override_until = self.datetime() + timedelta(minutes=self.override_minutes)
+        self.log(f"Override: pH/EC gate bypassed for {self.override_minutes:.0f} min (Irrigate Anyway tapped)")
+        self._notify_phone(f"✅ Override accepted — F2 will irrigate despite pH/EC for "
+                           f"{self.override_minutes:.0f} min (dosing/tank/system interlocks still apply).")
+
+    def _notify_phone(self, message, actions=None):
         if not self.notify_service:
             return
+        ndata = {"tag": "f2_cs_quality"}
+        if actions:
+            ndata["actions"] = actions
         try:
-            self.call_service(self.notify_service.replace(".", "/", 1), message=message, title="F2 Crop Steering")
+            self.call_service(self.notify_service.replace(".", "/", 1),
+                              message=message, title="F2 Crop Steering", data=ndata)
             self.log(f"Phone alert ({self.notify_service}): {message}")
         except Exception as e:
             self.log(f"notify failed ({self.notify_service}): {e}", level="ERROR")
@@ -218,7 +255,7 @@ class CropSteeringV2(hass.Hass):
     # ----------------------------------------------------------- control loop
     def control_loop(self, kwargs):
         try:
-            self._check_ph()
+            self._check_quality()
             lights = self._lights_on()
             for z in range(1, self.num_zones + 1):
                 self._step_zone(z, lights)
