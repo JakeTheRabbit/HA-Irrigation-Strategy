@@ -1,65 +1,43 @@
-# AppDaemon Apps Configuration
-# Advanced Crop Steering System with AI Features
-# 
-# This configuration sets up the complete AI-powered crop steering system
-# All modules work together to provide intelligent irrigation automation
-
-# Master Crop Steering Application
-# Coordinates all advanced modules and handles irrigation decisions
-master_crop_steering:
-  module: crop_steering.master_crop_steering_app
-  class: MasterCropSteeringApp
-  log: crop_steering_master
-  log_level: INFO
-
-# Advanced Dashboard Application  
-# Provides real-time Athena-style monitoring and analytics
-# DISABLED: Requires plotly/pandas dependencies not available in AppDaemon
-# crop_steering_dashboard:
-#   module: crop_steering.advanced_crop_steering_dashboard
-#   class: AdvancedCropSteeringDashboard
-#   log: crop_steering_dashboard
-#   log_level: INFO
-
-# Individual Advanced Modules (Optional - included in master app)
-# These can be enabled for standalone testing or modular operation
-
-# Dryback Detection Module
-# dryback_detector:
-#   module: crop_steering.advanced_dryback_detection
-#   class: AdvancedDrybackDetector
-#   log: crop_steering_dryback
-#   log_level: DEBUG
-
-# Sensor Fusion Module  
-# sensor_fusion:
-#   module: crop_steering.intelligent_sensor_fusion
-#   class: IntelligentSensorFusion
-#   log: crop_steering_fusion
-#   log_level: DEBUG
-
-# ML Prediction Module
-# ml_predictor:
-#   module: crop_steering.ml_irrigation_predictor
-#   class: SimplifiedIrrigationPredictor
-#   log: crop_steering_ml
-#   log_level: DEBUG
-
-# Crop Profiles Module
-# crop_profiles:
-#   module: crop_steering.intelligent_crop_profiles
-#   class: IntelligentCropProfiles
-#   log: crop_steering_profiles
-#   log_level: DEBUG
-
-# Global Python modules (deprecated but required for compatibility)
-# Individual apps will import these locally instead
-#global_modules:
-#  - requests
-#  - numpy  
-#  - pandas
-#  - plotly
-#  - scipy
-
-# Global configuration
-# All modules read from crop_steering.env file for hardware configuration
+# AppDaemon Apps Configuration — F2 Crop Steering.
+#
+# crop_steering_v2: lean deterministic controller that REPLACES the old broken
+# master_crop_steering engine (see ENGINE_ANALYSIS.md + git history). Runs the
+# per-zone P0->P1->P2->P3 loop. Hardware (pump/main/valves) fires ONLY when BOTH
+# switch.crop_steering_system_enabled AND switch.crop_steering_auto_irrigation_enabled
+# are on AND the interlock is clear (tank full, not dosing).
+#
+# emergency_only: true => SAFE HOLD mode. Bypasses the P0->P2 day cycle; keeps every
+# zone in P3 and only tops a row up when its VWC falls below thresholds.emergency_vwc
+# (15%), 24/7, still fully interlock-gated. Interim until full per-row calibration.
+# Set emergency_only: false to run the normal time-driven phase machine.
+crop_steering_v2:
+  module: crop_steering_v2
+  class: CropSteeringV2
+  num_zones: 3
+  emergency_only: true
+  hardware:
+    pump_master: switch.veg_main_pump
+    main_line: switch.espoe_irrigation_relay_2_3
+    zone_valves:
+      1: switch.f2_row1
+      2: switch.f2_row2
+      3: switch.f2_row3
+  timing:
+    phase_check_interval: 60
+  thresholds:
+    emergency_vwc: 15.0
+    min_irrigation_interval: 300
+  interlock:
+    dosing: input_boolean.nutrient_dosing_active
+    # ON = water present (low float). Block only when the tank reads EMPTY (pump
+    # dry-run guard). Do NOT gate on a "tank full" sensor — the tank drains as it
+    # waters, so that would allow only one shot then lock out until the next refill.
+    tank_not_empty: binary_sensor.veg_tank_empty_switch
+  # pH gate: only fire when min <= veg batch-tank pH <= max (the water being fed).
+  # Out of range or unreadable => irrigation blocked + phone alert. The Atlas probe
+  # sensor.aquaponics_kit_f4f618_ph is the "Veg Tank" pH per the existing pH alert.
+  ph:
+    entity: sensor.aquaponics_kit_f4f618_ph
+    min: 5.8
+    max: 6.2
+  notify_service: notify.mobile_app_s23ultra

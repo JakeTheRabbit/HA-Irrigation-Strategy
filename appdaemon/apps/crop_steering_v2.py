@@ -12,7 +12,7 @@ Design:
   number.crop_steering_<key>, then a code default).
 - Drives hardware pump -> main line -> zone valve via non-blocking run_in chain.
 - NEVER fires unless ALL of: system_enabled + auto_irrigation_enabled + zone
-  enabled + NOT manual_override + interlock clear (not dosing, tank full) +
+  enabled + NOT manual_override + interlock clear (not dosing, tank not empty) +
   min-interval elapsed + a single in-flight shot. Any error or unknown => no fire.
 - ML/AI is deliberately NOT in the control path (layer it on later as advisory).
 
@@ -31,7 +31,7 @@ apps.yaml:
       min_irrigation_interval: 300
     interlock:
       dosing: input_boolean.nutrient_dosing_active
-      tank_full: binary_sensor.veg_tank_full_float_tank_level_full
+      tank_not_empty: binary_sensor.veg_tank_empty_switch  # on = water present
 """
 from datetime import datetime, timedelta
 
@@ -44,9 +44,22 @@ class CropSteeringV2(hass.Hass):
         self.hw = self.args.get("hardware", {})
         self.tcfg = self.args.get("timing", {})
         self.thr = self.args.get("thresholds", {})
+        self.emergency_only = bool(self.args.get("emergency_only", False))
         ilk = self.args.get("interlock", {})
         self.ent_dosing = ilk.get("dosing", "input_boolean.nutrient_dosing_active")
-        self.ent_tank_full = ilk.get("tank_full", "binary_sensor.veg_tank_full_float_tank_level_full")
+        # Pump dry-run guard: entity that reads "on" when WATER IS PRESENT (e.g. the low
+        # float binary_sensor.veg_tank_empty_switch). Block only when it explicitly reads
+        # empty; fail-OPEN on unknown so a flaky sensor never halts irrigation. NOTE:
+        # gating on a "tank FULL" sensor is wrong — the tank drains as it waters, so it
+        # would only ever allow one shot then lock out until the next refill.
+        self.ent_tank_not_empty = ilk.get("tank_not_empty")
+        # pH gate: only fire when ph_min <= veg-tank pH <= ph_max; alert phone if not.
+        ph = self.args.get("ph", {})
+        self.ph_entity = ph.get("entity")
+        self.ph_min = float(ph.get("min", 5.8))
+        self.ph_max = float(ph.get("max", 6.2))
+        self.notify_service = self.args.get("notify_service")
+        self._ph_ok, self._ph_reason, self._ph_bad_count, self._ph_last_notify = True, None, 0, None
 
         # Explicit num_zones from config avoids a startup race where integration
         # zone sensors haven't loaded yet; fall back to detection.
@@ -146,8 +159,10 @@ class CropSteeringV2(hass.Hass):
                 return "manual_override"
             if self._on(self.ent_dosing, True):  # default True => block if unknown
                 return "nutrient_dosing_active"
-            if not self._on(self.ent_tank_full, False):  # default False => block if unknown
-                return "tank_not_full"
+            if self.ent_tank_not_empty and not self._on(self.ent_tank_not_empty, True):
+                return "tank_empty"  # low float reads empty -> protect the pump (dry-run)
+            if not self._ph_ok:
+                return self._ph_reason or "ph_block"
             if self.zone[z]["irrigating"]:
                 return "shot_in_progress"
         except Exception as e:
@@ -161,9 +176,49 @@ class CropSteeringV2(hass.Hass):
             return True
         return (self.datetime() - last).total_seconds() / 60.0 >= min_minutes
 
+    def _check_ph(self):
+        """Tank-pH gate (run once per control loop). Allow firing only when
+        ph_min <= veg-tank pH <= ph_max; otherwise set a block reason and alert the
+        phone (debounced ~2 checks, re-alert every 30 min, one notice on recovery)."""
+        if not self.ph_entity:
+            self._ph_ok, self._ph_reason = True, None
+            return
+        ph = self._float(self.ph_entity)
+        now = self.datetime()
+        if ph is None:
+            bad, self._ph_reason = True, "ph_unknown"
+            detail = f"veg-tank pH unreadable ({self.ph_entity})"
+        elif ph < self.ph_min or ph > self.ph_max:
+            bad, self._ph_reason = True, f"ph_out_of_range_{ph:.2f}"
+            detail = f"veg-tank pH {ph:.2f} outside {self.ph_min:g}-{self.ph_max:g}"
+        else:
+            bad, self._ph_reason, detail = False, None, f"veg-tank pH {ph:.2f}"
+        self._ph_ok = not bad
+        if bad:
+            self._ph_bad_count += 1
+            due = self._ph_last_notify is None or (now - self._ph_last_notify).total_seconds() >= 1800
+            if self._ph_bad_count >= 2 and due:
+                self._notify_phone(f"⚠️ F2 crop steering BLOCKED — {detail}. "
+                                   f"Irrigation paused until pH returns to {self.ph_min:g}–{self.ph_max:g}.")
+                self._ph_last_notify = now
+        else:
+            if self._ph_bad_count >= 2 and self._ph_last_notify is not None:
+                self._notify_phone(f"✅ F2 crop steering — {detail}, back in range. Irrigation re-enabled.")
+            self._ph_bad_count, self._ph_last_notify = 0, None
+
+    def _notify_phone(self, message):
+        if not self.notify_service:
+            return
+        try:
+            self.call_service(self.notify_service.replace(".", "/", 1), message=message, title="F2 Crop Steering")
+            self.log(f"Phone alert ({self.notify_service}): {message}")
+        except Exception as e:
+            self.log(f"notify failed ({self.notify_service}): {e}", level="ERROR")
+
     # ----------------------------------------------------------- control loop
     def control_loop(self, kwargs):
         try:
+            self._check_ph()
             lights = self._lights_on()
             for z in range(1, self.num_zones + 1):
                 self._step_zone(z, lights)
@@ -178,6 +233,20 @@ class CropSteeringV2(hass.Hass):
 
         vwc = self._vwc(z)
         veg = self._is_veg(z)
+
+        # Emergency-only hold (configured): keep P3 and only top up below the
+        # floor, 24/7, bypassing the normal P0->P2 day cycle. Safe interim until
+        # full per-row calibration. Still fully gated by _block_reason/interlock.
+        if self.emergency_only:
+            if st["phase"] != "P3":
+                self._set_phase(z, "P3")
+            if vwc is not None:
+                emerg = float(self.thr.get("emergency_vwc", 10.0))
+                min_int = float(self.thr.get("min_irrigation_interval", 300)) / 60.0
+                if vwc < emerg and self._shot_due(z, min_int):
+                    self._fire_shot(z, "emergency", self._znum(z, "p2_shot_size", 5.0))
+            self._publish(z, vwc)
+            return
 
         # Lights off => P3 / overnight dryback, no regular irrigation.
         if not lights:
