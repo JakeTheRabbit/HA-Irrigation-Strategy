@@ -124,8 +124,8 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
         """Return device information."""
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},
-            name="Crop Steering System",
-            manufacturer="Home Assistant Community", 
+            name="Crop Steering",
+            manufacturer="Home Assistant Community",
             model="Professional Irrigation Controller",
             sw_version=SOFTWARE_VERSION,
         )
