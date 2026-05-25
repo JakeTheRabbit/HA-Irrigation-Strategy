@@ -40,4 +40,13 @@ crop_steering_v2:
     entity: sensor.aquaponics_kit_f4f618_ph
     min: 5.8
     max: 6.2
+  # EC gate — same behaviour + same "Irrigate Anyway" button as pH. The LIVE veg-tank EC
+  # probe is sensor.atlas_legacy_1_ec (the aqua_pro_* sensors are dead). Uncomment and set
+  # min/max (mS/cm) to enable.
+  # ec:
+  #   entity: sensor.atlas_legacy_1_ec
+  #   min: 1.0
+  #   max: 3.0
   notify_service: notify.mobile_app_s23ultra
+  # Minutes that tapping "Irrigate Anyway" on the alert bypasses the pH/EC gate for.
+  override_minutes: 30
