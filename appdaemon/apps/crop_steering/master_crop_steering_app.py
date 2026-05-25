@@ -1518,28 +1518,43 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         return {'action': 'wait', 'reason': 'All zones satisfied in their current phases'}
 
+    def _get_zone_number(self, zone_num: int, global_entity_id: str, default: float) -> float:
+        """Per-zone number override with fallback: zone -> global -> default."""
+        per_zone = global_entity_id.replace("crop_steering_", f"crop_steering_zone_{zone_num}_", 1)
+        if self.entity_exists(per_zone):
+            return self._get_number_entity_value(per_zone, default)
+        return self._get_number_entity_value(global_entity_id, default)
+
+    def _zone_is_vegetative(self, zone_num: int) -> bool:
+        """Per-zone steering mode; falls back to global growth_stage. True if vegetative."""
+        per_zone = f"select.crop_steering_zone_{zone_num}_steering_mode"
+        val = self._get_select_entity_value(per_zone, None) if self.entity_exists(per_zone) else None
+        if not val:
+            val = self._get_select_entity_value("select.crop_steering_growth_stage", "Vegetative")
+        return str(val).lower() == "vegetative"
+
     def _evaluate_zone_p1_needs(self, zone_num: int, profile_params: Dict) -> Dict:
         """Evaluate P1 progressive irrigation needs with EC-based logic."""
-        target_vwc = self._get_number_entity_value("number.crop_steering_p1_target_vwc", 65)
+        target_vwc = self._get_zone_number(zone_num, "number.crop_steering_p1_target_vwc", 65)
         zone_vwc = self._get_zone_vwc(zone_num)
         zone_ec = self._get_zone_ec(zone_num)
         
         # Get growth stage for EC target selection
-        growth_stage = self._get_select_entity_value("select.crop_steering_growth_stage", "Vegetative")
+        growth_stage = ("Vegetative" if self._zone_is_vegetative(zone_num) else "Generative")
         
         # Get EC target for P1 based on growth stage
         if growth_stage.lower() == "vegetative":
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_veg_p1", 3.0)
+            ec_target = self._get_zone_number(zone_num, "number.crop_steering_ec_target_veg_p1", 3.0)
         else:  # Generative
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_gen_p1", 5.0)
+            ec_target = self._get_zone_number(zone_num, "number.crop_steering_ec_target_gen_p1", 5.0)
         
         # Get P1 progression parameters
-        initial_shot_size = self._get_number_entity_value("number.crop_steering_p1_initial_shot_size", 2.0)
-        shot_increment = self._get_number_entity_value("number.crop_steering_p1_shot_increment", 0.5)
-        max_shot_size = self._get_number_entity_value("number.crop_steering_p1_max_shot_size", 10.0)
-        min_shots = self._get_number_entity_value("number.crop_steering_p1_min_shots", 3.0)
-        max_shots = self._get_number_entity_value("number.crop_steering_p1_max_shots", 6.0)
-        time_between_shots = self._get_number_entity_value("number.crop_steering_p1_time_between_shots", 15.0)
+        initial_shot_size = self._get_zone_number(zone_num, "number.crop_steering_p1_initial_shot_size", 2.0)
+        shot_increment = self._get_zone_number(zone_num, "number.crop_steering_p1_shot_size_increment", 0.5)
+        max_shot_size = self._get_zone_number(zone_num, "number.crop_steering_p1_maximum_shot_size", 10.0)
+        min_shots = self._get_zone_number(zone_num, "number.crop_steering_p1_minimum_shots", 3.0)
+        max_shots = self._get_zone_number(zone_num, "number.crop_steering_p1_maximum_shots", 6.0)
+        time_between_shots = self._get_zone_number(zone_num, "number.crop_steering_p1_time_between_shots", 15.0)
         
         # Get current P1 progression data from state machine
         machine = self.zone_state_machines.get(zone_num)
@@ -1676,22 +1691,22 @@ class MasterCropSteeringApp(BaseAsyncApp):
 
     def _evaluate_zone_p2_needs(self, zone_num: int, profile_params: Dict) -> Dict:
         """Evaluate if a specific zone in P2 needs irrigation with EC-based logic."""
-        vwc_threshold = self._get_number_entity_value("number.crop_steering_p2_vwc_threshold", 60)
+        vwc_threshold = self._get_zone_number(zone_num, "number.crop_steering_p2_vwc_threshold", 60)
         zone_vwc = self._get_zone_vwc(zone_num)
         zone_ec = self._get_zone_ec(zone_num)
         
         # Get growth stage for EC target selection
-        growth_stage = self._get_select_entity_value("select.crop_steering_growth_stage", "Vegetative")
+        growth_stage = ("Vegetative" if self._zone_is_vegetative(zone_num) else "Generative")
         
         # Get EC target and thresholds for P2
         if growth_stage.lower() == "vegetative":
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_veg_p2", 3.2)
+            ec_target = self._get_zone_number(zone_num, "number.crop_steering_ec_target_veg_p2", 3.2)
         else:  # Generative
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_gen_p2", 6.0)
+            ec_target = self._get_zone_number(zone_num, "number.crop_steering_ec_target_gen_p2", 6.0)
         
         # Get P2 EC thresholds for ratio-based irrigation
-        ec_high_threshold = self._get_number_entity_value("number.crop_steering_p2_ec_high_threshold", 1.2)
-        ec_low_threshold = self._get_number_entity_value("number.crop_steering_p2_ec_low_threshold", 0.8)
+        ec_high_threshold = self._get_zone_number(zone_num, "number.crop_steering_p2_ec_high_threshold", 1.2)
+        ec_low_threshold = self._get_zone_number(zone_num, "number.crop_steering_p2_ec_low_threshold", 0.8)
         
         # Check VWC condition
         vwc_needs_irrigation = zone_vwc is not None and zone_vwc < vwc_threshold
@@ -1709,7 +1724,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         if needs_irrigation:
             # Calculate shot size with EC-based adjustments
-            base_shot_size = self._get_number_entity_value("number.crop_steering_p2_shot_size", 5.0)
+            base_shot_size = self._get_zone_number(zone_num, "number.crop_steering_p2_shot_size", 5.0)
             
             # Use EC ratio decision if it's the primary driver
             if ec_ratio_decision['needs_irrigation']:
@@ -1758,16 +1773,16 @@ class MasterCropSteeringApp(BaseAsyncApp):
         zone_ec = self._get_zone_ec(zone_num)
         
         # Get emergency threshold from entity
-        emergency_threshold = self._get_number_entity_value("number.crop_steering_p3_emergency_vwc_threshold", 40)
+        emergency_threshold = self._get_zone_number(zone_num, "number.crop_steering_p3_emergency_vwc_threshold", 40)
         
         # Get growth stage for EC target selection
-        growth_stage = self._get_select_entity_value("select.crop_steering_growth_stage", "Vegetative")
+        growth_stage = ("Vegetative" if self._zone_is_vegetative(zone_num) else "Generative")
         
         # Get EC target for P3 based on growth stage
         if growth_stage.lower() == "vegetative":
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_veg_p3", 3.0)
+            ec_target = self._get_zone_number(zone_num, "number.crop_steering_ec_target_veg_p3", 3.0)
         else:  # Generative
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_gen_p3", 4.5)
+            ec_target = self._get_zone_number(zone_num, "number.crop_steering_ec_target_gen_p3", 4.5)
         
         # P3 should normally have NO irrigation - it's the dryback period
         # Only irrigate if there's a critical emergency (plant wilting risk)
@@ -1785,7 +1800,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         if vwc_emergency or ec_emergency:
             # This is a true emergency - plant health at risk
-            shot_size = self._get_number_entity_value("number.crop_steering_p3_emergency_shot_size", 1.0)
+            shot_size = self._get_zone_number(zone_num, "number.crop_steering_p3_emergency_shot_size", 1.0)
             
             # Adjust shot size for EC emergency
             if ec_emergency and zone_ec is not None:
@@ -1826,13 +1841,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
         zone_ec = self._get_zone_ec(zone_num)
         
         # Get growth stage for EC target selection
-        growth_stage = self._get_select_entity_value("select.crop_steering_growth_stage", "Vegetative")
+        growth_stage = ("Vegetative" if self._zone_is_vegetative(zone_num) else "Generative")
         
         # Get EC target for P0 based on growth stage
         if growth_stage.lower() == "vegetative":
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_veg_p0", 3.0)
+            ec_target = self._get_zone_number(zone_num, "number.crop_steering_ec_target_veg_p0", 3.0)
         else:  # Generative
-            ec_target = self._get_number_entity_value("number.crop_steering_ec_target_gen_p0", 4.0)
+            ec_target = self._get_zone_number(zone_num, "number.crop_steering_ec_target_gen_p0", 4.0)
         
         # P0 is for dryback - typically NO irrigation allowed
         # Only exception: extreme EC emergencies that threaten plant health
@@ -1845,7 +1860,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         if ec_emergency:
             # Emergency flush needed even during dryback
-            flush_target = self._get_number_entity_value("number.crop_steering_ec_target_flush", 0.8)
+            flush_target = self._get_zone_number(zone_num, "number.crop_steering_ec_target_flush", 0.8)
             flush_shot_size = 10.0  # Large flush shot
             
             return {
@@ -2124,7 +2139,26 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     'zone': zone,
                     'message': 'Tank filling in progress - irrigation blocked to prevent conflicts'
                 }
-            
+
+            # F2 fill/dose interlock: never irrigate while the veg batch tank is
+            # dosing/filling, or while it is not full (prevents dose disruption + dry-pumping).
+            if (self.get_state("input_boolean.nutrient_dosing_active") or "off") == "on":
+                self.log(f"🛑 Zone {zone} irrigation blocked: veg batch tank dosing/filling in progress")
+                return {
+                    'status': 'blocked',
+                    'reason': 'nutrient_dosing_active',
+                    'zone': zone,
+                    'message': 'Veg batch tank dosing/filling - irrigation held',
+                }
+            if (self.get_state("binary_sensor.veg_tank_full_float_tank_level_full") or "off") != "on":
+                self.log(f"🛑 Zone {zone} irrigation blocked: veg batch tank not full")
+                return {
+                    'status': 'blocked',
+                    'reason': 'tank_not_full',
+                    'zone': zone,
+                    'message': 'Veg batch tank not full - irrigation held to avoid dry-pumping',
+                }
+
             # CRITICAL SAFETY CHECKS - HIGH PRIORITY 7
             safety_check = self._check_irrigation_safety_limits(zone, shot_type)
             if safety_check['blocked']:
@@ -2423,7 +2457,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # WORKAROUND: Multiple strategies to bypass AppDaemon async Task issue
             for zone_num in range(1, self.num_zones + 1):
-                integration_sensor = f"sensor.crop_steering_vwc_zone_{zone_num}"
+                integration_sensor = f"sensor.crop_steering_zone_{zone_num}_vwc"
                 value = None
                 
                 try:
@@ -2562,7 +2596,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         """Get VWC value for specific zone from configured sensors."""
         try:
             # Try integration sensor first (preferred method)
-            integration_sensor = f"sensor.crop_steering_vwc_zone_{zone_num}"
+            integration_sensor = f"sensor.crop_steering_zone_{zone_num}_vwc"
             state = self.get_entity_value(integration_sensor)
             if state not in ['unknown', 'unavailable', None]:
                 # Ensure state is a string or number, not an async Task
@@ -2677,7 +2711,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             zone_sensors = [s for s in self.config['sensors']['ec'] if f'r{zone_num}' in s or f'z{zone_num}' in s or f'zone_{zone_num}' in s.lower()]
             if not zone_sensors:
                 # Try integration sensor as fallback
-                integration_sensor = f"sensor.crop_steering_ec_zone_{zone_num}"
+                integration_sensor = f"sensor.crop_steering_zone_{zone_num}_ec"
                 state = self.get_entity_value(integration_sensor)
                 if state not in ['unknown', 'unavailable', None]:
                     return float(state)
@@ -2941,7 +2975,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 # Check for zone entities to count them
                 zone_count = 0
                 for i in range(1, 11):  # Check up to 10 zones
-                    zone_sensor = f"sensor.crop_steering_vwc_zone_{i}"
+                    zone_sensor = f"sensor.crop_steering_zone_{i}_vwc"
                     if self.entity_exists(zone_sensor):
                         zone_count = i
                 return max(zone_count, 1)  # At least 1 zone
@@ -3037,9 +3071,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
             current_time = now.time()
             
             # Get configuration values from existing entities
-            p0_max_duration = self._get_number_entity_value("number.crop_steering_p0_max_wait_time", 45)
+            p0_max_duration = self._get_number_entity_value("number.crop_steering_p0_maximum_wait_time", 45)
             p1_recovery_target = self._get_number_entity_value("number.crop_steering_p1_target_vwc", 65)
-            dryback_target = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50)
+            dryback_target = self._get_number_entity_value("number.crop_steering_vegetative_dryback_target", 50)
             
             # Check each zone independently with its own schedule
             for zone_num in range(1, self.num_zones + 1):
@@ -3066,7 +3100,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     
                 elif lights_on and current_phase == 'P0':
                     # Check P0 → P1 transition conditions for this zone
-                    if self._should_zone_exit_p0(zone_num, zone_vwc, dryback_target, p0_max_duration):
+                    if self._should_zone_exit_p0(zone_num, zone_vwc, self._get_zone_number(zone_num, "number.crop_steering_vegetative_dryback_target" if self._zone_is_vegetative(zone_num) else "number.crop_steering_generative_dryback_target", 50), p0_max_duration):
                         target_phase = 'P1'
                         reason = f"Zone {zone_num}: P0 dryback target achieved or max duration reached"
                         
@@ -3140,7 +3174,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             now = datetime.now()
             
             # Get P0 timing parameters
-            min_wait_time = self._get_number_entity_value("number.crop_steering_p0_min_wait_time", 30.0)
+            min_wait_time = self._get_number_entity_value("number.crop_steering_p0_minimum_wait_time", 30.0)
             dryback_drop_percent = self._get_number_entity_value("number.crop_steering_p0_dryback_drop_percent", 15.0)
             
             # Check if P0 phase has been initialized
@@ -3275,7 +3309,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         """Calculate optimal P3 start time using ML dryback prediction."""
         try:
             # Get target dryback for overnight period
-            target_dryback = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50)
+            target_dryback = self._get_number_entity_value("number.crop_steering_vegetative_dryback_target", 50)
             
             # Get current dryback status from advanced detector
             if hasattr(self, 'dryback_detector') and self.dryback_detector:
@@ -3322,7 +3356,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # This would query ML training data or stored dryback patterns
             
             # For now, use intelligent defaults based on typical dryback rates
-            target_dryback = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50)
+            target_dryback = self._get_number_entity_value("number.crop_steering_vegetative_dryback_target", 50)
             substrate_volume = self._get_number_entity_value("number.crop_steering_substrate_volume", 10)
             
             # Estimate dryback time based on substrate size and target
@@ -3363,7 +3397,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             hours_until_lights_on = (next_lights_on - now).total_seconds() / 3600
             
             # Get target dryback for overnight
-            target_dryback = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50)
+            target_dryback = self._get_zone_number(zone_num, "number.crop_steering_vegetative_dryback_target" if self._zone_is_vegetative(zone_num) else "number.crop_steering_generative_dryback_target", 50)
             
             # Get ML-predicted dryback rate for this zone
             predicted_dryback_rate = await self._get_zone_dryback_rate(zone_num)
@@ -3576,7 +3610,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             dryback_rate = await self._get_zone_dryback_rate(zone_num)
             if dryback_rate and dryback_rate > 0:
                 # Calculate time needed to achieve overnight dryback
-                target_dryback = self._get_number_entity_value("number.crop_steering_veg_dryback_target", 50.0)
+                target_dryback = self._get_zone_number(zone_num, "number.crop_steering_vegetative_dryback_target" if self._zone_is_vegetative(zone_num) else "number.crop_steering_generative_dryback_target", 50)
                 time_needed = target_dryback / dryback_rate + 0.5  # Add 30min buffer
                 
                 # Start P3 if we need to begin final dryback
