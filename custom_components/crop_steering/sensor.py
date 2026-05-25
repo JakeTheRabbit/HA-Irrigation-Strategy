@@ -257,7 +257,13 @@ class CropSteeringSensor(SensorEntity):
         """Initialize the sensor."""
         self.entity_description = description
         self._entry = entry
-        self._zones_config = zones_config
+        # Normalize zone keys to int: they arrive as int on first setup but as
+        # str after reload-from-storage (JSON object keys), which broke every
+        # per-zone lookup (zone VWC/EC etc. returned unknown after a restart).
+        self._zones_config = {
+            (int(k) if str(k).isdigit() else k): v
+            for k, v in (zones_config or {}).items()
+        }
         self._hardware_config = hardware_config
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{description.key}"
         self._attr_name = description.name
@@ -279,7 +285,7 @@ class CropSteeringSensor(SensorEntity):
         """Return device information."""
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},
-            name="Crop Steering System",
+            name="Crop Steering",
             manufacturer="Home Assistant Community",
             model="Professional Irrigation Controller",
             sw_version=SOFTWARE_VERSION,

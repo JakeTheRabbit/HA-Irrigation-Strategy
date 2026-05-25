@@ -379,6 +379,65 @@ NUMBER_DESCRIPTIONS = [
     ),
 ]
 
+# Default values (shared by global + per-zone entities).
+DEFAULT_VALUES = {
+    "substrate_volume": 10.0,
+    "dripper_flow_rate": 1.2,
+    "drippers_per_plant": 2,
+    "field_capacity": 70.0,
+    "max_ec": 9.0,
+    "veg_dryback_target": 50.0,
+    "gen_dryback_target": 40.0,
+    "p1_target_vwc": 65.0,
+    "p2_vwc_threshold": 60.0,
+    "p0_min_wait_time": 30.0,
+    "p0_max_wait_time": 120.0,
+    "p0_dryback_drop_percent": 15.0,
+    "p1_initial_shot_size": 2.0,
+    "p1_shot_increment": 0.5,
+    "p1_max_shot_size": 10.0,
+    "p1_time_between_shots": 15.0,
+    "p1_max_shots": 6.0,
+    "p1_min_shots": 3.0,
+    "p2_shot_size": 5.0,
+    "p2_ec_high_threshold": 1.2,
+    "p2_ec_low_threshold": 0.8,
+    "p3_veg_last_irrigation": 120.0,
+    "p3_gen_last_irrigation": 180.0,
+    "p3_emergency_vwc_threshold": 40.0,
+    "p3_emergency_shot_size": 2.0,
+    "ec_target_flush": 0.8,
+    "ec_target_veg_p0": 3.0,
+    "ec_target_veg_p1": 3.0,
+    "ec_target_veg_p2": 3.2,
+    "ec_target_veg_p3": 3.0,
+    "ec_target_gen_p0": 4.0,
+    "ec_target_gen_p1": 5.0,
+    "ec_target_gen_p2": 6.0,
+    "ec_target_gen_p3": 4.5,
+    "lights_on_hour": 12,
+    "lights_off_hour": 0,
+}
+
+# Steering params that ALSO get per-zone overrides (number.crop_steering_zone_N_<...>).
+# Hardware/substrate (substrate_volume, dripper_flow_rate, drippers_per_plant,
+# field_capacity, max_ec) and system (lights_*) stay GLOBAL only.
+PER_ZONE_STEERING_KEYS = [
+    "veg_dryback_target", "gen_dryback_target",
+    "p0_min_wait_time", "p0_max_wait_time", "p0_dryback_drop_percent",
+    "p1_target_vwc", "p1_initial_shot_size", "p1_shot_increment",
+    "p1_max_shot_size", "p1_time_between_shots", "p1_max_shots", "p1_min_shots",
+    "p2_vwc_threshold", "p2_shot_size", "p2_ec_high_threshold", "p2_ec_low_threshold",
+    "p3_veg_last_irrigation", "p3_gen_last_irrigation",
+    "p3_emergency_vwc_threshold", "p3_emergency_shot_size",
+    "ec_target_flush",
+    "ec_target_veg_p0", "ec_target_veg_p1", "ec_target_veg_p2", "ec_target_veg_p3",
+    "ec_target_gen_p0", "ec_target_gen_p1", "ec_target_gen_p2", "ec_target_gen_p3",
+]
+
+_DESC_BY_KEY = {d.key: d for d in NUMBER_DESCRIPTIONS}
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -402,7 +461,7 @@ async def async_setup_entry(
             entry,
             NumberEntityDescription(
                 key=f"zone_{zone_num}_plant_count",
-                name=f"Zone {zone_num} Plant Count",
+                name=f"Crop Steering Zone {zone_num} Plant Count",
                 icon="mdi:sprout",
                 native_min_value=1,
                 native_max_value=50,
@@ -418,7 +477,7 @@ async def async_setup_entry(
             entry,
             NumberEntityDescription(
                 key=f"zone_{zone_num}_max_daily_volume",
-                name=f"Zone {zone_num} Max Daily Volume",
+                name=f"Crop Steering Zone {zone_num} Max Daily Volume",
                 icon="mdi:water-check",
                 native_min_value=0,
                 native_max_value=200,
@@ -435,7 +494,7 @@ async def async_setup_entry(
             entry,
             NumberEntityDescription(
                 key=f"zone_{zone_num}_shot_size_multiplier",
-                name=f"Zone {zone_num} Shot Size Multiplier",
+                name=f"Crop Steering Zone {zone_num} Shot Size Multiplier",
                 icon="mdi:multiplication",
                 native_min_value=0.1,
                 native_max_value=5.0,
@@ -446,7 +505,26 @@ async def async_setup_entry(
             zone_num=zone_num,
             default_value=1.0
         ))
-    
+
+        # Per-zone copy of every steering parameter (AppDaemon falls back to global).
+        for _key in PER_ZONE_STEERING_KEYS:
+            _g = _DESC_BY_KEY[_key]
+            numbers.append(CropSteeringNumber(
+                entry,
+                NumberEntityDescription(
+                    key=f"zone_{zone_num}_{_key}",
+                    name=f"Crop Steering Zone {zone_num} {_g.name}",
+                    icon=_g.icon,
+                    native_min_value=_g.native_min_value,
+                    native_max_value=_g.native_max_value,
+                    native_step=_g.native_step,
+                    native_unit_of_measurement=_g.native_unit_of_measurement,
+                    mode="box",
+                ),
+                zone_num=zone_num,
+                default_value=DEFAULT_VALUES.get(_key),
+            ))
+
     async_add_entities(numbers)
 
 class CropSteeringNumber(NumberEntity, RestoreEntity):
@@ -468,52 +546,9 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         # Set object_id to include crop_steering prefix for entity_id generation
         self._attr_object_id = f"{DOMAIN}_{description.key}"
         
-        # Set default values based on Athena methodology
-        default_values = {
-            "substrate_volume": 10.0,
-            "dripper_flow_rate": 1.2,
-            "drippers_per_plant": 2,
-            "field_capacity": 70.0,
-            "max_ec": 9.0,
-            "veg_dryback_target": 50.0,
-            "gen_dryback_target": 40.0,
-            "p1_target_vwc": 65.0,
-            "p2_vwc_threshold": 60.0,
-            # P0 Phase Defaults
-            "p0_min_wait_time": 30.0,
-            "p0_max_wait_time": 120.0,
-            "p0_dryback_drop_percent": 15.0,
-            # P1 Phase Defaults
-            "p1_initial_shot_size": 2.0,
-            "p1_shot_increment": 0.5,
-            "p1_max_shot_size": 10.0,
-            "p1_time_between_shots": 15.0,
-            "p1_max_shots": 6.0,
-            "p1_min_shots": 3.0,
-            # P2 Phase Defaults
-            "p2_shot_size": 5.0,
-            "p2_ec_high_threshold": 1.2,
-            "p2_ec_low_threshold": 0.8,
-            # P3 Phase Defaults
-            "p3_veg_last_irrigation": 120.0,
-            "p3_gen_last_irrigation": 180.0,
-            "p3_emergency_vwc_threshold": 40.0,
-            "p3_emergency_shot_size": 2.0,
-            # EC Target Defaults (Athena Methodology)
-            "ec_target_flush": 0.8,
-            "ec_target_veg_p0": 3.0,
-            "ec_target_veg_p1": 3.0,
-            "ec_target_veg_p2": 3.2,
-            "ec_target_veg_p3": 3.0,
-            "ec_target_gen_p0": 4.0,
-            "ec_target_gen_p1": 5.0,
-            "ec_target_gen_p2": 6.0,
-            "ec_target_gen_p3": 4.5,
-            # System-wide light schedule (NOT per-zone)
-            "lights_on_hour": 12,  # Default noon
-            "lights_off_hour": 0,  # Default midnight
-        }
-        
+        # Default values shared with per-zone entities (module-level DEFAULT_VALUES).
+        default_values = DEFAULT_VALUES
+
         # Use provided default or lookup from dict
         if default_value is not None:
             self._attr_native_value = default_value
@@ -537,7 +572,7 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             # Zone-specific device
             return DeviceInfo(
                 identifiers={(DOMAIN, f"{self._entry.entry_id}_zone_{self._zone_num}")},
-                name=f"Zone {self._zone_num}",
+                name=f"Crop Steering Zone {self._zone_num}",
                 manufacturer="Home Assistant Community",
                 model="Zone Controller",
                 sw_version=SOFTWARE_VERSION,
@@ -547,7 +582,7 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             # Main device
             return DeviceInfo(
                 identifiers={(DOMAIN, self._entry.entry_id)},
-                name="Crop Steering System",
+                name="Crop Steering",
                 manufacturer="Home Assistant Community",
                 model="Professional Irrigation Controller",
                 sw_version=SOFTWARE_VERSION,
