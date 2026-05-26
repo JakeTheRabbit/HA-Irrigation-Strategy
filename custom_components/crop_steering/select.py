@@ -217,6 +217,14 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         if option in self.options:
             self._attr_current_option = option
             self.async_write_ha_state()
+            # The irrigation-phase select is a manual override: drive the engine by firing
+            # the same event the transition_phase service uses (forced => applies from any
+            # phase). Without this, changing the select did nothing to the controller.
+            if getattr(self.entity_description, "key", None) == "irrigation_phase":
+                self.hass.bus.async_fire(
+                    "crop_steering_phase_transition",
+                    {"target_phase": option, "reason": "Manual (phase select)", "forced": True},
+                )
 
     @property
     def available(self) -> bool:

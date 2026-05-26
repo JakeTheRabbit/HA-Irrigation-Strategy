@@ -268,7 +268,26 @@ class ZoneStateMachine:
                                   old_phase=old_phase, new_phase=to_phase, transition=transition)
             
             return True
-    
+
+    def force_phase(self, to_phase: 'IrrigationPhase', reason: str = "forced") -> bool:
+        """Force an unconditional phase change (manual override) — bypasses the
+        valid-transition table but keeps transition()'s bookkeeping. Added to back the
+        master engine's force_phase() calls, which previously hit a missing method."""
+        with self.lock:
+            old_phase = self.state.current_phase
+            old_data = self.state.get_current_phase_data()
+            if old_data:
+                old_data.exit_time = datetime.now()
+            self.state.current_phase = to_phase
+            self.state.phase_history.append((to_phase, datetime.now()))
+            self._initialize_phase_data(to_phase)
+            self.logger.info(f"Zone {self.zone_id}: FORCED {old_phase.value} -> {to_phase.value} ({reason})")
+            return True
+
+    def try_transition_to(self, to_phase: 'IrrigationPhase', reason: str = "manual") -> bool:
+        """Attempt a validated manual transition to a target phase (returns success)."""
+        return self.transition(PhaseTransition.MANUAL_OVERRIDE, to_phase, reason=reason)
+
     def _execute_callbacks(self, callbacks: List[Callable], **kwargs):
         """Execute callbacks with error handling"""
         for callback in callbacks:

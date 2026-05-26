@@ -1,20 +1,23 @@
 # AppDaemon Apps Configuration — F2 Crop Steering.
 #
-# crop_steering_v2: lean deterministic controller that REPLACES the old broken
-# master_crop_steering engine (see ENGINE_ANALYSIS.md + git history). Runs the
-# per-zone P0->P1->P2->P3 loop. Hardware (pump/main/valves) fires ONLY when BOTH
-# switch.crop_steering_system_enabled AND switch.crop_steering_auto_irrigation_enabled
-# are on AND the interlock is clear (tank full, not dosing).
-#
-# emergency_only: true => SAFE HOLD mode. Bypasses the P0->P2 day cycle; keeps every
-# zone in P3 and only tops a row up when its VWC falls below thresholds.emergency_vwc
-# (15%), 24/7, still fully interlock-gated. Interim until full per-row calibration.
-# Set emergency_only: false to run the normal time-driven phase machine.
-crop_steering_v2:
-  module: crop_steering_v2
-  class: CropSteeringV2
+# master_crop_steering: the FULL original engine (8,299-line package), with the identified
+# bugs fixed IN PLACE — no steering logic removed:
+#   (a) _check_all_zone_phase_transitions now reads the dryback target from the number
+#       entities instead of the hardcoded P0Data default (50%).
+#   (b) the duplicate _should_zone_start_p3 is de-shadowed (entity-driven 3-arg version is
+#       reachable again) and force_phase/try_transition_to are now real methods on the
+#       state machine, so the manual-phase service no longer throws.
+#   (c) the three irrigation safety handlers now fail CLOSED (block on error), not open.
+#   (d) analytics set_state calls drop the duplicate state= and JSON-sanitise attributes,
+#       so they stop returning HTTP 400.
+# emergency_vwc corrected 30 -> 10 (30 read this substrate's normal 12-28% VWC as a constant
+# emergency). Bring up DISARMED first (system_enabled OFF) to watch one clean cycle, then arm.
+master_crop_steering:
+  module: crop_steering.master_crop_steering_app
+  class: MasterCropSteeringApp
+  log_level: INFO
   num_zones: 3
-  emergency_only: true
+  notification_service: notify.persistent_notification
   hardware:
     pump_master: switch.veg_main_pump
     main_line: switch.espoe_irrigation_relay_2_3
@@ -22,31 +25,44 @@ crop_steering_v2:
       1: switch.f2_row1
       2: switch.f2_row2
       3: switch.f2_row3
+    zone_switches:
+      - switch.f2_row1
+      - switch.f2_row2
+      - switch.f2_row3
+  sensors:
+    vwc:
+      - sensor.f2_row_1_vwc
+      - sensor.veg_sdi12_vwc_2
+      - sensor.veg_sdi12_vwc
+    ec:
+      - sensor.f2_row_1_pwec
+      - sensor.veg_sdi12_ec_2
+      - sensor.veg_sdi12_ec
+    environmental:
+      temperature: sensor.veg_scd41_top_temperature_scd41
+      humidity: sensor.veg_scd41_top_humidity_scd41
+      vpd: sensor.veg_vpd
   timing:
     phase_check_interval: 60
+    ml_prediction_interval: 300
+    sensor_health_interval: 300
   thresholds:
-    emergency_vwc: 15.0
+    critical_ec: 9.0
+    emergency_vwc: 10.0
     min_irrigation_interval: 300
-  interlock:
-    dosing: input_boolean.nutrient_dosing_active
-    # ON = water present (low float). Block only when the tank reads EMPTY (pump
-    # dry-run guard). Do NOT gate on a "tank full" sensor — the tank drains as it
-    # waters, so that would allow only one shot then lock out until the next refill.
-    tank_not_empty: binary_sensor.veg_tank_empty_switch
-  # pH gate: only fire when min <= veg batch-tank pH <= max (the water being fed).
-  # Out of range or unreadable => irrigation blocked + phone alert. The Atlas probe
-  # sensor.aquaponics_kit_f4f618_ph is the "Veg Tank" pH per the existing pH alert.
-  ph:
-    entity: sensor.aquaponics_kit_f4f618_ph
-    min: 5.8
-    max: 6.2
-  # EC gate — same behaviour + same "Irrigate Anyway" button as pH. The LIVE veg-tank EC
-  # probe is sensor.atlas_legacy_1_ec (the aqua_pro_* sensors are dead). Uncomment and set
-  # min/max (mS/cm) to enable.
-  # ec:
-  #   entity: sensor.atlas_legacy_1_ec
-  #   min: 1.0
-  #   max: 3.0
-  notify_service: notify.mobile_app_s23ultra
-  # Minutes that tapping "Irrigate Anyway" on the alert bypasses the pH/EC gate for.
-  override_minutes: 30
+
+# Lean VWC-only replacement controller — SUPERSEDED by the fixed full engine above.
+# Kept in the repo (appdaemon/apps/crop_steering_v2.py) for reference; not loaded.
+# crop_steering_v2:
+#   module: crop_steering_v2
+#   class: CropSteeringV2
+#   ...
+
+# Python modules the engine references when available (all features degrade gracefully
+# to pure-Python if these aren't installed in the AppDaemon environment).
+global_modules:
+  - requests
+  - numpy
+  - pandas
+  - plotly
+  - scipy
