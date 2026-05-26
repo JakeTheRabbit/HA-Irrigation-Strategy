@@ -16,6 +16,34 @@ for cases where it's needed (e.g., interfacing with async libraries).
 import appdaemon.plugins.hass.hassapi as hass
 from typing import Any, Optional
 import time
+import datetime as _dt
+
+
+def _json_safe(obj):
+    """Coerce a value into JSON-serialisable form for HA set_state (datetimes ->
+    isoformat, unknown objects -> str). Stops the HTTP 400s when analytics attributes
+    contain datetime objects or nested non-primitive data."""
+    if isinstance(obj, dict):
+        return {str(k): _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    if isinstance(obj, (_dt.datetime, _dt.date)):
+        return obj.isoformat()
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    return str(obj)
+
+
+_RESERVED_ATTRS = {"last_updated", "last_changed", "last_reported",
+                   "context", "entity_id", "state", "domain", "object_id"}
+
+
+def _clean_attrs(attrs):
+    """Sanitise an attributes dict for HA set_state: drop reserved keys (HA returns 400
+    on last_updated/last_changed/etc.) and JSON-coerce the remaining values."""
+    if not isinstance(attrs, dict):
+        return attrs
+    return {k: _json_safe(v) for k, v in attrs.items() if k not in _RESERVED_ATTRS}
 
 
 class BaseAsyncApp(hass.Hass):
@@ -172,7 +200,20 @@ class BaseAsyncApp(hass.Hass):
         except Exception:
             return default
     
-    def set_entity_value(self, entity_id: str, value: Any, **kwargs) -> None:
+    def set_state(self, entity_id, state=None, **kwargs):
+        """Override HA set_state to make every analytics publish robust: strip reserved
+        attribute keys + JSON-coerce attribute values (else HA 400s), and coerce a missing
+        state to 'unknown' (HA rejects a stateless POST). Preserves sync/async via super()."""
+        try:
+            if "attributes" in kwargs:
+                kwargs["attributes"] = _clean_attrs(kwargs["attributes"])
+        except Exception:
+            pass
+        if state is None:
+            state = "unknown"
+        return super().set_state(entity_id, state=state, **kwargs)
+
+    def set_entity_value(self, entity_id: str, value: Any = None, **kwargs) -> None:
         """
         Synchronous wrapper for setting entity state.
         
@@ -191,13 +232,20 @@ class BaseAsyncApp(hass.Hass):
                 if key.startswith(f"{entity_id}:"):
                     del self.entity_cache[key]
             
-            # Set state directly - AppDaemon handles the async conversion
+            # Many callers pass the value as a state= kwarg with no positional value;
+            # accept both. Then sanitise attributes + drop reserved keys (else HA 400s).
+            if value is None and "state" in kwargs:
+                value = kwargs.pop("state")
+            else:
+                kwargs.pop("state", None)
+            if "attributes" in kwargs:
+                kwargs["attributes"] = _clean_attrs(kwargs["attributes"])
             self.set_state(entity_id, state=value, **kwargs)
-            
+
         except Exception as e:
             self.log(f"Error setting {entity_id} to {value}: {e}", level="ERROR")
     
-    async def async_set_entity_value(self, entity_id: str, value: Any, **kwargs) -> None:
+    async def async_set_entity_value(self, entity_id: str, value: Any = None, **kwargs) -> None:
         """
         Async method to set entity state - use this in async callbacks.
         
@@ -212,6 +260,12 @@ class BaseAsyncApp(hass.Hass):
                 if key.startswith(f"{entity_id}:"):
                     del self.entity_cache[key]
             
+            if value is None and "state" in kwargs:
+                value = kwargs.pop("state")
+            else:
+                kwargs.pop("state", None)
+            if "attributes" in kwargs:
+                kwargs["attributes"] = _clean_attrs(kwargs["attributes"])
             await self.set_state(entity_id, state=value, **kwargs)
         except Exception as e:
             self.log(f"Async error setting {entity_id}: {e}", level="ERROR")

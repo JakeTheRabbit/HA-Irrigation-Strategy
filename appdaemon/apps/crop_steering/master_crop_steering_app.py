@@ -136,7 +136,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
             state_machine = ZoneStateMachine(
                 zone_id=zone_num,
                 initial_phase=IrrigationPhase.P2_MAINTENANCE,  # Default to maintenance
-                logger=self
+                # NOTE: do NOT pass the AppDaemon app as logger — it has .log(), not
+                # .info()/.warning(), which made every transition throw. Use the module logger.
             )
             
             # Register phase callbacks
@@ -2969,6 +2970,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _get_number_of_zones(self) -> int:
         """Get number of zones from integration configuration."""
         try:
+            # Explicit config first — avoids a startup race where the integration's per-zone
+            # sensors haven't loaded yet at init (which undercounts to 1 zone after a restart).
+            cfg_zones = int(self.args.get("num_zones", 0) or 0)
+            if cfg_zones > 0:
+                return cfg_zones
             # Try to get from integration number entity
             zones_entity = self.get_entity_value("number.crop_steering_substrate_volume")  # This exists, so integration is loaded
             if zones_entity:
@@ -3314,7 +3320,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Get current dryback status from advanced detector
             if hasattr(self, 'dryback_detector') and self.dryback_detector:
                 # Get dryback prediction for target percentage
-                prediction = await self.dryback_detector.predict_target_dryback_time(target_dryback)
+                _pred_fn = getattr(self.dryback_detector, "predict_target_dryback_time", None)
+                prediction = (await _pred_fn(target_dryback)) if _pred_fn else {}
                 
                 if prediction.get('prediction_available'):
                     predicted_minutes = prediction.get('predicted_minutes_remaining', 60)
@@ -3458,7 +3465,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self.log(f"❌ Error getting zone {zone_num} dryback rate: {e}", level='ERROR')
             return None
 
-    async def _transition_zone_to_phase(self, zone_num: int, new_phase: str, reason: str):
+    async def _transition_zone_to_phase(self, zone_num: int, new_phase: str, reason: str, forced: bool = False):
         """Transition a specific zone to a new irrigation phase."""
         try:
             machine = self.zone_state_machines.get(zone_num)
@@ -3499,8 +3506,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 if "lights on" in reason.lower():
                     transition_type = PhaseTransition.LIGHTS_ON
             
-            # Execute transition
-            success = machine.transition(transition_type, target_phase, reason=reason)
+            # Execute transition. forced = unconditional manual override (applies from
+            # ANY current phase, bypassing the valid-transition table).
+            if forced:
+                success = machine.force_phase(target_phase, reason=reason)
+            else:
+                success = machine.transition(transition_type, target_phase, reason=reason)
             
             if not success:
                 self.log(f"Zone {zone_num}: Failed to transition to {new_phase}", level='WARNING')
@@ -3521,7 +3532,16 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Update crop profile parameters if needed (could be zone-specific in future)
             await self._update_phase_parameters()
-            
+
+            # Keep the zone-phase summary sensor in sync (it was only written at init, so it
+            # went stale at "Z*:P2" while the per-zone sensors updated correctly).
+            try:
+                summary = ", ".join([f"Z{z}:{p}" for z, p in self.zone_phases.items()])
+                await self.async_set_entity_value('sensor.crop_steering_app_current_phase', summary,
+                                   attributes={'friendly_name': 'Zone Phases', 'icon': 'mdi:water-circle'})
+            except Exception:
+                pass
+
         except Exception as e:
             self.log(f"❌ Error transitioning zone {zone_num} to phase {new_phase}: {e}", level='ERROR')
     
@@ -3557,7 +3577,17 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     if p0_data and zone_vwc is not None:
                         # Update dryback progress
                         machine.update_p0_dryback(zone_vwc, p0_data.peak_vwc or zone_vwc)
-                        
+
+                        # FIX (a): drive targets from the number entities instead of the
+                        # hardcoded P0Data defaults (was always 50% / 45min).
+                        _veg = self._zone_is_vegetative(zone_num)
+                        p0_data.target_dryback_percentage = self._get_zone_number(
+                            zone_num,
+                            "number.crop_steering_vegetative_dryback_target" if _veg
+                            else "number.crop_steering_generative_dryback_target", 50)
+                        p0_data.max_duration_minutes = self._get_number_entity_value(
+                            "number.crop_steering_p0_maximum_wait_time", 45)
+
                         # Check dryback completion
                         dryback_target = p0_data.target_dryback_percentage
                         current_dryback = p0_data.current_dryback_percentage
@@ -3578,7 +3608,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 # P2 → P3: ML-based or time-based transition
                 elif current_phase == IrrigationPhase.P2_MAINTENANCE:
                     # Check if it's time to transition to P3
-                    should_start_p3 = await self._should_zone_start_p3(zone_num)
+                    should_start_p3 = await self._should_zone_start_p3_simple(zone_num)
                     if should_start_p3:
                         await self._transition_zone_to_phase(zone_num, 'P3', 'ML predicted lights-off approaching')
         
@@ -3592,8 +3622,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
         else:
             return check_time >= start_time or check_time <= end_time
     
-    async def _should_zone_start_p3(self, zone_num: int) -> bool:
-        """Determine if zone should transition to P3 based on ML predictions."""
+    async def _should_zone_start_p3_simple(self, zone_num: int) -> bool:
+        """Determine if zone should transition to P3 (1-arg variant). Renamed from a
+        duplicate _should_zone_start_p3 that was shadowing the 3-arg version below and
+        making the entity-driven P2->P3 check (in _check_phase_transitions) throw."""
         try:
             # Get lights-off time
             lights_off_time = self._get_zone_schedule(zone_num)['lights_off']
@@ -4165,19 +4197,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 self.log(f"❌ Invalid phase: {target_phase}", level='ERROR')
                 return
             
-            # Transition all zones to the new phase
-            for zone_num, machine in self.zone_state_machines.items():
-                if forced:
-                    # Force transition regardless of conditions
-                    machine.force_phase(phase_map[target_phase])
-                    self.log(f"Zone {zone_num}: Forced transition to {target_phase}")
-                else:
-                    # Try normal transition
-                    success = machine.try_transition_to(phase_map[target_phase])
-                    if success:
-                        self.log(f"Zone {zone_num}: Transitioned to {target_phase}")
-                    else:
-                        self.log(f"Zone {zone_num}: Could not transition to {target_phase} - conditions not met", level='WARNING')
+            # Transition all zones via the canonical path (publishes phase sensors + saves
+            # state). Honour the event's forced flag — the phase select fires forced=True,
+            # so a manual set applies from ANY current phase, not just table-legal ones.
+            for zone_num in list(self.zone_state_machines.keys()):
+                await self._transition_zone_to_phase(zone_num, target_phase, reason, forced=forced)
             
         except Exception as e:
             self.log(f"❌ Error handling phase transition service: {e}", level='ERROR')
@@ -5044,11 +5068,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
         except Exception as e:
             self.log(f"❌ Error checking irrigation safety limits: {e}", level='ERROR')
-            # Default to allowing irrigation on error to prevent system lockup
+            # FAIL CLOSED: block irrigation on any safety-check error (never fire blind).
             return {
-                'blocked': False,
+                'blocked': True,
                 'reason': 'safety_check_error',
-                'message': f'Safety check error: {e}'
+                'message': f'Safety check error (blocking): {e}'
             }
 
     def _check_irrigation_frequency_safety(self, zone: int) -> Dict:
@@ -5085,7 +5109,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
         except Exception as e:
             self.log(f"❌ Error checking irrigation frequency safety: {e}", level='ERROR')
-            return {'blocked': False}
+            return {'blocked': True, 'reason': 'frequency_check_error'}  # FAIL CLOSED
 
     def _check_phase_specific_safety(self, zone: int, zone_vwc: Optional[float], zone_ec: Optional[float]) -> Dict:
         """Check phase-specific safety limits."""
@@ -5125,7 +5149,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
         except Exception as e:
             self.log(f"❌ Error checking phase-specific safety: {e}", level='ERROR')
-            return {'blocked': False}
+            return {'blocked': True, 'reason': 'phase_safety_check_error'}  # FAIL CLOSED
 
     def _update_safety_status_entities(self):
         """Update safety status entities for monitoring."""
