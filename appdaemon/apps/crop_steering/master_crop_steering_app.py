@@ -3298,7 +3298,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     
                 elif lights_on and current_phase == 'P0':
                     # Check P0 → P1 transition conditions for this zone
-                    if self._should_zone_exit_p0(zone_num, zone_vwc, self._get_zone_number(zone_num, "number.crop_steering_vegetative_dryback_target" if self._zone_is_vegetative(zone_num) else "number.crop_steering_generative_dryback_target", 50), p0_max_duration):
+                    if self._should_zone_exit_p0(zone_num, zone_vwc, self._get_zone_number(zone_num, "number.crop_steering_p0_dryback_drop_percent", 15), p0_max_duration):
                         target_phase = 'P1'
                         reason = f"Zone {zone_num}: P0 dryback target achieved or max duration reached"
                         
@@ -3774,13 +3774,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         # Update dryback progress
                         machine.update_p0_dryback(zone_vwc, p0_data.peak_vwc or zone_vwc)
 
-                        # FIX (a): drive targets from the number entities instead of the
-                        # hardcoded P0Data defaults (was always 50% / 45min).
-                        _veg = self._zone_is_vegetative(zone_num)
+                        # P0 is the MORNING dryback before the first P1 shot, so its exit
+                        # threshold is the P0 drop % (number.crop_steering_p0_dryback_drop_percent,
+                        # ~5-15%) — NOT the veg/gen dryback target (50/40%), which is the much
+                        # larger overnight/P3 dryback. Using the 50% veg target here meant P0
+                        # never completed on dryback and only ever exited on the 120-min timeout.
                         p0_data.target_dryback_percentage = self._get_zone_number(
-                            zone_num,
-                            "number.crop_steering_vegetative_dryback_target" if _veg
-                            else "number.crop_steering_generative_dryback_target", 50)
+                            zone_num, "number.crop_steering_p0_dryback_drop_percent", 15)
                         p0_data.max_duration_minutes = self._get_number_entity_value(
                             "number.crop_steering_p0_maximum_wait_time", 45)
 
