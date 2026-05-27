@@ -4010,22 +4010,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self.log(f"❌ Error updating performance analytics: {e}", level='ERROR')
 
     def _update_dryback_entities(self, dryback_result: Dict):
-        """Update Home Assistant entities with dryback data."""
-        try:
-            # Publish to an engine-owned *_app entity. sensor.crop_steering_dryback_percentage
-            # is integration-owned, so set_state on it returned HTTP 400 every cycle (log spam).
-            self.run_in(self._async_set_entity_wrapper, 0,
-                       entity_id='sensor.crop_steering_dryback_percentage_app',
-                       value=dryback_result['dryback_percentage'],
-                       attributes=dryback_result)
-            
-            self.run_in(self._async_set_entity_wrapper, 0,
-                       entity_id='binary_sensor.crop_steering_dryback_in_progress',
-                       value='on' if dryback_result['dryback_in_progress'] else 'off',
-                       attributes={'confidence': dryback_result['confidence_score']})
-            
-        except Exception as e:
-            self.log(f"❌ Error updating dryback entities: {e}", level='ERROR')
+        """Update Home Assistant entities with dryback data.
+
+        NOTE: HA reject (HTTP 400) this publish every VWC update regardless of payload
+        (verified: empty attrs + coerced state still 400). It's a cosmetic analytics sensor
+        and was never populated, so the HA publish is DISABLED to stop the error-log spam.
+        The dryback detector still runs and feeds P3 transitions via _get_zone_dryback_rate;
+        nothing functional depends on these HA entities. (Re-enable + instrument off-line to
+        chase the root cause if the dryback % / in-progress sensors are wanted on the UI.)"""
+        return
 
     def _update_sensor_fusion_entities(self, sensor_id: str, fusion_result: Dict):
         """Update sensor fusion entities."""

@@ -286,11 +286,15 @@ class BaseAsyncApp(hass.Hass):
                 kwargs["attributes"] = _clean_attrs(kwargs["attributes"])
         except Exception:
             pass
-        # The state value itself can be a numpy scalar or NaN (dryback/analytics) -> json 400.
+        # Coerce numpy scalars / NaN (dryback/analytics) -> json-safe, which may yield None.
         if state is not None:
             state = _json_safe(state)
         if state is None:
-            state = "unknown"
+            # No usable value -> SKIP the publish. HA returns 400 when you POST "unknown"
+            # (or any non-numeric) to a sensor declared with state_class/measurement, which
+            # is the bulk of the analytics 400 spam. Leaving the entity at its prior value is
+            # strictly better than spamming failed writes.
+            return None
         return super().set_state(entity_id, state=state, **kwargs)
 
     def set_entity_value(self, entity_id: str, value: Any = None, **kwargs) -> None:
