@@ -16,7 +16,13 @@ for cases where it's needed (e.g., interfacing with async libraries).
 import appdaemon.plugins.hass.hassapi as hass
 from typing import Any, Optional
 import time
+import os
 import datetime as _dt
+
+try:
+    import requests as _requests
+except Exception:  # pragma: no cover - requests is a declared global_module
+    _requests = None
 
 
 def _json_safe(obj):
@@ -91,21 +97,75 @@ class BaseAsyncApp(hass.Hass):
                 result = self.get_state(entity_id)
             else:
                 result = self.get_state(entity_id, attribute=attribute)
-            
-            # Check if we accidentally got a Task object (means we're in async context)
+
+            # In an async callback the sync get_state() hands back an un-awaited coroutine
+            # instead of a value. Close it (avoids "coroutine never awaited") and treat it as
+            # a miss so the Supervisor-REST fallback below produces the real value.
             if hasattr(result, '__await__'):
-                self.log(f"Task object detected for {entity_id}. Falling back to default: {default}", level="DEBUG")
-                return default
-            
+                try:
+                    result.close()
+                except Exception:
+                    pass
+                result = None
+
             if result is not None and result not in ['unknown', 'unavailable']:
                 # Cache the result
                 self.entity_cache[cache_key] = (result, time.time())
                 return result
+
+            # AppDaemon's local state cache is blind/desynced for this entity (common for
+            # rarely-changing switches, and for ANY read made from an async callback). Read it
+            # straight from HA via the Supervisor proxy so the control switches + gate sensors
+            # are always readable. Successful reads are cached like normal.
+            rest = self._rest_state(entity_id, attribute)
+            if rest is not None and rest not in ['unknown', 'unavailable']:
+                self.entity_cache[cache_key] = (rest, time.time())
+                return rest
             return default
-            
+
         except Exception as e:
             self.log(f"Error getting {attribute} for {entity_id}: {e}", level="DEBUG")
             return default
+
+    def _supervisor_token(self):
+        """Supervisor token for the http://supervisor/core/api proxy (cached once)."""
+        tok = getattr(self, "_sup_token_cache", "unset")
+        if tok != "unset":
+            return tok
+        tok = os.environ.get("SUPERVISOR_TOKEN")
+        if not tok:
+            try:
+                with open("/run/s6/container_environment/SUPERVISOR_TOKEN") as f:
+                    tok = f.read().strip()
+            except Exception:
+                tok = None
+        self._sup_token_cache = tok
+        return tok
+
+    def _rest_state(self, entity_id: str, attribute: str = "state"):
+        """Read an entity's LIVE state straight from HA via the Supervisor proxy. Reliable
+        even when AppDaemon's local state cache is blind or we're inside an async callback
+        (where the sync get_state returns a coroutine). Returns the state string (or an
+        attribute value), or None on any failure — callers fall back to their default."""
+        if _requests is None:
+            return None
+        tok = self._supervisor_token()
+        if not tok:
+            return None
+        try:
+            r = _requests.get(
+                f"http://supervisor/core/api/states/{entity_id}",
+                headers={"Authorization": f"Bearer {tok}"},
+                timeout=2,
+            )
+            if r.status_code != 200:
+                return None
+            data = r.json()
+            if attribute == "state":
+                return data.get("state")
+            return data.get("attributes", {}).get(attribute)
+        except Exception:
+            return None
     
     async def async_get_entity_value(self, entity_id: str, attribute: str = "state", default: Any = None) -> Any:
         """

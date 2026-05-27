@@ -61,7 +61,18 @@ def create_zone_switch_descriptions(num_zones: int) -> list[SwitchEntityDescript
                 icon="mdi:hand-water",
             )
         )
-    
+
+        # Per-zone blocked-dripper protection toggle. ON (default) = abandon emergency
+        # irrigation for this row after the threshold of failed shots (blocked-dripper guard).
+        # OFF = never abandon; the row keeps retrying emergency shots.
+        zone_switches.append(
+            SwitchEntityDescription(
+                key=f"zone_{zone_num}_dripper_protection",
+                name=f"Zone {zone_num} Dripper Protection",
+                icon="mdi:water-alert",
+            )
+        )
+
     return zone_switches
 
 async def async_setup_entry(
@@ -110,6 +121,8 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
             self._attr_is_on = True  # Auto irrigation enabled by default
         elif "zone_" in description.key and "_enabled" in description.key:
             self._attr_is_on = True  # Zones enabled by default
+        elif "dripper_protection" in description.key:
+            self._attr_is_on = True  # Blocked-dripper protection on by default
         else:
             self._attr_is_on = False
 

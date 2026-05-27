@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -270,15 +271,14 @@ class CropSteeringSensor(SensorEntity):
         # Set object_id to include crop_steering prefix for entity_id generation
         self._attr_object_id = f"{DOMAIN}_{description.key}"
         
-        # Extract zone number from key if this is a zone sensor
+        # Extract zone number from the key. Zone sensor keys look like "zone_1_status"
+        # (they START with "zone_"), so splitting on the infix "_zone_" never matched and left
+        # _zone_number = None — which made native_value skip the entire zone branch and return
+        # None ("unknown") for status / daily+weekly water / last irrigation / irrigations today.
         self._zone_number = None
-        if "_zone_" in description.key:
-            try:
-                parts = description.key.split("_zone_")
-                if len(parts) > 1:
-                    self._zone_number = int(parts[1].split("_")[0])
-            except (ValueError, IndexError):
-                pass
+        m = re.search(r"zone_(\d+)", description.key)
+        if m:
+            self._zone_number = int(m.group(1))
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -410,17 +410,32 @@ class CropSteeringSensor(SensorEntity):
             
         return self._average_sensor_values(ec_sensors)
         
+    def _read_state_float(self, entity_id: str) -> float | None:
+        """Float value of an entity's current state, or None if missing/non-numeric."""
+        st = self.hass.states.get(entity_id)
+        if st and st.state not in ("unknown", "unavailable", "", None):
+            try:
+                return float(st.state)
+            except (ValueError, TypeError):
+                return None
+        return None
+
     def _get_zone_status(self, zone_num: int) -> str:
         """Get status for specific zone."""
         # Check if zone is enabled
         zone_enabled = self.hass.states.get(f"switch.crop_steering_zone_{zone_num}_enabled")
         if not zone_enabled or zone_enabled.state != "on":
             return "Disabled"
-            
-        # Check VWC and EC values
-        vwc = self._get_zone_vwc(zone_num)
-        ec = self._get_zone_ec(zone_num)
-        
+
+        # Prefer the live engine-published per-zone VWC/EC (always present); fall back to the
+        # configured probes if those aren't available.
+        vwc = self._read_state_float(f"sensor.crop_steering_zone_{zone_num}_vwc")
+        if vwc is None:
+            vwc = self._get_zone_vwc(zone_num)
+        ec = self._read_state_float(f"sensor.crop_steering_zone_{zone_num}_ec")
+        if ec is None:
+            ec = self._get_zone_ec(zone_num)
+
         if vwc is None or ec is None:
             return "Sensor Error"
             

@@ -110,6 +110,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self.system_enabled = True
         self.irrigation_in_progress = False
         self.last_irrigation_time = None
+
+        # Source-water pH/EC gate state: Irrigate Anyway override window + alert debounce.
+        self._sw_override_until = None
+        self._sw_bad_count = 0
+        self._sw_last_notify = None
+        self._sw_blocked = False
         
         # Get number of zones from integration or config
         self.num_zones = self._get_number_of_zones()
@@ -341,6 +347,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         # Listen to manual override service calls from HA integration
         self.listen_event(self._on_set_manual_override_service, 'crop_steering_set_manual_override')
+
+        # "Irrigate Anyway" — phone notification action button, or a dashboard-fired event —
+        # grants a timed override of the source-water pH/EC gate only.
+        self.listen_event(self._on_irrigate_anyway, 'mobile_app_notification_action')
+        self.listen_event(self._on_irrigate_anyway, 'crop_steering_irrigate_anyway')
 
     def _setup_timers(self):
         """Set up periodic processing timers."""
@@ -626,10 +637,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 zone_data['weekly_total'] = 0
                 zone_data['last_reset_weekly'] = today
             
-            # Update totals
-            zone_data['daily_total'] += volume_liters
-            zone_data['weekly_total'] += volume_liters
-            zone_data['daily_count'] += 1
+            # Update totals. Use .get() defaults so a fresh zone_data dict can't KeyError on a
+            # non-Monday (the weekly_total reset block above only runs on Mondays) — that error
+            # was aborting the whole update, so daily water never published (stuck at 0).
+            zone_data['daily_total'] = zone_data.get('daily_total', 0) + volume_liters
+            zone_data['weekly_total'] = zone_data.get('weekly_total', 0) + volume_liters
+            zone_data['daily_count'] = zone_data.get('daily_count', 0) + 1
             
             self.zone_water_usage[zone_num] = zone_data
             
@@ -2079,6 +2092,125 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self.log(f"❌ Error in VWC fallback selection: {e}", level='ERROR')
             return candidate_zones[0] if candidate_zones else None
 
+    def _read_float(self, entity_id, default=None):
+        """Best-effort float read of an entity's state; default on missing/non-numeric.
+        Routes through get_entity_value so it inherits the Supervisor-REST fallback — works
+        from async callbacks where the raw sync get_state returns an un-awaited coroutine."""
+        v = self.get_entity_value(entity_id, default=None)
+        if v is None or v in ('unknown', 'unavailable', ''):
+            return default
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return default
+
+    def _source_water_limits(self):
+        """(ph_min, ph_max, ec_min, ec_max) from the integration number helpers, with
+        sane fallbacks. An EC limit of 0 disables that EC bound."""
+        return (
+            self._read_float('number.crop_steering_irrigation_ph_min', 5.8),
+            self._read_float('number.crop_steering_irrigation_ph_max', 6.2),
+            self._read_float('number.crop_steering_irrigation_ec_min', 0.0),
+            self._read_float('number.crop_steering_irrigation_ec_max', 0.0),
+        )
+
+    def _check_source_water_gate(self, zone: int) -> Dict:
+        """Block irrigation while the veg batch tank pH/EC sit outside the user limits
+        (number.crop_steering_irrigation_ph_min/max + ec_min/max). Out of range raises a
+        phone alert with an 'Irrigate Anyway' button that grants a timed override of THIS
+        gate only. Fails OPEN on a read/config error so a flaky sensor never permanently
+        halts irrigation. Returns {'blocked','reason','message'}."""
+        try:
+            cfg = self.config.get('source_water', {}) if isinstance(self.config, dict) else {}
+            ph_entity = cfg.get('ph_sensor', 'sensor.aquaponics_kit_f4f618_ph')
+            ec_entity = cfg.get('ec_sensor', 'sensor.atlas_legacy_1_ec')
+            ph_min, ph_max, ec_min, ec_max = self._source_water_limits()
+
+            problems = []
+            if ph_entity:
+                ph = self._read_float(ph_entity)
+                if ph is None:
+                    problems.append("pH unreadable")
+                elif ph < ph_min or ph > ph_max:
+                    problems.append(f"pH {ph:.2f} (want {ph_min:g}-{ph_max:g})")
+            if ec_entity and (ec_min > 0 or ec_max > 0):
+                ec = self._read_float(ec_entity)
+                if ec is None:
+                    problems.append("EC unreadable")
+                elif (ec_min > 0 and ec < ec_min) or (ec_max > 0 and ec > ec_max):
+                    if ec_min > 0 and ec_max > 0:
+                        want = f"{ec_min:g}-{ec_max:g}"
+                    else:
+                        want = f">={ec_min:g}" if ec_min > 0 else f"<={ec_max:g}"
+                    problems.append(f"EC {ec:.2f} (want {want})")
+
+            now = datetime.now()
+            override = self._sw_override_until is not None and now < self._sw_override_until
+
+            if not problems:
+                if self._sw_bad_count >= 2 and self._sw_last_notify is not None:
+                    self._notify_phone("✅ F2 crop steering — veg-tank pH/EC back in range. Irrigation re-enabled.")
+                self._sw_bad_count = 0
+                self._sw_last_notify = None
+                self._sw_override_until = None
+                self._sw_blocked = False
+                return {'blocked': False, 'reason': 'ok', 'message': 'source water in range'}
+
+            reason = "; ".join(problems)
+            if override:
+                self._sw_blocked = False
+                return {'blocked': False, 'reason': 'override', 'message': f'Irrigate Anyway active ({reason})'}
+
+            self._sw_blocked = True
+            self._sw_bad_count += 1
+            due = self._sw_last_notify is None or (now - self._sw_last_notify).total_seconds() >= 1800
+            if self._sw_bad_count >= 2 and due:
+                self._notify_phone(
+                    "⚠️ F2 irrigation BLOCKED — veg tank " + reason + ".",
+                    actions=[{"action": "CS_IRRIGATE_ANYWAY", "title": "Irrigate Anyway"}],
+                )
+                self._sw_last_notify = now
+            return {'blocked': True, 'reason': 'source_water_out_of_range', 'message': reason}
+        except Exception as e:
+            self.log(f"⚠️ source-water gate error (failing OPEN): {e}", level='WARNING')
+            return {'blocked': False, 'reason': 'gate_error', 'message': str(e)}
+
+    def _notify_phone(self, message, actions=None):
+        """Alert via the source-water notify service (falls back to the global
+        notification_service). mobile_app honours 'actions' for the Irrigate Anyway button;
+        persistent_notification simply ignores it."""
+        try:
+            cfg = self.config.get('source_water', {}) if isinstance(self.config, dict) else {}
+            service = cfg.get('notify_service') or self.config.get('notification_service', 'notify.persistent_notification')
+            if not service or not str(service).startswith('notify.'):
+                self.log(f"📱 {message}")
+                return
+            ndata = {"tag": "f2_cs_source_water"}
+            if actions:
+                ndata["actions"] = actions
+            self.call_service(service.replace('.', '/', 1),
+                              message=message, title="F2 Crop Steering", data=ndata)
+            self.log(f"📱 alert ({service}): {message}")
+        except Exception as e:
+            self.log(f"notify failed: {e}", level='ERROR')
+
+    def _on_irrigate_anyway(self, event_name, data, kwargs):
+        """'Irrigate Anyway' from the phone action (mobile_app_notification_action with
+        action CS_IRRIGATE_ANYWAY) or a dashboard-fired crop_steering_irrigate_anyway event.
+        Grants a timed override of the source-water pH/EC gate only — dosing/tank/system
+        interlocks still apply."""
+        try:
+            if event_name == 'mobile_app_notification_action' and (data or {}).get('action') != 'CS_IRRIGATE_ANYWAY':
+                return
+            cfg = self.config.get('source_water', {}) if isinstance(self.config, dict) else {}
+            minutes = float(cfg.get('override_minutes', 30))
+            self._sw_override_until = datetime.now() + timedelta(minutes=minutes)
+            self.log(f"⏭️ Source-water pH/EC gate overridden for {minutes:.0f} min (Irrigate Anyway)")
+            self._notify_phone(f"✅ Override accepted — F2 will irrigate despite pH/EC for {minutes:.0f} min "
+                               f"(dosing/tank/system interlocks still apply).")
+        except Exception as e:
+            self.log(f"irrigate-anyway handler error: {e}", level='ERROR')
+
     async def _execute_irrigation_shot(self, zone: int, duration: int, shot_type: str = 'manual') -> Dict:
         """Execute irrigation shot with proper sequencing and monitoring."""
         try:
@@ -2099,7 +2231,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 }
             
             # System-level controls
-            system_enabled = self._get_switch_state("switch.crop_steering_system_enabled", True)
+            # FAIL-SAFE: if the master switch is unreadable (e.g. AppDaemon's HA state cache
+            # hasn't synced yet on startup), treat the system as DISABLED, never armed. A blind
+            # engine must not autonomously irrigate, and this makes the HA disarm switch
+            # authoritative even mid-sync.
+            system_enabled = self._get_switch_state("switch.crop_steering_system_enabled", False)
             auto_irrigation_enabled = self._get_switch_state("switch.crop_steering_auto_irrigation_enabled", True)
             zone_enabled = self._get_switch_state(f"switch.crop_steering_zone_{zone}_enabled", True)
             
@@ -2141,9 +2277,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     'message': 'Tank filling in progress - irrigation blocked to prevent conflicts'
                 }
 
-            # F2 fill/dose interlock: never irrigate while the veg batch tank is
-            # dosing/filling, or while it is not full (prevents dose disruption + dry-pumping).
-            if (self.get_state("input_boolean.nutrient_dosing_active") or "off") == "on":
+            # F2 fill/dose interlock: never irrigate while the veg batch tank is dosing/filling.
+            if str(self.get_entity_value("input_boolean.nutrient_dosing_active", default="off")).lower() == "on":
                 self.log(f"🛑 Zone {zone} irrigation blocked: veg batch tank dosing/filling in progress")
                 return {
                     'status': 'blocked',
@@ -2151,13 +2286,31 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     'zone': zone,
                     'message': 'Veg batch tank dosing/filling - irrigation held',
                 }
-            if (self.get_state("binary_sensor.veg_tank_full_float_tank_level_full") or "off") != "on":
-                self.log(f"🛑 Zone {zone} irrigation blocked: veg batch tank not full")
+            # Dry-run guard: block ONLY when the low float explicitly reads EMPTY.
+            # binary_sensor.veg_tank_empty_switch reads "on" when WATER IS PRESENT, "off" when
+            # empty; fail OPEN on unknown/missing so a flaky float never permanently halts
+            # irrigation. (Gating on a "tank FULL" sensor was backwards — the tank drains as it
+            # waters, so it would water once then lock out until the next refill.)
+            tank_float = str(self.get_entity_value("binary_sensor.veg_tank_empty_switch", default="on")).strip().lower()
+            if tank_float == "off":
+                self.log(f"🛑 Zone {zone} irrigation blocked: veg batch tank empty (low float)")
                 return {
                     'status': 'blocked',
-                    'reason': 'tank_not_full',
+                    'reason': 'tank_empty',
                     'zone': zone,
-                    'message': 'Veg batch tank not full - irrigation held to avoid dry-pumping',
+                    'message': 'Veg batch tank empty (low float) - irrigation held to avoid dry-pumping',
+                }
+
+            # Source-water pH/EC quality gate (veg batch tank). Out of the user-set limits
+            # -> block + phone alert with an Irrigate Anyway override. Fails OPEN on error.
+            sw_gate = self._check_source_water_gate(zone)
+            if sw_gate['blocked']:
+                self.log(f"🛑 Zone {zone} irrigation blocked: source water {sw_gate['message']}")
+                return {
+                    'status': 'blocked',
+                    'reason': sw_gate['reason'],
+                    'zone': zone,
+                    'message': f"Source water out of range: {sw_gate['message']}",
                 }
 
             # CRITICAL SAFETY CHECKS - HIGH PRIORITY 7
@@ -2293,8 +2446,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Fire irrigation event
             self.fire_event('crop_steering_irrigation_shot', **irrigation_result)
             
+            # Guard against None VWC (e.g. _get_zone_average_vwc found no matching sensor) —
+            # formatting None as a float raised, which aborted the shot and tripped the
+            # emergency stop that killed the pump mid-feed.
+            _pv = f"{pre_vwc:.1f}" if isinstance(pre_vwc, (int, float)) else "n/a"
+            _qv = f"{post_vwc:.1f}" if isinstance(post_vwc, (int, float)) else "n/a"
             self.log(f"✅ Irrigation completed: Zone {zone}, {actual_duration:.1f}s, "
-                    f"VWC: {pre_vwc:.1f}% → {post_vwc:.1f}%")
+                    f"VWC: {_pv}% → {_qv}%")
             
             return irrigation_result
             
@@ -2397,7 +2555,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 self.log(f"🚨 Emergency VWC condition: {fused_vwc:.1f}%", level='WARNING')
                 
                 # Check if system is enabled and auto irrigation is enabled
-                system_enabled = self._get_switch_state("switch.crop_steering_system_enabled", True)
+                # FAIL-SAFE: if the master switch is unreadable (e.g. AppDaemon's HA state cache
+                # hasn't synced yet on startup), treat the system as DISABLED, never armed. A blind
+                # engine must not autonomously irrigate, and this makes the HA disarm switch
+                # authoritative even mid-sync.
+                system_enabled = self._get_switch_state("switch.crop_steering_system_enabled", False)
                 auto_irrigation_enabled = self._get_switch_state("switch.crop_steering_auto_irrigation_enabled", True)
                 
                 if not system_enabled:
@@ -3987,21 +4149,29 @@ class MasterCropSteeringApp(BaseAsyncApp):
     async def _should_abandon_emergency_zone(self, zone_num: int) -> bool:
         """Check if we should abandon emergency irrigation for a zone (blocked dripper protection)."""
         try:
+            # Per-zone opt-out: if Dripper Protection is OFF for this row, never abandon —
+            # clear any standing abandonment and keep retrying emergency shots.
+            if not self._get_switch_state(f"switch.crop_steering_zone_{zone_num}_dripper_protection", True):
+                self.emergency_attempts[zone_num]['abandoned_until'] = None
+                return False
+
             # Check if zone is already abandoned
             abandoned_until = self.emergency_attempts[zone_num].get('abandoned_until')
             if abandoned_until and datetime.now() < abandoned_until:
                 return True
-            
+
             attempts = self.emergency_attempts[zone_num]['attempts']
             now = datetime.now()
-            
+
             # Look for recent attempts (last 30 minutes)
             recent_cutoff = now - timedelta(minutes=30)
             recent_attempts = [attempt for attempt in attempts if attempt[0] > recent_cutoff]
-            
-            # If we've had 4+ emergency shots in 30 minutes, consider abandoning
-            if len(recent_attempts) >= 4:
-                self.log(f"🚫 Zone {zone_num}: {len(recent_attempts)} emergency shots in 30min - likely blocked dripper")
+
+            # Abandon after the user-set number of emergency shots in 30 min (default 4).
+            # NB: HA slugs the "(30min)" in the entity name into the id -> ..._max_shots_30min.
+            max_shots = int(self._read_float('number.crop_steering_blocked_dripper_max_shots_30min', 4) or 4)
+            if len(recent_attempts) >= max_shots:
+                self.log(f"🚫 Zone {zone_num}: {len(recent_attempts)} emergency shots in 30min (limit {max_shots}) - likely blocked dripper")
                 
                 # Abandon for 2 hours
                 self.emergency_attempts[zone_num]['abandoned_until'] = now + timedelta(hours=2)
@@ -4026,6 +4196,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
     async def _on_manual_irrigation_shot(self, event_name, data, kwargs):
         """Handle manual irrigation shot service calls."""
         try:
+            data = data or {}
+            # IGNORE our own completion broadcasts. _execute_irrigation_shot fires
+            # 'crop_steering_irrigation_shot' with the RESULT (carries a 'status'); since this
+            # handler listens to the same event, that re-triggered an endless ~65s shot loop.
+            # Genuine requests (from the integration service) carry no 'status'.
+            if 'status' in data or 'duration_actual' in data:
+                return
             zone = data.get('zone', 1)
             duration = data.get('duration_seconds', 30)
             shot_type = data.get('shot_type', 'manual')
