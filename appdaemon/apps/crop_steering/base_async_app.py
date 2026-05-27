@@ -35,7 +35,24 @@ def _json_safe(obj):
         return [_json_safe(v) for v in obj]
     if isinstance(obj, (_dt.datetime, _dt.date)):
         return obj.isoformat()
-    if isinstance(obj, (str, int, float, bool)) or obj is None:
+    # numpy scalars (np.float64 subclasses float, np.int64, np.bool_) pass the isinstance
+    # check below but are NOT json-serialisable -> they were the source of the analytics
+    # HTTP 400 spam (dryback uses scipy/numpy). Coerce to native Python via .item().
+    # Native str/int/float/bool have no .item(), so this only catches numpy-likes.
+    if hasattr(obj, "item") and not isinstance(obj, (str, bytes)):
+        try:
+            obj = obj.item()
+        except Exception:
+            return str(obj)
+    if isinstance(obj, bool):
+        return obj
+    if isinstance(obj, float):
+        # NaN / Inf serialise to the literal NaN/Infinity, which is invalid JSON -> HA 400.
+        # (dryback % is NaN before the first peak is detected.) Null them out.
+        if obj != obj or obj == float("inf") or obj == float("-inf"):
+            return None
+        return obj
+    if isinstance(obj, (str, int)) or obj is None:
         return obj
     return str(obj)
 
@@ -269,6 +286,9 @@ class BaseAsyncApp(hass.Hass):
                 kwargs["attributes"] = _clean_attrs(kwargs["attributes"])
         except Exception:
             pass
+        # The state value itself can be a numpy scalar or NaN (dryback/analytics) -> json 400.
+        if state is not None:
+            state = _json_safe(state)
         if state is None:
             state = "unknown"
         return super().set_state(entity_id, state=state, **kwargs)

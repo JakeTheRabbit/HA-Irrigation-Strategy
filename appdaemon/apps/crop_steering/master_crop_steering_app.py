@@ -760,14 +760,18 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     'last_irrigation_time': data['last_irrigation_time'].isoformat() if data['last_irrigation_time'] else None
                 }
             
-            # Convert date objects for water usage
+            # Convert date objects for water usage. Use .get() — weekly keys are only
+            # initialised on Mondays, so a direct index aborted the entire save the rest of
+            # the week (KeyError 'last_reset_weekly'), which is why state never persisted.
             for zone_num, data in self.zone_water_usage.items():
+                lrd = data.get('last_reset_daily')
+                lrw = data.get('last_reset_weekly')
                 state_data['zone_water_usage'][zone_num] = {
-                    'daily_total': data['daily_total'],
-                    'weekly_total': data['weekly_total'],
-                    'daily_count': data['daily_count'],
-                    'last_reset_daily': data['last_reset_daily'].isoformat() if data['last_reset_daily'] else None,
-                    'last_reset_weekly': data['last_reset_weekly'].isoformat() if data['last_reset_weekly'] else None
+                    'daily_total': data.get('daily_total', 0),
+                    'weekly_total': data.get('weekly_total', 0),
+                    'daily_count': data.get('daily_count', 0),
+                    'last_reset_daily': lrd.isoformat() if hasattr(lrd, 'isoformat') else None,
+                    'last_reset_weekly': lrw.isoformat() if hasattr(lrw, 'isoformat') else None
                 }
             
             # Save to file with atomic write (write to temp then rename)
@@ -828,10 +832,29 @@ class MasterCropSteeringApp(BaseAsyncApp):
             saved_version = state_data.get('version', '1.0.0')
             self.log(f"📂 Loading state from version {saved_version}")
             
-            # Restore zone phases
+            # Restore zone phases. zone_phases is a READ-ONLY @property derived from the state
+            # machines, so .update() on it was a silent no-op -> phase never actually restored
+            # and every restart booted to the P2 default. Drive the state machines directly.
             if 'zone_phases' in state_data:
-                self.zone_phases.update(state_data['zone_phases'])
-                self.log(f"✅ Restored zone phases: {self.zone_phases}")
+                phase_map = {
+                    'P0': IrrigationPhase.P0_MORNING_DRYBACK,
+                    'P1': IrrigationPhase.P1_RAMP_UP,
+                    'P2': IrrigationPhase.P2_MAINTENANCE,
+                    'P3': IrrigationPhase.P3_PRE_LIGHTS_OFF,
+                }
+                restored = {}
+                for zone_str, phase_str in state_data['zone_phases'].items():
+                    try:
+                        zone_num = int(zone_str)
+                    except (ValueError, TypeError):
+                        continue
+                    machine = self.zone_state_machines.get(zone_num)
+                    target = phase_map.get(str(phase_str))
+                    if machine and target is not None:
+                        machine.force_phase(target, reason="restored from persistent state")
+                        restored[zone_num] = str(phase_str)
+                if restored:
+                    self.log(f"✅ Restored zone phases: {restored}")
             else:
                 # Fallback: try to get phases from HA sensors
                 self._restore_phases_from_ha()
@@ -1552,7 +1575,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
         target_vwc = self._get_zone_number(zone_num, "number.crop_steering_p1_target_vwc", 65)
         zone_vwc = self._get_zone_vwc(zone_num)
         zone_ec = self._get_zone_ec(zone_num)
-        
+        # Can't evaluate (or safely format the reason strings) without a VWC reading.
+        if zone_vwc is None:
+            return {'needs_irrigation': False, 'reason': 'P1: VWC unreadable'}
+
         # Get growth stage for EC target selection
         growth_stage = ("Vegetative" if self._zone_is_vegetative(zone_num) else "Generative")
         
@@ -1708,10 +1734,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
         vwc_threshold = self._get_zone_number(zone_num, "number.crop_steering_p2_vwc_threshold", 60)
         zone_vwc = self._get_zone_vwc(zone_num)
         zone_ec = self._get_zone_ec(zone_num)
-        
+        if zone_vwc is None:
+            return {'needs_irrigation': False, 'reason': 'P2: VWC unreadable'}
+
         # Get growth stage for EC target selection
         growth_stage = ("Vegetative" if self._zone_is_vegetative(zone_num) else "Generative")
-        
+
         # Get EC target and thresholds for P2
         if growth_stage.lower() == "vegetative":
             ec_target = self._get_zone_number(zone_num, "number.crop_steering_ec_target_veg_p2", 3.2)
@@ -1785,7 +1813,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
         """P3 is the final dryback period - NO irrigation unless true emergency."""
         zone_vwc = self._get_zone_vwc(zone_num)
         zone_ec = self._get_zone_ec(zone_num)
-        
+        if zone_vwc is None:
+            return {'needs_irrigation': False, 'reason': 'P3: VWC unreadable'}
+
         # Get emergency threshold from entity
         emergency_threshold = self._get_zone_number(zone_num, "number.crop_steering_p3_emergency_vwc_threshold", 40)
         
@@ -3570,11 +3600,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Get ML-predicted dryback rate for this zone
             predicted_dryback_rate = await self._get_zone_dryback_rate(zone_num)
-            if predicted_dryback_rate is None:
-                # Fallback: estimate based on substrate volume
+            if not predicted_dryback_rate or predicted_dryback_rate <= 0:
+                # Fallback: estimate from substrate volume. Overnight the measured rate is
+                # often 0 (nothing drying) -> this both supplies a sane rate AND prevents the
+                # "float division by zero" that crashed the P3 check and blocked auto-P3.
                 substrate_volume = self._get_number_entity_value("number.crop_steering_substrate_volume", 10)
-                predicted_dryback_rate = 2.0 / substrate_volume  # %/hour, smaller = slower
-            
+                predicted_dryback_rate = 2.0 / max(substrate_volume, 0.1)  # %/hour, smaller = slower
+            if predicted_dryback_rate <= 0:
+                predicted_dryback_rate = 0.1  # final guard — never divide by zero below
+
             # Calculate how many hours needed to achieve target dryback
             hours_needed_for_dryback = target_dryback / predicted_dryback_rate
             
@@ -3978,8 +4012,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _update_dryback_entities(self, dryback_result: Dict):
         """Update Home Assistant entities with dryback data."""
         try:
+            # Publish to an engine-owned *_app entity. sensor.crop_steering_dryback_percentage
+            # is integration-owned, so set_state on it returned HTTP 400 every cycle (log spam).
             self.run_in(self._async_set_entity_wrapper, 0,
-                       entity_id='sensor.crop_steering_dryback_percentage',
+                       entity_id='sensor.crop_steering_dryback_percentage_app',
                        value=dryback_result['dryback_percentage'],
                        attributes=dryback_result)
             
@@ -4993,9 +5029,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                               'zones_irrigating': perf.get('zones_irrigating', 0)
                           })
             
-            # Irrigation analytics entities
+            # Irrigation analytics entities. *_app suffix: the bare entity is integration-owned
+            # (name "Daily Water Usage" -> sensor.crop_steering_daily_water_usage) so set_state
+            # on it returned HTTP 400 each cycle.
             irrig = analytics_data.get('irrigation_analytics', {})
-            self.set_entity_value('sensor.crop_steering_daily_water_usage',
+            self.set_entity_value('sensor.crop_steering_daily_water_usage_app',
                           state=irrig.get('total_daily_water_liters', 0),
                           attributes=irrig)
             
