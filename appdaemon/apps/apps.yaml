@@ -50,6 +50,15 @@ master_crop_steering:
     critical_ec: 9.0
     emergency_vwc: 10.0
     min_irrigation_interval: 300
+  # Source-water quality gate: block irrigation while the veg batch tank pH/EC sit outside
+  # the limits set on the dashboard (number.crop_steering_irrigation_ph_min/max + ec_min/max).
+  # Out of range -> phone alert to the S23 Ultra with an "Irrigate Anyway" button that grants
+  # a 30-min override of THIS gate only. An EC bound is ignored while its limit is 0.
+  source_water:
+    ph_sensor: sensor.aquaponics_kit_f4f618_ph
+    ec_sensor: sensor.atlas_legacy_1_ec
+    notify_service: notify.mobile_app_s23ultra
+    override_minutes: 30
 
 # Lean VWC-only replacement controller — SUPERSEDED by the fixed full engine above.
 # Kept in the repo (appdaemon/apps/crop_steering_v2.py) for reference; not loaded.

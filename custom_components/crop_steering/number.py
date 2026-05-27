@@ -265,6 +265,18 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
     ),
+    # Blocked-dripper guard: abandon a zone's emergency irrigation for 2h after this many
+    # emergency shots in 30 min (the row isn't responding -> likely blocked dripper). Raise it
+    # to tolerate more retries; the per-zone Dripper Protection switch disables it entirely.
+    NumberEntityDescription(
+        key="blocked_dripper_max_shots",
+        name="Blocked Dripper Max Shots (30min)",
+        icon="mdi:water-alert-outline",
+        native_min_value=1,
+        native_max_value=20,
+        native_step=1,
+        mode="box",
+    ),
     # EC Target Parameters - CRITICAL MISSING ENTITIES
     NumberEntityDescription(
         key="ec_target_flush",
@@ -356,6 +368,49 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement="mS/cm",
         mode="box",
     ),
+    # Source-Water Quality Gate (global; the veg batch tank feeds every row).
+    # The AppDaemon engine blocks irrigation while the live tank pH/EC sit outside
+    # these limits. Set an EC limit to 0 to disable that half of the check.
+    NumberEntityDescription(
+        key="irrigation_ph_min",
+        name="Irrigation pH Min",
+        icon="mdi:ph",
+        native_min_value=3.0,
+        native_max_value=9.0,
+        native_step=0.05,
+        native_unit_of_measurement="pH",
+        mode="box",
+    ),
+    NumberEntityDescription(
+        key="irrigation_ph_max",
+        name="Irrigation pH Max",
+        icon="mdi:ph",
+        native_min_value=3.0,
+        native_max_value=9.0,
+        native_step=0.05,
+        native_unit_of_measurement="pH",
+        mode="box",
+    ),
+    NumberEntityDescription(
+        key="irrigation_ec_min",
+        name="Irrigation EC Min",
+        icon="mdi:lightning-bolt-outline",
+        native_min_value=0.0,
+        native_max_value=20.0,
+        native_step=0.1,
+        native_unit_of_measurement="mS/cm",
+        mode="box",
+    ),
+    NumberEntityDescription(
+        key="irrigation_ec_max",
+        name="Irrigation EC Max",
+        icon="mdi:lightning-bolt",
+        native_min_value=0.0,
+        native_max_value=20.0,
+        native_step=0.1,
+        native_unit_of_measurement="mS/cm",
+        mode="box",
+    ),
     # System-wide Light Schedule (NOT per-zone)
     NumberEntityDescription(
         key="lights_on_hour",
@@ -406,6 +461,7 @@ DEFAULT_VALUES = {
     "p3_gen_last_irrigation": 180.0,
     "p3_emergency_vwc_threshold": 40.0,
     "p3_emergency_shot_size": 2.0,
+    "blocked_dripper_max_shots": 4.0,
     "ec_target_flush": 0.8,
     "ec_target_veg_p0": 3.0,
     "ec_target_veg_p1": 3.0,
@@ -415,6 +471,10 @@ DEFAULT_VALUES = {
     "ec_target_gen_p1": 5.0,
     "ec_target_gen_p2": 6.0,
     "ec_target_gen_p3": 4.5,
+    "irrigation_ph_min": 5.8,
+    "irrigation_ph_max": 6.2,
+    "irrigation_ec_min": 0.0,
+    "irrigation_ec_max": 0.0,
     "lights_on_hour": 12,
     "lights_off_hour": 0,
 }
