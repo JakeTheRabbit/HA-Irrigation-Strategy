@@ -3286,7 +3286,20 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         # Track emergency attempts for abandonment logic
                         await self._track_emergency_attempt(emergency_zone, fused_vwc)
 
-                        await self._execute_irrigation_shot(emergency_zone, 60, shot_type='emergency')
+                        em_result = await self._execute_irrigation_shot(emergency_zone, 60, shot_type='emergency')
+                        # Record the post-shot VWC against this attempt so the abandonment
+                        # logic can see whether the shot actually RAISED VWC. Without this the
+                        # avg-lift "not responding" check is dead, and a row that's taking water
+                        # but not rising — i.e. draining straight out the bottom / channeling —
+                        # would be hammered with emergency shots indefinitely (flooding the floor).
+                        try:
+                            post = (em_result or {}).get('post_vwc')
+                            attempts = self.emergency_attempts.get(emergency_zone, {}).get('attempts')
+                            if post is not None and attempts:
+                                ts, vb, _ = attempts[-1]
+                                attempts[-1] = (ts, vb, post)
+                        except Exception:
+                            pass
                     else:
                         self.log("⚠️ No sensor data available to select emergency zone - skipping blind irrigation", level='WARNING')
                 else:
@@ -4657,20 +4670,37 @@ class MasterCropSteeringApp(BaseAsyncApp):
             return False
 
     async def _get_zone_dryback_rate(self, zone_num: int) -> float | None:
-        """Get ML-predicted or historical dryback rate for a specific zone."""
+        """Current dryback rate for a zone, expressed as %-of-peak VWC per HOUR.
+
+        IMPORTANT — this MUST be a rate (%/hour), not a cumulative dryback %.
+        Callers (e.g. _should_zone_start_p3) divide a target dryback % by this
+        value to get an hours-needed estimate. The previous implementation
+        returned the detector's cumulative ``dryback_percentage`` (a % point
+        drop), silently mis-typing a % as a %/hour: early in a dryback it read
+        ~0.5 "%/h" → "100h needed" → P3 wrongly suppressed; late it read ~8
+        "%/h" regardless of actual speed. That made P3 timing meaningless.
+        """
         try:
-            # Try to get from dryback detector if available
+            # The detector tracks a single (sensor-fused) substrate trend; use it
+            # for all zones until per-zone detectors exist (matches prior behaviour).
+            # get_dryback_prediction() reports current_dryback_rate as %-of-peak per
+            # MINUTE from a 30-minute linear regression — convert to %/hour.
             if hasattr(self, 'dryback_detector') and self.dryback_detector:
-                # For now, use overall dryback rate
-                # Note: Per-zone dryback tracking implemented via state machines
-                status = self.dryback_detector._get_status_dict()
-                if status and status.get('dryback_percentage') is not None:
-                    return abs(status['dryback_percentage'])
-            
-            # Fallback to historical estimate based on zone characteristics
-            # Could be enhanced with zone-specific ML model
+                prediction = self.dryback_detector.get_dryback_prediction(target_percentage=100)
+                if prediction.get('prediction_available'):
+                    rate_per_min = prediction.get('current_dryback_rate')
+                    if rate_per_min and rate_per_min > 0:
+                        rate_per_hour = rate_per_min * 60.0
+                        # Clamp to a physically-plausible overnight band so a noisy
+                        # regression spike can't drive P3 timing to absurd values.
+                        return max(0.2, min(rate_per_hour, 8.0))
+
+            # No reliable live rate (detector has <10 samples, no active dryback, or
+            # overnight when nothing is drying). Return None so the caller's
+            # substrate-based fallback supplies a sane %/hour estimate instead of a
+            # mis-typed cumulative %.
             return None
-            
+
         except Exception as e:
             self.log(f"❌ Error getting zone {zone_num} dryback rate: {e}", level='ERROR')
             return None
@@ -5432,6 +5462,40 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Look for recent attempts (last 30 minutes)
             recent_cutoff = now - timedelta(minutes=30)
             recent_attempts = [a for a in attempts if a[0] > recent_cutoff]
+
+            # Early drain-through catch: if a row is TAKING water but VWC isn't rising,
+            # it's draining straight out the bottom / channeling (the live Row 2 failure
+            # mode). Don't wait for the full max-shots count before reacting — back off
+            # after 2 such shots so we don't keep dumping water on the floor. Relies on
+            # vwc_after being recorded right after each emergency shot fires.
+            responded = [a for a in recent_attempts if a[2] is not None]
+            if len(responded) >= 2:
+                recent_lift = statistics.mean([a[2] - a[1] for a in responded[-3:]])
+                if recent_lift < 1.0:
+                    max_observed = max(a[1] for a in responded)
+                    zone_data['effective_vwc_ceiling'] = max_observed + 2.0
+                    # Short cool-off so the operator/anomaly scan can react. This is the
+                    # drain-through brake, distinct from the escalating blocked-dripper
+                    # lockout below (which still applies if shots keep coming).
+                    zone_data['abandoned_until'] = now + timedelta(minutes=45)
+                    self.log(
+                        f"🕳️ Zone {zone_num}: water in but VWC flat (avg lift {recent_lift:.1f}% "
+                        f"over {len(responded)} shots) — likely draining out the bottom / "
+                        f"channeling. Backing off 45min; effective ceiling "
+                        f"{zone_data['effective_vwc_ceiling']:.1f}%",
+                        level='WARNING'
+                    )
+                    notification_service = self.config.get('notification_service')
+                    if notification_service and notification_service.startswith('notify.'):
+                        await self.call_service(
+                            notification_service.replace('notify.', 'notify/'),
+                            message=(f"🕳️ Zone {zone_num}: irrigation not raising VWC "
+                                     f"(avg {recent_lift:.1f}% over {len(responded)} shots). "
+                                     f"Water may be draining out the bottom — check dripper "
+                                     f"placement / runoff. Backed off 45min."),
+                            title="Crop Steering: row not absorbing"
+                        )
+                    return True
 
             # Abandon after the user-set number of emergency shots in 30 min (default 4),
             # then escalate the lockout each time it recurs.
