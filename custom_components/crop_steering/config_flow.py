@@ -13,7 +13,10 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
-from .const import DOMAIN, CONF_NUM_ZONES, MIN_ZONES, MAX_ZONES, DEFAULT_NUM_ZONES
+from .const import (
+    DOMAIN, CONF_NUM_ZONES, MIN_ZONES, MAX_ZONES, DEFAULT_NUM_ZONES,
+    CONF_PUMP_SWITCH, CONF_MAIN_LINE_SWITCH,
+)
 from .env_parser import load_env_config
 
 _LOGGER = logging.getLogger(__name__)
