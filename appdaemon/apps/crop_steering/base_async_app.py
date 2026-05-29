@@ -295,6 +295,16 @@ class BaseAsyncApp(hass.Hass):
             # is the bulk of the analytics 400 spam. Leaving the entity at its prior value is
             # strictly better than spamming failed writes.
             return None
+        # AppDaemon's clean_http_kwargs runs remove_literals(kwargs, (None, False)) before the
+        # POST. In Python 0 == 0.0 == False, so a legitimate numeric-zero state (daily water
+        # 0 L, efficiency 0, irrigation count 0) was being PRUNED from the request body -> HA
+        # got a stateless POST -> "[400] HTTP POST: Bad Request {'attributes': {...}}" every
+        # cycle. Send zero/False as a string so it survives the prune; HA stores every state
+        # as a string regardless, so numeric sensors still parse "0" / "0.0" fine.
+        if state is False:
+            state = "off"
+        elif state == 0:
+            state = str(state)
         return super().set_state(entity_id, state=state, **kwargs)
 
     def set_entity_value(self, entity_id: str, value: Any = None, **kwargs) -> None:

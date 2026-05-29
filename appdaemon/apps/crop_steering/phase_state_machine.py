@@ -329,16 +329,30 @@ class ZoneStateMachine:
         return self.state.current_phase.value
     
     def update_p0_dryback(self, current_vwc: float, peak_vwc: float):
-        """Update P0 dryback progress"""
+        """Update P0 dryback progress.
+
+        Peak is monotonic — we max() it against the prior stored peak, the caller-suggested
+        peak (e.g. seeded from persistence/history), and the current reading. Previously this
+        unconditionally OVERWROTE peak with the caller value, which meant a None or stale
+        seed would lock peak at zone_vwc → dryback always 0% → P0 never exited.
+        """
         with self.lock:
             if self.state.current_phase == IrrigationPhase.P0_MORNING_DRYBACK and self.state.p0_data:
-                self.state.p0_data.peak_vwc = peak_vwc
-                self.state.p0_data.current_dryback_percentage = ((peak_vwc - current_vwc) / peak_vwc) * 100 if peak_vwc > 0 else 0
-                
+                prior = self.state.p0_data.peak_vwc or 0.0
+                candidates = [c for c in (prior, peak_vwc, current_vwc) if c is not None]
+                new_peak = max(candidates) if candidates else 0.0
+                self.state.p0_data.peak_vwc = new_peak
+
+                if new_peak > 0 and current_vwc is not None:
+                    drop = max(0.0, ((new_peak - current_vwc) / new_peak) * 100)
+                else:
+                    drop = 0.0
+                self.state.p0_data.current_dryback_percentage = drop
+
                 # Calculate dryback rate
                 duration_minutes = self.get_phase_duration().total_seconds() / 60
                 if duration_minutes > 0:
-                    self.state.p0_data.dryback_rate = self.state.p0_data.current_dryback_percentage / duration_minutes
+                    self.state.p0_data.dryback_rate = drop / duration_minutes
     
     def update_p1_progress(self, current_vwc: float):
         """Update P1 ramp-up progress"""

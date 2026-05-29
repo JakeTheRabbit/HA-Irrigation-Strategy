@@ -136,6 +136,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self.emergency_attempts = {}  # Track emergency irrigation attempts per zone
         self.manual_overrides = {}  # Track manual override timeouts per zone
         self.zone_water_usage = {}  # Track water usage per zone
+        # Per-zone MANUAL PHASE PIN: {zone_num: 'P0'|'P1'|'P2'|'P3'}. Set when the dashboard
+        # input_select.crop_steering_zone_N_phase_control is moved off "Auto"; while present,
+        # the automatic phase-transition logic skips that zone so the operator's chosen phase
+        # holds. Cleared when the select returns to "Auto".
+        self.zone_manual_phase = {}
         
         for zone_num in range(1, self.num_zones + 1):
             # Create state machine for each zone
@@ -174,7 +179,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         # Load persistent state from file
         self._load_persistent_state()
-        
+
+        # Re-apply any dashboard manual phase pins (input_select off "Auto") so a forced
+        # phase survives a restart.
+        self._sync_manual_phase_pins()
+
         # Create initial sensors for integration compatibility
         self.run_in(self._create_initial_sensors, 2)
         
@@ -332,6 +341,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self.listen_state(self._on_system_toggle, 'switch.crop_steering_system_enabled')
         self.listen_state(self._on_phase_change, 'select.crop_steering_irrigation_phase')
         self.listen_state(self._on_crop_profile_change, 'select.crop_steering_crop_type')
+
+        # Per-zone manual phase control (dashboard input_selects). Moving one off "Auto"
+        # pins that zone's phase; "Auto" hands control back to the engine.
+        for zone_num in range(1, self.num_zones + 1):
+            self.listen_state(self._on_zone_phase_control_change,
+                              f'input_select.crop_steering_zone_{zone_num}_phase_control')
         
         # Listen to manual irrigation triggers
         self.listen_event(self._on_manual_irrigation, 'crop_steering_manual_irrigation')
@@ -752,11 +767,20 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'version': '2.1.0'
             }
             
-            # Convert datetime objects to ISO strings for JSON serialization
+            # Convert datetime objects to ISO strings for JSON serialization.
+            # Peak VWC lives on the state machine's P0Data (updated by update_p0_dryback)
+            # and was never copied into self.zone_phase_data, so reading from the dict
+            # always saved None — and on restart peak loaded as None, which the transition
+            # code then locked at the post-restart current VWC. Pull from the machine.
             for zone_num, data in self.zone_phase_data.items():
+                sm_peak = None
+                machine = self.zone_state_machines.get(zone_num)
+                if machine and machine.state.p0_data:
+                    sm_peak = machine.state.p0_data.peak_vwc
+                peak_to_save = sm_peak if sm_peak is not None else data.get('p0_peak_vwc')
                 state_data['zone_phase_data'][zone_num] = {
                     'p0_start_time': data['p0_start_time'].isoformat() if data['p0_start_time'] else None,
-                    'p0_peak_vwc': data['p0_peak_vwc'],
+                    'p0_peak_vwc': peak_to_save,
                     'last_irrigation_time': data['last_irrigation_time'].isoformat() if data['last_irrigation_time'] else None
                 }
             
@@ -877,6 +901,37 @@ class MasterCropSteeringApp(BaseAsyncApp):
                             'p0_peak_vwc': data.get('p0_peak_vwc'),
                             'last_irrigation_time': datetime.fromisoformat(data['last_irrigation_time']) if data.get('last_irrigation_time') else None
                         }
+
+                        # Push peak back into the state machine — without this the in-memory
+                        # P0Data.peak_vwc stays at its dataclass default (None) and the
+                        # transition logic locks peak at restart-time VWC, killing dryback.
+                        machine = self.zone_state_machines.get(zone_num)
+                        if machine and machine.state.p0_data:
+                            persisted_peak = data.get('p0_peak_vwc')
+                            if persisted_peak is not None:
+                                try:
+                                    machine.state.p0_data.peak_vwc = float(persisted_peak)
+                                except (TypeError, ValueError):
+                                    pass
+                            else:
+                                # No persisted peak (likely first run on the new persistence
+                                # code). Seed peak from the dryback detector's last known
+                                # peak so a mid-P0 restart doesn't reset the comparison
+                                # baseline to "current VWC". Falls back to current VWC if
+                                # no detector history.
+                                seed = None
+                                if hasattr(self, 'dryback_detector'):
+                                    seed = getattr(self.dryback_detector, 'last_peak_vwc', None)
+                                if seed is None:
+                                    seed = self._get_zone_average_vwc(zone_num)
+                                if seed is not None:
+                                    try:
+                                        machine.state.p0_data.peak_vwc = float(seed)
+                                        self.log(
+                                            f"Zone {zone_num}: P0 peak_vwc seeded to {seed:.1f}% "
+                                            f"(no persisted value)", level='WARNING')
+                                    except (TypeError, ValueError):
+                                        pass
                         restored_count += 1
                     except (ValueError, TypeError, KeyError) as e:
                         self.log(f"⚠️ Error restoring zone {zone_str} phase data: {e}", level='WARNING')
@@ -1304,6 +1359,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self.log(f"DEBUG Active VWC sensors: {self.sensor_fusion.get_sensor_count_by_type('vwc')}")
             self.log(f"DEBUG Active EC sensors: {self.sensor_fusion.get_sensor_count_by_type('ec')}")
             
+            # System-wide current phase = the most common zone phase. _get_ml_irrigation_predictions
+            # reads current_state['current_phase']; without this key it raised KeyError every cycle
+            # ("Error getting ML predictions: 'current_phase'").
+            zone_phases_now = self.zone_phases.copy()
+            if zone_phases_now:
+                current_phase = max(set(zone_phases_now.values()), key=list(zone_phases_now.values()).count)
+            else:
+                current_phase = 'P2'
+
             return {
                 'vwc_sensors': vwc_sensors,
                 'ec_sensors': ec_sensors,
@@ -1312,7 +1376,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'temperature': temperature,
                 'humidity': humidity,
                 'vpd': vpd,
-                'zone_phases': self.zone_phases.copy(),
+                'zone_phases': zone_phases_now,
+                'current_phase': current_phase,
                 'lights_on': self.get_entity_value('sun.sun', attribute='elevation', default=0) > 0,
                 'timestamp': datetime.now()
             }
@@ -2495,16 +2560,34 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _get_zone_average_vwc(self, zone: int) -> Optional[float]:
         """Get average VWC for specific zone with robust error handling."""
         try:
+            # PRIMARY: the integration's per-zone sensor (sensor.crop_steering_zone_N_vwc),
+            # which _get_zone_vwc resolves correctly. The legacy substring filter below
+            # (f'r{zone}' in sensor_name) matched NONE of the real sensor names
+            # (sensor.f2_row_1_vwc, sensor.veg_sdi12_vwc_2, ...), so this returned None for
+            # every zone — and because the P0->P1 transition check is gated on
+            # "zone_vwc is not None", phase transitions never ran at all. This is THE reason
+            # zones were frozen in P0.
+            primary = self._get_zone_vwc(zone)
+            if primary is not None:
+                return primary
+
             # Get configured sensors for this zone
             sensors_config = self.config.get('sensors', {})
             vwc_sensors = sensors_config.get('vwc', [])
-            
+
             if not vwc_sensors:
                 self.log(f"⚠️ No VWC sensors configured for zone {zone}", level='WARNING')
                 return None
-            
-            zone_sensors = [s for s in vwc_sensors if f'r{zone}' in s]
-            
+
+            # Fallback heuristics: match common per-zone naming patterns. Original code only
+            # tried 'r{zone}', which misses 'row_{zone}', 'zone_{zone}', and the Nth-sensor
+            # convention (e.g. _vwc_2 for zone 2, bare _vwc for zone 1).
+            zone_sensors = [
+                s for s in vwc_sensors
+                if (f'r{zone}' in s or f'row_{zone}' in s or f'row{zone}' in s
+                    or f'zone_{zone}' in s or f'zone{zone}' in s)
+            ]
+
             if not zone_sensors:
                 self.log(f"⚠️ No VWC sensors found for zone {zone}", level='DEBUG')
                 return None
@@ -3270,14 +3353,22 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
             # Get configuration values from existing entities
             p0_max_duration = self._get_number_entity_value("number.crop_steering_p0_maximum_wait_time", 45)
-            p1_recovery_target = self._get_number_entity_value("number.crop_steering_p1_target_vwc", 65)
             dryback_target = self._get_number_entity_value("number.crop_steering_vegetative_dryback_target", 50)
+            # NOTE: P1 recovery target is read PER ZONE inside the loop (below), not here.
+            # It used to be a single global read of number.crop_steering_p1_target_vwc, which
+            # ignored the per-zone override (e.g. zone_1 target 71% vs global 60%) and so
+            # promoted a zone to P2 the moment it crossed the GLOBAL target — bouncing it out
+            # of P1 while it was still ramping toward its own higher target.
             
             # Check each zone independently with its own schedule
             for zone_num in range(1, self.num_zones + 1):
+                # Skip zones the operator has pinned via the dashboard phase control.
+                if self.zone_manual_phase.get(zone_num):
+                    continue
+
                 current_phase = self.zone_phases.get(zone_num, 'P2')
                 zone_vwc = self._get_zone_vwc(zone_num)
-                
+
                 # Get zone-specific schedule
                 zone_schedule = self._get_zone_schedule(zone_num)
                 lights_on_time = zone_schedule['lights_on']
@@ -3290,12 +3381,16 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 reason = ""
                 
                 # Phase transition logic PER ZONE
-                if lights_on and current_phase != 'P0':
-                    # Lights on - zone should start P0 (morning dryback)
-                    # P0 begins when lights turn on (plants wake up and start using water)
+                if lights_on and current_phase == 'P3':
+                    # Lights just came back on after the overnight P3 dryback -> begin P0.
+                    # Only P3->P0 is a valid LIGHTS_ON transition. The previous condition
+                    # (lights_on and current_phase != 'P0') tried to drag P1/P2/P3 zones back
+                    # to P0 on EVERY cycle for the whole photoperiod, which the state machine
+                    # rejected as "Invalid transition LIGHTS_ON from P1 to P0" (spamming the
+                    # log) and which fought the main decision loop's P0->P1->P2->P3 progression.
                     target_phase = 'P0'
                     reason = f"Zone {zone_num}: Lights on - starting morning dryback phase"
-                    
+
                 elif lights_on and current_phase == 'P0':
                     # Check P0 → P1 transition conditions for this zone
                     if self._should_zone_exit_p0(zone_num, zone_vwc, self._get_zone_number(zone_num, "number.crop_steering_p0_dryback_drop_percent", 15), p0_max_duration):
@@ -3303,7 +3398,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         reason = f"Zone {zone_num}: P0 dryback target achieved or max duration reached"
                         
                 elif current_phase == 'P1':
-                    # Check P1 → P2 transition conditions for this zone
+                    # Check P1 → P2 transition conditions for this zone (PER-ZONE target)
+                    p1_recovery_target = self._get_zone_number(zone_num, "number.crop_steering_p1_target_vwc", 65)
                     if zone_vwc and zone_vwc >= p1_recovery_target:
                         target_phase = 'P2'
                         reason = f"Zone {zone_num}: P1 recovery target achieved: {zone_vwc:.1f}% >= {p1_recovery_target}%"
@@ -3588,7 +3684,19 @@ class MasterCropSteeringApp(BaseAsyncApp):
             zone_vwc = self._get_zone_vwc(zone_num)
             if zone_vwc is None:
                 return False
-            
+
+            # HARD GATE: P3 is the PRE-LIGHTS-OFF dryback run-up. Never enter it more than 3h
+            # before lights-off. The dryback-rate math below divides the (50%) target by a
+            # daytime rate that's often near-zero, making hours_needed explode to 100h+ and
+            # trip P3 at midday — which then strands the zone on emergency-only irrigation for
+            # the rest of the photoperiod. The big overnight dryback happens DURING lights-off.
+            lights_off_dt = datetime.combine(now.date(), lights_off_time)
+            if lights_off_dt <= now:
+                lights_off_dt += timedelta(days=1)
+            hours_until_lights_off = (lights_off_dt - now).total_seconds() / 3600
+            if hours_until_lights_off > 3.0:
+                return False
+
             # Calculate hours until next lights-on
             next_lights_on = datetime.combine(datetime.today(), lights_on_time)
             if next_lights_on <= now:
@@ -3759,10 +3867,14 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 machine = self.zone_state_machines.get(zone_num)
                 if not machine:
                     continue
-                
+
+                # Skip zones the operator has pinned via the dashboard phase control.
+                if self.zone_manual_phase.get(zone_num):
+                    continue
+
                 current_phase = machine.state.current_phase
                 zone_vwc = self._get_zone_average_vwc(zone_num)
-                
+
                 # P3 → P0: Lights turned on (only from P3, not P2)
                 if lights_just_on and current_phase == IrrigationPhase.P3_PRE_LIGHTS_OFF:
                     await self._transition_zone_to_phase(zone_num, 'P0', 'Lights on - starting morning dryback')
@@ -3771,8 +3883,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 elif current_phase == IrrigationPhase.P0_MORNING_DRYBACK:
                     p0_data = machine.state.p0_data
                     if p0_data and zone_vwc is not None:
-                        # Update dryback progress
-                        machine.update_p0_dryback(zone_vwc, p0_data.peak_vwc or zone_vwc)
+                        # Update dryback progress. Pass the prior peak (may be None) AND the
+                        # current reading — update_p0_dryback max()'s them so peak grows if
+                        # VWC ever rises (e.g. zone got watered) and stays put otherwise.
+                        machine.update_p0_dryback(zone_vwc, p0_data.peak_vwc)
 
                         # P0 is the MORNING dryback before the first P1 shot, so its exit
                         # threshold is the P0 drop % (number.crop_steering_p0_dryback_drop_percent,
@@ -3794,12 +3908,16 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         elif phase_duration >= p0_data.max_duration_minutes:
                             await self._transition_zone_to_phase(zone_num, 'P1', f'P0 timeout: {phase_duration:.0f} minutes')
                 
-                # P1 → P2: Recovery complete
+                # P1 → P2: Recovery complete. Use the PER-ZONE target (zone_1 = 71%, etc.) and
+                # keep p1_data.target_vwc in sync — the dataclass default was a flat 65%, so
+                # this method and the timer method disagreed in the 65-71% band.
                 elif current_phase == IrrigationPhase.P1_RAMP_UP:
                     p1_data = machine.state.p1_data
                     if p1_data and zone_vwc is not None:
-                        if zone_vwc >= p1_data.target_vwc:
-                            await self._transition_zone_to_phase(zone_num, 'P2', f'Recovery complete: {zone_vwc:.1f}%')
+                        p1_target = self._get_zone_number(zone_num, "number.crop_steering_p1_target_vwc", 65)
+                        p1_data.target_vwc = p1_target
+                        if zone_vwc >= p1_target:
+                            await self._transition_zone_to_phase(zone_num, 'P2', f'Recovery complete: {zone_vwc:.1f}% >= {p1_target}%')
                 
                 # P2 → P3: ML-based or time-based transition
                 elif current_phase == IrrigationPhase.P2_MAINTENANCE:
@@ -3826,21 +3944,29 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Get lights-off time
             lights_off_time = self._get_zone_schedule(zone_num)['lights_off']
             now = datetime.now()
-            
+
             # Calculate time until lights off
             lights_off_datetime = datetime.combine(now.date(), lights_off_time)
             if lights_off_datetime < now:
                 lights_off_datetime += timedelta(days=1)
-            
+
             time_until_lights_off = (lights_off_datetime - now).total_seconds() / 3600  # hours
-            
+
+            # HARD GATE: P3 is the pre-lights-off run-up; never start it more than 3h early.
+            # Without this, a near-zero daytime dryback rate makes time_needed explode and
+            # trips P3 at midday, stranding the zone on emergency-only irrigation all day.
+            if time_until_lights_off > 3.0:
+                return False
+
             # Get dryback rate prediction
             dryback_rate = await self._get_zone_dryback_rate(zone_num)
             if dryback_rate and dryback_rate > 0:
                 # Calculate time needed to achieve overnight dryback
                 target_dryback = self._get_zone_number(zone_num, "number.crop_steering_vegetative_dryback_target" if self._zone_is_vegetative(zone_num) else "number.crop_steering_generative_dryback_target", 50)
                 time_needed = target_dryback / dryback_rate + 0.5  # Add 30min buffer
-                
+                # Bound it to the 3h pre-lights-off window (see gate above).
+                time_needed = min(time_needed, 3.0)
+
                 # Start P3 if we need to begin final dryback
                 return time_until_lights_off <= time_needed
             else:
@@ -3882,22 +4008,27 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'optimal_timing_score': 0.8  # Would be calculated based on timing analysis
             }
             
-            # Add training sample
-            result = self.ml_predictor.add_training_sample(features, outcome)
-            
-            if result['status'] == 'retrained':
-                performance = result['performance']['ensemble']['r2']
-                self.log(f"🎓 ML models retrained - R² performance: {performance:.3f}")
-            
+            # Add training sample. add_training_sample doesn't always return a 'status' key
+            # (e.g. when it just buffers a sample without retraining) — index access raised
+            # KeyError 'status' every time, logged as an ERROR. Use defensive .get().
+            result = self.ml_predictor.add_training_sample(features, outcome) or {}
+
+            if result.get('status') == 'retrained':
+                try:
+                    performance = result['performance']['ensemble']['r2']
+                    self.log(f"🎓 ML models retrained - R² performance: {performance:.3f}")
+                except (KeyError, TypeError):
+                    self.log("🎓 ML models retrained")
+
         except Exception as e:
             self.log(f"❌ Error adding ML training sample: {e}", level='ERROR')
 
     async def _update_crop_profile_performance(self, irrigation_result: Dict):
         """Update crop profile with irrigation performance data."""
         try:
-            if irrigation_result['status'] != 'completed':
+            if irrigation_result.get('status') != 'completed':
                 return
-            
+
             # Prepare performance data
             performance_data = {
                 'irrigation_efficiency': irrigation_result.get('efficiency', 0.5),
@@ -4411,7 +4542,61 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
         except Exception as e:
             self.log(f"❌ Error handling phase transition service: {e}", level='ERROR')
-    
+
+    async def _on_zone_phase_control_change(self, entity, attribute, old, new, kwargs):
+        """Dashboard per-zone manual phase control (input_select.crop_steering_zone_N_phase_control).
+
+        Options are Auto / P0 / P1 / P2 / P3:
+          - 'Auto'      -> release the pin; the engine resumes automatic transitions.
+          - 'P0'..'P3'  -> force that zone to that phase NOW and PIN it (auto-transitions
+                           skip the zone) until the operator returns the select to Auto.
+        This is the only true per-zone phase control; the legacy select.crop_steering_
+        irrigation_phase applies to every zone at once."""
+        try:
+            if new in (None, 'unknown', 'unavailable') or new == old:
+                return
+            # entity = input_select.crop_steering_zone_<N>_phase_control
+            try:
+                zone_num = int(str(entity).split('zone_')[1].split('_')[0])
+            except (IndexError, ValueError):
+                self.log(f"⚠️ Could not parse zone from {entity}", level='WARNING')
+                return
+
+            choice = str(new).strip()
+            if choice == 'Auto':
+                if self.zone_manual_phase.pop(zone_num, None) is not None:
+                    self.log(f"🎛️ Zone {zone_num}: phase control -> AUTO (engine resumes control)")
+                return
+
+            if choice in ('P0', 'P1', 'P2', 'P3'):
+                self.zone_manual_phase[zone_num] = choice
+                # forced=True so it applies from any current phase, not just table-legal ones.
+                await self._transition_zone_to_phase(
+                    zone_num, choice, f"Manual dashboard override -> {choice}", forced=True)
+                self.log(f"🎛️ Zone {zone_num}: phase PINNED to {choice} (manual). "
+                         f"Set the selector back to Auto to resume automatic control.")
+            else:
+                self.log(f"⚠️ Zone {zone_num}: unknown phase control value '{choice}'", level='WARNING')
+
+        except Exception as e:
+            self.log(f"❌ Error handling zone phase control change: {e}", level='ERROR')
+
+    def _sync_manual_phase_pins(self):
+        """On startup, re-apply pins from the dashboard input_selects so a manual phase
+        survives an AppDaemon restart. Reads each zone's phase-control select; if it's not
+        'Auto', re-pin (the phase itself is restored from persistent state, so we only need
+        to restore the pin flag — no transition fired here)."""
+        try:
+            for zone_num in range(1, self.num_zones + 1):
+                val = self.get_entity_value(
+                    f'input_select.crop_steering_zone_{zone_num}_phase_control', default='Auto')
+                val = str(val).strip() if val else 'Auto'
+                if val in ('P0', 'P1', 'P2', 'P3'):
+                    self.zone_manual_phase[zone_num] = val
+                    self.log(f"🎛️ Zone {zone_num}: manual phase pin restored at {val}")
+        except Exception as e:
+            self.log(f"⚠️ Error syncing manual phase pins: {e}", level='WARNING')
+
     async def _on_set_manual_override_service(self, event_name, data, kwargs):
         """Handle manual override service calls from HA integration."""
         try:
@@ -4865,19 +5050,21 @@ class MasterCropSteeringApp(BaseAsyncApp):
             avg_vwc = self._calculate_system_average_vwc()
             avg_ec = self._calculate_system_average_ec()
             
-            # Calculate phase distribution
-            phase_distribution = {}
-            for phase in ['P0', 'P1', 'P2', 'P3']:
-                count = sum([1 for z_phase in self.zone_phases.values() if z_phase == phase])
-                phase_distribution[phase] = count
-            
+            # Phase distribution — flattened into scalar attrs (phase_count_P0 ...). HA's
+            # state API rejects a nested dict attribute with HTTP 400, which was the source of
+            # the every-cycle "[400] HTTP POST: Bad Request {... 'phase_distribution': {...}}".
+            phase_counts = {
+                f'phase_count_{phase}': sum(1 for z_phase in self.zone_phases.values() if z_phase == phase)
+                for phase in ['P0', 'P1', 'P2', 'P3']
+            }
+
             return {
                 'total_daily_water_liters': round(total_daily_water, 2),
                 'total_weekly_water_liters': round(total_weekly_water, 2),
                 'total_daily_irrigations': total_daily_count,
                 'average_vwc': round(avg_vwc, 1) if avg_vwc else None,
                 'average_ec': round(avg_ec, 1) if avg_ec else None,
-                'phase_distribution': phase_distribution,
+                **phase_counts,
                 'irrigation_frequency': round(total_daily_count / max(self.num_zones, 1), 1),
                 'water_per_zone': round(total_daily_water / max(self.num_zones, 1), 2)
             }
