@@ -110,7 +110,7 @@ async def async_setup_entry(
             entry,
             SelectEntityDescription(
                 key=f"zone_{zone_num}_group",
-                name=f"Zone {zone_num} Group",
+                name=f"Crop Steering Zone {zone_num} Group",
                 options=ZONE_GROUP_OPTIONS,
                 icon="mdi:group",
             ),
@@ -122,7 +122,7 @@ async def async_setup_entry(
             entry,
             SelectEntityDescription(
                 key=f"zone_{zone_num}_priority",
-                name=f"Zone {zone_num} Priority",
+                name=f"Crop Steering Zone {zone_num} Priority",
                 options=ZONE_PRIORITY_OPTIONS,
                 icon="mdi:priority-high",
             ),
@@ -134,14 +134,14 @@ async def async_setup_entry(
             entry,
             SelectEntityDescription(
                 key=f"zone_{zone_num}_crop_profile",
-                name=f"Zone {zone_num} Crop Profile",
+                name=f"Crop Steering Zone {zone_num} Crop Profile",
                 options=ZONE_CROP_PROFILES,
                 icon="mdi:sprout",
             ),
             zone_num=zone_num
         ))
 
-        # Zone Phase Override
+        # Zone Phase Override (native per-zone phase forcing: Auto/P0-P3) — RootSense v3.
         selects.append(CropSteeringSelect(
             entry,
             SelectEntityDescription(
@@ -149,6 +149,20 @@ async def async_setup_entry(
                 name=f"Zone {zone_num} Phase Override",
                 options=ZONE_PHASE_OVERRIDE_OPTIONS,
                 icon="mdi:state-machine",
+            ),
+            zone_num=zone_num
+        ))
+
+        # Zone Steering Mode (per-row Vegetative/Generative; AppDaemon falls back to global).
+        # Retained from the lean branch: the master app's _zone_is_vegetative() reads this
+        # for per-zone veg/gen EC-target selection.
+        selects.append(CropSteeringSelect(
+            entry,
+            SelectEntityDescription(
+                key=f"zone_{zone_num}_steering_mode",
+                name=f"Crop Steering Zone {zone_num} Steering Mode",
+                options=["Vegetative", "Generative"],
+                icon="mdi:steering",
             ),
             zone_num=zone_num
         ))
@@ -204,7 +218,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
             # Zone-specific device
             return DeviceInfo(
                 identifiers={(DOMAIN, f"{self._entry.entry_id}_zone_{self._zone_num}")},
-                name=f"Zone {self._zone_num}",
+                name=f"Crop Steering Zone {self._zone_num}",
                 manufacturer="Home Assistant Community",
                 model="Zone Controller",
                 sw_version=SOFTWARE_VERSION,
@@ -214,7 +228,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
             # Main device
             return DeviceInfo(
                 identifiers={(DOMAIN, self._entry.entry_id)},
-                name="Crop Steering System",
+                name="Crop Steering",
                 manufacturer="Home Assistant Community",
                 model="Professional Irrigation Controller",
                 sw_version=SOFTWARE_VERSION,
@@ -225,6 +239,14 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         if option in self.options:
             self._attr_current_option = option
             self.async_write_ha_state()
+            # The irrigation-phase select is a manual override: drive the engine by firing
+            # the same event the transition_phase service uses (forced => applies from any
+            # phase). Without this, changing the select did nothing to the controller.
+            if getattr(self.entity_description, "key", None) == "irrigation_phase":
+                self.hass.bus.async_fire(
+                    "crop_steering_phase_transition",
+                    {"target_phase": option, "reason": "Manual (phase select)", "forced": True},
+                )
 
     @property
     def available(self) -> bool:

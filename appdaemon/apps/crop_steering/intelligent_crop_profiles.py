@@ -399,17 +399,44 @@ class IntelligentCropProfiles:
             }
         }
 
+    # HA's select.crop_steering_growth_stage exposes title-case crop-steering modes
+    # ("Vegetative" / "Generative" / "Transition"), but the profile dicts are keyed by
+    # actual growth phases ("vegetative" / "early_flower" / "late_flower"). Without
+    # normalisation get_current_parameters() returned {}, the master engine bailed at
+    # "No active crop profile - using defaults", and irrigation never ran.
+    _STAGE_ALIASES = {
+        'vegetative': 'vegetative',
+        'veg': 'vegetative',
+        'transition': 'vegetative',     # Transition mode is veg-heavy
+        'generative': 'early_flower',   # Generative steering = early flower stress
+        'early_flower': 'early_flower',
+        'early flower': 'early_flower',
+        'flower': 'early_flower',
+        'late_flower': 'late_flower',
+        'late flower': 'late_flower',
+        'finishing': 'late_flower',
+    }
+
+    @classmethod
+    def _normalize_growth_stage(cls, stage):
+        if not stage:
+            return 'vegetative'
+        key = str(stage).strip().lower().replace('-', '_')
+        return cls._STAGE_ALIASES.get(key, cls._STAGE_ALIASES.get(key.replace('_', ' '), key))
+
     def select_profile(self, profile_name: str, growth_stage: str = 'vegetative') -> Dict:
         """
         Select and activate a crop profile.
-        
+
         Args:
             profile_name: Name of profile to activate
             growth_stage: Current growth stage
-            
+
         Returns:
             Dict with profile selection results
         """
+        growth_stage = self._normalize_growth_stage(growth_stage)
+
         # Check base profiles first
         if profile_name in self.base_profiles:
             self.current_profile = profile_name
@@ -462,15 +489,51 @@ class IntelligentCropProfiles:
             return None
         
         profile = profile_source[self.current_profile]
-        stage_params = profile['parameters'].get(self.current_growth_stage, {})
+        # Defensive re-normalise in case current_growth_stage was set bypassing select_profile.
+        normalized_stage = self._normalize_growth_stage(self.current_growth_stage)
+        stage_params = profile['parameters'].get(normalized_stage, {})
+        if not stage_params:
+            # Last-resort: fall through to the first defined stage rather than returning {}
+            # (which the caller treats as "no profile" and aborts the irrigation loop).
+            first_stage = next(iter(profile['parameters'].values()), {})
+            stage_params = first_stage
         
         # Apply adaptations if available
         adapted_params = self._apply_adaptations(stage_params.copy())
         
         # Add environmental adjustments
         environmental_params = self._apply_environmental_adjustments(adapted_params, profile)
-        
+
         return environmental_params
+
+    def get_profile_parameters(self, profile_name: str, growth_stage: str = None) -> Optional[Dict]:
+        """Parameters for a NAMED profile (per-zone override) without mutating the active
+        profile. The master engine calls this for any zone whose crop_profile select differs
+        from the global crop type (e.g. zone set to 'Custom'); the method never existed, so
+        every decision cycle for such a zone raised
+        AttributeError: 'IntelligentCropProfiles' object has no attribute 'get_profile_parameters'.
+        Unknown names (like the UI's 'Custom' sentinel, which has no profile dict) fall back to
+        the active profile's parameters — per-zone NUMBER entities still override individual
+        values downstream via _get_zone_number()."""
+        if not profile_name:
+            return self.get_current_parameters()
+
+        profile_source = (self.base_profiles if profile_name in self.base_profiles
+                          else self.custom_profiles)
+        if profile_name not in profile_source:
+            return self.get_current_parameters()
+
+        profile = profile_source[profile_name]
+        stage = self._normalize_growth_stage(growth_stage or self.current_growth_stage)
+        stage_params = profile['parameters'].get(stage, {})
+        if not stage_params:
+            stage_params = next(iter(profile['parameters'].values()), {})
+        if not stage_params:
+            return self.get_current_parameters()
+
+        # Environmental adjustments are profile-scoped and safe. Skip adaptation-learning
+        # here (it's keyed on the ACTIVE profile) to avoid cross-profile contamination.
+        return self._apply_environmental_adjustments(stage_params.copy(), profile)
 
     def _apply_adaptations(self, base_params: Dict) -> Dict:
         """Apply learned adaptations to base parameters."""

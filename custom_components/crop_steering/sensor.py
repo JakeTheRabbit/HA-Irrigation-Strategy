@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -250,13 +251,15 @@ class CropSteeringSensor(SensorEntity):
         # Set object_id to include crop_steering prefix for entity_id generation
         self._attr_object_id = f"{DOMAIN}_{description.key}"
         
-        # Extract zone number from key if this is a zone sensor
+        # Extract zone number from key if this is a zone sensor.
+        # Regex matches BOTH `vwc_zone_3` and `zone_3_status`-style keys; the prior
+        # `split("_zone_")` logic missed keys that *start* with `zone_` (e.g.
+        # zone_N_status), leaving _zone_number=None so the zone branch never fired.
         self._zone_number = None
-        if "_zone_" in description.key:
+        m = re.search(r"zone_(\d+)", description.key)
+        if m:
             try:
-                parts = description.key.split("_zone_")
-                if len(parts) > 1:
-                    self._zone_number = int(parts[1].split("_")[0])
+                self._zone_number = int(m.group(1))
             except (ValueError, IndexError):
                 pass
 
