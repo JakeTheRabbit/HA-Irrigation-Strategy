@@ -1,231 +1,370 @@
 # Crop Steering for Home Assistant
 
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
+![AppDaemon](https://img.shields.io/badge/AppDaemon-4-orange)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![Zones](https://img.shields.io/badge/Zones-1%E2%80%936-blue)
-![AppDaemon](https://img.shields.io/badge/AppDaemon-Required-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ![Dashboard Overview](img/Dashboard%201.png)
-![Crop Steering Controls](img/Dashboard%202.png)
-![Zone Detail](img/Dashboard%203.png)
 
-Turn Home Assistant into an autonomous **crop-steering irrigation** controller. A
-custom HA integration provides the entity surface + setup wizard; an AppDaemon app
-runs the 4-phase logic and drives the irrigation hardware from real-time VWC/EC
-sensors across 1–6 independent zones.
-
-> **Irrigation only.** This controls *watering* — the P0→P1→P2→P3 cycle, shot sizing,
-> EC steering, and safety. It does **not** control climate (temp / RH / CO₂).
+> **Professional crop steering — without the $3,000 controller and the monthly subscription.**
+> If you already run Home Assistant and have moisture sensors in your substrate, you
+> already own everything except the brain. This is the brain.
 
 ---
 
-## What it does
+## The short version
 
-A daily 4-phase cycle, per zone, driven by sensor data and bounded by lights-on →
-lights-on (one photoperiod = one "grow-day"):
+This turns Home Assistant into an autonomous **crop-steering irrigation** controller.
+It runs the full daily **P0 → P1 → P2 → P3** cycle — per zone, driven by live VWC/EC
+sensor data — sequences your pump and valves safely, and steers each zone toward a
+**vegetative** or **generative** growth response. Once it's mapped to your hardware
+and dialed in, it runs the room on its own and you watch a dashboard.
+
+It is **irrigation only**. It does not control climate.
+
+---
+
+## Why crop steering (and why automate it)
+
+Plants don't just need water — they read it. The **moisture and EC curve** of the
+substrate over a day is a language the plant responds to:
+
+- A **big overnight dryback** + **higher feed EC** + a controlled morning wait tells
+  the plant *"resources are scarce, finish up"* → a **generative** response: tighter
+  internodes, more flower, more resin, denser fruit.
+- **Consistent moisture** + **lower EC** + frequent small shots tells it *"conditions
+  are easy, grow"* → a **vegetative** response: leafy, stretchy, fast structural
+  growth.
+
+**Crop steering is the practice of using irrigation itself to push the plant one way
+or the other** — by deciding, every day, how far the substrate dries back, how fast
+you bring it back up, what EC you feed, and when you stop so it can dry overnight.
+
+That sounds simple until you try to do it by hand:
+
+- The right first shot of the day depends on **how far the substrate actually dried
+  back** overnight — which you can only know from a sensor, in real time.
+- Shots have to **grow** through the morning ramp, then become **threshold top-ups**,
+  then **stop** at the right moment before lights-off — all timed to the *substrate's*
+  behaviour, not the clock.
+- It has to happen on **every zone independently**, **every minute, all day**,
+  forever, and it must **never** flood a room or feed bad water.
+
+A timer can't do this — it waters the same amount whether the slab is bone-dry or
+saturated. A human can't babysit it 24/7. Commercial controllers (AROYA, TrolMaster
+and friends) *can* — for thousands of dollars and a closed, subscription ecosystem.
+
+**This brings that decision engine to the hardware and the platform you already
+own**, fully self-hosted and fully under your control.
+
+---
+
+## How it works
+
+### The daily cycle
+
+A "grow-day" is one **photoperiod** (lights-on → lights-on). Each zone walks four
+phases on its own:
 
 ```mermaid
 flowchart TD
-    LightsOn(["Lights ON"])
-    P0["P0 - Morning Dryback\nNo watering. Records peak VWC,\nwaits for the substrate to dry\nback by a target % from peak."]
-    P1["P1 - Ramp Up\nProgressive shots up to the\nper-zone VWC target."]
-    P2["P2 - Day Maintenance\nTop-up shots whenever VWC\ndrops below the per-zone\nthreshold (EC ratio shifts it)."]
-    P3["P3 - Pre-Lights-Off / Overnight\nEmergency-only. Substrate dries\nback through the dark period."]
-    LightsOff(["Lights OFF"])
-    EmgShot["Emergency Rescue\nshot if VWC falls below the\nper-zone emergency floor"]
+    LightsOn(["☀️ Lights ON"])
+    P0["P0 · Morning Dryback\nNo watering. Record the peak VWC,\nwait for the substrate to dry back\nby a target % — this sets up the day."]
+    P1["P1 · Ramp-Up\nProgressive shots, growing each time,\nuntil VWC reaches the zone's target.\nThe morning 'rehydrate'."]
+    P2["P2 · Maintenance\nThreshold top-ups: shoot whenever VWC\nfalls below the zone threshold.\nEC ratio nudges the threshold."]
+    P3["P3 · Pre-Lights-Off / Overnight\nPlanned watering stops. Substrate dries\nback through the dark. Emergency-only."]
+    LightsOff(["🌙 Lights OFF"])
+    Emg["Emergency rescue shot\nif VWC drops below the\nzone's emergency floor"]
 
     LightsOn --> P0
     P0 -- "dryback target hit / max wait" --> P1
-    P1 -- "target reached / max shots / timeout" --> P2
+    P1 -- "target reached · max shots · timeout" --> P2
     P2 -- "~3 h before lights-off" --> P3
     P3 --> LightsOff
-    LightsOff -- "lights-on -> daily counters reset" --> LightsOn
-    P3 -. "VWC below emergency floor" .-> EmgShot
-    EmgShot -. "back to overnight dryback" .-> P3
+    LightsOff -- "lights-on → daily counters reset" --> LightsOn
+    P3 -. "below emergency floor" .-> Emg
+    Emg -. "back to overnight dryback" .-> P3
 ```
 
-**Vegetative mode:** higher VWC targets, lower EC, more frequent irrigation.
-**Generative mode:** lower VWC targets, higher EC, controlled drought stress.
-Per-zone `steering_mode` selects which.
+The **size and aggressiveness of that curve is how you steer.** A `steering_mode` of
+**Vegetative** keeps VWC high and EC low; **Generative** allows deeper drybacks and
+higher EC. You set it per zone.
 
----
+> **One rule worth knowing:** every "dryback" number in the system is a *percentage-
+> point drop from the peak* (how far it dries back **by**, never the value it dries
+> back **to**), and the daily water/shot counters roll over at **lights-on** — the
+> real start of a grow-day — not at midnight.
 
-## Architecture
+### The architecture
+
+Two layers, clean separation:
 
 ```mermaid
 flowchart LR
   subgraph HA[Home Assistant]
-    I[Crop Steering Integration\ncustom_components/crop_steering/]
-    E[~100 Entities\nnumber/switch/select/sensor]
-    SVC[Services]
+    I["Crop Steering Integration\ncustom_components/crop_steering/"]
+    E["~100 entities + setup wizard\nnumber / switch / select / sensor"]
   end
   I --> E
-  I --> SVC
 
-  subgraph AD[AppDaemon Engine]
-    M[master_crop_steering_app.py]
-    SM[Phase State Machine]
-    D[Dryback Detection]
-    F[Sensor Fusion]
-    HB[AI Heartbeat + Watchdog]
+  subgraph AD["AppDaemon — the engine"]
+    M["master_crop_steering_app.py"]
+    SM["Per-zone phase\nstate machines"]
+    FU["Sensor fusion\n+ dryback detection"]
+    SAFE["AI heartbeat + watchdog\n+ safety gates"]
   end
 
-  E -- read --> M
-  SVC -- events --> M
+  E -- "reads setpoints / state" --> M
   M --> SM
-  M --> D
-  M --> F
-  M --> HB
-  M --> HW[(Hardware: pump -> main -> zone valve)]
+  M --> FU
+  M --> SAFE
+  M --> HW[("pump → mainline → zone valve")]
 ```
 
-Two layers:
+- **The integration** (`custom_components/crop_steering/`) is the data layer. A
+  config-flow wizard creates ~100 entities — every setpoint, switch and diagnostic
+  sensor — and exposes pure, unit-tested calculation helpers. It **never touches
+  hardware.**
+- **The AppDaemon engine** (`appdaemon/apps/crop_steering/`) is the brain. It reads
+  those entities and your live sensors, decides shots, sequences hardware, and runs
+  the phase logic. It is the **only** thing that drives a valve.
 
-- **Integration** (`custom_components/crop_steering/`) — creates all entities, runs
-  the config-flow wizard, performs pure calculations (shot duration, EC ratio,
-  adjusted thresholds), and fires service events. The data layer; never touches
-  hardware.
-- **AppDaemon engine** (`appdaemon/apps/crop_steering/`) — the brain. Reads sensor
-  state and integration events, makes irrigation decisions, sequences hardware
-  safely, and manages per-zone phase transitions. Modules: dryback detection,
-  IQR-based sensor fusion, statistical prediction, adaptive crop profiles, a
-  self-correcting `_ai_heartbeat`, and a hardware `_watchdog_check`.
-
-**Data flow:** `Sensors → HA entities → AppDaemon decision engine → HA services → hardware switches`
-
-See **`docs/SYSTEM_OVERVIEW.md`** for the full mental model.
+The feedback loop is the whole point: **sensors → entities → engine decision →
+hardware → substrate changes → sensors.** Every VWC update can trigger a re-evaluation.
 
 ---
 
-## Safety
+## Features, and what they're actually for
 
-Every shot passes a chain of gates before a valve opens:
+| Feature | Why it matters |
+|---|---|
+| **Per-zone autonomy** | Each zone (up to 6) runs its own phase machine, targets, and steering mode. Row 1 can be ramping in P1 while Row 3 dries back in P3. |
+| **Sensor fusion** | Front/back sensor pairs per zone are averaged with IQR outlier rejection, so one flaky probe doesn't fire (or block) a shot. |
+| **Dryback detection** | Peak/valley detection on the VWC curve drives the P0 wait and the overnight target — the engine acts on *real* substrate behaviour, not a guess. |
+| **EC steering** | The current-EC ÷ target-EC ratio nudges the P2 threshold, so the system feeds and dries to hit your EC, not just your moisture. |
+| **Source-water gate** | Irrigation is blocked while source pH/EC are out of range — it won't push bad water into your slabs. |
+| **Self-healing (`_ai_heartbeat`)** | A periodic watchdog force-advances a phase that's stuck >4 h, flags stale sensors, and flags a zone that takes water without VWC rising (a draining/channelling row or a blocked dripper). |
+| **Hardware watchdog** | Catches a valve or pump stuck on and emergency-stops; every shot's valve close is read-back verified. |
+| **Bounded by design** | Per-zone daily **volume** and **shot-count** caps stop runaway watering — but **emergency rescue is exempt**, so a genuinely dry plant is never denied water by a budget. |
+| **Activity feed** | `sensor.crop_steering_activity_log` is a rolling, human-readable feed of every watered / blocked / phase event — the dashboard's black-box recorder. |
+| **No-YAML setup** | A config-flow wizard (or a single `.env` file) maps your hardware and builds every entity. |
+
+---
+
+## The safety model
+
+Every shot passes a chain of gates before a valve opens. Nothing gets to the pump
+without clearing all of them:
 
 ```mermaid
 flowchart LR
     REQ(["Shot requested"]) --> C1{System enabled?}
-    C1 -- no --> STOP(["Blocked"])
-    C1 -- yes --> C2{Override off?}
+    C1 -- no --> STOP(["🚫 Blocked\n(logged to activity feed)"])
+    C1 -- yes --> C2{Zone override OFF?}
     C2 -- no --> STOP
-    C2 -- yes --> C3{VWC below field cap?}
+    C2 -- yes --> C3{VWC below field capacity?}
     C3 -- no --> STOP
     C3 -- yes --> C4{Source pH/EC in range?}
     C4 -- no --> STOP
     C4 -- yes --> C5{Daily volume + shot caps OK?}
     C5 -- no --> STOP
-    C5 -- yes --> C6{EC under max?}
+    C5 -- yes --> C6{EC under hard max?}
     C6 -- no --> STOP
-    C6 -- yes --> FIRE(["Valve opens"])
+    C6 -- yes --> FIRE(["✅ Pump prime → mainline → valve → irrigate → shutdown"])
 ```
 
-Plus: hardware sequencing prevents overlaps, valve close is read-back verified,
-`_watchdog_check` kills a stuck valve/pump, drain-through detection backs off a
-zone that takes water without VWC rising, emergency rescue is **exempt** from the
-daily caps (a wilting zone is never denied water by a budget), and per-zone manual
-overrides + phase pins are available for maintenance.
+Plus hardware sequencing that prevents overlapping shots, drain-through back-off,
+per-zone manual overrides and phase pins for maintenance, and an instant emergency
+stop.
 
 ---
 
-## What you need
+## Prerequisites
 
-**Hardware:** per-zone VWC + EC sensors (front/back pair ideal), a pump switch, a
-mainline valve switch, and one valve switch per zone (1–6). Optional: source-water
-pH/EC sensors for the irrigation-quality gate.
+**Software**
+- **Home Assistant** 2024.3.0+ (HA OS / Supervised recommended — you need add-ons).
+- **AppDaemon 4** add-on (this is where the engine runs — required).
+- **HACS** (recommended, for one-click integration install).
 
-**Software:** Home Assistant 2024.3.0+, the AppDaemon 4 add-on, and HACS (recommended).
+**Hardware — per zone**
+- **Substrate VWC sensor(s)** — moisture %. A front/back pair per zone is ideal; one
+  works. (TEROS 12, Acclima, SDI-12 probes, etc.)
+- **Substrate EC sensor(s)** — pore-water EC, mS/cm. Same front/back logic.
+- **A controllable valve** — one HA `switch.` per zone (relay board, ESPHome,
+  KC868, smart relay — anything HA can toggle).
+
+**Hardware — shared**
+- **A pump** and a **mainline solenoid**, each an HA `switch.`.
+- Drippers sized for your plant count (the engine converts shot *size %* → valve
+  *seconds* using your dripper flow rate and substrate volume).
+
+**Optional but recommended**
+- **Source-water pH + EC sensors** (e.g. Atlas Scientific) to enable the
+  irrigation-quality gate.
+
+**The substrate itself** should be a steerable medium under dripper irrigation —
+rockwool slabs/blocks or coco in pots. Crop steering is a substrate technique; it
+doesn't apply to soil beds.
 
 ---
 
 ## Installation
 
-> **Recommended:** install [Studio Code Server](https://github.com/hassio-addons/addon-vscode)
-> and drive setup with [Claude Code](https://claude.ai/code). This system needs to
-> be matched to your specific entity IDs and growing parameters — Claude Code can
-> adapt mappings, tune thresholds, and walk you through it.
+> **Strongly recommended:** install [Studio Code Server](https://github.com/hassio-addons/addon-vscode)
+> and drive the setup with [Claude Code](https://claude.ai/code). This system has to
+> be **matched to your exact entity IDs and substrate** — Claude Code can adapt the
+> mappings, tune thresholds against your real sensor data, and walk you through arming
+> it safely. The steps below are the manual path.
 
-1. **Integration (HACS):** add this repo as a custom Integration repository, install
-   "Crop Steering System", restart HA, then **Settings → Devices & Services → Add
-   Integration → Crop Steering System**. Pick the zone count and map your hardware.
-2. **HA packages:** copy `packages/irrigation/` into your HA `packages/` dir and add
-   `homeassistant: { packages: !include_dir_named packages }` to `configuration.yaml`.
-3. **AppDaemon:** copy `appdaemon/apps/crop_steering/` to your AppDaemon apps dir,
-   copy `appdaemon/apps/apps.yaml` and edit the hardware entity IDs + sensor map to
-   match your setup, copy `appdaemon.yaml` (set coordinates/timezone), restart
-   AppDaemon. On supervised HA the config path is `/addon_configs/a0d7b954_appdaemon/`.
-4. **Dashboard:** build a Lovelace dashboard from the `crop_steering_*` entities
-   (see `dashboards/crop_steering.yaml` for a starting point). The **Activity** card
-   reads `sensor.crop_steering_activity_log`.
-5. **(Optional) flat-file config:** `crop_steering.env` lets you define zones in one
-   file instead of the wizard — copy to `/config/crop_steering.env`, edit, then pick
-   "Load from crop_steering.env" during setup. Annotated example: `crop_steering.env.example`;
-   2/4/6-zone starters in `templates/`.
+### 1 · Install the integration
 
-Full walkthrough: `docs/installation_guide.md`.
+Via HACS → Integrations → **Custom repositories** → add this repo as an *Integration*
+→ install **"Crop Steering System"** → restart HA.
+
+Then **Settings → Devices & Services → Add Integration → Crop Steering System**.
+
+### 2 · Tell it about your room (wizard or `.env`)
+
+The wizard offers two paths:
+
+- **`crop_steering.env` file (recommended).** Copy `crop_steering.env.example` to
+  `/config/crop_steering.env`, fill in your zone count and entity mappings (there are
+  annotated 2 / 4 / 6-zone starters in `templates/`), then choose *"Load from
+  crop_steering.env"*. Zones are auto-detected.
+- **Manual.** Pick a zone count (1–6) and map the pump, mainline, per-zone valves and
+  sensors in the UI.
+
+Either way, the integration builds all ~100 `crop_steering_*` entities.
+
+### 3 · Add the HA package
+
+Copy `packages/irrigation/` into your HA `packages/` directory and add to
+`configuration.yaml`:
+
+```yaml
+homeassistant:
+  packages: !include_dir_named packages
+```
+
+### 4 · Install the engine (AppDaemon)
+
+1. Install the **AppDaemon 4** add-on.
+2. Copy `appdaemon/apps/crop_steering/` into your AppDaemon `apps/` directory.
+3. Copy `appdaemon/apps/apps.yaml` and **edit the hardware block** — the pump,
+   mainline, per-zone valve switches, and the VWC/EC sensor entity IDs for *your*
+   room. This file is where the engine learns your physical layout.
+4. Copy `appdaemon.yaml` to the AppDaemon config root and set your latitude/longitude
+   and timezone.
+5. Restart AppDaemon. On supervised HA the config path is
+   `/addon_configs/a0d7b954_appdaemon/`.
+
+Watch the AppDaemon log for `Master Crop Steering Application … initialized!` — that's
+the engine alive.
+
+### 5 · Build the dashboard
+
+Build a Lovelace dashboard from the `crop_steering_*` entities (use
+`dashboards/crop_steering.yaml` as a starting point). Add a Markdown card bound to
+`sensor.crop_steering_activity_log` for the live engine feed.
 
 ---
 
-## Services
+## Implementation — actually dialing it in
 
-| Service | Inputs | What it does |
-|---|---|---|
-| `crop_steering.transition_phase` | `target_phase` (P0–P3) | Changes phase, fires `crop_steering_phase_transition` |
-| `crop_steering.execute_irrigation_shot` | `zone`, `duration_seconds` | Fires `crop_steering_irrigation_shot` for hardware execution |
-| `crop_steering.check_transition_conditions` | — | Evaluates state, fires an event with reasoning |
-| `crop_steering.set_manual_override` | `zone` | Toggles per-zone manual control (optional timeout) |
+This is the part most guides skip. **It will not be perfect the moment you turn it
+on**, and that's normal — crop steering is tuned to *your* substrate's real
+behaviour. Plan for this:
 
-The integration fires events; AppDaemon listens and acts.
+1. **Arm it cold, watching.** Keep `switch.crop_steering_system_enabled` ON but treat
+   the first day as observation. The activity feed + per-zone phase sensors tell you
+   exactly what it's deciding and why.
+2. **Set the physical truths first.** Substrate volume, dripper flow rate, drippers
+   per plant, plant count — these convert "5% shot" into real seconds of valve time.
+   Get these right before tuning anything else, or every shot will be the wrong size.
+3. **Tune targets to observed reality, not theory.** Watch where each zone's VWC
+   *actually* peaks and troughs over a day, then set P1 target / P2 threshold /
+   emergency floor inside that real band. A target the substrate can't reach makes a
+   zone chase its tail; a floor it never hits never protects it.
+4. **Steer in one variable at a time.** Pick vegetative or generative per zone, adjust
+   the overnight dryback and feed EC, and give it a few days to respond before
+   changing more.
+5. **Trust the safety net, but check it.** The daily caps, source-water gate, drain
+   detection and watchdog are there so a mistake can't flood a room — but verify the
+   first real cycles fire and stop where you expect.
+
+A row that takes water without its VWC rising is telling you something *physical*
+(channelling, a dry-pocketed sensor, a blocked dripper) — the engine will flag and
+back off, but that's a go-look-at-the-row signal, not a setpoint to tune.
 
 ---
 
-## Entities
+## Daily operation
 
-~100 entities under the `crop_steering` domain. Highlights:
+Once dialed in, the loop runs itself. Day to day you're watching, not driving:
 
-- **Control:** `switch.crop_steering_system_enabled`, `switch.crop_steering_auto_irrigation_enabled`, `select.crop_steering_zone_X_steering_mode`, `input_select.crop_steering_zone_X_phase_control` (Auto / P0–P3).
-- **Calculated sensors:** `sensor.crop_steering_ec_ratio`, `sensor.crop_steering_p2_vwc_threshold_adjusted`, per-phase shot-duration sensors, `sensor.crop_steering_activity_log`.
-- **Per-zone:** VWC/EC, status, last irrigation, daily/weekly water + shot count, enable / manual-override / dripper-protection switches.
-- **Tunables (per zone + global):** substrate volume, dripper flow, VWC targets, EC targets by phase, shot sizes, timing windows, daily caps — all in the HA UI.
+- **Phase per zone** — are they marching P0→P1→P2→P3 on schedule?
+- **VWC/EC trend** — peaks and drybacks where you steered them?
+- **Activity feed** — shots landing, nothing stuck blocked.
+- **Water used vs cap** — a zone pinned at its cap, or one watering far more than its
+  neighbours, is the first sign of a physical problem.
 
-Full reference: `ENTITIES.md`.
+Full routine: `docs/operation_guide.md`. Mental model: `docs/SYSTEM_OVERVIEW.md`.
 
 ---
 
-## AppDaemon modules
+## Under the hood
 
-| Module | Purpose |
+| Module | Job |
 |---|---|
 | `master_crop_steering_app.py` | The coordinator — decisions, phase logic, hardware sequencing, safety, activity feed |
 | `phase_state_machine.py` | Per-zone P0→P1→P2→P3 transitions |
 | `advanced_dryback_detection.py` | Peak/valley detection + dryback % |
 | `intelligent_sensor_fusion.py` | IQR outlier filtering + multi-sensor averaging |
-| `ml_irrigation_predictor.py` | Statistical trend analysis for timing |
-| `intelligent_crop_profiles.py` | Per-crop/stage parameter profiles |
+| `ml_irrigation_predictor.py` | Statistical trend analysis for shot timing |
+| `intelligent_crop_profiles.py` | Per-crop / per-stage parameter profiles |
 | `base_async_app.py` | Async base class shared by the modules |
+
+```
+custom_components/crop_steering/   # HA integration — entities, wizard, calculations
+appdaemon/apps/crop_steering/      # the engine + supporting modules
+  └── apps.yaml                    # YOUR hardware + sensor map lives here
+packages/irrigation/               # HA package YAML (recorder, helpers)
+dashboards/                        # Lovelace starting points
+docs/                              # SYSTEM_OVERVIEW + install / operation / troubleshooting
+templates/                         # 2 / 4 / 6-zone .env starters
+tests/                             # unit tests (calculation helpers)
+```
 
 ---
 
-## Repository structure
+## Services
 
-```
-├── custom_components/crop_steering/   # HA integration (entities, services, calculations)
-├── appdaemon/apps/crop_steering/      # AppDaemon engine + supporting modules
-│   └── apps.yaml                      # AppDaemon app declaration + hardware/sensor map
-├── packages/irrigation/               # HA package YAML (recorder, helpers)
-├── dashboards/                        # Lovelace dashboard YAML
-├── docs/                              # SYSTEM_OVERVIEW + install/operation/troubleshooting
-├── templates/                         # Example .env configs (2 / 4 / 6 zone)
-├── tests/                             # Unit tests (calculations)
-├── config.yaml · appdaemon.yaml       # Example HA + AppDaemon config
-└── crop_steering.env(.example)        # Flat-file zone configuration
-```
+| Service | Inputs | Does |
+|---|---|---|
+| `crop_steering.transition_phase` | `target_phase` (P0–P3) | Move a zone's phase |
+| `crop_steering.execute_irrigation_shot` | `zone`, `duration_seconds` | Fire a shot through the safe hardware sequence |
+| `crop_steering.check_transition_conditions` | — | Evaluate + log the current decision reasoning |
+| `crop_steering.set_manual_override` | `zone` | Toggle per-zone manual control |
+
+---
+
+## Docs
+
+- **`docs/SYSTEM_OVERVIEW.md`** — the whole-stack mental model
+- **`docs/installation_guide.md`** — the long-form install walkthrough
+- **`docs/operation_guide.md`** — daily operator routine
+- **`docs/troubleshooting.md`** — when something's off
+- **`ENTITIES.md`** — every entity, explained
 
 ---
 
 ## License
 
-MIT
+MIT — use it, fork it, run your room with it.
 
 ## Acknowledgments
 
-Home Assistant Community, AppDaemon developers, and contributors advancing precision irrigation.
+Built on the shoulders of the Home Assistant and AppDaemon communities, and everyone
+pushing precision irrigation out from behind closed, expensive controllers.
