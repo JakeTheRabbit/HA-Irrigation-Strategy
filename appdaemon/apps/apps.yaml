@@ -60,13 +60,6 @@ master_crop_steering:
     notify_service: notify.mobile_app_s23ultra
     override_minutes: 30
 
-# Lean VWC-only replacement controller — SUPERSEDED by the fixed full engine above.
-# Kept in the repo (appdaemon/apps/crop_steering_v2.py) for reference; not loaded.
-# crop_steering_v2:
-#   module: crop_steering_v2
-#   class: CropSteeringV2
-#   ...
-
 # Python modules the engine references when available (all features degrade gracefully
 # to pure-Python if these aren't installed in the AppDaemon environment).
 global_modules:
