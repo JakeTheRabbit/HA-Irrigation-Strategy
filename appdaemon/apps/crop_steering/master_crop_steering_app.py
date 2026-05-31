@@ -155,6 +155,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self.manual_overrides = {}  # Track manual override timeouts per zone
         self.zone_water_usage = {}  # Track water usage per zone
         self.zone_vwc_capacity = {}  # Track adaptive per-zone VWC max (field capacity)
+        self._activity_log = []     # Rolling human-readable activity feed -> sensor.crop_steering_activity_log
+        self._activity_last = None  # Dedupe consecutive identical feed lines
         # Per-zone MANUAL PHASE PIN: {zone_num: 'P0'|'P1'|'P2'|'P3'}. Set when the operator
         # moves the per-zone phase override off "Auto"; while present, automatic
         # phase-transition logic skips that zone so the chosen phase holds. Cleared on "Auto".
@@ -957,6 +959,28 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
         except Exception as e:
             self.log(f"❌ Error updating zone {zone_num} water usage: {e}", level='ERROR')
+
+    def _log_activity(self, msg: str):
+        """Append a human-readable line to the rolling activity feed and publish it to
+        sensor.crop_steering_activity_log (newest-first, last ~40 events) for the dashboard
+        'System Activity' card. Deduped: a line identical to the previous one is skipped so
+        an every-cycle repeat (e.g. the same block reason) doesn't flood the feed."""
+        try:
+            if msg == self._activity_last:
+                return
+            self._activity_last = msg
+            ts = datetime.now().strftime('%H:%M:%S')
+            self._activity_log.append(f"{ts}  {msg}")
+            if len(self._activity_log) > 40:
+                self._activity_log = self._activity_log[-40:]
+            feed = "\n".join(reversed(self._activity_log))  # newest first
+            self.set_state(
+                'sensor.crop_steering_activity_log',
+                state=f"{datetime.now().strftime('%H:%M')} {msg}"[:255],
+                attributes={'feed': feed, 'event_count': len(self._activity_log),
+                            'friendly_name': 'Crop Steering Activity', 'icon': 'mdi:script-text-outline'})
+        except Exception:
+            pass
 
     async def _update_zone_water_sensors(self, zone_num: int):
         """Update water usage sensors for a zone."""
@@ -2912,6 +2936,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 safety_check = self._check_irrigation_safety_limits(zone, shot_type)
                 if safety_check['blocked']:
                     self.log(f"🚨 Zone {zone} irrigation blocked: {safety_check['reason']}")
+                    self._log_activity(f"Zone {zone} shot blocked — {safety_check['reason']}")
                     return {
                         'status': 'blocked',
                         'reason': safety_check['reason'],
@@ -3048,6 +3073,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 pre_vwc_str = f"{pre_vwc:.1f}%" if isinstance(pre_vwc, (int, float)) else "N/A"
                 post_vwc_str = f"{post_vwc:.1f}%" if isinstance(post_vwc, (int, float)) else "N/A"
                 self.log(f"✅ Irrigation completed: Zone {zone}, {actual_duration:.1f}s, VWC: {pre_vwc_str} → {post_vwc_str}")
+                self._log_activity(f"Zone {zone} watered {actual_duration:.0f}s  (VWC {pre_vwc_str} → {post_vwc_str})")
                 await self._publish_status(
                     status='safe_idle',
                     message=f'Zone {zone} irrigation completed ({actual_duration:.1f}s)'
