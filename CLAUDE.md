@@ -1,238 +1,115 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with
-code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repository.
 
-## System Overview
+## What this is
 
-Advanced Crop Steering System for Home Assistant. Currently shipping
-`v2.3.1` of the rule-based 4-phase controller, with `[Unreleased] - 3.0.0-dev
-"RootSense"` work landed on `main`. RootSense layers a four-pillar adaptive
-intelligence platform on top of the existing controller — every pillar is
-opt-in via a switch, default OFF, so existing v2.x installs are unaffected on
-upgrade.
+An autonomous **4-phase crop-steering irrigation** system for Home Assistant. Two
+layers:
 
-**Read this first:**
-- `docs/SYSTEM_OVERVIEW.md` — the unified mental model of the whole stack.
-- `docs/upgrade/SEQUENCE_OF_OPERATIONS.md` — operator-facing contract for what every actuator does.
-- `docs/upgrade/CONTROL_THEORY.md` — design rationale for the control layer.
-- `docs/upgrade/ROOTSENSE_v3_PLAN.md` — substrate intelligence design.
-- `docs/upgrade/CLIMATESENSE_PLAN.md` — environmental control design.
-- `docs/upgrade/RECONCILIATION.md` — maps gap-analysis items onto plan phases.
-- `docs/upgrade/LLM_ADVISOR_NOTES.md` — salvage notes from the archived
-  `llm-integration` branch (now reachable via tag `archive/llm-integration-v0.1`).
-- `MIGRATION.md` — operator-facing v2.3.x → v3.0 upgrade guide.
+1. **HA integration** (`custom_components/crop_steering/`) — entities, config-flow
+   wizard, pure calculations, service events. Never touches hardware.
+2. **AppDaemon engine** (`appdaemon/apps/crop_steering/`) — the autonomous
+   coordinator that reads entities, runs the per-zone P0→P1→P2→P3 logic, and drives
+   the hardware.
 
-## Development Commands
+There is **one engine**: `master_crop_steering_app.py` (+ its supporting libs). It
+does irrigation only — no climate control.
 
-### Linting & Validation
+> Start with `docs/SYSTEM_OVERVIEW.md` for the whole-stack mental model, then
+> `README.md`. `ENTITIES.md` is the entity reference.
+
+## Dev commands
+
 ```bash
-ruff check .
-black --check .
-yamllint -s .
-# Full CI validation:
+# Lint / format / yaml
 ruff check . && black --check . && yamllint -s .
-```
 
-### Testing
-```bash
-# Integration calculations (28 tests):
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/test_calculations.py -v
-
-# RootSense intelligence pillars (39 tests):
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/intelligence/ -v
-
-# Full suite:
+# Tests (integration calculation helpers)
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v
+
+# AppDaemon logs (supervised HA)
+#   ha addons logs a0d7b954_appdaemon     (or: docker logs addon_a0d7b954_appdaemon -f)
 ```
 
-The `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` env var dodges a broken
-hydra/omegaconf plugin in some local Python installs. CI is unaffected.
-
-### Home Assistant runtime
-```bash
-# Reload integration without restart (after code changes):
-# Developer Tools → YAML → Reload Custom Components
-
-# Monitor events (Developer Tools → Events → Listen):
-# Existing v2.x events:
-#   crop_steering_phase_transition
-#   crop_steering_irrigation_shot
-#   crop_steering_transition_check
-#   crop_steering_manual_override
-# RootSense v3 events:
-#   crop_steering_custom_shot
-#   crop_steering_dryback_complete
-#   crop_steering_field_capacity_observed
-#   crop_steering_anomaly
-#   crop_steering_run_report
-
-# View AppDaemon logs:
-docker logs addon_a0d7b954_appdaemon -f
-```
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` dodges a broken hydra/omegaconf plugin in some
+local Python installs. CI is unaffected.
 
 ## Architecture
 
-### Three-Layer System Design
+### 1. HA integration — `custom_components/crop_steering/`
+- ~100 entities (numbers, switches, selects, sensors) via a config-flow UI; no YAML.
+- Services: `transition_phase`, `execute_irrigation_shot`, `check_transition_conditions`, `set_manual_override`.
+- Pure, testable helpers in `calculations.py`.
 
-1. **Home Assistant Integration** (`custom_components/crop_steering/`)
-   - Provides 100+ entities (sensors, numbers, switches, selects).
-   - Config flow UI for setup; no YAML editing required.
-   - Services: `transition_phase`, `execute_irrigation_shot`,
-     `check_transition_conditions`, `set_manual_override`,
-     `custom_shot` (RootSense v3).
-   - Pure helpers split out into `calculations.py` for testability.
+### 2. AppDaemon engine — `appdaemon/apps/crop_steering/`
+- `master_crop_steering_app.py` — the coordinator. Phase transitions, hardware
+  sequencing, dryback detection, sensor fusion, source-water gating, daily caps,
+  emergency rescue, drain-through detection, the `_ai_heartbeat` self-correction
+  loop, the `_watchdog_check` hardware watchdog, and the activity feed
+  (`sensor.crop_steering_activity_log`).
+- Supporting libs it imports: `phase_state_machine.py`, `advanced_dryback_detection.py`,
+  `intelligent_sensor_fusion.py`, `intelligent_crop_profiles.py`,
+  `ml_irrigation_predictor.py`, `base_async_app.py`.
+- `apps.yaml` declares the app and holds the per-site hardware + sensor map.
 
-2. **AppDaemon — legacy controller** (`appdaemon/apps/crop_steering/`)
-   - `master_crop_steering_app.py` — the original autonomous coordinator.
-     Phase transitions, hardware sequencing, dryback detection, sensor fusion.
-     Untouched in the v3 work.
-   - `phase_state_machine.py`, `advanced_dryback_detection.py`,
-     `intelligent_sensor_fusion.py`, `intelligent_crop_profiles.py`,
-     `ml_irrigation_predictor.py` — supporting libraries the master app uses.
-
-3. **AppDaemon — RootSense v3 intelligence pillars**
-   (`appdaemon/apps/crop_steering/intelligence/`)
-   - `base.py` — `IntelligenceApp` mixin with module-enable gating + helpers.
-   - `bus.py` — in-process pub/sub (`RootSenseBus`).
-   - `store.py` — SQLite analytics store at
-     `appdaemon/apps/crop_steering/state/rootsense.db`.
-   - `root_zone.py` — Pillar 1: substrate analytics, FC detection, dryback
-     episode tracker.
-   - `adaptive_irrigation.py` — Pillar 2: intent slider, profile interpolation,
-     bandit shot-size optimisation.
-   - `agronomic.py` — Pillar 3: Penman-Monteith transpiration, VPD ceiling,
-     nightly run reports.
-   - `orchestration.py` — Pillar 4: `crop_steering.custom_shot` event handler,
-     emergency rescue, EC flush.
-   - `anomaly.py` — cross-cutting scanner (emitter blockage, EC drift, sensor
-     flat-line, peer-group VWC deviation).
-
-Each pillar gates itself behind its `switch.crop_steering_intelligence_*_enabled`
-entity. Default OFF.
-
-### Critical Files
-- `custom_components/crop_steering/config_flow.py` — integration setup wizard.
-- `custom_components/crop_steering/sensor.py` — calculated sensor entities.
-- `custom_components/crop_steering/calculations.py` — pure helpers (testable).
-- `custom_components/crop_steering/services.py` — service handlers + event firing.
+### Critical files
+- `custom_components/crop_steering/config_flow.py` — setup wizard.
+- `custom_components/crop_steering/{sensor,number,switch,select}.py` — entity platforms.
+- `custom_components/crop_steering/calculations.py` — pure helpers (tested).
 - `custom_components/crop_steering/const.py` — constants, single source of truth.
-- `custom_components/crop_steering/number.py` — number entities including
-  RootSense intent slider and dryback drop sliders.
-- `custom_components/crop_steering/switch.py` — switches including the 5
-  RootSense module-enable switches.
-- `appdaemon/apps/crop_steering/master_crop_steering_app.py` — legacy coordinator.
-- `appdaemon/apps/crop_steering/intelligence/*.py` — RootSense pillars.
-- `appdaemon/apps/apps.yaml` — AppDaemon app declarations.
-- `docs/upgrade/apps.example.yaml` — example apps.yaml additions for opting into
-  the RootSense pillars.
-- `packages/rootsense/00_recorder.yaml` — HA recorder includes for RootSense sensors.
-- `dashboards/rootsense_history.yaml` — three-tab Lovelace dashboard.
+- `appdaemon/apps/crop_steering/master_crop_steering_app.py` — the engine.
+- `appdaemon/apps/apps.yaml` — app declaration + hardware/sensor map.
 
-## Phase Logic (P0-P3 Cycle)
+## Phase logic (P0–P3)
 
 ```
-P0 (Morning Dryback): Wait for X% VWC DROP FROM PEAK → transition to P1
-P1 (Ramp-Up): Progressive shots until target VWC → transition to P2
-P2 (Maintenance): Threshold-based irrigation triggered by VWC or EC ratio
-P3 (Pre-Lights-Off): Emergency-only irrigation, prepare for night
+P0 (Morning dryback): after lights-on, wait for an X% VWC DROP FROM PEAK → P1
+P1 (Ramp-up):         progressive shots to the per-zone target → P2
+P2 (Maintenance):     top-up when VWC drops below the per-zone threshold → P3
+P3 (Pre-lights-off):  emergency-only; dry back overnight → P0 at lights-on
 ```
 
-> **Dryback semantic** (RootSense v3 clarification): every "dryback" value
-> in this codebase is a *percentage-point drop from peak VWC* — i.e. how
-> much the substrate dries back **by**, never what VWC value it dries back
-> **to**. Two operator-facing sliders feed the IntentResolver:
-> `number.crop_steering_veg_p0_dryback_drop_pct` (default 12) and
-> `..._gen_p0_dryback_drop_pct` (default 22). Defaults reflect Athena
-> guidance.
+- A "grow-day" is one **photoperiod**. The daily water + shot counters reset at the
+  **P3→P0 transition (lights-on)**, not at calendar midnight.
+- Lights-off forces any P1/P2 zone to P3 (no zone strands mid-cycle overnight).
+- **Dryback semantics:** every "dryback" value is a *% point drop from peak VWC*
+  (dries-back-by, never dries-back-to).
 
-## Hardware Control Sequence
+## Hardware control sequence
 
 ```
-Safety checks → Pump prime (2s) → Main line (1s) → Zone valve → Irrigate → Shutdown
+Safety checks → Pump prime (2s) → Mainline (1s) → Zone valve → Irrigate → Shutdown (reverse)
 ```
 
-Lives in `master_crop_steering_app.py`. RootSense pillars never touch hardware
-directly — they propose shots via the `crop_steering.custom_shot` service,
-which fires an event that `IrrigationOrchestrator` picks up, gates, and
-forwards to `crop_steering.execute_irrigation_shot`.
+Valve close is read-back verified; failure triggers an emergency pump stop. Lives
+entirely in `master_crop_steering_app.py`.
 
-## Sensor Processing
+## Key entity patterns
 
-- **VWC/EC Averaging**: front/back sensor pairs per zone.
-- **Outlier Detection**: IQR method (Q3 + 1.5*IQR) — currently bypassed in
-  legacy code.
-- **Dryback Detection (legacy)**: `scipy.signal.find_peaks` in
-  `master_crop_steering_app`.
-- **Dryback Detection (RootSense)**: a self-contained `DrybackTracker` state
-  machine in `root_zone.py` that uses the rolling per-zone VWC buffer. Tested
-  in `tests/intelligence/test_dryback_tracker.py`.
-- **EC Ratio**: current EC ÷ target EC drives threshold adjustments.
-- **Substrate Porosity Estimate (RootSense)**: `mL water / %VWC` — derived
-  from rolling shot responses in the SQLite store.
-- **EC Stack Index (RootSense)**: cumulative positive EC drift over a
-  6-hour window.
+- Global: `crop_steering_<param>` (e.g. `number.crop_steering_p2_shot_size`).
+- Per-zone: `crop_steering_zone_X_<param>`.
+- Sensors: `sensor.crop_steering_<metric>`; services: `crop_steering.<action>`.
+- Per-zone manual phase pin: `input_select.crop_steering_zone_X_phase_control` (Auto / P0–P3).
+- The engine reads switches/numbers by `entity_id` — renaming a friendly-name in HA
+  or the dashboard does not affect it.
 
-## Key Entity Patterns
+## Notes
 
-- Global: `crop_steering_<parameter>` (e.g. `crop_steering_p2_shot_size`).
-- Per-zone: `crop_steering_zone_X_<parameter>`.
-- Sensors: `sensor.crop_steering_<metric>`.
-- Services: `crop_steering.<action>`.
-- RootSense intent: `number.crop_steering_steering_intent` (-100..+100, step 5).
-- RootSense module enables: `switch.crop_steering_intelligence_<pillar>_enabled`.
+- **Dependencies:** integration = pure HA + voluptuous (no external deps). Engine =
+  scipy + numpy (already in the AppDaemon container).
+- **Testing:** `tests/test_calculations.py` covers the integration calc helpers; no
+  real hardware needed (input_boolean/number simulate pumps/sensors).
+- **Deploying engine changes:** copy the changed module(s) to the AppDaemon apps dir
+  and restart AppDaemon (the add-on watches files, but a clean restart is more
+  predictable). Integration changes: Developer Tools → YAML → Reload Custom Components.
+- **Commit style:** conventional commits (`feat:`/`fix:`/`docs:`/`chore:`) with a
+  `Co-Authored-By: Claude` trailer when written via Claude Code. One active branch:
+  `main`. Retired branches are kept as `archive/*` tags.
 
-## Important Notes
-
-### Dependencies
-- **Integration**: zero external Python dependencies. Pure HA + voluptuous.
-- **AppDaemon legacy modules**: scipy, numpy (already in AppDaemon container).
-- **AppDaemon RootSense modules**: stdlib + numpy. SQLite via stdlib.
-- **Home Assistant**: 2024.3.0+ required.
-
-### Testing Approach
-- Integration creates test helper entities automatically.
-- Input_boolean simulates hardware (pumps, valves).
-- Input_number simulates sensors (VWC, EC, temp).
-- No real hardware required for development/testing.
-- Tests in `tests/`:
-  - `test_calculations.py` — integration calc helpers (28 tests).
-  - `tests/intelligence/` — RootSense pillars (39 tests across 5 files).
-- The `_appdaemon_stub.py` module installs a fake `appdaemon.plugins.hass.hassapi`
-  so RootSense modules import cleanly without an AppDaemon runtime.
-
-### Event-Driven Communication
-- Integration fires events → AppDaemon listens → triggers automation.
-- RootSense pillars communicate among themselves via `RootSenseBus` (in-process)
-  to keep large payloads (full episodes, posteriors) off the HA event bus.
-- HA still receives high-signal events: anomalies, run reports, custom shots.
-- Hardware control happens in AppDaemon (legacy app), not in the integration.
-
-### Development Workflow
-1. Edit files in `custom_components/crop_steering/` or
-   `appdaemon/apps/crop_steering/`.
-2. **Integration changes**: Developer Tools → YAML → Reload Custom Components.
-3. **AppDaemon changes**: restart AppDaemon (the add-on watches files but a
-   clean restart is more predictable).
-4. Test with manual service calls: Developer Tools → Services.
-5. Monitor events: Developer Tools → Events → Listen to `crop_steering_*`.
-6. Run unit tests with `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests/`.
-
-### Common Development Tasks
-- **Add new entity**: edit the relevant platform file (sensor.py, number.py,
-  etc.), update `const.py` if needed.
-- **Modify service**: edit `services.py`, update event payload if needed.
-- **Change RootSense logic**: edit the relevant `intelligence/` module, restart
-  AppDaemon. Add a unit test before touching production behaviour.
-- **Update version**: edit `SOFTWARE_VERSION` in `const.py` and `manifest.json`
-  (single source is `const.py`). Bump to `3.0.0` only when Phase 5 closes.
-
-### Repo conventions
-- Commit messages use conventional commits (`feat:`, `fix:`, `docs:`,
-  `test:`) with a `Co-Authored-By: Claude` trailer when written via Claude Code.
-- Branches that are merged via PR get deleted on origin to keep the branch list
-  clean. Long-running exploration branches get archived as `archive/<name>-vX.Y`
-  tags before deletion.
-- Active branches: just `main`. The `feat/intelligent-crop-steering` branch was
-  merged via PR #7 and deleted; the `llm-integration` branch was archived as
-  tag `archive/llm-integration-v0.1`.
+> **Historical note.** An earlier experimental "intelligence" layer (RootSense
+> substrate AI + ClimateSense climate control, under `intelligence/`) was never
+> deployed and was retired from `main` to keep the repo matched to what actually
+> runs. It is recoverable from the `archive/pre-doc-cleanup-2026-06` tag. A few inert
+> `…_intelligence_*_enabled` entities still exist in the integration; the engine
+> ignores them.

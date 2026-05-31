@@ -2,6 +2,12 @@
 
 This document lists every single entity created by the Crop Steering System with detailed descriptions of their functions.
 
+> **Note:** sections tagged "RootSense v3" below belong to an experimental intelligence
+> layer that was **never deployed and has been removed** from the engine. The HA
+> integration may still create a few of these entities (e.g. the steering-intent
+> slider and `…_intelligence_*_enabled` switches), but they are **inert** — the
+> deployed irrigation engine ignores them.
+
 ## 📊 SENSORS
 
 ### System-Wide Sensors

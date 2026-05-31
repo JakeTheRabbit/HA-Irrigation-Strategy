@@ -5,7 +5,21 @@ All notable changes to the Advanced Automated Crop Steering System will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 3.0.0-dev "RootSense"
+## [Unreleased]
+
+### Changed — consolidated to a single deployed engine
+The repo now tracks exactly what runs in production: one AppDaemon engine
+(`master_crop_steering_app.py` — 4-phase crop-steering irrigation) plus the HA
+integration. README, CLAUDE.md and docs/SYSTEM_OVERVIEW.md rewritten to match.
+
+### Removed — undeployed experimental layers
+The `intelligence/` subsystem (RootSense substrate AI + ClimateSense climate
+control) was never deployed and has been removed from `main`, along with its tests,
+the F1/Green Wave `legacyag` dashboards, the `docs/upgrade/` planning docs, and the
+lean `crop_steering_v2` controller. All recoverable from the
+`archive/pre-doc-cleanup-2026-06` tag.
+
+## [Historical] - 3.0.0-dev "RootSense" (experimental, never deployed)
 
 ### Added (HVAC mode-switching hardened + LLM advisor Phase L0)
 
