@@ -223,7 +223,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         # Save state periodically
         self.run_every(self._save_persistent_state, 'now+60', 300)  # Every 5 minutes
-        
+
+        # Reset per-zone daily water/irrigation counters at the day boundary. The only reset
+        # path used to be post-shot (inside _update_zone_water_usage), so a zone that hit its
+        # daily volume/count cap never watered -> never reset -> stayed cap-locked across
+        # midnight, eventually starving the whole room until a manual AppDaemon restart. This
+        # fires even on idle zones; _check_irrigation_safety_limits also resets lazily as a
+        # backstop in case this callback is ever missed (app down at midnight).
+        self.run_daily(self._daily_usage_reset, "00:00:30")
+
         self.log("🚀 Master Crop Steering Application with Advanced AI Features initialized!")
         self.log("📊 Modules: Dryback Detection ✓, Sensor Fusion ✓, ML Prediction ✓, Crop Profiles ✓, Dashboard ✓")
 
@@ -959,7 +967,45 @@ class MasterCropSteeringApp(BaseAsyncApp):
             
         except Exception as e:
             self.log(f"❌ Error updating zone {zone_num} water usage: {e}", level='ERROR')
-    
+
+    def _reset_daily_usage_if_new_day(self, zone_num: int) -> bool:
+        """Reset a zone's daily water/count totals when the calendar day rolls over.
+
+        CRITICAL: must be reachable WITHOUT a successful shot. The reset previously lived
+        only inside _update_zone_water_usage (post-shot), so a zone that hit its daily volume
+        or count cap never watered -> never reset -> stayed cap-locked across the day boundary
+        indefinitely (observed live: a zone frozen at 50 shots / 155L locked the whole room
+        out until an AppDaemon restart). Called from both the midnight scheduler and
+        _check_irrigation_safety_limits so a stale daily counter can never deadlock a zone.
+
+        Returns True if a reset occurred.
+        """
+        zone_data = self.zone_water_usage.get(zone_num)
+        if not zone_data:
+            return False
+        today = datetime.now().date()
+        if zone_data.get('last_reset_daily') != today:
+            zone_data['daily_total'] = 0
+            zone_data['daily_count'] = 0
+            zone_data['last_reset_daily'] = today
+            return True
+        return False
+
+    async def _daily_usage_reset(self, kwargs):
+        """Midnight reset of all per-zone daily water/irrigation counters (and their sensors).
+
+        Belt-and-suspenders to the lazy reset in _check_irrigation_safety_limits: rolls the
+        budget over at the day boundary even for a zone that didn't irrigate, so a stale cap
+        can't carry into the new day and the published water/count sensors stay truthful.
+        """
+        try:
+            for zone_num in list(self.zone_water_usage.keys()):
+                if self._reset_daily_usage_if_new_day(zone_num):
+                    await self._update_zone_water_sensors(zone_num)
+            self.log("🔄 Daily water/irrigation counters rolled over for the new day")
+        except Exception as e:
+            self.log(f"❌ Error in daily usage reset: {e}", level='ERROR')
+
     async def _update_zone_water_sensors(self, zone_num: int):
         """Update water usage sensors for a zone."""
         try:
@@ -6658,6 +6704,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
     def _check_irrigation_safety_limits(self, zone: int, shot_type: str) -> Dict:
         """Check critical safety limits before allowing irrigation."""
         try:
+            # Roll the daily water/count budget over at the day boundary BEFORE evaluating the
+            # daily caps below. Without this a capped zone never waters (it's blocked), so the
+            # post-shot reset in _update_zone_water_usage never runs, and the stale counter
+            # locks the zone out across midnight — the whole-room lockout we hit live. This
+            # call is the actual deadlock break (the run_daily callback is the backstop).
+            self._reset_daily_usage_if_new_day(zone)
+
             # Get current zone conditions
             zone_vwc = self._get_zone_vwc(zone)
             zone_ec = self._get_zone_ec(zone)
