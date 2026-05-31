@@ -1,0 +1,1461 @@
+# F2 Crop Steering — native Home Assistant dashboard (auto-generated)
+# Import: Settings -> Dashboards -> + Add Dashboard -> open it -> 3-dot menu -> Edit dashboard
+#   -> 3-dot menu -> Raw configuration editor -> paste this whole file.
+# Decision-control design (markdown+Jinja compute the live verdict/exceptions/trust).
+# Covers EVERY crop_steering entity. Regenerate: scripts/build_lovelace.py
+title: F2 Crop Steering
+views:
+- title: Triage
+  path: triage
+  icon: mdi:alert-decagram
+  cards:
+  - type: markdown
+    content: |-
+      {% set h = states('sensor.crop_steering_sensor_health')|float(100) %}
+      {% set armed = is_state('switch.crop_steering_system_enabled','on') and is_state('switch.crop_steering_auto_irrigation_enabled','on') %}
+      {% set safe = is_state('sensor.crop_steering_system_safety_status','safe') %}
+      {% set ecmax = states('number.crop_steering_irrigation_ec_max')|float(3.5) %}
+      {% set ns = namespace(t1=0,t2=0) %}
+      {% if not safe %}{% set ns.t1 = ns.t1+1 %}{% endif %}
+      {% if h < 40 %}{% set ns.t1 = ns.t1+1 %}{% endif %}
+      {% for z in [1,2,3] %}{% set ec = states('sensor.crop_steering_zone_'~z~'_ec')|float(0) %}
+      {% set vwc = states('sensor.crop_steering_zone_'~z~'_vwc')|float(0) %}
+      {% set fl = states('number.crop_steering_zone_'~z~'_p2_vwc_threshold')|float(0) %}
+      {% if ec > ecmax %}{% set ns.t2 = ns.t2+1 %}{% endif %}
+      {% if vwc < fl %}{% set ns.t2 = ns.t2+1 %}{% endif %}{% endfor %}
+      {% if not armed %}{% set ns.t2 = ns.t2+1 %}{% endif %}
+      {% set v = 'INTERVENE' if (ns.t1>0 or h<40 or not safe) else ('WATCH' if (ns.t2>0 or not armed) else 'SAFE') %}
+      {% set c = '#f87171' if v=='INTERVENE' else ('#fbbf24' if v=='WATCH' else '#34d399') %}
+      <h1 style="margin:0;color:{{c}}">{{ v }}</h1>
+
+      **{{ states('sensor.crop_steering_app_current_phase') }}** &middot; {{ ns.t1+ns.t2 }} item(s) need attention
+
+      <font color="{{ '#34d399' if armed else '#fbbf24' }}">&#9679; ARM {{ 'ARMED' if armed else 'DISARMED' }}</font> &nbsp;
+      <font color="{{ '#34d399' if safe else '#f87171' }}">&#9679; SAFETY {{ 'OK' if safe else 'FAULT' }}</font> &nbsp;
+      <font color="{{ '#34d399' if h>=80 else ('#fbbf24' if h>=40 else '#f87171') }}">&#9679; DATA {{ h|round }}%</font>
+
+      <font color="#5d6b88">{{ state_attr('sensor.crop_steering_app_status','message') }} &middot; decision: {{ states('sensor.crop_steering_current_decision') }}</font>
+  - type: markdown
+    content: |-
+      {% set h = states('sensor.crop_steering_sensor_health')|float(100) %}
+      {% set fc = states('sensor.crop_steering_sensor_fusion_confidence')|float(1) %}
+      {% set v = 'UNTRUSTED' if h<40 else ('DEGRADED' if (h<80 or fc<0.6) else 'OK') %}
+      {% set c = '#f87171' if v=='UNTRUSTED' else ('#fbbf24' if v=='DEGRADED' else '#34d399') %}
+      **<font color="{{c}}">DATA TRUST: {{ v }}</font>** &middot; sensor health {{ h|round }}% &middot; fusion conf {{ fc|round(2) }} &middot; dryback acc {{ states('sensor.crop_steering_dryback_detection_accuracy')|float(0)|round(2) }} &middot; fused VWC {{ states('sensor.crop_steering_fused_vwc') }} / EC {{ states('sensor.crop_steering_fused_ec') }} &middot; AUTO {{ 'ON' if is_state('switch.crop_steering_auto_irrigation_enabled','on') else 'OFF' }}
+      {% if v=='UNTRUSTED' %}<font color="#f87171">Bands & gauges may be unreliable &mdash; verify probes before acting.</font>{% endif %}
+  - type: markdown
+    content: |-
+      ### What needs attention now
+      {% set ecmax = states('number.crop_steering_irrigation_ec_max')|float(3.5) %}
+      {% set fc = states('number.crop_steering_field_capacity')|float(60) %}
+      {% set armed = is_state('switch.crop_steering_system_enabled','on') and is_state('switch.crop_steering_auto_irrigation_enabled','on') %}
+      {% set ns = namespace(rows=[]) %}
+      {% if not is_state('sensor.crop_steering_system_safety_status','safe') %}{% set ns.rows = ns.rows + ['&#128308; **Safety fault** &mdash; engine protective state &middot; *inspect guardrails*'] %}{% endif %}
+      {% if states('sensor.crop_steering_sensor_health')|float(100) < 40 %}{% set ns.rows = ns.rows + ['&#128308; **Sensor health low** &mdash; steering on degraded data &middot; *hand-verify with a meter*'] %}{% endif %}
+      {% for z in [1,2,3] %}{% set ec = states('sensor.crop_steering_zone_'~z~'_ec')|float(0) %}
+      {% set vwc = states('sensor.crop_steering_zone_'~z~'_vwc')|float(0) %}
+      {% set fl = states('number.crop_steering_zone_'~z~'_p2_vwc_threshold')|float(0) %}
+      {% set ph = states('sensor.crop_steering_zone_'~z~'_phase') %}
+      {% set pn = '0' if 'P0' in ph else ('1' if 'P1' in ph else ('3' if 'P3' in ph else '2')) %}
+      {% set tg = states('number.crop_steering_zone_'~z~'_ec_target_veg_p'~pn)|float(3.2) %}
+      {% if ec > ecmax %}{% set ns.rows = ns.rows + ['&#128992; **Z'~z~' EC '~ec~' &gt; max '~ecmax~'** &mdash; salt stacking &middot; *flush; target '~tg~'*'] %}{% endif %}
+      {% if vwc < fl and vwc > 0 %}{% set ns.rows = ns.rows + ['&#128992; **Z'~z~' VWC '~vwc~' &lt; floor '~fl~'** &mdash; under-watered &middot; *why no shot?*'] %}{% endif %}
+      {% if vwc > fc %}{% set ns.rows = ns.rows + ['&#128992; **Z'~z~' VWC '~vwc~' &gt; FC '~fc~'** &mdash; over-saturated'] %}{% endif %}{% endfor %}
+      {% if not armed %}{% set ns.rows = ns.rows + ['&#128992; **System DISARMED** &mdash; watchdog only &middot; *arm when ready*'] %}{% endif %}
+      {% set gs = states('select.crop_steering_growth_stage')|lower %}{% set gp = states('input_select.growth_phase') %}{% set np = states('input_select.nutrient_phase') %}
+      {% if gp not in ['unknown','unavailable'] and not ('veg' in gs and 'veg' in gp|lower and 'veg' in np|lower) %}{% set ns.rows = ns.rows + ['&#128992; **Strategy selectors disagree** &mdash; '~states('select.crop_steering_growth_stage')~' &middot; '~gp~' &middot; '~np~''] %}{% endif %}
+      {% for z in [1,2,3] %}{% set ec = states('sensor.crop_steering_zone_'~z~'_ec')|float(0) %}
+      {% set ph = states('sensor.crop_steering_zone_'~z~'_phase') %}{% set pn = '0' if 'P0' in ph else ('1' if 'P1' in ph else ('3' if 'P3' in ph else '2')) %}
+      {% set tg = states('number.crop_steering_zone_'~z~'_ec_target_veg_p'~pn)|float(3.2) %}
+      {% if ec > 0 and ec < tg*0.8 and ec <= ecmax %}{% set ns.rows = ns.rows + ['&#128993; **Z'~z~' EC '~ec~' lean** (target '~tg~') &middot; *raise feed / lengthen dryback*'] %}{% endif %}
+      {% if is_state('switch.crop_steering_zone_'~z~'_manual_override','on') %}{% set ns.rows = ns.rows + ['&#9898; **Z'~z~' manual override ON** &mdash; AI blocked'] %}{% endif %}
+      {% if is_state('switch.crop_steering_zone_'~z~'_enabled','off') %}{% set ns.rows = ns.rows + ['&#9898; **Z'~z~' disabled** &mdash; no water'] %}{% endif %}{% endfor %}
+      {% set vw = [states('sensor.crop_steering_zone_1_ec')|float(0),states('sensor.crop_steering_zone_2_ec')|float(0),states('sensor.crop_steering_zone_3_ec')|float(0)] %}
+      {% if (vw|max - vw|min) > 1.0 %}{% set ns.rows = ns.rows + ['&#128993; **Zone EC spread '~(vw|max - vw|min)|round(1)~'** &mdash; zones disagree &middot; *distrust room-average EC*'] %}{% endif %}
+      {% if ns.rows|length == 0 %}&#9989; **Nothing needs attention** &mdash; every zone on strategy, within limits.{% else %}{% for r in ns.rows %}{{ r }}
+      {% endfor %}{% endif %}
+  - type: conditional
+    conditions:
+    - entity: switch.crop_steering_zone_1_manual_override
+      state: 'on'
+    card:
+      type: markdown
+      content: '## &#9888; Manual override active — AI irrigation blocked on one or more zones (see Control).'
+  - type: entities
+    title: Arm / Modes
+    state_color: true
+    entities:
+    - entity: switch.crop_steering_system_enabled
+      name: System Enabled
+    - entity: switch.crop_steering_auto_irrigation_enabled
+      name: Auto Irrigation Enabled
+    - entity: select.crop_steering_steering_mode
+      name: Steering Mode
+    - entity: select.crop_steering_growth_stage
+      name: Growth Stage
+    - entity: select.crop_steering_irrigation_phase
+      name: Irrigation Phase
+    icon: mdi:cog
+- title: Steering Trace
+  path: trace
+  icon: mdi:chart-line
+  cards:
+  - type: history-graph
+    title: VWC — all zones (24h)
+    hours_to_show: 24
+    entities:
+    - sensor.crop_steering_zone_1_vwc
+    - sensor.crop_steering_zone_2_vwc
+    - sensor.crop_steering_zone_3_vwc
+  - type: history-graph
+    title: Pore EC — all zones (24h)
+    hours_to_show: 24
+    entities:
+    - sensor.crop_steering_zone_1_ec
+    - sensor.crop_steering_zone_2_ec
+    - sensor.crop_steering_zone_3_ec
+  - type: markdown
+    content: |-
+      ### Dryback
+      Target **{{ states('sensor.crop_steering_dryback_target') }}%** drop-from-peak &middot; rate {{ states('sensor.f2_vwc_dryback_rate') }} %/h &middot; detector acc {{ states('sensor.crop_steering_dryback_detection_accuracy')|float(0)|round(2) }}
+
+      <font color="#5d6b88">Engine `dryback_percentage` is offline; the standalone HTML dashboard computes dryback from history. Per-zone phases:</font> {{ states('sensor.crop_steering_app_current_phase') }}
+  - type: history-graph
+    title: Phase timeline (24h)
+    hours_to_show: 24
+    entities:
+    - sensor.crop_steering_zone_1_phase
+    - sensor.crop_steering_zone_2_phase
+    - sensor.crop_steering_zone_3_phase
+  - type: history-graph
+    title: Daily water (48h)
+    hours_to_show: 48
+    entities:
+    - sensor.crop_steering_zone_1_daily_water_usage
+    - sensor.crop_steering_zone_2_daily_water_usage
+    - sensor.crop_steering_zone_3_daily_water_usage
+- title: Zones
+  path: zones
+  icon: mdi:sprout
+  cards:
+  - type: markdown
+    content: |-
+      {% set vwc = states('sensor.crop_steering_zone_1_vwc')|float(0) %}
+      {% set ec = states('sensor.crop_steering_zone_1_ec')|float(0) %}
+      {% set fl = states('number.crop_steering_zone_1_p2_vwc_threshold')|float(0) %}
+      {% set fc = states('number.crop_steering_field_capacity')|float(60) %}
+      {% set tgt = states('number.crop_steering_zone_1_p1_target_vwc')|float(0) %}
+      {% set ecmax = states('number.crop_steering_irrigation_ec_max')|float(3.5) %}
+      {% set vc = '#fbbf24' if vwc<fl else ('#60a5fa' if vwc>fc else '#34d399') %}
+      {% set ecc = '#f87171' if ec>ecmax else '#34d399' %}
+      #### Zone 1 &middot; <font color="#5d6b88">{{ states('sensor.crop_steering_zone_1_status') }}</font>
+      <font color="{{vc}}">**VWC {{ vwc }}%**</font> {% if vwc<fl %}({{ (fl-vwc)|round(1) }} below floor {{fl}}){% elif vwc>fc %}({{ (vwc-fc)|round(1) }} above FC){% else %}(in band, floor {{fl}}-FC {{fc}}, target {{tgt}}){% endif %} &nbsp; <font color="{{ecc}}">**EC {{ ec }}**</font> {% if ec>ecmax %}**OVER MAX**{% endif %} &middot; probe {{ states('sensor.f2_row_1_vwc') }} / {{ states('sensor.f2_row_1_pwec') }}
+  - type: horizontal-stack
+    cards:
+    - type: gauge
+      entity: sensor.crop_steering_zone_1_vwc
+      name: Z1 VWC
+      min: 0
+      max: 100
+      needle: true
+      severity: &id001
+        green: 40
+        yellow: 62
+        red: 72
+    - type: gauge
+      entity: sensor.crop_steering_zone_1_ec
+      name: Z1 EC
+      min: 0
+      max: 12
+      needle: true
+      severity: &id002
+        green: 0
+        yellow: 6
+        red: 8
+  - type: markdown
+    content: |-
+      {% set vwc = states('sensor.crop_steering_zone_2_vwc')|float(0) %}
+      {% set ec = states('sensor.crop_steering_zone_2_ec')|float(0) %}
+      {% set fl = states('number.crop_steering_zone_2_p2_vwc_threshold')|float(0) %}
+      {% set fc = states('number.crop_steering_field_capacity')|float(60) %}
+      {% set tgt = states('number.crop_steering_zone_2_p1_target_vwc')|float(0) %}
+      {% set ecmax = states('number.crop_steering_irrigation_ec_max')|float(3.5) %}
+      {% set vc = '#fbbf24' if vwc<fl else ('#60a5fa' if vwc>fc else '#34d399') %}
+      {% set ecc = '#f87171' if ec>ecmax else '#34d399' %}
+      #### Zone 2 &middot; <font color="#5d6b88">{{ states('sensor.crop_steering_zone_2_status') }}</font>
+      <font color="{{vc}}">**VWC {{ vwc }}%**</font> {% if vwc<fl %}({{ (fl-vwc)|round(1) }} below floor {{fl}}){% elif vwc>fc %}({{ (vwc-fc)|round(1) }} above FC){% else %}(in band, floor {{fl}}-FC {{fc}}, target {{tgt}}){% endif %} &nbsp; <font color="{{ecc}}">**EC {{ ec }}**</font> {% if ec>ecmax %}**OVER MAX**{% endif %} &middot; probe {{ states('sensor.veg_sdi12_vwc_2') }} / {{ states('sensor.veg_sdi12_ec_2') }}
+  - type: horizontal-stack
+    cards:
+    - type: gauge
+      entity: sensor.crop_steering_zone_2_vwc
+      name: Z2 VWC
+      min: 0
+      max: 100
+      needle: true
+      severity: *id001
+    - type: gauge
+      entity: sensor.crop_steering_zone_2_ec
+      name: Z2 EC
+      min: 0
+      max: 12
+      needle: true
+      severity: *id002
+  - type: markdown
+    content: |-
+      {% set vwc = states('sensor.crop_steering_zone_3_vwc')|float(0) %}
+      {% set ec = states('sensor.crop_steering_zone_3_ec')|float(0) %}
+      {% set fl = states('number.crop_steering_zone_3_p2_vwc_threshold')|float(0) %}
+      {% set fc = states('number.crop_steering_field_capacity')|float(60) %}
+      {% set tgt = states('number.crop_steering_zone_3_p1_target_vwc')|float(0) %}
+      {% set ecmax = states('number.crop_steering_irrigation_ec_max')|float(3.5) %}
+      {% set vc = '#fbbf24' if vwc<fl else ('#60a5fa' if vwc>fc else '#34d399') %}
+      {% set ecc = '#f87171' if ec>ecmax else '#34d399' %}
+      #### Zone 3 &middot; <font color="#5d6b88">{{ states('sensor.crop_steering_zone_3_status') }}</font>
+      <font color="{{vc}}">**VWC {{ vwc }}%**</font> {% if vwc<fl %}({{ (fl-vwc)|round(1) }} below floor {{fl}}){% elif vwc>fc %}({{ (vwc-fc)|round(1) }} above FC){% else %}(in band, floor {{fl}}-FC {{fc}}, target {{tgt}}){% endif %} &nbsp; <font color="{{ecc}}">**EC {{ ec }}**</font> {% if ec>ecmax %}**OVER MAX**{% endif %} &middot; probe {{ states('sensor.veg_sdi12_vwc') }} / {{ states('sensor.veg_sdi12_ec') }}
+  - type: horizontal-stack
+    cards:
+    - type: gauge
+      entity: sensor.crop_steering_zone_3_vwc
+      name: Z3 VWC
+      min: 0
+      max: 100
+      needle: true
+      severity: *id001
+    - type: gauge
+      entity: sensor.crop_steering_zone_3_ec
+      name: Z3 EC
+      min: 0
+      max: 12
+      needle: true
+      severity: *id002
+  - type: markdown
+    content: |-
+      ### Sensors & Environment
+      Source pH **{{ states('sensor.aquaponics_kit_f4f618_ph')|float(0)|round(1) }}** &middot; Source EC **{{ states('sensor.atlas_legacy_1_ec')|float(0)|round(1) }}** &middot; Room **{{ states('sensor.veg_scd41_top_temperature_scd41')|float(0)|round(1) }}&deg;C** / **{{ states('sensor.veg_scd41_top_humidity_scd41')|float(0)|round(0) }}%** &middot; Tank {{ states('sensor.tank_percentage_full') }}%
+  - type: entities
+    title: Raw probes (fusion inputs)
+    state_color: true
+    entities:
+    - entity: sensor.f2_row_1_vwc
+      name: F2 Row 1 Vwc
+    - entity: sensor.f2_row_1_pwec
+      name: F2 Row 1 Pwec
+    - entity: sensor.veg_sdi12_vwc_2
+      name: Veg Sdi12 Vwc 2
+    - entity: sensor.veg_sdi12_ec_2
+      name: Veg Sdi12 Ec 2
+    - entity: sensor.veg_sdi12_vwc
+      name: Veg Sdi12 Vwc
+    - entity: sensor.veg_sdi12_ec
+      name: Veg Sdi12 Ec
+    icon: mdi:radar
+- title: Control
+  path: control
+  icon: mdi:tune-variant
+  cards:
+  - type: entities
+    title: Global · P0
+    state_color: true
+    entities:
+    - entity: number.crop_steering_p0_dryback_drop_percent
+      name: P0 Dryback Drop Percent
+    - entity: number.crop_steering_p0_maximum_wait_time
+      name: P0 Maximum Wait Time
+    - entity: number.crop_steering_p0_minimum_wait_time
+      name: P0 Minimum Wait Time
+  - type: entities
+    title: Global · P1
+    state_color: true
+    entities:
+    - entity: number.crop_steering_p1_initial_shot_size
+      name: P1 Initial Shot Size
+    - entity: number.crop_steering_p1_maximum_shot_size
+      name: P1 Maximum Shot Size
+    - entity: number.crop_steering_p1_maximum_shots
+      name: P1 Maximum Shots
+    - entity: number.crop_steering_p1_minimum_shots
+      name: P1 Minimum Shots
+    - entity: number.crop_steering_p1_shot_size_increment
+      name: P1 Shot Size Increment
+    - entity: number.crop_steering_p1_target_vwc
+      name: P1 Target Vwc
+    - entity: number.crop_steering_p1_time_between_shots
+      name: P1 Time Between Shots
+  - type: entities
+    title: Global · P2
+    state_color: true
+    entities:
+    - entity: number.crop_steering_p2_ec_high_threshold
+      name: P2 Ec High Threshold
+    - entity: number.crop_steering_p2_ec_low_threshold
+      name: P2 Ec Low Threshold
+    - entity: number.crop_steering_p2_shot_size
+      name: P2 Shot Size
+    - entity: number.crop_steering_p2_vwc_threshold
+      name: P2 Vwc Threshold
+  - type: entities
+    title: Global · P3
+    state_color: true
+    entities:
+    - entity: number.crop_steering_p3_emergency_shot_size
+      name: P3 Emergency Shot Size
+    - entity: number.crop_steering_p3_emergency_vwc_threshold
+      name: P3 Emergency Vwc Threshold
+    - entity: number.crop_steering_p3_gen_last_irrigation
+      name: P3 Gen Last Irrigation
+    - entity: number.crop_steering_p3_veg_last_irrigation
+      name: P3 Veg Last Irrigation
+  - type: entities
+    title: Global · EC Targets
+    state_color: true
+    entities:
+    - entity: number.crop_steering_ec_target_flush
+      name: Ec Target Flush
+    - entity: number.crop_steering_ec_target_gen_p0
+      name: Ec Target Gen P0
+    - entity: number.crop_steering_ec_target_gen_p1
+      name: Ec Target Gen P1
+    - entity: number.crop_steering_ec_target_gen_p2
+      name: Ec Target Gen P2
+    - entity: number.crop_steering_ec_target_gen_p3
+      name: Ec Target Gen P3
+    - entity: number.crop_steering_ec_target_veg_p0
+      name: Ec Target Veg P0
+    - entity: number.crop_steering_ec_target_veg_p1
+      name: Ec Target Veg P1
+    - entity: number.crop_steering_ec_target_veg_p2
+      name: Ec Target Veg P2
+    - entity: number.crop_steering_ec_target_veg_p3
+      name: Ec Target Veg P3
+  - type: entities
+    title: Global · Substrate & Schedule
+    state_color: true
+    entities:
+    - entity: number.crop_steering_blocked_dripper_max_shots_30min
+      name: Blocked Dripper Max Shots 30Min
+    - entity: number.crop_steering_dripper_flow_rate
+      name: Dripper Flow Rate
+    - entity: number.crop_steering_drippers_per_plant
+      name: Drippers Per Plant
+    - entity: number.crop_steering_field_capacity
+      name: Field Capacity
+    - entity: number.crop_steering_generative_dryback_target
+      name: Generative Dryback Target
+    - entity: number.crop_steering_lights_off_hour
+      name: Lights Off Hour
+    - entity: number.crop_steering_lights_on_hour
+      name: Lights On Hour
+    - entity: number.crop_steering_substrate_volume
+      name: Substrate Volume
+    - entity: number.crop_steering_vegetative_dryback_target
+      name: Vegetative Dryback Target
+  - type: entities
+    title: Global · Safety Limits
+    state_color: true
+    entities:
+    - entity: number.crop_steering_irrigation_ec_max
+      name: Irrigation Ec Max
+    - entity: number.crop_steering_irrigation_ec_min
+      name: Irrigation Ec Min
+    - entity: number.crop_steering_irrigation_ph_max
+      name: Irrigation Ph Max
+    - entity: number.crop_steering_irrigation_ph_min
+      name: Irrigation Ph Min
+    - entity: number.crop_steering_maximum_ec
+      name: Maximum Ec
+  - type: entities
+    title: System switches
+    state_color: true
+    entities:
+    - entity: switch.crop_steering_analytics_enabled
+      name: Analytics Enabled
+    - entity: switch.crop_steering_auto_irrigation_enabled
+      name: Auto Irrigation Enabled
+    - entity: switch.crop_steering_ec_stacking_enabled
+      name: Ec Stacking Enabled
+    - entity: switch.crop_steering_system_enabled
+      name: System Enabled
+    icon: mdi:toggle-switch
+  - type: entities
+    title: System modes
+    state_color: true
+    entities:
+    - entity: select.crop_steering_crop_type
+      name: Crop Type
+    - entity: select.crop_steering_growth_stage
+      name: Growth Stage
+    - entity: select.crop_steering_irrigation_phase
+      name: Irrigation Phase
+    - entity: select.crop_steering_steering_mode
+      name: Steering Mode
+    - entity: input_select.crop_steering_phase
+      name: Phase
+    icon: mdi:format-list-bulleted
+  - type: entities
+    title: Zone 1 · per-zone overrides & controls
+    state_color: true
+    entities:
+    - entity: number.crop_steering_zone_1_ec_target_flush
+      name: Zone 1 Ec Target Flush
+    - entity: number.crop_steering_zone_1_ec_target_gen_p0
+      name: Zone 1 Ec Target Gen P0
+    - entity: number.crop_steering_zone_1_ec_target_gen_p1
+      name: Zone 1 Ec Target Gen P1
+    - entity: number.crop_steering_zone_1_ec_target_gen_p2
+      name: Zone 1 Ec Target Gen P2
+    - entity: number.crop_steering_zone_1_ec_target_gen_p3
+      name: Zone 1 Ec Target Gen P3
+    - entity: number.crop_steering_zone_1_ec_target_veg_p0
+      name: Zone 1 Ec Target Veg P0
+    - entity: number.crop_steering_zone_1_ec_target_veg_p1
+      name: Zone 1 Ec Target Veg P1
+    - entity: number.crop_steering_zone_1_ec_target_veg_p2
+      name: Zone 1 Ec Target Veg P2
+    - entity: number.crop_steering_zone_1_ec_target_veg_p3
+      name: Zone 1 Ec Target Veg P3
+    - entity: number.crop_steering_zone_1_generative_dryback_target
+      name: Zone 1 Generative Dryback Target
+    - entity: number.crop_steering_zone_1_max_daily_volume
+      name: Zone 1 Max Daily Volume
+    - entity: number.crop_steering_zone_1_p0_dryback_drop_percent
+      name: Zone 1 P0 Dryback Drop Percent
+    - entity: number.crop_steering_zone_1_p0_maximum_wait_time
+      name: Zone 1 P0 Maximum Wait Time
+    - entity: number.crop_steering_zone_1_p0_minimum_wait_time
+      name: Zone 1 P0 Minimum Wait Time
+    - entity: number.crop_steering_zone_1_p1_initial_shot_size
+      name: Zone 1 P1 Initial Shot Size
+    - entity: number.crop_steering_zone_1_p1_maximum_shot_size
+      name: Zone 1 P1 Maximum Shot Size
+    - entity: number.crop_steering_zone_1_p1_maximum_shots
+      name: Zone 1 P1 Maximum Shots
+    - entity: number.crop_steering_zone_1_p1_minimum_shots
+      name: Zone 1 P1 Minimum Shots
+    - entity: number.crop_steering_zone_1_p1_shot_size_increment
+      name: Zone 1 P1 Shot Size Increment
+    - entity: number.crop_steering_zone_1_p1_target_vwc
+      name: Zone 1 P1 Target Vwc
+    - entity: number.crop_steering_zone_1_p1_time_between_shots
+      name: Zone 1 P1 Time Between Shots
+    - entity: number.crop_steering_zone_1_p2_ec_high_threshold
+      name: Zone 1 P2 Ec High Threshold
+    - entity: number.crop_steering_zone_1_p2_ec_low_threshold
+      name: Zone 1 P2 Ec Low Threshold
+    - entity: number.crop_steering_zone_1_p2_shot_size
+      name: Zone 1 P2 Shot Size
+    - entity: number.crop_steering_zone_1_p2_vwc_threshold
+      name: Zone 1 P2 Vwc Threshold
+    - entity: number.crop_steering_zone_1_p3_emergency_shot_size
+      name: Zone 1 P3 Emergency Shot Size
+    - entity: number.crop_steering_zone_1_p3_emergency_vwc_threshold
+      name: Zone 1 P3 Emergency Vwc Threshold
+    - entity: number.crop_steering_zone_1_p3_gen_last_irrigation
+      name: Zone 1 P3 Gen Last Irrigation
+    - entity: number.crop_steering_zone_1_p3_veg_last_irrigation
+      name: Zone 1 P3 Veg Last Irrigation
+    - entity: number.crop_steering_zone_1_plant_count
+      name: Zone 1 Plant Count
+    - entity: number.crop_steering_zone_1_shot_size_multiplier
+      name: Zone 1 Shot Size Multiplier
+    - entity: number.crop_steering_zone_1_vegetative_dryback_target
+      name: Zone 1 Vegetative Dryback Target
+    - entity: switch.crop_steering_zone_1_dripper_protection
+      name: Zone 1 Dripper Protection
+    - entity: switch.crop_steering_zone_1_enabled
+      name: Zone 1 Enabled
+    - entity: switch.crop_steering_zone_1_manual_override
+      name: Zone 1 Manual Override
+    - entity: select.crop_steering_zone_1_crop_profile
+      name: Zone 1 Crop Profile
+    - entity: select.crop_steering_zone_1_group
+      name: Zone 1 Group
+    - entity: select.crop_steering_zone_1_priority
+      name: Zone 1 Priority
+    - entity: select.crop_steering_zone_1_steering_mode
+      name: Zone 1 Steering Mode
+    - entity: input_select.crop_steering_zone_1_phase_control
+      name: Zone 1 Phase Control
+    icon: mdi:sprout-outline
+  - type: entities
+    title: Zone 2 · per-zone overrides & controls
+    state_color: true
+    entities:
+    - entity: number.crop_steering_zone_2_ec_target_flush
+      name: Zone 2 Ec Target Flush
+    - entity: number.crop_steering_zone_2_ec_target_gen_p0
+      name: Zone 2 Ec Target Gen P0
+    - entity: number.crop_steering_zone_2_ec_target_gen_p1
+      name: Zone 2 Ec Target Gen P1
+    - entity: number.crop_steering_zone_2_ec_target_gen_p2
+      name: Zone 2 Ec Target Gen P2
+    - entity: number.crop_steering_zone_2_ec_target_gen_p3
+      name: Zone 2 Ec Target Gen P3
+    - entity: number.crop_steering_zone_2_ec_target_veg_p0
+      name: Zone 2 Ec Target Veg P0
+    - entity: number.crop_steering_zone_2_ec_target_veg_p1
+      name: Zone 2 Ec Target Veg P1
+    - entity: number.crop_steering_zone_2_ec_target_veg_p2
+      name: Zone 2 Ec Target Veg P2
+    - entity: number.crop_steering_zone_2_ec_target_veg_p3
+      name: Zone 2 Ec Target Veg P3
+    - entity: number.crop_steering_zone_2_generative_dryback_target
+      name: Zone 2 Generative Dryback Target
+    - entity: number.crop_steering_zone_2_max_daily_volume
+      name: Zone 2 Max Daily Volume
+    - entity: number.crop_steering_zone_2_p0_dryback_drop_percent
+      name: Zone 2 P0 Dryback Drop Percent
+    - entity: number.crop_steering_zone_2_p0_maximum_wait_time
+      name: Zone 2 P0 Maximum Wait Time
+    - entity: number.crop_steering_zone_2_p0_minimum_wait_time
+      name: Zone 2 P0 Minimum Wait Time
+    - entity: number.crop_steering_zone_2_p1_initial_shot_size
+      name: Zone 2 P1 Initial Shot Size
+    - entity: number.crop_steering_zone_2_p1_maximum_shot_size
+      name: Zone 2 P1 Maximum Shot Size
+    - entity: number.crop_steering_zone_2_p1_maximum_shots
+      name: Zone 2 P1 Maximum Shots
+    - entity: number.crop_steering_zone_2_p1_minimum_shots
+      name: Zone 2 P1 Minimum Shots
+    - entity: number.crop_steering_zone_2_p1_shot_size_increment
+      name: Zone 2 P1 Shot Size Increment
+    - entity: number.crop_steering_zone_2_p1_target_vwc
+      name: Zone 2 P1 Target Vwc
+    - entity: number.crop_steering_zone_2_p1_time_between_shots
+      name: Zone 2 P1 Time Between Shots
+    - entity: number.crop_steering_zone_2_p2_ec_high_threshold
+      name: Zone 2 P2 Ec High Threshold
+    - entity: number.crop_steering_zone_2_p2_ec_low_threshold
+      name: Zone 2 P2 Ec Low Threshold
+    - entity: number.crop_steering_zone_2_p2_shot_size
+      name: Zone 2 P2 Shot Size
+    - entity: number.crop_steering_zone_2_p2_vwc_threshold
+      name: Zone 2 P2 Vwc Threshold
+    - entity: number.crop_steering_zone_2_p3_emergency_shot_size
+      name: Zone 2 P3 Emergency Shot Size
+    - entity: number.crop_steering_zone_2_p3_emergency_vwc_threshold
+      name: Zone 2 P3 Emergency Vwc Threshold
+    - entity: number.crop_steering_zone_2_p3_gen_last_irrigation
+      name: Zone 2 P3 Gen Last Irrigation
+    - entity: number.crop_steering_zone_2_p3_veg_last_irrigation
+      name: Zone 2 P3 Veg Last Irrigation
+    - entity: number.crop_steering_zone_2_plant_count
+      name: Zone 2 Plant Count
+    - entity: number.crop_steering_zone_2_shot_size_multiplier
+      name: Zone 2 Shot Size Multiplier
+    - entity: number.crop_steering_zone_2_vegetative_dryback_target
+      name: Zone 2 Vegetative Dryback Target
+    - entity: switch.crop_steering_zone_2_dripper_protection
+      name: Zone 2 Dripper Protection
+    - entity: switch.crop_steering_zone_2_enabled
+      name: Zone 2 Enabled
+    - entity: switch.crop_steering_zone_2_manual_override
+      name: Zone 2 Manual Override
+    - entity: select.crop_steering_zone_2_crop_profile
+      name: Zone 2 Crop Profile
+    - entity: select.crop_steering_zone_2_group
+      name: Zone 2 Group
+    - entity: select.crop_steering_zone_2_priority
+      name: Zone 2 Priority
+    - entity: select.crop_steering_zone_2_steering_mode
+      name: Zone 2 Steering Mode
+    - entity: input_select.crop_steering_zone_2_phase_control
+      name: Zone 2 Phase Control
+    icon: mdi:sprout-outline
+  - type: entities
+    title: Zone 3 · per-zone overrides & controls
+    state_color: true
+    entities:
+    - entity: number.crop_steering_zone_3_ec_target_flush
+      name: Zone 3 Ec Target Flush
+    - entity: number.crop_steering_zone_3_ec_target_gen_p0
+      name: Zone 3 Ec Target Gen P0
+    - entity: number.crop_steering_zone_3_ec_target_gen_p1
+      name: Zone 3 Ec Target Gen P1
+    - entity: number.crop_steering_zone_3_ec_target_gen_p2
+      name: Zone 3 Ec Target Gen P2
+    - entity: number.crop_steering_zone_3_ec_target_gen_p3
+      name: Zone 3 Ec Target Gen P3
+    - entity: number.crop_steering_zone_3_ec_target_veg_p0
+      name: Zone 3 Ec Target Veg P0
+    - entity: number.crop_steering_zone_3_ec_target_veg_p1
+      name: Zone 3 Ec Target Veg P1
+    - entity: number.crop_steering_zone_3_ec_target_veg_p2
+      name: Zone 3 Ec Target Veg P2
+    - entity: number.crop_steering_zone_3_ec_target_veg_p3
+      name: Zone 3 Ec Target Veg P3
+    - entity: number.crop_steering_zone_3_generative_dryback_target
+      name: Zone 3 Generative Dryback Target
+    - entity: number.crop_steering_zone_3_max_daily_volume
+      name: Zone 3 Max Daily Volume
+    - entity: number.crop_steering_zone_3_p0_dryback_drop_percent
+      name: Zone 3 P0 Dryback Drop Percent
+    - entity: number.crop_steering_zone_3_p0_maximum_wait_time
+      name: Zone 3 P0 Maximum Wait Time
+    - entity: number.crop_steering_zone_3_p0_minimum_wait_time
+      name: Zone 3 P0 Minimum Wait Time
+    - entity: number.crop_steering_zone_3_p1_initial_shot_size
+      name: Zone 3 P1 Initial Shot Size
+    - entity: number.crop_steering_zone_3_p1_maximum_shot_size
+      name: Zone 3 P1 Maximum Shot Size
+    - entity: number.crop_steering_zone_3_p1_maximum_shots
+      name: Zone 3 P1 Maximum Shots
+    - entity: number.crop_steering_zone_3_p1_minimum_shots
+      name: Zone 3 P1 Minimum Shots
+    - entity: number.crop_steering_zone_3_p1_shot_size_increment
+      name: Zone 3 P1 Shot Size Increment
+    - entity: number.crop_steering_zone_3_p1_target_vwc
+      name: Zone 3 P1 Target Vwc
+    - entity: number.crop_steering_zone_3_p1_time_between_shots
+      name: Zone 3 P1 Time Between Shots
+    - entity: number.crop_steering_zone_3_p2_ec_high_threshold
+      name: Zone 3 P2 Ec High Threshold
+    - entity: number.crop_steering_zone_3_p2_ec_low_threshold
+      name: Zone 3 P2 Ec Low Threshold
+    - entity: number.crop_steering_zone_3_p2_shot_size
+      name: Zone 3 P2 Shot Size
+    - entity: number.crop_steering_zone_3_p2_vwc_threshold
+      name: Zone 3 P2 Vwc Threshold
+    - entity: number.crop_steering_zone_3_p3_emergency_shot_size
+      name: Zone 3 P3 Emergency Shot Size
+    - entity: number.crop_steering_zone_3_p3_emergency_vwc_threshold
+      name: Zone 3 P3 Emergency Vwc Threshold
+    - entity: number.crop_steering_zone_3_p3_gen_last_irrigation
+      name: Zone 3 P3 Gen Last Irrigation
+    - entity: number.crop_steering_zone_3_p3_veg_last_irrigation
+      name: Zone 3 P3 Veg Last Irrigation
+    - entity: number.crop_steering_zone_3_plant_count
+      name: Zone 3 Plant Count
+    - entity: number.crop_steering_zone_3_shot_size_multiplier
+      name: Zone 3 Shot Size Multiplier
+    - entity: number.crop_steering_zone_3_vegetative_dryback_target
+      name: Zone 3 Vegetative Dryback Target
+    - entity: switch.crop_steering_zone_3_dripper_protection
+      name: Zone 3 Dripper Protection
+    - entity: switch.crop_steering_zone_3_enabled
+      name: Zone 3 Enabled
+    - entity: switch.crop_steering_zone_3_manual_override
+      name: Zone 3 Manual Override
+    - entity: select.crop_steering_zone_3_crop_profile
+      name: Zone 3 Crop Profile
+    - entity: select.crop_steering_zone_3_group
+      name: Zone 3 Group
+    - entity: select.crop_steering_zone_3_priority
+      name: Zone 3 Priority
+    - entity: select.crop_steering_zone_3_steering_mode
+      name: Zone 3 Steering Mode
+    - entity: input_select.crop_steering_zone_3_phase_control
+      name: Zone 3 Phase Control
+    icon: mdi:sprout-outline
+- title: Sensors & Trust
+  path: sensors
+  icon: mdi:stethoscope
+  cards:
+  - type: markdown
+    content: |-
+      {% set h = states('sensor.crop_steering_sensor_health')|float(100) %}
+      {% set fc = states('sensor.crop_steering_sensor_fusion_confidence')|float(1) %}
+      {% set v = 'UNTRUSTED' if h<40 else ('DEGRADED' if (h<80 or fc<0.6) else 'OK') %}
+      {% set c = '#f87171' if v=='UNTRUSTED' else ('#fbbf24' if v=='DEGRADED' else '#34d399') %}
+      **<font color="{{c}}">DATA TRUST: {{ v }}</font>** &middot; sensor health {{ h|round }}% &middot; fusion conf {{ fc|round(2) }} &middot; dryback acc {{ states('sensor.crop_steering_dryback_detection_accuracy')|float(0)|round(2) }} &middot; fused VWC {{ states('sensor.crop_steering_fused_vwc') }} / EC {{ states('sensor.crop_steering_fused_ec') }} &middot; AUTO {{ 'ON' if is_state('switch.crop_steering_auto_irrigation_enabled','on') else 'OFF' }}
+      {% if v=='UNTRUSTED' %}<font color="#f87171">Bands & gauges may be unreliable &mdash; verify probes before acting.</font>{% endif %}
+  - type: entities
+    title: Health & trust
+    state_color: true
+    entities:
+    - entity: sensor.crop_steering_ai_heartbeat
+      name: Ai Heartbeat
+    - entity: sensor.crop_steering_dryback_detection_accuracy
+      name: Dryback Detection Accuracy
+    - entity: sensor.crop_steering_ml_model_accuracy
+      name: Ml Model Accuracy
+    - entity: sensor.crop_steering_sensor_fusion_confidence
+      name: Sensor Fusion Confidence
+    - entity: sensor.crop_steering_sensor_health
+      name: Sensor Health
+    - entity: sensor.crop_steering_system_health_score
+      name: System Health Score
+    - entity: sensor.crop_steering_system_safety_status
+      name: System Safety Status
+    - entity: sensor.crop_steering_system_uptime
+      name: System Uptime
+    icon: mdi:heart-pulse
+  - type: entities
+    title: System sensors
+    state_color: true
+    entities:
+    - entity: sensor.crop_steering_activity_log
+      name: Activity Log
+    - entity: sensor.crop_steering_app_current_phase
+      name: App Current Phase
+    - entity: sensor.crop_steering_app_next_irrigation
+      name: App Next Irrigation
+    - entity: sensor.crop_steering_app_status
+      name: App Status
+    - entity: sensor.crop_steering_average_ec_all_zones
+      name: Average Ec All Zones
+    - entity: sensor.crop_steering_average_vwc_all_zones
+      name: Average Vwc All Zones
+    - entity: sensor.crop_steering_current_decision
+      name: Current Decision
+    - entity: sensor.crop_steering_current_phase
+      name: Current Phase
+    - entity: sensor.crop_steering_daily_water_usage
+      name: Daily Water Usage
+    - entity: sensor.crop_steering_daily_water_usage_app
+      name: Daily Water Usage App
+    - entity: sensor.crop_steering_dryback_percentage
+      name: Dryback Percentage
+    - entity: sensor.crop_steering_dryback_target
+      name: Dryback Target
+    - entity: sensor.crop_steering_ec_baseline
+      name: Ec Baseline
+    - entity: sensor.crop_steering_ec_ratio
+      name: Ec Ratio
+    - entity: sensor.crop_steering_fused_ec
+      name: Fused Ec
+    - entity: sensor.crop_steering_fused_vwc
+      name: Fused Vwc
+    - entity: sensor.crop_steering_irrigation_efficiency
+      name: Irrigation Efficiency
+    - entity: sensor.crop_steering_next_irrigation_time
+      name: Next Irrigation Time
+    - entity: sensor.crop_steering_p1_shot_duration
+      name: P1 Shot Duration
+    - entity: sensor.crop_steering_p2_shot_duration
+      name: P2 Shot Duration
+    - entity: sensor.crop_steering_p2_vwc_threshold_adjusted
+      name: P2 Vwc Threshold Adjusted
+    - entity: sensor.crop_steering_p3_emergency_shot_duration
+      name: P3 Emergency Shot Duration
+    - entity: sensor.crop_steering_prediction_estimated_daily_water_need
+      name: Prediction Estimated Daily Water Need
+    - entity: sensor.crop_steering_system_efficiency
+      name: System Efficiency
+    - entity: sensor.crop_steering_system_state
+      name: System State
+    - entity: sensor.crop_steering_vwc_target_max
+      name: Vwc Target Max
+    - entity: sensor.crop_steering_vwc_target_min
+      name: Vwc Target Min
+    - entity: sensor.crop_steering_water_efficiency
+      name: Water Efficiency
+    icon: mdi:gauge
+  - type: entities
+    title: Zone 1 sensors
+    state_color: true
+    entities:
+    - entity: sensor.crop_steering_prediction_zone_1_next_irrigation_hours
+      name: Prediction Zone 1 Next Irrigation Hours
+    - entity: sensor.crop_steering_zone_1_daily_water_app
+      name: Zone 1 Daily Water App
+    - entity: sensor.crop_steering_zone_1_daily_water_usage
+      name: Zone 1 Daily Water Usage
+    - entity: sensor.crop_steering_zone_1_ec
+      name: Zone 1 Ec
+    - entity: sensor.crop_steering_zone_1_efficiency
+      name: Zone 1 Efficiency
+    - entity: sensor.crop_steering_zone_1_health_score
+      name: Zone 1 Health Score
+    - entity: sensor.crop_steering_zone_1_irrigation_count_app
+      name: Zone 1 Irrigation Count App
+    - entity: sensor.crop_steering_zone_1_irrigations_today
+      name: Zone 1 Irrigations Today
+    - entity: sensor.crop_steering_zone_1_last_irrigation
+      name: Zone 1 Last Irrigation
+    - entity: sensor.crop_steering_zone_1_phase
+      name: Zone 1 Phase
+    - entity: sensor.crop_steering_zone_1_safety_status
+      name: Zone 1 Safety Status
+    - entity: sensor.crop_steering_zone_1_status
+      name: Zone 1 Status
+    - entity: sensor.crop_steering_zone_1_vwc
+      name: Zone 1 Vwc
+    - entity: sensor.crop_steering_zone_1_weekly_water_app
+      name: Zone 1 Weekly Water App
+    - entity: sensor.crop_steering_zone_1_weekly_water_usage
+      name: Zone 1 Weekly Water Usage
+    icon: mdi:sprout
+  - type: entities
+    title: Zone 2 sensors
+    state_color: true
+    entities:
+    - entity: sensor.crop_steering_prediction_zone_2_next_irrigation_hours
+      name: Prediction Zone 2 Next Irrigation Hours
+    - entity: sensor.crop_steering_zone_2_daily_water_app
+      name: Zone 2 Daily Water App
+    - entity: sensor.crop_steering_zone_2_daily_water_usage
+      name: Zone 2 Daily Water Usage
+    - entity: sensor.crop_steering_zone_2_ec
+      name: Zone 2 Ec
+    - entity: sensor.crop_steering_zone_2_efficiency
+      name: Zone 2 Efficiency
+    - entity: sensor.crop_steering_zone_2_health_score
+      name: Zone 2 Health Score
+    - entity: sensor.crop_steering_zone_2_irrigation_count_app
+      name: Zone 2 Irrigation Count App
+    - entity: sensor.crop_steering_zone_2_irrigations_today
+      name: Zone 2 Irrigations Today
+    - entity: sensor.crop_steering_zone_2_last_irrigation
+      name: Zone 2 Last Irrigation
+    - entity: sensor.crop_steering_zone_2_last_irrigation_app
+      name: Zone 2 Last Irrigation App
+    - entity: sensor.crop_steering_zone_2_phase
+      name: Zone 2 Phase
+    - entity: sensor.crop_steering_zone_2_safety_status
+      name: Zone 2 Safety Status
+    - entity: sensor.crop_steering_zone_2_status
+      name: Zone 2 Status
+    - entity: sensor.crop_steering_zone_2_vwc
+      name: Zone 2 Vwc
+    - entity: sensor.crop_steering_zone_2_weekly_water_app
+      name: Zone 2 Weekly Water App
+    - entity: sensor.crop_steering_zone_2_weekly_water_usage
+      name: Zone 2 Weekly Water Usage
+    icon: mdi:sprout
+  - type: entities
+    title: Zone 3 sensors
+    state_color: true
+    entities:
+    - entity: sensor.crop_steering_prediction_zone_3_next_irrigation_hours
+      name: Prediction Zone 3 Next Irrigation Hours
+    - entity: sensor.crop_steering_zone_3_daily_water_app
+      name: Zone 3 Daily Water App
+    - entity: sensor.crop_steering_zone_3_daily_water_usage
+      name: Zone 3 Daily Water Usage
+    - entity: sensor.crop_steering_zone_3_ec
+      name: Zone 3 Ec
+    - entity: sensor.crop_steering_zone_3_efficiency
+      name: Zone 3 Efficiency
+    - entity: sensor.crop_steering_zone_3_health_score
+      name: Zone 3 Health Score
+    - entity: sensor.crop_steering_zone_3_irrigation_count_app
+      name: Zone 3 Irrigation Count App
+    - entity: sensor.crop_steering_zone_3_irrigations_today
+      name: Zone 3 Irrigations Today
+    - entity: sensor.crop_steering_zone_3_last_irrigation
+      name: Zone 3 Last Irrigation
+    - entity: sensor.crop_steering_zone_3_phase
+      name: Zone 3 Phase
+    - entity: sensor.crop_steering_zone_3_safety_status
+      name: Zone 3 Safety Status
+    - entity: sensor.crop_steering_zone_3_status
+      name: Zone 3 Status
+    - entity: sensor.crop_steering_zone_3_vwc
+      name: Zone 3 Vwc
+    - entity: sensor.crop_steering_zone_3_weekly_water_app
+      name: Zone 3 Weekly Water App
+    - entity: sensor.crop_steering_zone_3_weekly_water_usage
+      name: Zone 3 Weekly Water Usage
+    icon: mdi:sprout
+  - type: entities
+    title: Related — probes / water / climate / hardware
+    state_color: true
+    entities:
+    - entity: sensor.f2_row_1_vwc
+      name: F2 Row 1 Vwc
+    - entity: sensor.f2_row_1_pwec
+      name: F2 Row 1 Pwec
+    - entity: sensor.veg_sdi12_vwc_2
+      name: Veg Sdi12 Vwc 2
+    - entity: sensor.veg_sdi12_ec_2
+      name: Veg Sdi12 Ec 2
+    - entity: sensor.veg_sdi12_vwc
+      name: Veg Sdi12 Vwc
+    - entity: sensor.veg_sdi12_ec
+      name: Veg Sdi12 Ec
+    - entity: sensor.aquaponics_kit_f4f618_ph
+      name: Aquaponics Kit F4F618 Ph
+    - entity: sensor.atlas_legacy_1_ec
+      name: Atlas Legacy 1 Ec
+    - entity: sensor.veg_scd41_top_temperature_scd41
+      name: Veg Scd41 Top Temperature Scd41
+    - entity: sensor.veg_scd41_top_humidity_scd41
+      name: Veg Scd41 Top Humidity Scd41
+    - entity: sensor.f2_vwc_dryback_rate
+      name: F2 Vwc Dryback Rate
+    - entity: sensor.f2_ec_trend
+      name: F2 Ec Trend
+    - entity: sensor.tank_percentage_full
+      name: Tank Percentage Full
+    - entity: input_boolean.nutrient_dosing_active
+      name: Nutrient Dosing Active
+    - entity: switch.veg_main_pump
+      name: Veg Main Pump
+    - entity: switch.espoe_irrigation_relay_2_3
+      name: Espoe Irrigation Relay 2 3
+    - entity: switch.f2_row1
+      name: F2 Row1
+    - entity: switch.f2_row2
+      name: F2 Row2
+    - entity: switch.f2_row3
+      name: F2 Row3
+    icon: mdi:hydraulic-oil-level
+- title: All Entities
+  path: all
+  icon: mdi:format-list-checkbox
+  cards:
+  - type: markdown
+    content: '## Complete entity reference
+
+      Every crop_steering entity, guaranteed present. Legacy blueprint automations are listed but **superseded** by the AppDaemon engine.'
+  - type: entities
+    title: All number (137)
+    state_color: true
+    entities:
+    - entity: number.crop_steering_blocked_dripper_max_shots_30min
+      name: Blocked Dripper Max Shots 30Min
+    - entity: number.crop_steering_dripper_flow_rate
+      name: Dripper Flow Rate
+    - entity: number.crop_steering_drippers_per_plant
+      name: Drippers Per Plant
+    - entity: number.crop_steering_ec_target_flush
+      name: Ec Target Flush
+    - entity: number.crop_steering_ec_target_gen_p0
+      name: Ec Target Gen P0
+    - entity: number.crop_steering_ec_target_gen_p1
+      name: Ec Target Gen P1
+    - entity: number.crop_steering_ec_target_gen_p2
+      name: Ec Target Gen P2
+    - entity: number.crop_steering_ec_target_gen_p3
+      name: Ec Target Gen P3
+    - entity: number.crop_steering_ec_target_veg_p0
+      name: Ec Target Veg P0
+    - entity: number.crop_steering_ec_target_veg_p1
+      name: Ec Target Veg P1
+    - entity: number.crop_steering_ec_target_veg_p2
+      name: Ec Target Veg P2
+    - entity: number.crop_steering_ec_target_veg_p3
+      name: Ec Target Veg P3
+    - entity: number.crop_steering_field_capacity
+      name: Field Capacity
+    - entity: number.crop_steering_generative_dryback_target
+      name: Generative Dryback Target
+    - entity: number.crop_steering_irrigation_ec_max
+      name: Irrigation Ec Max
+    - entity: number.crop_steering_irrigation_ec_min
+      name: Irrigation Ec Min
+    - entity: number.crop_steering_irrigation_ph_max
+      name: Irrigation Ph Max
+    - entity: number.crop_steering_irrigation_ph_min
+      name: Irrigation Ph Min
+    - entity: number.crop_steering_lights_off_hour
+      name: Lights Off Hour
+    - entity: number.crop_steering_lights_on_hour
+      name: Lights On Hour
+    - entity: number.crop_steering_maximum_ec
+      name: Maximum Ec
+    - entity: number.crop_steering_p0_dryback_drop_percent
+      name: P0 Dryback Drop Percent
+    - entity: number.crop_steering_p0_maximum_wait_time
+      name: P0 Maximum Wait Time
+    - entity: number.crop_steering_p0_minimum_wait_time
+      name: P0 Minimum Wait Time
+    - entity: number.crop_steering_p1_initial_shot_size
+      name: P1 Initial Shot Size
+    - entity: number.crop_steering_p1_maximum_shot_size
+      name: P1 Maximum Shot Size
+    - entity: number.crop_steering_p1_maximum_shots
+      name: P1 Maximum Shots
+    - entity: number.crop_steering_p1_minimum_shots
+      name: P1 Minimum Shots
+    - entity: number.crop_steering_p1_shot_size_increment
+      name: P1 Shot Size Increment
+    - entity: number.crop_steering_p1_target_vwc
+      name: P1 Target Vwc
+    - entity: number.crop_steering_p1_time_between_shots
+      name: P1 Time Between Shots
+    - entity: number.crop_steering_p2_ec_high_threshold
+      name: P2 Ec High Threshold
+    - entity: number.crop_steering_p2_ec_low_threshold
+      name: P2 Ec Low Threshold
+    - entity: number.crop_steering_p2_shot_size
+      name: P2 Shot Size
+    - entity: number.crop_steering_p2_vwc_threshold
+      name: P2 Vwc Threshold
+    - entity: number.crop_steering_p3_emergency_shot_size
+      name: P3 Emergency Shot Size
+    - entity: number.crop_steering_p3_emergency_vwc_threshold
+      name: P3 Emergency Vwc Threshold
+    - entity: number.crop_steering_p3_gen_last_irrigation
+      name: P3 Gen Last Irrigation
+    - entity: number.crop_steering_p3_veg_last_irrigation
+      name: P3 Veg Last Irrigation
+    - entity: number.crop_steering_substrate_volume
+      name: Substrate Volume
+    - entity: number.crop_steering_vegetative_dryback_target
+      name: Vegetative Dryback Target
+    - entity: number.crop_steering_zone_1_ec_target_flush
+      name: Zone 1 Ec Target Flush
+    - entity: number.crop_steering_zone_1_ec_target_gen_p0
+      name: Zone 1 Ec Target Gen P0
+    - entity: number.crop_steering_zone_1_ec_target_gen_p1
+      name: Zone 1 Ec Target Gen P1
+    - entity: number.crop_steering_zone_1_ec_target_gen_p2
+      name: Zone 1 Ec Target Gen P2
+    - entity: number.crop_steering_zone_1_ec_target_gen_p3
+      name: Zone 1 Ec Target Gen P3
+    - entity: number.crop_steering_zone_1_ec_target_veg_p0
+      name: Zone 1 Ec Target Veg P0
+    - entity: number.crop_steering_zone_1_ec_target_veg_p1
+      name: Zone 1 Ec Target Veg P1
+    - entity: number.crop_steering_zone_1_ec_target_veg_p2
+      name: Zone 1 Ec Target Veg P2
+    - entity: number.crop_steering_zone_1_ec_target_veg_p3
+      name: Zone 1 Ec Target Veg P3
+    - entity: number.crop_steering_zone_1_generative_dryback_target
+      name: Zone 1 Generative Dryback Target
+    - entity: number.crop_steering_zone_1_max_daily_volume
+      name: Zone 1 Max Daily Volume
+    - entity: number.crop_steering_zone_1_p0_dryback_drop_percent
+      name: Zone 1 P0 Dryback Drop Percent
+    - entity: number.crop_steering_zone_1_p0_maximum_wait_time
+      name: Zone 1 P0 Maximum Wait Time
+    - entity: number.crop_steering_zone_1_p0_minimum_wait_time
+      name: Zone 1 P0 Minimum Wait Time
+    - entity: number.crop_steering_zone_1_p1_initial_shot_size
+      name: Zone 1 P1 Initial Shot Size
+    - entity: number.crop_steering_zone_1_p1_maximum_shot_size
+      name: Zone 1 P1 Maximum Shot Size
+    - entity: number.crop_steering_zone_1_p1_maximum_shots
+      name: Zone 1 P1 Maximum Shots
+    - entity: number.crop_steering_zone_1_p1_minimum_shots
+      name: Zone 1 P1 Minimum Shots
+    - entity: number.crop_steering_zone_1_p1_shot_size_increment
+      name: Zone 1 P1 Shot Size Increment
+    - entity: number.crop_steering_zone_1_p1_target_vwc
+      name: Zone 1 P1 Target Vwc
+    - entity: number.crop_steering_zone_1_p1_time_between_shots
+      name: Zone 1 P1 Time Between Shots
+    - entity: number.crop_steering_zone_1_p2_ec_high_threshold
+      name: Zone 1 P2 Ec High Threshold
+    - entity: number.crop_steering_zone_1_p2_ec_low_threshold
+      name: Zone 1 P2 Ec Low Threshold
+    - entity: number.crop_steering_zone_1_p2_shot_size
+      name: Zone 1 P2 Shot Size
+    - entity: number.crop_steering_zone_1_p2_vwc_threshold
+      name: Zone 1 P2 Vwc Threshold
+    - entity: number.crop_steering_zone_1_p3_emergency_shot_size
+      name: Zone 1 P3 Emergency Shot Size
+    - entity: number.crop_steering_zone_1_p3_emergency_vwc_threshold
+      name: Zone 1 P3 Emergency Vwc Threshold
+    - entity: number.crop_steering_zone_1_p3_gen_last_irrigation
+      name: Zone 1 P3 Gen Last Irrigation
+    - entity: number.crop_steering_zone_1_p3_veg_last_irrigation
+      name: Zone 1 P3 Veg Last Irrigation
+    - entity: number.crop_steering_zone_1_plant_count
+      name: Zone 1 Plant Count
+    - entity: number.crop_steering_zone_1_shot_size_multiplier
+      name: Zone 1 Shot Size Multiplier
+    - entity: number.crop_steering_zone_1_vegetative_dryback_target
+      name: Zone 1 Vegetative Dryback Target
+    - entity: number.crop_steering_zone_2_ec_target_flush
+      name: Zone 2 Ec Target Flush
+    - entity: number.crop_steering_zone_2_ec_target_gen_p0
+      name: Zone 2 Ec Target Gen P0
+    - entity: number.crop_steering_zone_2_ec_target_gen_p1
+      name: Zone 2 Ec Target Gen P1
+    - entity: number.crop_steering_zone_2_ec_target_gen_p2
+      name: Zone 2 Ec Target Gen P2
+    - entity: number.crop_steering_zone_2_ec_target_gen_p3
+      name: Zone 2 Ec Target Gen P3
+    - entity: number.crop_steering_zone_2_ec_target_veg_p0
+      name: Zone 2 Ec Target Veg P0
+    - entity: number.crop_steering_zone_2_ec_target_veg_p1
+      name: Zone 2 Ec Target Veg P1
+    - entity: number.crop_steering_zone_2_ec_target_veg_p2
+      name: Zone 2 Ec Target Veg P2
+    - entity: number.crop_steering_zone_2_ec_target_veg_p3
+      name: Zone 2 Ec Target Veg P3
+    - entity: number.crop_steering_zone_2_generative_dryback_target
+      name: Zone 2 Generative Dryback Target
+    - entity: number.crop_steering_zone_2_max_daily_volume
+      name: Zone 2 Max Daily Volume
+    - entity: number.crop_steering_zone_2_p0_dryback_drop_percent
+      name: Zone 2 P0 Dryback Drop Percent
+    - entity: number.crop_steering_zone_2_p0_maximum_wait_time
+      name: Zone 2 P0 Maximum Wait Time
+    - entity: number.crop_steering_zone_2_p0_minimum_wait_time
+      name: Zone 2 P0 Minimum Wait Time
+    - entity: number.crop_steering_zone_2_p1_initial_shot_size
+      name: Zone 2 P1 Initial Shot Size
+    - entity: number.crop_steering_zone_2_p1_maximum_shot_size
+      name: Zone 2 P1 Maximum Shot Size
+    - entity: number.crop_steering_zone_2_p1_maximum_shots
+      name: Zone 2 P1 Maximum Shots
+    - entity: number.crop_steering_zone_2_p1_minimum_shots
+      name: Zone 2 P1 Minimum Shots
+    - entity: number.crop_steering_zone_2_p1_shot_size_increment
+      name: Zone 2 P1 Shot Size Increment
+    - entity: number.crop_steering_zone_2_p1_target_vwc
+      name: Zone 2 P1 Target Vwc
+    - entity: number.crop_steering_zone_2_p1_time_between_shots
+      name: Zone 2 P1 Time Between Shots
+    - entity: number.crop_steering_zone_2_p2_ec_high_threshold
+      name: Zone 2 P2 Ec High Threshold
+    - entity: number.crop_steering_zone_2_p2_ec_low_threshold
+      name: Zone 2 P2 Ec Low Threshold
+    - entity: number.crop_steering_zone_2_p2_shot_size
+      name: Zone 2 P2 Shot Size
+    - entity: number.crop_steering_zone_2_p2_vwc_threshold
+      name: Zone 2 P2 Vwc Threshold
+    - entity: number.crop_steering_zone_2_p3_emergency_shot_size
+      name: Zone 2 P3 Emergency Shot Size
+    - entity: number.crop_steering_zone_2_p3_emergency_vwc_threshold
+      name: Zone 2 P3 Emergency Vwc Threshold
+    - entity: number.crop_steering_zone_2_p3_gen_last_irrigation
+      name: Zone 2 P3 Gen Last Irrigation
+    - entity: number.crop_steering_zone_2_p3_veg_last_irrigation
+      name: Zone 2 P3 Veg Last Irrigation
+    - entity: number.crop_steering_zone_2_plant_count
+      name: Zone 2 Plant Count
+    - entity: number.crop_steering_zone_2_shot_size_multiplier
+      name: Zone 2 Shot Size Multiplier
+    - entity: number.crop_steering_zone_2_vegetative_dryback_target
+      name: Zone 2 Vegetative Dryback Target
+    - entity: number.crop_steering_zone_3_ec_target_flush
+      name: Zone 3 Ec Target Flush
+    - entity: number.crop_steering_zone_3_ec_target_gen_p0
+      name: Zone 3 Ec Target Gen P0
+    - entity: number.crop_steering_zone_3_ec_target_gen_p1
+      name: Zone 3 Ec Target Gen P1
+    - entity: number.crop_steering_zone_3_ec_target_gen_p2
+      name: Zone 3 Ec Target Gen P2
+    - entity: number.crop_steering_zone_3_ec_target_gen_p3
+      name: Zone 3 Ec Target Gen P3
+    - entity: number.crop_steering_zone_3_ec_target_veg_p0
+      name: Zone 3 Ec Target Veg P0
+    - entity: number.crop_steering_zone_3_ec_target_veg_p1
+      name: Zone 3 Ec Target Veg P1
+    - entity: number.crop_steering_zone_3_ec_target_veg_p2
+      name: Zone 3 Ec Target Veg P2
+    - entity: number.crop_steering_zone_3_ec_target_veg_p3
+      name: Zone 3 Ec Target Veg P3
+    - entity: number.crop_steering_zone_3_generative_dryback_target
+      name: Zone 3 Generative Dryback Target
+    - entity: number.crop_steering_zone_3_max_daily_volume
+      name: Zone 3 Max Daily Volume
+    - entity: number.crop_steering_zone_3_p0_dryback_drop_percent
+      name: Zone 3 P0 Dryback Drop Percent
+    - entity: number.crop_steering_zone_3_p0_maximum_wait_time
+      name: Zone 3 P0 Maximum Wait Time
+    - entity: number.crop_steering_zone_3_p0_minimum_wait_time
+      name: Zone 3 P0 Minimum Wait Time
+    - entity: number.crop_steering_zone_3_p1_initial_shot_size
+      name: Zone 3 P1 Initial Shot Size
+    - entity: number.crop_steering_zone_3_p1_maximum_shot_size
+      name: Zone 3 P1 Maximum Shot Size
+    - entity: number.crop_steering_zone_3_p1_maximum_shots
+      name: Zone 3 P1 Maximum Shots
+    - entity: number.crop_steering_zone_3_p1_minimum_shots
+      name: Zone 3 P1 Minimum Shots
+    - entity: number.crop_steering_zone_3_p1_shot_size_increment
+      name: Zone 3 P1 Shot Size Increment
+    - entity: number.crop_steering_zone_3_p1_target_vwc
+      name: Zone 3 P1 Target Vwc
+    - entity: number.crop_steering_zone_3_p1_time_between_shots
+      name: Zone 3 P1 Time Between Shots
+    - entity: number.crop_steering_zone_3_p2_ec_high_threshold
+      name: Zone 3 P2 Ec High Threshold
+    - entity: number.crop_steering_zone_3_p2_ec_low_threshold
+      name: Zone 3 P2 Ec Low Threshold
+    - entity: number.crop_steering_zone_3_p2_shot_size
+      name: Zone 3 P2 Shot Size
+    - entity: number.crop_steering_zone_3_p2_vwc_threshold
+      name: Zone 3 P2 Vwc Threshold
+    - entity: number.crop_steering_zone_3_p3_emergency_shot_size
+      name: Zone 3 P3 Emergency Shot Size
+    - entity: number.crop_steering_zone_3_p3_emergency_vwc_threshold
+      name: Zone 3 P3 Emergency Vwc Threshold
+    - entity: number.crop_steering_zone_3_p3_gen_last_irrigation
+      name: Zone 3 P3 Gen Last Irrigation
+    - entity: number.crop_steering_zone_3_p3_veg_last_irrigation
+      name: Zone 3 P3 Veg Last Irrigation
+    - entity: number.crop_steering_zone_3_plant_count
+      name: Zone 3 Plant Count
+    - entity: number.crop_steering_zone_3_shot_size_multiplier
+      name: Zone 3 Shot Size Multiplier
+    - entity: number.crop_steering_zone_3_vegetative_dryback_target
+      name: Zone 3 Vegetative Dryback Target
+  - type: entities
+    title: All switch (13)
+    state_color: true
+    entities:
+    - entity: switch.crop_steering_analytics_enabled
+      name: Analytics Enabled
+    - entity: switch.crop_steering_auto_irrigation_enabled
+      name: Auto Irrigation Enabled
+    - entity: switch.crop_steering_ec_stacking_enabled
+      name: Ec Stacking Enabled
+    - entity: switch.crop_steering_system_enabled
+      name: System Enabled
+    - entity: switch.crop_steering_zone_1_dripper_protection
+      name: Zone 1 Dripper Protection
+    - entity: switch.crop_steering_zone_1_enabled
+      name: Zone 1 Enabled
+    - entity: switch.crop_steering_zone_1_manual_override
+      name: Zone 1 Manual Override
+    - entity: switch.crop_steering_zone_2_dripper_protection
+      name: Zone 2 Dripper Protection
+    - entity: switch.crop_steering_zone_2_enabled
+      name: Zone 2 Enabled
+    - entity: switch.crop_steering_zone_2_manual_override
+      name: Zone 2 Manual Override
+    - entity: switch.crop_steering_zone_3_dripper_protection
+      name: Zone 3 Dripper Protection
+    - entity: switch.crop_steering_zone_3_enabled
+      name: Zone 3 Enabled
+    - entity: switch.crop_steering_zone_3_manual_override
+      name: Zone 3 Manual Override
+  - type: entities
+    title: All select (16)
+    state_color: true
+    entities:
+    - entity: select.crop_steering_crop_type
+      name: Crop Type
+    - entity: select.crop_steering_growth_stage
+      name: Growth Stage
+    - entity: select.crop_steering_irrigation_phase
+      name: Irrigation Phase
+    - entity: select.crop_steering_steering_mode
+      name: Steering Mode
+    - entity: select.crop_steering_zone_1_crop_profile
+      name: Zone 1 Crop Profile
+    - entity: select.crop_steering_zone_1_group
+      name: Zone 1 Group
+    - entity: select.crop_steering_zone_1_priority
+      name: Zone 1 Priority
+    - entity: select.crop_steering_zone_1_steering_mode
+      name: Zone 1 Steering Mode
+    - entity: select.crop_steering_zone_2_crop_profile
+      name: Zone 2 Crop Profile
+    - entity: select.crop_steering_zone_2_group
+      name: Zone 2 Group
+    - entity: select.crop_steering_zone_2_priority
+      name: Zone 2 Priority
+    - entity: select.crop_steering_zone_2_steering_mode
+      name: Zone 2 Steering Mode
+    - entity: select.crop_steering_zone_3_crop_profile
+      name: Zone 3 Crop Profile
+    - entity: select.crop_steering_zone_3_group
+      name: Zone 3 Group
+    - entity: select.crop_steering_zone_3_priority
+      name: Zone 3 Priority
+    - entity: select.crop_steering_zone_3_steering_mode
+      name: Zone 3 Steering Mode
+  - type: entities
+    title: All input_select (4)
+    state_color: true
+    entities:
+    - entity: input_select.crop_steering_phase
+      name: Phase
+    - entity: input_select.crop_steering_zone_1_phase_control
+      name: Zone 1 Phase Control
+    - entity: input_select.crop_steering_zone_2_phase_control
+      name: Zone 2 Phase Control
+    - entity: input_select.crop_steering_zone_3_phase_control
+      name: Zone 3 Phase Control
+  - type: entities
+    title: All sensor (82)
+    state_color: true
+    entities:
+    - entity: sensor.crop_steering_activity_log
+      name: Activity Log
+    - entity: sensor.crop_steering_ai_heartbeat
+      name: Ai Heartbeat
+    - entity: sensor.crop_steering_app_current_phase
+      name: App Current Phase
+    - entity: sensor.crop_steering_app_next_irrigation
+      name: App Next Irrigation
+    - entity: sensor.crop_steering_app_status
+      name: App Status
+    - entity: sensor.crop_steering_average_ec_all_zones
+      name: Average Ec All Zones
+    - entity: sensor.crop_steering_average_vwc_all_zones
+      name: Average Vwc All Zones
+    - entity: sensor.crop_steering_current_decision
+      name: Current Decision
+    - entity: sensor.crop_steering_current_phase
+      name: Current Phase
+    - entity: sensor.crop_steering_daily_water_usage
+      name: Daily Water Usage
+    - entity: sensor.crop_steering_daily_water_usage_app
+      name: Daily Water Usage App
+    - entity: sensor.crop_steering_dryback_detection_accuracy
+      name: Dryback Detection Accuracy
+    - entity: sensor.crop_steering_dryback_percentage
+      name: Dryback Percentage
+    - entity: sensor.crop_steering_dryback_target
+      name: Dryback Target
+    - entity: sensor.crop_steering_ec_baseline
+      name: Ec Baseline
+    - entity: sensor.crop_steering_ec_ratio
+      name: Ec Ratio
+    - entity: sensor.crop_steering_fused_ec
+      name: Fused Ec
+    - entity: sensor.crop_steering_fused_vwc
+      name: Fused Vwc
+    - entity: sensor.crop_steering_irrigation_efficiency
+      name: Irrigation Efficiency
+    - entity: sensor.crop_steering_ml_model_accuracy
+      name: Ml Model Accuracy
+    - entity: sensor.crop_steering_next_irrigation_time
+      name: Next Irrigation Time
+    - entity: sensor.crop_steering_p1_shot_duration
+      name: P1 Shot Duration
+    - entity: sensor.crop_steering_p2_shot_duration
+      name: P2 Shot Duration
+    - entity: sensor.crop_steering_p2_vwc_threshold_adjusted
+      name: P2 Vwc Threshold Adjusted
+    - entity: sensor.crop_steering_p3_emergency_shot_duration
+      name: P3 Emergency Shot Duration
+    - entity: sensor.crop_steering_prediction_estimated_daily_water_need
+      name: Prediction Estimated Daily Water Need
+    - entity: sensor.crop_steering_prediction_zone_1_next_irrigation_hours
+      name: Prediction Zone 1 Next Irrigation Hours
+    - entity: sensor.crop_steering_prediction_zone_2_next_irrigation_hours
+      name: Prediction Zone 2 Next Irrigation Hours
+    - entity: sensor.crop_steering_prediction_zone_3_next_irrigation_hours
+      name: Prediction Zone 3 Next Irrigation Hours
+    - entity: sensor.crop_steering_sensor_fusion_confidence
+      name: Sensor Fusion Confidence
+    - entity: sensor.crop_steering_sensor_health
+      name: Sensor Health
+    - entity: sensor.crop_steering_system_efficiency
+      name: System Efficiency
+    - entity: sensor.crop_steering_system_health_score
+      name: System Health Score
+    - entity: sensor.crop_steering_system_safety_status
+      name: System Safety Status
+    - entity: sensor.crop_steering_system_state
+      name: System State
+    - entity: sensor.crop_steering_system_uptime
+      name: System Uptime
+    - entity: sensor.crop_steering_vwc_target_max
+      name: Vwc Target Max
+    - entity: sensor.crop_steering_vwc_target_min
+      name: Vwc Target Min
+    - entity: sensor.crop_steering_water_efficiency
+      name: Water Efficiency
+    - entity: sensor.crop_steering_zone_1_daily_water_app
+      name: Zone 1 Daily Water App
+    - entity: sensor.crop_steering_zone_1_daily_water_usage
+      name: Zone 1 Daily Water Usage
+    - entity: sensor.crop_steering_zone_1_ec
+      name: Zone 1 Ec
+    - entity: sensor.crop_steering_zone_1_efficiency
+      name: Zone 1 Efficiency
+    - entity: sensor.crop_steering_zone_1_health_score
+      name: Zone 1 Health Score
+    - entity: sensor.crop_steering_zone_1_irrigation_count_app
+      name: Zone 1 Irrigation Count App
+    - entity: sensor.crop_steering_zone_1_irrigations_today
+      name: Zone 1 Irrigations Today
+    - entity: sensor.crop_steering_zone_1_last_irrigation
+      name: Zone 1 Last Irrigation
+    - entity: sensor.crop_steering_zone_1_phase
+      name: Zone 1 Phase
+    - entity: sensor.crop_steering_zone_1_safety_status
+      name: Zone 1 Safety Status
+    - entity: sensor.crop_steering_zone_1_status
+      name: Zone 1 Status
+    - entity: sensor.crop_steering_zone_1_vwc
+      name: Zone 1 Vwc
+    - entity: sensor.crop_steering_zone_1_weekly_water_app
+      name: Zone 1 Weekly Water App
+    - entity: sensor.crop_steering_zone_1_weekly_water_usage
+      name: Zone 1 Weekly Water Usage
+    - entity: sensor.crop_steering_zone_2_daily_water_app
+      name: Zone 2 Daily Water App
+    - entity: sensor.crop_steering_zone_2_daily_water_usage
+      name: Zone 2 Daily Water Usage
+    - entity: sensor.crop_steering_zone_2_ec
+      name: Zone 2 Ec
+    - entity: sensor.crop_steering_zone_2_efficiency
+      name: Zone 2 Efficiency
+    - entity: sensor.crop_steering_zone_2_health_score
+      name: Zone 2 Health Score
+    - entity: sensor.crop_steering_zone_2_irrigation_count_app
+      name: Zone 2 Irrigation Count App
+    - entity: sensor.crop_steering_zone_2_irrigations_today
+      name: Zone 2 Irrigations Today
+    - entity: sensor.crop_steering_zone_2_last_irrigation
+      name: Zone 2 Last Irrigation
+    - entity: sensor.crop_steering_zone_2_last_irrigation_app
+      name: Zone 2 Last Irrigation App
+    - entity: sensor.crop_steering_zone_2_phase
+      name: Zone 2 Phase
+    - entity: sensor.crop_steering_zone_2_safety_status
+      name: Zone 2 Safety Status
+    - entity: sensor.crop_steering_zone_2_status
+      name: Zone 2 Status
+    - entity: sensor.crop_steering_zone_2_vwc
+      name: Zone 2 Vwc
+    - entity: sensor.crop_steering_zone_2_weekly_water_app
+      name: Zone 2 Weekly Water App
+    - entity: sensor.crop_steering_zone_2_weekly_water_usage
+      name: Zone 2 Weekly Water Usage
+    - entity: sensor.crop_steering_zone_3_daily_water_app
+      name: Zone 3 Daily Water App
+    - entity: sensor.crop_steering_zone_3_daily_water_usage
+      name: Zone 3 Daily Water Usage
+    - entity: sensor.crop_steering_zone_3_ec
+      name: Zone 3 Ec
+    - entity: sensor.crop_steering_zone_3_efficiency
+      name: Zone 3 Efficiency
+    - entity: sensor.crop_steering_zone_3_health_score
+      name: Zone 3 Health Score
+    - entity: sensor.crop_steering_zone_3_irrigation_count_app
+      name: Zone 3 Irrigation Count App
+    - entity: sensor.crop_steering_zone_3_irrigations_today
+      name: Zone 3 Irrigations Today
+    - entity: sensor.crop_steering_zone_3_last_irrigation
+      name: Zone 3 Last Irrigation
+    - entity: sensor.crop_steering_zone_3_phase
+      name: Zone 3 Phase
+    - entity: sensor.crop_steering_zone_3_safety_status
+      name: Zone 3 Safety Status
+    - entity: sensor.crop_steering_zone_3_status
+      name: Zone 3 Status
+    - entity: sensor.crop_steering_zone_3_vwc
+      name: Zone 3 Vwc
+    - entity: sensor.crop_steering_zone_3_weekly_water_app
+      name: Zone 3 Weekly Water App
+    - entity: sensor.crop_steering_zone_3_weekly_water_usage
+      name: Zone 3 Weekly Water Usage
+  - type: entities
+    title: Legacy automations — superseded (13)
+    state_color: true
+    entities:
+    - entity: automation.crop_steering_change_to_p0_at_lights_on
+      name: Change To P0 At Lights On
+    - entity: automation.crop_steering_entities_selection_blueprint
+      name: Entities Selection Blueprint
+    - entity: automation.crop_steering_p0_to_p1_transition
+      name: P0 To P1 Transition
+    - entity: automation.crop_steering_p1_ramp_up_irrigation
+      name: P1 Ramp Up Irrigation
+    - entity: automation.crop_steering_p1_to_p2_transition
+      name: P1 To P2 Transition
+    - entity: automation.crop_steering_p2_ec_adjusted_irrigation_on
+      name: P2 Ec Adjusted Irrigation On
+    - entity: automation.crop_steering_p2_irrigation_off_at_field_capacity
+      name: P2 Irrigation Off At Field Capacity
+    - entity: automation.crop_steering_p2_timed_irrigation_off
+      name: P2 Timed Irrigation Off
+    - entity: automation.crop_steering_p2_to_p3_transition
+      name: P2 To P3 Transition
+    - entity: automation.crop_steering_p3_emergency_irrigation
+      name: P3 Emergency Irrigation
+    - entity: automation.crop_steering_parameters_configuration
+      name: Parameters Configuration
+    - entity: automation.f1_crop_steering_parameters_config
+      name: Parameters Config
+    - entity: automation.f1_crop_steering_vwc_ec
+      name: Vwc Ec
+    icon: mdi:robot-off
+  - type: entities
+    title: Uncategorised (1)
+    state_color: true
+    entities:
+    - entity: input_select.cs_crop_steering_phase
+      name: Phase
