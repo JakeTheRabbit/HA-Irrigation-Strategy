@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>F2 Crop Steering — Control</title>
+<!--
+  F2 Crop Steering — decision-control dashboard.
+  Drop in HA's /config/www/ → http://<HA>:8123/local/crop_steering_dashboard.html
+  Token entered once, stored in browser localStorage. No secrets in this file. Dependency-free.
+  Design: Strategy → state → deviation → cause → action → verify. Answers SAFE? / ON-STRATEGY? / TRUSTWORTHY?
+-->
+<style>
+  :root{--bg:#070b16;--bg2:#0d1424;--card:rgba(255,255,255,.045);--br:rgba(255,255,255,.09);
+    --ink:#e9eef8;--dim:#93a0b8;--faint:#5d6b88;
+    --green:#34d399;--cyan:#22d3ee;--amber:#fbbf24;--red:#f87171;--purple:#a78bfa;--blue:#60a5fa;--orange:#fb923c;
+    --t1:#f87171;--t2:#fb923c;--t3:#fbbf24;--t4:#7c8db5;--shadow:0 10px 40px rgba(0,0,0,.45)}
+  *{box-sizing:border-box}html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  body::before{content:"";position:fixed;inset:-30% -10% auto -10%;height:60vh;z-index:-1;filter:blur(90px);opacity:.4;
+    background:radial-gradient(40% 60% at 20% 20%,#0e7490 0,transparent 60%),radial-gradient(50% 60% at 82% 8%,#4c1d95 0,transparent 60%),radial-gradient(40% 50% at 60% 50%,#065f46 0,transparent 60%)}
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:11px 20px;background:linear-gradient(180deg,rgba(7,11,22,.95),rgba(7,11,22,.6));backdrop-filter:blur(14px);border-bottom:1px solid var(--br)}
+  .brand{font-weight:750;letter-spacing:.4px;font-size:17px;display:flex;align-items:center;gap:9px}.brand .leaf{font-size:21px;filter:drop-shadow(0 0 8px #34d39988)}
+  .live{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--dim);padding:5px 10px;border:1px solid var(--br);border-radius:999px;background:var(--card)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--red)}.dot.ok{background:var(--green);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 #34d39966}70%{box-shadow:0 0 0 9px #34d39900}100%{box-shadow:0 0 0 0 #34d39900}}
+  .spacer{flex:1}
+  .btn{cursor:pointer;border:1px solid var(--br);background:var(--card);color:var(--ink);border-radius:10px;padding:7px 12px;font-size:13px;display:inline-flex;align-items:center;gap:6px;transition:.15s}
+  .btn:hover{border-color:#ffffff33;background:rgba(255,255,255,.09)}
+  select.mini{background:var(--bg2);color:var(--ink);border:1px solid var(--br);border-radius:8px;padding:6px 8px}
+
+  /* pinned spine: banner + trust strip */
+  .spine{position:sticky;top:55px;z-index:30;background:linear-gradient(180deg,rgba(7,11,22,.92),rgba(7,11,22,.7));backdrop-filter:blur(12px);border-bottom:1px solid var(--br);padding:12px 20px}
+  .banner{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .verdict{font-size:30px;font-weight:850;letter-spacing:-.5px;line-height:1;padding:4px 0}
+  .vpills{display:flex;gap:8px;flex-wrap:wrap}
+  .vp{display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;background:var(--card);border:1px solid var(--br);font-size:12.5px;font-weight:600;cursor:pointer}
+  .vp .pd{width:9px;height:9px;border-radius:50%}
+  .vp small{color:var(--faint);font-weight:600}
+  .bspacer{flex:1}
+  .phasechip{font-size:12px;color:var(--dim);text-align:right}
+  .phasechip b{color:var(--ink);font-weight:700}
+  .subcap{font-size:11.5px;color:var(--faint);margin-top:7px}
+  .armtoggles{display:flex;gap:8px;align-items:center}
+  .tg{width:40px;height:23px;border-radius:999px;background:#2a3550;position:relative;cursor:pointer;transition:.2s;border:1px solid var(--br);flex:none}
+  .tg::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#8a97b4;transition:.2s}
+  .tg.on{background:linear-gradient(90deg,#059669,#34d399)}.tg.on::after{left:19px;background:#fff}
+  .truststrip{margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;padding:7px 12px;border-radius:10px;border:1px solid var(--br);background:rgba(255,255,255,.025)}
+  .truststrip .tl{font-weight:750;letter-spacing:.4px}
+  .truststrip .tm{color:var(--dim)}
+
+  nav.tabs{display:flex;gap:4px;padding:10px 20px 0;flex-wrap:wrap;position:sticky;top:148px;z-index:25;background:linear-gradient(180deg,rgba(7,11,22,.85),transparent)}
+  .tab{cursor:pointer;padding:8px 14px;border-radius:11px 11px 0 0;color:var(--dim);font-weight:650;font-size:13px;border:1px solid transparent;border-bottom:none;transition:.15s;display:flex;align-items:center;gap:7px}
+  .tab:hover{color:var(--ink)}.tab.active{color:var(--ink);background:var(--card);border-color:var(--br)}
+  .tab .cnt{font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;background:var(--t1);color:#1b0606}
+
+  main{padding:18px 20px 80px;max-width:1500px;margin:0 auto}
+  section.view{display:none;animation:fade .3s ease}section.view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .lead{color:var(--dim);font-size:13px;margin:0 2px 16px;max-width:820px}.lead b{color:var(--ink)}
+  .grid{display:grid;gap:14px}.g-auto{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}.g-2{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}.g-3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .card{background:var(--card);border:1px solid var(--br);border-radius:15px;padding:15px;box-shadow:var(--shadow);backdrop-filter:blur(8px)}
+  .card h3{margin:0 0 4px;font-size:12.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);font-weight:750;display:flex;align-items:center;gap:8px}
+  .card .csub{color:var(--faint);font-size:11.5px;margin:0 0 11px}
+
+  /* exception centre */
+  .exc{display:flex;flex-direction:column;gap:8px}
+  .exrow{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border-radius:11px;background:rgba(255,255,255,.025);border:1px solid var(--br);border-left-width:4px}
+  .exrow.child{opacity:.5;margin-left:22px}
+  .exrow .ex-b{flex:1;min-width:0}
+  .exrow .ex-t{font-weight:700;font-size:13.5px}
+  .exrow .ex-c{color:var(--dim);font-size:12px;margin-top:3px}
+  .exrow .ex-a{color:var(--cyan);font-size:12px;margin-top:3px}
+  .exrow .ex-tag{font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;align-self:center}
+  .ok-banner{padding:16px;border-radius:12px;background:rgba(52,211,153,.08);border:1px solid #34d39944;color:var(--green);font-weight:650;text-align:center}
+
+  /* phase rail + schedule */
+  .rail{display:flex;gap:6px;margin:6px 0 14px}
+  .rcell{flex:1;text-align:center;padding:9px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--br);font-weight:750;font-size:13px;color:var(--faint);position:relative}
+  .rcell.on{color:#04130c;background:linear-gradient(135deg,#059669,#34d399);border-color:transparent}
+  .rcell .zc{display:flex;gap:3px;justify-content:center;margin-top:5px;min-height:16px}
+  .zchip{font-size:9px;font-weight:800;padding:1px 6px;border-radius:999px;background:#0008;color:#fff}
+  .sched{position:relative;height:42px;border-radius:10px;border:1px solid var(--br);overflow:hidden;background:#0a1120}
+  .sched .night{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,#1a233844,#1a233844 6px,#10182a44 6px,#10182a44 12px)}
+  .sched .tick{position:absolute;top:0;bottom:0;width:2px}
+  .sched .lbl{position:absolute;bottom:2px;font-size:9px;color:var(--faint);transform:translateX(-50%)}
+
+  /* band gauges */
+  .bg-wrap{margin:6px 0}
+  .bg-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+  .bg-val{font-size:22px;font-weight:800;letter-spacing:-.5px}.bg-val small{font-size:11px;color:var(--faint);font-weight:600}
+  .bg-dev{font-size:11px;font-weight:700}
+  svg.bandgauge{width:100%;height:38px;display:block}
+  .bg-cap{font-size:11px;color:var(--dim);margin-top:4px;display:flex;justify-content:space-between}
+
+  table.kv{width:100%;border-collapse:collapse;font-size:13px}
+  table.kv td{padding:7px 6px;border-bottom:1px solid rgba(255,255,255,.05)}
+  table.kv td:first-child{color:var(--dim)}table.kv td:last-child{text-align:right;font-weight:650;font-variant-numeric:tabular-nums}
+  .row{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.05)}.row:last-child{border-bottom:none}
+  .rl{flex:1;color:var(--ink);display:flex;align-items:center;gap:2px;min-width:0}
+  .ru{width:44px;font-size:11px;color:var(--faint);text-align:right}
+  .ni{width:84px;background:var(--bg2);color:var(--ink);border:1px solid var(--br);border-radius:8px;padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums}.ni:focus{outline:none;border-color:var(--cyan)}
+  select.sel{background:var(--bg2);color:var(--ink);border:1px solid var(--br);border-radius:8px;padding:6px 8px;max-width:170px}
+  .hi{display:inline-flex;width:14px;height:14px;border-radius:50%;border:1px solid var(--faint);color:var(--faint);font-size:9px;font-style:italic;font-weight:700;align-items:center;justify-content:center;margin-left:6px;flex:none;cursor:help;font-family:Georgia,serif}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .tile{background:rgba(255,255,255,.03);border:1px solid var(--br);border-radius:12px;padding:13px;border-top-width:3px}
+  .tile .th{font-size:12px;color:var(--dim);font-weight:700;display:flex;justify-content:space-between;align-items:center}
+  .tile .ts{font-size:16px;font-weight:750;margin:6px 0}
+  .tile .tx{font-size:11.5px;color:var(--faint);line-height:1.5}
+  .hdot{width:9px;height:9px;border-radius:50%}
+  .spread{height:34px;position:relative;margin:8px 0}
+  canvas.trace{width:100%;height:340px;display:block}
+  canvas.spark{width:100%;height:48px;display:block}
+  .zsel{display:flex;gap:6px;margin-bottom:10px}
+  .zbtn{cursor:pointer;padding:6px 13px;border-radius:9px;border:1px solid var(--br);background:var(--card);color:var(--dim);font-weight:700;font-size:13px}
+  .zbtn.on{color:#04130c;background:linear-gradient(135deg,#059669,#34d399);border-color:transparent}
+  .feed{max-height:300px;overflow:auto;font-size:12.5px}.feed div{padding:5px 8px;border-left:2px solid var(--br);margin-bottom:4px;background:rgba(255,255,255,.02);border-radius:0 8px 8px 0}
+  .conflict{padding:12px 14px;border-radius:11px;background:rgba(251,146,60,.09);border:1px solid #fb923c55;color:#fdba74;font-size:13px;margin-bottom:14px}
+  .override-banner{padding:14px;border-radius:12px;background:rgba(248,113,113,.1);border:1px solid #f8717166;color:#fca5a5;font-weight:700;margin-bottom:14px}
+  .pillrow{display:flex;gap:8px;flex-wrap:wrap}
+  .bigpill{padding:8px 14px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--br);font-size:13px}
+  .bigpill b{font-weight:800;color:#fff}.bigpill small{color:var(--faint);display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+  .notrack{color:var(--faint);font-size:12px;background:rgba(255,255,255,.02);border:1px dashed var(--br);border-radius:10px;padding:10px;margin-top:10px}
+  .sub{color:var(--faint);font-size:11px;font-weight:700;margin:14px 2px 7px;text-transform:uppercase;letter-spacing:.6px}
+  #tip{position:fixed;z-index:200;max-width:300px;background:#0a1326;border:1px solid #2a3a5a;border-radius:10px;padding:9px 12px;font-size:12px;color:var(--ink);box-shadow:var(--shadow);pointer-events:none;opacity:0;transition:opacity .12s;line-height:1.45}#tip.show{opacity:1}
+  .modal{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;background:rgba(2,5,12,.72);backdrop-filter:blur(6px)}.modal.open{display:flex}
+  .modal .box{width:min(440px,92vw);background:var(--bg2);border:1px solid var(--br);border-radius:18px;padding:24px;box-shadow:var(--shadow)}
+  .modal h2{margin:0 0 4px;font-size:18px}.modal p{margin:0 0 16px;color:var(--dim);font-size:13px}
+  .modal label{display:block;font-size:12px;color:var(--dim);margin:12px 0 5px;font-weight:600}
+  .modal input{width:100%;background:#0a1120;color:var(--ink);border:1px solid var(--br);border-radius:10px;padding:10px 12px;font-size:14px}.modal input:focus{outline:none;border-color:var(--cyan)}
+  .modal .r{display:flex;gap:10px;margin-top:20px}.modal .btn.primary{background:linear-gradient(90deg,#059669,#10b981);border-color:#10b981;font-weight:700;flex:1;justify-content:center}
+  .err{color:var(--red);font-size:12.5px;margin-top:10px;min-height:16px}.empty{color:var(--faint);text-align:center;padding:46px}
+  ::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:#2a3550;border-radius:9px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="leaf">🌿</span> F2 Crop Steering</div>
+  <div class="live"><span id="dot" class="dot"></span><span id="livetxt">connecting…</span></div>
+  <div class="spacer"></div>
+  <select id="rate" class="mini" title="Refresh rate"><option value="30000">30s</option><option value="60000" selected>60s</option><option value="120000">2m</option></select>
+  <button class="btn" id="refreshBtn" title="Refresh now">↻</button>
+  <button class="btn" id="gearBtn">⚙ Connection</button>
+</header>
+
+<div class="spine" id="spine"></div>
+<nav class="tabs" id="tabs"></nav>
+<main>
+  <section class="view active" data-view="triage" id="v-triage"></section>
+  <section class="view" data-view="trace" id="v-trace"></section>
+  <section class="view" data-view="zones" id="v-zones"></section>
+  <section class="view" data-view="control" id="v-control"></section>
+  <section class="view" data-view="trust" id="v-trust"></section>
+</main>
+
+<div class="modal" id="modal"><div class="box">
+  <h2>Connect to Home Assistant</h2><p>Stored only in this browser. HA → Profile → Security → Long-lived access tokens.</p>
+  <label>Home Assistant URL</label><input id="inBase" placeholder="http://192.168.73.250:8123"/>
+  <label>Long-lived access token</label><input id="inToken" type="password" placeholder="eyJhbGciOi…"/>
+  <div class="err" id="modalErr"></div>
+  <div class="r"><button class="btn primary" id="saveBtn">Connect</button><button class="btn" id="cancelBtn">Cancel</button></div>
+</div></div>
+
+<script>
+"use strict";
+/* ============ config / auth / data ============ */
+const LS={base:"cs_base",token:"cs_token"};
+let CFG={base:localStorage.getItem(LS.base)||location.origin,token:localStorage.getItem(LS.token)||""};
+let timer=null,ST={},HIST={},histAt=0,ZONES=[1,2,3],traceZone=1;
+const el=id=>document.getElementById(id);
+async function api(path,opts={}){const r=await fetch(CFG.base.replace(/\/$/,"")+path,{...opts,headers:{Authorization:"Bearer "+CFG.token,"Content-Type":"application/json",...(opts.headers||{})}});if(!r.ok)throw new Error(r.status+" "+r.statusText);return r.status===200?r.json():null;}
+
+/* ============ entity helpers ============ */
+const E=id=>ST[id];
+const S=id=>ST[id]?ST[id].state:undefined;
+const N=id=>{const n=parseFloat(S(id));return isNaN(n)?null:n;};
+const A=(id,a)=>ST[id]&&ST[id].attributes?ST[id].attributes[a]:undefined;
+const has=id=>ST[id]!==undefined;
+const bad=s=>s==null||s==="unknown"||s==="unavailable"||s==="none"||s==="";
+const r1=v=>v==null||isNaN(v)?"—":(Math.round(v*10)/10).toFixed(1);
+const r0=v=>v==null||isNaN(v)?"—":Math.round(v);
+const armed=()=>S("switch.crop_steering_system_enabled")==="on"&&S("switch.crop_steering_auto_irrigation_enabled")==="on";
+const zphase=z=>S(`sensor.crop_steering_zone_${z}_phase`);
+function modalPhase(){const ps=ZONES.map(zphase).filter(Boolean);if(!ps.length)return null;const c={};ps.forEach(p=>c[p]=(c[p]||0)+1);return Object.keys(c).sort((a,b)=>c[b]-c[a])[0];}
+function ageMin(id){const lc=ST[id]&&ST[id].last_changed;if(!lc)return null;return (Date.now()-Date.parse(lc))/60000;}
+const fmtAge=m=>m==null?"—":m<1?"just now":m<60?Math.round(m)+"m ago":m<1440?Math.round(m/60)+"h ago":Math.round(m/1440)+"d ago";
+// active EC target for a zone at current phase
+function ecTarget(z){const ph=(zphase(z)||"P2").replace(/[^0-3]/g,"")||"2";const mode=S("select.crop_steering_steering_mode")==="Generative"?"gen":"veg";return N(`number.crop_steering_zone_${z}_ec_target_${mode}_p${ph}`)??N(`number.crop_steering_ec_target_${mode}_p${ph}`)??3.2;}
+const C={green:"#34d399",cyan:"#22d3ee",amber:"#fbbf24",red:"#f87171",blue:"#60a5fa",faint:"#5d6b88",orange:"#fb923c"};
+// raw probe + environment sensors — verified live against the engine's apps.yaml
+const RAW={1:{vwc:"sensor.f2_row_1_vwc",ec:"sensor.f2_row_1_pwec"},2:{vwc:"sensor.veg_sdi12_vwc_2",ec:"sensor.veg_sdi12_ec_2"},3:{vwc:"sensor.veg_sdi12_vwc",ec:"sensor.veg_sdi12_ec"}};
+const WATER={ph:"sensor.aquaponics_kit_f4f618_ph",ec:"sensor.atlas_legacy_1_ec"};
+const CLIM={temp:"sensor.veg_scd41_top_temperature_scd41",rh:"sensor.veg_scd41_top_humidity_scd41"};
+function airVPD(){const t=N(CLIM.temp),rh=N(CLIM.rh);if(t==null||rh==null)return null;const svp=0.61078*Math.exp(17.27*t/(t+237.3));return svp*(1-rh/100);}
+function lineSpark(cv,pts,color){const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const c=cv.getContext("2d");c.scale(dpr,dpr);c.clearRect(0,0,w,h);if(!pts||pts.length<2){c.fillStyle=C.faint;c.font="10px sans-serif";c.fillText("loading…",4,h/2);return;}const ys=pts.map(p=>p[1]),xs=pts.map(p=>p[0]),lo=Math.min(...ys),hi=Math.max(...ys),r=(hi-lo)||1,x0=xs[0],x1=xs[xs.length-1],rx=(x1-x0)||1,X=t=>(t-x0)/rx*w,Y=v=>h-((v-lo)/r)*(h-6)-3;c.beginPath();pts.forEach((p,i)=>{const x=X(p[0]),y=Y(p[1]);i?c.lineTo(x,y):c.moveTo(x,y);});c.strokeStyle=color;c.lineWidth=1.8;c.lineJoin="round";c.stroke();c.lineTo(w,h);c.lineTo(0,h);c.closePath();const g=c.createLinearGradient(0,0,0,h);g.addColorStop(0,color+"33");g.addColorStop(1,color+"00");c.fillStyle=g;c.fill();}
+
+/* ============ tooltips ============ */
+const tipEl=document.createElement("div");tipEl.id="tip";document.body.appendChild(tipEl);
+function tmove(e){const m=14;let x=e.clientX+m,y=e.clientY+m,r=tipEl.getBoundingClientRect();if(x+r.width>innerWidth)x=e.clientX-r.width-m;if(y+r.height>innerHeight)y=e.clientY-r.height-m;tipEl.style.left=x+"px";tipEl.style.top=y+"px";}
+document.addEventListener("mouseover",e=>{const t=e.target.closest("[data-tip]");if(!t)return;tipEl.textContent=t.getAttribute("data-tip");tipEl.classList.add("show");tmove(e);});
+document.addEventListener("mousemove",e=>{if(tipEl.classList.contains("show"))tmove(e);});
+document.addEventListener("mouseout",e=>{if(e.target.closest("[data-tip]"))tipEl.classList.remove("show");});
+
+/* ============ TRUST ============ */
+function trust(){const h=N("sensor.crop_steering_sensor_health"),fc=N("sensor.crop_steering_sensor_fusion_confidence");
+  let v="OK",col=C.green;
+  if(h!=null&&h<40){v="UNTRUSTED";col=C.red;} else if((h!=null&&h<80)||(fc!=null&&fc<0.6)){v="DEGRADED";col=C.amber;}
+  return {verdict:v,col,health:h,fc};}
+
+/* ============ EXCEPTION ENGINE ============ */
+function exceptions(){
+  const out=[],T=trust();
+  const dataBlind=T.verdict==="UNTRUSTED";
+  // T1 safety
+  if(!bad(S("sensor.crop_steering_system_safety_status"))&&S("sensor.crop_steering_system_safety_status")!=="safe")
+    out.push({t:1,title:"Safety fault — engine in protective state",cause:"An EC/pH/volume guardrail or hardware interlock tripped",check:"Open Control → Guardrails and inspect the tripped limit"});
+  ZONES.forEach(z=>{const s=S(`sensor.crop_steering_zone_${z}_safety_status`);if(!bad(s)&&s!=="safe")out.push({t:1,title:`Zone ${z} safety fault`,cause:"Per-zone interlock tripped",check:"Inspect Zone "+z+" hardware / guardrails",zone:z});});
+  if(dataBlind)out.push({t:1,title:`Sensor health ${r0(T.health)}% — steering on degraded data`,cause:"Probe calibration/connection degraded; fusion is filling gaps",check:"Hand-verify substrate with a meter before trusting any band"});
+  // T2
+  const ecMax=N("number.crop_steering_irrigation_ec_max")??3.5,fc=N("number.crop_steering_field_capacity")??60;
+  ZONES.forEach(z=>{const ec=N(`sensor.crop_steering_zone_${z}_ec`),vwc=N(`sensor.crop_steering_zone_${z}_vwc`),floor=N(`number.crop_steering_zone_${z}_p2_vwc_threshold`);
+    if(ec!=null&&ec>ecMax)out.push({t:2,title:`Zone ${z} EC ${r1(ec)} above feed-max ${r1(ecMax)} — salt stacking`,cause:"Insufficient dryback flush or feed EC too high",check:`Compare to target ${r1(ecTarget(z))}; consider a flush shot`,zone:z,child:dataBlind});
+    if(vwc!=null&&floor!=null&&vwc<floor)out.push({t:2,title:`Zone ${z} VWC ${r1(vwc)} below P2 floor ${r1(floor)} — under-watered`,cause:"Dryback exceeded the maintenance floor",check:"Check why no shot fired (DISARMED? interval? dripper?)",zone:z,child:dataBlind});
+    if(vwc!=null&&vwc>fc)out.push({t:2,title:`Zone ${z} VWC ${r1(vwc)} above field capacity ${r1(fc)} — over-saturated`,cause:"Over-watering / no dryback",check:"Reduce shot size or interval for Zone "+z,zone:z,child:dataBlind});});
+  // strategy conflict
+  const gs=(S("select.crop_steering_growth_stage")||"").toLowerCase(),gp=S("input_select.growth_phase"),np=S("input_select.nutrient_phase");
+  if(gp&&np&&!(gs.includes("veget")&&/veg/i.test(gp)&&/veg/i.test(np))&&(gp&&np&&gs))
+    out.push({t:2,title:"Strategy selectors disagree",cause:`Integration=${S("select.crop_steering_growth_stage")} · growth_phase=${gp} · nutrient_phase=${np}`,check:"Designate the integration selects canonical; reconcile the duplicates"});
+  const pin=S("select.crop_steering_irrigation_phase"),mp=modalPhase();
+  if(pin&&mp&&pin!==mp&&pin!=="Manual")out.push({t:2,title:`Manual phase pin (${pin}) diverges from engine (${mp})`,cause:"A manual phase override is set",check:"Set irrigation_phase back to the engine's phase or confirm intent"});
+  if(!armed())out.push({t:2,title:"System DISARMED while a grow is active",cause:"system_enabled / auto_irrigation are OFF — no autonomous shots",check:"Arm from the banner when ready; watchdog may still fire emergency shots"});
+  // T3
+  ZONES.forEach(z=>{const ec=N(`sensor.crop_steering_zone_${z}_ec`),tg=ecTarget(z);if(ec!=null&&ec<tg*0.8&&!(ec>ecMax))out.push({t:3,title:`Zone ${z} EC ${r1(ec)} running lean (target ${r1(tg)})`,cause:"Pore-EC well below target",check:"Raise feed EC or lengthen dryback for Zone "+z,zone:z,child:dataBlind});});
+  const u=uniformity();
+  if(u.spreadEc>1.0)out.push({t:3,title:`Zone EC spread ${r1(u.spreadEc)} — zones strongly disagree`,cause:"Non-uniform feed/dripper or substrate",check:"Don't trust a single room-EC; inspect the outlier zone",child:dataBlind});
+  else if(u.spreadVwc>8)out.push({t:3,title:`Zone VWC spread ${r1(u.spreadVwc)} — uneven hydration`,cause:"Dripper/emitter or sensor-placement imbalance",check:"Compare zones in the Zones tab",child:dataBlind});
+  ZONES.forEach(z=>{const db=drybackOf(z);if(db&&db.pct!=null){const tgt=N("sensor.crop_steering_dryback_target")??15;if(Math.abs(db.pct-tgt)>10)out.push({t:3,title:`Zone ${z} dryback ${r0(db.pct)}% vs target ${r0(tgt)}%`,cause:db.pct>tgt?"Over-drying — stress / dripper fault":"Under-drying — insufficient stress",check:"Review the Steering Trace dryback card for Zone "+z,zone:z,child:dataBlind});}});
+  // T4
+  ZONES.forEach(z=>{if(S(`switch.crop_steering_zone_${z}_manual_override`)==="on")out.push({t:4,title:`Zone ${z} manual override ON — AI blocked`,cause:"Intentional maintenance lockout",check:"Confirm still needed; clear in Control",zone:z});
+    if(S(`switch.crop_steering_zone_${z}_enabled`)==="off")out.push({t:4,title:`Zone ${z} disabled — gets no water`,cause:"Zone excluded from automation",check:"Re-enable in Control when ready",zone:z});});
+  if(!bad(S("sensor.crop_steering_ai_heartbeat"))&&S("sensor.crop_steering_ai_heartbeat")!=="healthy")out.push({t:4,title:"Engine heartbeat not healthy",cause:S("sensor.crop_steering_ai_heartbeat"),check:"Check AppDaemon logs"});
+  out.sort((a,b)=>a.t-b.t||(a.child?1:0)-(b.child?1:0));
+  return out;
+}
+
+/* ============ UNIFORMITY ============ */
+function uniformity(){const vw=ZONES.map(z=>N(`sensor.crop_steering_zone_${z}_vwc`)).filter(v=>v!=null);
+  const ec=ZONES.map(z=>N(`sensor.crop_steering_zone_${z}_ec`)).filter(v=>v!=null);
+  const med=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);return s[Math.floor(s.length/2)];};
+  return {nv:vw.length,ne:ec.length,minVwc:Math.min(...vw),maxVwc:Math.max(...vw),medVwc:med(vw),spreadVwc:vw.length?Math.max(...vw)-Math.min(...vw):0,
+    minEc:Math.min(...ec),maxEc:Math.max(...ec),medEc:med(ec),spreadEc:ec.length?Math.max(...ec)-Math.min(...ec):0};}
+
+/* ============ DRYBACK (client-computed from history) ============ */
+function lastLightsOnMs(){const on=N("number.crop_steering_lights_on_hour")??10;const d=new Date();d.setMinutes(0,0,0);d.setHours(on);if(d.getTime()>Date.now())d.setDate(d.getDate()-1);return d.getTime();}
+function drybackOf(z){const h=HIST[`sensor.crop_steering_zone_${z}_vwc`];if(!h||h.length<3)return null;
+  const since=lastLightsOnMs();const w=h.filter(p=>p[0]>=since);if(w.length<3)return null;
+  let peak=-1,peakT=0;w.forEach(p=>{if(p[1]>peak){peak=p[1];peakT=p[0];}});
+  let valley=999;w.forEach(p=>{if(p[0]>=peakT&&p[1]<valley)valley=p[1];});
+  const cur=w[w.length-1][1];if(peak<=0)return null;
+  return {peak,peakT,valley,cur,pct:(peak-cur)/peak*100,complete:(peak-valley)/peak*100};}
+
+/* ============ SHOT PARSE (activity_log feed) ============ */
+function parseShots(){const raw=A("sensor.crop_steering_activity_log","feed");if(!raw)return [];
+  const lines=String(raw).split("\n");const now=Date.now(),out=[];
+  lines.forEach(l=>{const m=l.match(/^(\d\d):(\d\d):(\d\d)\s+Zone (\d)\s+watered\s+(\d+)s(?:\s*\((\d+\.?\d*)% shot\))?/i);
+    if(!m)return;const d=new Date();d.setHours(+m[1],+m[2],+m[3],0);if(d.getTime()>now+60000)d.setDate(d.getDate()-1);
+    out.push({t:d.getTime(),zone:+m[4],dur:+m[5],size:m[6]?+m[6]:null});});
+  return out;}
+
+/* ============ band gauge SVG ============ */
+function bandGauge(id,val,mn,mx,bandLo,bandHi,target,col,fmt){
+  const W=300,pad=2,x=v=>pad+(Math.max(mn,Math.min(mx,v))-mn)/(mx-mn)*(W-2*pad);
+  const blo=x(bandLo),bhi=x(bandHi),tx=target!=null?x(target):null,vx=val!=null?x(val):null;
+  return `<svg class="bandgauge" viewBox="0 0 ${W} 38" preserveAspectRatio="none">
+    <rect x="${pad}" y="14" width="${W-2*pad}" height="10" rx="5" fill="rgba(255,255,255,.06)"/>
+    <rect x="${blo}" y="14" width="${Math.max(0,bhi-blo)}" height="10" rx="5" fill="${C.green}33"/>
+    <line x1="${blo}" y1="11" x2="${blo}" y2="27" stroke="${C.green}" stroke-width="1.5"/>
+    <line x1="${bhi}" y1="11" x2="${bhi}" y2="27" stroke="${C.amber}" stroke-width="1.5"/>
+    ${tx!=null?`<line x1="${tx}" y1="9" x2="${tx}" y2="29" stroke="${C.blue}" stroke-width="2" stroke-dasharray="2 2"/>`:""}
+    ${vx!=null?`<circle cx="${vx}" cy="19" r="6" fill="${col}" stroke="#0a1120" stroke-width="2"/>`:`<text x="6" y="23" fill="${C.faint}" font-size="11">NO SIGNAL</text>`}
+  </svg>`;}
+
+/* ============ canvas trace ============ */
+function drawTrace(){
+  const cv=el("traceCanvas");if(!cv)return;const z=traceZone;
+  const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const c=cv.getContext("2d");c.scale(dpr,dpr);c.clearRect(0,0,w,h);
+  const vh=HIST[`sensor.crop_steering_zone_${z}_vwc`]||[],eh=HIST[`sensor.crop_steering_zone_${z}_ec`]||[];
+  const pad={l:34,r:38,t:10,b:20};
+  if(vh.length<2){c.fillStyle=C.faint;c.font="13px sans-serif";c.fillText("Loading history…",pad.l,h/2);return;}
+  const t0=Math.min(...vh.map(p=>p[0])),t1=Math.max(...vh.map(p=>p[0])),rx=(t1-t0)||1;
+  const X=t=>pad.l+(t-t0)/rx*(w-pad.l-pad.r);
+  const vMin=0,vMax=100,YV=v=>pad.t+(1-(v-vMin)/(vMax-vMin))*(h-pad.t-pad.b);
+  const eMin=0,eMax=8,YE=v=>pad.t+(1-(v-eMin)/(eMax-eMin))*(h-pad.t-pad.b);
+  // night shading (lights off complement)
+  const on=N("number.crop_steering_lights_on_hour")??10,off=N("number.crop_steering_lights_off_hour")??22;
+  for(let t=t0;t<t1;t+=600000){const hr=new Date(t).getHours();if(!(hr>=on&&hr<off)){c.fillStyle="rgba(120,140,180,.06)";c.fillRect(X(t),pad.t,Math.max(1,X(t+600000)-X(t)),h-pad.t-pad.b);}}
+  // VWC target band
+  const bMin=N("sensor.crop_steering_vwc_target_min")??50,bMax=N("sensor.crop_steering_vwc_target_max")??70,fc=N("number.crop_steering_field_capacity")??60;
+  c.fillStyle="rgba(52,211,153,.08)";c.fillRect(pad.l,YV(bMax),w-pad.l-pad.r,YV(bMin)-YV(bMax));
+  c.strokeStyle="rgba(150,160,180,.35)";c.setLineDash([4,3]);c.beginPath();c.moveTo(pad.l,YV(fc));c.lineTo(w-pad.r,YV(fc));c.stroke();
+  // EC target dashed
+  const ecT=ecTarget(z);c.strokeStyle=C.amber+"99";c.beginPath();c.moveTo(pad.l,YE(ecT));c.lineTo(w-pad.r,YE(ecT));c.stroke();c.setLineDash([]);
+  // grid labels
+  c.fillStyle=C.faint;c.font="10px sans-serif";for(let i=0;i<=4;i++){const v=vMin+(vMax-vMin)*i/4;c.fillText(r0(v),3,YV(v)+3);const e=eMin+(eMax-eMin)*i/4;c.fillStyle=C.amber+"99";c.fillText(r1(e),w-pad.r+4,YE(e)+3);c.fillStyle=C.faint;}
+  // shot markers
+  parseShots().filter(s=>s.zone===z&&s.t>=t0&&s.t<=t1).forEach(s=>{c.strokeStyle="rgba(96,165,250,.5)";c.beginPath();c.moveTo(X(s.t),pad.t);c.lineTo(X(s.t),h-pad.b);c.stroke();});
+  // VWC line
+  c.strokeStyle=C.blue;c.lineWidth=2;c.lineJoin="round";c.beginPath();vh.forEach((p,i)=>{const x=X(p[0]),y=YV(p[1]);i?c.lineTo(x,y):c.moveTo(x,y);});c.stroke();
+  // EC line
+  if(eh.length>1){c.strokeStyle=C.amber;c.beginPath();eh.forEach((p,i)=>{const x=X(p[0]),y=YE(p[1]);i?c.lineTo(x,y):c.moveTo(x,y);});c.stroke();}
+  // legend
+  c.font="11px sans-serif";c.fillStyle=C.blue;c.fillText("VWC %",pad.l,h-6);c.fillStyle=C.amber;c.fillText("EC mS/cm",pad.l+54,h-6);c.fillStyle=C.green;c.fillText("target band",pad.l+140,h-6);
+}
+function sparkBars(cv,vals,target,colFn){const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const c=cv.getContext("2d");c.scale(dpr,dpr);c.clearRect(0,0,w,h);
+  if(!vals.length){c.fillStyle=C.faint;c.font="11px sans-serif";c.fillText("no history",6,h/2);return;}
+  const mx=Math.max(target||0,...vals)*1.15||1,bw=w/vals.length;
+  if(target!=null){const ty=h-(target/mx)*(h-4)-2;c.strokeStyle="rgba(150,160,180,.4)";c.setLineDash([3,2]);c.beginPath();c.moveTo(0,ty);c.lineTo(w,ty);c.stroke();c.setLineDash([]);}
+  vals.forEach((v,i)=>{const bh=(v/mx)*(h-4);c.fillStyle=colFn(v);c.fillRect(i*bw+2,h-bh-2,bw-4,bh);});}
+
+/* ============ render: SPINE (banner + trust strip) ============ */
+function renderSpine(){
+  const T=trust();const ar=armed();const exc=exceptions();const t1=exc.filter(e=>e.t===1&&!e.child).length,t2=exc.filter(e=>e.t===2&&!e.child).length;
+  const safe=S("sensor.crop_steering_system_safety_status")==="safe";
+  const pills=[
+    {k:"ARM",v:ar?"ARMED":"DISARMED",col:ar?C.green:C.amber},
+    {k:"SAFETY",v:safe?"OK":(bad(S("sensor.crop_steering_system_safety_status"))?"?":"FAULT"),col:safe?C.green:C.red},
+    {k:"DATA",v:T.verdict,col:T.col},
+    {k:"STRATEGY",v:(t2||exc.some(e=>e.title.includes("Strategy")))?"OFF":"OK",col:(t2)?C.amber:C.green}];
+  let verdict="SAFE",vcol=C.green;
+  if(t1||T.verdict==="UNTRUSTED"||!safe){verdict="INTERVENE";vcol=C.red;}
+  else if(t2||T.verdict==="DEGRADED"||!ar){verdict="WATCH";vcol=C.amber;}
+  const ph=S("sensor.crop_steering_app_current_phase")||"—";
+  const nextT=S("sensor.crop_steering_app_next_irrigation");let cd="";
+  if(nextT&&!bad(nextT)){const ms=Date.parse(nextT)-Date.now();cd=ms>0?`in ${Math.floor(ms/3600000)}h ${Math.floor(ms%3600000/60000)}m`:"due";}
+  el("spine").innerHTML=`
+   <div class="banner">
+     <div class="verdict" style="color:${vcol}">${verdict}</div>
+     <div class="vpills">${pills.map(p=>`<div class="vp" data-jump="${p.k}"><span class="pd" style="background:${p.col}"></span>${p.k} <small>${p.v}</small></div>`).join("")}</div>
+     <div class="armtoggles" data-tip="Arm = system_enabled AND auto_irrigation_enabled both ON">
+       <div class="tg ${S('switch.crop_steering_system_enabled')==='on'?'on':''}" onclick="toggleSwitch('switch.crop_steering_system_enabled')" title="system_enabled"></div>
+       <div class="tg ${S('switch.crop_steering_auto_irrigation_enabled')==='on'?'on':''}" onclick="toggleSwitch('switch.crop_steering_auto_irrigation_enabled')" title="auto_irrigation"></div>
+     </div>
+     <div class="bspacer"></div>
+     <div class="phasechip"><b>${ph}</b><br>next ${cd||"—"} ${ar?"":"· <span style='color:#fbbf24'>watchdog only</span>"}</div>
+   </div>
+   <div class="subcap">${A("sensor.crop_steering_app_status","message")||S("sensor.crop_steering_app_status")||""} · decision: ${S("sensor.crop_steering_current_decision")||"—"}</div>
+   <div class="truststrip" style="border-color:${T.col}55">
+     <span class="tl" style="color:${T.col}">DATA TRUST: ${T.verdict}</span>
+     <span class="tm">sensor health ${r0(T.health)}% · fusion conf ${r1(T.fc)} · dryback acc ${r1(N("sensor.crop_steering_dryback_detection_accuracy"))}</span>
+     <span class="tm">AUTO: <b style="color:${ar?C.green:C.amber}">${ar?"ON":"OFF"}</b></span>
+     ${T.verdict==="UNTRUSTED"?'<span style="color:#f87171">Bands below may be unreliable — verify probes before acting.</span>':""}
+   </div>`;
+  // nav badge
+  const b=el("excBadge");if(b)b.textContent=(t1+t2)||"";if(b)b.style.display=(t1+t2)?"":"none";
+}
+
+/* ============ render: TRIAGE ============ */
+function renderTriage(){
+  const exc=exceptions();const blind=trust().verdict==="UNTRUSTED";
+  const tname={1:"CROP-THREAT",2:"STRATEGY",3:"QUALITY",4:"UPKEEP"},tcol={1:C.red,2:C.orange,3:C.amber,4:C.faint};
+  const rows=exc.length?exc.map(e=>`<div class="exrow ${e.child?'child':''}" style="border-left-color:${tcol[e.t]}">
+      <div class="ex-b"><div class="ex-t">${e.title}</div><div class="ex-c">Likely: ${e.cause}</div><div class="ex-a">→ ${e.check}</div></div>
+      <div class="ex-tag" style="background:${tcol[e.t]}22;color:${tcol[e.t]}">${tname[e.t]}${e.zone?" · Z"+e.zone:""}</div></div>`).join("")
+    :`<div class="ok-banner">✓ No exceptions — every zone on strategy, data trusted, within limits.</div>`;
+  // phase rail
+  const rail=["P0","P1","P2","P3"].map(p=>{const zs=ZONES.filter(z=>(zphase(z)||"").includes(p));return `<div class="rcell ${zs.length?'on':''}"><div>${p}</div><div class="zc">${zs.map(z=>`<span class="zchip">Z${z}</span>`).join("")}</div></div>`;}).join("");
+  const on=N("number.crop_steering_lights_on_hour")??10,off=N("number.crop_steering_lights_off_hour")??22,cut=off-(N("number.crop_steering_p3_veg_last_irrigation")??30)/60;
+  const hr=new Date().getHours()+new Date().getMinutes()/60;const px=h=>(h/24*100);
+  const sched=`<div class="sched">
+     <div class="night" style="left:0;width:${px(on)}%"></div><div class="night" style="left:${px(off)}%;right:0"></div>
+     <div class="tick" style="left:${px(on)}%;background:${C.amber}"></div><div class="lbl" style="left:${px(on)}%">lights ${on}:00</div>
+     <div class="tick" style="left:${px(off)}%;background:${C.purple}"></div><div class="lbl" style="left:${px(off)}%">off ${off}:00</div>
+     <div class="tick" style="left:${px(cut)}%;background:${C.faint}"></div><div class="lbl" style="left:${px(cut)}%">cutoff</div>
+     <div class="tick" style="left:${px(hr)}%;background:#fff;width:2px"></div>
+   </div>`;
+  el("v-triage").innerHTML=`<p class="lead"><b>What needs attention now.</b> Ranked by consequence — crop-threatening first. This is not a graph. Hover the ⓘ on any limit for what it means.</p>
+    <div class="card"><h3>Exception Centre ${blind?'· <span style="color:#f87171">data-blind: band alarms suppressed</span>':''}</h3><div class="exc">${rows}</div></div>
+    <div class="card" style="margin-top:14px"><h3>Phase & Schedule Adherence</h3><p class="csub">Authoritative per-zone phase. Photoperiod derived from lights_on/off (no live lights sensor). ${armed()?"":"Engine DISARMED — schedule is planned; watchdog may still fire."}</p>
+      <div class="rail">${rail}</div>${sched}</div>`;
+}
+
+/* ============ render: ZONES ============ */
+function renderZones(){
+  const fc=N("number.crop_steering_field_capacity")??60,ecMax=N("number.crop_steering_irrigation_ec_max")??3.5,absMax=N("number.crop_steering_maximum_ec")??9;
+  const u=uniformity();
+  const cols=ZONES.map(z=>{
+    const vwc=N(`sensor.crop_steering_zone_${z}_vwc`),floor=N(`number.crop_steering_zone_${z}_p2_vwc_threshold`),tgt=N(`number.crop_steering_zone_${z}_p1_target_vwc`);
+    const ec=N(`sensor.crop_steering_zone_${z}_ec`),et=ecTarget(z),hi=et*(N(`number.crop_steering_zone_${z}_p2_ec_high_threshold`)??1.2),lo=et*(N(`number.crop_steering_zone_${z}_p2_ec_low_threshold`)??0.8);
+    const vcol=vwc==null?C.faint:vwc<floor?C.amber:vwc>fc?C.blue:C.green;
+    const ecol=ec==null?C.faint:ec>ecMax?C.red:ec>hi?C.amber:ec<lo?C.blue:C.green;
+    const vdev=vwc==null?"":vwc<floor?`<span style="color:${C.amber}">${r1(floor-vwc)} below floor</span>`:vwc>fc?`<span style="color:${C.blue}">${r1(vwc-fc)} above FC</span>`:`<span style="color:${C.green}">in band</span>`;
+    const ecstat=ec==null?"no signal":ec>absMax?"OVER ABS-MAX":ec>ecMax?"over feed-max":ec>hi?"accumulating":ec<lo?"lean/flushing":"stable";
+    const trend=N("sensor.f2_ec_trend");
+    return `<div class="card"><h3>🌱 Zone ${z} <span style="margin-left:auto;font-size:11px;color:${vcol}">${S(`sensor.crop_steering_zone_${z}_status`)||""}</span></h3>
+      <div class="bg-wrap"><div class="bg-top"><div class="bg-val" style="color:${vcol}">${vwc==null?"—":r1(vwc)}<small> % VWC</small></div><div class="bg-dev">${vdev}</div></div>
+        ${bandGauge("v"+z,vwc,20,70,floor,fc,tgt,vcol)}
+        <div class="bg-cap"><span data-tip="P2 maintenance floor for this zone">floor ${r0(floor)}</span><span data-tip="P1 ramp target">target ${r0(tgt)}</span><span data-tip="field capacity ceiling">FC ${r0(fc)}</span></div></div>
+      <div class="bg-wrap"><div class="bg-top"><div class="bg-val" style="color:${ecol}">${ec==null?"—":r1(ec)}<small> mS/cm EC</small></div><div class="bg-dev" style="color:${ecol}">${ecstat} ${trend!=null?(trend<0?"↓":"↑"):""}</div></div>
+        ${bandGauge("e"+z,ec,0,absMax,lo,hi,et,ecol)}
+        <div class="bg-cap"><span>lean ${r1(lo)}</span><span data-tip="active EC target for current phase">target ${r1(et)}</span><span style="color:${C.red}">max ${r1(ecMax)}</span></div></div>
+      <canvas class="zspark" id="zspark-${z}" style="width:100%;height:38px;display:block;margin-top:8px"></canvas>
+      <div class="bg-cap"><span data-tip="Raw SDI-12 probe feeding this zone, vs the calibrated zone value above">probe ${r1(N(RAW[z].vwc))}% · ${r1(N(RAW[z].ec))} EC</span><span>${fmtAge(ageMin(RAW[z].vwc))}</span></div></div>`;
+  }).join("");
+  // uniformity strip
+  const ubar=(label,mn,md,mx,sev)=>{const W=v=>((v-mn)/((mx-mn)||1))*100;return `<div class="sub">${label}</div><div class="spread"><div style="position:absolute;top:14px;left:0;right:0;height:6px;border-radius:3px;background:${sev}33"></div>
+     <div style="position:absolute;top:10px;left:${W(md)}%;width:2px;height:14px;background:#fff"></div>
+     <span style="position:absolute;top:-2px;left:0;font-size:11px;color:${C.dim}">${r1(mn)}</span><span style="position:absolute;top:-2px;left:${W(md)}%;transform:translateX(-50%);font-size:11px;font-weight:700">${r1(md)}</span><span style="position:absolute;top:-2px;right:0;font-size:11px">${r1(mx)}</span></div>`;};
+  const vsev=u.spreadVwc<=4?C.green:u.spreadVwc<=8?C.amber:C.red,esev=u.spreadEc<=0.5?C.green:u.spreadEc<=1.0?C.amber:C.red;
+  // tiles
+  const tiles=ZONES.map(z=>{const st=S(`sensor.crop_steering_zone_${z}_status`)||"—",hp=N(`sensor.crop_steering_zone_${z}_health_score`),last=S(`sensor.crop_steering_zone_${z}_last_irrigation_app`);
+    const tcol=/dry|need|low/i.test(st)?C.amber:/error|fault/i.test(st)?C.red:C.green;
+    return `<div class="tile" style="border-top-color:${tcol}"><div class="th">Zone ${z}<span class="hdot" style="background:${hp==null?C.faint:hp<0.5?C.red:hp<0.75?C.amber:C.green}"></span></div>
+      <div class="ts" style="color:${tcol}">${st}</div>
+      <div class="tx">today ${S(`sensor.crop_steering_zone_${z}_irrigations_today`)??"0"} shots · ${r1(N(`sensor.crop_steering_zone_${z}_daily_water_usage`))} L<br>week ${r1(N(`sensor.crop_steering_zone_${z}_weekly_water_usage`))} L<br>last ${last&&!bad(last)?fmtAge((Date.now()-Date.parse(last))/60000):"—"}</div></div>`;}).join("");
+  el("v-zones").innerHTML=`<p class="lead"><b>Per-zone steering — deviation from band, not raw value.</b> Distinct per-zone floors/targets (verified). Crop-steering failures are local; the spread strip shows whether the zones agree.</p>
+    <div class="grid g-3">${cols}</div>
+    <div class="card" style="margin-top:14px"><h3>Zone Uniformity</h3><p class="csub">Built from ${u.nv} of 3 zones · engine mean VWC ${r1(N("sensor.crop_steering_average_vwc_all_zones"))} / EC ${r1(N("sensor.crop_steering_average_ec_all_zones"))}</p>
+      ${ubar(`VWC spread ${r1(u.spreadVwc)} (min·median·max)`,u.minVwc,u.medVwc,u.maxVwc,vsev)}
+      ${ubar(`EC spread ${r1(u.spreadEc)} — ${u.spreadEc>1?"zones disagree, distrust room-average EC":"acceptable"}`,u.minEc,u.medEc,u.maxEc,esev)}</div>
+    <div class="card" style="margin-top:14px"><h3>Status & Water</h3><div class="tiles">${tiles}</div></div>
+    <div class="card" style="margin-top:14px"><h3>📡 Sensors & Environment</h3><p class="csub">Raw probe → calibrated zone value, source-water feed quality, and room climate.</p>
+      <div class="grid g-2">
+        <table class="kv"><tr style="color:${C.faint}"><td>Signal</td><td>raw → calibrated</td></tr>
+          ${ZONES.map(z=>`<tr><td>Zone ${z} VWC</td><td>${r1(N(RAW[z].vwc))} → <b>${r1(N(`sensor.crop_steering_zone_${z}_vwc`))}</b> %</td></tr><tr><td>Zone ${z} EC</td><td>${r1(N(RAW[z].ec))} → <b>${r1(N(`sensor.crop_steering_zone_${z}_ec`))}</b> mS/cm</td></tr>`).join("")}
+          <tr><td>Fused room VWC / EC</td><td>${r1(N("sensor.crop_steering_fused_vwc"))} % · ${r1(N("sensor.crop_steering_fused_ec"))}</td></tr></table>
+        <table class="kv">
+          <tr><td>Source-water pH <span class="hi" data-tip="Gate ${r1(N("number.crop_steering_irrigation_ph_min"))}–${r1(N("number.crop_steering_irrigation_ph_max"))}">i</span></td><td style="color:${(()=>{const v=N(WATER.ph),lo=N("number.crop_steering_irrigation_ph_min"),hi=N("number.crop_steering_irrigation_ph_max");return v!=null&&lo!=null&&hi!=null&&(v<lo||v>hi)?C.red:C.green;})()}">${r1(N(WATER.ph))}</td></tr>
+          <tr><td>Source-water EC <span class="hi" data-tip="Gate ${r1(N("number.crop_steering_irrigation_ec_min"))}–${r1(N("number.crop_steering_irrigation_ec_max"))}">i</span></td><td style="color:${(()=>{const v=N(WATER.ec),lo=N("number.crop_steering_irrigation_ec_min"),hi=N("number.crop_steering_irrigation_ec_max");return v!=null&&lo!=null&&hi!=null&&(v<lo||v>hi)?C.amber:C.green;})()}">${r1(N(WATER.ec))} mS/cm</td></tr>
+          <tr><td>Room temperature</td><td>${r1(N(CLIM.temp))} °C</td></tr>
+          <tr><td>Room humidity</td><td>${r1(N(CLIM.rh))} %</td></tr>
+          <tr><td>Air VPD <span class="hi" data-tip="Computed from temp + RH (the engine's VPD sensor is offline)">i</span></td><td>${r1(airVPD())} kPa</td></tr></table></div></div>`;
+  ZONES.forEach(z=>{const cv=el("zspark-"+z);if(cv)lineSpark(cv,HIST[`sensor.crop_steering_zone_${z}_vwc`],C.green);});
+}
+
+/* ============ render: CONTROL ============ */
+function numRow(id,help){return `<div class="row"><span class="rl">${id.split("crop_steering_")[1].replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase())}${help?`<span class="hi" data-tip="${help}">i</span>`:""}</span><input class="ni" type="number" step="${A(id,'step')||0.1}" value="${S(id)}" onchange="setNumber('${id}',this.value)"/><span class="ru">${A(id,'unit_of_measurement')||""}</span></div>;`.replace(/;$/,"");}
+function selRow(id){const o=A(id,"options")||[];return `<div class="row"><span class="rl">${id.split(".")[1].replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase())}</span><select class="sel" onchange="setSelect('${id}',this.value)">${o.map(x=>`<option ${x===S(id)?"selected":""}>${x}</option>`).join("")}</select></div>`;}
+function swRow(id,lab){return `<div class="row"><span class="rl">${lab}</span><div class="tg ${S(id)==='on'?'on':''}" onclick="toggleSwitch('${id}')"></div></div>`;}
+function renderControl(){
+  const mode=S("select.crop_steering_steering_mode"),dbT=mode==="Generative"?N("number.crop_steering_generative_dryback_target"):N("number.crop_steering_vegetative_dryback_target");
+  const gs=S("select.crop_steering_growth_stage"),gp=S("input_select.growth_phase"),np=S("input_select.nutrient_phase");
+  const conflict=gp&&np&&gs&&!((gs||"").toLowerCase().includes("veget")&&/veg/i.test(gp)&&/veg/i.test(np));
+  const phase=(modalPhase()||"P3");
+  const pcard=(p,ids)=>`<div class="card" style="${p===phase?'border-color:#34d39966':''}"><h3>${p}${p===phase?' <span style="color:#34d399">● ACTIVE</span>':''}</h3>${ids.filter(has).map(i=>numRow(i)).join("")}</div>`;
+  const ovOn=ZONES.some(z=>S(`switch.crop_steering_zone_${z}_manual_override`)==="on"),disOff=ZONES.some(z=>S(`switch.crop_steering_zone_${z}_enabled`)==="off");
+  el("v-control").innerHTML=`<p class="lead"><b>The control surface.</b> Active strategy, the live recipe for the current phase, and the full safety envelope. Edits to number/select cards commit to HA immediately (no confirm, no version history).</p>
+    ${ovOn||disOff?`<div class="override-banner">⚠ ${ovOn?"MANUAL OVERRIDE ACTIVE":"ZONE DISABLED"} — ${ZONES.filter(z=>S(`switch.crop_steering_zone_${z}_manual_override`)==="on"||S(`switch.crop_steering_zone_${z}_enabled`)==="off").map(z=>"Z"+z).join(", ")}. AI irrigation blocked on those zones.</div>`:""}
+    <div class="card"><h3>Active Strategy</h3><div class="pillrow">
+      <div class="bigpill"><small>Mode</small><b>${mode||"—"}</b></div><div class="bigpill"><small>Stage</small><b>${gs||"—"}</b></div>
+      <div class="bigpill"><small>Profile</small><b>${S("select.crop_steering_crop_type")||"—"}</b></div><div class="bigpill"><small>Phase</small><b>${S("sensor.crop_steering_app_current_phase")||"—"}</b></div>
+      <div class="bigpill"><small>Dryback intent</small><b>${r0(dbT)}%</b></div><div class="bigpill"><small>Field cap</small><b>${r0(N("number.crop_steering_field_capacity"))}%</b></div></div>
+      <div style="margin-top:10px" class="grid g-3">${selRow("select.crop_steering_steering_mode")}${selRow("select.crop_steering_growth_stage")}${selRow("select.crop_steering_crop_type")}</div></div>
+    ${conflict?`<div class="conflict">⚠ Strategy selectors disagree — Integration: <b>${gs}</b> · growth_phase: <b>${gp}</b> · nutrient_phase: <b>${np}</b>. Confirm which is authoritative (recommend the integration selects).</div>`:""}
+    <div class="sub">Live Recipe — phase parameters (current phase highlighted)</div>
+    <div class="grid g-2" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      ${pcard("P0",["number.crop_steering_p0_dryback_drop_percent","number.crop_steering_p0_minimum_wait_time","number.crop_steering_p0_maximum_wait_time"])}
+      ${pcard("P1",["number.crop_steering_p1_target_vwc","number.crop_steering_p1_initial_shot_size","number.crop_steering_p1_shot_size_increment","number.crop_steering_p1_maximum_shot_size","number.crop_steering_p1_time_between_shots","number.crop_steering_p1_maximum_shots"])}
+      ${pcard("P2",["number.crop_steering_p2_vwc_threshold","number.crop_steering_p2_shot_size","number.crop_steering_p2_ec_high_threshold","number.crop_steering_p2_ec_low_threshold"])}
+      ${pcard("P3",["number.crop_steering_p3_emergency_vwc_threshold","number.crop_steering_p3_emergency_shot_size","number.crop_steering_p3_veg_last_irrigation"])}</div>
+    <div class="grid g-2" style="margin-top:14px">
+      <div class="card"><h3>🛡 Safety Envelope — Guardrails</h3>
+        ${numRow("number.crop_steering_maximum_ec","Hard substrate-EC cutoff — no shot above this")}
+        ${numRow("number.crop_steering_irrigation_ec_min","Source-water EC gate low bound")}${numRow("number.crop_steering_irrigation_ec_max","Source-water EC gate high bound")}
+        ${numRow("number.crop_steering_irrigation_ph_min","Source-water pH gate low")}${numRow("number.crop_steering_irrigation_ph_max","Source-water pH gate high")}
+        ${numRow("number.crop_steering_zone_1_max_daily_volume","Per-zone daily water cap (z1 shown)")}
+        ${numRow("number.crop_steering_p1_time_between_shots","Min interval between P1 shots")}${numRow("number.crop_steering_blocked_dripper_max_shots_30min","Emergency shots/30min before backoff")}
+        <div class="bg-cap" style="margin-top:8px">Lights/lockout ${r0(N("number.crop_steering_lights_on_hour"))}:00–${r0(N("number.crop_steering_lights_off_hour"))}:00 · last shot ${r0(N("number.crop_steering_p3_veg_last_irrigation"))}m before off</div></div>
+      <div class="card"><h3>Zone Control</h3>
+        ${ZONES.map(z=>swRow(`switch.crop_steering_zone_${z}_enabled`,`Zone ${z} enabled`)).join("")}
+        ${ZONES.map(z=>swRow(`switch.crop_steering_zone_${z}_manual_override`,`Zone ${z} manual override`)).join("")}
+        ${ZONES.map(z=>swRow(`switch.crop_steering_zone_${z}_dripper_protection`,`Zone ${z} dripper protection`)).join("")}</div></div>
+    <div class="grid g-2" style="margin-top:14px">
+      <div class="card"><h3>Grow Context</h3><table class="kv">
+        <tr><td>Room</td><td>F2 · veg</td></tr><tr><td>Crop</td><td>${S("select.crop_steering_crop_type")||"—"}</td></tr>
+        <tr><td>Substrate</td><td>${r0(N("number.crop_steering_substrate_volume"))} L coco</td></tr><tr><td>Dripper</td><td>${r1(N("number.crop_steering_dripper_flow_rate"))} L/hr ×${r0(N("number.crop_steering_drippers_per_plant"))}</td></tr>
+        <tr><td>Plants</td><td>${ZONES.map(z=>r0(N(`number.crop_steering_zone_${z}_plant_count`))).join(" / ")} per zone</td></tr></table>
+        <div class="notrack">Batch / cultivar name / harvest group / plant date: <b>NOT TRACKED</b> in HA — maintain externally.</div></div>
+      <div class="card"><h3>Recent Actions & Next Step</h3>
+        <div style="font-size:13px;margin-bottom:8px">Next: <b>${(()=>{const t=S("sensor.crop_steering_app_next_irrigation");if(!t||bad(t))return "—";const ms=Date.parse(t)-Date.now();return ms>0?`in ${Math.floor(ms/3600000)}h ${Math.floor(ms%3600000/60000)}m`:"due";})()}</b> ${armed()?"":'<span style="color:#fbbf24">· planned, watchdog-driven (DISARMED)</span>'}</div>
+        <div class="feed" id="ctrlfeed"></div>
+        <div class="notrack">No user audit trail exists; setpoint changes are unversioned and apply immediately. Keep a manual change note.</div></div></div>`;
+  const f=el("ctrlfeed"),raw=A("sensor.crop_steering_activity_log","feed");if(f&&raw)f.innerHTML=String(raw).split("\n").filter(Boolean).slice(0,30).map(l=>`<div>${l.replace(/[<>]/g,"")}</div>`).join("");
+}
+
+/* ============ render: TRACE ============ */
+function renderTrace(){
+  el("v-trace").innerHTML=`<p class="lead"><b>Are we tracking strategy?</b> Substrate VWC + pore-EC over their target bands, with shot markers, night shading and dryback-as-an-event. One zone at a time.</p>
+    <div class="zsel">${ZONES.map(z=>`<div class="zbtn ${z===traceZone?'on':''}" onclick="setTraceZone(${z})">Zone ${z}</div>`).join("")}</div>
+    <div class="card"><h3>Steering Trace · 24h <span style="margin-left:auto;font-size:11px;color:${C.dim}">VWC ${r1(N(`sensor.crop_steering_zone_${traceZone}_vwc`))}% · EC ${r1(N(`sensor.crop_steering_zone_${traceZone}_ec`))} · ${zphase(traceZone)||""}</span></h3><canvas class="trace" id="traceCanvas"></canvas></div>
+    <div class="grid g-3" style="margin-top:14px" id="drybackCards"></div>
+    <div class="card" style="margin-top:14px"><h3>Per-shot cause & effect — last 10</h3><p class="csub">True ΔVWC computed from history (the feed's inline a%→b% is bogus for maintenance shots). A >60s shot with ΔVWC<0.5% = no uptake.</p><div id="shotTable"></div></div>
+    <div class="card" style="margin-top:14px"><h3>Multi-day dryback trend (selected zone)</h3><canvas class="spark" id="drybackSpark"></canvas></div>`;
+  drawTrace();renderDrybackCards();renderShotTable();renderDrybackSpark();
+}
+function renderDrybackCards(){const wrap=el("drybackCards");if(!wrap)return;const tgt=N("sensor.crop_steering_dryback_target")??15,conf=N("sensor.crop_steering_dryback_detection_accuracy"),rate=N("sensor.f2_vwc_dryback_rate");
+  wrap.innerHTML=ZONES.map(z=>{const db=drybackOf(z);
+    if(!db||db.pct==null)return `<div class="card"><h3>Zone ${z} dryback</h3><div style="color:${C.faint};font-size:13px">No peak yet today — computing from history.</div></div>`;
+    const dev=db.pct-tgt,col=Math.abs(dev)<=5?C.green:Math.abs(dev)<=10?C.amber:C.red;
+    return `<div class="card"><h3>Zone ${z} dryback</h3>
+      <div style="font-size:30px;font-weight:850;color:${col}">${r0(db.pct)}%<span style="font-size:13px;color:${C.faint};font-weight:600"> from peak</span></div>
+      <div style="font-size:12px;color:${C.dim};margin:4px 0">peak ${r1(db.peak)}% → now ${r1(db.cur)}% · target ${r0(tgt)}% drop · ${rate!=null?r1(rate)+"%/h":""}</div>
+      ${conf!=null&&conf<0.6?`<div style="font-size:11px;color:${C.amber}">⚠ detector confidence ${r1(conf)} — don't over-trust</div>`:""}</div>`;}).join("");
+  if(N("number.crop_steering_vegetative_dryback_target")!=null&&Math.abs(N("number.crop_steering_vegetative_dryback_target")-tgt)>5)wrap.insertAdjacentHTML("beforeend",`<div class="notrack" style="grid-column:1/-1">Target sources conflict: dryback_target=${tgt} vs vegetative_dryback_target=${r0(N("number.crop_steering_vegetative_dryback_target"))} — confirm which the engine reads (using ${tgt} as drop-from-peak).</div>`);
+}
+function renderShotTable(){const wrap=el("shotTable");if(!wrap)return;const shots=parseShots().slice(0,10);
+  if(!shots.length){wrap.innerHTML=`<div style="color:${C.faint}">No recent shots in the activity feed.</div>`;return;}
+  const rows=shots.map(s=>{const h=HIST[`sensor.crop_steering_zone_${s.zone}_vwc`]||[];let pre=null,peak=null;
+    if(h.length){const before=h.filter(p=>p[0]<=s.t);pre=before.length?before[before.length-1][1]:null;const after=h.filter(p=>p[0]>s.t&&p[0]<=s.t+360000);peak=after.length?Math.max(...after.map(p=>p[1])):null;}
+    const dv=(pre!=null&&peak!=null)?peak-pre:null;const flag=dv!=null&&dv<0.5&&s.dur>60;
+    return `<tr style="${flag?'background:rgba(248,113,113,.08)':''}"><td>${new Date(s.t).toLocaleTimeString()}</td><td>Z${s.zone}</td><td style="text-align:right">${s.dur}s</td><td style="text-align:right;color:${dv==null?C.faint:dv<0.5?C.red:C.green}">${dv==null?"—":(dv>=0?"+":"")+r1(dv)+"%"}</td><td style="text-align:right;color:${flag?C.red:C.dim}">${flag?"no uptake?":""}</td></tr>`;}).join("");
+  wrap.innerHTML=`<table class="kv"><tr style="color:${C.faint}"><td>time</td><td>zone</td><td style="text-align:right">dur</td><td style="text-align:right">ΔVWC</td><td></td></tr>${rows}</table>`;
+}
+function renderDrybackSpark(){const cv=el("drybackSpark");if(!cv)return;const h=HIST[`sensor.crop_steering_zone_${traceZone}_vwc`]||[];const tgt=N("sensor.crop_steering_dryback_target")??15;
+  // bucket by day anchored at lights-on
+  const on=N("number.crop_steering_lights_on_hour")??10,days={};h.forEach(p=>{const d=new Date(p[0]);let day=new Date(d);if(d.getHours()<on)day.setDate(day.getDate()-1);const k=day.toDateString();(days[k]=days[k]||[]).push(p[1]);});
+  const vals=Object.values(days).map(a=>{const pk=Math.max(...a),mn=Math.min(...a);return pk>0?(pk-mn)/pk*100:0;});
+  sparkBars(cv,vals,tgt,v=>Math.abs(v-tgt)<=5?C.green:Math.abs(v-tgt)<=10?C.amber:C.red);
+}
+
+/* ============ render: TRUST ============ */
+function renderTrust(){
+  const T=trust();const sigs=[["sensor.crop_steering_zone_1_vwc","Z1 VWC"],["sensor.crop_steering_zone_2_vwc","Z2 VWC"],["sensor.crop_steering_zone_3_vwc","Z3 VWC"],["sensor.crop_steering_zone_1_ec","Z1 EC"],["sensor.crop_steering_zone_2_ec","Z2 EC"],["sensor.crop_steering_zone_3_ec","Z3 EC"],["sensor.crop_steering_fused_vwc","Fused VWC"],["sensor.crop_steering_fused_ec","Fused EC"],["sensor.crop_steering_dryback_percentage","Dryback % (engine)"],["sensor.crop_steering_app_status","App status"]];
+  const rows=sigs.map(([id,nm])=>{const s=S(id),a=ageMin(id);let tag,col;
+    if(bad(s)){tag="OFFLINE";col=C.red;}else if(a==null){tag="—";col=C.faint;}else if(a<10){tag="FRESH";col=C.green;}else if(a<30){tag="WATCH";col=C.amber;}else{tag="STALE";col=C.red;}
+    const note=id.includes("dryback_percentage")?' <span style="color:'+C.faint+'">engine sensor offline since 29 May — dryback computed client-side</span>':"";
+    return {id,nm,s,a,tag,col,note,off:bad(s)};}).sort((x,y)=>(y.off-x.off)||((y.a||0)-(x.a||0)));
+  el("v-trust").innerHTML=`<p class="lead"><b>Can we believe the numbers?</b> Trust is a first-class gate — no green verdict survives degraded data. These fused values are what the engine actually steers on.</p>
+    <div class="grid g-2"><div class="card"><h3>Trust Verdict</h3>
+      <div style="font-size:26px;font-weight:850;color:${T.col}">${T.verdict}</div>
+      <table class="kv" style="margin-top:8px">
+        <tr><td>Sensor health</td><td style="color:${T.health<40?C.red:T.health<80?C.amber:C.green}">${r0(T.health)}%</td></tr>
+        <tr><td>Fusion confidence</td><td>${r1(T.fc)}</td></tr>
+        <tr><td>Dryback detector accuracy</td><td>${r1(N("sensor.crop_steering_dryback_detection_accuracy"))}</td></tr>
+        <tr><td>Fused VWC (engine consensus)</td><td>${r1(N("sensor.crop_steering_fused_vwc"))}% · ${A("sensor.crop_steering_fused_vwc","active_sensors")||"?"} probes</td></tr>
+        <tr><td>Fused EC</td><td>${r1(N("sensor.crop_steering_fused_ec"))} · conf ${r1(A("sensor.crop_steering_fused_ec","confidence"))}</td></tr>
+        <tr><td>AI heartbeat</td><td>${S("sensor.crop_steering_ai_heartbeat")||"—"} (${fmtAge(ageMin("sensor.crop_steering_ai_heartbeat"))})</td></tr>
+        <tr><td>Auto irrigation</td><td style="color:${armed()?C.green:C.amber}">${armed()?"ON":"OFF"}</td></tr></table></div>
+      <div class="card"><h3>Per-signal Liveness</h3><table class="kv">
+        ${rows.map(r=>`<tr><td>${r.nm}${r.note}</td><td><span style="color:${r.col}">${r.tag}</span> · ${bad(r.s)?"—":(typeof r.s==="string"?r.s.slice(0,14):r.s)} · ${fmtAge(r.a)}</td></tr>`).join("")}</table></div></div>`;
+}
+
+/* ============ services ============ */
+async function svc(d,s,data){try{await api(`/api/services/${d}/${s}`,{method:"POST",body:JSON.stringify(data)});setTimeout(refresh,600);}catch(e){alert("Failed: "+e.message);}}
+window.toggleSwitch=id=>{if(/system_enabled|auto_irrigation/.test(id)&&!confirm("Toggle the system arm? This affects live irrigation."))return;svc("switch","toggle",{entity_id:id});};
+window.setSelect=(id,v)=>svc(id.split(".")[0],"select_option",{entity_id:id,option:v});
+window.setNumber=(id,v)=>{if(v!=="")svc("number","set_value",{entity_id:id,value:parseFloat(v)});};
+window.setTraceZone=z=>{traceZone=z;renderTrace();};
+
+/* ============ loop ============ */
+function setLive(ok,msg){el("dot").classList.toggle("ok",ok);el("livetxt").textContent=msg;}
+function renderActive(){const v=document.querySelector(".view.active");if(!v)return;({triage:renderTriage,trace:renderTrace,zones:renderZones,control:renderControl,trust:renderTrust})[v.dataset.view]();}
+async function refresh(){
+  if(!CFG.token){openModal();return;}
+  try{
+    const states=await api("/api/states");ST={};states.forEach(s=>ST[s.entity_id]=s);
+    if(!has("sensor.crop_steering_zone_1_vwc")){setLive(false,"no crop_steering entities");el("v-triage").innerHTML='<div class="empty">No crop_steering entities found.</div>';return;}
+    if(Date.now()-histAt>55000){const ids=ZONES.flatMap(z=>[`sensor.crop_steering_zone_${z}_vwc`,`sensor.crop_steering_zone_${z}_ec`]);
+      try{const start=new Date(Date.now()-26*3600*1000).toISOString();const hd=await api(`/api/history/period/${start}?filter_entity_id=${ids.join(",")}&minimal_response&no_attributes`);
+        HIST={};(hd||[]).forEach(arr=>{if(arr&&arr.length){HIST[arr[0].entity_id]=arr.map(s=>[Date.parse(s.last_changed||s.lu||s.last_updated),parseFloat(s.state)]).filter(p=>!isNaN(p[0])&&!isNaN(p[1]));}});histAt=Date.now();}catch(e){}}
+    renderSpine();renderActive();
+    setLive(true,"live · "+new Date().toLocaleTimeString());
+  }catch(e){setLive(false,"error: "+e.message);if(String(e.message).startsWith("401")){el("modalErr").textContent="Token rejected (401).";openModal();}}
+}
+function startLoop(){if(timer)clearInterval(timer);refresh();timer=setInterval(refresh,+el("rate").value);}
+
+/* ============ tabs / modal ============ */
+const VIEWS=[["triage","◆ Triage"],["trace","📈 Steering Trace"],["zones","🌱 Zones"],["control","🎛 Control"],["trust","🛰 Trust"]];
+el("tabs").innerHTML=VIEWS.map((v,i)=>`<div class="tab ${i?"":"active"}" data-t="${v[0]}">${v[1]}${v[0]==="triage"?' <span class="cnt" id="excBadge" style="display:none"></span>':""}</div>`).join("");
+el("tabs").addEventListener("click",e=>{const t=e.target.closest(".tab");if(!t)return;document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));t.classList.add("active");document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.dataset.view===t.dataset.t));renderActive();});
+el("spine").addEventListener("click",e=>{const p=e.target.closest("[data-jump]");if(p){document.querySelector('.tab[data-t="triage"]').click();}});
+function openModal(){el("inBase").value=CFG.base;el("inToken").value=CFG.token;el("modal").classList.add("open");}
+function closeModal(){el("modal").classList.remove("open");}
+el("gearBtn").onclick=openModal;el("cancelBtn").onclick=closeModal;el("refreshBtn").onclick=refresh;el("rate").onchange=startLoop;
+el("saveBtn").onclick=async()=>{const base=el("inBase").value.trim()||location.origin,token=el("inToken").value.trim();el("modalErr").textContent="testing…";
+  try{const r=await fetch(base.replace(/\/$/,"")+"/api/",{headers:{Authorization:"Bearer "+token}});if(!r.ok)throw new Error(r.status);CFG={base,token};localStorage.setItem(LS.base,base);localStorage.setItem(LS.token,token);closeModal();startLoop();}catch(e){el("modalErr").textContent="Could not connect ("+e.message+"). Check URL, token, CORS.";}};
+addEventListener("resize",()=>{if(document.querySelector('.view.active')?.dataset.view==="trace")drawTrace();});
+if(!CFG.token)openModal();else startLoop();
+</script>
+</body>
+</html>

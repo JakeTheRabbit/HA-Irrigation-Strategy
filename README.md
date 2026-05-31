@@ -6,7 +6,7 @@
 ![Zones](https://img.shields.io/badge/Zones-1%E2%80%936-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-![Dashboard Overview](img/Dashboard%201.png)
+![Decision-control dashboard — triage / exception centre](img/Dashboard%201.png)
 
 > **Professional crop steering — without the $3,000 controller and the monthly subscription.**
 > If you already run Home Assistant and have moisture sensors in your substrate, you
@@ -265,9 +265,25 @@ the engine alive.
 
 ### 5 · Build the dashboard
 
-Build a Lovelace dashboard from the `crop_steering_*` entities (use
-`dashboards/crop_steering.yaml` as a starting point). Add a Markdown card bound to
-`sensor.crop_steering_activity_log` for the live engine feed.
+Three ready-made dashboards ship in this repo — all built around **decision control**
+(*is the room applying the intended stress, at the right time, in the right zones, with
+trustworthy data, within safe limits?*) instead of a wall of sensors:
+
+| Dashboard | File | What it is |
+|---|---|---|
+| **Standalone — desktop** | [`www/crop_steering_dashboard.html`](www/crop_steering_dashboard.html) | Full decision UI: a triage exception centre, time-aligned steering trace with client-computed dryback, per-zone band gauges + raw probes, a guarded control surface, and a data-trust layer. Open `http://<ha>:8123/local/crop_steering_dashboard.html`. |
+| **Standalone — mobile** | [`www/crop_steering_mobile.html`](www/crop_steering_mobile.html) | The same five views, phone-first with a bottom tab bar. Add to home screen. |
+| **Native Lovelace** | [`crop_steering_lovelace.yaml`](crop_steering_lovelace.yaml) | A native HA dashboard where markdown + Jinja compute the live verdict / exception list / trust — and it covers **every** `crop_steering` entity. Paste into a new dashboard's raw-config editor. |
+
+The standalone pages need only a long-lived token (entered once, kept in your browser);
+they read live state + 24 h history from the HA REST API, and parse
+`sensor.crop_steering_activity_log` for the per-shot feed. Regenerate the Lovelace YAML
+with `scripts/build_lovelace.py`.
+
+|  |  |
+|---|---|
+| ![Zones — band gauges + raw probes](img/Dashboard%202.png) | ![Steering trace](img/Dashboard%203.png) |
+| ![Control surface](img/Dashboard%204.png) | ![Mobile](img/Mobile%201.png) |
 
 ---
 
