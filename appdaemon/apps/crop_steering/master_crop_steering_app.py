@@ -4897,7 +4897,18 @@ class MasterCropSteeringApp(BaseAsyncApp):
                             await self._transition_zone_to_phase(zone_num, 'P1', f'Dryback complete: {current_dryback:.1f}%')
                         elif phase_duration >= p0_data.max_duration_minutes:
                             await self._transition_zone_to_phase(zone_num, 'P1', f'P0 timeout: {phase_duration:.0f} minutes')
-                
+
+                # Lights OFF -> force the overnight P3 dryback from P1 or P2. Neither normal exit
+                # fires here: P1->P2 needs the per-zone recovery target (a slow / cap-starved zone
+                # never reaches it) and P2->P3 via _should_zone_start_p3 returns False once we are
+                # PAST lights-off (it measures hours to TOMORROW's lights-off, ~24h > its 3h gate).
+                # Without this a zone strands in P1/P2 all night instead of P3 (observed live on
+                # the lean engine: Z1:P1, Z2:P2, Z3:P1 at 10pm). The startup state-validation
+                # forces P3 as well, but only on restart — this makes the correction continuous.
+                elif current_phase in (IrrigationPhase.P1_RAMP_UP, IrrigationPhase.P2_MAINTENANCE) \
+                        and not self._are_lights_on(datetime.now().time(), lights_on_time, lights_off_time):
+                    await self._transition_zone_to_phase(zone_num, 'P3', 'Lights off — entering overnight P3 dryback')
+
                 # P1 → P2: Recovery complete. Use the PER-ZONE target (zone_1 = 71%, etc.) and
                 # keep p1_data.target_vwc in sync — the dataclass default was a flat 65%, so
                 # this method and the timer method disagreed in the 65-71% band.
