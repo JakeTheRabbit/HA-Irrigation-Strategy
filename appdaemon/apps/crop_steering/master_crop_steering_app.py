@@ -1282,29 +1282,41 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 if restored_count > 0:
                     self.log(f"✅ Restored zone phase data for {restored_count} zones")
             
-            # Restore water usage (check if data is from today/this week)
+            # Restore water usage (check if data is from the same PHOTOPERIOD / week)
             if 'zone_water_usage' in state_data:
                 today = datetime.now().date()
+                # The daily water/shot counters belong to the current GROW-DAY (one photoperiod,
+                # lights-on → lights-on), NOT the calendar day. Comparing to `today` zeroed the
+                # day's totals on any restart between midnight and lights-on — the "reset at 1am
+                # instead of lights-on" bug. The grow-day containing `now` started at the most
+                # recent lights-on; if we're before today's lights-on we're still in YESTERDAY's
+                # grow-day, so its totals must survive until today's lights-on (the P0 reset).
+                lights_on_hour = int(self._get_number_entity_value("number.crop_steering_lights_on_hour", 10) or 10)
+                _now = datetime.now()
+                grow_day_start = _now.date() if _now.hour >= lights_on_hour else (_now - timedelta(days=1)).date()
                 restored_count = 0
                 for zone_str, data in state_data['zone_water_usage'].items():
                     try:
                         zone_num = int(zone_str)
                         if zone_num < 1 or zone_num > self.num_zones:
                             continue
-                        
-                        last_daily_reset = datetime.fromisoformat(data['last_reset_daily']).date() if data.get('last_reset_daily') else today
+
+                        last_daily_reset = datetime.fromisoformat(data['last_reset_daily']).date() if data.get('last_reset_daily') else grow_day_start
                         last_weekly_reset = datetime.fromisoformat(data['last_reset_weekly']).date() if data.get('last_reset_weekly') else today
-                        
-                        # Only restore if from same day/week
-                        daily_total = data.get('daily_total', 0.0) if last_daily_reset == today else 0.0
-                        daily_count = data.get('daily_count', 0) if last_daily_reset == today else 0
+
+                        # Keep the day's totals only if they belong to the CURRENT grow-day — i.e.
+                        # last reset on/after this photoperiod's lights-on. A restart in the overnight
+                        # window (midnight → lights-on) is still the same grow-day, so totals persist.
+                        same_grow_day = last_daily_reset >= grow_day_start
+                        daily_total = data.get('daily_total', 0.0) if same_grow_day else 0.0
+                        daily_count = data.get('daily_count', 0) if same_grow_day else 0
                         weekly_total = data.get('weekly_total', 0.0) if (today - last_weekly_reset).days < 7 else 0.0
-                        
+
                         self.zone_water_usage[zone_num] = {
                             'daily_total': daily_total,
                             'weekly_total': weekly_total,
                             'daily_count': daily_count,
-                            'last_reset_daily': today,
+                            'last_reset_daily': last_daily_reset if same_grow_day else grow_day_start,
                             'last_reset_weekly': last_weekly_reset
                         }
                         restored_count += 1
