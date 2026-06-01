@@ -155,7 +155,7 @@
 /* ============ config / data ============ */
 const LS={base:"cs_base",token:"cs_token"};
 let CFG={base:localStorage.getItem(LS.base)||location.origin,token:localStorage.getItem(LS.token)||""};
-let timer=null,ST={},HIST={},histAt=0,ZONES=[1,2,3],traceZone=1,curView="now";
+let timer=null,ST={},HIST={},histAt=0,ZONES=[1,2,3],traceZone=1,curView="now",histWindowH=72,_ovl=null;
 const el=id=>document.getElementById(id);
 async function api(p,o={}){const r=await fetch(CFG.base.replace(/\/$/,"")+p,{...o,headers:{Authorization:"Bearer "+CFG.token,"Content-Type":"application/json",...(o.headers||{})}});if(!r.ok)throw new Error(r.status+" "+r.statusText);return r.status===200?r.json():null;}
 const S=id=>ST[id]?ST[id].state:undefined,N=id=>{const n=parseFloat(S(id));return isNaN(n)?null:n;},A=(id,a)=>ST[id]&&ST[id].attributes?ST[id].attributes[a]:undefined,has=id=>ST[id]!==undefined;
@@ -201,6 +201,50 @@ function bandGauge(val,mn,mx,lo,hi,target,col){const W=300,p=2,x=v=>p+(Math.max(
   return `<svg class="bandgauge" viewBox="0 0 ${W} 30" preserveAspectRatio="none"><rect x="${p}" y="11" width="${W-2*p}" height="8" rx="4" fill="rgba(255,255,255,.07)"/><rect x="${bl}" y="11" width="${Math.max(0,bh-bl)}" height="8" rx="4" fill="${C.green}33"/><line x1="${bl}" y1="8" x2="${bl}" y2="22" stroke="${C.green}" stroke-width="1.5"/><line x1="${bh}" y1="8" x2="${bh}" y2="22" stroke="${C.amber}" stroke-width="1.5"/>${tx!=null?`<line x1="${tx}" y1="6" x2="${tx}" y2="24" stroke="${C.blue}" stroke-width="2" stroke-dasharray="2 2"/>`:""}${vx!=null?`<circle cx="${vx}" cy="15" r="6" fill="${col}" stroke="#0a1120" stroke-width="2"/>`:`<text x="6" y="19" fill="${C.faint}" font-size="10">NO SIGNAL</text>`}</svg>`;}
 function spark(cv,pts,color){const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const c=cv.getContext("2d");c.scale(dpr,dpr);c.clearRect(0,0,w,h);if(!pts||pts.length<2){c.fillStyle=C.faint;c.font="10px sans-serif";c.fillText("loading…",4,h/2);return;}const ys=pts.map(p=>p[1]),xs=pts.map(p=>p[0]),lo=Math.min(...ys),hi=Math.max(...ys),r=(hi-lo)||1,x0=xs[0],x1=xs[xs.length-1],rx=(x1-x0)||1,X=t=>(t-x0)/rx*w,Y=v=>h-((v-lo)/r)*(h-6)-3;c.beginPath();pts.forEach((p,i)=>{const x=X(p[0]),y=Y(p[1]);i?c.lineTo(x,y):c.moveTo(x,y);});c.strokeStyle=color;c.lineWidth=1.8;c.lineJoin="round";c.stroke();c.lineTo(w,h);c.lineTo(0,h);c.closePath();const g=c.createLinearGradient(0,0,0,h);g.addColorStop(0,color+"33");g.addColorStop(1,color+"00");c.fillStyle=g;c.fill();}
 function sparkBars(cv,vals,target,colFn){const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const c=cv.getContext("2d");c.scale(dpr,dpr);c.clearRect(0,0,w,h);if(!vals.length){c.fillStyle=C.faint;c.font="10px sans-serif";c.fillText("no history",4,h/2);return;}const mx=Math.max(target||0,...vals)*1.15||1,bw=w/vals.length;if(target!=null){const ty=h-(target/mx)*(h-4)-2;c.strokeStyle="rgba(150,160,180,.4)";c.setLineDash([3,2]);c.beginPath();c.moveTo(0,ty);c.lineTo(w,ty);c.stroke();c.setLineDash([]);}vals.forEach((v,i)=>{const bh=(v/mx)*(h-4);c.fillStyle=colFn(v);c.fillRect(i*bw+2,h-bh-2,bw-4,bh);});}
+/* ============ AROYA-style multi-zone overlay (VWC + EC, dual axis, scrubber) ============ */
+const OVL_V=[C.blue,C.cyan,"#7dd3fc"],OVL_E=[C.amber,C.orange,"#fcd34d"];
+function setHistWindow(h){if(histWindowH===h)return;histWindowH=h;histAt=0;refresh();}
+window.setHistWindow=setHistWindow;
+function _decim(a,max){if(!a||a.length<=max)return a||[];const step=Math.ceil(a.length/max);return a.filter((_,i)=>i%step===0||i===a.length-1);}
+function _seriesAt(data,t){if(!data||!data.length||t<data[0][0])return null;let lo=0,hi=data.length-1,r=null;while(lo<=hi){const m=(lo+hi)>>1;if(data[m][0]<=t){r=data[m];lo=m+1;}else hi=m-1;}return r?r[1]:null;}
+function drawOverlay(cursorX){
+  const cv=el("ovlCanvas");if(!cv)return;
+  const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;
+  const c=cv.getContext("2d");c.scale(dpr,dpr);c.clearRect(0,0,w,h);
+  const t1=Date.now(),t0=t1-histWindowH*3600*1000,rx=(t1-t0)||1,pad={l:34,r:40,t:14,b:30};
+  const series=[];
+  ZONES.forEach((z,i)=>series.push({label:`Z${z} VWC`,color:OVL_V[i%3],axis:"v",data:_decim((HIST[`sensor.crop_steering_zone_${z}_vwc`]||[]).filter(p=>p[0]>=t0),900)}));
+  ZONES.forEach((z,i)=>series.push({label:`Z${z} EC`,color:OVL_E[i%3],axis:"e",data:_decim((HIST[`sensor.crop_steering_zone_${z}_ec`]||[]).filter(p=>p[0]>=t0),900)}));
+  if(!series.some(s=>s.data.length>1)){c.fillStyle=C.faint;c.font="13px sans-serif";c.fillText("Loading history…",pad.l,h/2);return;}
+  const vAll=series.filter(s=>s.axis==="v").flatMap(s=>s.data.map(p=>p[1])),eAll=series.filter(s=>s.axis==="e").flatMap(s=>s.data.map(p=>p[1]));
+  let vMin=Math.min(...vAll),vMax=Math.max(...vAll);if(!isFinite(vMin)){vMin=0;vMax=100;}
+  let eMin=Math.min(...eAll),eMax=Math.max(...eAll);if(!isFinite(eMin)){eMin=0;eMax=8;}
+  const vp=Math.max(1,(vMax-vMin)*0.12),ep=Math.max(.1,(eMax-eMin)*0.12);
+  vMin=Math.max(0,vMin-vp);vMax=Math.min(100,vMax+vp);eMin=Math.max(0,eMin-ep);eMax=eMax+ep;
+  if(vMax-vMin<1)vMax=vMin+1;if(eMax-eMin<.2)eMax=eMin+.2;
+  const X=t=>pad.l+(t-t0)/rx*(w-pad.l-pad.r),YV=v=>pad.t+(1-(v-vMin)/(vMax-vMin))*(h-pad.t-pad.b),YE=v=>pad.t+(1-(v-eMin)/(eMax-eMin))*(h-pad.t-pad.b);
+  const on=N("number.crop_steering_lights_on_hour")??10,off=N("number.crop_steering_lights_off_hour")??22;
+  for(let t=Math.floor(t0/3600000)*3600000;t<t1;t+=3600000){const hr=new Date(t).getHours();if(!(hr>=on&&hr<off)){const x0=Math.max(pad.l,X(t)),x1=Math.min(w-pad.r,X(t+3600000));if(x1>x0){c.fillStyle="rgba(120,140,180,.07)";c.fillRect(x0,pad.t,x1-x0,h-pad.t-pad.b);}}}
+  c.textAlign="center";let day=new Date(t0);day.setHours(0,0,0,0);
+  for(;day.getTime()<t1;day.setDate(day.getDate()+1)){const t=day.getTime();if(t>t0+1800000&&t<t1){c.strokeStyle="rgba(150,160,180,.12)";c.beginPath();c.moveTo(X(t),pad.t);c.lineTo(X(t),h-pad.b);c.stroke();c.fillStyle=C.faint;c.font="9px sans-serif";c.fillText(day.toLocaleDateString(undefined,{month:"short",day:"numeric"}),X(t),h-pad.b+12);}}
+  c.textAlign="left";
+  c.font="9px sans-serif";c.fillStyle=C.blue;for(let i=0;i<=4;i++){const v=vMin+(vMax-vMin)*i/4;c.fillText(r0(v),2,YV(v)+3);}
+  c.fillStyle=C.amber;c.textAlign="right";for(let i=0;i<=4;i++){const e=eMin+(eMax-eMin)*i/4;c.fillText(r1(e),w-2,YE(e)+3);}c.textAlign="left";
+  series.forEach(s=>{if(s.data.length<2)return;const Y=s.axis==="v"?YV:YE;c.strokeStyle=s.color;c.lineWidth=s.axis==="v"?1.8:1.3;c.globalAlpha=s.axis==="v"?.95:.8;c.lineJoin="round";c.beginPath();s.data.forEach((p,i)=>{const x=X(p[0]),y=Y(p[1]);i?c.lineTo(x,y):c.moveTo(x,y);});c.stroke();});
+  c.globalAlpha=1;_ovl={t0,t1};
+  const tip=el("ovlTip");
+  if(cursorX!=null&&cursorX>=pad.l&&cursorX<=w-pad.r){
+    const t=t0+(cursorX-pad.l)/(w-pad.l-pad.r)*rx;
+    c.strokeStyle="rgba(220,230,255,.5)";c.setLineDash([3,3]);c.beginPath();c.moveTo(cursorX,pad.t);c.lineTo(cursorX,h-pad.b);c.stroke();c.setLineDash([]);
+    const rows=series.map(s=>{const val=_seriesAt(s.data,t);if(val==null)return null;const Y=s.axis==="v"?YV:YE;c.fillStyle=s.color;c.beginPath();c.arc(X(t),Y(val),2.6,0,7);c.fill();return{label:s.label,color:s.color,val,axis:s.axis};}).filter(Boolean);
+    if(tip){
+      tip.innerHTML=`<div style="color:${C.faint};margin-bottom:2px">${new Date(t).toLocaleString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</div>`+
+        rows.filter(r=>r.axis==="e").map(r=>`<div><span style="color:${r.color}">●</span> ${r.label} <b>${r1(r.val)}</b></div>`).join("")+
+        rows.filter(r=>r.axis==="v").map(r=>`<div><span style="color:${r.color}">●</span> ${r.label} <b>${r1(r.val)}</b>%</div>`).join("");
+      tip.style.display="block";const tw=tip.offsetWidth||130;let left=cursorX+12;if(left+tw>w)left=cursorX-tw-12;tip.style.left=Math.max(2,left)+"px";tip.style.top=(pad.t+2)+"px";
+    }
+  }else if(tip){tip.style.display="none";}
+}
 function drawTrace(){const cv=el("traceCanvas");if(!cv)return;const z=traceZone;const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const c=cv.getContext("2d");c.scale(dpr,dpr);c.clearRect(0,0,w,h);
   const vh=HIST[`sensor.crop_steering_zone_${z}_vwc`]||[],eh=HIST[`sensor.crop_steering_zone_${z}_ec`]||[],pad={l:30,r:34,t:8,b:18};
   if(vh.length<2){c.fillStyle=C.faint;c.font="12px sans-serif";c.fillText("Loading history…",pad.l,h/2);return;}
@@ -287,12 +331,16 @@ function vZones(){
 }
 function vTrace(){
   el("v-trace").innerHTML=`<p class="lead"><b>Are we tracking strategy?</b> VWC + EC over target bands, shot markers, night shading, dryback-as-event.</p>
+    <div class="card"><h3>Zone overlay · VWC + EC<span style="margin-left:auto;display:inline-flex;gap:4px">${[["24H",24],["3D",72],["1W",168]].map(([l,hh])=>`<span onclick="setHistWindow(${hh})" style="cursor:pointer;font-size:11px;padding:2px 8px;border-radius:6px;${histWindowH===hh?`background:${C.blue};color:#04122b;font-weight:800`:`color:${C.faint};border:1px solid #2a3a55`}">${l}</span>`).join("")}</span></h3>
+      <div style="position:relative"><canvas id="ovlCanvas" style="width:100%;height:210px;display:block"></canvas><div id="ovlTip" style="position:absolute;display:none;pointer-events:none;background:rgba(8,16,33,.96);border:1px solid #2a3a55;border-radius:8px;padding:6px 8px;font-size:11px;line-height:1.5;white-space:nowrap;z-index:6;box-shadow:0 6px 20px rgba(0,0,0,.5)"></div></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:10.5px;margin-top:8px;color:${C.faint}">${ZONES.map((z,i)=>`<span style="color:${OVL_V[i]}">● Z${z} VWC</span>`).join("")}${ZONES.map((z,i)=>`<span style="color:${OVL_E[i]}">● Z${z} EC</span>`).join("")}<span style="margin-left:auto">shaded = lights-off</span></div></div>
     <div class="zsel">${ZONES.map(z=>`<div class="zbtn ${z===traceZone?'on':''}" onclick="setTraceZone(${z})">Zone ${z}</div>`).join("")}</div>
     <div class="card"><h3>Trace · 24h <span style="margin-left:auto;font-size:11px;color:${C.dim}">VWC ${r1(N(`sensor.crop_steering_zone_${traceZone}_vwc`))} · EC ${r1(N(`sensor.crop_steering_zone_${traceZone}_ec`))} · ${zphase(traceZone)||""}</span></h3><canvas class="trace" id="traceCanvas"></canvas></div>
     <div id="dbCards"></div>
     <div class="card"><h3>Per-shot effect — last 8</h3><p class="csub">True ΔVWC from history (feed's a%→b% is bogus for maintenance shots).</p><div id="shotTbl"></div></div>
     <div class="card"><h3>Multi-day dryback (Z${traceZone})</h3><canvas class="spark" id="dbSpark" style="height:46px"></canvas></div>`;
-  drawTrace();
+  const ovc=el("ovlCanvas");if(ovc){const mv=x=>{const r=ovc.getBoundingClientRect();drawOverlay(x-r.left);};ovc.onmousemove=e=>mv(e.clientX);ovc.ontouchstart=ovc.ontouchmove=e=>{if(e.touches[0]){mv(e.touches[0].clientX);e.preventDefault();}};ovc.onmouseleave=()=>drawOverlay(null);}
+  drawOverlay();drawTrace();
   const tgt=N("sensor.crop_steering_dryback_target")??15,conf=N("sensor.crop_steering_dryback_detection_accuracy"),rate=N("sensor.f2_vwc_dryback_rate");
   el("dbCards").innerHTML=ZONES.map(z=>{const db=drybackOf(z);if(!db||db.pct==null)return `<div class="card"><h3>Z${z} dryback</h3><div style="color:${C.faint};font-size:13px">No peak yet — computing.</div></div>`;const dev=db.pct-tgt,col=Math.abs(dev)<=5?C.green:Math.abs(dev)<=10?C.amber:C.red;
     return `<div class="card"><div style="display:flex;align-items:baseline;gap:10px"><h3 style="margin:0">Z${z} dryback</h3><span style="font-size:26px;font-weight:850;color:${col}">${r0(db.pct)}%</span></div><div style="font-size:12px;color:${C.dim};margin-top:4px">peak ${r1(db.peak)}% → ${r1(db.cur)}% · target ${r0(tgt)}% · ${rate!=null?r1(rate)+"%/h":""}${conf!=null&&conf<0.6?` · <span style="color:${C.amber}">low conf ${r1(conf)}</span>`:""}</div></div>`;}).join("");
@@ -353,7 +401,7 @@ async function refresh(){
   if(!CFG.token){openModal();return;}
   try{const states=await api("/api/states");ST={};states.forEach(s=>ST[s.entity_id]=s);
     if(!has("sensor.crop_steering_zone_1_vwc")){el("v-now").innerHTML='<div class="empty">No crop_steering entities found.</div>';return;}
-    if(Date.now()-histAt>55000){const ids=ZONES.flatMap(z=>[`sensor.crop_steering_zone_${z}_vwc`,`sensor.crop_steering_zone_${z}_ec`]);try{const start=new Date(Date.now()-26*3600*1000).toISOString();const hd=await api(`/api/history/period/${start}?filter_entity_id=${ids.join(",")}&minimal_response&no_attributes`);HIST={};(hd||[]).forEach(arr=>{if(arr&&arr.length)HIST[arr[0].entity_id]=arr.map(s=>[Date.parse(s.last_changed||s.lu||s.last_updated),parseFloat(s.state)]).filter(p=>!isNaN(p[0])&&!isNaN(p[1]));});histAt=Date.now();}catch(e){}}
+    if(Date.now()-histAt>55000){const ids=ZONES.flatMap(z=>[`sensor.crop_steering_zone_${z}_vwc`,`sensor.crop_steering_zone_${z}_ec`]);try{const start=new Date(Date.now()-(histWindowH+2)*3600*1000).toISOString();const hd=await api(`/api/history/period/${start}?filter_entity_id=${ids.join(",")}&minimal_response&no_attributes`);HIST={};(hd||[]).forEach(arr=>{if(arr&&arr.length)HIST[arr[0].entity_id]=arr.map(s=>[Date.parse(s.last_changed||s.lu||s.last_updated),parseFloat(s.state)]).filter(p=>!isNaN(p[0])&&!isNaN(p[1]));});histAt=Date.now();}catch(e){}}
     renderSpine();
     const ae=document.activeElement;if(!(ae&&(ae.tagName==="INPUT"||ae.tagName==="SELECT")))renderActive();  // don't clobber an in-progress edit
   }catch(e){if(String(e.message).startsWith("401")){el("modalErr").textContent="Token rejected (401).";openModal();}else el("v-now").innerHTML='<div class="empty">error: '+e.message+'</div>';}
@@ -367,7 +415,7 @@ el("tabs").addEventListener("click",e=>{const t=e.target.closest(".tab");if(!t)r
 function openModal(){el("inBase").value=CFG.base;el("inToken").value=CFG.token;el("modal").classList.add("open");}
 el("refreshBtn").onclick=refresh;
 el("saveBtn").onclick=async()=>{const base=el("inBase").value.trim()||location.origin,token=el("inToken").value.trim();el("modalErr").textContent="testing…";try{const r=await fetch(base.replace(/\/$/,"")+"/api/",{headers:{Authorization:"Bearer "+token}});if(!r.ok)throw new Error(r.status);CFG={base,token};localStorage.setItem(LS.base,base);localStorage.setItem(LS.token,token);el("modal").classList.remove("open");startLoop();}catch(e){el("modalErr").textContent="Could not connect ("+e.message+").";}};
-addEventListener("resize",()=>{if(curView==="trace")drawTrace();if(curView==="zones")ZONES.forEach(z=>{const cv=el("zspk-"+z);if(cv)spark(cv,HIST[`sensor.crop_steering_zone_${z}_vwc`],C.green);});});
+addEventListener("resize",()=>{if(curView==="trace"){drawTrace();drawOverlay();}if(curView==="zones")ZONES.forEach(z=>{const cv=el("zspk-"+z);if(cv)spark(cv,HIST[`sensor.crop_steering_zone_${z}_vwc`],C.green);});});
 if(!CFG.token)openModal();else startLoop();
 </script>
 </body>
