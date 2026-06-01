@@ -1,6 +1,6 @@
 # Crop Steering System Guide
 
-Version 2.3.1 | 6-Zone Coco Coir | Athena Nutrients | GroundWork Probes
+Version 2.3.1 | 3-Zone Coco Coir | Athena Nutrients | F2 Veg Room
 
 ---
 
@@ -38,14 +38,14 @@ This is an automated irrigation controller for cannabis grown in coco coir. It r
 The system runs a 4-phase daily irrigation cycle (P0-P3) independently per zone. It uses sensor fusion, dryback detection, EC ratio logic, and an ML predictor to make irrigation decisions. Every decision passes through multiple safety checks before a valve opens.
 
 **Hardware controlled:**
-- 1 main line solenoid (`switch.irrigation_mainline`)
-- 6 zone valve solenoids (`switch.irrigation_table_1_valve` through `switch.irrigation_table_6_valve`)
-- No dedicated pump — constant-pressure switch auto-starts when the main line opens
+- 1 pump (`switch.veg_main_pump`) — primed 2s before the main line opens
+- 1 main line solenoid (`switch.espoe_irrigation_relay_2_3`)
+- 3 zone valve solenoids, one per row (`switch.f2_row1`, `switch.f2_row2`, `switch.f2_row3`)
 
 **Sensors read:**
-- 6 VWC probes (one per zone): `sensor.substrate_N_substrate_N_vwc_coco_coir`
-- 6 EC probes (one per zone): `sensor.substrate_N_substrate_N_pwec`
-- Room temperature, humidity, VPD from GroundWork gateway
+- 3 fused VWC sensors (one per zone): `sensor.crop_steering_zone_1..3_vwc`
+- 3 fused EC sensors (one per zone): `sensor.crop_steering_zone_1..3_ec`
+- Source-water pH (`sensor.aquaponics_kit_f4f618_ph`) and EC (`sensor.atlas_legacy_1_ec`) for the irrigation-quality gate
 
 ---
 
@@ -96,14 +96,14 @@ The custom component sets `_attr_object_id = f"crop_steering_{key}"` on every en
 |---|---|
 | `switch.system_enabled` | `switch.crop_steering_system_enabled` |
 | `number.p1_target_vwc` | `number.crop_steering_p1_target_vwc` |
-| `select.zone_1_phase_override` | `select.crop_steering_zone_1_phase_override` |
+| `select.zone_1_phase_override` | `input_select.crop_steering_zone_1_phase_control` |
 | `button.zone_1_trigger_shot` | `button.crop_steering_zone_1_trigger_shot` |
 
 The AppDaemon app tries both naming conventions (with and without prefix) when reading entity states. It uses a startup cache warm via the HA REST API to populate a `switch_state_cache` since `get_state()` returns `None` for custom component entities in AppDaemon.
 
 Sensors **created by AppDaemon** (via `set_state`) do not have this issue — they use the exact entity ID passed (e.g., `sensor.crop_steering_zone_1_phase`).
 
-Hardware entities from other integrations keep their own naming (e.g., `switch.irrigation_mainline`, `sensor.substrate_1_substrate_1_vwc_coco_coir`).
+Hardware entities from other integrations keep their own naming (e.g., `switch.espoe_irrigation_relay_2_3`, `switch.f2_row1`).
 
 ### Communication Flow
 
@@ -134,7 +134,7 @@ Each zone runs its own independent phase cycle every day. Phases advance automat
 
 ### P0 — Morning Dryback
 
-**When:** Lights turn on (08:00 by default).
+**When:** Lights turn on (10:00 by default).
 **What:** No irrigation. The substrate dries back from overnight saturation. The system records the peak VWC at lights-on and tracks how far VWC drops.
 **Exits when (any of):**
 - Dryback reaches the target percentage (default 50% of peak VWC lost)
@@ -186,19 +186,19 @@ Lights ON → P0 (dryback) → P1 (ramp-up) → P2 (maintenance) → P3 (dry-dow
 <a name="daily-cycle"></a>
 ## 4. Daily Cycle — What Happens Automatically
 
-Assuming lights 08:00–20:00, Cannabis_Athena profile, vegetative stage:
+Assuming lights 10:00–22:00, Cannabis_Athena profile, vegetative stage:
 
 | Time | What Happens |
 |------|-------------|
-| 08:00 | Lights on. All zones transition P3→P0. Peak VWC recorded. |
-| 08:00–09:30 | P0 dryback. No watering. System watches VWC fall. |
-| ~09:30 | Dryback target met or timeout. Zones transition P0→P1. |
-| 09:30–11:00 | P1 ramp-up. Progressive shots every 15 min. Shot sizes increase. |
-| ~11:00 | VWC reaches 65% target. Zones transition P1→P2. |
-| 11:00–17:00 | P2 maintenance. Shots fire when VWC drops below 60%. EC-adjusted. |
-| ~17:00 | System predicts dryback timing. Zones transition P2→P3. |
-| 17:00–20:00 | P3 pre-lights-off. No irrigation unless emergency VWC (<40%). |
-| 20:00 | Lights off. Zones stay in P3 until next morning. |
+| 10:00 | Lights on. All zones transition P3→P0. Peak VWC recorded. **Daily water + shot counters reset here** (not midnight). |
+| 10:00–11:30 | P0 dryback. No watering. System watches VWC fall. |
+| ~11:30 | Dryback target met or timeout. Zones transition P0→P1. |
+| 11:30–13:00 | P1 ramp-up. Progressive shots. Shot sizes increase. |
+| ~13:00 | VWC reaches the P1 target. Zones transition P1→P2. |
+| 13:00–19:00 | P2 maintenance. Shots fire when VWC drops below the threshold. EC-adjusted. |
+| ~19:00 | System predicts dryback timing. Zones transition P2→P3. |
+| 19:00–22:00 | P3 pre-lights-off. No irrigation unless emergency VWC (<40%). |
+| 22:00 | Lights off. **Any zone still in P1/P2 is forced to P3.** Zones dry back until next morning. |
 
 Actual timing varies per zone based on sensor readings. Zones operate independently.
 
@@ -219,15 +219,16 @@ The main decision loop runs every 60 seconds (`phase_check_interval`). Each cycl
 
 When a shot fires:
 
-1. Turn on main line (`switch.irrigation_mainline`), wait 1s
-2. Turn on zone valve (`switch.irrigation_table_N_valve`)
-3. Wait for shot duration
-4. Turn off zone valve, wait 1s
-5. Turn off main line, wait 1s
-6. Wait 30s for sensor stabilization
-7. Read post-irrigation VWC, calculate efficiency
+1. Prime the pump (`switch.veg_main_pump`), wait 2s
+2. Turn on main line (`switch.espoe_irrigation_relay_2_3`), wait 1s
+3. Turn on zone valve (`switch.f2_rowN`)
+4. Wait for shot duration
+5. Turn off zone valve, wait 1s
+6. Turn off main line, then the pump
+7. Wait 30s for sensor stabilization
+8. Read post-irrigation VWC, calculate efficiency
 
-The pump is not directly controlled — it auto-starts via pressure switch when the main line opens.
+Valve close is read-back verified; a failure triggers an emergency pump stop.
 
 A `finally` block ensures all hardware is turned off even if an error occurs mid-shot.
 
@@ -260,7 +261,7 @@ All have the `crop_steering_` prefix in their actual entity ID.
 | `select.crop_steering_zone_N_group` | Ungrouped, Group A/B/C/D | Ungrouped | Zone grouping for coordinated irrigation |
 | `select.crop_steering_zone_N_priority` | Critical, High, Normal, Low | Normal | Zone priority for irrigation scheduling |
 | `select.crop_steering_zone_N_crop_profile` | Follow Main, Cannabis_Athena, etc. | Follow Main | Per-zone crop profile override |
-| `select.crop_steering_zone_N_phase_override` | Auto, P0, P1, P2, P3 | Auto | Per-zone phase lock. Non-Auto = permanent hold until set back to Auto. |
+| `input_select.crop_steering_zone_N_phase_control` | Auto, P0, P1, P2, P3 | Auto | Per-zone phase lock. Non-Auto = permanent hold until set back to Auto. |
 
 ### Numbers (from custom component)
 
@@ -274,7 +275,7 @@ All have the `crop_steering_` prefix. Listed by category.
 | `number.crop_steering_dripper_flow_rate` | 0.1–50 | 1.2 | L/hr |
 | `number.crop_steering_drippers_per_plant` | 1–6 | 2 | — |
 | `number.crop_steering_field_capacity` | 20–100 | 70.0 | % |
-| `number.crop_steering_max_ec` | 1–20 | 9.0 | mS/cm |
+| `number.crop_steering_maximum_ec` | 1–20 | 9.0 | mS/cm |
 | `number.crop_steering_lights_on_hour` | 0–23 | 12 | hour |
 | `number.crop_steering_lights_off_hour` | 0–23 | 0 | hour |
 
@@ -282,10 +283,10 @@ All have the `crop_steering_` prefix. Listed by category.
 
 | Entity ID | Range | Default | Unit |
 |-----------|-------|---------|------|
-| `number.crop_steering_veg_dryback_target` | 20–80 | 50.0 | % |
-| `number.crop_steering_gen_dryback_target` | 15–70 | 40.0 | % |
-| `number.crop_steering_p0_min_wait_time` | 5–300 | 30.0 | min |
-| `number.crop_steering_p0_max_wait_time` | 30–600 | 120.0 | min |
+| `number.crop_steering_vegetative_dryback_target` | 20–80 | 50.0 | % |
+| `number.crop_steering_generative_dryback_target` | 15–70 | 40.0 | % |
+| `number.crop_steering_p0_minimum_wait_time` | 5–300 | 30.0 | min |
+| `number.crop_steering_p0_maximum_wait_time` | 30–600 | 120.0 | min |
 | `number.crop_steering_p0_dryback_drop_percent` | 2–40 | 15.0 | % |
 
 **P1 Parameters:**
@@ -294,11 +295,11 @@ All have the `crop_steering_` prefix. Listed by category.
 |-----------|-------|---------|------|
 | `number.crop_steering_p1_target_vwc` | 30–95 | 65.0 | % |
 | `number.crop_steering_p1_initial_shot_size` | 0.1–20 | 2.0 | % substrate |
-| `number.crop_steering_p1_shot_increment` | 0.05–10 | 0.5 | % substrate |
-| `number.crop_steering_p1_max_shot_size` | 2–50 | 10.0 | % substrate |
+| `number.crop_steering_p1_shot_size_increment` | 0.05–10 | 0.5 | % substrate |
+| `number.crop_steering_p1_maximum_shot_size` | 2–50 | 10.0 | % substrate |
 | `number.crop_steering_p1_time_between_shots` | 1–60 | 15.0 | min |
-| `number.crop_steering_p1_max_shots` | 1–30 | 6.0 | — |
-| `number.crop_steering_p1_min_shots` | 1–20 | 3.0 | — |
+| `number.crop_steering_p1_maximum_shots` | 1–30 | 6.0 | — |
+| `number.crop_steering_p1_minimum_shots` | 1–20 | 3.0 | — |
 
 **P2 Parameters:**
 
@@ -344,10 +345,10 @@ All have the `crop_steering_` prefix. Listed by category.
 | `number.crop_steering_zone_N_plant_count` | 1–200 | 4 | — |
 | `number.crop_steering_zone_N_max_daily_volume` | 0–500 | 20.0 | L |
 | `number.crop_steering_zone_N_shot_size_multiplier` | 0.1–5.0 | 1.0 | multiplier |
-| `number.crop_steering_zone_N_dryback_target` | 0–80 | 0 | % |
+| `number.crop_steering_zone_N_vegetative_dryback_target` | 0–80 | 0 | % |
 | `number.crop_steering_zone_N_p1_target_vwc` | 0–95 | 0 | % |
 | `number.crop_steering_zone_N_p2_vwc_threshold` | 0–85 | 0 | % |
-| `number.crop_steering_zone_N_p3_emergency_vwc` | 0–65 | 0 | % |
+| `number.crop_steering_zone_N_p3_emergency_vwc_threshold` | 0–65 | 0 | % |
 
 A value of **0** on any per-zone target means "use the system-wide default."
 
@@ -375,7 +376,7 @@ These are written by the AppDaemon app at runtime. They do NOT have the naming c
 | `sensor.crop_steering_zone_N_efficiency` | Zone irrigation efficiency 0–1 |
 | `sensor.crop_steering_zone_N_safety_status` | `safe`, `approaching_saturation`, `over_saturated`, `approaching_ec_limit`, `ec_limit_exceeded` |
 | `sensor.crop_steering_ai_heartbeat` | AI oversight status with zone summary attributes |
-| `sensor.crop_steering_ai_last_action` | Last corrective action taken by AI |
+| `sensor.crop_steering_current_decision` | Last corrective action taken by AI |
 | `sensor.crop_steering_system_health_score` | Overall system health 0–100 |
 | `sensor.crop_steering_system_safety_status` | `safe`, `warning`, `unsafe` |
 | `sensor.crop_steering_sensor_health` | Number of healthy sensors |
@@ -384,8 +385,8 @@ These are written by the AppDaemon app at runtime. They do NOT have the naming c
 | `sensor.crop_steering_fused_ec` | Kalman-filtered average EC |
 | `sensor.crop_steering_dryback_percentage` | Current dryback % from peak |
 | `sensor.crop_steering_current_decision` | Last decision: `irrigate` or `wait` with reason |
-| `sensor.crop_steering_ml_irrigation_need` | ML-predicted irrigation need 0–1 |
-| `sensor.crop_steering_ml_confidence` | ML model confidence 0–1 |
+| `sensor.crop_steering_prediction_estimated_daily_water_need` | ML-predicted irrigation need 0–1 |
+| `sensor.crop_steering_ml_model_accuracy` | ML model confidence 0–1 |
 | `sensor.crop_steering_water_efficiency` | Water use efficiency metric |
 | `sensor.crop_steering_system_efficiency` | Overall system efficiency % |
 
@@ -410,9 +411,9 @@ The primary configuration file. Located at `/config/crop_steering.env`. Parsed d
 
 **Zone definition (per zone):**
 ```
-ZONE_1_SWITCH=switch.irrigation_table_1_valve
-ZONE_1_VWC_SENSORS=sensor.substrate_1_substrate_1_vwc_coco_coir
-ZONE_1_EC_SENSORS=sensor.substrate_1_substrate_1_pwec
+ZONE_1_SWITCH=switch.f2_row1
+ZONE_1_VWC_SENSORS=sensor.f2_row_1_vwc
+ZONE_1_EC_SENSORS=sensor.f2_row_1_ec
 ZONE_1_PLANT_COUNT=4
 ZONE_1_MAX_DAILY_VOLUME=20.0
 ZONE_1_SHOT_MULTIPLIER=1.0
@@ -442,23 +443,22 @@ master_crop_steering:
   module: crop_steering.master_crop_steering_app
   class: MasterCropSteeringApp
   hardware:
-    pump_master: null          # No pump — pressure switch auto-starts
-    main_line: switch.irrigation_mainline
+    pump_master: switch.veg_main_pump
+    main_line: switch.espoe_irrigation_relay_2_3
     zone_valves:
-      1: switch.irrigation_table_1_valve
-      2: switch.irrigation_table_2_valve
-      # ... through 6
+      1: switch.f2_row1
+      2: switch.f2_row2
+      3: switch.f2_row3
   sensors:
     vwc:
-      - sensor.substrate_1_substrate_1_vwc_coco_coir
-      # ... through 6
+      - sensor.f2_row_1_vwc
+      # ... one per row
     ec:
-      - sensor.substrate_1_substrate_1_pwec
-      # ... through 6
-    environmental:
-      temperature: sensor.irrigation_room_1_temp
-      humidity: sensor.irrigation_room_1_rh
-      vpd: sensor.irrigation_room_1_vpd
+      - sensor.f2_row_1_ec
+      # ... one per row
+    water:
+      ph: sensor.aquaponics_kit_f4f618_ph
+      ec: sensor.atlas_legacy_1_ec
   timing:
     phase_check_interval: 60     # Decision loop interval (seconds)
     ml_prediction_interval: 300  # ML update interval (seconds)
@@ -469,7 +469,7 @@ master_crop_steering:
 
 ### Lights Schedule
 
-Set via `number.crop_steering_lights_on_hour` and `number.crop_steering_lights_off_hour` in the dashboard. These are system-wide (not per-zone). Current setup: **08:00 on, 20:00 off** (set in `.env` as `LIGHTS_ON_TIME` and `LIGHTS_OFF_TIME`).
+Set via `number.crop_steering_lights_on_hour` and `number.crop_steering_lights_off_hour` in the dashboard. These are system-wide (not per-zone). Current F2 setup: **10:00 on, 22:00 off**. The P3→P0 transition and the daily water/shot counter reset both fire at lights-on.
 
 The AppDaemon app also checks `sun.sun` entity elevation as a fallback for lights-on detection.
 
@@ -482,15 +482,15 @@ The dashboard is at `/config/dashboards/crop_steering.yaml`, path `crop-steering
 
 ### Row 1 — System Controls + Infrastructure + Valves + AI Status
 
-Top row gives you the master switches (system enabled, auto irrigation, EC stacking, analytics), crop type/growth stage selects, lights schedule, infrastructure switches (mainline, mains water, manifold, tank fill, waste, recirculation), all 6 zone valves with last-changed timestamps, and AI status sensors.
+Top row gives you the master switches (system enabled, auto irrigation, EC stacking, analytics), crop type/growth stage selects, lights schedule, infrastructure switches (mainline, mains water, manifold, tank fill, waste, recirculation), all 3 row valves with last-changed timestamps, and AI status sensors.
 
 ### Row 2 — Live Sensors + Phase Override + Trigger Shots
 
-All 6 VWC readings, all 6 EC readings, per-zone phase override selects (Auto/P0/P1/P2/P3), and per-zone trigger shot buttons.
+All 3 VWC readings, all 3 EC readings, per-zone phase control selects (Auto/P0/P1/P2/P3), and per-zone trigger shot buttons.
 
 ### Row 3 — System Health + Manual Override + Zone Safety + AI Oversight
 
-System health score, sensor health, daily water, fused VWC/EC, dryback percentage. Manual override switches for all 6 zones. Per-zone safety status. AI heartbeat and last action.
+System health score, sensor health, daily water, fused VWC/EC, dryback percentage. Manual override switches for all 3 zones. Per-zone safety status. AI heartbeat and last action.
 
 ### Row 4 — Water Usage + Zone Health
 
@@ -652,10 +652,10 @@ Each zone has 4 override parameters. **Set to 0 to use the system-wide default.*
 
 | Parameter | System Default Entity | Per-Zone Entity |
 |-----------|----------------------|-----------------|
-| Dryback target | `number.crop_steering_veg_dryback_target` | `number.crop_steering_zone_N_dryback_target` |
+| Dryback target | `number.crop_steering_vegetative_dryback_target` | `number.crop_steering_zone_N_vegetative_dryback_target` |
 | P1 target VWC | `number.crop_steering_p1_target_vwc` | `number.crop_steering_zone_N_p1_target_vwc` |
 | P2 VWC threshold | `number.crop_steering_p2_vwc_threshold` | `number.crop_steering_zone_N_p2_vwc_threshold` |
-| P3 emergency VWC | `number.crop_steering_p3_emergency_vwc_threshold` | `number.crop_steering_zone_N_p3_emergency_vwc` |
+| P3 emergency VWC | `number.crop_steering_p3_emergency_vwc_threshold` | `number.crop_steering_zone_N_p3_emergency_vwc_threshold` |
 
 **Example:** Zone 4 has a weaker root system and dries out faster. Set `zone_4_p2_vwc_threshold` to 65 (instead of system default 60) so it gets watered sooner. Leave all other zones at 0 to use defaults.
 
@@ -758,7 +758,7 @@ Runs every 15 minutes. Checks 6 anomaly conditions per zone and takes corrective
 ### Published Sensors
 
 - `sensor.crop_steering_ai_heartbeat` — state: anomaly count. Attributes: zone summary, anomalies list, actions taken.
-- `sensor.crop_steering_ai_last_action` — last corrective action description.
+- `sensor.crop_steering_current_decision` — last corrective action description.
 
 ### History
 
@@ -893,7 +893,7 @@ On restart, the system logs how long it was down and validates all zone phases a
 | Zone getting too many shots | VWC not rising after irrigation (blocked dripper, bad sensor position) | Check sensor placement. System will auto-lockout after 4 rapid shots. Reset with `crop_steering_reset_emergency` event after fixing. |
 | All zones stuck in P3 | Lights schedule wrong, or `_should_zone_start_p3()` calculating early transition | Check `number.crop_steering_lights_on_hour` and `number.crop_steering_lights_off_hour`. Verify they match your actual lights schedule. |
 | All zones stuck in P0 | Dryback target too aggressive, or VWC not dropping | Lower `veg_dryback_target` or increase `p0_max_wait_time`. Check if sensors are reading correctly. AI heartbeat will force P0→P1 after 4 hours. |
-| Phase changes not taking effect | Per-zone phase override not set to "Auto" | Check `select.crop_steering_zone_N_phase_override` — must be "Auto" for automatic transitions. |
+| Phase changes not taking effect | Per-zone phase override not set to "Auto" | Check `input_select.crop_steering_zone_N_phase_control` — must be "Auto" for automatic transitions. |
 | System-wide phase change only affects some zones | Zones with non-"Auto" phase override are excluded | System-wide phase changes via `select.crop_steering_irrigation_phase` only apply to zones set to "Auto". |
 | Dashboard shows "Entity not found" | Entity naming mismatch | Custom component entities have `crop_steering_` prefix. Dashboard may reference unprefixed names. |
 | AppDaemon logs "0/15 switches warmed" | REST API can't read entity states at startup | Check AppDaemon plugin config has valid HA token. The system will still work via `listen_state` callbacks after entities report their first state change. |
@@ -957,38 +957,23 @@ The `_should_zone_start_p3()` calculation can trigger too early if the predicted
 <a name="hardware-map"></a>
 ## 21. Hardware Map
 
-### Current Installation
+### Current Installation — F2 veg room
 
 | Component | Entity ID | Physical |
 |-----------|-----------|----------|
-| Main Line Valve | `switch.irrigation_mainline` | GroundWork mainline solenoid |
-| Zone 1 Valve | `switch.irrigation_table_1_valve` | Table 1 solenoid |
-| Zone 2 Valve | `switch.irrigation_table_2_valve` | Table 2 solenoid |
-| Zone 3 Valve | `switch.irrigation_table_3_valve` | Table 3 solenoid |
-| Zone 4 Valve | `switch.irrigation_table_4_valve` | Table 4 solenoid |
-| Zone 5 Valve | `switch.irrigation_table_5_valve` | Table 5 solenoid |
-| Zone 6 Valve | `switch.irrigation_table_6_valve` | Table 6 solenoid |
-| Pump | None (auto-start) | Constant pressure switch |
-| Zone 1 VWC | `sensor.substrate_1_substrate_1_vwc_coco_coir` | GroundWork substrate probe |
-| Zone 1 EC | `sensor.substrate_1_substrate_1_pwec` | GroundWork substrate probe (pore water EC) |
-| Zone 2 VWC | `sensor.substrate_2_substrate_2_vwc_coco_coir` | GroundWork substrate probe |
-| Zone 2 EC | `sensor.substrate_2_substrate_2_pwec` | GroundWork substrate probe |
-| Zone 3 VWC | `sensor.substrate_3_substrate_3_vwc_coco_coir` | GroundWork substrate probe |
-| Zone 3 EC | `sensor.substrate_3_substrate_3_pwec` | GroundWork substrate probe |
-| Zone 4 VWC | `sensor.substrate_4_substrate_4_vwc_coco_coir` | GroundWork substrate probe |
-| Zone 4 EC | `sensor.substrate_4_substrate_4_pwec` | GroundWork substrate probe |
-| Zone 5 VWC | `sensor.substrate_5_substrate_5_vwc_coco_coir` | GroundWork substrate probe |
-| Zone 5 EC | `sensor.substrate_5_substrate_5_pwec` | GroundWork substrate probe |
-| Zone 6 VWC | `sensor.substrate_6_substrate_6_vwc_coco_coir` | GroundWork substrate probe |
-| Zone 6 EC | `sensor.substrate_6_substrate_6_pwec` | GroundWork substrate probe |
-| Room Temp | `sensor.irrigation_room_1_temp` | GroundWork gateway sensor |
-| Room Humidity | `sensor.irrigation_room_1_rh` | GroundWork gateway sensor |
-| Room VPD | `sensor.irrigation_room_1_vpd` | GroundWork gateway sensor |
-| Mains Water | `switch.irrigation_mains_water` | Mains water valve (infrastructure) |
-| Manifold | `switch.irrigation_manifold` | Tank filling/mixing manifold |
-| Tank Fill | `switch.irrigation_tank_fill_valve` | Tank fill valve |
-| Waste Valve | `switch.irrigation_waste_valve` | Waste/drain valve |
-| Recirculation | `switch.irrigation_recirculation_valve` | Recirculation valve |
+| Pump | `switch.veg_main_pump` | Veg-room pump (primed 2s ahead of the main line) |
+| Main Line | `switch.espoe_irrigation_relay_2_3` | Veg mainline solenoid |
+| Row 1 Valve | `switch.f2_row1` | Row 1 solenoid |
+| Row 2 Valve | `switch.f2_row2` | Row 2 solenoid |
+| Row 3 Valve | `switch.f2_row3` | Row 3 solenoid |
+| Zone 1–3 VWC | `sensor.crop_steering_zone_1..3_vwc` | Fused substrate moisture (per row) |
+| Zone 1–3 EC | `sensor.crop_steering_zone_1..3_ec` | Fused pore-water EC (per row) |
+| Source-water pH | `sensor.aquaponics_kit_f4f618_ph` | Batch-tank pH (irrigation-quality gate) |
+| Source-water EC | `sensor.atlas_legacy_1_ec` | Batch-tank EC (irrigation-quality gate) |
+| Dosing interlock | `input_boolean.nutrient_dosing_active` | Holds irrigation (and the watchdog) while the tank is dosed |
+
+Raw per-row sensors are fused into the `crop_steering_zone_N_*` entities; the live
+hardware/sensor map lives in `appdaemon/apps/apps.yaml`.
 
 ### Irrigation Sequence Timing
 

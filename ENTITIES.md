@@ -1,293 +1,216 @@
-# Home Assistant Crop Steering System - Complete Entity Reference
-
-This document lists every single entity created by the Crop Steering System with detailed descriptions of their functions.
-
-> **Note:** sections tagged "RootSense v3" below belong to an experimental intelligence
-> layer that was **never deployed and has been removed** from the engine. The HA
-> integration may still create a few of these entities (e.g. the steering-intent
-> slider and `…_intelligence_*_enabled` switches), but they are **inert** — the
-> deployed irrigation engine ignores them.
-
-## 📊 SENSORS
-
-### System-Wide Sensors
-
-| Entity ID | Name | Description |
-|-----------|------|-------------|
-| `sensor.crop_steering_current_phase` | Current Phase | Shows current irrigation phase (P0/P1/P2/P3) |
-| `sensor.crop_steering_irrigation_efficiency` | Irrigation Efficiency | System irrigation efficiency percentage |
-| `sensor.crop_steering_water_usage_daily` | Daily Water Usage | Total daily water consumption across all zones (Liters) |
-| `sensor.crop_steering_dryback_percentage` | Dryback Percentage | Current dryback percentage from peak VWC |
-| `sensor.crop_steering_next_irrigation_time` | Next Irrigation Time | Predicted time for next irrigation event |
-| `sensor.crop_steering_configured_avg_vwc` | Average VWC All Zones | Average VWC across all configured zones (%) |
-| `sensor.crop_steering_configured_avg_ec` | Average EC All Zones | Average EC across all configured zones (mS/cm) |
-| `sensor.crop_steering_ec_ratio` | EC Ratio | Current EC to target EC ratio |
-| `sensor.crop_steering_p2_vwc_threshold_adjusted` | P2 VWC Threshold Adjusted | EC-adjusted P2 VWC threshold (%) |
-
-### Shot Duration Calculation Sensors
-
-| Entity ID | Name | Description |
-|-----------|------|-------------|
-| `sensor.crop_steering_p1_shot_duration_seconds` | P1 Shot Duration | Calculated P1 irrigation duration in seconds |
-| `sensor.crop_steering_p2_shot_duration_seconds` | P2 Shot Duration | Calculated P2 irrigation duration in seconds |
-| `sensor.crop_steering_p3_shot_duration_seconds` | P3 Emergency Shot Duration | Calculated P3 emergency irrigation duration in seconds |
-
-### Analytics Sensors (AppDaemon Generated)
-
-| Entity ID | Name | Description |
-|-----------|------|-------------|
-| `sensor.crop_steering_system_health_score` | System Health Score | Overall system health percentage (0-100%) |
-| `sensor.crop_steering_daily_water_usage` | Daily Water Usage | System daily water consumption with analytics |
-| `sensor.crop_steering_sensor_health` | Sensor Health | Overall sensor availability and health percentage |
-| `sensor.crop_steering_system_efficiency` | System Efficiency | Combined system efficiency score |
-| `sensor.crop_steering_water_efficiency` | Water Efficiency | Water use efficiency metric (VWC per liter) |
-| `sensor.crop_steering_app_current_phase` | Zone Phases | Summary of all zone phases (Z1:P2, Z2:P1, etc.) |
-| `sensor.crop_steering_app_next_irrigation` | Next Irrigation Time | AppDaemon calculated next irrigation time |
-| `sensor.crop_steering_system_safety_status` | System Safety Status | Overall safety status (safe/warning/unsafe) |
-
-### Zone-Specific Sensors (Per Zone 1-N)
-
-| Entity ID Pattern | Name Pattern | Description |
-|-------------------|--------------|-------------|
-| `sensor.crop_steering_vwc_zone_{N}` | Zone {N} VWC | Volumetric Water Content for zone N (%) |
-| `sensor.crop_steering_ec_zone_{N}` | Zone {N} EC | Electrical Conductivity for zone N (mS/cm) |
-| `sensor.crop_steering_zone_{N}_status` | Zone {N} Status | Zone operational status (Optimal/Dry/Saturated/Error) |
-| `sensor.crop_steering_zone_{N}_last_irrigation` | Zone {N} Last Irrigation | Timestamp of last irrigation for zone N |
-| `sensor.crop_steering_zone_{N}_daily_water_usage` | Zone {N} Daily Water Usage | Daily water consumption for zone N (Liters) |
-| `sensor.crop_steering_zone_{N}_weekly_water_usage` | Zone {N} Weekly Water Usage | Weekly water consumption for zone N (Liters) |
-| `sensor.crop_steering_zone_{N}_irrigation_count_today` | Zone {N} Irrigations Today | Count of irrigations for zone N today |
-| `sensor.crop_steering_zone_{N}_health_score` | Zone {N} Health Score | Zone health score based on VWC/EC (0-1) |
-| `sensor.crop_steering_zone_{N}_efficiency` | Zone {N} Efficiency | Zone irrigation efficiency score |
-| `sensor.crop_steering_zone_{N}_safety_status` | Zone {N} Safety Status | Zone safety status (safe/warning/unsafe) |
-
-### Predictive Analytics Sensors (AppDaemon Generated)
-
-| Entity ID Pattern | Name Pattern | Description |
-|-------------------|--------------|-------------|
-| `sensor.crop_steering_prediction_zone_{N}_next_irrigation_hours` | Zone {N} Next Irrigation Hours | Predicted hours until zone N needs irrigation |
-| `sensor.crop_steering_prediction_system_vwc_trend` | System VWC Trend | Predicted VWC trend (stable/declining/increasing) |
-| `sensor.crop_steering_prediction_estimated_daily_water_need` | Estimated Daily Water Need | Predicted daily water requirement (Liters) |
-
-### RootSense Substrate Intelligence (v3, AppDaemon Generated)
-
-Published by `intelligence/root_zone.py` when the matching module switch is on
-(see `switch.crop_steering_intelligence_root_zone_enabled`).
-
-| Entity ID Pattern | Description |
-|-------------------|-------------|
-| `sensor.crop_steering_zone_{N}_field_capacity_observed` | Auto-detected field capacity (% VWC) with `confidence` and `sample_count` attributes. Replaces the static `field_capacity` default once `confidence ≥ 0.8`. |
-| `sensor.crop_steering_zone_{N}_dryback_velocity_pct_per_hr` | Smoothed VWC dryback rate over the last hour (positive = drying). |
-| `sensor.crop_steering_zone_{N}_substrate_porosity_estimate_ml_per_pct` | mL of irrigation needed to lift VWC by 1 % (24-h median). |
-| `sensor.crop_steering_zone_{N}_ec_stack_index` | Cumulative EC drift (mS/cm) over the last 6 h. |
-
-### RootSense Adaptive Sensors (v3)
-
-| Entity ID | Description |
-|-----------|-------------|
-| `sensor.crop_steering_p0_dryback_drop_pct_current` | Interpolated P0 dryback target (current). Attributes: `veg_endpoint`, `gen_endpoint`, `intent`, `semantic`. |
-
-### RootSense Anomaly Sensor (v3)
-
-| Entity ID | Description |
-|-----------|-------------|
-| `binary_sensor.crop_steering_anomaly_active` | `on` while at least one zone has an unresolved anomaly. Attributes: `active_count`, `active_codes`. |
-
-## 🔢 NUMBER INPUTS
-
-### Substrate & Hardware Configuration
-
-| Entity ID | Name | Range | Unit | Description |
-|-----------|------|-------|------|-------------|
-| `number.crop_steering_substrate_volume` | Substrate Volume | 1.0-200.0 | L | Volume of growing medium per zone |
-| `number.crop_steering_dripper_flow_rate` | Dripper Flow Rate | 0.1-50.0 | L/hr | Flow rate per individual dripper |
-| `number.crop_steering_drippers_per_plant` | Drippers Per Plant | 1-6 | count | Number of drippers per individual plant |
-| `number.crop_steering_field_capacity` | Field Capacity | 20.0-100.0 | % | Maximum safe VWC (over-watering protection) |
-| `number.crop_steering_max_ec` | Maximum EC | 1.0-20.0 | mS/cm | Maximum safe EC (nutrient burn protection) |
-
-### Dryback Target Configuration
-
-> **Semantic clarification (RootSense v3):** all "dryback" values in this
-> system are *percentage-point drop from peak VWC* — i.e. how much the
-> substrate dries back **by**, not what VWC value it dries back **to**.
-> Example: peak 70 %, valley 58 % → dryback = 12 (not 58).
-
-| Entity ID | Name | Range | Unit | Description |
-|-----------|------|-------|------|-------------|
-| `number.crop_steering_veg_p0_dryback_drop_pct` | Vegetative P0 Dryback Drop % | 2.0-40.0 | % | Vegetative endpoint for P0 dryback drop. Read live by IntentResolver. Default 12. |
-| `number.crop_steering_gen_p0_dryback_drop_pct` | Generative P0 Dryback Drop % | 2.0-50.0 | % | Generative endpoint for P0 dryback drop. Read live by IntentResolver. Default 22. |
-| `number.crop_steering_veg_dryback_target` | Vegetative Dryback Target (legacy) | 2.0-80.0 | % | Legacy alias for veg endpoint. Same semantic ("drop %"); corrected default. |
-| `number.crop_steering_gen_dryback_target` | Generative Dryback Target (legacy) | 2.0-70.0 | % | Legacy alias for gen endpoint. Same semantic; corrected default. |
-
-### Cultivator Intent (RootSense v3)
-
-| Entity ID | Name | Range | Unit | Description |
-|-----------|------|-------|------|-------------|
-| `number.crop_steering_steering_intent` | Cultivator Intent | -100 to +100 | bias | Single dial — -100 = pure generative, +100 = pure vegetative, 0 = balanced. IntentResolver interpolates every derived parameter from this. |
-
-### Phase Target Configuration
-
-| Entity ID | Name | Range | Unit | Description |
-|-----------|------|-------|------|-------------|
-| `number.crop_steering_p1_target_vwc` | P1 Target VWC | 30.0-95.0 | % | Target VWC for P1 recovery phase |
-| `number.crop_steering_p2_vwc_threshold` | P2 VWC Threshold | 25.0-85.0 | % | VWC threshold for P2 irrigation trigger |
-
-### P0 Phase Parameters
-
-| Entity ID | Name | Range | Unit | Description |
-|-----------|------|-------|------|-------------|
-| `number.crop_steering_p0_min_wait_time` | P0 Minimum Wait Time | 5.0-300.0 | min | Minimum duration in P0 phase |
-| `number.crop_steering_p0_max_wait_time` | P0 Maximum Wait Time | 30.0-600.0 | min | Maximum duration in P0 phase (safety limit) |
-| `number.crop_steering_p0_dryback_drop_percent` | P0 Dryback Drop Percent | 2.0-40.0 | % | Alternative exit condition for P0 phase |
-
-### P1 Progressive Irrigation Parameters
-
-| Entity ID | Name | Range | Unit | Description |
-|-----------|------|-------|------|-------------|
-| `number.crop_steering_p1_initial_shot_size` | P1 Initial Shot Size | 0.1-20.0 | % | Starting shot size for P1 progression |
-| `number.crop_steering_p1_shot_increment` | P1 Shot Size Increment | 0.05-10.0 | % | Progressive increase per P1 shot |
-| `number.crop_steering_p1_max_shot_size` | P1 Maximum Shot Size | 2.0-50.0 | % | Maximum shot size in P1 phase |
-| `number.crop_steering_p1_time_between_shots` | P1 Time Between Shots | 1.0-60.0 | min | Time interval between P1 shots |
-| `number.crop_steering_p1_max_shots` | P1 Maximum Shots | 1.0-30.0 | count | Maximum number of P1 shots |
-| `number.crop_steering_p1_min_shots` | P1 Minimum Shots | 1.0-20.0 | count | Minimum number of P1 shots |
-
-### P2 Maintenance Parameters
-
-| Entity ID | Name | Range | Unit | Description |
-|-----------|------|-------|------|-------------|
-| `number.crop_steering_p2_shot_size` | P2 Shot Size | 0.5-30.0 | % | Standard shot size for P2 phase |
-| `number.crop_steering_p2_ec_high_threshold` | P2 EC High Threshold | 0.50-3.00 | ratio | EC ratio threshold for reduced irrigation |
-| `number.crop_steering_p2_ec_low_threshold` | P2 EC Low Threshold | 0.20-2.00 | ratio | EC ratio threshold for increased irrigation |
-
-### P3 Final Phase Parameters
-
-| Entity ID | Name | Range | Unit | Description |
-|-----------|------|-------|------|-------------|
-| `number.crop_steering_p3_veg_last_irrigation` | P3 Veg Last Irrigation | 15.0-360.0 | min | Last irrigation timing for vegetative phase |
-| `number.crop_steering_p3_gen_last_irrigation` | P3 Gen Last Irrigation | 30.0-600.0 | min | Last irrigation timing for generative phase |
-| `number.crop_steering_p3_emergency_vwc_threshold` | P3 Emergency VWC Threshold | 20.0-65.0 | % | VWC threshold for emergency irrigation |
-| `number.crop_steering_p3_emergency_shot_size` | P3 Emergency Shot Size | 0.1-15.0 | % | Shot size for emergency irrigation |
-
-### EC Target Parameters (Athena Methodology)
-
-| Entity ID | Name | Range | Unit | Description |
-|-----------|------|-------|------|-------------|
-| `number.crop_steering_ec_target_flush` | EC Target Flush | 0.1-15.0 | mS/cm | Target EC for flush irrigation |
-| `number.crop_steering_ec_target_veg_p0` | EC Target Veg P0 | 0.5-15.0 | mS/cm | EC target for vegetative P0 phase |
-| `number.crop_steering_ec_target_veg_p1` | EC Target Veg P1 | 0.5-15.0 | mS/cm | EC target for vegetative P1 phase |
-| `number.crop_steering_ec_target_veg_p2` | EC Target Veg P2 | 0.5-15.0 | mS/cm | EC target for vegetative P2 phase |
-| `number.crop_steering_ec_target_veg_p3` | EC Target Veg P3 | 0.5-15.0 | mS/cm | EC target for vegetative P3 phase |
-| `number.crop_steering_ec_target_gen_p0` | EC Target Gen P0 | 0.5-20.0 | mS/cm | EC target for generative P0 phase |
-| `number.crop_steering_ec_target_gen_p1` | EC Target Gen P1 | 0.5-20.0 | mS/cm | EC target for generative P1 phase |
-| `number.crop_steering_ec_target_gen_p2` | EC Target Gen P2 | 0.5-20.0 | mS/cm | EC target for generative P2 phase |
-| `number.crop_steering_ec_target_gen_p3` | EC Target Gen P3 | 0.5-20.0 | mS/cm | EC target for generative P3 phase |
-
-### System Light Schedule
-
-| Entity ID | Name | Range | Unit | Description |
-|-----------|------|-------|------|-------------|
-| `number.crop_steering_lights_on_hour` | Lights On Hour | 0-23 | hour | Hour when lights turn on for the entire system |
-| `number.crop_steering_lights_off_hour` | Lights Off Hour | 0-23 | hour | Hour when lights turn off for the entire system |
-
-### Zone-Specific Numbers (Per Zone 1-N)
-
-| Entity ID Pattern | Name Pattern | Range | Unit | Description |
-|-------------------|--------------|-------|------|-------------|
-| `number.crop_steering_zone_{N}_plant_count` | Zone {N} Plant Count | 1-50 | count | Number of plants in zone N |
-| `number.crop_steering_zone_{N}_max_daily_volume` | Zone {N} Max Daily Volume | 0-200 | L | Maximum daily water volume for zone N |
-| `number.crop_steering_zone_{N}_shot_size_multiplier` | Zone {N} Shot Size Multiplier | 0.1-5.0 | factor | Shot size adjustment factor for zone N |
-
-## 🔄 SELECT ENTITIES
-
-### System Configuration
-
-| Entity ID | Name | Options | Description |
-|-----------|------|---------|-------------|
-| `select.crop_steering_crop_type` | Crop Type | Cannabis_Athena, Cannabis_Hybrid, Cannabis_Indica, Cannabis_Sativa, Tomato, Lettuce, Basil, Custom | Type of crop being grown |
-| `select.crop_steering_growth_stage` | Growth Stage | Vegetative, Generative, Transition | Current growth stage |
-| `select.crop_steering_steering_mode` | Steering Mode | Vegetative, Generative | Active steering mode |
-| `select.crop_steering_irrigation_phase` | Irrigation Phase | P0, P1, P2, P3 | Current irrigation phase (automatic phase control) |
-
-### Zone-Specific Selects (Per Zone 1-N)
-
-| Entity ID Pattern | Name Pattern | Options | Description |
-|-------------------|--------------|---------|-------------|
-| `select.crop_steering_zone_{N}_group` | Zone {N} Group | Ungrouped, Group A, Group B, Group C, Group D | Zone grouping for coordination |
-| `select.crop_steering_zone_{N}_priority` | Zone {N} Priority | Critical, High, Normal, Low | Zone irrigation priority level |
-| `select.crop_steering_zone_{N}_crop_profile` | Zone {N} Crop Profile | Follow Main, Cannabis_Athena, Cannabis_Indica_Dominant, Cannabis_Sativa_Dominant, Cannabis_Balanced_Hybrid, Tomato_Hydroponic, Lettuce_Leafy_Greens, Custom | Zone-specific crop profile |
-
-## 🔘 SWITCHES
-
-### System Control Switches
-
-| Entity ID | Name | Description |
-|-----------|------|-------------|
-| `switch.crop_steering_system_enabled` | System Enabled | Master system enable/disable switch |
-| `switch.crop_steering_auto_irrigation_enabled` | Auto Irrigation Enabled | Enable/disable automatic irrigation |
-| `switch.crop_steering_ec_stacking_enabled` | EC Stacking Enabled | Enable EC-based shot stacking |
-| `switch.crop_steering_analytics_enabled` | Analytics Enabled | Enable advanced statistical analysis features |
-| `switch.crop_steering_debug_mode` | Debug Mode | Enable debug logging and verbose output |
-
-### RootSense Intelligence Module Switches (v3)
-
-Each pillar checks its switch on every iteration; OFF short-circuits all
-side effects. Default OFF so existing v2.x installs are unaffected.
-
-| Entity ID | Name | Description |
-|-----------|------|-------------|
-| `switch.crop_steering_intelligence_root_zone_enabled` | Root Zone Intelligence | Substrate analytics, FC detection, dryback episodes |
-| `switch.crop_steering_intelligence_adaptive_enabled` | Adaptive Irrigation | Cultivator-intent slider, profile interpolation, bandit optimisation |
-| `switch.crop_steering_intelligence_agronomic_enabled` | Agronomic Intelligence | Transpiration model, VPD ceiling, nightly run reports |
-| `switch.crop_steering_intelligence_orchestrator_enabled` | Orchestrator | Custom-shot service handler, emergency rescue, EC flush |
-| `switch.crop_steering_intelligence_anomaly_enabled` | Anomaly Scanner | Emitter, EC drift, sensor flat-line, peer-zone deviation |
-
-### Zone Control Switches (Per Zone 1-N)
-
-| Entity ID Pattern | Name Pattern | Description |
-|-------------------|--------------|-------------|
-| `switch.crop_steering_zone_{N}_enabled` | Zone {N} Enabled | Enable/disable zone N for irrigation |
-| `switch.crop_steering_zone_{N}_manual_override` | Zone {N} Manual Override | Manual override switch for zone N (blocks auto irrigation) |
-
-## 🛠️ SERVICES
-
-### Phase Management Services
-
-| Service ID | Parameters | Description |
-|------------|------------|-------------|
-| `crop_steering.transition_phase` | `target_phase` (P0-P3), `reason`, `forced` | Manually transition to specified irrigation phase |
-| `crop_steering.check_transition_conditions` | None | Check if phase transition conditions are met |
-
-### Irrigation Control Services
-
-| Service ID | Parameters | Description |
-|------------|------------|-------------|
-| `crop_steering.execute_irrigation_shot` | `zone`, `duration_seconds`, `shot_type` | Execute manual irrigation shot for specified zone |
-| `crop_steering.set_manual_override` | `zone`, `timeout_minutes`, `enable` | Set manual override for zone with optional timeout |
-| `crop_steering.custom_shot` | `target_zone`, `intent` (manual/rescue/rebalance_ec/test_emitter/planned), `volume_ml`, optional `target_runoff_pct`, optional `tag` | RootSense v3 — fires `crop_steering_custom_shot` event; orchestrator applies safety gates and routes to hardware. |
-
-## 📋 ENTITY USAGE SUMMARY
-
-### Total Entity Count by Type:
-- **Sensors**: 70+ (varies by zone count)
-- **Numbers**: 46+ (varies by zone count, includes per-zone plant counts)  
-- **Selects**: 20+ (varies by zone count)
-- **Switches**: 10+ (varies by zone count)
-- **Services**: 4
-
-### Key Features:
-- **100% Entity Functionality**: All entities are fully functional and integrated
-- **Zone Scalability**: Supports 1-10 zones with per-zone entities
-- **Real-time Analytics**: Comprehensive monitoring and reporting
-- **Safety Systems**: Multi-layer protection against over-watering and nutrient burn
-- **Advanced Automation**: EC-based irrigation, progressive P1, intelligent phase transitions
-- **Manual Control**: Complete override system with timeout functionality
-- **Professional Monitoring**: Health scoring, efficiency metrics, predictive analytics
-
-### Entity Categories:
-1. **Configuration Entities**: Set system parameters and zone settings
-2. **Control Entities**: Enable/disable features and manual overrides
-3. **Monitoring Entities**: Real-time system status and analytics
-4. **Safety Entities**: Critical safety limits and protection systems
-5. **Analytics Entities**: Performance metrics and predictive data
-6. **Zone Entities**: Per-zone controls and monitoring
-
-This comprehensive entity system provides complete control over a professional-grade crop steering irrigation system with rule-based automation, safety systems, and real-time monitoring capabilities.
+# Entity Reference — Complete Schema
+
+Every entity the Crop Steering System creates, what it does, its range/options, and
+its default. Generated against the live deployed system (3-zone example; per-zone
+entities scale with your zone count, `N` = 1…zones).
+
+**Conventions**
+- **Global** entities set the system-wide default: `…crop_steering_<param>`.
+- **Per-zone** entities override the global for one zone: `…crop_steering_zone_N_<param>`.
+  Most phase/EC/dryback setpoints exist in **both** forms — the engine uses the
+  per-zone value for that zone and falls back to the global otherwise.
+- The engine reads these by `entity_id`. Renaming a friendly-name in HA or on a
+  dashboard does not affect it.
+
+---
+
+## 1. Numbers — global setpoints (`number.crop_steering_*`)
+
+### P0 — morning dryback
+| Entity | Range | Default | Unit | What it does |
+|---|---|---|---|---|
+| `p0_dryback_drop_percent` | 2–40 | 15 | % | How far VWC must drop from the overnight peak before P0 ends and P1 begins. |
+| `p0_minimum_wait_time` | 5–300 | 30 | min | Earliest P0 may exit, even if the dryback target is already met. |
+| `p0_maximum_wait_time` | 30–600 | 120 | min | Hard ceiling — forces P0 → P1 if the dryback target is never reached. |
+
+### P1 — ramp-up
+| Entity | Range | Default | Unit | What it does |
+|---|---|---|---|---|
+| `p1_initial_shot_size` | 0.1–20 | 2 | % | Size of the first ramp shot (% of substrate volume). |
+| `p1_shot_size_increment` | 0.05–10 | 0.5 | % | How much each successive shot grows. |
+| `p1_maximum_shot_size` | 2–50 | 10 | % | Cap on the ramp shot size. |
+| `p1_minimum_shots` | 1–20 | 3 | — | Minimum shots before P1 may exit. |
+| `p1_maximum_shots` | 1–30 | 6 | — | After this many shots P1 exits to P2 even if the target wasn't hit. |
+| `p1_target_vwc` | 5–95 | 60 | % | VWC that ends the ramp and moves the zone to P2. |
+| `p1_time_between_shots` | 1–60 | 5 | min | Spacing between ramp shots. |
+
+### P2 — maintenance
+| Entity | Range | Default | Unit | What it does |
+|---|---|---|---|---|
+| `p2_vwc_threshold` | 5–85 | 55 | % | Shoot a maintenance top-up when VWC falls below this. |
+| `p2_shot_size` | 0.5–30 | 5 | % | Size of a P2 maintenance shot. |
+| `p2_ec_high_threshold` | 0.5–3.0 | 1.2 | ×target | EC ratio above which the threshold is raised (water more to flush salts). |
+| `p2_ec_low_threshold` | 0.2–2.0 | 0.8 | ×target | EC ratio below which the threshold is lowered. |
+
+### P3 — pre-lights-off / overnight
+| Entity | Range | Default | Unit | What it does |
+|---|---|---|---|---|
+| `p3_emergency_vwc_threshold` | 20–65 | 40 | % | Overnight emergency floor — a rescue shot fires below this. |
+| `p3_emergency_shot_size` | 0.1–15 | 2 | % | Size of an emergency rescue shot. |
+| `p3_veg_last_irrigation` | 15–360 | 120 | min | Minutes before lights-off after which veg zones take no planned shots. |
+| `p3_gen_last_irrigation` | 30–600 | 180 | min | Same, for generative zones. |
+
+### EC targets — vegetative & generative (per phase)
+| Entity | Range | Default | Unit |
+|---|---|---|---|
+| `ec_target_veg_p0` / `_p1` / `_p2` / `_p3` | 0.5–15 | 3.0 / 3.0 / 3.2 / 3.0 | mS/cm |
+| `ec_target_gen_p0` / `_p1` / `_p2` / `_p3` | 0.5–20 | 4.0 / 5.0 / 6.0 / 4.5 | mS/cm |
+| `ec_target_flush` | 0.1–15 | 0.8 | mS/cm |
+
+The active EC target = the row for the current phase **and** the zone's steering mode.
+`sensor.crop_steering_ec_ratio` = current EC ÷ this target.
+
+### EC & safety limits
+| Entity | Range | Default | Unit | What it does |
+|---|---|---|---|---|
+| `irrigation_ec_min` | 0–20 | 2.3 | mS/cm | Source-water EC gate (low bound). Irrigation blocked below it. `0` disables. |
+| `irrigation_ec_max` | 0–20 | 3.5 | mS/cm | Source-water EC gate (high bound). |
+| `irrigation_ph_min` | 3.0–9.0 | 5.8 | pH | Source-water pH gate (low bound). |
+| `irrigation_ph_max` | 3.0–9.0 | 6.2 | pH | Source-water pH gate (high bound). |
+| `maximum_ec` | 1–20 | 9.0 | mS/cm | Hard substrate-EC cutoff — no shot above it (salt-burn guard). |
+| `blocked_dripper_max_shots_30min` | 1–20 | 4 | — | Emergency shots in 30 min before a zone is flagged/backed-off as a blocked/draining dripper. |
+
+### Substrate & schedule
+| Entity | Range | Default | Unit | What it does |
+|---|---|---|---|---|
+| `substrate_volume` | 1–200 | 6 | L | Substrate volume per plant — converts shot % → mL → valve seconds. |
+| `dripper_flow_rate` | 0.1–50 | 4 | L/hr | Per-dripper flow — the other half of the % → seconds conversion. |
+| `drippers_per_plant` | 1–6 | 1 | — | Drippers feeding each plant. |
+| `field_capacity` | 5–100 | 60 | % | VWC at/above which irrigation is blocked (over-water guard / P1 clamp). |
+| `vegetative_dryback_target` | 5–80 | 50 | % | Overnight dryback target in vegetative mode. |
+| `generative_dryback_target` | 5–70 | 40 | % | Overnight dryback target in generative mode. |
+| `lights_on_hour` | 0–23 | 10 | hour | Photoperiod start — P3→P0 + daily-counter reset fire here. |
+| `lights_off_hour` | 0–23 | 22 | hour | Photoperiod end — zones move to P3. |
+
+---
+
+## 2. Numbers — per-zone overrides (`number.crop_steering_zone_N_*`)
+
+Every zone gets its own copy of the setpoints below. The engine uses the zone's value
+for that zone. (3 zones × 32 = 96 entities on a 3-zone system.)
+
+**Per-zone copies of the global setpoints:** `p0_dryback_drop_percent`,
+`p0_minimum_wait_time`, `p0_maximum_wait_time`, `p1_initial_shot_size`,
+`p1_shot_size_increment`, `p1_maximum_shot_size`, `p1_minimum_shots`,
+`p1_maximum_shots`, `p1_target_vwc`, `p1_time_between_shots`, `p2_vwc_threshold`,
+`p2_shot_size`, `p2_ec_high_threshold`, `p2_ec_low_threshold`,
+`p3_emergency_vwc_threshold`, `p3_emergency_shot_size`, `p3_veg_last_irrigation`,
+`p3_gen_last_irrigation`, `vegetative_dryback_target`, `generative_dryback_target`,
+and all eight `ec_target_veg_pX` / `ec_target_gen_pX` plus `ec_target_flush`. Ranges
+match the globals above.
+
+**Per-zone only (no global equivalent):**
+| Entity | Range | Default | Unit | What it does |
+|---|---|---|---|---|
+| `zone_N_plant_count` | 1–50 | — | — | Plants in the zone — scales total water volume. |
+| `zone_N_max_daily_volume` | 0–200 | 200 | L | Hard daily water cap for the zone (emergency rescue is exempt). |
+| `zone_N_shot_size_multiplier` | 0.1–5 | 1.0 | × | Scales every shot for this zone (a weak/strong row trim). |
+
+---
+
+## 3. Switches
+
+### Global (`switch.crop_steering_*`)
+| Entity | What it does |
+|---|---|
+| `system_enabled` | Master on/off. Off = no irrigation at all. |
+| `auto_irrigation_enabled` | Enables the autonomous decision loop (off = manual-only). |
+| `ec_stacking_enabled` | When on, the system builds EC when below target instead of diluting (push EC up intentionally). |
+| `analytics_enabled` | Enables the analytics/efficiency sensors + history tracking. |
+
+### Per-zone (`switch.crop_steering_zone_N_*`)
+| Entity | What it does |
+|---|---|
+| `zone_N_enabled` | Include/exclude the zone from automation. |
+| `zone_N_manual_override` | Absolute lockout — **nothing** opens that valve (auto, emergency, manual). For maintenance. |
+| `zone_N_dripper_protection` | When on, the zone is allowed to abandon/back-off after repeated unresponsive emergency shots (blocked-dripper protection). |
+
+---
+
+## 4. Selects
+
+### Global (`select.crop_steering_*`)
+| Entity | Options | What it does |
+|---|---|---|
+| `steering_mode` | Vegetative · Generative | System-wide veg/gen bias (picks which EC + dryback targets apply). |
+| `growth_stage` | Vegetative · Generative · Transition | Current growth stage — shifts EC targets + dryback aggressiveness. |
+| `crop_type` | Cannabis_Athena · _Hybrid · _Indica · _Sativa | Crop profile preset. |
+| `irrigation_phase` | P0 · P1 · P2 · P3 · Manual | System phase indicator / manual phase set. |
+
+### Per-zone (`select.crop_steering_zone_N_*`)
+| Entity | Options | What it does |
+|---|---|---|
+| `zone_N_steering_mode` | Vegetative · Generative | Per-zone veg/gen bias. |
+| `zone_N_crop_profile` | Follow Main · Cannabis_Athena · _Indica_Dominant · … · Custom | Per-zone crop preset (Follow Main = use system default). |
+| `zone_N_priority` | Critical · High · Normal · Low | Ordering when multiple zones want water at once. |
+| `zone_N_group` | Ungrouped · Group A–D | Logical grouping for multi-zone coordination. |
+
+---
+
+## 5. Phase control (`input_select.crop_steering_*`)
+
+| Entity | Options | What it does |
+|---|---|---|
+| `zone_N_phase_control` | Auto · P0 · P1 · P2 · P3 | Per-zone manual phase pin. **Auto** = engine controls the phase; any other value pins the zone there until set back to Auto. |
+
+---
+
+## 6. Sensors (read-only)
+
+### System (`sensor.crop_steering_*`)
+| Entity | Unit | What it reports |
+|---|---|---|
+| `activity_log` | — | Rolling human-readable feed (last ~40 watered/blocked/phase events); full feed in the `feed` attribute. |
+| `current_phase` / `app_current_phase` | — | Combined per-zone phase string (e.g. `Z1:P3, Z2:P3, Z3:P3`). |
+| `current_decision` | — | What the engine decided this cycle (`irrigate` / `wait` / …). |
+| `app_next_irrigation` / `next_irrigation_time` | — | Predicted next shot time. |
+| `system_state` / `app_status` | — | `active` / `safe_idle` / … |
+| `system_safety_status` | — | `safe` / fault. |
+| `system_health_score` | — | 0–100 composite health. |
+| `system_uptime` | — | Engine uptime. |
+| `ai_heartbeat` | — | Self-correction loop status (`healthy` / anomaly). |
+| `system_efficiency` / `water_efficiency` | — | Efficiency metrics. |
+| `average_vwc_all_zones` / `average_ec_all_zones` | % / mS/cm | Cross-zone means. |
+| `fused_vwc` / `fused_ec` | — | Sensor-fused VWC/EC. |
+| `sensor_health` / `sensor_fusion_confidence` | % / — | Sensor-fusion quality. |
+| `ec_ratio` | — | Current EC ÷ target EC. |
+| `ec_baseline` | mS/cm | Reference EC baseline. |
+| `dryback_percentage` / `dryback_target` | % | Current dryback + active target. |
+| `dryback_detection_accuracy` | — | Dryback-detector confidence. |
+| `ml_model_accuracy` | — | Predictor confidence. |
+| `p1_shot_duration` / `p2_shot_duration` / `p3_emergency_shot_duration` | s | Computed valve seconds for each shot type. |
+| `p2_vwc_threshold_adjusted` | % | P2 threshold after EC-ratio adjustment. |
+| `vwc_target_min` / `vwc_target_max` | % | Active VWC band. |
+| `daily_water_usage` / `daily_water_usage_app` | L | Total water today. |
+| `prediction_estimated_daily_water_need` | L | Predicted daily demand. |
+| `irrigation_efficiency` | % | Water-to-uptake efficiency. |
+
+### Per-zone (`sensor.crop_steering_zone_N_*`)
+| Entity | Unit | What it reports |
+|---|---|---|
+| `zone_N_vwc` | % | Fused substrate moisture. |
+| `zone_N_ec` | mS/cm | Fused pore-water EC. |
+| `zone_N_phase` | — | The zone's current phase (P0–P3). |
+| `zone_N_status` | — | `Optimal` / `Dry - Needs Water` / `Saturated` / `Disabled` / `Sensor Error`. |
+| `zone_N_safety_status` | — | `safe` / fault. |
+| `zone_N_health_score` / `zone_N_efficiency` | — | Per-zone health/efficiency. |
+| `zone_N_daily_water_usage` / `_daily_water_app` | L | Water today (resets at lights-on). |
+| `zone_N_weekly_water_usage` / `_weekly_water_app` | L | Rolling 7-day water. |
+| `zone_N_irrigations_today` / `_irrigation_count_app` | — | Shot count today. |
+| `zone_N_last_irrigation` / `_last_irrigation_app` | — | Last shot timestamp. |
+| `prediction_zone_N_next_irrigation_hours` | h | Predicted hours to next shot. |
+
+> Note: a few `…_app` sensors are engine-published mirrors of the integration sensors;
+> prefer the engine `…_app` value when the two differ.
+
+---
+
+## 7. Hardware (your own switches/sensors — mapped in `apps.yaml`, not created here)
+
+The pump, mainline solenoid, per-zone valve switches, and the raw VWC/EC + source-water
+sensors are **your** existing HA entities. You map them to the engine in
+`appdaemon/apps/apps.yaml`; the engine drives the switches and reads the sensors.
+
+> **Inert legacy entities:** the integration may still create a steering-intent slider
+> and a few `…_intelligence_*_enabled` switches from a retired experimental layer. The
+> deployed engine ignores them.
