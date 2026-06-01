@@ -324,6 +324,14 @@ class MasterCropSteeringApp(BaseAsyncApp):
     async def _startup_safety_sweep(self, kwargs):
         """Ensure all irrigation actuators are OFF on startup/restart."""
         try:
+            if self._is_dosing_active():
+                # The batch tank is being dosed/filled right now, with the pump
+                # circulating to mix the concentrate. Slamming the hardware off on
+                # (re)start would dump that concentrate into the manifold. The dosing
+                # automation owns the hardware until it finishes — stand down.
+                self.log("🛡️ Startup safety sweep SKIPPED — tank dosing/fill active; leaving circulation pump alone")
+                await self._publish_status(status='safe_idle', message='Startup sweep deferred — dosing/fill active')
+                return
             self.log("🛡️ Running startup safety sweep (turning off irrigation hardware)")
             await self._emergency_stop()
             await self._publish_status(status='safe_idle', message='Startup safety sweep completed')
@@ -384,6 +392,28 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 if entity_id and self._get_switch_state(entity_id, False):
                     return True
             return False
+        except Exception:
+            return False
+
+    def _is_dosing_active(self) -> bool:
+        """True while the veg batch tank is being dosed/filled.
+
+        During dosing the pump (and manifold) run intentionally to circulate the
+        batch tank so freshly-dosed nutrient concentrate gets mixed instead of
+        slugging the manifold. The irrigation decision loop already holds off shots
+        while this is active; this helper lets the periodic watchdog and the
+        sensor-offline fail-safe stand down too, instead of emergency-stopping the
+        circulation pump every 60 s.
+
+        Uses the same two signals as the irrigation dose/fill interlock:
+          - switch.tank_filling
+          - input_boolean.nutrient_dosing_active
+        """
+        try:
+            if self._get_switch_state("switch.tank_filling", False):
+                return True
+            val = self.get_entity_value("input_boolean.nutrient_dosing_active", default="off")
+            return str(val).lower() == "on"
         except Exception:
             return False
 
@@ -2548,33 +2578,58 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         return {'action': 'wait', 'reason': 'Profile parameters satisfied'}
 
+    def _shot_pct_to_duration(self, zone_num: int, shot_pct: float) -> int:
+        """Convert a shot size (% of substrate volume) to valve-open seconds for a zone.
+
+        Uses substrate volume, dripper flow rate, drippers-per-plant and the zone's
+        shot-size multiplier. THIS is the conversion the executor was missing: phase
+        logic computes shot %s (P1 ramp, P2 maintenance) and they used to be discarded
+        in favour of a flat 30 s, so shots never grew and P1 never ramped.
+        """
+        substrate_vol = self._get_number_entity_value("number.crop_steering_substrate_volume", 3.0)
+        dripper_flow = self._get_number_entity_value("number.crop_steering_dripper_flow_rate", 2.0)
+        drippers = self._get_number_entity_value("number.crop_steering_drippers_per_plant", 2)
+        multiplier = self._get_number_entity_value(f"number.crop_steering_zone_{zone_num}_shot_size_multiplier", 1.0)
+        shot_volume_ml = (shot_pct / 100.0) * substrate_vol * 1000 * multiplier
+        flow_rate_ml_s = (dripper_flow * drippers * 1000) / 3600
+        return max(5, int(shot_volume_ml / flow_rate_ml_s)) if flow_rate_ml_s > 0 else 30
+
     async def _execute_intelligent_irrigation(self, decision: Dict):
         """Execute irrigation with intelligent zone selection and monitoring."""
         try:
-            # Check if this is multi-zone emergency irrigation
+            # Multi-zone irrigation — each zone fires its OWN computed shot size + phase label.
             zones = decision.get('zones', [])
             if zones:
-                # Multi-zone emergency irrigation
-                duration = decision.get('duration', 40)
-                reason = decision.get('reason', 'Emergency irrigation')
-                shot_size = decision.get('shot_size_percent', 2.0)
-                
-                self.log(f"🚨 Executing emergency irrigation: Zones {zones}, {duration}s - {reason}")
-                
-                # Execute irrigation for each zone that needs it
+                reason = decision.get('reason', 'Irrigation')
+                fallback_duration = decision.get('duration', 30)
+                zone_decisions = decision.get('zone_decisions', {})
+                self.log(f"💧 Executing irrigation: Zones {zones} - {reason}")
+
                 for zone in zones:
                     try:
-                        zone_result = await self._execute_irrigation_shot(zone, duration, shot_type='emergency')
-                        self.log(f"💧 Emergency irrigation completed for zone {zone}")
-                        
+                        zd = zone_decisions.get(zone, {})
+                        shot_pct = zd.get('shot_size')
+                        # Real per-zone duration from the computed shot size (no more flat 30 s).
+                        duration = self._shot_pct_to_duration(zone, shot_pct) if shot_pct else fallback_duration
+                        # Label by ACTUAL phase. Genuine emergencies (P0 EC flush / P3 rescue) set
+                        # 'emergency' and stay daily-cap-exempt; normal P1 ramp / P2 maintenance get
+                        # phase labels and respect the daily volume + count caps again.
+                        phase = self.zone_phases.get(zone, 'P2')
+                        if zd.get('emergency'):
+                            stype = 'emergency'
+                        else:
+                            stype = {'P0': 'p0', 'P1': 'p1_ramp', 'P2': 'p2_maintenance', 'P3': 'p3_emergency'}.get(phase, 'scheduled')
+                        self.log(f"💧 Zone {zone} {stype} shot: {shot_pct if shot_pct else '?'}% → {duration}s (VWC {zd.get('vwc', '?')})")
+                        zone_result = await self._execute_irrigation_shot(zone, duration, shot_type=stype)
+
                         # Add to ML training data
                         zone_decision = decision.copy()
                         zone_decision['zone'] = zone
                         await self._add_ml_training_sample(zone_decision, zone_result)
-                        
+
                     except Exception as zone_error:
                         self.log(f"❌ Error irrigating zone {zone}: {zone_error}", level='ERROR')
-                
+
                 return
                 
             # Standard single-zone irrigation
@@ -5116,6 +5171,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     vwc_online += 1
 
             if vwc_total > 0 and vwc_online == 0 and self._is_any_irrigation_hardware_on():
+                if self._is_dosing_active():
+                    # Pump circulating for tank dosing/fill, not irrigating — don't
+                    # emergency-stop just because VWC sensors are offline.
+                    return
                 self.log("🚨 Watchdog fail-safe: all sensors offline while hardware is ON, executing emergency stop", level='ERROR')
                 await self._publish_status(
                     status='error',
@@ -5146,6 +5205,16 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 return
 
             if (not self.irrigation_in_progress) and hardware_on:
+                # DOSING/TANK-FILL EXEMPTION: the pump (and manifold) run on purpose to
+                # circulate the batch tank while it's dosed/filled — that pump-on is owned
+                # by the dosing automation, not a fault. Stand down instead of killing the
+                # circulation pump (which would dump concentrate into the manifold).
+                if self._is_dosing_active():
+                    await self._publish_status(
+                        status='safe_idle',
+                        message='Tank dosing/fill active — watchdog standing down (pump circulating)'
+                    )
+                    return
                 self.log("🚨 Watchdog: hardware ON while irrigation_in_progress=False. Executing emergency stop.", level='ERROR')
                 await self._publish_status(
                     status='error',
