@@ -147,6 +147,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
         # AI heartbeat tracking
         self.heartbeat_history = []  # Rolling list of heartbeat reports (last 96 = 24h)
         self.heartbeat_ec_history = {}  # {zone_num: [ec_values]} for trend detection
+        # Phase-agnostic "stuck low / not absorbing" hydration-fault detector (heartbeat #7).
+        # {zone_num: {'prev_vwc', 'prev_shots', 'strikes', 'last_alert'}}
+        self.heartbeat_hydration = {}
 
         # Initialize per-zone tracking
         self.zone_profiles = {}     # Zone-specific crop profiles
@@ -4348,6 +4351,61 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     if enabled_time and (datetime.now() - enabled_time).total_seconds() > 86400:
                         report['anomalies'].append(f"Zone {zone_num}: Manual override active >24h (forgotten?)")
 
+                # 7. Stuck LOW / not absorbing — ANY phase (P1/P2/P3), not just emergency.
+                #    Catches the channeling / dried-back-cube / probe-out-of-wet-zone failure
+                #    (the live Row 3 case: fed repeatedly, VWC flat AND below its own target).
+                #    Anomaly #3 above only sees emergency-path attempts; this watches the
+                #    per-heartbeat shot-count vs VWC response for every phase. Read-only —
+                #    it alerts, it never changes irrigation.
+                try:
+                    hyd = self.heartbeat_hydration.setdefault(
+                        zone_num,
+                        {'prev_vwc': None, 'prev_shots': None, 'strikes': 0, 'last_alert': None},
+                    )
+                    p2_threshold = self._get_number_entity_value(
+                        f"number.crop_steering_zone_{zone_num}_p2_vwc_threshold", 0.0
+                    )
+                    vwc_ok = isinstance(zone_vwc, (int, float)) and 0 < zone_vwc < 100
+                    stuck = False
+                    if vwc_ok and hyd['prev_vwc'] is not None and hyd['prev_shots'] is not None:
+                        shots_delta = daily_shots - hyd['prev_shots']
+                        vwc_delta = zone_vwc - hyd['prev_vwc']
+                        # shots_delta < 0 => daily counter reset at lights-on; skip that interval.
+                        # Fault = fed >=2 shots since last heartbeat, VWC essentially flat (<1.5%),
+                        # and still below the level the engine is trying to hold it at.
+                        if shots_delta >= 2 and vwc_delta < 1.5 and p2_threshold > 0 and zone_vwc < p2_threshold:
+                            stuck = True
+                            report['anomalies'].append(
+                                f"Zone {zone_num}: fed {shots_delta} shots but VWC flat "
+                                f"({zone_vwc:.1f}%, Δ{vwc_delta:+.1f}%) below target {p2_threshold:.0f}% — not absorbing"
+                            )
+                            zone_report['status'] = 'stuck_low_not_absorbing'
+                    hyd['strikes'] = hyd['strikes'] + 1 if stuck else 0
+                    # Alert once the fault is sustained (>=2 heartbeats / ~30min), then re-alert
+                    # at most every 3h while it persists, so we don't cry wolf on a single reading.
+                    if hyd['strikes'] >= 2:
+                        last = hyd['last_alert']
+                        due = last is None or (datetime.now() - last).total_seconds() >= 10800
+                        if due:
+                            self._notify_phone(
+                                f"🚱 Zone {zone_num} STUCK LOW — VWC {zone_vwc:.0f}% and not rising despite "
+                                f"repeated shots (target {p2_threshold:.0f}%). The row is not absorbing water. "
+                                f"Likely one of:\n"
+                                f"1+3. Cube dried back too far and is CHANNELLING — water runs straight through. "
+                                f"Needs hand-watering / pulse-rehydration rescue (small 1–2% shots, lower EC) to recover.\n"
+                                f"2. VWC probe slipped into a dry pocket / out of the wet core — reseat it.\n"
+                                f"Check by hand: blocks heavy & wet ⇒ probe fault (reseat); light & dry ⇒ "
+                                f"channelling (hand-water / rescue)."
+                            )
+                            hyd['last_alert'] = datetime.now()
+                            report['actions_taken'].append(f"Zone {zone_num}: stuck-low hydration alert sent")
+                    # Roll the snapshot forward for the next heartbeat.
+                    if vwc_ok:
+                        hyd['prev_vwc'] = zone_vwc
+                    hyd['prev_shots'] = daily_shots
+                except Exception as e:
+                    self.log(f"⚠️ hydration-fault check error (zone {zone_num}): {e}", level='WARNING')
+
                 report['zones'][zone_num] = zone_report
 
             # Publish heartbeat sensor
@@ -4906,8 +4964,34 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 elif hold_expiry:
                     del self.manual_phase_hold[zone_num]
                     self.log(f"🔓 Zone {zone_num}: Manual phase hold expired, resuming automatic transitions")
-                if self.zone_manual_phase.get(zone_num):
+                # Authoritative manual pin: the dashboard input_select is the SOURCE OF TRUTH.
+                # The in-memory zone_manual_phase flag is wiped on every AppDaemon restart and
+                # only re-synced ONCE at startup — if that single read lands in the blind-startup
+                # window (HA state not synced yet → reads default 'Auto') the pin was silently
+                # lost and the zone resumed auto-transitions. That is the "set P1 but it walks
+                # through to P2" bug. Re-read the pin every cycle (get_entity_value has a
+                # Supervisor-proxy REST fallback) and self-heal the cached flag, so the hold
+                # survives restarts and the blind-read race.
+                pin = self.get_entity_value(
+                    f'input_select.crop_steering_zone_{zone_num}_phase_control', default='Auto')
+                pin = str(pin).strip() if pin else 'Auto'
+                if pin in ('P0', 'P1', 'P2', 'P3'):
+                    self.zone_manual_phase[zone_num] = pin
+                    # If a restart race advanced the zone off its pinned phase before the pin was
+                    # restored, pull it back — so "hold P1 all day" actually holds P1, not P2.
+                    pinned_enum = {
+                        'P0': IrrigationPhase.P0_MORNING_DRYBACK,
+                        'P1': IrrigationPhase.P1_RAMP_UP,
+                        'P2': IrrigationPhase.P2_MAINTENANCE,
+                        'P3': IrrigationPhase.P3_PRE_LIGHTS_OFF,
+                    }[pin]
+                    if machine.state.current_phase != pinned_enum:
+                        self.log(f"📌 Zone {zone_num}: re-asserting manual pin {pin} (had drifted off it)")
+                        await self._transition_zone_to_phase(
+                            zone_num, pin, f"Re-assert manual phase pin {pin}", forced=True)
                     continue
+                elif self.zone_manual_phase.pop(zone_num, None) is not None:
+                    self.log(f"🔓 Zone {zone_num}: phase control = Auto — resuming automatic transitions")
 
                 current_phase = machine.state.current_phase
                 zone_vwc = self._get_zone_average_vwc(zone_num)
