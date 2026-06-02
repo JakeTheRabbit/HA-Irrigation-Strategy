@@ -20,6 +20,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 from homeassistant.helpers.entity import DeviceInfo
 
 from .const import (
@@ -373,7 +374,10 @@ class CropSteeringSensor(SensorEntity):
         Supports N sensors per zone (new vwc_sensors list) with
         fallback to legacy vwc_front/vwc_back pair.
         """
-        zone_config = self._zones_config.get(zone_num, {})
+        # _zones_config keys can be int OR str ('1','2','3') depending on how the config
+        # entry was (re)loaded — JSON serialises dict keys as strings, so after a config
+        # reload the int lookup misses and every zone reads None ('unknown'). Accept both.
+        zone_config = self._zones_config.get(zone_num) or self._zones_config.get(str(zone_num)) or {}
 
         # Prefer new list format
         vwc_sensors = list(zone_config.get('vwc_sensors', []))
@@ -392,7 +396,7 @@ class CropSteeringSensor(SensorEntity):
         Supports N sensors per zone (new ec_sensors list) with
         fallback to legacy ec_front/ec_back pair.
         """
-        zone_config = self._zones_config.get(zone_num, {})
+        zone_config = self._zones_config.get(zone_num) or self._zones_config.get(str(zone_num)) or {}
 
         ec_sensors = list(zone_config.get('ec_sensors', []))
         if not ec_sensors:
@@ -425,13 +429,16 @@ class CropSteeringSensor(SensorEntity):
         else:
             return "Optimal"
             
-    def _get_zone_last_irrigation(self, zone_num: int) -> str | None:
-        """Get last irrigation time for zone."""
-        # Check AppDaemon sensor for zone last irrigation
-        last_irrigation_sensor = self.hass.states.get(f"sensor.crop_steering_zone_{zone_num}_last_irrigation_app")
-        if last_irrigation_sensor and last_irrigation_sensor.state not in ['unknown', 'unavailable']:
-            return last_irrigation_sensor.state
-        return None
+    def _get_zone_last_irrigation(self, zone_num: int):
+        """Return zone last-irrigation as a tz-aware datetime (or None) — see
+        _get_next_irrigation_time: a naive string crashes the TIMESTAMP sensor."""
+        s = self.hass.states.get(f"sensor.crop_steering_zone_{zone_num}_last_irrigation_app")
+        if not s or s.state in ('unknown', 'unavailable', '', None):
+            return None
+        dt = dt_util.parse_datetime(s.state)
+        if dt is None:
+            return None
+        return dt if dt.tzinfo else dt_util.as_local(dt)
     
     def _get_zone_daily_water_usage(self, zone_num: int) -> float:
         """Get daily water usage for zone."""
@@ -592,16 +599,21 @@ class CropSteeringSensor(SensorEntity):
         except Exception:
             return "P2"
 
-    def _get_next_irrigation_time(self) -> str | None:
-        """Get next irrigation time from AppDaemon sensor."""
+    def _get_next_irrigation_time(self):
+        """Return next-irrigation time as a tz-aware datetime (or None).
+
+        device_class=TIMESTAMP requires a tz-aware datetime. Returning the raw naive ISO
+        *string* makes HA raise ('str' has no attribute 'tzinfo') inside the platform's
+        shared asyncio.gather, which cascades and freezes the other coordinator sensors
+        (the per-zone VWC/EC went 'unknown' from exactly this)."""
         try:
-            # Check if there's a sensor from AppDaemon
-            time_sensor = self.hass.states.get("sensor.crop_steering_app_next_irrigation")
-            if time_sensor and time_sensor.state not in ['unknown', 'unavailable']:
-                return time_sensor.state
-            
-            # If no specific time available, return None
-            return None
+            s = self.hass.states.get("sensor.crop_steering_app_next_irrigation")
+            if not s or s.state in ('unknown', 'unavailable', '', None):
+                return None
+            dt = dt_util.parse_datetime(s.state)
+            if dt is None:
+                return None
+            return dt if dt.tzinfo else dt_util.as_local(dt)
         except Exception:
             return None
 
