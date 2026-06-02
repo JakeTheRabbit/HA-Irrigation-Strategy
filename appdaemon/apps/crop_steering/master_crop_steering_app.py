@@ -108,6 +108,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
         # Initialize thread lock for thread safety
         self.lock = threading.RLock()
         self._startup_time = datetime.now()
+        # Throttle heavy sensor-fusion processing per entity to avoid thread starvation.
+        # EC/VWC probes tick several times/sec; running fusion on every tick backed up the
+        # AppDaemon queue and starved thread-0 (watchdog then false-fired mid-shot).
+        self._sensor_proc_last = {}          # entity_id -> monotonic ts of last fusion process
+        self._sensor_proc_min_interval = 10  # seconds between heavy fusion cycles per entity
 
         # System state
         self.system_enabled = True
@@ -1587,16 +1592,35 @@ class MasterCropSteeringApp(BaseAsyncApp):
             if new in ['unavailable', 'unknown', None]:
                 return
 
-            with self.lock:
-                ec_value = float(new)
+            ec_value = float(new)
 
-                # Reject clearly invalid EC values (pore water EC should be 0-15 mS/cm)
-                if ec_value < 0 or ec_value > 15:
-                    self.log(f"⚠️ Rejecting invalid EC reading: {entity} = {ec_value:.2f} mS/cm", level='WARNING')
-                    return
+            # Reject clearly invalid EC values (pore water EC should be 0-15 mS/cm)
+            if ec_value < 0 or ec_value > 15:
+                self.log(f"⚠️ Rejecting invalid EC reading: {entity} = {ec_value:.2f} mS/cm", level='WARNING')
+                return
 
+            # SAFETY first — runs on every tick, cheap, no lock held: critical-EC escalation.
+            if ec_value > self.config['thresholds']['critical_ec']:
+                self.log(f"🚨 Critical EC level detected: {ec_value:.2f} mS/cm", level='WARNING')
+                # Schedule async critical EC handling
+                self.run_in(self._run_critical_ec_check, 0, ec_value=ec_value)
+
+            # THROTTLE the heavy fusion + entity writes. EC probes tick several times/sec;
+            # running fusion on every tick (and waiting on self.lock) starved thread-0 and
+            # backed up the AppDaemon queue, which made the watchdog false-fire mid-shot.
+            import time as _time
+            now_epoch = _time.monotonic()
+            if now_epoch - self._sensor_proc_last.get(entity, 0.0) < self._sensor_proc_min_interval:
+                return
+
+            # Non-blocking lock: if the engine is mid-shot / heartbeat, skip this fusion cycle
+            # rather than queue up behind the lock (fusion is smoothing, not safety-critical).
+            if not self.lock.acquire(blocking=False):
+                return
+            try:
+                self._sensor_proc_last[entity] = now_epoch
                 timestamp = datetime.now()
-                
+
                 # Process EC sensor through fusion system
                 fusion_result = self.sensor_fusion.add_sensor_reading(
                     sensor_id=entity,
@@ -1604,20 +1628,16 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     timestamp=timestamp,
                     sensor_type='ec'  # Explicitly mark as EC sensor
                 )
-                
+
                 # Update fusion entities
                 self._update_sensor_fusion_entities(entity, fusion_result)
-                
-                # Check for critical EC levels (using direct value)
-                if ec_value > self.config['thresholds']['critical_ec']:
-                    self.log(f"🚨 Critical EC level detected: {ec_value:.2f} mS/cm", level='WARNING')
-                    # Schedule async critical EC handling
-                    self.run_in(self._run_critical_ec_check, 0, ec_value=ec_value)
-                
+
                 # Log outliers
                 if fusion_result['is_outlier']:
                     self.log(f"⚠️ EC outlier detected: {entity} = {ec_value:.2f} mS/cm")
-                
+            finally:
+                self.lock.release()
+
         except Exception as e:
             self.log(f"❌ Error processing EC update: {e}", level='ERROR')
 
@@ -3909,6 +3929,79 @@ class MasterCropSteeringApp(BaseAsyncApp):
         except Exception as e:
             self.log(f"❌ Error updating zone {zone_num} adaptive VWC max: {e}", level='ERROR')
 
+    def _ec_stack_dryback(self, zone_num: int, zone_vwc: Optional[float], zone_ec: Optional[float],
+                          phase: Optional[IrrigationPhase]):
+        """Stack pore-EC up to target by modulating P2 dryback depth (single owner of p2_vwc_threshold).
+
+        Per zone, in P2: compare smoothed pore-EC to its phase EC target.
+          • pore-EC UNDER target  -> deepen dryback: LOWER p2_vwc_threshold (salts concentrate, EC rises)
+          • pore-EC DROPPED (runoff) since last step -> deepen dryback too (operator's rule)
+          • pore-EC AT/OVER target -> ease: RAISE p2_vwc_threshold (water sooner, stop over-stacking)
+        Field capacity is NOT touched. Gated by switch.crop_steering_ec_stacking_enabled.
+        Bounded: floor = p3_emergency_vwc_threshold + margin; ceil = min(p1_target, cap) - 1.
+        """
+        STEP, COOLDOWN_S, EC_DROP, LO, HI, FLOOR_MARGIN = 1.0, 1800, 0.4, 0.90, 1.10, 3.0
+        try:
+            if not self._get_switch_state("switch.crop_steering_ec_stacking_enabled", False):
+                return
+            if phase != IrrigationPhase.P2_MAINTENANCE:   # P2 is where dryback-between-shots lives
+                return
+            if zone_vwc is None or zone_ec is None:
+                return
+            data = self.zone_vwc_capacity.get(zone_num)
+            if data is None:
+                data = self.zone_vwc_capacity.setdefault(zone_num, {})
+
+            # EWMA-smooth pore-EC to resist probe noise
+            prev = data.get('ecs_smooth')
+            ec_s = zone_ec if prev is None else (0.3 * zone_ec + 0.7 * prev)
+            data['ecs_smooth'] = ec_s
+
+            import time as _t
+            now = _t.monotonic()
+            if now - data.get('ecs_last_ts', 0.0) < COOLDOWN_S:
+                return
+
+            mode = 'veg' if self._zone_is_vegetative(zone_num) else 'gen'
+            target = self._get_zone_number(zone_num, f"number.crop_steering_ec_target_{mode}_p2", 3.0)
+            if target <= 0:
+                return
+            thr_id = f"number.crop_steering_zone_{zone_num}_p2_vwc_threshold"
+            T = self._get_number_entity_value(thr_id, -1.0)
+            if T < 0:
+                return
+            floor = self._get_zone_number(zone_num, "number.crop_steering_p3_emergency_vwc_threshold", 30.0) + FLOOR_MARGIN
+            cap = float(data.get('current_max') or self._get_number_entity_value("number.crop_steering_field_capacity", 60.0))
+            ceil = min(self._get_zone_number(zone_num, "number.crop_steering_p1_target_vwc", cap), cap) - 1.0
+            if floor > ceil:   # band collapsed (e.g. cap below the safety floor) — don't fight it
+                data['ecs_ref'] = ec_s
+                data['ecs_last_ts'] = now
+                return
+
+            ratio = ec_s / target
+            ref = data.get('ecs_ref')
+            runoff = ref is not None and ec_s < ref - EC_DROP
+            data['ecs_ref'] = ec_s
+            data['ecs_last_ts'] = now
+
+            if ratio < LO or runoff:
+                newT = round(max(T - STEP, floor), 1)        # deepen dryback -> stack EC up
+                why = (f"runoff (pore-EC fell {ref - ec_s:.2f})" if runoff
+                       else f"pore-EC {ec_s:.2f} < target {target:.2f}")
+            elif ratio > HI:
+                newT = round(min(T + STEP, ceil), 1)         # ease -> water sooner
+                why = f"pore-EC {ec_s:.2f} > target {target:.2f}"
+            else:
+                return                                       # in band — hold
+
+            if abs(newT - T) >= 0.05:
+                self.call_service('number/set_value', entity_id=thr_id, value=newT)
+                arrow = "deepened" if newT < T else "eased"
+                self.log(f"🧂 Zone {zone_num}: EC-stack {arrow} P2 dryback — p2_vwc_threshold "
+                         f"{T:.1f}→{newT:.1f}% ({why}; pore-EC {ec_s:.2f}/{target:.2f})", level='INFO')
+        except Exception as e:
+            self.log(f"❌ EC-stack error (zone {zone_num}): {e}", level='ERROR')
+
     def _evaluate_ec_irrigation_need(self, current_ec: Optional[float], target_ec: float, phase: str) -> Dict:
         """Evaluate if irrigation is needed based on EC levels."""
         try:
@@ -5008,6 +5101,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 current_phase = machine.state.current_phase
                 zone_vwc = self._get_zone_average_vwc(zone_num)
                 self._update_zone_vwc_capacity(zone_num, zone_vwc, current_phase)
+                self._ec_stack_dryback(zone_num, zone_vwc, self._get_zone_ec(zone_num), current_phase)
 
                 # P3 → P0: Lights turned on (only from P3, not P2)
                 if lights_just_on and current_phase == IrrigationPhase.P3_PRE_LIGHTS_OFF:
