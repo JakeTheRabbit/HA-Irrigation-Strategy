@@ -3929,6 +3929,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
         except Exception as e:
             self.log(f"❌ Error updating zone {zone_num} adaptive VWC max: {e}", level='ERROR')
 
+    def _steering_dial(self) -> float:
+        """Global crop-steering dial 1..10 (1 = fully vegetative, 10 = fully generative).
+        Sets generative aggressiveness: it blends the pore-EC target the EC-stack loop chases
+        (veg/low EC ↔ gen/high EC), so a higher dial drives a deeper dryback. Default 5 if unset."""
+        try:
+            return min(10.0, max(1.0, float(self.get_state('input_number.crop_steering_steering_dial'))))
+        except (TypeError, ValueError):
+            return 5.0
+
     def _ec_stack_dryback(self, zone_num: int, zone_vwc: Optional[float], zone_ec: Optional[float],
                           phase: Optional[IrrigationPhase]):
         """Stack pore-EC up to target by modulating P2 dryback depth (single owner of p2_vwc_threshold).
@@ -3962,8 +3971,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
             if now - data.get('ecs_last_ts', 0.0) < COOLDOWN_S:
                 return
 
-            mode = 'veg' if self._zone_is_vegetative(zone_num) else 'gen'
-            target = self._get_zone_number(zone_num, f"number.crop_steering_ec_target_{mode}_p2", 3.0)
+            # Dial-blended pore-EC target: lerp(veg, gen) by the 1..10 steering dial.
+            # dial 1 -> veg EC (shallow dryback) … dial 10 -> gen EC (deep dryback).
+            veg_t = self._get_zone_number(zone_num, "number.crop_steering_ec_target_veg_p2", 3.0)
+            gen_t = self._get_zone_number(zone_num, "number.crop_steering_ec_target_gen_p2", 6.0)
+            t = (self._steering_dial() - 1.0) / 9.0
+            target = veg_t + (gen_t - veg_t) * t
             if target <= 0:
                 return
             thr_id = f"number.crop_steering_zone_{zone_num}_p2_vwc_threshold"
