@@ -76,6 +76,16 @@ photoperiod's data across two dates).
 > **Dryback semantics:** every "dryback" value is a *percentage-point drop from peak
 > VWC* — how much it dries back **by**, not the VWC it dries back **to**.
 
+### EC stacking (autonomous, P2)
+
+When `switch.crop_steering_ec_stacking_enabled` is on, the engine closes a loop on
+**substrate EC** during P2 (`_ec_stack_dryback`): it nudges each zone's
+`p2_vwc_threshold` to drive smoothed pore-EC toward that zone's phase target
+(`…_ec_target_{veg|gen}_p2`). Deeper dryback concentrates salts (EC rises); a pore-EC
+*drop* is read as runoff and deepens the dryback further. EWMA-smoothed, 30-min cooldown,
+bounded by the P3 emergency floor and the `min(p1_target, adaptive-cap)` ceiling. This is
+the generative salt lever, run hands-off — the F2 heartbeat oversees it, doesn't drive it.
+
 ## 2. Hardware control sequence
 
 ```

@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — autonomous EC-stacking via P2 dryback (engine closed loop)
+- New `_ec_stack_dryback` per-zone loop in the AppDaemon engine. In P2 it modulates each
+  zone's `number.crop_steering_zone_X_p2_vwc_threshold` to drive smoothed pore-EC toward
+  that zone's phase target (`…_ec_target_{veg|gen}_p2`): deeper dryback concentrates salts
+  (EC stacks up), and a pore-EC *drop* is read as runoff and deepens the dryback further.
+  EWMA-smoothed, 30-min cooldown, bounded by the P3 emergency floor and the
+  `min(p1_target, adaptive-cap)` ceiling, gated by `switch.crop_steering_ec_stacking_enabled`.
+  It is the single owner of the P2 dryback lever (the F2 heartbeat oversees it, no longer
+  tunes it).
+
+### Fixed — engine stability & timing
+- **EC sensor-fusion throttle:** `_on_ec_sensor_update` now throttles the heavy fusion +
+  entity writes (10 s per probe, non-blocking lock) so high-frequency EC ticks can no longer
+  starve the AppDaemon worker thread / back up the queue (which had been false-firing the
+  hardware watchdog mid-shot). The critical-EC safety check still runs on every tick.
+- **Daily counters reset at lights-on, not on restart:** `_load_persistent_state` is now
+  photoperiod-aware — the daily water/shot totals reset at the P3→P0 lights-on boundary, so a
+  mid-day AppDaemon restart no longer zeroes the running day.
+- **Manual phase pin holds across restarts:** the per-zone
+  `input_select.crop_steering_zone_X_phase_control` is re-read every engine cycle and
+  re-asserted, so a pinned phase survives a restart instead of snapping back to the P2 default.
+- **Stuck-low / not-absorbing alert:** a zone fed ≥2 shots whose VWC stays flat below its P2
+  floor (channelling / probe out of the wet core / dried rockwool cube) is flagged instead of
+  being chased with more water.
+
+### Added — operator dashboards
+- AROYA-style multi-zone VWC + EC overlay chart (dual-axis, scrubber, 24 h / 3 d / 1 w) on the
+  desktop and mobile control dashboards; full per-entity Control surface and a dark
+  operator-console re-skin.
+
+### Experimental — branch `feature/dial-ppfd-rehydration` (NOT on main)
+- 1–10 crop-steering dial (`input_number.crop_steering_steering_dial`) that blends the
+  EC-stack target from vegetative→generative. PPFD→support coupling and a dried-cube
+  rehydration mode are planned on the same branch.
+
 ### Changed — consolidated to a single deployed engine
 The repo now tracks exactly what runs in production: one AppDaemon engine
 (`master_crop_steering_app.py` — 4-phase crop-steering irrigation) plus the HA
