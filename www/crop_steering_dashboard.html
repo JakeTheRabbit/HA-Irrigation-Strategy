@@ -11,28 +11,45 @@
   Design: Strategy → state → deviation → cause → action → verify. Answers SAFE? / ON-STRATEGY? / TRUSTWORTHY?
 -->
 <style>
-  :root{--bg:#070b16;--bg2:#0d1424;--card:rgba(255,255,255,.045);--br:rgba(255,255,255,.09);
-    --ink:#e9eef8;--dim:#93a0b8;--faint:#5d6b88;
-    --green:#34d399;--cyan:#22d3ee;--amber:#fbbf24;--red:#f87171;--purple:#a78bfa;--blue:#60a5fa;--orange:#fb923c;
-    --t1:#f87171;--t2:#fb923c;--t3:#fbbf24;--t4:#7c8db5;--shadow:0 10px 40px rgba(0,0,0,.45)}
+  :root{--bg:#0e0f11;--bg2:#131517;--card:#1b1d20;--raised:#232629;--br:#2a2d31;
+    --ink:#ECEDEE;--dim:#8B9196;--faint:#5C6166;--accent:#26A69A;--accent-tint:rgba(38,166,154,.14);
+    --green:#4CAF50;--cyan:#26A69A;--amber:#FF9F40;--red:#F44336;--purple:#7E8AA0;--blue:#42A5F5;--orange:#FF9F40;
+    --t1:#F44336;--t2:#FF9F40;--t3:#FFB020;--t4:#5C6166;--shadow:none}
   *{box-sizing:border-box}html,body{margin:0;height:100%}
-  body{background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-  body::before{content:"";position:fixed;inset:-30% -10% auto -10%;height:60vh;z-index:-1;filter:blur(90px);opacity:.4;
-    background:radial-gradient(40% 60% at 20% 20%,#0e7490 0,transparent 60%),radial-gradient(50% 60% at 82% 8%,#4c1d95 0,transparent 60%),radial-gradient(40% 50% at 60% 50%,#065f46 0,transparent 60%)}
-  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:11px 20px;background:linear-gradient(180deg,rgba(7,11,22,.95),rgba(7,11,22,.6));backdrop-filter:blur(14px);border-bottom:1px solid var(--br)}
-  .brand{font-weight:750;letter-spacing:.4px;font-size:17px;display:flex;align-items:center;gap:9px}.brand .leaf{font-size:21px;filter:drop-shadow(0 0 8px #34d39988)}
+  body{background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+  body::before{content:none}
+  header{flex:none;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:9px 20px;background:var(--bg2);border-bottom:1px solid var(--br)}
+  .brand{font-weight:650;letter-spacing:.4px;font-size:17px;display:flex;align-items:center;gap:9px}.brand .leaf{font-size:21px}
   .live{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--dim);padding:5px 10px;border:1px solid var(--br);border-radius:999px;background:var(--card)}
-  .dot{width:8px;height:8px;border-radius:50%;background:var(--red)}.dot.ok{background:var(--green);animation:pulse 2s infinite}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--red)}.dot.ok{background:var(--accent)}
   @keyframes pulse{0%{box-shadow:0 0 0 0 #34d39966}70%{box-shadow:0 0 0 9px #34d39900}100%{box-shadow:0 0 0 0 #34d39900}}
   .spacer{flex:1}
   .btn{cursor:pointer;border:1px solid var(--br);background:var(--card);color:var(--ink);border-radius:10px;padding:7px 12px;font-size:13px;display:inline-flex;align-items:center;gap:6px;transition:.15s}
   .btn:hover{border-color:#ffffff33;background:rgba(255,255,255,.09)}
   select.mini{background:var(--bg2);color:var(--ink);border:1px solid var(--br);border-radius:8px;padding:6px 8px}
+  /* single status bar */
+  .sb-status{flex:1;display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0}
+  .sbv{font-weight:800;font-size:15px;letter-spacing:.3px;padding:2px 10px;border-radius:7px;border:1px solid;background:rgba(255,255,255,.03)}
+  .sbdots{display:flex;gap:9px}
+  .sbd{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;cursor:default}
+  .sbdt{width:8px;height:8px;border-radius:50%;flex:none}
+  .sbsep{width:1px;height:18px;background:var(--br);flex:none}
+  .sbz{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}.sbz b{font-size:11px;margin-right:3px}.sbz small{color:var(--faint);margin:0 1px}
+  .sbc{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}.sbc b{color:var(--ink);font-weight:650}
+  .sbspacer{flex:1;min-width:6px}
+  .sbphase{font-size:12px;color:var(--dim);white-space:nowrap}.sbphase b{color:var(--ink)}
+  .sbarm{display:flex;gap:6px;align-items:center}
+  .sb-icon{padding:6px 9px}
+  .sbTrust{flex:none;padding:5px 16px;font-size:11.5px;color:var(--dim);background:var(--bg);border-bottom:1px solid var(--br)}
+  /* Control sub-tabs */
+  .csub2{display:flex;gap:6px;margin:8px 0 14px;flex-wrap:wrap}
+  .csbtn{cursor:pointer;padding:6px 14px;border-radius:8px;border:1px solid var(--br);background:var(--card);color:var(--dim);font-weight:650;font-size:13px}
+  .csbtn:hover{color:var(--ink)}.csbtn.on{background:var(--accent-tint);color:var(--accent);border-color:transparent}
 
   /* pinned spine: banner + trust strip */
-  .spine{position:sticky;top:55px;z-index:30;background:linear-gradient(180deg,rgba(7,11,22,.92),rgba(7,11,22,.7));backdrop-filter:blur(12px);border-bottom:1px solid var(--br);padding:12px 20px}
+  .spine{flex:none;background:var(--bg);border-bottom:1px solid var(--br);padding:10px 20px}
   .banner{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
-  .verdict{font-size:30px;font-weight:850;letter-spacing:-.5px;line-height:1;padding:4px 0}
+  .verdict{font-size:34px;font-weight:800;letter-spacing:-.5px;line-height:1;padding:4px 0;font-variant-numeric:tabular-nums}
   .vpills{display:flex;gap:8px;flex-wrap:wrap}
   .vp{display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;background:var(--card);border:1px solid var(--br);font-size:12.5px;font-weight:600;cursor:pointer}
   .vp .pd{width:9px;height:9px;border-radius:50%}
@@ -44,22 +61,40 @@
   .armtoggles{display:flex;gap:8px;align-items:center}
   .tg{width:40px;height:23px;border-radius:999px;background:#2a3550;position:relative;cursor:pointer;transition:.2s;border:1px solid var(--br);flex:none}
   .tg::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#8a97b4;transition:.2s}
-  .tg.on{background:linear-gradient(90deg,#059669,#34d399)}.tg.on::after{left:19px;background:#fff}
-  .truststrip{margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;padding:7px 12px;border-radius:10px;border:1px solid var(--br);background:rgba(255,255,255,.025)}
+  .tg.on{background:var(--accent);border-color:var(--accent)}.tg.on::after{left:19px;background:#fff}
+  .truststrip{margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;padding:7px 12px;border-radius:10px;border:1px solid var(--br);background:var(--raised)}
   .truststrip .tl{font-weight:750;letter-spacing:.4px}
   .truststrip .tm{color:var(--dim)}
 
-  nav.tabs{display:flex;gap:4px;padding:10px 20px 0;flex-wrap:wrap;position:sticky;top:148px;z-index:25;background:linear-gradient(180deg,rgba(7,11,22,.85),transparent)}
-  .tab{cursor:pointer;padding:8px 14px;border-radius:11px 11px 0 0;color:var(--dim);font-weight:650;font-size:13px;border:1px solid transparent;border-bottom:none;transition:.15s;display:flex;align-items:center;gap:7px}
-  .tab:hover{color:var(--ink)}.tab.active{color:var(--ink);background:var(--card);border-color:var(--br)}
+  nav.tabs{flex:none;display:flex;gap:6px;padding:8px 20px;flex-wrap:wrap;background:var(--bg);border-bottom:1px solid var(--br)}
+  /* persistent metrics toolbar (all tabs) */
+  .toolbar{flex:none;display:flex;gap:14px;align-items:center;flex-wrap:nowrap;overflow-x:auto;padding:7px 20px;background:var(--bg2);border-bottom:1px solid var(--br)}
+  .toolbar::-webkit-scrollbar{height:0}
+  .tbgrp{display:flex;gap:9px;align-items:center;flex:none}
+  .tbsep{width:1px;align-self:stretch;background:var(--br);flex:none;min-height:26px}
+  .tbz{display:flex;align-items:baseline;gap:3px;padding:4px 9px;border-radius:8px;background:var(--card);border:1px solid var(--br);white-space:nowrap}
+  .tbz .tbzl{color:var(--accent);font-weight:800;font-size:11px;margin-right:3px}
+  .tbz b{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .tbz small{color:var(--faint);font-size:9px;margin-left:1px}
+  .tbx{display:flex;flex-direction:column;line-height:1.15;white-space:nowrap;flex:none}
+  .tbx .tbl{color:var(--faint);font-size:9px;text-transform:uppercase;letter-spacing:.4px}
+  .tbx .tbv{font-size:14px;font-weight:650;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .tbx .tbv small{color:var(--faint);font-size:9px;font-weight:500;margin-left:2px}
+  /* overlay chart legend (clickable series toggle) */
+  .ovleg{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;align-items:center}
+  .lgc{cursor:pointer;font-size:11px;font-weight:650;color:var(--lc);padding:2px 9px;border-radius:999px;border:1px solid var(--br);user-select:none;white-space:nowrap}
+  .lgc:hover{border-color:var(--lc)}
+  .lgc.off{color:var(--faint)!important;opacity:.55;text-decoration:line-through}
+  .tab{cursor:pointer;padding:8px 14px;border-radius:9px;color:var(--dim);font-weight:650;font-size:13px;border:1px solid transparent;transition:.15s;display:flex;align-items:center;gap:7px}
+  .tab:hover{color:var(--ink)}.tab.active{color:var(--accent);background:var(--accent-tint);border-color:transparent}
   .tab .cnt{font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;background:var(--t1);color:#1b0606}
 
-  main{padding:18px 20px 80px;max-width:1500px;margin:0 auto}
+  main{flex:1;min-height:0;overflow:auto;padding:16px 20px}
   section.view{display:none;animation:fade .3s ease}section.view.active{display:block}
   @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   .lead{color:var(--dim);font-size:13px;margin:0 2px 16px;max-width:820px}.lead b{color:var(--ink)}
   .grid{display:grid;gap:14px}.g-auto{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}.g-2{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}.g-3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
-  .card{background:var(--card);border:1px solid var(--br);border-radius:15px;padding:15px;box-shadow:var(--shadow);backdrop-filter:blur(8px)}
+  .card{background:var(--card);border:1px solid var(--br);border-radius:12px;padding:18px}
   .card h3{margin:0 0 4px;font-size:12.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);font-weight:750;display:flex;align-items:center;gap:8px}
   .card .csub{color:var(--faint);font-size:11.5px;margin:0 0 11px}
 
@@ -72,12 +107,23 @@
   .exrow .ex-c{color:var(--dim);font-size:12px;margin-top:3px}
   .exrow .ex-a{color:var(--cyan);font-size:12px;margin-top:3px}
   .exrow .ex-tag{font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;align-self:center}
-  .ok-banner{padding:16px;border-radius:12px;background:rgba(52,211,153,.08);border:1px solid #34d39944;color:var(--green);font-weight:650;text-align:center}
+  .ok-banner{padding:16px;border-radius:12px;background:rgba(76,175,80,.10);border:1px solid #4CAF5044;color:var(--green);font-weight:650;text-align:center}
+  .exrow .ex-right{display:flex;flex-direction:column;align-items:flex-end;gap:7px;align-self:center}
+  .exrow .ex-meta{color:var(--faint);font-size:10.5px;margin-top:6px}
+  .ex-i{cursor:help;color:var(--cyan);font-size:12.5px;margin-left:5px;opacity:.8;font-weight:700}
+  .ex-i:hover{opacity:1}
+  .ex-x{background:rgba(255,255,255,.05);border:1px solid var(--br);color:var(--dim);font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}
+  .ex-x:hover{background:rgba(255,255,255,.11);color:var(--ink)}
+  .exrow.resolved{border-left-color:var(--green)!important;opacity:.82}
+  .exrow.resolved .ex-t{color:var(--green)}
+  .exc-head{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);font-weight:750;margin:2px 0 7px}
+  .exc-dism{margin-top:10px;font-size:11px;color:var(--faint)}
+  .exc-dism a{color:var(--cyan);cursor:pointer;text-decoration:underline dotted;margin:0 1px}
 
   /* phase rail + schedule */
   .rail{display:flex;gap:6px;margin:6px 0 14px}
-  .rcell{flex:1;text-align:center;padding:9px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--br);font-weight:750;font-size:13px;color:var(--faint);position:relative}
-  .rcell.on{color:#04130c;background:linear-gradient(135deg,#059669,#34d399);border-color:transparent}
+  .rcell{flex:1;text-align:center;padding:9px;border-radius:10px;background:var(--raised);border:1px solid var(--br);font-weight:750;font-size:13px;color:var(--faint);position:relative}
+  .rcell.on{color:#04130c;background:var(--green);border-color:transparent}
   .rcell .zc{display:flex;gap:3px;justify-content:center;margin-top:5px;min-height:16px}
   .zchip{font-size:9px;font-weight:800;padding:1px 6px;border-radius:999px;background:#0008;color:#fff}
   .sched{position:relative;height:42px;border-radius:10px;border:1px solid var(--br);overflow:hidden;background:#0a1120}
@@ -88,7 +134,7 @@
   /* band gauges */
   .bg-wrap{margin:6px 0}
   .bg-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
-  .bg-val{font-size:22px;font-weight:800;letter-spacing:-.5px}.bg-val small{font-size:11px;color:var(--faint);font-weight:600}
+  .bg-val{font-size:34px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums}.bg-val small{font-size:12px;color:var(--faint);font-weight:600}
   .bg-dev{font-size:11px;font-weight:700}
   svg.bandgauge{width:100%;height:38px;display:block}
   .bg-cap{font-size:11px;color:var(--dim);margin-top:4px;display:flex;justify-content:space-between}
@@ -103,7 +149,7 @@
   select.sel{background:var(--bg2);color:var(--ink);border:1px solid var(--br);border-radius:8px;padding:6px 8px;max-width:170px}
   .hi{display:inline-flex;width:14px;height:14px;border-radius:50%;border:1px solid var(--faint);color:var(--faint);font-size:9px;font-style:italic;font-weight:700;align-items:center;justify-content:center;margin-left:6px;flex:none;cursor:help;font-family:Georgia,serif}
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
-  .tile{background:rgba(255,255,255,.03);border:1px solid var(--br);border-radius:12px;padding:13px;border-top-width:3px}
+  .tile{background:var(--raised);border:1px solid var(--br);border-radius:12px;padding:13px;border-top-width:3px}
   .tile .th{font-size:12px;color:var(--dim);font-weight:700;display:flex;justify-content:space-between;align-items:center}
   .tile .ts{font-size:16px;font-weight:750;margin:6px 0}
   .tile .tx{font-size:11.5px;color:var(--faint);line-height:1.5}
@@ -113,13 +159,19 @@
   canvas.spark{width:100%;height:48px;display:block}
   .zsel{display:flex;gap:6px;margin-bottom:10px}
   .zbtn{cursor:pointer;padding:6px 13px;border-radius:9px;border:1px solid var(--br);background:var(--card);color:var(--dim);font-weight:700;font-size:13px}
-  .zbtn.on{color:#04130c;background:linear-gradient(135deg,#059669,#34d399);border-color:transparent}
-  .feed{max-height:300px;overflow:auto;font-size:12.5px}.feed div{padding:5px 8px;border-left:2px solid var(--br);margin-bottom:4px;background:rgba(255,255,255,.02);border-radius:0 8px 8px 0}
+  .zbtn.on{color:#04130c;background:var(--green);border-color:transparent}
+  .feed{max-height:300px;overflow:auto;font-size:12.5px;font-family:ui-monospace,Menlo,Consolas,monospace}.feed div{padding:5px 8px;border-left:2px solid var(--br);margin-bottom:4px;background:var(--raised);border-radius:0 8px 8px 0}
+  .ecg{width:100%;border-collapse:collapse;font-size:12px;margin-top:2px}
+  .ecg th{color:var(--faint);font-weight:700;text-align:center;padding:3px 2px}
+  .ecg td{padding:3px 3px;text-align:center}.ecg .ecr{color:var(--dim);text-align:left;font-weight:650;white-space:nowrap;padding-right:8px}
+  .ecni{width:100%;min-width:52px;background:#0a1120;border:1px solid var(--br);color:var(--ink);border-radius:7px;padding:5px 4px;font-size:12px;text-align:center;font-variant-numeric:tabular-nums}
+  .ecni:focus{outline:none;border-color:var(--blue)}
   .conflict{padding:12px 14px;border-radius:11px;background:rgba(251,146,60,.09);border:1px solid #fb923c55;color:#fdba74;font-size:13px;margin-bottom:14px}
+  .axisnote{padding:9px 13px;border-radius:10px;background:rgba(96,165,250,.07);border:1px solid #60a5fa33;color:var(--dim);font-size:12px;margin-bottom:14px}.axisnote b{color:var(--ink)}
   .override-banner{padding:14px;border-radius:12px;background:rgba(248,113,113,.1);border:1px solid #f8717166;color:#fca5a5;font-weight:700;margin-bottom:14px}
   .pillrow{display:flex;gap:8px;flex-wrap:wrap}
-  .bigpill{padding:8px 14px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--br);font-size:13px}
-  .bigpill b{font-weight:800;color:#fff}.bigpill small{color:var(--faint);display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+  .bigpill{padding:8px 14px;border-radius:11px;background:var(--raised);border:1px solid var(--br);font-size:13px}
+  .bigpill b{font-weight:800;color:var(--ink)}.bigpill small{color:var(--faint);display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
   .notrack{color:var(--faint);font-size:12px;background:rgba(255,255,255,.02);border:1px dashed var(--br);border-radius:10px;padding:10px;margin-top:10px}
   .sub{color:var(--faint);font-size:11px;font-weight:700;margin:14px 2px 7px;text-transform:uppercase;letter-spacing:.6px}
   #tip{position:fixed;z-index:200;max-width:300px;background:#0a1326;border:1px solid #2a3a5a;border-radius:10px;padding:9px 12px;font-size:12px;color:var(--ink);box-shadow:var(--shadow);pointer-events:none;opacity:0;transition:opacity .12s;line-height:1.45}#tip.show{opacity:1}
@@ -128,22 +180,21 @@
   .modal h2{margin:0 0 4px;font-size:18px}.modal p{margin:0 0 16px;color:var(--dim);font-size:13px}
   .modal label{display:block;font-size:12px;color:var(--dim);margin:12px 0 5px;font-weight:600}
   .modal input{width:100%;background:#0a1120;color:var(--ink);border:1px solid var(--br);border-radius:10px;padding:10px 12px;font-size:14px}.modal input:focus{outline:none;border-color:var(--cyan)}
-  .modal .r{display:flex;gap:10px;margin-top:20px}.modal .btn.primary{background:linear-gradient(90deg,#059669,#10b981);border-color:#10b981;font-weight:700;flex:1;justify-content:center}
+  .modal .r{display:flex;gap:10px;margin-top:20px}.modal .btn.primary{background:var(--accent);border-color:var(--accent);color:#04130c;font-weight:700;flex:1;justify-content:center}
   .err{color:var(--red);font-size:12.5px;margin-top:10px;min-height:16px}.empty{color:var(--faint);text-align:center;padding:46px}
   ::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:#2a3550;border-radius:9px}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand"><span class="leaf">🌿</span> F2 Crop Steering</div>
-  <div class="live"><span id="dot" class="dot"></span><span id="livetxt">connecting…</span></div>
-  <div class="spacer"></div>
+  <div class="brand"><span class="leaf">🌿</span> F2</div>
+  <div class="live"><span id="dot" class="dot"></span><span id="livetxt">…</span></div>
+  <div class="sb-status" id="sbstatus"></div>
   <select id="rate" class="mini" title="Refresh rate"><option value="30000">30s</option><option value="60000" selected>60s</option><option value="120000">2m</option></select>
-  <button class="btn" id="refreshBtn" title="Refresh now">↻</button>
-  <button class="btn" id="gearBtn">⚙ Connection</button>
+  <button class="btn sb-icon" id="refreshBtn" title="Refresh now">↻</button>
+  <button class="btn sb-icon" id="gearBtn" title="Connection">⚙</button>
 </header>
-
-<div class="spine" id="spine"></div>
+<div class="sbTrust" id="sbTrust" style="display:none"></div>
 <nav class="tabs" id="tabs"></nav>
 <main>
   <section class="view active" data-view="triage" id="v-triage"></section>
@@ -166,7 +217,7 @@
 /* ============ config / auth / data ============ */
 const LS={base:"cs_base",token:"cs_token"};
 let CFG={base:localStorage.getItem(LS.base)||location.origin,token:localStorage.getItem(LS.token)||""};
-let timer=null,ST={},HIST={},histAt=0,ZONES=[1,2,3],traceZone=1,histWindowH=72,_ovl=null;
+let timer=null,ST={},HIST={},histAt=0,ZONES=[1,2,3],traceZone=1,ctrlZone=1,ctrlSec='global',histWindowH=72,OVL_HIDDEN=new Set(),_ovl=null;
 const el=id=>document.getElementById(id);
 async function api(path,opts={}){const r=await fetch(CFG.base.replace(/\/$/,"")+path,{...opts,headers:{Authorization:"Bearer "+CFG.token,"Content-Type":"application/json",...(opts.headers||{})}});if(!r.ok)throw new Error(r.status+" "+r.statusText);return r.status===200?r.json():null;}
 
@@ -186,7 +237,7 @@ function ageMin(id){const lc=ST[id]&&ST[id].last_changed;if(!lc)return null;retu
 const fmtAge=m=>m==null?"—":m<1?"just now":m<60?Math.round(m)+"m ago":m<1440?Math.round(m/60)+"h ago":Math.round(m/1440)+"d ago";
 // active EC target for a zone at current phase
 function ecTarget(z){const ph=(zphase(z)||"P2").replace(/[^0-3]/g,"")||"2";const mode=S("select.crop_steering_steering_mode")==="Generative"?"gen":"veg";return N(`number.crop_steering_zone_${z}_ec_target_${mode}_p${ph}`)??N(`number.crop_steering_ec_target_${mode}_p${ph}`)??3.2;}
-const C={green:"#34d399",cyan:"#22d3ee",amber:"#fbbf24",red:"#f87171",blue:"#60a5fa",faint:"#5d6b88",orange:"#fb923c"};
+const C={bg:"#0e0f11",card:"#1b1d20",raised:"#232629",br:"#2a2d31",ink:"#ECEDEE",dim:"#8B9196",accent:"#26A69A",green:"#4CAF50",cyan:"#26A69A",amber:"#FF9F40",red:"#F44336",blue:"#42A5F5",faint:"#5C6166",orange:"#FF9F40",purple:"#7E8AA0"};
 // raw probe + environment sensors — verified live against the engine's apps.yaml
 const RAW={1:{vwc:"sensor.f2_row_1_vwc",ec:"sensor.f2_row_1_pwec"},2:{vwc:"sensor.veg_sdi12_vwc_2",ec:"sensor.veg_sdi12_ec_2"},3:{vwc:"sensor.veg_sdi12_vwc",ec:"sensor.veg_sdi12_ec"}};
 const WATER={ph:"sensor.aquaponics_kit_f4f618_ph",ec:"sensor.atlas_legacy_1_ec"};
@@ -207,14 +258,37 @@ function trust(){const h=N("sensor.crop_steering_sensor_health"),fc=N("sensor.cr
   if(h!=null&&h<40){v="UNTRUSTED";col=C.red;} else if((h!=null&&h<80)||(fc!=null&&fc<0.6)){v="DEGRADED";col=C.amber;}
   return {verdict:v,col,health:h,fc};}
 
+/* ============ STEERING DIRECTION (gen/veg axis) ============ */
+/* Per-zone steering_mode is authoritative to the engine; global growth_stage is the fallback.
+   The Athena calendar stage (growth_phase / nutrient_phase) is a SEPARATE axis that drives the
+   setpoints chart — it is NOT expected to match direction and is never compared to it. */
+function steerDir(){
+  const zone=ZONES.map(z=>({z,v:S(`select.crop_steering_zone_${z}_steering_mode`)})).filter(o=>o.v&&!bad(o.v));
+  const gstage=S("select.crop_steering_growth_stage");
+  const all=[...zone.map(o=>o.v),...(gstage&&!bad(gstage)?[gstage]:[])].map(v=>v.toLowerCase());
+  return {zone,gstage,coherent:all.length<2||new Set(all).size===1,dir:all[0]||null};
+}
+
+/* classify a safety_status string: 0 safe · 1 warning (soft, e.g. approaching_saturation) · 2 fault (hard interlock).
+   Unknown serious words err to 2 (fail-safe: over-warn beats hiding a real fault). */
+function safetySev(s){if(!s||bad(s))return 0;const v=String(s).toLowerCase();if(v==="safe"||v==="ok"||v==="normal"||v==="nominal")return 0;if(/warn|approach|caution|elevat|near|margin|saturat/.test(v))return 1;return 2;}
+
 /* ============ EXCEPTION ENGINE ============ */
 function exceptions(){
   const out=[],T=trust();
   const dataBlind=T.verdict==="UNTRUSTED";
-  // T1 safety
-  if(!bad(S("sensor.crop_steering_system_safety_status"))&&S("sensor.crop_steering_system_safety_status")!=="safe")
-    out.push({t:1,title:"Safety fault — engine in protective state",cause:"An EC/pH/volume guardrail or hardware interlock tripped",check:"Open Control → Guardrails and inspect the tripped limit"});
-  ZONES.forEach(z=>{const s=S(`sensor.crop_steering_zone_${z}_safety_status`);if(!bad(s)&&s!=="safe")out.push({t:1,title:`Zone ${z} safety fault`,cause:"Per-zone interlock tripped",check:"Inspect Zone "+z+" hardware / guardrails",zone:z});});
+  // Safety — VWC over-saturation (engine auto-pauses irrigation) is NOT an EC/pH/hardware interlock. Classify by status string.
+  const _sys=(S("sensor.crop_steering_system_safety_status")||"").toLowerCase();
+  if(/emergency|interlock|halt|critical|fault|pump|valve|ph_/.test(_sys))
+    out.push({t:1,title:"Safety fault — engine in protective state",cause:"A guardrail (EC/pH/volume) or hardware interlock tripped",check:"Open Control → Guardrails and inspect the tripped limit"});
+  ZONES.forEach(z=>{const s=S(`sensor.crop_steering_zone_${z}_safety_status`);if(!s||bad(s))return;const v=s.toLowerCase();
+    if(v==="safe")return;
+    if(/over.?sat/.test(v))
+      out.push({t:2,title:`Zone ${z} over-saturated — VWC at field capacity, irrigation auto-paused`,cause:"VWC reached the block's field-capacity cap (EC margin still ample); engine paused shots to prevent over-watering",check:`Lower Zone ${z} p1_target below its real field capacity (or raise field_capacity); block dries back and resumes`,zone:z,child:dataBlind});
+    else if(/approach|near|saturat/.test(v))
+      out.push({t:3,title:`Zone ${z} ${v.replace(/_/g," ")} — VWC near field capacity`,cause:"VWC within ~1% of field capacity; near-saturation (EC margin still ample)",check:"Normal in late-P2 / bulk if EC is on target; if persistent, lower target or raise field_capacity",zone:z,child:dataBlind});
+    else
+      out.push({t:1,title:`Zone ${z} safety fault (${v.replace(/_/g," ")})`,cause:"Per-zone EC/pH/hardware interlock tripped",check:"Inspect Zone "+z+" hardware / guardrails",zone:z});});
   if(dataBlind)out.push({t:1,title:`Sensor health ${r0(T.health)}% — steering on degraded data`,cause:"Probe calibration/connection degraded; fusion is filling gaps",check:"Hand-verify substrate with a meter before trusting any band"});
   // T2
   const ecMax=N("number.crop_steering_irrigation_ec_max")??3.5,fc=N("number.crop_steering_field_capacity")??60;
@@ -222,10 +296,11 @@ function exceptions(){
     if(ec!=null&&ec>ecMax)out.push({t:2,title:`Zone ${z} EC ${r1(ec)} above feed-max ${r1(ecMax)} — salt stacking`,cause:"Insufficient dryback flush or feed EC too high",check:`Compare to target ${r1(ecTarget(z))}; consider a flush shot`,zone:z,child:dataBlind});
     if(vwc!=null&&floor!=null&&vwc<floor)out.push({t:2,title:`Zone ${z} VWC ${r1(vwc)} below P2 floor ${r1(floor)} — under-watered`,cause:"Dryback exceeded the maintenance floor",check:"Check why no shot fired (DISARMED? interval? dripper?)",zone:z,child:dataBlind});
     if(vwc!=null&&vwc>fc)out.push({t:2,title:`Zone ${z} VWC ${r1(vwc)} above field capacity ${r1(fc)} — over-saturated`,cause:"Over-watering / no dryback",check:"Reduce shot size or interval for Zone "+z,zone:z,child:dataBlind});});
-  // strategy conflict
-  const gs=(S("select.crop_steering_growth_stage")||"").toLowerCase(),gp=S("input_select.growth_phase"),np=S("input_select.nutrient_phase");
-  if(gp&&np&&!(gs.includes("veget")&&/veg/i.test(gp)&&/veg/i.test(np))&&(gp&&np&&gs))
-    out.push({t:2,title:"Strategy selectors disagree",cause:`Integration=${S("select.crop_steering_growth_stage")} · growth_phase=${gp} · nutrient_phase=${np}`,check:"Designate the integration selects canonical; reconcile the duplicates"});
+  // steering DIRECTION coherence (gen/veg) — the only axis the engine acts on.
+  // growth_phase/nutrient_phase = Athena CALENDAR stage (drives the setpoints chart), a different axis — not compared here.
+  const sd=steerDir();
+  if(!sd.coherent)
+    out.push({t:2,title:"Steering direction selectors disagree",cause:`Zones ${sd.zone.map(o=>"Z"+o.z+":"+o.v).join(" ")} · global growth-stage ${sd.gstage}`,check:"Set every zone steering mode and the global growth stage to the same Vegetative/Generative"});
   const pin=S("select.crop_steering_irrigation_phase"),mp=modalPhase();
   if(pin&&mp&&pin!==mp&&pin!=="Manual")out.push({t:2,title:`Manual phase pin (${pin}) diverges from engine (${mp})`,cause:"A manual phase override is set",check:"Set irrigation_phase back to the engine's phase or confirm intent"});
   if(!armed())out.push({t:2,title:"System DISARMED while a grow is active",cause:"system_enabled / auto_irrigation are OFF — no autonomous shots",check:"Arm from the banner when ready; watchdog may still fire emergency shots"});
@@ -238,9 +313,55 @@ function exceptions(){
   // T4
   ZONES.forEach(z=>{if(S(`switch.crop_steering_zone_${z}_manual_override`)==="on")out.push({t:4,title:`Zone ${z} manual override ON — AI blocked`,cause:"Intentional maintenance lockout",check:"Confirm still needed; clear in Control",zone:z});
     if(S(`switch.crop_steering_zone_${z}_enabled`)==="off")out.push({t:4,title:`Zone ${z} disabled — gets no water`,cause:"Zone excluded from automation",check:"Re-enable in Control when ready",zone:z});});
-  if(!bad(S("sensor.crop_steering_ai_heartbeat"))&&S("sensor.crop_steering_ai_heartbeat")!=="healthy")out.push({t:4,title:"Engine heartbeat not healthy",cause:S("sensor.crop_steering_ai_heartbeat"),check:"Check AppDaemon logs"});
+  if(!bad(S("sensor.crop_steering_ai_heartbeat"))&&S("sensor.crop_steering_ai_heartbeat")!=="healthy"){const _an=A("sensor.crop_steering_ai_heartbeat","anomalies");out.push({t:4,title:"Engine heartbeat reported an anomaly",cause:(Array.isArray(_an)&&_an.length?_an.join("; "):S("sensor.crop_steering_ai_heartbeat")),check:"A one-off right after an AppDaemon restart self-clears next cycle; if it persists, check AppDaemon logs"});}
   out.sort((a,b)=>a.t-b.t||(a.child?1:0)-(b.child?1:0));
   return out;
+}
+
+/* ============ EXCEPTION STATE: timestamp · dismiss · resolved ============ */
+const EXC_STORE_KEY="cs_exc_state_v1",RESOLVED_TTL=6*3600*1000;
+let EXC_STATE=(()=>{try{return JSON.parse(localStorage.getItem(EXC_STORE_KEY))||{};}catch(e){return {};}})();
+function _excSave(){try{localStorage.setItem(EXC_STORE_KEY,JSON.stringify(EXC_STATE));}catch(e){}}
+function excKey(e){return e.title.replace(/[-+\d.]+/g,"#")+"|"+(e.zone||0);}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function since(ts){if(!ts)return"";let s=(Date.now()-ts)/1000;if(s<90)return"just now";let m=s/60;if(m<60)return Math.round(m)+"m ago";let h=m/60;if(h<48)return Math.round(h)+"h ago";return Math.round(h/24)+"d ago";}
+function dur(ms){if(ms==null||ms<0)return"";let m=ms/60000;if(m<60)return Math.round(m)+"m";let h=m/60;if(h<48)return (Math.round(h*10)/10)+"h";return Math.round(h/24)+"d";}
+function reconcileExceptions(cur){
+  const now=Date.now(),curKeys=new Set();
+  cur.forEach(e=>{const k=e.key=excKey(e);curKeys.add(k);
+    const st=EXC_STATE[k]||(EXC_STATE[k]={firstSeen:now});
+    st.lastSeen=now;st.title=e.title;st.t=e.t;st.zone=e.zone||0;st.resolvedAt=0;
+    e.firstSeen=st.firstSeen;e.dismissed=!!st.dismissed;});
+  const resolved=[];
+  Object.keys(EXC_STATE).forEach(k=>{const st=EXC_STATE[k];if(curKeys.has(k))return;
+    if(st.dismissed){delete EXC_STATE[k];return;}            // dismissed + gone → purge silently
+    if(!st.resolvedAt)st.resolvedAt=now;
+    if(now-st.resolvedAt>RESOLVED_TTL){delete EXC_STATE[k];return;}
+    resolved.push({key:k,title:st.title,t:st.t,zone:st.zone,resolvedAt:st.resolvedAt,firstSeen:st.firstSeen});});
+  resolved.sort((a,b)=>b.resolvedAt-a.resolvedAt);
+  _excSave();return resolved;
+}
+function dismissExc(k){if(EXC_STATE[k]){EXC_STATE[k].dismissed=Date.now();_excSave();renderTriage();}}
+function restoreExc(k){if(EXC_STATE[k]){delete EXC_STATE[k].dismissed;_excSave();renderTriage();}}
+function clearResolved(k){delete EXC_STATE[k];_excSave();renderTriage();}
+window.dismissExc=dismissExc;window.restoreExc=restoreExc;window.clearResolved=clearResolved;
+function excTip(e){const t=e.title;
+  if(/safety fault|protective state|interlock/i.test(t))return "Safety interlock: the engine halts irrigation when a guardrail (EC/pH/daily-volume) or hardware check trips. No autonomous shots fire until it clears — guards against flood and root burn.";
+  if(/above feed-max|salt stacking/i.test(t))return "Feed-max EC = the rootzone salt ceiling. Above it, salts build faster than dryback can flush them → osmotic stress / nutrient lockout. Flush with a larger or extra shot, or lower feed EC.";
+  if(/below P2 floor|under-watered/i.test(t))return "P2 VWC floor = the maintenance-phase minimum moisture. Below it the block is drying past target between shots — check why no shot fired (disarmed, interval too long, blocked dripper, channelling probe).";
+  if(/near field capacity|approaching|saturation/i.test(t))return "Approaching saturation = VWC is within ~1% of the block's field capacity (its water ceiling). Mild — normal in late-P2 / bulk when EC is on target. Only act if it persists with rising EC or no overnight dryback (over-watering).";
+  if(/above field capacity|over-saturated/i.test(t))return "Field capacity = the most water the block holds before runoff. Above it = waterlogged, no dryback, anaerobic-root risk. Cut shot size or lengthen the interval.";
+  if(/running lean/i.test(t))return "EC target = the desired pore-water salt for this stage. 'Lean' = 20%+ under target → under-fed. Raise feed EC or lengthen dryback to concentrate the rootzone.";
+  if(/dryback/i.test(t))return "Dryback % = how far VWC falls from its daily peak; it drives generative-vs-vegetative steering. Too little = not enough stress; too much = over-stress or a dripper fault.";
+  if(/spread|disagree/i.test(t))return "Zone spread = the gap between zones for the same metric. A large spread means uneven feed / drippers / substrate — a single room-average hides the outlier zone.";
+  if(/Steering direction/i.test(t))return "Steering direction = the single Vegetative/Generative choice the engine acts on (per-zone steering mode, with global growth-stage as fallback). All zones + the global should match. The calendar/recipe stage (Stretch/Bloom) is a separate axis that drives the setpoints chart — not compared here.";
+  if(/Manual phase pin/i.test(t))return "Manual phase pin = a hand override forcing a phase. Diverging from the engine means the schedule is held — confirm intent or return the pin to Auto.";
+  if(/DISARMED/i.test(t))return "Armed = system_enabled AND auto_irrigation both ON. Disarmed = no autonomous shots (only the watchdog can fire an emergency shot).";
+  if(/manual override ON/i.test(t))return "Per-zone manual override locks the AI out of that zone for maintenance. Clear it to resume autonomous steering.";
+  if(/disabled — gets no water/i.test(t))return "Zone disabled = excluded from automation entirely; it receives no shots. Re-enable when the zone is back in production.";
+  if(/Sensor health|degraded data/i.test(t))return "Sensor health = fusion confidence in the probes. Low = readings unreliable, so band alarms are suppressed; hand-verify substrate with a meter before acting.";
+  if(/heartbeat/i.test(t))return "Engine heartbeat = the AppDaemon self-check pulse. Not 'healthy' means the control loop may be stalled — check AppDaemon logs.";
+  return "";
 }
 
 /* ============ UNIFORMITY ============ */
@@ -296,7 +417,7 @@ function drawTrace(){
   for(let t=t0;t<t1;t+=600000){const hr=new Date(t).getHours();if(!(hr>=on&&hr<off)){c.fillStyle="rgba(120,140,180,.06)";c.fillRect(X(t),pad.t,Math.max(1,X(t+600000)-X(t)),h-pad.t-pad.b);}}
   // VWC target band
   const bMin=N("sensor.crop_steering_vwc_target_min")??50,bMax=N("sensor.crop_steering_vwc_target_max")??70,fc=N("number.crop_steering_field_capacity")??60;
-  c.fillStyle="rgba(52,211,153,.08)";c.fillRect(pad.l,YV(bMax),w-pad.l-pad.r,YV(bMin)-YV(bMax));
+  c.fillStyle="rgba(76,175,80,.10)";c.fillRect(pad.l,YV(bMax),w-pad.l-pad.r,YV(bMin)-YV(bMax));
   c.strokeStyle="rgba(150,160,180,.35)";c.setLineDash([4,3]);c.beginPath();c.moveTo(pad.l,YV(fc));c.lineTo(w-pad.r,YV(fc));c.stroke();
   // EC target dashed
   const ecT=ecTarget(z);c.strokeStyle=C.amber+"99";c.beginPath();c.moveTo(pad.l,YE(ecT));c.lineTo(w-pad.r,YE(ecT));c.stroke();c.setLineDash([]);
@@ -315,6 +436,10 @@ function drawTrace(){
 const OVL_V=[C.blue,C.cyan,"#7dd3fc"],OVL_E=[C.amber,C.orange,"#fcd34d"];
 function setHistWindow(h){if(histWindowH===h)return;histWindowH=h;histAt=0;refresh();}
 window.setHistWindow=setHistWindow;
+function setCustomWindow(v){const h=Math.max(1,Math.min(720,Math.round(+v||72)));histWindowH=h;histAt=0;refresh();}
+window.setCustomWindow=setCustomWindow;
+function toggleSeries(k){if(OVL_HIDDEN.has(k))OVL_HIDDEN.delete(k);else OVL_HIDDEN.add(k);drawOverlay();const e=document.getElementById("leg-"+k);if(e)e.classList.toggle("off",OVL_HIDDEN.has(k));}
+window.toggleSeries=toggleSeries;
 function _decim(a,max){if(!a||a.length<=max)return a||[];const step=Math.ceil(a.length/max);return a.filter((_,i)=>i%step===0||i===a.length-1);}
 function _seriesAt(data,t){ // last sample at-or-before t (data sorted ascending)
   if(!data||!data.length||t<data[0][0])return null;
@@ -325,12 +450,14 @@ function drawOverlay(cursorX){
   const cv=el("ovlCanvas");if(!cv)return;
   const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;
   const c=cv.getContext("2d");c.scale(dpr,dpr);c.clearRect(0,0,w,h);
-  const t1=Date.now(),t0=t1-histWindowH*3600*1000,rx=(t1-t0)||1,pad={l:40,r:48,t:16,b:34};
+  const t1=Date.now(),t0=t1-histWindowH*3600*1000,rx=(t1-t0)||1,pad={l:14,r:72,t:16,b:34};
   const series=[];
-  ZONES.forEach((z,i)=>series.push({label:`Z${z} VWC`,color:OVL_V[i%3],axis:"v",data:_decim((HIST[`sensor.crop_steering_zone_${z}_vwc`]||[]).filter(p=>p[0]>=t0),1400)}));
-  ZONES.forEach((z,i)=>series.push({label:`Z${z} EC`,color:OVL_E[i%3],axis:"e",data:_decim((HIST[`sensor.crop_steering_zone_${z}_ec`]||[]).filter(p=>p[0]>=t0),1400)}));
+  ZONES.forEach((z,i)=>series.push({key:`z${z}v`,label:`Z${z} VWC`,color:OVL_V[i%3],axis:"v",data:_decim((HIST[`sensor.crop_steering_zone_${z}_vwc`]||[]).filter(p=>p[0]>=t0),1400)}));
+  ZONES.forEach((z,i)=>series.push({key:`z${z}e`,label:`Z${z} EC`,color:OVL_E[i%3],axis:"e",data:_decim((HIST[`sensor.crop_steering_zone_${z}_ec`]||[]).filter(p=>p[0]>=t0),1400)}));
+  series.forEach(s=>s.hidden=OVL_HIDDEN.has(s.key));
   if(!series.some(s=>s.data.length>1)){c.fillStyle=C.faint;c.font="13px sans-serif";c.fillText("Loading history…",pad.l,h/2);return;}
-  const vAll=series.filter(s=>s.axis==="v").flatMap(s=>s.data.map(p=>p[1])),eAll=series.filter(s=>s.axis==="e").flatMap(s=>s.data.map(p=>p[1]));
+  const vis=series.filter(s=>!s.hidden);
+  const vAll=vis.filter(s=>s.axis==="v").flatMap(s=>s.data.map(p=>p[1])),eAll=vis.filter(s=>s.axis==="e").flatMap(s=>s.data.map(p=>p[1]));
   let vMin=Math.min(...vAll),vMax=Math.max(...vAll);if(!isFinite(vMin)){vMin=0;vMax=100;}
   let eMin=Math.min(...eAll),eMax=Math.max(...eAll);if(!isFinite(eMin)){eMin=0;eMax=8;}
   const vp=Math.max(1,(vMax-vMin)*0.12),ep=Math.max(.1,(eMax-eMin)*0.12);
@@ -345,18 +472,19 @@ function drawOverlay(cursorX){
   for(;day.getTime()<t1;day.setDate(day.getDate()+1)){const t=day.getTime();if(t>t0+1800000&&t<t1){c.strokeStyle="rgba(150,160,180,.12)";c.beginPath();c.moveTo(X(t),pad.t);c.lineTo(X(t),h-pad.b);c.stroke();c.fillStyle=C.faint;c.font="10px sans-serif";c.fillText(day.toLocaleDateString(undefined,{month:"short",day:"numeric"}),X(t),h-pad.b+13);}}
   c.textAlign="left";
   // axis ticks + captions
-  c.font="10px sans-serif";c.fillStyle=C.blue;for(let i=0;i<=4;i++){const v=vMin+(vMax-vMin)*i/4;c.fillText(r0(v),3,YV(v)+3);}
-  c.fillStyle=C.amber;c.textAlign="right";for(let i=0;i<=4;i++){const e=eMin+(eMax-eMin)*i/4;c.fillText(r1(e),w-3,YE(e)+3);}
-  c.fillStyle=C.blue;c.textAlign="left";c.fillText("% WC",pad.l,pad.t-3);c.fillStyle=C.amber;c.textAlign="right";c.fillText("dS/m",w-pad.r,pad.t-3);c.textAlign="left";
+  c.font="10px sans-serif";c.textAlign="right";
+  c.fillStyle=C.blue;for(let i=0;i<=4;i++){const v=vMin+(vMax-vMin)*i/4;c.fillText(r0(v),w-36,YV(v)+3);}
+  c.fillStyle=C.amber;for(let i=0;i<=4;i++){const e=eMin+(eMax-eMin)*i/4;c.fillText(r1(e),w-4,YE(e)+3);}
+  c.fillStyle=C.blue;c.fillText("%WC",w-36,pad.t-3);c.fillStyle=C.amber;c.fillText("dS/m",w-4,pad.t-3);c.textAlign="left";
   // lines (EC behind, VWC in front)
-  series.forEach(s=>{if(s.data.length<2)return;const Y=s.axis==="v"?YV:YE;c.strokeStyle=s.color;c.lineWidth=s.axis==="v"?1.9:1.4;c.globalAlpha=s.axis==="v"?.95:.8;c.lineJoin="round";c.beginPath();s.data.forEach((p,i)=>{const x=X(p[0]),y=Y(p[1]);i?c.lineTo(x,y):c.moveTo(x,y);});c.stroke();});
+  series.forEach(s=>{if(s.hidden||s.data.length<2)return;const Y=s.axis==="v"?YV:YE;c.strokeStyle=s.color;c.lineWidth=s.axis==="v"?1.9:1.4;c.globalAlpha=s.axis==="v"?.95:.8;c.lineJoin="round";c.beginPath();s.data.forEach((p,i)=>{const x=X(p[0]),y=Y(p[1]);i?c.lineTo(x,y):c.moveTo(x,y);});c.stroke();});
   c.globalAlpha=1;_ovl={t0,t1,pad,w,h};
   // scrubber crosshair + tooltip
   const tip=el("ovlTip");
   if(cursorX!=null&&cursorX>=pad.l&&cursorX<=w-pad.r){
     const t=t0+(cursorX-pad.l)/(w-pad.l-pad.r)*rx;
     c.strokeStyle="rgba(220,230,255,.5)";c.setLineDash([3,3]);c.beginPath();c.moveTo(cursorX,pad.t);c.lineTo(cursorX,h-pad.b);c.stroke();c.setLineDash([]);
-    const rows=series.map(s=>{const val=_seriesAt(s.data,t);if(val==null)return null;const Y=s.axis==="v"?YV:YE;c.fillStyle=s.color;c.beginPath();c.arc(X(t),Y(val),2.7,0,7);c.fill();return{label:s.label,color:s.color,val,axis:s.axis};}).filter(Boolean);
+    const rows=series.map(s=>{if(s.hidden)return null;const val=_seriesAt(s.data,t);if(val==null)return null;const Y=s.axis==="v"?YV:YE;c.fillStyle=s.color;c.beginPath();c.arc(X(t),Y(val),2.7,0,7);c.fill();return{label:s.label,color:s.color,val,axis:s.axis};}).filter(Boolean);
     if(tip){
       tip.innerHTML=`<div style="color:${C.faint};margin-bottom:3px">${new Date(t).toLocaleString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</div>`+
         rows.filter(r=>r.axis==="e").map(r=>`<div><span style="color:${r.color}">●</span> ${r.label} <b>${r1(r.val)}</b> dS/m</div>`).join("")+
@@ -371,51 +499,57 @@ function sparkBars(cv,vals,target,colFn){const dpr=devicePixelRatio||1,w=cv.clie
   if(target!=null){const ty=h-(target/mx)*(h-4)-2;c.strokeStyle="rgba(150,160,180,.4)";c.setLineDash([3,2]);c.beginPath();c.moveTo(0,ty);c.lineTo(w,ty);c.stroke();c.setLineDash([]);}
   vals.forEach((v,i)=>{const bh=(v/mx)*(h-4);c.fillStyle=colFn(v);c.fillRect(i*bw+2,h-bh-2,bw-4,bh);});}
 
-/* ============ render: SPINE (banner + trust strip) ============ */
-function renderSpine(){
-  const T=trust();const ar=armed();const exc=exceptions();const t1=exc.filter(e=>e.t===1&&!e.child).length,t2=exc.filter(e=>e.t===2&&!e.child).length;
-  const safe=S("sensor.crop_steering_system_safety_status")==="safe";
-  const pills=[
-    {k:"ARM",v:ar?"ARMED":"DISARMED",col:ar?C.green:C.amber},
-    {k:"SAFETY",v:safe?"OK":(bad(S("sensor.crop_steering_system_safety_status"))?"?":"FAULT"),col:safe?C.green:C.red},
-    {k:"DATA",v:T.verdict,col:T.col},
-    {k:"STRATEGY",v:(t2||exc.some(e=>e.title.includes("Strategy")))?"OFF":"OK",col:(t2)?C.amber:C.green}];
+/* ============ render: STATUS BAR (one compact line: verdict · A/S/D/St · zones · climate · phase) ============ */
+function renderStatusBar(){
+  const sb=el("sbstatus");if(!sb)return;
+  const T=trust();const ar=armed();const exc=exceptions();
+  const t1=exc.filter(e=>e.t===1&&!e.child).length,t2=exc.filter(e=>e.t===2&&!e.child).length;
+  const _sst=S("sensor.crop_steering_system_safety_status"),sysBad=bad(_sst);
+  const _sysFault=/emergency|interlock|halt|critical|fault|pump|valve|ph_/.test((_sst||"").toLowerCase());
+  const sysSev=Math.max(_sysFault?2:0,...ZONES.map(z=>safetySev(S(`sensor.crop_steering_zone_${z}_safety_status`))),0);
   let verdict="SAFE",vcol=C.green;
-  if(t1||T.verdict==="UNTRUSTED"||!safe){verdict="INTERVENE";vcol=C.red;}
-  else if(t2||T.verdict==="DEGRADED"||!ar){verdict="WATCH";vcol=C.amber;}
+  if(t1||T.verdict==="UNTRUSTED"||sysSev===2){verdict="INTERVENE";vcol=C.red;}
+  else if(t2||T.verdict==="DEGRADED"||!ar||sysSev===1){verdict="WATCH";vcol=C.amber;}
+  const dot=(k,col,txt)=>`<span class="sbd" data-tip="${k}: ${txt}"><span class="sbdt" style="background:${col}"></span>${k}</span>`;
+  const dots=
+    dot("ARM",ar?C.green:C.amber,ar?"ARMED":"DISARMED")+
+    dot("SAFE",sysBad?C.faint:(sysSev===0?C.green:sysSev===1?C.amber:C.red),sysBad?"?":(sysSev===0?"OK":sysSev===1?"WARN":"FAULT"))+
+    dot("DATA",T.col,T.verdict)+
+    dot("STRAT",t2?C.amber:C.green,t2?"OFF":"OK");
+  const zc=ZONES.map(z=>`<span class="sbz"><b style="color:${C.accent}">Z${z}</b>${r1(N(`sensor.crop_steering_zone_${z}_vwc`))}<small>/</small><span style="color:${C.amber}">${r1(N(`sensor.crop_steering_zone_${z}_ec`))}</span></span>`).join("");
+  const clim=[["🌡leaf","sensor.f1_r1_thermal_camera_leaf_temperature",r1],["room","sensor.f2_scd41_env3_dlight_poe_temperature",r1],["RH","sensor.f2_sensor_humidity",r0],["lVPD","sensor.f2_leaf_vpd",r1],["CO₂","sensor.airq_f2_co2_internal",r0],["PPFD","sensor.f2_scd41_env3_dlight_poe_ppfd",r0]].map(([l,id,f])=>`<span class="sbc">${l} <b>${f(N(id))}</b></span>`).join("");
   const ph=S("sensor.crop_steering_app_current_phase")||"—";
   const nextT=S("sensor.crop_steering_app_next_irrigation");let cd="";
-  if(nextT&&!bad(nextT)){const ms=Date.parse(nextT)-Date.now();cd=ms>0?`in ${Math.floor(ms/3600000)}h ${Math.floor(ms%3600000/60000)}m`:"due";}
-  el("spine").innerHTML=`
-   <div class="banner">
-     <div class="verdict" style="color:${vcol}">${verdict}</div>
-     <div class="vpills">${pills.map(p=>`<div class="vp" data-jump="${p.k}"><span class="pd" style="background:${p.col}"></span>${p.k} <small>${p.v}</small></div>`).join("")}</div>
-     <div class="armtoggles" data-tip="Arm = system_enabled AND auto_irrigation_enabled both ON">
-       <div class="tg ${S('switch.crop_steering_system_enabled')==='on'?'on':''}" onclick="toggleSwitch('switch.crop_steering_system_enabled')" title="system_enabled"></div>
-       <div class="tg ${S('switch.crop_steering_auto_irrigation_enabled')==='on'?'on':''}" onclick="toggleSwitch('switch.crop_steering_auto_irrigation_enabled')" title="auto_irrigation"></div>
-     </div>
-     <div class="bspacer"></div>
-     <div class="phasechip"><b>${ph}</b><br>next ${cd||"—"} ${ar?"":"· <span style='color:#fbbf24'>watchdog only</span>"}</div>
-   </div>
-   <div class="subcap">${A("sensor.crop_steering_app_status","message")||S("sensor.crop_steering_app_status")||""} · decision: ${S("sensor.crop_steering_current_decision")||"—"}</div>
-   <div class="truststrip" style="border-color:${T.col}55">
-     <span class="tl" style="color:${T.col}">DATA TRUST: ${T.verdict}</span>
-     <span class="tm">sensor health ${r0(T.health)}% · fusion conf ${r1(T.fc)} · dryback acc ${r1(N("sensor.crop_steering_dryback_detection_accuracy"))}</span>
-     <span class="tm">AUTO: <b style="color:${ar?C.green:C.amber}">${ar?"ON":"OFF"}</b></span>
-     ${T.verdict==="UNTRUSTED"?'<span style="color:#f87171">Bands below may be unreliable — verify probes before acting.</span>':""}
-   </div>`;
-  // nav badge
-  const b=el("excBadge");if(b)b.textContent=(t1+t2)||"";if(b)b.style.display=(t1+t2)?"":"none";
+  if(nextT&&!bad(nextT)){const ms=Date.parse(nextT)-Date.now();cd=ms>0?`${Math.floor(ms/3600000)}h${Math.floor(ms%3600000/60000)}m`:"due";}
+  sb.innerHTML=
+    `<span class="sbv" style="color:${vcol};border-color:${vcol}66">${verdict}</span>`+
+    `<span class="sbdots">${dots}</span>`+
+    `<span class="sbsep"></span>${zc}`+
+    `<span class="sbsep"></span>${clim}`+
+    `<span class="sbspacer"></span>`+
+    `<span class="sbphase"><b>${ph}</b> · next ${cd||"—"}${ar?"":" · <span style='color:#FF9F40'>watchdog</span>"}</span>`+
+    `<span class="sbarm"><span class="tg ${S('switch.crop_steering_system_enabled')==='on'?'on':''}" onclick="toggleSwitch('switch.crop_steering_system_enabled')" title="system_enabled"></span><span class="tg ${S('switch.crop_steering_auto_irrigation_enabled')==='on'?'on':''}" onclick="toggleSwitch('switch.crop_steering_auto_irrigation_enabled')" title="auto_irrigation"></span></span>`;
+  const tr=el("sbTrust");
+  if(tr){if(T.verdict!=="OK"){tr.style.display="block";tr.innerHTML=`<span style="color:${T.col};font-weight:700">DATA ${T.verdict}</span> · sensor health ${r0(T.health)}% · fusion ${r1(T.fc)} · dryback acc ${r1(N("sensor.crop_steering_dryback_detection_accuracy"))}${T.verdict==="UNTRUSTED"?' · <span style="color:#F44336">verify probes before acting</span>':''}`;}else tr.style.display="none";}
+  const b=el("excBadge");if(b){b.textContent=(t1+t2)||"";b.style.display=(t1+t2)?"":"none";}
 }
 
 /* ============ render: TRIAGE ============ */
 function renderTriage(){
   const exc=exceptions();const blind=trust().verdict==="UNTRUSTED";
+  const resolved=reconcileExceptions(exc);
   const tname={1:"CROP-THREAT",2:"STRATEGY",3:"QUALITY",4:"UPKEEP"},tcol={1:C.red,2:C.orange,3:C.amber,4:C.faint};
-  const rows=exc.length?exc.map(e=>`<div class="exrow ${e.child?'child':''}" style="border-left-color:${tcol[e.t]}">
-      <div class="ex-b"><div class="ex-t">${e.title}</div><div class="ex-c">Likely: ${e.cause}</div><div class="ex-a">→ ${e.check}</div></div>
-      <div class="ex-tag" style="background:${tcol[e.t]}22;color:${tcol[e.t]}">${tname[e.t]}${e.zone?" · Z"+e.zone:""}</div></div>`).join("")
-    :`<div class="ok-banner">✓ No exceptions — every zone on strategy, data trusted, within limits.</div>`;
+  const active=exc.filter(e=>!e.dismissed),dism=exc.filter(e=>e.dismissed);
+  const rowOf=e=>{const tip=excTip(e);return `<div class="exrow ${e.child?'child':''}" style="border-left-color:${tcol[e.t]}">
+      <div class="ex-b"><div class="ex-t">${e.title}${tip?` <span class="ex-i" data-tip="${esc(tip)}">ⓘ</span>`:""}</div><div class="ex-c">Likely: ${e.cause}</div><div class="ex-a">→ ${e.check}</div><div class="ex-meta">seen ${since(e.firstSeen)}</div></div>
+      <div class="ex-right"><div class="ex-tag" style="background:${tcol[e.t]}22;color:${tcol[e.t]}">${tname[e.t]}${e.zone?" · Z"+e.zone:""}</div><button class="ex-x" onclick="dismissExc('${e.key}')">Dismiss</button></div></div>`;};
+  const rows=active.length?active.map(rowOf).join("")
+    :(exc.length?`<div class="ok-banner">✓ All ${exc.length} exception${exc.length>1?"s":""} dismissed — none active.</div>`
+      :`<div class="ok-banner">✓ No exceptions — every zone on strategy, data trusted, within limits.</div>`);
+  const dismBar=dism.length?`<div class="exc-dism">${dism.length} dismissed (still active): `+dism.map(e=>`<a onclick="restoreExc('${e.key}')">${tname[e.t]}${e.zone?" Z"+e.zone:""} ↺</a>`).join(" · ")+`</div>`:"";
+  const resRows=resolved.length?`<div class="exc-head">✓ Recently resolved</div>`+resolved.map(r=>`<div class="exrow resolved">
+      <div class="ex-b"><div class="ex-t">✓ ${r.title}</div><div class="ex-meta">cleared ${since(r.resolvedAt)} · was open ${dur(r.resolvedAt-r.firstSeen)}</div></div>
+      <div class="ex-right"><div class="ex-tag" style="background:${C.green}22;color:${C.green}">RESOLVED</div><button class="ex-x" onclick="clearResolved('${r.key}')">Clear</button></div></div>`).join(""):"";
   // phase rail
   const rail=["P0","P1","P2","P3"].map(p=>{const zs=ZONES.filter(z=>(zphase(z)||"").includes(p));return `<div class="rcell ${zs.length?'on':''}"><div>${p}</div><div class="zc">${zs.map(z=>`<span class="zchip">Z${z}</span>`).join("")}</div></div>`;}).join("");
   const on=N("number.crop_steering_lights_on_hour")??10,off=N("number.crop_steering_lights_off_hour")??22,cut=off-(N("number.crop_steering_p3_veg_last_irrigation")??30)/60;
@@ -428,9 +562,11 @@ function renderTriage(){
      <div class="tick" style="left:${px(hr)}%;background:#fff;width:2px"></div>
    </div>`;
   el("v-triage").innerHTML=`<p class="lead"><b>What needs attention now.</b> Ranked by consequence — crop-threatening first. This is not a graph. Hover the ⓘ on any limit for what it means.</p>
-    <div class="card"><h3>Exception Centre ${blind?'· <span style="color:#f87171">data-blind: band alarms suppressed</span>':''}</h3><div class="exc">${rows}</div></div>
+    <div class="card"><h3>Exception Centre ${blind?'· <span style="color:#f87171">data-blind: band alarms suppressed</span>':''}</h3><div class="exc">${rows}</div>${dismBar}${resRows?`<div class="exc" style="margin-top:12px">${resRows}</div>`:""}</div>
     <div class="card" style="margin-top:14px"><h3>Phase & Schedule Adherence</h3><p class="csub">Authoritative per-zone phase. Photoperiod derived from lights_on/off (no live lights sensor). ${armed()?"":"Engine DISARMED — schedule is planned; watchdog may still fire."}</p>
-      <div class="rail">${rail}</div>${sched}</div>`;
+      <div class="rail">${rail}</div>${sched}</div>
+    <div id="v-trust-embed" style="margin-top:14px"></div>`;
+  renderTrust();
 }
 
 /* ============ render: ZONES ============ */
@@ -482,66 +618,114 @@ function renderZones(){
           <tr><td>Source-water EC <span class="hi" data-tip="Gate ${r1(N("number.crop_steering_irrigation_ec_min"))}–${r1(N("number.crop_steering_irrigation_ec_max"))}">i</span></td><td style="color:${(()=>{const v=N(WATER.ec),lo=N("number.crop_steering_irrigation_ec_min"),hi=N("number.crop_steering_irrigation_ec_max");return v!=null&&lo!=null&&hi!=null&&(v<lo||v>hi)?C.amber:C.green;})()}">${r1(N(WATER.ec))} mS/cm</td></tr>
           <tr><td>Room temperature</td><td>${r1(N(CLIM.temp))} °C</td></tr>
           <tr><td>Room humidity</td><td>${r1(N(CLIM.rh))} %</td></tr>
-          <tr><td>Air VPD <span class="hi" data-tip="Computed from temp + RH (the engine's VPD sensor is offline)">i</span></td><td>${r1(airVPD())} kPa</td></tr></table></div></div>`;
+          <tr><td>Air VPD <span class="hi" data-tip="Computed from temp + RH (the engine's VPD sensor is offline)">i</span></td><td>${r1(airVPD())} kPa</td></tr>
+          <tr><td>Leaf temp 🌡️ <span class="hi" data-tip="Thermal-camera canopy leaf temperature — sensor.f1_r1_thermal_camera_leaf_temperature">i</span></td><td>${r1(N("sensor.f1_r1_thermal_camera_leaf_temperature"))} °C</td></tr>
+          <tr><td>Leaf VPD</td><td>${r1(N("sensor.f2_leaf_vpd"))} kPa</td></tr>
+          <tr><td>Target RH for VPD <span class="hi" data-tip="RH needed to hold the canopy at the target leaf VPD (${r1(N("input_number.f2_target_vpd"))} kPa). Auto-pushed to the F2 dehumidifier setpoint.">i</span></td><td><b>${r1(N("sensor.f2_target_rh_for_vpd"))}</b> %</td></tr>
+          <tr><td>Dehumidifier target → now</td><td>${r0(A("humidifier.f2_dehumidifier","humidity"))} → ${r1(A("humidifier.f2_dehumidifier","current_humidity"))} %</td></tr></table></div></div>`;
   ZONES.forEach(z=>{const cv=el("zspark-"+z);if(cv)lineSpark(cv,HIST[`sensor.crop_steering_zone_${z}_vwc`],C.green);});
 }
 
 /* ============ render: CONTROL ============ */
-function numRow(id,help){return `<div class="row"><span class="rl">${id.split("crop_steering_")[1].replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase())}${help?`<span class="hi" data-tip="${help}">i</span>`:""}</span><input class="ni" type="number" step="${A(id,'step')||0.1}" value="${S(id)}" onchange="setNumber('${id}',this.value)"/><span class="ru">${A(id,'unit_of_measurement')||""}</span></div>;`.replace(/;$/,"");}
-function selRow(id){const o=A(id,"options")||[];return `<div class="row"><span class="rl">${id.split(".")[1].replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase())}</span><select class="sel" onchange="setSelect('${id}',this.value)">${o.map(x=>`<option ${x===S(id)?"selected":""}>${x}</option>`).join("")}</select></div>`;}
+function pretty(s){return String(s||"").replace(/_/g," ").replace(/\bp([0-3])\b/gi,"P$1").replace(/\bec\b/gi,"EC").replace(/\bvwc\b/gi,"VWC").replace(/\bph\b/gi,"pH").replace(/\b\w/g,c=>c.toUpperCase());}
+function numRow(id,help,lab){const name=lab||pretty(id.split("crop_steering_")[1]||id);return `<div class="row"><span class="rl">${name}${help?`<span class="hi" data-tip="${help}">i</span>`:""}</span><input class="ni" type="number" step="${A(id,'step')||0.1}" value="${S(id)}" onchange="setNumber('${id}',this.value)"/><span class="ru">${A(id,'unit_of_measurement')||""}</span></div>`;}
+function selRow(id,lab){const o=A(id,"options")||[];return `<div class="row"><span class="rl">${lab||pretty((id.split(".")[1]||"").replace(/^crop_steering_/,""))}</span><select class="sel" onchange="setSelect('${id}',this.value)">${o.map(x=>`<option ${x===S(id)?"selected":""}>${x}</option>`).join("")}</select></div>`;}
+function ecGrid(pfx){const cell=s=>{const id=`number.crop_steering_${pfx}ec_target_${s}`;return `<input class="ecni" type="number" step="0.1" value="${S(id)}" onchange="setNumber('${id}',this.value)" data-tip="${id.split('crop_steering_')[1]}"/>`;};
+  return `<table class="ecg"><tr><th></th><th>P0</th><th>P1</th><th>P2</th><th>P3</th></tr>
+    <tr><td class="ecr">Gen</td><td>${cell('gen_p0')}</td><td>${cell('gen_p1')}</td><td>${cell('gen_p2')}</td><td>${cell('gen_p3')}</td></tr>
+    <tr><td class="ecr">Veg</td><td>${cell('veg_p0')}</td><td>${cell('veg_p1')}</td><td>${cell('veg_p2')}</td><td>${cell('veg_p3')}</td></tr>
+    <tr><td class="ecr">Flush</td><td colspan="4">${cell('flush')}</td></tr></table>`;}
+window.setCtrlZone=z=>{ctrlZone=z;renderControl();};
+window.setCtrlSec=k=>{if(k[0]==='z'&&k.length===2){ctrlZone=+k[1];ctrlSec='zone';}else ctrlSec=k;renderControl();};
 function swRow(id,lab){return `<div class="row"><span class="rl">${lab}</span><div class="tg ${S(id)==='on'?'on':''}" onclick="toggleSwitch('${id}')"></div></div>`;}
 function renderControl(){
   const mode=S("select.crop_steering_steering_mode"),dbT=mode==="Generative"?N("number.crop_steering_generative_dryback_target"):N("number.crop_steering_vegetative_dryback_target");
   const gs=S("select.crop_steering_growth_stage"),gp=S("input_select.growth_phase"),np=S("input_select.nutrient_phase");
-  const conflict=gp&&np&&gs&&!((gs||"").toLowerCase().includes("veget")&&/veg/i.test(gp)&&/veg/i.test(np));
+  const sd=steerDir();
   const phase=(modalPhase()||"P3");
-  const pcard=(p,ids)=>`<div class="card" style="${p===phase?'border-color:#34d39966':''}"><h3>${p}${p===phase?' <span style="color:#34d399">● ACTIVE</span>':''}</h3>${ids.filter(has).map(i=>numRow(i)).join("")}</div>`;
-  const ovOn=ZONES.some(z=>S(`switch.crop_steering_zone_${z}_manual_override`)==="on"),disOff=ZONES.some(z=>S(`switch.crop_steering_zone_${z}_enabled`)==="off");
-  el("v-control").innerHTML=`<p class="lead"><b>The control surface.</b> Active strategy, the live recipe for the current phase, and the full safety envelope. Edits to number/select cards commit to HA immediately (no confirm, no version history).</p>
-    ${ovOn||disOff?`<div class="override-banner">⚠ ${ovOn?"MANUAL OVERRIDE ACTIVE":"ZONE DISABLED"} — ${ZONES.filter(z=>S(`switch.crop_steering_zone_${z}_manual_override`)==="on"||S(`switch.crop_steering_zone_${z}_enabled`)==="off").map(z=>"Z"+z).join(", ")}. AI irrigation blocked on those zones.</div>`:""}
+  const pcard=(p,ids)=>`<div class="card" style="${p===phase?'border-color:#4CAF5077':''}"><h3>${p}${p===phase?' <span style="color:#4CAF50">● ACTIVE</span>':''}</h3>${ids.filter(has).map(i=>numRow(i)).join("")}</div>`;
+  const z=ctrlZone;
+  const zn=(suf,help)=>numRow(`number.crop_steering_zone_${z}_${suf}`,help,pretty(suf));
+  const pz=(p,sufs)=>{const act=(zphase(z)||"").includes(p);return `<div class="card" style="${act?'border-color:#4CAF5077':''}"><h3>${p}${act?' <span style="color:#4CAF50">● ACTIVE</span>':''}</h3>${sufs.map(s=>zn(s)).join("")}</div>`;};
+  const ovOn=ZONES.some(zz=>S(`switch.crop_steering_zone_${zz}_manual_override`)==="on"),disOff=ZONES.some(zz=>S(`switch.crop_steering_zone_${zz}_enabled`)==="off");
+  const sec=ctrlSec,curKey=sec==='zone'?('z'+z):sec;
+  const subbar=`<div class="csub2">${[["global","Global"],["z1","Zone 1"],["z2","Zone 2"],["z3","Zone 3"],["safety","Safety / System"]].map(([k,l])=>`<div class="csbtn ${k===curKey?'on':''}" onclick="setCtrlSec('${k}')">${l}</div>`).join("")}</div>`;
+  const GLOBAL=`
     <div class="card"><h3>Active Strategy</h3><div class="pillrow">
       <div class="bigpill"><small>Mode</small><b>${mode||"—"}</b></div><div class="bigpill"><small>Stage</small><b>${gs||"—"}</b></div>
       <div class="bigpill"><small>Profile</small><b>${S("select.crop_steering_crop_type")||"—"}</b></div><div class="bigpill"><small>Phase</small><b>${S("sensor.crop_steering_app_current_phase")||"—"}</b></div>
       <div class="bigpill"><small>Dryback intent</small><b>${r0(dbT)}%</b></div><div class="bigpill"><small>Field cap</small><b>${r0(N("number.crop_steering_field_capacity"))}%</b></div></div>
-      <div style="margin-top:10px" class="grid g-3">${selRow("select.crop_steering_steering_mode")}${selRow("select.crop_steering_growth_stage")}${selRow("select.crop_steering_crop_type")}</div></div>
-    ${conflict?`<div class="conflict">⚠ Strategy selectors disagree — Integration: <b>${gs}</b> · growth_phase: <b>${gp}</b> · nutrient_phase: <b>${np}</b>. Confirm which is authoritative (recommend the integration selects).</div>`:""}
-    <div class="sub">Live Recipe — phase parameters (current phase highlighted)</div>
+      <div style="margin-top:10px" class="grid g-3">${selRow("select.crop_steering_steering_mode","Steering Mode")}${selRow("select.crop_steering_growth_stage","Growth Stage")}${selRow("select.crop_steering_crop_type","Crop Type")}${selRow("select.crop_steering_irrigation_phase","Manual Phase Pin")}</div></div>
+    ${!sd.coherent?`<div class="conflict">⚠ Steering direction selectors disagree — ${sd.zone.map(o=>"Z"+o.z+":"+o.v).join(" · ")} · global ${gs}. Set all zones + the global growth-stage to the same Vegetative/Generative.</div>`:""}
+    <div class="axisnote">Two independent axes — <b>steering direction</b> = <b>${gs||sd.dir||"—"}</b> <span style="color:var(--faint)">(gen/veg the engine acts on)</span> · <b>recipe stage</b> = <b>${gp||"—"} / ${np||"—"}</b> <span style="color:var(--faint)">(drives the Athena setpoints chart, applied at lights-on)</span>. Different things — not expected to match.</div>
+    <div class="grid g-2">
+      <div class="card"><h3>Substrate &amp; Hardware</h3>
+        ${numRow("number.crop_steering_field_capacity","Max water the block holds before runoff")}
+        ${numRow("number.crop_steering_substrate_volume","Block volume per plant")}
+        ${numRow("number.crop_steering_dripper_flow_rate","Per-dripper flow rate")}
+        ${numRow("number.crop_steering_drippers_per_plant","Drippers per plant")}</div>
+      <div class="card"><h3>Dryback Targets (global)</h3>
+        ${numRow("number.crop_steering_generative_dryback_target","Generative % drop from peak")}
+        ${numRow("number.crop_steering_vegetative_dryback_target","Vegetative % drop from peak")}
+        ${numRow("number.crop_steering_p0_dryback_drop_percent","P0 morning dryback before P1")}</div></div>
+    <div class="sub">Global phase recipe (current phase highlighted)</div>
     <div class="grid g-2" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
       ${pcard("P0",["number.crop_steering_p0_dryback_drop_percent","number.crop_steering_p0_minimum_wait_time","number.crop_steering_p0_maximum_wait_time"])}
-      ${pcard("P1",["number.crop_steering_p1_target_vwc","number.crop_steering_p1_initial_shot_size","number.crop_steering_p1_shot_size_increment","number.crop_steering_p1_maximum_shot_size","number.crop_steering_p1_time_between_shots","number.crop_steering_p1_maximum_shots"])}
+      ${pcard("P1",["number.crop_steering_p1_target_vwc","number.crop_steering_p1_initial_shot_size","number.crop_steering_p1_shot_size_increment","number.crop_steering_p1_maximum_shot_size","number.crop_steering_p1_minimum_shots","number.crop_steering_p1_maximum_shots","number.crop_steering_p1_time_between_shots"])}
       ${pcard("P2",["number.crop_steering_p2_vwc_threshold","number.crop_steering_p2_shot_size","number.crop_steering_p2_ec_high_threshold","number.crop_steering_p2_ec_low_threshold"])}
-      ${pcard("P3",["number.crop_steering_p3_emergency_vwc_threshold","number.crop_steering_p3_emergency_shot_size","number.crop_steering_p3_veg_last_irrigation"])}</div>
+      ${pcard("P3",["number.crop_steering_p3_emergency_vwc_threshold","number.crop_steering_p3_emergency_shot_size","number.crop_steering_p3_veg_last_irrigation","number.crop_steering_p3_gen_last_irrigation"])}</div>
+    <div class="card" style="margin-top:14px"><h3>Global EC Targets by Phase <span style="color:var(--faint);font-weight:600">mS/cm</span></h3>${ecGrid("")}</div>`;
+  const ZONE=`
+    <div class="card"><h3>Zone ${z} — mode, profile &amp; status</h3>
+      <div class="grid g-2">${selRow(`select.crop_steering_zone_${z}_steering_mode`,"Steering Mode")}${selRow(`select.crop_steering_zone_${z}_crop_profile`,"Crop Profile")}${selRow(`select.crop_steering_zone_${z}_group`,"Group")}${selRow(`select.crop_steering_zone_${z}_priority`,"Priority")}</div>
+      <div style="margin-top:8px">${swRow(`switch.crop_steering_zone_${z}_enabled`,`Zone ${z} enabled`)}${swRow(`switch.crop_steering_zone_${z}_manual_override`,`Zone ${z} manual override`)}${swRow(`switch.crop_steering_zone_${z}_dripper_protection`,`Zone ${z} dripper protection`)}</div></div>
     <div class="grid g-2" style="margin-top:14px">
+      <div class="card"><h3>Zone ${z} setup</h3>
+        ${zn("max_daily_volume","Daily water cap for this zone")}${zn("plant_count")}${zn("shot_size_multiplier","Scales all this zone's shot sizes")}
+        ${zn("generative_dryback_target")}${zn("vegetative_dryback_target")}</div>
+      <div class="card"><h3>Zone ${z} EC Targets by Phase <span style="color:var(--faint);font-weight:600">mS/cm</span></h3>${ecGrid(`zone_${z}_`)}</div></div>
+    <div class="sub">Zone ${z} phase recipe (this zone's current phase highlighted)</div>
+    <div class="grid g-2" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      ${pz("P0",["p0_dryback_drop_percent","p0_minimum_wait_time","p0_maximum_wait_time"])}
+      ${pz("P1",["p1_target_vwc","p1_initial_shot_size","p1_shot_size_increment","p1_maximum_shot_size","p1_minimum_shots","p1_maximum_shots","p1_time_between_shots"])}
+      ${pz("P2",["p2_vwc_threshold","p2_shot_size","p2_ec_high_threshold","p2_ec_low_threshold"])}
+      ${pz("P3",["p3_emergency_vwc_threshold","p3_emergency_shot_size","p3_veg_last_irrigation","p3_gen_last_irrigation"])}</div>`;
+  const SAFETY=`
+    <div class="grid g-2">
       <div class="card"><h3>🛡 Safety Envelope — Guardrails</h3>
         ${numRow("number.crop_steering_maximum_ec","Hard substrate-EC cutoff — no shot above this")}
         ${numRow("number.crop_steering_irrigation_ec_min","Source-water EC gate low bound")}${numRow("number.crop_steering_irrigation_ec_max","Source-water EC gate high bound")}
         ${numRow("number.crop_steering_irrigation_ph_min","Source-water pH gate low")}${numRow("number.crop_steering_irrigation_ph_max","Source-water pH gate high")}
-        ${numRow("number.crop_steering_zone_1_max_daily_volume","Per-zone daily water cap (z1 shown)")}
-        ${numRow("number.crop_steering_p1_time_between_shots","Min interval between P1 shots")}${numRow("number.crop_steering_blocked_dripper_max_shots_30min","Emergency shots/30min before backoff")}
-        <div class="bg-cap" style="margin-top:8px">Lights/lockout ${r0(N("number.crop_steering_lights_on_hour"))}:00–${r0(N("number.crop_steering_lights_off_hour"))}:00 · last shot ${r0(N("number.crop_steering_p3_veg_last_irrigation"))}m before off</div></div>
-      <div class="card"><h3>Zone Control</h3>
-        ${ZONES.map(z=>swRow(`switch.crop_steering_zone_${z}_enabled`,`Zone ${z} enabled`)).join("")}
-        ${ZONES.map(z=>swRow(`switch.crop_steering_zone_${z}_manual_override`,`Zone ${z} manual override`)).join("")}
-        ${ZONES.map(z=>swRow(`switch.crop_steering_zone_${z}_dripper_protection`,`Zone ${z} dripper protection`)).join("")}</div></div>
+        ${numRow("number.crop_steering_lights_on_hour","Photoperiod start — resets counters (P3→P0)")}${numRow("number.crop_steering_lights_off_hour","Photoperiod end — forces P3")}
+        ${numRow("number.crop_steering_blocked_dripper_max_shots_30min","Emergency shots/30min before backoff")}</div>
+      <div class="card"><h3>System Switches</h3>
+        ${swRow("switch.crop_steering_system_enabled","System enabled (master)")}
+        ${swRow("switch.crop_steering_auto_irrigation_enabled","Auto irrigation")}
+        ${swRow("switch.crop_steering_ec_stacking_enabled","EC stacking")}
+        ${swRow("switch.crop_steering_analytics_enabled","Analytics")}</div></div>
     <div class="grid g-2" style="margin-top:14px">
       <div class="card"><h3>Grow Context</h3><table class="kv">
-        <tr><td>Room</td><td>F2 · veg</td></tr><tr><td>Crop</td><td>${S("select.crop_steering_crop_type")||"—"}</td></tr>
-        <tr><td>Substrate</td><td>${r0(N("number.crop_steering_substrate_volume"))} L coco</td></tr><tr><td>Dripper</td><td>${r1(N("number.crop_steering_dripper_flow_rate"))} L/hr ×${r0(N("number.crop_steering_drippers_per_plant"))}</td></tr>
-        <tr><td>Plants</td><td>${ZONES.map(z=>r0(N(`number.crop_steering_zone_${z}_plant_count`))).join(" / ")} per zone</td></tr></table>
-        <div class="notrack">Batch / cultivar name / harvest group / plant date: <b>NOT TRACKED</b> in HA — maintain externally.</div></div>
+        <tr><td>Room</td><td>F2 · veg/flower</td></tr><tr><td>Crop</td><td>${S("select.crop_steering_crop_type")||"—"}</td></tr>
+        <tr><td>Substrate</td><td>${r0(N("number.crop_steering_substrate_volume"))} L rockwool</td></tr><tr><td>Dripper</td><td>${r1(N("number.crop_steering_dripper_flow_rate"))} L/hr ×${r0(N("number.crop_steering_drippers_per_plant"))}</td></tr>
+        <tr><td>Plants</td><td>${ZONES.map(zz=>r0(N(`number.crop_steering_zone_${zz}_plant_count`))).join(" / ")} per zone</td></tr></table>
+        <div class="notrack">Batch / cultivar / harvest group / plant date: <b>NOT TRACKED</b> in HA — maintain externally.</div></div>
       <div class="card"><h3>Recent Actions & Next Step</h3>
-        <div style="font-size:13px;margin-bottom:8px">Next: <b>${(()=>{const t=S("sensor.crop_steering_app_next_irrigation");if(!t||bad(t))return "—";const ms=Date.parse(t)-Date.now();return ms>0?`in ${Math.floor(ms/3600000)}h ${Math.floor(ms%3600000/60000)}m`:"due";})()}</b> ${armed()?"":'<span style="color:#fbbf24">· planned, watchdog-driven (DISARMED)</span>'}</div>
+        <div style="font-size:13px;margin-bottom:8px">Next: <b>${(()=>{const t=S("sensor.crop_steering_app_next_irrigation");if(!t||bad(t))return "—";const ms=Date.parse(t)-Date.now();return ms>0?`in ${Math.floor(ms/3600000)}h ${Math.floor(ms%3600000/60000)}m`:"due";})()}</b> ${armed()?"":'<span style="color:#FF9F40">· planned, watchdog-driven (DISARMED)</span>'}</div>
         <div class="feed" id="ctrlfeed"></div>
         <div class="notrack">No user audit trail exists; setpoint changes are unversioned and apply immediately. Keep a manual change note.</div></div></div>`;
+  el("v-control").innerHTML=`<p class="lead"><b>The control surface.</b> Every crop-steering parameter the engine exposes. Edits commit to HA immediately (no confirm, no version history).</p>
+    ${ovOn||disOff?`<div class="override-banner">⚠ ${ovOn?"MANUAL OVERRIDE ACTIVE":"ZONE DISABLED"} — ${ZONES.filter(zz=>S(`switch.crop_steering_zone_${zz}_manual_override`)==="on"||S(`switch.crop_steering_zone_${zz}_enabled`)==="off").map(zz=>"Z"+zz).join(", ")}. AI irrigation blocked on those zones.</div>`:""}
+    ${subbar}
+    ${sec==='global'?GLOBAL:sec==='safety'?SAFETY:ZONE}`;
   const f=el("ctrlfeed"),raw=A("sensor.crop_steering_activity_log","feed");if(f&&raw)f.innerHTML=String(raw).split("\n").filter(Boolean).slice(0,30).map(l=>`<div>${l.replace(/[<>]/g,"")}</div>`).join("");
 }
 
 /* ============ render: TRACE ============ */
 function renderTrace(){
   el("v-trace").innerHTML=`<p class="lead"><b>Are we tracking strategy?</b> Substrate VWC + pore-EC over their target bands, with shot markers, night shading and dryback-as-an-event. One zone at a time.</p>
-    <div class="card"><h3>Zone overlay · VWC + EC<span style="margin-left:auto;display:inline-flex;gap:5px">${[["24H",24],["3D",72],["1W",168]].map(([l,hh])=>`<span onclick="setHistWindow(${hh})" style="cursor:pointer;font-size:11px;padding:2px 9px;border-radius:6px;${histWindowH===hh?`background:${C.blue};color:#04122b;font-weight:800`:`color:${C.faint};border:1px solid #2a3a55`}">${l}</span>`).join("")}</span></h3>
+    <div class="card"><h3>Zone overlay · VWC + EC<span style="margin-left:auto;display:inline-flex;gap:5px;align-items:center">${[["24H",24],["3D",72],["1W",168],["2W",336]].map(([l,hh])=>`<span onclick="setHistWindow(${hh})" style="cursor:pointer;font-size:11px;padding:2px 9px;border-radius:6px;${histWindowH===hh?`background:${C.accent};color:#04130c;font-weight:800`:`color:${C.faint};border:1px solid var(--br)`}">${l}</span>`).join("")}<span style="display:inline-flex;align-items:center;gap:3px;border:1px solid var(--br);border-radius:6px;padding:1px 5px;color:${C.faint};font-size:11px">⏱<input type="number" min="1" max="720" value="${histWindowH}" onchange="setCustomWindow(this.value)" title="custom hours (1–720)" style="width:46px;background:var(--raised);border:none;color:var(--ink);font-size:11px;border-radius:4px;padding:2px 4px;font-variant-numeric:tabular-nums"/>h</span></span></h3>
       <div style="position:relative"><canvas id="ovlCanvas" style="width:100%;height:300px;display:block"></canvas><div id="ovlTip" style="position:absolute;display:none;pointer-events:none;background:rgba(8,16,33,.95);border:1px solid #2a3a55;border-radius:8px;padding:7px 9px;font-size:11px;line-height:1.55;white-space:nowrap;z-index:6;box-shadow:0 6px 20px rgba(0,0,0,.45)"></div></div>
-      <div style="display:flex;gap:13px;flex-wrap:wrap;font-size:11px;margin-top:9px;color:${C.faint}">${ZONES.map((z,i)=>`<span style="color:${OVL_V[i]}">● Z${z} VWC</span>`).join("")}${ZONES.map((z,i)=>`<span style="color:${OVL_E[i]}">● Z${z} EC</span>`).join("")}<span style="margin-left:auto">shaded = lights-off</span></div></div>
+      <div class="ovleg">${ZONES.map((z,i)=>`<span id="leg-z${z}v" class="lgc${OVL_HIDDEN.has(`z${z}v`)?' off':''}" onclick="toggleSeries('z${z}v')" style="--lc:${OVL_V[i]}">● Z${z} VWC</span>`).join("")}${ZONES.map((z,i)=>`<span id="leg-z${z}e" class="lgc${OVL_HIDDEN.has(`z${z}e`)?' off':''}" onclick="toggleSeries('z${z}e')" style="--lc:${OVL_E[i]}">● Z${z} EC</span>`).join("")}<span style="margin-left:auto;color:${C.faint};font-size:11px">shaded = lights-off · click to toggle a series</span></div></div>
     <div class="zsel">${ZONES.map(z=>`<div class="zbtn ${z===traceZone?'on':''}" onclick="setTraceZone(${z})">Zone ${z}</div>`).join("")}</div>
     <div class="card"><h3>Steering Trace · 24h <span style="margin-left:auto;font-size:11px;color:${C.dim}">VWC ${r1(N(`sensor.crop_steering_zone_${traceZone}_vwc`))}% · EC ${r1(N(`sensor.crop_steering_zone_${traceZone}_ec`))} · ${zphase(traceZone)||""}</span></h3><canvas class="trace" id="traceCanvas"></canvas></div>
     <div class="grid g-3" style="margin-top:14px" id="drybackCards"></div>
@@ -580,9 +764,9 @@ function renderTrust(){
   const T=trust();const sigs=[["sensor.crop_steering_zone_1_vwc","Z1 VWC"],["sensor.crop_steering_zone_2_vwc","Z2 VWC"],["sensor.crop_steering_zone_3_vwc","Z3 VWC"],["sensor.crop_steering_zone_1_ec","Z1 EC"],["sensor.crop_steering_zone_2_ec","Z2 EC"],["sensor.crop_steering_zone_3_ec","Z3 EC"],["sensor.crop_steering_fused_vwc","Fused VWC"],["sensor.crop_steering_fused_ec","Fused EC"],["sensor.crop_steering_dryback_percentage","Dryback % (engine)"],["sensor.crop_steering_app_status","App status"]];
   const rows=sigs.map(([id,nm])=>{const s=S(id),a=ageMin(id);let tag,col;
     if(bad(s)){tag="OFFLINE";col=C.red;}else if(a==null){tag="—";col=C.faint;}else if(a<10){tag="FRESH";col=C.green;}else if(a<30){tag="WATCH";col=C.amber;}else{tag="STALE";col=C.red;}
-    const note=id.includes("dryback_percentage")?' <span style="color:'+C.faint+'">engine sensor offline since 29 May — dryback computed client-side</span>':"";
-    return {id,nm,s,a,tag,col,note,off:bad(s)};}).sort((x,y)=>(y.off-x.off)||((y.a||0)-(x.a||0)));
-  el("v-trust").innerHTML=`<p class="lead"><b>Can we believe the numbers?</b> Trust is a first-class gate — no green verdict survives degraded data. These fused values are what the engine actually steers on.</p>
+    const note=id.includes("dryback_percentage")?' <span style="color:'+C.faint+'">engine-computed (per-zone mean of peak→current); per-zone in attrs</span>':"";
+    return {id,nm,s,a,tag,col,note,off:bad(s)?1:0};}).sort((x,y)=>(y.off-x.off)||((y.a||0)-(x.a||0)));
+  (el("v-trust-embed")||el("v-trust")).innerHTML=`<div class="sub">Trust — can we believe the numbers?</div>
     <div class="grid g-2"><div class="card"><h3>Trust Verdict</h3>
       <div style="font-size:26px;font-weight:850;color:${T.col}">${T.verdict}</div>
       <table class="kv" style="margin-top:8px">
@@ -613,19 +797,18 @@ async function refresh(){
     const states=await api("/api/states");ST={};states.forEach(s=>ST[s.entity_id]=s);
     if(!has("sensor.crop_steering_zone_1_vwc")){setLive(false,"no crop_steering entities");el("v-triage").innerHTML='<div class="empty">No crop_steering entities found.</div>';return;}
     if(Date.now()-histAt>55000){const ids=ZONES.flatMap(z=>[`sensor.crop_steering_zone_${z}_vwc`,`sensor.crop_steering_zone_${z}_ec`]);
-      try{const start=new Date(Date.now()-(histWindowH+2)*3600*1000).toISOString();const hd=await api(`/api/history/period/${start}?filter_entity_id=${ids.join(",")}&minimal_response&no_attributes`);
+      try{const start=new Date(Date.now()-(histWindowH+2)*3600*1000).toISOString();const hd=await api(`/api/history/period/${start}?filter_entity_id=${ids.join(",")}&end_time=${new Date().toISOString()}&minimal_response&no_attributes`);
         HIST={};(hd||[]).forEach(arr=>{if(arr&&arr.length){HIST[arr[0].entity_id]=arr.map(s=>[Date.parse(s.last_changed||s.lu||s.last_updated),parseFloat(s.state)]).filter(p=>!isNaN(p[0])&&!isNaN(p[1]));}});histAt=Date.now();}catch(e){}}
-    renderSpine();renderActive();
+    renderStatusBar();renderActive();
     setLive(true,"live · "+new Date().toLocaleTimeString());
   }catch(e){setLive(false,"error: "+e.message);if(String(e.message).startsWith("401")){el("modalErr").textContent="Token rejected (401).";openModal();}}
 }
 function startLoop(){if(timer)clearInterval(timer);refresh();timer=setInterval(refresh,+el("rate").value);}
 
 /* ============ tabs / modal ============ */
-const VIEWS=[["triage","◆ Triage"],["trace","📈 Steering Trace"],["zones","🌱 Zones"],["control","🎛 Control"],["trust","🛰 Trust"]];
+const VIEWS=[["triage","◆ Triage + Trust"],["zones","🌱 Zones"],["trace","📈 Graph"],["control","🎛 Control"]];
 el("tabs").innerHTML=VIEWS.map((v,i)=>`<div class="tab ${i?"":"active"}" data-t="${v[0]}">${v[1]}${v[0]==="triage"?' <span class="cnt" id="excBadge" style="display:none"></span>':""}</div>`).join("");
 el("tabs").addEventListener("click",e=>{const t=e.target.closest(".tab");if(!t)return;document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));t.classList.add("active");document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.dataset.view===t.dataset.t));renderActive();});
-el("spine").addEventListener("click",e=>{const p=e.target.closest("[data-jump]");if(p){document.querySelector('.tab[data-t="triage"]').click();}});
 function openModal(){el("inBase").value=CFG.base;el("inToken").value=CFG.token;el("modal").classList.add("open");}
 function closeModal(){el("modal").classList.remove("open");}
 el("gearBtn").onclick=openModal;el("cancelBtn").onclick=closeModal;el("refreshBtn").onclick=refresh;el("rate").onchange=startLoop;
