@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"/>
-<meta name="theme-color" content="#070b16"/>
+<meta name="theme-color" content="#0e0f11"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <title>F2 Steering</title>
 <!--
@@ -12,24 +12,24 @@
   Token entered once, stored on-device. No secrets in this file. Dependency-free.
 -->
 <style>
-  :root{--bg:#070b16;--bg2:#0d1424;--card:#0f1a30;--br:#22304f;--ink:#e9eef8;--dim:#93a0b8;--faint:#5d6b88;
-    --green:#34d399;--cyan:#22d3ee;--amber:#fbbf24;--red:#f87171;--blue:#60a5fa;--purple:#a78bfa;--orange:#fb923c;
-    --t1:#f87171;--t2:#fb923c;--t3:#fbbf24;--t4:#7c8db5}
+  :root{--bg:#0e0f11;--bg2:#131517;--card:#1b1d20;--raised:#232629;--br:#2a2d31;--ink:#ECEDEE;--dim:#8B9196;--faint:#5C6166;--accent:#26A69A;--accent-tint:rgba(38,166,154,.14);
+    --green:#4CAF50;--cyan:#26A69A;--amber:#FF9F40;--red:#F44336;--blue:#42A5F5;--purple:#7E8AA0;--orange:#FF9F40;
+    --t1:#F44336;--t2:#FF9F40;--t3:#FFB020;--t4:#5C6166}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0}
   body{background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
   /* compact sticky header */
-  .spine{position:sticky;top:0;z-index:20;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;backdrop-filter:blur(14px);border-bottom:1px solid var(--br)}
+  .spine{position:sticky;top:0;z-index:20;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;background:var(--bg2);border-bottom:1px solid var(--br)}
   .srow{display:flex;align-items:center;gap:11px}
-  .vword{font-size:26px;font-weight:850;letter-spacing:-.8px;line-height:1}
+  .vword{font-size:30px;font-weight:800;letter-spacing:-.8px;line-height:1;font-variant-numeric:tabular-nums}
   .smeta{flex:1;font-size:11.5px;color:var(--dim);line-height:1.35}.smeta b{color:var(--ink)}
   .armbtn{flex:none;padding:9px 13px;border-radius:11px;font-weight:800;font-size:12.5px;border:1px solid var(--br);min-width:90px;text-align:center}
-  .armbtn.armed{background:linear-gradient(135deg,#059669,#34d399);color:#04130c;border-color:transparent}
-  .armbtn.disarmed{background:rgba(251,191,36,.12);color:var(--amber);border-color:#fbbf2455}
+  .armbtn.armed{background:var(--green);color:#04130c;border-color:transparent}
+  .armbtn.disarmed{background:rgba(255,159,64,.12);color:var(--amber);border-color:#FF9F4055}
   .pills{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
-  .vp{display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--br);font-size:11px;font-weight:650}
+  .vp{display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:var(--raised);border:1px solid var(--br);font-size:11px;font-weight:650}
   .vp .pd{width:8px;height:8px;border-radius:50%}.vp small{color:var(--faint)}
-  .trust1{margin-top:8px;font-size:11px;padding:6px 10px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid var(--br)}
+  .trust1{margin-top:8px;font-size:11px;padding:6px 10px;border-radius:9px;background:var(--raised);border:1px solid var(--br)}
   .trust1 b{font-weight:750}
 
   main{padding:12px 12px 86px;max-width:600px;margin:0 auto}
@@ -38,7 +38,7 @@
   .lead{color:var(--dim);font-size:12.5px;margin:2px 2px 12px}.lead b{color:var(--ink)}
   .sec{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);margin:16px 4px 7px}
   .grid{display:grid;gap:12px;grid-template-columns:1fr}
-  .card{background:var(--card);border:1px solid var(--br);border-radius:15px;padding:14px;margin-bottom:12px}
+  .card{background:var(--card);border:1px solid var(--br);border-radius:12px;padding:14px;margin-bottom:12px}
   .card h3{margin:0 0 4px;font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--dim);font-weight:750;display:flex;align-items:center;gap:8px}
   .card .csub{color:var(--faint);font-size:11.5px;margin:0 0 10px}
 
@@ -47,12 +47,12 @@
   .exrow.child{opacity:.5}
   .exrow .ex-b{flex:1;min-width:0}.exrow .ex-t{font-weight:700;font-size:14px;line-height:1.3}.exrow .ex-c{color:var(--dim);font-size:12.5px;margin-top:3px}.exrow .ex-a{color:var(--cyan);font-size:12.5px;margin-top:3px}
   .exrow .ex-tag{font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;white-space:nowrap;align-self:center}
-  .ok-banner{padding:16px;border-radius:14px;background:rgba(52,211,153,.08);border:1px solid #34d39944;color:var(--green);font-weight:650;text-align:center}
+  .ok-banner{padding:16px;border-radius:14px;background:rgba(76,175,80,.10);border:1px solid #4CAF5044;color:var(--green);font-weight:650;text-align:center}
 
   /* phase rail + schedule */
   .rail{display:flex;gap:5px;margin:4px 0 12px}
-  .rcell{flex:1;text-align:center;padding:8px 2px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--br);font-weight:750;font-size:13px;color:var(--faint)}
-  .rcell.on{color:#04130c;background:linear-gradient(135deg,#059669,#34d399);border-color:transparent}
+  .rcell{flex:1;text-align:center;padding:8px 2px;border-radius:10px;background:var(--raised);border:1px solid var(--br);font-weight:750;font-size:13px;color:var(--faint)}
+  .rcell.on{color:#04130c;background:var(--green);border-color:transparent}
   .rcell .zc{display:flex;gap:3px;justify-content:center;margin-top:4px;min-height:14px;flex-wrap:wrap}
   .zchip{font-size:9px;font-weight:800;padding:1px 5px;border-radius:999px;background:#0008;color:#fff}
   .sched{position:relative;height:40px;border-radius:10px;border:1px solid var(--br);overflow:hidden;background:#0a1120}
@@ -87,7 +87,7 @@
   /* trace */
   .zsel{display:flex;gap:7px;margin-bottom:10px}
   .zbtn{flex:1;text-align:center;padding:11px;border-radius:11px;border:1px solid var(--br);background:var(--card);color:var(--dim);font-weight:750;font-size:14px}
-  .zbtn.on{color:#04130c;background:linear-gradient(135deg,#059669,#34d399);border-color:transparent}
+  .zbtn.on{color:#04130c;background:var(--green);border-color:transparent}
 
   /* control rows */
   .row{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid rgba(255,255,255,.06)}.row:last-child{border-bottom:none}
@@ -97,10 +97,13 @@
   select.sel{background:var(--bg2);color:var(--ink);border:1px solid var(--br);border-radius:9px;padding:10px;font-size:14px;max-width:170px}
   .tg{width:50px;height:30px;border-radius:999px;background:#2a3550;position:relative;transition:.2s;border:1px solid var(--br);flex:none}
   .tg::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#8a97b4;transition:.2s}
-  .tg.on{background:linear-gradient(90deg,#059669,#34d399)}.tg.on::after{left:23px;background:#fff}
+  .tg.on{background:var(--accent);border-color:var(--accent)}.tg.on::after{left:23px;background:#fff}
   .hi{display:inline-flex;width:15px;height:15px;border-radius:50%;border:1px solid var(--faint);color:var(--faint);font-size:9px;font-style:italic;font-weight:700;align-items:center;justify-content:center;margin-left:6px;flex:none;font-family:Georgia,serif}
   details{margin-bottom:12px}details summary{list-style:none;cursor:pointer;padding:13px 14px;background:var(--card);border:1px solid var(--br);border-radius:14px;font-weight:750;display:flex;align-items:center;gap:8px}
   details summary::-webkit-details-marker{display:none}details summary::before{content:"▸";color:var(--faint)}details[open] summary::before{content:"▾"}
+  .ovleg{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px;align-items:center}
+  .lgc{cursor:pointer;font-size:10.5px;font-weight:650;color:var(--lc);padding:2px 8px;border-radius:999px;border:1px solid var(--br);user-select:none;white-space:nowrap}
+  .lgc.off{color:var(--faint)!important;opacity:.55;text-decoration:line-through}
   details .dbody{padding:6px 2px 0}
   .pillrow{display:flex;gap:8px;flex-wrap:wrap}
   .bigpill{padding:9px 13px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--br);font-size:14px}.bigpill b{font-weight:800;color:#fff}.bigpill small{color:var(--faint);display:block;font-size:10px;text-transform:uppercase;letter-spacing:.4px}
@@ -111,7 +114,7 @@
   table.kv{width:100%;border-collapse:collapse;font-size:13px}table.kv td{padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.05)}table.kv td:first-child{color:var(--dim)}table.kv td:last-child{text-align:right;font-weight:650;font-variant-numeric:tabular-nums}
 
   /* bottom nav */
-  nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:rgba(10,16,30,.96);backdrop-filter:blur(14px);border-top:1px solid var(--br);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:var(--bg2);border-top:1px solid var(--br);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
   .tab{flex:1;text-align:center;padding:6px 2px;color:var(--faint);font-size:10px;font-weight:700;border-radius:10px}
   .tab .ic{font-size:20px;display:block;line-height:1.2}
   .tab.active{color:var(--green)}
@@ -123,7 +126,7 @@
   .modal h2{margin:0 0 4px;font-size:18px}.modal p{margin:0 0 14px;color:var(--dim);font-size:13px}
   .modal label{display:block;font-size:12px;color:var(--dim);margin:12px 0 5px}
   .modal input{width:100%;background:#0a1120;color:var(--ink);border:1px solid var(--br);border-radius:11px;padding:12px;font-size:16px}
-  .modal .btn{margin-top:18px;width:100%;padding:13px;border-radius:12px;border:none;background:linear-gradient(90deg,#059669,#10b981);color:#04130c;font-weight:800;font-size:15px}
+  .modal .btn{margin-top:18px;width:100%;padding:13px;border-radius:12px;border:none;background:var(--accent);color:#04130c;font-weight:800;font-size:15px}
   .err{color:var(--red);font-size:12.5px;margin-top:10px;min-height:14px}
   .fab{position:fixed;right:14px;bottom:calc(72px + env(safe-area-inset-bottom));z-index:25}
   .fab button{width:46px;height:46px;border-radius:50%;border:1px solid var(--br);background:var(--card);color:var(--ink);font-size:18px;box-shadow:0 6px 20px #0006}
@@ -155,7 +158,7 @@
 /* ============ config / data ============ */
 const LS={base:"cs_base",token:"cs_token"};
 let CFG={base:localStorage.getItem(LS.base)||location.origin,token:localStorage.getItem(LS.token)||""};
-let timer=null,ST={},HIST={},histAt=0,ZONES=[1,2,3],traceZone=1,curView="now",histWindowH=72,_ovl=null;
+let timer=null,ST={},HIST={},histAt=0,ZONES=[1,2,3],traceZone=1,curView="now",histWindowH=72,OVL_HIDDEN=new Set(),_ovl=null;
 const el=id=>document.getElementById(id);
 async function api(p,o={}){const r=await fetch(CFG.base.replace(/\/$/,"")+p,{...o,headers:{Authorization:"Bearer "+CFG.token,"Content-Type":"application/json",...(o.headers||{})}});if(!r.ok)throw new Error(r.status+" "+r.statusText);return r.status===200?r.json():null;}
 const S=id=>ST[id]?ST[id].state:undefined,N=id=>{const n=parseFloat(S(id));return isNaN(n)?null:n;},A=(id,a)=>ST[id]&&ST[id].attributes?ST[id].attributes[a]:undefined,has=id=>ST[id]!==undefined;
@@ -166,7 +169,7 @@ const zphase=z=>S(`sensor.crop_steering_zone_${z}_phase`);
 function modalPhase(){const ps=ZONES.map(zphase).filter(Boolean);if(!ps.length)return null;const c={};ps.forEach(p=>c[p]=(c[p]||0)+1);return Object.keys(c).sort((a,b)=>c[b]-c[a])[0];}
 const ageMin=id=>{const lc=ST[id]&&ST[id].last_changed;return lc?(Date.now()-Date.parse(lc))/60000:null;},fmtAge=m=>m==null?"—":m<1?"now":m<60?Math.round(m)+"m":m<1440?Math.round(m/60)+"h":Math.round(m/1440)+"d";
 function ecTarget(z){const ph=(zphase(z)||"P2").replace(/[^0-3]/g,"")||"2",mode=S("select.crop_steering_steering_mode")==="Generative"?"gen":"veg";return N(`number.crop_steering_zone_${z}_ec_target_${mode}_p${ph}`)??N(`number.crop_steering_ec_target_${mode}_p${ph}`)??3.2;}
-const C={green:"#34d399",cyan:"#22d3ee",amber:"#fbbf24",red:"#f87171",blue:"#60a5fa",faint:"#5d6b88",orange:"#fb923c",purple:"#a78bfa"};
+const C={bg:"#0e0f11",card:"#1b1d20",raised:"#232629",br:"#2a2d31",ink:"#ECEDEE",dim:"#8B9196",accent:"#26A69A",green:"#4CAF50",cyan:"#26A69A",amber:"#FF9F40",red:"#F44336",blue:"#42A5F5",faint:"#5C6166",orange:"#FF9F40",purple:"#7E8AA0"};
 const RAW={1:{vwc:"sensor.f2_row_1_vwc",ec:"sensor.f2_row_1_pwec"},2:{vwc:"sensor.veg_sdi12_vwc_2",ec:"sensor.veg_sdi12_ec_2"},3:{vwc:"sensor.veg_sdi12_vwc",ec:"sensor.veg_sdi12_ec"}};
 const WATER={ph:"sensor.aquaponics_kit_f4f618_ph",ec:"sensor.atlas_legacy_1_ec"},CLIM={temp:"sensor.veg_scd41_top_temperature_scd41",rh:"sensor.veg_scd41_top_humidity_scd41"};
 function airVPD(){const t=N(CLIM.temp),rh=N(CLIM.rh);if(t==null||rh==null)return null;return 0.61078*Math.exp(17.27*t/(t+237.3))*(1-rh/100);}
@@ -205,18 +208,24 @@ function sparkBars(cv,vals,target,colFn){const dpr=devicePixelRatio||1,w=cv.clie
 const OVL_V=[C.blue,C.cyan,"#7dd3fc"],OVL_E=[C.amber,C.orange,"#fcd34d"];
 function setHistWindow(h){if(histWindowH===h)return;histWindowH=h;histAt=0;refresh();}
 window.setHistWindow=setHistWindow;
+function setCustomWindow(v){const h=Math.max(1,Math.min(720,Math.round(+v||72)));histWindowH=h;histAt=0;refresh();}
+window.setCustomWindow=setCustomWindow;
+function toggleSeries(k){if(OVL_HIDDEN.has(k))OVL_HIDDEN.delete(k);else OVL_HIDDEN.add(k);drawOverlay();const e=document.getElementById("leg-"+k);if(e)e.classList.toggle("off",OVL_HIDDEN.has(k));}
+window.toggleSeries=toggleSeries;
 function _decim(a,max){if(!a||a.length<=max)return a||[];const step=Math.ceil(a.length/max);return a.filter((_,i)=>i%step===0||i===a.length-1);}
 function _seriesAt(data,t){if(!data||!data.length||t<data[0][0])return null;let lo=0,hi=data.length-1,r=null;while(lo<=hi){const m=(lo+hi)>>1;if(data[m][0]<=t){r=data[m];lo=m+1;}else hi=m-1;}return r?r[1]:null;}
 function drawOverlay(cursorX){
   const cv=el("ovlCanvas");if(!cv)return;
   const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;
   const c=cv.getContext("2d");c.scale(dpr,dpr);c.clearRect(0,0,w,h);
-  const t1=Date.now(),t0=t1-histWindowH*3600*1000,rx=(t1-t0)||1,pad={l:34,r:40,t:14,b:30};
+  const t1=Date.now(),t0=t1-histWindowH*3600*1000,rx=(t1-t0)||1,pad={l:10,r:60,t:14,b:30};
   const series=[];
-  ZONES.forEach((z,i)=>series.push({label:`Z${z} VWC`,color:OVL_V[i%3],axis:"v",data:_decim((HIST[`sensor.crop_steering_zone_${z}_vwc`]||[]).filter(p=>p[0]>=t0),900)}));
-  ZONES.forEach((z,i)=>series.push({label:`Z${z} EC`,color:OVL_E[i%3],axis:"e",data:_decim((HIST[`sensor.crop_steering_zone_${z}_ec`]||[]).filter(p=>p[0]>=t0),900)}));
+  ZONES.forEach((z,i)=>series.push({key:`z${z}v`,label:`Z${z} VWC`,color:OVL_V[i%3],axis:"v",data:_decim((HIST[`sensor.crop_steering_zone_${z}_vwc`]||[]).filter(p=>p[0]>=t0),900)}));
+  ZONES.forEach((z,i)=>series.push({key:`z${z}e`,label:`Z${z} EC`,color:OVL_E[i%3],axis:"e",data:_decim((HIST[`sensor.crop_steering_zone_${z}_ec`]||[]).filter(p=>p[0]>=t0),900)}));
+  series.forEach(s=>s.hidden=OVL_HIDDEN.has(s.key));
   if(!series.some(s=>s.data.length>1)){c.fillStyle=C.faint;c.font="13px sans-serif";c.fillText("Loading history…",pad.l,h/2);return;}
-  const vAll=series.filter(s=>s.axis==="v").flatMap(s=>s.data.map(p=>p[1])),eAll=series.filter(s=>s.axis==="e").flatMap(s=>s.data.map(p=>p[1]));
+  const vis=series.filter(s=>!s.hidden);
+  const vAll=vis.filter(s=>s.axis==="v").flatMap(s=>s.data.map(p=>p[1])),eAll=vis.filter(s=>s.axis==="e").flatMap(s=>s.data.map(p=>p[1]));
   let vMin=Math.min(...vAll),vMax=Math.max(...vAll);if(!isFinite(vMin)){vMin=0;vMax=100;}
   let eMin=Math.min(...eAll),eMax=Math.max(...eAll);if(!isFinite(eMin)){eMin=0;eMax=8;}
   const vp=Math.max(1,(vMax-vMin)*0.12),ep=Math.max(.1,(eMax-eMin)*0.12);
@@ -228,15 +237,16 @@ function drawOverlay(cursorX){
   c.textAlign="center";let day=new Date(t0);day.setHours(0,0,0,0);
   for(;day.getTime()<t1;day.setDate(day.getDate()+1)){const t=day.getTime();if(t>t0+1800000&&t<t1){c.strokeStyle="rgba(150,160,180,.12)";c.beginPath();c.moveTo(X(t),pad.t);c.lineTo(X(t),h-pad.b);c.stroke();c.fillStyle=C.faint;c.font="9px sans-serif";c.fillText(day.toLocaleDateString(undefined,{month:"short",day:"numeric"}),X(t),h-pad.b+12);}}
   c.textAlign="left";
-  c.font="9px sans-serif";c.fillStyle=C.blue;for(let i=0;i<=4;i++){const v=vMin+(vMax-vMin)*i/4;c.fillText(r0(v),2,YV(v)+3);}
-  c.fillStyle=C.amber;c.textAlign="right";for(let i=0;i<=4;i++){const e=eMin+(eMax-eMin)*i/4;c.fillText(r1(e),w-2,YE(e)+3);}c.textAlign="left";
-  series.forEach(s=>{if(s.data.length<2)return;const Y=s.axis==="v"?YV:YE;c.strokeStyle=s.color;c.lineWidth=s.axis==="v"?1.8:1.3;c.globalAlpha=s.axis==="v"?.95:.8;c.lineJoin="round";c.beginPath();s.data.forEach((p,i)=>{const x=X(p[0]),y=Y(p[1]);i?c.lineTo(x,y):c.moveTo(x,y);});c.stroke();});
+  c.font="9px sans-serif";c.textAlign="right";
+  c.fillStyle=C.blue;for(let i=0;i<=4;i++){const v=vMin+(vMax-vMin)*i/4;c.fillText(r0(v),w-30,YV(v)+3);}
+  c.fillStyle=C.amber;for(let i=0;i<=4;i++){const e=eMin+(eMax-eMin)*i/4;c.fillText(r1(e),w-2,YE(e)+3);}c.textAlign="left";
+  series.forEach(s=>{if(s.hidden||s.data.length<2)return;const Y=s.axis==="v"?YV:YE;c.strokeStyle=s.color;c.lineWidth=s.axis==="v"?1.8:1.3;c.globalAlpha=s.axis==="v"?.95:.8;c.lineJoin="round";c.beginPath();s.data.forEach((p,i)=>{const x=X(p[0]),y=Y(p[1]);i?c.lineTo(x,y):c.moveTo(x,y);});c.stroke();});
   c.globalAlpha=1;_ovl={t0,t1};
   const tip=el("ovlTip");
   if(cursorX!=null&&cursorX>=pad.l&&cursorX<=w-pad.r){
     const t=t0+(cursorX-pad.l)/(w-pad.l-pad.r)*rx;
     c.strokeStyle="rgba(220,230,255,.5)";c.setLineDash([3,3]);c.beginPath();c.moveTo(cursorX,pad.t);c.lineTo(cursorX,h-pad.b);c.stroke();c.setLineDash([]);
-    const rows=series.map(s=>{const val=_seriesAt(s.data,t);if(val==null)return null;const Y=s.axis==="v"?YV:YE;c.fillStyle=s.color;c.beginPath();c.arc(X(t),Y(val),2.6,0,7);c.fill();return{label:s.label,color:s.color,val,axis:s.axis};}).filter(Boolean);
+    const rows=series.map(s=>{if(s.hidden)return null;const val=_seriesAt(s.data,t);if(val==null)return null;const Y=s.axis==="v"?YV:YE;c.fillStyle=s.color;c.beginPath();c.arc(X(t),Y(val),2.6,0,7);c.fill();return{label:s.label,color:s.color,val,axis:s.axis};}).filter(Boolean);
     if(tip){
       tip.innerHTML=`<div style="color:${C.faint};margin-bottom:2px">${new Date(t).toLocaleString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</div>`+
         rows.filter(r=>r.axis==="e").map(r=>`<div><span style="color:${r.color}">●</span> ${r.label} <b>${r1(r.val)}</b></div>`).join("")+
@@ -252,7 +262,7 @@ function drawTrace(){const cv=el("traceCanvas");if(!cv)return;const z=traceZone;
   const on=N("number.crop_steering_lights_on_hour")??10,off=N("number.crop_steering_lights_off_hour")??22;
   for(let t=t0;t<t1;t+=600000){const hr=new Date(t).getHours();if(!(hr>=on&&hr<off)){c.fillStyle="rgba(120,140,180,.06)";c.fillRect(X(t),pad.t,Math.max(1,X(t+600000)-X(t)),h-pad.t-pad.b);}}
   const bMin=N("sensor.crop_steering_vwc_target_min")??50,bMax=N("sensor.crop_steering_vwc_target_max")??70,fc=N("number.crop_steering_field_capacity")??60;
-  c.fillStyle="rgba(52,211,153,.08)";c.fillRect(pad.l,YV(bMax),w-pad.l-pad.r,YV(bMin)-YV(bMax));
+  c.fillStyle="rgba(76,175,80,.10)";c.fillRect(pad.l,YV(bMax),w-pad.l-pad.r,YV(bMin)-YV(bMax));
   c.strokeStyle="rgba(150,160,180,.35)";c.setLineDash([4,3]);c.beginPath();c.moveTo(pad.l,YV(fc));c.lineTo(w-pad.r,YV(fc));c.stroke();
   const ecT=ecTarget(z);c.strokeStyle=C.amber+"99";c.beginPath();c.moveTo(pad.l,YE(ecT));c.lineTo(w-pad.r,YE(ecT));c.stroke();c.setLineDash([]);
   c.fillStyle=C.faint;c.font="9px sans-serif";for(let i=0;i<=4;i++){c.fillText(r0(i*25),2,YV(i*25)+3);c.fillStyle=C.amber+"99";c.fillText(r1(i*2),w-pad.r+3,YE(i*2)+3);c.fillStyle=C.faint;}
@@ -268,7 +278,7 @@ function renderSpine(){
   let word="SAFE",col=C.green;if(t1||T.v==="UNTRUSTED"||!safe){word="CHECK NOW";col=C.red;}else if(t2||T.v==="DEGRADED"||!ar){word="WATCH";col=C.amber;}
   const ph=S("sensor.crop_steering_app_current_phase")||"—";
   const pills=[["ARM",ar?"ARMED":"DISARMED",ar?C.green:C.amber],["SAFE",safe?"OK":"FAULT",safe?C.green:C.red],["DATA",T.v,T.col],["STRAT",(t2||exc.some(e=>e.title.includes("Strategy")))?"OFF":"OK",t2?C.amber:C.green]];
-  el("spine").style.background="linear-gradient(180deg,"+col+"14,rgba(7,11,22,.92))";
+  el("spine").style.background="var(--bg2)";
   el("spine").innerHTML=`<div class="srow">
       <div class="vword" style="color:${col}">${word}</div>
       <div class="smeta"><b>${ph}</b><br>${t1+t2?`${t1+t2} need attention`:"on strategy"} · ${new Date().toLocaleTimeString().slice(0,5)}</div>
@@ -291,7 +301,9 @@ function vNow(){
       <div class="sched"><div class="night" style="left:0;width:${px(on)}%"></div><div class="night" style="left:${px(off)}%;right:0"></div>
         <div class="tick" style="left:${px(on)}%;background:${C.amber}"></div><div class="lbl" style="left:${px(on)}%">on ${on}</div>
         <div class="tick" style="left:${px(off)}%;background:${C.purple}"></div><div class="lbl" style="left:${px(off)}%">off ${off}</div>
-        <div class="tick" style="left:${px(cut)}%;background:${C.faint}"></div><div class="tick" style="left:${px(hr)}%;background:#fff"></div></div></div>`;
+        <div class="tick" style="left:${px(cut)}%;background:${C.faint}"></div><div class="tick" style="left:${px(hr)}%;background:#fff"></div></div></div>
+    <div id="v-trust-embed" style="margin-top:6px"></div>`;
+  vTrust();
 }
 function vZones(){
   const fc=N("number.crop_steering_field_capacity")??60,ecMax=N("number.crop_steering_irrigation_ec_max")??3.5,absMax=N("number.crop_steering_maximum_ec")??9,u=uniformity();
@@ -325,15 +337,19 @@ function vZones(){
         <div class="envt"><div class="l">Room Temp</div><div class="v">${r1(N(CLIM.temp))}<small style="font-size:11px"> °C</small></div></div>
         <div class="envt"><div class="l">Humidity</div><div class="v">${r1(N(CLIM.rh))}<small style="font-size:11px"> %</small></div></div>
         <div class="envt"><div class="l">Air VPD</div><div class="v">${r1(airVPD())}<small style="font-size:11px"> kPa</small></div></div>
+        <div class="envt"><div class="l">Leaf Temp</div><div class="v">${r1(N("sensor.f1_r1_thermal_camera_leaf_temperature"))}<small style="font-size:11px"> °C</small></div></div>
+        <div class="envt"><div class="l">Leaf VPD</div><div class="v">${r1(N("sensor.f2_leaf_vpd"))}<small style="font-size:11px"> kPa</small></div></div>
+        <div class="envt"><div class="l">Target RH</div><div class="v">${r1(N("sensor.f2_target_rh_for_vpd"))}<small style="font-size:11px"> %</small></div></div>
+        <div class="envt"><div class="l">Dehum →</div><div class="v">${r0(A("humidifier.f2_dehumidifier","humidity"))}<small style="font-size:11px"> %</small></div></div>
         <div class="envt"><div class="l">Tank</div><div class="v">${r0(N("sensor.tank_percentage_full"))}<small style="font-size:11px"> %</small></div></div></div></div>
     <div class="card"><h3>Status & Water</h3><div class="tiles">${tiles}</div></div>`;
   ZONES.forEach(z=>{const cv=el("zspk-"+z);if(cv)spark(cv,HIST[`sensor.crop_steering_zone_${z}_vwc`],C.green);});
 }
 function vTrace(){
   el("v-trace").innerHTML=`<p class="lead"><b>Are we tracking strategy?</b> VWC + EC over target bands, shot markers, night shading, dryback-as-event.</p>
-    <div class="card"><h3>Zone overlay · VWC + EC<span style="margin-left:auto;display:inline-flex;gap:4px">${[["24H",24],["3D",72],["1W",168]].map(([l,hh])=>`<span onclick="setHistWindow(${hh})" style="cursor:pointer;font-size:11px;padding:2px 8px;border-radius:6px;${histWindowH===hh?`background:${C.blue};color:#04122b;font-weight:800`:`color:${C.faint};border:1px solid #2a3a55`}">${l}</span>`).join("")}</span></h3>
+    <div class="card"><h3>Zone overlay · VWC + EC<span style="margin-left:auto;display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap">${[["24H",24],["3D",72],["1W",168],["2W",336]].map(([l,hh])=>`<span onclick="setHistWindow(${hh})" style="cursor:pointer;font-size:11px;padding:2px 8px;border-radius:6px;${histWindowH===hh?`background:${C.accent};color:#04130c;font-weight:800`:`color:${C.faint};border:1px solid var(--br)`}">${l}</span>`).join("")}<span style="display:inline-flex;align-items:center;gap:2px;border:1px solid var(--br);border-radius:6px;padding:1px 4px;color:${C.faint};font-size:11px">⏱<input type="number" min="1" max="720" value="${histWindowH}" onchange="setCustomWindow(this.value)" style="width:42px;background:var(--raised);border:none;color:var(--ink);font-size:11px;border-radius:4px;padding:2px 3px"/>h</span></span></h3>
       <div style="position:relative"><canvas id="ovlCanvas" style="width:100%;height:210px;display:block"></canvas><div id="ovlTip" style="position:absolute;display:none;pointer-events:none;background:rgba(8,16,33,.96);border:1px solid #2a3a55;border-radius:8px;padding:6px 8px;font-size:11px;line-height:1.5;white-space:nowrap;z-index:6;box-shadow:0 6px 20px rgba(0,0,0,.5)"></div></div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:10.5px;margin-top:8px;color:${C.faint}">${ZONES.map((z,i)=>`<span style="color:${OVL_V[i]}">● Z${z} VWC</span>`).join("")}${ZONES.map((z,i)=>`<span style="color:${OVL_E[i]}">● Z${z} EC</span>`).join("")}<span style="margin-left:auto">shaded = lights-off</span></div></div>
+      <div class="ovleg">${ZONES.map((z,i)=>`<span id="leg-z${z}v" class="lgc${OVL_HIDDEN.has(`z${z}v`)?' off':''}" onclick="toggleSeries('z${z}v')" style="--lc:${OVL_V[i]}">● Z${z} VWC</span>`).join("")}${ZONES.map((z,i)=>`<span id="leg-z${z}e" class="lgc${OVL_HIDDEN.has(`z${z}e`)?' off':''}" onclick="toggleSeries('z${z}e')" style="--lc:${OVL_E[i]}">● Z${z} EC</span>`).join("")}<span style="margin-left:auto;color:${C.faint};font-size:10.5px">tap to toggle</span></div></div>
     <div class="zsel">${ZONES.map(z=>`<div class="zbtn ${z===traceZone?'on':''}" onclick="setTraceZone(${z})">Zone ${z}</div>`).join("")}</div>
     <div class="card"><h3>Trace · 24h <span style="margin-left:auto;font-size:11px;color:${C.dim}">VWC ${r1(N(`sensor.crop_steering_zone_${traceZone}_vwc`))} · EC ${r1(N(`sensor.crop_steering_zone_${traceZone}_ec`))} · ${zphase(traceZone)||""}</span></h3><canvas class="trace" id="traceCanvas"></canvas></div>
     <div id="dbCards"></div>
@@ -354,7 +370,7 @@ function vControl(){
   const mode=S("select.crop_steering_steering_mode"),dbT=mode==="Generative"?N("number.crop_steering_generative_dryback_target"):N("number.crop_steering_vegetative_dryback_target");
   const gs=S("select.crop_steering_growth_stage"),gp=S("input_select.growth_phase"),np=S("input_select.nutrient_phase"),conflict=gp&&np&&gs&&!((gs||"").toLowerCase().includes("veget")&&/veg/i.test(gp)&&/veg/i.test(np));
   const phase=modalPhase()||"P3",ovOn=ZONES.some(z=>S(`switch.crop_steering_zone_${z}_manual_override`)==="on"),disOff=ZONES.some(z=>S(`switch.crop_steering_zone_${z}_enabled`)==="off");
-  const recipe=p=>{const ids={P0:["p0_dryback_drop_percent","p0_minimum_wait_time","p0_maximum_wait_time"],P1:["p1_target_vwc","p1_initial_shot_size","p1_shot_size_increment","p1_maximum_shot_size","p1_time_between_shots","p1_maximum_shots"],P2:["p2_vwc_threshold","p2_shot_size","p2_ec_high_threshold","p2_ec_low_threshold"],P3:["p3_emergency_vwc_threshold","p3_emergency_shot_size","p3_veg_last_irrigation"]}[p].map(s=>"number.crop_steering_"+s).filter(has);return `<details ${p===phase?"open":""}><summary>${p}${p===phase?' <span style="color:#34d399;margin-left:auto">● ACTIVE</span>':''}</summary><div class="dbody"><div class="card">${ids.map(i=>numRow(i)).join("")}</div></div></details>`;};
+  const recipe=p=>{const ids={P0:["p0_dryback_drop_percent","p0_minimum_wait_time","p0_maximum_wait_time"],P1:["p1_target_vwc","p1_initial_shot_size","p1_shot_size_increment","p1_maximum_shot_size","p1_time_between_shots","p1_maximum_shots"],P2:["p2_vwc_threshold","p2_shot_size","p2_ec_high_threshold","p2_ec_low_threshold"],P3:["p3_emergency_vwc_threshold","p3_emergency_shot_size","p3_veg_last_irrigation"]}[p].map(s=>"number.crop_steering_"+s).filter(has);return `<details ${p===phase?"open":""}><summary>${p}${p===phase?' <span style="color:#4CAF50;margin-left:auto">● ACTIVE</span>':''}</summary><div class="dbody"><div class="card">${ids.map(i=>numRow(i)).join("")}</div></div></details>`;};
   el("v-control").innerHTML=`<p class="lead"><b>Control surface.</b> Edits commit to HA immediately — no undo, no version history.</p>
     ${ovOn||disOff?`<div class="override-banner">⚠ ${ovOn?"MANUAL OVERRIDE":"ZONE DISABLED"} — ${ZONES.filter(z=>S(`switch.crop_steering_zone_${z}_manual_override`)==="on"||S(`switch.crop_steering_zone_${z}_enabled`)==="off").map(z=>"Z"+z).join(", ")}. AI blocked.</div>`:""}
     <div class="card"><h3>Active Strategy</h3><div class="pillrow"><div class="bigpill"><small>Mode</small><b>${mode||"—"}</b></div><div class="bigpill"><small>Stage</small><b>${gs||"—"}</b></div><div class="bigpill"><small>Phase</small><b>${phase}</b></div><div class="bigpill"><small>Dryback</small><b>${r0(dbT)}%</b></div></div>
@@ -375,8 +391,8 @@ function vControl(){
 }
 function vTrust(){
   const T=trust(),sigs=[["sensor.crop_steering_zone_1_vwc","Z1 VWC"],["sensor.crop_steering_zone_2_vwc","Z2 VWC"],["sensor.crop_steering_zone_3_vwc","Z3 VWC"],["sensor.crop_steering_zone_1_ec","Z1 EC"],["sensor.crop_steering_zone_2_ec","Z2 EC"],["sensor.crop_steering_zone_3_ec","Z3 EC"],["sensor.crop_steering_fused_vwc","Fused VWC"],["sensor.crop_steering_fused_ec","Fused EC"],["sensor.crop_steering_dryback_percentage","Dryback (engine)"],["sensor.crop_steering_app_status","App status"]];
-  const rows=sigs.map(([id,nm])=>{const s=S(id),a=ageMin(id);let tag,col;if(bad(s)){tag="OFFLINE";col=C.red;}else if(a==null){tag="—";col=C.faint;}else if(a<10){tag="FRESH";col=C.green;}else if(a<30){tag="WATCH";col=C.amber;}else{tag="STALE";col=C.red;}return {id,nm,s,a,tag,col,note:id.includes("dryback_percentage")?' (engine offline since 29 May — computed client-side)':"",off:bad(s)};}).sort((x,y)=>(y.off-x.off)||((y.a||0)-(x.a||0)));
-  el("v-trust").innerHTML=`<p class="lead"><b>Can we believe the numbers?</b> No green verdict survives degraded data.</p>
+  const rows=sigs.map(([id,nm])=>{const s=S(id),a=ageMin(id);let tag,col;if(bad(s)){tag="OFFLINE";col=C.red;}else if(a==null){tag="—";col=C.faint;}else if(a<10){tag="FRESH";col=C.green;}else if(a<30){tag="WATCH";col=C.amber;}else{tag="STALE";col=C.red;}return {id,nm,s,a,tag,col,note:id.includes("dryback_percentage")?' (engine-computed, per-zone mean)':"",off:bad(s)};}).sort((x,y)=>(y.off-x.off)||((y.a||0)-(x.a||0)));
+  (el("v-trust-embed")||el("v-trust")).innerHTML=`<div class="sec">Trust — believe the numbers?</div>
     <div class="card"><h3>Trust Verdict</h3><div style="font-size:24px;font-weight:850;color:${T.col}">${T.v}</div>
       <table class="kv" style="margin-top:6px"><tr><td>Sensor health</td><td style="color:${T.h<40?C.red:T.h<80?C.amber:C.green}">${r0(T.h)}%</td></tr><tr><td>Fusion confidence</td><td>${r1(T.fc)}</td></tr><tr><td>Dryback detector</td><td>${r1(N("sensor.crop_steering_dryback_detection_accuracy"))}</td></tr><tr><td>Fused VWC</td><td>${r1(N("sensor.crop_steering_fused_vwc"))}% · ${A("sensor.crop_steering_fused_vwc","active_sensors")||"?"} probes</td></tr><tr><td>Fused EC</td><td>${r1(N("sensor.crop_steering_fused_ec"))} · conf ${r1(A("sensor.crop_steering_fused_ec","confidence"))}</td></tr><tr><td>Heartbeat</td><td>${S("sensor.crop_steering_ai_heartbeat")||"—"} (${fmtAge(ageMin("sensor.crop_steering_ai_heartbeat"))})</td></tr><tr><td>Auto irrigation</td><td style="color:${armed()?C.green:C.amber}">${armed()?"ON":"OFF"}</td></tr></table></div>
     <div class="card"><h3>Per-signal Liveness</h3><table class="kv">${rows.map(r=>`<tr><td>${r.nm}<span style="color:${C.faint};font-size:11px">${r.note}</span></td><td><span style="color:${r.col}">${r.tag}</span> · ${bad(r.s)?"—":(typeof r.s==="string"?r.s.slice(0,12):r.s)} · ${fmtAge(r.a)}</td></tr>`).join("")}</table></div>`;
@@ -401,7 +417,7 @@ async function refresh(){
   if(!CFG.token){openModal();return;}
   try{const states=await api("/api/states");ST={};states.forEach(s=>ST[s.entity_id]=s);
     if(!has("sensor.crop_steering_zone_1_vwc")){el("v-now").innerHTML='<div class="empty">No crop_steering entities found.</div>';return;}
-    if(Date.now()-histAt>55000){const ids=ZONES.flatMap(z=>[`sensor.crop_steering_zone_${z}_vwc`,`sensor.crop_steering_zone_${z}_ec`]);try{const start=new Date(Date.now()-(histWindowH+2)*3600*1000).toISOString();const hd=await api(`/api/history/period/${start}?filter_entity_id=${ids.join(",")}&minimal_response&no_attributes`);HIST={};(hd||[]).forEach(arr=>{if(arr&&arr.length)HIST[arr[0].entity_id]=arr.map(s=>[Date.parse(s.last_changed||s.lu||s.last_updated),parseFloat(s.state)]).filter(p=>!isNaN(p[0])&&!isNaN(p[1]));});histAt=Date.now();}catch(e){}}
+    if(Date.now()-histAt>55000){const ids=ZONES.flatMap(z=>[`sensor.crop_steering_zone_${z}_vwc`,`sensor.crop_steering_zone_${z}_ec`]);try{const start=new Date(Date.now()-(histWindowH+2)*3600*1000).toISOString();const hd=await api(`/api/history/period/${start}?filter_entity_id=${ids.join(",")}&end_time=${new Date().toISOString()}&minimal_response&no_attributes`);HIST={};(hd||[]).forEach(arr=>{if(arr&&arr.length)HIST[arr[0].entity_id]=arr.map(s=>[Date.parse(s.last_changed||s.lu||s.last_updated),parseFloat(s.state)]).filter(p=>!isNaN(p[0])&&!isNaN(p[1]));});histAt=Date.now();}catch(e){}}
     renderSpine();
     const ae=document.activeElement;if(!(ae&&(ae.tagName==="INPUT"||ae.tagName==="SELECT")))renderActive();  // don't clobber an in-progress edit
   }catch(e){if(String(e.message).startsWith("401")){el("modalErr").textContent="Token rejected (401).";openModal();}else el("v-now").innerHTML='<div class="empty">error: '+e.message+'</div>';}
@@ -409,7 +425,7 @@ async function refresh(){
 function startLoop(){if(timer)clearInterval(timer);refresh();timer=setInterval(refresh,60000);}
 
 /* ============ bottom nav / modal ============ */
-const VIEWS=[["now","◆","Now"],["trace","📈","Trace"],["zones","🌱","Zones"],["control","🎛","Control"],["trust","🛰","Trust"]];
+const VIEWS=[["now","◆","Now"],["zones","🌱","Zones"],["trace","📈","Graph"],["control","🎛","Control"]];
 el("tabs").innerHTML=VIEWS.map((v,i)=>`<div class="tab ${i?"":"active"}" data-t="${v[0]}"><span class="ic">${v[1]}</span>${v[2]}${v[0]==="now"?'<span class="cnt" id="nowBadge" style="display:none"></span>':""}</div>`).join("");
 el("tabs").addEventListener("click",e=>{const t=e.target.closest(".tab");if(!t)return;curView=t.dataset.t;document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));t.classList.add("active");document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.dataset.view===curView));renderActive();window.scrollTo(0,0);});
 function openModal(){el("inBase").value=CFG.base;el("inToken").value=CFG.token;el("modal").classList.add("open");}
