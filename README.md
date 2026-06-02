@@ -19,8 +19,10 @@
 This turns Home Assistant into an autonomous **crop-steering irrigation** controller.
 It runs the full daily **P0 → P1 → P2 → P3** cycle — per zone, driven by live VWC/EC
 sensor data — sequences your pump and valves safely, and steers each zone toward a
-**vegetative** or **generative** growth response. Once it's mapped to your hardware
-and dialed in, it runs the room on its own and you watch a dashboard.
+**vegetative** or **generative** growth response. It also **auto-stacks substrate EC**
+to a per-stage target by closed-loop control of the P2 dryback — the generative salt
+lever, run hands-off. Once it's mapped to your hardware and dialed in, it runs the room
+on its own and you watch a dashboard.
 
 It is **irrigation only**. It does not control climate.
 

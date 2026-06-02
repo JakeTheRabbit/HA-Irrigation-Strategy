@@ -45,8 +45,10 @@ local Python installs. CI is unaffected.
 ### 2. AppDaemon engine — `appdaemon/apps/crop_steering/`
 - `master_crop_steering_app.py` — the coordinator. Phase transitions, hardware
   sequencing, dryback detection, sensor fusion, source-water gating, daily caps,
-  emergency rescue, drain-through detection, the `_ai_heartbeat` self-correction
-  loop, the `_watchdog_check` hardware watchdog, and the activity feed
+  emergency rescue, drain-through detection, the autonomous EC-stacking loop
+  (`_ec_stack_dryback`, gated by `switch.crop_steering_ec_stacking_enabled`), the
+  `_ai_heartbeat` self-correction loop, the `_watchdog_check` hardware watchdog, and the
+  activity feed
   (`sensor.crop_steering_activity_log`).
 - Supporting libs it imports: `phase_state_machine.py`, `advanced_dryback_detection.py`,
   `intelligent_sensor_fusion.py`, `intelligent_crop_profiles.py`,
