@@ -55,13 +55,11 @@ BASE_SENSOR_DESCRIPTIONS = [
         native_unit_of_measurement=UnitOfVolume.LITERS,
         icon="mdi:water",
     ),
-    SensorEntityDescription(
-        key="dryback_percentage",
-        name="Dryback Percentage",
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=PERCENTAGE,
-        icon="mdi:water-minus",
-    ),
+    # dryback_percentage is OWNED BY THE ENGINE (AppDaemon set_state from
+    # _update_dryback_entities — computed per-zone from peak vs current VWC). It was a
+    # coordinator-backed descriptor here whose native_value was always None, so it
+    # perpetually re-asserted `unknown` and clobbered the engine's publish. Removed so
+    # the engine owns it (same pattern as the fused_vwc/fused_ec sensors).
     SensorEntityDescription(
         key="next_irrigation_time",
         name="Next Irrigation Time",

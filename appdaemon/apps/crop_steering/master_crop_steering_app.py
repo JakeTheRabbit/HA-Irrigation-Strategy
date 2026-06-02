@@ -5474,16 +5474,41 @@ class MasterCropSteeringApp(BaseAsyncApp):
             self.log(f"❌ Error updating performance analytics: {e}", level='ERROR')
 
     def _update_dryback_entities(self, dryback_result: Dict):
-        """Update Home Assistant entities with dryback data.
+        """Publish a clean dryback % to sensor.crop_steering_dryback_percentage.
 
-        NOTE: HA reject (HTTP 400) this publish every VWC update regardless of payload
-        (verified: empty attrs + coerced state still 400, so even passing scalar-only
-        attributes does not fix it). It's a cosmetic analytics sensor and was never
-        populated, so the HA publish is DISABLED to stop the error-log spam. The dryback
-        detector still runs and feeds P3 transitions via _get_zone_dryback_rate; nothing
-        functional depends on these HA entities. (Re-enable + instrument off-line to chase
-        the root cause if the dryback % / in-progress sensors are wanted on the UI.)"""
-        return
+        Computed from the engine's own peak tracking (zone_vwc_capacity daily_peak / current_max)
+        vs each zone's current VWC, meaned across zones. ALL values coerced to plain Python
+        floats — the earlier persistent HTTP-400 was numpy types (np.float64) in the payload,
+        not the entity (verified: a clean float write returns 200). Throttled to 60 s."""
+        try:
+            import time as _t
+            now = _t.monotonic()
+            if now - getattr(self, '_dryback_pub_ts', 0.0) < 60:
+                return
+            zdb = []
+            for zone_num in range(1, self.num_zones + 1):
+                d = self.zone_vwc_capacity.get(zone_num) or {}
+                peak = d.get('daily_peak') or d.get('current_max')
+                vwc = self._get_zone_average_vwc(zone_num)
+                if peak and vwc is not None and float(peak) > 0:
+                    zdb.append(max(0.0, (float(peak) - float(vwc)) / float(peak) * 100.0))
+            if zdb:
+                val = float(round(sum(zdb) / len(zdb), 1))
+            elif isinstance(dryback_result, dict) and dryback_result.get('dryback_percentage') is not None:
+                val = float(round(float(dryback_result['dryback_percentage']), 1))
+            elif getattr(self.dryback_detector, 'current_dryback', None) is not None:
+                val = float(round(float(self.dryback_detector.current_dryback), 1))
+            else:
+                return
+            self._dryback_pub_ts = now
+            self.run_in(self._async_set_entity_wrapper, 0,
+                        entity_id='sensor.crop_steering_dryback_percentage',
+                        value=val,
+                        attributes={'unit_of_measurement': '%', 'state_class': 'measurement',
+                                    'friendly_name': 'Dryback Percentage', 'icon': 'mdi:water-minus',
+                                    'per_zone': [round(float(x), 1) for x in zdb], 'source': 'engine'})
+        except Exception as e:
+            self.log(f"❌ Error publishing dryback %: {e}", level='ERROR')
 
     def _update_sensor_fusion_entities(self, sensor_id: str, fusion_result: Dict):
         """Update sensor fusion entities."""
