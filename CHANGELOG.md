@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — adaptive steering: self-tuning P1/P2 and predictive P3 (optional, off by default)
+- New drop-in engine module `appdaemon/apps/crop_steering/adaptive_steering.py`, gated by
+  `input_boolean.f2_adaptive_steering_enabled`. Wires into `master_crop_steering_app.py` via four
+  small hooks (import; `tick()` at the end of `_update_zone_vwc_capacity`; per-zone rate in
+  `_get_zone_dryback_rate`; buffer-safe cap in `_should_zone_start_p3`). Every setpoint write is
+  clamped and confidence-gated; nothing runs unless the switch is on.
+- **Per-zone P1 `Vmax` detection** — votes four independent saturation signals (marginal-uptake
+  collapse, peak plateau, pore-EC runoff, saturating-curve fit) to detect each zone's true
+  field-capacity ceiling during the morning ramp, with a confidence score. Published as
+  `sensor.crop_steering_zone_X_vmax_detected`.
+- **Dryback-derived P2** — the P2 trigger is set to `Vmax × (1 − dryback_target%)` per zone/mode, so
+  each zone dries back the correct % from its own measured ceiling; the EC-stacker trims around it.
+- **Multi-day P1 ramp** — the P1 target climbs toward the detected `Vmax` (capped below field
+  capacity) a configurable amount per day, instead of a static hand-tuned number.
+- **Predictive per-zone overnight (P3) cutoff** — measures each zone's own overnight dryback rate and
+  feeds it into the engine's P3-start timing (previously a single fused room rate); caps the overnight
+  target dryback so the predicted lights-on VWC stays above the P3 emergency floor + buffer, landing on
+  the dryback target without firing overnight emergency shots. Forecast published as
+  `sensor.crop_steering_zone_X_p3_prediction`.
+- Control surface in `packages/f2_adaptive_steering.yaml` (enable switch + `f2_vmax_confidence_min`,
+  `f2_p1_climb_rate_per_day`, `f2_p1_margin`).
+
+### Added — manual pump modes (flush / fill)
+- `packages/f2_pump_modes.yaml`: `input_boolean.f2_flush_mode` and `f2_fill_mode` hand the pump to the
+  operator (hose-flood each plant, or tank fill/dosing). While either is on the engine pauses its own
+  shots and the hardware watchdog is exempted; a 30-minute reminder notification fires so the mode is
+  never left on by accident.
+
+### Added — unified operator console
+- `www/crop_steering.html`: one dependency-free, responsive dashboard (replaces separate desktop/mobile
+  pages). One-glance **verdict** (`ALL GOOD / WATCH / ACT NOW`) with a 7-point system-health checklist;
+  word-threshold per-zone status (VWC `DRY/LOW/GOOD/FULL/WET`, EC `LOW/ON-TARGET/HIGH/OVER`, dryback);
+  an **issues side-drawer** with persisted first-seen timestamps and durations; expandable VWC+EC and
+  per-zone trace graphs; per-field coaching tooltips with recommended values; clickable pump/valve
+  toggles; and a **feed-lockout** panel that names the exact gate blocking a low-VWC zone.
+
+### Fixed — overnight P3 timing and dashboard correctness
+- **Per-zone overnight dryback rate** replaces the single shared/fused rate that previously timed every
+  zone's P3 cutoff off the room average.
+- **Buffer-safe overnight cap** stops a zone drying past the P3 emergency floor → no spurious overnight
+  emergency shots.
+- **Phase-aware floor (dashboard):** a zone in P3 is judged against the P3 emergency floor, not the P2
+  maintenance floor, so normal generative night dryback no longer false-alarms as "under-watered".
+- **Trust verdict keys off fusion confidence**, not the flaky `sensor_health` metric — kills a permanent
+  false "data untrusted" state.
+- **Alert debounce + real timestamps:** noisy alerts must persist two cycles before showing and carry a
+  persisted first-seen time, so the alert list stops being a graveyard of one-tick blips.
+
 ### Added — autonomous EC-stacking via P2 dryback (engine closed loop)
 - New `_ec_stack_dryback` per-zone loop in the AppDaemon engine. In P2 it modulates each
   zone's `number.crop_steering_zone_X_p2_vwc_threshold` to drive smoothed pore-EC toward
