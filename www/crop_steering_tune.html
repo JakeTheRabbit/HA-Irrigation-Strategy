@@ -369,9 +369,10 @@ function editor(){
       this.mode = this.dial>=5.5?'gen':'veg'; this.pullLive(); },
     pullLive(){   // embedded in crop_steering.html → live setpoints arrive from the parent via postMessage. Standalone (?demo / GitHub Pages) → keep the seed.
       if(window.parent===window) return;
+      const put=(o,k,v)=>{ const m=META[k]; o[k]=(m&&v!=null&&!isNaN(v))?clamp(rstep(+v,m.step),m.min,m.max):v; };   // round seeded values to their step so labels stay clean
       window.addEventListener("message",ev=>{ const d=ev.data; if(!d||d.type!=="cs-tune-data") return;
-        try{ if(d.zones){ for(const z in d.zones){ if(this.Z[z]) Object.assign(this.Z[z], d.zones[z]); } }
-             if(d.global) Object.assign(this.G, d.global);
+        try{ if(d.zones){ for(const z in d.zones){ if(this.Z[z]) for(const k in d.zones[z]) put(this.Z[z],k,d.zones[z][k]); } }
+             if(d.global) for(const k in d.global) put(this.G,k,d.global[k]);
              if(d.dial!=null) this.dial=d.dial;
              this.mode=this.dial>=5.5?'gen':'veg'; this.live=true; SIMKEY=null; ENVK=null; PREV={}; }catch(e){ console.warn("tune seed failed:",e.message); } });
       try{ window.parent.postMessage({type:"cs-tune-ready"},"*"); }catch(e){}
