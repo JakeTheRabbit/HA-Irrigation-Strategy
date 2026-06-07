@@ -311,7 +311,7 @@ const LIVE = {
   3: zoneDefaults({ p2_vwc_threshold:43, p2_shot_size:1.5, p1_maximum_shots:12, p1_minimum_shots:5, p3_gen_last_irrigation:30, p3_emergency_vwc_threshold:40 }),
 };
 const GLOBAL = { field_capacity:60, substrate_volume:6, lights_on:10, lights_off:22, ppfd:1150, co2:1400, temp:25.5, rh:64, temp_night:21.5, rh_night:68, feed_ec:3.0,
-  room_length:6, room_width:4, room_height:3, canopy_coverage:80, plant_count:40, light_watts:18000, hvac_cooling_kw:18, dehum_capacity:600 };
+  room_length:6, room_width:4, room_height:3, canopy_coverage:80, plant_count:40, light_watts:18000, hvac_cooling_kw:18, dehum_capacity:600, root_temp:22 };
 
 /* field metadata: key -> ranges/units (from the live entity attributes) */
 const META = {
@@ -357,6 +357,7 @@ const META = {
   light_watts:{label:"Total light power",unit:"W",min:0,max:100000,step:100,dec:0},
   hvac_cooling_kw:{label:"HVAC cooling",unit:"kW",min:0,max:100,step:0.5,dec:1},
   dehum_capacity:{label:"Dehumidification",unit:"L/d",min:0,max:5000,step:5,dec:0},
+  root_temp:{label:"Root / substrate temp",unit:"°C",min:10,max:35,step:0.5,dec:1},
 };
 
 function editor(){
@@ -438,6 +439,18 @@ function editor(){
     co2DrawPpmH(){ return this.co2UptakeGh()*1000/(1.96*Math.max(this.roomVol(),1)); },        // ppm/h drawn down if uninjected (1 ppm ≈ 1.96 mg/m³)
     lightWm2(){ return this.g('light_watts')/Math.max(this.floorArea(),0.1); },                // W/m² electrical
 
+    /* ===== root-zone temperature inferences (from the substrate-temp sensor) + extra derived ===== */
+    rootTemp(){ return this.g('root_temp'); },
+    dissolvedO2(){ return clamp(14.7-0.275*this.rootTemp(),2,14); },                            // mg/L · Henry (9.2@20 · 8.3@24 · 7.0@28)
+    uptakeFactor(){ return clamp(Math.exp(-Math.pow((this.rootTemp()-21)/6,2)),0,1); },          // nutrient uptake, optimum ~18–22°C, falls >26
+    ecTempComp(){ return 1+0.02*(this.rootTemp()-25); },                                         // raw EC drifts ~2%/°C off the 25°C reference
+    pathogenRisk(){ const T=this.rootTemp(), o2=this.dissolvedO2(), wet=this.overnightLow()>this.g('field_capacity')*0.72; let r=0;
+      if(T>22)r+=(T-22)/6; if(o2<5)r+=(5-o2)/3; if(wet)r+=0.5; return clamp(r,0,1); },            // Pythium: warm + low-O₂ + chronically wet
+    osmoticMPa(){ return -0.36*this.peakEC(); },                                                 // pore-EC → osmotic potential (more negative = harder to drink)
+    leafAirDelta(){ return this.leafTemp()-this.g('temp'); },                                    // leaf−air ΔT (LED canopy runs below air)
+    absHumidity(){ const T=this.g('temp'); return 216.7*(this.svp(T)*10*this.g('rh')/100)/(T+273.15); },   // g/m³
+    latentKw(){ return this.transpiration(this.dayEnv())*this.g('plant_count')*0.628; },          // moisture-removal (dehum) load
+
     /* ===== the whole coupled state — every lever feeds these; change one, they all move ===== */
     coupled(){
       const ppfd=this.g('ppfd'), photo=this.photo(), Tl=this.leafTemp(), Td=this.dewPoint();
@@ -465,6 +478,14 @@ function editor(){
         ["tons","Cooling need","ton",tons,2,"kW ÷ 3.517","room",cool<=this.g('hvac_cooling_kw')],
         ["co2d","CO₂ draw","ppm/h",this.co2DrawPpmH(),0,"uptake / room vol","room",true],
         ["wm2","Light intensity","W/m²",this.lightWm2(),0,"watts / floor","room",true],
+        ["rootT","Root temp","°C",this.rootTemp(),1,"substrate sensor","root",this.rootTemp()>=18&&this.rootTemp()<=24],
+        ["do2","Dissolved O₂","mg/L",this.dissolvedO2(),1,"Henry(root temp)","root",this.dissolvedO2()>=5],
+        ["upt","Nutrient uptake","%",this.uptakeFactor()*100,0,"root-temp Q10","root",this.uptakeFactor()>0.7],
+        ["path","Pythium risk","%",this.pathogenRisk()*100,0,"warm+low O₂+wet","root",this.pathogenRisk()<0.4],
+        ["osm","Osmotic stress","MPa",this.osmoticMPa(),2,"−0.36·pore EC","root",this.osmoticMPa()>-2.6],
+        ["dT","Leaf−air ΔT","°C",this.leafAirDelta(),1,"leaf − air","plant",this.leafAirDelta()>=-3&&this.leafAirDelta()<=1],
+        ["ah","Abs humidity","g/m³",this.absHumidity(),1,"from temp · RH","atm",true],
+        ["lat","Latent load","kW",this.latentKw(),1,"transp → dehum","room",this.latentKw()<=this.g('dehum_capacity')/24*0.8],
       ];
       return R.map(r=>{ const [key,label,unit,n,dec,driver,grp,good]=r, p=PREV[key]; let dir=0;
         if(p!==undefined && Math.abs(n-p)>Math.max(0.02,Math.abs(n)*0.004)) dir=n>p?1:-1; PREV[key]=n;

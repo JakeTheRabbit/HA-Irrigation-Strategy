@@ -601,6 +601,7 @@ const TUNE_GK={field_capacity:"field_capacity",substrate_volume:"substrate_volum
 function tuneSeed(){const zones={};ZONES.forEach(z=>{const o={};TUNE_ZK.forEach(k=>{const v=N(`number.crop_steering_zone_${z}_${k}`);if(v!=null)o[k]=v;});zones[z]=o;});
   const global={};for(const k in TUNE_GK){const v=N("number.crop_steering_"+TUNE_GK[k]);if(v!=null)global[k]=v;}
   const t=N(CLIM.temp),rh=N(CLIM.rh);if(t!=null)global.temp=t;if(rh!=null)global.rh=rh;
+  const rt=N("sensor.crop_steering_zone_1_root_temp")??N("sensor.f2_row_1_temperature");if(rt!=null)global.root_temp=rt;   // substrate temp for root-zone inferences
   return {type:"cs-tune-data",zones,global};}
 function tuneApply(zone,ch,gG){const rows=[];
   TUNE_ZK.forEach(k=>{if(ch[k]==null)return;const id=`number.crop_steering_zone_${zone}_${k}`,cur=N(id);if(cur!=null&&Math.abs(cur-ch[k])>1e-6)rows.push([id,cur,ch[k]]);});
