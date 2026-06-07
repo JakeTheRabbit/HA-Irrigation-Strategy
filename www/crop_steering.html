@@ -609,13 +609,17 @@ function tuneApply(zone,ch,gG){const rows=[];
   if(!confirm(`Apply ${rows.length} change${rows.length>1?"s":""} to Zone ${zone}? Writes live to the controller.\n\n`+rows.map(r=>"• "+r[0].replace("number.crop_steering_","")+":  "+r[1]+" → "+r[2]).join("\n")))return;
   if(DEMO){rows.forEach(r=>{if(ST[r[0]])ST[r[0]].state=String(r[2]);});const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(tuneSeed(),"*");return;}
   rows.forEach(r=>svc("number","set_value",{entity_id:r[0],value:r[2]}));}  // svc schedules a refresh → re-seeds the iframe (readback)
-let tuneWired=false;
+let tuneWired=false,tuneSizer=null;
+function sizeTune(){const f=el("tuneFrame");try{const b=f&&f.contentDocument&&f.contentDocument.body;const h=b&&b.scrollHeight;if(h&&Math.abs((parseInt(f.style.height)||0)-h)>8)f.style.height=(h+12)+"px";}catch(e){}}   // same-origin: size iframe to content → one scrollbar
 function renderModel(){const host=el("v-model");
-  if(!host.dataset.built){host.dataset.built="1";host.innerHTML=`<iframe id="tuneFrame" src="crop_steering_tune.html${DEMO?"?demo":""}" style="width:100%;height:calc(100vh - 120px);border:0;border-radius:12px;background:#0a0c10"></iframe>`;}
+  if(!host.dataset.built){host.dataset.built="1";host.innerHTML=`<iframe id="tuneFrame" src="crop_steering_tune.html?${DEMO?"demo&":""}_=${Date.now()}" scrolling="no" style="width:100%;height:1400px;border:0;border-radius:12px;background:#0a0c10;display:block;overflow:hidden"></iframe>`;
+    const fr=el("tuneFrame");if(fr)fr.addEventListener("load",()=>[200,600,1200,2200].forEach(d=>setTimeout(sizeTune,d)));}
+  if(!tuneSizer)tuneSizer=setInterval(sizeTune,700);
   if(!tuneWired){tuneWired=true;window.addEventListener("message",ev=>{const d=ev.data;if(!d)return;
-    if(d.type==="cs-tune-ready"){const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(tuneSeed(),"*");}
+    if(d.type==="cs-tune-ready"){const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(tuneSeed(),"*");[100,500,1200].forEach(t=>setTimeout(sizeTune,t));}
+    else if(d.type==="cs-tune-h"){const f=el("tuneFrame");if(f&&d.h>300)f.style.height=d.h+"px";}
     else if(d.type==="cs-tune-apply"){tuneApply(d.zone,d.changes||{},d.global);}});}
-  const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(tuneSeed(),"*");}
+  const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(tuneSeed(),"*");sizeTune();}
 const RENDER={home:renderHome,zones:renderZones,control:renderControl,model:renderModel};
 function renderActive(){renderVbar();(RENDER[curView]||renderHome)();redrawBig();if(el("drawer")&&el("drawer").classList.contains("open"))renderDrawer();}
 async function refresh(){if(!CFG.token){openModal();return;}
