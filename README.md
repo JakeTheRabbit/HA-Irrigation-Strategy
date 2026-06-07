@@ -152,6 +152,47 @@ hardware → substrate changes → sensors.** Every VWC update can trigger a re-
 | **Bounded by design** | Per-zone daily **volume** and **shot-count** caps stop runaway watering — but **emergency rescue is exempt**, so a genuinely dry plant is never denied water by a budget. |
 | **Activity feed** | `sensor.crop_steering_activity_log` is a rolling, human-readable feed of every watered / blocked / phase event — the dashboard's black-box recorder. |
 | **No-YAML setup** | A config-flow wizard (or a single `.env` file) maps your hardware and builds every entity. |
+| **Adaptive steering** *(optional)* | Detects each zone's true P1 moisture ceiling (`Vmax`), then derives the P2 trigger as `Vmax × (1 − dryback%)` per zone and ramps the P1 target up over days — each zone dries back the right % from *its own* measured ceiling. Off by default, behind one switch. |
+| **Predictive overnight (P3)** | Each zone's *own* overnight dryback rate feeds the P3-start timing (was a shared room rate), with a buffer-safe cap so a zone lands on its target dryback by lights-on **without firing overnight emergency shots**. |
+| **Feed-lockout diagnostic** | When a low-VWC zone isn't being fed, it names the exact gate stopping it — tank empty, dosing, flush/fill, source-water gate, EC ceiling, safety lockout, phase pin, disabled, daily cap — and attaches it to the under-watered alert. |
+| **Manual pump modes** | `flush` / `fill` booleans hand the pump to the operator (hose-flood or tank dosing); the engine pauses its own shots and exempts the hardware watchdog while either is on. |
+| **Operator console** | One dependency-free responsive dashboard (`www/crop_steering.html`): a one-glance verdict + system-health checks, word-threshold zone status, an issues drawer with real timestamps, expandable graphs, per-field coaching tooltips, and clickable pump/valve toggles. |
+
+---
+
+## Adaptive steering (optional, self-tuning)
+
+The base engine runs every setpoint you give it. The **adaptive layer**
+(`appdaemon/apps/crop_steering/adaptive_steering.py`) makes the key ones tune themselves to
+each zone's measured behaviour. It is **off by default** and gated by a single switch —
+`input_boolean.f2_adaptive_steering_enabled` — so it changes nothing until you arm it, and
+every write is clamped and confidence-gated.
+
+**1 · Per-zone P1 ceiling (`Vmax`) detection.** During the morning ramp it watches the wet-up
+and decides when a zone has actually hit its field-capacity ceiling by *voting* four independent
+signals — marginal-uptake collapse (ΔVWC per shot fading), peak plateau, pore-EC runoff, and a
+saturating-curve fit — and locks a per-zone `Vmax` with a confidence score
+(`sensor.crop_steering_zone_X_vmax_detected`).
+
+**2 · Dryback-derived P2.** Once `Vmax` is known the P2 trigger is set to
+`Vmax × (1 − dryback_target%)` **per zone, per mode** — so each zone dries back the *right %* from
+its *own* measured ceiling. The EC-stacker still trims around that base.
+
+**3 · Multi-day P1 ramp.** The P1 target climbs a configurable amount each day toward the detected
+`Vmax` (capped below field capacity), so the morning saturation target follows the plant up as the
+root mass fills the block — instead of a static number you hand-crank.
+
+**4 · Predictive overnight cutoff (P3).** Each zone's *own* overnight dryback rate is measured and
+fed into the engine's P3-start timing (previously a single shared rate), and the overnight target
+dryback is capped so the predicted lights-on VWC stays above the P3 emergency floor + a buffer —
+it lands on the dryback target **without needing an overnight emergency shot**. The forecast is
+published as `sensor.crop_steering_zone_X_p3_prediction`.
+
+Control + tuning live in `packages/f2_adaptive_steering.yaml` (the enable switch + confidence /
+climb-rate / margin numbers). The module is a drop-in: it wires into the engine with four small
+hooks in `master_crop_steering_app.py` (an `import`; a `tick()` call at the end of
+`_update_zone_vwc_capacity`; one block in `_get_zone_dryback_rate` for the per-zone rate; and a
+buffer-safe cap in `_should_zone_start_p3`) — documented in the module header.
 
 ---
 
