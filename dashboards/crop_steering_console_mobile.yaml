@@ -1,0 +1,28 @@
+# Operator console (mobile) — a second dashboard entry pointing at the SAME responsive console
+# (www/crop_steering.html). The single HTML adapts to screen width (stacked cards + larger touch
+# targets on narrow screens), so this is just a separate sidebar entry for the phone / PWA — handy
+# if you want a mobile-only dashboard or to "Add to Home Screen" on the device.
+#
+# Register it (YAML-mode dashboard) in configuration.yaml:
+#   lovelace:
+#     dashboards:
+#       crop-steering-mobile:
+#         mode: yaml
+#         title: Crop Steering (mobile)
+#         icon: mdi:cellphone
+#         show_in_sidebar: true
+#         filename: dashboards/crop_steering_console_mobile.yaml
+title: Crop Steering (mobile)
+views:
+  - title: Console
+    path: cs
+    panel: true
+    cards:
+      - type: iframe
+        url: /local/crop_steering.html
+        aspect_ratio: '100%'
+        card_mod:
+          style: |
+            ha-card { height: calc(100vh - var(--header-height, 56px)) !important; border: none; box-shadow: none; background: transparent; }
+            ha-card .container { padding-top: 0 !important; height: 100% !important; }
+            ha-card iframe { height: 100% !important; }

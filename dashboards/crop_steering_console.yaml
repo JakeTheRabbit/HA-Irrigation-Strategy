@@ -1,0 +1,30 @@
+# Operator console (desktop) — mounts the responsive single-file console www/crop_steering.html
+# as a full-bleed panel dashboard. The HTML is responsive: this same file serves desktop AND
+# mobile, so the mobile wrapper below points at the identical file.
+#
+# Register it (YAML-mode dashboard) in configuration.yaml:
+#   lovelace:
+#     dashboards:
+#       crop-steering-console:
+#         mode: yaml
+#         title: Crop Steering
+#         icon: mdi:water-percent
+#         show_in_sidebar: true
+#         filename: dashboards/crop_steering_console.yaml
+#
+# Requires the card-mod custom card (HACS) for the full-bleed styling — drop the card_mod
+# block if you don't have it (the iframe still works, just with default card chrome).
+title: Crop Steering Console
+views:
+  - title: Console
+    path: cs
+    panel: true
+    cards:
+      - type: iframe
+        url: /local/crop_steering.html
+        aspect_ratio: '100%'
+        card_mod:
+          style: |
+            ha-card { height: calc(100vh - var(--header-height, 56px)) !important; border: none; box-shadow: none; background: transparent; }
+            ha-card .container { padding-top: 0 !important; height: 100% !important; }
+            ha-card iframe { height: 100% !important; }
