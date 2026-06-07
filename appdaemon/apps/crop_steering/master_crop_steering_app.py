@@ -13,6 +13,10 @@ import re
 import statistics
 from datetime import datetime, timedelta, time
 from typing import Dict, List, Optional
+try:
+    import adaptive_steering as _adaptive
+except Exception:
+    _adaptive = None
 
 # Import our advanced modules with fallback
 try:
@@ -420,8 +424,12 @@ class MasterCropSteeringApp(BaseAsyncApp):
         try:
             if self._get_switch_state("switch.tank_filling", False):
                 return True
-            val = self.get_entity_value("input_boolean.nutrient_dosing_active", default="off")
-            return str(val).lower() == "on"
+            for _hlp in ("input_boolean.nutrient_dosing_active",
+                         "input_boolean.f2_fill_mode",
+                         "input_boolean.f2_flush_mode"):
+                if str(self.get_entity_value(_hlp, default="off")).lower() == "on":
+                    return True
+            return False
         except Exception:
             return False
 
@@ -2917,6 +2925,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     self.log("⚠️ Irrigation already in progress - skipping")
                     return {'status': 'skipped', 'reason': 'already_in_progress'}
 
+                if self._is_dosing_active():
+                    self.log(f"⏸️ Zone {zone} shot skipped - fill/flush/dosing mode active (pump under manual control)")
+                    return {'status': 'blocked', 'reason': 'manual_pump_mode', 'zone': zone,
+                            'message': 'Fill/flush/dosing mode active - engine not touching the pump'}
+
                 has_conflicts = await self._check_zone_conflicts(zone)
                 if has_conflicts:
                     self.log(f"🚫 Zone {zone} irrigation blocked: conflict detected")
@@ -3926,6 +3939,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     f"📈 Zone {zone_num}: Adaptive VWC max ratcheted up to {zone_vwc:.1f}%",
                     level='INFO'
                 )
+            try:
+                if _adaptive is not None:
+                    _adaptive.tick(self, zone_num, zone_vwc, phase)
+            except Exception as _ae:
+                self.log(f"adaptive tick z{zone_num}: {_ae}", level='WARNING')
         except Exception as e:
             self.log(f"❌ Error updating zone {zone_num} adaptive VWC max: {e}", level='ERROR')
 
@@ -4854,6 +4872,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
 
             # Get target dryback for overnight
             target_dryback = self._get_zone_number(zone_num, "number.crop_steering_vegetative_dryback_target" if self._zone_is_vegetative(zone_num) else "number.crop_steering_generative_dryback_target", 50)
+            try:
+                if _adaptive is not None:
+                    _zv = self._get_zone_vwc(zone_num)
+                    _cap = _adaptive.safe_target_dryback(self, zone_num, _zv)
+                    if _cap is not None and _cap < target_dryback:
+                        self.log(f"Zone {zone_num}: P3 target dryback capped {target_dryback:.0f}%->{_cap:.0f}% (buffer-safe, no overnight emergency shot)", level='INFO')
+                        target_dryback = _cap
+            except Exception:
+                pass
 
             # Get ML-predicted dryback rate for this zone
             predicted_dryback_rate = await self._get_zone_dryback_rate(zone_num)
@@ -4923,6 +4950,13 @@ class MasterCropSteeringApp(BaseAsyncApp):
         "%/h" regardless of actual speed. That made P3 timing meaningless.
         """
         try:
+            try:
+                if _adaptive is not None:
+                    _r = _adaptive.get_zone_rate(self, zone_num)
+                    if _r and _r > 0:
+                        return max(0.2, min(_r, 8.0))
+            except Exception:
+                pass
             # The detector tracks a single (sensor-fused) substrate trend; use it
             # for all zones until per-zone detectors exist (matches prior behaviour).
             # get_dryback_prediction() reports current_dryback_rate as %-of-peak per
