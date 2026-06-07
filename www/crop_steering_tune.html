@@ -76,20 +76,20 @@
   .ch{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
   .ch h2{margin:0;font-size:1.02rem;font-weight:800;letter-spacing:-.01em}
   .ch .chs{font-size:12px;color:var(--ink3)}
-  .cstate{display:grid;gap:9px;grid-template-columns:repeat(2,1fr)}
-  @media(min-width:560px){.cstate{grid-template-columns:repeat(3,1fr)}}
-  @media(min-width:860px){.cstate{grid-template-columns:repeat(4,1fr)}}
-  @media(min-width:1140px){.cstate{grid-template-columns:repeat(6,1fr)}}
-  .cc{border:1px solid var(--hair);border-left:3px solid var(--cg,#64748b);border-radius:11px;background:var(--card2);padding:9px 11px;transition:background .35s,box-shadow .35s}
-  .cc.g-atm{--cg:var(--p1)} .cc.g-plant{--cg:var(--p2)} .cc.g-root{--cg:var(--p3)} .cc.g-room{--cg:var(--ec)}
-  .cc.up{background:rgba(52,211,153,.1);box-shadow:inset 0 0 0 1px rgba(52,211,153,.35)}
-  .cc.down{background:rgba(248,113,113,.09);box-shadow:inset 0 0 0 1px rgba(248,113,113,.32)}
-  .ccl{font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;line-height:1.2}
-  .ccv{font-size:1.32rem;font-weight:800;letter-spacing:-.02em;margin:2px 0 1px;display:flex;align-items:baseline;gap:3px}
-  .ccv.ok{color:var(--ink)} .ccv.warn{color:var(--p3)}
-  .ccv i{font-size:11px;font-weight:600;color:var(--ink3);font-style:normal}
-  .ccv .arr{font-size:11px;margin-left:auto;font-weight:800}
-  .cc.up .arr{color:var(--ok)} .cc.down .arr{color:var(--crit)}
+  .cstate{display:grid;gap:8px;grid-template-columns:1fr}
+  @media(min-width:680px){.cstate{grid-template-columns:1fr 1fr}}
+  .csr{border:1px solid var(--hair);border-left:3px solid var(--cg,#64748b);border-radius:10px;background:var(--card2);padding:7px 11px 9px;cursor:help;transition:background .25s}
+  .csr:hover{background:rgba(255,255,255,.035)}
+  .csr.g-atm{--cg:var(--p1)} .csr.g-plant{--cg:var(--p2)} .csr.g-root{--cg:var(--p3)} .csr.g-room{--cg:var(--ec)}
+  .csr-top{display:flex;align-items:baseline;gap:8px}
+  .csr-w{font-size:10.5px;font-weight:800;letter-spacing:.04em;min-width:40px}
+  .csr-lab{font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.045em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .csr-v{font-size:1.02rem;font-weight:800;letter-spacing:-.02em;white-space:nowrap;color:var(--ink)}
+  .csr-v i{font-size:10px;font-weight:600;color:var(--ink3);font-style:normal;margin-left:2px}
+  .csr-v .arr{font-size:10px;margin-left:4px;font-weight:800}
+  .csbar{position:relative;height:7px;border-radius:4px;background:rgba(255,255,255,.06);margin-top:7px;overflow:hidden}
+  .csband{position:absolute;top:0;bottom:0;background:rgba(40,180,99,.28)}
+  .cstick{position:absolute;top:-2px;width:3px;height:11px;border-radius:2px;transform:translateX(-1.5px);box-shadow:0 0 4px rgba(0,0,0,.45)}
   .ccd{font-size:9.5px;color:var(--ink3);font-family:ui-monospace,Menlo,Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .clegend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--ink3);margin-top:12px}
   .clegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
@@ -207,11 +207,14 @@
     <div class="panel glass">
       <div class="ch"><h2>Live coupled state</h2><span class="chs">one algorithm — every lever feeds these. Change any number and watch the rest move in sync (▲▼ = which way each just shifted).</span></div>
       <div class="cstate">
-        <template x-for="c in coupled()" :key="c.key">
-          <div class="cc" :class="['g-'+c.grp, c.dir>0&&'up', c.dir<0&&'down']">
-            <div class="ccl" x-text="c.label"></div>
-            <div class="ccv" :class="c.good?'ok':'warn'"><span x-text="c.disp"></span><i x-text="c.unit"></i><b class="arr" x-text="c.dir>0?'▲':(c.dir<0?'▼':'')"></b></div>
-            <div class="ccd" x-text="c.driver"></div>
+        <template x-for="c in coupledRanked()" :key="c.key">
+          <div class="csr" :class="'g-'+c.grp" :title="c.label+' — '+c.tip">
+            <div class="csr-top">
+              <span class="csr-w" :style="'color:'+c.wc" x-text="c.word||'·'"></span>
+              <span class="csr-lab" x-text="c.label"></span>
+              <span class="csr-v"><b x-text="c.disp"></b><i x-text="c.unit"></i><b class="arr" :style="c.dir>0?'color:var(--ok)':(c.dir<0?'color:#42a5f5':'opacity:.25')" x-text="c.dir>0?'▲':(c.dir<0?'▼':'·')"></b></span>
+            </div>
+            <div class="csbar"><div class="csband" x-show="c.bandW>0" :style="'left:'+c.bandL+'%;width:'+c.bandW+'%'"></div><div class="cstick" :style="'left:'+c.pos+'%;background:'+c.wc"></div></div>
           </div>
         </template>
       </div>
@@ -295,6 +298,37 @@ const ATHENA = {
 };
 /* steering-dial profile: which per-zone setpoints slide between [vegetative, generative] as the dial moves */
 const STEER = { p2_vwc_threshold:[54,40], p2_shot_size:[12,3] };   // veg: high re-water + big flushing shots (EC↓); gen: dry deeper + small stacking shots (EC↑)
+/* coupled-state display meta: o=importance order, band=[lo,hi] optimal, scale=[min,max] bar, tip=plain English */
+const CINFO={
+ path:{o:1,band:[0,40],scale:[0,100],tip:"Root-disease (Pythium) pressure — warm + wet substrate + low O₂ feed it. Keep under 40%."},
+ osm:{o:2,band:[-2.6,0],scale:[-5,0],tip:"Osmotic pull: how hard roots fight salt to drink. Past −2.6 MPa uptake stalls → tip burn."},
+ margin:{o:3,band:[3,15],scale:[0,15],tip:"Leaf temp minus dew point. Under 3°C overnight → condensation, mould, GMP risk."},
+ do2:{o:4,band:[5,12],scale:[0,12],tip:"Oxygen dissolved in root water (falls as substrate warms). Under 5 mg/L = hypoxia / Pythium."},
+ rootT:{o:5,band:[18,24],scale:[12,32],tip:"Substrate temperature. 18–24°C ideal; over 26°C stresses roots and wakes Pythium."},
+ pec:{o:6,band:[4,9],scale:[0,12],tip:"Pore EC at the driest point — the salt roots actually sit in. Too high = lockout / burn."},
+ db:{o:7,band:[2,6],scale:[0,10],tip:"Mid-day dryback rate. Drives EC stacking and how aggressive the steering is."},
+ vpdL:{o:8,band:[0.8,1.5],scale:[0,2.5],tip:"Leaf-to-air vapour deficit — the real transpiration driver at the leaf."},
+ vpdA:{o:9,band:[0.8,1.4],scale:[0,2.5],tip:"Room (air) VPD. 0.8–1.4 kPa; too high shuts stomata, too low invites mould."},
+ leaf:{o:10,band:[22,28],scale:[15,35],tip:"Canopy leaf temp = air + light gain − transpiration cooling."},
+ dT:{o:11,band:[-3,1],scale:[-5,3],tip:"Leaf minus air. LED canopy sits ~1–2.5°C below air; positive = poor airflow / stress."},
+ pn:{o:12,band:[40,100],scale:[0,100],tip:"Relative photosynthesis (light × CO₂ × leaf temp). Higher = more growth."},
+ gs:{o:13,band:[25,100],scale:[0,100],tip:"Stomatal opening. Closes under high VPD or high CO₂."},
+ dli:{o:14,band:[30,62],scale:[0,70],tip:"Daily light integral. ~30–62 mol with CO₂; over = waste / bleach, under = light-limited."},
+ upt:{o:15,band:[70,100],scale:[0,100],tip:"Nutrient-uptake vigour vs root temp (peaks 18–22°C)."},
+ E:{o:16,band:null,scale:[0,0.6],tip:"Transpiration — water each plant loses per hour."},
+ wue:{o:17,band:null,scale:[0,8],tip:"Water-use efficiency — carbon fixed per litre transpired."},
+ bal:{o:18,band:[0,9999],scale:[-200,700],tip:"Dehum capacity minus moisture load. Negative → RH will climb tonight."},
+ lat:{o:19,band:null,scale:[0,15],tip:"Latent (moisture) heat the dehumidifier must pull."},
+ cool:{o:20,band:null,scale:[0,30],tip:"Sensible heat (~50% of LED watts) the AC must remove."},
+ tons:{o:21,band:null,scale:[0,10],tip:"Cooling load in refrigeration tons."},
+ dew:{o:22,band:null,scale:[5,25],tip:"Dew point — the temperature at which room air condenses."},
+ ah:{o:23,band:null,scale:[0,25],tip:"Absolute humidity — total water vapour the air carries."},
+ co2d:{o:24,band:null,scale:[0,300],tip:"CO₂ the canopy draws from room air per hour."},
+ water:{o:25,band:null,scale:[0,300],tip:"Whole-room water use per day."},
+ ro:{o:26,band:null,scale:[0,5],tip:"Runoff — water pushed past field capacity to drain."},
+ shots:{o:27,band:null,scale:[0,30],tip:"Irrigation shots the controller fires per day."},
+ wm2:{o:28,band:null,scale:[0,1000],tip:"Electrical light power per m² of floor."},
+};
 
 /* ===== real live setpoints (F2, per zone). Shared hardware in GLOBAL. ===== */
 function zoneDefaults(o){ return Object.assign({
@@ -452,6 +486,17 @@ function editor(){
     latentKw(){ return this.transpiration(this.dayEnv())*this.g('plant_count')*0.628; },          // moisture-removal (dehum) load
 
     /* ===== the whole coupled state — every lever feeds these; change one, they all move ===== */
+    coupledRanked(){ const list=this.coupled();
+      const out=list.map(m=>{ const ci=CINFO[m.key]||{o:99,band:null,scale:[0,1],tip:""};
+        const s=ci.scale, val=parseFloat(m.disp), span=(s[1]-s[0])||1, pos=clamp((val-s[0])/span,0,1)*100;
+        let word="",wc="#8b93a7", bandL=0,bandW=0;
+        if(ci.band){ const lo=ci.band[0],hi=ci.band[1], within=val>=lo&&val<=hi;
+          word=within?"GOOD":(val<lo?"LOW":"HIGH");
+          const off=within?0:(val<lo?(lo-val):(val-hi))/((hi-lo)||1);
+          wc=within?"#28b463":(off>0.4?"#e5484d":"#f5a524");
+          bandL=clamp((lo-s[0])/span,0,1)*100; bandW=clamp((Math.min(hi,s[1])-Math.max(lo,s[0]))/span,0,1)*100; }
+        return {...m, val, pos, word, wc, bandL, bandW, tip:ci.tip, imp:ci.o }; });
+      out.sort((a,b)=>a.imp-b.imp); return out; },
     coupled(){
       const ppfd=this.g('ppfd'), photo=this.photo(), Tl=this.leafTemp(), Td=this.dewPoint();
       const vpdA=this.vpd(), vpdL=this.vpdLeaf(), gs=this.gs(), pn=this.psRate(), E=this.transpiration(this.dayEnv());
