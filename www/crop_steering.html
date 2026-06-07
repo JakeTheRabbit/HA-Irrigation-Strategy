@@ -215,6 +215,7 @@ const LS={base:"cs_base",token:"cs_token"};
 let CFG={base:localStorage.getItem(LS.base)||location.origin,token:localStorage.getItem(LS.token)||""};
 let timer=null,ST={},HIST={},histAt=0,ZONES=[1,2,3],curView="home",selZone=1,histWindowH=72,OVL_HIDDEN=new Set(),_ovl=null,TICK=0,goodSince=null;
 const el=id=>document.getElementById(id);
+const DEMO=new URLSearchParams(location.search).has("demo");   // ?demo = render baked-in mock data, no HA/token
 async function api(p,o={}){const r=await fetch(CFG.base.replace(/\/$/,"")+p,{...o,headers:{Authorization:"Bearer "+CFG.token,"Content-Type":"application/json",...(o.headers||{})}});if(!r.ok)throw new Error(r.status+" "+r.statusText);return r.status===200?r.json():null;}
 
 /* ================= entity helpers ================= */
@@ -316,7 +317,7 @@ function alerts(){if(_alCache.tick===TICK)return _alCache.val;   // memoize per 
   Object.keys(ALERT_DB).forEach(k=>{if(!keys.has(k))delete ALERT_DB[k];});
   const show=[];
   raw.forEach(a=>{const st=ALERT_DB[a.key]||(ALERT_DB[a.key]={count:0,lastTick:-1});st.count=st.lastTick===TICK-1?st.count+1:1;st.lastTick=TICK;a.since=ALERT_SEEN[a.key];
-    if(!a.deb||st.count>=2)show.push(a);});
+    if(!a.deb||st.count>=2||DEMO)show.push(a);});
   show.sort((x,y)=>x.tier-y.tier);_alCache={tick:TICK,val:show};return show;
 }
 function quietBanners(){const out=[];
@@ -555,7 +556,7 @@ function renderControl(){const mode=S("select.crop_steering_steering_mode"),dbT=
   const f=el("ctrlfeed"),raw=A("sensor.crop_steering_activity_log","feed");if(f&&raw)f.innerHTML=String(raw).split("\n").filter(Boolean).slice(0,30).map(l=>`<div>${l.replace(/[<>]/g,"")}</div>`).join("");}
 
 /* ================= services ================= */
-async function svc(d,s,data){try{await api(`/api/services/${d}/${s}`,{method:"POST",body:JSON.stringify(data)});setTimeout(refresh,600);}catch(e){alert("Failed: "+e.message);}}
+async function svc(d,s,data){if(DEMO)return;try{await api(`/api/services/${d}/${s}`,{method:"POST",body:JSON.stringify(data)});setTimeout(refresh,600);}catch(e){alert("Failed: "+e.message);}}
 window.toggleArm=()=>{const want=!armed();if(!confirm((want?"ARM":"DISARM")+" autonomous irrigation?"))return;svc("switch",want?"turn_on":"turn_off",{entity_id:["switch.crop_steering_system_enabled","switch.crop_steering_auto_irrigation_enabled"]});};
 window.toggleEntity=id=>{if(/system_enabled|auto_irrigation/.test(id)&&!confirm("Toggle the arm state? Affects live irrigation."))return;svc(id.split(".")[0],"toggle",{entity_id:id});};
 window.setSel=(id,v)=>svc(id.split(".")[0],"select_option",{entity_id:id,option:v});
@@ -614,7 +615,62 @@ function openModal(){el("inBase").value=CFG.base;el("inToken").value=CFG.token;e
 window.openModal=openModal;el("cancelBtn").onclick=()=>el("modal").classList.remove("open");
 el("saveBtn").onclick=async()=>{const base=el("inBase").value.trim()||location.origin,token=el("inToken").value.trim();el("mErr").textContent="testing…";try{const r=await fetch(base.replace(/\/$/,"")+"/api/",{headers:{Authorization:"Bearer "+token}});if(!r.ok)throw new Error(r.status);CFG={base,token};localStorage.setItem(LS.base,base);localStorage.setItem(LS.token,token);el("modal").classList.remove("open");startLoop();}catch(e){el("mErr").textContent="Could not connect ("+e.message+").";}};
 addEventListener("resize",()=>{if(curView==="home")drawOverlay();else if(curView==="zones")drawTrace();if(el("gmodal").classList.contains("open"))redrawBig();});
-if(!CFG.token)openModal();else startLoop();
+/* ================= demo mode: baked-in mock data (no HA, no token) ================= */
+function buildDemo(){
+  const now=Date.now(),iso=ms=>new Date(ms).toISOString();ST={};HIST={};
+  const E=(id,st,at)=>{ST[id]={entity_id:id,state:(st==null?"unknown":String(st)),attributes:at||{},last_changed:iso(now-3e5),last_updated:iso(now-3e5)};};
+  E("switch.crop_steering_system_enabled","on");E("switch.crop_steering_auto_irrigation_enabled","on");
+  E("switch.crop_steering_ec_stacking_enabled","on");E("switch.crop_steering_analytics_enabled","on");
+  E("input_boolean.f2_adaptive_steering_enabled","on");E("input_number.f2_vmax_confidence_min",0.6);E("input_number.f2_p1_climb_rate_per_day",1);E("input_number.f2_p1_margin",2);
+  E("select.crop_steering_steering_mode","Generative",{options:["Vegetative","Generative"]});
+  E("select.crop_steering_growth_stage","Generative",{options:["Vegetative","Generative"]});
+  E("select.crop_steering_crop_type","Cannabis_Athena",{options:["Cannabis_Athena","Generic"]});
+  E("input_select.growth_phase","Bloom");E("input_select.nutrient_phase","Stretch");
+  E("number.crop_steering_field_capacity",62);E("number.crop_steering_maximum_ec",9);
+  E("number.crop_steering_generative_dryback_target",30);E("number.crop_steering_vegetative_dryback_target",20);
+  E("number.crop_steering_lights_on_hour",10);E("number.crop_steering_lights_off_hour",22);
+  E("number.crop_steering_substrate_volume",6);E("number.crop_steering_dripper_flow_rate",4);E("number.crop_steering_drippers_per_plant",1);
+  E("number.crop_steering_irrigation_ph_min",5.5);E("number.crop_steering_irrigation_ph_max",6.5);E("number.crop_steering_irrigation_ec_min",2.5);E("number.crop_steering_irrigation_ec_max",3.5);
+  E("number.crop_steering_p0_dryback_drop_percent",3);E("number.crop_steering_p0_minimum_wait_time",45);E("number.crop_steering_p0_maximum_wait_time",90);
+  E("number.crop_steering_p1_target_vwc",60);E("number.crop_steering_p1_initial_shot_size",2);E("number.crop_steering_p1_shot_size_increment",0.5);E("number.crop_steering_p1_maximum_shot_size",10);E("number.crop_steering_p1_minimum_shots",3);E("number.crop_steering_p1_maximum_shots",10);E("number.crop_steering_p1_time_between_shots",15);
+  E("number.crop_steering_p2_vwc_threshold",46);E("number.crop_steering_p2_shot_size",5);E("number.crop_steering_p2_ec_high_threshold",1.2);E("number.crop_steering_p2_ec_low_threshold",0.8);
+  E("number.crop_steering_p3_emergency_vwc_threshold",40);E("number.crop_steering_p3_emergency_shot_size",2);E("number.crop_steering_p3_veg_last_irrigation",45);E("number.crop_steering_p3_gen_last_irrigation",60);
+  E("number.crop_steering_blocked_dripper_max_shots_30min",4);
+  ["gen","veg"].forEach(m=>["0","1","2","3"].forEach((p,j)=>E(`number.crop_steering_ec_target_${m}_p${p}`,m==="gen"?3.5+j*0.6:2.6+j*0.3)));
+  E("number.crop_steering_ec_target_gen_flush",1.5);E("number.crop_steering_ec_target_veg_flush",1.5);
+  E("sensor.crop_steering_sensor_health",96);E("sensor.crop_steering_sensor_fusion_confidence",1.0);
+  E("sensor.crop_steering_app_current_phase","Z1:P2 Z2:P2 Z3:P2");E("sensor.crop_steering_app_next_irrigation",iso(now+22*60000));
+  E("sensor.crop_steering_system_safety_status","safe");E("sensor.crop_steering_ai_heartbeat","healthy");
+  E("sensor.crop_steering_dryback_detection_accuracy",0.86);E("sensor.crop_steering_fused_vwc",53.7,{active_sensors:3});E("sensor.crop_steering_fused_ec",4.6,{confidence:0.95});
+  E("sensor.crop_steering_daily_water_usage_app",21);E("sensor.crop_steering_p1_shot_duration",108);E("sensor.crop_steering_p2_shot_duration",230);E("sensor.crop_steering_p3_emergency_shot_duration",108);E("sensor.crop_steering_p2_vwc_threshold_adjusted",45.2);E("sensor.crop_steering_prediction_estimated_daily_water_need",230);
+  E("sensor.crop_steering_app_status","running");E("sensor.crop_steering_system_state","active");E("sensor.crop_steering_current_decision","P2 maintenance — holding band");E("sensor.crop_steering_system_uptime","3d 4h");E("sensor.crop_steering_system_health_score",94);
+  E("sensor.crop_steering_system_efficiency",0.9);E("sensor.crop_steering_water_efficiency",0.86);E("sensor.crop_steering_irrigation_efficiency",0.88);E("sensor.crop_steering_ml_model_accuracy",0.81);E("sensor.crop_steering_ec_baseline",3.0);E("sensor.crop_steering_ec_ratio",1.02);E("sensor.crop_steering_dryback_percentage",22);E("sensor.crop_steering_dryback_target",30);
+  E("switch.veg_main_pump","off");E("switch.espoe_irrigation_relay_2_3","off");E("switch.f2_row1","off");E("switch.f2_row2","off");E("switch.f2_row3","off");
+  E("input_boolean.nutrient_dosing_active","off");E("input_boolean.f2_flush_mode","off");E("input_boolean.f2_fill_mode","off");E("binary_sensor.veg_tank_empty_switch","on");E("sensor.tank_percentage_full",78);E("switch.tank_filling","off");
+  E("sensor.aquaponics_kit_f4f618_ph",5.9);E("sensor.atlas_legacy_1_ec",3.0);E("sensor.veg_scd41_top_temperature_scd41",24.5);E("sensor.veg_scd41_top_humidity_scd41",62);
+  E("sensor.f1_r1_thermal_camera_leaf_temperature",23.1);E("sensor.f2_leaf_vpd",1.05);E("sensor.f2_target_rh_for_vpd",61);E("sensor.f2_ec_trend",0.1);E("sensor.f2_vwc_dryback_rate",2.1);E("humidifier.f2_dehumidifier","on",{humidity:60,current_humidity:62});
+  E("sensor.crop_steering_average_vwc_all_zones",53.7);E("sensor.crop_steering_average_ec_all_zones",4.6);E("sensor.crop_steering_vwc_target_min",46);E("sensor.crop_steering_vwc_target_max",60);
+  const Z=[{v:54,e:4.6,vm:60},{v:58,e:5.5,vm:61},{v:49,e:4.2,vm:59}];
+  const RAWm={1:["sensor.f2_row_1_vwc","sensor.f2_row_1_pwec"],2:["sensor.veg_sdi12_vwc_2","sensor.veg_sdi12_ec_2"],3:["sensor.veg_sdi12_vwc","sensor.veg_sdi12_ec"]};
+  Z.forEach((z,i)=>{const n=i+1;
+    E(`sensor.crop_steering_zone_${n}_vwc`,z.v);E(`sensor.crop_steering_zone_${n}_ec`,z.e);E(`sensor.crop_steering_zone_${n}_phase`,"P2");E(`sensor.crop_steering_zone_${n}_status`,"Optimal");
+    E(`number.crop_steering_zone_${n}_p2_vwc_threshold`,46-i);E(`number.crop_steering_zone_${n}_p1_target_vwc`,60);E(`number.crop_steering_zone_${n}_p3_emergency_vwc_threshold`,40);
+    E(`sensor.crop_steering_zone_${n}_irrigations_today`,8+i);E(`sensor.crop_steering_zone_${n}_daily_water_usage`,6+i);E(`sensor.crop_steering_zone_${n}_weekly_water_usage`,42+i*5);
+    E(`sensor.crop_steering_zone_${n}_health_score`,0.9-i*0.04);E(`sensor.crop_steering_zone_${n}_last_irrigation_app`,iso(now-(20+i*8)*60000));E(`sensor.crop_steering_zone_${n}_safety_status`,"safe");E(`sensor.crop_steering_zone_${n}_efficiency`,0.85+i*0.02);
+    E(`switch.crop_steering_zone_${n}_enabled`,"on");E(`switch.crop_steering_zone_${n}_manual_override`,"off");E(`switch.crop_steering_zone_${n}_dripper_protection`,"on");
+    E(`input_select.crop_steering_zone_${n}_phase_control`,"Auto",{options:["Auto","P0","P1","P2","P3"]});E(`select.crop_steering_zone_${n}_steering_mode`,"Generative",{options:["Vegetative","Generative"]});E(`select.crop_steering_zone_${n}_crop_profile`,"Cannabis_Athena",{options:["Cannabis_Athena","Generic"]});
+    E(`number.crop_steering_zone_${n}_max_daily_volume`,12);E(`number.crop_steering_zone_${n}_plant_count`,8);E(`number.crop_steering_zone_${n}_shot_size_multiplier`,1);E(`number.crop_steering_zone_${n}_generative_dryback_target`,30);E(`number.crop_steering_zone_${n}_vegetative_dryback_target`,20);
+    ["gen","veg"].forEach(m=>["0","1","2","3"].forEach((p,j)=>E(`number.crop_steering_zone_${n}_ec_target_${m}_p${p}`,m==="gen"?3.5+j*0.6:2.6+j*0.3)));
+    E(`sensor.crop_steering_zone_${n}_vmax_detected`,z.vm,{confidence:Math.round((0.72+i*0.06)*100)/100,votes:3,locked_today:true});
+    E(`sensor.crop_steering_zone_${n}_p3_prediction`,Math.round((z.v-2.1*11)*10)/10,{rate_pct_per_h:2.1,hours_to_lights_on:11,current_vwc:z.v,p3_floor_plus_buffer:43,will_hit_floor:false});
+    E(RAWm[n][0],z.v-0.3);E(RAWm[n][1],z.e+0.05);
+    const vh=[],eh=[],wh=[];for(let t=now-72*3600000;t<=now;t+=600000){const h=new Date(t).getHours()+new Date(t).getMinutes()/60;let v;if(h>=10&&h<13)v=46+(z.vm-46)*((h-10)/3);else{const s=(h>=13)?(h-13):(h+11);v=z.vm-(z.vm-44)*(s/21);}v+=Math.sin(t/5e6)*0.7;v=Math.round(Math.max(42,Math.min(z.vm+1,v))*10)/10;vh.push([t,v]);eh.push([t,Math.round((z.e-0.5+(h>=10&&h<13?0:0.4))*100)/100]);wh.push([t,h>=10?Math.round((Math.min(h,22)-10)/12*(6+i)*10)/10:0]);}
+    HIST[`sensor.crop_steering_zone_${n}_vwc`]=vh;HIST[`sensor.crop_steering_zone_${n}_ec`]=eh;HIST[`sensor.crop_steering_zone_${n}_daily_water_usage`]=wh;});
+  const fl=[];for(let i=0;i<14;i++){const t=new Date(now-i*23*60000);fl.push(`${String(t.getHours()).padStart(2,"0")}:${String(t.getMinutes()).padStart(2,"0")}:00  Zone ${1+(i%3)} P2 shot ${200+i*4}s → ${(3+i%3).toFixed(1)}%`);}
+  E("sensor.crop_steering_activity_log",fl[0].slice(11),{feed:fl.join("\n")});
+}
+if(DEMO){buildDemo();TICK=4;document.title="F2 Crop Steering — DEMO";renderVbar();switchTab("home");}
+else if(!CFG.token)openModal();else startLoop();
 </script>
 </body>
 </html>

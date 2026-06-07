@@ -160,6 +160,22 @@ hardware → substrate changes → sensors.** Every VWC update can trigger a re-
 
 ---
 
+## Live demo (no install)
+
+The console ships with a **demo mode** that runs on baked-in mock data — no Home Assistant, no
+token, no hardware. See every page (verdict + health checks, word-threshold zone status, the
+VWC+EC graph, per-zone detail with the detected `Vmax` and overnight prediction, the control
+surface, and the issues drawer) before installing anything:
+
+- **Locally:** open `www/crop_steering.html?demo` in any browser.
+- **Hosted:** serve the `www/` folder on GitHub Pages (or any static host) and visit
+  `…/crop_steering.html?demo` for a fully-interactive demo.
+
+Drop `?demo` and point it at your Home Assistant (URL + a long-lived token, stored only in your
+browser) to drive the real thing.
+
+---
+
 ## Adaptive steering (optional, self-tuning)
 
 The base engine runs every setpoint you give it. The **adaptive layer**
