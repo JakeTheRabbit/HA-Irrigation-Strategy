@@ -189,6 +189,7 @@
   <section class="view on" data-v="home" id="v-home"><div class="empty">connecting…</div></section>
   <section class="view" data-v="zones" id="v-zones"></section>
   <section class="view" data-v="control" id="v-control"></section>
+  <section class="view" data-v="model" id="v-model"></section>
 </div></main>
 
 <div class="modal" id="modal"><div class="box">
@@ -594,7 +595,28 @@ function redrawBig(){if(!gKind||!el("gmodal").classList.contains("open"))return;
     leg.innerHTML=ZONES.map((z,i)=>`<span class="lgc${OVL_HIDDEN.has(`z${z}v`)?' off':''}" onclick="toggleSeries('z${z}v')" style="--lc:${OVL_V[i]}">● Z${z} VWC</span>`).join("")+ZONES.map((z,i)=>`<span class="lgc${OVL_HIDDEN.has(`z${z}e`)?' off':''}" onclick="toggleSeries('z${z}e')" style="--lc:${OVL_E[i]}">● Z${z} EC</span>`).join("");
     const cv=el("gCanvas");cv.onmousemove=e=>{const r=cv.getBoundingClientRect();drawOverlay(e.clientX-r.left,"gCanvas");};cv.onmouseleave=()=>drawOverlay(null,"gCanvas");drawOverlay(null,"gCanvas");
   }else{el("gTitle").textContent=`Zone ${selZone} trace · 24h`;tools.innerHTML="";leg.innerHTML="";const cv=el("gCanvas");cv.onmousemove=null;cv.onmouseleave=null;drawTrace("gCanvas");}}
-const RENDER={home:renderHome,zones:renderZones,control:renderControl};
+/* ===== Tune tab: embedded visual setpoint editor (crop_steering_tune.html) bridged by postMessage ===== */
+const TUNE_ZK=["p0_minimum_wait_time","p0_maximum_wait_time","p0_dryback_drop_percent","p1_target_vwc","p1_initial_shot_size","p1_shot_size_increment","p1_maximum_shot_size","p1_time_between_shots","p1_minimum_shots","p1_maximum_shots","p2_vwc_threshold","p2_shot_size","p2_ec_high_threshold","p2_ec_low_threshold","p3_emergency_vwc_threshold","p3_emergency_shot_size","p3_gen_last_irrigation","p3_veg_last_irrigation","generative_dryback_target","vegetative_dryback_target","ec_target_gen_p1","ec_target_gen_p2","ec_target_gen_p3","ec_target_veg_p1","ec_target_veg_p2","ec_target_veg_p3","ec_target_flush"];
+const TUNE_GK={field_capacity:"field_capacity",substrate_volume:"substrate_volume",lights_on:"lights_on_hour",lights_off:"lights_off_hour"};
+function tuneSeed(){const zones={};ZONES.forEach(z=>{const o={};TUNE_ZK.forEach(k=>{const v=N(`number.crop_steering_zone_${z}_${k}`);if(v!=null)o[k]=v;});zones[z]=o;});
+  const global={};for(const k in TUNE_GK){const v=N("number.crop_steering_"+TUNE_GK[k]);if(v!=null)global[k]=v;}
+  const t=N(CLIM.temp),rh=N(CLIM.rh);if(t!=null)global.temp=t;if(rh!=null)global.rh=rh;
+  return {type:"cs-tune-data",zones,global};}
+function tuneApply(zone,ch,gG){const rows=[];
+  TUNE_ZK.forEach(k=>{if(ch[k]==null)return;const id=`number.crop_steering_zone_${zone}_${k}`,cur=N(id);if(cur!=null&&Math.abs(cur-ch[k])>1e-6)rows.push([id,cur,ch[k]]);});
+  if(gG)for(const k in TUNE_GK){if(gG[k]==null)continue;const id="number.crop_steering_"+TUNE_GK[k],cur=N(id);if(cur!=null&&Math.abs(cur-gG[k])>1e-6)rows.push([id,cur,gG[k]]);}
+  if(!rows.length){alert("Zone "+zone+": nothing changed.");return;}
+  if(!confirm(`Apply ${rows.length} change${rows.length>1?"s":""} to Zone ${zone}? Writes live to the controller.\n\n`+rows.map(r=>"• "+r[0].replace("number.crop_steering_","")+":  "+r[1]+" → "+r[2]).join("\n")))return;
+  if(DEMO){rows.forEach(r=>{if(ST[r[0]])ST[r[0]].state=String(r[2]);});const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(tuneSeed(),"*");return;}
+  rows.forEach(r=>svc("number","set_value",{entity_id:r[0],value:r[2]}));}  // svc schedules a refresh → re-seeds the iframe (readback)
+let tuneWired=false;
+function renderModel(){const host=el("v-model");
+  if(!host.dataset.built){host.dataset.built="1";host.innerHTML=`<iframe id="tuneFrame" src="crop_steering_tune.html${DEMO?"?demo":""}" style="width:100%;height:calc(100vh - 120px);border:0;border-radius:12px;background:#0a0c10"></iframe>`;}
+  if(!tuneWired){tuneWired=true;window.addEventListener("message",ev=>{const d=ev.data;if(!d)return;
+    if(d.type==="cs-tune-ready"){const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(tuneSeed(),"*");}
+    else if(d.type==="cs-tune-apply"){tuneApply(d.zone,d.changes||{},d.global);}});}
+  const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(tuneSeed(),"*");}
+const RENDER={home:renderHome,zones:renderZones,control:renderControl,model:renderModel};
 function renderActive(){renderVbar();(RENDER[curView]||renderHome)();redrawBig();if(el("drawer")&&el("drawer").classList.contains("open"))renderDrawer();}
 async function refresh(){if(!CFG.token){openModal();return;}
   try{const states=await api("/api/states");ST={};states.forEach(s=>ST[s.entity_id]=s);TICK++;
@@ -606,7 +628,7 @@ async function refresh(){if(!CFG.token){openModal();return;}
 function startLoop(){if(timer)clearInterval(timer);refresh();timer=setInterval(refresh,60000);}
 
 /* ================= tabs / modal / boot ================= */
-const TABS=[["home","◆ Home"],["zones","🌱 Zones"],["control","🎛 Control"]];
+const TABS=[["home","◆ Home"],["zones","🌱 Zones"],["control","🎛 Control"],["model","🎚 Tune"]];
 el("tabs").innerHTML=TABS.map((t,i)=>`<div class="tab ${i?"":"on"}" data-t="${t[0]}">${t[1]}${t[0]==="home"?' <span class="cnt" id="homeCnt" style="display:none"></span>':""}</div>`).join("");
 function switchTab(t){curView=t;document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x.dataset.t===t));document.querySelectorAll(".view").forEach(x=>x.classList.toggle("on",x.dataset.v===t));renderActive();window.scrollTo(0,0);}
 window.switchTab=switchTab;

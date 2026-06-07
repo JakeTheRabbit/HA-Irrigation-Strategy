@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0c10">
+<title>F2 Crop-Steering Editor · full setpoints</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+  :root{--bg:#0a0c10;--card:#141a21;--card2:#19212a;--hair:rgba(255,255,255,.09);--ink:#e7ecf2;--ink2:#aab4c0;--ink3:#727d8a;
+    --p0:#8b93a1;--p1:#38bdf8;--p2:#34d399;--p3:#fbbf24;--ec:#f472b6;--ok:#34d399;--crit:#f87171;--maxw:1320px;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;line-height:1.5}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+  .glass{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--hair)}
+  [x-cloak]{display:none!important}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:clamp(14px,3vw,26px)}
+  .kicker{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ok);background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);padding:5px 11px;border-radius:999px}
+  h1{font-size:clamp(1.4rem,1.1rem+1.6vw,2rem);font-weight:800;letter-spacing:-.02em;margin:12px 0 4px}
+  .sub{color:var(--ink2);max-width:78ch;font-size:.92rem}
+  .layout{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+  .panel{border-radius:18px;padding:clamp(12px,2vw,18px)}
+  svg{width:100%;height:auto;display:block;touch-action:none;user-select:none}
+  .topbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .steer{margin:0 0 12px}
+  .steer .lab{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink2);margin-bottom:6px}
+  .steer .lab b{color:var(--ink)}
+  .steer input[type=range]{width:100%;height:14px;-webkit-appearance:none;appearance:none;border-radius:999px;outline:none;cursor:pointer;
+    background:linear-gradient(90deg,#34d399,#a3e635 34%,#fbbf24 68%,#f472b6)}
+  .steer input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid #0a0c10;box-shadow:0 1px 5px rgba(0,0,0,.55);cursor:grab;margin-top:0}
+  .steer input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid #0a0c10;cursor:grab}
+  .steer .ends{display:flex;justify-content:space-between;font-size:11px;color:var(--ink3);margin-top:4px}
+  .seg{display:inline-flex;border:1px solid var(--hair);border-radius:10px;overflow:hidden;flex:none}
+  .seg button{font:inherit;font-size:12.5px;padding:8px 12px;border:0;background:transparent;color:var(--ink2);cursor:pointer}
+  .seg button.on{background:var(--p2);color:#06281c;font-weight:700}
+  .seg.mode button.on{background:var(--p3);color:#1a0e03}
+  .hint{font-size:11.5px;color:var(--ink3);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap}
+  .hint b{color:var(--ink2)}
+  .readout{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .pill{font-size:11.5px;padding:5px 10px;border-radius:999px;background:var(--card2);border:1px solid var(--hair);color:var(--ink2)}
+  .pill b{color:var(--ink)}
+  .verdict{font-size:13px;color:var(--ink2);margin-left:auto;text-align:right;max-width:50%}
+  .verdict b{color:var(--ink)}
+
+  .settings-grid{display:grid;gap:12px;grid-template-columns:1fr}
+  @media(min-width:560px){.settings-grid{grid-template-columns:1fr 1fr}}
+  @media(min-width:920px){.settings-grid{grid-template-columns:repeat(3,1fr)}}
+  @media(min-width:1180px){.settings-grid{grid-template-columns:repeat(6,1fr)}}
+  .grp{border-radius:13px;border:1px solid var(--hair);background:var(--card2);padding:11px 12px;transition:border-color .15s}
+  .grp.hot{border-color:var(--ph)}
+  .grp .gh{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+  .grp .dot{width:10px;height:10px;border-radius:3px;flex:none}
+  .grp .gh h3{margin:0;font-size:.9rem;font-weight:700}
+  .grp .gh .ph{font-size:9.5px;font-weight:800;color:#0a0c10;padding:1px 5px;border-radius:4px}
+  .frow{display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid rgba(255,255,255,.05)}
+  .frow:first-of-type{border-top:0}
+  .frow .fl{font-size:11.5px;color:var(--ink2);flex:1;min-width:0;line-height:1.25}
+  .frow{transition:background .12s,box-shadow .12s}
+  .frow.lit{background:linear-gradient(90deg,color-mix(in srgb,var(--ph,#38bdf8) 22%,transparent),transparent);border-radius:8px;box-shadow:inset 3px 0 0 var(--ph,#38bdf8)}
+  .frow.lit .fl{color:var(--ink);font-weight:600}
+  .step{display:inline-flex;align-items:center;border:1px solid var(--hair);border-radius:8px;overflow:hidden;background:var(--bg);flex:none}
+  .step button{width:24px;height:30px;border:0;background:transparent;color:var(--ink2);font-size:15px;cursor:pointer;padding:0}
+  .step button:hover{background:rgba(255,255,255,.06);color:var(--ink)}
+  .step input{width:44px;height:30px;border:0;background:transparent;color:var(--ink);text-align:center;font:inherit;font-size:13px;-moz-appearance:textfield}
+  .step input::-webkit-outer-spin-button,.step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .step .u{font-size:10px;color:var(--ink3);padding:0 6px 0 1px;white-space:nowrap}
+  .btn{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 15px;border-radius:11px;font-weight:600;font-size:13.5px;border:1px solid var(--hair);background:var(--card);color:var(--ink);cursor:pointer}
+  .btn.primary{background:linear-gradient(135deg,#34d399,#10b981);color:#06281c;border-color:transparent}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center}
+  .note{font-size:11px;color:var(--ink3);margin-top:10px;font-style:italic}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--ink3);margin-top:4px}
+  .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+
+  .ch{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .ch h2{margin:0;font-size:1.02rem;font-weight:800;letter-spacing:-.01em}
+  .ch .chs{font-size:12px;color:var(--ink3)}
+  .cstate{display:grid;gap:9px;grid-template-columns:repeat(2,1fr)}
+  @media(min-width:560px){.cstate{grid-template-columns:repeat(3,1fr)}}
+  @media(min-width:860px){.cstate{grid-template-columns:repeat(4,1fr)}}
+  @media(min-width:1140px){.cstate{grid-template-columns:repeat(6,1fr)}}
+  .cc{border:1px solid var(--hair);border-left:3px solid var(--cg,#64748b);border-radius:11px;background:var(--card2);padding:9px 11px;transition:background .35s,box-shadow .35s}
+  .cc.g-atm{--cg:var(--p1)} .cc.g-plant{--cg:var(--p2)} .cc.g-root{--cg:var(--p3)} .cc.g-room{--cg:var(--ec)}
+  .cc.up{background:rgba(52,211,153,.1);box-shadow:inset 0 0 0 1px rgba(52,211,153,.35)}
+  .cc.down{background:rgba(248,113,113,.09);box-shadow:inset 0 0 0 1px rgba(248,113,113,.32)}
+  .ccl{font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;line-height:1.2}
+  .ccv{font-size:1.32rem;font-weight:800;letter-spacing:-.02em;margin:2px 0 1px;display:flex;align-items:baseline;gap:3px}
+  .ccv.ok{color:var(--ink)} .ccv.warn{color:var(--p3)}
+  .ccv i{font-size:11px;font-weight:600;color:var(--ink3);font-style:normal}
+  .ccv .arr{font-size:11px;margin-left:auto;font-weight:800}
+  .cc.up .arr{color:var(--ok)} .cc.down .arr{color:var(--crit)}
+  .ccd{font-size:9.5px;color:var(--ink3);font-family:ui-monospace,Menlo,Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .clegend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--ink3);margin-top:12px}
+  .clegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+
+  /* limiting factors */
+  .lim2{display:grid;gap:14px;grid-template-columns:1fr}
+  @media(min-width:760px){.lim2{grid-template-columns:1fr 1fr}}
+  .limcol{border:1px solid var(--hair);border-radius:13px;background:var(--card2);padding:12px 13px}
+  .limhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+  .limgoal{font-size:.95rem;font-weight:800}
+  .limpot{font-size:.78rem;color:var(--ink2)} .limpot b{font-size:1.5rem;font-weight:800} .limpot i{font-style:normal;font-size:.7rem;color:var(--ink3);margin-left:4px}
+  .limpot.ok b{color:var(--ok)} .limpot.mid b{color:var(--p3)} .limpot.low b{color:var(--crit)}
+  .limtop{font-size:12px;color:var(--ink2);background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:6px 9px;margin-bottom:9px}
+  .limtop.ok{background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.25)}
+  .limtop b{color:var(--ink)} .limtop i{font-style:normal;color:var(--ink3)}
+  .limrow{display:grid;grid-template-columns:82px 1fr auto auto;gap:8px;align-items:center;padding:4px 0;font-size:12px}
+  .lrl{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lrbar{height:7px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden}
+  .lrbar i{display:block;height:100%;border-radius:4px;background:var(--ok);transition:width .3s}
+  .limrow.mid .lrbar i{background:var(--p3)} .limrow.low .lrbar i{background:var(--crit)}
+  .lrv b{font-weight:700} .lrv em{font-style:normal;color:var(--ink3);font-size:10px;margin-left:2px}
+  .lrd{font-size:10.5px;color:var(--ink3);white-space:nowrap;min-width:52px;text-align:right}
+  .limrow.low .lrd{color:var(--crit)} .limrow.mid .lrd{color:var(--p3)}
+  .zsum{display:grid;gap:8px;grid-template-columns:repeat(3,1fr);margin-top:12px}
+  .zs{border:1px solid var(--hair);border-left:3px solid var(--ink3);border-radius:10px;background:var(--bg);padding:8px 10px;cursor:pointer;font-size:11px;color:var(--ink3);display:flex;flex-direction:column;gap:2px}
+  .zs.on{border-left-color:var(--ok)} .zs b{color:var(--ink);font-size:12px} .zs em{font-style:normal;color:var(--ink2);font-weight:700}
+  /* environment graph stack */
+  .envlab{font-size:11px;color:var(--ink3);display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0 1px}
+  .envlab i{font-style:normal;font-weight:600} .envlab b{font-weight:600;color:var(--ink3);margin-left:auto}
+  .envstack .envrow:first-of-type .envlab{margin-top:0}
+  svg.mini{width:100%;height:auto;display:block}
+  .minicwrap{touch-action:none}
+  .seg.ath button{font-size:11.5px;padding:7px 9px}
+  .seg.ath button.on{background:#f59e0b;color:#1a0e03;font-weight:700}
+  /* two-column: graphs left, their controls in a sticky right rail */
+  .gridrow{display:flex;flex-direction:column;gap:14px}
+  .gcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .scol{display:flex;flex-direction:column;gap:12px}
+  .srail{display:flex;flex-direction:column;gap:10px}
+  .srail .grp{background:var(--card)}
+  @media(min-width:1100px){
+    .gridrow{display:grid;grid-template-columns:minmax(0,1fr) 384px;gap:16px;align-items:start}
+    .scol{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto;overflow-x:hidden}
+  }
+</style>
+</head>
+<body x-data="editor()" x-cloak>
+<div class="wrap">
+  <span class="kicker">🎛️ F2 Crop-Steering Editor · live setpoints</span>
+  <h1>Every setpoint, on the curve.</h1>
+  <p class="sub">A full-day <b>physics simulation</b>, not a drawing: the environment (PPFD, CO₂, temp, RH → VPD) sets a transpiration rate that drys the substrate back; the crop-steering controller fires shots; each shot mixes <b>feed EC</b> into the pore by the litres applied (<b>shot % × substrate L</b>); when VWC hits <b>field capacity</b> the overshoot runs off and flushes salt out, pulling pore EC toward the feed EC. The white line is VWC, the pink line is <b>pore EC on the right 0–10 axis</b>. Edit any field or drag a glowing handle and the whole day re-solves. Environment seeded live from F2; everything else from <code>number.crop_steering_*</code>.</p>
+
+  <div class="layout">
+    <!-- ===== SECTION A: irrigation graph + its controls ===== -->
+    <div class="gridrow">
+      <div class="gcol">
+    <div class="panel glass">
+      <div class="topbar">
+        <div class="seg"><template x-for="z in [1,2,3]" :key="'z'+z"><button :class="zone===z&&'on'" @click="zone=z" x-text="'Zone '+z"></button></template></div>
+        <div class="seg ath"><template x-for="s in ['Clone','Veg','Stretch','Bulk','Finish']" :key="'a'+s"><button :class="athena===s&&'on'" @click="applyAthena(s)" x-text="s"></button></template></div>
+        <div class="verdict" x-html="verdict()"></div>
+      </div>
+      <div class="steer">
+        <div class="lab"><span>Steering dial</span><span x-text="dialLabel()"></span></div>
+        <input type="range" min="1" max="10" step="0.5" x-model.number="dial" @input="mode = dial>=5.5?'gen':'veg'; applySteer()">
+        <div class="ends"><span>🌿 vegetative · shallow dryback</span><span>generative · deep dryback 🌸</span></div>
+      </div>
+      <svg viewBox="0 0 1240 500" @pointerdown="onDown($event)" @pointermove="onMove($event)" @pointerup="drag=null" @pointercancel="drag=null" @mouseover="onHover($event)" @mouseleave="hov=null" x-html="svgBody()"></svg>
+      <div class="legend"><span><i style="background:#e7ecf2"></i>VWC</span><span><i style="background:#f472b6"></i>pore EC</span><span><i style="background:#34d399"></i>field capacity</span><span><i style="background:#f87171"></i>emergency floor</span><span style="color:var(--ink3)">· glowing dot = draggable</span></div>
+      <div class="readout" style="margin-top:10px">
+        <span class="pill">first shot <b x-text="fmtMin(firstShotMin())"></b></span>
+        <span class="pill">P1 shots <b x-text="p1ShotCount()"></b></span>
+        <span class="pill">last shot <b x-text="fmtBeforeOff()"></b></span>
+        <span class="pill">total dryback <b x-text="((g('field_capacity')-overnightLow())/g('field_capacity')*100).toFixed(0)+'%'"></b></span>
+        <span class="pill">peak EC <b x-text="peakEC().toFixed(1)"></b></span>
+        <span class="pill" x-show="live" style="color:var(--ok)">● live F2</span>
+      </div>
+    </div>
+    <!-- ===== LIMITING FACTORS (Liebig minimum) ===== -->
+    <div class="panel glass">
+      <div class="ch"><h2>Limiting factors — Zone <span x-text="zone"></span></h2><span class="chs">Liebig's law of the minimum — your ceiling is set by the worst factor, not the average. Biggest bottleneck first; fix it, then the next.</span></div>
+      <div class="lim2">
+        <template x-for="goal in [{k:'y',name:'Max yield'},{k:'p',name:'Max potency'}]" :key="goal.k">
+          <div class="limcol">
+            <div class="limhead"><span class="limgoal" x-text="goal.name"></span>
+              <span class="limpot" :class="potential(goal.k).pct>=80?'ok':(potential(goal.k).pct>=60?'mid':'low')"><b x-text="potential(goal.k).pct"></b>%<i>potential</i></span></div>
+            <div class="limtop" x-show="potential(goal.k).top.dir!=='ok'">⛔ <b x-text="potential(goal.k).top.label"></b> — <span x-text="potential(goal.k).top.dir"></span> toward <span x-text="potential(goal.k).top.lo+'–'+potential(goal.k).top.hi"></span> <i x-text="'· '+potential(goal.k).top.lever"></i></div>
+            <div class="limtop ok" x-show="potential(goal.k).top.dir==='ok'">✓ every factor in its optimal band</div>
+            <template x-for="f in potential(goal.k).list" :key="f.key">
+              <div class="limrow" :class="f.pct>=80?'ok':(f.pct>=60?'mid':'low')">
+                <span class="lrl" x-text="f.label"></span>
+                <span class="lrbar"><i :style="'width:'+f.pct+'%'"></i></span>
+                <span class="lrv"><b x-text="f.val"></b><em x-text="f.unit"></em></span>
+                <span class="lrd" x-text="f.dir==='ok'?'✓ in band':(f.dir==='raise'?'▲ raise':'▼ lower')"></span>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+      <div class="zsum">
+        <template x-for="zz in zonesSummary()" :key="zz.z">
+          <div class="zs" :class="zone===zz.z&&'on'" @click="zone=zz.z">
+            <b>Zone <span x-text="zz.z"></span></b>
+            <span>yield <em x-text="zz.y.pct+'%'"></em> · <span x-text="zz.y.top.label"></span></span>
+            <span>potency <em x-text="zz.p.pct+'%'"></em> · <span x-text="zz.p.top.label"></span></span>
+          </div>
+        </template>
+      </div>
+    </div>
+    <!-- ===== LIVE COUPLED STATE ===== -->
+    <div class="panel glass">
+      <div class="ch"><h2>Live coupled state</h2><span class="chs">one algorithm — every lever feeds these. Change any number and watch the rest move in sync (▲▼ = which way each just shifted).</span></div>
+      <div class="cstate">
+        <template x-for="c in coupled()" :key="c.key">
+          <div class="cc" :class="['g-'+c.grp, c.dir>0&&'up', c.dir<0&&'down']">
+            <div class="ccl" x-text="c.label"></div>
+            <div class="ccv" :class="c.good?'ok':'warn'"><span x-text="c.disp"></span><i x-text="c.unit"></i><b class="arr" x-text="c.dir>0?'▲':(c.dir<0?'▼':'')"></b></div>
+            <div class="ccd" x-text="c.driver"></div>
+          </div>
+        </template>
+      </div>
+      <div class="clegend"><span><i style="background:var(--p1)"></i>atmosphere</span><span><i style="background:var(--p2)"></i>plant</span><span><i style="background:var(--p3)"></i>root-zone</span><span><i style="background:var(--ec)"></i>room balance</span></div>
+    </div>
+      </div>
+      <aside class="scol"><div class="srail">
+        <template x-for="grp in groups().filter(g=>['P0','P1','P2','P3','ST','HW'].includes(g.k))" :key="grp.k">
+          <div class="grp" :class="hot===grp.k&&'hot'" :style="'--ph:'+grp.col" @mouseenter="hot=grp.k">
+            <div class="gh"><span class="dot" :style="'background:'+grp.col"></span><span x-show="grp.ph" class="ph" :style="'background:'+grp.col" x-text="grp.ph"></span><h3 x-text="grp.name"></h3></div>
+            <template x-for="f in grp.fields" :key="f.key">
+              <div class="frow" :class="hov===f.key&&'lit'" @mouseenter="hov=f.key" @mouseleave="hov=null">
+                <div class="fl" x-text="f.label"></div>
+                <span class="step"><button @click="bump(f,-1)">−</button><input type="number" :step="f.step" :value="fmtNum(g(f.key),f.dec)" @change="setField(f,$event.target.value)"><button @click="bump(f,1)">+</button><span class="u" x-text="f.unit"></span></span>
+              </div>
+            </template>
+          </div>
+        </template>
+        <div class="actions">
+          <button class="btn primary" x-show="live" @click="applyToHA()">✔ Apply Zone <span x-text="zone"></span> to HA</button>
+          <button class="btn" :class="!live&&'primary'" @click="save()">💾 Save template</button>
+          <button class="btn" @click="reset()">Reset zone</button>
+          <span x-show="saved" style="color:var(--ok);font-size:13px">Saved ✓</span>
+        </div>
+      </div></aside>
+    </div>
+
+    <!-- ===== SECTION B: environment graphs + climate/room controls ===== -->
+    <div class="gridrow">
+      <div class="gcol">
+    <!-- ===== ROOM ENVIRONMENT GRAPHS ===== -->
+    <div class="panel glass envstack">
+      <div class="ch"><h2>Room environment · 24h</h2><span class="chs">same lights-aligned timeline as the irrigation card — read root-zone, air, light & balances as one synchronized story.</span></div>
+      <div class="envrow"><div class="envlab">Climate · VPD <i style="color:#f472b6">leaf</i> <i style="color:#7dd3fc">air</i> · <i style="color:#fb923c">temp</i> <i style="color:#60a5fa">RH</i><b>green = in-band 0.8–1.4 kPa · drag temp/RH dots</b></div><div class="minicwrap" @pointerdown="miniDown('climate',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="climateChart()"></div></div>
+      <div class="envrow"><div class="envlab">Dew point & condensation margin · <i style="color:#fb923c">leaf temp</i> <i style="color:#60a5fa">dew point</i><b style="color:#f87171">red ribbon = &lt;3°C → condensation risk</b></div><div class="minicwrap" @pointerdown="miniDown('dew',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dewChart()"></div></div>
+      <div class="envrow"><div class="envlab">Moisture balance · <i style="color:#34d399">transpiration in</i> <i style="color:#f472b6">dehum capacity out</i><b>fill above the line → RH will climb · drag dehum</b></div><div class="minicwrap" @pointerdown="miniDown('moist',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="moistChart()"></div></div>
+      <div class="envrow"><div class="envlab">Light · <i style="color:#a3e635">cumulative DLI</i> <i style="color:#6b7682">target pace</i> · <i style="color:#fbbf24">photosynthesis %</i></div><div class="minicwrap" @pointerdown="miniDown('dli',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dliChart()"></div></div>
+      <div class="envrow"><div class="envlab">Leaf vs air temp · <i style="color:#fb923c">leaf</i> <i style="color:#7dd3fc">air</i><b>gap = transpirational cooling / stress · drag air</b></div><div class="minicwrap" @pointerdown="miniDown('leafair',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="leafAirChart()"></div></div>
+      <div class="envrow"><div class="envlab">CO₂ utilization · <i style="color:#a78bfa">room ppm</i> <i style="color:#34d399">canopy uptake g/h</i><b>enriched by day · ambient at night · drag CO₂</b></div><div class="minicwrap" @pointerdown="miniDown('co2',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="co2Chart()"></div></div>
+      <div class="envrow"><div class="envlab">Heat / cooling · <i style="color:#f59e0b">sensible load (lights)</i> <i style="color:#60a5fa">AC capacity</i><b>area above the line = under-cooled · drag AC</b></div><div class="minicwrap" @pointerdown="miniDown('heat',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="heatChart()"></div></div>
+    </div>
+
+      </div>
+      <aside class="scol"><div class="srail">
+        <template x-for="grp in groups().filter(g=>['EN','RM'].includes(g.k))" :key="grp.k">
+          <div class="grp" :class="hot===grp.k&&'hot'" :style="'--ph:'+grp.col" @mouseenter="hot=grp.k">
+            <div class="gh"><span class="dot" :style="'background:'+grp.col"></span><span x-show="grp.ph" class="ph" :style="'background:'+grp.col" x-text="grp.ph"></span><h3 x-text="grp.name"></h3></div>
+            <template x-for="f in grp.fields" :key="f.key">
+              <div class="frow" :class="hov===f.key&&'lit'" @mouseenter="hov=f.key" @mouseleave="hov=null">
+                <div class="fl" x-text="f.label"></div>
+                <span class="step"><button @click="bump(f,-1)">−</button><input type="number" :step="f.step" :value="fmtNum(g(f.key),f.dec)" @change="setField(f,$event.target.value)"><button @click="bump(f,1)">+</button><span class="u" x-text="f.unit"></span></span>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div></aside>
+    </div>
+    <p class="note">Live values pulled from F2 on 2026-06-07. Hardware (field capacity, substrate volume, lights) is shared across zones; everything else is per-zone. Next step: write changes back to the <code>number.crop_steering_zone_N_*</code> entities with a confirm step.</p>
+  </div>
+</div>
+
+<script>
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function rstep(v,s){ const inv=1/s; return Math.round(v*inv)/inv; }
+
+/* TOKEN-FREE: embedded in crop_steering.html (live values arrive via postMessage) or standalone ?demo (seed). No secrets in this file. */
+const CONFIG = { BASE:"", LL_TOKEN:"", ENT:{} };
+let SIM=null, SIMKEY=null;   // simulation cache in module scope (never Alpine-reactive — avoids reactive-write recursion)
+let ENVS=null, ENVK=null;    // diurnal environment-series cache
+let MINI={};                 // per-mini-chart geometry, for on-graph drag inversion
+let ZOVR=null;               // transient zone override for cross-zone calc (NOT Alpine-reactive — avoids render churn that eats input focus)
+let PREV={};                 // last coupled-state values, for change-direction arrows
+
+/* Athena standard setpoints by stage (from the Setpoints dashboard WEEK_DATA) */
+const ATHENA = {
+  Clone:   {ppfd:150,  co2:400,  temp:25,   rh:70, temp_night:23,   rh_night:75},
+  Veg:     {ppfd:450,  co2:400,  temp:26,   rh:68, temp_night:22,   rh_night:72},
+  Stretch: {ppfd:850,  co2:1300, temp:27,   rh:66, temp_night:23,   rh_night:70},
+  Bulk:    {ppfd:1150, co2:1400, temp:25.5, rh:64, temp_night:21.5, rh_night:68},
+  Finish:  {ppfd:800,  co2:700,  temp:22,   rh:55, temp_night:18,   rh_night:60},
+};
+/* steering-dial profile: which per-zone setpoints slide between [vegetative, generative] as the dial moves */
+const STEER = { p2_vwc_threshold:[54,40], p2_shot_size:[12,3] };   // veg: high re-water + big flushing shots (EC↓); gen: dry deeper + small stacking shots (EC↑)
+
+/* ===== real live setpoints (F2, per zone). Shared hardware in GLOBAL. ===== */
+function zoneDefaults(o){ return Object.assign({
+  p0_minimum_wait_time:5, p0_maximum_wait_time:30, p0_dryback_drop_percent:2,
+  p1_target_vwc:60, p1_initial_shot_size:2, p1_shot_size_increment:0.5, p1_maximum_shot_size:5, p1_time_between_shots:15, p1_minimum_shots:5, p1_maximum_shots:12,
+  p2_vwc_threshold:43, p2_shot_size:5, p2_ec_high_threshold:1.2, p2_ec_low_threshold:0.8,
+  p3_emergency_vwc_threshold:40, p3_emergency_shot_size:5, p3_gen_last_irrigation:30, p3_veg_last_irrigation:15,
+  generative_dryback_target:45, vegetative_dryback_target:18,
+  ec_target_gen_p1:5.0, ec_target_gen_p2:6.0, ec_target_gen_p3:4.5, ec_target_veg_p1:3.0, ec_target_veg_p2:3.2, ec_target_veg_p3:3.0, ec_target_flush:0.8,
+}, o); }
+const LIVE = {
+  1: zoneDefaults({ p2_vwc_threshold:41, p2_shot_size:5,   p1_maximum_shots:12, p1_minimum_shots:5, p3_gen_last_irrigation:30, p3_emergency_vwc_threshold:38 }),
+  2: zoneDefaults({ p2_vwc_threshold:43, p2_shot_size:5,   p1_maximum_shots:4,  p1_minimum_shots:3, p3_gen_last_irrigation:60, p3_emergency_vwc_threshold:40 }),
+  3: zoneDefaults({ p2_vwc_threshold:43, p2_shot_size:1.5, p1_maximum_shots:12, p1_minimum_shots:5, p3_gen_last_irrigation:30, p3_emergency_vwc_threshold:40 }),
+};
+const GLOBAL = { field_capacity:60, substrate_volume:6, lights_on:10, lights_off:22, ppfd:1150, co2:1400, temp:25.5, rh:64, temp_night:21.5, rh_night:68, feed_ec:3.0,
+  room_length:6, room_width:4, room_height:3, canopy_coverage:80, plant_count:40, light_watts:18000, hvac_cooling_kw:18, dehum_capacity:600 };
+
+/* field metadata: key -> ranges/units (from the live entity attributes) */
+const META = {
+  p0_minimum_wait_time:{label:"Min wait",unit:"min",min:5,max:300,step:5,dec:0},
+  p0_maximum_wait_time:{label:"Max wait → first shot",unit:"min",min:30,max:600,step:15,dec:0},
+  p0_dryback_drop_percent:{label:"Dryback drop trigger",unit:"%",min:2,max:40,step:1,dec:0},
+  p1_target_vwc:{label:"Target VWC (peak)",unit:"%",min:5,max:95,step:1,dec:0},
+  p1_initial_shot_size:{label:"Initial shot",unit:"%",min:0.1,max:20,step:0.1,dec:1},
+  p1_shot_size_increment:{label:"Shot increment",unit:"%",min:0.05,max:10,step:0.05,dec:2},
+  p1_maximum_shot_size:{label:"Max shot",unit:"%",min:2,max:50,step:0.5,dec:1},
+  p1_time_between_shots:{label:"Time between shots",unit:"min",min:1,max:60,step:1,dec:0},
+  p1_minimum_shots:{label:"Min shots",unit:"",min:1,max:20,step:1,dec:0},
+  p1_maximum_shots:{label:"Max shots",unit:"",min:1,max:30,step:1,dec:0},
+  p2_vwc_threshold:{label:"Re-water threshold",unit:"%",min:5,max:85,step:1,dec:0},
+  p2_shot_size:{label:"Shot size",unit:"%",min:0.5,max:30,step:0.5,dec:1},
+  p2_ec_high_threshold:{label:"EC high ratio",unit:"×",min:0.5,max:3,step:0.05,dec:2},
+  p2_ec_low_threshold:{label:"EC low ratio",unit:"×",min:0.2,max:2,step:0.05,dec:2},
+  p3_emergency_vwc_threshold:{label:"Emergency floor",unit:"%",min:20,max:65,step:1,dec:0},
+  p3_emergency_shot_size:{label:"Emergency shot",unit:"%",min:0.1,max:15,step:0.1,dec:1},
+  p3_gen_last_irrigation:{label:"Last shot (gen)",unit:"min",min:30,max:600,step:15,dec:0},
+  p3_veg_last_irrigation:{label:"Last shot (veg)",unit:"min",min:15,max:360,step:15,dec:0},
+  generative_dryback_target:{label:"Generative dryback",unit:"%",min:5,max:70,step:1,dec:0},
+  vegetative_dryback_target:{label:"Vegetative dryback",unit:"%",min:5,max:80,step:1,dec:0},
+  ec_target_gen_p1:{label:"EC gen P1",unit:"",min:0.5,max:20,step:0.1,dec:1},
+  ec_target_gen_p2:{label:"EC gen P2",unit:"",min:0.5,max:20,step:0.1,dec:1},
+  ec_target_gen_p3:{label:"EC gen P3",unit:"",min:0.5,max:20,step:0.1,dec:1},
+  ec_target_veg_p2:{label:"EC veg P2",unit:"",min:0.5,max:15,step:0.1,dec:1},
+  ec_target_flush:{label:"EC flush",unit:"",min:0.1,max:15,step:0.1,dec:1},
+  field_capacity:{label:"Field capacity",unit:"%",min:5,max:100,step:1,dec:0},
+  substrate_volume:{label:"Substrate volume",unit:"L",min:1,max:200,step:0.1,dec:1},
+  ppfd:{label:"PPFD (canopy)",unit:"µmol",min:0,max:1500,step:25,dec:0},
+  co2:{label:"CO₂",unit:"ppm",min:400,max:1600,step:50,dec:0},
+  temp:{label:"Day temp",unit:"°C",min:10,max:40,step:0.5,dec:1},
+  rh:{label:"Day RH",unit:"%",min:20,max:95,step:1,dec:0},
+  temp_night:{label:"Night temp",unit:"°C",min:8,max:38,step:0.5,dec:1},
+  rh_night:{label:"Night RH",unit:"%",min:20,max:95,step:1,dec:0},
+  feed_ec:{label:"Feed EC (input)",unit:"mS",min:0.2,max:6,step:0.1,dec:1},
+  room_length:{label:"Room length",unit:"m",min:1,max:60,step:0.1,dec:1},
+  room_width:{label:"Room width",unit:"m",min:1,max:60,step:0.1,dec:1},
+  room_height:{label:"Room height",unit:"m",min:2,max:10,step:0.1,dec:1},
+  canopy_coverage:{label:"Canopy coverage",unit:"%",min:20,max:100,step:5,dec:0},
+  plant_count:{label:"Plant count",unit:"",min:1,max:5000,step:1,dec:0},
+  light_watts:{label:"Total light power",unit:"W",min:0,max:100000,step:100,dec:0},
+  hvac_cooling_kw:{label:"HVAC cooling",unit:"kW",min:0,max:100,step:0.5,dec:1},
+  dehum_capacity:{label:"Dehumidification",unit:"L/d",min:0,max:5000,step:5,dec:0},
+};
+
+function editor(){
+  return {
+    W:1240, H:500, PL:42, PR:46, PT:26, PB:70, VMIN:18, VMAX:84,
+    get PW(){return this.W-this.PL-this.PR}, get PH(){return this.H-this.PT-this.PB},
+    x(t){return this.PL+(t/24)*this.PW}, y(v){return this.PT+(1-(v-this.VMIN)/(this.VMAX-this.VMIN))*this.PH},
+    invT(px){return clamp((px-this.PL)/this.PW*24,0,24)}, invV(py){return clamp(this.VMIN+(1-(py-this.PT)/this.PH)*(this.VMAX-this.VMIN),0,100)},
+
+    zone:1, mode:"gen", dial:7, hot:"P1", drag:null, hov:null, saved:false, live:false, athena:"Bulk", minidrag:null,
+    Z:{}, G:{},
+    init(){ this.Z=JSON.parse(JSON.stringify(LIVE)); this.G=Object.assign({},GLOBAL);
+      try{ const s=JSON.parse(localStorage.getItem("f2cs.tpl")); if(s&&s.Z){this.Z=s.Z; this.G=s.G||this.G; if(s.dial) this.dial=s.dial;} }catch(e){}
+      this.mode = this.dial>=5.5?'gen':'veg'; this.pullLive(); },
+    pullLive(){   // embedded in crop_steering.html → live setpoints arrive from the parent via postMessage. Standalone (?demo / GitHub Pages) → keep the seed.
+      if(window.parent===window) return;
+      window.addEventListener("message",ev=>{ const d=ev.data; if(!d||d.type!=="cs-tune-data") return;
+        try{ if(d.zones){ for(const z in d.zones){ if(this.Z[z]) Object.assign(this.Z[z], d.zones[z]); } }
+             if(d.global) Object.assign(this.G, d.global);
+             if(d.dial!=null) this.dial=d.dial;
+             this.mode=this.dial>=5.5?'gen':'veg'; this.live=true; SIMKEY=null; ENVK=null; PREV={}; }catch(e){ console.warn("tune seed failed:",e.message); } });
+      try{ window.parent.postMessage({type:"cs-tune-ready"},"*"); }catch(e){}
+    },
+    applyToHA(){   // push this zone's edited setpoints back to HA via the parent (parent maps → number.set_value with a confirm)
+      if(window.parent===window){ this.save(); return; }   // standalone → save the local template
+      const z=this.zone, changes=Object.assign({},this.Z[z]);
+      try{ window.parent.postMessage({type:"cs-tune-apply",zone:z,changes,global:Object.assign({},this.G)},"*"); }catch(e){}
+    },
+    dialLabel(){ const v=this.dial; const t=v<3?"deep vegetative":v<5?"vegetative":v<5.5?"balanced":v<7.5?"generative":"hard generative"; return v.toFixed(1)+" · "+t; },
+    applyAthena(s){ const a=ATHENA[s]; if(!a) return; for(const k in a) this.G[k]=a[k]; this.athena=s; SIMKEY=null; ENVK=null; },
+    applySteer(){ const gf=clamp((this.dial-1)/9,0,1); for(const z of [1,2,3]) for(const k in STEER){ const m=META[k], v=STEER[k][0]+(STEER[k][1]-STEER[k][0])*gf; this.Z[z][k]=clamp(rstep(v,m.step),m.min,m.max); } SIMKEY=null; },   // dial writes the steered setpoints across all zones
+
+    /* accessors */
+    g(k){ if(k in this.G) return this.G[k]; return this.Z[ZOVR||this.zone][k]; },
+    setRaw(k,v){ if(k in this.G) this.G[k]=v; else this.Z[this.zone][k]=v; },
+    setField(f,val){ const n=parseFloat(val); if(isNaN(n)) return; this.setRaw(f.key, clamp(rstep(n,f.step),f.min,f.max)); },
+    bump(f,dir){ this.setRaw(f.key, clamp(rstep(this.g(f.key)+dir*f.step,f.step),f.min,f.max)); },
+
+    photo(){ return ((this.G.lights_off-this.G.lights_on)+24)%24 || 12; },
+
+    /* steering-derived */
+    lastIrrigMin(){ return this.mode==='gen'? this.g('p3_gen_last_irrigation') : this.g('p3_veg_last_irrigation'); },
+    drybackTarget(){ const gf=clamp((this.dial-1)/9,0,1); return this.g('vegetative_dryback_target')*(1-gf)+this.g('generative_dryback_target')*gf; },  // veg shallow → gen deep, smooth with the dial
+    ecP1(){ return this.mode==='gen'? this.g('ec_target_gen_p1') : this.g('ec_target_veg_p1'); },
+    ecP2(){ return this.mode==='gen'? this.g('ec_target_gen_p2') : this.g('ec_target_veg_p2'); },
+    ecP3(){ return this.mode==='gen'? this.g('ec_target_gen_p3') : this.g('ec_target_veg_p3'); },
+
+    /* ===== coupled lever chain: environment → leaf → stomata → transpiration → dryback → EC =====
+       Every derived quantity takes an env snapshot e={ppfd,co2,temp,rh,on}. Default = day setpoints (headline);
+       envAt(t) gives the diurnal value so the graphs + sim vary across the 24h. */
+    dayEnv(){ return {ppfd:this.g('ppfd'), co2:this.g('co2'), temp:this.g('temp'), rh:this.g('rh'), on:true}; },
+    envAt(t){ const photo=this.photo(), on=t<photo, cl=x=>clamp(x,0,1), lerp=(a,b,f)=>a+(b-a)*f;
+      const lOn = on ? cl(Math.min(t/0.3,(photo-t)/0.3)) : 0;          // light trapezoid 0..1 (ramp at lights-on/off)
+      const ease= on ? cl(Math.min(t/1,(photo-t)/1)) : 0;             // climate day-fraction (1h dawn/dusk transitions)
+      return { on, ppfd:this.g('ppfd')*lOn, co2:lerp(400,this.g('co2'),ease), temp:lerp(this.g('temp_night'),this.g('temp'),ease), rh:lerp(this.g('rh_night'),this.g('rh'),ease) }; },
+    svp(T){ return 0.6108*Math.exp(17.27*T/(T+237.3)); },                                   // saturation vapour pressure (kPa)
+    vpd(e){ e=e||this.dayEnv(); return Math.max(0.05, this.svp(e.temp)*(1-e.rh/100)); },     // air VPD
+    dewPoint(e){ e=e||this.dayEnv(); const rh=clamp(e.rh,1,100), a=Math.log(rh/100)+17.27*e.temp/(237.3+e.temp); return 237.3*a/(17.27-a); },
+    gs(e){ e=e||this.dayEnv(); const fL=e.ppfd/(e.ppfd+300), fC=1/(1+Math.max(0,e.co2-400)/4000), fV=1/(1+Math.pow(this.vpd(e)/1.8,2)); return fL*fC*fV; },  // stomatal conductance 0..1
+    leafTemp(e){ e=e||this.dayEnv(); return e.temp + 0.7*(e.ppfd/1000) - 4.5*this.gs(e); },  // LED: small radiative gain, larger transpirational cooling → leaf 1–2.5°C BELOW air; rises above only when stomata close (water stress)
+    vpdLeaf(e){ e=e||this.dayEnv(); const eAir=this.svp(e.temp)*e.rh/100; return Math.max(0.05, this.svp(this.leafTemp(e))-eAir); },   // leaf-to-air VPD (leaf cooler → lower than air VPD)
+    psRate(e){ e=e||this.dayEnv(); const Kl=250+0.2*e.co2, fL=e.ppfd/(e.ppfd+Kl), fC=e.co2/(e.co2+500), fT=Math.exp(-Math.pow((this.leafTemp(e)-27)/10,2)); return fL*fC*fT; },  // light-saturation point rises with CO₂ (Kl); CO₂ fertilisation; leaf-temp optimum ~27°C
+    transpiration(e){ const KT=0.57; return (e.on && e.ppfd>20) ? KT*this.gs(e)*this.vpdLeaf(e) : KT*0.06*this.vpd(e); },   // litres/hour; KT tuned so daily-mean dryback ≈ live 3.97%/h
+    transpirationLh(t,on){ return this.transpiration(this.envAt(t)); },                      // diurnal value the sim integrates
+    drybackRatePct(){ return this.transpiration(this.dayEnv())/Math.max(this.g('substrate_volume'),0.1)*100; },   // midday peak rate
+
+    /* ===== room/facility scaling — turns the per-plant physics into real room totals ===== */
+    floorArea(){ return this.g('room_length')*this.g('room_width'); },                        // m²
+    roomVol(){ return this.floorArea()*this.g('room_height'); },                              // m³
+    canopyArea(){ return this.floorArea()*this.g('canopy_coverage')/100; },                   // m²
+    dailyWaterL(){ const photo=this.photo(); let s=0; for(let t=0;t<photo;t+=0.25) s+=this.transpiration(this.envAt(t))*0.25; return s*this.g('plant_count'); },  // total room L/day
+    coolingLoadKw(){ return this.g('light_watts')/1000*0.5; },   // AC sensible load ≈ 50% of LED watts (driver + non-PAR); the PAR half drives transpiration → latent → dehumidifier
+    co2UptakeGh(){ return this.canopyArea()*2.0*this.psRate(this.dayEnv()); },                 // g CO₂/h (≈2 g/m²/h at full photosynthesis)
+    co2DrawPpmH(){ return this.co2UptakeGh()*1000/(1.96*Math.max(this.roomVol(),1)); },        // ppm/h drawn down if uninjected (1 ppm ≈ 1.96 mg/m³)
+    lightWm2(){ return this.g('light_watts')/Math.max(this.floorArea(),0.1); },                // W/m² electrical
+
+    /* ===== the whole coupled state — every lever feeds these; change one, they all move ===== */
+    coupled(){
+      const ppfd=this.g('ppfd'), photo=this.photo(), Tl=this.leafTemp(), Td=this.dewPoint();
+      const vpdA=this.vpd(), vpdL=this.vpdLeaf(), gs=this.gs(), pn=this.psRate(), E=this.transpiration(this.dayEnv());
+      const dli=ppfd*photo*0.0036, m=this.sim().meta, peakEC=this.peakEC();
+      const water=this.dailyWaterL(), load=water*1.1, bal=this.g('dehum_capacity')-load, cool=this.coolingLoadKw(), tons=cool/3.517, wue=pn/Math.max(E,0.02)*2, margin=Tl-Td;
+      const R=[
+        ["vpdA","Air VPD","kPa",vpdA,2,"svp(air)·(1−RH)","atm",vpdA>=0.8&&vpdA<=1.3],
+        ["vpdL","Leaf VPD","kPa",vpdL,2,"svp(leaf)−e(air)","atm",vpdL>=0.8&&vpdL<=1.6],
+        ["dew","Dew point","°C",Td,1,"Magnus(air,RH)","atm",true],
+        ["margin","Condensation margin","°C",margin,1,"leaf−dew · >3 safe","atm",margin>3],
+        ["dli","DLI","mol/d",dli,1,"PPFD·hrs·0.0036","atm",dli>=30&&dli<=62],
+        ["leaf","Leaf temp","°C",Tl,1,"air +light −transp","plant",Tl<=30],
+        ["gs","Stomata open","%",gs*100,0,"light·CO₂·VPD","plant",gs>0.25],
+        ["pn","Photosynthesis","%",pn*100,0,"light·CO₂·leafT","plant",pn>0.4],
+        ["E","Transpiration","L/h/pl",E,2,"gs·leaf-VPD","plant",true],
+        ["wue","Water-use eff","idx",wue,2,"photosynth/transp","plant",true],
+        ["db","Dryback rate","%/h",this.drybackRatePct(),1,"transp/substrate","root",true],
+        ["pec","Peak pore EC","mS",peakEC,1,"feed + dryback stack","root",peakEC<this.ecP2()*1.6],
+        ["shots","Shots/day","",m.shots.length,0,"controller fires","root",true],
+        ["ro","Runoff","L/day",m.runoffL||0,2,"overshoot past FC","root",true],
+        ["water","Water use (room)","L/day",water,1,"Σ transp · plants","room",true],
+        ["bal","Moisture balance","L/day",bal,1,"dehum − load·1.1","room",bal>=0],
+        ["cool","Cooling load","kW",cool,1,"≈50% of LED W","room",cool<=this.g('hvac_cooling_kw')],
+        ["tons","Cooling need","ton",tons,2,"kW ÷ 3.517","room",cool<=this.g('hvac_cooling_kw')],
+        ["co2d","CO₂ draw","ppm/h",this.co2DrawPpmH(),0,"uptake / room vol","room",true],
+        ["wm2","Light intensity","W/m²",this.lightWm2(),0,"watts / floor","room",true],
+      ];
+      return R.map(r=>{ const [key,label,unit,n,dec,driver,grp,good]=r, p=PREV[key]; let dir=0;
+        if(p!==undefined && Math.abs(n-p)>Math.max(0.02,Math.abs(n)*0.004)) dir=n>p?1:-1; PREV[key]=n;
+        return {key,label,unit,grp,driver,good,dir,disp:Number(n).toFixed(dec)}; });
+    },
+
+    /* ===== diurnal environment series for the room graphs (cached in module scope) ===== */
+    envSeries(){ const key=JSON.stringify([this.G,this.photo()]); if(ENVK===key) return ENVS;
+      const S={t:[],vpdA:[],vpdL:[],temp:[],rh:[],dew:[],leaf:[],transp:[],pn:[],dli:[],ppfd:[],co2:[],uptake:[],lightKw:[],heatKw:[]}; let dli=0;
+      const dP=this.g('ppfd'), pc=this.g('plant_count'), lw=this.g('light_watts'), ca=this.canopyArea();
+      for(let i=0;i<=96;i++){ const t=i*0.25, e=this.envAt(t), pn=this.psRate(e), tr=this.transpiration(e);
+        S.t.push(t); S.vpdA.push([t,this.vpd(e)]); S.vpdL.push([t,this.vpdLeaf(e)]); S.temp.push([t,e.temp]); S.rh.push([t,e.rh]);
+        S.dew.push([t,this.dewPoint(e)]); S.leaf.push([t,this.leafTemp(e)]); S.transp.push([t,tr*pc]);   // room total L/h
+        S.pn.push([t,pn*100]); dli+=e.ppfd*0.25*0.0036; S.dli.push([t,dli]); S.ppfd.push([t,e.ppfd]);
+        S.co2.push([t,e.co2]); S.uptake.push([t,ca*2*pn]);
+        const lightKw=lw/1000*(dP>0?e.ppfd/dP:0); S.lightKw.push([t,lightKw]); S.heatKw.push([t,lightKw+tr*pc*0.628]); }
+      ENVS=S; ENVK=key; return S; },
+
+    /* generic 24h mini-chart — shares the irrigation card's x-scale + lights-off shading (vertical register) */
+    miniChart(o){ const W=this.W,PL=this.PL,PR=this.PR,h=o.h||150,mPT=16,mPB=22,PWi=W-PL-PR,PHi=h-mPT-mPB,photo=this.photo();
+      const xx=t=>PL+(t/24)*PWi, L=o.left, R=o.right, yl=v=>mPT+(1-(v-L.min)/((L.max-L.min)||1))*PHi, yr=v=>mPT+(1-(v-R.min)/((R.max-R.min)||1))*PHi;
+      const poly=(pts,map)=>pts.map(p=>xx(p[0]).toFixed(1)+","+map(p[1]).toFixed(1)).join(" ");
+      let s=`<svg viewBox="0 0 ${W} ${h}" class="mini" preserveAspectRatio="none">`;
+      s+=`<rect x="${xx(photo).toFixed(1)}" y="${mPT}" width="${(xx(24)-xx(photo)).toFixed(1)}" height="${PHi}" fill="rgba(255,255,255,.04)"/>`;
+      (L.bands||[]).forEach(b=>{ s+=`<rect x="${PL}" y="${yl(b.hi).toFixed(1)}" width="${PWi}" height="${Math.abs(yl(b.lo)-yl(b.hi)).toFixed(1)}" fill="${b.color||'rgba(52,211,153,.10)'}"/>`; });
+      (L.ticks||[]).forEach(v=>{ s+=`<line x1="${PL}" y1="${yl(v).toFixed(1)}" x2="${W-PR}" y2="${yl(v).toFixed(1)}" stroke="rgba(255,255,255,.06)"/><text x="${PL-6}" y="${(yl(v)+3).toFixed(1)}" text-anchor="end" font-size="9" fill="#6b7682">${v}</text>`; });
+      s+=`<text x="${PL-6}" y="${mPT-5}" text-anchor="end" font-size="9.5" fill="#9aa4b1">${L.label}</text>`;
+      if(R){ s+=`<text x="${W-PR+6}" y="${mPT-5}" font-size="9.5" fill="#7c8693">${R.label}</text>`; (R.ticks||[]).forEach(v=>{ s+=`<text x="${W-PR+6}" y="${(yr(v)+3).toFixed(1)}" font-size="9" fill="#6b7682">${v}</text>`; }); }
+      for(let hh=0;hh<=24;hh+=3){ s+=`<text x="${xx(hh).toFixed(1)}" y="${h-6}" text-anchor="middle" font-size="8.5" fill="#6b7682">${hh}h</text>`; }
+      if(o.extra) s+=o.extra(xx,yl,yr);
+      (L.series||[]).forEach(se=>{ if(se.fill) s+=`<polygon points="${PL},${yl(L.min).toFixed(1)} ${poly(se.pts,yl)} ${(W-PR)},${yl(L.min).toFixed(1)}" fill="${se.fill}"/>`;
+        s+=`<polyline points="${poly(se.pts,yl)}" fill="none" stroke="${se.color}" stroke-width="${se.w||2}" ${se.dash?`stroke-dasharray="${se.dash}"`:''} stroke-linejoin="round" stroke-linecap="round"/>`; });
+      if(R)(R.series||[]).forEach(se=>{ s+=`<polyline points="${poly(se.pts,yr)}" fill="none" stroke="${se.color}" stroke-width="${se.w||1.5}" ${se.dash?`stroke-dasharray="${se.dash}"`:''} opacity="${se.op||.8}" stroke-linejoin="round"/>`; });
+      // value callouts + draggable handles (like the VWC card)
+      (o.bubbles||[]).forEach(b=>{ const by=(b.ax==='r'?yr:yl)(b.v), bx=xx(b.t), drg=!!b.k, w=Math.max((''+b.txt).length*6.4+10,26), bh=15, above=b.dy<0, ry=above?by-bh-9:by+9;
+        s+=`<line x1="${bx.toFixed(1)}" y1="${by.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${(above?ry+bh:ry).toFixed(1)}" stroke="${b.col}" stroke-width="1" opacity=".5"/>`;
+        s+=`<g ${drg?`data-h="${b.k}" data-ax="${b.ax||'l'}" data-mul="${b.mul||1}" style="cursor:ns-resize"`:''}>`;
+        s+=`<rect x="${(bx-w/2).toFixed(1)}" y="${ry.toFixed(1)}" width="${w}" height="${bh}" rx="5" fill="#0c1117" stroke="${b.col}" stroke-width="${drg?1.5:1}"/>`;
+        s+=`<text x="${bx.toFixed(1)}" y="${(ry+11).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="${b.col}">${b.txt}</text>`;
+        if(b.cap) s+=`<text x="${bx.toFixed(1)}" y="${(above?ry-3:ry+bh+9).toFixed(1)}" text-anchor="middle" font-size="8" fill="#7c8693">${b.cap}</text>`;
+        s+=`<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="${drg?4.5:3}" fill="${b.col}" ${drg?'stroke="#0a0c10" stroke-width="2"':''}/>`;
+        if(drg) s+=`<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="8" fill="${b.col}" opacity="${this.minidrag&&this.minidrag.key===b.k?.3:.14}"/>`;
+        s+=`</g>`; });
+      MINI[o.id]={mPT,PHi,h,l:[L.min,L.max],r:R?[R.min,R.max]:null};
+      return s+`</svg>`; },
+    miniDown(id,e){ const h=e.target.closest&&e.target.closest('[data-h]'); if(!h) return; this.minidrag={id,key:h.getAttribute('data-h'),ax:h.getAttribute('data-ax'),mul:+(h.getAttribute('data-mul')||1)}; try{e.currentTarget.setPointerCapture(e.pointerId)}catch(_){} },
+    miniMove(e){ if(!this.minidrag) return; const d=this.minidrag, m=MINI[d.id]; if(!m) return; const r=e.currentTarget.getBoundingClientRect(); const py=(e.clientY-r.top)/r.height*m.h, ax=d.ax==='r'?m.r:m.l; if(!ax) return;
+      let val=ax[0]+(1-(py-m.mPT)/m.PHi)*(ax[1]-ax[0]); const me=META[d.key]; if(!me) return; this.setRaw(d.key, clamp(rstep(val*d.mul,me.step),me.min,me.max)); ENVK=null; },
+
+    climateChart(){ const S=this.envSeries(), p=this.photo(), e=this.dayEnv();
+      return this.miniChart({id:'climate', h:158, left:{min:0,max:2.6,label:'VPD kPa',ticks:[0.5,1,1.5,2],bands:[{lo:0.8,hi:1.4}],
+          series:[{pts:S.vpdL,color:'#f472b6',w:2.4},{pts:S.vpdA,color:'#7dd3fc',w:1.6,dash:'4 3'}]},
+        right:{min:0,max:100,label:'°C · %',ticks:[20,40,60,80],series:[{pts:S.temp,color:'#fb923c',w:1.5,op:.75},{pts:S.rh,color:'#60a5fa',w:1.5,op:.75}]},
+        bubbles:[ {t:p*0.45,v:this.vpdLeaf(e),ax:'l',col:'#f472b6',txt:this.vpdLeaf(e).toFixed(2),cap:'leaf VPD',dy:-1},
+          {t:p*0.64,v:this.g('temp'),ax:'r',col:'#fb923c',txt:this.g('temp')+'°',cap:'day temp · drag',k:'temp',dy:-1},
+          {t:p*0.82,v:this.g('rh'),ax:'r',col:'#60a5fa',txt:this.g('rh')+'%',cap:'day RH · drag',k:'rh',dy:1} ] }); },
+    dewChart(){ const S=this.envSeries(), p=this.photo();
+      let mi=0,mv=99; for(let i=0;i<S.leaf.length;i++){ const m=S.leaf[i][1]-S.dew[i][1]; if(m<mv){mv=m;mi=i;} }
+      const extra=(xx,yl)=>{ const top=S.dew.map(q=>xx(q[0]).toFixed(1)+","+yl(q[1]+3).toFixed(1)).join(" ");
+        const bot=S.dew.map(q=>xx(q[0]).toFixed(1)+","+yl(q[1]).toFixed(1)).reverse().join(" "); return `<polygon points="${top} ${bot}" fill="rgba(248,113,113,.15)"/>`; };
+      return this.miniChart({id:'dew', h:158, extra, left:{min:8,max:34,label:'°C',ticks:[12,18,24,30],
+          series:[{pts:S.leaf,color:'#fb923c',w:2.4},{pts:S.temp,color:'#e7ecf2',w:1.3,dash:'2 3'},{pts:S.dew,color:'#60a5fa',w:2.2,dash:'4 3'}]},
+        bubbles:[ {t:S.t[mi],v:S.leaf[mi][1],ax:'l',col:mv<3?'#f87171':'#34d399',txt:mv.toFixed(1)+'°',cap:'min margin',dy:-1},
+          {t:p+(24-p)*0.55,v:S.dew[Math.round((p+(24-p)*0.55)*4)]?S.dew[Math.round((p+(24-p)*0.55)*4)][1]:S.dew[S.dew.length-1][1],ax:'l',col:'#60a5fa',txt:(S.dew[S.dew.length-1][1]).toFixed(1)+'°',cap:'night dew',dy:1} ] }); },
+    moistChart(){ const S=this.envSeries(), dh=this.g('dehum_capacity')/24, mx=(Math.max(dh*1.3, ...S.transp.map(q=>q[1]))*1.12)||1, dpts=S.t.map(t=>[t,dh]), pk=Math.max(...S.transp.map(q=>q[1]));
+      return this.miniChart({id:'moist', h:150, left:{min:0,max:mx,label:'L/h',ticks:[+(mx*0.25).toFixed(2),+(mx*0.5).toFixed(2),+(mx*0.75).toFixed(2)],
+          series:[{pts:S.transp,color:'#34d399',w:2,fill:'rgba(52,211,153,.16)'},{pts:dpts,color:'#f472b6',w:1.8,dash:'5 4'}]},
+        bubbles:[ {t:this.photo()*0.28,v:dh,ax:'l',col:'#f472b6',txt:this.g('dehum_capacity')+'L/d',cap:'dehum · drag',k:'dehum_capacity',mul:24,dy:-1},
+          {t:this.photo()*0.6,v:pk,ax:'l',col:'#34d399',txt:this.dailyWaterL().toFixed(0)+'L/d',cap:'water use',dy:-1} ] }); },
+    dliChart(){ const S=this.envSeries(), tot=S.dli[S.dli.length-1][1], photo=this.photo(), tgt=38, target=S.t.map(t=>[t, tgt*Math.min(t,photo)/photo]);
+      return this.miniChart({id:'dli', h:150, left:{min:0,max:Math.max(tot*1.1,42),label:'DLI mol',ticks:[10,20,30,40],
+          series:[{pts:S.dli,color:'#a3e635',w:2.6},{pts:target,color:'#6b7682',w:1.4,dash:'4 4'}]},
+        right:{min:0,max:100,label:'photo %',ticks:[25,50,75],series:[{pts:S.pn,color:'#fbbf24',w:1.6,op:.7}]},
+        bubbles:[ {t:photo*0.92,v:tot,ax:'l',col:'#a3e635',txt:tot.toFixed(0),cap:'DLI mol/d',dy:-1},
+          {t:photo*0.5,v:Math.max(...S.pn.map(q=>q[1])),ax:'r',col:'#fbbf24',txt:Math.round(Math.max(...S.pn.map(q=>q[1])))+'%',cap:'photo',dy:1} ] }); },
+    leafAirChart(){ const S=this.envSeries(), p=this.photo(), lf=this.leafTemp(this.dayEnv());
+      return this.miniChart({id:'leafair', h:148, left:{min:14,max:36,label:'°C',ticks:[18,24,30],
+          series:[{pts:S.leaf,color:'#fb923c',w:2.4},{pts:S.temp,color:'#7dd3fc',w:2,dash:'4 3'}]},
+        bubbles:[ {t:p*0.45,v:lf,ax:'l',col:'#fb923c',txt:lf.toFixed(1)+'°',cap:'leaf · Δ'+(lf-this.g('temp')).toFixed(1),dy:-1},
+          {t:p*0.68,v:this.g('temp'),ax:'l',col:'#7dd3fc',txt:this.g('temp')+'°',cap:'day air · drag',k:'temp',dy:1} ] }); },
+    co2Chart(){ const S=this.envSeries(), umax=(Math.max(8,...S.uptake.map(q=>q[1]))*1.25)||10, p=this.photo();
+      return this.miniChart({id:'co2', h:148, left:{min:0,max:1700,label:'CO₂ ppm',ticks:[400,800,1200,1600],
+          series:[{pts:S.co2,color:'#a78bfa',w:2.4,fill:'rgba(167,139,250,.12)'}]},
+        right:{min:0,max:umax,label:'uptake g/h',ticks:[+(umax*0.5).toFixed(0),+umax.toFixed(0)],series:[{pts:S.uptake,color:'#34d399',w:1.8,op:.85}]},
+        bubbles:[ {t:p*0.5,v:this.g('co2'),ax:'l',col:'#a78bfa',txt:this.g('co2'),cap:'day CO₂ · drag',k:'co2',dy:-1},
+          {t:p*0.5,v:this.co2UptakeGh(),ax:'r',col:'#34d399',txt:this.co2UptakeGh().toFixed(0)+'g/h',cap:'uptake',dy:1} ] }); },
+    heatChart(){ const S=this.envSeries(), cap=this.g('hvac_cooling_kw'), sens=S.lightKw.map(q=>[q[0],q[1]*0.5]), pk=Math.max(...sens.map(q=>q[1])), mx=(Math.max(cap*1.2,pk)*1.1)||1, cp=S.t.map(t=>[t,cap]), p=this.photo();
+      return this.miniChart({id:'heat', h:150, left:{min:0,max:mx,label:'kW',ticks:[+(mx*0.33).toFixed(1),+(mx*0.66).toFixed(1)],
+          series:[{pts:sens,color:'#f59e0b',w:1.8,fill:'rgba(245,158,11,.15)'},{pts:cp,color:'#60a5fa',w:1.8,dash:'5 4'}]},
+        bubbles:[ {t:p*0.24,v:cap,ax:'l',col:'#60a5fa',txt:cap+'kW',cap:'AC · drag',k:'hvac_cooling_kw',dy:1},
+          {t:p*0.58,v:pk,ax:'l',col:pk>cap?'#f87171':'#f59e0b',txt:pk.toFixed(1)+'kW',cap:'sensible ≈50% LED',dy:-1} ] }); },
+
+    /* ===== limiting-factor (Liebig minimum) analysis vs max yield & potency ===== */
+    OPT(){ const m=this.sim().meta, FCv=this.g('field_capacity'), db=(FCv-m.overnightLow)/Math.max(FCv,1)*100, e=this.dayEnv(), dli=this.g('ppfd')*this.photo()*0.0036, ecT=this.ecP2(), dt=this.g('temp');
+      return [
+        {key:'dli',label:'DLI (light)',val:dli,unit:'mol',dec:1,y:[35,62],p:[40,65],lever:'PPFD / photoperiod'},          // light saturation ~1400–1500 PPFD under CO₂
+        {key:'co2',label:'CO₂ day',val:this.g('co2'),unit:'ppm',dec:0,y:[1000,1500],p:[800,1300],lever:'CO₂ enrichment'},
+        {key:'dtemp',label:'Day temp',val:dt,unit:'°C',dec:1,y:[25,29],p:[23,27],lever:'cooling setpoint'},
+        {key:'ntemp',label:'Night temp (DIF)',val:this.g('temp_night'),unit:'°C',dec:1,y:[dt-4,dt],p:[dt-5,dt-1],lever:'small day↔night gap = yield'},   // tight DIF favours yield; modest drop for finish/colour
+        {key:'vpd',label:'Air VPD',val:this.vpd(e),unit:'kPa',dec:2,y:[0.8,1.3],p:[1.0,1.5],lever:'temp + RH'},
+        {key:'rh',label:'Day RH',val:this.g('rh'),unit:'%',dec:0,y:[55,68],p:[50,62],lever:'humidity / dehum'},
+        {key:'db',label:'Dryback',val:db,unit:'%',dec:0,y:[15,30],p:[25,45],lever:'P3 / steering dial'},
+        {key:'ec',label:'Pore EC',val:this.peakEC(),unit:'mS',dec:1,y:[ecT*0.85,ecT*1.25],p:[ecT*1.0,ecT*1.55],lever:'feed EC / dryback'},
+      ]; },
+    suff(v,b){ if(v>=b[0]&&v<=b[1]) return 1; const span=(b[1]-b[0])||1, d=v<b[0]?b[0]-v:v-b[1]; return clamp(1-d/(span*1.1),0,1); },
+    limiters(goal){ const a=this.OPT().map(o=>{ const b=goal==='p'?o.p:o.y, s=this.suff(o.val,b), dir=o.val<b[0]?'raise':(o.val>b[1]?'lower':'ok');
+        return {key:o.key,label:o.label,val:Number(o.val).toFixed(o.dec),unit:o.unit,lo:b[0].toFixed(o.dec),hi:b[1].toFixed(o.dec),s,pct:Math.round(s*100),dir,lever:o.lever}; });
+      return a.sort((x,y)=>x.s-y.s); },
+    potential(goal){ const a=this.limiters(goal); return {pct:Math.round(a[0].s*100), top:a[0], list:a}; },
+    zonesSummary(){ const out=[]; for(const z of [1,2,3]){ ZOVR=z; try{ out.push({z, y:this.potential('y'), p:this.potential('p')}); } finally{ ZOVR=null; } } return out; },
+
+    /* phase boundaries — read from the simulation meta */
+    overnightLow(){ return this.sim().meta.overnightLow; },
+    morningMin(){ return this.sim().meta.morningLow; },
+    firstShotT(){ return this.sim().meta.firstShot; },
+    firstShotMin(){ return Math.round(this.sim().meta.firstShot*60); },
+    p1EndT(){ return this.sim().meta.p1End; },
+    lastShotT(){ return this.sim().meta.lastShot; },
+    p1ShotCount(){ return this.sim().meta.p1Count; },
+
+    /* ===== full-day physics simulation (0..24h, 0 = lights-on): controller fires shots, transpiration drybacks, salt mass-balance ===== */
+    sim(){ const z=ZOVR||this.zone; const key=JSON.stringify([z,this.mode,this.dial,this.Z[z],this.G]); if(SIMKEY===key) return SIM; SIM=this.simDay(); SIMKEY=key; return SIM; },
+    simDay(){
+      const Vsub=this.g('substrate_volume'), FC=this.g('field_capacity'), Wfc=FC/100*Vsub, photo=this.photo();
+      const minW=this.g('p0_minimum_wait_time'), maxW=this.g('p0_maximum_wait_time'), dropTrig=this.g('p0_dryback_drop_percent');
+      const p1init=this.g('p1_initial_shot_size'), p1inc=this.g('p1_shot_size_increment'), p1maxsz=this.g('p1_maximum_shot_size'),
+            p1iv=this.g('p1_time_between_shots')/60, p1minS=this.g('p1_minimum_shots'), p1maxS=this.g('p1_maximum_shots'), p1tgt=this.g('p1_target_vwc');
+      const p2thr=this.g('p2_vwc_threshold'), p2sz=this.g('p2_shot_size'), ecHi=this.g('p2_ec_high_threshold'), ecLo=this.g('p2_ec_low_threshold');
+      const cutoff=photo-this.lastIrrigMin()/60, emFloor=this.g('p3_emergency_vwc_threshold'), emSz=this.g('p3_emergency_shot_size');
+      const feedEC=this.g('feed_ec'), tgtEC=this.ecP2(), SIGMA=0.28;                 // SIGMA = salt taken up with transpired water; rest left behind → concentrates
+      const dbLow=clamp(FC*(1-this.drybackTarget()/100), emFloor, FC-2);             // deepest dryback (end of P0 / first shot) = overnight steering target, floored at emergency
+      const lightsOnV=dbLow, dbLowVol=dbLow/100*Vsub, lightsOnVol=dbLowVol;   // overnight dryback bottoms at lights-on = the dryback target (= daily minimum)
+      const p2thrEff=Math.max(p2thr, dbLow+1);   // safety: re-water never below the overnight low (shot size + threshold are set by the steering dial / panel)
+      let W=lightsOnVol, M=clamp(tgtEC*1.1,0,10)*W;                                   // morning pore EC = overnight-stacked residual
+      const vwc=[], ec=[], recE=()=>clamp(M/Math.max(W,1e-3),0,10);
+      let phase='P0', peakV=lightsOnV, shotN=0, lastFire=-9, firstShot=null, p1End=null, lastShot=cutoff, p1Count=0, shots=[], runoffL=0;
+      vwc.push([0,lightsOnV]); ec.push([0,recE()]);
+      for(let mi=1; mi<=1440; mi++){
+        const t=mi/60, on=t<photo;
+        // dryback this minute: P3 = controlled overnight descent back to the lights-on level (steering lever); P0/P1/P2 = transpiration-driven
+        const poreEC=M/Math.max(W,1e-3); let dW;
+        if(phase==='P3'){ const remMin=Math.max((24-t)*60,1); dW=Math.max(0,W-lightsOnVol)/remMin; }
+        else dW=this.transpiration(this.envAt(t))/60;
+        W=Math.max(W-dW, dbLowVol); M=Math.max(M-dW*poreEC*SIGMA,0);
+        let curV=W/Vsub*100; if(phase==='P0'||phase==='P1') peakV=Math.max(peakV,curV);
+        // controller (P0→P1→P2→P3)
+        let fire=0;
+        if(phase==='P0'){ if(t>=maxW/60){ fire=p1init; phase='P1'; firstShot=t; shotN=0; } }   // overnight already bottomed at dbLow; P0 = the wait before first shot
+        else if(phase==='P1'){ if(t-lastFire>=p1iv-1e-6) fire=Math.min(p1maxsz, p1init+shotN*p1inc);
+          if((peakV>=p1tgt && shotN>=p1minS) || shotN>=p1maxS){ phase='P2'; p1End=t; p1Count=shotN; } }
+        else if(phase==='P2'){ if(t>=cutoff){ phase='P3'; lastShot=t; }
+          else if(curV<=p2thrEff && t-lastFire>=p1iv-1e-6){ const r=poreEC/Math.max(tgtEC,0.1); fire = r>ecHi? p2sz*1.3 : r<ecLo? p2sz*0.75 : p2sz; } }   // EC-modulated maintenance shot
+        else { if(curV<=emFloor && t-lastFire>=p1iv-1e-6) fire=emSz; }
+        // apply shot: mix feed → transient overshoot peak (may exceed FC) → runoff flush → settle
+        if(fire>0){ const Vapp=fire/100*Vsub, Wpk=W+Vapp, Mmix=M+Vapp*feedEC, ecMix=Mmix/Wpk;
+          vwc.push([t+0.008, Wpk/Vsub*100]); ec.push([t+0.008, clamp(ecMix,0,10)]);            // saturation spike (overshoot above FC); EC dips toward feed EC
+          if(Wpk>Wfc){ const ro=Wpk-Wfc; M=Mmix-ro*ecMix; W=Wfc; runoffL+=ro; } else { M=Mmix; W=Wpk; }   // runoff at FC carries pore salt out
+          vwc.push([t+0.034, W/Vsub*100]); ec.push([t+0.034, recE()]);                          // settle to held water
+          lastFire=t; if(phase==='P1') shotN++; shots.push({t,pct:fire,phase});
+          if(phase==='P1') peakV=Math.max(peakV,W/Vsub*100);
+          continue; }
+        vwc.push([t,curV]); ec.push([t,recE()]);
+      }
+      if(firstShot===null) firstShot=maxW/60;
+      if(p1End===null) p1End=Math.min(cutoff, firstShot+p1maxS*p1iv);
+      if(!p1Count) p1Count=shots.filter(s=>s.phase==='P1').length;
+      return {vwc, ec, meta:{firstShot, p1End, lastShot, p1Count, morningLow:dbLow, overnightLow:dbLow, shots, runoffL}};
+    },
+    samples(){ return this.sim().vwc; },
+    vAt(t){ const s=this.sim().vwc; for(let i=1;i<s.length;i++){ if(s[i][0]>=t){ const a=s[i-1],b=s[i],f=(t-a[0])/((b[0]-a[0])||1); return a[1]+(b[1]-a[1])*f; } } return s[s.length-1][1]; },
+    vwcPath(){ return this.sim().vwc.map(p=>this.x(p[0]).toFixed(1)+","+this.y(p[1]).toFixed(1)).join(" "); },
+    /* EC = pore EC straight from the salt mass-balance (feed EC × litres in, runoff flush at FC, transpiration concentration). Fixed 0–10 axis. */
+    ecSamples(){ return this.sim().ec; },
+    ecAt(t){ const s=this.sim().ec; for(let i=1;i<s.length;i++){ if(s[i][0]>=t){ const a=s[i-1],b=s[i],f=(t-a[0])/((b[0]-a[0])||1); return a[1]+(b[1]-a[1])*f; } } return s[s.length-1][1]; },
+    peakEC(){ return Math.max.apply(null,this.sim().ec.map(p=>p[1])); },
+    ecToY(ec){ return this.PT+(1-clamp(ec/10,0,1))*this.PH; },      // fixed 0–10 EC axis
+    ecPath(){ return this.sim().ec.map(p=>this.x(p[0]).toFixed(1)+","+this.ecToY(p[1]).toFixed(1)).join(" "); },
+
+    bands(){ return [
+      {k:"P0",t0:0,t1:this.firstShotT(),fill:"#8b93a1",col:"#aab4c0",name:"dryback"},
+      {k:"P1",t0:this.firstShotT(),t1:this.p1EndT(),fill:"#38bdf8",col:"#7dd3fc",name:"ramp-up"},
+      {k:"P2",t0:this.p1EndT(),t1:this.lastShotT(),fill:"#34d399",col:"#6ee7b7",name:"maintain"},
+      {k:"P3",t0:this.lastShotT(),t1:24,fill:"#fbbf24",col:"#fcd34d",name:"overnight"}]; },
+
+    /* bubbles: value callouts placed where each setpoint acts. drag:key makes it a handle. */
+    bubbles(){
+      const fc=this.g('field_capacity'),tgt=this.g('p1_target_vwc'),p2t=this.g('p2_vwc_threshold'),low=this.morningMin();
+      const fst=this.firstShotT(),p1e=this.p1EndT(),ls=this.lastShotT(),p2mid=(p1e+ls)/2,genc=this.mode==='gen';
+      const b=[];
+      b.push({t:1.0,v:fc,col:"#34d399",txt:fc+"%",cap:"field capacity",drag:"field_capacity",dy:-1,hk:["field_capacity"]});
+      b.push({t:fst,v:low,col:"#8b93a1",txt:this.firstShotMin()+"m",cap:"P0 first shot",drag:"p0_maximum_wait_time",dy:1,hk:["p0_maximum_wait_time","p0_minimum_wait_time"]});
+      b.push({t:fst/2,v:(this.morningMin()+low)/2+4,col:"#8b93a1",txt:this.g('p0_dryback_drop_percent')+"%",cap:"P0 drop",dy:-1,hk:["p0_dryback_drop_percent"]});
+      b.push({t:fst+(p1e-fst)*0.45,v:(low+tgt)/2,col:"#38bdf8",txt:this.g('p1_initial_shot_size')+"→"+this.g('p1_maximum_shot_size')+"%",cap:"P1 shot +"+this.g('p1_shot_size_increment'),dy:-1,hk:["p1_initial_shot_size","p1_maximum_shot_size","p1_shot_size_increment"]});
+      b.push({t:fst+(p1e-fst)*0.78,v:(low+tgt)/2-9,col:"#38bdf8",txt:"every "+this.g('p1_time_between_shots')+"m",cap:this.g('p1_minimum_shots')+"–"+this.g('p1_maximum_shots')+" shots",dy:1,hk:["p1_time_between_shots","p1_minimum_shots","p1_maximum_shots"]});
+      b.push({t:p1e,v:tgt,col:"#7dd3fc",txt:tgt+"%",cap:"P1 target",drag:"p1_target_vwc",dy:-1,hk:["p1_target_vwc"]});
+      b.push({t:p2mid,v:p2t,col:"#34d399",txt:p2t+"%",cap:"P2 re-water",drag:"p2_vwc_threshold",dy:1,hk:["p2_vwc_threshold"]});
+      b.push({t:p2mid+1.2,v:Math.min(tgt,p2t+this.g('p2_shot_size')),col:"#34d399",txt:this.g('p2_shot_size')+"%",cap:"P2 shot",drag:"p2_shot_size",dy:-1,hk:["p2_shot_size"]});
+      b.push({t:fst+0.15,v:this.ecToYv(this.ecAt(fst)),col:"#f472b6",txt:this.ecAt(fst).toFixed(1),cap:"pore EC · AM peak",isEC:true,dy:-1,hk:[genc?'ec_target_gen_p1':'ec_target_veg_p1','feed_ec']});
+      b.push({t:p2mid-1.2,v:this.ecToYv(this.ecAt(p2mid-1.2)),col:"#f472b6",txt:this.ecAt(p2mid-1.2).toFixed(1),cap:"pore EC · P2",isEC:true,dy:-1,hk:[genc?'ec_target_gen_p2':'ec_target_veg_p2','feed_ec']});
+      b.push({t:ls,v:Math.min(tgt,p2t+this.g('p2_shot_size')),col:"#fbbf24",txt:this.lastIrrigMin()+"m",cap:"last shot",drag:genc?'p3_gen_last_irrigation':'p3_veg_last_irrigation',dy:-1,hk:[genc?'p3_gen_last_irrigation':'p3_veg_last_irrigation']});
+      b.push({t:ls+(24-ls)*0.82,v:this.overnightLow(),col:"#fbbf24",txt:((this.g('field_capacity')-this.overnightLow())/this.g('field_capacity')*100).toFixed(0)+"%",cap:"P3 dryback → overnight low",drag:genc?'generative_dryback_target':'vegetative_dryback_target',dy:1,hk:[genc?'generative_dryback_target':'vegetative_dryback_target']});
+      b.push({t:23.2,v:this.g('p3_emergency_vwc_threshold'),col:"#f87171",txt:this.g('p3_emergency_vwc_threshold')+"%",cap:"emergency floor",drag:"p3_emergency_vwc_threshold",dy:1,hk:["p3_emergency_vwc_threshold"]});
+      b.push({t:23.4,v:this.ecToYv(this.ecAt(23.4)),col:"#f472b6",txt:this.ecAt(23.4).toFixed(1),cap:"pore EC · P3 peak",isEC:true,dy:1,hk:[genc?'ec_target_gen_p3':'ec_target_veg_p3','feed_ec']});
+      return b;
+    },
+    ecToYv(ec){ /* VWC-equivalent so EC bubbles sit on the EC line */ return this.invV(this.ecToY(ec)); },
+
+    svgBody(){
+      const W=this.W,PL=this.PL,PR=this.PR,PT=this.PT,PH=this.PH,fc=this.g('field_capacity'),x=t=>this.x(t),y=v=>this.y(v); let s="";
+      s+=`<defs><filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+      s+=`<rect x="${x(this.photo())}" y="${PT}" width="${x(24)-x(this.photo())}" height="${PH}" fill="rgba(255,255,255,.04)"/>`;
+      s+=`<text x="${x(this.photo())+6}" y="${PT+13}" font-size="11" fill="#6b7682">lights off</text>`;
+      for(const b of this.bands()){ const op=this.hot===b.k?0.18:0.07,m=(x(b.t0)+x(b.t1))/2;
+        s+=`<rect data-band="${b.k}" x="${x(b.t0)}" y="${PT}" width="${x(b.t1)-x(b.t0)}" height="${PH}" fill="${b.fill}" opacity="${op}" style="cursor:pointer"/>`;
+        s+=`<text x="${m}" y="${PT+PH+30}" text-anchor="middle" font-size="13" font-weight="700" fill="${b.col}">${b.k}</text>`;
+        s+=`<text x="${m}" y="${PT+PH+44}" text-anchor="middle" font-size="10" fill="#6b7682">${b.name}</text>`; }
+      for(const gy of [20,30,40,50,60,70,80]) s+=`<line x1="${PL}" y1="${y(gy)}" x2="${W-PR}" y2="${y(gy)}" stroke="rgba(255,255,255,.06)"/><text x="${PL-7}" y="${y(gy)+4}" text-anchor="end" font-size="10" fill="#6b7682">${gy}</text>`;
+      for(const e of [0,2,4,6,8,10]){ const ey=this.ecToY(e); s+=`<line x1="${W-PR}" y1="${ey}" x2="${W-PR+4}" y2="${ey}" stroke="#f472b6" opacity=".45"/><text x="${W-PR+7}" y="${ey+3.5}" font-size="9.5" fill="#f472b6" opacity=".85">${e}</text>`; }
+      for(let h=0;h<=24;h+=3){ const hr=(this.G.lights_on+h)%24; s+=`<text x="${x(h)}" y="${PT+PH+15}" text-anchor="middle" font-size="10" fill="#6b7682">${h}h</text><text x="${x(h)}" y="${PT+PH+27}" text-anchor="middle" font-size="8.5" fill="#4b5563">${hr}:00</text>`; }
+      s+=`<text x="${PL-32}" y="${PT-8}" font-size="11" fill="#9aa4b1">VWC %</text><text x="${W-2}" y="${PT-8}" text-anchor="end" font-size="10.5" fill="#f472b6">EC mS/cm</text>`;
+      // emergency floor line
+      const ef=this.g('p3_emergency_vwc_threshold'); s+=`<line x1="${PL}" y1="${y(ef)}" x2="${W-PR}" y2="${y(ef)}" stroke="#f87171" stroke-width="1" stroke-dasharray="3 4" opacity=".55"/>`;
+      // field capacity line
+      s+=`<line x1="${PL}" y1="${y(fc)}" x2="${W-PR}" y2="${y(fc)}" stroke="#34d399" stroke-width="1.4" stroke-dasharray="5 5" opacity=".7"/>`;
+      // curves
+      s+=`<polyline points="${this.ecPath()}" fill="none" stroke="#f472b6" stroke-width="2.4" opacity=".85" stroke-linejoin="round" stroke-linecap="round"/>`;
+      s+=`<polyline points="${this.vwcPath()}" fill="none" stroke="#e7ecf2" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      // bubbles
+      for(const b of this.bubbles()){
+        const bx=x(b.t), by=y(b.v), draggable=!!b.drag, lit=!!(this.hov&&b.hk&&b.hk.indexOf(this.hov)>=0), w=Math.max(b.txt.length*7.0+12, 30), h=18;
+        const above=b.dy<0, ry=above?by-h-12:by+12, cx=bx;
+        s+=`<line x1="${bx}" y1="${by}" x2="${cx}" y2="${above?ry+h:ry}" stroke="${b.col}" stroke-width="${lit?2.2:1}" opacity="${lit?.95:.5}"/>`;
+        s+=`<g ${draggable?`data-h="${b.drag}"`:""} data-hk="${(b.hk&&b.hk[0])||''}" style="cursor:${draggable?'grab':'pointer'}"${lit?' filter="url(#glow)"':''}>`;
+        if(lit) s+=`<rect x="${cx-w/2-4}" y="${ry-4}" width="${w+8}" height="${h+8}" rx="9" fill="${b.col}" opacity=".18"/>`;
+        s+=`<rect x="${cx-w/2}" y="${ry}" width="${w}" height="${h}" rx="6" fill="${lit?'#10212c':'#0c1117'}" stroke="${b.col}" stroke-width="${lit?2.2:(draggable?1.4:1)}" opacity="${lit?1:(draggable?1:.92)}"/>`;
+        s+=`<text x="${cx}" y="${ry+12.5}" text-anchor="middle" font-size="${lit?12:11}" font-weight="700" fill="${lit?'#fff':b.col}">${b.txt}</text>`;
+        s+=`<text x="${cx}" y="${ry+(above?-4:h+11)}" text-anchor="middle" font-size="8.5" fill="${lit?b.col:'#7c8693'}">${b.cap}</text>`;
+        s+=`<circle cx="${bx}" cy="${by}" r="${lit?7:(draggable?(this.drag===b.drag?6.5:5):3)}" fill="${b.col}" ${(draggable||lit)?'stroke="#0a0c10" stroke-width="2"':''}/>`;
+        if(lit) s+=`<circle cx="${bx}" cy="${by}" r="11" fill="none" stroke="${b.col}" stroke-width="2" opacity=".5"><animate attributeName="r" values="9;16;9" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;.12;.6" dur="1.5s" repeatCount="indefinite"/></circle>`;
+        else if(draggable) s+=`<circle cx="${bx}" cy="${by}" r="10" fill="${b.col}" opacity="${this.drag===b.drag?.25:.12}"/>`;
+        s+=`</g>`;
+      }
+      return s;
+    },
+
+    onDown(e){ const h=e.target.closest&&e.target.closest('[data-h]'); if(h){ this.drag=h.getAttribute('data-h'); try{e.currentTarget.setPointerCapture(e.pointerId)}catch(_){} return; } const b=e.target.closest&&e.target.closest('[data-band]'); if(b) this.hot=b.getAttribute('data-band'); },
+    onHover(e){ if(this.drag) return; const g=e.target.closest&&e.target.closest('[data-hk]'); const k=g&&g.getAttribute('data-hk'); this.hov = k||null; },
+    onMove(e){ if(!this.drag) return; const r=e.currentTarget.getBoundingClientRect();
+      const px=(e.clientX-r.left)/r.width*this.W, py=(e.clientY-r.top)/r.height*this.H, t=this.invT(px), v=this.invV(py);
+      const k=this.drag, m=META[k]; if(!m) return; let nv;
+      if(k==='p0_maximum_wait_time') nv=clamp(t*60,m.min,m.max);
+      else if(k==='p3_gen_last_irrigation'||k==='p3_veg_last_irrigation') nv=clamp((this.photo()-t)*60,m.min,m.max);
+      else if(k==='generative_dryback_target'||k==='vegetative_dryback_target'){ const fc=this.g('field_capacity'); nv=clamp((1-v/fc)*100,m.min,m.max); }
+      else nv=clamp(v,m.min,m.max);   // VWC-type handles (FC, p1_target, p2_threshold, p2_shot, emergency)
+      if(k==='p2_shot_size') nv=clamp(v-this.g('p2_vwc_threshold'),m.min,m.max);
+      this.setRaw(k, rstep(nv,m.step)); },
+
+    /* settings groups */
+    groups(){ const f=(k)=>Object.assign({key:k},META[k]); return [
+      {k:"P0",ph:"P0",col:"var(--p0)",name:"Morning dryback",fields:["p0_minimum_wait_time","p0_maximum_wait_time","p0_dryback_drop_percent"].map(f)},
+      {k:"P1",ph:"P1",col:"var(--p1)",name:"Ramp-up",fields:["p1_target_vwc","p1_initial_shot_size","p1_shot_size_increment","p1_maximum_shot_size","p1_time_between_shots","p1_minimum_shots","p1_maximum_shots"].map(f)},
+      {k:"P2",ph:"P2",col:"var(--p2)",name:"Maintenance",fields:["p2_vwc_threshold","p2_shot_size","p2_ec_high_threshold","p2_ec_low_threshold"].map(f)},
+      {k:"P3",ph:"P3",col:"var(--p3)",name:"Overnight",fields:["p3_emergency_vwc_threshold","p3_emergency_shot_size","p3_gen_last_irrigation","p3_veg_last_irrigation"].map(f)},
+      {k:"ST",ph:"⇄",col:"var(--ec)",name:"Steering & EC",fields:["generative_dryback_target","vegetative_dryback_target","ec_target_gen_p2","ec_target_gen_p3","ec_target_veg_p2","ec_target_flush"].map(f)},
+      {k:"EN",ph:"☀",col:"#f59e0b",name:"Climate setpoints",fields:["ppfd","co2","temp","rh","temp_night","rh_night","feed_ec"].map(f)},
+      {k:"RM",ph:"▦",col:"#a78bfa",name:"Room / facility",fields:["room_length","room_width","room_height","canopy_coverage","plant_count","light_watts","hvac_cooling_kw","dehum_capacity"].map(f)},
+      {k:"HW",ph:"⚙",col:"#94a3b8",name:"Substrate (shared)",fields:["field_capacity","substrate_volume"].map(f)},
+    ]; },
+
+    verdict(){ const db=(this.g('field_capacity')-this.overnightLow())/this.g('field_capacity')*100; const t=this.mode==='gen'?"Generative":"Vegetative";
+      return `<b>${t} steering</b> · ${this.mode==='gen'?'deep dryback, EC stacking to '+this.ecP2().toFixed(1):'shallow dryback, EC held ~'+this.ecP2().toFixed(1)} · total dryback ${db.toFixed(0)}%`; },
+
+    fmtNum(v,d){ return Number(v).toFixed(d); },
+    fmtMin(m){ return m>=60?(m/60).toFixed(1)+"h":Math.round(m)+"m"; },
+    fmtBeforeOff(){ return "−"+this.fmtMin(this.lastIrrigMin()); },
+    save(){ try{ localStorage.setItem("f2cs.tpl",JSON.stringify({Z:this.Z,G:this.G,dial:this.dial})); }catch(e){} this.saved=true; setTimeout(()=>this.saved=false,1600); },
+    reset(){ this.Z[this.zone]=JSON.parse(JSON.stringify(LIVE[this.zone])); },
+  };
+}
+window.editor=editor;
+</script>
+<script defer src="https://unpkg.com/alpinejs@3/dist/cdn.min.js"></script>
+</body>
+</html>
