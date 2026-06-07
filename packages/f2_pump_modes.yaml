@@ -1,0 +1,56 @@
+# F2 manual pump modes — toggles + "mode still ON" 30-min reminder.
+input_boolean:
+  f2_fill_mode:
+    name: F2 Fill Mode
+    icon: mdi:water-pump
+  f2_flush_mode:
+    name: F2 Flush Mode
+    icon: mdi:sprinkler
+
+automation:
+  - id: f2_pump_mode_on_reminder
+    alias: F2 - Manual pump mode ON reminder (30 min)
+    mode: single
+    trigger:
+      - platform: time_pattern
+        minutes: "/30"
+    condition:
+      - condition: or
+        conditions:
+          - condition: state
+            entity_id: input_boolean.f2_flush_mode
+            state: "on"
+          - condition: state
+            entity_id: input_boolean.f2_fill_mode
+            state: "on"
+    action:
+      - service: notify.mobile_app_s23ultra
+        data:
+          title: "⚠️ F2 pump mode still ON"
+          message: "Manual pump mode active — engine is NOT steering veg_main_pump (no autonomous irrigation). Flip flush/fill OFF when done."
+          data:
+            tag: f2-pump-mode-reminder
+            channel: F2 Crop Steering
+
+  - id: f2_pump_mode_off_clear
+    alias: F2 - Manual pump mode OFF clears reminder
+    mode: single
+    trigger:
+      - platform: state
+        entity_id:
+          - input_boolean.f2_flush_mode
+          - input_boolean.f2_fill_mode
+        to: "off"
+    condition:
+      - condition: state
+        entity_id: input_boolean.f2_flush_mode
+        state: "off"
+      - condition: state
+        entity_id: input_boolean.f2_fill_mode
+        state: "off"
+    action:
+      - service: notify.mobile_app_s23ultra
+        data:
+          message: clear_notification
+          data:
+            tag: f2-pump-mode-reminder
