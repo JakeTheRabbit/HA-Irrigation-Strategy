@@ -134,6 +134,10 @@
     .gridrow{display:grid;grid-template-columns:minmax(0,1fr) 384px;gap:16px;align-items:start}
     .scol{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto;overflow-x:hidden}
   }
+  /* embedded in crop_steering.html → flow naturally; parent sizes the iframe so there's ONE scrollbar */
+  html.embed,html.embed body{overflow:visible}
+  html.embed .scol{position:static!important;max-height:none!important;overflow:visible!important}
+  html.embed body{padding-bottom:8px}
 </style>
 </head>
 <body x-data="editor()" x-cloak>
@@ -366,7 +370,11 @@ function editor(){
     Z:{}, G:{},
     init(){ this.Z=JSON.parse(JSON.stringify(LIVE)); this.G=Object.assign({},GLOBAL);
       try{ const s=JSON.parse(localStorage.getItem("f2cs.tpl")); if(s&&s.Z){this.Z=s.Z; this.G=s.G||this.G; if(s.dial) this.dial=s.dial;} }catch(e){}
-      this.mode = this.dial>=5.5?'gen':'veg'; this.pullLive(); },
+      this.mode = this.dial>=5.5?'gen':'veg'; this.pullLive();
+      if(window.parent!==window){ document.documentElement.classList.add("embed");   // embedded → report content height so the parent sizes the iframe (one scrollbar, not three)
+        const post=()=>{ try{ window.parent.postMessage({type:"cs-tune-h",h:Math.ceil(document.body.scrollHeight)+24},"*"); }catch(e){} };
+        try{ new ResizeObserver(post).observe(document.body); }catch(e){} [200,600,1200].forEach(d=>setTimeout(post,d)); }
+    },
     pullLive(){   // embedded in crop_steering.html → live setpoints arrive from the parent via postMessage. Standalone (?demo / GitHub Pages) → keep the seed.
       if(window.parent===window) return;
       const put=(o,k,v)=>{ const m=META[k]; o[k]=(m&&v!=null&&!isNaN(v))?clamp(rstep(+v,m.step),m.min,m.max):v; };   // round seeded values to their step so labels stay clean
