@@ -652,7 +652,7 @@
         <input type="range" min="1" max="10" step="0.5" x-model.number="dial" @input="mode = dial>=5.5?'gen':'veg'; applySteer()">
         <div class="ends"><span>🌿 vegetative · shallow dryback</span><span>generative · deep dryback 🌸</span></div>
       </div>
-      <svg viewBox="0 0 1240 500" @pointerdown="onDown($event)" @pointermove="onMove($event)" @pointerup="drag=null" @pointercancel="drag=null" @mouseover="onHover($event)" @mouseleave="hov=null" x-html="svgBody()"></svg>
+      <svg viewBox="0 0 1240 680" @pointerdown="onDown($event)" @pointermove="onMove($event)" @pointerup="drag=null" @pointercancel="drag=null" @mouseover="onHover($event)" @mouseleave="hov=null" x-html="svgBody()"></svg>
       <div class="legend"><span class="ttinfo" @mouseenter="showTip('chart_irrig','Irrigation curve · 24h sim',$event)" @mouseleave="hideTip()" @click="showTip('chart_irrig','Irrigation curve · 24h sim',$event)" style="margin-right:2px">ⓘ</span><span><i style="background:#e7ecf2"></i>VWC</span><span><i style="background:#f472b6"></i>pore EC</span><span><i style="background:#34d399"></i>field capacity</span><span><i style="background:#f87171"></i>emergency floor</span><span style="color:var(--ink3)">· glowing dot = draggable</span></div>
       <div class="readout" style="margin-top:10px">
         <span class="pill">first shot <b x-text="fmtMin(firstShotMin())"></b></span>
@@ -1525,7 +1525,7 @@ function synthTip(key){
 
 function editor(){
   return {
-    W:1240, H:500, PL:42, PR:46, PT:26, PB:70, VMIN:18, VMAX:84, gdays:3, histPts:null,
+    W:1240, H:680, PL:42, PR:46, PT:38, PB:70, VMIN:28, VMAX:72, gdays:3, histPts:null,
     get PW(){return this.W-this.PL-this.PR}, get PH(){return this.H-this.PT-this.PB},
     x(t){return this.PL+(t/24)*this.PW}, y(v){return this.PT+(1-(v-this.VMIN)/(this.VMAX-this.VMIN))*this.PH},
     invT(px){return clamp((px-this.PL)/this.PW*24,0,24)}, invV(py){return clamp(this.VMIN+(1-(py-this.PT)/this.PH)*(this.VMAX-this.VMIN),0,100)},
@@ -1991,7 +1991,7 @@ function editor(){
         s+=`<rect data-band="${b.k}" x="${x(b.t0)}" y="${PT}" width="${x(b.t1)-x(b.t0)}" height="${PH}" fill="${b.fill}" opacity="${op}" style="cursor:pointer"/>`;
         s+=`<text x="${m}" y="${PT+PH+30}" text-anchor="middle" font-size="13" font-weight="700" fill="${b.col}">${b.k}</text>`;
         s+=`<text x="${m}" y="${PT+PH+44}" text-anchor="middle" font-size="10" fill="#6b7682">${b.name}</text>`; }
-      for(const gy of [20,30,40,50,60,70,80]) s+=`<line x1="${PL}" y1="${y(gy)}" x2="${W-PR}" y2="${y(gy)}" stroke="rgba(255,255,255,.06)"/><text x="${PL-7}" y="${y(gy)+4}" text-anchor="end" font-size="10" fill="#6b7682">${gy}</text>`;
+      for(const gy of [30,40,50,60,70]) s+=`<line x1="${PL}" y1="${y(gy)}" x2="${W-PR}" y2="${y(gy)}" stroke="rgba(255,255,255,.06)"/><text x="${PL-7}" y="${y(gy)+4}" text-anchor="end" font-size="10" fill="#6b7682">${gy}</text>`;
       for(const e of [0,2,4,6,8,10]){ const ey=this.ecToY(e); s+=`<line x1="${W-PR}" y1="${ey}" x2="${W-PR+4}" y2="${ey}" stroke="#f472b6" opacity=".45"/><text x="${W-PR+7}" y="${ey+3.5}" font-size="9.5" fill="#f472b6" opacity=".85">${e}</text>`; }
       for(let h=0;h<=24;h+=3){ const hr=(this.G.lights_on+h)%24; s+=`<text x="${x(h)}" y="${PT+PH+15}" text-anchor="middle" font-size="10" fill="#6b7682">${h}h</text><text x="${x(h)}" y="${PT+PH+27}" text-anchor="middle" font-size="8.5" fill="#4b5563">${hr}:00</text>`; }
       s+=`<text x="${PL-32}" y="${PT-8}" font-size="11" fill="#9aa4b1">VWC %</text><text x="${W-2}" y="${PT-8}" text-anchor="end" font-size="10.5" fill="#f472b6">EC mS/cm</text>`;
