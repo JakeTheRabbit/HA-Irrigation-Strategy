@@ -105,6 +105,9 @@
   .limtop{font-size:12px;color:var(--ink2);background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:6px 9px;margin-bottom:9px}
   .limthc{font-size:12.5px;color:var(--ink);margin:-2px 0 8px} .limthc b{font-size:1.15rem;font-weight:800;color:#34d399} .limthc em{font-style:normal;font-size:.72rem;color:var(--ink3)} .limthc i{font-style:normal;font-size:.7rem;color:var(--ink3)}
   .tradeoff{font-size:11px;color:var(--ink3);background:rgba(148,163,184,.08);border:1px dashed rgba(148,163,184,.3);border-radius:8px;padding:5px 9px;margin-top:8px;line-height:1.35}
+  .limfix{margin-top:6px;padding-top:6px;border-top:1px solid rgba(248,113,113,.18);font-size:12px;color:var(--ink);display:flex;align-items:center;gap:6px;flex-wrap:wrap} .limfix b{font-weight:800} .limfix i{font-style:normal;color:var(--ink3);font-size:11px}
+  .limfix .advice{color:var(--ink3);font-size:11px}
+  .btn.xs{padding:2px 8px;font-size:11px;border-radius:6px;background:var(--ok);color:#04130b;border:0;font-weight:800;cursor:pointer}
   .limtop.ok{background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.25)}
   .limtop b{color:var(--ink)} .limtop i{font-style:normal;color:var(--ink3)}
   .limrow{display:grid;grid-template-columns:82px 1fr auto auto;gap:8px;align-items:center;padding:4px 0;font-size:12px}
@@ -183,7 +186,14 @@
             <div class="limhead"><span class="limgoal" x-text="goal.name"></span>
               <span class="limpot" :class="potential(goal.k).pct>=80?'ok':(potential(goal.k).pct>=60?'mid':'low')"><b x-text="potential(goal.k).pct"></b>%<i>potential</i></span></div>
             <div class="limthc" x-show="goal.k==='p'">≈ <b x-text="potential('p').thc"></b><em>% THC est</em> <i>· strain baseline <span x-text="potential('p').base"></span>%</i></div>
-            <div class="limtop" x-show="potential(goal.k).top.dir!=='ok'">⛔ <b x-text="potential(goal.k).top.label"></b> — <span x-text="potential(goal.k).top.dir"></span> toward <span x-text="potential(goal.k).top.lo+'–'+potential(goal.k).top.hi"></span> <i x-text="'· '+potential(goal.k).top.lever"></i></div>
+            <div class="limtop" x-show="potential(goal.k).top.dir!=='ok'">⛔ <b x-text="potential(goal.k).top.label"></b> — <span x-text="potential(goal.k).top.dir"></span> toward <span x-text="potential(goal.k).top.lo+'–'+potential(goal.k).top.hi"></span> <i x-text="'· '+potential(goal.k).top.lever"></i>
+              <template x-if="potential(goal.k).top.fix">
+                <div class="limfix">→ set <b x-text="potential(goal.k).top.fix.set"></b> to <b x-text="potential(goal.k).top.fix.to+potential(goal.k).top.fix.unit"></b><i x-show="potential(goal.k).top.fix.note" x-text="' · '+potential(goal.k).top.fix.note"></i>
+                  <button class="btn xs" x-show="potential(goal.k).top.fix.entity&&live" @click="applyFix(potential(goal.k).top.fix)">✓ apply to HA</button>
+                  <span class="advice" x-show="!potential(goal.k).top.fix.entity">· set on your climate controller</span>
+                </div>
+              </template>
+            </div>
             <div class="limtop ok" x-show="potential(goal.k).top.dir==='ok'">✓ every factor in its optimal band</div>
             <div class="tradeoff" x-show="goal.k==='p'">⇄ THC levers (deeper dryback, leaner feed, cooler finish) trade against yield — push to taste</div>
             <template x-for="f in potential(goal.k).list" :key="f.key">
@@ -698,11 +708,34 @@ function editor(){
     suff(v,b){ if(v>=b[0]&&v<=b[1]) return 1; const span=(b[1]-b[0])||1, d=v<b[0]?b[0]-v:v-b[1]; return clamp(1-d/(span*1.1),0,1); },
     limiters(goal){ const ax = goal==='p'? this.potencyAxes() : this.yieldAxes();
       const a = ax.map(o=>{ const s=clamp(o.score,0,1), dir=s>=0.95?'ok':(o.val<o.mid?'raise':'lower');
-        return {key:o.key,label:o.label,val:Number(o.val).toFixed(o.dec),unit:o.unit,lo:Number(o.lo).toFixed(o.dec),hi:Number(o.hi).toFixed(o.dec),s,pct:Math.round(s*100),dir,lever:o.lever}; });
+        return {key:o.key,label:o.label,val:Number(o.val).toFixed(o.dec),unit:o.unit,lo:Number(o.lo).toFixed(o.dec),hi:Number(o.hi).toFixed(o.dec),mid:o.mid,s,pct:Math.round(s*100),dir,lever:o.lever}; });
       return a.sort((x,y)=>x.s-y.s); },
     potential(goal){ const a=this.limiters(goal); const r={pct:Math.round((a[0]?a[0].s:1)*100), top:a[0]||{dir:'ok',label:'',lo:'',hi:'',lever:''}, list:a};
       if(goal==='p'){ const pm=this.potencyModel(); r.thc=pm.estTHC.toFixed(1); r.base=Number(pm.base).toFixed(1); r.pct=Math.round(clamp(pm.estTHC/(pm.base*1.3),0,1)*100); }
+      r.top.fix = r.top.label ? this.solveFix(r.top, goal) : null;
       return r; },
+    /* inverse-solve the worst axis → the setpoint value that fixes it, given everything else held.
+       Returns {set,to,unit,note?, entity?,entityVal?}. entity present ⇒ it maps to a writable F2 number ⇒ one-click apply; else advice-only (climate is controlled outside crop-steering). */
+    solveFix(o, goal){ const dt=this.g('temp'), lon=this.g('lights_on'), z=this.zone, ecT=this.ecP2();
+      const r5=v=>Math.round(v/5)*5;
+      switch(o.key){
+        case 'dli':   return {set:'PPFD', to:Math.round(this.co2Ceiling()), unit:' µmol', note:'raise light to the CO₂ ceiling'};
+        case 'co2':   return {set:'CO₂', to:r5(400+clamp((this.g('ppfd')-600)/900,0,1)*1100), unit:' ppm', note:'match the light demand'};
+        case 'dtemp': return {set:'Day temp', to:27, unit:' °C'};
+        case 'dif':   return {set:'Night temp', to:+(dt-3).toFixed(1), unit:' °C', note:'~3 °C below day (tight positive DIF)'};
+        case 'vpd': case 'vpdL': { const rh=Math.round(clamp((1-1.15/this.svp(dt))*100,30,85)); return {set:'Day RH', to:rh, unit:' %', note:'≈1.15 kPa VPD at this temp'}; }
+        case 'cool':  return {set:'Day temp', to:22, unit:' °C', note:'cooler finish preserves THC'};
+        case 'light': return {set:'PPFD', to:700, unit:' µmol', note:'above the maturation floor'};
+        case 'degrade': return {set:'Day temp', to:26, unit:' °C', note:'avoid >30 °C / negative DIF'};
+        case 'photo': { const off=((Math.round(lon)+13)%24); return {set:'Photoperiod', to:13, unit:' h', note:'13 h flowering', entity:'number.crop_steering_lights_off_hour', entityVal:off}; }
+        case 'db':    { const v=45; return {set:'Generative dryback', to:v, unit:' %', note:'deeper finish dryback (costs some yield)', entity:`number.crop_steering_zone_${z}_generative_dryback_target`, entityVal:v}; }
+        case 'lean':  return {set:'Feed EC', to:+(ecT*0.85).toFixed(1), unit:' mS', note:'leaner feed (costs yield)'};
+        case 'ec':    return {set:'Feed EC', to:+(ecT*1.0).toFixed(1), unit:' mS', note:'toward the phase target'};
+        default:      return {set:o.lever, to:o.mid, unit:' '+o.unit};
+      } },
+    applyFix(fix){ if(!fix||!fix.entity){ return; }
+      if(window.parent===window){ alert('Set '+fix.set+' → '+fix.to+fix.unit+'  ('+fix.entity+')'); return; }
+      try{ window.parent.postMessage({type:'cs-tune-apply-one', entity:fix.entity, value:fix.entityVal, label:fix.set+' = '+fix.to+fix.unit},"*"); }catch(e){} },
     zonesSummary(){ const out=[]; for(const z of [1,2,3]){ ZOVR=z; try{ out.push({z, y:this.potential('y'), p:this.potential('p')}); } finally{ ZOVR=null; } } return out; },
 
     /* phase boundaries — read from the simulation meta */
