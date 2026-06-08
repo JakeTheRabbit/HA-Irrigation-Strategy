@@ -86,9 +86,18 @@
   .ch .chs{font-size:12px;color:var(--ink3)}
   .cstate{display:grid;gap:8px;grid-template-columns:1fr}
   @media(min-width:680px){.cstate{grid-template-columns:1fr 1fr}}
-  .csr{border:1px solid var(--hair);border-left:3px solid var(--cg,#64748b);border-radius:10px;background:var(--card2);padding:7px 11px 9px;cursor:help;transition:background .25s}
+  .csr{border:1px solid var(--hair);border-left:3px solid var(--cg,#64748b);border-radius:10px;background:var(--card2);padding:8px 11px 9px;cursor:help;transition:background .25s;display:flex;align-items:center;gap:11px}
   .csr:hover{background:rgba(255,255,255,.035)}
   .csr.g-atm{--cg:var(--p1)} .csr.g-plant{--cg:var(--p2)} .csr.g-root{--cg:var(--p3)} .csr.g-room{--cg:var(--ec)}
+  .csic{flex:none;width:27px;height:27px;display:flex;align-items:center;justify-content:center;opacity:.95}
+  .csbody{flex:1;min-width:0}
+  .csr.mini{display:block;padding:6px 10px 8px}
+  .engdrawer{margin-top:12px}
+  .engdrawer>summary{cursor:pointer;font-size:11.5px;color:var(--ink3);list-style:none;padding:7px 10px;border:1px dashed var(--hair);border-radius:9px;user-select:none}
+  .engdrawer>summary::-webkit-details-marker{display:none}
+  .engdrawer>summary:hover{color:var(--ink2);border-color:rgba(255,255,255,.16)}
+  .engdrawer[open]>summary{color:var(--ink2);margin-bottom:10px}
+  .engmini{opacity:.86}
   .csr-top{display:flex;align-items:baseline;gap:8px}
   .csr-w{font-size:10.5px;font-weight:800;letter-spacing:.04em;min-width:40px}
   .csr-lab{font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.045em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -242,20 +251,38 @@
     </div>
     <!-- ===== LIVE COUPLED STATE ===== -->
     <div class="panel glass">
-      <div class="ch"><h2>Live coupled state</h2><span class="chs">one algorithm — every lever feeds these. Change any number and watch the rest move in sync (▲▼ = which way each just shifted).</span></div>
+      <div class="ch"><h2>Live coupled state</h2><span class="chs">the levers a grower actually steers by — the picture shows what each is (cube drying back, leaf losing heat, roots breathing). Change any setpoint and watch them move in sync (▲▼ = which way each just shifted).</span></div>
       <div class="cstate">
-        <template x-for="c in coupledRanked()" :key="c.key">
+        <template x-for="c in coupledUseful()" :key="c.key">
           <div class="csr" :class="'g-'+c.grp" :title="c.label+' — '+c.tip">
-            <div class="csr-top">
-              <span class="csr-w" :style="'color:'+c.wc" x-text="c.word||'·'"></span>
-              <span class="csr-lab" x-text="c.label"></span>
-              <span class="csr-v"><b x-text="c.disp"></b><i x-text="c.unit"></i><b class="arr" :style="c.dir>0?'color:var(--ok)':(c.dir<0?'color:#42a5f5':'opacity:.25')" x-text="c.dir>0?'▲':(c.dir<0?'▼':'·')"></b></span>
+            <div class="csic" x-html="c.glyph"></div>
+            <div class="csbody">
+              <div class="csr-top">
+                <span class="csr-w" :style="'color:'+c.wc" x-text="c.word||'·'"></span>
+                <span class="csr-lab" x-text="c.label"></span>
+                <span class="csr-v"><b x-text="c.disp"></b><i x-text="c.unit"></i><b class="arr" :style="c.dir>0?'color:var(--ok)':(c.dir<0?'color:#42a5f5':'opacity:.25')" x-text="c.dir>0?'▲':(c.dir<0?'▼':'·')"></b></span>
+              </div>
+              <div class="csbar"><div class="csband" x-show="c.bandW>0" :style="'left:'+c.bandL+'%;width:'+c.bandW+'%'"></div><div class="cstick" :style="'left:'+c.pos+'%;background:'+c.wc"></div></div>
             </div>
-            <div class="csbar"><div class="csband" x-show="c.bandW>0" :style="'left:'+c.bandL+'%;width:'+c.bandW+'%'"></div><div class="cstick" :style="'left:'+c.pos+'%;background:'+c.wc"></div></div>
           </div>
         </template>
       </div>
       <div class="clegend"><span><i style="background:var(--p1)"></i>atmosphere</span><span><i style="background:var(--p2)"></i>plant</span><span><i style="background:var(--p3)"></i>root-zone</span><span><i style="background:var(--ec)"></i>room balance</span></div>
+      <details class="engdrawer">
+        <summary>Facility &amp; engineering detail · <span x-text="coupledEng().length"></span> derived values</summary>
+        <div class="cstate engmini">
+          <template x-for="c in coupledEng()" :key="c.key">
+            <div class="csr mini" :class="'g-'+c.grp" :title="c.label+' — '+c.tip">
+              <div class="csr-top">
+                <span class="csr-w" :style="'color:'+c.wc" x-text="c.word||'·'"></span>
+                <span class="csr-lab" x-text="c.label"></span>
+                <span class="csr-v"><b x-text="c.disp"></b><i x-text="c.unit"></i></span>
+              </div>
+              <div class="csbar"><div class="csband" x-show="c.bandW>0" :style="'left:'+c.bandL+'%;width:'+c.bandW+'%'"></div><div class="cstick" :style="'left:'+c.pos+'%;background:'+c.wc"></div></div>
+            </div>
+          </template>
+        </div>
+      </details>
     </div>
       </div>
       <aside class="scol"><div class="srail">
@@ -387,6 +414,38 @@ const CINFO={
  shots:{o:27,band:null,scale:[0,30],tip:"Irrigation shots the controller fires per day."},
  wm2:{o:28,band:null,scale:[0,1000],tip:"Electrical light power per m² of floor."},
 };
+/* the metrics a grower actually steers by / that flag a problem → shown big with a data-driven glyph. The rest collapse into an engineering drawer. */
+const CS_USEFUL = new Set(['db','pec','path','rootT','do2','upt','osm','vpdL','vpdA','leaf','gs','pn','dli','margin','bal']);
+
+/* ===== data-driven SVG glyphs for the useful coupled-state metrics — the picture IS the value =====
+   c = {key,val,pos(0-100 on scale),wc(status colour),word}. Frame muted, the "live" part drawn in the status colour. */
+function csGlyph(c){
+  const col=c.wc||'#8b93a7', F='#59606e', f=Math.max(0,Math.min(1,(c.pos||0)/100));
+  const o=(0.35+f*0.6).toFixed(2);   // intensity that tracks the value
+  const wrap=g=>`<svg viewBox="0 0 28 28" width="27" height="27" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${g}</svg>`;
+  switch(c.key){
+    case 'db': { const top=(9+f*11).toFixed(1);   // higher dryback rate → water sits lower in the cube
+      return wrap(`<rect x="5.5" y="7.5" width="14" height="16" rx="2.5" stroke="${F}"/><path d="M6.2 ${top} H18.8 V21 a2 2 0 0 1-2 2 H8.2 a2 2 0 0 1-2-2 Z" fill="${col}" fill-opacity=".30" stroke="none"/><path d="M6.2 ${top} H18.8" stroke="${col}"/><path d="M24 9 V15 M22 13 L24 15.6 L26 13" stroke="${col}"/>`); }
+    case 'pec': { const n=Math.round(2+f*5); const xs=[9,13,16,11,14,9,16], ys=[12,11,14,16,15,18,18]; let d=''; for(let i=0;i<n;i++) d+=`<circle cx="${xs[i%7]}" cy="${ys[i%7]}" r="1.15" fill="${col}" stroke="none"/>`;
+      return wrap(`<rect x="5.5" y="7.5" width="15" height="16" rx="2.5" stroke="${F}"/>${d}<path d="M23 10 v3 m0 2 v3 M21.5 11.5 h3 M21.5 16.5 h3" stroke="${col}" opacity="${o}"/>`); }
+    case 'path': return wrap(`<path d="M7 6 V13 M7 13 C7 17 4 18 4 22 M7 13 C7 17 10 18 10 22" stroke="${F}"/><path d="M17.5 7 L24 20 H11 Z" stroke="${col}" fill="${col}" fill-opacity="${(0.1+f*0.5).toFixed(2)}"/><path d="M17.5 11.5 V15.5 M17.5 17.6 v.2" stroke="${col}"/>`);
+    case 'rootT': { const fy=(20-f*9).toFixed(1); return wrap(`<path d="M14.5 18.5 V9 a2.4 2.4 0 0 1 4.8 0 V18.5" stroke="${F}"/><circle cx="16.9" cy="20.5" r="3.2" stroke="${F}"/><circle cx="16.9" cy="20.5" r="1.5" fill="${col}" stroke="none"/><path d="M16.9 20.5 V${fy}" stroke="${col}" stroke-width="2.6"/><path d="M4 13 h6 M4 17 h5 M4 21 h6" stroke="${F}"/>`); }
+    case 'do2': { const n=Math.max(1,Math.round(1+f*4)); const bx=[10,14,17,12,15],by=[18,15,19,12,13],br=[1.4,1.1,1.5,1,1.3]; let b=''; for(let i=0;i<n;i++) b+=`<circle cx="${bx[i%5]}" cy="${by[i%5]}" r="${br[i%5]}" stroke="${col}"/>`;
+      return wrap(`<path d="M7 8 H21 L19.4 21.5 a2.2 2.2 0 0 1-2.2 2 H10.8 a2.2 2.2 0 0 1-2.2-2 Z" stroke="${F}"/>${b}`); }
+    case 'upt': return wrap(`<path d="M14 23 V13 M14 17 C10 15 9 12 9 8 M14 17 C18 15 19 12 19 8" stroke="${F}"/><g stroke="${col}" opacity="${o}"><path d="M14 13 V4 M11.3 6.7 L14 4 L16.7 6.7"/></g>`);
+    case 'osm': return wrap(`<path d="M10 6 C6 12 6 16 10 19 C14 16 14 12 10 6 Z" stroke="${F}"/><g stroke="${col}" opacity="${o}"><path d="M19 8 v3 M17.5 9.5 h3 M22 16 v3 M20.5 17.5 h3"/></g><path d="M11 13 H17 M14.5 11 L17 13 L14.5 15" stroke="${col}"/>`);
+    case 'vpdL': { const h=(f*5).toFixed(1); return wrap(`<path d="M8 21 C8 13 13 9 21 9 C21 16 16 22 8 21 Z" stroke="${F}"/><path d="M11 19 C15 17 18 14 20 11" stroke="${F}"/><g stroke="${col}" opacity="${o}"><path d="M12 ${(13-h)} q2 -2 0 -4 q-2 -2 0 -4"/><path d="M16.5 ${(12-h)} q2 -2 0 -4 q-2 -2 0 -4"/></g>`); }
+    case 'vpdA': return wrap(`<path d="M14 5 C9 13 9 18 14 21 C19 18 19 13 14 5 Z" stroke="${F}"/><path d="M4 24 q3 -2.2 6 0 t6 0 t6 0" stroke="${col}" opacity="${o}"/>`);
+    case 'leaf': return wrap(`<path d="M8 21 C8 13 13 9 21 9 C21 16 16 22 8 21 Z" stroke="${F}"/><path d="M11 19 C15 17 18 14 20 11" stroke="${F}"/><g stroke="${col}" opacity="${o}"><path d="M9 6 q2.2 -2 0 -4.2"/><path d="M14 5 q2.2 -2 0 -4.2"/><path d="M19 6 q2.2 -2 0 -4.2"/></g>`);
+    case 'gs': { const ap=(0.8+f*4).toFixed(1); return wrap(`<path d="M5 14 C9 10.5 19 10.5 23 14 C19 17.5 9 17.5 5 14 Z" stroke="${F}"/><ellipse cx="14" cy="14" rx="${ap}" ry="4.6" stroke="${col}" fill="${col}" fill-opacity=".2"/>`); }
+    case 'pn': return wrap(`<path d="M10 21 C10 14 14 10 21 10 C21 16 17 22 10 21 Z" stroke="${F}"/><path d="M12.5 19 C15 17.5 18 15 20 12" stroke="${F}"/><circle cx="8" cy="8" r="3" stroke="${col}"/><g stroke="${col}" opacity="${o}"><path d="M8 2.2 V3.6 M3.6 3.6 L4.6 4.6 M2.2 8 H3.6 M12.4 8 H11"/></g>`);
+    case 'dli': { const a=f*2*Math.PI, r=8, cx=14, cy=14, x=(cx+r*Math.sin(a)).toFixed(2), y=(cy-r*Math.cos(a)).toFixed(2), lg=f>0.5?1:0;
+      return wrap(`<circle cx="14" cy="14" r="8" stroke="${F}" opacity=".5"/>${f>0.02?`<path d="M14 6 A8 8 0 ${lg} 1 ${x} ${y}" stroke="${col}" stroke-width="2.5"/>`:''}<circle cx="14" cy="14" r="3.4" stroke="${col}"/><g stroke="${col}"><path d="M14 1.5 v2 M14 24.5 v2 M1.5 14 h2 M24.5 14 h2"/></g>`); }
+    case 'margin': { const g=(f*7).toFixed(1); return wrap(`<path d="M4 22 h20" stroke="${F}"/><path d="M4 22 q3 -3 7 0 q4 -3 8 0 q3 -2 5 0" stroke="${F}"/><path d="M16 ${(19-g)} C13 ${(22-g)} 13 ${(24-g)} 16 ${(24-g)} C19 ${(24-g)} 19 ${(22-g)} 16 ${(19-g)} Z" fill="${col}" fill-opacity=".25" stroke="${col}"/>`); }
+    case 'bal': { const lvl=(21-f*11).toFixed(1); return wrap(`<rect x="5" y="7" width="18" height="16" rx="1.5" stroke="${F}"/><rect x="5.6" y="${lvl}" width="16.8" height="${(22.4-lvl).toFixed(1)}" fill="${col}" fill-opacity=".22" stroke="none"/><path d="M5.6 ${lvl} H22.4" stroke="${col}"/><path d="M9 10.5 v4 M7.5 13 L9 14.6 L10.5 13" stroke="${col}" opacity="${o}"/>`); }
+    default: return '';
+  }
+}
 
 /* ===== real live setpoints (F2, per zone). Shared hardware in GLOBAL. ===== */
 function zoneDefaults(o){ return Object.assign({
@@ -680,8 +739,11 @@ function editor(){
           const off=within?0:(val<lo?(lo-val):(val-hi))/((hi-lo)||1);
           wc=within?"#28b463":(off>0.4?"#e5484d":"#f5a524");
           bandL=clamp((lo-s[0])/span,0,1)*100; bandW=clamp((Math.min(hi,s[1])-Math.max(lo,s[0]))/span,0,1)*100; }
-        return {...m, val, pos, word, wc, bandL, bandW, tip:ci.tip, imp:ci.o }; });
+        const o={...m, val, pos, word, wc, bandL, bandW, tip:ci.tip, imp:ci.o, useful:CS_USEFUL.has(m.key) };
+        o.glyph = o.useful ? csGlyph(o) : ''; return o; });
       out.sort((a,b)=>a.imp-b.imp); return out; },
+    coupledUseful(){ return this.coupledRanked().filter(c=>c.useful); },
+    coupledEng(){ return this.coupledRanked().filter(c=>!c.useful); },
     coupled(){
       const ppfd=this.g('ppfd'), photo=this.photo(), Tl=this.leafTemp(), Td=this.dewPoint();
       const vpdA=this.vpd(), vpdL=this.vpdLeaf(), gs=this.gs(), pn=this.psRate(), E=this.transpiration(this.dayEnv());
