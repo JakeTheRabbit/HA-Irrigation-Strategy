@@ -584,6 +584,31 @@
             <div class="glass rounded-2xl p-4"><div class="text-[11px] uppercase tracking-wider text-slate-400" x-text="m.label"></div><div class="text-2xl font-bold mt-1" :class="m.cls" x-text="m.val"></div><div class="text-[11px] text-slate-500" x-text="m.sub"></div></div>
           </template>
         </div>
+        <!-- ===== F2 room controls — every control + helper, full functionality ===== -->
+        <div class="flex items-center justify-between pt-1"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.radio" class="w-4 h-4 block text-emerald-400"></span> F2 room controls</h2><span class="text-[11px] text-slate-500">live · writes to HA immediately, no undo</span></div>
+        <template x-for="g in climateCtl" :key="g.name">
+          <div class="glass rounded-2xl p-5">
+            <button @click="g.collapsed && (ctlOpen[g.name]=!ctlOpen[g.name])" class="w-full flex items-center justify-between text-left" :class="!g.collapsed&&'cursor-default'">
+              <span class="text-sm font-semibold flex items-center gap-2"><span x-html="icons[g.icon]||icons.radio" class="w-4 h-4 block text-emerald-400"></span><span x-text="g.name"></span><span class="text-[11px] text-slate-500 font-normal" x-text="'· '+g.items.length"></span></span>
+              <span x-show="g.collapsed" x-html="ctlOpen[g.name]?icons.collapse:icons.expand" class="w-4 h-4 block text-slate-400"></span>
+            </button>
+            <div x-show="!g.collapsed || ctlOpen[g.name]" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mt-3">
+              <template x-for="it in g.items" :key="it.id">
+                <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3">
+                  <template x-if="it.type==='toggle'"><div class="flex items-center justify-between gap-2"><span class="text-sm text-slate-300 min-w-0 truncate" x-text="it.label"></span><button @click="!it.un&&ctrlToggle(it.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="it.un?'bg-white/10 opacity-40 cursor-not-allowed':it.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="it.on&&'translate-x-5'"></span></button></div></template>
+                  <template x-if="it.type==='num'"><div><div class="text-[11px] text-slate-400 mb-1 truncate" x-text="it.label"></div><div class="flex items-center gap-2"><input type="number" :min="it.min" :max="it.max" :step="it.step" :value="it.val" @change="ctrlNum(it.id,$event.target.value)" class="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-slate-200"><span class="text-[11px] text-slate-500 shrink-0" x-text="it.unit"></span></div></div></template>
+                  <template x-if="it.type==='text'"><div><div class="text-[11px] text-slate-400 mb-1 truncate" x-text="it.label"></div><input type="text" :value="it.value" @change="ctrlText(it.id,$event.target.value)" class="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"></div></template>
+                  <template x-if="it.type==='button'"><button @click="ctrlBtn(it.id)" class="w-full h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 truncate px-2" x-text="it.label"></button></template>
+                  <template x-if="it.type==='light'"><div><div class="flex items-center justify-between gap-2"><span class="text-sm text-slate-300 truncate" x-text="it.label"></span><button @click="!it.un&&ctrlToggle(it.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="it.un?'bg-white/10 opacity-40':it.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="it.on&&'translate-x-5'"></span></button></div><input x-show="it.hasBri&&it.on" type="range" min="1" max="100" :value="it.bri||100" @change="ctrlLightBri(it.id,$event.target.value)" class="w-full mt-2 accent-emerald-500"></div></template>
+                  <template x-if="it.type==='climate'"><div><div class="flex items-center justify-between"><span class="text-sm font-medium text-slate-200 truncate" x-text="it.label"></span><span class="text-[11px] text-slate-400">now <b x-text="it.cur!=null?it.cur+'°':'—'"></b></span></div>
+                    <div class="flex flex-wrap gap-1 mt-2"><template x-for="m in it.modes" :key="m"><button @click="ctrlClimateMode(it.id,m)" class="px-2 py-1 rounded-md text-[11px] capitalize" :class="it.mode===m?'bg-emerald-500/25 text-emerald-300':'bg-white/5 text-slate-400'" x-text="m.replace('_',' ')"></button></template></div>
+                    <div class="flex items-center gap-2 mt-2"><button @click="ctrlClimateTemp(it.id,it.temp-it.step)" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-lg leading-none">−</button><div class="flex-1 text-center font-bold text-lg" x-text="it.temp+'°'"></div><button @click="ctrlClimateTemp(it.id,it.temp+it.step)" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-lg leading-none">+</button></div></div></template>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
         <details class="glass rounded-2xl overflow-hidden">
           <summary class="cursor-pointer list-none p-4 text-sm text-slate-300 flex items-center gap-2"><span x-html="icons.doc" class="w-4 h-4 block"></span> All raw readings</summary>
           <div class="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
@@ -3404,6 +3429,32 @@ window.tlInit=function(){
   renderCharts();   // re-measure + repaint on every show (width is real now)
 };
 
+/* ===================== CLIMATE controls — all F2 controls + helpers (data-driven) ===================== */
+const CLIMATE_GROUPS = [
+  {name:'Climate setpoints', icon:'thermo', ids:['input_number.f2_setpoint_temp_day','input_number.f2_setpoint_rh','input_number.f2_setpoint_vpd','input_number.f2_target_vpd','input_number.f2_setpoint_leaf_temp','input_number.f2_setpoint_co2','input_number.f2_setpoint_ppfd','input_number.f2_setpoint_air_velocity','input_number.f2_setpoint_photoperiod','input_number.f2_setpoint_pwec','input_number.f2_setpoint_vwc']},
+  {name:'AC / cooling', icon:'wind', ids:['climate.f2_ac_pid','climate.f2_ac_wall_f2_ac_wall','climate.f2_ac_door_f2_ac_door']},
+  {name:'Dehumidification', icon:'haze', ids:['humidifier.f2_dehumidifier','switch.f2_dehumidifiers_group','switch.f2_dehumidifiers_relay_1','switch.f2_dehumidifiers_relay_2','switch.f2_dehumidifiers_relay_3','switch.f2_dehumidifiers_relay_4']},
+  {name:'CO₂', icon:'haze', ids:['switch.f2_co2','switch.f2_co2_led','input_number.f2_co2_target_input','input_number.f2_co2_day_target_input','input_number.f2_co2_night_target_input','input_number.f2_co2_tolerance_input','input_boolean.f2_co2_tank_empty','input_boolean.f2_co2_tank_replaced']},
+  {name:'Lighting', icon:'bulb', ids:['light.led_f2_r1_f2_r1_led','light.led_f2_r2_f2_r2_led','switch.f2_lights_contactor_ssr_f1_lights_contactor','light.f2_work_light','switch.f2_work_light']},
+  {name:'Room & access', icon:'radio', ids:['switch.f2_door_relay','switch.f2_detect_2','switch.f2_motion_2']},
+  {name:'Climate-Sense thresholds', icon:'doc', collapsed:true, ids:['input_number.csig_f2_high_vpd','input_number.csig_f2_high_ec','input_number.csig_f2_high_ppfd','input_number.csig_f2_high_root_temp','input_number.csig_f2_low_root_temp','input_number.csig_f2_low_vwc','input_number.csig_f2_min_cooling','input_number.csig_f2_warm_leaf_delta','input_number.csig_f2_co2_enriched','input_number.csig_f2_co2_ppfd_min','input_number.csig_f2_cwsi_nwsb_intercept','input_number.csig_f2_cwsi_nwsb_slope','input_number.csig_f2_cwsi_wsb_delta']},
+  {name:'Sensor mapping', icon:'doc', collapsed:true, ids:['input_text.csig_f2_air_temp','input_text.csig_f2_humidity','input_text.csig_f2_co2','input_text.csig_f2_ppfd','input_text.csig_f2_leaf_temp','input_text.csig_f2_root_temp','input_text.csig_f2_ec','input_text.csig_f2_vwc']},
+  {name:'Sensor calibration', icon:'flask', collapsed:true, ids:['number.air_q_entrance_temperature_offset','number.air_q_entrance_humidity_offset','number.air_q_entrance_reference_temperature','number.air_q_entrance_reference_humidity','number.air_q_entrance_co2_calibration_value','number.f2_scd41_env3_dlight_poe_scd41_frc_reference_co2','number.f2_scd41_env3_dlight_poe_ppfd_cal_point_1','number.f2_scd41_env3_dlight_poe_ppfd_cal_point_2','number.f2_scd41_env3_dlight_poe_lux_cal_point_1','number.f2_scd41_env3_dlight_poe_lux_cal_point_2','number.f2_scd41_env3_dlight_poe_dli_reset_hour','number.f2_scd41_env3_dlight_poe_dli_reset_minute','button.airq_f2_co2_external_force_manual_calibration','button.airq_f2_co2_internal_force_manual_calibration','button.air_q_entrance_calibrate_temperature_humidity','button.f2_scd41_env3_dlight_poe_scd41_perform_forced_recalibration_frc','button.f2_scd41_env3_dlight_poe_capture_lux_cal_point_1','button.f2_scd41_env3_dlight_poe_capture_lux_cal_point_2']},
+  {name:'Camera & recording', icon:'eye', collapsed:true, ids:['switch.f2_recordings_2','switch.f2_snapshots_2','switch.f2_review_alerts_2','switch.f2_review_detections_2']},
+  {name:'Device restarts', icon:'radio', collapsed:true, ids:['switch.f2_ac_wall_restart','switch.f2_ac_door_restart','switch.f2_dehumidifiers_restart','switch.f2_scd41_env3_dlight_poe_restart','switch.led_f2_r1_restart','switch.led_f2_r2_restart','button.air_q_entrance_restart','button.airq_f2_refresh_display']},
+];
+function ctlItem(id){ const e=S[id]; if(!e) return null; const dom=id.split('.')[0], a=e.attributes||{}, label=a.friendly_name||id;
+  if(dom==='climate') return {type:'climate',id,label,mode:e.state,modes:a.hvac_modes||[],temp:(a.temperature!=null?a.temperature:(a.min_temp||20)),tmin:a.min_temp||10,tmax:a.max_temp||35,step:a.target_temp_step||0.5,cur:a.current_temperature};
+  if(dom==='light') return {type:'light',id,label,on:e.state==='on',un:e.state==='unavailable',bri:a.brightness!=null?Math.round(a.brightness/2.55):null,hasBri:(a.supported_color_modes||[]).some(m=>m!=='onoff')};
+  if(dom==='humidifier'||dom==='switch'||dom==='input_boolean') return {type:'toggle',id,label,on:e.state==='on',un:e.state==='unavailable'};
+  if(dom==='input_number'||dom==='number') return {type:'num',id,label,val:e.state,min:a.min,max:a.max,step:a.step,unit:a.unit_of_measurement||''};
+  if(dom==='input_select'||dom==='select') return {type:'select',id,label,value:e.state,options:a.options||[]};
+  if(dom==='input_text') return {type:'text',id,label,value:e.state};
+  if(dom==='button') return {type:'button',id,label};
+  return null;
+}
+function buildClimateCtl(){ return CLIMATE_GROUPS.map(g=>({name:g.name,icon:g.icon,collapsed:!!g.collapsed,items:g.ids.map(ctlItem).filter(Boolean)})).filter(g=>g.items.length); }
+
 document.addEventListener('alpine:init', () => {
   Alpine.data('app', () => ({
     icons:{
@@ -3448,6 +3499,7 @@ document.addEventListener('alpine:init', () => {
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
     headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], armChips:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},guardrails:[],telemetry:[],feed:[]}, ctrlZone:1,
+    climateCtl:[], ctlOpen:{},
     notes:{}, toasts:[], _tid:0, _toastId:0, _acked:{},
     aiMessages:[], aiSuggestions:["Any rooms drifting?","Why the hotspot?","How is the EC tracking?","Is dryback on target?"],
 
@@ -3471,7 +3523,7 @@ document.addEventListener('alpine:init', () => {
       const rr=runRules();
       this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
       this.headline=computeHeadline(this.adv,this.watch);
-      this.kpis=buildKpis(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl();
+      this.kpis=buildKpis(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl();
       if(window.__tuneReseed) window.__tuneReseed();   // refresh the Tune editor from live HA (respects its hydrated/unsaved-edit guard)
       this.armChips=[{k:"System",on:isOn("sw_system")},{k:"Auto-water",on:isOn("sw_auto")},{k:"EC-stack",on:isOn("sw_ecstack")},{k:"Dosing",on:isOn("dosing_active")}];
       this.steeringMeta=[{label:"Fused EC",val:fmt(num("fused_ec"),2),cls:"text-slate-200"},{label:"EC target",val:fmt(CONFIG.EC_TARGET,1),cls:"text-slate-200"},{label:"Pump",val:fmt(num("pump_power"),0)+" W",cls:num("pump_power")>100?"text-amber-400":"text-slate-200"},{label:"Next shot",val:this.shortTime(val("next_irrig")),cls:"text-slate-200"}];
@@ -3506,6 +3558,11 @@ document.addEventListener('alpine:init', () => {
     ctrlToggle(id,confirmArm){ if(confirmArm && !confirm("Toggle the arm state? This affects live irrigation.")) return; this.ctrlSvc(id.split(".")[0],"toggle",{entity_id:id}); },
     ctrlSelect(id,v){ this.ctrlSvc(id.split(".")[0],"select_option",{entity_id:id,option:v}); },
     ctrlNum(id,v){ if(v!==""&&v!=null) this.ctrlSvc(id.split(".")[0],"set_value",{entity_id:id,value:parseFloat(v)}); },
+    ctrlClimateMode(id,mode){ this.ctrlSvc("climate","set_hvac_mode",{entity_id:id,hvac_mode:mode}); },
+    ctrlClimateTemp(id,t){ const v=parseFloat(t); if(!isNaN(v)) this.ctrlSvc("climate","set_temperature",{entity_id:id,temperature:v}); },
+    ctrlBtn(id){ if(confirm("Press "+id+"?")) this.ctrlSvc("button","press",{entity_id:id}); },
+    ctrlText(id,v){ this.ctrlSvc("input_text","set_value",{entity_id:id,value:v}); },
+    ctrlLightBri(id,pct){ this.ctrlSvc("light","turn_on",{entity_id:id,brightness_pct:parseInt(pct)}); },
     openZone(id){ this.zoneModal=id; },
     zoneById(id){ return this.zones.find(z=>z.id===id)||this.zones[0]; },
     ackAlert(id){ this._acked[id]=true; this.adv=this.adv.filter(a=>a.id!==id); this.toast("Advisory acknowledged"); },
