@@ -337,8 +337,65 @@
         <div class="glass rounded-2xl p-10 text-center text-slate-400">Tune editor — wiring up…</div>
       </section>
 
-      <!-- ===== CONTROL (native ops console — Phase B) ===== -->
-      <section x-show="view==='control'" class="fade-enter space-y-4"></section>
+      <!-- ===== CONTROL (native ops console) ===== -->
+      <section x-show="view==='control'" class="fade-enter space-y-4">
+        <div class="glass rounded-2xl p-4 flex items-center gap-3 border-l-4 border-l-amber-400/60"><span x-html="icons.alert" class="w-5 h-5 block text-amber-400 shrink-0"></span><span class="text-sm text-slate-300">Live ops — toggles &amp; selects write to HA immediately, no undo. Setpoints live in the <b class="text-slate-200">Tune</b> tab.</span></div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="glass rounded-2xl p-5 space-y-4">
+            <h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.salt" class="w-4 h-4 block text-emerald-400"></span> Active strategy</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <template x-for="s in control.summary" :key="s.k"><div class="rounded-xl bg-white/[0.03] border border-white/8 p-2.5"><div class="text-[10px] uppercase tracking-wider text-slate-400" x-text="s.k"></div><div class="font-semibold mt-0.5 text-sm" x-text="s.v"></div></div></template>
+            </div>
+            <template x-for="sel in control.strategy" :key="sel.id">
+              <label class="flex items-center justify-between gap-3"><span class="text-sm text-slate-300" x-text="sel.label"></span>
+                <select @change="ctrlSelect(sel.id,$event.target.value)" class="bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-slate-200 max-w-[55%]">
+                  <template x-for="o in sel.options" :key="o"><option :value="o" :selected="o===sel.value" x-text="o"></option></template></select></label>
+            </template>
+          </div>
+          <div class="glass rounded-2xl p-5 space-y-3">
+            <h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.radio" class="w-4 h-4 block text-emerald-400"></span> Arm &amp; pump</h3>
+            <template x-for="t in control.arm" :key="t.id">
+              <div class="flex items-center justify-between py-1"><span class="text-sm text-slate-300" x-text="t.label"></span>
+                <button @click="ctrlToggle(t.id,t.confirmArm)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="t.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="t.on&&'translate-x-5'"></span></button></div>
+            </template>
+          </div>
+        </div>
+        <div class="glass rounded-2xl p-5 space-y-3">
+          <h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.ai" class="w-4 h-4 block text-emerald-400"></span> Adaptive steering</h3>
+          <div class="flex items-center justify-between py-1"><span class="text-sm text-slate-300" x-text="control.adaptive.toggle.label||'Adaptive steering enabled'"></span>
+            <button @click="ctrlToggle(control.adaptive.toggle.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="control.adaptive.toggle.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="control.adaptive.toggle.on&&'translate-x-5'"></span></button></div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <template x-for="n in control.adaptive.nums" :key="n.id">
+              <label class="rounded-xl bg-white/[0.03] border border-white/8 p-3"><div class="text-[11px] text-slate-400 mb-1" x-text="n.label"></div>
+                <input type="number" :step="n.step" :value="n.val" @change="ctrlNum(n.id,$event.target.value)" class="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-slate-200"></label></template>
+          </div>
+        </div>
+        <div class="glass rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Zone ops</h3>
+            <div class="flex gap-1"><template x-for="z in [1,2,3]" :key="z"><button @click="ctrlZone=z" class="px-3 py-1 rounded-lg text-xs font-medium" :class="ctrlZone===z?'bg-emerald-500/20 text-emerald-300':'bg-white/5 text-slate-400'" x-text="'Zone '+z"></button></template></div></div>
+          <template x-for="sel in control.zones[ctrlZone].selects" :key="sel.id">
+            <label class="flex items-center justify-between gap-3"><span class="text-sm text-slate-300" x-text="sel.label"></span>
+              <select @change="ctrlSelect(sel.id,$event.target.value)" class="bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-slate-200 max-w-[55%]">
+                <template x-for="o in sel.options" :key="o"><option :value="o" :selected="o===sel.value" x-text="o"></option></template></select></label>
+          </template>
+          <div class="divide-y divide-white/6">
+            <template x-for="t in control.zones[ctrlZone].switches" :key="t.id">
+              <div class="flex items-center justify-between py-2.5"><span class="text-sm text-slate-300" x-text="t.label"></span>
+                <button @click="ctrlToggle(t.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="t.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="t.on&&'translate-x-5'"></span></button></div>
+            </template>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="glass rounded-2xl p-5"><h3 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.flag" class="w-4 h-4 block text-amber-400"></span> Guardrails <span class="text-[11px] text-slate-500 font-normal">· edit in Tune</span></h3>
+            <div class="divide-y divide-white/6"><template x-for="g in control.guardrails" :key="g.label"><div class="flex justify-between py-2 text-sm"><span class="text-slate-400" x-text="g.label"></span><span class="font-semibold" x-text="g.val"></span></div></template></div></div>
+          <div class="glass rounded-2xl p-5"><h3 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Engine</h3>
+            <div class="divide-y divide-white/6"><template x-for="t in control.telemetry" :key="t.label"><div class="flex justify-between py-2 text-sm"><span class="text-slate-400" x-text="t.label"></span><span class="font-semibold" :class="t.warn&&'text-amber-400'" x-text="t.val"></span></div></template></div></div>
+        </div>
+        <div class="glass rounded-2xl p-5"><h3 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.doc" class="w-4 h-4 block text-slate-400"></span> Recent activity</h3>
+          <div class="space-y-1 max-h-60 overflow-y-auto scrollx text-[12px] text-slate-400 font-mono">
+            <template x-for="(line,i) in control.feed" :key="i"><div x-text="line"></div></template>
+            <div x-show="!control.feed.length" class="text-slate-500">No recent activity.</div></div></div>
+      </section>
 
       <!-- ===== TIMELINE (native canvas — Phase D) ===== -->
       <section x-show="view==='timeline'" class="fade-enter"><div class="tlroot" id="tlRoot"><div class="glass rounded-2xl p-10 text-center text-slate-400">Timeline — wiring up…</div></div></section>
@@ -608,6 +665,42 @@ function buildInsights(){ const out=[]; const bt=num("bl_temp"),at=num("air_temp
   if(!out.length) out.push({id:"i-ok",sev:"ok",title:"F2 steering cleanly",summary:"All zones in band, plant transpiring normally. No action.",body:"Every zone is above its floor, the plant is transpiring normally and climate is in band. Nothing to change — the leading indicators are quiet."});
   return out; }
 
+/* ===================== CONTROL view-model (ops console) ===================== */
+function ex(id){ return !!S[id]; }
+function buildControl(){
+  const mode=val("select.crop_steering_steering_mode")||"—", phase=val("sensor.crop_steering_app_current_phase")||"—";
+  const dbT=mode==="Generative"?num("number.crop_steering_generative_dryback_target"):num("number.crop_steering_vegetative_dryback_target");
+  const summary=[{k:"Mode",v:mode},{k:"Phase",v:phase},{k:"Dryback",v:fmt(dbT,0)+"%"},{k:"Field cap",v:fmt(num("number.crop_steering_field_capacity"),0)+"%"}];
+  const sw=(id,label,confirmArm)=>({id,label,on:val(id)==="on",confirmArm:!!confirmArm});
+  const arm=[sw("switch.crop_steering_system_enabled","System enabled",true),sw("switch.crop_steering_auto_irrigation_enabled","Auto irrigation",true),sw("input_boolean.f2_flush_mode","Flush mode"),sw("input_boolean.f2_fill_mode","Fill mode")].filter(t=>ex(t.id));
+  const adaptive={toggle:sw("input_boolean.f2_adaptive_steering_enabled","Adaptive steering enabled"),
+    nums:[{id:"input_number.f2_vmax_confidence_min",label:"Vmax confidence min",val:val("input_number.f2_vmax_confidence_min"),step:0.05},
+          {id:"input_number.f2_p1_climb_rate_per_day",label:"P1 climb / day (%)",val:val("input_number.f2_p1_climb_rate_per_day"),step:0.5},
+          {id:"input_number.f2_p1_margin",label:"P1 margin below Vmax (%)",val:val("input_number.f2_p1_margin"),step:0.5}].filter(n=>ex(n.id))};
+  const opts=id=>(S[id]&&S[id].attributes&&S[id].attributes.options)||[];
+  const strategy=[{id:"select.crop_steering_steering_mode",label:"Steering mode"},{id:"select.crop_steering_growth_stage",label:"Growth stage"}]
+    .filter(s=>ex(s.id)).map(s=>({...s,options:opts(s.id),value:val(s.id)}));
+  const zones={};
+  for(const z of [1,2,3]){ const sp="select.crop_steering_zone_"+z+"_", wp="switch.crop_steering_zone_"+z+"_", ph="input_select.crop_steering_zone_"+z+"_phase_control";
+    const selects=[{id:sp+"steering_mode",label:"Steering mode"}];
+    if(ex(sp+"crop_profile")) selects.push({id:sp+"crop_profile",label:"Crop profile"});
+    if(ex(ph)) selects.push({id:ph,label:"Manual phase pin"});
+    zones[z]={ selects:selects.filter(s=>ex(s.id)).map(s=>({...s,options:opts(s.id),value:val(s.id)})),
+      switches:[sw(wp+"enabled","Zone enabled"),sw(wp+"manual_override","Manual override"),sw(wp+"dripper_protection","Dripper protection")].filter(t=>ex(t.id)) };
+  }
+  const g=id=>{ const v=val("number.crop_steering_"+id); return v==null?"—":v; };
+  const guardrails=[{label:"Max EC cutoff",val:g("maximum_ec")+" mS/cm"},{label:"Irrigation EC",val:g("irrigation_ec_min")+" – "+g("irrigation_ec_max")+" mS/cm"},
+    {label:"Irrigation pH",val:g("irrigation_ph_min")+" – "+g("irrigation_ph_max")},{label:"Lights on → off",val:g("lights_on_hour")+":00 → "+g("lights_off_hour")+":00"},
+    {label:"Blocked-dripper max / 30m",val:g("blocked_dripper_max_shots_30min")}];
+  const hb=val("sensor.crop_steering_ai_heartbeat"), hbAge=ageMin("sensor.crop_steering_ai_heartbeat");
+  const telemetry=[{label:"App status",val:val("sensor.crop_steering_app_status")||"—"},{label:"System state",val:val("sensor.crop_steering_system_state")||"—"},
+    {label:"Current decision",val:val("sensor.crop_steering_current_decision")||"—"},{label:"AI heartbeat",val:(hb||"—")+(hbAge!=null?" · "+fmt(hbAge,0)+"m":""),warn:!!(hb&&hb!=="healthy")},
+    {label:"P2 VWC adjusted",val:fmt(num("sensor.crop_steering_p2_vwc_threshold_adjusted"),1)+"%"},{label:"Est. daily water",val:fmt(num("sensor.crop_steering_prediction_estimated_daily_water_need"),1)+" L"}];
+  const fa=S["sensor.crop_steering_activity_log"], feedRaw=(fa&&fa.attributes&&fa.attributes.feed)||(fa&&fa.state)||"";
+  const feed=String(feedRaw).split("\n").map(l=>l.replace(/[<>]/g,"")).filter(Boolean).slice(0,25);
+  return {summary,arm,adaptive,strategy,zones,guardrails,telemetry,feed};
+}
+
 /* ===================== Alpine app ===================== */
 document.addEventListener('alpine:init', () => {
   Alpine.data('app', () => ({
@@ -652,7 +745,7 @@ document.addEventListener('alpine:init', () => {
     cmdOpen:false, cmdQuery:"", aiOpen:false, aiInput:"", aiThinking:false, zoneModal:null, evOpen:null,
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
     headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], armChips:[], steeringMeta:[],
-    control:{summary:[],arm:[],adaptive:{nums:[]},strategy:[],zones:[],guardrails:[],telemetry:[],feed:[]}, ctrlZone:1,
+    control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},guardrails:[],telemetry:[],feed:[]}, ctrlZone:1,
     notes:{}, toasts:[], _tid:0, _toastId:0, _acked:{},
     aiMessages:[], aiSuggestions:["Any rooms drifting?","Why the hotspot?","How is the EC tracking?","Is dryback on target?"],
 
@@ -676,7 +769,7 @@ document.addEventListener('alpine:init', () => {
       const rr=runRules();
       this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
       this.headline=computeHeadline(this.adv,this.watch);
-      this.kpis=buildKpis(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights();
+      this.kpis=buildKpis(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl();
       this.armChips=[{k:"System",on:isOn("sw_system")},{k:"Auto-water",on:isOn("sw_auto")},{k:"EC-stack",on:isOn("sw_ecstack")},{k:"Dosing",on:isOn("dosing_active")}];
       this.steeringMeta=[{label:"Fused EC",val:fmt(num("fused_ec"),2),cls:"text-slate-200"},{label:"EC target",val:fmt(CONFIG.EC_TARGET,1),cls:"text-slate-200"},{label:"Pump",val:fmt(num("pump_power"),0)+" W",cls:num("pump_power")>100?"text-amber-400":"text-slate-200"},{label:"Next shot",val:this.shortTime(val("next_irrig")),cls:"text-slate-200"}];
       this.hotspotCells=this.buildHotspot();
@@ -705,6 +798,10 @@ document.addEventListener('alpine:init', () => {
 
     /* actions */
     go(v){ this.view=v; window.scrollTo({top:0,behavior:this.reduced()?'auto':'smooth'}); },
+    async ctrlSvc(domain,service,data){ try{ await svc(domain,service,data); this.toast("Sent"); setTimeout(()=>this.tick(),700); }catch(e){ this.toast("Failed: "+e.message); } },
+    ctrlToggle(id,confirmArm){ if(confirmArm && !confirm("Toggle the arm state? This affects live irrigation.")) return; this.ctrlSvc(id.split(".")[0],"toggle",{entity_id:id}); },
+    ctrlSelect(id,v){ this.ctrlSvc(id.split(".")[0],"select_option",{entity_id:id,option:v}); },
+    ctrlNum(id,v){ if(v!==""&&v!=null) this.ctrlSvc(id.split(".")[0],"set_value",{entity_id:id,value:parseFloat(v)}); },
     openZone(id){ this.zoneModal=id; },
     zoneById(id){ return this.zones.find(z=>z.id===id)||this.zones[0]; },
     ackAlert(id){ this._acked[id]=true; this.adv=this.adv.filter(a=>a.id!==id); this.toast("Advisory acknowledged"); },
