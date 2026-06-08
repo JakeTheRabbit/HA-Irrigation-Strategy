@@ -235,6 +235,7 @@
         </template>
         <div class="actions">
           <button class="btn primary" x-show="live" @click="applyToHA()">✔ Apply Zone <span x-text="zone"></span> to HA</button>
+          <button class="btn" x-show="live" @click="pullFromHA()" :title="liveWaiting?'Live HA differs from your saved edits — pull to overwrite them with current HA values':'Re-pull current values from HA (overwrites your edits)'">⟳ Pull live from HA<span x-show="liveWaiting" style="color:var(--p3);font-weight:800"> •</span></button>
           <button class="btn" :class="!live&&'primary'" @click="save()">💾 Save template</button>
           <button class="btn" @click="reset()">Reset zone</button>
           <span x-show="saved" style="color:var(--ok);font-size:13px">Saved ✓</span>
@@ -402,9 +403,9 @@ function editor(){
     invT(px){return clamp((px-this.PL)/this.PW*24,0,24)}, invV(py){return clamp(this.VMIN+(1-(py-this.PT)/this.PH)*(this.VMAX-this.VMIN),0,100)},
 
     zone:1, mode:"gen", dial:7, hot:"P1", drag:null, hov:null, saved:false, live:false, athena:"Bulk", minidrag:null,
-    Z:{}, G:{},
+    Z:{}, G:{}, hydrated:false, liveWaiting:false,
     init(){ this.Z=JSON.parse(JSON.stringify(LIVE)); this.G=Object.assign({},GLOBAL);
-      try{ const s=JSON.parse(localStorage.getItem("f2cs.tpl")); if(s&&s.Z){this.Z=s.Z; this.G=s.G||this.G; if(s.dial) this.dial=s.dial;} }catch(e){}
+      try{ const s=JSON.parse(localStorage.getItem("f2cs.tpl")); if(s&&s.Z){this.Z=s.Z; this.G=Object.assign({},GLOBAL,s.G||{}); if(s.dial) this.dial=s.dial; this.hydrated=true;} }catch(e){}   // restored edits win on reload (hydrated) — no clobber
       this.mode = this.dial>=5.5?'gen':'veg'; this.pullLive();
       if(window.parent!==window){ document.documentElement.classList.add("embed");   // embedded → report content height so the parent sizes the iframe (one scrollbar, not three)
         const post=()=>{ try{ window.parent.postMessage({type:"cs-tune-h",h:Math.ceil(document.body.scrollHeight)+24},"*"); }catch(e){} };
@@ -414,24 +415,28 @@ function editor(){
       if(window.parent===window) return;
       const put=(o,k,v)=>{ const m=META[k]; o[k]=(m&&v!=null&&!isNaN(v))?clamp(rstep(+v,m.step),m.min,m.max):v; };   // round seeded values to their step so labels stay clean
       window.addEventListener("message",ev=>{ const d=ev.data; if(!d||d.type!=="cs-tune-data") return;
+        this.live=true;   // live HA is reachable → show the badge + Apply button regardless
+        if(this.hydrated && !d.explicit){ this.liveWaiting=true; return; }   // user has saved edits → DON'T clobber on auto-seed; offer "Pull live" instead
         try{ if(d.zones){ for(const z in d.zones){ if(this.Z[z]) for(const k in d.zones[z]) put(this.Z[z],k,d.zones[z][k]); } }
              if(d.global) for(const k in d.global) put(this.G,k,d.global[k]);
              if(d.dial!=null) this.dial=d.dial;
-             this.mode=this.dial>=5.5?'gen':'veg'; this.live=true; SIMKEY=null; ENVK=null; PREV={}; }catch(e){ console.warn("tune seed failed:",e.message); } });
+             this.mode=this.dial>=5.5?'gen':'veg'; SIMKEY=null; ENVK=null; PREV={}; this.liveWaiting=false; this.hydrated=true; this.persist(); }catch(e){ console.warn("tune seed failed:",e.message); } });
       try{ window.parent.postMessage({type:"cs-tune-ready"},"*"); }catch(e){}
     },
+    pullFromHA(){ try{ window.parent.postMessage({type:"cs-tune-pull"},"*"); }catch(e){} },   // explicit: overwrite my edits with current live HA values
+    persist(){ try{ clearTimeout(this._pt); }catch(e){} this._pt=setTimeout(()=>{ try{ localStorage.setItem("f2cs.tpl",JSON.stringify({Z:this.Z,G:this.G,dial:this.dial})); }catch(e){} }, 350); },   // silent autosave on every edit
     applyToHA(){   // push this zone's edited setpoints back to HA via the parent (parent maps → number.set_value with a confirm)
       if(window.parent===window){ this.save(); return; }   // standalone → save the local template
       const z=this.zone, changes=Object.assign({},this.Z[z]);
       try{ window.parent.postMessage({type:"cs-tune-apply",zone:z,changes,global:Object.assign({},this.G)},"*"); }catch(e){}
     },
     dialLabel(){ const v=this.dial; const t=v<3?"deep vegetative":v<5?"vegetative":v<5.5?"balanced":v<7.5?"generative":"hard generative"; return v.toFixed(1)+" · "+t; },
-    applyAthena(s){ const a=ATHENA[s]; if(!a) return; for(const k in a) this.G[k]=a[k]; this.athena=s; SIMKEY=null; ENVK=null; },
-    applySteer(){ const gf=clamp((this.dial-1)/9,0,1); for(const z of [1,2,3]) for(const k in STEER){ const m=META[k], v=STEER[k][0]+(STEER[k][1]-STEER[k][0])*gf; this.Z[z][k]=clamp(rstep(v,m.step),m.min,m.max); } SIMKEY=null; },   // dial writes the steered setpoints across all zones
+    applyAthena(s){ const a=ATHENA[s]; if(!a) return; for(const k in a) this.G[k]=a[k]; this.athena=s; SIMKEY=null; ENVK=null; this.persist(); },
+    applySteer(){ const gf=clamp((this.dial-1)/9,0,1); for(const z of [1,2,3]) for(const k in STEER){ const m=META[k], v=STEER[k][0]+(STEER[k][1]-STEER[k][0])*gf; this.Z[z][k]=clamp(rstep(v,m.step),m.min,m.max); } SIMKEY=null; this.persist(); },   // dial writes the steered setpoints across all zones
 
     /* accessors */
     g(k){ if(k in this.G) return this.G[k]; return this.Z[ZOVR||this.zone][k]; },
-    setRaw(k,v){ if(k in this.G) this.G[k]=v; else this.Z[this.zone][k]=v; },
+    setRaw(k,v){ if(k in this.G) this.G[k]=v; else this.Z[this.zone][k]=v; this.persist(); },
     setField(f,val){ const n=parseFloat(val); if(isNaN(n)) return; this.setRaw(f.key, clamp(rstep(n,f.step),f.min,f.max)); },
     bump(f,dir){ this.setRaw(f.key, clamp(rstep(this.g(f.key)+dir*f.step,f.step),f.min,f.max)); },
 

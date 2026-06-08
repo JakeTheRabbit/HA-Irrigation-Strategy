@@ -619,8 +619,9 @@ function renderModel(){const host=el("v-model");
   if(!tuneWired){tuneWired=true;window.addEventListener("message",ev=>{const d=ev.data;if(!d)return;
     if(d.type==="cs-tune-ready"){const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(tuneSeed(),"*");[100,500,1200].forEach(t=>setTimeout(sizeTune,t));}
     else if(d.type==="cs-tune-h"){const f=el("tuneFrame");if(f&&d.h>300)f.style.height=d.h+"px";}
-    else if(d.type==="cs-tune-apply"){tuneApply(d.zone,d.changes||{},d.global);}});}
-  const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(tuneSeed(),"*");sizeTune();}
+    else if(d.type==="cs-tune-apply"){tuneApply(d.zone,d.changes||{},d.global);}
+    else if(d.type==="cs-tune-pull"){const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(Object.assign(tuneSeed(),{explicit:true}),"*");}});}
+  sizeTune();}   // NOTE: do NOT reseed here — clobbers the user's edits on every tab-switch. Seed happens once on cs-tune-ready; explicit refresh via cs-tune-pull.
 const RENDER={home:renderHome,zones:renderZones,control:renderControl,model:renderModel};
 function renderActive(){renderVbar();(RENDER[curView]||renderHome)();redrawBig();if(el("drawer")&&el("drawer").classList.contains("open"))renderDrawer();}
 async function refresh(){if(!CFG.token){openModal();return;}
