@@ -7,23 +7,31 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grow Setpoints Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  /* HA dark theme exact values */
-  --bg:       #111318;
-  --surface:  #1c1c1c;
-  --surface2: #252525;
-  --border:   rgba(255,255,255,0.12);
-  --text:     #e1e1e1;
-  --muted:    #727272;
-  --accent:   #03a9f4;
+  /* plant-state-dashboard palette (jaketherabbit.github.io/plant-state-dashboard) */
+  --bg:       #0a0c10;
+  --bg2:      #0f1318;
+  --surface:  #141a21;
+  --surface2: #19212a;
+  --border:   rgba(255,255,255,0.08);
+  --text:     #e7ecf2;
+  --muted:    #727d8a;
+  --accent:   #34d399;
+  --accent2:  #22d3ee;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
-  background: var(--bg);
+  background:
+    radial-gradient(42rem 42rem at -8% -12%, rgba(16,185,129,.10), transparent 60%),
+    radial-gradient(36rem 36rem at 112% 6%, rgba(34,211,238,.07), transparent 60%),
+    var(--bg);
   color: var(--text);
-  font-family: var(--paper-font-common-base_-_font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -31,8 +39,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
-.topbar-title { font-size: 15px; font-weight: 500; white-space: nowrap; color: var(--text); letter-spacing: 0.01em; }
+.topbar { background: linear-gradient(180deg,var(--surface),var(--bg2)); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
+.topbar-title { font-size: 15px; font-weight: 800; white-space: nowrap; letter-spacing: -0.01em; background:linear-gradient(135deg,#6ee7b7,#34d399 50%,#22d3ee); -webkit-background-clip:text; background-clip:text; color:transparent; }
 .phase-tabs { display: flex; gap: 3px; flex-wrap: wrap; }
 .phase-tab { padding: 4px 11px; border-radius: 4px; border: 1px solid var(--border); background: transparent; cursor: pointer; font-size: 11px; color: var(--muted); transition: all 0.15s; white-space: nowrap; }
 .phase-tab:hover { color: var(--text); background: rgba(255,255,255,0.05); }
@@ -45,8 +53,8 @@ body {
 .spacer { flex:1; min-width:8px; }
 .btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color:var(--text); padding:5px 12px; border-radius:4px; cursor:pointer; font-size:12px; white-space:nowrap; transition:background 0.15s; }
 .btn:hover { background: rgba(255,255,255,0.12); }
-.btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
-.btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn.active { background:var(--accent); border-color:var(--accent); color:#06281c; font-weight:700; }
+.btn.primary { background:linear-gradient(135deg,#34d399,#10b981); border-color:transparent; color:#06281c; font-weight:700; }
 
 .layout { flex:1; display:flex; overflow:hidden; }
 .left-panel { width:250px; background:var(--surface); border-right:1px solid var(--border); overflow-y:auto; flex-shrink:0; }
@@ -56,14 +64,14 @@ body {
 .param-row { display:flex; align-items:center; padding:7px 14px; gap:8px; border-bottom:1px solid rgba(255,255,255,0.05); cursor:pointer; transition:background 0.1s; user-select:none; }
 .param-row:hover { background:rgba(255,255,255,0.05); }
 .param-row.dragging { opacity:0.4; background:rgba(255,255,255,0.08); }
-.param-row.drag-over { border-top:2px solid var(--accent); background:rgba(3,169,244,0.08); }
+.param-row.drag-over { border-top:2px solid var(--accent); background:rgba(52,211,153,0.10); }
 .drag-handle { color:rgba(255,255,255,0.2); font-size:12px; cursor:grab; padding:0 2px; flex-shrink:0; }
 .drag-handle:active { cursor:grabbing; }
 .param-color { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
 .param-name { font-size:12px; flex:1; }
 .param-unit { font-size:10px; color:var(--muted); }
 .param-vis { width:18px; height:18px; border-radius:3px; border:1px solid rgba(255,255,255,0.18); display:flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0; }
-.param-vis.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.param-vis.on { background:var(--accent); border-color:var(--accent); color:#06281c; }
 
 .chart-area { flex:1; display:flex; flex-direction:column; overflow:hidden; }
 .main-scroll { flex:1; overflow:auto; position:relative; }
@@ -92,7 +100,7 @@ body {
 .phase-badge { display:inline-block; padding:3px 9px; border-radius:4px; font-size:11px; font-weight:600; margin-bottom:12px; }
 .apply-btn { width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:var(--text); padding:7px; border-radius:4px; cursor:pointer; font-size:12px; margin-top:6px; transition:background 0.15s; }
 .apply-btn:hover { background:rgba(255,255,255,0.12); }
-.status-bar { background:var(--surface); border-top:1px solid var(--border); padding:5px 18px; font-size:11px; color:var(--muted); display:flex; gap:16px; flex-shrink:0; flex-wrap:wrap; }
+.status-bar { background:linear-gradient(0deg,var(--surface),var(--bg2)); border-top:1px solid var(--border); padding:5px 18px; font-size:11px; color:var(--muted); display:flex; gap:16px; flex-shrink:0; flex-wrap:wrap; }
 .status-item strong { color:var(--text); }
 .status-swatch { width:9px; height:9px; border-radius:2px; display:inline-block; margin-right:4px; }
 </style>
@@ -125,8 +133,9 @@ body {
     <button class="btn" id="zLg"   onclick="setDayW(48)"  title="Large">L</button>
   </div>
   <button class="btn" onclick="resetToDefaults()">Reset</button>
-  <button class="btn primary" onclick="exportJSON()">Export</button>
+  <button class="btn" onclick="exportJSON()">Export</button>
   <button class="btn" onclick="importRecipe()">Import</button>
+  <button class="btn primary" onclick="openHASync()">⇅ HA Sync</button>
 </div>
 
 <div id="zoneBanner" style="display:none;align-items:center;gap:12px;padding:5px 16px;font-size:12px;border-bottom:1px solid var(--border);"></div>
@@ -136,7 +145,7 @@ body {
 
   <div class="chart-area">
     <div class="main-scroll" id="mainScroll">
-      <canvas id="dayCanvas" height="72" style="display:block;position:sticky;top:0;z-index:10;border-bottom:1px solid #2e3240;"></canvas>
+      <canvas id="dayCanvas" height="72" style="display:block;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border);"></canvas>
       <canvas id="chartCanvas" style="display:block;"></canvas>
     </div>
   </div>
@@ -151,6 +160,11 @@ body {
 </div>
 
 <div class="status-bar" id="statusBar"></div>
+
+<div id="haToast" style="position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:linear-gradient(180deg,var(--surface),var(--bg2));border:1px solid var(--border);color:var(--text);padding:9px 16px;border-radius:9px;font-size:13px;display:none;z-index:200;box-shadow:0 14px 44px -12px #000"></div>
+<div id="haModal" style="position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;z-index:150" onclick="if(event.target===this)closeHASync()">
+  <div id="haModalCard" style="background:linear-gradient(180deg,var(--surface),var(--bg2));border:1px solid var(--border);border-radius:14px;max-width:560px;width:92%;max-height:85vh;overflow:auto;padding:18px;box-shadow:0 24px 70px -20px #000"></div>
+</div>
 
 <script>
 // ============================================================
@@ -689,7 +703,7 @@ function drawDayHeader(ctx, totalW) {
 }
 
 function drawChartRows(ctx, vp, totalW, totalH) {
-  ctx.fillStyle = '#111318';
+  ctx.fillStyle = '#0a0c10';
   ctx.fillRect(0, 0, totalW, totalH);
 
   for (const ph of PHASES) {
@@ -711,7 +725,7 @@ function drawChartRows(ctx, vp, totalW, totalH) {
   vp.forEach((param, ri) => {
     const rowY = ri * ROW_H;
 
-    ctx.fillStyle = ri % 2 === 0 ? '#111318' : '#131619';
+    ctx.fillStyle = ri % 2 === 0 ? '#0a0c10' : '#0f1318';
     ctx.fillRect(0, rowY, totalW, ROW_H);
 
     // Param label mini
@@ -1370,6 +1384,140 @@ function resetToDefaults() {
     closeDayEditor();
     renderCharts();
   }
+}
+
+// ============================================================
+// HA SYNC (T9) — push the timeline week's setpoints to Home Assistant
+// ============================================================
+// timeline param id -> [crop_steering entity suffix, scope]. scope: 'both' (global + per-zone), 'global', 'zone' (per-zone only).
+const HA_SYNC = {
+  ec_gen_p0:['ec_target_gen_p0','both'], ec_gen_p1:['ec_target_gen_p1','both'], ec_gen_p2:['ec_target_gen_p2','both'], ec_gen_p3:['ec_target_gen_p3','both'],
+  ec_veg_p0:['ec_target_veg_p0','both'], ec_veg_p1:['ec_target_veg_p1','both'], ec_veg_p2:['ec_target_veg_p2','both'], ec_veg_p3:['ec_target_veg_p3','both'],
+  ec_flush:['ec_target_flush','both'],
+  p0_min_wait:['p0_minimum_wait_time','both'], p0_max_wait:['p0_maximum_wait_time','both'],
+  p1_time_btwn:['p1_time_between_shots','both'], p1_min_shots:['p1_minimum_shots','both'], p1_max_shots:['p1_maximum_shots','both'],
+  p3_gen_last:['p3_gen_last_irrigation','both'], p3_veg_last:['p3_veg_last_irrigation','both'],
+  p1_target_vwc:['p1_target_vwc','both'], p1_init_pct:['p1_initial_shot_size','both'], p1_incr_pct:['p1_shot_size_increment','both'], p1_max_pct:['p1_maximum_shot_size','both'],
+  p2_vwc_thresh:['p2_vwc_threshold','both'], p2_shot_pct:['p2_shot_size','both'], p2_ec_high:['p2_ec_high_threshold','both'], p2_ec_low:['p2_ec_low_threshold','both'],
+  p0_dryback_drop:['p0_dryback_drop_percent','both'], p3_emerg_vwc:['p3_emergency_vwc_threshold','both'], p3_emerg_pct:['p3_emergency_shot_size','both'],
+  db_gen_target:['generative_dryback_target','both'], db_veg_target:['vegetative_dryback_target','both'],
+  field_capacity:['field_capacity','global'], substrate_vol:['substrate_volume','global'],
+  lights_on_hr:['lights_on_hour','global'], lights_off_hr:['lights_off_hour','global'],
+  max_ec:['maximum_ec','global'], irrig_ec_min:['irrigation_ec_min','global'], irrig_ec_max:['irrigation_ec_max','global'],
+  irrig_ph_min:['irrigation_ph_min','global'], irrig_ph_max:['irrigation_ph_max','global'],
+  blocked_drip_max:['blocked_dripper_max_shots_30min','global'], dripper_flow:['dripper_flow_rate','global'], drippers_plant:['drippers_per_plant','global'],
+  plant_count:['plant_count','zone'], max_daily_vol:['max_daily_volume','zone'], shot_size_mult:['shot_size_multiplier','zone'],
+};
+const HA_GROWWEEK  = 'sensor.f2_grow_week';
+const HA_AUTOPILOT = 'input_boolean.crop_steering_timeline_autopilot';
+let HA = { base: localStorage.getItem('cs_base') || location.origin, token: localStorage.getItem('cs_token') || '' };
+const haUrl = p => HA.base.replace(/\/$/, '') + p;
+async function haGet(entity) { const r = await fetch(haUrl('/api/states/' + entity), { headers:{ Authorization:'Bearer ' + HA.token } }); if (!r.ok) throw new Error(entity + ' ' + r.status); return r.json(); }
+async function haSet(entity, value) { const r = await fetch(haUrl('/api/services/number/set_value'), { method:'POST', headers:{ Authorization:'Bearer ' + HA.token, 'Content-Type':'application/json' }, body: JSON.stringify({ entity_id: entity, value }) }); if (!r.ok) throw new Error('set ' + entity + ' ' + r.status); }
+async function haTest() { const r = await fetch(haUrl('/api/'), { headers:{ Authorization:'Bearer ' + HA.token } }); return r.ok; }
+
+function computeWeekWrites(week) {
+  const day = Math.min(Math.max(week, 0), WEEK_DATA.length - 1) * 7;   // representative = week start
+  const writes = [];
+  for (const pid in HA_SYNC) {
+    if (!recipe[pid]) continue;
+    const [suffix, scope] = HA_SYNC[pid];
+    const fac = recipe[pid][day];
+    if (scope === 'global' || scope === 'both') writes.push({ entity:'number.crop_steering_' + suffix, newVal: fac, label: suffix });
+    if (scope === 'both') for (const z of ZONE_IDS) { if (hasOverride(pid, day, z)) writes.push({ entity:`number.crop_steering_zone_${z}_${suffix}`, newVal: getVal(pid, day, z), label:`Z${z} ${suffix}` }); }
+    if (scope === 'zone') for (const z of ZONE_IDS) writes.push({ entity:`number.crop_steering_zone_${z}_${suffix}`, newVal: getVal(pid, day, z), label:`Z${z} ${suffix}` });
+  }
+  return writes;
+}
+async function previewWeek(week) {
+  const writes = computeWeekWrites(week);
+  const cur = {};
+  await Promise.all(writes.map(async w => { try { const s = await haGet(w.entity); cur[w.entity] = parseFloat(s.state); } catch (e) { cur[w.entity] = NaN; } }));
+  const changed = writes.filter(w => isNaN(cur[w.entity]) || Math.abs(cur[w.entity] - w.newVal) > 1e-6);
+  return { writes, cur, changed };
+}
+async function applyWeekToHA(week, silent) {
+  if (!HA.token) { openHASync(); return; }
+  let res; try { res = await previewWeek(week); } catch (e) { if (!silent) alert('HA read failed: ' + e.message); return; }
+  if (!res.changed.length) { if (!silent) haToast('Week ' + week + ': HA already matches.'); return; }
+  if (!silent) {
+    const lines = res.changed.slice(0, 40).map(w => `• ${w.label}:  ${isNaN(res.cur[w.entity]) ? '—' : res.cur[w.entity]} -> ${w.newVal}`).join('\n');
+    if (!confirm(`Apply Week ${week} to HA?\nWrites ${res.changed.length} crop-steering setpoint(s) LIVE:\n\n${lines}${res.changed.length > 40 ? '\n…' : ''}`)) return;
+  }
+  let ok = 0, fail = 0;
+  for (const w of res.changed) { try { await haSet(w.entity, w.newVal); ok++; } catch (e) { fail++; } }
+  haToast(`Week ${week} → HA: ${ok} written${fail ? ', ' + fail + ' failed' : ''}`);
+}
+
+// ── autopilot: while this page is open + the switch is ON, auto-apply on grow-week change ──
+let _lastAutoWeek = null;
+async function autopilotTick() {
+  if (!HA.token) return;
+  let ap, gw;
+  try { ap = await haGet(HA_AUTOPILOT); gw = await haGet(HA_GROWWEEK); } catch (e) { return; }
+  if (ap.state !== 'on') { _lastAutoWeek = null; return; }
+  const week = Math.round(parseFloat(gw.state));
+  if (isNaN(week)) return;
+  if (_lastAutoWeek === null) { _lastAutoWeek = week; return; }   // baseline on first ON tick — never mass-write on page load
+  if (week !== _lastAutoWeek) { _lastAutoWeek = week; haToast('Autopilot: grow week → ' + week + ', applying…'); applyWeekToHA(week, true); }
+}
+setInterval(autopilotTick, 60000);
+
+// ── modal UI ──
+function haToast(msg) { const t = document.getElementById('haToast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._t); t._t = setTimeout(() => t.style.display = 'none', 3400); }
+function openHASync() { document.getElementById('haModal').style.display = 'flex'; renderHASync(); }
+function closeHASync() { document.getElementById('haModal').style.display = 'none'; }
+function connectHTML() {
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 style="font-size:16px;font-weight:800">Connect to Home Assistant</h2><span style="cursor:pointer;color:var(--muted)" onclick="closeHASync()">✕</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Paste a long-lived token (Profile → Security). Stored only in this browser (localStorage), never in the file.</div>
+    <input id="haInBase" placeholder="${location.origin}" value="${HA.base}" style="width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:6px;margin-bottom:8px">
+    <input id="haInToken" placeholder="eyJhbG…" type="password" style="width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:6px;margin-bottom:8px">
+    <div id="haConnErr" style="font-size:12px;color:#f87171;margin-bottom:8px"></div>
+    <button class="btn primary" onclick="haConnect()">Connect</button>`;
+}
+async function haConnect() {
+  const base = document.getElementById('haInBase').value.trim() || location.origin;
+  const token = document.getElementById('haInToken').value.trim();
+  HA = { base, token };
+  try { if (!await haTest()) throw new Error('auth'); localStorage.setItem('cs_base', base); localStorage.setItem('cs_token', token); renderHASync(); }
+  catch (e) { document.getElementById('haConnErr').textContent = 'Could not connect (' + e.message + ')'; }
+}
+async function renderHASync() {
+  const card = document.getElementById('haModalCard');
+  if (!HA.token) { card.innerHTML = connectHTML(); return; }
+  card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 style="font-size:16px;font-weight:800">⇅ Apply timeline → Home Assistant</h2><span style="cursor:pointer;color:var(--muted)" onclick="closeHASync()">✕</span></div>
+    <div id="haStatus" style="font-size:12px;color:var(--muted);margin-bottom:12px">Checking connection…</div>
+    <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:12px">
+      <div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px">Grow week to apply</div>
+        <input id="haWeek" type="number" min="0" max="${WEEK_DATA.length - 1}" value="0" style="width:90px;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);padding:7px 9px;border-radius:6px"></div>
+      <button class="btn primary" onclick="haPreviewClick()">Preview &amp; Apply</button>
+    </div>
+    <div id="haDiff" style="font-size:12px;max-height:38vh;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:10px;display:none;font-family:ui-monospace,Menlo,Consolas,monospace"></div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+    <label style="display:flex;align-items:flex-start;gap:9px;font-size:13px;cursor:pointer">
+      <input type="checkbox" id="haAutoToggle" style="margin-top:3px" onchange="haToggleAutopilot(this.checked)">
+      <span><b>Autopilot</b> — auto-apply the new week whenever the F2 grow week changes <span style="color:var(--muted)">(runs only while this page is open; default off)</span></span></label>
+    <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5">Writes only crop-steering setpoints (EC grid, dryback, P0–P3, limits, dripper, zone setup). Climate (temp/RH/CO₂/PPFD) is plan-only — set those on your climate controller. Facility values → global entities; per-zone overrides → <code>number.crop_steering_zone_N_*</code>.</div>`;
+  try {
+    const gw = await haGet(HA_GROWWEEK);
+    const ap = await haGet(HA_AUTOPILOT).catch(() => ({ state:'unavailable' }));
+    document.getElementById('haStatus').innerHTML = `Connected ✓ · F2 grow week <b style="color:var(--text)">${gw.state}</b>`;
+    const wk = document.getElementById('haWeek'); wk.value = Math.min(Math.max(Math.round(parseFloat(gw.state)) || 0, 0), WEEK_DATA.length - 1);
+    const at = document.getElementById('haAutoToggle'); at.checked = ap.state === 'on';
+    if (ap.state === 'unavailable') { at.disabled = true; at.parentElement.title = HA_AUTOPILOT + ' not found — create it to enable autopilot'; }
+  } catch (e) { const s = document.getElementById('haStatus'); if (s) s.textContent = 'Connect error: ' + e.message; }
+}
+async function haPreviewClick() {
+  const week = parseInt(document.getElementById('haWeek').value) || 0;
+  const diff = document.getElementById('haDiff'); diff.style.display = 'block'; diff.textContent = 'Reading HA…';
+  let res; try { res = await previewWeek(week); } catch (e) { diff.textContent = 'Read failed: ' + e.message; return; }
+  if (!res.changed.length) { diff.innerHTML = `<span style="color:var(--accent)">HA already matches week ${week} — nothing to write.</span>`; return; }
+  diff.innerHTML = res.changed.slice(0, 80).map(w => `<div>${w.label}: <span style="color:var(--muted)">${isNaN(res.cur[w.entity]) ? '—' : res.cur[w.entity]}</span> → <b>${w.newVal}</b></div>`).join('')
+    + `<button class="btn primary" style="margin-top:10px" onclick="applyWeekToHA(${week}).then(()=>{closeHASync();})">✓ Write ${res.changed.length} change(s) to HA</button>`;
+}
+async function haToggleAutopilot(on) {
+  try { await fetch(haUrl('/api/services/input_boolean/' + (on ? 'turn_on' : 'turn_off')), { method:'POST', headers:{ Authorization:'Bearer ' + HA.token, 'Content-Type':'application/json' }, body: JSON.stringify({ entity_id: HA_AUTOPILOT }) }); haToast('Autopilot ' + (on ? 'ON' : 'OFF')); _lastAutoWeek = null; }
+  catch (e) { haToast('Autopilot toggle failed'); }
 }
 
 // ============================================================
