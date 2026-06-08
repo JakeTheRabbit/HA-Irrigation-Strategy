@@ -157,6 +157,15 @@
   html.embed,html.embed body{overflow:visible}
   html.embed .scol{position:static!important;max-height:none!important;overflow:visible!important}
   html.embed body{padding-bottom:8px}
+  /* universal field tooltips (T7) — ⓘ affordance + one floating fact popover */
+  .ttinfo{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--hair);color:var(--ink3);font-size:9px;font-weight:800;line-height:1;cursor:help;flex:none;background:var(--bg);user-select:none;margin-left:2px}
+  .ttinfo:hover{color:var(--accent);border-color:var(--accent)}
+  .ttpop{position:fixed;z-index:90;pointer-events:none;border-radius:12px;padding:11px 13px;box-shadow:0 18px 50px -14px rgba(0,0,0,.82)}
+  .ttpop .tth{font-weight:800;font-size:12.5px;margin-bottom:6px;color:var(--ink)}
+  .ttp-r{display:grid;grid-template-columns:62px 1fr;gap:9px;margin-top:5px;font-size:12px;line-height:1.4}
+  .ttp-r span{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);font-weight:800;padding-top:2px}
+  .ttp-r p{margin:0;color:var(--ink2)}
+  .ttp-f{margin-top:8px;padding-top:7px;border-top:1px solid var(--hair);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;color:var(--accent);word-break:break-word}
 </style>
 </head>
 <body x-data="editor()" x-cloak>
@@ -172,16 +181,16 @@
     <div class="panel glass">
       <div class="topbar">
         <div class="seg"><template x-for="z in [1,2,3]" :key="'z'+z"><button :class="zone===z&&'on'" @click="zone=z" x-text="'Zone '+z"></button></template></div>
-        <div class="seg ath"><template x-for="s in ['Clone','Veg','Stretch','Bulk','Finish']" :key="'a'+s"><button :class="athena===s&&'on'" @click="applyAthena(s)" x-text="s"></button></template></div>
+        <div class="seg ath"><template x-for="s in ['Clone','Veg','Stretch','Bulk','Finish']" :key="'a'+s"><button :class="athena===s&&'on'" @click="applyAthena(s)" x-text="s"></button></template></div><span class="ttinfo" @mouseenter="showTip('athena','Athena stage presets',$event)" @mouseleave="hideTip()" @click="showTip('athena','Athena stage presets',$event)">ⓘ</span>
         <div class="verdict" x-html="verdict()"></div>
       </div>
       <div class="steer">
-        <div class="lab"><span>Steering dial</span><span x-text="dialLabel()"></span></div>
+        <div class="lab"><span>Steering dial <span class="ttinfo" @mouseenter="showTip('dial','Steering dial',$event)" @mouseleave="hideTip()" @click="showTip('dial','Steering dial',$event)">ⓘ</span></span><span x-text="dialLabel()"></span></div>
         <input type="range" min="1" max="10" step="0.5" x-model.number="dial" @input="mode = dial>=5.5?'gen':'veg'; applySteer()">
         <div class="ends"><span>🌿 vegetative · shallow dryback</span><span>generative · deep dryback 🌸</span></div>
       </div>
       <svg viewBox="0 0 1240 500" @pointerdown="onDown($event)" @pointermove="onMove($event)" @pointerup="drag=null" @pointercancel="drag=null" @mouseover="onHover($event)" @mouseleave="hov=null" x-html="svgBody()"></svg>
-      <div class="legend"><span><i style="background:#e7ecf2"></i>VWC</span><span><i style="background:#f472b6"></i>pore EC</span><span><i style="background:#34d399"></i>field capacity</span><span><i style="background:#f87171"></i>emergency floor</span><span style="color:var(--ink3)">· glowing dot = draggable</span></div>
+      <div class="legend"><span class="ttinfo" @mouseenter="showTip('chart_irrig','Irrigation curve · 24h sim',$event)" @mouseleave="hideTip()" @click="showTip('chart_irrig','Irrigation curve · 24h sim',$event)" style="margin-right:2px">ⓘ</span><span><i style="background:#e7ecf2"></i>VWC</span><span><i style="background:#f472b6"></i>pore EC</span><span><i style="background:#34d399"></i>field capacity</span><span><i style="background:#f87171"></i>emergency floor</span><span style="color:var(--ink3)">· glowing dot = draggable</span></div>
       <div class="readout" style="margin-top:10px">
         <span class="pill">first shot <b x-text="fmtMin(firstShotMin())"></b></span>
         <span class="pill">P1 shots <b x-text="p1ShotCount()"></b></span>
@@ -212,7 +221,7 @@
             <div class="tradeoff" x-show="goal.k==='p'">⇄ THC levers (deeper dryback, leaner feed, cooler finish) trade against yield — push to taste</div>
             <template x-for="f in potential(goal.k).list" :key="f.key">
               <div class="limrow" :class="f.pct>=80?'ok':(f.pct>=60?'mid':'low')">
-                <span class="lrl" x-text="f.label"></span>
+                <span class="lrl" x-text="f.label" style="cursor:help" @mouseenter="showTip(f.key,f.label,$event)" @mouseleave="hideTip()"></span>
                 <span class="lrbar"><i :style="'width:'+f.pct+'%'"></i></span>
                 <span class="lrv"><b x-text="f.val"></b><em x-text="f.unit"></em></span>
                 <span class="lrd" x-text="f.dir==='ok'?'✓ in band':(f.dir==='raise'?'▲ raise':'▼ lower')"></span>
@@ -256,6 +265,7 @@
             <template x-for="f in grp.fields" :key="f.key">
               <div class="frow" :class="hov===f.key&&'lit'" @mouseenter="hov=f.key" @mouseleave="hov=null">
                 <div class="fl" x-text="f.label"></div>
+                <span class="ttinfo" @mouseenter="showTip(f.key,f.label,$event)" @mouseleave="hideTip()" @click="showTip(f.key,f.label,$event)">ⓘ</span>
                 <span class="step"><button @click="bump(f,-1)">−</button><input type="number" :step="f.step" :value="fmtNum(g(f.key),f.dec)" @change="setField(f,$event.target.value)"><button @click="bump(f,1)">+</button><span class="u" x-text="f.unit"></span></span>
               </div>
             </template>
@@ -273,7 +283,7 @@
 
     <!-- ===== MULTI-DAY DRIVERS (scrollable) ===== -->
     <div class="panel glass">
-      <div class="ch"><h2>Dryback vs drivers · multi-day</h2><span class="chs">the steady-state day repeated — scroll to read how the dryback rate tracks PPFD, leaf VPD, temp &amp; CO₂.
+      <div class="ch"><h2>Dryback vs drivers · multi-day <span class="ttinfo" @mouseenter="showTip('chart_multi','Dryback vs drivers · multi-day',$event)" @mouseleave="hideTip()" @click="showTip('chart_multi','Dryback vs drivers · multi-day',$event)">ⓘ</span></h2><span class="chs">the steady-state day repeated — scroll to read how the dryback rate tracks PPFD, leaf VPD, temp &amp; CO₂.
         <span class="dseg"><button :class="gdays===1&&'on'" @click="gdays=1">1d</button><button :class="gdays===2&&'on'" @click="gdays=2">2d</button><button :class="gdays===3&&'on'" @click="gdays=3">3d</button></span>
         <button class="btn xs2" x-show="live" @click="reqHistory()">overlay live VWC</button></span></div>
       <div class="mdleg"><span><i style="background:#34d399"></i>VWC / dryback</span><span><i style="background:#f59e0b"></i>PPFD</span><span><i style="background:#fb923c"></i>temp</span><span><i style="background:#f472b6"></i>leaf VPD</span><span><i style="background:#60a5fa"></i>CO₂</span><span x-show="histPts"><i style="background:#94a3b8"></i>live VWC</span></div>
@@ -286,13 +296,13 @@
     <!-- ===== ROOM ENVIRONMENT GRAPHS ===== -->
     <div class="panel glass envstack">
       <div class="ch"><h2>Room environment · 24h</h2><span class="chs">same lights-aligned timeline as the irrigation card — read root-zone, air, light & balances as one synchronized story.</span></div>
-      <div class="envrow"><div class="envlab">Climate · VPD <i style="color:#f472b6">leaf</i> <i style="color:#7dd3fc">air</i> · <i style="color:#fb923c">temp</i> <i style="color:#60a5fa">RH</i><b>green = in-band 0.8–1.4 kPa · drag temp/RH dots</b></div><div class="minicwrap" @pointerdown="miniDown('climate',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="climateChart()"></div></div>
-      <div class="envrow"><div class="envlab">Dew point & condensation margin · <i style="color:#fb923c">leaf temp</i> <i style="color:#60a5fa">dew point</i><b style="color:#f87171">red ribbon = &lt;3°C → condensation risk</b></div><div class="minicwrap" @pointerdown="miniDown('dew',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dewChart()"></div></div>
-      <div class="envrow"><div class="envlab">Moisture balance · <i style="color:#34d399">transpiration in</i> <i style="color:#f472b6">dehum capacity out</i><b>fill above the line → RH will climb · drag dehum</b></div><div class="minicwrap" @pointerdown="miniDown('moist',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="moistChart()"></div></div>
-      <div class="envrow"><div class="envlab">Light · <i style="color:#a3e635">cumulative DLI</i> <i style="color:#6b7682">target pace</i> · <i style="color:#fbbf24">photosynthesis %</i></div><div class="minicwrap" @pointerdown="miniDown('dli',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dliChart()"></div></div>
-      <div class="envrow"><div class="envlab">Leaf vs air temp · <i style="color:#fb923c">leaf</i> <i style="color:#7dd3fc">air</i><b>gap = transpirational cooling / stress · drag air</b></div><div class="minicwrap" @pointerdown="miniDown('leafair',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="leafAirChart()"></div></div>
-      <div class="envrow"><div class="envlab">CO₂ utilization · <i style="color:#a78bfa">room ppm</i> <i style="color:#34d399">canopy uptake g/h</i><b>enriched by day · ambient at night · drag CO₂</b></div><div class="minicwrap" @pointerdown="miniDown('co2',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="co2Chart()"></div></div>
-      <div class="envrow"><div class="envlab">Heat / cooling · <i style="color:#f59e0b">sensible load (lights)</i> <i style="color:#60a5fa">AC capacity</i><b>area above the line = under-cooled · drag AC</b></div><div class="minicwrap" @pointerdown="miniDown('heat',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="heatChart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_climate','Climate · VPD',$event)" @mouseleave="hideTip()" @click="showTip('chart_climate','Climate · VPD',$event)">ⓘ</span> Climate · VPD <i style="color:#f472b6">leaf</i> <i style="color:#7dd3fc">air</i> · <i style="color:#fb923c">temp</i> <i style="color:#60a5fa">RH</i><b>green = in-band 0.8–1.4 kPa · drag temp/RH dots</b></div><div class="minicwrap" @pointerdown="miniDown('climate',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="climateChart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_dew','Dew point & condensation margin',$event)" @mouseleave="hideTip()" @click="showTip('chart_dew','Dew point & condensation margin',$event)">ⓘ</span> Dew point & condensation margin · <i style="color:#fb923c">leaf temp</i> <i style="color:#60a5fa">dew point</i><b style="color:#f87171">red ribbon = &lt;3°C → condensation risk</b></div><div class="minicwrap" @pointerdown="miniDown('dew',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dewChart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_moist','Moisture balance',$event)" @mouseleave="hideTip()" @click="showTip('chart_moist','Moisture balance',$event)">ⓘ</span> Moisture balance · <i style="color:#34d399">transpiration in</i> <i style="color:#f472b6">dehum capacity out</i><b>fill above the line → RH will climb · drag dehum</b></div><div class="minicwrap" @pointerdown="miniDown('moist',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="moistChart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_dli','Light · DLI',$event)" @mouseleave="hideTip()" @click="showTip('chart_dli','Light · DLI',$event)">ⓘ</span> Light · <i style="color:#a3e635">cumulative DLI</i> <i style="color:#6b7682">target pace</i> · <i style="color:#fbbf24">photosynthesis %</i></div><div class="minicwrap" @pointerdown="miniDown('dli',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dliChart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_leafair','Leaf vs air temp',$event)" @mouseleave="hideTip()" @click="showTip('chart_leafair','Leaf vs air temp',$event)">ⓘ</span> Leaf vs air temp · <i style="color:#fb923c">leaf</i> <i style="color:#7dd3fc">air</i><b>gap = transpirational cooling / stress · drag air</b></div><div class="minicwrap" @pointerdown="miniDown('leafair',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="leafAirChart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_co2','CO₂ utilization',$event)" @mouseleave="hideTip()" @click="showTip('chart_co2','CO₂ utilization',$event)">ⓘ</span> CO₂ utilization · <i style="color:#a78bfa">room ppm</i> <i style="color:#34d399">canopy uptake g/h</i><b>enriched by day · ambient at night · drag CO₂</b></div><div class="minicwrap" @pointerdown="miniDown('co2',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="co2Chart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_heat','Heat / cooling',$event)" @mouseleave="hideTip()" @click="showTip('chart_heat','Heat / cooling',$event)">ⓘ</span> Heat / cooling · <i style="color:#f59e0b">sensible load (lights)</i> <i style="color:#60a5fa">AC capacity</i><b>area above the line = under-cooled · drag AC</b></div><div class="minicwrap" @pointerdown="miniDown('heat',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="heatChart()"></div></div>
     </div>
 
       </div>
@@ -303,6 +313,7 @@
             <template x-for="f in grp.fields" :key="f.key">
               <div class="frow" :class="hov===f.key&&'lit'" @mouseenter="hov=f.key" @mouseleave="hov=null">
                 <div class="fl" x-text="f.label"></div>
+                <span class="ttinfo" @mouseenter="showTip(f.key,f.label,$event)" @mouseleave="hideTip()" @click="showTip(f.key,f.label,$event)">ⓘ</span>
                 <span class="step"><button @click="bump(f,-1)">−</button><input type="number" :step="f.step" :value="fmtNum(g(f.key),f.dec)" @change="setField(f,$event.target.value)"><button @click="bump(f,1)">+</button><span class="u" x-text="f.unit"></span></span>
               </div>
             </template>
@@ -311,6 +322,15 @@
       </div></aside>
     </div>
     <p class="note">Live values pulled from F2 on 2026-06-07. Hardware (field capacity, substrate volume, lights) is shared across zones; everything else is per-zone. Next step: write changes back to the <code>number.crop_steering_zone_N_*</code> entities with a confirm step.</p>
+  </div>
+
+  <!-- ===== universal tooltip popover (T7): hover any ⓘ ===== -->
+  <div class="ttpop glass" x-show="tip" x-cloak :style="tipStyle()">
+    <div class="tth" x-text="tip&&tip.label"></div>
+    <div class="ttp-r" x-show="tip&&tip.d"><span>Does</span><p x-text="tip&&tip.d"></p></div>
+    <div class="ttp-r" x-show="tip&&tip.a"><span>Affects</span><p x-text="tip&&tip.a"></p></div>
+    <div class="ttp-r" x-show="tip&&tip.b"><span>Driven by</span><p x-text="tip&&tip.b"></p></div>
+    <div class="ttp-f" x-show="tip&&tip.f"><span x-text="tip&&tip.f"></span></div>
   </div>
 </div>
 
@@ -437,6 +457,92 @@ const META = {
   baseline_thc:{label:"Strain THC potential",unit:"%",min:5,max:35,step:0.5,dec:1},
 };
 
+/* ===== universal tooltips (T7): every knob explained — {d:does, a:affects downstream, b:driven by upstream, f:formula/logic} ===== */
+const FIELDTIPS = {
+  /* P0 — morning dryback */
+  p0_minimum_wait_time:{d:"Minimum minutes after lights-on before P0 can end — forces a real morning dryback even if VWC already dropped.",a:"Delays the first irrigation (P1 start); longer = deeper forced dryback.",b:"Lights-on time; the dryback-drop trigger.",f:"hold ≥ this long, THEN watch for the % drop"},
+  p0_maximum_wait_time:{d:"Hard cap — if the dryback-drop trigger hasn't fired by now, P0 ends and P1 starts anyway.",a:"Sets the latest possible first shot; safety so a stalled sensor can't starve the plant.",b:"Lights-on; dryback-drop %; sensor health.",f:"first shot at min(drop-hit, this cap)"},
+  p0_dryback_drop_percent:{d:"VWC drop from the overnight peak that ends P0 and starts ramp-up.",a:"How dry the root-zone gets each morning before re-water; key generative push.",b:"Overnight low; transpiration rate (light, VPD).",f:"trigger when (peak − now) ≥ this %"},
+  /* P1 — ramp-up */
+  p1_target_vwc:{d:"The VWC ceiling P1 ramps the substrate up to — field capacity for the day.",a:"Sets peak saturation, runoff onset and EC dilution; top of every sawtooth.",b:"Substrate type, field capacity, gen vs veg goal.",f:"ramp shots until VWC ≥ target"},
+  p1_initial_shot_size:{d:"Size of the first ramp-up shot, as % of substrate volume.",a:"How fast VWC climbs early in P1.",b:"Substrate volume, dryback depth.",f:"litres = % × substrate L"},
+  p1_shot_size_increment:{d:"How much each successive P1 shot grows over the last.",a:"Ramp aggressiveness — bigger = fewer, larger shots to target.",b:"Initial shot, max shot, time between shots.",f:"shot_n = initial + n × increment (≤ max)"},
+  p1_maximum_shot_size:{d:"Ceiling on any single P1 shot.",a:"Caps runoff spikes and channeling from oversized shots.",b:"Substrate volume, dripper flow.",f:"shot = min(ramp value, this)"},
+  p1_time_between_shots:{d:"Spacing between P1 ramp shots.",a:"Total ramp duration; lets each shot wick in before the next.",b:"Substrate absorption rate, shot size.",f:"P1 length ≈ shots × this interval"},
+  p1_minimum_shots:{d:"Fewest P1 shots before P2 can begin, even if target VWC is already hit.",a:"Guarantees even wetting / EC reset before maintenance.",b:"Target VWC, shot size.",f:"P2 starts after ≥ min shots AND VWC ≥ target"},
+  p1_maximum_shots:{d:"Most P1 shots allowed before forcing into P2.",a:"Stops endless ramping if VWC never reaches target (channeling / sensor fault).",b:"Shot size, target VWC, substrate health.",f:"force P2 at this shot count"},
+  /* P2 — maintenance */
+  p2_vwc_threshold:{d:"VWC level that triggers a maintenance top-up shot in P2.",a:"Sets the daytime dryback band — lower = deeper dryback per cycle.",b:"Dryback target, steering dial, target VWC.",f:"shoot when VWC ≤ threshold"},
+  p2_shot_size:{d:"Size of each P2 maintenance shot, % of substrate.",a:"VWC recovered per top-up; small = EC stacking, large = flushing.",b:"Substrate volume, EC strategy.",f:"litres = % × substrate L"},
+  p2_ec_high_threshold:{d:"Pore-EC / target ratio above which the controller reacts to high salt.",a:"Triggers larger / flushing shots to pull pore EC down.",b:"Feed EC, dryback depth, target EC.",f:"if EC_ratio ≥ this → correct down"},
+  p2_ec_low_threshold:{d:"Pore-EC / target ratio below which the controller reacts to low salt.",a:"Triggers smaller shots / lets EC stack back up.",b:"Feed EC, runoff, target EC.",f:"if EC_ratio ≤ this → let EC rise"},
+  /* P3 — overnight */
+  p3_emergency_vwc_threshold:{d:"Overnight VWC floor — only a drop below this fires an emergency shot.",a:"Prevents wilting overnight while still allowing the dryback.",b:"Overnight transpiration, substrate volume.",f:"emergency shot if VWC ≤ floor"},
+  p3_emergency_shot_size:{d:"Size of an overnight emergency shot.",a:"Just enough to clear the floor without resetting the dryback.",b:"Substrate volume.",f:"litres = % × substrate L"},
+  p3_gen_last_irrigation:{d:"Minutes before lights-off to stop irrigating in generative steering.",a:"Sets the overnight dryback runway — earlier last shot = deeper generative dryback.",b:"Steering mode, lights-off time.",f:"last shot at lights_off − this"},
+  p3_veg_last_irrigation:{d:"Minutes before lights-off to stop irrigating in vegetative steering.",a:"Shorter runway than gen = shallower overnight dryback.",b:"Steering mode, lights-off time.",f:"last shot at lights_off − this"},
+  /* steering & EC */
+  generative_dryback_target:{d:"Target dryback depth for generative steering (% drop from peak).",a:"Drives EC stacking and flower push; deeper = more potency, less yield.",b:"Steering dial, P2 threshold, P3 last-shot.",f:"used when dial ≥ 5.5 (gen)"},
+  vegetative_dryback_target:{d:"Target dryback depth for vegetative steering (% drop).",a:"Shallow dryback = vegetative push, more yield, lower EC.",b:"Steering dial, P2 threshold.",f:"used when dial < 5.5; the dial blends the two"},
+  /* climate */
+  ppfd:{d:"Photosynthetic photon flux at canopy — light intensity.",a:"Drives photosynthesis, DLI, transpiration, leaf temp, yield (≈linear to the CO₂ ceiling) and the potency floor (≥~600).",b:"Fixture power, hang height, dimming.",f:"DLI = PPFD × photoperiod_h × 0.0036"},
+  co2:{d:"Daytime CO₂ enrichment level.",a:"Raises the light-saturation ceiling so high PPFD pays off; +20–40% yield. Not a direct potency knob.",b:"Injection rate, sealing, canopy uptake.",f:"usable-PPFD ceiling rises with CO₂"},
+  temp:{d:"Daytime air temperature setpoint.",a:"Sets VPD (with RH), leaf temp, photosynthesis (peak ~27°C) and DIF. >30°C degrades THC.",b:"HVAC, light heat load.",f:"VPD = SVP(T)·(1 − RH/100)"},
+  rh:{d:"Daytime relative humidity setpoint.",a:"Sets VPD and condensation margin; too high → mould, too low → stomata shut.",b:"Transpiration, dehum capacity, fresh air.",f:"VPD = SVP(T)·(1 − RH/100)"},
+  temp_night:{d:"Night air temperature setpoint.",a:"Sets day→night DIF (tight positive best) and overnight condensation risk.",b:"HVAC night mode.",f:"DIF = day_temp − night_temp"},
+  rh_night:{d:"Night relative humidity setpoint.",a:"Overnight condensation / mould risk and dryback transpiration.",b:"Night temp, dehum.",f:"dew-point vs leaf-temp margin"},
+  feed_ec:{d:"EC of the nutrient solution fed to the dripper (input).",a:"Sets baseline pore EC; leaner feed → N-stress → +THC, −yield.",b:"Recipe / dosing.",f:"pore EC drifts toward feed EC on runoff"},
+  baseline_thc:{d:"The strain's genetic THC ceiling under ideal conditions.",a:"Anchors the potency estimate; stress modifiers scale around it.",b:"Genetics / cultivar.",f:"est THC = baseline × Π(stress modifiers)"},
+  /* room / facility */
+  room_length:{d:"Room length.",a:"Floor area & volume → CO₂ draw-down, cooling/dehum sizing, W/m².",b:"Physical room.",f:"area = L × W"},
+  room_width:{d:"Room width.",a:"Floor area & volume → CO₂ draw-down, cooling/dehum sizing, W/m².",b:"Physical room.",f:"area = L × W"},
+  room_height:{d:"Room height.",a:"Room volume → CO₂ ppm draw-down rate.",b:"Physical room.",f:"volume = area × H"},
+  canopy_coverage:{d:"% of floor under active canopy.",a:"Scales transpiration, CO₂ uptake and water use to real plant area.",b:"Plant count, spacing.",f:"canopy m² = floor × coverage%"},
+  plant_count:{d:"Plants in the room.",a:"Multiplies per-plant transpiration into room water / dehum load.",b:"Layout density.",f:"room water = per-plant × count"},
+  light_watts:{d:"Total electrical light power in the room.",a:"Sensible cooling load (~50% of watts) and W/m².",b:"Fixture count × wattage.",f:"AC sensible ≈ 0.5 × watts"},
+  hvac_cooling_kw:{d:"Installed AC cooling capacity.",a:"Whether sensible heat is removed; undersized → temp climbs.",b:"HVAC spec.",f:"compare to 0.5 × light_watts"},
+  dehum_capacity:{d:"Dehumidifier moisture-removal capacity (L/day).",a:"Whether the transpiration load is met; deficit → RH climbs at night.",b:"Dehum spec.",f:"balance = capacity − transpiration load"},
+  /* substrate */
+  field_capacity:{d:"Max VWC the substrate holds before runoff — the day's saturation ceiling.",a:"Top of the curve, runoff onset, dryback % baseline.",b:"Substrate type / size, dripper.",f:"runoff when VWC > field capacity"},
+  substrate_volume:{d:"Litres of substrate per plant / zone.",a:"Converts shot % to litres and sets dryback rate; bigger = slower swings.",b:"Block / pot size.",f:"shot L = shot% × this · dryback%/h = transp ÷ this"},
+  root_temp:{d:"Root-zone / substrate temperature.",a:"Dissolved O₂, nutrient-uptake vigour, Pythium risk, EC temp-comp.",b:"Floor heat, feed temp, room temp.",f:"18–24°C ideal; >26°C wakes pathogens"},
+  /* master controls */
+  dial:{d:"Master vegetative ↔ generative steering slider.",a:"Blends dryback targets and EC strategy across all phases & zones at once.",b:"Your crop goal — leafy growth vs flower / potency push.",f:"gen fraction = (dial − 1) / 9"},
+  athena:{d:"One-tap Athena climate presets per growth stage.",a:"Loads PPFD, CO₂, temp & RH (day + night) for the chosen stage; everything re-solves.",b:"Growth stage (Clone → Finish).",f:"writes the climate setpoints"},
+  /* yield limiting factors */
+  dli:{d:"Daily Light Integral actually usable given your CO₂ — total photons/day.",a:"Near-linear yield driver (little saturation to ~1800 µmol when CO₂ supports it).",b:"PPFD × photoperiod, capped by the CO₂ ceiling.",f:"Y ≈ 0.22·PPFD + 54 (Rodriguez-Morrison 2021)"},
+  dtemp:{d:"Daytime temperature vs the photosynthesis optimum.",a:"Yield via photosynthesis rate; bell peak ~27°C.",b:"Day temp, light load, cooling.",f:"score = bell(T, 27, 4.5)"},
+  dif:{d:"Day-minus-night temperature differential.",a:"Tight positive (1–5°C) = even ripening, no stretch; negative collapses yield.",b:"Day temp − night temp.",f:"DIF = day − night"},
+  vpd:{d:"Room air vapour-pressure deficit.",a:"Transpiration and stomatal opening; 0.8–1.4 kPa band.",b:"Temp + RH.",f:"VPD = SVP(T)·(1 − RH/100)"},
+  vpdL:{d:"Leaf-to-air vapour-pressure deficit — the real transpiration driver at the leaf.",a:"Stomata, transpiration, nutrient uptake, yield.",b:"Leaf temp (light − evaporative cooling), air RH.",f:"VPD_leaf = SVP(leaf) − e(air)"},
+  ec:{d:"Pore EC vs the phase target.",a:"Osmotic balance — too high locks out water, too low under-feeds.",b:"Feed EC, dryback, runoff.",f:"score = bell(pore EC, 1.05 × target)"},
+  photo:{d:"Photoperiod — hours of light.",a:"13h > 12h: +35–50% dry weight and +9% THCA; a soft yield lever.",b:"Lights on/off hours.",f:"photo = lights_off − lights_on"},
+  /* potency modifiers */
+  db:{d:"Finish-stage dryback depth.",a:"Deeper late-flower drought → +12–13% THCA (Caplan 2019); costs some yield.",b:"P3 last-shot, dial, P2 threshold.",f:"THC mult = 1 + score × 0.13"},
+  lean:{d:"Lean feed / nitrogen stress (low pore EC).",a:"Low-N stress → +20–30% %THC (Caplan 2017); −biomass.",b:"Feed EC, target EC.",f:"THC mult = 1 + score × 0.18"},
+  cool:{d:"Cool finish temperature.",a:"A cooler finish preserves THC and terpenes.",b:"Day temp in flower.",f:"THC mult = 1 + score × 0.05"},
+  light:{d:"Light maturation floor.",a:"PPFD below ~600 → immature, less potent flower; above it is a plateau.",b:"PPFD setpoint.",f:"potency floor, not a ceiling"},
+  degrade:{d:"Heat / negative-DIF degradation guard.",a:">30°C or negative DIF degrades cannabinoids.",b:"Day temp, DIF.",f:"penalty multiplier ≤ 1"},
+  /* charts */
+  chart_climate:{d:"24h air VPD (leaf + air), temp and RH on the lights-aligned timeline.",a:"Read whether VPD stays in the 0.8–1.4 kPa band day & night; drag the temp/RH dots to retune.",b:"temp, rh, temp_night, rh_night, ppfd.",f:"VPD = SVP(T)·(1 − RH/100)"},
+  chart_dew:{d:"Leaf temp vs dew point across 24h.",a:"Red ribbon = margin <3°C → condensation / mould risk overnight.",b:"temp, rh, night setpoints, leaf temp.",f:"margin = leaf_temp − dew_point"},
+  chart_moist:{d:"Transpiration moisture load vs dehumidifier capacity.",a:"Fill above the line = RH will climb; drag dehum to size it.",b:"plant_count, VPD, dehum_capacity.",f:"balance = capacity − transpiration load"},
+  chart_dli:{d:"Cumulative DLI vs target pace, with photosynthesis %.",a:"Read whether you hit the day's light target and where photosynthesis saturates.",b:"ppfd, photoperiod, co2, temp.",f:"DLI = Σ PPFD × 0.0036/timestep"},
+  chart_leafair:{d:"Leaf temperature vs air temperature over 24h.",a:"Gap = transpirational cooling; leaf above air = closed stomata / stress.",b:"ppfd, VPD, airflow.",f:"leaf = air + 0.7·PPFD/1000 − 4.5·gs"},
+  chart_co2:{d:"Room CO₂ ppm vs canopy uptake (g/h).",a:"Enriched by day, ambient at night; drag CO₂ to set enrichment.",b:"co2, canopy area, photosynthesis.",f:"draw ppm/h = uptake ÷ room volume"},
+  chart_heat:{d:"Sensible heat load (lights) vs AC capacity.",a:"Area above the line = under-cooled; drag AC to size it.",b:"light_watts, hvac_cooling_kw.",f:"sensible load ≈ 0.5 × light_watts"},
+  chart_irrig:{d:"Full-day physics sim: VWC (white) and pore EC (pink) as the controller fires shots.",a:"Drag any glowing handle to retune that setpoint; the whole day re-solves.",b:"every P0–P3, EC and substrate setpoint.",f:"shot mixes feed EC by litres; runoff flushes at field capacity"},
+  chart_multi:{d:"The steady-state day repeated 1–3 days, dryback overlaid with PPFD, temp, leaf VPD & CO₂.",a:"Scroll to read how the dryback rate tracks its environmental drivers.",b:"climate + substrate setpoints; live VWC overlay.",f:"dryback%/h = transpiration ÷ substrate L"},
+};
+function synthTip(key){
+  if(key && key.indexOf('ec_target_')===0){ const f=key.replace('ec_target_','');
+    if(f==='flush') return {d:"Target pore EC during a flush.",a:"Strips accumulated salts before harvest / reset; drops osmotic stress.",b:"Feed EC, runoff volume.",f:"big shots pull pore EC toward flush EC"};
+    const mode=f.indexOf('gen')===0?'generative':'vegetative', ph=f.slice(-2).toUpperCase();
+    return {d:"Target pore EC for "+ph+" in "+mode+" steering.",a:"Sets the salt strength roots sit in this phase — feed strength vs osmotic stress.",b:"Feed EC, shot size, dryback (small shots stack, big shots flush).",f:"controller drives shots toward this EC"};
+  }
+  return null;
+}
+
 function editor(){
   return {
     W:1240, H:500, PL:42, PR:46, PT:26, PB:70, VMIN:18, VMAX:84, gdays:3, histPts:null,
@@ -444,7 +550,7 @@ function editor(){
     x(t){return this.PL+(t/24)*this.PW}, y(v){return this.PT+(1-(v-this.VMIN)/(this.VMAX-this.VMIN))*this.PH},
     invT(px){return clamp((px-this.PL)/this.PW*24,0,24)}, invV(py){return clamp(this.VMIN+(1-(py-this.PT)/this.PH)*(this.VMAX-this.VMIN),0,100)},
 
-    zone:1, mode:"gen", dial:7, hot:"P1", drag:null, hov:null, saved:false, live:false, athena:"Bulk", minidrag:null,
+    zone:1, mode:"gen", dial:7, hot:"P1", drag:null, hov:null, saved:false, live:false, athena:"Bulk", minidrag:null, tip:null,
     Z:{}, G:{}, hydrated:false, liveWaiting:false,
     init(){ this.Z=JSON.parse(JSON.stringify(LIVE)); this.G=Object.assign({},GLOBAL);
       try{ const s=JSON.parse(localStorage.getItem("f2cs.tpl")); if(s&&s.Z){ for(const z in this.Z){ if(s.Z[z]) this.Z[z]=Object.assign({},this.Z[z],s.Z[z]); }   // MERGE saved over defaults so new schema keys aren't lost
@@ -953,6 +1059,15 @@ function editor(){
     fmtMin(m){ return m>=60?(m/60).toFixed(1)+"h":Math.round(m)+"m"; },
     fmtBeforeOff(){ return "−"+this.fmtMin(this.lastIrrigMin()); },
     save(){ try{ localStorage.setItem("f2cs.tpl",JSON.stringify({Z:this.Z,G:this.G,dial:this.dial})); }catch(e){} this.saved=true; setTimeout(()=>this.saved=false,1600); },
+    /* ===== universal tooltips (T7) ===== */
+    showTip(key,label,ev){ const t=FIELDTIPS[key]||synthTip(key); if(!t){ this.tip=null; return; }
+      const r=(ev&&ev.currentTarget&&ev.currentTarget.getBoundingClientRect)?ev.currentTarget.getBoundingClientRect():{left:60,right:80,top:60};
+      this.tip=Object.assign({label:label||(META[key]&&META[key].label)||key, x:r.left, right:r.right, y:r.top}, t); },
+    hideTip(){ this.tip=null; },
+    tipStyle(){ if(!this.tip) return 'display:none'; const W=320, vw=window.innerWidth||1280, vh=window.innerHeight||900;
+      let left=this.tip.x-W-12; if(left<8) left=this.tip.right+12; if(left+W>vw-8) left=Math.max(8,vw-W-8);
+      let top=clamp(this.tip.y-6,8,Math.max(8,vh-230));
+      return 'left:'+left+'px;top:'+top+'px;width:'+W+'px'; },
     reset(){ this.Z[this.zone]=JSON.parse(JSON.stringify(LIVE[this.zone])); },
   };
 }
