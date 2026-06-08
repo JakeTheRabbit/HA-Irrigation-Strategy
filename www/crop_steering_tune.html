@@ -98,6 +98,19 @@
   .engdrawer>summary:hover{color:var(--ink2);border-color:rgba(255,255,255,.16)}
   .engdrawer[open]>summary{color:var(--ink2);margin-bottom:10px}
   .engmini{opacity:.86}
+  /* coupled-state as radial ring-gauges in a bento grid */
+  .vizgrid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .vizcard{display:flex!important;flex-direction:column;align-items:center;text-align:center;gap:7px;padding:13px 10px 12px}
+  .vizcard.wide{grid-column:span 2}
+  .vizart{width:100%;max-width:104px;aspect-ratio:88/82;line-height:0}
+  .vizcard.wide .vizart{max-width:128px}
+  .vizfoot{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%;min-width:0}
+  .vizval{font-size:1.18rem;font-weight:800;letter-spacing:-.02em;color:var(--ink);white-space:nowrap}
+  .vizval i{font-size:10px;font-weight:600;color:var(--ink3);font-style:normal;margin-left:2px}
+  .vizval .arr{font-size:10px;margin-left:4px;font-weight:800}
+  .vizcard.wide .vizval{font-size:1.5rem}
+  .vizlab{display:flex;align-items:baseline;gap:5px;justify-content:center;flex-wrap:wrap;font-size:9.5px;text-transform:uppercase;letter-spacing:.045em;color:var(--ink3);max-width:100%;line-height:1.3}
+  .vizlab .csr-w{font-weight:800;letter-spacing:.03em;flex:none}
   .csr-top{display:flex;align-items:baseline;gap:8px}
   .csr-w{font-size:10.5px;font-weight:800;letter-spacing:.04em;min-width:40px}
   .csr-lab{font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.045em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -252,17 +265,13 @@
     <!-- ===== LIVE COUPLED STATE ===== -->
     <div class="panel glass">
       <div class="ch"><h2>Live coupled state</h2><span class="chs">the levers a grower actually steers by — the picture shows what each is (cube drying back, leaf losing heat, roots breathing). Change any setpoint and watch them move in sync (▲▼ = which way each just shifted).</span></div>
-      <div class="cstate">
+      <div class="vizgrid">
         <template x-for="c in coupledUseful()" :key="c.key">
-          <div class="csr" :class="'g-'+c.grp" :title="c.label+' — '+c.tip">
-            <div class="csic" x-html="c.glyph"></div>
-            <div class="csbody">
-              <div class="csr-top">
-                <span class="csr-w" :style="'color:'+c.wc" x-text="c.word||'·'"></span>
-                <span class="csr-lab" x-text="c.label"></span>
-                <span class="csr-v"><b x-text="c.disp"></b><i x-text="c.unit"></i><b class="arr" :style="c.dir>0?'color:var(--ok)':(c.dir<0?'color:#42a5f5':'opacity:.25')" x-text="c.dir>0?'▲':(c.dir<0?'▼':'·')"></b></span>
-              </div>
-              <div class="csbar"><div class="csband" x-show="c.bandW>0" :style="'left:'+c.bandL+'%;width:'+c.bandW+'%'"></div><div class="cstick" :style="'left:'+c.pos+'%;background:'+c.wc"></div></div>
+          <div class="vizcard csr" :class="('g-'+c.grp)+(c.wide?' wide':'')" :title="c.label+' — '+c.tip">
+            <div class="vizart" x-html="c.viz"></div>
+            <div class="vizfoot">
+              <div class="vizval"><b x-text="c.disp"></b><i x-text="c.unit"></i><b class="arr" :style="c.dir>0?'color:var(--ok)':(c.dir<0?'color:#42a5f5':'opacity:.25')" x-text="c.dir>0?'▲':(c.dir<0?'▼':'·')"></b></div>
+              <div class="vizlab"><span class="csr-w" :style="'color:'+c.wc" x-text="c.word||'·'"></span><span x-text="c.label"></span></div>
             </div>
           </div>
         </template>
@@ -445,6 +454,23 @@ function csGlyph(c){
     case 'bal': { const lvl=(21-f*11).toFixed(1); return wrap(`<rect x="5" y="7" width="18" height="16" rx="1.5" stroke="${F}"/><rect x="5.6" y="${lvl}" width="16.8" height="${(22.4-lvl).toFixed(1)}" fill="${col}" fill-opacity=".22" stroke="none"/><path d="M5.6 ${lvl} H22.4" stroke="${col}"/><path d="M9 10.5 v4 M7.5 13 L9 14.6 L10.5 13" stroke="${col}" opacity="${o}"/>`); }
     default: return '';
   }
+}
+
+/* ===== radial ring-gauge that wraps the pictorial glyph — the arc is the value, the green segment is the optimal band, the glyph is what's measured ===== */
+function _pol(cx,cy,r,deg){ const a=(deg-90)*Math.PI/180; return [cx+r*Math.cos(a), cy+r*Math.sin(a)]; }
+function _arc(cx,cy,r,a0,a1){ const p=_pol(cx,cy,r,a0), q=_pol(cx,cy,r,a1); const large=((((a1-a0)%360)+360)%360)>180?1:0; return `M${p[0].toFixed(1)} ${p[1].toFixed(1)} A${r} ${r} 0 ${large} 1 ${q[0].toFixed(1)} ${q[1].toFixed(1)}`; }
+function csViz(c){
+  const col=c.wc||'#8b93a7', TR='#28303b', f=Math.max(0,Math.min(1,(c.pos||0)/100));
+  const cx=44, cy=44, r=33, S=225, SP=270;   // 270° gauge, opening at the bottom
+  const band=(c.bandW>0)?`<path d="${_arc(cx,cy,r,S+(c.bandL/100)*SP,S+(Math.min(100,c.bandL+c.bandW)/100)*SP)}" stroke="rgba(52,211,153,.42)" stroke-width="6" stroke-linecap="round" fill="none"/>`:'';
+  const vEnd=S+f*SP, d=_pol(cx,cy,r,vEnd);
+  return `<svg viewBox="0 0 88 82" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" fill="none">`
+    + `<path d="${_arc(cx,cy,r,S,S+SP)}" stroke="${TR}" stroke-width="6" stroke-linecap="round"/>`
+    + band
+    + `<path d="${_arc(cx,cy,r,S,vEnd)}" stroke="${col}" stroke-width="6" stroke-linecap="round"/>`
+    + `<circle cx="${d[0].toFixed(1)}" cy="${d[1].toFixed(1)}" r="3.4" fill="${col}"/>`
+    + `<g transform="translate(30.5,30.5)">${csGlyph(c)}</g>`
+    + `</svg>`;
 }
 
 /* ===== real live setpoints (F2, per zone). Shared hardware in GLOBAL. ===== */
@@ -740,7 +766,7 @@ function editor(){
           wc=within?"#28b463":(off>0.4?"#e5484d":"#f5a524");
           bandL=clamp((lo-s[0])/span,0,1)*100; bandW=clamp((Math.min(hi,s[1])-Math.max(lo,s[0]))/span,0,1)*100; }
         const o={...m, val, pos, word, wc, bandL, bandW, tip:ci.tip, imp:ci.o, useful:CS_USEFUL.has(m.key) };
-        o.glyph = o.useful ? csGlyph(o) : ''; return o; });
+        o.glyph = o.useful ? csGlyph(o) : ''; o.viz = o.useful ? csViz(o) : ''; o.wide = ['path','db','pec'].includes(o.key); return o; });
       out.sort((a,b)=>a.imp-b.imp); return out; },
     coupledUseful(){ return this.coupledRanked().filter(c=>c.useful); },
     coupledEng(){ return this.coupledRanked().filter(c=>!c.useful); },
