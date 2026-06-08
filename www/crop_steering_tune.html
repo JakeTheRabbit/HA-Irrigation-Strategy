@@ -103,6 +103,8 @@
   .limpot{font-size:.78rem;color:var(--ink2)} .limpot b{font-size:1.5rem;font-weight:800} .limpot i{font-style:normal;font-size:.7rem;color:var(--ink3);margin-left:4px}
   .limpot.ok b{color:var(--ok)} .limpot.mid b{color:var(--p3)} .limpot.low b{color:var(--crit)}
   .limtop{font-size:12px;color:var(--ink2);background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:6px 9px;margin-bottom:9px}
+  .limthc{font-size:12.5px;color:var(--ink);margin:-2px 0 8px} .limthc b{font-size:1.15rem;font-weight:800;color:#34d399} .limthc em{font-style:normal;font-size:.72rem;color:var(--ink3)} .limthc i{font-style:normal;font-size:.7rem;color:var(--ink3)}
+  .tradeoff{font-size:11px;color:var(--ink3);background:rgba(148,163,184,.08);border:1px dashed rgba(148,163,184,.3);border-radius:8px;padding:5px 9px;margin-top:8px;line-height:1.35}
   .limtop.ok{background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.25)}
   .limtop b{color:var(--ink)} .limtop i{font-style:normal;color:var(--ink3)}
   .limrow{display:grid;grid-template-columns:82px 1fr auto auto;gap:8px;align-items:center;padding:4px 0;font-size:12px}
@@ -180,8 +182,10 @@
           <div class="limcol">
             <div class="limhead"><span class="limgoal" x-text="goal.name"></span>
               <span class="limpot" :class="potential(goal.k).pct>=80?'ok':(potential(goal.k).pct>=60?'mid':'low')"><b x-text="potential(goal.k).pct"></b>%<i>potential</i></span></div>
+            <div class="limthc" x-show="goal.k==='p'">≈ <b x-text="potential('p').thc"></b><em>% THC est</em> <i>· strain baseline <span x-text="potential('p').base"></span>%</i></div>
             <div class="limtop" x-show="potential(goal.k).top.dir!=='ok'">⛔ <b x-text="potential(goal.k).top.label"></b> — <span x-text="potential(goal.k).top.dir"></span> toward <span x-text="potential(goal.k).top.lo+'–'+potential(goal.k).top.hi"></span> <i x-text="'· '+potential(goal.k).top.lever"></i></div>
             <div class="limtop ok" x-show="potential(goal.k).top.dir==='ok'">✓ every factor in its optimal band</div>
+            <div class="tradeoff" x-show="goal.k==='p'">⇄ THC levers (deeper dryback, leaner feed, cooler finish) trade against yield — push to taste</div>
             <template x-for="f in potential(goal.k).list" :key="f.key">
               <div class="limrow" :class="f.pct>=80?'ok':(f.pct>=60?'mid':'low')">
                 <span class="lrl" x-text="f.label"></span>
@@ -346,7 +350,7 @@ const LIVE = {
   3: zoneDefaults({ p2_vwc_threshold:43, p2_shot_size:1.5, p1_maximum_shots:12, p1_minimum_shots:5, p3_gen_last_irrigation:30, p3_emergency_vwc_threshold:40 }),
 };
 const GLOBAL = { field_capacity:60, substrate_volume:6, lights_on:10, lights_off:22, ppfd:1150, co2:1400, temp:25.5, rh:64, temp_night:21.5, rh_night:68, feed_ec:3.0,
-  room_length:6, room_width:4, room_height:3, canopy_coverage:80, plant_count:40, light_watts:18000, hvac_cooling_kw:18, dehum_capacity:600, root_temp:22 };
+  room_length:6, room_width:4, room_height:3, canopy_coverage:80, plant_count:40, light_watts:18000, hvac_cooling_kw:18, dehum_capacity:600, root_temp:22, baseline_thc:24 };
 
 /* field metadata: key -> ranges/units (from the live entity attributes) */
 const META = {
@@ -397,6 +401,7 @@ const META = {
   hvac_cooling_kw:{label:"HVAC cooling",unit:"kW",min:0,max:100,step:0.5,dec:1},
   dehum_capacity:{label:"Dehumidification",unit:"L/d",min:0,max:5000,step:5,dec:0},
   root_temp:{label:"Root / substrate temp",unit:"°C",min:10,max:35,step:0.5,dec:1},
+  baseline_thc:{label:"Strain THC potential",unit:"%",min:5,max:35,step:0.5,dec:1},
 };
 
 function editor(){
@@ -664,23 +669,40 @@ function editor(){
         {key:'photo',label:'Photoperiod',unit:'h',dec:1,val:photo,lever:'lights on/off hours', lo:12,hi:13,mid:13, score:(photo>=12?0.85+ramp(photo,12,13)*0.15:clamp(ramp(photo,9,12),0,1)*0.85)},   // 12h standard = good (0.85); 13h = max (+35–50% DW, Jockers 2024); only a soft yield lever, not a crisis at 12/12
       ]; },
 
-    /* POTENCY axes — interim band scoring; T3 rebuilds as cultivar baseline × evidence-based stress modifiers. */
-    potencyAxes(){ const e=this.dayEnv(), m=this.sim().meta, FCv=this.g('field_capacity'), db=(FCv-m.overnightLow)/Math.max(FCv,1)*100, dt=this.g('temp'), ecT=this.ecP2();
-      const A=(key,label,unit,dec,val,lo,hi,lever)=>({key,label,unit,dec,val,lo,hi,mid:(lo+hi)/2,lever,score:this.suff(val,[lo,hi])});
-      return [
-        A('db','Late-flower dryback','%',0,db,25,45,'P3 / steering dial'),                                  // mild late stress lifts THCA (Caplan 2019)
-        A('dtemp','Day temp (degrade)','°C',1,dt,20,26,'cooling setpoint'),                                  // >30°C degrades cannabinoids
-        A('vpd','Air VPD','kPa',2,this.vpd(e),1.0,1.5,'temp + RH'),
-        A('ec','Pore EC (stress)','mS',1,this.peakEC(),ecT*1.0,ecT*1.55,'feed EC / dryback'),                // N-stress raises % but costs yield
-        A('dli','DLI (maturation floor)','mol',1,this.g('ppfd')*this.photo()*0.0036,12,90,'PPFD / photoperiod'),  // % flat above a low floor; only LOW light hurts (Rodriguez-Morrison 2021)
-      ]; },
+    /* ── POTENCY = cultivar baseline THC% × evidence-based stress MODIFIERS ──
+       Potency is mostly genetic; environment only nudges it — and the upward nudges COST yield.
+       Light/CO₂/UV ≈ neutral on %THC (Rodriguez-Morrison 2021; Westmoreland & Bugbee 2023). The
+       real movers are late-flower stress, leaner N/EC, photoperiod, and heat/DIF degradation. */
+    potencyModel(){ const m=this.sim().meta, FCv=this.g('field_capacity');
+      const db=(FCv-m.overnightLow)/Math.max(FCv,1)*100, dt=this.g('temp'), nt=this.g('temp_night'), dif=dt-nt;
+      const ppfd=this.g('ppfd'), photo=this.photo(), ecT=this.ecP2(), pec=this.peakEC(), base=this.g('baseline_thc')||24;
+      const ramp=(v,lo,hi)=>clamp((v-lo)/((hi-lo)||1),0,1);
+      const sDb=ramp(db,20,50),                                   // deeper late dryback → +THCA, capped ~+13% (Caplan, Dixon & Zheng 2019, HortScience 54:964)
+            sLean=ramp(ecT*1.25-pec,0,ecT*0.55),                  // leaner feed (lower pore EC = N-stress) → +20–30% %THC but −yield (Caplan 2017, HortScience 52:1796)
+            sCool=ramp(26-dt,0,6),                                // cooler finish preserves THC + terpenes
+            sPhoto=ramp(photo,12,13),                             // 13h flower → +9% THCA (Jockers 2024, Plants 13:433)
+            sLight=ppfd>=600?1:clamp(0.6+0.4*ramp(ppfd,200,600),0,1),  // floor-plateau: %THC FLAT above ~600µmol; only very low light makes immature/larfy flower (Rodriguez-Morrison 2021)
+            sDeg=(dif<0?0.6:1)*(dt>30?clamp(1-(dt-30)/8,0.7,1):1);     // negative DIF or >30°C degrade cannabinoids
+      const mods=[
+        {key:'db',label:'Finish dryback',unit:'%',dec:0,val:db,lo:30,hi:50,mid:42,lever:'P3 / dial — deeper = +THC, −yield',score:sDb,mult:1+sDb*0.13},
+        {key:'lean',label:'Lean feed (N-stress)',unit:'mS',dec:1,val:pec,lo:+(ecT*0.7).toFixed(1),hi:+(ecT*1.0).toFixed(1),mid:ecT*0.85,lever:'feed EC — leaner = +THC, −yield',score:sLean,mult:1+sLean*0.18},
+        {key:'cool',label:'Cool finish',unit:'°C',dec:1,val:dt,lo:20,hi:24,mid:22,lever:'cooling — cooler preserves THC/terpenes',score:sCool,mult:1+sCool*0.05},
+        {key:'photo',label:'Photoperiod 13h',unit:'h',dec:1,val:photo,lo:12,hi:13,mid:13,lever:'13h → +9% THCA (Jockers 2024)',score:sPhoto,mult:1+sPhoto*0.09},
+        {key:'light',label:'Light maturation floor',unit:'µmol',dec:0,val:ppfd,lo:600,hi:900,mid:750,lever:'keep PPFD ≥ ~600 (below = immature)',score:sLight,mult:sLight},
+        {key:'degrade',label:'Heat / DIF degradation',unit:'°C',dec:1,val:dt,lo:18,hi:30,mid:24,lever:'avoid >30°C & negative DIF',score:sDeg,mult:sDeg},
+      ];
+      let estTHC=base; mods.forEach(o=>estTHC*=o.mult); estTHC=clamp(estTHC,base*0.7,base*1.45);
+      return {base, estTHC, mods}; },
+    potencyAxes(){ return this.potencyModel().mods; },
 
     suff(v,b){ if(v>=b[0]&&v<=b[1]) return 1; const span=(b[1]-b[0])||1, d=v<b[0]?b[0]-v:v-b[1]; return clamp(1-d/(span*1.1),0,1); },
     limiters(goal){ const ax = goal==='p'? this.potencyAxes() : this.yieldAxes();
       const a = ax.map(o=>{ const s=clamp(o.score,0,1), dir=s>=0.95?'ok':(o.val<o.mid?'raise':'lower');
         return {key:o.key,label:o.label,val:Number(o.val).toFixed(o.dec),unit:o.unit,lo:Number(o.lo).toFixed(o.dec),hi:Number(o.hi).toFixed(o.dec),s,pct:Math.round(s*100),dir,lever:o.lever}; });
       return a.sort((x,y)=>x.s-y.s); },
-    potential(goal){ const a=this.limiters(goal); return {pct:Math.round((a[0]?a[0].s:1)*100), top:a[0]||{dir:'ok',label:'',lo:'',hi:'',lever:''}, list:a}; },
+    potential(goal){ const a=this.limiters(goal); const r={pct:Math.round((a[0]?a[0].s:1)*100), top:a[0]||{dir:'ok',label:'',lo:'',hi:'',lever:''}, list:a};
+      if(goal==='p'){ const pm=this.potencyModel(); r.thc=pm.estTHC.toFixed(1); r.base=Number(pm.base).toFixed(1); r.pct=Math.round(clamp(pm.estTHC/(pm.base*1.3),0,1)*100); }
+      return r; },
     zonesSummary(){ const out=[]; for(const z of [1,2,3]){ ZOVR=z; try{ out.push({z, y:this.potential('y'), p:this.potential('p')}); } finally{ ZOVR=null; } } return out; },
 
     /* phase boundaries — read from the simulation meta */
@@ -836,7 +858,7 @@ function editor(){
       {k:"P2",ph:"P2",col:"var(--p2)",name:"Maintenance",fields:["p2_vwc_threshold","p2_shot_size","p2_ec_high_threshold","p2_ec_low_threshold"].map(f)},
       {k:"P3",ph:"P3",col:"var(--p3)",name:"Overnight",fields:["p3_emergency_vwc_threshold","p3_emergency_shot_size","p3_gen_last_irrigation","p3_veg_last_irrigation"].map(f)},
       {k:"ST",ph:"⇄",col:"var(--ec)",name:"Steering & EC",fields:["generative_dryback_target","vegetative_dryback_target","ec_target_gen_p0","ec_target_gen_p1","ec_target_gen_p2","ec_target_gen_p3","ec_target_veg_p0","ec_target_veg_p1","ec_target_veg_p2","ec_target_veg_p3","ec_target_flush"].map(f)},
-      {k:"EN",ph:"☀",col:"#f59e0b",name:"Climate setpoints",fields:["ppfd","co2","temp","rh","temp_night","rh_night","feed_ec"].map(f)},
+      {k:"EN",ph:"☀",col:"#f59e0b",name:"Climate setpoints",fields:["ppfd","co2","temp","rh","temp_night","rh_night","feed_ec","baseline_thc"].map(f)},
       {k:"RM",ph:"▦",col:"#a78bfa",name:"Room / facility",fields:["room_length","room_width","room_height","canopy_coverage","plant_count","light_watts","hvac_cooling_kw","dehum_capacity"].map(f)},
       {k:"HW",ph:"⚙",col:"#94a3b8",name:"Substrate (shared)",fields:["field_capacity","substrate_volume"].map(f)},
     ]; },
