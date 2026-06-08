@@ -612,6 +612,14 @@ function tuneApply(zone,ch,gG){const rows=[];
   rows.forEach(r=>svc("number","set_value",{entity_id:r[0],value:r[2]}));}  // svc schedules a refresh → re-seeds the iframe (readback)
 let tuneWired=false,tuneSizer=null;
 function sizeTune(){const f=el("tuneFrame");try{const b=f&&f.contentDocument&&f.contentDocument.body;const h=b&&b.scrollHeight;if(h&&Math.abs((parseInt(f.style.height)||0)-h)>8)f.style.height=(h+12)+"px";}catch(e){}}   // same-origin: size iframe to content → one scrollbar
+async function fetchTuneHistory(zone,days){try{if(DEMO)return;const sid=(RAW[zone]||{}).vwc;if(!sid)return;
+  const end=new Date(),start=new Date(end.getTime()-days*24*3600*1000);
+  const r=await api(`/api/history/period/${start.toISOString()}?filter_entity_id=${sid}&minimal_response&end_time=${encodeURIComponent(end.toISOString())}`);
+  const arr=(r&&r[0])||[];if(!arr.length)return;
+  const t0=new Date(arr[0].last_changed||arr[0].last_updated).getTime();
+  const pts=arr.map(o=>{const v=parseFloat(o.state),tt=new Date(o.last_changed||o.last_updated).getTime();return [(tt-t0)/3600000,v];}).filter(p=>!isNaN(p[1])&&isFinite(p[0]));
+  const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage({type:"cs-tune-history",pts},"*");
+}catch(e){console.warn("tune history failed:",e.message);}}
 function renderModel(){const host=el("v-model");
   if(!host.dataset.built){host.dataset.built="1";host.innerHTML=`<iframe id="tuneFrame" src="crop_steering_tune.html?${DEMO?"demo&":""}_=${Date.now()}" scrolling="no" style="width:100%;height:1400px;border:0;border-radius:12px;background:#0a0c10;display:block;overflow:hidden"></iframe>`;
     const fr=el("tuneFrame");if(fr)fr.addEventListener("load",()=>[200,600,1200,2200].forEach(d=>setTimeout(sizeTune,d)));}
@@ -621,7 +629,8 @@ function renderModel(){const host=el("v-model");
     else if(d.type==="cs-tune-h"){const f=el("tuneFrame");if(f&&d.h>300)f.style.height=d.h+"px";}
     else if(d.type==="cs-tune-apply"){tuneApply(d.zone,d.changes||{},d.global);}
     else if(d.type==="cs-tune-pull"){const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(Object.assign(tuneSeed(),{explicit:true}),"*");}
-    else if(d.type==="cs-tune-apply-one"){if(d.entity&&d.value!=null){if(confirm(`Apply optimal setpoint?\n\n${d.label||d.entity}\n→ ${d.entity}`)){svc("number","set_value",{entity_id:d.entity,value:d.value});}}}});}
+    else if(d.type==="cs-tune-apply-one"){if(d.entity&&d.value!=null){if(confirm(`Apply optimal setpoint?\n\n${d.label||d.entity}\n→ ${d.entity}`)){svc("number","set_value",{entity_id:d.entity,value:d.value});}}}
+    else if(d.type==="cs-tune-history-req"){fetchTuneHistory(d.zone,d.days);}});}
   sizeTune();}   // NOTE: do NOT reseed here — clobbers the user's edits on every tab-switch. Seed happens once on cs-tune-ready; explicit refresh via cs-tune-pull.
 const RENDER={home:renderHome,zones:renderZones,control:renderControl,model:renderModel};
 function renderActive(){renderVbar();(RENDER[curView]||renderHome)();redrawBig();if(el("drawer")&&el("drawer").classList.contains("open"))renderDrawer();}
