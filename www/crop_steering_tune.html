@@ -338,7 +338,7 @@ function zoneDefaults(o){ return Object.assign({
   p2_vwc_threshold:43, p2_shot_size:5, p2_ec_high_threshold:1.2, p2_ec_low_threshold:0.8,
   p3_emergency_vwc_threshold:40, p3_emergency_shot_size:5, p3_gen_last_irrigation:30, p3_veg_last_irrigation:15,
   generative_dryback_target:45, vegetative_dryback_target:18,
-  ec_target_gen_p1:5.0, ec_target_gen_p2:6.0, ec_target_gen_p3:4.5, ec_target_veg_p1:3.0, ec_target_veg_p2:3.2, ec_target_veg_p3:3.0, ec_target_flush:0.8,
+  ec_target_gen_p0:4.0, ec_target_veg_p0:3.0, ec_target_gen_p1:5.0, ec_target_gen_p2:6.0, ec_target_gen_p3:4.5, ec_target_veg_p1:3.0, ec_target_veg_p2:3.2, ec_target_veg_p3:3.0, ec_target_flush:0.8,
 }, o); }
 const LIVE = {
   1: zoneDefaults({ p2_vwc_threshold:41, p2_shot_size:5,   p1_maximum_shots:12, p1_minimum_shots:5, p3_gen_last_irrigation:30, p3_emergency_vwc_threshold:38 }),
@@ -370,10 +370,14 @@ const META = {
   p3_veg_last_irrigation:{label:"Last shot (veg)",unit:"min",min:15,max:360,step:15,dec:0},
   generative_dryback_target:{label:"Generative dryback",unit:"%",min:5,max:70,step:1,dec:0},
   vegetative_dryback_target:{label:"Vegetative dryback",unit:"%",min:5,max:80,step:1,dec:0},
+  ec_target_gen_p0:{label:"EC gen P0",unit:"",min:0.5,max:20,step:0.1,dec:1},
   ec_target_gen_p1:{label:"EC gen P1",unit:"",min:0.5,max:20,step:0.1,dec:1},
   ec_target_gen_p2:{label:"EC gen P2",unit:"",min:0.5,max:20,step:0.1,dec:1},
   ec_target_gen_p3:{label:"EC gen P3",unit:"",min:0.5,max:20,step:0.1,dec:1},
+  ec_target_veg_p0:{label:"EC veg P0",unit:"",min:0.5,max:15,step:0.1,dec:1},
+  ec_target_veg_p1:{label:"EC veg P1",unit:"",min:0.5,max:15,step:0.1,dec:1},
   ec_target_veg_p2:{label:"EC veg P2",unit:"",min:0.5,max:15,step:0.1,dec:1},
+  ec_target_veg_p3:{label:"EC veg P3",unit:"",min:0.5,max:15,step:0.1,dec:1},
   ec_target_flush:{label:"EC flush",unit:"",min:0.1,max:15,step:0.1,dec:1},
   field_capacity:{label:"Field capacity",unit:"%",min:5,max:100,step:1,dec:0},
   substrate_volume:{label:"Substrate volume",unit:"L",min:1,max:200,step:0.1,dec:1},
@@ -405,7 +409,8 @@ function editor(){
     zone:1, mode:"gen", dial:7, hot:"P1", drag:null, hov:null, saved:false, live:false, athena:"Bulk", minidrag:null,
     Z:{}, G:{}, hydrated:false, liveWaiting:false,
     init(){ this.Z=JSON.parse(JSON.stringify(LIVE)); this.G=Object.assign({},GLOBAL);
-      try{ const s=JSON.parse(localStorage.getItem("f2cs.tpl")); if(s&&s.Z){this.Z=s.Z; this.G=Object.assign({},GLOBAL,s.G||{}); if(s.dial) this.dial=s.dial; this.hydrated=true;} }catch(e){}   // restored edits win on reload (hydrated) — no clobber
+      try{ const s=JSON.parse(localStorage.getItem("f2cs.tpl")); if(s&&s.Z){ for(const z in this.Z){ if(s.Z[z]) this.Z[z]=Object.assign({},this.Z[z],s.Z[z]); }   // MERGE saved over defaults so new schema keys aren't lost
+        this.G=Object.assign({},GLOBAL,s.G||{}); if(s.dial) this.dial=s.dial; this.hydrated=true; } }catch(e){}   // restored edits win on reload (hydrated) — no clobber
       this.mode = this.dial>=5.5?'gen':'veg'; this.pullLive();
       if(window.parent!==window){ document.documentElement.classList.add("embed");   // embedded → report content height so the parent sizes the iframe (one scrollbar, not three)
         const post=()=>{ try{ window.parent.postMessage({type:"cs-tune-h",h:Math.ceil(document.body.scrollHeight)+24},"*"); }catch(e){} };
@@ -799,7 +804,7 @@ function editor(){
       {k:"P1",ph:"P1",col:"var(--p1)",name:"Ramp-up",fields:["p1_target_vwc","p1_initial_shot_size","p1_shot_size_increment","p1_maximum_shot_size","p1_time_between_shots","p1_minimum_shots","p1_maximum_shots"].map(f)},
       {k:"P2",ph:"P2",col:"var(--p2)",name:"Maintenance",fields:["p2_vwc_threshold","p2_shot_size","p2_ec_high_threshold","p2_ec_low_threshold"].map(f)},
       {k:"P3",ph:"P3",col:"var(--p3)",name:"Overnight",fields:["p3_emergency_vwc_threshold","p3_emergency_shot_size","p3_gen_last_irrigation","p3_veg_last_irrigation"].map(f)},
-      {k:"ST",ph:"⇄",col:"var(--ec)",name:"Steering & EC",fields:["generative_dryback_target","vegetative_dryback_target","ec_target_gen_p2","ec_target_gen_p3","ec_target_veg_p2","ec_target_flush"].map(f)},
+      {k:"ST",ph:"⇄",col:"var(--ec)",name:"Steering & EC",fields:["generative_dryback_target","vegetative_dryback_target","ec_target_gen_p0","ec_target_gen_p1","ec_target_gen_p2","ec_target_gen_p3","ec_target_veg_p0","ec_target_veg_p1","ec_target_veg_p2","ec_target_veg_p3","ec_target_flush"].map(f)},
       {k:"EN",ph:"☀",col:"#f59e0b",name:"Climate setpoints",fields:["ppfd","co2","temp","rh","temp_night","rh_night","feed_ec"].map(f)},
       {k:"RM",ph:"▦",col:"#a78bfa",name:"Room / facility",fields:["room_length","room_width","room_height","canopy_coverage","plant_count","light_watts","hvac_cooling_kw","dehum_capacity"].map(f)},
       {k:"HW",ph:"⚙",col:"#94a3b8",name:"Substrate (shared)",fields:["field_capacity","substrate_volume"].map(f)},
