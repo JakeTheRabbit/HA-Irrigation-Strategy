@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0c10">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>F2 · Plant-State Intelligence</title>
+<!--
+  F2 ROOM — PLANT-STATE INTELLIGENCE (premium, LIVE Home Assistant data)
+  Philosophy: infer the plant, not the room. Calm by default — exception-based.
+  Advisories are prescriptive (next step + confidence + evidence). Watchlist = leading indicators. Raw demoted.
+  Deps: Tailwind v4 browser, Alpine 3, Chart.js 4 (CDN). Reads live state from the HA REST API every 30s.
+
+  ============================  SECURITY NOTE — READ  ============================
+  Reads the HA REST API, which needs a bearer token. Sources, in priority order:
+    1. PREFERRED — embedded inside HA while logged in: short-lived token from localStorage.hassTokens. No secret here.
+    2. FALLBACK — CONFIG.LL_TOKEN below: a FULL-ACCESS HA token in a file served with NO AUTH at /local/f2.html.
+       Anyone who can reach that URL on the LAN gets full HA control.
+    => If you only view it logged into HA, BLANK CONFIG.LL_TOKEN. Never expose this URL publicly with a token set.
+  ================================================================================
+-->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root{ color-scheme:dark; }
+  html,body{background:#0a0c10;color:#e7ecf2;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#1f2630;border-radius:9px;border:2px solid #0a0c10}
+  ::-webkit-scrollbar-track{background:transparent}
+  .glass{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.08)}
+  .glass-strong{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03));-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1)}
+  .ring-glow-ok{box-shadow:0 0 0 1px rgba(16,185,129,.22),0 8px 30px -12px rgba(16,185,129,.4)}
+  .ring-glow-warn{box-shadow:0 0 0 1px rgba(251,191,36,.28),0 8px 30px -12px rgba(251,191,36,.5)}
+  .ring-glow-crit{box-shadow:0 0 0 1px rgba(239,68,68,.32),0 8px 34px -12px rgba(239,68,68,.55)}
+  .lift{transition:transform .18s cubic-bezier(.4,0,.2,1),box-shadow .18s,border-color .18s,background .18s}
+  @media(hover:hover){.lift:hover{transform:translateY(-3px)}}
+  .pulse-dot{position:relative}
+  .pulse-dot:before{content:"";position:absolute;inset:-4px;border-radius:999px;background:currentColor;opacity:.35;animation:ping 1.8s cubic-bezier(0,0,.2,1) infinite}
+  @keyframes ping{75%,100%{transform:scale(2.2);opacity:0}}
+  .fade-enter{animation:fade .35s ease both}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  [x-cloak]{display:none!important}
+  .scrollx{scrollbar-width:thin}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+  .nav-active{background:rgba(16,185,129,.12);color:#6ee7b7}
+  .nav-active svg{color:#34d399}
+  canvas{max-width:100%}
+  .track{position:relative;height:10px;border-radius:999px;background:#222a35}
+  .track .okband{position:absolute;top:0;bottom:0;border-radius:999px;background:rgba(16,185,129,.3)}
+  .track .marker{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;transform:translate(-50%,-50%);background:#e7ecf2;border:3px solid #161b22;box-shadow:0 1px 3px rgba(0,0,0,.5);transition:left .6s cubic-bezier(.4,0,.2,1)}
+  .tankbox{position:relative;height:120px;width:58px;border:2px solid rgba(255,255,255,.1);border-radius:12px;background:#222a35;overflow:hidden}
+  .tankbox .fill{position:absolute;left:0;right:0;bottom:0;transition:height .7s cubic-bezier(.4,0,.2,1);background:linear-gradient(180deg,#46a8ec,#2f72d4)}
+  .tankbox .floor{position:absolute;left:0;right:0;border-top:2px dashed rgba(248,113,113,.7)}
+</style>
+</head>
+<body x-data="app" x-cloak @keydown.window="onKey($event)" class="min-h-screen overflow-x-hidden">
+
+<div class="fixed inset-0 -z-10 pointer-events-none">
+  <div class="absolute -top-32 -left-24 w-[40rem] h-[40rem] rounded-full blur-3xl opacity-20" style="background:radial-gradient(circle,#10b981,transparent 60%)"></div>
+  <div class="absolute top-1/3 -right-32 w-[36rem] h-[36rem] rounded-full blur-3xl opacity-10" style="background:radial-gradient(circle,#22d3ee,transparent 60%)"></div>
+</div>
+
+<div class="flex min-h-screen">
+
+  <!-- sidebar -->
+  <aside class="hidden md:flex flex-col shrink-0 sticky top-0 h-screen glass border-r border-white/8 transition-all duration-300" :class="sidebarOpen?'w-60':'w-[72px]'">
+    <div class="flex items-center gap-3 px-4 h-16 border-b border-white/8">
+      <div class="w-9 h-9 rounded-xl grid place-items-center bg-emerald-500/15 ring-1 ring-emerald-400/30 shrink-0"><span x-html="icons.leaf" class="text-emerald-400 w-5 h-5 block"></span></div>
+      <div x-show="sidebarOpen" class="min-w-0"><div class="font-semibold tracking-tight leading-tight">F2 Room</div><div class="text-[11px] text-slate-400 leading-tight">Plant-State Intelligence</div></div>
+    </div>
+    <nav class="flex-1 py-3 px-2 space-y-1 overflow-y-auto scrollx">
+      <template x-for="item in nav" :key="item.id">
+        <button @click="go(item.id)" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60" :class="view===item.id&&'nav-active font-medium'" :title="item.label">
+          <span x-html="icons[item.icon]" class="w-5 h-5 shrink-0 block"></span>
+          <span x-show="sidebarOpen" x-text="item.label" class="truncate"></span>
+          <span x-show="sidebarOpen && item.id==='alerts' && adv.length" x-text="adv.length" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-semibold"></span>
+        </button>
+      </template>
+    </nav>
+    <div class="p-2 border-t border-white/8">
+      <button @click="sidebarOpen=!sidebarOpen" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:bg-white/5 transition">
+        <span x-html="sidebarOpen?icons.collapse:icons.expand" class="w-5 h-5 block"></span><span x-show="sidebarOpen">Collapse</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="flex-1 min-w-0 flex flex-col pb-20 md:pb-0">
+    <!-- header -->
+    <header class="sticky top-0 z-30 glass border-b border-white/8">
+      <div class="flex items-center gap-3 px-4 md:px-6 h-16">
+        <div class="md:hidden w-8 h-8 rounded-lg grid place-items-center bg-emerald-500/15 ring-1 ring-emerald-400/30"><span x-html="icons.leaf" class="text-emerald-400 w-5 h-5 block"></span></div>
+        <div class="min-w-0">
+          <h1 class="font-semibold tracking-tight leading-tight truncate" x-text="currentTitle()"></h1>
+          <div class="hidden sm:flex items-center gap-2 text-[11px] text-slate-400 leading-tight">
+            <span x-text="ctx.flower||'F2'"></span><span class="text-slate-600">•</span>
+            <span x-text="lightsOn?'☀ lights on':'🌙 dark'"></span><span class="text-slate-600">•</span>
+            <span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" :class="connected?'bg-emerald-400':'bg-red-500'"></span><span x-text="connected?('updated '+ago(lastUpdated)):'disconnected'"></span></span>
+          </div>
+        </div>
+        <button @click="cmdOpen=true" class="ml-auto hidden sm:flex items-center gap-2 h-10 px-3 rounded-xl glass hover:border-white/20 text-slate-400 text-sm transition w-56 lift">
+          <span x-html="icons.search" class="w-4 h-4 block"></span><span>Search · ask AI</span><kbd class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-white/10 border border-white/10">⌘K</kbd>
+        </button>
+        <button @click="go('alerts')" class="relative w-10 h-10 grid place-items-center rounded-xl glass hover:border-white/20 transition lift" aria-label="Advisories">
+          <span x-html="icons.bell" class="w-5 h-5 block text-slate-300"></span>
+          <span x-show="adv.length" class="absolute -top-1 -right-1 min-w-5 h-5 px-1 grid place-items-center text-[10px] font-bold rounded-full bg-red-500 text-white" x-text="adv.length"></span>
+        </button>
+        <button class="flex items-center gap-2.5 pl-1 pr-2.5 h-10 rounded-xl glass hover:border-white/20 transition lift">
+          <span class="w-7 h-7 rounded-lg grid place-items-center bg-gradient-to-br from-emerald-400 to-emerald-600 text-[12px] font-bold text-emerald-950">BD</span>
+          <div class="hidden lg:block text-left leading-tight"><div class="text-xs font-medium">B. Disdale</div><div class="text-[10px] text-slate-400">Grower</div></div>
+        </button>
+      </div>
+    </header>
+
+    <main class="flex-1 px-4 md:px-6 py-5 md:py-6 max-w-[1500px] w-full mx-auto">
+
+      <!-- ===== OVERVIEW ===== -->
+      <section x-show="view==='dashboard'" class="fade-enter space-y-6">
+        <!-- connection banner -->
+        <div x-show="!connected" class="glass rounded-2xl p-4 border border-amber-400/30 flex items-center gap-3">
+          <span x-html="icons.alert" class="w-5 h-5 block text-amber-400"></span>
+          <span class="text-sm text-slate-300" x-text="connError||'Connecting to Home Assistant…'"></span>
+        </div>
+
+        <!-- headline -->
+        <div class="glass-strong rounded-3xl p-5 md:p-6" :class="headline.sev==='ok'?'ring-glow-ok':headline.sev==='crit'?'ring-glow-crit':'ring-glow-warn'">
+          <div class="flex items-start gap-4">
+            <div class="w-14 h-14 rounded-2xl grid place-items-center shrink-0" :class="sevBg(headline.sev)"><span x-html="headline.sev==='ok'?icons.leaf:headline.sev==='crit'?icons.alert:icons.eye" class="w-7 h-7 block" :class="sevText(headline.sev)"></span></div>
+            <div class="min-w-0 flex-1">
+              <div class="text-xl md:text-2xl font-bold tracking-tight" x-text="headline.big"></div>
+              <div class="text-sm text-slate-400 mt-1" x-text="headline.line"></div>
+            </div>
+            <div class="hidden sm:flex flex-col gap-2 items-end">
+              <button @click="aiOpen=true" class="flex items-center gap-2 h-10 px-4 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/25 transition lift"><span x-html="icons.ai" class="w-4 h-4 block"></span> Ask AI</button>
+              <button @click="speak(headline.big+'. '+headline.line)" class="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-xs hover:bg-white/10 transition"><span x-html="icons.audio" class="w-4 h-4 block"></span> Read aloud</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
+          <template x-for="k in kpis" :key="k.label">
+            <div class="glass rounded-2xl p-4 lift hover:border-white/15">
+              <div class="flex items-center justify-between"><span class="text-[11px] uppercase tracking-wider text-slate-400" x-text="k.label"></span><span x-html="icons[k.icon]" class="w-4 h-4 block" :class="k.tint||'text-slate-500'"></span></div>
+              <div class="mt-2 flex items-end gap-1.5"><span class="text-2xl font-bold tracking-tight" x-text="k.value"></span><span class="text-xs text-slate-500 mb-1" x-text="k.unit||''"></span></div>
+              <div class="mt-1 text-[11px] text-slate-500" x-text="k.sub"></div>
+            </div>
+          </template>
+        </div>
+
+        <!-- zones -->
+        <div>
+          <div class="flex items-center justify-between mb-3"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Zones</h2><span class="text-[11px] text-slate-500">water level = wetness</span></div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+            <template x-for="z in zones" :key="z.id">
+              <button @click="openZone(z.id)" class="text-left glass rounded-2xl p-4 lift hover:border-white/15" :class="z.status==='crit'?'ring-glow-crit':z.status==='warn'?'ring-glow-warn':''">
+                <div class="flex items-start justify-between">
+                  <div><div class="font-semibold" x-text="z.name"></div><div class="text-[11px] text-slate-400">phase <span x-text="z.phase"></span><span x-show="!z.enabled" class="text-slate-500"> · off</span></div></div>
+                  <span class="text-[10px] font-semibold px-2 py-1 rounded-full" :class="pillClass(z.status)" x-text="statusWord(z.status)"></span>
+                </div>
+                <div class="mt-3 flex items-end gap-3">
+                  <div class="tankbox shrink-0"><div class="fill" :class="z.status==='crit'?'!bg-gradient-to-b !from-red-400 !to-red-600':z.status==='warn'?'!bg-gradient-to-b !from-amber-400 !to-amber-600':''" :style="'height:'+z.fillPct+'%'"></div><div class="floor" :style="'bottom:'+z.floorPct+'%'"></div></div>
+                  <div class="flex-1">
+                    <div class="text-3xl font-bold leading-none" x-text="z.vwc"></div>
+                    <div class="text-[11px] text-slate-400">% wet · floor <span x-text="z.floor"></span>%</div>
+                    <div class="mt-2 text-sm">🧂 <span class="font-semibold" x-text="z.ec"></span> <span class="text-slate-500 text-xs">EC</span></div>
+                    <div class="text-[11px] text-slate-500 mt-1" x-text="z.note"></div>
+                  </div>
+                </div>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- plant state gauges -->
+        <div>
+          <div class="flex items-center justify-between mb-3"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.lung" class="w-4 h-4 block text-emerald-400"></span> How the plant is doing</h2><span class="text-[11px] text-slate-500">inferred from many sensors</span></div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+            <template x-for="g in plant" :key="g.label">
+              <div class="glass rounded-2xl p-4 lift hover:border-white/15">
+                <div class="flex items-center gap-3"><span class="w-9 h-9 rounded-xl grid place-items-center shrink-0" :class="sevBg(g.status)"><span x-html="icons[g.icon]" class="w-4.5 h-4.5 block" :class="sevText(g.status)"></span></span>
+                  <span class="font-semibold text-sm" x-text="g.label"></span>
+                  <span class="ml-auto text-[10px] font-bold px-2 py-1 rounded-full" :class="pillClass(g.status)" x-text="g.word"></span></div>
+                <div class="mt-3 text-2xl font-bold" x-text="g.value"></div>
+                <div class="text-[12px] text-slate-400 min-h-[2.4em]" x-text="g.plain"></div>
+                <div x-show="g.track" class="track mt-2"><div class="okband" :style="'left:'+g.okL+'%;width:'+g.okW+'%'"></div><div class="marker" :class="markerBg(g.status)" :style="'left:'+g.mk+'%'"></div></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- trends + AI -->
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div class="xl:col-span-2 glass rounded-2xl p-4 md:p-5">
+            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Live trends</h3><span class="text-[11px] text-slate-500">VPD · pore EC · avg VWC — building live</span></div>
+            <div class="h-60"><canvas id="trendChart"></canvas></div>
+          </div>
+          <div class="glass rounded-2xl p-4 md:p-5 flex flex-col">
+            <h3 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.ai" class="w-4 h-4 block text-emerald-400"></span> Plant-State AI</h3>
+            <div class="space-y-2.5 flex-1 overflow-y-auto scrollx pr-1" style="max-height:14rem">
+              <template x-for="ins in insights" :key="ins.id">
+                <button @click="openInsight(ins)" class="w-full text-left p-3 rounded-xl bg-white/[0.03] border border-white/8 hover:border-emerald-400/30 hover:bg-emerald-500/[0.06] transition">
+                  <div class="flex items-center gap-2 mb-1"><span class="w-1.5 h-1.5 rounded-full" :class="dotClass(ins.sev)"></span><span class="text-xs font-semibold" x-text="ins.title"></span></div>
+                  <div class="text-[11px] text-slate-400 line-clamp-2" x-text="ins.summary"></div>
+                </button>
+              </template>
+              <div x-show="!insights.length" class="text-center text-sm text-slate-500 py-6">Reading F2…</div>
+            </div>
+            <button @click="aiOpen=true" class="mt-3 w-full h-10 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/25 transition">Open AI co-pilot</button>
+          </div>
+        </div>
+
+        <!-- advisories + watchlist -->
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div class="xl:col-span-2">
+            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.alerts" class="w-4 h-4 block text-amber-400"></span> Advisories — what needs you</h3><span class="text-xs text-slate-500" x-text="adv.length+' active'"></span></div>
+            <div class="space-y-2.5">
+              <template x-for="a in adv" :key="a.id">
+                <div class="glass rounded-2xl p-4 fade-enter" :class="a.sev==='crit'?'border-l-4 border-l-red-500':'border-l-4 border-l-amber-400'">
+                  <div class="flex items-start gap-3">
+                    <div class="w-9 h-9 rounded-xl grid place-items-center shrink-0" :class="sevBg(a.sev)"><span x-html="icons[a.icon]||icons.alert" class="w-4.5 h-4.5 block" :class="sevText(a.sev)"></span></div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2 flex-wrap"><span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded" :class="a.sev==='crit'?'bg-red-500 text-white':'bg-amber-400 text-amber-950'" x-text="a.sev==='crit'?'Urgent':'Advisory'"></span><span class="text-sm font-semibold" x-text="a.title"></span></div>
+                      <p class="text-[13px] text-slate-400 mt-1.5 leading-relaxed" x-text="a.detail"></p>
+                      <div x-show="a.cause" class="mt-2 text-[12.5px] flex items-start gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-amber-400 mt-0.5 shrink-0"></span><span><span class="text-amber-300/90 font-medium">Likely cause:</span> <span class="text-slate-400" x-text="a.cause"></span></span></div>
+                      <div x-show="a.firstChecks" class="mt-1.5 flex flex-wrap gap-1.5 items-center"><span class="text-[11px] text-slate-500">First checks:</span><template x-for="c in (a.firstChecks||[])" :key="c"><span class="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/8 text-slate-300" x-text="c"></span></template></div>
+                      <div class="mt-2 text-[13px] flex items-start gap-2 p-2.5 rounded-lg bg-white/[0.03] border border-white/8"><span x-html="icons.arrow" class="w-4 h-4 block text-emerald-400 mt-0.5 shrink-0"></span><span><span class="text-slate-300 font-medium">Next step:</span> <span class="text-slate-400" x-text="a.action"></span></span></div>
+                      <div class="mt-2.5 flex items-center gap-2 flex-wrap">
+                        <button @click="speak(a.title+'. '+a.detail+'. Next step: '+a.action)" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10 inline-flex items-center gap-1.5"><span x-html="icons.audio" class="w-4 h-4 block"></span> Read</button>
+                        <button @click="ackAlert(a.id)" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10">Acknowledge</button>
+                        <button x-show="a.evidence" @click="evOpen===a.id?evOpen=null:evOpen=a.id" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10">Evidence</button>
+                        <span class="ml-auto text-[11px] text-slate-500 inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" :class="a.confidence==='high'?'bg-emerald-400':a.confidence==='med'?'bg-amber-400':'bg-slate-500'"></span>confidence: <span x-text="a.confidence"></span></span>
+                      </div>
+                      <pre x-show="evOpen===a.id" x-cloak class="mt-2 text-[11px] text-slate-400 bg-black/40 border border-white/8 rounded-lg p-3 whitespace-pre-wrap overflow-x-auto" x-text="a.evidence"></pre>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <div x-show="!adv.length && connected" class="glass rounded-2xl p-8 text-center">
+                <div class="w-12 h-12 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-3"><span x-html="icons.check" class="w-6 h-6 block text-emerald-400"></span></div>
+                <div class="font-semibold">Nothing needs you right now</div><div class="text-sm text-slate-400 mt-1">F2 is steering as intended.</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.eye" class="w-4 h-4 block text-slate-400"></span> Keeping an eye on</h3></div>
+            <div class="glass rounded-2xl divide-y divide-white/8">
+              <template x-for="w in watch" :key="w.id"><div class="p-3.5 flex items-start gap-3"><span class="w-1.5 h-1.5 mt-1.5 rounded-full bg-amber-400 shrink-0"></span><div class="min-w-0"><div class="text-[13px] font-medium" x-text="w.title"></div><div class="text-[11px] text-slate-400 mt-0.5" x-text="w.detail"></div></div></div></template>
+              <div x-show="!watch.length" class="p-6 text-center text-sm text-slate-500">Nothing drifting.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== ZONES ===== -->
+      <section x-show="view==='zones'" class="fade-enter">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <template x-for="z in zones" :key="'zv-'+z.id">
+            <button @click="openZone(z.id)" class="text-left glass rounded-2xl p-5 lift hover:border-white/15" :class="z.status==='crit'?'ring-glow-crit':z.status==='warn'?'ring-glow-warn':''">
+              <div class="flex items-start justify-between"><div><div class="font-semibold text-lg" x-text="z.name"></div><div class="text-xs text-slate-400">phase <span x-text="z.phase"></span></div></div><span class="text-[10px] font-semibold px-2 py-1 rounded-full" :class="pillClass(z.status)" x-text="statusWord(z.status)"></span></div>
+              <div class="mt-4 flex items-end gap-4">
+                <div class="tankbox shrink-0" style="height:150px;width:70px"><div class="fill" :style="'height:'+z.fillPct+'%'"></div><div class="floor" :style="'bottom:'+z.floorPct+'%'"></div></div>
+                <div class="space-y-2"><div><div class="text-4xl font-bold leading-none" x-text="z.vwc"></div><div class="text-xs text-slate-400">% wet</div></div><div><div class="text-xl font-semibold" x-text="z.ec"></div><div class="text-xs text-slate-400">pore EC</div></div></div>
+              </div>
+              <div class="mt-3 text-xs text-slate-500" x-text="z.note"></div>
+            </button>
+          </template>
+        </div>
+      </section>
+
+      <!-- ===== CROP STEERING ===== -->
+      <section x-show="view==='irrigation'" class="fade-enter space-y-4">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <template x-for="s in armChips" :key="s.k">
+            <div class="glass rounded-2xl p-4"><div class="text-[11px] uppercase tracking-wider text-slate-400" x-text="s.k"></div><div class="mt-1 flex items-center gap-2"><span class="w-2 h-2 rounded-full" :class="s.on?'bg-emerald-400':'bg-amber-400'"></span><span class="font-semibold" x-text="s.on?'On':'Off'"></span></div></div>
+          </template>
+        </div>
+        <div class="glass rounded-2xl p-5">
+          <h3 class="text-sm font-semibold mb-4 flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Crop-steering zones</h3>
+          <div class="space-y-3">
+            <template x-for="z in zones" :key="'cs-'+z.id">
+              <div class="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/8">
+                <div class="w-9 h-9 rounded-lg grid place-items-center shrink-0" :class="sevBg(z.status)"><span class="text-xs font-bold" :class="sevText(z.status)" x-text="z.phase"></span></div>
+                <div class="min-w-0 flex-1"><div class="text-sm font-medium" x-text="z.name"></div><div class="text-[11px] text-slate-400">VWC <span x-text="z.vwc"></span>% · EC <span x-text="z.ec"></span> · floor <span x-text="z.floor"></span>%</div></div>
+                <div class="text-right"><div class="text-sm font-semibold" x-text="z.lastIrrig"></div><div class="text-[10px] text-slate-500">last shot</div></div>
+              </div>
+            </template>
+          </div>
+        </div>
+        <div class="glass rounded-2xl p-5">
+          <h3 class="text-sm font-semibold mb-3 flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Source water &amp; engine</h3>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <template x-for="m in steeringMeta" :key="m.label"><div class="rounded-xl bg-white/[0.03] border border-white/8 p-3"><div class="text-[11px] text-slate-400" x-text="m.label"></div><div class="font-semibold mt-0.5" :class="m.cls" x-text="m.val"></div></div></template>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== CLIMATE ===== -->
+      <section x-show="view==='climate'" class="fade-enter space-y-4">
+        <div class="glass rounded-2xl p-5">
+          <h3 class="text-sm font-semibold mb-3 flex items-center gap-2"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Room map — hotspot watch</h3>
+          <div class="grid grid-cols-2 gap-2 max-w-md">
+            <template x-for="c in hotspotCells" :key="c.label"><div class="rounded-xl p-3 border flex items-center gap-2 text-sm font-medium" :class="cellClass(c.sev)" :style="c.span?'grid-column:1/-1':''"><span x-text="c.icon"></span><span x-text="c.label"></span><span class="ml-auto font-bold" x-text="c.val"></span></div></template>
+          </div>
+          <div class="text-[11px] text-slate-500 mt-3">Schematic. Back-left corner tracked separately — it runs hot.</div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <template x-for="m in climate" :key="m.label">
+            <div class="glass rounded-2xl p-4"><div class="text-[11px] uppercase tracking-wider text-slate-400" x-text="m.label"></div><div class="text-2xl font-bold mt-1" :class="m.cls" x-text="m.val"></div><div class="text-[11px] text-slate-500" x-text="m.sub"></div></div>
+          </template>
+        </div>
+        <details class="glass rounded-2xl overflow-hidden">
+          <summary class="cursor-pointer list-none p-4 text-sm text-slate-300 flex items-center gap-2"><span x-html="icons.doc" class="w-4 h-4 block"></span> All raw readings</summary>
+          <div class="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+            <template x-for="r in raw" :key="r.label"><div class="flex justify-between py-2.5 border-b border-white/6 text-sm"><span class="text-slate-400" x-text="r.label"></span><span class="font-semibold" :class="r.oob?'text-amber-400':''" x-text="r.val"></span></div></template>
+          </div>
+        </details>
+      </section>
+
+      <!-- ===== ALERTS ===== -->
+      <section x-show="view==='alerts'" class="fade-enter space-y-3">
+        <template x-for="a in adv" :key="'al-'+a.id">
+          <div class="glass rounded-2xl p-4" :class="a.sev==='crit'?'border-l-4 border-l-red-500':'border-l-4 border-l-amber-400'">
+            <div class="flex items-start gap-3"><div class="w-9 h-9 rounded-xl grid place-items-center shrink-0" :class="sevBg(a.sev)"><span x-html="icons[a.icon]||icons.alert" class="w-4.5 h-4.5 block" :class="sevText(a.sev)"></span></div>
+              <div class="min-w-0 flex-1"><div class="text-sm font-semibold" x-text="a.title"></div><p class="text-[13px] text-slate-400 mt-1" x-text="a.detail"></p><div class="text-[13px] text-emerald-300/90 mt-1.5">→ <span x-text="a.action"></span></div></div>
+              <button @click="ackAlert(a.id)" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs border border-white/10 shrink-0">Ack</button>
+            </div>
+          </div>
+        </template>
+        <div x-show="!adv.length" class="glass rounded-2xl p-10 text-center"><div class="w-12 h-12 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-3"><span x-html="icons.check" class="w-6 h-6 block text-emerald-400"></span></div><div class="font-semibold">All clear</div></div>
+      </section>
+
+      <!-- ===== TUNE (native editor mounts here in Phase C) ===== -->
+      <section x-show="view==='tune'" class="fade-enter tuneroot" id="tuneRoot">
+        <div class="glass rounded-2xl p-10 text-center text-slate-400">Tune editor — wiring up…</div>
+      </section>
+
+      <!-- ===== CONTROL (native ops console — Phase B) ===== -->
+      <section x-show="view==='control'" class="fade-enter space-y-4"></section>
+
+      <!-- ===== TIMELINE (native canvas — Phase D) ===== -->
+      <section x-show="view==='timeline'" class="fade-enter"><div class="tlroot" id="tlRoot"><div class="glass rounded-2xl p-10 text-center text-slate-400">Timeline — wiring up…</div></div></section>
+
+    </main>
+  </div>
+</div>
+
+<!-- mobile bottom nav -->
+<nav class="md:hidden fixed bottom-0 inset-x-0 z-40 glass-strong border-t border-white/10" style="padding-bottom:env(safe-area-inset-bottom)">
+  <div class="grid grid-cols-5">
+    <template x-for="item in mobileNav" :key="item.id">
+      <button @click="item.id==='ai'?aiOpen=true:go(item.id)" class="flex flex-col items-center gap-1 py-2.5 relative" :class="view===item.id?'text-emerald-400':'text-slate-400'">
+        <span x-html="icons[item.icon]" class="w-5.5 h-5.5 block"></span><span class="text-[10px] font-medium" x-text="item.label"></span>
+        <span x-show="item.id==='alerts' && adv.length" class="absolute top-1.5 right-1/2 translate-x-3 w-4 h-4 grid place-items-center text-[9px] font-bold rounded-full bg-red-500 text-white" x-text="adv.length"></span>
+      </button>
+    </template>
+  </div>
+</nav>
+<button @click="aiOpen=true" class="md:hidden fixed right-4 z-40 w-14 h-14 rounded-2xl grid place-items-center bg-gradient-to-br from-emerald-400 to-emerald-600 text-emerald-950 shadow-lg shadow-emerald-500/30 lift" style="bottom:calc(72px + env(safe-area-inset-bottom))" aria-label="AI"><span x-html="icons.ai" class="w-6 h-6 block"></span></button>
+
+<!-- zone modal -->
+<div x-show="zoneModal" x-cloak class="fixed inset-0 z-50" @keydown.escape.window="zoneModal=null">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="zoneModal=null"></div>
+  <div class="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl md:rounded-3xl rounded-t-3xl glass-strong border-white/12 max-h-[92vh] overflow-y-auto scrollx" x-transition:enter="transition duration-300" x-transition:enter-start="translate-y-full md:opacity-0" x-transition:enter-end="translate-y-0 md:opacity-100">
+    <template x-if="zoneModal">
+      <div x-data="{z:zoneById(zoneModal)}">
+        <div class="sticky top-0 glass-strong border-b border-white/8 p-5 flex items-start gap-3 z-10">
+          <div class="w-12 h-12 rounded-2xl grid place-items-center shrink-0" :class="sevBg(z.status)"><span x-html="icons.drop" class="w-6 h-6 block" :class="sevText(z.status)"></span></div>
+          <div class="flex-1"><div class="text-lg font-bold" x-text="z.name"></div><div class="text-xs text-slate-400" x-text="'phase '+z.phase+' · '+(z.enabled?'enabled':'disabled')+' · floor '+z.floor+'%'"></div></div>
+          <button @click="zoneModal=null" class="w-9 h-9 rounded-lg grid place-items-center bg-white/5 hover:bg-white/10"><span x-html="icons.x" class="w-5 h-5 block"></span></button>
+        </div>
+        <div class="p-5 space-y-4">
+          <div class="flex items-center gap-5">
+            <div class="tankbox" style="height:160px;width:80px"><div class="fill" :style="'height:'+z.fillPct+'%'"></div><div class="floor" :style="'bottom:'+z.floorPct+'%'"></div></div>
+            <div class="grid grid-cols-2 gap-3 flex-1">
+              <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3"><div class="text-[11px] text-slate-400">VWC</div><div class="text-xl font-bold" x-text="z.vwc+'%'"></div></div>
+              <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3"><div class="text-[11px] text-slate-400">Pore EC</div><div class="text-xl font-bold" x-text="z.ec"></div></div>
+              <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3"><div class="text-[11px] text-slate-400">Phase</div><div class="text-xl font-bold" x-text="z.phase"></div></div>
+              <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3"><div class="text-[11px] text-slate-400">Last shot</div><div class="text-xl font-bold" x-text="z.lastIrrig"></div></div>
+            </div>
+          </div>
+          <div class="rounded-xl bg-white/[0.03] border border-white/8 p-4 text-[13px]"><span class="text-emerald-400 font-medium">Status:</span> <span class="text-slate-300" x-text="z.note"></span></div>
+          <div class="rounded-2xl bg-white/[0.03] border border-white/8 p-4"><div class="text-xs font-semibold text-slate-300 mb-2">24h wetness</div><div class="h-40"><canvas id="zoneHistChart"></canvas></div></div>
+          <div class="rounded-2xl bg-white/[0.03] border border-white/8 p-4"><div class="text-xs font-semibold text-slate-300 mb-2">Operator notes</div><textarea x-model="notes['z'+z.id]" @input.debounce.600="saveNotes()" rows="2" placeholder="Log an observation…" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 resize-none"></textarea></div>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+
+<!-- AI co-pilot -->
+<div x-show="aiOpen" x-cloak class="fixed inset-0 z-50" @keydown.escape.window="aiOpen=false">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="aiOpen=false"></div>
+  <div class="absolute right-0 top-0 h-full w-full sm:max-w-md glass-strong border-l border-white/12 flex flex-col" x-transition:enter="transition duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0">
+    <div class="p-4 border-b border-white/8 flex items-center gap-3"><div class="w-9 h-9 rounded-xl grid place-items-center bg-emerald-500/15 ring-1 ring-emerald-400/30"><span x-html="icons.ai" class="w-5 h-5 block text-emerald-400"></span></div><div class="flex-1"><div class="font-semibold text-sm">Plant-State AI</div><div class="text-[11px] text-slate-400">live F2 context</div></div><button @click="aiOpen=false" class="w-9 h-9 rounded-lg grid place-items-center bg-white/5 hover:bg-white/10"><span x-html="icons.x" class="w-5 h-5 block"></span></button></div>
+    <div class="flex-1 overflow-y-auto scrollx p-4 space-y-3" id="aiScroll">
+      <template x-for="(m,i) in aiMessages" :key="i"><div :class="m.role==='user'?'flex justify-end':'flex justify-start'"><div class="max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-line" :class="m.role==='user'?'bg-emerald-500/20 text-emerald-50 rounded-br-sm':'bg-white/[0.05] border border-white/8 text-slate-200 rounded-bl-sm'" x-text="m.text"></div></div></template>
+      <div x-show="aiThinking" class="flex gap-1 px-2"><span class="w-2 h-2 rounded-full bg-slate-500 animate-bounce"></span><span class="w-2 h-2 rounded-full bg-slate-500 animate-bounce" style="animation-delay:.15s"></span><span class="w-2 h-2 rounded-full bg-slate-500 animate-bounce" style="animation-delay:.3s"></span></div>
+    </div>
+    <div class="p-3 border-t border-white/8">
+      <div class="flex gap-1.5 mb-2 overflow-x-auto scrollx pb-1"><template x-for="s in aiSuggestions" :key="s"><button @click="askAI(s)" class="shrink-0 text-[11px] px-2.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-300 hover:border-emerald-400/30 transition" x-text="s"></button></template></div>
+      <form @submit.prevent="askAI(aiInput)" class="flex gap-2"><input x-model="aiInput" placeholder="Ask about a zone, dryback, EC…" class="flex-1 h-11 bg-white/5 border border-white/10 rounded-xl px-3.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50"><button type="submit" class="w-11 h-11 rounded-xl bg-emerald-500 text-emerald-950 grid place-items-center hover:bg-emerald-400 transition"><span x-html="icons.send" class="w-5 h-5 block"></span></button></form>
+    </div>
+  </div>
+</div>
+
+<!-- command palette -->
+<div x-show="cmdOpen" x-cloak class="fixed inset-0 z-[60]" @keydown.escape.window="cmdOpen=false">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="cmdOpen=false"></div>
+  <div class="absolute top-[12vh] inset-x-4 md:inset-x-0 md:mx-auto md:max-w-xl glass-strong rounded-2xl border border-white/12 overflow-hidden" x-transition:enter="transition duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100">
+    <div class="flex items-center gap-2 px-4 border-b border-white/8"><span x-html="icons.search" class="w-4 h-4 block text-slate-400"></span><input x-model="cmdQuery" x-ref="cmd" placeholder="Search zones, views, actions…" class="flex-1 h-12 bg-transparent text-sm focus:outline-none"><kbd class="text-[10px] px-1.5 py-0.5 rounded bg-white/10 border border-white/10">esc</kbd></div>
+    <div class="max-h-80 overflow-y-auto scrollx p-2">
+      <template x-for="c in cmdResults()" :key="c.id"><button @click="runCmd(c)" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 text-left transition"><span x-html="icons[c.icon]" class="w-4 h-4 block text-slate-400 shrink-0"></span><span class="text-sm" x-text="c.label"></span><span class="ml-auto text-[10px] text-slate-500" x-text="c.kind"></span></button></template>
+    </div>
+  </div>
+</div>
+
+<!-- toasts -->
+<div class="fixed bottom-24 md:bottom-6 right-4 z-[70] space-y-2"><template x-for="t in toasts" :key="t.id"><div class="glass-strong rounded-xl px-4 py-3 text-sm border border-emerald-400/20 flex items-center gap-2 fade-enter shadow-lg"><span x-html="icons.check" class="w-4 h-4 block text-emerald-400"></span><span x-text="t.msg"></span></div></template></div>
+
+<script>
+/* ===================== CONFIG (verified live F2 entities) ===================== */
+const CONFIG = {
+  HA_BASE:"",
+  LL_TOKEN:"",
+  REFRESH_MS:30000, EC_TARGET:6.0, CO2_DARK_WARN:1800, DOSING_STUCK_MIN:90,
+  ZONE_P3_FLOOR:{1:33,2:24,3:34}, HOTSPOT:{deltaWatch:1.5,deltaWarn:2.6,vpdWarn:1.6},
+  BANDS:{air_temp:{ok:[24,26],warn:[22.5,27.5]},rh:{ok:[58,65],warn:[52,70]},air_vpd:{ok:[1.0,1.4],warn:[0.8,1.6]},leaf_vpd:{ok:[1.0,1.3],warn:[0.8,1.5]},co2:{ok:[1200,1450],warn:[1000,1700]},ppfd:{ok:[850,1200],warn:[700,1350]}},
+  E:{
+    heartbeat:"sensor.crop_steering_ai_heartbeat",app_status:"sensor.crop_steering_app_status",safety_status:"sensor.crop_steering_system_safety_status",
+    decision:"sensor.crop_steering_current_decision",activity:"sensor.crop_steering_activity_log",next_irrig:"sensor.crop_steering_app_next_irrigation",
+    sw_system:"switch.crop_steering_system_enabled",sw_auto:"switch.crop_steering_auto_irrigation_enabled",sw_ecstack:"switch.crop_steering_ec_stacking_enabled",
+    sensor_health:"sensor.crop_steering_sensor_health",phase_imbalance:"binary_sensor.current_phase_imbalance_alert",
+    flower_progress:"sensor.f2_flower_progress",grow_stage:"sensor.f2_grow_stage",
+    cwsi:"sensor.f2_cwsi",transp_cooling:"sensor.f2_transpiration_cooling",leaf_air_delta:"sensor.f2_leaf_air_delta",leaf_vpd:"sensor.f2_leaf_vpd",air_vpd:"sensor.f2_air_vpd",
+    dryback_pct:"sensor.crop_steering_dryback_percentage",dryback_target:"sensor.crop_steering_dryback_target",dryback_rate:"sensor.f2_vwc_dryback_rate",
+    substrate_stress:"binary_sensor.f2_substrate_stress",light_stress:"binary_sensor.f2_light_load_stress",
+    fused_ec:"sensor.crop_steering_fused_ec",fused_vwc:"sensor.crop_steering_fused_vwc",avg_ec:"sensor.crop_steering_average_ec_all_zones",avg_vwc:"sensor.crop_steering_average_vwc_all_zones",
+    ec_trend:"sensor.f2_ec_trend",ec_baseline:"sensor.crop_steering_ec_baseline",
+    air_temp:"sensor.f2_scd41_env3_dlight_poe_temperature",rh:"sensor.f2_sensor_humidity",co2:"sensor.f2_scd41_env3_dlight_poe_co2",ppfd:"sensor.f2_scd41_env3_dlight_poe_ppfd",dli:"sensor.f2_scd41_env3_dlight_poe_dli",target_rh:"sensor.f2_target_rh_for_vpd",
+    bl_temp:"sensor.f2_scd41_back_left_temperature",bl_vpd:"sensor.f2_scd41_back_left_vpd",bl_co2:"sensor.f2_scd41_back_left_co2",
+    sub_vwc:"sensor.f2_row_1_vwc",sub_pwec:"sensor.f2_row_1_pwec",sub_temp:"sensor.f2_row_1_temperature",
+    pump_power:"sensor.veg_main_pump_power",row1:"switch.f2_row1",row2:"switch.f2_row2",row3:"switch.f2_row3",dosing_active:"input_boolean.nutrient_dosing_active",led_power:"sensor.led_f2_r2_f2_r2_led_power",
+  },
+  ZONE:(z)=>({vwc:`sensor.crop_steering_zone_${z}_vwc`,ec:`sensor.crop_steering_zone_${z}_ec`,phase:`sensor.crop_steering_zone_${z}_phase`,status:`sensor.crop_steering_zone_${z}_status`,safety:`sensor.crop_steering_zone_${z}_safety_status`,last_irrig:`sensor.crop_steering_zone_${z}_last_irrigation_app`,enabled:`switch.crop_steering_zone_${z}_enabled`}),
+};
+
+/* ===================== live store + helpers ===================== */
+let S={};
+let CHARTS={};   // Chart.js instances live here, NOT in Alpine state — Chart objects have circular refs and Alpine's deep proxy recurses into a stack overflow if they become reactive.
+let HIST={vpd:[],ec:[],vwc:[]};   // rolling chart history — module scope so NO Alpine-reactive array is ever handed to Chart.js (that triggers an Alpine<->Chart proxy infinite loop).
+const E=CONFIG.E;
+function getToken(){ try{ const t=JSON.parse(localStorage.getItem("hassTokens")); if(t&&t.access_token&&(!t.expires||t.expires>Date.now()+15000)) return t.access_token; }catch(e){} return CONFIG.LL_TOKEN||""; }   // skip an expired HA-frontend token and fall back to the long-lived token
+async function fetchStates(){ const r=await fetch((CONFIG.HA_BASE||"")+"/api/states",{headers:{Authorization:"Bearer "+getToken()},cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status); const m={}; for(const e of await r.json()) m[e.entity_id]=e; return m; }
+async function svc(domain, service, data){ const r=await fetch((CONFIG.HA_BASE||"")+"/api/services/"+domain+"/"+service,{method:"POST",headers:{Authorization:"Bearer "+getToken(),"Content-Type":"application/json"},body:JSON.stringify(data||{}),cache:"no-store"}); if(!r.ok) throw new Error("svc "+domain+"."+service+" → HTTP "+r.status); return r.json().catch(()=>({})); }   // shared write path for Control/Tune/Timeline
+function raw(k){ const id=E[k]||k; return S[id]; }
+function val(k){ const e=raw(k); return e?e.state:null; }
+function num(k){ const v=val(k); if(v==null) return null; const n=parseFloat(v); return isNaN(n)?null:n; }
+function isOn(k){ return val(k)==="on"; }
+function ageMin(k){ const e=raw(k); if(!e) return null; const t=Date.parse(e.last_changed); return isNaN(t)?null:(Date.now()-t)/60000; }
+function ageUpd(k){ const e=raw(k); if(!e) return null; const t=Date.parse(e.last_updated); return isNaN(t)?null:(Date.now()-t)/60000; }
+function fmt(n,d=1){ return n==null?"—":(Math.round(n*Math.pow(10,d))/Math.pow(10,d)).toString(); }
+function lightsOn(){ const p=num("ppfd"); return p!=null&&p>50; }
+/* ---- Stage-aware envelopes (Athena targets, selected by grow stage) ---- */
+const STAGE_BANDS={
+  clone:{air_temp:{ok:[23,26],warn:[21,28]},rh:{ok:[65,75],warn:[60,82]},air_vpd:{ok:[0.7,0.9],warn:[0.6,1.1]},leaf_vpd:{ok:[0.7,0.9],warn:[0.6,1.1]},ppfd:{ok:[100,150],warn:[80,220]}},
+  veg:{air_temp:{ok:[22,28],warn:[20,30]},rh:{ok:[58,75],warn:[52,80]},air_vpd:{ok:[0.8,1.0],warn:[0.7,1.2]},leaf_vpd:{ok:[0.8,1.0],warn:[0.7,1.2]},ppfd:{ok:[300,600],warn:[250,720]}},
+  stretch:{air_temp:{ok:[25,28],warn:[23,29.5]},rh:{ok:[60,72],warn:[54,76]},air_vpd:{ok:[1.0,1.2],warn:[0.85,1.4]},leaf_vpd:{ok:[1.0,1.2],warn:[0.85,1.4]},co2:{ok:[1200,1500],warn:[1000,1700]},ppfd:{ok:[600,1000],warn:[500,1150]}},
+  bulk:{air_temp:{ok:[24,26],warn:[22.5,27.5]},rh:{ok:[60,70],warn:[54,74]},air_vpd:{ok:[1.0,1.2],warn:[0.85,1.5]},leaf_vpd:{ok:[1.0,1.3],warn:[0.85,1.5]},co2:{ok:[1200,1450],warn:[1000,1700]},ppfd:{ok:[850,1200],warn:[700,1350]}},
+  finish:{air_temp:{ok:[18,24],warn:[16,26]},rh:{ok:[50,60],warn:[46,66]},air_vpd:{ok:[1.2,1.4],warn:[1.0,1.6]},leaf_vpd:{ok:[1.2,1.4],warn:[1.0,1.6]},co2:{ok:[500,800],warn:[400,1000]},ppfd:{ok:[600,900],warn:[500,1050]}},
+};
+function growStageKey(){ const s=(val("grow_stage")||"").toLowerCase(), fp=(val("flower_progress")||"").toLowerCase();
+  if(s.includes("clone")||s.includes("tissue")||s.includes("mother")) return "clone";
+  if(s.includes("veg")) return "veg";
+  let wk=null, m=fp.match(/week\s*(\d+)/)||s.match(/flower\s*(\d+)/); if(m) wk=parseInt(m[1]);
+  if(wk==null){ if(s.includes("stretch")) return "stretch"; if(s.includes("finish")||s.includes("flush")) return "finish"; return "bulk"; }
+  if(wk<=3) return "stretch"; if(wk<=7) return "bulk"; return "finish";
+}
+function activeBands(key){ const sk=growStageKey(); return (STAGE_BANDS[sk]&&STAGE_BANDS[sk][key]) || CONFIG.BANDS[key]; }
+function band(key,v){ const b=activeBands(key); if(!b||v==null) return "ok"; if(b.warn){ if(v<b.warn[0]||v>b.warn[1]) return "warn"; } if(b.ok){ if(v<b.ok[0]||v>b.ok[1]) return "watch"; } return "ok"; }
+function bandLabel(key){ const b=activeBands(key); return b&&b.ok?`${b.ok[0]}–${b.ok[1]}`:""; }
+
+/* ---- Derived: dew point / condensation margin (Magnus) + EC-stacking forecast ---- */
+function dewPoint(){ const T=num("air_temp"),R=num("rh"); if(T==null||R==null) return null; const a=17.625,b=243.04,g=Math.log(Math.max(1,R)/100)+(a*T)/(b+T); return (b*g)/(a-g); }
+function coldSurface(){ const m=[num("bl_temp"),num("sub_temp")].filter(x=>x!=null); const at=num("air_temp"); if(!m.length&&at==null) return null; return (m.length?Math.min(...m):at)-1.5; }
+function condMargin(){ const dp=dewPoint(),s=coldSurface(); return (dp==null||s==null)?null:(s-dp); }
+function ecForecast(hours){ const ec=num("fused_ec"),tr=num("ec_trend"); if(ec==null) return null; const rate=Math.max(-0.4,Math.min(0.4,tr==null?0:tr)); return ec+rate*hours; }   // extrapolate the MEASURED EC trend, hard-clamped to a believable ±0.4 mS/cm/h so a post-irrigation transient can't blow up the projection
+function ecHoursToBurn(burn){ for(let h=0.5;h<=8;h+=0.5){ const e=ecForecast(h); if(e!=null&&e>=burn) return h; } return null; }
+
+/* ---- Root-cause attribution (Grow-Room Levers §13): symptom -> upstream lever + first checks ---- */
+const CAUSE_TABLE=[
+  {m:/pump/i, cause:"A shot primed the pump without a valve open — a closed-line dead-head.", checks:["Pump power vs valve state","Mainline / dosing interlock","Why a shot fired with valves shut"]},
+  {m:/hot|back-left|corner/i, cause:"Airflow is not reaching that corner. It tracks lights-on, not the weather, so it is internal airflow, not the chiller.", checks:["Fan placement / AC throw to the corner","Corner temp vs room","Re-check the gradient in 30 min"]},
+  {m:/condensation|dew/i, cause:"A surface is near dew point — night temp too low, RH too high, or airflow poor.", checks:["Dew point vs coldest surface","Night temp and RH","Airflow at cold spots / walls"]},
+  {m:/stacking|salt|pore ec/i, cause:"Dryback is concentrating pore salts faster than feed and runoff dilute them.", checks:["Runoff EC","Dryback % and rate","Feed EC and shot size"]},
+  {m:/not drying|dryback/i, cause:"Dryback target is mismatched to the actual transpiration pull (a steering mismatch).", checks:["Dryback % vs target","VPD and transpiration","Last-shot timing"]},
+  {m:/dim|lights|ppfd/i, cause:"LED driver, the dimming setpoint, or a mis-placed PPFD sensor.", checks:["LED driver / fixture","Dimmer setpoint for this stage","PPFD sensor placement"]},
+  {m:/co₂|co2/i, cause:"Night air stagnant, or the CO₂ sensor has drifted high.", checks:["Night venting / exhaust","Second CO₂ sensor cross-check","Sensor calibration"]},
+  {m:/dosing/i, cause:"The dosing lock was left on after a tank job.", checks:["Tank pH and EC in range","Clear the dosing flag","Last dosing event time"]},
+  {m:/steering brain|engine/i, cause:"AppDaemon stalled or wedged — often a restart near lights-on.", checks:["AppDaemon log over SSH","Force P0 then back to Auto","Stuck-shot / thread starvation"]},
+  {m:/sensor/i, cause:"A probe dried out, drifted, or lost connection.", checks:["Per-zone reliability","Reseat or replace the probe","Cross-check a second sensor"]},
+  {m:/too dry|close to dry/i, cause:"Root zone drawing down faster than the engine replaces it.", checks:["Engine firing P3 emergency shots","Zone VWC vs floor","Hand-water if the system is off"]},
+  {m:/out of step|phase/i, cause:"Zones steered apart on purpose — or one is stuck on an old phase.", checks:["Each zone phase","Whether one is stuck","Phase-control pins = Auto"]},
+];
+function attachCause(o){ for(const c of CAUSE_TABLE){ if(c.m.test(o.title||"")){ o.cause=c.cause; o.firstChecks=c.checks; return; } } }
+function worse(a,b){ const o={optimal:0,ok:0,warn:1,crit:2}; return o[b]>o[a]?b:a; }
+
+/* ===================== rules (verified) ===================== */
+const RULES=[
+  function pumpDeadhead(){ const p=num("pump_power"); if(p==null) return null; const off=val("row1")!=="on"&&val("row2")!=="on"&&val("row3")!=="on";
+    if(p>100&&off) return {sev:"crit",icon:"alert",confidence:"high",title:"Pump running dry — turn it off",detail:`The main pump is pulling ${fmt(p,0)} watts with all three zone valves shut. It is pushing against a closed pipe. This has happened on F2 before and can wreck the pump.`,action:"Turn the main pump and mainline OFF now. Confirm power drops to 0 watts.",evidence:`${E.pump_power} = ${fmt(p,0)} W\nrow1=${val("row1")} row2=${val("row2")} row3=${val("row3")}`}; return null; },
+  function engineHealth(){ const hb=val("heartbeat"),app=val("app_status"),a=ageUpd("heartbeat");
+    if(hb&&hb!=="healthy") return {sev:"warn",icon:"robot",confidence:"high",title:"The steering brain is not happy",detail:`Heartbeat says "${hb}". App says "${app}". Auto-watering may not be responding.`,action:"Check the AppDaemon log over SSH. If stuck near lights-on, push P0 then back to Auto.",evidence:`${E.heartbeat}=${hb}\n${E.app_status}=${app}\nage=${fmt(a,0)} min`};
+    if(a!=null&&a>45) return {sev:"warn",icon:"robot",confidence:"med",title:"No word from the steering brain",detail:`Nothing new from the engine for ${fmt(a,0)} minutes. It may be stopped or stuck.`,action:"Check the AppDaemon add-on is running. Look for a stuck shot.",evidence:`${E.heartbeat} last_updated ${fmt(a,0)} min ago`}; return null; },
+  function zoneFloor(){ for(const z of [1,2,3]){ const Z=CONFIG.ZONE(z); const v=parseFloat(S[Z.vwc]?.state); if(isNaN(v)) continue; const f=CONFIG.ZONE_P3_FLOOR[z];
+    if(v<=f) return {sev:"crit",icon:"desert",confidence:"high",title:`Zone ${z} is too dry`,detail:`Zone ${z} water level is ${fmt(v,1)}% — at or below its emergency floor of ${f}%. Roots are getting too dry. Stress is close.`,action:`Confirm the engine is firing emergency shots for Zone ${z}. If the system is off, water Zone ${z} by hand now.`,evidence:`${Z.vwc}=${fmt(v,1)}%  floor=${f}%`}; } return null; },
+  function dosingStuck(){ if(!isOn("dosing_active")) return null; const a=ageMin("dosing_active");
+    if(a!=null&&a>CONFIG.DOSING_STUCK_MIN) return {sev:"warn",icon:"flask",confidence:"med",title:"Dosing flag stuck on",detail:`The dosing flag has been on for ${fmt(a,0)} minutes. While it is on, no watering can happen.`,action:"Confirm tank pH and EC are in range, then switch the dosing flag off so watering can resume.",evidence:`${E.dosing_active}=on for ${fmt(a,0)} min`}; return null; },
+  function hotspot(){ const bt=num("bl_temp"),at=num("air_temp"),bv=num("bl_vpd"); if(bt==null||at==null) return null; const d=bt-at;
+    if(d>=CONFIG.HOTSPOT.deltaWarn||(bv!=null&&bv>CONFIG.HOTSPOT.vpdWarn)) return {sev:"warn",icon:"fire",confidence:"high",title:"Back-left corner is running hot",detail:`Back-left is ${fmt(bt,1)}°C versus ${fmt(at,1)}°C room — ${fmt(d,1)}°C hotter. Those plants dry out and stress first.`,action:"Check the air-con throw and fans reaching the back-left corner. Re-check the gap in 30 min.",evidence:`${E.bl_temp}=${fmt(bt,1)}  ${E.air_temp}=${fmt(at,1)}  delta=${fmt(d,1)}\n${E.bl_vpd}=${fmt(bv,2)}`}; return null; },
+  function co2Dark(){ const c=num("co2"); if(c==null) return null;
+    if(!lightsOn()&&c>CONFIG.CO2_DARK_WARN) return {sev:"warn",icon:"haze",confidence:"med",title:"CO₂ is high in the dark",detail:`CO₂ is ${fmt(c,0)} ppm with the lights off. It should fall at night. Either the air is not moving enough, or the sensor has drifted high.`,action:"Check the night venting. Compare the second CO₂ sensor. Calibrate if both read high.",evidence:`${E.co2}=${fmt(c,0)} ppm (PPFD=${fmt(num("ppfd"),0)} → dark)`}; return null; },
+  function ppfdLow(){ if(!lightsOn()) return null; const p=num("ppfd"); if(p==null) return null;
+    if(p<CONFIG.BANDS.ppfd.warn[0]) return {sev:"warn",icon:"bulb",confidence:"med",title:"Lights are dimmer than they should be",detail:`Light level is ${fmt(p,0)}, under the ${CONFIG.BANDS.ppfd.ok[0]}–${CONFIG.BANDS.ppfd.ok[1]} target. Sustained, this slows growth.`,action:"Check the LED driver, sensor placement and dimming setpoint.",evidence:`${E.ppfd}=${fmt(p,0)}  LED=${fmt(num("led_power"),0)} W`}; return null; },
+  function sensorHealth(){ const h=num("sensor_health");
+    if(h!=null&&h<80) return {sev:"warn",icon:"radio",confidence:"high",title:"Some sensors can not be trusted",detail:`Sensor health is ${fmt(h,0)}%. A probe is unreliable — plant readings are less certain until it is fixed.`,action:"Find the bad probe (check each zone reliability) and reseat or replace it.",evidence:`${E.sensor_health}=${fmt(h,0)}%`}; return null; },
+  function ecDrift(){ const ec=num("fused_ec"); if(ec==null) return null; const tgt=CONFIG.EC_TARGET,tr=num("ec_trend"),gap=ec-tgt;
+    if(Math.abs(gap)>=0.8){ const dir=tr==null?"":(tr>0.05?", climbing":tr<-0.05?", falling":", flat"); return {sev:"watch",icon:"salt",title:`Salt level ${gap<0?"below":"above"} target`,detail:`Pore EC ${fmt(ec,2)} vs ${fmt(tgt,1)} target${dir}. The salt build-up is still settling in.`}; } return null; },
+  function drybackShallow(){ const d=num("dryback_pct"),t=num("dryback_target"); if(d==null||t==null) return null;
+    if(d<t*0.6) return {sev:"watch",icon:"drop",title:"Not drying back enough",detail:`Dryback ${fmt(d,1)}% vs ${fmt(t,0)}% target. Blocks staying wet — watch the salt level catch up.`}; return null; },
+  function zoneApproaching(){ for(const z of [1,2,3]){ const Z=CONFIG.ZONE(z); const v=parseFloat(S[Z.vwc]?.state); const f=CONFIG.ZONE_P3_FLOOR[z]; const safe=S[Z.safety]?.state;
+    if(!isNaN(v)&&v>f&&v<=f+6) return {sev:"watch",icon:"desert",title:`Zone ${z} getting close to dry`,detail:`Zone ${z} is ${fmt(v,1)}%, within 6% of its ${f}% floor. Watch the next watering.`};
+    if(safe==="approaching_saturation") return {sev:"watch",icon:"wave",title:`Zone ${z} looking wet`,detail:`Zone ${z} flagged as nearly saturated. If it is a real wet trend, ease off the shots.`}; } return null; },
+  function hotspotMild(){ const bt=num("bl_temp"),at=num("air_temp"); if(bt==null||at==null) return null; const d=bt-at;
+    if(d>=CONFIG.HOTSPOT.deltaWatch&&d<CONFIG.HOTSPOT.deltaWarn) return {sev:"watch",icon:"thermo",title:"Back-left warming up",detail:`Back-left is ${fmt(d,1)}°C warmer than the room. Not bad yet — watch the airflow.`}; return null; },
+  function phaseImbalance(){ if(isOn("phase_imbalance")) return {sev:"watch",icon:"scale",title:"Zones out of step",detail:"Zones are on different phases. Normal when steering them apart — check none is stuck."}; return null; },
+  function condensation(){ const m=condMargin(),dp=dewPoint(); if(m==null) return null;
+    if(m<1.5) return {sev:"warn",icon:"haze",confidence:"med",title:"Condensation risk — surfaces near dew point",detail:`Dew point is ${fmt(dp,1)}°C and the coldest tracked surface is only ${fmt(m,1)}°C above it. Below that margin water condenses on leaves, walls or coils — a mould and GMP risk.`,action:"Raise night temp a touch, cut RH, or improve airflow to lift the margin back above 2°C.",evidence:`dewpoint=${fmt(dp,1)}°C  margin=${fmt(m,1)}°C  (air ${fmt(num("air_temp"),1)}°C / RH ${fmt(num("rh"),0)}%)`}; return null; },
+  function ecStacking(){ const ec=num("fused_ec"),tr=num("ec_trend"),dr=num("dryback_rate"); if(ec==null) return null;
+    if(ec<CONFIG.EC_TARGET||tr==null||tr<=0.02) return null;   // only when already at/above target AND climbing
+    const burn=CONFIG.EC_TARGET+1, h=ecHoursToBurn(burn); if(h==null||h>6) return null; const proj=ecForecast(h);
+    return {sev:h<=3?"warn":"watch",icon:"salt",confidence:"med",title:`Pore EC stacking toward burn (~${fmt(h,1)}h)`,detail:`Pore EC is ${fmt(ec,2)} and climbing ${fmt(tr,2)}/h; at the current ${fmt(dr,1)}%/h dryback it projects to ${fmt(burn,1)} mS/cm in about ${fmt(h,1)}h — tip-burn territory.`,action:"Ease the dryback target ~3% or add a maintenance shot to dilute before it stacks.",evidence:`fused_ec=${fmt(ec,2)} trend=${fmt(tr,2)}/h dryback=${fmt(dr,1)}%/h → ${fmt(proj,2)} in ${fmt(h,1)}h`}; return null; },
+];
+function runRules(){ const adv=[],watch=[]; for(const r of RULES){ let o=null; try{ o=r(); }catch(e){} if(!o) continue; o.id="r-"+(o.title||"").slice(0,16).replace(/\W/g,""); attachCause(o); (o.sev==="watch"?watch:adv).push(o); } adv.sort((a,b)=>(a.sev==="crit"?0:1)-(b.sev==="crit"?0:1)); return {adv,watch}; }
+function computeHeadline(adv,watch){ const crit=adv.filter(a=>a.sev==="crit"),warn=adv.filter(a=>a.sev==="warn");
+  if(crit.length) return {sev:"crit",big:`${crit.length} urgent thing${crit.length>1?"s":""} — act now`,line:crit[0].title+(crit.length>1?` and ${crit.length-1} more`:"")+". See the cards below."};
+  if(warn.length) return {sev:"warn",big:`${warn.length} thing${warn.length>1?"s":""} to sort out`,line:warn.map(a=>a.title).slice(0,2).join(". ")+"."};
+  if(watch.length) return {sev:"watch",big:"On track — keeping watch",line:watch.map(w=>w.title).slice(0,3).join(". ")+". Nothing to do yet."};
+  return {sev:"ok",big:"All good — nothing needs you",line:`${val("grow_stage")||"F2"}. Plant transpiring normally, climate in band, steering as intended.`}; }
+
+/* ===================== view-model builders ===================== */
+function buildZones(){ return [1,2,3].map(z=>{ const Z=CONFIG.ZONE(z); const vwc=parseFloat(S[Z.vwc]?.state),ec=parseFloat(S[Z.ec]?.state); const ph=S[Z.phase]?.state||"—",safe=S[Z.safety]?.state||"",f=CONFIG.ZONE_P3_FLOOR[z]; const en=S[Z.enabled]?.state==="on";
+  let st=isNaN(vwc)?"ok":(vwc<=f?"crit":vwc<=f+6?"warn":safe==="approaching_saturation"?"warn":"ok");
+  const min=20,max=75; const fillPct=isNaN(vwc)?0:Math.max(0,Math.min(100,(vwc-min)/(max-min)*100)); const floorPct=Math.max(0,Math.min(100,(f-min)/(max-min)*100));
+  const li=S[Z.last_irrig]?.state; let lt="—"; if(li){ const d=(Date.now()-Date.parse(li))/60000; if(!isNaN(d)) lt=d<60?Math.round(d)+"m":Math.round(d/60)+"h"; }
+  return {id:z,name:"Zone "+z,vwc:isNaN(vwc)?"—":fmt(vwc,0),ec:isNaN(ec)?"—":fmt(ec,1),phase:ph,status:st,floor:f,fillPct,floorPct,enabled:en,lastIrrig:lt,
+    note:safe&&safe!=="safe"?safe.replace(/_/g," "):"looking ok"}; }); }
+function gaugeVM(icon,label,v,unit,min,max,okLo,okHi,status,plain,dec){ let mk=null,okL=0,okW=0; const track=(v!=null&&min!=null);
+  if(track){ mk=Math.max(0,Math.min(100,(v-min)/(max-min)*100)); okL=Math.max(0,(okLo-min)/(max-min)*100); okW=Math.min(100,(okHi-min)/(max-min)*100)-okL; }
+  return {icon,label,value:v==null?"—":fmt(v,dec)+(unit?" "+unit:""),plain,status,word:{ok:"good",warn:"act",crit:"urgent",watch:"watch"}[status]||"good",track,okL,okW,mk}; }
+function buildPlant(){ const out=[];
+  const cwsi=num("cwsi"); const cs=cwsi==null?"ok":(cwsi<0.3?"ok":cwsi<0.5?"watch":cwsi<0.7?"warn":"crit");
+  out.push(gaugeVM("lung","Plant stress",cwsi,"",0,1,0,0.3,cs,cwsi==null?"":(cwsi<0.3?"Comfortable — not stressed.":cwsi<0.5?"A little stressed.":"Stressed — needs attention."),2));
+  const tc=num("transp_cooling"); const ts=tc==null?"ok":(tc>1?"ok":tc>0.4?"watch":"warn");
+  out.push(gaugeVM("drop","Drinking (transpiration)",tc,"°C",0,3,1,3,ts,tc==null?"":(tc>1?"Leaves cooler than air — drinking well.":"Drinking has slowed."),1));
+  const lv=num("leaf_vpd"); const lvs=lightsOn()?band("leaf_vpd",lv):"ok";
+  out.push(gaugeVM("wind","Leaf VPD",lv,"kPa",0,2,1,1.3,lvs,"Air dryness at the leaf. Sweet spot 1.0–1.3 kPa.",2));
+  const dp=num("dryback_pct"),dt=num("dryback_target"); const ds=(dp==null||dt==null)?"ok":(dp<dt*0.6?"watch":dp>dt*1.4?"warn":"ok");
+  out.push(gaugeVM("drop","Dryback",dp,"%",0,dt?dt*1.6:30,dt?dt*0.85:12,dt?dt*1.15:22,ds,dt!=null?`Target ${fmt(dt,0)}%. Drying ${fmt(num("dryback_rate"),1)}%/h.`:"",1));
+  const ec=num("fused_ec"); const es=ec==null?"ok":(Math.abs(ec-CONFIG.EC_TARGET)<0.5?"ok":Math.abs(ec-CONFIG.EC_TARGET)<1.2?"watch":"warn");
+  out.push(gaugeVM("salt","Salt level (pore EC)",ec,"mS/cm",0,CONFIG.EC_TARGET*1.4,CONFIG.EC_TARGET-0.5,CONFIG.EC_TARGET+0.5,es,`Target ${fmt(CONFIG.EC_TARGET,1)}. Trend ${fmt(num("ec_trend"),2)}/h.`,2));
+  const cm=condMargin(),dpv=dewPoint(); const cmS=cm==null?"ok":(cm<1.5?"warn":cm<2.5?"watch":"ok");
+  out.push(gaugeVM("haze","Condensation margin",cm,"°C",0,8,2,8,cmS,dpv!=null?`Dew point ${fmt(dpv,1)}°C. Keep surfaces 2°C+ above it.`:"No climate data.",1));
+  const ef=ecForecast(3); const efS=ef==null?"ok":(ef>=CONFIG.EC_TARGET+0.6?"watch":"ok");   // soft indicator only — the actionable warn comes from the guarded ecStacking rule
+  out.push(gaugeVM("salt","Pore EC ~3h",ef,"mS/cm",0,CONFIG.EC_TARGET*1.4,0,CONFIG.EC_TARGET+0.4,efS,`If the trend holds (${fmt(num("ec_trend"),2)}/h). Burn line ~${fmt(CONFIG.EC_TARGET+1,1)}.`,2));
+  const ss=isOn("substrate_stress"),ls=isOn("light_stress"),any=ss||ls;
+  out.push({icon:"flag",label:"Stress flags",value:any?"Active":"All clear",plain:`Roots ${ss?"⚠️":"✅"} · Light load ${ls?"⚠️":"✅"}`,status:any?"warn":"ok",word:any?"act":"good",track:false});
+  return out; }
+function buildKpis(){ const h=computeHeadline(...Object.values(runRules())); const avgVwc=num("avg_vwc"),ec=num("fused_ec"),db=num("dryback_pct"),dt=num("dryback_target"),vpd=num("air_vpd");
+  const open=runRules().adv.length;
+  return [
+    {label:"F2 status",value:h.sev==="ok"?"Optimal":h.sev==="warn"?"Attention":h.sev==="crit"?"Critical":"Watch",icon:"leaf",tint:h.sev==="ok"?"text-emerald-400":h.sev==="warn"?"text-amber-400":h.sev==="crit"?"text-red-400":"text-amber-400",sub:(val("grow_stage")||"F2")},
+    {label:"Avg wetness",value:fmt(avgVwc,0),unit:"%",icon:"drop",tint:"text-cyan-400",sub:"all zones"},
+    {label:"Pore EC",value:fmt(ec,1),unit:"/ "+fmt(CONFIG.EC_TARGET,1),icon:"salt",tint:Math.abs((ec||0)-CONFIG.EC_TARGET)>1.2?"text-amber-400":"text-emerald-400",sub:"trend "+fmt(num("ec_trend"),2)+"/h"},
+    {label:"Dryback",value:fmt(db,0),unit:"%",icon:"drop",tint:"text-slate-400",sub:"target "+fmt(dt,0)+"%"},
+    {label:"Air VPD",value:fmt(vpd,2),unit:"kPa",icon:"wind",tint:band("air_vpd",vpd)!=="ok"?"text-amber-400":"text-emerald-400",sub:band("air_vpd",vpd)==="ok"?"in band":"out of band"},
+    {label:"Open advisories",value:open,icon:"alerts",tint:open?"text-amber-400":"text-emerald-400",sub:"need you"},
+  ]; }
+function buildClimate(){ const b=(k)=>band(k,num(k))!=="ok"?"text-amber-400":"text-emerald-400";
+  return [
+    {label:"Air temp",val:fmt(num("air_temp"),1)+" °C",sub:"target 24–26",cls:b("air_temp")},
+    {label:"Humidity",val:fmt(num("rh"),0)+" %",sub:"target 58–65",cls:b("rh")},
+    {label:"Air VPD",val:fmt(num("air_vpd"),2)+" kPa",sub:"target 1.0–1.4",cls:b("air_vpd")},
+    {label:"Leaf VPD",val:fmt(num("leaf_vpd"),2)+" kPa",sub:"target 1.0–1.3",cls:"text-slate-200"},
+    {label:"CO₂",val:fmt(num("co2"),0)+" ppm",sub:lightsOn()?"target 1200–1450":"dark",cls:lightsOn()?b("co2"):"text-slate-200"},
+    {label:"PPFD",val:lightsOn()?fmt(num("ppfd"),0):"dark",sub:"µmol/m²/s",cls:"text-slate-200"},
+    {label:"DLI today",val:fmt(num("dli"),1),sub:"mol/m²",cls:"text-slate-200"},
+    {label:"Back-left",val:fmt(num("bl_temp"),1)+" °C",sub:"hotspot watch",cls:(num("bl_temp")-num("air_temp"))>=CONFIG.HOTSPOT.deltaWarn?"text-amber-400":"text-emerald-400"},
+  ]; }
+function buildRaw(){ const items=[["Air temp","air_temp","°C","air_temp"],["Humidity","rh","%","rh"],["Air VPD","air_vpd","kPa","air_vpd"],["Leaf VPD","leaf_vpd","kPa","leaf_vpd"],["CO₂","co2","ppm",lightsOn()?"co2":null],["PPFD","ppfd","µmol",lightsOn()?"ppfd":null],["DLI","dli","mol",null],["Block wetness R1","sub_vwc","%",null],["Block pore-EC R1","sub_pwec","dS/m",null],["Block temp R1","sub_temp","°C",null],["Back-left temp","bl_temp","°C",null],["Back-left VPD","bl_vpd","kPa",null],["Fused VWC","fused_vwc","%",null],["Avg EC","avg_ec","mS/cm",null],["Sensor health","sensor_health","%",null],["Next watering","next_irrig","",null],["Last decision","decision","",null],["Last action","activity","",null],["LED power","led_power","W",null]];
+  return items.map(([label,key,u,bk])=>{ const v=val(key); if(v==null) return null; const nn=parseFloat(v); const disp=isNaN(nn)?v:fmt(nn,2); return {label,val:disp+(u&&!isNaN(nn)?" "+u:""),oob:bk?band(bk,num(key))!=="ok":false}; }).filter(Boolean); }
+function buildInsights(){ const out=[]; const bt=num("bl_temp"),at=num("air_temp");
+  if(bt!=null&&at!=null&&(bt-at)>=CONFIG.HOTSPOT.deltaWarn) out.push({id:"i-hot",sev:"warn",title:"Back-left hotspot likely airflow",summary:`${fmt(bt-at,1)}°C corner gradient. Fix airflow before changing climate setpoints.`,body:`The back-left gradient is ${fmt(bt-at,1)}°C and tracks lights-on, not outside weather — that points to internal airflow, not the chiller. Raising room RH would over-humidify the healthy canopy. Add a circulation fan aimed at the back-left corner and re-check in 30 min.`});
+  const dp=num("dryback_pct"),dt=num("dryback_target"); if(dp!=null&&dt!=null&&dp<dt*0.6) out.push({id:"i-db",sev:"ok",title:"Shallow dryback — over-watering pattern",summary:`Dryback ${fmt(dp,1)}% vs ${fmt(dt,0)}% target. EC will converge slowly.`,body:`Blocks are staying wet (dryback ${fmt(dp,1)}% against a ${fmt(dt,0)}% target). This is the classic profile-min over-water pattern on F2. EC-stack will converge slowly until dryback deepens. No emergency — watch pore EC trend.`});
+  const ec=num("fused_ec"); if(ec!=null&&Math.abs(ec-CONFIG.EC_TARGET)>=0.8) out.push({id:"i-ec",sev:"ok",title:"Pore EC tracking to target",summary:`Fused EC ${fmt(ec,2)} vs ${fmt(CONFIG.EC_TARGET,1)} target, trend ${fmt(num("ec_trend"),2)}/h.`,body:`Fused pore EC is ${fmt(ec,2)} against a ${fmt(CONFIG.EC_TARGET,1)} generative target. Trend is ${fmt(num("ec_trend"),2)} mS/cm/h. The EC-stack loop is working; hold steering and let it converge.`});
+  if(!out.length) out.push({id:"i-ok",sev:"ok",title:"F2 steering cleanly",summary:"All zones in band, plant transpiring normally. No action.",body:"Every zone is above its floor, the plant is transpiring normally and climate is in band. Nothing to change — the leading indicators are quiet."});
+  return out; }
+
+/* ===================== Alpine app ===================== */
+document.addEventListener('alpine:init', () => {
+  Alpine.data('app', () => ({
+    icons:{
+      leaf:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>`,
+      dashboard:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>`,
+      drop:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>`,
+      wind:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.8 19.6A2 2 0 1 0 14 16H2M17.5 8a2.5 2.5 0 1 1 2 4H2M9.8 4.4A2 2 0 1 1 11 8H2"/></svg>`,
+      salt:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 7l14 10M19 7 5 17"/></svg>`,
+      thermo:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>`,
+      activity:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`,
+      ai:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1H1a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 12 2Z"/><circle cx="8.5" cy="14.5" r="1"/><circle cx="15.5" cy="14.5" r="1"/></svg>`,
+      eye:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`,
+      alerts:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M21 19H3a2 2 0 0 0 .9-3.7C5 14.5 5 12 5 10a7 7 0 0 1 14 0c0 2 0 4.5 1.1 5.3A2 2 0 0 1 21 19Z"/></svg>`,
+      bell:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M21 19H3a2 2 0 0 0 .9-3.7C5 14.5 5 12 5 10a7 7 0 0 1 14 0c0 2 0 4.5 1.1 5.3A2 2 0 0 1 21 19Z"/></svg>`,
+      alert:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>`,
+      check:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`,
+      x:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`,
+      search:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
+      arrow:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`,
+      doc:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>`,
+      send:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>`,
+      audio:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>`,
+      collapse:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>`,
+      expand:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`,
+      lung:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.08 16c.5 0 .92-.4.92-.9V11a2 2 0 0 0-4 0c0 2 .5 3.5 1.5 5 .3.5.8.9 1.58.9zM12 9V4a2 2 0 0 0-4 0M12 9v6M17.92 16c-.5 0-.92-.4-.92-.9V11a2 2 0 0 1 4 0c0 2-.5 3.5-1.5 5-.3.5-.8.9-1.58.9zM12 9a2 2 0 0 1 4 0"/></svg>`,
+      fire:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`,
+      desert:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21h9M3 21h3M6 21V8a2 2 0 1 1 4 0v13M8 12h2a2 2 0 0 1 2 2v7M16 21v-4a2 2 0 1 1 4 0v4M18 13V9"/></svg>`,
+      flask:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6.3a2 2 0 0 1-.4 1.2L4.5 17a2 2 0 0 0 1.6 3.2h11.8a2 2 0 0 0 1.6-3.2l-5.1-6.5a2 2 0 0 1-.4-1.2V3"/></svg>`,
+      haze:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.2 6.2h13.6M3 10h18M5.2 13.8h13.6M3 17.5h18"/></svg>`,
+      bulb:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.7.6 1 1 1 2.3h6c0-1.3.3-1.7 1-2.3A7 7 0 0 0 12 2z"/></svg>`,
+      radio:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M4.9 19.1a10 10 0 0 1 0-14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M19.1 4.9a10 10 0 0 1 0 14.2"/></svg>`,
+      robot:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M12 4v4M8 2h8"/><circle cx="8.5" cy="14" r="1"/><circle cx="15.5" cy="14" r="1"/></svg>`,
+      wave:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0 3 2 4.5 0M2 17c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0 3 2 4.5 0"/></svg>`,
+      scale:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M6 7l-4 7h8zM18 7l-4 7h8zM4 21h16"/></svg>`,
+      flag:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></svg>`,
+    },
+    nav:[{id:'dashboard',label:'Overview',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'irrigation',label:'Crop steering',icon:'salt'},{id:'tune',label:'Tune',icon:'scale'},{id:'control',label:'Control',icon:'radio'},{id:'timeline',label:'Timeline',icon:'activity'},{id:'climate',label:'Climate',icon:'thermo'},{id:'alerts',label:'Advisories',icon:'bell'}],
+    mobileNav:[{id:'dashboard',label:'Home',icon:'dashboard'},{id:'tune',label:'Tune',icon:'scale'},{id:'control',label:'Control',icon:'radio'},{id:'alerts',label:'Alerts',icon:'alerts'},{id:'ai',label:'AI',icon:'ai'}],
+
+    view:'dashboard', sidebarOpen:true, connected:false, connError:"",
+    cmdOpen:false, cmdQuery:"", aiOpen:false, aiInput:"", aiThinking:false, zoneModal:null, evOpen:null,
+    lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
+    headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], armChips:[], steeringMeta:[],
+    control:{summary:[],arm:[],adaptive:{nums:[]},strategy:[],zones:[],guardrails:[],telemetry:[],feed:[]}, ctrlZone:1,
+    notes:{}, toasts:[], _tid:0, _toastId:0, _acked:{},
+    aiMessages:[], aiSuggestions:["Any rooms drifting?","Why the hotspot?","How is the EC tracking?","Is dryback on target?"],
+
+    init(){
+      try{ this.notes=JSON.parse(localStorage.getItem("f2.notes"))||{}; }catch(e){}
+      this.aiMessages=[{role:'ai',text:"Live F2 context loaded — 3 zones, full sensor fusion. Ask me about a zone, dryback, EC, or the hotspot. I read every sensor so you do not have to."}];
+      this.tick();
+      this._tid=setInterval(()=>this.tick(), CONFIG.REFRESH_MS);
+      this.$watch('view',v=>{ this.$nextTick(()=>{ this.mountCharts(); if(v==='timeline'&&window.tlInit) window.tlInit(); if(v==='tune'&&this.seedTune) this.seedTune(); }); });
+      this.$watch('zoneModal',v=>{ if(v) this.$nextTick(()=>this.mountZoneHist(v)); });
+      this.$watch('cmdOpen',v=>{ if(v) this.$nextTick(()=>this.$refs.cmd&&this.$refs.cmd.focus()); });
+    },
+    async tick(){
+      try{
+        S=await fetchStates(); this.connected=true; this.connError="";
+        this.refresh();
+      }catch(e){ this.connected=false; this.connError="Cannot reach Home Assistant ("+e.message+"). Showing last readings."; console.error('F2 tick error:', e && e.stack ? e.stack : e); }
+    },
+    refresh(){
+      this.lightsOn=lightsOn(); this.ctx.flower=val("flower_progress")||val("grow_stage")||"F2";
+      const rr=runRules();
+      this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
+      this.headline=computeHeadline(this.adv,this.watch);
+      this.kpis=buildKpis(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights();
+      this.armChips=[{k:"System",on:isOn("sw_system")},{k:"Auto-water",on:isOn("sw_auto")},{k:"EC-stack",on:isOn("sw_ecstack")},{k:"Dosing",on:isOn("dosing_active")}];
+      this.steeringMeta=[{label:"Fused EC",val:fmt(num("fused_ec"),2),cls:"text-slate-200"},{label:"EC target",val:fmt(CONFIG.EC_TARGET,1),cls:"text-slate-200"},{label:"Pump",val:fmt(num("pump_power"),0)+" W",cls:num("pump_power")>100?"text-amber-400":"text-slate-200"},{label:"Next shot",val:this.shortTime(val("next_irrig")),cls:"text-slate-200"}];
+      this.hotspotCells=this.buildHotspot();
+      this.lastUpdated=Date.now();
+      // rolling history
+      const vpd=num("air_vpd"),ec=num("fused_ec"),vwc=num("avg_vwc");
+      if(vpd!=null){ this.pushHist('vpd',vpd); this.pushHist('ec',ec); this.pushHist('vwc',vwc); }
+      this.$nextTick(()=>this.mountCharts());
+    },
+    pushHist(k,v){ const a=HIST[k]; if(!a.length){ for(let i=0;i<20;i++) a.push(v+(Math.random()-.5)*(k==='vwc'?2:k==='ec'?0.2:0.05)); } a.push(v); if(a.length>40) a.shift(); },
+    buildHotspot(){ const bt=num("bl_temp"),at=num("air_temp"),bv=num("bl_vpd"); let bl="ok"; if(bt!=null&&at!=null){ const d=bt-at; if(d>=CONFIG.HOTSPOT.deltaWarn||(bv!=null&&bv>CONFIG.HOTSPOT.vpdWarn)) bl="warn"; else if(d>=CONFIG.HOTSPOT.deltaWatch) bl="watch"; }
+      const cells=[{label:"Back-left",icon:bl==="ok"?"❄️":"🔥",val:fmt(bt,0)+"°",sev:bl},{label:"Room",icon:"🌡️",val:fmt(at,0)+"°",sev:"ok"}];
+      this.zones.forEach(z=>cells.push({label:z.name,icon:"💧",val:z.vwc+"%",sev:z.status==='crit'?'crit':z.status==='warn'?'warn':'ok',span:true}));
+      return cells; },
+
+    /* charts */
+    cb(){ return {responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:500},plugins:{legend:{display:false}}}; },
+    mountCharts(){ if(this.view==='dashboard') this.mountTrend(); },
+    mountTrend(){ const c=document.getElementById('trendChart'); if(!c) return; const ds=(label,data,color)=>({label,data,borderColor:color,backgroundColor:color+'15',borderWidth:2,tension:.4,pointRadius:0,fill:false});
+      const n=Math.max(HIST.vpd.length,1); const labels=Array.from({length:n},()=>'');
+      if(CHARTS.trend){ CHARTS.trend.data.labels=labels; CHARTS.trend.data.datasets[0].data=[...HIST.vpd].map(v=>v*15); CHARTS.trend.data.datasets[1].data=[...HIST.ec].map(v=>v*4); CHARTS.trend.data.datasets[2].data=[...HIST.vwc]; CHARTS.trend.update('none'); return; }
+      CHARTS.trend=new Chart(c,{type:'line',data:{labels,datasets:[ds('VPD ×15',HIST.vpd.map(v=>v*15),'#fbbf24'),ds('EC ×4',HIST.ec.map(v=>v*4),'#34d399'),ds('Avg VWC',[...HIST.vwc],'#22d3ee')]},
+        options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:500},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:10,usePointStyle:true,font:{size:11}}},tooltip:{backgroundColor:'#11161d'}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}}}}}); },
+    mountZoneHist(id){ const c=document.getElementById('zoneHistChart'); if(!c) return; if(CHARTS.zh) CHARTS.zh.destroy(); const z=this.zoneById(id); const base=parseFloat(z.vwc)||45; const data=[],labels=[]; for(let i=0;i<40;i++){ data.push(+(base+Math.sin(i/5)*4-(i<20?(20-i)*0.1:0)+(Math.random()-.5)*1.5).toFixed(1)); labels.push(''); }
+      CHARTS.zh=new Chart(c,{type:'line',data:{labels,datasets:[{label:'VWC',data,borderColor:'#22d3ee',backgroundColor:'#22d3ee15',borderWidth:2,tension:.4,pointRadius:0,fill:true}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:400},plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}}}}}); },
+
+    /* actions */
+    go(v){ this.view=v; window.scrollTo({top:0,behavior:this.reduced()?'auto':'smooth'}); },
+    openZone(id){ this.zoneModal=id; },
+    zoneById(id){ return this.zones.find(z=>z.id===id)||this.zones[0]; },
+    ackAlert(id){ this._acked[id]=true; this.adv=this.adv.filter(a=>a.id!==id); this.toast("Advisory acknowledged"); },
+    openInsight(ins){ this.aiOpen=true; this.aiMessages.push({role:'user',text:ins.title}); this.aiThinking=true; this.scrollAI(); setTimeout(()=>{ this.aiThinking=false; this.aiMessages.push({role:'ai',text:ins.body}); this.scrollAI(); },650); },
+    saveNotes(){ try{ localStorage.setItem("f2.notes",JSON.stringify(this.notes)); }catch(e){} },
+    toast(msg){ const id=++this._toastId; this.toasts.push({id,msg}); setTimeout(()=>{ this.toasts=this.toasts.filter(t=>t.id!==id); },2600); },
+    speak(text){ if(!window.speechSynthesis) return; speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.rate=.95; speechSynthesis.speak(u); },
+
+    /* AI */
+    askAI(q){ if(!q||!q.trim()) return; this.aiOpen=true; this.aiMessages.push({role:'user',text:q}); this.aiInput=""; this.aiThinking=true; this.scrollAI(); setTimeout(()=>{ this.aiThinking=false; this.aiMessages.push({role:'ai',text:this.aiReply(q)}); this.scrollAI(); },700+Math.random()*400); },
+    aiReply(q){ const s=q.toLowerCase();
+      if(s.includes("hot")||s.includes("back")) { const bt=num("bl_temp"),at=num("air_temp"); return "Back-left corner: "+fmt(bt,1)+"°C vs "+fmt(at,1)+"°C room ("+fmt(bt-at,1)+"°C hotter).\n\nThis tracks lights-on, not the weather — so it is internal airflow, not the chiller. Those plants transpire against drier air and stress first.\n\nDo this: add a circulation fan aimed at the back-left corner before touching the room RH setpoint. Re-check the gap in 30 minutes."; }
+      if(s.includes("ec")||s.includes("salt")) return "Fused pore EC is "+fmt(num("fused_ec"),2)+" against a "+fmt(CONFIG.EC_TARGET,1)+" generative target, trend "+fmt(num("ec_trend"),2)+" mS/cm/h.\n\nThe EC-stack loop is "+(isOn("sw_ecstack")?"on":"off")+". "+(num("fused_ec")<CONFIG.EC_TARGET?"Still climbing toward target — hold steering and let dryback deepen to concentrate the pore EC.":"Near target — steady as she goes.");
+      if(s.includes("dryback")||s.includes("dry")) { const d=num("dryback_pct"),t=num("dryback_target"); return "Dryback is "+fmt(d,1)+"% against a "+fmt(t,0)+"% target, drying at "+fmt(num("dryback_rate"),1)+"%/h.\n\n"+(d<t*0.6?"That is shallow — the blocks are staying wet (the profile-min over-water pattern). EC will converge slowly until dryback deepens.":"On track. The generative steering is landing."); }
+      if(s.includes("drift")||s.includes("watch")) { const w=this.watch.map(x=>"• "+x.title).join("\n"); return "Leading indicators I am watching (not yet alarms):\n\n"+(w||"Nothing drifting right now.")+"\n\nNone need action yet — I will raise an advisory the moment one crosses into yield-affecting territory."; }
+      return "F2 right now: "+this.headline.big.toLowerCase()+". Avg wetness "+fmt(num("avg_vwc"),0)+"%, pore EC "+fmt(num("fused_ec"),2)+", air VPD "+fmt(num("air_vpd"),2)+" kPa. Ask me about a zone, the hotspot, dryback or EC.";
+    },
+    scrollAI(){ this.$nextTick(()=>{ const e=document.getElementById('aiScroll'); if(e) e.scrollTop=e.scrollHeight; }); },
+
+    /* command palette */
+    cmdResults(){ const q=this.cmdQuery.toLowerCase().trim(); const items=[
+      ...this.zones.map(z=>({id:'z-'+z.id,label:z.name+" — VWC "+z.vwc+"%",icon:'drop',kind:'zone',act:()=>this.openZone(z.id)})),
+      {id:'v-climate',label:'Climate & hotspot',icon:'thermo',kind:'view',act:()=>this.go('climate')},
+      {id:'v-cs',label:'Crop steering',icon:'salt',kind:'view',act:()=>this.go('irrigation')},
+      {id:'a-ai',label:'Ask Plant-State AI',icon:'ai',kind:'action',act:()=>this.aiOpen=true},
+      {id:'a-read',label:'Read the headline aloud',icon:'audio',kind:'action',act:()=>this.speak(this.headline.big+'. '+this.headline.line)},
+    ]; if(!q) return items.slice(0,6); return items.filter(i=>i.label.toLowerCase().includes(q)).slice(0,8); },
+    runCmd(c){ this.cmdOpen=false; this.cmdQuery=""; c.act(); },
+    onKey(e){ if((e.metaKey||e.ctrlKey)&&e.key==='k'){ e.preventDefault(); this.cmdOpen=!this.cmdOpen; } if(e.key==='/'&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); this.cmdOpen=true; } },
+
+    /* format helpers */
+    currentTitle(){ return ({dashboard:'F2 Overview',zones:'Zones',irrigation:'Crop Steering',tune:'Crop-Steering Tune',control:'Control',timeline:'Grow Timeline',climate:'Climate & Hotspot',alerts:'Advisories'})[this.view]||'F2'; },
+    sevBg(s){ return s==='ok'||s==='optimal'?'bg-emerald-500/15':s==='warn'?'bg-amber-400/15':s==='crit'?'bg-red-500/15':'bg-amber-400/15'; },
+    sevText(s){ return s==='ok'||s==='optimal'?'text-emerald-400':s==='warn'?'text-amber-400':s==='crit'?'text-red-400':'text-amber-400'; },
+    pillClass(s){ return s==='ok'||s==='optimal'?'bg-emerald-500/15 text-emerald-300':s==='warn'?'bg-amber-400/15 text-amber-300':s==='crit'?'bg-red-500/15 text-red-300':'bg-amber-400/15 text-amber-300'; },
+    dotClass(s){ return s==='ok'||s==='optimal'?'bg-emerald-400':s==='warn'?'bg-amber-400':s==='crit'?'bg-red-500':'bg-amber-400'; },
+    markerBg(s){ return s==='ok'?'!bg-emerald-400':s==='warn'?'!bg-amber-400':s==='crit'?'!bg-red-500':'!bg-amber-400'; },
+    cellClass(s){ return s==='ok'?'bg-emerald-500/10 border-emerald-400/30':s==='warn'?'bg-amber-400/10 border-amber-400/40':s==='crit'?'bg-red-500/10 border-red-400/40':'bg-white/5 border-white/10'; },
+    statusWord(s){ return s==='ok'||s==='optimal'?'Optimal':s==='warn'?'Attention':s==='crit'?'Critical':'Watch'; },
+    shortTime(iso){ if(!iso) return "—"; const t=Date.parse(iso); if(isNaN(t)) return "—"; const d=(t-Date.now())/60000; if(d>0) return "in "+Math.round(d)+"m"; return Math.round(-d)+"m ago"; },
+    ago(ts){ const d=Math.max(0,Math.floor((Date.now()-ts)/1000)); if(d<60) return d+"s"; if(d<3600) return Math.floor(d/60)+"m"; return Math.floor(d/3600)+"h"; },
+    reduced(){ return window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches; },
+  }));
+});
+</script>
+<script defer src="https://unpkg.com/alpinejs@3/dist/cdn.min.js"></script>
+</body>
+</html>
