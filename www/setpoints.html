@@ -746,6 +746,7 @@ function drawChartRows(ctx, vp, totalW, totalH) {
 
     // per-row OVR badge when the active zone overrides this param
     if (activeZone !== 0 && paramDiffers(param.id, activeZone)) {
+      ctx.font = 'bold 9px sans-serif';   // match the param-label font so the width measures right
       const lblW = ctx.measureText(param.name).width;
       ctx.fillStyle = ZONE_META[activeZone].color;
       ctx.font = 'bold 8px sans-serif';
@@ -1009,7 +1010,7 @@ function buildEditorFields(day, ph, week, wd) {
       <div class="de-label">Plant Steering</div>
       <input type="range" min="0" max="100" value="${getVal('steering',day)}" style="width:100%"
         oninput="updateVal('steering',${day},this.value); document.getElementById('steerLabel').textContent=steeringLabel(this.value)">
-      <div id="steerLabel" style="font-size:11px;text-align:center;margin-top:4px;font-weight:600;color:#ec4899">${steeringLabel(recipe.steering[day])}</div>
+      <div id="steerLabel" style="font-size:11px;text-align:center;margin-top:4px;font-weight:600;color:#ec4899">${steeringLabel(getVal('steering',day))}</div>
     </div>
 
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
