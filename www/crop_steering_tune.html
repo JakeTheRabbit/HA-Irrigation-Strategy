@@ -259,7 +259,7 @@
     </div>
       </div>
       <aside class="scol"><div class="srail">
-        <template x-for="grp in groups().filter(g=>['P0','P1','P2','P3','ST','HW'].includes(g.k))" :key="grp.k">
+        <template x-for="grp in groups().filter(g=>['P0','P1','P2','P3','ST','ZN','HW'].includes(g.k))" :key="grp.k">
           <div class="grp" :class="hot===grp.k&&'hot'" :style="'--ph:'+grp.col" @mouseenter="hot=grp.k">
             <div class="gh"><span class="dot" :style="'background:'+grp.col"></span><span x-show="grp.ph" class="ph" :style="'background:'+grp.col" x-text="grp.ph"></span><h3 x-text="grp.name"></h3></div>
             <template x-for="f in grp.fields" :key="f.key">
@@ -307,7 +307,7 @@
 
       </div>
       <aside class="scol"><div class="srail">
-        <template x-for="grp in groups().filter(g=>['EN','RM'].includes(g.k))" :key="grp.k">
+        <template x-for="grp in groups().filter(g=>['EN','RM','SF'].includes(g.k))" :key="grp.k">
           <div class="grp" :class="hot===grp.k&&'hot'" :style="'--ph:'+grp.col" @mouseenter="hot=grp.k">
             <div class="gh"><span class="dot" :style="'background:'+grp.col"></span><span x-show="grp.ph" class="ph" :style="'background:'+grp.col" x-text="grp.ph"></span><h3 x-text="grp.name"></h3></div>
             <template x-for="f in grp.fields" :key="f.key">
@@ -396,6 +396,7 @@ function zoneDefaults(o){ return Object.assign({
   p3_emergency_vwc_threshold:40, p3_emergency_shot_size:5, p3_gen_last_irrigation:30, p3_veg_last_irrigation:15,
   generative_dryback_target:45, vegetative_dryback_target:18,
   ec_target_gen_p0:4.0, ec_target_veg_p0:3.0, ec_target_gen_p1:5.0, ec_target_gen_p2:6.0, ec_target_gen_p3:4.5, ec_target_veg_p1:3.0, ec_target_veg_p2:3.2, ec_target_veg_p3:3.0, ec_target_flush:0.8,
+  plant_count:36, max_daily_volume:300, shot_size_multiplier:1,
 }, o); }
 const LIVE = {
   1: zoneDefaults({ p2_vwc_threshold:41, p2_shot_size:5,   p1_maximum_shots:12, p1_minimum_shots:5, p3_gen_last_irrigation:30, p3_emergency_vwc_threshold:38 }),
@@ -403,7 +404,8 @@ const LIVE = {
   3: zoneDefaults({ p2_vwc_threshold:43, p2_shot_size:1.5, p1_maximum_shots:12, p1_minimum_shots:5, p3_gen_last_irrigation:30, p3_emergency_vwc_threshold:40 }),
 };
 const GLOBAL = { field_capacity:60, substrate_volume:6, lights_on:10, lights_off:22, ppfd:1150, co2:1400, temp:25.5, rh:64, temp_night:21.5, rh_night:68, feed_ec:3.0,
-  room_length:6, room_width:4, room_height:3, canopy_coverage:80, plant_count:40, light_watts:18000, hvac_cooling_kw:18, dehum_capacity:600, root_temp:22, baseline_thc:24 };
+  room_length:6, room_width:4, room_height:3, canopy_coverage:80, room_plant_count:40, light_watts:18000, hvac_cooling_kw:18, dehum_capacity:600, root_temp:22, baseline_thc:24,
+  maximum_ec:9, irrigation_ec_min:2.3, irrigation_ec_max:3.5, irrigation_ph_min:5.8, irrigation_ph_max:6.2, blocked_dripper_max_shots_30min:4, dripper_flow_rate:4, drippers_per_plant:1 };
 
 /* field metadata: key -> ranges/units (from the live entity attributes) */
 const META = {
@@ -449,7 +451,20 @@ const META = {
   room_width:{label:"Room width",unit:"m",min:1,max:60,step:0.1,dec:1},
   room_height:{label:"Room height",unit:"m",min:2,max:10,step:0.1,dec:1},
   canopy_coverage:{label:"Canopy coverage",unit:"%",min:20,max:100,step:5,dec:0},
-  plant_count:{label:"Plant count",unit:"",min:1,max:5000,step:1,dec:0},
+  room_plant_count:{label:"Room plant total",unit:"",min:1,max:5000,step:1,dec:0},
+  plant_count:{label:"Plant count (zone)",unit:"",min:1,max:50,step:1,dec:0},
+  max_daily_volume:{label:"Daily water cap",unit:"L",min:0,max:1000,step:0.5,dec:1},
+  shot_size_multiplier:{label:"Shot-size multiplier",unit:"×",min:0.1,max:5,step:0.1,dec:1},
+  lights_on:{label:"Lights on",unit:"h",min:0,max:23,step:1,dec:0},
+  lights_off:{label:"Lights off",unit:"h",min:0,max:23,step:1,dec:0},
+  maximum_ec:{label:"Max EC (hard cutoff)",unit:"mS",min:1,max:20,step:0.1,dec:1},
+  irrigation_ec_min:{label:"Irrigation EC min",unit:"mS",min:0,max:20,step:0.1,dec:1},
+  irrigation_ec_max:{label:"Irrigation EC max",unit:"mS",min:0,max:20,step:0.1,dec:1},
+  irrigation_ph_min:{label:"Irrigation pH min",unit:"pH",min:3,max:9,step:0.05,dec:2},
+  irrigation_ph_max:{label:"Irrigation pH max",unit:"pH",min:3,max:9,step:0.05,dec:2},
+  blocked_dripper_max_shots_30min:{label:"Blocked-dripper max shots/30m",unit:"",min:1,max:20,step:1,dec:0},
+  dripper_flow_rate:{label:"Dripper flow",unit:"L/h",min:0.1,max:50,step:0.1,dec:1},
+  drippers_per_plant:{label:"Drippers / plant",unit:"",min:1,max:6,step:1,dec:0},
   light_watts:{label:"Total light power",unit:"W",min:0,max:100000,step:100,dec:0},
   hvac_cooling_kw:{label:"HVAC cooling",unit:"kW",min:0,max:100,step:0.5,dec:1},
   dehum_capacity:{label:"Dehumidification",unit:"L/d",min:0,max:5000,step:5,dec:0},
@@ -498,7 +513,20 @@ const FIELDTIPS = {
   room_width:{d:"Room width.",a:"Floor area & volume → CO₂ draw-down, cooling/dehum sizing, W/m².",b:"Physical room.",f:"area = L × W"},
   room_height:{d:"Room height.",a:"Room volume → CO₂ ppm draw-down rate.",b:"Physical room.",f:"volume = area × H"},
   canopy_coverage:{d:"% of floor under active canopy.",a:"Scales transpiration, CO₂ uptake and water use to real plant area.",b:"Plant count, spacing.",f:"canopy m² = floor × coverage%"},
-  plant_count:{d:"Plants in the room.",a:"Multiplies per-plant transpiration into room water / dehum load.",b:"Layout density.",f:"room water = per-plant × count"},
+  room_plant_count:{d:"Total plants in the room (facility-load estimate).",a:"Multiplies per-plant transpiration into room water / dehum / cooling load.",b:"Layout density across all zones.",f:"room water = per-plant × count"},
+  plant_count:{d:"Plants in THIS zone.",a:"Scales the zone's daily water target and shot volumes.",b:"Zone layout / spacing.",f:"writes number.crop_steering_zone_N_plant_count"},
+  max_daily_volume:{d:"Hard cap on total water this zone can apply per day.",a:"Safety ceiling — controller stops irrigating once hit, even if dry.",b:"Plant count, substrate, climate demand.",f:"daily L ≤ this"},
+  shot_size_multiplier:{d:"Per-zone scaler applied to every shot size.",a:"Trims or boosts all P1–P3 shots for this zone without re-tuning each.",b:"Dripper count/flow, substrate.",f:"actual shot = shot% × this"},
+  lights_on:{d:"Hour of day the lights turn on (24h clock).",a:"Anchors the whole photoperiod, the P3→P0 grow-day reset and every diurnal curve.",b:"Light schedule.",f:"photo = lights_off − lights_on"},
+  lights_off:{d:"Hour of day the lights turn off (24h clock).",a:"Sets photoperiod length and when P1/P2 force to P3 overnight.",b:"Light schedule.",f:"photo = lights_off − lights_on"},
+  maximum_ec:{d:"Hard substrate-EC cutoff.",a:"Safety — irrigation is gated/forced to flush above this to prevent lockout.",b:"Feed EC, stacking, dryback.",f:"block stacking when pore EC ≥ this"},
+  irrigation_ec_min:{d:"Minimum acceptable feed-water EC.",a:"Below it the source water is flagged too weak to irrigate.",b:"Dosing / mixing.",f:"gate: feed EC ≥ this"},
+  irrigation_ec_max:{d:"Maximum acceptable feed-water EC.",a:"Above it the source water is flagged too strong to irrigate.",b:"Dosing / mixing.",f:"gate: feed EC ≤ this"},
+  irrigation_ph_min:{d:"Minimum acceptable feed-water pH.",a:"Below it irrigation is gated (too acidic).",b:"pH dosing.",f:"gate: pH ≥ this"},
+  irrigation_ph_max:{d:"Maximum acceptable feed-water pH.",a:"Above it irrigation is gated (too alkaline → lockout).",b:"pH dosing.",f:"gate: pH ≤ this"},
+  blocked_dripper_max_shots_30min:{d:"Shots in 30 min before a dripper is called blocked.",a:"Abandons emergency shots that aren't raising VWC (clog protection).",b:"Dripper health, shot frequency.",f:"flag if shots/30min ≥ this with no VWC rise"},
+  dripper_flow_rate:{d:"Flow rate of a single dripper.",a:"Converts shot duration ↔ litres; sets how long a shot runs.",b:"Dripper hardware.",f:"shot time = shot L ÷ (flow × drippers)"},
+  drippers_per_plant:{d:"Drippers feeding each plant.",a:"Total delivery rate per plant → shot duration.",b:"Irrigation layout.",f:"plant flow = dripper_flow × drippers"},
   light_watts:{d:"Total electrical light power in the room.",a:"Sensible cooling load (~50% of watts) and W/m².",b:"Fixture count × wattage.",f:"AC sensible ≈ 0.5 × watts"},
   hvac_cooling_kw:{d:"Installed AC cooling capacity.",a:"Whether sensible heat is removed; undersized → temp climbs.",b:"HVAC spec.",f:"compare to 0.5 × light_watts"},
   dehum_capacity:{d:"Dehumidifier moisture-removal capacity (L/day).",a:"Whether the transpiration load is met; deficit → RH climbs at night.",b:"Dehum spec.",f:"balance = capacity − transpiration load"},
@@ -554,7 +582,8 @@ function editor(){
     Z:{}, G:{}, hydrated:false, liveWaiting:false,
     init(){ this.Z=JSON.parse(JSON.stringify(LIVE)); this.G=Object.assign({},GLOBAL);
       try{ const s=JSON.parse(localStorage.getItem("f2cs.tpl")); if(s&&s.Z){ for(const z in this.Z){ if(s.Z[z]) this.Z[z]=Object.assign({},this.Z[z],s.Z[z]); }   // MERGE saved over defaults so new schema keys aren't lost
-        this.G=Object.assign({},GLOBAL,s.G||{}); if(s.dial) this.dial=s.dial; this.hydrated=true; } }catch(e){}   // restored edits win on reload (hydrated) — no clobber
+        this.G=Object.assign({},GLOBAL); if(s.G) for(const k in GLOBAL){ if(s.G[k]!=null) this.G[k]=s.G[k]; }   // only re-apply stored keys still in the schema — a stale removed key (e.g. old global plant_count) can't shadow a new per-zone field
+        if(s.dial) this.dial=s.dial; this.hydrated=true; } }catch(e){}   // restored edits win on reload (hydrated) — no clobber
       this.mode = this.dial>=5.5?'gen':'veg'; this.pullLive();
       if(window.parent!==window){ document.documentElement.classList.add("embed");   // embedded → report content height so the parent sizes the iframe (one scrollbar, not three)
         const post=()=>{ try{ window.parent.postMessage({type:"cs-tune-h",h:Math.ceil(document.body.scrollHeight)+24},"*"); }catch(e){} };
@@ -623,7 +652,7 @@ function editor(){
     floorArea(){ return this.g('room_length')*this.g('room_width'); },                        // m²
     roomVol(){ return this.floorArea()*this.g('room_height'); },                              // m³
     canopyArea(){ return this.floorArea()*this.g('canopy_coverage')/100; },                   // m²
-    dailyWaterL(){ const photo=this.photo(); let s=0; for(let t=0;t<photo;t+=0.25) s+=this.transpiration(this.envAt(t))*0.25; return s*this.g('plant_count'); },  // total room L/day
+    dailyWaterL(){ const photo=this.photo(); let s=0; for(let t=0;t<photo;t+=0.25) s+=this.transpiration(this.envAt(t))*0.25; return s*this.g('room_plant_count'); },  // total room L/day
     coolingLoadKw(){ return this.g('light_watts')/1000*0.5; },   // AC sensible load ≈ 50% of LED watts (driver + non-PAR); the PAR half drives transpiration → latent → dehumidifier
     co2UptakeGh(){ return this.canopyArea()*2.0*this.psRate(this.dayEnv()); },                 // g CO₂/h (≈2 g/m²/h at full photosynthesis)
     co2DrawPpmH(){ return this.co2UptakeGh()*1000/(1.96*Math.max(this.roomVol(),1)); },        // ppm/h drawn down if uninjected (1 ppm ≈ 1.96 mg/m³)
@@ -639,7 +668,7 @@ function editor(){
     osmoticMPa(){ return -0.36*this.peakEC(); },                                                 // pore-EC → osmotic potential (more negative = harder to drink)
     leafAirDelta(){ return this.leafTemp()-this.g('temp'); },                                    // leaf−air ΔT (LED canopy runs below air)
     absHumidity(){ const T=this.g('temp'); return 216.7*(this.svp(T)*10*this.g('rh')/100)/(T+273.15); },   // g/m³
-    latentKw(){ return this.transpiration(this.dayEnv())*this.g('plant_count')*0.628; },          // moisture-removal (dehum) load
+    latentKw(){ return this.transpiration(this.dayEnv())*this.g('room_plant_count')*0.628; },          // moisture-removal (dehum) load
 
     /* ===== the whole coupled state — every lever feeds these; change one, they all move ===== */
     coupledRanked(){ const list=this.coupled();
@@ -696,7 +725,7 @@ function editor(){
     /* ===== diurnal environment series for the room graphs (cached in module scope) ===== */
     envSeries(){ const key=JSON.stringify([this.G,this.photo()]); if(ENVK===key) return ENVS;
       const S={t:[],vpdA:[],vpdL:[],temp:[],rh:[],dew:[],leaf:[],transp:[],pn:[],dli:[],ppfd:[],co2:[],uptake:[],lightKw:[],heatKw:[]}; let dli=0;
-      const dP=this.g('ppfd'), pc=this.g('plant_count'), lw=this.g('light_watts'), ca=this.canopyArea();
+      const dP=this.g('ppfd'), pc=this.g('room_plant_count'), lw=this.g('light_watts'), ca=this.canopyArea();
       for(let i=0;i<=96;i++){ const t=i*0.25, e=this.envAt(t), pn=this.psRate(e), tr=this.transpiration(e);
         S.t.push(t); S.vpdA.push([t,this.vpd(e)]); S.vpdL.push([t,this.vpdLeaf(e)]); S.temp.push([t,e.temp]); S.rh.push([t,e.rh]);
         S.dew.push([t,this.dewPoint(e)]); S.leaf.push([t,this.leafTemp(e)]); S.transp.push([t,tr*pc]);   // room total L/h
@@ -1047,9 +1076,11 @@ function editor(){
       {k:"P2",ph:"P2",col:"var(--p2)",name:"Maintenance",fields:["p2_vwc_threshold","p2_shot_size","p2_ec_high_threshold","p2_ec_low_threshold"].map(f)},
       {k:"P3",ph:"P3",col:"var(--p3)",name:"Overnight",fields:["p3_emergency_vwc_threshold","p3_emergency_shot_size","p3_gen_last_irrigation","p3_veg_last_irrigation"].map(f)},
       {k:"ST",ph:"⇄",col:"var(--ec)",name:"Steering & EC",fields:["generative_dryback_target","vegetative_dryback_target","ec_target_gen_p0","ec_target_gen_p1","ec_target_gen_p2","ec_target_gen_p3","ec_target_veg_p0","ec_target_veg_p1","ec_target_veg_p2","ec_target_veg_p3","ec_target_flush"].map(f)},
-      {k:"EN",ph:"☀",col:"#f59e0b",name:"Climate setpoints",fields:["ppfd","co2","temp","rh","temp_night","rh_night","feed_ec","baseline_thc"].map(f)},
-      {k:"RM",ph:"▦",col:"#a78bfa",name:"Room / facility",fields:["room_length","room_width","room_height","canopy_coverage","plant_count","light_watts","hvac_cooling_kw","dehum_capacity"].map(f)},
-      {k:"HW",ph:"⚙",col:"#94a3b8",name:"Substrate (shared)",fields:["field_capacity","substrate_volume"].map(f)},
+      {k:"ZN",ph:"▣",col:"#64748b",name:"Zone setup",fields:["plant_count","max_daily_volume","shot_size_multiplier"].map(f)},
+      {k:"EN",ph:"☀",col:"#f59e0b",name:"Climate setpoints",fields:["lights_on","lights_off","ppfd","co2","temp","rh","temp_night","rh_night","feed_ec","baseline_thc"].map(f)},
+      {k:"RM",ph:"▦",col:"#a78bfa",name:"Room / facility",fields:["room_length","room_width","room_height","canopy_coverage","room_plant_count","light_watts","hvac_cooling_kw","dehum_capacity"].map(f)},
+      {k:"SF",ph:"⚠",col:"#f87171",name:"Safety guardrails",fields:["maximum_ec","irrigation_ec_min","irrigation_ec_max","irrigation_ph_min","irrigation_ph_max","blocked_dripper_max_shots_30min"].map(f)},
+      {k:"HW",ph:"⚙",col:"#94a3b8",name:"Substrate & dripper (shared)",fields:["field_capacity","substrate_volume","dripper_flow_rate","drippers_per_plant"].map(f)},
     ]; },
 
     verdict(){ const db=(this.g('field_capacity')-this.overnightLow())/this.g('field_capacity')*100; const t=this.mode==='gen'?"Generative":"Vegetative";
