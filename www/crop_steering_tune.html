@@ -634,22 +634,53 @@ function editor(){
           {t:p*0.58,v:pk,ax:'l',col:pk>cap?'#f87171':'#f59e0b',txt:pk.toFixed(1)+'kW',cap:'sensible ≈50% LED',dy:-1} ] }); },
 
     /* ===== limiting-factor (Liebig minimum) analysis vs max yield & potency ===== */
-    OPT(){ const m=this.sim().meta, FCv=this.g('field_capacity'), db=(FCv-m.overnightLow)/Math.max(FCv,1)*100, e=this.dayEnv(), dli=this.g('ppfd')*this.photo()*0.0036, ecT=this.ecP2(), dt=this.g('temp');
+    co2Ceiling(){ return clamp(600+(this.g('co2')-400)/1100*900, 600, 1600); },   // usable PPFD ceiling rises with CO₂: ~600 µmol @400ppm → ~1500 @1500ppm. Above the ceiling extra photons are wasted, not harmful. CO₂ "lets you push light harder" — it is a yield enabler, not a potency knob. (Chandra et al. 2008; Westmoreland & Bugbee 2023, https://digitalcommons.usu.edu/etd2023/243/)
+
+    /* ── YIELD response per lever — evidence-based shapes, NOT symmetric guesses ──
+       Liebig minimum: relative yield = the WORST axis score (0..1). Each axis carries a display
+       band [lo,hi] + a midpoint so the advice line can say raise/lower toward a real range. */
+    yieldAxes(){ const e=this.dayEnv(), m=this.sim().meta, FCv=this.g('field_capacity');
+      const db=(FCv-m.overnightLow)/Math.max(FCv,1)*100;
+      const ppfd=this.g('ppfd'), co2=this.g('co2'), photo=this.photo(), dt=this.g('temp'), nt=this.g('temp_night'), dif=dt-nt;
+      const bell=(v,c,s)=>Math.exp(-Math.pow((v-c)/s,2)), ramp=(v,lo,hi)=>clamp((v-lo)/((hi-lo)||1),0,1);
+      const ceil=this.co2Ceiling(), useDLI=Math.min(ppfd,ceil)*photo*0.0036, tgtDLI=ceil*photo*0.0036;
+      const reqCO2=400+ramp(ppfd,600,1500)*1100, ecT=this.ecP2(), pec=this.peakEC();
       return [
-        {key:'dli',label:'DLI (light)',val:dli,unit:'mol',dec:1,y:[35,62],p:[40,65],lever:'PPFD / photoperiod'},          // light saturation ~1400–1500 PPFD under CO₂
-        {key:'co2',label:'CO₂ day',val:this.g('co2'),unit:'ppm',dec:0,y:[1000,1500],p:[800,1300],lever:'CO₂ enrichment'},
-        {key:'dtemp',label:'Day temp',val:dt,unit:'°C',dec:1,y:[25,29],p:[23,27],lever:'cooling setpoint'},
-        {key:'ntemp',label:'Night temp (DIF)',val:this.g('temp_night'),unit:'°C',dec:1,y:[dt-4,dt],p:[dt-5,dt-1],lever:'small day↔night gap = yield'},   // tight DIF favours yield; modest drop for finish/colour
-        {key:'vpd',label:'Air VPD',val:this.vpd(e),unit:'kPa',dec:2,y:[0.8,1.3],p:[1.0,1.5],lever:'temp + RH'},
-        {key:'rh',label:'Day RH',val:this.g('rh'),unit:'%',dec:0,y:[55,68],p:[50,62],lever:'humidity / dehum'},
-        {key:'db',label:'Dryback',val:db,unit:'%',dec:0,y:[15,30],p:[25,45],lever:'P3 / steering dial'},
-        {key:'ec',label:'Pore EC',val:this.peakEC(),unit:'mS',dec:1,y:[ecT*0.85,ecT*1.25],p:[ecT*1.0,ecT*1.55],lever:'feed EC / dryback'},
+        // Inflorescence yield rises ~linearly with USABLE light, no saturation to ~1800 µmol — but only up to the CO₂-set ceiling; above it the photons are wasted. Y≈0.221·PPFD+53.6 g/m². (Rodriguez-Morrison, Llewellyn & Zheng 2021, https://www.frontiersin.org/articles/10.3389/fpls.2021.646020/full)
+        {key:'dli',label:'DLI (usable light)',unit:'mol',dec:1,val:useDLI,lever:'PPFD / photoperiod', lo:+(tgtDLI*0.85).toFixed(1),hi:+tgtDLI.toFixed(1),mid:tgtDLI, score:clamp(useDLI/Math.max(tgtDLI,1),0,1)},
+        // CO₂ must keep pace with PPFD or photosynthesis is carbon-limited; ~95% of the benefit is in by ~1200 ppm. (Westmoreland & Bugbee 2023; Chandra et al. 2008, Physiol Mol Biol Plants 14:215)
+        {key:'co2',label:'CO₂ vs light demand',unit:'ppm',dec:0,val:co2,lever:'CO₂ enrichment', lo:Math.round(reqCO2),hi:1500,mid:1500, score:clamp(co2/Math.max(reqCO2,400),0,1)},
+        // Whole-plant photosynthesis peaks ~26–28 °C under high light and falls off either side. (Chandra et al. 2008)
+        {key:'dtemp',label:'Day temp',unit:'°C',dec:1,val:dt,lever:'cooling / heating setpoint', lo:25,hi:29,mid:27, score:bell(dt,27,4.5)},
+        // A small positive day→night gap (DIF ~3–8 °C) maximises yield; flat or negative DIF hurts. (Chandra 2008; CEA DIF studies)
+        {key:'dif',label:'Day→night DIF',unit:'°C',dec:1,val:dif,lever:'night temp (avoid negative DIF)', lo:1,hi:5,mid:2.5, score:(dif<=0?clamp(0.5+dif*0.1,0,0.5):(dif<=5?1:clamp(1-(dif-5)/8,0.2,1)))},   // tight positive DIF (1–5°C) ideal — even ripening, no stretch (operator-confirmed); NEGATIVE DIF (cool day/warm night) collapses yield; very wide DIF also penalised
+        // Air VPD ~0.8–1.4 kPa keeps stomata open without over-stress; too high closes them, too low slows nutrition. (industry consensus — weak direct cannabis data)
+        {key:'vpd',label:'Air VPD',unit:'kPa',dec:2,val:this.vpd(e),lever:'temp + RH', lo:0.8,hi:1.4,mid:1.1, score:bell(this.vpd(e),1.1,0.45)},
+        // Leaf-to-air VPD is the ACTUAL transpiration driver at the leaf (levers doc); target ~0.9–1.5 kPa. Set by leaf temp (PPFD/airflow) + RH.
+        {key:'vpdL',label:'Leaf VPD',unit:'kPa',dec:2,val:this.vpdLeaf(e),lever:'airflow / leaf temp + RH', lo:0.9,hi:1.5,mid:1.2, score:bell(this.vpdLeaf(e),1.2,0.5)},
+        // Higher feed/substrate EC supplies more N → more biomass, up to a point; very high pore-EC stalls uptake osmotically. (Caplan, Dixon & Zheng 2017, HortScience 52:1796)
+        {key:'ec',label:'Pore EC',unit:'mS',dec:1,val:pec,lever:'feed EC / dryback', lo:+(ecT*0.85).toFixed(1),hi:+(ecT*1.3).toFixed(1),mid:ecT*1.05, score:bell(pec,ecT*1.05,ecT*0.6)},
+        // 13 h flowering photoperiod out-yields 12 h by 35–50% DW; below ~11 h is light-limited. (Jockers et al. 2024, Plants 13:433)
+        {key:'photo',label:'Photoperiod',unit:'h',dec:1,val:photo,lever:'lights on/off hours', lo:12,hi:13,mid:13, score:(photo>=12?0.85+ramp(photo,12,13)*0.15:clamp(ramp(photo,9,12),0,1)*0.85)},   // 12h standard = good (0.85); 13h = max (+35–50% DW, Jockers 2024); only a soft yield lever, not a crisis at 12/12
       ]; },
+
+    /* POTENCY axes — interim band scoring; T3 rebuilds as cultivar baseline × evidence-based stress modifiers. */
+    potencyAxes(){ const e=this.dayEnv(), m=this.sim().meta, FCv=this.g('field_capacity'), db=(FCv-m.overnightLow)/Math.max(FCv,1)*100, dt=this.g('temp'), ecT=this.ecP2();
+      const A=(key,label,unit,dec,val,lo,hi,lever)=>({key,label,unit,dec,val,lo,hi,mid:(lo+hi)/2,lever,score:this.suff(val,[lo,hi])});
+      return [
+        A('db','Late-flower dryback','%',0,db,25,45,'P3 / steering dial'),                                  // mild late stress lifts THCA (Caplan 2019)
+        A('dtemp','Day temp (degrade)','°C',1,dt,20,26,'cooling setpoint'),                                  // >30°C degrades cannabinoids
+        A('vpd','Air VPD','kPa',2,this.vpd(e),1.0,1.5,'temp + RH'),
+        A('ec','Pore EC (stress)','mS',1,this.peakEC(),ecT*1.0,ecT*1.55,'feed EC / dryback'),                // N-stress raises % but costs yield
+        A('dli','DLI (maturation floor)','mol',1,this.g('ppfd')*this.photo()*0.0036,12,90,'PPFD / photoperiod'),  // % flat above a low floor; only LOW light hurts (Rodriguez-Morrison 2021)
+      ]; },
+
     suff(v,b){ if(v>=b[0]&&v<=b[1]) return 1; const span=(b[1]-b[0])||1, d=v<b[0]?b[0]-v:v-b[1]; return clamp(1-d/(span*1.1),0,1); },
-    limiters(goal){ const a=this.OPT().map(o=>{ const b=goal==='p'?o.p:o.y, s=this.suff(o.val,b), dir=o.val<b[0]?'raise':(o.val>b[1]?'lower':'ok');
-        return {key:o.key,label:o.label,val:Number(o.val).toFixed(o.dec),unit:o.unit,lo:b[0].toFixed(o.dec),hi:b[1].toFixed(o.dec),s,pct:Math.round(s*100),dir,lever:o.lever}; });
+    limiters(goal){ const ax = goal==='p'? this.potencyAxes() : this.yieldAxes();
+      const a = ax.map(o=>{ const s=clamp(o.score,0,1), dir=s>=0.95?'ok':(o.val<o.mid?'raise':'lower');
+        return {key:o.key,label:o.label,val:Number(o.val).toFixed(o.dec),unit:o.unit,lo:Number(o.lo).toFixed(o.dec),hi:Number(o.hi).toFixed(o.dec),s,pct:Math.round(s*100),dir,lever:o.lever}; });
       return a.sort((x,y)=>x.s-y.s); },
-    potential(goal){ const a=this.limiters(goal); return {pct:Math.round(a[0].s*100), top:a[0], list:a}; },
+    potential(goal){ const a=this.limiters(goal); return {pct:Math.round((a[0]?a[0].s:1)*100), top:a[0]||{dir:'ok',label:'',lo:'',hi:'',lever:''}, list:a}; },
     zonesSummary(){ const out=[]; for(const z of [1,2,3]){ ZOVR=z; try{ out.push({z, y:this.potential('y'), p:this.potential('p')}); } finally{ ZOVR=null; } } return out; },
 
     /* phase boundaries — read from the simulation meta */
