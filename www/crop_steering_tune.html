@@ -108,6 +108,12 @@
   .limfix{margin-top:6px;padding-top:6px;border-top:1px solid rgba(248,113,113,.18);font-size:12px;color:var(--ink);display:flex;align-items:center;gap:6px;flex-wrap:wrap} .limfix b{font-weight:800} .limfix i{font-style:normal;color:var(--ink3);font-size:11px}
   .limfix .advice{color:var(--ink3);font-size:11px}
   .btn.xs{padding:2px 8px;font-size:11px;border-radius:6px;background:var(--ok);color:#04130b;border:0;font-weight:800;cursor:pointer}
+  .btn.xs2{padding:2px 9px;font-size:11px;border-radius:6px;background:rgba(148,163,184,.16);color:var(--ink);border:1px solid var(--hair);font-weight:700;cursor:pointer;margin-left:6px}
+  .dseg{display:inline-flex;gap:0;border:1px solid var(--hair);border-radius:7px;overflow:hidden;margin:0 4px;vertical-align:middle}
+  .dseg button{background:transparent;color:var(--ink3);border:0;padding:2px 9px;font-size:11px;font-weight:700;cursor:pointer} .dseg button.on{background:var(--p2);color:#04130b}
+  .mdleg{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--ink3);margin:2px 2px 8px} .mdleg span{display:inline-flex;align-items:center;gap:5px} .mdleg i{width:11px;height:3px;border-radius:2px;display:inline-block}
+  .mdscroll{overflow-x:auto;overflow-y:hidden;border:1px solid var(--hair);border-radius:10px;background:#0a0c10} .mdscroll::-webkit-scrollbar{height:9px} .mdscroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:5px}
+  .mdscroll svg{width:auto!important;max-width:none!important;height:270px}   /* keep intrinsic width so it scrolls instead of squashing (overrides the global svg{width:100%}) */
   .limtop.ok{background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.25)}
   .limtop b{color:var(--ink)} .limtop i{font-style:normal;color:var(--ink3)}
   .limrow{display:grid;grid-template-columns:82px 1fr auto auto;gap:8px;align-items:center;padding:4px 0;font-size:12px}
@@ -255,6 +261,15 @@
           <span x-show="saved" style="color:var(--ok);font-size:13px">Saved ✓</span>
         </div>
       </div></aside>
+    </div>
+
+    <!-- ===== MULTI-DAY DRIVERS (scrollable) ===== -->
+    <div class="panel glass">
+      <div class="ch"><h2>Dryback vs drivers · multi-day</h2><span class="chs">the steady-state day repeated — scroll to read how the dryback rate tracks PPFD, leaf VPD, temp &amp; CO₂.
+        <span class="dseg"><button :class="gdays===1&&'on'" @click="gdays=1">1d</button><button :class="gdays===2&&'on'" @click="gdays=2">2d</button><button :class="gdays===3&&'on'" @click="gdays=3">3d</button></span>
+        <button class="btn xs2" x-show="live" @click="reqHistory()">overlay live VWC</button></span></div>
+      <div class="mdleg"><span><i style="background:#34d399"></i>VWC / dryback</span><span><i style="background:#f59e0b"></i>PPFD</span><span><i style="background:#fb923c"></i>temp</span><span><i style="background:#f472b6"></i>leaf VPD</span><span><i style="background:#60a5fa"></i>CO₂</span><span x-show="histPts"><i style="background:#94a3b8"></i>live VWC</span></div>
+      <div class="mdscroll" x-html="multiChart()"></div>
     </div>
 
     <!-- ===== SECTION B: environment graphs + climate/room controls ===== -->
@@ -416,7 +431,7 @@ const META = {
 
 function editor(){
   return {
-    W:1240, H:500, PL:42, PR:46, PT:26, PB:70, VMIN:18, VMAX:84,
+    W:1240, H:500, PL:42, PR:46, PT:26, PB:70, VMIN:18, VMAX:84, gdays:3, histPts:null,
     get PW(){return this.W-this.PL-this.PR}, get PH(){return this.H-this.PT-this.PB},
     x(t){return this.PL+(t/24)*this.PW}, y(v){return this.PT+(1-(v-this.VMIN)/(this.VMAX-this.VMIN))*this.PH},
     invT(px){return clamp((px-this.PL)/this.PW*24,0,24)}, invV(py){return clamp(this.VMIN+(1-(py-this.PT)/this.PH)*(this.VMAX-this.VMIN),0,100)},
@@ -434,7 +449,9 @@ function editor(){
     pullLive(){   // embedded in crop_steering.html → live setpoints arrive from the parent via postMessage. Standalone (?demo / GitHub Pages) → keep the seed.
       if(window.parent===window) return;
       const put=(o,k,v)=>{ const m=META[k]; o[k]=(m&&v!=null&&!isNaN(v))?clamp(rstep(+v,m.step),m.min,m.max):v; };   // round seeded values to their step so labels stay clean
-      window.addEventListener("message",ev=>{ const d=ev.data; if(!d||d.type!=="cs-tune-data") return;
+      window.addEventListener("message",ev=>{ const d=ev.data; if(!d) return;
+        if(d.type==='cs-tune-history'){ this.histPts=(Array.isArray(d.pts)&&d.pts.length)?d.pts:null; return; }
+        if(d.type!=="cs-tune-data") return;
         this.live=true;   // live HA is reachable → show the badge + Apply button regardless
         if(this.hydrated && !d.explicit){ this.liveWaiting=true; return; }   // user has saved edits → DON'T clobber on auto-seed; offer "Pull live" instead
         try{ if(d.zones){ for(const z in d.zones){ if(this.Z[z]) for(const k in d.zones[z]) put(this.Z[z],k,d.zones[z][k]); } }
@@ -833,6 +850,31 @@ function editor(){
       return b;
     },
     ecToYv(ec){ /* VWC-equivalent so EC bubbles sit on the EC line */ return this.invV(this.ecToY(ec)); },
+
+    /* ── multi-day drivers (scrollable): the steady-state day repeated, so the dryback sawtooth can be read against PPFD / leaf-VPD / temp / CO₂ — that's what sets the dryback RATE. ── */
+    driverPts(){ const days=this.gdays, S={vwc:[],ppfd:[],temp:[],vpdL:[],co2:[]};
+      for(let t=0;t<=days*24+1e-6;t+=0.5){ const h=t%24, e=this.envAt(h); S.vwc.push([t,this.vAt(h)]); S.ppfd.push([t,e.ppfd]); S.temp.push([t,e.temp]); S.vpdL.push([t,this.vpdLeaf(e)]); S.co2.push([t,e.co2]); }
+      return S; },
+    multiChart(){ const days=this.gdays, photo=this.photo(), S=this.driverPts(), maxP=Math.max(this.g('ppfd'),200);
+      const dayW=440, PL=46, PR=16, PT=18, PB=24, H=270, PW=dayW*days, W=PL+PR+PW, PH=H-PT-PB;
+      const xx=t=>PL+(t/(days*24))*PW, yV=v=>PT+(1-clamp(v,0,100)/100)*PH, nrm=(v,lo,hi)=>clamp((v-lo)/((hi-lo)||1),0,1)*100;
+      const poly=(arr,f)=>arr.map(p=>xx(p[0]).toFixed(1)+","+yV(f(p[1])).toFixed(1)).join(" ");
+      let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;font-family:inherit">`;
+      for(let d=0;d<days;d++){ const xOn=xx(d*24),xOff=xx(d*24+photo),xEnd=xx((d+1)*24);
+        s+=`<rect x="${xOn.toFixed(1)}" y="${PT}" width="${(xOff-xOn).toFixed(1)}" height="${PH}" fill="rgba(245,200,80,.05)"/>`;
+        s+=`<rect x="${xOff.toFixed(1)}" y="${PT}" width="${(xEnd-xOff).toFixed(1)}" height="${PH}" fill="rgba(40,60,120,.16)"/>`;
+        if(d>0) s+=`<line x1="${xOn.toFixed(1)}" y1="${PT}" x2="${xOn.toFixed(1)}" y2="${PT+PH}" stroke="rgba(255,255,255,.14)"/>`;
+        s+=`<text x="${(xOn+6).toFixed(1)}" y="${PT+12}" font-size="10" font-weight="700" fill="#9aa4b2">Day ${d+1} · ${this.mode==='gen'?'GEN':'VEG'}</text>`; }
+      [20,40,60,80].forEach(v=>{ s+=`<line x1="${PL}" y1="${yV(v).toFixed(1)}" x2="${(W-PR).toFixed(1)}" y2="${yV(v).toFixed(1)}" stroke="rgba(255,255,255,.05)"/><text x="${PL-5}" y="${(yV(v)+3).toFixed(1)}" text-anchor="end" font-size="9" fill="#6b7682">${v}</text>`; });
+      for(let d=0;d<days;d++) [0,6,12,18].forEach(hh=>{ const x=xx(d*24+hh); s+=`<text x="${x.toFixed(1)}" y="${H-7}" text-anchor="middle" font-size="8" fill="#5b6470">${hh}h</text>`; });
+      s+=`<polygon points="${PL},${(PT+PH).toFixed(1)} ${poly(S.ppfd,v=>nrm(v,0,maxP))} ${(W-PR).toFixed(1)},${(PT+PH).toFixed(1)}" fill="rgba(245,158,11,.10)"/>`;   // PPFD area
+      s+=`<polyline points="${poly(S.temp,v=>nrm(v,15,35))}" fill="none" stroke="#fb923c" stroke-width="1.4" opacity=".8"/>`;        // temp
+      s+=`<polyline points="${poly(S.vpdL,v=>nrm(v,0,2.5))}" fill="none" stroke="#f472b6" stroke-width="1.4" opacity=".8"/>`;        // leaf VPD
+      s+=`<polyline points="${poly(S.co2,v=>nrm(v,400,1600))}" fill="none" stroke="#60a5fa" stroke-width="1.2" stroke-dasharray="4 3" opacity=".7"/>`;   // CO₂
+      if(this.histPts&&this.histPts.length){ const hp=this.histPts.map(p=>xx(clamp(p[0],0,days*24)).toFixed(1)+","+yV(p[1]).toFixed(1)).join(" "); s+=`<polyline points="${hp}" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="2 3" opacity=".9"/>`; }   // live VWC ghost
+      s+=`<polyline points="${poly(S.vwc,v=>v)}" fill="none" stroke="#34d399" stroke-width="2.2" stroke-linejoin="round"/>`;        // VWC/dryback (bold)
+      s+=`</svg>`; return s; },
+    reqHistory(){ if(window.parent===window){ alert('Live history overlay needs the connected dashboard.'); return; } try{ window.parent.postMessage({type:'cs-tune-history-req',zone:this.zone,days:this.gdays},"*"); }catch(e){} },
 
     svgBody(){
       const W=this.W,PL=this.PL,PR=this.PR,PT=this.PT,PH=this.PH,fc=this.g('field_capacity'),x=t=>this.x(t),y=v=>this.y(v); let s="";
