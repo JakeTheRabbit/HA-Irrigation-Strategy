@@ -1738,7 +1738,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 return
 
             # Calculate shot duration from P2 shot size as default
-            shot_size_pct = self._get_number_entity_value("number.crop_steering_p2_shot_size", 5.0)
+            shot_size_pct = self._get_zone_number(int(zone), "number.crop_steering_p2_shot_size", 5.0)
             substrate_vol = self._get_number_entity_value("number.crop_steering_substrate_volume", 3.0)
             dripper_flow = self._get_number_entity_value("number.crop_steering_dripper_flow_rate", 2.0)
             drippers = self._get_number_entity_value("number.crop_steering_drippers_per_plant", 2)
@@ -2396,7 +2396,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
 
         # Check EC ratio conditions (P2 specific logic)
         ec_ratio_decision = self._evaluate_p2_ec_ratio_irrigation(
-            zone_ec, ec_target, ec_high_threshold, ec_low_threshold
+            zone_num, zone_ec, ec_target, ec_high_threshold, ec_low_threshold
         )
 
         # Combined decision logic for P2
@@ -4100,9 +4100,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 'ec_ratio': None
             }
 
-    def _evaluate_p2_ec_ratio_irrigation(self, current_ec: Optional[float], target_ec: float, 
-                                       high_threshold: float, low_threshold: float) -> Dict:
-        """P2 specific EC ratio-based irrigation logic."""
+    def _evaluate_p2_ec_ratio_irrigation(self, zone_num: int, current_ec: Optional[float],
+                                       target_ec: float, high_threshold: float,
+                                       low_threshold: float) -> Dict:
+        """P2 specific EC ratio-based irrigation logic.
+
+        Converges zones toward target: high EC forces dilution shots, low EC
+        HOLDS water (low pore EC is corrected by feed strength / longer dryback,
+        not by irrigating more — extra water only washes EC lower).
+        """
         try:
             if current_ec is None:
                 return {
@@ -4110,10 +4116,11 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     'reason': 'No EC data for P2 ratio evaluation',
                     'confidence': 0.0
                 }
-            
+
             ec_ratio = current_ec / target_ec if target_ec > 0 else 0
-            base_shot_size = self._get_number_entity_value("number.crop_steering_p2_shot_size", 5.0)
-            
+            base_shot_size = self._get_zone_number(zone_num, "number.crop_steering_p2_shot_size", 5.0)
+            max_ec_limit = self._get_number_entity_value("number.crop_steering_maximum_ec", 8.0)
+
             if ec_ratio > high_threshold:
                 # EC too high - irrigate with larger shot to dilute
                 adjusted_shot_size = base_shot_size * 1.5  # 50% larger shot
@@ -4124,17 +4131,28 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     'adjusted_shot_size': adjusted_shot_size,
                     'action': 'dilute'
                 }
-            elif ec_ratio < low_threshold:
-                # EC too low - smaller shot to avoid further dilution
-                adjusted_shot_size = base_shot_size * 0.7  # 30% smaller shot
+            elif current_ec >= max_ec_limit - 1.0:
+                # Approaching the hard max-EC safety block even though the ratio is
+                # under threshold (e.g. stacking toward the ceiling). Rescue-flush
+                # NOW: at/above the ceiling the safety layer blocks ALL irrigation
+                # and the zone deadlocks, concentrating further every dryback.
                 return {
                     'needs_irrigation': True,
-                    'reason': f'P2 EC conservation: {current_ec:.2f} mS/cm (ratio: {ec_ratio:.2f} < {low_threshold})',
-                    'confidence': 0.75,
-                    'adjusted_shot_size': adjusted_shot_size,
-                    'action': 'conserve'
+                    'reason': f'P2 EC rescue: {current_ec:.2f} mS/cm within 1.0 of max EC {max_ec_limit:.1f}',
+                    'confidence': 0.85,
+                    'adjusted_shot_size': base_shot_size * 1.5,
+                    'action': 'dilute'
                 }
-            
+            elif ec_ratio < low_threshold:
+                # EC too low - hold irrigation, defer to VWC; more water would dilute further
+                return {
+                    'needs_irrigation': False,
+                    'reason': f'P2 EC lean: {current_ec:.2f} mS/cm (ratio: {ec_ratio:.2f} < {low_threshold}) - holding, correct via feed EC/dryback',
+                    'confidence': 0.75,
+                    'adjusted_shot_size': base_shot_size * 0.7,
+                    'action': 'hold'
+                }
+
             return {
                 'needs_irrigation': False,
                 'reason': f'P2 EC ratio optimal: {ec_ratio:.2f} ({low_threshold} - {high_threshold})',
