@@ -590,6 +590,11 @@
 
       <!-- ===== CLIMATE ===== -->
       <section x-show="view==='climate'" class="fade-enter space-y-4">
+        <!-- room camera -->
+        <div class="glass rounded-2xl p-3" x-show="camUrl" x-cloak>
+          <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.eye" class="w-4 h-4 block text-emerald-400"></span> Room camera</h3><span class="text-[11px] text-slate-500">F2 · refreshes ~30s</span></div>
+          <img :src="camUrl" class="w-full rounded-xl border border-white/8 bg-black" style="aspect-ratio:16/9;object-fit:contain;max-height:420px" alt="F2 room camera" @error="$el.style.opacity='0.25'" @load="$el.style.opacity='1'">
+        </div>
         <!-- live metrics first — context for the controls below -->
         <div>
           <h2 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Live climate</h2>
@@ -621,7 +626,8 @@
               <template x-for="it in g.items" :key="it.id">
                 <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3">
                   <template x-if="it.type==='toggle'"><div class="flex items-center justify-between gap-2"><span class="text-sm text-slate-300 min-w-0 truncate" x-text="it.label"></span><button @click="!it.un&&ctrlToggle(it.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="it.un?'bg-white/10 opacity-40 cursor-not-allowed':it.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="it.on&&'translate-x-5'"></span></button></div></template>
-                  <template x-if="it.type==='num'"><div><div class="text-[11px] text-slate-400 mb-1 truncate" x-text="it.label"></div><div class="flex items-center gap-2"><input type="number" :min="it.min" :max="it.max" :step="it.step" :value="it.val" @change="ctrlNum(it.id,$event.target.value)" class="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-slate-200"><span class="text-[11px] text-slate-500 shrink-0" x-text="it.unit"></span></div></div></template>
+                  <template x-if="it.type==='num'"><div><div class="text-[11px] text-slate-400 mb-1 truncate" x-text="it.label"></div><div class="flex items-center gap-2"><input type="number" :min="it.min" :max="it.max" :step="it.step" :value="it.val" @change="ctrlNum(it.id,$event.target.value)" class="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-slate-200"><span class="text-[11px] text-slate-500 shrink-0" x-text="it.unit"></span></div>
+                    <div x-show="it.live" class="flex items-center gap-1.5 mt-1.5 text-[11px]"><span class="w-1.5 h-1.5 rounded-full shrink-0" :class="dotClass(it.live?.sev)"></span><span :class="sevText(it.live?.sev)">now <span x-text="it.live?.val"></span><span x-text="it.unit"></span></span><span class="text-slate-500" x-show="it.live?.band">· on-target <span x-text="(it.live?.band?.[0])+'–'+(it.live?.band?.[1])"></span></span></div></div></template>
                   <template x-if="it.type==='text'"><div><div class="text-[11px] text-slate-400 mb-1 truncate" x-text="it.label"></div><input type="text" :value="it.value" @change="ctrlText(it.id,$event.target.value)" class="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"></div></template>
                   <template x-if="it.type==='button'"><button @click="ctrlBtn(it.id)" class="w-full h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 truncate px-2" x-text="it.label"></button></template>
                   <template x-if="it.type==='light'"><div><div class="flex items-center justify-between gap-2"><span class="text-sm text-slate-300 truncate" x-text="it.label"></span><button @click="!it.un&&ctrlToggle(it.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="it.un?'bg-white/10 opacity-40':it.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="it.on&&'translate-x-5'"></span></button></div><input x-show="it.hasBri&&it.on" type="range" min="1" max="100" :value="it.bri||100" @change="ctrlLightBri(it.id,$event.target.value)" class="w-full mt-2 accent-emerald-500"></div></template>
@@ -1052,7 +1058,7 @@ const CONFIG = {
     air_temp:"sensor.f2_scd41_env3_dlight_poe_temperature",rh:"sensor.f2_sensor_humidity",co2:"sensor.f2_scd41_env3_dlight_poe_co2",ppfd:"sensor.f2_scd41_env3_dlight_poe_ppfd",dli:"sensor.f2_scd41_env3_dlight_poe_dli",target_rh:"sensor.f2_target_rh_for_vpd",
     bl_temp:"sensor.f2_scd41_back_left_temperature",bl_vpd:"sensor.f2_scd41_back_left_vpd",bl_co2:"sensor.f2_scd41_back_left_co2",
     sub_vwc:"sensor.f2_row_1_vwc",sub_pwec:"sensor.f2_row_1_pwec",sub_temp:"sensor.f2_row_1_temperature",
-    pump_power:"sensor.veg_main_pump_power",row1:"switch.f2_row1",row2:"switch.f2_row2",row3:"switch.f2_row3",dosing_active:"input_boolean.nutrient_dosing_active",led_power:"sensor.led_f2_r2_f2_r2_led_power",
+    pump_power:"sensor.veg_main_pump_power",row1:"switch.f2_row1",row2:"switch.f2_row2",row3:"switch.f2_row3",dosing_active:"input_boolean.nutrient_dosing_active",led_power:"sensor.led_f2_r2_f2_r2_led_power",cam:"camera.flower2_cam_clear",
   },
   ZONE:(z)=>({vwc:`sensor.crop_steering_zone_${z}_vwc`,ec:`sensor.crop_steering_zone_${z}_ec`,phase:`sensor.crop_steering_zone_${z}_phase`,status:`sensor.crop_steering_zone_${z}_status`,safety:`sensor.crop_steering_zone_${z}_safety_status`,last_irrig:`sensor.crop_steering_zone_${z}_last_irrigation_app`,enabled:`switch.crop_steering_zone_${z}_enabled`}),
 };
@@ -3517,7 +3523,7 @@ const CLIMATE_GROUPS = [
   {name:'AC / cooling', icon:'wind', ids:['climate.f2_ac_pid','climate.f2_ac_wall_f2_ac_wall','climate.f2_ac_door_f2_ac_door']},
   {name:'Dehumidification', icon:'haze', ids:['humidifier.f2_dehumidifier','switch.f2_dehumidifiers_group','switch.f2_dehumidifiers_relay_1','switch.f2_dehumidifiers_relay_2','switch.f2_dehumidifiers_relay_3','switch.f2_dehumidifiers_relay_4']},
   {name:'CO₂', icon:'haze', ids:['switch.f2_co2','switch.f2_co2_led','input_number.f2_co2_target_input','input_number.f2_co2_day_target_input','input_number.f2_co2_night_target_input','input_number.f2_co2_tolerance_input','input_boolean.f2_co2_tank_empty','input_boolean.f2_co2_tank_replaced']},
-  {name:'Lighting', icon:'bulb', ids:['light.led_f2_r1_f2_r1_led','light.led_f2_r2_f2_r2_led','switch.f2_lights_contactor_ssr_f1_lights_contactor','light.f2_work_light','switch.f2_work_light']},
+  {name:'Lighting', icon:'bulb', ids:['light.led_f2_r1_f2_r1_led','light.led_f2_r2_f2_r2_led','light.office_lights','switch.f2_lights_contactor_ssr_f1_lights_contactor','light.f2_work_light','switch.f2_work_light']},
   {name:'Room & access', icon:'radio', ids:['switch.f2_door_relay','switch.f2_detect_2','switch.f2_motion_2']},
   {name:'Climate-Sense thresholds', icon:'doc', collapsed:true, ids:['input_number.csig_f2_high_vpd','input_number.csig_f2_high_ec','input_number.csig_f2_high_ppfd','input_number.csig_f2_high_root_temp','input_number.csig_f2_low_root_temp','input_number.csig_f2_low_vwc','input_number.csig_f2_min_cooling','input_number.csig_f2_warm_leaf_delta','input_number.csig_f2_co2_enriched','input_number.csig_f2_co2_ppfd_min','input_number.csig_f2_cwsi_nwsb_intercept','input_number.csig_f2_cwsi_nwsb_slope','input_number.csig_f2_cwsi_wsb_delta']},
   {name:'Sensor mapping', icon:'doc', collapsed:true, ids:['input_text.csig_f2_air_temp','input_text.csig_f2_humidity','input_text.csig_f2_co2','input_text.csig_f2_ppfd','input_text.csig_f2_leaf_temp','input_text.csig_f2_root_temp','input_text.csig_f2_ec','input_text.csig_f2_vwc']},
@@ -3525,11 +3531,21 @@ const CLIMATE_GROUPS = [
   {name:'Camera & recording', icon:'eye', collapsed:true, ids:['switch.f2_recordings_2','switch.f2_snapshots_2','switch.f2_review_alerts_2','switch.f2_review_detections_2']},
   {name:'Device restarts', icon:'radio', collapsed:true, ids:['switch.f2_ac_wall_restart','switch.f2_ac_door_restart','switch.f2_dehumidifiers_restart','switch.f2_scd41_env3_dlight_poe_restart','switch.led_f2_r1_restart','switch.led_f2_r2_restart','button.air_q_entrance_restart','button.airq_f2_refresh_display']},
 ];
-function ctlItem(id){ const e=S[id]; if(!e) return null; const dom=id.split('.')[0], a=e.attributes||{}, label=a.friendly_name||id;
+const CTL_LABELS={'light.office_lights':'Row 3 LED (office)'};   // office fixture is the Row-3 grow light
+const SETPOINT_LIVE={   // climate setpoint entity → live sensor (CONFIG.E key) + band, so you see current-vs-target while configuring
+  'input_number.f2_setpoint_temp_day':{k:'air_temp',band:'air_temp'},'input_number.f2_setpoint_rh':{k:'rh',band:'rh'},
+  'input_number.f2_setpoint_vpd':{k:'air_vpd',band:'air_vpd'},'input_number.f2_target_vpd':{k:'leaf_vpd',band:'leaf_vpd'},
+  'input_number.f2_setpoint_co2':{k:'co2',band:'co2'},'input_number.f2_setpoint_ppfd':{k:'ppfd',band:'ppfd'},
+  'input_number.f2_setpoint_pwec':{k:'avg_ec'},'input_number.f2_setpoint_vwc':{k:'fused_vwc'} };
+function ctlItem(id){ const e=S[id]; if(!e) return null; const dom=id.split('.')[0], a=e.attributes||{}, label=CTL_LABELS[id]||a.friendly_name||id;
   if(dom==='climate') return {type:'climate',id,label,mode:e.state,modes:a.hvac_modes||[],temp:(a.temperature!=null?a.temperature:(a.min_temp||20)),tmin:a.min_temp||10,tmax:a.max_temp||35,step:a.target_temp_step||0.5,cur:a.current_temperature};
   if(dom==='light') return {type:'light',id,label,on:e.state==='on',un:e.state==='unavailable',bri:a.brightness!=null?Math.round(a.brightness/2.55):null,hasBri:(a.supported_color_modes||[]).some(m=>m!=='onoff')};
   if(dom==='humidifier'||dom==='switch'||dom==='input_boolean') return {type:'toggle',id,label,on:e.state==='on',un:e.state==='unavailable'};
-  if(dom==='input_number'||dom==='number') return {type:'num',id,label,val:e.state,min:a.min,max:a.max,step:a.step,unit:a.unit_of_measurement||''};
+  if(dom==='input_number'||dom==='number'){ const sp=SETPOINT_LIVE[id]; let live=null;
+    if(sp){ const lv=parseFloat(S[CONFIG.E[sp.k]]?.state); if(!isNaN(lv)){ const b=sp.band?CONFIG.BANDS[sp.band]:null;
+      const sev=b?((lv>=b.ok[0]&&lv<=b.ok[1])?'ok':(lv>=b.warn[0]&&lv<=b.warn[1])?'warn':'crit'):'ok';
+      live={val:fmt(lv,(sp.k==='co2'||sp.k==='ppfd')?0:1),sev,band:b?b.ok:null}; } }
+    return {type:'num',id,label,val:e.state,min:a.min,max:a.max,step:a.step,unit:a.unit_of_measurement||'',live}; }
   if(dom==='input_select'||dom==='select') return {type:'select',id,label,value:e.state,options:a.options||[]};
   if(dom==='input_text') return {type:'text',id,label,value:e.state};
   if(dom==='button') return {type:'button',id,label};
@@ -3581,7 +3597,7 @@ document.addEventListener('alpine:init', () => {
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
     headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},guardrails:[],telemetry:[],feed:[]}, ctrlZone:1,
-    climateCtl:[], ctlOpen:{}, snapshot:[], zSel:1, zoneDetail:{},
+    climateCtl:[], ctlOpen:{}, snapshot:[], zSel:1, zoneDetail:{}, camUrl:'',
     notes:{}, toasts:[], _tid:0, _toastId:0, _acked:{},
     aiMessages:[], aiSuggestions:["Any rooms drifting?","Why the hotspot?","How is the EC tracking?","Is dryback on target?"],
 
@@ -3607,6 +3623,8 @@ document.addEventListener('alpine:init', () => {
       this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
       this.headline=computeHeadline(this.adv,this.watch);
       this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.zones=buildZones(); this.zoneDetail=buildZoneDetail(this.zSel); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl();
+      { const cam=S[CONFIG.E.cam], ct=cam&&cam.attributes&&cam.attributes.access_token; this._camTick=(this._camTick||0)+1;
+        this.camUrl=ct?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+CONFIG.E.cam+'?token='+ct+'&_='+this._camTick):''; }
       if(window.__tuneReseed) window.__tuneReseed();   // refresh the Tune editor from live HA (respects its hydrated/unsaved-edit guard)
       this.steeringMeta=[{label:"Fused EC",val:fmt(num("fused_ec"),2),cls:"text-slate-200"},{label:"EC target",val:fmt(CONFIG.EC_TARGET,1),cls:"text-slate-200"},{label:"Pump",val:fmt(num("pump_power"),0)+" W",cls:num("pump_power")>100?"text-amber-400":"text-slate-200"},{label:"Next shot",val:this.shortTime(val("next_irrig")),cls:"text-slate-200"}];
       this.hotspotCells=this.buildHotspot();
