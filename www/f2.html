@@ -376,7 +376,7 @@
         <button @click="cmdOpen=true" class="ml-auto hidden sm:flex items-center gap-2 h-10 px-3 rounded-xl glass hover:border-white/20 text-slate-400 text-sm transition w-56 lift">
           <span x-html="icons.search" class="w-4 h-4 block"></span><span>Search · ask AI</span><kbd class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-white/10 border border-white/10">⌘K</kbd>
         </button>
-        <button @click="go('alerts')" class="relative w-10 h-10 grid place-items-center rounded-xl glass hover:border-white/20 transition lift" aria-label="Advisories">
+        <button @click="go('dashboard'); $nextTick(()=>{const e=document.getElementById('advisories'); if(e) e.scrollIntoView({behavior:'smooth'})})" class="relative w-10 h-10 grid place-items-center rounded-xl glass hover:border-white/20 transition lift" aria-label="Advisories">
           <span x-html="icons.bell" class="w-5 h-5 block text-slate-300"></span>
           <span x-show="adv.length" class="absolute -top-1 -right-1 min-w-5 h-5 px-1 grid place-items-center text-[10px] font-bold rounded-full bg-red-500 text-white" x-text="adv.length"></span>
         </button>
@@ -387,6 +387,14 @@
       </div>
     </header>
 
+    <!-- persistent alert strip — visible on every view -->
+    <div x-show="adv.length" x-cloak @click="go('dashboard'); $nextTick(()=>{const e=document.getElementById('advisories'); if(e) e.scrollIntoView({behavior:'smooth'})})" class="sticky top-16 z-20 cursor-pointer px-4 md:px-6 py-2 flex items-center gap-3 border-b text-sm" :class="adv.some(a=>a.sev==='crit')?'bg-red-500/15 border-red-500/30 text-red-200':'bg-amber-400/12 border-amber-400/25 text-amber-100'">
+      <span x-html="adv.some(a=>a.sev==='crit')?icons.alert:icons.eye" class="w-4 h-4 block shrink-0"></span>
+      <span class="font-semibold shrink-0" x-text="(adv.filter(a=>a.sev==='crit').length?adv.filter(a=>a.sev==='crit').length+' urgent · ':'')+adv.length+' to sort out'"></span>
+      <span class="truncate opacity-80" x-text="adv[0]&&adv[0].title"></span>
+      <span class="ml-auto text-[11px] opacity-70 shrink-0">view →</span>
+    </div>
+
     <main class="flex-1 px-4 md:px-6 py-5 md:py-6 max-w-[1500px] w-full mx-auto">
 
       <!-- ===== OVERVIEW ===== -->
@@ -395,6 +403,47 @@
         <div x-show="!connected" class="glass rounded-2xl p-4 border border-amber-400/30 flex items-center gap-3">
           <span x-html="icons.alert" class="w-5 h-5 block text-amber-400"></span>
           <span class="text-sm text-slate-300" x-text="connError||'Connecting to Home Assistant…'"></span>
+        </div>
+
+        <!-- ADVISORIES (lead section — alerts first) -->
+        <div id="advisories" class="grid grid-cols-1 xl:grid-cols-3 gap-4 scroll-mt-28">
+          <div class="xl:col-span-2">
+            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.alerts" class="w-4 h-4 block text-amber-400"></span> Advisories — what needs you</h3><span class="text-xs text-slate-500" x-text="adv.length+' active'"></span></div>
+            <div class="space-y-2.5">
+              <template x-for="a in adv" :key="a.id">
+                <div class="glass rounded-2xl p-4 fade-enter" :class="a.sev==='crit'?'border-l-4 border-l-red-500':'border-l-4 border-l-amber-400'">
+                  <div class="flex items-start gap-3">
+                    <div class="w-9 h-9 rounded-xl grid place-items-center shrink-0" :class="sevBg(a.sev)"><span x-html="icons[a.icon]||icons.alert" class="w-4.5 h-4.5 block" :class="sevText(a.sev)"></span></div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2 flex-wrap"><span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded" :class="a.sev==='crit'?'bg-red-500 text-white':'bg-amber-400 text-amber-950'" x-text="a.sev==='crit'?'Urgent':'Advisory'"></span><span class="text-sm font-semibold" x-text="a.title"></span></div>
+                      <p class="text-[13px] text-slate-400 mt-1.5 leading-relaxed" x-text="a.detail"></p>
+                      <div x-show="a.cause" class="mt-2 text-[12.5px] flex items-start gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-amber-400 mt-0.5 shrink-0"></span><span><span class="text-amber-300/90 font-medium">Likely cause:</span> <span class="text-slate-400" x-text="a.cause"></span></span></div>
+                      <div x-show="a.firstChecks" class="mt-1.5 flex flex-wrap gap-1.5 items-center"><span class="text-[11px] text-slate-500">First checks:</span><template x-for="c in (a.firstChecks||[])" :key="c"><span class="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/8 text-slate-300" x-text="c"></span></template></div>
+                      <div class="mt-2 text-[13px] flex items-start gap-2 p-2.5 rounded-lg bg-white/[0.03] border border-white/8"><span x-html="icons.arrow" class="w-4 h-4 block text-emerald-400 mt-0.5 shrink-0"></span><span><span class="text-slate-300 font-medium">Next step:</span> <span class="text-slate-400" x-text="a.action"></span></span></div>
+                      <div class="mt-2.5 flex items-center gap-2 flex-wrap">
+                        <button @click="speak(a.title+'. '+a.detail+'. Next step: '+a.action)" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10 inline-flex items-center gap-1.5"><span x-html="icons.audio" class="w-4 h-4 block"></span> Read</button>
+                        <button @click="ackAlert(a.id)" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10">Acknowledge</button>
+                        <button x-show="a.evidence" @click="evOpen===a.id?evOpen=null:evOpen=a.id" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10">Evidence</button>
+                        <span class="ml-auto text-[11px] text-slate-500 inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" :class="a.confidence==='high'?'bg-emerald-400':a.confidence==='med'?'bg-amber-400':'bg-slate-500'"></span>confidence: <span x-text="a.confidence"></span></span>
+                      </div>
+                      <pre x-show="evOpen===a.id" x-cloak class="mt-2 text-[11px] text-slate-400 bg-black/40 border border-white/8 rounded-lg p-3 whitespace-pre-wrap overflow-x-auto" x-text="a.evidence"></pre>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <div x-show="!adv.length && connected" class="glass rounded-2xl p-6 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl grid place-items-center bg-emerald-500/15 shrink-0"><span x-html="icons.check" class="w-5 h-5 block text-emerald-400"></span></div>
+                <div><div class="font-semibold text-sm">All clear — nothing needs you</div><div class="text-[12px] text-slate-400">F2 is steering as intended.</div></div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.eye" class="w-4 h-4 block text-slate-400"></span> Keeping an eye on</h3></div>
+            <div class="glass rounded-2xl divide-y divide-white/8">
+              <template x-for="w in watch" :key="w.id"><div class="p-3.5 flex items-start gap-3"><span class="w-1.5 h-1.5 mt-1.5 rounded-full bg-amber-400 shrink-0"></span><div class="min-w-0"><div class="text-[13px] font-medium" x-text="w.title"></div><div class="text-[11px] text-slate-400 mt-0.5" x-text="w.detail"></div></div></div></template>
+              <div x-show="!watch.length" class="p-6 text-center text-sm text-slate-500">Nothing drifting.</div>
+            </div>
+          </div>
         </div>
 
         <!-- headline -->
@@ -412,37 +461,14 @@
           </div>
         </div>
 
-        <!-- KPIs -->
-        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
-          <template x-for="k in kpis" :key="k.label">
-            <div class="glass rounded-2xl p-4 lift hover:border-white/15">
-              <div class="flex items-center justify-between"><span class="text-[11px] uppercase tracking-wider text-slate-400" x-text="k.label"></span><span x-html="icons[k.icon]" class="w-4 h-4 block" :class="k.tint||'text-slate-500'"></span></div>
-              <div class="mt-2 flex items-end gap-1.5"><span class="text-2xl font-bold tracking-tight" x-text="k.value"></span><span class="text-xs text-slate-500 mb-1" x-text="k.unit||''"></span></div>
-              <div class="mt-1 text-[11px] text-slate-500" x-text="k.sub"></div>
-            </div>
-          </template>
-        </div>
-
-        <!-- zones -->
+        <!-- live sensor snapshot (all key sensors, glanceable) -->
         <div>
-          <div class="flex items-center justify-between mb-3"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Zones</h2><span class="text-[11px] text-slate-500">water level = wetness</span></div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-            <template x-for="z in zones" :key="z.id">
-              <button @click="openZone(z.id)" class="text-left glass rounded-2xl p-4 lift hover:border-white/15" :class="z.status==='crit'?'ring-glow-crit':z.status==='warn'?'ring-glow-warn':''">
-                <div class="flex items-start justify-between">
-                  <div><div class="font-semibold" x-text="z.name"></div><div class="text-[11px] text-slate-400">phase <span x-text="z.phase"></span><span x-show="!z.enabled" class="text-slate-500"> · off</span></div></div>
-                  <span class="text-[10px] font-semibold px-2 py-1 rounded-full" :class="pillClass(z.status)" x-text="statusWord(z.status)"></span>
-                </div>
-                <div class="mt-3 flex items-end gap-3">
-                  <div class="tankbox shrink-0"><div class="fill" :class="z.status==='crit'?'!bg-gradient-to-b !from-red-400 !to-red-600':z.status==='warn'?'!bg-gradient-to-b !from-amber-400 !to-amber-600':''" :style="'height:'+z.fillPct+'%'"></div><div class="floor" :style="'bottom:'+z.floorPct+'%'"></div></div>
-                  <div class="flex-1">
-                    <div class="text-3xl font-bold leading-none" x-text="z.vwc"></div>
-                    <div class="text-[11px] text-slate-400">% wet · floor <span x-text="z.floor"></span>%</div>
-                    <div class="mt-2 text-sm">🧂 <span class="font-semibold" x-text="z.ec"></span> <span class="text-slate-500 text-xs">EC</span></div>
-                    <div class="text-[11px] text-slate-500 mt-1" x-text="z.note"></div>
-                  </div>
-                </div>
-              </button>
+          <div class="flex items-center justify-between mb-2"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Live snapshot</h2><span class="text-[11px] text-slate-500">every key sensor · adjust in Climate / Zones</span></div>
+          <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
+            <template x-for="s in snapshot" :key="s.label">
+              <div class="glass rounded-xl p-3"><div class="text-[10px] uppercase tracking-wider text-slate-400 truncate" x-text="s.label"></div>
+                <div class="mt-1 flex items-end gap-1"><span class="text-xl md:text-2xl font-bold tracking-tight" :class="sevText(s.sev)" x-text="s.val"></span><span class="text-[10px] text-slate-500 mb-0.5" x-text="s.unit"></span></div>
+                <div class="text-[10px] text-slate-500 mt-0.5 truncate" x-text="s.sub"></div></div>
             </template>
           </div>
         </div>
@@ -485,46 +511,6 @@
           </div>
         </div>
 
-        <!-- advisories + watchlist -->
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div class="xl:col-span-2">
-            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.alerts" class="w-4 h-4 block text-amber-400"></span> Advisories — what needs you</h3><span class="text-xs text-slate-500" x-text="adv.length+' active'"></span></div>
-            <div class="space-y-2.5">
-              <template x-for="a in adv" :key="a.id">
-                <div class="glass rounded-2xl p-4 fade-enter" :class="a.sev==='crit'?'border-l-4 border-l-red-500':'border-l-4 border-l-amber-400'">
-                  <div class="flex items-start gap-3">
-                    <div class="w-9 h-9 rounded-xl grid place-items-center shrink-0" :class="sevBg(a.sev)"><span x-html="icons[a.icon]||icons.alert" class="w-4.5 h-4.5 block" :class="sevText(a.sev)"></span></div>
-                    <div class="min-w-0 flex-1">
-                      <div class="flex items-center gap-2 flex-wrap"><span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded" :class="a.sev==='crit'?'bg-red-500 text-white':'bg-amber-400 text-amber-950'" x-text="a.sev==='crit'?'Urgent':'Advisory'"></span><span class="text-sm font-semibold" x-text="a.title"></span></div>
-                      <p class="text-[13px] text-slate-400 mt-1.5 leading-relaxed" x-text="a.detail"></p>
-                      <div x-show="a.cause" class="mt-2 text-[12.5px] flex items-start gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-amber-400 mt-0.5 shrink-0"></span><span><span class="text-amber-300/90 font-medium">Likely cause:</span> <span class="text-slate-400" x-text="a.cause"></span></span></div>
-                      <div x-show="a.firstChecks" class="mt-1.5 flex flex-wrap gap-1.5 items-center"><span class="text-[11px] text-slate-500">First checks:</span><template x-for="c in (a.firstChecks||[])" :key="c"><span class="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/8 text-slate-300" x-text="c"></span></template></div>
-                      <div class="mt-2 text-[13px] flex items-start gap-2 p-2.5 rounded-lg bg-white/[0.03] border border-white/8"><span x-html="icons.arrow" class="w-4 h-4 block text-emerald-400 mt-0.5 shrink-0"></span><span><span class="text-slate-300 font-medium">Next step:</span> <span class="text-slate-400" x-text="a.action"></span></span></div>
-                      <div class="mt-2.5 flex items-center gap-2 flex-wrap">
-                        <button @click="speak(a.title+'. '+a.detail+'. Next step: '+a.action)" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10 inline-flex items-center gap-1.5"><span x-html="icons.audio" class="w-4 h-4 block"></span> Read</button>
-                        <button @click="ackAlert(a.id)" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10">Acknowledge</button>
-                        <button x-show="a.evidence" @click="evOpen===a.id?evOpen=null:evOpen=a.id" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10">Evidence</button>
-                        <span class="ml-auto text-[11px] text-slate-500 inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" :class="a.confidence==='high'?'bg-emerald-400':a.confidence==='med'?'bg-amber-400':'bg-slate-500'"></span>confidence: <span x-text="a.confidence"></span></span>
-                      </div>
-                      <pre x-show="evOpen===a.id" x-cloak class="mt-2 text-[11px] text-slate-400 bg-black/40 border border-white/8 rounded-lg p-3 whitespace-pre-wrap overflow-x-auto" x-text="a.evidence"></pre>
-                    </div>
-                  </div>
-                </div>
-              </template>
-              <div x-show="!adv.length && connected" class="glass rounded-2xl p-8 text-center">
-                <div class="w-12 h-12 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-3"><span x-html="icons.check" class="w-6 h-6 block text-emerald-400"></span></div>
-                <div class="font-semibold">Nothing needs you right now</div><div class="text-sm text-slate-400 mt-1">F2 is steering as intended.</div>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.eye" class="w-4 h-4 block text-slate-400"></span> Keeping an eye on</h3></div>
-            <div class="glass rounded-2xl divide-y divide-white/8">
-              <template x-for="w in watch" :key="w.id"><div class="p-3.5 flex items-start gap-3"><span class="w-1.5 h-1.5 mt-1.5 rounded-full bg-amber-400 shrink-0"></span><div class="min-w-0"><div class="text-[13px] font-medium" x-text="w.title"></div><div class="text-[11px] text-slate-400 mt-0.5" x-text="w.detail"></div></div></div></template>
-              <div x-show="!watch.length" class="p-6 text-center text-sm text-slate-500">Nothing drifting.</div>
-            </div>
-          </div>
-        </div>
       </section>
 
       <!-- ===== ZONES ===== -->
@@ -1178,6 +1164,23 @@ function buildKpis(){ const h=computeHeadline(...Object.values(runRules())); con
     {label:"Dryback",value:fmt(db,0),unit:"%",icon:"drop",tint:"text-slate-400",sub:"target "+fmt(dt,0)+"%"},
     {label:"Air VPD",value:fmt(vpd,2),unit:"kPa",icon:"wind",tint:band("air_vpd",vpd)!=="ok"?"text-amber-400":"text-emerald-400",sub:band("air_vpd",vpd)==="ok"?"in band":"out of band"},
     {label:"Open advisories",value:open,icon:"alerts",tint:open?"text-amber-400":"text-emerald-400",sub:"need you"},
+  ]; }
+function buildSnapshot(){   // Status: the full at-a-glance sensor snapshot (owner-requested)
+  const t=num("air_temp"),rh=num("rh"),avpd=num("air_vpd"),lvpd=num("leaf_vpd"),co2=num("co2"),ppfd=num("ppfd"),dli=num("dli"),vwc=num("avg_vwc"),ec=num("fused_ec"),db=num("dryback_pct"),dbt=num("dryback_target"),bl=num("bl_temp"),mg=condMargin();
+  const T=(label,val,unit,sev,sub)=>({label,val:(val==null||val==="—")?"—":val,unit:unit||"",sev:sev||"ok",sub:sub||""});
+  const ecSev=ec!=null&&Math.abs(ec-CONFIG.EC_TARGET)>=0.8?"warn":"ok";
+  return [
+    T("Air temp",fmt(t,1),"°C",band("air_temp",t),"target "+(bandLabel("air_temp")||"—")),
+    T("RH",fmt(rh,0),"%",band("rh",rh),"target "+(bandLabel("rh")||"—")),
+    T("Air VPD",fmt(avpd,2),"kPa",band("air_vpd",avpd),"target "+(bandLabel("air_vpd")||"—")),
+    T("Leaf VPD",fmt(lvpd,2),"kPa",band("leaf_vpd",lvpd),"target "+(bandLabel("leaf_vpd")||"—")),
+    T("CO₂",fmt(co2,0),"ppm",band("co2",co2),lightsOn()?"day target":"night"),
+    T("PPFD",fmt(ppfd,0),"µmol",band("ppfd",ppfd),"DLI "+fmt(dli,1)),
+    T("Avg VWC",fmt(vwc,1),"%","ok","all zones"),
+    T("Pore EC",fmt(ec,2),"mS",ecSev,"target "+fmt(CONFIG.EC_TARGET,1)),
+    T("Dryback",fmt(db,1),"%",(db!=null&&dbt!=null&&db<dbt*0.6)?"warn":"ok","target "+fmt(dbt,0)+"%"),
+    T("Cond. margin",fmt(mg,1),"°C",(mg!=null&&mg<1.5)?"warn":"ok","keep >2°C"),
+    T("Back-left",fmt(bl,1),"°C",(bl!=null&&t!=null&&(bl-t)>=CONFIG.HOTSPOT.deltaWarn)?"warn":"ok","hotspot watch"),
   ]; }
 function buildClimate(){ const b=(k)=>band(k,num(k))!=="ok"?"text-amber-400":"text-emerald-400";
   return [
@@ -3491,15 +3494,15 @@ document.addEventListener('alpine:init', () => {
       scale:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M6 7l-4 7h8zM18 7l-4 7h8zM4 21h16"/></svg>`,
       flag:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></svg>`,
     },
-    nav:[{id:'dashboard',label:'Overview',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'irrigation',label:'Crop steering',icon:'salt'},{id:'tune',label:'Tune',icon:'scale'},{id:'control',label:'Control',icon:'radio'},{id:'timeline',label:'Timeline',icon:'activity'},{id:'climate',label:'Climate',icon:'thermo'},{id:'alerts',label:'Advisories',icon:'bell'}],
-    mobileNav:[{id:'dashboard',label:'Home',icon:'dashboard'},{id:'tune',label:'Tune',icon:'scale'},{id:'control',label:'Control',icon:'radio'},{id:'alerts',label:'Alerts',icon:'alerts'},{id:'ai',label:'AI',icon:'ai'}],
+    nav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'tune',label:'Tune',icon:'scale'},{id:'climate',label:'Climate',icon:'thermo'},{id:'control',label:'Operate',icon:'radio'},{id:'timeline',label:'Plan',icon:'activity'}],
+    mobileNav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'tune',label:'Tune',icon:'scale'},{id:'control',label:'Operate',icon:'radio'},{id:'ai',label:'AI',icon:'ai'}],
 
     view:'dashboard', sidebarOpen:true, connected:false, connError:"",
     cmdOpen:false, cmdQuery:"", aiOpen:false, aiInput:"", aiThinking:false, zoneModal:null, evOpen:null,
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
     headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], armChips:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},guardrails:[],telemetry:[],feed:[]}, ctrlZone:1,
-    climateCtl:[], ctlOpen:{},
+    climateCtl:[], ctlOpen:{}, snapshot:[],
     notes:{}, toasts:[], _tid:0, _toastId:0, _acked:{},
     aiMessages:[], aiSuggestions:["Any rooms drifting?","Why the hotspot?","How is the EC tracking?","Is dryback on target?"],
 
@@ -3523,7 +3526,7 @@ document.addEventListener('alpine:init', () => {
       const rr=runRules();
       this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
       this.headline=computeHeadline(this.adv,this.watch);
-      this.kpis=buildKpis(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl();
+      this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl();
       if(window.__tuneReseed) window.__tuneReseed();   // refresh the Tune editor from live HA (respects its hydrated/unsaved-edit guard)
       this.armChips=[{k:"System",on:isOn("sw_system")},{k:"Auto-water",on:isOn("sw_auto")},{k:"EC-stack",on:isOn("sw_ecstack")},{k:"Dosing",on:isOn("dosing_active")}];
       this.steeringMeta=[{label:"Fused EC",val:fmt(num("fused_ec"),2),cls:"text-slate-200"},{label:"EC target",val:fmt(CONFIG.EC_TARGET,1),cls:"text-slate-200"},{label:"Pump",val:fmt(num("pump_power"),0)+" W",cls:num("pump_power")>100?"text-amber-400":"text-slate-200"},{label:"Next shot",val:this.shortTime(val("next_irrig")),cls:"text-slate-200"}];
@@ -3594,7 +3597,7 @@ document.addEventListener('alpine:init', () => {
     onKey(e){ if((e.metaKey||e.ctrlKey)&&e.key==='k'){ e.preventDefault(); this.cmdOpen=!this.cmdOpen; } if(e.key==='/'&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); this.cmdOpen=true; } },
 
     /* format helpers */
-    currentTitle(){ return ({dashboard:'F2 Overview',zones:'Zones',irrigation:'Crop Steering',tune:'Crop-Steering Tune',control:'Control',timeline:'Grow Timeline',climate:'Climate & Hotspot',alerts:'Advisories'})[this.view]||'F2'; },
+    currentTitle(){ return ({dashboard:'F2 Status',zones:'Zones',irrigation:'Crop Steering',tune:'Crop-Steering Tune',control:'Operate',timeline:'Grow Plan',climate:'Climate',alerts:'Advisories'})[this.view]||'F2'; },
     sevBg(s){ return s==='ok'||s==='optimal'?'bg-emerald-500/15':s==='warn'?'bg-amber-400/15':s==='crit'?'bg-red-500/15':'bg-amber-400/15'; },
     sevText(s){ return s==='ok'||s==='optimal'?'text-emerald-400':s==='warn'?'text-amber-400':s==='crit'?'text-red-400':'text-amber-400'; },
     pillClass(s){ return s==='ok'||s==='optimal'?'bg-emerald-500/15 text-emerald-300':s==='warn'?'bg-amber-400/15 text-amber-300':s==='crit'?'bg-red-500/15 text-red-300':'bg-amber-400/15 text-amber-300'; },
