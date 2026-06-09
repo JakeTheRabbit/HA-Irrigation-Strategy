@@ -626,8 +626,14 @@
               <template x-for="it in g.items" :key="it.id">
                 <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3">
                   <template x-if="it.type==='toggle'"><div class="flex items-center justify-between gap-2"><span class="text-sm text-slate-300 min-w-0 truncate" x-text="it.label"></span><button @click="!it.un&&ctrlToggle(it.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="it.un?'bg-white/10 opacity-40 cursor-not-allowed':it.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="it.on&&'translate-x-5'"></span></button></div></template>
-                  <template x-if="it.type==='num'"><div><div class="text-[11px] text-slate-400 mb-1 truncate" x-text="it.label"></div><div class="flex items-center gap-2"><input type="number" :min="it.min" :max="it.max" :step="it.step" :value="it.val" @change="ctrlNum(it.id,$event.target.value)" class="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-slate-200"><span class="text-[11px] text-slate-500 shrink-0" x-text="it.unit"></span></div>
-                    <div x-show="it.live" class="flex items-center gap-1.5 mt-1.5 text-[11px]"><span class="w-1.5 h-1.5 rounded-full shrink-0" :class="dotClass(it.live?.sev)"></span><span :class="sevText(it.live?.sev)">now <span x-text="it.live?.val"></span><span x-text="it.unit"></span></span><span class="text-slate-500" x-show="it.live?.band">· on-target <span x-text="(it.live?.band?.[0])+'–'+(it.live?.band?.[1])"></span></span></div></div></template>
+                  <template x-if="it.type==='num'"><div>
+                    <div class="flex items-center justify-between gap-2 mb-2"><span class="text-[13px] text-slate-300 truncate" x-text="it.label"></span>
+                      <span x-show="it.live" class="text-[10px] px-1.5 py-0.5 rounded-full shrink-0" :class="sevBg(it.live?.sev)"><span :class="sevText(it.live?.sev)" x-text="'now '+(it.live?.val)+(it.unit||'')"></span></span></div>
+                    <div class="flex items-center gap-2">
+                      <button @click="stepNum(it,-1)" class="w-11 h-11 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/20 border border-white/10 text-xl text-slate-200 grid place-items-center shrink-0 select-none" aria-label="decrease">−</button>
+                      <button @click="openSp(it)" class="flex-1 h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.09] border border-white/10 flex items-baseline justify-center gap-1"><span class="text-lg font-bold text-slate-100" x-text="it.val"></span><span class="text-[11px] text-slate-500" x-text="it.unit"></span></button>
+                      <button @click="stepNum(it,1)" class="w-11 h-11 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/20 border border-white/10 text-xl text-slate-200 grid place-items-center shrink-0 select-none" aria-label="increase">+</button></div>
+                    <div x-show="it.live?.band" class="text-[10px] text-slate-500 mt-1.5 text-center" x-text="it.live?.band ? ('on-target '+(it.live?.band?.[0])+'–'+(it.live?.band?.[1])) : ''"></div></div></template>
                   <template x-if="it.type==='text'"><div><div class="text-[11px] text-slate-400 mb-1 truncate" x-text="it.label"></div><input type="text" :value="it.value" @change="ctrlText(it.id,$event.target.value)" class="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"></div></template>
                   <template x-if="it.type==='button'"><button @click="ctrlBtn(it.id)" class="w-full h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 truncate px-2" x-text="it.label"></button></template>
                   <template x-if="it.type==='light'"><div><div class="flex items-center justify-between gap-2"><span class="text-sm text-slate-300 truncate" x-text="it.label"></span><button @click="!it.un&&ctrlToggle(it.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="it.un?'bg-white/10 opacity-40':it.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="it.on&&'translate-x-5'"></span></button></div><input x-show="it.hasBri&&it.on" type="range" min="1" max="100" :value="it.bri||100" @change="ctrlLightBri(it.id,$event.target.value)" class="w-full mt-2 accent-emerald-500"></div></template>
@@ -1001,6 +1007,32 @@
           <div class="rounded-2xl bg-white/[0.03] border border-white/8 p-4"><div class="text-xs font-semibold text-slate-300 mb-2">24h wetness</div><div class="h-40"><canvas id="zoneHistChart"></canvas></div></div>
           <div class="rounded-2xl bg-white/[0.03] border border-white/8 p-4"><div class="text-xs font-semibold text-slate-300 mb-2">Operator notes</div><textarea x-model="notes['z'+z.id]" @input.debounce.600="saveNotes()" rows="2" placeholder="Log an observation…" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 resize-none"></textarea></div>
         </div>
+      </div>
+    </template>
+  </div>
+</div>
+
+<!-- setpoint tuner — bottom sheet on phone, centered card on desktop -->
+<div x-show="spOpen" x-cloak class="fixed inset-0 z-50" @keydown.escape.window="spOpen=false">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="spOpen=false"></div>
+  <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:max-w-sm sm:h-fit bg-[#11161d] border-t sm:border border-white/10 rounded-t-3xl sm:rounded-2xl p-5 pb-[calc(20px+env(safe-area-inset-bottom))]" style="max-height:92vh;overflow:auto">
+    <template x-if="spItem">
+      <div>
+        <div class="flex items-center justify-between mb-4"><div class="font-semibold text-base" x-text="spItem.label"></div><button @click="spOpen=false" class="w-9 h-9 rounded-lg grid place-items-center bg-white/5 hover:bg-white/10"><span x-html="icons.x" class="w-5 h-5 block"></span></button></div>
+        <div x-show="spItem.live" class="rounded-2xl p-3 mb-5 text-center" :class="sevBg(spItem.live?.sev)">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400">current reading</div>
+          <div class="text-3xl font-bold leading-tight" :class="sevText(spItem.live?.sev)"><span x-text="spItem.live?.val"></span><span class="text-base" x-text="spItem.unit"></span></div>
+          <div x-show="spItem.live?.band" class="text-[11px] text-slate-400">on-target <span x-text="(spItem.live?.band?.[0])+'–'+(spItem.live?.band?.[1])"></span></div>
+        </div>
+        <div class="text-center text-[10px] uppercase tracking-wider text-slate-400 mb-2">setpoint</div>
+        <div class="flex items-center gap-3 mb-4">
+          <button @click="stepNum(spItem,-1)" class="w-16 h-16 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/20 border border-white/10 text-3xl text-slate-100 grid place-items-center select-none">−</button>
+          <div class="flex-1 text-center"><span class="text-5xl font-bold text-emerald-300" x-text="spItem.val"></span><span class="text-sm text-slate-400" x-text="' '+spItem.unit"></span></div>
+          <button @click="stepNum(spItem,1)" class="w-16 h-16 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/20 border border-white/10 text-3xl text-slate-100 grid place-items-center select-none">+</button>
+        </div>
+        <input x-show="spItem.min!=null&&spItem.min!==''&&spItem.max!=null&&spItem.max!==''" type="range" :min="spItem.min" :max="spItem.max" :step="spItem.step" :value="spItem.val" @change="setNumVal(spItem,$event.target.value)" class="w-full accent-emerald-500 h-2">
+        <div x-show="spItem.min!=null&&spItem.min!==''" class="flex justify-between text-[10px] text-slate-500 mt-1"><span x-text="spItem.min"></span><span x-text="spItem.max"></span></div>
+        <div class="text-[11px] text-slate-500 mt-5 text-center">writes to HA live · no undo</div>
       </div>
     </template>
   </div>
@@ -3599,7 +3631,7 @@ document.addEventListener('alpine:init', () => {
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
     headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},guardrails:[],telemetry:[],feed:[]}, ctrlZone:1,
-    climateCtl:[], ctlOpen:{}, snapshot:[], zSel:1, zoneDetail:{}, camUrl:'',
+    climateCtl:[], ctlOpen:{}, snapshot:[], zSel:1, zoneDetail:{}, camUrl:'', spOpen:false, spItem:null,
     notes:{}, toasts:[], _tid:0, _toastId:0, _acked:{},
     aiMessages:[], aiSuggestions:["Any rooms drifting?","Why the hotspot?","How is the EC tracking?","Is dryback on target?"],
 
@@ -3706,6 +3738,11 @@ document.addEventListener('alpine:init', () => {
     ctrlToggle(id,confirmArm){ if(confirmArm && !confirm("Toggle the arm state? This affects live irrigation.")) return; this.ctrlSvc(id.split(".")[0],"toggle",{entity_id:id}); },
     ctrlSelect(id,v){ this.ctrlSvc(id.split(".")[0],"select_option",{entity_id:id,option:v}); },
     ctrlNum(id,v){ if(v!==""&&v!=null) this.ctrlSvc(id.split(".")[0],"set_value",{entity_id:id,value:parseFloat(v)}); },
+    stepNum(it,dir){ const step=parseFloat(it.step)||1; let v=(parseFloat(it.val)||0)+dir*step;   // optimistic UI bump + live write
+      if(it.min!=null&&it.min!=='') v=Math.max(parseFloat(it.min),v); if(it.max!=null&&it.max!=='') v=Math.min(parseFloat(it.max),v);
+      v=parseFloat((Math.round(v/step)*step).toFixed(4)); it.val=String(v); this.ctrlNum(it.id,v); },
+    setNumVal(it,v){ if(v===''||v==null) return; v=parseFloat(v); it.val=String(v); this.ctrlNum(it.id,v); },
+    openSp(it){ this.spItem=it; this.spOpen=true; },
     ctrlClimateMode(id,mode){ this.ctrlSvc("climate","set_hvac_mode",{entity_id:id,hvac_mode:mode}); },
     ctrlClimateTemp(id,t){ const v=parseFloat(t); if(!isNaN(v)) this.ctrlSvc("climate","set_temperature",{entity_id:id,temperature:v}); },
     ctrlBtn(id){ if(confirm("Press "+id+"?")) this.ctrlSvc("button","press",{entity_id:id}); },
