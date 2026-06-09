@@ -11,7 +11,7 @@ Run:  HA_TOKEN=... python scripts/build_lovelace.py
 """
 import json, os, re, sys, urllib.request
 
-BASE = os.environ.get("HA_BASE", "http://192.168.73.250:8123") + "/api"
+BASE = os.environ.get("HA_BASE", "http://homeassistant.local:8123") + "/api"
 TOK = os.environ.get("HA_TOKEN", "")
 try:
     import yaml
