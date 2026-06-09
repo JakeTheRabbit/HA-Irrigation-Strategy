@@ -903,6 +903,24 @@
             <div x-show="!control.feed.length" class="text-slate-500">No recent activity.</div></div></div>
       </section>
 
+      <!-- ===== 3D FLOOR (facility twin, iframe — loads only on tap) ===== -->
+      <section x-show="view==='floor'" class="fade-enter">
+        <div class="glass rounded-2xl overflow-hidden relative" style="height:calc(100vh - 160px);min-height:460px">
+          <template x-if="floorLoaded">
+            <iframe src="/local/facility-twin/twin.html?v=1" class="w-full h-full border-0 block" title="F2 facility 3D twin"></iframe>
+          </template>
+          <div x-show="!floorLoaded" class="absolute inset-0 grid place-items-center p-6">
+            <div class="text-center">
+              <div class="w-14 h-14 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-3"><span x-html="icons.grid" class="w-7 h-7 block text-emerald-400"></span></div>
+              <div class="font-semibold mb-1">3D facility twin</div>
+              <div class="text-[12px] text-slate-400 mb-4 max-w-xs">Live sensor cards on the real floor plan. Loads a ~34 MB model — best on wifi.</div>
+              <button @click="floorLoaded=true" class="h-11 px-6 rounded-xl bg-emerald-500/20 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/30 transition">Load 3D view</button>
+            </div>
+          </div>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-2 px-1 flex items-center gap-1.5"><span x-html="icons.grid" class="w-3.5 h-3.5 block"></span> Drag to orbit, scroll to zoom · tap a sensor tile on a room to jump to its controls.</div>
+      </section>
+
       <!-- ===== TIMELINE (native canvas — Phase D) ===== -->
       <section x-show="view==='timeline'" class="fade-enter"><div class="tlroot" id="tlRoot">
 <div class="topbar">
@@ -3623,7 +3641,8 @@ document.addEventListener('alpine:init', () => {
       scale:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M6 7l-4 7h8zM18 7l-4 7h8zM4 21h16"/></svg>`,
       flag:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></svg>`,
     },
-    nav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'tune',label:'Tune',icon:'scale'},{id:'climate',label:'Climate',icon:'thermo'},{id:'control',label:'Operate',icon:'radio'},{id:'timeline',label:'Plan',icon:'activity'}],
+    nav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'tune',label:'Tune',icon:'scale'},{id:'climate',label:'Climate',icon:'thermo'},{id:'control',label:'Operate',icon:'radio'},{id:'timeline',label:'Plan',icon:'activity'},{id:'floor',label:'3D Floor',icon:'grid'}],
+    floorLoaded:false,
     mobileNav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'tune',label:'Tune',icon:'scale'},{id:'control',label:'Operate',icon:'radio'},{id:'ai',label:'AI',icon:'ai'}],
 
     view:'dashboard', sidebarOpen:true, connected:false, connError:"",
@@ -3642,6 +3661,7 @@ document.addEventListener('alpine:init', () => {
       this._tid=setInterval(()=>this.tick(), CONFIG.REFRESH_MS);
       this.$watch('view',v=>{ this.$nextTick(()=>{ this.mountCharts(); if(v==='timeline'&&window.tlInit) window.tlInit(); if(v==='tune'&&this.seedTune) this.seedTune(); }); });
       this.$watch('zSel',()=>{ this.zoneDetail=buildZoneDetail(this.zSel); });
+      window.addEventListener('message',e=>{ if(e&&e.data&&e.data.type==='f2nav') this.floorNav(e.data); });   // deep-links from the 3D twin iframe
       this.$watch('zoneModal',v=>{ if(v) this.$nextTick(()=>this.mountZoneHist(v)); });
       this.$watch('cmdOpen',v=>{ if(v) this.$nextTick(()=>this.$refs.cmd&&this.$refs.cmd.focus()); });
     },
@@ -3743,6 +3763,9 @@ document.addEventListener('alpine:init', () => {
       v=parseFloat((Math.round(v/step)*step).toFixed(4)); it.val=String(v); this.ctrlNum(it.id,v); },
     setNumVal(it,v){ if(v===''||v==null) return; v=parseFloat(v); it.val=String(v); this.ctrlNum(it.id,v); },
     openSp(it){ this.spItem=it; this.spOpen=true; },
+    floorNav(d){ const m=(d&&d.metric)||''; const dest=(m==='vwc'||m==='ec')?'zones':'climate';   // 3D tile → relevant dashboard tab
+      this.go(dest); const lbl={temp:'Air temp',rh:'Humidity',vpd:'VPD',co2:'CO₂',ppfd:'PPFD',vwc:'VWC',ec:'EC'}[m]||m;
+      this.toast((d.room?d.room+' · ':'')+lbl+' → '+(dest==='zones'?'Zones':'Climate')); },
     ctrlClimateMode(id,mode){ this.ctrlSvc("climate","set_hvac_mode",{entity_id:id,hvac_mode:mode}); },
     ctrlClimateTemp(id,t){ const v=parseFloat(t); if(!isNaN(v)) this.ctrlSvc("climate","set_temperature",{entity_id:id,temperature:v}); },
     ctrlBtn(id){ if(confirm("Press "+id+"?")) this.ctrlSvc("button","press",{entity_id:id}); },
@@ -3805,7 +3828,7 @@ document.addEventListener('alpine:init', () => {
     onKey(e){ if((e.metaKey||e.ctrlKey)&&e.key==='k'){ e.preventDefault(); this.cmdOpen=!this.cmdOpen; } if(e.key==='/'&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); this.cmdOpen=true; } },
 
     /* format helpers */
-    currentTitle(){ return ({dashboard:'F2 Status',zones:'Zones',irrigation:'Crop Steering',tune:'Crop-Steering Tune',control:'Operate',timeline:'Grow Plan',climate:'Climate',alerts:'Advisories'})[this.view]||'F2'; },
+    currentTitle(){ return ({dashboard:'F2 Status',zones:'Zones',irrigation:'Crop Steering',tune:'Crop-Steering Tune',control:'Operate',timeline:'Grow Plan',climate:'Climate',alerts:'Advisories',floor:'3D Floor'})[this.view]||'F2'; },
     sevBg(s){ return s==='ok'||s==='optimal'?'bg-emerald-500/15':s==='warn'?'bg-amber-400/15':s==='crit'?'bg-red-500/15':'bg-amber-400/15'; },
     sevText(s){ return s==='ok'||s==='optimal'?'text-emerald-400':s==='warn'?'text-amber-400':s==='crit'?'text-red-400':'text-amber-400'; },
     pillClass(s){ return s==='ok'||s==='optimal'?'bg-emerald-500/15 text-emerald-300':s==='warn'?'bg-amber-400/15 text-amber-300':s==='crit'?'bg-red-500/15 text-red-300':'bg-amber-400/15 text-amber-300'; },
