@@ -5,7 +5,7 @@ for runtime errors, exercises the scrubber + the 1W toggle, and writes screensho
 import base64, json, os, subprocess, sys, time, urllib.request, websocket
 
 TOK = os.environ.get("HA_TOKEN", "")
-BASE = os.environ.get("HA_BASE", "http://192.168.73.250:8123")
+BASE = os.environ.get("HA_BASE", "http://homeassistant.local:8123")
 DESK = BASE + "/local/crop_steering_dashboard.html?v=ovlverify"
 
 chrome = next((p for p in [

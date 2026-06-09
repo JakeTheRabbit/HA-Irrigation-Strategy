@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grow Setpoints Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* plant-state-dashboard palette (jaketherabbit.github.io/plant-state-dashboard) */
+  --bg:       #0a0c10;
+  --bg2:      #0f1318;
+  --surface:  #141a21;
+  --surface2: #19212a;
+  --border:   rgba(255,255,255,0.08);
+  --text:     #e7ecf2;
+  --muted:    #727d8a;
+  --accent:   #34d399;
+  --accent2:  #22d3ee;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background:
+    radial-gradient(42rem 42rem at -8% -12%, rgba(16,185,129,.10), transparent 60%),
+    radial-gradient(36rem 36rem at 112% 6%, rgba(34,211,238,.07), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.topbar { background: linear-gradient(180deg,var(--surface),var(--bg2)); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
+.topbar-title { font-size: 15px; font-weight: 800; white-space: nowrap; letter-spacing: -0.01em; background:linear-gradient(135deg,#6ee7b7,#34d399 50%,#22d3ee); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.phase-tabs { display: flex; gap: 3px; flex-wrap: wrap; }
+.phase-tab { padding: 4px 11px; border-radius: 4px; border: 1px solid var(--border); background: transparent; cursor: pointer; font-size: 11px; color: var(--muted); transition: all 0.15s; white-space: nowrap; }
+.phase-tab:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+.phase-tab[data-phase="clone"].active  { background:#16a34a; border-color:#16a34a; color:#fff; }
+.phase-tab[data-phase="veg"].active    { background:#65a30d; border-color:#65a30d; color:#fff; }
+.phase-tab[data-phase="stretch"].active{ background:#4f46e5; border-color:#4f46e5; color:#fff; }
+.phase-tab[data-phase="bulk"].active   { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+.phase-tab[data-phase="late"].active   { background:#9333ea; border-color:#9333ea; color:#fff; }
+.phase-tab[data-phase="flush"].active  { background:#ea580c; border-color:#ea580c; color:#fff; }
+.spacer { flex:1; min-width:8px; }
+.btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color:var(--text); padding:5px 12px; border-radius:4px; cursor:pointer; font-size:12px; white-space:nowrap; transition:background 0.15s; }
+.btn:hover { background: rgba(255,255,255,0.12); }
+.btn.active { background:var(--accent); border-color:var(--accent); color:#06281c; font-weight:700; }
+.btn.primary { background:linear-gradient(135deg,#34d399,#10b981); border-color:transparent; color:#06281c; font-weight:700; }
+
+.layout { flex:1; display:flex; overflow:hidden; }
+.left-panel { width:250px; background:var(--surface); border-right:1px solid var(--border); overflow-y:auto; flex-shrink:0; }
+.left-panel::-webkit-scrollbar { width:5px; } .left-panel::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.15); border-radius:3px; }
+.param-section-header { padding:8px 14px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); background:rgba(255,255,255,0.03); display:flex; align-items:center; gap:5px; }
+.param-section-header .dot { width:7px; height:7px; border-radius:50%; }
+.param-row { display:flex; align-items:center; padding:7px 14px; gap:8px; border-bottom:1px solid rgba(255,255,255,0.05); cursor:pointer; transition:background 0.1s; user-select:none; }
+.param-row:hover { background:rgba(255,255,255,0.05); }
+.param-row.dragging { opacity:0.4; background:rgba(255,255,255,0.08); }
+.param-row.drag-over { border-top:2px solid var(--accent); background:rgba(52,211,153,0.10); }
+.drag-handle { color:rgba(255,255,255,0.2); font-size:12px; cursor:grab; padding:0 2px; flex-shrink:0; }
+.drag-handle:active { cursor:grabbing; }
+.param-color { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+.param-name { font-size:12px; flex:1; }
+.param-unit { font-size:10px; color:var(--muted); }
+.param-vis { width:18px; height:18px; border-radius:3px; border:1px solid rgba(255,255,255,0.18); display:flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0; }
+.param-vis.on { background:var(--accent); border-color:var(--accent); color:#06281c; }
+
+.chart-area { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.main-scroll { flex:1; overflow:auto; position:relative; }
+.main-scroll::-webkit-scrollbar { height:8px; width:8px; }
+.main-scroll::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+.main-scroll::-webkit-scrollbar-track { background:var(--surface); }
+
+.day-editor { width:290px; background:var(--surface); border-left:1px solid var(--border); flex-shrink:0; overflow-y:auto; display:none; }
+.day-editor.open { display:block; }
+.day-editor::-webkit-scrollbar { width:5px; } .day-editor::-webkit-scrollbar-thumb { background:var(--border); }
+.de-header { padding:13px 15px; border-bottom:1px solid var(--border); font-size:14px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+.de-close { cursor:pointer; color:var(--muted); padding:2px 7px; border-radius:4px; }
+.de-close:hover { background:var(--surface2); color:var(--text); }
+.de-body { padding:14px; }
+.de-field { margin-bottom:12px; }
+.de-label { font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin-bottom:4px; }
+.de-input { width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:var(--text); padding:7px 9px; border-radius:4px; font-size:13px; }
+.de-input:focus { outline:none; border-color:var(--accent); }
+.de-row { display:flex; gap:8px; }
+.de-row .de-field { flex:1; }
+.vpd-box { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px; margin-bottom:12px; text-align:center; }
+.vpd-val { font-size:26px; font-weight:700; }
+.vpd-label { font-size:10px; color:var(--muted); }
+.vpd-zone { font-size:11px; padding:2px 9px; border-radius:4px; margin-top:5px; display:inline-block; font-weight:600; }
+.notes-box { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:10px; font-size:12px; color:var(--muted); line-height:1.5; margin-bottom:12px; }
+.phase-badge { display:inline-block; padding:3px 9px; border-radius:4px; font-size:11px; font-weight:600; margin-bottom:12px; }
+.apply-btn { width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:var(--text); padding:7px; border-radius:4px; cursor:pointer; font-size:12px; margin-top:6px; transition:background 0.15s; }
+.apply-btn:hover { background:rgba(255,255,255,0.12); }
+.status-bar { background:linear-gradient(0deg,var(--surface),var(--bg2)); border-top:1px solid var(--border); padding:5px 18px; font-size:11px; color:var(--muted); display:flex; gap:16px; flex-shrink:0; flex-wrap:wrap; }
+.status-item strong { color:var(--text); }
+.status-swatch { width:9px; height:9px; border-radius:2px; display:inline-block; margin-right:4px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="topbar-title">🌡 Grow Setpoints Planner</span>
+  <div class="phase-tabs">
+    <div class="phase-tab" data-phase="clone"   onclick="jumpToPhase('clone')">Clone (W0)</div>
+    <div class="phase-tab" data-phase="veg"     onclick="jumpToPhase('veg')">Veg (W1–2)</div>
+    <div class="phase-tab" data-phase="stretch" onclick="jumpToPhase('stretch')">Stretch (W3–5)</div>
+    <div class="phase-tab" data-phase="bulk"    onclick="jumpToPhase('bulk')">Bulk (W6–9)</div>
+    <div class="phase-tab" data-phase="late"    onclick="jumpToPhase('late')">Late (W10)</div>
+    <div class="phase-tab" data-phase="flush"   onclick="jumpToPhase('flush')">Flush (W11)</div>
+  </div>
+  <div class="spacer"></div>
+  <select id="zoneSelect" onchange="setZone(parseInt(this.value))"
+          title="Editing layer — Facility baseline or a per-zone override"
+          style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:12px;cursor:pointer;">
+    <option value="0">🏭 Facility (base)</option>
+    <option value="1">① Zone 1</option>
+    <option value="2">② Zone 2</option>
+    <option value="3">③ Zone 3</option>
+  </select>
+  <div style="display:flex;gap:2px;">
+    <button class="btn" id="zFit"  onclick="setDayW('fit')"  title="Fit whole grow on screen">⊞ Fit</button>
+    <button class="btn" id="zSm"   onclick="setDayW(14)"  title="Compact">S</button>
+    <button class="btn active" id="zMd" onclick="setDayW(28)"  title="Medium">M</button>
+    <button class="btn" id="zLg"   onclick="setDayW(48)"  title="Large">L</button>
+  </div>
+  <button class="btn" onclick="resetToDefaults()">Reset</button>
+  <button class="btn" onclick="exportJSON()">Export</button>
+  <button class="btn" onclick="importRecipe()">Import</button>
+  <button class="btn primary" onclick="openHASync()">⇅ HA Sync</button>
+</div>
+
+<div id="zoneBanner" style="display:none;align-items:center;gap:12px;padding:5px 16px;font-size:12px;border-bottom:1px solid var(--border);"></div>
+
+<div class="layout">
+  <div class="left-panel" id="leftPanel"></div>
+
+  <div class="chart-area">
+    <div class="main-scroll" id="mainScroll">
+      <canvas id="dayCanvas" height="72" style="display:block;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border);"></canvas>
+      <canvas id="chartCanvas" style="display:block;"></canvas>
+    </div>
+  </div>
+
+  <div class="day-editor" id="dayEditor">
+    <div class="de-header">
+      <span id="deTitle">Day 1</span>
+      <span class="de-close" onclick="closeDayEditor()">×</span>
+    </div>
+    <div class="de-body" id="deBody"></div>
+  </div>
+</div>
+
+<div class="status-bar" id="statusBar"></div>
+
+<div id="haToast" style="position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:linear-gradient(180deg,var(--surface),var(--bg2));border:1px solid var(--border);color:var(--text);padding:9px 16px;border-radius:9px;font-size:13px;display:none;z-index:200;box-shadow:0 14px 44px -12px #000"></div>
+<div id="haModal" style="position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;z-index:150" onclick="if(event.target===this)closeHASync()">
+  <div id="haModalCard" style="background:linear-gradient(180deg,var(--surface),var(--bg2));border:1px solid var(--border);border-radius:14px;max-width:560px;width:92%;max-height:85vh;overflow:auto;padding:18px;box-shadow:0 24px 70px -20px #000"></div>
+</div>
+
+<script>
+// ============================================================
+// DATA FROM YOUR RECIPE TABLE
+// Week 0: Clone | Weeks 1-2: Veg | Weeks 3-11: Flower
+// ============================================================
+// Values aligned to the Athena Handbook environmental targets (cannabis-grow-room-levers).
+const WEEK_DATA = [
+  // wk, stage,               roomTemp, leafTemp, rh, ppfd, co2,  vpd,  airVel, notes
+  [  0, 'Clone',               25,      23.5,     70, 150,  400,  0.80, 0.25,  'Athena Clones: 23–26 °C, 65–75% RH (dome higher), VPD ~0.8, ambient CO₂'],
+  [  1, 'Veg 1',               26,      24.5,     70, 300,  400,  0.90, 1.65,  'Athena Veg: 22–28 °C, ambient CO₂ (no enrichment), establish structure'],
+  [  2, 'Veg 2',               26,      24.5,     68, 450,  400,  0.95, 1.65,  'Athena Veg: PPFD 300–600, ambient CO₂, prep for flip'],
+  [  3, 'Flower 1 (Stretch)',  27,      25.5,     68, 700,  1200, 1.05, 1.9,   'Athena Stretch: 25–28 °C, CO₂ 1200–1500, ramp PPFD'],
+  [  4, 'Flower 2 (Stretch)',  27,      25.5,     66, 850,  1300, 1.10, 1.9,   'Athena Stretch: PPFD 600–1000, RH 60–72'],
+  [  5, 'Flower 3 (Stretch)',  26.5,    25,       65, 1000, 1400, 1.15, 1.9,   'Athena Stretch wk3 → bulk transition'],
+  [  6, 'Flower 4 (Bulk)',     26,      24.5,     65, 1100, 1400, 1.15, 1.9,   'Athena Bulk: 24–26 °C, PPFD 850–1200, CO₂ 1200–1500'],
+  [  7, 'Flower 5 (Bulk)',     25.5,    24,       64, 1150, 1400, 1.15, 1.9,   'Athena Bulk: peak gas exchange'],
+  [  8, 'Flower 6 (Bulk)',     25,      23.5,     62, 1200, 1400, 1.18, 1.9,   'Athena Bulk: yield-max zone'],
+  [  9, 'Flower 7 (Bulk)',     25,      23.5,     62, 1200, 1300, 1.18, 1.9,   'Athena Bulk wk4 → finish transition'],
+  [ 10, 'Flower 8 (Finish)',   22,      20.5,     55, 800,  700,  1.25, 1.9,   'Athena Finish: 18–24 °C, RH 50–60, VPD 1.2–1.4, CO₂ 500–800'],
+  [ 11, 'Flower 9 (Flush)',    20,      19,       52, 650,  550,  1.30, 1.9,   'Athena Finish/Flush: cool + dry, botrytis suppression'],
+];
+
+const TOTAL_DAYS = 84; // 12 weeks × 7 days
+let   DAY_W     = 28;
+const ROW_H     = 62;
+const HDR_H     = 72;
+
+// ============================================================
+// PHASE DEFINITIONS
+// ============================================================
+const PHASES = [
+  { id:'clone',   label:'Clone',    start:0,  end:7,  color:'#16a34a' },
+  { id:'veg',     label:'Veg',      start:7,  end:21, color:'#65a30d' },
+  { id:'stretch', label:'Stretch',  start:21, end:42, color:'#4f46e5' },   // Athena flower wk 1–3
+  { id:'bulk',    label:'Bulk Flower', start:42, end:70, color:'#7c3aed' },// Athena flower wk 4–7
+  { id:'late',    label:'Late Flower', start:70, end:77, color:'#9333ea' },// Athena finish wk 8
+  { id:'flush',   label:'Flush',    start:77, end:84, color:'#ea580c' },   // Athena finish wk 9
+];
+
+// ============================================================
+// PARAMETERS
+// ============================================================
+const PARAMS = [
+  // Environment
+  { id:'temp_day',    name:'Room Temp',       unit:'°C',          color:'#ef4444', section:'Environment', min:18, max:32, step:0.5,  visible:true },
+  { id:'leaf_temp',   name:'Leaf Temp',       unit:'°C',          color:'#f97316', section:'Environment', min:18, max:32, step:0.5,  visible:true },
+  { id:'rh',          name:'RH',              unit:'%',           color:'#06b6d4', section:'Environment', min:30, max:85, step:1,    visible:true },
+  { id:'vpd',         name:'VPD',             unit:'kPa',         color:'#8b5cf6', section:'Environment', min:0.4,max:1.8,step:0.01, visible:true, derived:true },
+  { id:'co2',         name:'CO₂',             unit:'ppm',         color:'#22c55e', section:'Environment', min:400,max:1800,step:50,  visible:true },
+  { id:'air_velocity',name:'Air Velocity',    unit:'m/s',         color:'#a78bfa', section:'Environment', min:0,  max:2.5, step:0.1,  visible:true },
+  // Lighting
+  { id:'ppfd',        name:'PPFD',            unit:'μmol/m²/s',   color:'#fbbf24', section:'Lighting',    min:0,  max:1400,step:25,  visible:true },
+  { id:'dli',         name:'DLI',             unit:'mol/m²/d',    color:'#f59e0b', section:'Lighting',    min:0,  max:65,  step:1,   visible:true, derived:true },
+  { id:'photoperiod', name:'Photoperiod',     unit:'hrs',         color:'#fde68a', section:'Lighting',    min:10, max:24,  step:0.5, visible:true },
+  // Root Zone
+  { id:'vwc',         name:'VWC Target',      unit:'%',           color:'#10b981', section:'Root Zone',   min:20, max:80,  step:1,   visible:true },
+  { id:'pwec',        name:'PW-EC',           unit:'mS/cm',       color:'#34d399', section:'Root Zone',   min:1.0,max:6.0, step:0.1, visible:true },
+  { id:'drain_pct',   name:'Drain %',         unit:'%',           color:'#6ee7b7', section:'Root Zone',   min:0,  max:40,  step:1,   visible:false },
+  { id:'irrig_freq',  name:'Irrig. Freq.',    unit:'×/day',       color:'#a7f3d0', section:'Root Zone',   min:1,  max:16,  step:1,   visible:false },
+  // Steering
+  { id:'steering',    name:'Plant Steering',  unit:'',            color:'#ec4899', section:'Steering',    min:0,  max:100, step:1,   visible:true, categorical:true },
+  // Irrigation Strategy
+  { id:'dryback',     name:'Overnight Dryback',unit:'%',          color:'#f43f5e', section:'Irrigation',  min:0,  max:50,  step:1,   visible:true },
+  { id:'p0_ml',       name:'P0 Shot (pre-dawn)',unit:'mL',        color:'#94a3b8', section:'Irrigation',  min:0,  max:500, step:10,  visible:true },
+  { id:'p1_ml',       name:'P1 Shot (wake-up)',unit:'mL',         color:'#38bdf8', section:'Irrigation',  min:0,  max:500, step:10,  visible:true },
+  { id:'p2_ml',       name:'P2 Shots (day)',   unit:'mL',         color:'#0ea5e9', section:'Irrigation',  min:0,  max:400, step:10,  visible:true },
+  { id:'p3_ml',       name:'P3 Shot (end)',    unit:'mL',         color:'#0369a1', section:'Irrigation',  min:0,  max:400, step:10,  visible:true },
+  // Tank / Feed
+  { id:'tank_ph',     name:'Tank pH',          unit:'',           color:'#fb923c', section:'Tank / Feed', min:5.0,max:7.0, step:0.1, visible:true },
+  { id:'tank_ec',     name:'Tank EC (feed)',   unit:'mS/cm',      color:'#fbbf24', section:'Tank / Feed', min:0.5,max:5.0, step:0.1, visible:true },
+
+  // ── Steering EC (mS/cm) — number.crop_steering_ec_target_* ──
+  { id:'ec_gen_p0',   name:'EC Gen P0',        unit:'mS/cm', color:'#fca5a5', section:'Steering EC', min:0.5, max:20, step:0.1, visible:false },
+  { id:'ec_gen_p1',   name:'EC Gen P1',        unit:'mS/cm', color:'#f87171', section:'Steering EC', min:0.5, max:20, step:0.1, visible:false },
+  { id:'ec_gen_p2',   name:'EC Gen P2',        unit:'mS/cm', color:'#ef4444', section:'Steering EC', min:0.5, max:20, step:0.1, visible:false },
+  { id:'ec_gen_p3',   name:'EC Gen P3',        unit:'mS/cm', color:'#dc2626', section:'Steering EC', min:0.5, max:20, step:0.1, visible:false },
+  { id:'ec_veg_p0',   name:'EC Veg P0',        unit:'mS/cm', color:'#86efac', section:'Steering EC', min:0.5, max:15, step:0.1, visible:false },
+  { id:'ec_veg_p1',   name:'EC Veg P1',        unit:'mS/cm', color:'#4ade80', section:'Steering EC', min:0.5, max:15, step:0.1, visible:false },
+  { id:'ec_veg_p2',   name:'EC Veg P2',        unit:'mS/cm', color:'#22c55e', section:'Steering EC', min:0.5, max:15, step:0.1, visible:false },
+  { id:'ec_veg_p3',   name:'EC Veg P3',        unit:'mS/cm', color:'#16a34a', section:'Steering EC', min:0.5, max:15, step:0.1, visible:false },
+  { id:'ec_flush',    name:'EC Flush',         unit:'mS/cm', color:'#ea580c', section:'Steering EC', min:0.1, max:15, step:0.1, visible:false },
+
+  // ── Phase Timing — number.crop_steering_p0/p1/p3_* ──
+  { id:'p0_min_wait', name:'P0 Min Wait',      unit:'min',   color:'#cbd5e1', section:'Phase Timing', min:5,  max:300, step:5,   visible:false },
+  { id:'p0_max_wait', name:'P0 Max Wait',      unit:'min',   color:'#94a3b8', section:'Phase Timing', min:30, max:600, step:5,   visible:false },
+  { id:'p1_time_btwn',name:'P1 Time Between',  unit:'min',   color:'#7dd3fc', section:'Phase Timing', min:1,  max:60,  step:1,   visible:false },
+  { id:'p1_min_shots',name:'P1 Min Shots',     unit:'×',     color:'#38bdf8', section:'Phase Timing', min:1,  max:20,  step:1,   visible:false },
+  { id:'p1_max_shots',name:'P1 Max Shots',     unit:'×',     color:'#0ea5e9', section:'Phase Timing', min:1,  max:30,  step:1,   visible:false },
+  { id:'p3_gen_last', name:'P3 Gen Last Irrig',unit:'min',   color:'#a78bfa', section:'Phase Timing', min:30, max:600, step:5,   visible:false },
+  { id:'p3_veg_last', name:'P3 Veg Last Irrig',unit:'min',   color:'#c4b5fd', section:'Phase Timing', min:15, max:360, step:5,   visible:false },
+
+  // ── Shot Sizes % — number.crop_steering_p1/p2/p3_* + dryback targets ──
+  { id:'p1_target_vwc',  name:'P1 Target VWC',    unit:'%',  color:'#5eead4', section:'Shot Sizes %', min:5,   max:95, step:1,    visible:false },
+  { id:'p1_init_pct',    name:'P1 Initial Shot',  unit:'%',  color:'#2dd4bf', section:'Shot Sizes %', min:0.1, max:20, step:0.1,  visible:false },
+  { id:'p1_incr_pct',    name:'P1 Shot Increment',unit:'%',  color:'#14b8a6', section:'Shot Sizes %', min:0.05,max:10, step:0.05, visible:false },
+  { id:'p1_max_pct',     name:'P1 Max Shot',      unit:'%',  color:'#0d9488', section:'Shot Sizes %', min:2,   max:50, step:0.5,  visible:false },
+  { id:'p2_vwc_thresh',  name:'P2 VWC Threshold', unit:'%',  color:'#67e8f9', section:'Shot Sizes %', min:5,   max:85, step:1,    visible:false },
+  { id:'p2_shot_pct',    name:'P2 Shot Size',     unit:'%',  color:'#22d3ee', section:'Shot Sizes %', min:0.5, max:30, step:0.5,  visible:false },
+  { id:'p2_ec_high',     name:'P2 EC High Ratio', unit:'×',  color:'#06b6d4', section:'Shot Sizes %', min:0.5, max:3,  step:0.05, visible:false },
+  { id:'p2_ec_low',      name:'P2 EC Low Ratio',  unit:'×',  color:'#0891b2', section:'Shot Sizes %', min:0.2, max:2,  step:0.05, visible:false },
+  { id:'p0_dryback_drop',name:'P0 Dryback Drop',  unit:'%',  color:'#fda4af', section:'Shot Sizes %', min:2,   max:40, step:0.5,  visible:false },
+  { id:'p3_emerg_vwc',   name:'P3 Emergency VWC', unit:'%',  color:'#fb7185', section:'Shot Sizes %', min:20,  max:65, step:1,    visible:false },
+  { id:'p3_emerg_pct',   name:'P3 Emergency Shot',unit:'%',  color:'#f43f5e', section:'Shot Sizes %', min:0.1, max:15, step:0.1,  visible:false },
+  { id:'db_gen_target',  name:'Gen Dryback Tgt',  unit:'%',  color:'#e11d48', section:'Shot Sizes %', min:5,   max:70, step:1,    visible:false },
+  { id:'db_veg_target',  name:'Veg Dryback Tgt',  unit:'%',  color:'#84cc16', section:'Shot Sizes %', min:5,   max:80, step:1,    visible:false },
+
+  // ── Limits & Hardware — global guards + dripper hardware ──
+  { id:'field_capacity', name:'Field Capacity',   unit:'%',   color:'#a3e635', section:'Limits & Hardware', min:40,  max:90,  step:1,   visible:false },
+  { id:'substrate_vol',  name:'Substrate Volume', unit:'L',   color:'#bef264', section:'Limits & Hardware', min:1,   max:100, step:0.5, visible:false },
+  { id:'lights_on_hr',   name:'Lights On Hour',   unit:'h',   color:'#fde047', section:'Limits & Hardware', min:0,   max:23,  step:1,   visible:false },
+  { id:'lights_off_hr',  name:'Lights Off Hour',  unit:'h',   color:'#facc15', section:'Limits & Hardware', min:0,   max:23,  step:1,   visible:false },
+  { id:'max_ec',         name:'Maximum EC',       unit:'mS/cm',color:'#eab308',section:'Limits & Hardware', min:1,   max:20,  step:0.1, visible:false },
+  { id:'irrig_ec_min',   name:'Irrig EC Min',     unit:'mS/cm',color:'#ca8a04',section:'Limits & Hardware', min:0.5, max:20,  step:0.1, visible:false },
+  { id:'irrig_ec_max',   name:'Irrig EC Max',     unit:'mS/cm',color:'#a16207',section:'Limits & Hardware', min:0.5, max:20,  step:0.1, visible:false },
+  { id:'irrig_ph_min',   name:'Irrig pH Min',     unit:'',    color:'#fdba74', section:'Limits & Hardware', min:3,   max:9,   step:0.1, visible:false },
+  { id:'irrig_ph_max',   name:'Irrig pH Max',     unit:'',    color:'#fb923c', section:'Limits & Hardware', min:3,   max:9,   step:0.1, visible:false },
+  { id:'blocked_drip_max',name:'Blocked Drip Max',unit:'/30m',color:'#f97316', section:'Limits & Hardware', min:1,   max:20,  step:1,   visible:false },
+  { id:'dripper_flow',   name:'Dripper Flow',     unit:'L/h', color:'#60a5fa', section:'Limits & Hardware', min:0.5, max:10,  step:0.1, visible:false },
+  { id:'drippers_plant', name:'Drippers / Plant', unit:'×',   color:'#3b82f6', section:'Limits & Hardware', min:1,   max:6,   step:1,   visible:false },
+
+  // ── Zone Setup — per-zone only (number.crop_steering_zone_N_*) ──
+  { id:'plant_count',    name:'Plant Count',      unit:'×',   color:'#818cf8', section:'Zone Setup', min:1,  max:50,   step:1,   visible:false },
+  { id:'max_daily_vol',  name:'Max Daily Volume', unit:'L',   color:'#6366f1', section:'Zone Setup', min:0,  max:1000, step:5,   visible:false },
+  { id:'shot_size_mult', name:'Shot Size Mult',   unit:'×',   color:'#4f46e5', section:'Zone Setup', min:0.1,max:5,    step:0.05,visible:false },
+];
+
+// ============================================================
+// BUILD DEFAULT RECIPE FROM WEEK TABLE
+// ============================================================
+function buildDefaultRecipe() {
+  const data = {};
+  for (const p of PARAMS) data[p.id] = new Array(TOTAL_DAYS).fill(0);
+
+  for (let d = 0; d < TOTAL_DAYS; d++) {
+    const week = Math.floor(d / 7);
+    const wd = WEEK_DATA[Math.min(week, WEEK_DATA.length - 1)];
+
+    data.temp_day[d]    = wd[2];
+    data.leaf_temp[d]   = wd[3];
+    data.rh[d]          = wd[4];
+    data.ppfd[d]        = wd[5];
+    data.co2[d]         = wd[6];
+    data.vpd[d]         = wd[7];
+    data.air_velocity[d]= wd[8];
+
+    // Photoperiod (Athena): 24h clone, 18h veg, 12h all flower incl. finish/flush
+    if (week === 0)       data.photoperiod[d] = 24;
+    else if (week <= 2)   data.photoperiod[d] = 18;
+    else                  data.photoperiod[d] = 12;
+
+    // DLI derived
+    data.dli[d] = +((data.ppfd[d] * data.photoperiod[d] * 3600) / 1000000).toFixed(2);
+
+    // VWC — generative progression
+    if (week === 0)      data.vwc[d] = 65;
+    else if (week <= 2)  data.vwc[d] = 60;
+    else if (week <= 4)  data.vwc[d] = 50;
+    else if (week <= 7)  data.vwc[d] = 45;
+    else if (week <= 10) data.vwc[d] = 40;
+    else                 data.vwc[d] = 30;
+
+    // PW-EC progression
+    if (week === 0)      data.pwec[d] = 2.0;
+    else if (week <= 2)  data.pwec[d] = 2.5;
+    else if (week === 3) data.pwec[d] = 3.0;
+    else if (week <= 5)  data.pwec[d] = 4.0;
+    else if (week <= 8)  data.pwec[d] = 4.5;
+    else if (week <= 10) data.pwec[d] = 4.0;
+    else                 data.pwec[d] = 1.5;
+
+    // Drain %
+    data.drain_pct[d] = week <= 2 ? 15 : week <= 8 ? 20 : 10;
+
+    // Irrigation freq
+    data.irrig_freq[d] = week === 0 ? 4 : week <= 2 ? 6 : week <= 8 ? 10 : 8;
+
+    // Steering (0=veg, 100=generative)
+    if (week === 0)      data.steering[d] = 15;
+    else if (week <= 2)  data.steering[d] = 30;
+    else if (week === 3) data.steering[d] = 60;
+    else if (week <= 7)  data.steering[d] = 80;
+    else if (week <= 10) data.steering[d] = 90;
+    else                 data.steering[d] = 50;
+
+    // Overnight dryback % — higher = more generative
+    if (week === 0)      data.dryback[d] = 5;
+    else if (week <= 2)  data.dryback[d] = 8;
+    else if (week === 3) data.dryback[d] = 15;
+    else if (week <= 7)  data.dryback[d] = 20;
+    else if (week <= 10) data.dryback[d] = 25;
+    else                 data.dryback[d] = 30;
+
+    // P0 — small pre-dawn prime to wake root zone (0 in early stages)
+    if (week <= 1)       data.p0_ml[d] = 0;
+    else if (week <= 3)  data.p0_ml[d] = 50;
+    else if (week <= 8)  data.p0_ml[d] = 100;
+    else                 data.p0_ml[d] = 80;
+
+    // P1 — larger wake-up shot to trigger day's first big uptake
+    if (week === 0)      data.p1_ml[d] = 80;
+    else if (week <= 2)  data.p1_ml[d] = 120;
+    else if (week <= 5)  data.p1_ml[d] = 200;
+    else if (week <= 8)  data.p1_ml[d] = 180;
+    else                 data.p1_ml[d] = 120;
+
+    // P2 — repeating day shots (size per event)
+    if (week === 0)      data.p2_ml[d] = 60;
+    else if (week <= 2)  data.p2_ml[d] = 80;
+    else if (week <= 5)  data.p2_ml[d] = 120;
+    else if (week <= 8)  data.p2_ml[d] = 100;
+    else                 data.p2_ml[d] = 80;
+
+    // P3 — end-of-day shot to set overnight starting VWC
+    if (week <= 1)       data.p3_ml[d] = 60;
+    else if (week <= 4)  data.p3_ml[d] = 100;
+    else if (week <= 8)  data.p3_ml[d] = 80;
+    else                 data.p3_ml[d] = 60;
+
+    // Tank pH (Athena): 5.6–6.0 clone/veg, 5.8–6.2 stretch, 6.0–6.2 bulk/finish
+    if (week <= 2)       data.tank_ph[d] = 5.8;
+    else if (week <= 5)  data.tank_ph[d] = 6.0;
+    else                 data.tank_ph[d] = 6.1;
+
+    // Tank EC (feed / input) — Athena: ~3.0 mS/cm veg→bulk, 2.0–3.0 clone & finish
+    if (week === 0)      data.tank_ec[d] = 2.5;   // clone (Athena 2.0–3.0)
+    else if (week <= 9)  data.tank_ec[d] = 3.0;   // veg + stretch + bulk (Athena 3.0)
+    else if (week === 10)data.tank_ec[d] = 2.5;   // finish (Athena 2.0–3.0)
+    else                 data.tank_ec[d] = 2.0;   // flush (Athena finish floor)
+
+    // ── NEW CROP-STEERING SETPOINT DEFAULTS (per-phase by week) ──
+    const ecBase =
+        week === 0 ? 2.0 : week <= 2 ? 2.5 : week === 3 ? 3.0 :
+        week <= 5 ? 4.0 : week <= 8 ? 4.5 : week <= 10 ? 4.0 : 1.5;
+    data.ec_gen_p0[d] = +(ecBase + 0.0).toFixed(1);
+    data.ec_gen_p1[d] = +(ecBase + 0.3).toFixed(1);
+    data.ec_gen_p2[d] = +(ecBase + 0.5).toFixed(1);
+    data.ec_gen_p3[d] = +(ecBase + 0.8).toFixed(1);
+    data.ec_veg_p0[d] = +(ecBase - 0.5).toFixed(1);
+    data.ec_veg_p1[d] = +(ecBase - 0.3).toFixed(1);
+    data.ec_veg_p2[d] = +(ecBase - 0.2).toFixed(1);
+    data.ec_veg_p3[d] = +(ecBase + 0.0).toFixed(1);
+    data.ec_flush[d]  = week >= 11 ? 0.8 : week === 10 ? 1.5 : ecBase;
+
+    data.p0_min_wait[d] = week === 0 ? 60 : week <= 2 ? 45 : week <= 5 ? 30 : week <= 9 ? 20 : 30;
+    data.p0_max_wait[d] = week === 0 ? 240 : week <= 2 ? 180 : week <= 5 ? 120 : week <= 9 ? 90 : 150;
+    data.p1_time_btwn[d] = week <= 2 ? 20 : week <= 9 ? 12 : 15;
+    data.p1_min_shots[d] = week <= 2 ? 2 : week <= 9 ? 3 : 2;
+    data.p1_max_shots[d] = week === 0 ? 4 : week <= 2 ? 6 : week <= 9 ? 10 : 6;
+    data.p3_gen_last[d] = week <= 2 ? 90 : week <= 5 ? 120 : week <= 9 ? 180 : 120;
+    data.p3_veg_last[d] = week <= 2 ? 45 : week <= 5 ? 60 : week <= 9 ? 75 : 60;
+
+    data.p1_target_vwc[d] = week === 0 ? 65 : week <= 2 ? 60 : week <= 4 ? 55 : week <= 9 ? 50 : 45;
+    data.p1_init_pct[d]   = week <= 2 ? 2.0 : week <= 9 ? 3.0 : 2.0;
+    data.p1_incr_pct[d]   = week <= 2 ? 1.0 : week <= 9 ? 2.0 : 1.0;
+    data.p1_max_pct[d]    = week <= 2 ? 5.0 : week <= 9 ? 8.0 : 5.0;
+    data.p2_vwc_thresh[d] = week === 0 ? 60 : week <= 2 ? 55 : week <= 4 ? 48 : week <= 9 ? 42 : 38;
+    data.p2_shot_pct[d]   = week <= 2 ? 3.0 : week <= 9 ? 4.0 : 3.0;
+    data.p2_ec_high[d]    = 1.2;
+    data.p2_ec_low[d]     = 0.8;
+    data.p0_dryback_drop[d] = week === 0 ? 5 : week <= 2 ? 8 : week === 3 ? 12 : week <= 9 ? 15 : 20;
+    data.p3_emerg_vwc[d]  = week <= 2 ? 40 : week <= 9 ? 35 : 30;
+    data.p3_emerg_pct[d]  = week <= 2 ? 3.0 : week <= 9 ? 2.0 : 2.0;
+    data.db_gen_target[d] = week === 0 ? 8 : week <= 2 ? 12 : week === 3 ? 20 : week <= 9 ? 30 : 35;
+    data.db_veg_target[d] = week === 0 ? 5 : week <= 2 ? 8  : week === 3 ? 12 : week <= 9 ? 18 : 22;
+
+    data.field_capacity[d] = 70;
+    data.substrate_vol[d]  = 6.0;
+    data.lights_on_hr[d]   = 6;
+    data.lights_off_hr[d]  = (week === 0) ? 6 : (week <= 2 ? 0 : 18);
+    data.max_ec[d]         = 9.0;
+    data.irrig_ec_min[d]   = 1.0;
+    data.irrig_ec_max[d]   = 7.0;
+    data.irrig_ph_min[d]   = 5.5;
+    data.irrig_ph_max[d]   = 6.5;
+    data.blocked_drip_max[d] = 5;
+    data.dripper_flow[d]   = 2.0;
+    data.drippers_plant[d] = 2;
+
+    data.plant_count[d]   = 12;
+    data.max_daily_vol[d] = week === 0 ? 6 : week <= 2 ? 12 : week <= 9 ? 30 : 20;
+    data.shot_size_mult[d] = 1.0;
+  }
+
+  return data;
+}
+
+function calcVPD(tempC, rh) {
+  const svp = 0.6108 * Math.exp(17.27 * tempC / (tempC + 237.3));
+  return Math.round((svp * (1 - rh / 100)) * 100) / 100;
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let recipe      = buildDefaultRecipe();
+let visParams   = PARAMS.filter(p => p.visible).map(p => p.id);
+let selectedDay = null;
+
+// ── ZONE STATE ──
+let zones = { 1: {}, 2: {}, 3: {} };
+const ZONE_IDS  = [1, 2, 3];
+const ZONE_META = {
+  1: { label: 'Zone 1', color: '#03a9f4', ha_prefix: 'zone_1' },
+  2: { label: 'Zone 2', color: '#f59e0b', ha_prefix: 'zone_2' },
+  3: { label: 'Zone 3', color: '#ec4899', ha_prefix: 'zone_3' },
+};
+let activeZone = 0;
+
+// ── PERSISTENCE ──
+const LS_KEY = 'f2.timeline';
+function saveState() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ schema: 'grow-timeline/v2', recipe, zones, visParams })); }
+  catch (e) { /* quota/full — non-fatal for a planner */ }
+}
+function restoreState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    if (d.recipe) recipe = d.recipe;
+    if (d.zones)  zones  = normalizeZones(d.zones);
+    if (Array.isArray(d.visParams) && d.visParams.length) visParams = d.visParams.filter(id => PARAMS.some(p => p.id === id));
+    return true;
+  } catch { return false; }
+}
+function normalizeZones(z) {
+  const out = { 1: {}, 2: {}, 3: {} };
+  if (!z) return out;
+  for (const zid of ZONE_IDS) {
+    const src = z[zid] || z[String(zid)] || {};
+    for (const pid in src) {
+      out[zid][pid] = {};
+      for (const day in src[pid]) out[zid][pid][+day] = src[pid][day];
+    }
+  }
+  return out;
+}
+
+// ============================================================
+// LEFT PANEL
+// ============================================================
+let dragSrcId = null;
+
+function buildLeftPanel() {
+  const sections = [...new Set(PARAMS.map(p => p.section))];
+  const panel = document.getElementById('leftPanel');
+  panel.innerHTML = '';
+
+  // Show all params in visParams order first, then hidden ones
+  const ordered = [
+    ...visParams.map(id => PARAMS.find(p => p.id === id)).filter(Boolean),
+    ...PARAMS.filter(p => !visParams.includes(p.id)),
+  ];
+
+  // Group into sections preserving order
+  const seen = new Set();
+  for (const p of ordered) {
+    if (seen.has(p.section)) continue;
+    seen.add(p.section);
+    const secParams = ordered.filter(x => x.section === p.section);
+    const secDiv = document.createElement('div');
+    secDiv.innerHTML = `<div class="param-section-header"><div class="dot" style="background:${secParams[0].color}"></div>${p.section}</div>`;
+
+    for (const param of secParams) {
+      const isVis = visParams.includes(param.id);
+      const row = document.createElement('div');
+      row.className = 'param-row';
+      row.dataset.pid = param.id;
+      row.draggable = true;
+      row.innerHTML = `
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
+        <div class="param-color" style="background:${param.color}"></div>
+        <div class="param-name">${param.name}${param.derived ? ' <span style="color:var(--muted);font-size:9px">(auto)</span>' : ''}</div>
+        <div class="param-unit">${param.unit}</div>
+        <div class="param-vis ${isVis ? 'on' : ''}" data-pid="${param.id}">✓</div>
+      `;
+
+      // Visibility toggle
+      row.querySelector('.param-vis').addEventListener('click', e => { e.stopPropagation(); toggleParam(param.id); });
+      row.addEventListener('click', e => { if (!e.target.classList.contains('drag-handle')) toggleParam(param.id); });
+
+      // Drag events
+      row.addEventListener('dragstart', e => {
+        dragSrcId = param.id;
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', param.id);
+      });
+      row.addEventListener('dragend', () => {
+        row.classList.remove('dragging');
+        panel.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      });
+      row.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        panel.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        if (dragSrcId !== param.id) row.classList.add('drag-over');
+      });
+      row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+      row.addEventListener('drop', e => {
+        e.preventDefault();
+        row.classList.remove('drag-over');
+        if (!dragSrcId || dragSrcId === param.id) return;
+        // Reorder visParams
+        const srcInVis = visParams.includes(dragSrcId);
+        const tgtInVis = visParams.includes(param.id);
+        if (srcInVis && tgtInVis) {
+          // Both visible — reorder within visParams
+          const srcIdx = visParams.indexOf(dragSrcId);
+          const tgtIdx = visParams.indexOf(param.id);
+          visParams.splice(srcIdx, 1);
+          visParams.splice(tgtIdx, 0, dragSrcId);
+        } else if (srcInVis && !tgtInVis) {
+          // Dragged onto a hidden row — just move within vis
+          // no-op for hidden targets
+        } else if (!srcInVis && tgtInVis) {
+          // Enable dragged param and insert before target
+          const tgtIdx = visParams.indexOf(param.id);
+          visParams.splice(tgtIdx, 0, dragSrcId);
+        }
+        dragSrcId = null;
+        buildLeftPanel();
+        renderCharts();
+      });
+
+      secDiv.appendChild(row);
+    }
+    panel.appendChild(secDiv);
+  }
+}
+
+function toggleParam(pid) {
+  visParams = visParams.includes(pid) ? visParams.filter(x => x !== pid) : [...visParams, pid];
+  buildLeftPanel();
+  renderCharts();
+}
+
+// ============================================================
+// CANVAS
+// ============================================================
+const dayCanvas   = document.getElementById('dayCanvas');
+const chartCanvas = document.getElementById('chartCanvas');
+const ctxDay      = dayCanvas.getContext('2d');
+const ctxChart    = chartCanvas.getContext('2d');
+
+function renderCharts() {
+  renderZoneBanner();   // keep the override-count banner live as edits land
+  const vp      = visParams.map(id => PARAMS.find(p => p.id === id)).filter(Boolean);
+  const totalW  = TOTAL_DAYS * DAY_W;
+  const totalH  = Math.max(vp.length * ROW_H, 100);
+
+  dayCanvas.width   = totalW;
+  dayCanvas.height  = HDR_H;
+  chartCanvas.width = totalW;
+  chartCanvas.height= totalH;
+
+  drawDayHeader(ctxDay, totalW);
+  drawChartRows(ctxChart, vp, totalW, totalH);
+  syncScroll();
+  buildStatusBar(vp);
+}
+
+function drawDayHeader(ctx, totalW) {
+  ctx.fillStyle = '#111318';
+  ctx.fillRect(0, 0, totalW, HDR_H);
+
+  // Phase bands
+  for (const ph of PHASES) {
+    const x = ph.start * DAY_W, w = (ph.end - ph.start) * DAY_W;
+    ctx.fillStyle = ph.color + '44';
+    ctx.fillRect(x, 0, w, 22);
+    ctx.fillStyle = ph.color;
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(ph.label, x + w / 2, 14);
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(0, 22, totalW, 1);
+
+  for (let d = 0; d < TOTAL_DAYS; d++) {
+    const x        = d * DAY_W;
+    const week     = Math.floor(d / 7);
+    const wd       = WEEK_DATA[Math.min(week, WEEK_DATA.length - 1)];
+    const ph       = PHASES.find(p => d >= p.start && d < p.end) || PHASES[PHASES.length - 1];
+    const isStart  = d % 7 === 0;
+    const isSel    = d === selectedDay;
+
+    if (isSel) {
+      ctx.fillStyle = ph.color + '55';
+      ctx.fillRect(x, 22, DAY_W, HDR_H - 22);
+    }
+
+    ctx.strokeStyle = isStart ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.12)';
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, 22); ctx.lineTo(x, HDR_H);
+    ctx.stroke();
+
+    if (isStart) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = ph.color;
+      ctx.font      = `bold ${Math.max(8, Math.min(10, DAY_W))}px sans-serif`;
+      ctx.fillText(`W${week}`, x + 2, 36);
+      if (DAY_W >= 20) {
+        ctx.fillStyle = '#888';
+        ctx.font      = '9px sans-serif';
+        // Truncate stage name based on available width
+        const maxChars = Math.max(3, Math.floor(DAY_W * 7 / 8));
+        const stageName = wd[1].length > maxChars ? wd[1].slice(0, maxChars) + '…' : wd[1];
+        ctx.fillText(stageName, x + 2, 48);
+        const vpdColor = wd[7] < 0.9 ? '#06b6d4' : wd[7] > 1.3 ? '#ef4444' : '#22c55e';
+        ctx.fillStyle  = vpdColor;
+        ctx.font       = 'bold 8px sans-serif';
+        ctx.fillText(`${wd[7]}`, x + 2, 60);
+      }
+    } else if (DAY_W >= 24) {
+      ctx.fillStyle = isSel ? '#fff' : '#555';
+      ctx.font      = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(d + 1, x + DAY_W / 2, HDR_H - 3);
+    }
+  }
+
+  if (selectedDay !== null) {
+    const sx = selectedDay * DAY_W + DAY_W / 2;
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(sx, 22); ctx.lineTo(sx, HDR_H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function drawChartRows(ctx, vp, totalW, totalH) {
+  ctx.fillStyle = '#0a0c10';
+  ctx.fillRect(0, 0, totalW, totalH);
+
+  for (const ph of PHASES) {
+    const x = ph.start * DAY_W, w = (ph.end - ph.start) * DAY_W;
+    ctx.fillStyle = ph.color + '0b';
+    ctx.fillRect(x, 0, w, totalH);
+  }
+  for (const ph of PHASES) {
+    ctx.strokeStyle = ph.color + '44';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(ph.start * DAY_W, 0);
+    ctx.lineTo(ph.start * DAY_W, totalH);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  vp.forEach((param, ri) => {
+    const rowY = ri * ROW_H;
+
+    ctx.fillStyle = ri % 2 === 0 ? '#0a0c10' : '#0f1318';
+    ctx.fillRect(0, rowY, totalW, ROW_H);
+
+    // Param label mini
+    ctx.fillStyle = param.color + 'bb';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(param.name, 4, rowY + 12);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, rowY + ROW_H); ctx.lineTo(totalW, rowY + ROW_H);
+    ctx.stroke();
+
+    for (let d = 0; d < TOTAL_DAYS; d += 7) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(d * DAY_W, rowY); ctx.lineTo(d * DAY_W, rowY + ROW_H);
+      ctx.stroke();
+    }
+
+    if (selectedDay !== null) {
+      ctx.fillStyle = param.color + '22';
+      ctx.fillRect(selectedDay * DAY_W, rowY, DAY_W, ROW_H);
+    }
+
+    if (!recipe[param.id]) return;
+
+    if (param.categorical) drawCategoricalRow(ctx, param, rowY);
+    else drawLineRow(ctx, param, rowY);
+
+    // per-row OVR badge when the active zone overrides this param
+    if (activeZone !== 0 && paramDiffers(param.id, activeZone)) {
+      ctx.font = 'bold 9px sans-serif';   // match the param-label font so the width measures right
+      const lblW = ctx.measureText(param.name).width;
+      ctx.fillStyle = ZONE_META[activeZone].color;
+      ctx.font = 'bold 8px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('● OVR', 8 + lblW + 6, rowY + 12);
+    }
+  });
+}
+
+function drawLineRow(ctx, param, rowY) {
+  const PAD = 7;
+  const chartH = ROW_H - PAD * 2;
+  const eff = d => getVal(param.id, d, activeZone);
+  const fac = d => recipe[param.id][d];
+  const zoneMode = activeZone !== 0;
+
+  // auto-scale across BOTH effective and facility series so ghost shares the axis
+  let minV = Infinity, maxV = -Infinity;
+  for (let d = 0; d < TOTAL_DAYS; d++) {
+    const a = eff(d), b = fac(d);
+    if (a < minV) minV = a; if (a > maxV) maxV = a;
+    if (zoneMode) { if (b < minV) minV = b; if (b > maxV) maxV = b; }
+  }
+  const range = maxV - minV || 1;
+  const dispMin = minV - range * 0.08;
+  const dispMax = maxV + range * 0.08;
+  const toY = v => rowY + PAD + chartH - ((v - dispMin) / (dispMax - dispMin)) * chartH;
+
+  // override column tint (zone mode)
+  if (zoneMode) {
+    for (let d = 0; d < TOTAL_DAYS; d++) {
+      if (!hasOverride(param.id, d, activeZone)) continue;
+      ctx.fillStyle = ZONE_META[activeZone].color + '22';
+      ctx.fillRect(d * DAY_W, rowY, DAY_W, ROW_H);
+    }
+  }
+
+  // facility ghost line (zone mode)
+  if (zoneMode) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.strokeStyle = param.color + '55';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    for (let d = 0; d < TOTAL_DAYS; d++) {
+      const x = d * DAY_W + DAY_W / 2;
+      d === 0 ? ctx.moveTo(x, toY(fac(d))) : ctx.lineTo(x, toY(fac(d)));
+    }
+    ctx.stroke();
+    ctx.restore();
+    ctx.setLineDash([]);
+  }
+
+  // Area (effective)
+  ctx.save();
+  ctx.beginPath();
+  for (let d = 0; d < TOTAL_DAYS; d++) {
+    const x = d * DAY_W + DAY_W / 2;
+    d === 0 ? ctx.moveTo(x, toY(eff(d))) : ctx.lineTo(x, toY(eff(d)));
+  }
+  ctx.lineTo((TOTAL_DAYS - 1) * DAY_W + DAY_W / 2, rowY + ROW_H - PAD);
+  ctx.lineTo(DAY_W / 2, rowY + ROW_H - PAD);
+  ctx.closePath();
+  ctx.fillStyle = param.color + '22';
+  ctx.fill();
+  ctx.restore();
+
+  // Line (effective)
+  ctx.save();
+  ctx.beginPath();
+  ctx.strokeStyle = param.color;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  for (let d = 0; d < TOTAL_DAYS; d++) {
+    const x = d * DAY_W + DAY_W / 2;
+    d === 0 ? ctx.moveTo(x, toY(eff(d))) : ctx.lineTo(x, toY(eff(d)));
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // Value labels + dots/diamonds at week boundaries
+  ctx.font = 'bold 8px sans-serif';
+  ctx.textAlign = 'center';
+  for (let d = 0; d < TOTAL_DAYS; d += 7) {
+    const x = d * DAY_W + DAY_W / 2;
+    const y = toY(eff(d));
+    const over = zoneMode && hasOverride(param.id, d, activeZone);
+    if (over) {
+      const r = DAY_W < 16 ? 2.5 : 3.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y);
+      ctx.closePath();
+      ctx.fillStyle = ZONE_META[activeZone].color;
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, DAY_W < 16 ? 1.5 : 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = param.color;
+      ctx.fill();
+    }
+    if (DAY_W >= 16) {
+      ctx.fillStyle = param.color + 'cc';
+      ctx.fillText(fmtVal(param, eff(d)), x, Math.max(rowY + 10, y - 4));
+    }
+  }
+}
+
+function drawCategoricalRow(ctx, param, rowY) {
+  for (let d = 0; d < TOTAL_DAYS; d++) {
+    const x = d * DAY_W;
+    const v = getVal(param.id, d, activeZone);
+    let color, label;
+    if (v < 35) { color = '#22c55e'; label = 'Veg'; }
+    else if (v < 65) { color = '#f59e0b'; label = 'Bal'; }
+    else { color = '#ec4899'; label = 'Gen'; }
+    ctx.fillStyle = color + '88';
+    ctx.fillRect(x + 1, rowY + ROW_H - 26, DAY_W - 2, 22);
+    if (activeZone !== 0 && hasOverride(param.id, d, activeZone)) {
+      ctx.strokeStyle = ZONE_META[activeZone].color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 1, rowY + ROW_H - 26, DAY_W - 2, 22);
+    }
+    if (DAY_W > 22) {
+      ctx.fillStyle = '#fff';
+      ctx.font = '8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x + DAY_W / 2, rowY + ROW_H - 10);
+    }
+  }
+}
+
+function fmtVal(param, v) {
+  if (!param) return '';
+  if (param.step < 0.1) return (+v).toFixed(2);
+  if (param.step < 1)   return (+v).toFixed(1);
+  return Math.round(v).toString();
+}
+
+// ============================================================
+// SYNC SCROLL — single container, sticky header canvas handles itself
+// ============================================================
+function syncScroll() {
+  // no-op: single scroll container, sticky canvas keeps header in place
+}
+
+// ============================================================
+// CLICK → SELECT DAY
+// ============================================================
+function getClickDay(e, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const scroll = document.getElementById('mainScroll');
+  const mx = e.clientX - rect.left + scroll.scrollLeft;
+  return Math.max(0, Math.min(TOTAL_DAYS - 1, Math.floor(mx / DAY_W)));
+}
+
+dayCanvas.addEventListener('click', e => {
+  selectedDay = getClickDay(e, dayCanvas);
+  openDayEditor(selectedDay);
+  renderCharts();
+});
+chartCanvas.addEventListener('click', e => {
+  selectedDay = getClickDay(e, chartCanvas);
+  openDayEditor(selectedDay);
+  renderCharts();
+});
+
+// ============================================================
+// DAY EDITOR
+// ============================================================
+function openDayEditor(day) {
+  const week = Math.floor(day / 7);
+  const ph   = PHASES.find(p => day >= p.start && day < p.end) || PHASES[PHASES.length - 1];
+  const wd   = WEEK_DATA[Math.min(week, WEEK_DATA.length - 1)];
+  document.getElementById('deTitle').textContent = `Day ${day + 1} — ${wd[1]}`;
+  document.getElementById('dayEditor').classList.add('open');
+  buildEditorFields(day, ph, week, wd);
+}
+
+function closeDayEditor() {
+  selectedDay = null;
+  document.getElementById('dayEditor').classList.remove('open');
+  renderCharts();
+}
+
+const HAND_CODED = new Set([
+  'temp_day','leaf_temp','rh','air_velocity','co2','photoperiod','ppfd',
+  'vwc','pwec','steering','dryback','p0_ml','p1_ml','p2_ml','p3_ml','tank_ph','tank_ec',
+  'vpd','dli'  // derived, shown in the VPD box / DLI line
+]);
+
+function buildEditorFields(day, ph, week, wd) {
+  const body = document.getElementById('deBody');
+  const vpd  = getVal('vpd',day);
+  const vpdColor = vpd < 0.9 ? '#06b6d4' : vpd > 1.3 ? '#ef4444' : '#22c55e';
+  const vpdLabel = vpd < 0.9 ? 'LOW — Propagation/Veg zone' : vpd > 1.3 ? 'HIGH — Late flower zone' : 'OPTIMAL — Flower zone';
+
+  body.innerHTML = `
+    <div class="phase-badge" style="background:${ph.color}33;color:${ph.color}">${ph.label}</div>
+    <div class="vpd-box">
+      <div class="vpd-val" style="color:${vpdColor}">${vpd}</div>
+      <div class="vpd-label">VPD (kPa)</div>
+      <div class="vpd-zone" style="background:${vpdColor}22;color:${vpdColor}">${vpdLabel}</div>
+    </div>
+    ${wd[9] ? `<div class="notes-box">📝 ${wd[9]}</div>` : ''}
+
+    <div class="de-row">
+      <div class="de-field">
+        <div class="de-label">Room Temp (°C)</div>
+        <input class="de-input" type="number" step="0.5" min="18" max="35" value="${getVal('temp_day',day)}"
+          onchange="updateVal('temp_day',${day},this.value); recalcVPD(${day})">
+      </div>
+      <div class="de-field">
+        <div class="de-label">Leaf Temp (°C)</div>
+        <input class="de-input" type="number" step="0.5" min="15" max="32" value="${getVal('leaf_temp',day)}"
+          onchange="updateVal('leaf_temp',${day},this.value)">
+      </div>
+    </div>
+    <div class="de-row">
+      <div class="de-field">
+        <div class="de-label">RH (%)</div>
+        <input class="de-input" type="number" step="1" min="30" max="90" value="${getVal('rh',day)}"
+          onchange="updateVal('rh',${day},this.value); recalcVPD(${day})">
+      </div>
+      <div class="de-field">
+        <div class="de-label">Air Velocity (m/s)</div>
+        <input class="de-input" type="number" step="0.05" min="0" max="3" value="${getVal('air_velocity',day)}"
+          onchange="updateVal('air_velocity',${day},this.value)">
+      </div>
+    </div>
+    <div class="de-row">
+      <div class="de-field">
+        <div class="de-label">CO₂ (ppm)</div>
+        <input class="de-input" type="number" step="50" min="400" max="1800" value="${getVal('co2',day)}"
+          onchange="updateVal('co2',${day},this.value)">
+      </div>
+      <div class="de-field">
+        <div class="de-label">Photoperiod (hrs)</div>
+        <input class="de-input" type="number" step="0.5" min="10" max="24" value="${getVal('photoperiod',day)}"
+          onchange="updateVal('photoperiod',${day},this.value); recalcDLI(${day})">
+      </div>
+    </div>
+    <div class="de-field">
+      <div class="de-label">PPFD (μmol/m²/s)</div>
+      <input class="de-input" type="number" step="25" min="0" max="1400" value="${getVal('ppfd',day)}"
+        onchange="updateVal('ppfd',${day},this.value); recalcDLI(${day})">
+      <div style="margin-top:4px;font-size:10px;color:var(--muted)">DLI: <span id="dliShow">${getVal('dli',day).toFixed(1)}</span> mol/m²/d</div>
+    </div>
+    <div class="de-row">
+      <div class="de-field">
+        <div class="de-label">VWC (%)</div>
+        <input class="de-input" type="number" step="1" min="20" max="80" value="${getVal('vwc',day)}"
+          onchange="updateVal('vwc',${day},this.value)">
+      </div>
+      <div class="de-field">
+        <div class="de-label">PW-EC (mS/cm)</div>
+        <input class="de-input" type="number" step="0.1" min="0.5" max="6" value="${getVal('pwec',day)}"
+          onchange="updateVal('pwec',${day},this.value)">
+      </div>
+    </div>
+    <div class="de-field">
+      <div class="de-label">Plant Steering</div>
+      <input type="range" min="0" max="100" value="${getVal('steering',day)}" style="width:100%"
+        oninput="updateVal('steering',${day},this.value); document.getElementById('steerLabel').textContent=steeringLabel(this.value)">
+      <div id="steerLabel" style="font-size:11px;text-align:center;margin-top:4px;font-weight:600;color:#ec4899">${steeringLabel(getVal('steering',day))}</div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px">💧 Irrigation Strategy</div>
+
+    <div class="de-field">
+      <div class="de-label" style="color:#f43f5e">Overnight Dryback (%)</div>
+      <input class="de-input" type="number" step="1" min="0" max="50" value="${getVal('dryback',day)}"
+        onchange="updateVal('dryback',${day},this.value)">
+      <div style="margin-top:3px;font-size:10px;color:var(--muted)">Target VWC drop from lights-off to first P1</div>
+    </div>
+
+    <div class="de-row">
+      <div class="de-field">
+        <div class="de-label" style="color:#94a3b8">P0 Shot (mL)</div>
+        <input class="de-input" type="number" step="10" min="0" max="500" value="${getVal('p0_ml',day)}"
+          onchange="updateVal('p0_ml',${day},this.value)">
+        <div style="margin-top:2px;font-size:9px;color:var(--muted)">Pre-dawn prime</div>
+      </div>
+      <div class="de-field">
+        <div class="de-label" style="color:#38bdf8">P1 Shot (mL)</div>
+        <input class="de-input" type="number" step="10" min="0" max="500" value="${getVal('p1_ml',day)}"
+          onchange="updateVal('p1_ml',${day},this.value)">
+        <div style="margin-top:2px;font-size:9px;color:var(--muted)">Wake-up / first big shot</div>
+      </div>
+    </div>
+
+    <div class="de-row">
+      <div class="de-field">
+        <div class="de-label" style="color:#0ea5e9">P2 Shots (mL)</div>
+        <input class="de-input" type="number" step="10" min="0" max="400" value="${getVal('p2_ml',day)}"
+          onchange="updateVal('p2_ml',${day},this.value)">
+        <div style="margin-top:2px;font-size:9px;color:var(--muted)">Repeating day shots</div>
+      </div>
+      <div class="de-field">
+        <div class="de-label" style="color:#0369a1">P3 Shot (mL)</div>
+        <input class="de-input" type="number" step="10" min="0" max="400" value="${getVal('p3_ml',day)}"
+          onchange="updateVal('p3_ml',${day},this.value)">
+        <div style="margin-top:2px;font-size:9px;color:var(--muted)">End-of-day set VWC</div>
+      </div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px">🧪 Tank / Feed</div>
+
+    <div class="de-row">
+      <div class="de-field">
+        <div class="de-label" style="color:#fb923c">Tank pH</div>
+        <input class="de-input" type="number" step="0.1" min="5.0" max="7.0" value="${getVal('tank_ph',day)}"
+          onchange="updateVal('tank_ph',${day},this.value)">
+      </div>
+      <div class="de-field">
+        <div class="de-label" style="color:#fbbf24">Tank EC (mS/cm)</div>
+        <input class="de-input" type="number" step="0.1" min="0.5" max="5.0" value="${getVal('tank_ec',day)}"
+          onchange="updateVal('tank_ec',${day},this.value)">
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:12px">PW-EC target: <strong style="color:var(--text)">${getVal('pwec',day)} mS/cm</strong> → expect ~${(getVal('pwec',day) * 1.1).toFixed(1)} mS/cm runoff</div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+    <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Apply to range:</div>
+    <div class="de-row">
+      <div class="de-field">
+        <div class="de-label">From Day</div>
+        <input class="de-input" type="number" min="1" max="${TOTAL_DAYS}" value="${day + 1}" id="rangeFrom">
+      </div>
+      <div class="de-field">
+        <div class="de-label">To Day</div>
+        <input class="de-input" type="number" min="1" max="${TOTAL_DAYS}" value="${Math.min(day + 7, TOTAL_DAYS)}" id="rangeTo">
+      </div>
+    </div>
+    <button class="apply-btn" onclick="applyRange(${day})">Apply to Range</button>
+    <button class="apply-btn" onclick="applyToPhase('${ph.id}',${day})">Apply to Entire Phase: ${ph.label}</button>
+    <button class="apply-btn" onclick="applyToWeek(${week},${day})">Apply to Week ${week}</button>
+  `;
+  body.insertAdjacentHTML('beforeend', renderExtraSetpoints(day));
+}
+
+function renderExtraSetpoints(day) {
+  const extras = PARAMS.filter(p => !p.derived && !p.categorical && !HAND_CODED.has(p.id));
+  if (!extras.length) return '';
+  let html = `<hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px">⚙️ Crop-Steering Setpoints${activeZone !== 0 ? ` — <span style="color:${ZONE_META[activeZone].color}">${ZONE_META[activeZone].label}</span>` : ''}</div>`;
+  let curSection = null;
+  for (const p of extras) {
+    if (p.section !== curSection) {
+      curSection = p.section;
+      html += `<div style="font-size:10px;color:var(--muted);margin:10px 0 4px">${curSection}</div>`;
+    }
+    const ov = hasOverride(p.id, day, activeZone);
+    const val = getVal(p.id, day, activeZone);
+    const facHint = (activeZone !== 0)
+      ? `<span style="font-size:9px;color:var(--muted);margin-left:6px">${ov ? `<span style="cursor:pointer" title="Reset to Facility" onclick="clearOverride('${p.id}',${day})">↺ facility: ${recipe[p.id][day]}</span>` : 'inherits Facility'}</span>`
+      : '';
+    const border = ov ? `border-color:${ZONE_META[activeZone].color};` : '';
+    html += `<div class="de-field">
+      <div class="de-label">${p.name}${p.unit ? ` (${p.unit})` : ''}${facHint}</div>
+      <input class="de-input" style="${border}" type="number" step="${p.step}" min="${p.min}" max="${p.max}" value="${val}"
+        onchange="updateVal('${p.id}',${day},this.value)">
+    </div>`;
+  }
+  if (activeZone !== 0) {
+    html += `<button class="apply-btn" onclick="clearDay(${day})">↺ Reset Day ${day + 1} to Facility (this zone)</button>`;
+  }
+  return html;
+}
+
+function steeringLabel(v) {
+  v = parseInt(v);
+  return v < 35 ? '🌿 Vegetative' : v < 65 ? '⚖️ Balanced' : '🌸 Generative';
+}
+
+// ── ZONE-AWARE RESOLVER / WRITER ──
+function getVal(paramId, day, zone = activeZone) {
+  if (zone !== 0) {
+    const layer = zones[zone] && zones[zone][paramId];
+    if (layer && Object.prototype.hasOwnProperty.call(layer, day)) return layer[day];
+  }
+  return recipe[paramId][day];
+}
+function getValFor(zone, paramId, day) { return getVal(paramId, day, zone); }
+function hasOverride(paramId, day, zone) {
+  const layer = zones[zone] && zones[zone][paramId];
+  return !!layer && Object.prototype.hasOwnProperty.call(layer, day);
+}
+function paramDiffers(paramId, zone) {
+  const layer = zones[zone] && zones[zone][paramId];
+  return !!layer && Object.keys(layer).length > 0;
+}
+function setVal(paramId, day, value, zone = activeZone) {
+  const v = parseFloat(value);
+  if (zone === 0) { recipe[paramId][day] = v; saveState(); return; }
+  const z = zones[zone];
+  const layer = (z[paramId] || (z[paramId] = {}));
+  if (v === recipe[paramId][day]) {
+    delete layer[day];
+    if (Object.keys(layer).length === 0) delete z[paramId];
+  } else {
+    layer[day] = v;
+  }
+  saveState();
+}
+function clearOverride(paramId, day, zone = activeZone) {
+  const layer = zones[zone] && zones[zone][paramId];
+  if (!layer) return;
+  delete layer[day];
+  if (Object.keys(layer).length === 0) delete zones[zone][paramId];
+  saveState();
+  if (selectedDay !== null) openDayEditor(selectedDay);
+  renderCharts();
+}
+function clearDay(day, zone = activeZone) {
+  if (zone === 0) return;
+  for (const pid of Object.keys(zones[zone])) {
+    delete zones[zone][pid][day];
+    if (Object.keys(zones[zone][pid]).length === 0) delete zones[zone][pid];
+  }
+  saveState();
+  if (selectedDay !== null) openDayEditor(day);
+  renderCharts();
+}
+function clearZone(zone) {
+  if (zone === 0) return;
+  if (!confirm(`Clear all ${ZONE_META[zone].label} overrides? Reverts to Facility.`)) return;
+  zones[zone] = {};
+  saveState();
+  if (selectedDay !== null) openDayEditor(selectedDay);
+  renderCharts();
+}
+function recalcDerived(day) {
+  setVal('vpd', day, calcVPD(getVal('temp_day', day), getVal('rh', day)));
+  setVal('dli', day, +((getVal('ppfd', day) * getVal('photoperiod', day) * 3600) / 1e6).toFixed(2));
+}
+
+function updateVal(paramId, day, value) {
+  setVal(paramId, day, value);
+  renderCharts();
+}
+
+function recalcVPD(day) {
+  recalcDerived(day);
+  const v  = getVal('vpd', day);
+  const el = document.querySelector('.vpd-val');
+  if (el) {
+    el.textContent = v;
+    el.style.color = v < 0.9 ? '#06b6d4' : v > 1.3 ? '#ef4444' : '#22c55e';
+  }
+  renderCharts();
+}
+
+function recalcDLI(day) {
+  recalcDerived(day);
+  const el = document.getElementById('dliShow');
+  if (el) el.textContent = getVal('dli', day).toFixed(1);
+  renderCharts();
+}
+
+function applyRange(fromDay) {
+  const from = parseInt(document.getElementById('rangeFrom').value) - 1;
+  const to   = parseInt(document.getElementById('rangeTo').value)   - 1;
+  for (let d = from; d <= to && d < TOTAL_DAYS; d++) {
+    for (const p of PARAMS.filter(x => !x.derived)) setVal(p.id, d, getVal(p.id, fromDay));
+    recalcDerived(d);
+  }
+  saveState();
+  renderCharts();
+}
+
+function applyToPhase(phaseId, fromDay) {
+  const ph = PHASES.find(p => p.id === phaseId);
+  if (!ph) return;
+  for (let d = ph.start; d < ph.end; d++) {
+    for (const p of PARAMS.filter(x => !x.derived)) setVal(p.id, d, getVal(p.id, fromDay));
+    recalcDerived(d);
+  }
+  saveState();
+  renderCharts();
+}
+
+function applyToWeek(week, fromDay) {
+  const start = week * 7, end = Math.min(start + 7, TOTAL_DAYS);
+  for (let d = start; d < end; d++) {
+    for (const p of PARAMS.filter(x => !x.derived)) setVal(p.id, d, getVal(p.id, fromDay));
+    recalcDerived(d);
+  }
+  saveState();
+  renderCharts();
+}
+
+// ============================================================
+// ZOOM / FIT
+// ============================================================
+function setDayW(v) {
+  if (v === 'fit') {
+    const available = document.getElementById('mainScroll').clientWidth || window.innerWidth - 250 - 290;
+    DAY_W = Math.max(8, Math.floor(available / TOTAL_DAYS));
+  } else {
+    DAY_W = v;
+  }
+  // update button states
+  document.querySelectorAll('.topbar .btn').forEach(b => b.classList.remove('active'));
+  const map = {8:'zSm', 14:'zSm', 28:'zMd', 48:'zLg'};
+  if (v === 'fit') document.getElementById('zFit').classList.add('active');
+  else if (map[v]) document.getElementById(map[v]).classList.add('active');
+  renderCharts();
+}
+
+function setZone(z) {
+  activeZone = z;
+  renderZoneBanner();
+  if (selectedDay !== null) openDayEditor(selectedDay);
+  renderCharts();
+}
+
+function renderZoneBanner() {
+  const sel = document.getElementById('zoneSelect');
+  if (sel) sel.value = String(activeZone);
+  const banner = document.getElementById('zoneBanner');
+  if (!banner) return;
+  if (activeZone === 0) { banner.style.display = 'none'; return; }
+  const m = ZONE_META[activeZone];
+  let paramsOver = 0, daysOver = 0;
+  for (const pid in zones[activeZone]) { paramsOver++; daysOver += Object.keys(zones[activeZone][pid]).length; }
+  banner.style.display = 'flex';
+  banner.style.background = m.color + '18';
+  banner.style.color = m.color;
+  banner.innerHTML =
+    `<strong>Editing ${m.label}</strong>` +
+    `<span style="color:var(--muted)">${paramsOver} param(s) overridden across ${daysOver} day-cell(s) — blank days inherit Facility</span>` +
+    `<button class="btn" style="margin-left:auto" onclick="clearZone(${activeZone})">Clear ${m.label}</button>`;
+}
+
+// ============================================================
+// PHASE JUMP
+// ============================================================
+function jumpToPhase(phaseId) {
+  const ph = PHASES.find(p => p.id === phaseId);
+  if (!ph) return;
+  const scroll = document.getElementById('mainScroll');
+  scroll.scrollLeft = ph.start * DAY_W;
+  // (header canvas is sticky inside #mainScroll and scrolls with it — no separate scroll element)
+}
+
+// ============================================================
+// STATUS BAR
+// ============================================================
+function buildStatusBar(vp) {
+  const d    = selectedDay !== null ? selectedDay : 0;
+  const week = Math.floor(d / 7);
+  const wd   = WEEK_DATA[Math.min(week, WEEK_DATA.length - 1)];
+  const items = ['temp_day','leaf_temp','rh','vpd','co2','ppfd','air_velocity'].map(id => {
+    const p = PARAMS.find(x => x.id === id);
+    if (!p) return '';
+    return `<div class="status-item"><span class="status-swatch" style="background:${p.color}"></span>${p.name}: <strong>${fmtVal(p, recipe[id][d])} ${p.unit}</strong></div>`;
+  }).join('');
+  document.getElementById('statusBar').innerHTML =
+    `<span style="color:var(--muted)">Day ${d+1} / W${week} — ${wd[1]}:</span> ` + items;
+}
+
+// ============================================================
+// EXPORT / IMPORT / RESET
+// ============================================================
+function exportJSON() {
+  const payload = {
+    schema: 'grow-timeline/v2',
+    meta: {
+      totalDays: TOTAL_DAYS,
+      weeks: WEEK_DATA.length,
+      zones: ZONE_IDS.map(z => ({ id: z, ...ZONE_META[z] })),
+    },
+    recipe,
+    zones: pruneZones(zones),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'grow-recipe.json' });
+  a.click();
+}
+
+function pruneZones(z) {
+  const out = {};
+  for (const zid of ZONE_IDS) {
+    const layers = {};
+    for (const pid in (z[zid] || {})) if (Object.keys(z[zid][pid]).length) layers[pid] = z[zid][pid];
+    if (Object.keys(layers).length) out[zid] = layers;
+  }
+  return out;
+}
+
+function importRecipe() {
+  const inp = Object.assign(document.createElement('input'), { type: 'file', accept: '.json' });
+  inp.onchange = e => {
+    const fr = new FileReader();
+    fr.onload = ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        recipe = d.recipe || d;            // v1 (bare/{meta,recipe}) and v2 both supply .recipe
+        zones  = normalizeZones(d.zones);  // missing => empty layers
+        activeZone = 0;
+        saveState();
+        renderZoneBanner();
+        buildLeftPanel();
+        renderCharts();
+      } catch { alert('Invalid JSON.'); }
+    };
+    fr.readAsText(e.target.files[0]);
+  };
+  inp.click();
+}
+
+function resetToDefaults() {
+  if (confirm('Reset all setpoints AND clear all zone overrides to the standard recipe?')) {
+    recipe = buildDefaultRecipe();
+    zones = { 1: {}, 2: {}, 3: {} };
+    activeZone = 0;
+    saveState();
+    renderZoneBanner();
+    closeDayEditor();
+    renderCharts();
+  }
+}
+
+// ============================================================
+// HA SYNC (T9) — push the timeline week's setpoints to Home Assistant
+// ============================================================
+// timeline param id -> [crop_steering entity suffix, scope]. scope: 'both' (global + per-zone), 'global', 'zone' (per-zone only).
+const HA_SYNC = {
+  ec_gen_p0:['ec_target_gen_p0','both'], ec_gen_p1:['ec_target_gen_p1','both'], ec_gen_p2:['ec_target_gen_p2','both'], ec_gen_p3:['ec_target_gen_p3','both'],
+  ec_veg_p0:['ec_target_veg_p0','both'], ec_veg_p1:['ec_target_veg_p1','both'], ec_veg_p2:['ec_target_veg_p2','both'], ec_veg_p3:['ec_target_veg_p3','both'],
+  ec_flush:['ec_target_flush','both'],
+  p0_min_wait:['p0_minimum_wait_time','both'], p0_max_wait:['p0_maximum_wait_time','both'],
+  p1_time_btwn:['p1_time_between_shots','both'], p1_min_shots:['p1_minimum_shots','both'], p1_max_shots:['p1_maximum_shots','both'],
+  p3_gen_last:['p3_gen_last_irrigation','both'], p3_veg_last:['p3_veg_last_irrigation','both'],
+  p1_target_vwc:['p1_target_vwc','both'], p1_init_pct:['p1_initial_shot_size','both'], p1_incr_pct:['p1_shot_size_increment','both'], p1_max_pct:['p1_maximum_shot_size','both'],
+  p2_vwc_thresh:['p2_vwc_threshold','both'], p2_shot_pct:['p2_shot_size','both'], p2_ec_high:['p2_ec_high_threshold','both'], p2_ec_low:['p2_ec_low_threshold','both'],
+  p0_dryback_drop:['p0_dryback_drop_percent','both'], p3_emerg_vwc:['p3_emergency_vwc_threshold','both'], p3_emerg_pct:['p3_emergency_shot_size','both'],
+  db_gen_target:['generative_dryback_target','both'], db_veg_target:['vegetative_dryback_target','both'],
+  field_capacity:['field_capacity','global'], substrate_vol:['substrate_volume','global'],
+  lights_on_hr:['lights_on_hour','global'], lights_off_hr:['lights_off_hour','global'],
+  max_ec:['maximum_ec','global'], irrig_ec_min:['irrigation_ec_min','global'], irrig_ec_max:['irrigation_ec_max','global'],
+  irrig_ph_min:['irrigation_ph_min','global'], irrig_ph_max:['irrigation_ph_max','global'],
+  blocked_drip_max:['blocked_dripper_max_shots_30min','global'], dripper_flow:['dripper_flow_rate','global'], drippers_plant:['drippers_per_plant','global'],
+  plant_count:['plant_count','zone'], max_daily_vol:['max_daily_volume','zone'], shot_size_mult:['shot_size_multiplier','zone'],
+};
+const HA_GROWWEEK  = 'sensor.f2_grow_week';
+const HA_AUTOPILOT = 'input_boolean.crop_steering_timeline_autopilot';
+let HA = { base: localStorage.getItem('cs_base') || location.origin, token: localStorage.getItem('cs_token') || '' };
+const haUrl = p => HA.base.replace(/\/$/, '') + p;
+async function haGet(entity) { const r = await fetch(haUrl('/api/states/' + entity), { headers:{ Authorization:'Bearer ' + HA.token } }); if (!r.ok) throw new Error(entity + ' ' + r.status); return r.json(); }
+async function haSet(entity, value) { const r = await fetch(haUrl('/api/services/number/set_value'), { method:'POST', headers:{ Authorization:'Bearer ' + HA.token, 'Content-Type':'application/json' }, body: JSON.stringify({ entity_id: entity, value }) }); if (!r.ok) throw new Error('set ' + entity + ' ' + r.status); }
+async function haTest() { const r = await fetch(haUrl('/api/'), { headers:{ Authorization:'Bearer ' + HA.token } }); return r.ok; }
+
+function computeWeekWrites(week) {
+  const day = Math.min(Math.max(week, 0), WEEK_DATA.length - 1) * 7;   // representative = week start
+  const writes = [];
+  for (const pid in HA_SYNC) {
+    if (!recipe[pid]) continue;
+    const [suffix, scope] = HA_SYNC[pid];
+    const fac = recipe[pid][day];
+    if (scope === 'global' || scope === 'both') writes.push({ entity:'number.crop_steering_' + suffix, newVal: fac, label: suffix });
+    if (scope === 'both') for (const z of ZONE_IDS) { if (hasOverride(pid, day, z)) writes.push({ entity:`number.crop_steering_zone_${z}_${suffix}`, newVal: getVal(pid, day, z), label:`Z${z} ${suffix}` }); }
+    if (scope === 'zone') for (const z of ZONE_IDS) writes.push({ entity:`number.crop_steering_zone_${z}_${suffix}`, newVal: getVal(pid, day, z), label:`Z${z} ${suffix}` });
+  }
+  return writes;
+}
+async function previewWeek(week) {
+  const writes = computeWeekWrites(week);
+  const cur = {};
+  await Promise.all(writes.map(async w => { try { const s = await haGet(w.entity); cur[w.entity] = parseFloat(s.state); } catch (e) { cur[w.entity] = NaN; } }));
+  const changed = writes.filter(w => isNaN(cur[w.entity]) || Math.abs(cur[w.entity] - w.newVal) > 1e-6);
+  return { writes, cur, changed };
+}
+async function applyWeekToHA(week, silent) {
+  if (!HA.token) { openHASync(); return; }
+  let res; try { res = await previewWeek(week); } catch (e) { if (!silent) alert('HA read failed: ' + e.message); return; }
+  if (!res.changed.length) { if (!silent) haToast('Week ' + week + ': HA already matches.'); return; }
+  if (!silent) {
+    const lines = res.changed.slice(0, 40).map(w => `• ${w.label}:  ${isNaN(res.cur[w.entity]) ? '—' : res.cur[w.entity]} -> ${w.newVal}`).join('\n');
+    if (!confirm(`Apply Week ${week} to HA?\nWrites ${res.changed.length} crop-steering setpoint(s) LIVE:\n\n${lines}${res.changed.length > 40 ? '\n…' : ''}`)) return;
+  }
+  let ok = 0, fail = 0;
+  for (const w of res.changed) { try { await haSet(w.entity, w.newVal); ok++; } catch (e) { fail++; } }
+  haToast(`Week ${week} → HA: ${ok} written${fail ? ', ' + fail + ' failed' : ''}`);
+}
+
+// ── autopilot: while this page is open + the switch is ON, auto-apply on grow-week change ──
+let _lastAutoWeek = null;
+async function autopilotTick() {
+  if (!HA.token) return;
+  let ap, gw;
+  try { ap = await haGet(HA_AUTOPILOT); gw = await haGet(HA_GROWWEEK); } catch (e) { return; }
+  if (ap.state !== 'on') { _lastAutoWeek = null; return; }
+  const week = Math.round(parseFloat(gw.state));
+  if (isNaN(week)) return;
+  if (_lastAutoWeek === null) { _lastAutoWeek = week; return; }   // baseline on first ON tick — never mass-write on page load
+  if (week !== _lastAutoWeek) { _lastAutoWeek = week; haToast('Autopilot: grow week → ' + week + ', applying…'); applyWeekToHA(week, true); }
+}
+setInterval(autopilotTick, 60000);
+
+// ── modal UI ──
+function haToast(msg) { const t = document.getElementById('haToast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._t); t._t = setTimeout(() => t.style.display = 'none', 3400); }
+function openHASync() { document.getElementById('haModal').style.display = 'flex'; renderHASync(); }
+function closeHASync() { document.getElementById('haModal').style.display = 'none'; }
+function connectHTML() {
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 style="font-size:16px;font-weight:800">Connect to Home Assistant</h2><span style="cursor:pointer;color:var(--muted)" onclick="closeHASync()">✕</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Paste a long-lived token (Profile → Security). Stored only in this browser (localStorage), never in the file.</div>
+    <input id="haInBase" placeholder="${location.origin}" value="${HA.base}" style="width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:6px;margin-bottom:8px">
+    <input id="haInToken" placeholder="eyJhbG…" type="password" style="width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:6px;margin-bottom:8px">
+    <div id="haConnErr" style="font-size:12px;color:#f87171;margin-bottom:8px"></div>
+    <button class="btn primary" onclick="haConnect()">Connect</button>`;
+}
+async function haConnect() {
+  const base = document.getElementById('haInBase').value.trim() || location.origin;
+  const token = document.getElementById('haInToken').value.trim();
+  HA = { base, token };
+  try { if (!await haTest()) throw new Error('auth'); localStorage.setItem('cs_base', base); localStorage.setItem('cs_token', token); renderHASync(); }
+  catch (e) { document.getElementById('haConnErr').textContent = 'Could not connect (' + e.message + ')'; }
+}
+async function renderHASync() {
+  const card = document.getElementById('haModalCard');
+  if (!HA.token) { card.innerHTML = connectHTML(); return; }
+  card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 style="font-size:16px;font-weight:800">⇅ Apply timeline → Home Assistant</h2><span style="cursor:pointer;color:var(--muted)" onclick="closeHASync()">✕</span></div>
+    <div id="haStatus" style="font-size:12px;color:var(--muted);margin-bottom:12px">Checking connection…</div>
+    <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:12px">
+      <div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px">Grow week to apply</div>
+        <input id="haWeek" type="number" min="0" max="${WEEK_DATA.length - 1}" value="0" style="width:90px;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);padding:7px 9px;border-radius:6px"></div>
+      <button class="btn primary" onclick="haPreviewClick()">Preview &amp; Apply</button>
+    </div>
+    <div id="haDiff" style="font-size:12px;max-height:38vh;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:10px;display:none;font-family:ui-monospace,Menlo,Consolas,monospace"></div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+    <label style="display:flex;align-items:flex-start;gap:9px;font-size:13px;cursor:pointer">
+      <input type="checkbox" id="haAutoToggle" style="margin-top:3px" onchange="haToggleAutopilot(this.checked)">
+      <span><b>Autopilot</b> — auto-apply the new week whenever the F2 grow week changes <span style="color:var(--muted)">(runs only while this page is open; default off)</span></span></label>
+    <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5">Writes only crop-steering setpoints (EC grid, dryback, P0–P3, limits, dripper, zone setup). Climate (temp/RH/CO₂/PPFD) is plan-only — set those on your climate controller. Facility values → global entities; per-zone overrides → <code>number.crop_steering_zone_N_*</code>.</div>`;
+  try {
+    const gw = await haGet(HA_GROWWEEK);
+    const ap = await haGet(HA_AUTOPILOT).catch(() => ({ state:'unavailable' }));
+    document.getElementById('haStatus').innerHTML = `Connected ✓ · F2 grow week <b style="color:var(--text)">${gw.state}</b>`;
+    const wk = document.getElementById('haWeek'); wk.value = Math.min(Math.max(Math.round(parseFloat(gw.state)) || 0, 0), WEEK_DATA.length - 1);
+    const at = document.getElementById('haAutoToggle'); at.checked = ap.state === 'on';
+    if (ap.state === 'unavailable') { at.disabled = true; at.parentElement.title = HA_AUTOPILOT + ' not found — create it to enable autopilot'; }
+  } catch (e) { const s = document.getElementById('haStatus'); if (s) s.textContent = 'Connect error: ' + e.message; }
+}
+async function haPreviewClick() {
+  const week = parseInt(document.getElementById('haWeek').value) || 0;
+  const diff = document.getElementById('haDiff'); diff.style.display = 'block'; diff.textContent = 'Reading HA…';
+  let res; try { res = await previewWeek(week); } catch (e) { diff.textContent = 'Read failed: ' + e.message; return; }
+  if (!res.changed.length) { diff.innerHTML = `<span style="color:var(--accent)">HA already matches week ${week} — nothing to write.</span>`; return; }
+  diff.innerHTML = res.changed.slice(0, 80).map(w => `<div>${w.label}: <span style="color:var(--muted)">${isNaN(res.cur[w.entity]) ? '—' : res.cur[w.entity]}</span> → <b>${w.newVal}</b></div>`).join('')
+    + `<button class="btn primary" style="margin-top:10px" onclick="applyWeekToHA(${week}).then(()=>{closeHASync();})">✓ Write ${res.changed.length} change(s) to HA</button>`;
+}
+async function haToggleAutopilot(on) {
+  try { await fetch(haUrl('/api/services/input_boolean/' + (on ? 'turn_on' : 'turn_off')), { method:'POST', headers:{ Authorization:'Bearer ' + HA.token, 'Content-Type':'application/json' }, body: JSON.stringify({ entity_id: HA_AUTOPILOT }) }); haToast('Autopilot ' + (on ? 'ON' : 'OFF')); _lastAutoWeek = null; }
+  catch (e) { haToast('Autopilot toggle failed'); }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+restoreState();
+new ResizeObserver(() => renderCharts()).observe(document.getElementById('mainScroll'));
+renderZoneBanner();
+buildLeftPanel();
+renderCharts();
+</script>
+</body>
+</html>
+
+
+
+
+

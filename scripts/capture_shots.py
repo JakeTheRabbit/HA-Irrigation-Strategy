@@ -7,7 +7,7 @@ data, clicks through the views, and writes PNGs into img/. Token comes from HA_T
 import base64, json, os, subprocess, sys, time, urllib.request, glob, websocket
 
 TOK = os.environ.get("HA_TOKEN", "")
-BASE = os.environ.get("HA_BASE", "http://192.168.73.250:8123")
+BASE = os.environ.get("HA_BASE", "http://homeassistant.local:8123")
 OUT = os.path.join(os.path.dirname(__file__), "..", "img")
 DESK = BASE + "/local/crop_steering_dashboard.html"
 MOB = BASE + "/local/crop_steering_mobile.html"

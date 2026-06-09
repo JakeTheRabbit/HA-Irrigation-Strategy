@@ -189,6 +189,7 @@
   <section class="view on" data-v="home" id="v-home"><div class="empty">connecting…</div></section>
   <section class="view" data-v="zones" id="v-zones"></section>
   <section class="view" data-v="control" id="v-control"></section>
+  <section class="view" data-v="model" id="v-model"></section>
 </div></main>
 
 <div class="modal" id="modal"><div class="box">
@@ -466,63 +467,17 @@ function renderZones(){const z=selZone,v=vwcWord(z),e=ecWord(z),db=dbWord(z),flo
 
 /* ================= render: CONTROL ================= */
 function pretty(s){return String(s||"").replace(/_/g," ").replace(/\bp([0-3])\b/gi,"P$1").replace(/\bec\b/gi,"EC").replace(/\bvwc\b/gi,"VWC").replace(/\bph\b/gi,"pH").replace(/\b\w/g,c=>c.toUpperCase());}
-/* per-parameter coaching: what it does · what a good number is & why · the system's recommendation (some live-computed). No double-quotes (goes in an HTML attribute). */
-const HELP={
- p0_dryback_drop_percent:{what:"How far VWC must fall from the overnight peak before P0 ends and the P1 morning ramp begins.",good:"Bigger drop = more generative wake-up. 2–4% typical.",rec:"3%"},
- p0_minimum_wait_time:{what:"Earliest P1 can start after lights-on, even if the dryback target is already hit. Stops feeding a sleeping canopy.",good:"30–60 min.",rec:"45 min"},
- p0_maximum_wait_time:{what:"Failsafe — force P1 to start this long after lights-on even if dryback never hit.",good:"60–120 min.",rec:"90 min"},
- p1_target_vwc:{what:"The VWC the engine ramps the block up to during the P1 morning saturation.",good:"A few % under field capacity so P2 has headroom to dry back.",rec:()=>{const fc=N("number.crop_steering_field_capacity");return fc?`about ${r0(fc-3)}% (FC ${r0(fc)} minus 3)`:"about FC minus 3%";}},
- p1_initial_shot_size:{what:"Size of the first P1 shot, as % of substrate volume.",good:"2–3% of pot volume — small, frequent wet-up.",rec:"2%"},
- p1_shot_size_increment:{what:"How much each successive P1 shot grows.",good:"0.5–1%.",rec:"0.5%"},
- p1_maximum_shot_size:{what:"Cap on any single P1 shot.",good:"As much as the block takes without runoff — around 10%.",rec:"10%"},
- p1_minimum_shots:{what:"Fewest P1 shots before P1 can finish — guarantees an even wet-up.",good:"3–5.",rec:"3"},
- p1_maximum_shots:{what:"Most P1 shots before the engine forces into P2.",good:"8–12.",rec:"10"},
- p1_time_between_shots:{what:"Gap between P1 shots so VWC can settle and read true before the next.",good:"10–20 min.",rec:"15 min"},
- p2_vwc_threshold:{what:"P2 maintenance floor — a shot fires whenever VWC drops to this. Sets your daily dryback band.",good:"Lower = more generative stress; keep above the P3 night floor.",rec:()=>{const t=N(`number.crop_steering_zone_${selZone}_p1_target_vwc`);return t?`about ${r0(t-6)}% (P1 target minus your dryback)`:"P1 target minus ~6%";}},
- p2_shot_size:{what:"Replenish shot size in P2, as % of pot volume.",good:"Big enough to lift VWC back near target in one shot — 3–6%.",rec:"5%"},
- p2_ec_high_threshold:{what:"Pore-EC ratio (multiple of target) above which P2 shots get BIGGER to dilute stacked salts.",good:"About 1.2x target.",rec:"1.2"},
- p2_ec_low_threshold:{what:"Pore-EC ratio below which P2 shots SHRINK to let EC concentrate.",good:"About 0.8x target.",rec:"0.8"},
- p3_emergency_vwc_threshold:{what:"Overnight (P3) hard floor — only an emergency rescue shot fires below this. Keeps nights dry and generative.",good:"Well under the P2 floor.",rec:"40%"},
- p3_emergency_shot_size:{what:"Size of a P3 emergency rescue shot — just enough to lift off the floor.",good:"2–3%.",rec:"2%"},
- p3_veg_last_irrigation:{what:"Minutes before lights-off to stop irrigating (vegetative steering).",good:"30–60 min.",rec:"45 min"},
- p3_gen_last_irrigation:{what:"Minutes before lights-off to stop irrigating (generative — earlier cutoff = drier, more stressful night).",good:"60–120 min.",rec:"60 min"},
- field_capacity:{what:"Max VWC the block holds before runoff — the ceiling every other VWC number is measured against.",good:"Measure it: saturate to runoff, read the plateau. 6L rockwool is ~60–70%.",rec:"your measured plateau"},
- substrate_volume:{what:"Litres of medium per plant — converts shot % into litres/seconds.",good:"Your actual block size.",rec:"6 L"},
- dripper_flow_rate:{what:"One dripper-s flow in L/hr — converts a shot % into pump seconds.",good:"From the emitter spec.",rec:"4 L/hr"},
- drippers_per_plant:{what:"Emitters per plant — total flow = this times the dripper flow.",good:"Your hardware count.",rec:"1"},
- generative_dryback_target:{what:"Daily % VWC drop the engine steers toward in Generative. Bigger dryback = more stress = more generative.",good:"15–30%.",rec:"25–30%"},
- vegetative_dryback_target:{what:"Daily % VWC drop for Vegetative. Smaller = steadier moisture = more vegetative growth.",good:"10–20%.",rec:"15%"},
- maximum_ec:{what:"Hard substrate-EC ceiling — no shot fires while pore-EC is above this. Root-burn cutoff.",good:"Roughly 1.5–2x your feed EC.",rec:"~9"},
- irrigation_ec_min:{what:"Reject source water below this EC (catches an under-mixed batch or a dead EC probe).",good:"Just under your feed EC.",rec:"feed minus 0.5"},
- irrigation_ec_max:{what:"Reject source water above this EC (catches an over-concentrated batch).",good:"Just over your feed EC.",rec:"feed plus 0.5"},
- irrigation_ph_min:{what:"Reject source water below this pH.",good:"5.5 suits rockwool/hydro.",rec:"5.5"},
- irrigation_ph_max:{what:"Reject source water above this pH.",good:"6.5.",rec:"6.5"},
- lights_on_hour:{what:"Photoperiod start (24h clock). Resets the daily counters and kicks off P0 to P1.",good:"Match your light timer exactly.",rec:"10"},
- lights_off_hour:{what:"Photoperiod end. Forces the engine into P3/night.",good:"Match your light timer exactly.",rec:"22"},
- blocked_dripper_max_shots_30min:{what:"Emergency shots allowed in 30 min before the blocked-dripper guard parks the zone for 2h.",good:"3–5.",rec:"4"},
- max_daily_volume:{what:"Hard cap on litres this zone may use in a day — flood protection if a valve sticks.",good:"About 1.5x a normal day-s use.",rec:"size to the plants"},
- plant_count:{what:"Plants on this zone — scales total water.",good:"Actual count.",rec:"actual"},
- shot_size_multiplier:{what:"Trims every shot for THIS zone vs the global recipe — use when one zone runs wetter/drier.",good:"Leave at 1.0 unless a zone drifts.",rec:"1.0"},
-};
-const EC_HELP="Pore-EC target for this phase (mS/cm). Higher EC steers generative / less stretch; lower steers vegetative. Gen row runs hotter than Veg; Flush is the low-EC rinse value. Ramp it across P0 to P3 per your feed chart (e.g. Athena).";
-function helpFor(id){const suf=(id.split("crop_steering_")[1]||"").replace(/^zone_\d+_/,"");const h=HELP[suf];if(!h)return"";let s=h.what;const g=typeof h.good==="function"?h.good():h.good,rc=typeof h.rec==="function"?h.rec():h.rec;if(g)s+=" · Good: "+g;if(rc)s+=" · System recommends: "+rc;return s;}
-function numRow(id,help,lab){const name=lab||pretty(id.split("crop_steering_")[1]||id);help=helpFor(id)||help||"";return `<div class="row"><span class="rl">${name}${help?`<span class="hi" data-tip="${help}">i</span>`:""}</span><input class="ni" type="number" step="${A(id,'step')||0.1}" value="${S(id)}" onchange="setNum('${id}',this.value)"/><span class="ru">${A(id,'unit_of_measurement')||""}</span></div>`;}
+/* Setpoint coaching/help + numRow/ecGrid removed — all setpoints now live in the Tune tab (crop_steering_tune.html FIELDTIPS). Control is ops-only. */
 function selRow(id,lab){const o=A(id,"options")||[];return `<div class="row"><span class="rl">${lab||pretty((id.split(".")[1]||"").replace(/^crop_steering_/,""))}</span><select class="sel" onchange="setSel('${id}',this.value)">${o.map(x=>`<option ${x===S(id)?"selected":""}>${x}</option>`).join("")}</select></div>`;}
 function swRow(id,lab,help){return `<div class="row"><span class="rl">${lab}${help?`<span class="hi" data-tip="${help}">i</span>`:""}</span><div class="tg sm ${S(id)==='on'?'on':''}" onclick="toggleEntity('${id}')"></div></div>`;}
-function ecGrid(pfx){const cell=s=>{const id=`number.crop_steering_${pfx}ec_target_${s}`;return `<input class="ecni" type="number" step="0.1" value="${S(id)}" onchange="setNum('${id}',this.value)" data-tip="${EC_HELP}"/>`;};
-  return `<table class="ecg"><tr><th></th><th>P0</th><th>P1</th><th>P2</th><th>P3</th></tr><tr><td class="ecr">Gen</td><td>${cell('gen_p0')}</td><td>${cell('gen_p1')}</td><td>${cell('gen_p2')}</td><td>${cell('gen_p3')}</td></tr><tr><td class="ecr">Veg</td><td>${cell('veg_p0')}</td><td>${cell('veg_p1')}</td><td>${cell('veg_p2')}</td><td>${cell('veg_p3')}</td></tr><tr><td class="ecr">Flush</td><td colspan="4">${cell('flush')}</td></tr></table>`;}
 window.setCtrlSec=k=>{ctrlSec=k;renderControl();};
-let ctrlSec="global";
-function renderControl(){const mode=S("select.crop_steering_steering_mode"),dbT=mode==="Generative"?N("number.crop_steering_generative_dryback_target"):N("number.crop_steering_vegetative_dryback_target"),phase=S("sensor.crop_steering_app_current_phase")||"—",z=selZone,gp=S("input_select.growth_phase"),np=S("input_select.nutrient_phase");
-  const pcard=(p,ids)=>`<details ${p===phase?"open":""}><summary>${p} recipe${p===phase?` · <span style="color:${C.green}">ACTIVE</span>`:""}</summary><div class="db">${ids.filter(has).map(i=>numRow(i)).join("")}</div></details>`;
-  const zn=(suf,help)=>numRow(`number.crop_steering_zone_${z}_${suf}`,help,pretty(suf));
-  const pz=(p,sufs)=>`<details><summary>Zone ${z} ${p}${(zphase(z)||"").includes(p)?` · <span style="color:${C.green}">ACTIVE</span>`:""}</summary><div class="db">${sufs.map(s=>zn(s)).join("")}</div></details>`;
-  // SIMPLE (always-visible) controls
+let ctrlSec="zone";
+function renderControl(){const mode=S("select.crop_steering_steering_mode"),dbT=mode==="Generative"?N("number.crop_steering_generative_dryback_target"):N("number.crop_steering_vegetative_dryback_target"),phase=S("sensor.crop_steering_app_current_phase")||"—",z=selZone;
+  // Tune owns every setpoint now (P0–P3, EC grid, climate, guardrails, dripper, zone setup). Control = live OPS console: arm, modes, switches, telemetry.
   const SIMPLE=`<div class="card"><h3>Active Strategy</h3>
       <div class="pills"><div class="pill"><small>Mode</small><b>${mode||"—"}</b></div><div class="pill"><small>Phase</small><b>${phase}</b></div><div class="pill"><small>Dryback</small><b>${r0(dbT)}%</b></div><div class="pill"><small>Field cap</small><b>${r0(N("number.crop_steering_field_capacity"))}%</b></div></div>
       ${selRow("select.crop_steering_steering_mode","Steering Mode")}${selRow("select.crop_steering_growth_stage","Growth Stage")}
-      ${numRow(mode==="Generative"?"number.crop_steering_generative_dryback_target":"number.crop_steering_vegetative_dryback_target","Active dryback target (% drop from peak)","Dryback target")}
-      ${numRow("number.crop_steering_field_capacity","Max water the block holds before runoff","Field capacity")}</div>
+      <p class="sub" style="margin:8px 2px 0">Setpoints (P0–P3, EC grid, climate, guardrails, dripper, zone setup) live in the <b>🎚 Tune</b> tab — edit on the curve, apply to HA there.</p></div>
     <div class="card"><h3>Arm & pump</h3>
       ${swRow("switch.crop_steering_system_enabled","System enabled (master)")}${swRow("switch.crop_steering_auto_irrigation_enabled","Auto irrigation")}
       <div class="row" style="border-top:1px solid var(--br);margin-top:6px;padding-top:12px"><span class="rl">🚰 Flush mode<span class="hi" data-tip="Manually hosing each plant from the pump — engine hands off veg_main_pump">i</span></span><div class="tg sm ${S('input_boolean.f2_flush_mode')==='on'?'on':''}" onclick="toggleEntity('input_boolean.f2_flush_mode')"></div></div>
@@ -532,27 +487,20 @@ function renderControl(){const mode=S("select.crop_steering_steering_mode"),dbT=
       <div class="row"><span class="rl">Vmax confidence min<span class="hi" data-tip="Only act on a detected Vmax at/above this detector confidence (agreeing-signals ÷ total). Higher = more cautious.">i</span></span><input class="ni" type="number" step="0.05" value="${S('input_number.f2_vmax_confidence_min')}" onchange="setVal('input_number.f2_vmax_confidence_min',this.value)"/></div>
       <div class="row"><span class="rl">P1 climb per day<span class="hi" data-tip="Max % the P1 target rises per day toward the detected Vmax.">i</span></span><input class="ni" type="number" step="0.5" value="${S('input_number.f2_p1_climb_rate_per_day')}" onchange="setVal('input_number.f2_p1_climb_rate_per_day',this.value)"/><span class="ru">%</span></div>
       <div class="row"><span class="rl">P1 margin below Vmax<span class="hi" data-tip="P1 target is capped this far below the detected Vmax so it never targets exact saturation.">i</span></span><input class="ni" type="number" step="0.5" value="${S('input_number.f2_p1_margin')}" onchange="setVal('input_number.f2_p1_margin',this.value)"/><span class="ru">%</span></div></div>`;
-  // ADVANCED (collapsed)
-  const ADV_GLOBAL=`${pcard("P0",["number.crop_steering_p0_dryback_drop_percent","number.crop_steering_p0_minimum_wait_time","number.crop_steering_p0_maximum_wait_time"])}
-    ${pcard("P1",["number.crop_steering_p1_target_vwc","number.crop_steering_p1_initial_shot_size","number.crop_steering_p1_shot_size_increment","number.crop_steering_p1_maximum_shot_size","number.crop_steering_p1_minimum_shots","number.crop_steering_p1_maximum_shots","number.crop_steering_p1_time_between_shots"])}
-    ${pcard("P2",["number.crop_steering_p2_vwc_threshold","number.crop_steering_p2_shot_size","number.crop_steering_p2_ec_high_threshold","number.crop_steering_p2_ec_low_threshold"])}
-    ${pcard("P3",["number.crop_steering_p3_emergency_vwc_threshold","number.crop_steering_p3_emergency_shot_size","number.crop_steering_p3_veg_last_irrigation","number.crop_steering_p3_gen_last_irrigation"])}
-    <details><summary>Global EC targets by phase (mS/cm)</summary><div class="db">${ecGrid("")}</div></details>
-    <details><summary>Substrate & hardware</summary><div class="db">${numRow("number.crop_steering_substrate_volume","Block volume per plant")}${numRow("number.crop_steering_dripper_flow_rate","Per-dripper flow")}${numRow("number.crop_steering_drippers_per_plant")}${numRow("number.crop_steering_p0_dryback_drop_percent")}</div></details>`;
+  // ZONE OPS — modes / profile / phase-pin / switches only (no setpoints)
   const ADV_ZONE=`<details open><summary>Zone ${z} — mode, profile, switches</summary><div class="db">${selRow(`select.crop_steering_zone_${z}_steering_mode`,"Steering Mode")}${has(`select.crop_steering_zone_${z}_crop_profile`)?selRow(`select.crop_steering_zone_${z}_crop_profile`,"Crop Profile"):""}${has(`input_select.crop_steering_zone_${z}_phase_control`)?selRow(`input_select.crop_steering_zone_${z}_phase_control`,"Manual phase pin"):""}${swRow(`switch.crop_steering_zone_${z}_enabled`,`Zone ${z} enabled`)}${swRow(`switch.crop_steering_zone_${z}_manual_override`,`Zone ${z} manual override`)}${swRow(`switch.crop_steering_zone_${z}_dripper_protection`,`Zone ${z} dripper protection`,"Abandons emergency shots if a blocked dripper won't raise VWC")}</div></details>
-    <details><summary>Zone ${z} setup & EC targets</summary><div class="db">${zn("max_daily_volume","Daily water cap")}${zn("plant_count")}${zn("shot_size_multiplier")}${ecGrid(`zone_${z}_`)}</div></details>
-    ${pz("P1",["p1_target_vwc","p1_initial_shot_size","p1_maximum_shot_size","p1_maximum_shots","p1_time_between_shots"])}
-    ${pz("P2",["p2_vwc_threshold","p2_shot_size","p2_ec_high_threshold","p2_ec_low_threshold"])}
-    ${pz("P3",["p3_emergency_vwc_threshold","p3_emergency_shot_size","p3_veg_last_irrigation"])}`;
-  const ADV_SAFETY=`<details open><summary>Guardrails</summary><div class="db">${numRow("number.crop_steering_maximum_ec","Hard substrate-EC cutoff")}${numRow("number.crop_steering_irrigation_ec_min")}${numRow("number.crop_steering_irrigation_ec_max")}${numRow("number.crop_steering_irrigation_ph_min")}${numRow("number.crop_steering_irrigation_ph_max")}${numRow("number.crop_steering_lights_on_hour")}${numRow("number.crop_steering_lights_off_hour")}${numRow("number.crop_steering_blocked_dripper_max_shots_30min")}</div></details>
+    <p class="sub" style="margin:4px 2px">Zone ${z} setpoints — plant count, daily cap, shot multiplier, EC grid, P1–P3 — are in the <b>🎚 Tune</b> tab.</p>`;
+  // STATUS — guardrails (read-only mirror of Tune), switches, telemetry, feed
+  const gd=id=>{const v=S("number.crop_steering_"+id);return v==null||v===""?"—":v;};
+  const ADV_STATUS=`<details open><summary>Guardrails (read-only · edit in Tune)</summary><div class="db"><table class="kv"><tr><td>Max EC cutoff</td><td>${gd("maximum_ec")} mS/cm</td></tr><tr><td>Irrigation EC band</td><td>${gd("irrigation_ec_min")} – ${gd("irrigation_ec_max")} mS/cm</td></tr><tr><td>Irrigation pH band</td><td>${gd("irrigation_ph_min")} – ${gd("irrigation_ph_max")}</td></tr><tr><td>Lights on → off</td><td>${gd("lights_on_hour")}:00 → ${gd("lights_off_hour")}:00</td></tr><tr><td>Blocked-dripper max shots / 30m</td><td>${gd("blocked_dripper_max_shots_30min")}</td></tr></table></div></details>
     <details><summary>Other switches</summary><div class="db">${swRow("switch.crop_steering_ec_stacking_enabled","EC stacking")}${has("switch.crop_steering_analytics_enabled")?swRow("switch.crop_steering_analytics_enabled","Analytics"):""}</div></details>
     <details><summary>Engine internals (read-only)</summary><div class="db"><table class="kv"><tr><td>App status</td><td>${S("sensor.crop_steering_app_status")||"—"}</td></tr><tr><td>System state</td><td>${S("sensor.crop_steering_system_state")||"—"}</td></tr><tr><td>Current decision</td><td>${S("sensor.crop_steering_current_decision")||"—"}</td></tr><tr><td>AI heartbeat</td><td>${S("sensor.crop_steering_ai_heartbeat")||"—"} · ${fmtAge(ageMin("sensor.crop_steering_ai_heartbeat"))}</td></tr><tr><td>P2 VWC threshold (adj)</td><td>${r1(N("sensor.crop_steering_p2_vwc_threshold_adjusted"))}%</td></tr><tr><td>Est. daily water need</td><td>${r1(N("sensor.crop_steering_prediction_estimated_daily_water_need"))} L</td></tr></table></div></details>
     <details><summary>Recent activity feed</summary><div class="db"><div class="feed" id="ctrlfeed"></div></div></details>`;
-  const subbar=`<div class="csub2">${[["global","Global"],["zone","Zone "+z],["safety","Safety"]].map(([k,l])=>`<div class="csbtn ${k===ctrlSec?'on':''}" onclick="setCtrlSec('${k}')">${l}</div>`).join("")}${ctrlSec==='zone'?`<div style="display:flex;gap:4px;margin-left:6px">${ZONES.map(zz=>`<div class="csbtn ${zz===z?'on':''}" onclick="setZone(${zz})" style="padding:7px 11px">Z${zz}</div>`).join("")}</div>`:""}</div>`;
-  el("v-control").innerHTML=`<p class="lead"><b>Control surface.</b> The everyday knobs are up top; everything else is tucked into <b>Advanced</b>. Edits commit to HA immediately — no undo.</p>
+  const subbar=`<div class="csub2">${[["zone","Zone "+z],["status","Status"]].map(([k,l])=>`<div class="csbtn ${k===ctrlSec?'on':''}" onclick="setCtrlSec('${k}')">${l}</div>`).join("")}${ctrlSec==='zone'?`<div style="display:flex;gap:4px;margin-left:6px">${ZONES.map(zz=>`<div class="csbtn ${zz===z?'on':''}" onclick="setZone(${zz})" style="padding:7px 11px">Z${zz}</div>`).join("")}</div>`:""}</div>`;
+  el("v-control").innerHTML=`<p class="lead"><b>Live ops surface.</b> Arm state, modes & switches commit to HA immediately — no undo. <b>Setpoints moved to the 🎚 Tune tab.</b></p>
     ${SIMPLE}
     <div class="sec">Advanced</div>${subbar}
-    ${ctrlSec==='global'?ADV_GLOBAL:ctrlSec==='safety'?ADV_SAFETY:ADV_ZONE}`;
+    ${ctrlSec==='status'?ADV_STATUS:ADV_ZONE}`;
   const f=el("ctrlfeed"),raw=A("sensor.crop_steering_activity_log","feed");if(f&&raw)f.innerHTML=String(raw).split("\n").filter(Boolean).slice(0,30).map(l=>`<div>${l.replace(/[<>]/g,"")}</div>`).join("");}
 
 /* ================= services ================= */
@@ -594,7 +542,44 @@ function redrawBig(){if(!gKind||!el("gmodal").classList.contains("open"))return;
     leg.innerHTML=ZONES.map((z,i)=>`<span class="lgc${OVL_HIDDEN.has(`z${z}v`)?' off':''}" onclick="toggleSeries('z${z}v')" style="--lc:${OVL_V[i]}">● Z${z} VWC</span>`).join("")+ZONES.map((z,i)=>`<span class="lgc${OVL_HIDDEN.has(`z${z}e`)?' off':''}" onclick="toggleSeries('z${z}e')" style="--lc:${OVL_E[i]}">● Z${z} EC</span>`).join("");
     const cv=el("gCanvas");cv.onmousemove=e=>{const r=cv.getBoundingClientRect();drawOverlay(e.clientX-r.left,"gCanvas");};cv.onmouseleave=()=>drawOverlay(null,"gCanvas");drawOverlay(null,"gCanvas");
   }else{el("gTitle").textContent=`Zone ${selZone} trace · 24h`;tools.innerHTML="";leg.innerHTML="";const cv=el("gCanvas");cv.onmousemove=null;cv.onmouseleave=null;drawTrace("gCanvas");}}
-const RENDER={home:renderHome,zones:renderZones,control:renderControl};
+/* ===== Tune tab: embedded visual setpoint editor (crop_steering_tune.html) bridged by postMessage ===== */
+const TUNE_ZK=["p0_minimum_wait_time","p0_maximum_wait_time","p0_dryback_drop_percent","p1_target_vwc","p1_initial_shot_size","p1_shot_size_increment","p1_maximum_shot_size","p1_time_between_shots","p1_minimum_shots","p1_maximum_shots","p2_vwc_threshold","p2_shot_size","p2_ec_high_threshold","p2_ec_low_threshold","p3_emergency_vwc_threshold","p3_emergency_shot_size","p3_gen_last_irrigation","p3_veg_last_irrigation","generative_dryback_target","vegetative_dryback_target","ec_target_gen_p0","ec_target_veg_p0","ec_target_gen_p1","ec_target_gen_p2","ec_target_gen_p3","ec_target_veg_p1","ec_target_veg_p2","ec_target_veg_p3","ec_target_flush","plant_count","max_daily_volume","shot_size_multiplier"];
+const TUNE_GK={field_capacity:"field_capacity",substrate_volume:"substrate_volume",lights_on:"lights_on_hour",lights_off:"lights_off_hour",maximum_ec:"maximum_ec",irrigation_ec_min:"irrigation_ec_min",irrigation_ec_max:"irrigation_ec_max",irrigation_ph_min:"irrigation_ph_min",irrigation_ph_max:"irrigation_ph_max",blocked_dripper_max_shots_30min:"blocked_dripper_max_shots_30min",dripper_flow_rate:"dripper_flow_rate",drippers_per_plant:"drippers_per_plant"};
+function tuneSeed(){const zones={};ZONES.forEach(z=>{const o={};TUNE_ZK.forEach(k=>{const v=N(`number.crop_steering_zone_${z}_${k}`);if(v!=null)o[k]=v;});zones[z]=o;});
+  const global={};for(const k in TUNE_GK){const v=N("number.crop_steering_"+TUNE_GK[k]);if(v!=null)global[k]=v;}
+  const t=N(CLIM.temp),rh=N(CLIM.rh);if(t!=null)global.temp=t;if(rh!=null)global.rh=rh;
+  const rt=N("sensor.crop_steering_zone_1_root_temp")??N("sensor.f2_row_1_temperature");if(rt!=null)global.root_temp=rt;   // substrate temp for root-zone inferences
+  return {type:"cs-tune-data",zones,global};}
+function tuneApply(zone,ch,gG){const rows=[];
+  TUNE_ZK.forEach(k=>{if(ch[k]==null)return;const id=`number.crop_steering_zone_${zone}_${k}`,cur=N(id);if(cur!=null&&Math.abs(cur-ch[k])>1e-6)rows.push([id,cur,ch[k]]);});
+  if(gG)for(const k in TUNE_GK){if(gG[k]==null)continue;const id="number.crop_steering_"+TUNE_GK[k],cur=N(id);if(cur!=null&&Math.abs(cur-gG[k])>1e-6)rows.push([id,cur,gG[k]]);}
+  if(!rows.length){alert("Zone "+zone+": nothing changed.");return;}
+  if(!confirm(`Apply ${rows.length} change${rows.length>1?"s":""} to Zone ${zone}? Writes live to the controller.\n\n`+rows.map(r=>"• "+r[0].replace("number.crop_steering_","")+":  "+r[1]+" → "+r[2]).join("\n")))return;
+  if(DEMO){rows.forEach(r=>{if(ST[r[0]])ST[r[0]].state=String(r[2]);});const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(tuneSeed(),"*");return;}
+  rows.forEach(r=>svc("number","set_value",{entity_id:r[0],value:r[2]}));}  // svc schedules a refresh → re-seeds the iframe (readback)
+let tuneWired=false,tuneSizer=null;
+function sizeTune(){const f=el("tuneFrame");try{const b=f&&f.contentDocument&&f.contentDocument.body;const h=b&&b.scrollHeight;if(h&&Math.abs((parseInt(f.style.height)||0)-h)>8)f.style.height=(h+12)+"px";}catch(e){}}   // same-origin: size iframe to content → one scrollbar
+async function fetchTuneHistory(zone,days){try{if(DEMO)return;const sid=(RAW[zone]||{}).vwc;if(!sid)return;
+  const end=new Date(),start=new Date(end.getTime()-days*24*3600*1000);
+  const r=await api(`/api/history/period/${start.toISOString()}?filter_entity_id=${sid}&minimal_response&end_time=${encodeURIComponent(end.toISOString())}`);
+  const arr=(r&&r[0])||[];if(!arr.length)return;
+  const t0=new Date(arr[0].last_changed||arr[0].last_updated).getTime();
+  const pts=arr.map(o=>{const v=parseFloat(o.state),tt=new Date(o.last_changed||o.last_updated).getTime();return [(tt-t0)/3600000,v];}).filter(p=>!isNaN(p[1])&&isFinite(p[0]));
+  const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage({type:"cs-tune-history",pts},"*");
+}catch(e){console.warn("tune history failed:",e.message);}}
+function renderModel(){const host=el("v-model");
+  if(!host.dataset.built){host.dataset.built="1";host.innerHTML=`<iframe id="tuneFrame" src="crop_steering_tune.html?${DEMO?"demo&":""}_=${Date.now()}" scrolling="no" style="width:100%;height:1400px;border:0;border-radius:12px;background:#0a0c10;display:block;overflow:hidden"></iframe>`;
+    const fr=el("tuneFrame");if(fr)fr.addEventListener("load",()=>[200,600,1200,2200].forEach(d=>setTimeout(sizeTune,d)));}
+  if(!tuneSizer)tuneSizer=setInterval(sizeTune,700);
+  if(!tuneWired){tuneWired=true;window.addEventListener("message",ev=>{const d=ev.data;if(!d)return;
+    if(d.type==="cs-tune-ready"){const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(tuneSeed(),"*");[100,500,1200].forEach(t=>setTimeout(sizeTune,t));}
+    else if(d.type==="cs-tune-h"){const f=el("tuneFrame");if(f&&d.h>300)f.style.height=d.h+"px";}
+    else if(d.type==="cs-tune-apply"){tuneApply(d.zone,d.changes||{},d.global);}
+    else if(d.type==="cs-tune-pull"){const f=el("tuneFrame");if(f&&f.contentWindow)f.contentWindow.postMessage(Object.assign(tuneSeed(),{explicit:true}),"*");}
+    else if(d.type==="cs-tune-apply-one"){if(d.entity&&d.value!=null){if(confirm(`Apply optimal setpoint?\n\n${d.label||d.entity}\n→ ${d.entity}`)){svc("number","set_value",{entity_id:d.entity,value:d.value});}}}
+    else if(d.type==="cs-tune-history-req"){fetchTuneHistory(d.zone,d.days);}});}
+  sizeTune();}   // NOTE: do NOT reseed here — clobbers the user's edits on every tab-switch. Seed happens once on cs-tune-ready; explicit refresh via cs-tune-pull.
+const RENDER={home:renderHome,zones:renderZones,control:renderControl,model:renderModel};
 function renderActive(){renderVbar();(RENDER[curView]||renderHome)();redrawBig();if(el("drawer")&&el("drawer").classList.contains("open"))renderDrawer();}
 async function refresh(){if(!CFG.token){openModal();return;}
   try{const states=await api("/api/states");ST={};states.forEach(s=>ST[s.entity_id]=s);TICK++;
@@ -606,7 +591,7 @@ async function refresh(){if(!CFG.token){openModal();return;}
 function startLoop(){if(timer)clearInterval(timer);refresh();timer=setInterval(refresh,60000);}
 
 /* ================= tabs / modal / boot ================= */
-const TABS=[["home","◆ Home"],["zones","🌱 Zones"],["control","🎛 Control"]];
+const TABS=[["home","◆ Home"],["zones","🌱 Zones"],["control","🎛 Control"],["model","🎚 Tune"]];
 el("tabs").innerHTML=TABS.map((t,i)=>`<div class="tab ${i?"":"on"}" data-t="${t[0]}">${t[1]}${t[0]==="home"?' <span class="cnt" id="homeCnt" style="display:none"></span>':""}</div>`).join("");
 function switchTab(t){curView=t;document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x.dataset.t===t));document.querySelectorAll(".view").forEach(x=>x.classList.toggle("on",x.dataset.v===t));renderActive();window.scrollTo(0,0);}
 window.switchTab=switchTab;

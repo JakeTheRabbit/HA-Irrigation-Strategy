@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0c10">
+<title>F2 Crop-Steering Editor · full setpoints</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* palette aligned to the plant-state-dashboard (jaketherabbit.github.io/plant-state-dashboard) */
+  :root{--bg:#0a0c10;--bg2:#0f1318;--card:#141a21;--card2:#19212a;--hair:rgba(255,255,255,.08);--ink:#e7ecf2;--ink2:#aab4c0;--ink3:#727d8a;
+    --ok:#34d399;--okdim:#10b981;--accent:#34d399;--accent2:#22d3ee;--warn:#fbbf24;
+    --p0:#8b93a1;--p1:#38bdf8;--p2:#34d399;--p3:#fbbf24;--ec:#f472b6;--crit:#f87171;--maxw:1320px;}
+  *{box-sizing:border-box}
+  body{margin:0;color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;line-height:1.5;
+    background:radial-gradient(42rem 42rem at -8% -12%,rgba(16,185,129,.10),transparent 60%),radial-gradient(36rem 36rem at 112% 34%,rgba(34,211,238,.07),transparent 60%),var(--bg);background-attachment:fixed}
+  ::selection{background:rgba(52,211,153,.25)}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+  .glass{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--hair);box-shadow:0 10px 40px -22px rgba(0,0,0,.65)}
+  .grad{background:linear-gradient(135deg,#6ee7b7,#34d399 50%,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+  [x-cloak]{display:none!important}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:clamp(14px,3vw,26px)}
+  .kicker{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ok);background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);padding:5px 11px;border-radius:999px}
+  h1{font-size:clamp(1.4rem,1.1rem+1.6vw,2rem);font-weight:800;letter-spacing:-.02em;margin:12px 0 4px}
+  .sub{color:var(--ink2);max-width:78ch;font-size:.92rem}
+  .layout{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+  .panel{border-radius:18px;padding:clamp(12px,2vw,18px)}
+  svg{width:100%;height:auto;display:block;touch-action:none;user-select:none}
+  .topbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .steer{margin:0 0 12px}
+  .steer .lab{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink2);margin-bottom:6px}
+  .steer .lab b{color:var(--ink)}
+  .steer input[type=range]{width:100%;height:14px;-webkit-appearance:none;appearance:none;border-radius:999px;outline:none;cursor:pointer;
+    background:linear-gradient(90deg,#34d399,#a3e635 34%,#fbbf24 68%,#f472b6)}
+  .steer input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid #0a0c10;box-shadow:0 1px 5px rgba(0,0,0,.55);cursor:grab;margin-top:0}
+  .steer input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid #0a0c10;cursor:grab}
+  .steer .ends{display:flex;justify-content:space-between;font-size:11px;color:var(--ink3);margin-top:4px}
+  .seg{display:inline-flex;border:1px solid var(--hair);border-radius:10px;overflow:hidden;flex:none}
+  .seg button{font:inherit;font-size:12.5px;padding:8px 12px;border:0;background:transparent;color:var(--ink2);cursor:pointer}
+  .seg button.on{background:var(--p2);color:#06281c;font-weight:700}
+  .seg.mode button.on{background:var(--p3);color:#1a0e03}
+  .hint{font-size:11.5px;color:var(--ink3);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap}
+  .hint b{color:var(--ink2)}
+  .readout{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .pill{font-size:11.5px;padding:5px 10px;border-radius:999px;background:var(--card2);border:1px solid var(--hair);color:var(--ink2)}
+  .pill b{color:var(--ink)}
+  .verdict{font-size:13px;color:var(--ink2);margin-left:auto;text-align:right;max-width:50%}
+  .verdict b{color:var(--ink)}
+
+  .settings-grid{display:grid;gap:12px;grid-template-columns:1fr}
+  @media(min-width:560px){.settings-grid{grid-template-columns:1fr 1fr}}
+  @media(min-width:920px){.settings-grid{grid-template-columns:repeat(3,1fr)}}
+  @media(min-width:1180px){.settings-grid{grid-template-columns:repeat(6,1fr)}}
+  .grp{border-radius:13px;border:1px solid var(--hair);background:var(--card2);padding:11px 12px;transition:border-color .15s}
+  .grp.hot{border-color:var(--ph)}
+  .grp .gh{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+  .grp .dot{width:10px;height:10px;border-radius:3px;flex:none}
+  .grp .gh h3{margin:0;font-size:.9rem;font-weight:700}
+  .grp .gh .ph{font-size:9.5px;font-weight:800;color:#0a0c10;padding:1px 5px;border-radius:4px}
+  .frow{display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid rgba(255,255,255,.05)}
+  .frow:first-of-type{border-top:0}
+  .frow .fl{font-size:11.5px;color:var(--ink2);flex:1;min-width:0;line-height:1.25}
+  .frow{transition:background .12s,box-shadow .12s}
+  .frow.lit{background:linear-gradient(90deg,color-mix(in srgb,var(--ph,#38bdf8) 22%,transparent),transparent);border-radius:8px;box-shadow:inset 3px 0 0 var(--ph,#38bdf8)}
+  .frow.lit .fl{color:var(--ink);font-weight:600}
+  .step{display:inline-flex;align-items:center;border:1px solid var(--hair);border-radius:8px;overflow:hidden;background:var(--bg);flex:none}
+  .step button{width:24px;height:30px;border:0;background:transparent;color:var(--ink2);font-size:15px;cursor:pointer;padding:0}
+  .step button:hover{background:rgba(255,255,255,.06);color:var(--ink)}
+  .step input{width:44px;height:30px;border:0;background:transparent;color:var(--ink);text-align:center;font:inherit;font-size:13px;-moz-appearance:textfield}
+  .step input::-webkit-outer-spin-button,.step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .step .u{font-size:10px;color:var(--ink3);padding:0 6px 0 1px;white-space:nowrap}
+  .btn{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 15px;border-radius:11px;font-weight:600;font-size:13.5px;border:1px solid var(--hair);background:var(--card);color:var(--ink);cursor:pointer}
+  .btn.primary{background:linear-gradient(135deg,#34d399,#10b981);color:#06281c;border-color:transparent}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center}
+  .note{font-size:11px;color:var(--ink3);margin-top:10px;font-style:italic}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--ink3);margin-top:4px}
+  .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+
+  .ch{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .ch h2{margin:0;font-size:1.02rem;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
+  .ch h2::before{content:"";width:4px;height:1.05em;border-radius:3px;background:linear-gradient(180deg,var(--accent),var(--accent2));flex:none}
+  .ch .chs{font-size:12px;color:var(--ink3)}
+  .cstate{display:grid;gap:8px;grid-template-columns:1fr}
+  @media(min-width:680px){.cstate{grid-template-columns:1fr 1fr}}
+  .csr{border:1px solid var(--hair);border-left:3px solid var(--cg,#64748b);border-radius:10px;background:var(--card2);padding:8px 11px 9px;cursor:help;transition:background .25s;display:flex;align-items:center;gap:11px}
+  .csr:hover{background:rgba(255,255,255,.035)}
+  .csr.g-atm{--cg:var(--p1)} .csr.g-plant{--cg:var(--p2)} .csr.g-root{--cg:var(--p3)} .csr.g-room{--cg:var(--ec)}
+  .csic{flex:none;width:27px;height:27px;display:flex;align-items:center;justify-content:center;opacity:.95}
+  .csbody{flex:1;min-width:0}
+  .csr.mini{display:block;padding:6px 10px 8px}
+  .engdrawer{margin-top:12px}
+  .engdrawer>summary{cursor:pointer;font-size:11.5px;color:var(--ink3);list-style:none;padding:7px 10px;border:1px dashed var(--hair);border-radius:9px;user-select:none}
+  .engdrawer>summary::-webkit-details-marker{display:none}
+  .engdrawer>summary:hover{color:var(--ink2);border-color:rgba(255,255,255,.16)}
+  .engdrawer[open]>summary{color:var(--ink2);margin-bottom:10px}
+  .engmini{opacity:.86}
+  /* coupled-state as radial ring-gauges in a bento grid */
+  .vizgrid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .vizcard{display:flex!important;flex-direction:column;align-items:center;text-align:center;gap:7px;padding:13px 10px 12px}
+  .vizcard.wide{grid-column:span 2}
+  .vizart{width:100%;max-width:104px;aspect-ratio:88/82;line-height:0}
+  .vizcard.wide .vizart{max-width:128px}
+  .vizfoot{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%;min-width:0}
+  .vizval{font-size:1.18rem;font-weight:800;letter-spacing:-.02em;color:var(--ink);white-space:nowrap}
+  .vizval i{font-size:10px;font-weight:600;color:var(--ink3);font-style:normal;margin-left:2px}
+  .vizval .arr{font-size:10px;margin-left:4px;font-weight:800}
+  .vizcard.wide .vizval{font-size:1.5rem}
+  .vizlab{display:flex;align-items:baseline;gap:5px;justify-content:center;flex-wrap:wrap;font-size:9.5px;text-transform:uppercase;letter-spacing:.045em;color:var(--ink3);max-width:100%;line-height:1.3}
+  .vizlab .csr-w{font-weight:800;letter-spacing:.03em;flex:none}
+  .csr-top{display:flex;align-items:baseline;gap:8px}
+  .csr-w{font-size:10.5px;font-weight:800;letter-spacing:.04em;min-width:40px}
+  .csr-lab{font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.045em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .csr-v{font-size:1.02rem;font-weight:800;letter-spacing:-.02em;white-space:nowrap;color:var(--ink)}
+  .csr-v i{font-size:10px;font-weight:600;color:var(--ink3);font-style:normal;margin-left:2px}
+  .csr-v .arr{font-size:10px;margin-left:4px;font-weight:800}
+  .csbar{position:relative;height:7px;border-radius:4px;background:rgba(255,255,255,.06);margin-top:7px;overflow:hidden}
+  .csband{position:absolute;top:0;bottom:0;background:rgba(40,180,99,.28)}
+  .cstick{position:absolute;top:-2px;width:3px;height:11px;border-radius:2px;transform:translateX(-1.5px);box-shadow:0 0 4px rgba(0,0,0,.45)}
+  .ccd{font-size:9.5px;color:var(--ink3);font-family:ui-monospace,Menlo,Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .clegend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--ink3);margin-top:12px}
+  .clegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+
+  /* limiting factors */
+  .lim2{display:grid;gap:14px;grid-template-columns:1fr}
+  @media(min-width:760px){.lim2{grid-template-columns:1fr 1fr}}
+  .limcol{border:1px solid var(--hair);border-radius:13px;background:var(--card2);padding:12px 13px}
+  .limhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+  .limgoal{font-size:.95rem;font-weight:800}
+  .limpot{font-size:.78rem;color:var(--ink2)} .limpot b{font-size:1.5rem;font-weight:800} .limpot i{font-style:normal;font-size:.7rem;color:var(--ink3);margin-left:4px}
+  .limpot.ok b{color:var(--ok)} .limpot.mid b{color:var(--p3)} .limpot.low b{color:var(--crit)}
+  .limtop{font-size:12px;color:var(--ink2);background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:6px 9px;margin-bottom:9px}
+  .limthc{font-size:12.5px;color:var(--ink);margin:-2px 0 8px} .limthc b{font-size:1.15rem;font-weight:800;color:#34d399} .limthc em{font-style:normal;font-size:.72rem;color:var(--ink3)} .limthc i{font-style:normal;font-size:.7rem;color:var(--ink3)}
+  .tradeoff{font-size:11px;color:var(--ink3);background:rgba(148,163,184,.08);border:1px dashed rgba(148,163,184,.3);border-radius:8px;padding:5px 9px;margin-top:8px;line-height:1.35}
+  .limfix{margin-top:6px;padding-top:6px;border-top:1px solid rgba(248,113,113,.18);font-size:12px;color:var(--ink);display:flex;align-items:center;gap:6px;flex-wrap:wrap} .limfix b{font-weight:800} .limfix i{font-style:normal;color:var(--ink3);font-size:11px}
+  .limfix .advice{color:var(--ink3);font-size:11px}
+  .btn.xs{padding:2px 8px;font-size:11px;border-radius:6px;background:var(--ok);color:#04130b;border:0;font-weight:800;cursor:pointer}
+  .btn.xs2{padding:2px 9px;font-size:11px;border-radius:6px;background:rgba(148,163,184,.16);color:var(--ink);border:1px solid var(--hair);font-weight:700;cursor:pointer;margin-left:6px}
+  .dseg{display:inline-flex;gap:0;border:1px solid var(--hair);border-radius:7px;overflow:hidden;margin:0 4px;vertical-align:middle}
+  .dseg button{background:transparent;color:var(--ink3);border:0;padding:2px 9px;font-size:11px;font-weight:700;cursor:pointer} .dseg button.on{background:var(--p2);color:#04130b}
+  .mdleg{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--ink3);margin:2px 2px 8px} .mdleg span{display:inline-flex;align-items:center;gap:5px} .mdleg i{width:11px;height:3px;border-radius:2px;display:inline-block}
+  .mdscroll{overflow-x:auto;overflow-y:hidden;border:1px solid var(--hair);border-radius:10px;background:#0a0c10} .mdscroll::-webkit-scrollbar{height:9px} .mdscroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:5px}
+  .mdscroll svg{width:auto!important;max-width:none!important;height:270px}   /* keep intrinsic width so it scrolls instead of squashing (overrides the global svg{width:100%}) */
+  .limtop.ok{background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.25)}
+  .limtop b{color:var(--ink)} .limtop i{font-style:normal;color:var(--ink3)}
+  .limrow{display:grid;grid-template-columns:82px 1fr auto auto;gap:8px;align-items:center;padding:4px 0;font-size:12px}
+  .lrl{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lrbar{height:7px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden}
+  .lrbar i{display:block;height:100%;border-radius:4px;background:var(--ok);transition:width .3s}
+  .limrow.mid .lrbar i{background:var(--p3)} .limrow.low .lrbar i{background:var(--crit)}
+  .lrv b{font-weight:700} .lrv em{font-style:normal;color:var(--ink3);font-size:10px;margin-left:2px}
+  .lrd{font-size:10.5px;color:var(--ink3);white-space:nowrap;min-width:52px;text-align:right}
+  .limrow.low .lrd{color:var(--crit)} .limrow.mid .lrd{color:var(--p3)}
+  .zsum{display:grid;gap:8px;grid-template-columns:repeat(3,1fr);margin-top:12px}
+  .zs{border:1px solid var(--hair);border-left:3px solid var(--ink3);border-radius:10px;background:var(--bg);padding:8px 10px;cursor:pointer;font-size:11px;color:var(--ink3);display:flex;flex-direction:column;gap:2px}
+  .zs.on{border-left-color:var(--ok)} .zs b{color:var(--ink);font-size:12px} .zs em{font-style:normal;color:var(--ink2);font-weight:700}
+  /* environment graph stack */
+  .envlab{font-size:11px;color:var(--ink3);display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0 1px}
+  .envlab i{font-style:normal;font-weight:600} .envlab b{font-weight:600;color:var(--ink3);margin-left:auto}
+  .envstack .envrow:first-of-type .envlab{margin-top:0}
+  svg.mini{width:100%;height:auto;display:block}
+  .minicwrap{touch-action:none}
+  .seg.ath button{font-size:11.5px;padding:7px 9px}
+  .seg.ath button.on{background:#f59e0b;color:#1a0e03;font-weight:700}
+  /* two-column: graphs left, their controls in a sticky right rail */
+  .gridrow{display:flex;flex-direction:column;gap:14px}
+  .gcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .scol{display:flex;flex-direction:column;gap:12px}
+  .srail{display:flex;flex-direction:column;gap:10px}
+  .srail .grp{background:var(--card)}
+  @media(min-width:1100px){
+    .gridrow{display:grid;grid-template-columns:minmax(0,1fr) 384px;gap:16px;align-items:start}
+    .scol{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto;overflow-x:hidden}
+  }
+  /* embedded in crop_steering.html → flow naturally; parent sizes the iframe so there's ONE scrollbar */
+  html.embed,html.embed body{overflow:visible}
+  html.embed .scol{position:static!important;max-height:none!important;overflow:visible!important}
+  html.embed body{padding-bottom:8px}
+  /* universal field tooltips (T7) — ⓘ affordance + one floating fact popover */
+  .ttinfo{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--hair);color:var(--ink3);font-size:9px;font-weight:800;line-height:1;cursor:help;flex:none;background:var(--bg);user-select:none;margin-left:2px}
+  .ttinfo:hover{color:var(--accent);border-color:var(--accent)}
+  .ttpop{position:fixed;z-index:90;pointer-events:none;border-radius:12px;padding:11px 13px;box-shadow:0 18px 50px -14px rgba(0,0,0,.82)}
+  .ttpop .tth{font-weight:800;font-size:12.5px;margin-bottom:6px;color:var(--ink)}
+  .ttp-r{display:grid;grid-template-columns:62px 1fr;gap:9px;margin-top:5px;font-size:12px;line-height:1.4}
+  .ttp-r span{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);font-weight:800;padding-top:2px}
+  .ttp-r p{margin:0;color:var(--ink2)}
+  .ttp-f{margin-top:8px;padding-top:7px;border-top:1px solid var(--hair);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;color:var(--accent);word-break:break-word}
+</style>
+</head>
+<body x-data="editor()" x-cloak>
+<div class="wrap">
+  <span class="kicker">🎛️ F2 Crop-Steering Editor · live setpoints</span>
+  <h1><span class="grad">Every setpoint, on the curve.</span></h1>
+  <p class="sub">A full-day <b>physics simulation</b>, not a drawing: the environment (PPFD, CO₂, temp, RH → VPD) sets a transpiration rate that drys the substrate back; the crop-steering controller fires shots; each shot mixes <b>feed EC</b> into the pore by the litres applied (<b>shot % × substrate L</b>); when VWC hits <b>field capacity</b> the overshoot runs off and flushes salt out, pulling pore EC toward the feed EC. The white line is VWC, the pink line is <b>pore EC on the right 0–10 axis</b>. Edit any field or drag a glowing handle and the whole day re-solves. Environment seeded live from F2; everything else from <code>number.crop_steering_*</code>.</p>
+
+  <div class="layout">
+    <!-- ===== SECTION A: irrigation graph + its controls ===== -->
+    <div class="gridrow">
+      <div class="gcol">
+    <div class="panel glass">
+      <div class="topbar">
+        <div class="seg"><template x-for="z in [1,2,3]" :key="'z'+z"><button :class="zone===z&&'on'" @click="zone=z" x-text="'Zone '+z"></button></template></div>
+        <div class="seg ath"><template x-for="s in ['Clone','Veg','Stretch','Bulk','Finish']" :key="'a'+s"><button :class="athena===s&&'on'" @click="applyAthena(s)" x-text="s"></button></template></div><span class="ttinfo" @mouseenter="showTip('athena','Athena stage presets',$event)" @mouseleave="hideTip()" @click="showTip('athena','Athena stage presets',$event)">ⓘ</span>
+        <div class="verdict" x-html="verdict()"></div>
+      </div>
+      <div class="steer">
+        <div class="lab"><span>Steering dial <span class="ttinfo" @mouseenter="showTip('dial','Steering dial',$event)" @mouseleave="hideTip()" @click="showTip('dial','Steering dial',$event)">ⓘ</span></span><span x-text="dialLabel()"></span></div>
+        <input type="range" min="1" max="10" step="0.5" x-model.number="dial" @input="mode = dial>=5.5?'gen':'veg'; applySteer()">
+        <div class="ends"><span>🌿 vegetative · shallow dryback</span><span>generative · deep dryback 🌸</span></div>
+      </div>
+      <svg viewBox="0 0 1240 680" @pointerdown="onDown($event)" @pointermove="onMove($event)" @pointerup="drag=null" @pointercancel="drag=null" @mouseover="onHover($event)" @mouseleave="hov=null" x-html="svgBody()"></svg>
+      <div class="legend"><span class="ttinfo" @mouseenter="showTip('chart_irrig','Irrigation curve · 24h sim',$event)" @mouseleave="hideTip()" @click="showTip('chart_irrig','Irrigation curve · 24h sim',$event)" style="margin-right:2px">ⓘ</span><span><i style="background:#e7ecf2"></i>VWC</span><span><i style="background:#f472b6"></i>pore EC</span><span><i style="background:#34d399"></i>field capacity</span><span><i style="background:#f87171"></i>emergency floor</span><span style="color:var(--ink3)">· glowing dot = draggable</span></div>
+      <div class="readout" style="margin-top:10px">
+        <span class="pill">first shot <b x-text="fmtMin(firstShotMin())"></b></span>
+        <span class="pill">P1 shots <b x-text="p1ShotCount()"></b></span>
+        <span class="pill">last shot <b x-text="fmtBeforeOff()"></b></span>
+        <span class="pill">total dryback <b x-text="((g('field_capacity')-overnightLow())/g('field_capacity')*100).toFixed(0)+'%'"></b></span>
+        <span class="pill">peak EC <b x-text="peakEC().toFixed(1)"></b></span>
+        <span class="pill" x-show="live" style="color:var(--ok)">● live F2</span>
+      </div>
+    </div>
+    <!-- ===== LIMITING FACTORS (Liebig minimum) ===== -->
+    <div class="panel glass">
+      <div class="ch"><h2>Limiting factors — Zone <span x-text="zone"></span></h2><span class="chs">Liebig's law of the minimum — your ceiling is set by the worst factor, not the average. Biggest bottleneck first; fix it, then the next.</span></div>
+      <div class="lim2">
+        <template x-for="goal in [{k:'y',name:'Max yield'},{k:'p',name:'Max potency'}]" :key="goal.k">
+          <div class="limcol">
+            <div class="limhead"><span class="limgoal" x-text="goal.name"></span>
+              <span class="limpot" :class="potential(goal.k).pct>=80?'ok':(potential(goal.k).pct>=60?'mid':'low')"><b x-text="potential(goal.k).pct"></b>%<i>potential</i></span></div>
+            <div class="limthc" x-show="goal.k==='p'">≈ <b x-text="potential('p').thc"></b><em>% THC est</em> <i>· strain baseline <span x-text="potential('p').base"></span>%</i></div>
+            <div class="limtop" x-show="potential(goal.k).top.dir!=='ok'">⛔ <b x-text="potential(goal.k).top.label"></b> — <span x-text="potential(goal.k).top.dir"></span> toward <span x-text="potential(goal.k).top.lo+'–'+potential(goal.k).top.hi"></span> <i x-text="'· '+potential(goal.k).top.lever"></i>
+              <template x-if="potential(goal.k).top.fix">
+                <div class="limfix">→ set <b x-text="potential(goal.k).top.fix.set"></b> to <b x-text="potential(goal.k).top.fix.to+potential(goal.k).top.fix.unit"></b><i x-show="potential(goal.k).top.fix.note" x-text="' · '+potential(goal.k).top.fix.note"></i>
+                  <button class="btn xs" x-show="potential(goal.k).top.fix.entity&&live" @click="applyFix(potential(goal.k).top.fix)">✓ apply to HA</button>
+                  <span class="advice" x-show="!potential(goal.k).top.fix.entity">· set on your climate controller</span>
+                </div>
+              </template>
+            </div>
+            <div class="limtop ok" x-show="potential(goal.k).top.dir==='ok'">✓ every factor in its optimal band</div>
+            <div class="tradeoff" x-show="goal.k==='p'">⇄ THC levers (deeper dryback, leaner feed, cooler finish) trade against yield — push to taste</div>
+            <template x-for="f in potential(goal.k).list" :key="f.key">
+              <div class="limrow" :class="f.pct>=80?'ok':(f.pct>=60?'mid':'low')">
+                <span class="lrl" x-text="f.label" style="cursor:help" @mouseenter="showTip(f.key,f.label,$event)" @mouseleave="hideTip()"></span>
+                <span class="lrbar"><i :style="'width:'+f.pct+'%'"></i></span>
+                <span class="lrv"><b x-text="f.val"></b><em x-text="f.unit"></em></span>
+                <span class="lrd" x-text="f.dir==='ok'?'✓ in band':(f.dir==='raise'?'▲ raise':'▼ lower')"></span>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+      <div class="zsum">
+        <template x-for="zz in zonesSummary()" :key="zz.z">
+          <div class="zs" :class="zone===zz.z&&'on'" @click="zone=zz.z">
+            <b>Zone <span x-text="zz.z"></span></b>
+            <span>yield <em x-text="zz.y.pct+'%'"></em> · <span x-text="zz.y.top.label"></span></span>
+            <span>potency <em x-text="zz.p.pct+'%'"></em> · <span x-text="zz.p.top.label"></span></span>
+          </div>
+        </template>
+      </div>
+    </div>
+    <!-- ===== LIVE COUPLED STATE ===== -->
+    <div class="panel glass">
+      <div class="ch"><h2>Live coupled state</h2><span class="chs">the levers a grower actually steers by — the picture shows what each is (cube drying back, leaf losing heat, roots breathing). Change any setpoint and watch them move in sync (▲▼ = which way each just shifted).</span></div>
+      <div class="vizgrid">
+        <template x-for="c in coupledUseful()" :key="c.key">
+          <div class="vizcard csr" :class="('g-'+c.grp)+(c.wide?' wide':'')" :title="c.label+' — '+c.tip">
+            <div class="vizart" x-html="c.viz"></div>
+            <div class="vizfoot">
+              <div class="vizval"><b x-text="c.disp"></b><i x-text="c.unit"></i><b class="arr" :style="c.dir>0?'color:var(--ok)':(c.dir<0?'color:#42a5f5':'opacity:.25')" x-text="c.dir>0?'▲':(c.dir<0?'▼':'·')"></b></div>
+              <div class="vizlab"><span class="csr-w" :style="'color:'+c.wc" x-text="c.word||'·'"></span><span x-text="c.label"></span></div>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div class="clegend"><span><i style="background:var(--p1)"></i>atmosphere</span><span><i style="background:var(--p2)"></i>plant</span><span><i style="background:var(--p3)"></i>root-zone</span><span><i style="background:var(--ec)"></i>room balance</span></div>
+      <details class="engdrawer">
+        <summary>Facility &amp; engineering detail · <span x-text="coupledEng().length"></span> derived values</summary>
+        <div class="cstate engmini">
+          <template x-for="c in coupledEng()" :key="c.key">
+            <div class="csr mini" :class="'g-'+c.grp" :title="c.label+' — '+c.tip">
+              <div class="csr-top">
+                <span class="csr-w" :style="'color:'+c.wc" x-text="c.word||'·'"></span>
+                <span class="csr-lab" x-text="c.label"></span>
+                <span class="csr-v"><b x-text="c.disp"></b><i x-text="c.unit"></i></span>
+              </div>
+              <div class="csbar"><div class="csband" x-show="c.bandW>0" :style="'left:'+c.bandL+'%;width:'+c.bandW+'%'"></div><div class="cstick" :style="'left:'+c.pos+'%;background:'+c.wc"></div></div>
+            </div>
+          </template>
+        </div>
+      </details>
+    </div>
+      </div>
+      <aside class="scol"><div class="srail">
+        <template x-for="grp in groups().filter(g=>['P0','P1','P2','P3','ST','ZN','HW'].includes(g.k))" :key="grp.k">
+          <div class="grp" :class="hot===grp.k&&'hot'" :style="'--ph:'+grp.col" @mouseenter="hot=grp.k">
+            <div class="gh"><span class="dot" :style="'background:'+grp.col"></span><span x-show="grp.ph" class="ph" :style="'background:'+grp.col" x-text="grp.ph"></span><h3 x-text="grp.name"></h3></div>
+            <template x-for="f in grp.fields" :key="f.key">
+              <div class="frow" :class="hov===f.key&&'lit'" @mouseenter="hov=f.key" @mouseleave="hov=null">
+                <div class="fl" x-text="f.label"></div>
+                <span class="ttinfo" @mouseenter="showTip(f.key,f.label,$event)" @mouseleave="hideTip()" @click="showTip(f.key,f.label,$event)">ⓘ</span>
+                <span class="step"><button @click="bump(f,-1)">−</button><input type="number" :step="f.step" :value="fmtNum(g(f.key),f.dec)" @change="setField(f,$event.target.value)"><button @click="bump(f,1)">+</button><span class="u" x-text="f.unit"></span></span>
+              </div>
+            </template>
+          </div>
+        </template>
+        <div class="actions">
+          <button class="btn primary" x-show="live" @click="applyToHA()">✔ Apply Zone <span x-text="zone"></span> to HA</button>
+          <button class="btn" x-show="live" @click="pullFromHA()" :title="liveWaiting?'Live HA differs from your saved edits — pull to overwrite them with current HA values':'Re-pull current values from HA (overwrites your edits)'">⟳ Pull live from HA<span x-show="liveWaiting" style="color:var(--p3);font-weight:800"> •</span></button>
+          <button class="btn" :class="!live&&'primary'" @click="save()">💾 Save template</button>
+          <button class="btn" @click="reset()">Reset zone</button>
+          <span x-show="saved" style="color:var(--ok);font-size:13px">Saved ✓</span>
+        </div>
+      </div></aside>
+    </div>
+
+    <!-- ===== MULTI-DAY DRIVERS (scrollable) ===== -->
+    <div class="panel glass">
+      <div class="ch"><h2>Dryback vs drivers · multi-day <span class="ttinfo" @mouseenter="showTip('chart_multi','Dryback vs drivers · multi-day',$event)" @mouseleave="hideTip()" @click="showTip('chart_multi','Dryback vs drivers · multi-day',$event)">ⓘ</span></h2><span class="chs">the steady-state day repeated — scroll to read how the dryback rate tracks PPFD, leaf VPD, temp &amp; CO₂.
+        <span class="dseg"><button :class="gdays===1&&'on'" @click="gdays=1">1d</button><button :class="gdays===2&&'on'" @click="gdays=2">2d</button><button :class="gdays===3&&'on'" @click="gdays=3">3d</button></span>
+        <button class="btn xs2" x-show="live" @click="reqHistory()">overlay live VWC</button></span></div>
+      <div class="mdleg"><span><i style="background:#34d399"></i>VWC / dryback</span><span><i style="background:#f59e0b"></i>PPFD</span><span><i style="background:#fb923c"></i>temp</span><span><i style="background:#f472b6"></i>leaf VPD</span><span><i style="background:#60a5fa"></i>CO₂</span><span x-show="histPts"><i style="background:#94a3b8"></i>live VWC</span></div>
+      <div class="mdscroll" x-html="multiChart()"></div>
+    </div>
+
+    <!-- ===== SECTION B: environment graphs + climate/room controls ===== -->
+    <div class="gridrow">
+      <div class="gcol">
+    <!-- ===== ROOM ENVIRONMENT GRAPHS ===== -->
+    <div class="panel glass envstack">
+      <div class="ch"><h2>Room environment · 24h</h2><span class="chs">same lights-aligned timeline as the irrigation card — read root-zone, air, light & balances as one synchronized story.</span></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_climate','Climate · VPD',$event)" @mouseleave="hideTip()" @click="showTip('chart_climate','Climate · VPD',$event)">ⓘ</span> Climate · VPD <i style="color:#f472b6">leaf</i> <i style="color:#7dd3fc">air</i> · <i style="color:#fb923c">temp</i> <i style="color:#60a5fa">RH</i><b>green = in-band 0.8–1.4 kPa · drag temp/RH dots</b></div><div class="minicwrap" @pointerdown="miniDown('climate',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="climateChart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_dew','Dew point & condensation margin',$event)" @mouseleave="hideTip()" @click="showTip('chart_dew','Dew point & condensation margin',$event)">ⓘ</span> Dew point & condensation margin · <i style="color:#fb923c">leaf temp</i> <i style="color:#60a5fa">dew point</i><b style="color:#f87171">red ribbon = &lt;3°C → condensation risk</b></div><div class="minicwrap" @pointerdown="miniDown('dew',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dewChart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_moist','Moisture balance',$event)" @mouseleave="hideTip()" @click="showTip('chart_moist','Moisture balance',$event)">ⓘ</span> Moisture balance · <i style="color:#34d399">transpiration in</i> <i style="color:#f472b6">dehum capacity out</i><b>fill above the line → RH will climb · drag dehum</b></div><div class="minicwrap" @pointerdown="miniDown('moist',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="moistChart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_dli','Light · DLI',$event)" @mouseleave="hideTip()" @click="showTip('chart_dli','Light · DLI',$event)">ⓘ</span> Light · <i style="color:#a3e635">cumulative DLI</i> <i style="color:#6b7682">target pace</i> · <i style="color:#fbbf24">photosynthesis %</i></div><div class="minicwrap" @pointerdown="miniDown('dli',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dliChart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_leafair','Leaf vs air temp',$event)" @mouseleave="hideTip()" @click="showTip('chart_leafair','Leaf vs air temp',$event)">ⓘ</span> Leaf vs air temp · <i style="color:#fb923c">leaf</i> <i style="color:#7dd3fc">air</i><b>gap = transpirational cooling / stress · drag air</b></div><div class="minicwrap" @pointerdown="miniDown('leafair',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="leafAirChart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_co2','CO₂ utilization',$event)" @mouseleave="hideTip()" @click="showTip('chart_co2','CO₂ utilization',$event)">ⓘ</span> CO₂ utilization · <i style="color:#a78bfa">room ppm</i> <i style="color:#34d399">canopy uptake g/h</i><b>enriched by day · ambient at night · drag CO₂</b></div><div class="minicwrap" @pointerdown="miniDown('co2',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="co2Chart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_heat','Heat / cooling',$event)" @mouseleave="hideTip()" @click="showTip('chart_heat','Heat / cooling',$event)">ⓘ</span> Heat / cooling · <i style="color:#f59e0b">sensible load (lights)</i> <i style="color:#60a5fa">AC capacity</i><b>area above the line = under-cooled · drag AC</b></div><div class="minicwrap" @pointerdown="miniDown('heat',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="heatChart()"></div></div>
+    </div>
+
+      </div>
+      <aside class="scol"><div class="srail">
+        <template x-for="grp in groups().filter(g=>['EN','RM','SF'].includes(g.k))" :key="grp.k">
+          <div class="grp" :class="hot===grp.k&&'hot'" :style="'--ph:'+grp.col" @mouseenter="hot=grp.k">
+            <div class="gh"><span class="dot" :style="'background:'+grp.col"></span><span x-show="grp.ph" class="ph" :style="'background:'+grp.col" x-text="grp.ph"></span><h3 x-text="grp.name"></h3></div>
+            <template x-for="f in grp.fields" :key="f.key">
+              <div class="frow" :class="hov===f.key&&'lit'" @mouseenter="hov=f.key" @mouseleave="hov=null">
+                <div class="fl" x-text="f.label"></div>
+                <span class="ttinfo" @mouseenter="showTip(f.key,f.label,$event)" @mouseleave="hideTip()" @click="showTip(f.key,f.label,$event)">ⓘ</span>
+                <span class="step"><button @click="bump(f,-1)">−</button><input type="number" :step="f.step" :value="fmtNum(g(f.key),f.dec)" @change="setField(f,$event.target.value)"><button @click="bump(f,1)">+</button><span class="u" x-text="f.unit"></span></span>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div></aside>
+    </div>
+    <p class="note">Live values pulled from F2 on 2026-06-07. Hardware (field capacity, substrate volume, lights) is shared across zones; everything else is per-zone. Next step: write changes back to the <code>number.crop_steering_zone_N_*</code> entities with a confirm step.</p>
+  </div>
+
+  <!-- ===== universal tooltip popover (T7): hover any ⓘ ===== -->
+  <div class="ttpop glass" x-show="tip" x-cloak :style="tipStyle()">
+    <div class="tth" x-text="tip&&tip.label"></div>
+    <div class="ttp-r" x-show="tip&&tip.d"><span>Does</span><p x-text="tip&&tip.d"></p></div>
+    <div class="ttp-r" x-show="tip&&tip.a"><span>Affects</span><p x-text="tip&&tip.a"></p></div>
+    <div class="ttp-r" x-show="tip&&tip.b"><span>Driven by</span><p x-text="tip&&tip.b"></p></div>
+    <div class="ttp-f" x-show="tip&&tip.f"><span x-text="tip&&tip.f"></span></div>
+  </div>
+</div>
+
+<script>
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function rstep(v,s){ const inv=1/s; return Math.round(v*inv)/inv; }
+
+/* TOKEN-FREE: embedded in crop_steering.html (live values arrive via postMessage) or standalone ?demo (seed). No secrets in this file. */
+const CONFIG = { BASE:"", LL_TOKEN:"", ENT:{} };
+let SIM=null, SIMKEY=null;   // simulation cache in module scope (never Alpine-reactive — avoids reactive-write recursion)
+let ENVS=null, ENVK=null;    // diurnal environment-series cache
+let MINI={};                 // per-mini-chart geometry, for on-graph drag inversion
+let ZOVR=null;               // transient zone override for cross-zone calc (NOT Alpine-reactive — avoids render churn that eats input focus)
+let PREV={};                 // last coupled-state values, for change-direction arrows
+
+/* Athena standard setpoints by stage (from the Setpoints dashboard WEEK_DATA) */
+const ATHENA = {
+  Clone:   {ppfd:150,  co2:400,  temp:25,   rh:70, temp_night:23,   rh_night:75},
+  Veg:     {ppfd:450,  co2:400,  temp:26,   rh:68, temp_night:22,   rh_night:72},
+  Stretch: {ppfd:850,  co2:1300, temp:27,   rh:66, temp_night:23,   rh_night:70},
+  Bulk:    {ppfd:1150, co2:1400, temp:25.5, rh:64, temp_night:21.5, rh_night:68},
+  Finish:  {ppfd:800,  co2:700,  temp:22,   rh:55, temp_night:18,   rh_night:60},
+};
+/* steering-dial profile: which per-zone setpoints slide between [vegetative, generative] as the dial moves */
+const STEER = { p2_vwc_threshold:[54,40], p2_shot_size:[12,3] };   // veg: high re-water + big flushing shots (EC↓); gen: dry deeper + small stacking shots (EC↑)
+/* coupled-state display meta: o=importance order, band=[lo,hi] optimal, scale=[min,max] bar, tip=plain English */
+const CINFO={
+ path:{o:1,band:[0,40],scale:[0,100],tip:"Root-disease (Pythium) pressure — warm + wet substrate + low O₂ feed it. Keep under 40%."},
+ osm:{o:2,band:[-2.6,0],scale:[-5,0],tip:"Osmotic pull: how hard roots fight salt to drink. Past −2.6 MPa uptake stalls → tip burn."},
+ margin:{o:3,band:[3,15],scale:[0,15],tip:"Leaf temp minus dew point. Under 3°C overnight → condensation, mould, GMP risk."},
+ do2:{o:4,band:[5,12],scale:[0,12],tip:"Oxygen dissolved in root water (falls as substrate warms). Under 5 mg/L = hypoxia / Pythium."},
+ rootT:{o:5,band:[18,24],scale:[12,32],tip:"Substrate temperature. 18–24°C ideal; over 26°C stresses roots and wakes Pythium."},
+ pec:{o:6,band:[4,9],scale:[0,12],tip:"Pore EC at the driest point — the salt roots actually sit in. Too high = lockout / burn."},
+ db:{o:7,band:[2,6],scale:[0,10],tip:"Mid-day dryback rate. Drives EC stacking and how aggressive the steering is."},
+ vpdL:{o:8,band:[0.8,1.5],scale:[0,2.5],tip:"Leaf-to-air vapour deficit — the real transpiration driver at the leaf."},
+ vpdA:{o:9,band:[0.8,1.4],scale:[0,2.5],tip:"Room (air) VPD. 0.8–1.4 kPa; too high shuts stomata, too low invites mould."},
+ leaf:{o:10,band:[22,28],scale:[15,35],tip:"Canopy leaf temp = air + light gain − transpiration cooling."},
+ dT:{o:11,band:[-3,1],scale:[-5,3],tip:"Leaf minus air. LED canopy sits ~1–2.5°C below air; positive = poor airflow / stress."},
+ pn:{o:12,band:[40,100],scale:[0,100],tip:"Relative photosynthesis (light × CO₂ × leaf temp). Higher = more growth."},
+ gs:{o:13,band:[25,100],scale:[0,100],tip:"Stomatal opening. Closes under high VPD or high CO₂."},
+ dli:{o:14,band:[30,62],scale:[0,70],tip:"Daily light integral. ~30–62 mol with CO₂; over = waste / bleach, under = light-limited."},
+ upt:{o:15,band:[70,100],scale:[0,100],tip:"Nutrient-uptake vigour vs root temp (peaks 18–22°C)."},
+ E:{o:16,band:null,scale:[0,0.6],tip:"Transpiration — water each plant loses per hour."},
+ wue:{o:17,band:null,scale:[0,8],tip:"Water-use efficiency — carbon fixed per litre transpired."},
+ bal:{o:18,band:[0,9999],scale:[-200,700],tip:"Dehum capacity minus moisture load. Negative → RH will climb tonight."},
+ lat:{o:19,band:null,scale:[0,15],tip:"Latent (moisture) heat the dehumidifier must pull."},
+ cool:{o:20,band:null,scale:[0,30],tip:"Sensible heat (~50% of LED watts) the AC must remove."},
+ tons:{o:21,band:null,scale:[0,10],tip:"Cooling load in refrigeration tons."},
+ dew:{o:22,band:null,scale:[5,25],tip:"Dew point — the temperature at which room air condenses."},
+ ah:{o:23,band:null,scale:[0,25],tip:"Absolute humidity — total water vapour the air carries."},
+ co2d:{o:24,band:null,scale:[0,300],tip:"CO₂ the canopy draws from room air per hour."},
+ water:{o:25,band:null,scale:[0,300],tip:"Whole-room water use per day."},
+ ro:{o:26,band:null,scale:[0,5],tip:"Runoff — water pushed past field capacity to drain."},
+ shots:{o:27,band:null,scale:[0,30],tip:"Irrigation shots the controller fires per day."},
+ wm2:{o:28,band:null,scale:[0,1000],tip:"Electrical light power per m² of floor."},
+};
+/* the metrics a grower actually steers by / that flag a problem → shown big with a data-driven glyph. The rest collapse into an engineering drawer. */
+const CS_USEFUL = new Set(['db','pec','path','rootT','do2','upt','osm','vpdL','vpdA','leaf','gs','pn','dli','margin','bal']);
+
+/* ===== data-driven SVG glyphs for the useful coupled-state metrics — the picture IS the value =====
+   c = {key,val,pos(0-100 on scale),wc(status colour),word}. Frame muted, the "live" part drawn in the status colour. */
+function csGlyph(c){
+  const col=c.wc||'#8b93a7', F='#59606e', f=Math.max(0,Math.min(1,(c.pos||0)/100));
+  const o=(0.35+f*0.6).toFixed(2);   // intensity that tracks the value
+  const wrap=g=>`<svg viewBox="0 0 28 28" width="27" height="27" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${g}</svg>`;
+  switch(c.key){
+    case 'db': { const top=(9+f*11).toFixed(1);   // higher dryback rate → water sits lower in the cube
+      return wrap(`<rect x="5.5" y="7.5" width="14" height="16" rx="2.5" stroke="${F}"/><path d="M6.2 ${top} H18.8 V21 a2 2 0 0 1-2 2 H8.2 a2 2 0 0 1-2-2 Z" fill="${col}" fill-opacity=".30" stroke="none"/><path d="M6.2 ${top} H18.8" stroke="${col}"/><path d="M24 9 V15 M22 13 L24 15.6 L26 13" stroke="${col}"/>`); }
+    case 'pec': { const n=Math.round(2+f*5); const xs=[9,13,16,11,14,9,16], ys=[12,11,14,16,15,18,18]; let d=''; for(let i=0;i<n;i++) d+=`<circle cx="${xs[i%7]}" cy="${ys[i%7]}" r="1.15" fill="${col}" stroke="none"/>`;
+      return wrap(`<rect x="5.5" y="7.5" width="15" height="16" rx="2.5" stroke="${F}"/>${d}<path d="M23 10 v3 m0 2 v3 M21.5 11.5 h3 M21.5 16.5 h3" stroke="${col}" opacity="${o}"/>`); }
+    case 'path': return wrap(`<path d="M7 6 V13 M7 13 C7 17 4 18 4 22 M7 13 C7 17 10 18 10 22" stroke="${F}"/><path d="M17.5 7 L24 20 H11 Z" stroke="${col}" fill="${col}" fill-opacity="${(0.1+f*0.5).toFixed(2)}"/><path d="M17.5 11.5 V15.5 M17.5 17.6 v.2" stroke="${col}"/>`);
+    case 'rootT': { const fy=(20-f*9).toFixed(1); return wrap(`<path d="M14.5 18.5 V9 a2.4 2.4 0 0 1 4.8 0 V18.5" stroke="${F}"/><circle cx="16.9" cy="20.5" r="3.2" stroke="${F}"/><circle cx="16.9" cy="20.5" r="1.5" fill="${col}" stroke="none"/><path d="M16.9 20.5 V${fy}" stroke="${col}" stroke-width="2.6"/><path d="M4 13 h6 M4 17 h5 M4 21 h6" stroke="${F}"/>`); }
+    case 'do2': { const n=Math.max(1,Math.round(1+f*4)); const bx=[10,14,17,12,15],by=[18,15,19,12,13],br=[1.4,1.1,1.5,1,1.3]; let b=''; for(let i=0;i<n;i++) b+=`<circle cx="${bx[i%5]}" cy="${by[i%5]}" r="${br[i%5]}" stroke="${col}"/>`;
+      return wrap(`<path d="M7 8 H21 L19.4 21.5 a2.2 2.2 0 0 1-2.2 2 H10.8 a2.2 2.2 0 0 1-2.2-2 Z" stroke="${F}"/>${b}`); }
+    case 'upt': return wrap(`<path d="M14 23 V13 M14 17 C10 15 9 12 9 8 M14 17 C18 15 19 12 19 8" stroke="${F}"/><g stroke="${col}" opacity="${o}"><path d="M14 13 V4 M11.3 6.7 L14 4 L16.7 6.7"/></g>`);
+    case 'osm': return wrap(`<path d="M10 6 C6 12 6 16 10 19 C14 16 14 12 10 6 Z" stroke="${F}"/><g stroke="${col}" opacity="${o}"><path d="M19 8 v3 M17.5 9.5 h3 M22 16 v3 M20.5 17.5 h3"/></g><path d="M11 13 H17 M14.5 11 L17 13 L14.5 15" stroke="${col}"/>`);
+    case 'vpdL': { const h=(f*5).toFixed(1); return wrap(`<path d="M8 21 C8 13 13 9 21 9 C21 16 16 22 8 21 Z" stroke="${F}"/><path d="M11 19 C15 17 18 14 20 11" stroke="${F}"/><g stroke="${col}" opacity="${o}"><path d="M12 ${(13-h)} q2 -2 0 -4 q-2 -2 0 -4"/><path d="M16.5 ${(12-h)} q2 -2 0 -4 q-2 -2 0 -4"/></g>`); }
+    case 'vpdA': return wrap(`<path d="M14 5 C9 13 9 18 14 21 C19 18 19 13 14 5 Z" stroke="${F}"/><path d="M4 24 q3 -2.2 6 0 t6 0 t6 0" stroke="${col}" opacity="${o}"/>`);
+    case 'leaf': return wrap(`<path d="M8 21 C8 13 13 9 21 9 C21 16 16 22 8 21 Z" stroke="${F}"/><path d="M11 19 C15 17 18 14 20 11" stroke="${F}"/><g stroke="${col}" opacity="${o}"><path d="M9 6 q2.2 -2 0 -4.2"/><path d="M14 5 q2.2 -2 0 -4.2"/><path d="M19 6 q2.2 -2 0 -4.2"/></g>`);
+    case 'gs': { const ap=(0.8+f*4).toFixed(1); return wrap(`<path d="M5 14 C9 10.5 19 10.5 23 14 C19 17.5 9 17.5 5 14 Z" stroke="${F}"/><ellipse cx="14" cy="14" rx="${ap}" ry="4.6" stroke="${col}" fill="${col}" fill-opacity=".2"/>`); }
+    case 'pn': return wrap(`<path d="M10 21 C10 14 14 10 21 10 C21 16 17 22 10 21 Z" stroke="${F}"/><path d="M12.5 19 C15 17.5 18 15 20 12" stroke="${F}"/><circle cx="8" cy="8" r="3" stroke="${col}"/><g stroke="${col}" opacity="${o}"><path d="M8 2.2 V3.6 M3.6 3.6 L4.6 4.6 M2.2 8 H3.6 M12.4 8 H11"/></g>`);
+    case 'dli': { const a=f*2*Math.PI, r=8, cx=14, cy=14, x=(cx+r*Math.sin(a)).toFixed(2), y=(cy-r*Math.cos(a)).toFixed(2), lg=f>0.5?1:0;
+      return wrap(`<circle cx="14" cy="14" r="8" stroke="${F}" opacity=".5"/>${f>0.02?`<path d="M14 6 A8 8 0 ${lg} 1 ${x} ${y}" stroke="${col}" stroke-width="2.5"/>`:''}<circle cx="14" cy="14" r="3.4" stroke="${col}"/><g stroke="${col}"><path d="M14 1.5 v2 M14 24.5 v2 M1.5 14 h2 M24.5 14 h2"/></g>`); }
+    case 'margin': { const g=(f*7).toFixed(1); return wrap(`<path d="M4 22 h20" stroke="${F}"/><path d="M4 22 q3 -3 7 0 q4 -3 8 0 q3 -2 5 0" stroke="${F}"/><path d="M16 ${(19-g)} C13 ${(22-g)} 13 ${(24-g)} 16 ${(24-g)} C19 ${(24-g)} 19 ${(22-g)} 16 ${(19-g)} Z" fill="${col}" fill-opacity=".25" stroke="${col}"/>`); }
+    case 'bal': { const lvl=(21-f*11).toFixed(1); return wrap(`<rect x="5" y="7" width="18" height="16" rx="1.5" stroke="${F}"/><rect x="5.6" y="${lvl}" width="16.8" height="${(22.4-lvl).toFixed(1)}" fill="${col}" fill-opacity=".22" stroke="none"/><path d="M5.6 ${lvl} H22.4" stroke="${col}"/><path d="M9 10.5 v4 M7.5 13 L9 14.6 L10.5 13" stroke="${col}" opacity="${o}"/>`); }
+    default: return '';
+  }
+}
+
+/* ===== radial ring-gauge that wraps the pictorial glyph — the arc is the value, the green segment is the optimal band, the glyph is what's measured ===== */
+function _pol(cx,cy,r,deg){ const a=(deg-90)*Math.PI/180; return [cx+r*Math.cos(a), cy+r*Math.sin(a)]; }
+function _arc(cx,cy,r,a0,a1){ const p=_pol(cx,cy,r,a0), q=_pol(cx,cy,r,a1); const large=((((a1-a0)%360)+360)%360)>180?1:0; return `M${p[0].toFixed(1)} ${p[1].toFixed(1)} A${r} ${r} 0 ${large} 1 ${q[0].toFixed(1)} ${q[1].toFixed(1)}`; }
+function csViz(c){
+  const col=c.wc||'#8b93a7', TR='#28303b', f=Math.max(0,Math.min(1,(c.pos||0)/100));
+  const cx=44, cy=44, r=33, S=225, SP=270;   // 270° gauge, opening at the bottom
+  const band=(c.bandW>0)?`<path d="${_arc(cx,cy,r,S+(c.bandL/100)*SP,S+(Math.min(100,c.bandL+c.bandW)/100)*SP)}" stroke="rgba(52,211,153,.42)" stroke-width="6" stroke-linecap="round" fill="none"/>`:'';
+  const vEnd=S+f*SP, d=_pol(cx,cy,r,vEnd);
+  return `<svg viewBox="0 0 88 82" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" fill="none">`
+    + `<path d="${_arc(cx,cy,r,S,S+SP)}" stroke="${TR}" stroke-width="6" stroke-linecap="round"/>`
+    + band
+    + `<path d="${_arc(cx,cy,r,S,vEnd)}" stroke="${col}" stroke-width="6" stroke-linecap="round"/>`
+    + `<circle cx="${d[0].toFixed(1)}" cy="${d[1].toFixed(1)}" r="3.4" fill="${col}"/>`
+    + `<g transform="translate(30.5,30.5)">${csGlyph(c)}</g>`
+    + `</svg>`;
+}
+
+/* ===== real live setpoints (F2, per zone). Shared hardware in GLOBAL. ===== */
+function zoneDefaults(o){ return Object.assign({
+  p0_minimum_wait_time:5, p0_maximum_wait_time:30, p0_dryback_drop_percent:2,
+  p1_target_vwc:60, p1_initial_shot_size:2, p1_shot_size_increment:0.5, p1_maximum_shot_size:5, p1_time_between_shots:15, p1_minimum_shots:5, p1_maximum_shots:12,
+  p2_vwc_threshold:43, p2_shot_size:5, p2_ec_high_threshold:1.2, p2_ec_low_threshold:0.8,
+  p3_emergency_vwc_threshold:40, p3_emergency_shot_size:5, p3_gen_last_irrigation:30, p3_veg_last_irrigation:15,
+  generative_dryback_target:45, vegetative_dryback_target:18,
+  ec_target_gen_p0:4.0, ec_target_veg_p0:3.0, ec_target_gen_p1:5.0, ec_target_gen_p2:6.0, ec_target_gen_p3:4.5, ec_target_veg_p1:3.0, ec_target_veg_p2:3.2, ec_target_veg_p3:3.0, ec_target_flush:0.8,
+  plant_count:36, max_daily_volume:300, shot_size_multiplier:1,
+}, o); }
+const LIVE = {
+  1: zoneDefaults({ p2_vwc_threshold:41, p2_shot_size:5,   p1_maximum_shots:12, p1_minimum_shots:5, p3_gen_last_irrigation:30, p3_emergency_vwc_threshold:38 }),
+  2: zoneDefaults({ p2_vwc_threshold:43, p2_shot_size:5,   p1_maximum_shots:4,  p1_minimum_shots:3, p3_gen_last_irrigation:60, p3_emergency_vwc_threshold:40 }),
+  3: zoneDefaults({ p2_vwc_threshold:43, p2_shot_size:1.5, p1_maximum_shots:12, p1_minimum_shots:5, p3_gen_last_irrigation:30, p3_emergency_vwc_threshold:40 }),
+};
+const GLOBAL = { field_capacity:60, substrate_volume:6, lights_on:10, lights_off:22, ppfd:1150, co2:1400, temp:25.5, rh:64, temp_night:21.5, rh_night:68, feed_ec:3.0,
+  room_length:6, room_width:4, room_height:3, canopy_coverage:80, room_plant_count:40, light_watts:18000, hvac_cooling_kw:18, dehum_capacity:600, root_temp:22, baseline_thc:24,
+  maximum_ec:9, irrigation_ec_min:2.3, irrigation_ec_max:3.5, irrigation_ph_min:5.8, irrigation_ph_max:6.2, blocked_dripper_max_shots_30min:4, dripper_flow_rate:4, drippers_per_plant:1 };
+
+/* field metadata: key -> ranges/units (from the live entity attributes) */
+const META = {
+  p0_minimum_wait_time:{label:"Min wait",unit:"min",min:5,max:300,step:5,dec:0},
+  p0_maximum_wait_time:{label:"Max wait → first shot",unit:"min",min:30,max:600,step:15,dec:0},
+  p0_dryback_drop_percent:{label:"Dryback drop trigger",unit:"%",min:2,max:40,step:1,dec:0},
+  p1_target_vwc:{label:"Target VWC (peak)",unit:"%",min:5,max:95,step:1,dec:0},
+  p1_initial_shot_size:{label:"Initial shot",unit:"%",min:0.1,max:20,step:0.1,dec:1},
+  p1_shot_size_increment:{label:"Shot increment",unit:"%",min:0.05,max:10,step:0.05,dec:2},
+  p1_maximum_shot_size:{label:"Max shot",unit:"%",min:2,max:50,step:0.5,dec:1},
+  p1_time_between_shots:{label:"Time between shots",unit:"min",min:1,max:60,step:1,dec:0},
+  p1_minimum_shots:{label:"Min shots",unit:"",min:1,max:20,step:1,dec:0},
+  p1_maximum_shots:{label:"Max shots",unit:"",min:1,max:30,step:1,dec:0},
+  p2_vwc_threshold:{label:"Re-water threshold",unit:"%",min:5,max:85,step:1,dec:0},
+  p2_shot_size:{label:"Shot size",unit:"%",min:0.5,max:30,step:0.5,dec:1},
+  p2_ec_high_threshold:{label:"EC high ratio",unit:"×",min:0.5,max:3,step:0.05,dec:2},
+  p2_ec_low_threshold:{label:"EC low ratio",unit:"×",min:0.2,max:2,step:0.05,dec:2},
+  p3_emergency_vwc_threshold:{label:"Emergency floor",unit:"%",min:20,max:65,step:1,dec:0},
+  p3_emergency_shot_size:{label:"Emergency shot",unit:"%",min:0.1,max:15,step:0.1,dec:1},
+  p3_gen_last_irrigation:{label:"Last shot (gen)",unit:"min",min:30,max:600,step:15,dec:0},
+  p3_veg_last_irrigation:{label:"Last shot (veg)",unit:"min",min:15,max:360,step:15,dec:0},
+  generative_dryback_target:{label:"Generative dryback",unit:"%",min:5,max:70,step:1,dec:0},
+  vegetative_dryback_target:{label:"Vegetative dryback",unit:"%",min:5,max:80,step:1,dec:0},
+  ec_target_gen_p0:{label:"EC gen P0",unit:"",min:0.5,max:20,step:0.1,dec:1},
+  ec_target_gen_p1:{label:"EC gen P1",unit:"",min:0.5,max:20,step:0.1,dec:1},
+  ec_target_gen_p2:{label:"EC gen P2",unit:"",min:0.5,max:20,step:0.1,dec:1},
+  ec_target_gen_p3:{label:"EC gen P3",unit:"",min:0.5,max:20,step:0.1,dec:1},
+  ec_target_veg_p0:{label:"EC veg P0",unit:"",min:0.5,max:15,step:0.1,dec:1},
+  ec_target_veg_p1:{label:"EC veg P1",unit:"",min:0.5,max:15,step:0.1,dec:1},
+  ec_target_veg_p2:{label:"EC veg P2",unit:"",min:0.5,max:15,step:0.1,dec:1},
+  ec_target_veg_p3:{label:"EC veg P3",unit:"",min:0.5,max:15,step:0.1,dec:1},
+  ec_target_flush:{label:"EC flush",unit:"",min:0.1,max:15,step:0.1,dec:1},
+  field_capacity:{label:"Field capacity",unit:"%",min:5,max:100,step:1,dec:0},
+  substrate_volume:{label:"Substrate volume",unit:"L",min:1,max:200,step:0.1,dec:1},
+  ppfd:{label:"PPFD (canopy)",unit:"µmol",min:0,max:1500,step:25,dec:0},
+  co2:{label:"CO₂",unit:"ppm",min:400,max:1600,step:50,dec:0},
+  temp:{label:"Day temp",unit:"°C",min:10,max:40,step:0.5,dec:1},
+  rh:{label:"Day RH",unit:"%",min:20,max:95,step:1,dec:0},
+  temp_night:{label:"Night temp",unit:"°C",min:8,max:38,step:0.5,dec:1},
+  rh_night:{label:"Night RH",unit:"%",min:20,max:95,step:1,dec:0},
+  feed_ec:{label:"Feed EC (input)",unit:"mS",min:0.2,max:6,step:0.1,dec:1},
+  room_length:{label:"Room length",unit:"m",min:1,max:60,step:0.1,dec:1},
+  room_width:{label:"Room width",unit:"m",min:1,max:60,step:0.1,dec:1},
+  room_height:{label:"Room height",unit:"m",min:2,max:10,step:0.1,dec:1},
+  canopy_coverage:{label:"Canopy coverage",unit:"%",min:20,max:100,step:5,dec:0},
+  room_plant_count:{label:"Room plant total",unit:"",min:1,max:5000,step:1,dec:0},
+  plant_count:{label:"Plant count (zone)",unit:"",min:1,max:50,step:1,dec:0},
+  max_daily_volume:{label:"Daily water cap",unit:"L",min:0,max:1000,step:0.5,dec:1},
+  shot_size_multiplier:{label:"Shot-size multiplier",unit:"×",min:0.1,max:5,step:0.1,dec:1},
+  lights_on:{label:"Lights on",unit:"h",min:0,max:23,step:1,dec:0},
+  lights_off:{label:"Lights off",unit:"h",min:0,max:23,step:1,dec:0},
+  maximum_ec:{label:"Max EC (hard cutoff)",unit:"mS",min:1,max:20,step:0.1,dec:1},
+  irrigation_ec_min:{label:"Irrigation EC min",unit:"mS",min:0,max:20,step:0.1,dec:1},
+  irrigation_ec_max:{label:"Irrigation EC max",unit:"mS",min:0,max:20,step:0.1,dec:1},
+  irrigation_ph_min:{label:"Irrigation pH min",unit:"pH",min:3,max:9,step:0.05,dec:2},
+  irrigation_ph_max:{label:"Irrigation pH max",unit:"pH",min:3,max:9,step:0.05,dec:2},
+  blocked_dripper_max_shots_30min:{label:"Blocked-dripper max shots/30m",unit:"",min:1,max:20,step:1,dec:0},
+  dripper_flow_rate:{label:"Dripper flow",unit:"L/h",min:0.1,max:50,step:0.1,dec:1},
+  drippers_per_plant:{label:"Drippers / plant",unit:"",min:1,max:6,step:1,dec:0},
+  light_watts:{label:"Total light power",unit:"W",min:0,max:100000,step:100,dec:0},
+  hvac_cooling_kw:{label:"HVAC cooling",unit:"kW",min:0,max:100,step:0.5,dec:1},
+  dehum_capacity:{label:"Dehumidification",unit:"L/d",min:0,max:5000,step:5,dec:0},
+  root_temp:{label:"Root / substrate temp",unit:"°C",min:10,max:35,step:0.5,dec:1},
+  baseline_thc:{label:"Strain THC potential",unit:"%",min:5,max:35,step:0.5,dec:1},
+};
+
+/* ===== universal tooltips (T7): every knob explained — {d:does, a:affects downstream, b:driven by upstream, f:formula/logic} ===== */
+const FIELDTIPS = {
+  /* P0 — morning dryback */
+  p0_minimum_wait_time:{d:"Minimum minutes after lights-on before P0 can end — forces a real morning dryback even if VWC already dropped.",a:"Delays the first irrigation (P1 start); longer = deeper forced dryback.",b:"Lights-on time; the dryback-drop trigger.",f:"hold ≥ this long, THEN watch for the % drop"},
+  p0_maximum_wait_time:{d:"Hard cap — if the dryback-drop trigger hasn't fired by now, P0 ends and P1 starts anyway.",a:"Sets the latest possible first shot; safety so a stalled sensor can't starve the plant.",b:"Lights-on; dryback-drop %; sensor health.",f:"first shot at min(drop-hit, this cap)"},
+  p0_dryback_drop_percent:{d:"VWC drop from the overnight peak that ends P0 and starts ramp-up.",a:"How dry the root-zone gets each morning before re-water; key generative push.",b:"Overnight low; transpiration rate (light, VPD).",f:"trigger when (peak − now) ≥ this %"},
+  /* P1 — ramp-up */
+  p1_target_vwc:{d:"The VWC ceiling P1 ramps the substrate up to — field capacity for the day.",a:"Sets peak saturation, runoff onset and EC dilution; top of every sawtooth.",b:"Substrate type, field capacity, gen vs veg goal.",f:"ramp shots until VWC ≥ target"},
+  p1_initial_shot_size:{d:"Size of the first ramp-up shot, as % of substrate volume.",a:"How fast VWC climbs early in P1.",b:"Substrate volume, dryback depth.",f:"litres = % × substrate L"},
+  p1_shot_size_increment:{d:"How much each successive P1 shot grows over the last.",a:"Ramp aggressiveness — bigger = fewer, larger shots to target.",b:"Initial shot, max shot, time between shots.",f:"shot_n = initial + n × increment (≤ max)"},
+  p1_maximum_shot_size:{d:"Ceiling on any single P1 shot.",a:"Caps runoff spikes and channeling from oversized shots.",b:"Substrate volume, dripper flow.",f:"shot = min(ramp value, this)"},
+  p1_time_between_shots:{d:"Spacing between P1 ramp shots.",a:"Total ramp duration; lets each shot wick in before the next.",b:"Substrate absorption rate, shot size.",f:"P1 length ≈ shots × this interval"},
+  p1_minimum_shots:{d:"Fewest P1 shots before P2 can begin, even if target VWC is already hit.",a:"Guarantees even wetting / EC reset before maintenance.",b:"Target VWC, shot size.",f:"P2 starts after ≥ min shots AND VWC ≥ target"},
+  p1_maximum_shots:{d:"Most P1 shots allowed before forcing into P2.",a:"Stops endless ramping if VWC never reaches target (channeling / sensor fault).",b:"Shot size, target VWC, substrate health.",f:"force P2 at this shot count"},
+  /* P2 — maintenance */
+  p2_vwc_threshold:{d:"VWC level that triggers a maintenance top-up shot in P2.",a:"Sets the daytime dryback band — lower = deeper dryback per cycle.",b:"Dryback target, steering dial, target VWC.",f:"shoot when VWC ≤ threshold"},
+  p2_shot_size:{d:"Size of each P2 maintenance shot, % of substrate.",a:"VWC recovered per top-up; small = EC stacking, large = flushing.",b:"Substrate volume, EC strategy.",f:"litres = % × substrate L"},
+  p2_ec_high_threshold:{d:"Pore-EC / target ratio above which the controller reacts to high salt.",a:"Triggers larger / flushing shots to pull pore EC down.",b:"Feed EC, dryback depth, target EC.",f:"if EC_ratio ≥ this → correct down"},
+  p2_ec_low_threshold:{d:"Pore-EC / target ratio below which the controller reacts to low salt.",a:"Triggers smaller shots / lets EC stack back up.",b:"Feed EC, runoff, target EC.",f:"if EC_ratio ≤ this → let EC rise"},
+  /* P3 — overnight */
+  p3_emergency_vwc_threshold:{d:"Overnight VWC floor — only a drop below this fires an emergency shot.",a:"Prevents wilting overnight while still allowing the dryback.",b:"Overnight transpiration, substrate volume.",f:"emergency shot if VWC ≤ floor"},
+  p3_emergency_shot_size:{d:"Size of an overnight emergency shot.",a:"Just enough to clear the floor without resetting the dryback.",b:"Substrate volume.",f:"litres = % × substrate L"},
+  p3_gen_last_irrigation:{d:"Minutes before lights-off to stop irrigating in generative steering.",a:"Sets the overnight dryback runway — earlier last shot = deeper generative dryback.",b:"Steering mode, lights-off time.",f:"last shot at lights_off − this"},
+  p3_veg_last_irrigation:{d:"Minutes before lights-off to stop irrigating in vegetative steering.",a:"Shorter runway than gen = shallower overnight dryback.",b:"Steering mode, lights-off time.",f:"last shot at lights_off − this"},
+  /* steering & EC */
+  generative_dryback_target:{d:"Target dryback depth for generative steering (% drop from peak).",a:"Drives EC stacking and flower push; deeper = more potency, less yield.",b:"Steering dial, P2 threshold, P3 last-shot.",f:"used when dial ≥ 5.5 (gen)"},
+  vegetative_dryback_target:{d:"Target dryback depth for vegetative steering (% drop).",a:"Shallow dryback = vegetative push, more yield, lower EC.",b:"Steering dial, P2 threshold.",f:"used when dial < 5.5; the dial blends the two"},
+  /* climate */
+  ppfd:{d:"Photosynthetic photon flux at canopy — light intensity.",a:"Drives photosynthesis, DLI, transpiration, leaf temp, yield (≈linear to the CO₂ ceiling) and the potency floor (≥~600).",b:"Fixture power, hang height, dimming.",f:"DLI = PPFD × photoperiod_h × 0.0036"},
+  co2:{d:"Daytime CO₂ enrichment level.",a:"Raises the light-saturation ceiling so high PPFD pays off; +20–40% yield. Not a direct potency knob.",b:"Injection rate, sealing, canopy uptake.",f:"usable-PPFD ceiling rises with CO₂"},
+  temp:{d:"Daytime air temperature setpoint.",a:"Sets VPD (with RH), leaf temp, photosynthesis (peak ~27°C) and DIF. >30°C degrades THC.",b:"HVAC, light heat load.",f:"VPD = SVP(T)·(1 − RH/100)"},
+  rh:{d:"Daytime relative humidity setpoint.",a:"Sets VPD and condensation margin; too high → mould, too low → stomata shut.",b:"Transpiration, dehum capacity, fresh air.",f:"VPD = SVP(T)·(1 − RH/100)"},
+  temp_night:{d:"Night air temperature setpoint.",a:"Sets day→night DIF (tight positive best) and overnight condensation risk.",b:"HVAC night mode.",f:"DIF = day_temp − night_temp"},
+  rh_night:{d:"Night relative humidity setpoint.",a:"Overnight condensation / mould risk and dryback transpiration.",b:"Night temp, dehum.",f:"dew-point vs leaf-temp margin"},
+  feed_ec:{d:"EC of the nutrient solution fed to the dripper (input).",a:"Sets baseline pore EC; leaner feed → N-stress → +THC, −yield.",b:"Recipe / dosing.",f:"pore EC drifts toward feed EC on runoff"},
+  baseline_thc:{d:"The strain's genetic THC ceiling under ideal conditions.",a:"Anchors the potency estimate; stress modifiers scale around it.",b:"Genetics / cultivar.",f:"est THC = baseline × Π(stress modifiers)"},
+  /* room / facility */
+  room_length:{d:"Room length.",a:"Floor area & volume → CO₂ draw-down, cooling/dehum sizing, W/m².",b:"Physical room.",f:"area = L × W"},
+  room_width:{d:"Room width.",a:"Floor area & volume → CO₂ draw-down, cooling/dehum sizing, W/m².",b:"Physical room.",f:"area = L × W"},
+  room_height:{d:"Room height.",a:"Room volume → CO₂ ppm draw-down rate.",b:"Physical room.",f:"volume = area × H"},
+  canopy_coverage:{d:"% of floor under active canopy.",a:"Scales transpiration, CO₂ uptake and water use to real plant area.",b:"Plant count, spacing.",f:"canopy m² = floor × coverage%"},
+  room_plant_count:{d:"Total plants in the room (facility-load estimate).",a:"Multiplies per-plant transpiration into room water / dehum / cooling load.",b:"Layout density across all zones.",f:"room water = per-plant × count"},
+  plant_count:{d:"Plants in THIS zone.",a:"Scales the zone's daily water target and shot volumes.",b:"Zone layout / spacing.",f:"writes number.crop_steering_zone_N_plant_count"},
+  max_daily_volume:{d:"Hard cap on total water this zone can apply per day.",a:"Safety ceiling — controller stops irrigating once hit, even if dry.",b:"Plant count, substrate, climate demand.",f:"daily L ≤ this"},
+  shot_size_multiplier:{d:"Per-zone scaler applied to every shot size.",a:"Trims or boosts all P1–P3 shots for this zone without re-tuning each.",b:"Dripper count/flow, substrate.",f:"actual shot = shot% × this"},
+  lights_on:{d:"Hour of day the lights turn on (24h clock).",a:"Anchors the whole photoperiod, the P3→P0 grow-day reset and every diurnal curve.",b:"Light schedule.",f:"photo = lights_off − lights_on"},
+  lights_off:{d:"Hour of day the lights turn off (24h clock).",a:"Sets photoperiod length and when P1/P2 force to P3 overnight.",b:"Light schedule.",f:"photo = lights_off − lights_on"},
+  maximum_ec:{d:"Hard substrate-EC cutoff.",a:"Safety — irrigation is gated/forced to flush above this to prevent lockout.",b:"Feed EC, stacking, dryback.",f:"block stacking when pore EC ≥ this"},
+  irrigation_ec_min:{d:"Minimum acceptable feed-water EC.",a:"Below it the source water is flagged too weak to irrigate.",b:"Dosing / mixing.",f:"gate: feed EC ≥ this"},
+  irrigation_ec_max:{d:"Maximum acceptable feed-water EC.",a:"Above it the source water is flagged too strong to irrigate.",b:"Dosing / mixing.",f:"gate: feed EC ≤ this"},
+  irrigation_ph_min:{d:"Minimum acceptable feed-water pH.",a:"Below it irrigation is gated (too acidic).",b:"pH dosing.",f:"gate: pH ≥ this"},
+  irrigation_ph_max:{d:"Maximum acceptable feed-water pH.",a:"Above it irrigation is gated (too alkaline → lockout).",b:"pH dosing.",f:"gate: pH ≤ this"},
+  blocked_dripper_max_shots_30min:{d:"Shots in 30 min before a dripper is called blocked.",a:"Abandons emergency shots that aren't raising VWC (clog protection).",b:"Dripper health, shot frequency.",f:"flag if shots/30min ≥ this with no VWC rise"},
+  dripper_flow_rate:{d:"Flow rate of a single dripper.",a:"Converts shot duration ↔ litres; sets how long a shot runs.",b:"Dripper hardware.",f:"shot time = shot L ÷ (flow × drippers)"},
+  drippers_per_plant:{d:"Drippers feeding each plant.",a:"Total delivery rate per plant → shot duration.",b:"Irrigation layout.",f:"plant flow = dripper_flow × drippers"},
+  light_watts:{d:"Total electrical light power in the room.",a:"Sensible cooling load (~50% of watts) and W/m².",b:"Fixture count × wattage.",f:"AC sensible ≈ 0.5 × watts"},
+  hvac_cooling_kw:{d:"Installed AC cooling capacity.",a:"Whether sensible heat is removed; undersized → temp climbs.",b:"HVAC spec.",f:"compare to 0.5 × light_watts"},
+  dehum_capacity:{d:"Dehumidifier moisture-removal capacity (L/day).",a:"Whether the transpiration load is met; deficit → RH climbs at night.",b:"Dehum spec.",f:"balance = capacity − transpiration load"},
+  /* substrate */
+  field_capacity:{d:"Max VWC the substrate holds before runoff — the day's saturation ceiling.",a:"Top of the curve, runoff onset, dryback % baseline.",b:"Substrate type / size, dripper.",f:"runoff when VWC > field capacity"},
+  substrate_volume:{d:"Litres of substrate per plant / zone.",a:"Converts shot % to litres and sets dryback rate; bigger = slower swings.",b:"Block / pot size.",f:"shot L = shot% × this · dryback%/h = transp ÷ this"},
+  root_temp:{d:"Root-zone / substrate temperature.",a:"Dissolved O₂, nutrient-uptake vigour, Pythium risk, EC temp-comp.",b:"Floor heat, feed temp, room temp.",f:"18–24°C ideal; >26°C wakes pathogens"},
+  /* master controls */
+  dial:{d:"Master vegetative ↔ generative steering slider.",a:"Blends dryback targets and EC strategy across all phases & zones at once.",b:"Your crop goal — leafy growth vs flower / potency push.",f:"gen fraction = (dial − 1) / 9"},
+  athena:{d:"One-tap Athena climate presets per growth stage.",a:"Loads PPFD, CO₂, temp & RH (day + night) for the chosen stage; everything re-solves.",b:"Growth stage (Clone → Finish).",f:"writes the climate setpoints"},
+  /* yield limiting factors */
+  dli:{d:"Daily Light Integral actually usable given your CO₂ — total photons/day.",a:"Near-linear yield driver (little saturation to ~1800 µmol when CO₂ supports it).",b:"PPFD × photoperiod, capped by the CO₂ ceiling.",f:"Y ≈ 0.22·PPFD + 54 (Rodriguez-Morrison 2021)"},
+  dtemp:{d:"Daytime temperature vs the photosynthesis optimum.",a:"Yield via photosynthesis rate; bell peak ~27°C.",b:"Day temp, light load, cooling.",f:"score = bell(T, 27, 4.5)"},
+  dif:{d:"Day-minus-night temperature differential.",a:"Tight positive (1–5°C) = even ripening, no stretch; negative collapses yield.",b:"Day temp − night temp.",f:"DIF = day − night"},
+  vpd:{d:"Room air vapour-pressure deficit.",a:"Transpiration and stomatal opening; 0.8–1.4 kPa band.",b:"Temp + RH.",f:"VPD = SVP(T)·(1 − RH/100)"},
+  vpdL:{d:"Leaf-to-air vapour-pressure deficit — the real transpiration driver at the leaf.",a:"Stomata, transpiration, nutrient uptake, yield.",b:"Leaf temp (light − evaporative cooling), air RH.",f:"VPD_leaf = SVP(leaf) − e(air)"},
+  ec:{d:"Pore EC vs the phase target.",a:"Osmotic balance — too high locks out water, too low under-feeds.",b:"Feed EC, dryback, runoff.",f:"score = bell(pore EC, 1.05 × target)"},
+  photo:{d:"Photoperiod — hours of light.",a:"13h > 12h: +35–50% dry weight and +9% THCA; a soft yield lever.",b:"Lights on/off hours.",f:"photo = lights_off − lights_on"},
+  /* potency modifiers */
+  db:{d:"Finish-stage dryback depth.",a:"Deeper late-flower drought → +12–13% THCA (Caplan 2019); costs some yield.",b:"P3 last-shot, dial, P2 threshold.",f:"THC mult = 1 + score × 0.13"},
+  lean:{d:"Lean feed / nitrogen stress (low pore EC).",a:"Low-N stress → +20–30% %THC (Caplan 2017); −biomass.",b:"Feed EC, target EC.",f:"THC mult = 1 + score × 0.18"},
+  cool:{d:"Cool finish temperature.",a:"A cooler finish preserves THC and terpenes.",b:"Day temp in flower.",f:"THC mult = 1 + score × 0.05"},
+  light:{d:"Light maturation floor.",a:"PPFD below ~600 → immature, less potent flower; above it is a plateau.",b:"PPFD setpoint.",f:"potency floor, not a ceiling"},
+  degrade:{d:"Heat / negative-DIF degradation guard.",a:">30°C or negative DIF degrades cannabinoids.",b:"Day temp, DIF.",f:"penalty multiplier ≤ 1"},
+  /* charts */
+  chart_climate:{d:"24h air VPD (leaf + air), temp and RH on the lights-aligned timeline.",a:"Read whether VPD stays in the 0.8–1.4 kPa band day & night; drag the temp/RH dots to retune.",b:"temp, rh, temp_night, rh_night, ppfd.",f:"VPD = SVP(T)·(1 − RH/100)"},
+  chart_dew:{d:"Leaf temp vs dew point across 24h.",a:"Red ribbon = margin <3°C → condensation / mould risk overnight.",b:"temp, rh, night setpoints, leaf temp.",f:"margin = leaf_temp − dew_point"},
+  chart_moist:{d:"Transpiration moisture load vs dehumidifier capacity.",a:"Fill above the line = RH will climb; drag dehum to size it.",b:"plant_count, VPD, dehum_capacity.",f:"balance = capacity − transpiration load"},
+  chart_dli:{d:"Cumulative DLI vs target pace, with photosynthesis %.",a:"Read whether you hit the day's light target and where photosynthesis saturates.",b:"ppfd, photoperiod, co2, temp.",f:"DLI = Σ PPFD × 0.0036/timestep"},
+  chart_leafair:{d:"Leaf temperature vs air temperature over 24h.",a:"Gap = transpirational cooling; leaf above air = closed stomata / stress.",b:"ppfd, VPD, airflow.",f:"leaf = air + 0.7·PPFD/1000 − 4.5·gs"},
+  chart_co2:{d:"Room CO₂ ppm vs canopy uptake (g/h).",a:"Enriched by day, ambient at night; drag CO₂ to set enrichment.",b:"co2, canopy area, photosynthesis.",f:"draw ppm/h = uptake ÷ room volume"},
+  chart_heat:{d:"Sensible heat load (lights) vs AC capacity.",a:"Area above the line = under-cooled; drag AC to size it.",b:"light_watts, hvac_cooling_kw.",f:"sensible load ≈ 0.5 × light_watts"},
+  chart_irrig:{d:"Full-day physics sim: VWC (white) and pore EC (pink) as the controller fires shots.",a:"Drag any glowing handle to retune that setpoint; the whole day re-solves.",b:"every P0–P3, EC and substrate setpoint.",f:"shot mixes feed EC by litres; runoff flushes at field capacity"},
+  chart_multi:{d:"The steady-state day repeated 1–3 days, dryback overlaid with PPFD, temp, leaf VPD & CO₂.",a:"Scroll to read how the dryback rate tracks its environmental drivers.",b:"climate + substrate setpoints; live VWC overlay.",f:"dryback%/h = transpiration ÷ substrate L"},
+};
+function synthTip(key){
+  if(key && key.indexOf('ec_target_')===0){ const f=key.replace('ec_target_','');
+    if(f==='flush') return {d:"Target pore EC during a flush.",a:"Strips accumulated salts before harvest / reset; drops osmotic stress.",b:"Feed EC, runoff volume.",f:"big shots pull pore EC toward flush EC"};
+    const mode=f.indexOf('gen')===0?'generative':'vegetative', ph=f.slice(-2).toUpperCase();
+    return {d:"Target pore EC for "+ph+" in "+mode+" steering.",a:"Sets the salt strength roots sit in this phase — feed strength vs osmotic stress.",b:"Feed EC, shot size, dryback (small shots stack, big shots flush).",f:"controller drives shots toward this EC"};
+  }
+  return null;
+}
+
+function editor(){
+  return {
+    W:1240, H:680, PL:42, PR:46, PT:38, PB:70, VMIN:28, VMAX:72, gdays:3, histPts:null,
+    get PW(){return this.W-this.PL-this.PR}, get PH(){return this.H-this.PT-this.PB},
+    x(t){return this.PL+(t/24)*this.PW}, y(v){return this.PT+(1-(v-this.VMIN)/(this.VMAX-this.VMIN))*this.PH},
+    invT(px){return clamp((px-this.PL)/this.PW*24,0,24)}, invV(py){return clamp(this.VMIN+(1-(py-this.PT)/this.PH)*(this.VMAX-this.VMIN),0,100)},
+
+    zone:1, mode:"gen", dial:7, hot:"P1", drag:null, hov:null, saved:false, live:false, athena:"Bulk", minidrag:null, tip:null,
+    Z:{}, G:{}, hydrated:false, liveWaiting:false,
+    init(){ this.Z=JSON.parse(JSON.stringify(LIVE)); this.G=Object.assign({},GLOBAL);
+      try{ const s=JSON.parse(localStorage.getItem("f2cs.tpl")); if(s&&s.Z){ for(const z in this.Z){ if(s.Z[z]) this.Z[z]=Object.assign({},this.Z[z],s.Z[z]); }   // MERGE saved over defaults so new schema keys aren't lost
+        this.G=Object.assign({},GLOBAL); if(s.G) for(const k in GLOBAL){ if(s.G[k]!=null) this.G[k]=s.G[k]; }   // only re-apply stored keys still in the schema — a stale removed key (e.g. old global plant_count) can't shadow a new per-zone field
+        if(s.dial) this.dial=s.dial; this.hydrated=true; } }catch(e){}   // restored edits win on reload (hydrated) — no clobber
+      this.mode = this.dial>=5.5?'gen':'veg'; this.pullLive();
+      if(window.parent!==window){ document.documentElement.classList.add("embed");   // embedded → report content height so the parent sizes the iframe (one scrollbar, not three)
+        const post=()=>{ try{ window.parent.postMessage({type:"cs-tune-h",h:Math.ceil(document.body.scrollHeight)+24},"*"); }catch(e){} };
+        try{ new ResizeObserver(post).observe(document.body); }catch(e){} [200,600,1200].forEach(d=>setTimeout(post,d)); }
+    },
+    pullLive(){   // embedded in crop_steering.html → live setpoints arrive from the parent via postMessage. Standalone (?demo / GitHub Pages) → keep the seed.
+      if(window.parent===window) return;
+      const put=(o,k,v)=>{ const m=META[k]; o[k]=(m&&v!=null&&!isNaN(v))?clamp(rstep(+v,m.step),m.min,m.max):v; };   // round seeded values to their step so labels stay clean
+      window.addEventListener("message",ev=>{ const d=ev.data; if(!d) return;
+        if(d.type==='cs-tune-history'){ this.histPts=(Array.isArray(d.pts)&&d.pts.length)?d.pts:null; return; }
+        if(d.type!=="cs-tune-data") return;
+        this.live=true;   // live HA is reachable → show the badge + Apply button regardless
+        if(this.hydrated && !d.explicit){ this.liveWaiting=true; return; }   // user has saved edits → DON'T clobber on auto-seed; offer "Pull live" instead
+        try{ if(d.zones){ for(const z in d.zones){ if(this.Z[z]) for(const k in d.zones[z]) put(this.Z[z],k,d.zones[z][k]); } }
+             if(d.global) for(const k in d.global) put(this.G,k,d.global[k]);
+             if(d.dial!=null) this.dial=d.dial;
+             this.mode=this.dial>=5.5?'gen':'veg'; SIMKEY=null; ENVK=null; PREV={}; this.liveWaiting=false; this.hydrated=true; this.persist(); }catch(e){ console.warn("tune seed failed:",e.message); } });
+      try{ window.parent.postMessage({type:"cs-tune-ready"},"*"); }catch(e){}
+    },
+    pullFromHA(){ try{ window.parent.postMessage({type:"cs-tune-pull"},"*"); }catch(e){} },   // explicit: overwrite my edits with current live HA values
+    persist(){ try{ clearTimeout(this._pt); }catch(e){} this._pt=setTimeout(()=>{ try{ localStorage.setItem("f2cs.tpl",JSON.stringify({Z:this.Z,G:this.G,dial:this.dial})); }catch(e){} }, 350); },   // silent autosave on every edit
+    applyToHA(){   // push this zone's edited setpoints back to HA via the parent (parent maps → number.set_value with a confirm)
+      if(window.parent===window){ this.save(); return; }   // standalone → save the local template
+      const z=this.zone, changes=Object.assign({},this.Z[z]);
+      try{ window.parent.postMessage({type:"cs-tune-apply",zone:z,changes,global:Object.assign({},this.G)},"*"); }catch(e){}
+    },
+    dialLabel(){ const v=this.dial; const t=v<3?"deep vegetative":v<5?"vegetative":v<5.5?"balanced":v<7.5?"generative":"hard generative"; return v.toFixed(1)+" · "+t; },
+    applyAthena(s){ const a=ATHENA[s]; if(!a) return; for(const k in a) this.G[k]=a[k]; this.athena=s; SIMKEY=null; ENVK=null; this.persist(); },
+    applySteer(){ const gf=clamp((this.dial-1)/9,0,1); for(const z of [1,2,3]) for(const k in STEER){ const m=META[k], v=STEER[k][0]+(STEER[k][1]-STEER[k][0])*gf; this.Z[z][k]=clamp(rstep(v,m.step),m.min,m.max); } SIMKEY=null; this.persist(); },   // dial writes the steered setpoints across all zones
+
+    /* accessors */
+    g(k){ if(k in this.G) return this.G[k]; return this.Z[ZOVR||this.zone][k]; },
+    setRaw(k,v){ if(k in this.G) this.G[k]=v; else this.Z[this.zone][k]=v; this.persist(); },
+    setField(f,val){ const n=parseFloat(val); if(isNaN(n)) return; this.setRaw(f.key, clamp(rstep(n,f.step),f.min,f.max)); },
+    bump(f,dir){ this.setRaw(f.key, clamp(rstep(this.g(f.key)+dir*f.step,f.step),f.min,f.max)); },
+
+    photo(){ return ((this.G.lights_off-this.G.lights_on)+24)%24 || 12; },
+
+    /* steering-derived */
+    lastIrrigMin(){ return this.mode==='gen'? this.g('p3_gen_last_irrigation') : this.g('p3_veg_last_irrigation'); },
+    drybackTarget(){ const gf=clamp((this.dial-1)/9,0,1); return this.g('vegetative_dryback_target')*(1-gf)+this.g('generative_dryback_target')*gf; },  // veg shallow → gen deep, smooth with the dial
+    ecP1(){ return this.mode==='gen'? this.g('ec_target_gen_p1') : this.g('ec_target_veg_p1'); },
+    ecP2(){ return this.mode==='gen'? this.g('ec_target_gen_p2') : this.g('ec_target_veg_p2'); },
+    ecP3(){ return this.mode==='gen'? this.g('ec_target_gen_p3') : this.g('ec_target_veg_p3'); },
+
+    /* ===== coupled lever chain: environment → leaf → stomata → transpiration → dryback → EC =====
+       Every derived quantity takes an env snapshot e={ppfd,co2,temp,rh,on}. Default = day setpoints (headline);
+       envAt(t) gives the diurnal value so the graphs + sim vary across the 24h. */
+    dayEnv(){ return {ppfd:this.g('ppfd'), co2:this.g('co2'), temp:this.g('temp'), rh:this.g('rh'), on:true}; },
+    envAt(t){ const photo=this.photo(), on=t<photo, cl=x=>clamp(x,0,1), lerp=(a,b,f)=>a+(b-a)*f;
+      const lOn = on ? cl(Math.min(t/0.3,(photo-t)/0.3)) : 0;          // light trapezoid 0..1 (ramp at lights-on/off)
+      const ease= on ? cl(Math.min(t/1,(photo-t)/1)) : 0;             // climate day-fraction (1h dawn/dusk transitions)
+      return { on, ppfd:this.g('ppfd')*lOn, co2:lerp(400,this.g('co2'),ease), temp:lerp(this.g('temp_night'),this.g('temp'),ease), rh:lerp(this.g('rh_night'),this.g('rh'),ease) }; },
+    svp(T){ return 0.6108*Math.exp(17.27*T/(T+237.3)); },                                   // saturation vapour pressure (kPa)
+    vpd(e){ e=e||this.dayEnv(); return Math.max(0.05, this.svp(e.temp)*(1-e.rh/100)); },     // air VPD
+    dewPoint(e){ e=e||this.dayEnv(); const rh=clamp(e.rh,1,100), a=Math.log(rh/100)+17.27*e.temp/(237.3+e.temp); return 237.3*a/(17.27-a); },
+    gs(e){ e=e||this.dayEnv(); const fL=e.ppfd/(e.ppfd+300), fC=1/(1+Math.max(0,e.co2-400)/4000), fV=1/(1+Math.pow(this.vpd(e)/1.8,2)); return fL*fC*fV; },  // stomatal conductance 0..1
+    leafTemp(e){ e=e||this.dayEnv(); return e.temp + 0.7*(e.ppfd/1000) - 4.5*this.gs(e); },  // LED: small radiative gain, larger transpirational cooling → leaf 1–2.5°C BELOW air; rises above only when stomata close (water stress)
+    vpdLeaf(e){ e=e||this.dayEnv(); const eAir=this.svp(e.temp)*e.rh/100; return Math.max(0.05, this.svp(this.leafTemp(e))-eAir); },   // leaf-to-air VPD (leaf cooler → lower than air VPD)
+    psRate(e){ e=e||this.dayEnv(); const Kl=250+0.2*e.co2, fL=e.ppfd/(e.ppfd+Kl), fC=e.co2/(e.co2+500), fT=Math.exp(-Math.pow((this.leafTemp(e)-27)/10,2)); return fL*fC*fT; },  // light-saturation point rises with CO₂ (Kl); CO₂ fertilisation; leaf-temp optimum ~27°C
+    transpiration(e){ const KT=0.57; return (e.on && e.ppfd>20) ? KT*this.gs(e)*this.vpdLeaf(e) : KT*0.06*this.vpd(e); },   // litres/hour; KT tuned so daily-mean dryback ≈ live 3.97%/h
+    transpirationLh(t,on){ return this.transpiration(this.envAt(t)); },                      // diurnal value the sim integrates
+    drybackRatePct(){ return this.transpiration(this.dayEnv())/Math.max(this.g('substrate_volume'),0.1)*100; },   // midday peak rate
+
+    /* ===== room/facility scaling — turns the per-plant physics into real room totals ===== */
+    floorArea(){ return this.g('room_length')*this.g('room_width'); },                        // m²
+    roomVol(){ return this.floorArea()*this.g('room_height'); },                              // m³
+    canopyArea(){ return this.floorArea()*this.g('canopy_coverage')/100; },                   // m²
+    dailyWaterL(){ const photo=this.photo(); let s=0; for(let t=0;t<photo;t+=0.25) s+=this.transpiration(this.envAt(t))*0.25; return s*this.g('room_plant_count'); },  // total room L/day
+    coolingLoadKw(){ return this.g('light_watts')/1000*0.5; },   // AC sensible load ≈ 50% of LED watts (driver + non-PAR); the PAR half drives transpiration → latent → dehumidifier
+    co2UptakeGh(){ return this.canopyArea()*2.0*this.psRate(this.dayEnv()); },                 // g CO₂/h (≈2 g/m²/h at full photosynthesis)
+    co2DrawPpmH(){ return this.co2UptakeGh()*1000/(1.96*Math.max(this.roomVol(),1)); },        // ppm/h drawn down if uninjected (1 ppm ≈ 1.96 mg/m³)
+    lightWm2(){ return this.g('light_watts')/Math.max(this.floorArea(),0.1); },                // W/m² electrical
+
+    /* ===== root-zone temperature inferences (from the substrate-temp sensor) + extra derived ===== */
+    rootTemp(){ return this.g('root_temp'); },
+    dissolvedO2(){ return clamp(14.7-0.275*this.rootTemp(),2,14); },                            // mg/L · Henry (9.2@20 · 8.3@24 · 7.0@28)
+    uptakeFactor(){ return clamp(Math.exp(-Math.pow((this.rootTemp()-21)/6,2)),0,1); },          // nutrient uptake, optimum ~18–22°C, falls >26
+    ecTempComp(){ return 1+0.02*(this.rootTemp()-25); },                                         // raw EC drifts ~2%/°C off the 25°C reference
+    pathogenRisk(){ const T=this.rootTemp(), o2=this.dissolvedO2(), wet=this.overnightLow()>this.g('field_capacity')*0.72; let r=0;
+      if(T>22)r+=(T-22)/6; if(o2<5)r+=(5-o2)/3; if(wet)r+=0.5; return clamp(r,0,1); },            // Pythium: warm + low-O₂ + chronically wet
+    osmoticMPa(){ return -0.36*this.peakEC(); },                                                 // pore-EC → osmotic potential (more negative = harder to drink)
+    leafAirDelta(){ return this.leafTemp()-this.g('temp'); },                                    // leaf−air ΔT (LED canopy runs below air)
+    absHumidity(){ const T=this.g('temp'); return 216.7*(this.svp(T)*10*this.g('rh')/100)/(T+273.15); },   // g/m³
+    latentKw(){ return this.transpiration(this.dayEnv())*this.g('room_plant_count')*0.628; },          // moisture-removal (dehum) load
+
+    /* ===== the whole coupled state — every lever feeds these; change one, they all move ===== */
+    coupledRanked(){ const list=this.coupled();
+      const out=list.map(m=>{ const ci=CINFO[m.key]||{o:99,band:null,scale:[0,1],tip:""};
+        const s=ci.scale, val=parseFloat(m.disp), span=(s[1]-s[0])||1, pos=clamp((val-s[0])/span,0,1)*100;
+        let word="",wc="#8b93a7", bandL=0,bandW=0;
+        if(ci.band){ const lo=ci.band[0],hi=ci.band[1], within=val>=lo&&val<=hi;
+          word=within?"GOOD":(val<lo?"LOW":"HIGH");
+          const off=within?0:(val<lo?(lo-val):(val-hi))/((hi-lo)||1);
+          wc=within?"#28b463":(off>0.4?"#e5484d":"#f5a524");
+          bandL=clamp((lo-s[0])/span,0,1)*100; bandW=clamp((Math.min(hi,s[1])-Math.max(lo,s[0]))/span,0,1)*100; }
+        const o={...m, val, pos, word, wc, bandL, bandW, tip:ci.tip, imp:ci.o, useful:CS_USEFUL.has(m.key) };
+        o.glyph = o.useful ? csGlyph(o) : ''; o.viz = o.useful ? csViz(o) : ''; o.wide = ['path','db','pec'].includes(o.key); return o; });
+      out.sort((a,b)=>a.imp-b.imp); return out; },
+    coupledUseful(){ return this.coupledRanked().filter(c=>c.useful); },
+    coupledEng(){ return this.coupledRanked().filter(c=>!c.useful); },
+    coupled(){
+      const ppfd=this.g('ppfd'), photo=this.photo(), Tl=this.leafTemp(), Td=this.dewPoint();
+      const vpdA=this.vpd(), vpdL=this.vpdLeaf(), gs=this.gs(), pn=this.psRate(), E=this.transpiration(this.dayEnv());
+      const dli=ppfd*photo*0.0036, m=this.sim().meta, peakEC=this.peakEC();
+      const water=this.dailyWaterL(), load=water*1.1, bal=this.g('dehum_capacity')-load, cool=this.coolingLoadKw(), tons=cool/3.517, wue=pn/Math.max(E,0.02)*2, margin=Tl-Td;
+      const R=[
+        ["vpdA","Air VPD","kPa",vpdA,2,"svp(air)·(1−RH)","atm",vpdA>=0.8&&vpdA<=1.3],
+        ["vpdL","Leaf VPD","kPa",vpdL,2,"svp(leaf)−e(air)","atm",vpdL>=0.8&&vpdL<=1.6],
+        ["dew","Dew point","°C",Td,1,"Magnus(air,RH)","atm",true],
+        ["margin","Condensation margin","°C",margin,1,"leaf−dew · >3 safe","atm",margin>3],
+        ["dli","DLI","mol/d",dli,1,"PPFD·hrs·0.0036","atm",dli>=30&&dli<=62],
+        ["leaf","Leaf temp","°C",Tl,1,"air +light −transp","plant",Tl<=30],
+        ["gs","Stomata open","%",gs*100,0,"light·CO₂·VPD","plant",gs>0.25],
+        ["pn","Photosynthesis","%",pn*100,0,"light·CO₂·leafT","plant",pn>0.4],
+        ["E","Transpiration","L/h/pl",E,2,"gs·leaf-VPD","plant",true],
+        ["wue","Water-use eff","idx",wue,2,"photosynth/transp","plant",true],
+        ["db","Dryback rate","%/h",this.drybackRatePct(),1,"transp/substrate","root",true],
+        ["pec","Peak pore EC","mS",peakEC,1,"feed + dryback stack","root",peakEC<this.ecP2()*1.6],
+        ["shots","Shots/day","",m.shots.length,0,"controller fires","root",true],
+        ["ro","Runoff","L/day",m.runoffL||0,2,"overshoot past FC","root",true],
+        ["water","Water use (room)","L/day",water,1,"Σ transp · plants","room",true],
+        ["bal","Moisture balance","L/day",bal,1,"dehum − load·1.1","room",bal>=0],
+        ["cool","Cooling load","kW",cool,1,"≈50% of LED W","room",cool<=this.g('hvac_cooling_kw')],
+        ["tons","Cooling need","ton",tons,2,"kW ÷ 3.517","room",cool<=this.g('hvac_cooling_kw')],
+        ["co2d","CO₂ draw","ppm/h",this.co2DrawPpmH(),0,"uptake / room vol","room",true],
+        ["wm2","Light intensity","W/m²",this.lightWm2(),0,"watts / floor","room",true],
+        ["rootT","Root temp","°C",this.rootTemp(),1,"substrate sensor","root",this.rootTemp()>=18&&this.rootTemp()<=24],
+        ["do2","Dissolved O₂","mg/L",this.dissolvedO2(),1,"Henry(root temp)","root",this.dissolvedO2()>=5],
+        ["upt","Nutrient uptake","%",this.uptakeFactor()*100,0,"root-temp Q10","root",this.uptakeFactor()>0.7],
+        ["path","Pythium risk","%",this.pathogenRisk()*100,0,"warm+low O₂+wet","root",this.pathogenRisk()<0.4],
+        ["osm","Osmotic stress","MPa",this.osmoticMPa(),2,"−0.36·pore EC","root",this.osmoticMPa()>-2.6],
+        ["dT","Leaf−air ΔT","°C",this.leafAirDelta(),1,"leaf − air","plant",this.leafAirDelta()>=-3&&this.leafAirDelta()<=1],
+        ["ah","Abs humidity","g/m³",this.absHumidity(),1,"from temp · RH","atm",true],
+        ["lat","Latent load","kW",this.latentKw(),1,"transp → dehum","room",this.latentKw()<=this.g('dehum_capacity')/24*0.8],
+      ];
+      return R.map(r=>{ const [key,label,unit,n,dec,driver,grp,good]=r, p=PREV[key]; let dir=0;
+        if(p!==undefined && Math.abs(n-p)>Math.max(0.02,Math.abs(n)*0.004)) dir=n>p?1:-1; PREV[key]=n;
+        return {key,label,unit,grp,driver,good,dir,disp:Number(n).toFixed(dec)}; });
+    },
+
+    /* ===== diurnal environment series for the room graphs (cached in module scope) ===== */
+    envSeries(){ const key=JSON.stringify([this.G,this.photo()]); if(ENVK===key) return ENVS;
+      const S={t:[],vpdA:[],vpdL:[],temp:[],rh:[],dew:[],leaf:[],transp:[],pn:[],dli:[],ppfd:[],co2:[],uptake:[],lightKw:[],heatKw:[]}; let dli=0;
+      const dP=this.g('ppfd'), pc=this.g('room_plant_count'), lw=this.g('light_watts'), ca=this.canopyArea();
+      for(let i=0;i<=96;i++){ const t=i*0.25, e=this.envAt(t), pn=this.psRate(e), tr=this.transpiration(e);
+        S.t.push(t); S.vpdA.push([t,this.vpd(e)]); S.vpdL.push([t,this.vpdLeaf(e)]); S.temp.push([t,e.temp]); S.rh.push([t,e.rh]);
+        S.dew.push([t,this.dewPoint(e)]); S.leaf.push([t,this.leafTemp(e)]); S.transp.push([t,tr*pc]);   // room total L/h
+        S.pn.push([t,pn*100]); dli+=e.ppfd*0.25*0.0036; S.dli.push([t,dli]); S.ppfd.push([t,e.ppfd]);
+        S.co2.push([t,e.co2]); S.uptake.push([t,ca*2*pn]);
+        const lightKw=lw/1000*(dP>0?e.ppfd/dP:0); S.lightKw.push([t,lightKw]); S.heatKw.push([t,lightKw+tr*pc*0.628]); }
+      ENVS=S; ENVK=key; return S; },
+
+    /* generic 24h mini-chart — shares the irrigation card's x-scale + lights-off shading (vertical register) */
+    miniChart(o){ const W=this.W,PL=this.PL,PR=this.PR,h=o.h||150,mPT=16,mPB=22,PWi=W-PL-PR,PHi=h-mPT-mPB,photo=this.photo();
+      const xx=t=>PL+(t/24)*PWi, L=o.left, R=o.right, yl=v=>mPT+(1-(v-L.min)/((L.max-L.min)||1))*PHi, yr=v=>mPT+(1-(v-R.min)/((R.max-R.min)||1))*PHi;
+      const poly=(pts,map)=>pts.map(p=>xx(p[0]).toFixed(1)+","+map(p[1]).toFixed(1)).join(" ");
+      let s=`<svg viewBox="0 0 ${W} ${h}" class="mini" preserveAspectRatio="none">`;
+      s+=`<rect x="${xx(photo).toFixed(1)}" y="${mPT}" width="${(xx(24)-xx(photo)).toFixed(1)}" height="${PHi}" fill="rgba(255,255,255,.04)"/>`;
+      (L.bands||[]).forEach(b=>{ s+=`<rect x="${PL}" y="${yl(b.hi).toFixed(1)}" width="${PWi}" height="${Math.abs(yl(b.lo)-yl(b.hi)).toFixed(1)}" fill="${b.color||'rgba(52,211,153,.10)'}"/>`; });
+      (L.ticks||[]).forEach(v=>{ s+=`<line x1="${PL}" y1="${yl(v).toFixed(1)}" x2="${W-PR}" y2="${yl(v).toFixed(1)}" stroke="rgba(255,255,255,.06)"/><text x="${PL-6}" y="${(yl(v)+3).toFixed(1)}" text-anchor="end" font-size="9" fill="#6b7682">${v}</text>`; });
+      s+=`<text x="${PL-6}" y="${mPT-5}" text-anchor="end" font-size="9.5" fill="#9aa4b1">${L.label}</text>`;
+      if(R){ s+=`<text x="${W-PR+6}" y="${mPT-5}" font-size="9.5" fill="#7c8693">${R.label}</text>`; (R.ticks||[]).forEach(v=>{ s+=`<text x="${W-PR+6}" y="${(yr(v)+3).toFixed(1)}" font-size="9" fill="#6b7682">${v}</text>`; }); }
+      for(let hh=0;hh<=24;hh+=3){ s+=`<text x="${xx(hh).toFixed(1)}" y="${h-6}" text-anchor="middle" font-size="8.5" fill="#6b7682">${hh}h</text>`; }
+      if(o.extra) s+=o.extra(xx,yl,yr);
+      (L.series||[]).forEach(se=>{ if(se.fill) s+=`<polygon points="${PL},${yl(L.min).toFixed(1)} ${poly(se.pts,yl)} ${(W-PR)},${yl(L.min).toFixed(1)}" fill="${se.fill}"/>`;
+        s+=`<polyline points="${poly(se.pts,yl)}" fill="none" stroke="${se.color}" stroke-width="${se.w||2}" ${se.dash?`stroke-dasharray="${se.dash}"`:''} stroke-linejoin="round" stroke-linecap="round"/>`; });
+      if(R)(R.series||[]).forEach(se=>{ s+=`<polyline points="${poly(se.pts,yr)}" fill="none" stroke="${se.color}" stroke-width="${se.w||1.5}" ${se.dash?`stroke-dasharray="${se.dash}"`:''} opacity="${se.op||.8}" stroke-linejoin="round"/>`; });
+      // value callouts + draggable handles (like the VWC card)
+      (o.bubbles||[]).forEach(b=>{ const by=(b.ax==='r'?yr:yl)(b.v), bx=xx(b.t), drg=!!b.k, w=Math.max((''+b.txt).length*6.4+10,26), bh=15, above=b.dy<0, ry=above?by-bh-9:by+9;
+        s+=`<line x1="${bx.toFixed(1)}" y1="${by.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${(above?ry+bh:ry).toFixed(1)}" stroke="${b.col}" stroke-width="1" opacity=".5"/>`;
+        s+=`<g ${drg?`data-h="${b.k}" data-ax="${b.ax||'l'}" data-mul="${b.mul||1}" style="cursor:ns-resize"`:''}>`;
+        s+=`<rect x="${(bx-w/2).toFixed(1)}" y="${ry.toFixed(1)}" width="${w}" height="${bh}" rx="5" fill="#0c1117" stroke="${b.col}" stroke-width="${drg?1.5:1}"/>`;
+        s+=`<text x="${bx.toFixed(1)}" y="${(ry+11).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="${b.col}">${b.txt}</text>`;
+        if(b.cap) s+=`<text x="${bx.toFixed(1)}" y="${(above?ry-3:ry+bh+9).toFixed(1)}" text-anchor="middle" font-size="8" fill="#7c8693">${b.cap}</text>`;
+        s+=`<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="${drg?4.5:3}" fill="${b.col}" ${drg?'stroke="#0a0c10" stroke-width="2"':''}/>`;
+        if(drg) s+=`<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="8" fill="${b.col}" opacity="${this.minidrag&&this.minidrag.key===b.k?.3:.14}"/>`;
+        s+=`</g>`; });
+      MINI[o.id]={mPT,PHi,h,l:[L.min,L.max],r:R?[R.min,R.max]:null};
+      return s+`</svg>`; },
+    miniDown(id,e){ const h=e.target.closest&&e.target.closest('[data-h]'); if(!h) return; this.minidrag={id,key:h.getAttribute('data-h'),ax:h.getAttribute('data-ax'),mul:+(h.getAttribute('data-mul')||1)}; try{e.currentTarget.setPointerCapture(e.pointerId)}catch(_){} },
+    miniMove(e){ if(!this.minidrag) return; const d=this.minidrag, m=MINI[d.id]; if(!m) return; const r=e.currentTarget.getBoundingClientRect(); const py=(e.clientY-r.top)/r.height*m.h, ax=d.ax==='r'?m.r:m.l; if(!ax) return;
+      let val=ax[0]+(1-(py-m.mPT)/m.PHi)*(ax[1]-ax[0]); const me=META[d.key]; if(!me) return; this.setRaw(d.key, clamp(rstep(val*d.mul,me.step),me.min,me.max)); ENVK=null; },
+
+    climateChart(){ const S=this.envSeries(), p=this.photo(), e=this.dayEnv();
+      return this.miniChart({id:'climate', h:158, left:{min:0,max:2.6,label:'VPD kPa',ticks:[0.5,1,1.5,2],bands:[{lo:0.8,hi:1.4}],
+          series:[{pts:S.vpdL,color:'#f472b6',w:2.4},{pts:S.vpdA,color:'#7dd3fc',w:1.6,dash:'4 3'}]},
+        right:{min:0,max:100,label:'°C · %',ticks:[20,40,60,80],series:[{pts:S.temp,color:'#fb923c',w:1.5,op:.75},{pts:S.rh,color:'#60a5fa',w:1.5,op:.75}]},
+        bubbles:[ {t:p*0.45,v:this.vpdLeaf(e),ax:'l',col:'#f472b6',txt:this.vpdLeaf(e).toFixed(2),cap:'leaf VPD',dy:-1},
+          {t:p*0.64,v:this.g('temp'),ax:'r',col:'#fb923c',txt:this.g('temp')+'°',cap:'day temp · drag',k:'temp',dy:-1},
+          {t:p*0.82,v:this.g('rh'),ax:'r',col:'#60a5fa',txt:this.g('rh')+'%',cap:'day RH · drag',k:'rh',dy:1} ] }); },
+    dewChart(){ const S=this.envSeries(), p=this.photo();
+      let mi=0,mv=99; for(let i=0;i<S.leaf.length;i++){ const m=S.leaf[i][1]-S.dew[i][1]; if(m<mv){mv=m;mi=i;} }
+      const extra=(xx,yl)=>{ const top=S.dew.map(q=>xx(q[0]).toFixed(1)+","+yl(q[1]+3).toFixed(1)).join(" ");
+        const bot=S.dew.map(q=>xx(q[0]).toFixed(1)+","+yl(q[1]).toFixed(1)).reverse().join(" "); return `<polygon points="${top} ${bot}" fill="rgba(248,113,113,.15)"/>`; };
+      return this.miniChart({id:'dew', h:158, extra, left:{min:8,max:34,label:'°C',ticks:[12,18,24,30],
+          series:[{pts:S.leaf,color:'#fb923c',w:2.4},{pts:S.temp,color:'#e7ecf2',w:1.3,dash:'2 3'},{pts:S.dew,color:'#60a5fa',w:2.2,dash:'4 3'}]},
+        bubbles:[ {t:S.t[mi],v:S.leaf[mi][1],ax:'l',col:mv<3?'#f87171':'#34d399',txt:mv.toFixed(1)+'°',cap:'min margin',dy:-1},
+          {t:p+(24-p)*0.55,v:S.dew[Math.round((p+(24-p)*0.55)*4)]?S.dew[Math.round((p+(24-p)*0.55)*4)][1]:S.dew[S.dew.length-1][1],ax:'l',col:'#60a5fa',txt:(S.dew[S.dew.length-1][1]).toFixed(1)+'°',cap:'night dew',dy:1} ] }); },
+    moistChart(){ const S=this.envSeries(), dh=this.g('dehum_capacity')/24, mx=(Math.max(dh*1.3, ...S.transp.map(q=>q[1]))*1.12)||1, dpts=S.t.map(t=>[t,dh]), pk=Math.max(...S.transp.map(q=>q[1]));
+      return this.miniChart({id:'moist', h:150, left:{min:0,max:mx,label:'L/h',ticks:[+(mx*0.25).toFixed(2),+(mx*0.5).toFixed(2),+(mx*0.75).toFixed(2)],
+          series:[{pts:S.transp,color:'#34d399',w:2,fill:'rgba(52,211,153,.16)'},{pts:dpts,color:'#f472b6',w:1.8,dash:'5 4'}]},
+        bubbles:[ {t:this.photo()*0.28,v:dh,ax:'l',col:'#f472b6',txt:this.g('dehum_capacity')+'L/d',cap:'dehum · drag',k:'dehum_capacity',mul:24,dy:-1},
+          {t:this.photo()*0.6,v:pk,ax:'l',col:'#34d399',txt:this.dailyWaterL().toFixed(0)+'L/d',cap:'water use',dy:-1} ] }); },
+    dliChart(){ const S=this.envSeries(), tot=S.dli[S.dli.length-1][1], photo=this.photo(), tgt=38, target=S.t.map(t=>[t, tgt*Math.min(t,photo)/photo]);
+      return this.miniChart({id:'dli', h:150, left:{min:0,max:Math.max(tot*1.1,42),label:'DLI mol',ticks:[10,20,30,40],
+          series:[{pts:S.dli,color:'#a3e635',w:2.6},{pts:target,color:'#6b7682',w:1.4,dash:'4 4'}]},
+        right:{min:0,max:100,label:'photo %',ticks:[25,50,75],series:[{pts:S.pn,color:'#fbbf24',w:1.6,op:.7}]},
+        bubbles:[ {t:photo*0.92,v:tot,ax:'l',col:'#a3e635',txt:tot.toFixed(0),cap:'DLI mol/d',dy:-1},
+          {t:photo*0.5,v:Math.max(...S.pn.map(q=>q[1])),ax:'r',col:'#fbbf24',txt:Math.round(Math.max(...S.pn.map(q=>q[1])))+'%',cap:'photo',dy:1} ] }); },
+    leafAirChart(){ const S=this.envSeries(), p=this.photo(), lf=this.leafTemp(this.dayEnv());
+      return this.miniChart({id:'leafair', h:148, left:{min:14,max:36,label:'°C',ticks:[18,24,30],
+          series:[{pts:S.leaf,color:'#fb923c',w:2.4},{pts:S.temp,color:'#7dd3fc',w:2,dash:'4 3'}]},
+        bubbles:[ {t:p*0.45,v:lf,ax:'l',col:'#fb923c',txt:lf.toFixed(1)+'°',cap:'leaf · Δ'+(lf-this.g('temp')).toFixed(1),dy:-1},
+          {t:p*0.68,v:this.g('temp'),ax:'l',col:'#7dd3fc',txt:this.g('temp')+'°',cap:'day air · drag',k:'temp',dy:1} ] }); },
+    co2Chart(){ const S=this.envSeries(), umax=(Math.max(8,...S.uptake.map(q=>q[1]))*1.25)||10, p=this.photo();
+      return this.miniChart({id:'co2', h:148, left:{min:0,max:1700,label:'CO₂ ppm',ticks:[400,800,1200,1600],
+          series:[{pts:S.co2,color:'#a78bfa',w:2.4,fill:'rgba(167,139,250,.12)'}]},
+        right:{min:0,max:umax,label:'uptake g/h',ticks:[+(umax*0.5).toFixed(0),+umax.toFixed(0)],series:[{pts:S.uptake,color:'#34d399',w:1.8,op:.85}]},
+        bubbles:[ {t:p*0.5,v:this.g('co2'),ax:'l',col:'#a78bfa',txt:this.g('co2'),cap:'day CO₂ · drag',k:'co2',dy:-1},
+          {t:p*0.5,v:this.co2UptakeGh(),ax:'r',col:'#34d399',txt:this.co2UptakeGh().toFixed(0)+'g/h',cap:'uptake',dy:1} ] }); },
+    heatChart(){ const S=this.envSeries(), cap=this.g('hvac_cooling_kw'), sens=S.lightKw.map(q=>[q[0],q[1]*0.5]), pk=Math.max(...sens.map(q=>q[1])), mx=(Math.max(cap*1.2,pk)*1.1)||1, cp=S.t.map(t=>[t,cap]), p=this.photo();
+      return this.miniChart({id:'heat', h:150, left:{min:0,max:mx,label:'kW',ticks:[+(mx*0.33).toFixed(1),+(mx*0.66).toFixed(1)],
+          series:[{pts:sens,color:'#f59e0b',w:1.8,fill:'rgba(245,158,11,.15)'},{pts:cp,color:'#60a5fa',w:1.8,dash:'5 4'}]},
+        bubbles:[ {t:p*0.24,v:cap,ax:'l',col:'#60a5fa',txt:cap+'kW',cap:'AC · drag',k:'hvac_cooling_kw',dy:1},
+          {t:p*0.58,v:pk,ax:'l',col:pk>cap?'#f87171':'#f59e0b',txt:pk.toFixed(1)+'kW',cap:'sensible ≈50% LED',dy:-1} ] }); },
+
+    /* ===== limiting-factor (Liebig minimum) analysis vs max yield & potency ===== */
+    co2Ceiling(){ return clamp(600+(this.g('co2')-400)/1100*900, 600, 1600); },   // usable PPFD ceiling rises with CO₂: ~600 µmol @400ppm → ~1500 @1500ppm. Above the ceiling extra photons are wasted, not harmful. CO₂ "lets you push light harder" — it is a yield enabler, not a potency knob. (Chandra et al. 2008; Westmoreland & Bugbee 2023, https://digitalcommons.usu.edu/etd2023/243/)
+
+    /* ── YIELD response per lever — evidence-based shapes, NOT symmetric guesses ──
+       Liebig minimum: relative yield = the WORST axis score (0..1). Each axis carries a display
+       band [lo,hi] + a midpoint so the advice line can say raise/lower toward a real range. */
+    yieldAxes(){ const e=this.dayEnv(), m=this.sim().meta, FCv=this.g('field_capacity');
+      const db=(FCv-m.overnightLow)/Math.max(FCv,1)*100;
+      const ppfd=this.g('ppfd'), co2=this.g('co2'), photo=this.photo(), dt=this.g('temp'), nt=this.g('temp_night'), dif=dt-nt;
+      const bell=(v,c,s)=>Math.exp(-Math.pow((v-c)/s,2)), ramp=(v,lo,hi)=>clamp((v-lo)/((hi-lo)||1),0,1);
+      const ceil=this.co2Ceiling(), useDLI=Math.min(ppfd,ceil)*photo*0.0036, tgtDLI=ceil*photo*0.0036;
+      const reqCO2=400+ramp(ppfd,600,1500)*1100, ecT=this.ecP2(), pec=this.peakEC();
+      return [
+        // Inflorescence yield rises ~linearly with USABLE light, no saturation to ~1800 µmol — but only up to the CO₂-set ceiling; above it the photons are wasted. Y≈0.221·PPFD+53.6 g/m². (Rodriguez-Morrison, Llewellyn & Zheng 2021, https://www.frontiersin.org/articles/10.3389/fpls.2021.646020/full)
+        {key:'dli',label:'DLI (usable light)',unit:'mol',dec:1,val:useDLI,lever:'PPFD / photoperiod', lo:+(tgtDLI*0.85).toFixed(1),hi:+tgtDLI.toFixed(1),mid:tgtDLI, score:clamp(useDLI/Math.max(tgtDLI,1),0,1)},
+        // CO₂ must keep pace with PPFD or photosynthesis is carbon-limited; ~95% of the benefit is in by ~1200 ppm. (Westmoreland & Bugbee 2023; Chandra et al. 2008, Physiol Mol Biol Plants 14:215)
+        {key:'co2',label:'CO₂ vs light demand',unit:'ppm',dec:0,val:co2,lever:'CO₂ enrichment', lo:Math.round(reqCO2),hi:1500,mid:1500, score:clamp(co2/Math.max(reqCO2,400),0,1)},
+        // Whole-plant photosynthesis peaks ~26–28 °C under high light and falls off either side. (Chandra et al. 2008)
+        {key:'dtemp',label:'Day temp',unit:'°C',dec:1,val:dt,lever:'cooling / heating setpoint', lo:25,hi:29,mid:27, score:bell(dt,27,4.5)},
+        // A small positive day→night gap (DIF ~3–8 °C) maximises yield; flat or negative DIF hurts. (Chandra 2008; CEA DIF studies)
+        {key:'dif',label:'Day→night DIF',unit:'°C',dec:1,val:dif,lever:'night temp (avoid negative DIF)', lo:1,hi:5,mid:2.5, score:(dif<=0?clamp(0.5+dif*0.1,0,0.5):(dif<=5?1:clamp(1-(dif-5)/8,0.2,1)))},   // tight positive DIF (1–5°C) ideal — even ripening, no stretch (operator-confirmed); NEGATIVE DIF (cool day/warm night) collapses yield; very wide DIF also penalised
+        // Air VPD ~0.8–1.4 kPa keeps stomata open without over-stress; too high closes them, too low slows nutrition. (industry consensus — weak direct cannabis data)
+        {key:'vpd',label:'Air VPD',unit:'kPa',dec:2,val:this.vpd(e),lever:'temp + RH', lo:0.8,hi:1.4,mid:1.1, score:bell(this.vpd(e),1.1,0.45)},
+        // Leaf-to-air VPD is the ACTUAL transpiration driver at the leaf (levers doc); target ~0.9–1.5 kPa. Set by leaf temp (PPFD/airflow) + RH.
+        {key:'vpdL',label:'Leaf VPD',unit:'kPa',dec:2,val:this.vpdLeaf(e),lever:'airflow / leaf temp + RH', lo:0.9,hi:1.5,mid:1.2, score:bell(this.vpdLeaf(e),1.2,0.5)},
+        // Higher feed/substrate EC supplies more N → more biomass, up to a point; very high pore-EC stalls uptake osmotically. (Caplan, Dixon & Zheng 2017, HortScience 52:1796)
+        {key:'ec',label:'Pore EC',unit:'mS',dec:1,val:pec,lever:'feed EC / dryback', lo:+(ecT*0.85).toFixed(1),hi:+(ecT*1.3).toFixed(1),mid:ecT*1.05, score:bell(pec,ecT*1.05,ecT*0.6)},
+        // 13 h flowering photoperiod out-yields 12 h by 35–50% DW; below ~11 h is light-limited. (Jockers et al. 2024, Plants 13:433)
+        {key:'photo',label:'Photoperiod',unit:'h',dec:1,val:photo,lever:'lights on/off hours', lo:12,hi:13,mid:13, score:(photo>=12?0.85+ramp(photo,12,13)*0.15:clamp(ramp(photo,9,12),0,1)*0.85)},   // 12h standard = good (0.85); 13h = max (+35–50% DW, Jockers 2024); only a soft yield lever, not a crisis at 12/12
+      ]; },
+
+    /* ── POTENCY = cultivar baseline THC% × evidence-based stress MODIFIERS ──
+       Potency is mostly genetic; environment only nudges it — and the upward nudges COST yield.
+       Light/CO₂/UV ≈ neutral on %THC (Rodriguez-Morrison 2021; Westmoreland & Bugbee 2023). The
+       real movers are late-flower stress, leaner N/EC, photoperiod, and heat/DIF degradation. */
+    potencyModel(){ const m=this.sim().meta, FCv=this.g('field_capacity');
+      const db=(FCv-m.overnightLow)/Math.max(FCv,1)*100, dt=this.g('temp'), nt=this.g('temp_night'), dif=dt-nt;
+      const ppfd=this.g('ppfd'), photo=this.photo(), ecT=this.ecP2(), pec=this.peakEC(), base=this.g('baseline_thc')||24;
+      const ramp=(v,lo,hi)=>clamp((v-lo)/((hi-lo)||1),0,1);
+      const sDb=ramp(db,20,50),                                   // deeper late dryback → +THCA, capped ~+13% (Caplan, Dixon & Zheng 2019, HortScience 54:964)
+            sLean=ramp(ecT*1.25-pec,0,ecT*0.55),                  // leaner feed (lower pore EC = N-stress) → +20–30% %THC but −yield (Caplan 2017, HortScience 52:1796)
+            sCool=ramp(26-dt,0,6),                                // cooler finish preserves THC + terpenes
+            sPhoto=ramp(photo,12,13),                             // 13h flower → +9% THCA (Jockers 2024, Plants 13:433)
+            sLight=ppfd>=600?1:clamp(0.6+0.4*ramp(ppfd,200,600),0,1),  // floor-plateau: %THC FLAT above ~600µmol; only very low light makes immature/larfy flower (Rodriguez-Morrison 2021)
+            sDeg=(dif<0?0.6:1)*(dt>30?clamp(1-(dt-30)/8,0.7,1):1);     // negative DIF or >30°C degrade cannabinoids
+      const mods=[
+        {key:'db',label:'Finish dryback',unit:'%',dec:0,val:db,lo:30,hi:50,mid:42,lever:'P3 / dial — deeper = +THC, −yield',score:sDb,mult:1+sDb*0.13},
+        {key:'lean',label:'Lean feed (N-stress)',unit:'mS',dec:1,val:pec,lo:+(ecT*0.7).toFixed(1),hi:+(ecT*1.0).toFixed(1),mid:ecT*0.85,lever:'feed EC — leaner = +THC, −yield',score:sLean,mult:1+sLean*0.18},
+        {key:'cool',label:'Cool finish',unit:'°C',dec:1,val:dt,lo:20,hi:24,mid:22,lever:'cooling — cooler preserves THC/terpenes',score:sCool,mult:1+sCool*0.05},
+        {key:'photo',label:'Photoperiod 13h',unit:'h',dec:1,val:photo,lo:12,hi:13,mid:13,lever:'13h → +9% THCA (Jockers 2024)',score:sPhoto,mult:1+sPhoto*0.09},
+        {key:'light',label:'Light maturation floor',unit:'µmol',dec:0,val:ppfd,lo:600,hi:900,mid:750,lever:'keep PPFD ≥ ~600 (below = immature)',score:sLight,mult:sLight},
+        {key:'degrade',label:'Heat / DIF degradation',unit:'°C',dec:1,val:dt,lo:18,hi:30,mid:24,lever:'avoid >30°C & negative DIF',score:sDeg,mult:sDeg},
+      ];
+      let estTHC=base; mods.forEach(o=>estTHC*=o.mult); estTHC=clamp(estTHC,base*0.7,base*1.45);
+      return {base, estTHC, mods}; },
+    potencyAxes(){ return this.potencyModel().mods; },
+
+    suff(v,b){ if(v>=b[0]&&v<=b[1]) return 1; const span=(b[1]-b[0])||1, d=v<b[0]?b[0]-v:v-b[1]; return clamp(1-d/(span*1.1),0,1); },
+    limiters(goal){ const ax = goal==='p'? this.potencyAxes() : this.yieldAxes();
+      const a = ax.map(o=>{ const s=clamp(o.score,0,1), dir=s>=0.95?'ok':(o.val<o.mid?'raise':'lower');
+        return {key:o.key,label:o.label,val:Number(o.val).toFixed(o.dec),unit:o.unit,lo:Number(o.lo).toFixed(o.dec),hi:Number(o.hi).toFixed(o.dec),mid:o.mid,s,pct:Math.round(s*100),dir,lever:o.lever}; });
+      return a.sort((x,y)=>x.s-y.s); },
+    potential(goal){ const a=this.limiters(goal); const r={pct:Math.round((a[0]?a[0].s:1)*100), top:a[0]||{dir:'ok',label:'',lo:'',hi:'',lever:''}, list:a};
+      if(goal==='p'){ const pm=this.potencyModel(); r.thc=pm.estTHC.toFixed(1); r.base=Number(pm.base).toFixed(1); r.pct=Math.round(clamp(pm.estTHC/(pm.base*1.3),0,1)*100); }
+      r.top.fix = r.top.label ? this.solveFix(r.top, goal) : null;
+      return r; },
+    /* inverse-solve the worst axis → the setpoint value that fixes it, given everything else held.
+       Returns {set,to,unit,note?, entity?,entityVal?}. entity present ⇒ it maps to a writable F2 number ⇒ one-click apply; else advice-only (climate is controlled outside crop-steering). */
+    solveFix(o, goal){ const dt=this.g('temp'), lon=this.g('lights_on'), z=this.zone, ecT=this.ecP2();
+      const r5=v=>Math.round(v/5)*5;
+      switch(o.key){
+        case 'dli':   return {set:'PPFD', to:Math.round(this.co2Ceiling()), unit:' µmol', note:'raise light to the CO₂ ceiling'};
+        case 'co2':   return {set:'CO₂', to:r5(400+clamp((this.g('ppfd')-600)/900,0,1)*1100), unit:' ppm', note:'match the light demand'};
+        case 'dtemp': return {set:'Day temp', to:27, unit:' °C'};
+        case 'dif':   return {set:'Night temp', to:+(dt-3).toFixed(1), unit:' °C', note:'~3 °C below day (tight positive DIF)'};
+        case 'vpd': case 'vpdL': { const rh=Math.round(clamp((1-1.15/this.svp(dt))*100,30,85)); return {set:'Day RH', to:rh, unit:' %', note:'≈1.15 kPa VPD at this temp'}; }
+        case 'cool':  return {set:'Day temp', to:22, unit:' °C', note:'cooler finish preserves THC'};
+        case 'light': return {set:'PPFD', to:700, unit:' µmol', note:'above the maturation floor'};
+        case 'degrade': return {set:'Day temp', to:26, unit:' °C', note:'avoid >30 °C / negative DIF'};
+        case 'photo': { const off=((Math.round(lon)+13)%24); return {set:'Photoperiod', to:13, unit:' h', note:'13 h flowering', entity:'number.crop_steering_lights_off_hour', entityVal:off}; }
+        case 'db':    { const v=45; return {set:'Generative dryback', to:v, unit:' %', note:'deeper finish dryback (costs some yield)', entity:`number.crop_steering_zone_${z}_generative_dryback_target`, entityVal:v}; }
+        case 'lean':  return {set:'Feed EC', to:+(ecT*0.85).toFixed(1), unit:' mS', note:'leaner feed (costs yield)'};
+        case 'ec':    return {set:'Feed EC', to:+(ecT*1.0).toFixed(1), unit:' mS', note:'toward the phase target'};
+        default:      return {set:o.lever, to:o.mid, unit:' '+o.unit};
+      } },
+    applyFix(fix){ if(!fix||!fix.entity){ return; }
+      if(window.parent===window){ alert('Set '+fix.set+' → '+fix.to+fix.unit+'  ('+fix.entity+')'); return; }
+      try{ window.parent.postMessage({type:'cs-tune-apply-one', entity:fix.entity, value:fix.entityVal, label:fix.set+' = '+fix.to+fix.unit},"*"); }catch(e){} },
+    zonesSummary(){ const out=[]; for(const z of [1,2,3]){ ZOVR=z; try{ out.push({z, y:this.potential('y'), p:this.potential('p')}); } finally{ ZOVR=null; } } return out; },
+
+    /* phase boundaries — read from the simulation meta */
+    overnightLow(){ return this.sim().meta.overnightLow; },
+    morningMin(){ return this.sim().meta.morningLow; },
+    firstShotT(){ return this.sim().meta.firstShot; },
+    firstShotMin(){ return Math.round(this.sim().meta.firstShot*60); },
+    p1EndT(){ return this.sim().meta.p1End; },
+    lastShotT(){ return this.sim().meta.lastShot; },
+    p1ShotCount(){ return this.sim().meta.p1Count; },
+
+    /* ===== full-day physics simulation (0..24h, 0 = lights-on): controller fires shots, transpiration drybacks, salt mass-balance ===== */
+    sim(){ const z=ZOVR||this.zone; const key=JSON.stringify([z,this.mode,this.dial,this.Z[z],this.G]); if(SIMKEY===key) return SIM; SIM=this.simDay(); SIMKEY=key; return SIM; },
+    simDay(){
+      const Vsub=this.g('substrate_volume'), FC=this.g('field_capacity'), Wfc=FC/100*Vsub, photo=this.photo();
+      const minW=this.g('p0_minimum_wait_time'), maxW=this.g('p0_maximum_wait_time'), dropTrig=this.g('p0_dryback_drop_percent');
+      const p1init=this.g('p1_initial_shot_size'), p1inc=this.g('p1_shot_size_increment'), p1maxsz=this.g('p1_maximum_shot_size'),
+            p1iv=this.g('p1_time_between_shots')/60, p1minS=this.g('p1_minimum_shots'), p1maxS=this.g('p1_maximum_shots'), p1tgt=this.g('p1_target_vwc');
+      const p2thr=this.g('p2_vwc_threshold'), p2sz=this.g('p2_shot_size'), ecHi=this.g('p2_ec_high_threshold'), ecLo=this.g('p2_ec_low_threshold');
+      const cutoff=photo-this.lastIrrigMin()/60, emFloor=this.g('p3_emergency_vwc_threshold'), emSz=this.g('p3_emergency_shot_size');
+      const feedEC=this.g('feed_ec'), tgtEC=this.ecP2(), SIGMA=0.28;                 // SIGMA = salt taken up with transpired water; rest left behind → concentrates
+      const dbLow=clamp(FC*(1-this.drybackTarget()/100), emFloor, FC-2);             // deepest dryback (end of P0 / first shot) = overnight steering target, floored at emergency
+      const lightsOnV=dbLow, dbLowVol=dbLow/100*Vsub, lightsOnVol=dbLowVol;   // overnight dryback bottoms at lights-on = the dryback target (= daily minimum)
+      const p2thrEff=Math.max(p2thr, dbLow+1);   // safety: re-water never below the overnight low (shot size + threshold are set by the steering dial / panel)
+      let W=lightsOnVol, M=clamp(tgtEC*1.1,0,10)*W;                                   // morning pore EC = overnight-stacked residual
+      const vwc=[], ec=[], recE=()=>clamp(M/Math.max(W,1e-3),0,10);
+      let phase='P0', peakV=lightsOnV, shotN=0, lastFire=-9, firstShot=null, p1End=null, lastShot=cutoff, p1Count=0, shots=[], runoffL=0;
+      vwc.push([0,lightsOnV]); ec.push([0,recE()]);
+      for(let mi=1; mi<=1440; mi++){
+        const t=mi/60, on=t<photo;
+        // dryback this minute: P3 = controlled overnight descent back to the lights-on level (steering lever); P0/P1/P2 = transpiration-driven
+        const poreEC=M/Math.max(W,1e-3); let dW;
+        if(phase==='P3'){ const remMin=Math.max((24-t)*60,1); dW=Math.max(0,W-lightsOnVol)/remMin; }
+        else dW=this.transpiration(this.envAt(t))/60;
+        W=Math.max(W-dW, dbLowVol); M=Math.max(M-dW*poreEC*SIGMA,0);
+        let curV=W/Vsub*100; if(phase==='P0'||phase==='P1') peakV=Math.max(peakV,curV);
+        // controller (P0→P1→P2→P3)
+        let fire=0;
+        if(phase==='P0'){ if(t>=maxW/60){ fire=p1init; phase='P1'; firstShot=t; shotN=0; } }   // overnight already bottomed at dbLow; P0 = the wait before first shot
+        else if(phase==='P1'){ if(t-lastFire>=p1iv-1e-6) fire=Math.min(p1maxsz, p1init+shotN*p1inc);
+          if((peakV>=p1tgt && shotN>=p1minS) || shotN>=p1maxS){ phase='P2'; p1End=t; p1Count=shotN; } }
+        else if(phase==='P2'){ if(t>=cutoff){ phase='P3'; lastShot=t; }
+          else if(curV<=p2thrEff && t-lastFire>=p1iv-1e-6){ const r=poreEC/Math.max(tgtEC,0.1); fire = r>ecHi? p2sz*1.3 : r<ecLo? p2sz*0.75 : p2sz; } }   // EC-modulated maintenance shot
+        else { if(curV<=emFloor && t-lastFire>=p1iv-1e-6) fire=emSz; }
+        // apply shot: mix feed → transient overshoot peak (may exceed FC) → runoff flush → settle
+        if(fire>0){ const Vapp=fire/100*Vsub, Wpk=W+Vapp, Mmix=M+Vapp*feedEC, ecMix=Mmix/Wpk;
+          vwc.push([t+0.008, Wpk/Vsub*100]); ec.push([t+0.008, clamp(ecMix,0,10)]);            // saturation spike (overshoot above FC); EC dips toward feed EC
+          if(Wpk>Wfc){ const ro=Wpk-Wfc; M=Mmix-ro*ecMix; W=Wfc; runoffL+=ro; } else { M=Mmix; W=Wpk; }   // runoff at FC carries pore salt out
+          vwc.push([t+0.034, W/Vsub*100]); ec.push([t+0.034, recE()]);                          // settle to held water
+          lastFire=t; if(phase==='P1') shotN++; shots.push({t,pct:fire,phase});
+          if(phase==='P1') peakV=Math.max(peakV,W/Vsub*100);
+          continue; }
+        vwc.push([t,curV]); ec.push([t,recE()]);
+      }
+      if(firstShot===null) firstShot=maxW/60;
+      if(p1End===null) p1End=Math.min(cutoff, firstShot+p1maxS*p1iv);
+      if(!p1Count) p1Count=shots.filter(s=>s.phase==='P1').length;
+      return {vwc, ec, meta:{firstShot, p1End, lastShot, p1Count, morningLow:dbLow, overnightLow:dbLow, shots, runoffL}};
+    },
+    samples(){ return this.sim().vwc; },
+    vAt(t){ const s=this.sim().vwc; for(let i=1;i<s.length;i++){ if(s[i][0]>=t){ const a=s[i-1],b=s[i],f=(t-a[0])/((b[0]-a[0])||1); return a[1]+(b[1]-a[1])*f; } } return s[s.length-1][1]; },
+    vwcPath(){ return this.sim().vwc.map(p=>this.x(p[0]).toFixed(1)+","+this.y(p[1]).toFixed(1)).join(" "); },
+    /* EC = pore EC straight from the salt mass-balance (feed EC × litres in, runoff flush at FC, transpiration concentration). Fixed 0–10 axis. */
+    ecSamples(){ return this.sim().ec; },
+    ecAt(t){ const s=this.sim().ec; for(let i=1;i<s.length;i++){ if(s[i][0]>=t){ const a=s[i-1],b=s[i],f=(t-a[0])/((b[0]-a[0])||1); return a[1]+(b[1]-a[1])*f; } } return s[s.length-1][1]; },
+    peakEC(){ return Math.max.apply(null,this.sim().ec.map(p=>p[1])); },
+    ecToY(ec){ return this.PT+(1-clamp(ec/10,0,1))*this.PH; },      // fixed 0–10 EC axis
+    ecPath(){ return this.sim().ec.map(p=>this.x(p[0]).toFixed(1)+","+this.ecToY(p[1]).toFixed(1)).join(" "); },
+
+    bands(){ return [
+      {k:"P0",t0:0,t1:this.firstShotT(),fill:"#8b93a1",col:"#aab4c0",name:"dryback"},
+      {k:"P1",t0:this.firstShotT(),t1:this.p1EndT(),fill:"#38bdf8",col:"#7dd3fc",name:"ramp-up"},
+      {k:"P2",t0:this.p1EndT(),t1:this.lastShotT(),fill:"#34d399",col:"#6ee7b7",name:"maintain"},
+      {k:"P3",t0:this.lastShotT(),t1:24,fill:"#fbbf24",col:"#fcd34d",name:"overnight"}]; },
+
+    /* bubbles: value callouts placed where each setpoint acts. drag:key makes it a handle. */
+    bubbles(){
+      const fc=this.g('field_capacity'),tgt=this.g('p1_target_vwc'),p2t=this.g('p2_vwc_threshold'),low=this.morningMin();
+      const fst=this.firstShotT(),p1e=this.p1EndT(),ls=this.lastShotT(),p2mid=(p1e+ls)/2,genc=this.mode==='gen';
+      const b=[];
+      b.push({t:1.0,v:fc,col:"#34d399",txt:fc+"%",cap:"field capacity",drag:"field_capacity",dy:-1,hk:["field_capacity"]});
+      b.push({t:fst,v:low,col:"#8b93a1",txt:this.firstShotMin()+"m",cap:"P0 first shot",drag:"p0_maximum_wait_time",dy:1,hk:["p0_maximum_wait_time","p0_minimum_wait_time"]});
+      b.push({t:fst/2,v:(this.morningMin()+low)/2+4,col:"#8b93a1",txt:this.g('p0_dryback_drop_percent')+"%",cap:"P0 drop",dy:-1,hk:["p0_dryback_drop_percent"]});
+      b.push({t:fst+(p1e-fst)*0.45,v:(low+tgt)/2,col:"#38bdf8",txt:this.g('p1_initial_shot_size')+"→"+this.g('p1_maximum_shot_size')+"%",cap:"P1 shot +"+this.g('p1_shot_size_increment'),dy:-1,hk:["p1_initial_shot_size","p1_maximum_shot_size","p1_shot_size_increment"]});
+      b.push({t:fst+(p1e-fst)*0.78,v:(low+tgt)/2-9,col:"#38bdf8",txt:"every "+this.g('p1_time_between_shots')+"m",cap:this.g('p1_minimum_shots')+"–"+this.g('p1_maximum_shots')+" shots",dy:1,hk:["p1_time_between_shots","p1_minimum_shots","p1_maximum_shots"]});
+      b.push({t:p1e,v:tgt,col:"#7dd3fc",txt:tgt+"%",cap:"P1 target",drag:"p1_target_vwc",dy:-1,hk:["p1_target_vwc"]});
+      b.push({t:p2mid,v:p2t,col:"#34d399",txt:p2t+"%",cap:"P2 re-water",drag:"p2_vwc_threshold",dy:1,hk:["p2_vwc_threshold"]});
+      b.push({t:p2mid+1.2,v:Math.min(tgt,p2t+this.g('p2_shot_size')),col:"#34d399",txt:this.g('p2_shot_size')+"%",cap:"P2 shot",drag:"p2_shot_size",dy:-1,hk:["p2_shot_size"]});
+      b.push({t:fst+0.15,v:this.ecToYv(this.ecAt(fst)),col:"#f472b6",txt:this.ecAt(fst).toFixed(1),cap:"pore EC · AM peak",isEC:true,dy:-1,hk:[genc?'ec_target_gen_p1':'ec_target_veg_p1','feed_ec']});
+      b.push({t:p2mid-1.2,v:this.ecToYv(this.ecAt(p2mid-1.2)),col:"#f472b6",txt:this.ecAt(p2mid-1.2).toFixed(1),cap:"pore EC · P2",isEC:true,dy:-1,hk:[genc?'ec_target_gen_p2':'ec_target_veg_p2','feed_ec']});
+      b.push({t:ls,v:Math.min(tgt,p2t+this.g('p2_shot_size')),col:"#fbbf24",txt:this.lastIrrigMin()+"m",cap:"last shot",drag:genc?'p3_gen_last_irrigation':'p3_veg_last_irrigation',dy:-1,hk:[genc?'p3_gen_last_irrigation':'p3_veg_last_irrigation']});
+      b.push({t:ls+(24-ls)*0.82,v:this.overnightLow(),col:"#fbbf24",txt:((this.g('field_capacity')-this.overnightLow())/this.g('field_capacity')*100).toFixed(0)+"%",cap:"P3 dryback → overnight low",drag:genc?'generative_dryback_target':'vegetative_dryback_target',dy:1,hk:[genc?'generative_dryback_target':'vegetative_dryback_target']});
+      b.push({t:23.2,v:this.g('p3_emergency_vwc_threshold'),col:"#f87171",txt:this.g('p3_emergency_vwc_threshold')+"%",cap:"emergency floor",drag:"p3_emergency_vwc_threshold",dy:1,hk:["p3_emergency_vwc_threshold"]});
+      b.push({t:23.4,v:this.ecToYv(this.ecAt(23.4)),col:"#f472b6",txt:this.ecAt(23.4).toFixed(1),cap:"pore EC · P3 peak",isEC:true,dy:1,hk:[genc?'ec_target_gen_p3':'ec_target_veg_p3','feed_ec']});
+      return b;
+    },
+    ecToYv(ec){ /* VWC-equivalent so EC bubbles sit on the EC line */ return this.invV(this.ecToY(ec)); },
+
+    /* ── multi-day drivers (scrollable): the steady-state day repeated, so the dryback sawtooth can be read against PPFD / leaf-VPD / temp / CO₂ — that's what sets the dryback RATE. ── */
+    driverPts(){ const days=this.gdays, S={vwc:[],ppfd:[],temp:[],vpdL:[],co2:[]};
+      for(let t=0;t<=days*24+1e-6;t+=0.5){ const h=t%24, e=this.envAt(h); S.vwc.push([t,this.vAt(h)]); S.ppfd.push([t,e.ppfd]); S.temp.push([t,e.temp]); S.vpdL.push([t,this.vpdLeaf(e)]); S.co2.push([t,e.co2]); }
+      return S; },
+    multiChart(){ const days=this.gdays, photo=this.photo(), S=this.driverPts(), maxP=Math.max(this.g('ppfd'),200);
+      const dayW=440, PL=46, PR=16, PT=18, PB=24, H=270, PW=dayW*days, W=PL+PR+PW, PH=H-PT-PB;
+      const xx=t=>PL+(t/(days*24))*PW, yV=v=>PT+(1-clamp(v,0,100)/100)*PH, nrm=(v,lo,hi)=>clamp((v-lo)/((hi-lo)||1),0,1)*100;
+      const poly=(arr,f)=>arr.map(p=>xx(p[0]).toFixed(1)+","+yV(f(p[1])).toFixed(1)).join(" ");
+      let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;font-family:inherit">`;
+      for(let d=0;d<days;d++){ const xOn=xx(d*24),xOff=xx(d*24+photo),xEnd=xx((d+1)*24);
+        s+=`<rect x="${xOn.toFixed(1)}" y="${PT}" width="${(xOff-xOn).toFixed(1)}" height="${PH}" fill="rgba(245,200,80,.05)"/>`;
+        s+=`<rect x="${xOff.toFixed(1)}" y="${PT}" width="${(xEnd-xOff).toFixed(1)}" height="${PH}" fill="rgba(40,60,120,.16)"/>`;
+        if(d>0) s+=`<line x1="${xOn.toFixed(1)}" y1="${PT}" x2="${xOn.toFixed(1)}" y2="${PT+PH}" stroke="rgba(255,255,255,.14)"/>`;
+        s+=`<text x="${(xOn+6).toFixed(1)}" y="${PT+12}" font-size="10" font-weight="700" fill="#9aa4b2">Day ${d+1} · ${this.mode==='gen'?'GEN':'VEG'}</text>`; }
+      [20,40,60,80].forEach(v=>{ s+=`<line x1="${PL}" y1="${yV(v).toFixed(1)}" x2="${(W-PR).toFixed(1)}" y2="${yV(v).toFixed(1)}" stroke="rgba(255,255,255,.05)"/><text x="${PL-5}" y="${(yV(v)+3).toFixed(1)}" text-anchor="end" font-size="9" fill="#6b7682">${v}</text>`; });
+      for(let d=0;d<days;d++) [0,6,12,18].forEach(hh=>{ const x=xx(d*24+hh); s+=`<text x="${x.toFixed(1)}" y="${H-7}" text-anchor="middle" font-size="8" fill="#5b6470">${hh}h</text>`; });
+      s+=`<polygon points="${PL},${(PT+PH).toFixed(1)} ${poly(S.ppfd,v=>nrm(v,0,maxP))} ${(W-PR).toFixed(1)},${(PT+PH).toFixed(1)}" fill="rgba(245,158,11,.10)"/>`;   // PPFD area
+      s+=`<polyline points="${poly(S.temp,v=>nrm(v,15,35))}" fill="none" stroke="#fb923c" stroke-width="1.4" opacity=".8"/>`;        // temp
+      s+=`<polyline points="${poly(S.vpdL,v=>nrm(v,0,2.5))}" fill="none" stroke="#f472b6" stroke-width="1.4" opacity=".8"/>`;        // leaf VPD
+      s+=`<polyline points="${poly(S.co2,v=>nrm(v,400,1600))}" fill="none" stroke="#60a5fa" stroke-width="1.2" stroke-dasharray="4 3" opacity=".7"/>`;   // CO₂
+      if(this.histPts&&this.histPts.length){ const hp=this.histPts.map(p=>xx(clamp(p[0],0,days*24)).toFixed(1)+","+yV(p[1]).toFixed(1)).join(" "); s+=`<polyline points="${hp}" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="2 3" opacity=".9"/>`; }   // live VWC ghost
+      s+=`<polyline points="${poly(S.vwc,v=>v)}" fill="none" stroke="#34d399" stroke-width="2.2" stroke-linejoin="round"/>`;        // VWC/dryback (bold)
+      s+=`</svg>`; return s; },
+    reqHistory(){ if(window.parent===window){ alert('Live history overlay needs the connected dashboard.'); return; } try{ window.parent.postMessage({type:'cs-tune-history-req',zone:this.zone,days:this.gdays},"*"); }catch(e){} },
+
+    svgBody(){
+      const W=this.W,PL=this.PL,PR=this.PR,PT=this.PT,PH=this.PH,fc=this.g('field_capacity'),x=t=>this.x(t),y=v=>this.y(v); let s="";
+      s+=`<defs><filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+      s+=`<rect x="${x(this.photo())}" y="${PT}" width="${x(24)-x(this.photo())}" height="${PH}" fill="rgba(255,255,255,.04)"/>`;
+      s+=`<text x="${x(this.photo())+6}" y="${PT+13}" font-size="11" fill="#6b7682">lights off</text>`;
+      for(const b of this.bands()){ const op=this.hot===b.k?0.18:0.07,m=(x(b.t0)+x(b.t1))/2;
+        s+=`<rect data-band="${b.k}" x="${x(b.t0)}" y="${PT}" width="${x(b.t1)-x(b.t0)}" height="${PH}" fill="${b.fill}" opacity="${op}" style="cursor:pointer"/>`;
+        s+=`<text x="${m}" y="${PT+PH+30}" text-anchor="middle" font-size="13" font-weight="700" fill="${b.col}">${b.k}</text>`;
+        s+=`<text x="${m}" y="${PT+PH+44}" text-anchor="middle" font-size="10" fill="#6b7682">${b.name}</text>`; }
+      for(const gy of [30,40,50,60,70]) s+=`<line x1="${PL}" y1="${y(gy)}" x2="${W-PR}" y2="${y(gy)}" stroke="rgba(255,255,255,.06)"/><text x="${PL-7}" y="${y(gy)+4}" text-anchor="end" font-size="10" fill="#6b7682">${gy}</text>`;
+      for(const e of [0,2,4,6,8,10]){ const ey=this.ecToY(e); s+=`<line x1="${W-PR}" y1="${ey}" x2="${W-PR+4}" y2="${ey}" stroke="#f472b6" opacity=".45"/><text x="${W-PR+7}" y="${ey+3.5}" font-size="9.5" fill="#f472b6" opacity=".85">${e}</text>`; }
+      for(let h=0;h<=24;h+=3){ const hr=(this.G.lights_on+h)%24; s+=`<text x="${x(h)}" y="${PT+PH+15}" text-anchor="middle" font-size="10" fill="#6b7682">${h}h</text><text x="${x(h)}" y="${PT+PH+27}" text-anchor="middle" font-size="8.5" fill="#4b5563">${hr}:00</text>`; }
+      s+=`<text x="${PL-32}" y="${PT-8}" font-size="11" fill="#9aa4b1">VWC %</text><text x="${W-2}" y="${PT-8}" text-anchor="end" font-size="10.5" fill="#f472b6">EC mS/cm</text>`;
+      // emergency floor line
+      const ef=this.g('p3_emergency_vwc_threshold'); s+=`<line x1="${PL}" y1="${y(ef)}" x2="${W-PR}" y2="${y(ef)}" stroke="#f87171" stroke-width="1" stroke-dasharray="3 4" opacity=".55"/>`;
+      // field capacity line
+      s+=`<line x1="${PL}" y1="${y(fc)}" x2="${W-PR}" y2="${y(fc)}" stroke="#34d399" stroke-width="1.4" stroke-dasharray="5 5" opacity=".7"/>`;
+      // curves
+      s+=`<polyline points="${this.ecPath()}" fill="none" stroke="#f472b6" stroke-width="2.4" opacity=".85" stroke-linejoin="round" stroke-linecap="round"/>`;
+      s+=`<polyline points="${this.vwcPath()}" fill="none" stroke="#e7ecf2" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      // bubbles
+      for(const b of this.bubbles()){
+        const bx=x(b.t), by=y(b.v), draggable=!!b.drag, lit=!!(this.hov&&b.hk&&b.hk.indexOf(this.hov)>=0), w=Math.max(b.txt.length*7.0+12, 30), h=18;
+        const above=b.dy<0, ry=above?by-h-12:by+12, cx=bx;
+        s+=`<line x1="${bx}" y1="${by}" x2="${cx}" y2="${above?ry+h:ry}" stroke="${b.col}" stroke-width="${lit?2.2:1}" opacity="${lit?.95:.5}"/>`;
+        s+=`<g ${draggable?`data-h="${b.drag}"`:""} data-hk="${(b.hk&&b.hk[0])||''}" style="cursor:${draggable?'grab':'pointer'}"${lit?' filter="url(#glow)"':''}>`;
+        if(lit) s+=`<rect x="${cx-w/2-4}" y="${ry-4}" width="${w+8}" height="${h+8}" rx="9" fill="${b.col}" opacity=".18"/>`;
+        s+=`<rect x="${cx-w/2}" y="${ry}" width="${w}" height="${h}" rx="6" fill="${lit?'#10212c':'#0c1117'}" stroke="${b.col}" stroke-width="${lit?2.2:(draggable?1.4:1)}" opacity="${lit?1:(draggable?1:.92)}"/>`;
+        s+=`<text x="${cx}" y="${ry+12.5}" text-anchor="middle" font-size="${lit?12:11}" font-weight="700" fill="${lit?'#fff':b.col}">${b.txt}</text>`;
+        s+=`<text x="${cx}" y="${ry+(above?-4:h+11)}" text-anchor="middle" font-size="8.5" fill="${lit?b.col:'#7c8693'}">${b.cap}</text>`;
+        s+=`<circle cx="${bx}" cy="${by}" r="${lit?7:(draggable?(this.drag===b.drag?6.5:5):3)}" fill="${b.col}" ${(draggable||lit)?'stroke="#0a0c10" stroke-width="2"':''}/>`;
+        if(lit) s+=`<circle cx="${bx}" cy="${by}" r="11" fill="none" stroke="${b.col}" stroke-width="2" opacity=".5"><animate attributeName="r" values="9;16;9" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;.12;.6" dur="1.5s" repeatCount="indefinite"/></circle>`;
+        else if(draggable) s+=`<circle cx="${bx}" cy="${by}" r="10" fill="${b.col}" opacity="${this.drag===b.drag?.25:.12}"/>`;
+        s+=`</g>`;
+      }
+      return s;
+    },
+
+    onDown(e){ const h=e.target.closest&&e.target.closest('[data-h]'); if(h){ this.drag=h.getAttribute('data-h'); try{e.currentTarget.setPointerCapture(e.pointerId)}catch(_){} return; } const b=e.target.closest&&e.target.closest('[data-band]'); if(b) this.hot=b.getAttribute('data-band'); },
+    onHover(e){ if(this.drag) return; const g=e.target.closest&&e.target.closest('[data-hk]'); const k=g&&g.getAttribute('data-hk'); this.hov = k||null; },
+    onMove(e){ if(!this.drag) return; const r=e.currentTarget.getBoundingClientRect();
+      const px=(e.clientX-r.left)/r.width*this.W, py=(e.clientY-r.top)/r.height*this.H, t=this.invT(px), v=this.invV(py);
+      const k=this.drag, m=META[k]; if(!m) return; let nv;
+      if(k==='p0_maximum_wait_time') nv=clamp(t*60,m.min,m.max);
+      else if(k==='p3_gen_last_irrigation'||k==='p3_veg_last_irrigation') nv=clamp((this.photo()-t)*60,m.min,m.max);
+      else if(k==='generative_dryback_target'||k==='vegetative_dryback_target'){ const fc=this.g('field_capacity'); nv=clamp((1-v/fc)*100,m.min,m.max); }
+      else nv=clamp(v,m.min,m.max);   // VWC-type handles (FC, p1_target, p2_threshold, p2_shot, emergency)
+      if(k==='p2_shot_size') nv=clamp(v-this.g('p2_vwc_threshold'),m.min,m.max);
+      this.setRaw(k, rstep(nv,m.step)); },
+
+    /* settings groups */
+    groups(){ const f=(k)=>Object.assign({key:k},META[k]); return [
+      {k:"P0",ph:"P0",col:"var(--p0)",name:"Morning dryback",fields:["p0_minimum_wait_time","p0_maximum_wait_time","p0_dryback_drop_percent"].map(f)},
+      {k:"P1",ph:"P1",col:"var(--p1)",name:"Ramp-up",fields:["p1_target_vwc","p1_initial_shot_size","p1_shot_size_increment","p1_maximum_shot_size","p1_time_between_shots","p1_minimum_shots","p1_maximum_shots"].map(f)},
+      {k:"P2",ph:"P2",col:"var(--p2)",name:"Maintenance",fields:["p2_vwc_threshold","p2_shot_size","p2_ec_high_threshold","p2_ec_low_threshold"].map(f)},
+      {k:"P3",ph:"P3",col:"var(--p3)",name:"Overnight",fields:["p3_emergency_vwc_threshold","p3_emergency_shot_size","p3_gen_last_irrigation","p3_veg_last_irrigation"].map(f)},
+      {k:"ST",ph:"⇄",col:"var(--ec)",name:"Steering & EC",fields:["generative_dryback_target","vegetative_dryback_target","ec_target_gen_p0","ec_target_gen_p1","ec_target_gen_p2","ec_target_gen_p3","ec_target_veg_p0","ec_target_veg_p1","ec_target_veg_p2","ec_target_veg_p3","ec_target_flush"].map(f)},
+      {k:"ZN",ph:"▣",col:"#64748b",name:"Zone setup",fields:["plant_count","max_daily_volume","shot_size_multiplier"].map(f)},
+      {k:"EN",ph:"☀",col:"#f59e0b",name:"Climate setpoints",fields:["lights_on","lights_off","ppfd","co2","temp","rh","temp_night","rh_night","feed_ec","baseline_thc"].map(f)},
+      {k:"RM",ph:"▦",col:"#a78bfa",name:"Room / facility",fields:["room_length","room_width","room_height","canopy_coverage","room_plant_count","light_watts","hvac_cooling_kw","dehum_capacity"].map(f)},
+      {k:"SF",ph:"⚠",col:"#f87171",name:"Safety guardrails",fields:["maximum_ec","irrigation_ec_min","irrigation_ec_max","irrigation_ph_min","irrigation_ph_max","blocked_dripper_max_shots_30min"].map(f)},
+      {k:"HW",ph:"⚙",col:"#94a3b8",name:"Substrate & dripper (shared)",fields:["field_capacity","substrate_volume","dripper_flow_rate","drippers_per_plant"].map(f)},
+    ]; },
+
+    verdict(){ const db=(this.g('field_capacity')-this.overnightLow())/this.g('field_capacity')*100; const t=this.mode==='gen'?"Generative":"Vegetative";
+      return `<b>${t} steering</b> · ${this.mode==='gen'?'deep dryback, EC stacking to '+this.ecP2().toFixed(1):'shallow dryback, EC held ~'+this.ecP2().toFixed(1)} · total dryback ${db.toFixed(0)}%`; },
+
+    fmtNum(v,d){ return Number(v).toFixed(d); },
+    fmtMin(m){ return m>=60?(m/60).toFixed(1)+"h":Math.round(m)+"m"; },
+    fmtBeforeOff(){ return "−"+this.fmtMin(this.lastIrrigMin()); },
+    save(){ try{ localStorage.setItem("f2cs.tpl",JSON.stringify({Z:this.Z,G:this.G,dial:this.dial})); }catch(e){} this.saved=true; setTimeout(()=>this.saved=false,1600); },
+    /* ===== universal tooltips (T7) ===== */
+    showTip(key,label,ev){ const t=FIELDTIPS[key]||synthTip(key); if(!t){ this.tip=null; return; }
+      const r=(ev&&ev.currentTarget&&ev.currentTarget.getBoundingClientRect)?ev.currentTarget.getBoundingClientRect():{left:60,right:80,top:60};
+      this.tip=Object.assign({label:label||(META[key]&&META[key].label)||key, x:r.left, right:r.right, y:r.top}, t); },
+    hideTip(){ this.tip=null; },
+    tipStyle(){ if(!this.tip) return 'display:none'; const W=320, vw=window.innerWidth||1280, vh=window.innerHeight||900;
+      let left=this.tip.x-W-12; if(left<8) left=this.tip.right+12; if(left+W>vw-8) left=Math.max(8,vw-W-8);
+      let top=clamp(this.tip.y-6,8,Math.max(8,vh-230));
+      return 'left:'+left+'px;top:'+top+'px;width:'+W+'px'; },
+    reset(){ this.Z[this.zone]=JSON.parse(JSON.stringify(LIVE[this.zone])); },
+  };
+}
+window.editor=editor;
+</script>
+<script defer src="https://unpkg.com/alpinejs@3/dist/cdn.min.js"></script>
+</body>
+</html>
