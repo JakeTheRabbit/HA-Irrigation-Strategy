@@ -590,17 +590,14 @@
 
       <!-- ===== CLIMATE ===== -->
       <section x-show="view==='climate'" class="fade-enter space-y-4">
-        <div class="glass rounded-2xl p-5">
-          <h3 class="text-sm font-semibold mb-3 flex items-center gap-2"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Room map — hotspot watch</h3>
-          <div class="grid grid-cols-2 gap-2 max-w-md">
-            <template x-for="c in hotspotCells" :key="c.label"><div class="rounded-xl p-3 border flex items-center gap-2 text-sm font-medium" :class="cellClass(c.sev)" :style="c.span?'grid-column:1/-1':''"><span x-text="c.icon"></span><span x-text="c.label"></span><span class="ml-auto font-bold" x-text="c.val"></span></div></template>
+        <!-- live metrics first — context for the controls below -->
+        <div>
+          <h2 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Live climate</h2>
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <template x-for="m in climate" :key="m.label">
+              <div class="glass rounded-2xl p-4"><div class="text-[11px] uppercase tracking-wider text-slate-400" x-text="m.label"></div><div class="text-2xl font-bold mt-1" :class="m.cls" x-text="m.val"></div><div class="text-[11px] text-slate-500" x-text="m.sub"></div></div>
+            </template>
           </div>
-          <div class="text-[11px] text-slate-500 mt-3">Schematic. Back-left corner tracked separately — it runs hot.</div>
-        </div>
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <template x-for="m in climate" :key="m.label">
-            <div class="glass rounded-2xl p-4"><div class="text-[11px] uppercase tracking-wider text-slate-400" x-text="m.label"></div><div class="text-2xl font-bold mt-1" :class="m.cls" x-text="m.val"></div><div class="text-[11px] text-slate-500" x-text="m.sub"></div></div>
-          </template>
         </div>
         <!-- ===== F2 room controls — every control + helper, full functionality ===== -->
         <div class="flex items-center justify-between pt-1"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.radio" class="w-4 h-4 block text-emerald-400"></span> F2 room controls</h2><span class="text-[11px] text-slate-500">live · writes to HA immediately, no undo</span></div>
@@ -627,6 +624,13 @@
           </div>
         </template>
 
+        <div class="glass rounded-2xl p-5">
+          <h3 class="text-sm font-semibold mb-3 flex items-center gap-2"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Room map — hotspot watch</h3>
+          <div class="grid grid-cols-2 gap-2 max-w-md">
+            <template x-for="c in hotspotCells" :key="c.label"><div class="rounded-xl p-3 border flex items-center gap-2 text-sm font-medium" :class="cellClass(c.sev)" :style="c.span?'grid-column:1/-1':''"><span x-text="c.icon"></span><span x-text="c.label"></span><span class="ml-auto font-bold" x-text="c.val"></span></div></template>
+          </div>
+          <div class="text-[11px] text-slate-500 mt-3">Schematic. Back-left corner tracked separately — it runs hot.</div>
+        </div>
         <details class="glass rounded-2xl overflow-hidden">
           <summary class="cursor-pointer list-none p-4 text-sm text-slate-300 flex items-center gap-2"><span x-html="icons.doc" class="w-4 h-4 block"></span> All raw readings</summary>
           <div class="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
