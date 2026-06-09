@@ -2504,6 +2504,7 @@ function calcVPD(tempC, rh) {
 let recipe      = buildDefaultRecipe();
 let visParams   = PARAMS.filter(p => p.visible).map(p => p.id);
 let selectedDay = null;
+let selectedPhase = null;   // active phase tab → zoom + highlight that day range
 
 // ── ZONE STATE ──
 let zones = { 1: {}, 2: {}, 3: {} };
@@ -2692,9 +2693,10 @@ function drawDayHeader(ctx, totalW) {
   // Phase bands
   for (const ph of PHASES) {
     const x = ph.start * DAY_W, w = (ph.end - ph.start) * DAY_W;
-    ctx.fillStyle = ph.color + '44';
+    const sel = ph.id === selectedPhase;
+    ctx.fillStyle = ph.color + (sel ? 'dd' : '44');
     ctx.fillRect(x, 0, w, 22);
-    ctx.fillStyle = ph.color;
+    ctx.fillStyle = sel ? '#fff' : ph.color;
     ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(ph.label, x + w / 2, 14);
@@ -2765,7 +2767,7 @@ function drawChartRows(ctx, vp, totalW, totalH, geom) {
 
   for (const ph of PHASES) {
     const x = ph.start * DAY_W, w = (ph.end - ph.start) * DAY_W;
-    ctx.fillStyle = ph.color + '0b';
+    ctx.fillStyle = ph.color + (ph.id === selectedPhase ? '22' : '0b');
     ctx.fillRect(x, 0, w, totalH);
   }
   for (const ph of PHASES) {
@@ -2778,6 +2780,15 @@ function drawChartRows(ctx, vp, totalW, totalH, geom) {
     ctx.stroke();
   }
   ctx.setLineDash([]);
+  // outline the selected phase range
+  if (selectedPhase) {
+    const sp = PHASES.find(p => p.id === selectedPhase);
+    if (sp) {
+      const x = sp.start * DAY_W, w = (sp.end - sp.start) * DAY_W;
+      ctx.strokeStyle = sp.color; ctx.lineWidth = 2;
+      ctx.strokeRect(x + 1, 1, w - 2, totalH - 2);
+    }
+  }
 
   vp.forEach((param, ri) => {
     const rowY = geom.ys[ri];
@@ -3308,6 +3319,8 @@ function applyToWeek(week, fromDay) {
 // ZOOM / FIT
 // ============================================================
 function setDayW(v) {
+  selectedPhase = null;   // manual zoom clears the phase highlight
+  document.querySelectorAll('#tlRoot .phase-tab').forEach(t => t.classList.remove('active'));
   if (v === 'fit') {
     const available = document.getElementById('mainScroll').clientWidth || window.innerWidth - 250 - 290;
     DAY_W = Math.max(8, Math.floor(available / TOTAL_DAYS));
@@ -3354,8 +3367,20 @@ function jumpToPhase(phaseId) {
   const ph = PHASES.find(p => p.id === phaseId);
   if (!ph) return;
   const scroll = document.getElementById('mainScroll');
-  scroll.scrollLeft = ph.start * DAY_W;
-  // (header canvas is sticky inside #mainScroll and scrolls with it — no separate scroll element)
+  // toggle: clicking the active phase again zooms back out to Fit
+  if (selectedPhase === phaseId) { selectedPhase = null;
+    document.querySelectorAll('#tlRoot .phase-tab').forEach(t => t.classList.remove('active'));
+    setDayW('fit'); return;
+  }
+  selectedPhase = phaseId;
+  document.querySelectorAll('#tlRoot .phase-tab').forEach(t => t.classList.toggle('active', t.dataset.phase === phaseId));
+  document.querySelectorAll('#tlRoot .topbar > div .btn').forEach(b => b.classList.remove('active'));   // clear Fit/S/M/L
+  // zoom so the phase fills the viewport, then scroll to it
+  const days  = Math.max(1, ph.end - ph.start);
+  const avail = scroll.clientWidth || (window.innerWidth - 250 - 290);
+  DAY_W = Math.max(16, Math.min(64, Math.floor(avail / days)));
+  renderCharts();
+  requestAnimationFrame(() => scroll.scrollTo({ left: Math.max(0, ph.start * DAY_W - 6), behavior: 'smooth' }));
 }
 
 // ============================================================
