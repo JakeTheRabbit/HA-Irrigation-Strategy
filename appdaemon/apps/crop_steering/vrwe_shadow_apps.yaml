@@ -1,0 +1,78 @@
+---
+# VRWE Shadow — standalone, READ-ONLY. Loaded alongside the live engine.
+# AppDaemon 4 loads every *.yaml in the apps dir, so this does NOT modify
+# your existing apps.yaml. Delete this file to remove VRWE entirely.
+#
+# Entity ids below are pulled straight from the f2 dashboard CONFIG map.
+# Lines marked  # FILL  need a real value before that feature works.
+
+vrwe_shadow:
+  module: vrwe_shadow
+  class: VRWEShadow
+
+  # --- loop / learning ---
+  tick_seconds: 60
+  # wait this long after a shot to read the VWC response
+  shot_settle_seconds: 150
+  ewma_alpha: 0.2
+  pump_on_watts: 15               # pump power above this = "running"
+  rol_min_s: 10                   # runoff-onset attribution window (start)
+  rol_max_s: 300                  # runoff-onset attribution window (end)
+  # no shot for 15 min => a pump event is condensate-only
+  quiet_gap_s: 900
+  # specific-yield ratio below which = saturation CANDIDATE
+  s_collapse_ratio: 0.25
+  cold_start_events: 5            # DUL events needed before leaving COLD_START
+  # daily runoff-pump runtime above this => EXCESS_RUNOFF flag
+  excess_runoff_runtime_s: 600
+
+  # --- shared signals ---
+  feed_pump_power: sensor.veg_main_pump_power
+  # FILL — the SUMP/RUNOFF pump watts entity (same naming as feed)
+  runoff_pump_power: ""
+
+  env:
+    vpd: sensor.f2_air_vpd
+    ppfd: sensor.f2_scd41_env3_dlight_poe_ppfd
+    rh: sensor.f2_sensor_humidity
+    co2: sensor.f2_scd41_env3_dlight_poe_co2
+    air_temp: sensor.f2_scd41_env3_dlight_poe_temperature
+
+  hvac:
+    ac_state: climate.f2_ac_pid   # feeds the condensate baseline model
+    dehum: ""                     # FILL if a dehumidifier entity exists
+
+  # --- per-zone map ---
+  zones:
+    1:
+      vwc: sensor.f2_row_1_vwc
+      bulk_ec: sensor.f2_row_1_pwec
+      sub_temp: sensor.f2_row_1_temperature
+      valve: switch.f2_row1
+      p1_target_vwc: number.crop_steering_zone_1_p1_target_vwc
+      emergency_floor: number.crop_steering_zone_1_p3_emergency_vwc_threshold
+      emitters: 12                # FILL — drippers on this zone
+      # FILL — PCJ rated flow (L/h); confirm installed variant
+      emitter_lph: 1.6
+      # FILL — total substrate volume on this zone (mL)
+      substrate_ml: 6000
+    2:
+      vwc: sensor.veg_sdi12_vwc_2
+      bulk_ec: ""
+      sub_temp: ""
+      valve: switch.f2_row2
+      p1_target_vwc: number.crop_steering_zone_2_p1_target_vwc
+      emergency_floor: number.crop_steering_zone_2_p3_emergency_vwc_threshold
+      emitters: 12                # FILL
+      emitter_lph: 1.6            # FILL
+      substrate_ml: 6000          # FILL
+    3:
+      vwc: sensor.veg_sdi12_vwc
+      bulk_ec: ""
+      sub_temp: ""
+      valve: switch.f2_row3
+      p1_target_vwc: number.crop_steering_zone_3_p1_target_vwc
+      emergency_floor: number.crop_steering_zone_3_p3_emergency_vwc_threshold
+      emitters: 12                # FILL
+      emitter_lph: 1.6            # FILL
+      substrate_ml: 6000          # FILL
