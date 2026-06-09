@@ -819,7 +819,7 @@
 
       <!-- ===== CONTROL (native ops console) ===== -->
       <section x-show="view==='control'" class="fade-enter space-y-4">
-        <div class="glass rounded-2xl p-4 flex items-center gap-3 border-l-4 border-l-amber-400/60"><span x-html="icons.alert" class="w-5 h-5 block text-amber-400 shrink-0"></span><span class="text-sm text-slate-300">Live ops — toggles &amp; selects write to HA immediately, no undo. Setpoints live in the <b class="text-slate-200">Tune</b> tab.</span></div>
+        <div class="glass rounded-2xl p-4 flex items-center gap-3 border-l-4 border-l-amber-400/60"><span x-html="icons.alert" class="w-5 h-5 block text-amber-400 shrink-0"></span><span class="text-sm text-slate-300">Facility ops — strategy, arm/pump &amp; adaptive write to HA immediately, no undo. Per-zone setpoints live in <b class="text-slate-200">Zones</b>; recipe in <b class="text-slate-200">Tune</b>.</span></div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div class="glass rounded-2xl p-5 space-y-4">
             <h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.salt" class="w-4 h-4 block text-emerald-400"></span> Active strategy</h3>
@@ -851,17 +851,17 @@
           </div>
         </div>
         <div class="glass rounded-2xl p-5 space-y-3">
-          <div class="flex items-center justify-between"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Zone ops</h3>
-            <div class="flex gap-1"><template x-for="z in [1,2,3]" :key="z"><button @click="ctrlZone=z" class="px-3 py-1 rounded-lg text-xs font-medium" :class="ctrlZone===z?'bg-emerald-500/20 text-emerald-300':'bg-white/5 text-slate-400'" x-text="'Zone '+z"></button></template></div></div>
-          <template x-for="sel in control.zones[ctrlZone].selects" :key="sel.id">
-            <label class="flex items-center justify-between gap-3"><span class="text-sm text-slate-300" x-text="sel.label"></span>
-              <select @change="ctrlSelect(sel.id,$event.target.value)" class="bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-slate-200 max-w-[55%]">
-                <template x-for="o in sel.options" :key="o"><option :value="o" :selected="o===sel.value" x-text="o"></option></template></select></label>
-          </template>
-          <div class="divide-y divide-white/6">
-            <template x-for="t in control.zones[ctrlZone].switches" :key="t.id">
-              <div class="flex items-center justify-between py-2.5"><span class="text-sm text-slate-300" x-text="t.label"></span>
-                <button @click="ctrlToggle(t.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="t.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="t.on&&'translate-x-5'"></span></button></div>
+          <div class="flex items-center justify-between"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> All zones at a glance</h3>
+            <button @click="go('zones')" class="text-[11px] text-emerald-300/80 hover:text-emerald-300">tune per-zone in Zones →</button></div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <template x-for="z in zones" :key="'cz-'+z.id">
+              <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3" :class="z.status==='crit'?'ring-1 ring-red-500/40':z.status==='warn'?'ring-1 ring-amber-400/30':''">
+                <div class="flex items-center justify-between"><span class="text-sm font-semibold" x-text="z.name"></span><span class="w-8 h-8 rounded-lg grid place-items-center text-xs font-bold" :class="sevBg(z.status)" ><span :class="sevText(z.status)" x-text="z.phase"></span></span></div>
+                <div class="flex items-end gap-1 mt-2"><span class="text-2xl font-bold" :class="sevText(z.status)" x-text="z.vwc"></span><span class="text-xs text-slate-400 mb-0.5">% · EC <span x-text="z.ec"></span></span></div>
+                <div class="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 text-[11px] text-slate-400"><div>floor <span class="text-slate-300" x-text="z.floor"></span>%</div><div>next <span class="text-slate-300" x-text="z.next"></span></div><div>last <span class="text-slate-300" x-text="z.lastIrrig"></span></div><div>peak <span class="text-slate-300" x-text="z.peak"></span>%</div></div>
+                <div class="flex items-center justify-between mt-2.5 pt-2.5 border-t border-white/6"><span class="text-xs text-slate-400">Enabled</span>
+                  <button @click="ctrlToggle('switch.crop_steering_zone_'+z.id+'_enabled',false)" class="relative w-10 h-6 rounded-full transition shrink-0" :class="z.enabled?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="z.enabled&&'translate-x-4'"></span></button></div>
+              </div>
             </template>
           </div>
         </div>
@@ -1147,11 +1147,14 @@ function computeHeadline(adv,watch){ const crit=adv.filter(a=>a.sev==="crit"),wa
   return {sev:"ok",big:"All good — nothing needs you",line:`${val("grow_stage")||"F2"}. Plant transpiring normally, climate in band, steering as intended.`}; }
 
 /* ===================== view-model builders ===================== */
-function buildZones(){ return [1,2,3].map(z=>{ const Z=CONFIG.ZONE(z); const vwc=parseFloat(S[Z.vwc]?.state),ec=parseFloat(S[Z.ec]?.state); const ph=S[Z.phase]?.state||"—",safe=S[Z.safety]?.state||"",f=CONFIG.ZONE_P3_FLOOR[z]; const en=S[Z.enabled]?.state==="on";
+function buildZones(){ return [1,2,3].map(z=>{ const Z=CONFIG.ZONE(z); const vwc=parseFloat(S[Z.vwc]?.state),ec=parseFloat(S[Z.ec]?.state); const ph=S[Z.phase]?.state||"—",safe=S[Z.safety]?.state||"";
+  const fLive=parseFloat(S["number.crop_steering_zone_"+z+"_p3_emergency_vwc_threshold"]?.state); const f=isNaN(fLive)?CONFIG.ZONE_P3_FLOOR[z]:fLive; const en=S[Z.enabled]?.state==="on";
   let st=isNaN(vwc)?"ok":(vwc<=f?"crit":vwc<=f+6?"warn":safe==="approaching_saturation"?"warn":"ok");
   const min=20,max=75; const fillPct=isNaN(vwc)?0:Math.max(0,Math.min(100,(vwc-min)/(max-min)*100)); const floorPct=Math.max(0,Math.min(100,(f-min)/(max-min)*100));
   const li=S[Z.last_irrig]?.state; let lt="—"; if(li){ const d=(Date.now()-Date.parse(li))/60000; if(!isNaN(d)) lt=d<60?Math.round(d)+"m":Math.round(d/60)+"h"; }
-  return {id:z,name:"Zone "+z,vwc:isNaN(vwc)?"—":fmt(vwc,0),ec:isNaN(ec)?"—":fmt(ec,1),phase:ph,status:st,floor:f,fillPct,floorPct,enabled:en,lastIrrig:lt,
+  const nh=parseFloat(S["sensor.crop_steering_prediction_zone_"+z+"_next_irrigation_hours"]?.state); const nextL=isNaN(nh)?"—":(nh<=0?"now":nh<1?Math.round(nh*60)+"m":nh.toFixed(1)+"h");
+  const pk=parseFloat(S["sensor.crop_steering_zone_"+z+"_vmax_detected"]?.state);
+  return {id:z,name:"Zone "+z,vwc:isNaN(vwc)?"—":fmt(vwc,0),ec:isNaN(ec)?"—":fmt(ec,1),phase:ph,status:st,floor:f,fillPct,floorPct,enabled:en,lastIrrig:lt,next:nextL,peak:isNaN(pk)?"—":fmt(pk,0),
     note:safe&&safe!=="safe"?safe.replace(/_/g," "):"looking ok"}; }); }
 function zSt(id){ return S[id]?.state; }
 function zNum(id){ const v=parseFloat(S[id]?.state); return isNaN(v)?null:v; }
