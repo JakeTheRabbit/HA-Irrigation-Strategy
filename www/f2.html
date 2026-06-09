@@ -1182,6 +1182,21 @@ function seedDemo(){
   }));
   (typeof FLOOR_ROOMS!=='undefined'?FLOOR_ROOMS:[]).forEach(r=>r.lights.forEach(id=>set(id,'on')));
   set('sensor.aqua_pro_tank_ph',5.9); set('sensor.aqua_pro_tank_ec',2.4); set('sensor.aqua_pro_tank_temperature',20); set('sensor.tank_percentage_full',86);
+  // Operate tab — global strategy / guardrails / engine telemetry (perfect role-model)
+  set('select.crop_steering_steering_mode','Generative',{options:['Vegetative','Generative']});
+  set('select.crop_steering_growth_stage','Generative',{options:['Vegetative','Generative']});
+  set('sensor.crop_steering_app_current_phase','P2');
+  set('sensor.crop_steering_app_status','Running'); set('sensor.crop_steering_system_state','Active');
+  set('sensor.crop_steering_ai_heartbeat','healthy');
+  set('sensor.crop_steering_p2_vwc_threshold_adjusted',41);
+  set('sensor.crop_steering_prediction_estimated_daily_water_need',156);
+  set('number.crop_steering_field_capacity',60);
+  set('number.crop_steering_generative_dryback_target',15); set('number.crop_steering_vegetative_dryback_target',12);
+  set('number.crop_steering_maximum_ec',9);
+  set('number.crop_steering_irrigation_ec_min',2.3); set('number.crop_steering_irrigation_ec_max',3.5);
+  set('number.crop_steering_irrigation_ph_min',5.8); set('number.crop_steering_irrigation_ph_max',6.2);
+  set('number.crop_steering_lights_on_hour',10); set('number.crop_steering_lights_off_hour',22);
+  set('number.crop_steering_blocked_dripper_max_shots_30min',4);
   return D;
 }
 function demoHist(ids,hours){ const end=Date.now(), start=end-hours*3600e3, out={__start:start,__end:end};
