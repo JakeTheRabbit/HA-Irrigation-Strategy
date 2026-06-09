@@ -1010,7 +1010,7 @@
 <div x-show="aiOpen" x-cloak class="fixed inset-0 z-50" @keydown.escape.window="aiOpen=false">
   <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="aiOpen=false"></div>
   <div class="absolute right-0 top-0 h-full w-full sm:max-w-md glass-strong border-l border-white/12 flex flex-col" x-transition:enter="transition duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0">
-    <div class="p-4 border-b border-white/8 flex items-center gap-3"><div class="w-9 h-9 rounded-xl grid place-items-center bg-emerald-500/15 ring-1 ring-emerald-400/30"><span x-html="icons.ai" class="w-5 h-5 block text-emerald-400"></span></div><div class="flex-1"><div class="font-semibold text-sm">Plant-State AI</div><div class="text-[11px] text-slate-400">live F2 context</div></div><button @click="aiOpen=false" class="w-9 h-9 rounded-lg grid place-items-center bg-white/5 hover:bg-white/10"><span x-html="icons.x" class="w-5 h-5 block"></span></button></div>
+    <div class="p-4 border-b border-white/8 flex items-center gap-3"><div class="w-9 h-9 rounded-xl grid place-items-center bg-emerald-500/15 ring-1 ring-emerald-400/30"><span x-html="icons.ai" class="w-5 h-5 block text-emerald-400"></span></div><div class="flex-1"><div class="font-semibold text-sm">Plant-State AI</div><div class="text-[11px] text-slate-400">Claude · live F2 context</div></div><button @click="aiOpen=false" class="w-9 h-9 rounded-lg grid place-items-center bg-white/5 hover:bg-white/10"><span x-html="icons.x" class="w-5 h-5 block"></span></button></div>
     <div class="flex-1 overflow-y-auto scrollx p-4 space-y-3" id="aiScroll">
       <template x-for="(m,i) in aiMessages" :key="i"><div :class="m.role==='user'?'flex justify-end':'flex justify-start'"><div class="max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-line" :class="m.role==='user'?'bg-emerald-500/20 text-emerald-50 rounded-br-sm':'bg-white/[0.05] border border-white/8 text-slate-200 rounded-bl-sm'" x-text="m.text"></div></div></template>
       <div x-show="aiThinking" class="flex gap-1 px-2"><span class="w-2 h-2 rounded-full bg-slate-500 animate-bounce"></span><span class="w-2 h-2 rounded-full bg-slate-500 animate-bounce" style="animation-delay:.15s"></span><span class="w-2 h-2 rounded-full bg-slate-500 animate-bounce" style="animation-delay:.3s"></span></div>
@@ -1041,6 +1041,7 @@
 const CONFIG = {
   HA_BASE:"",
   LL_TOKEN:"",
+  AI:{base:"http://192.168.73.55:4000",model:"claude-sonnet-4-6",key:""},   // LiteLLM proxy → Claude (ccproxy). key BLANK in repo; scoped key injected on live deploy / localStorage f2_ai_key for testing
   REFRESH_MS:30000, EC_TARGET:6.0, CO2_DARK_WARN:1800, DOSING_STUCK_MIN:90,
   ZONE_P3_FLOOR:{1:33,2:24,3:34}, HOTSPOT:{deltaWatch:1.5,deltaWarn:2.6,vpdWarn:1.6},
   BANDS:{air_temp:{ok:[24,26],warn:[22.5,27.5]},rh:{ok:[58,65],warn:[52,70]},air_vpd:{ok:[1.0,1.4],warn:[0.8,1.6]},leaf_vpd:{ok:[1.0,1.3],warn:[0.8,1.5]},co2:{ok:[1200,1450],warn:[1000,1700]},ppfd:{ok:[850,1200],warn:[700,1350]}},
@@ -1069,6 +1070,7 @@ let CHARTS={};   // Chart.js instances live here, NOT in Alpine state — Chart 
 let HIST={vpd:[],ec:[],vwc:[]};   // rolling chart history — module scope so NO Alpine-reactive array is ever handed to Chart.js (that triggers an Alpine<->Chart proxy infinite loop).
 const E=CONFIG.E;
 function getToken(){ try{ const t=JSON.parse(localStorage.getItem("hassTokens")); if(t&&t.access_token&&(!t.expires||t.expires>Date.now()+15000)) return t.access_token; }catch(e){} return CONFIG.LL_TOKEN||""; }   // skip an expired HA-frontend token and fall back to the long-lived token
+function getAIKey(){ try{ const k=localStorage.getItem("f2_ai_key"); if(k) return k; }catch(e){} return (CONFIG.AI&&CONFIG.AI.key)||""; }   // scoped LiteLLM key: localStorage override, else the baked one
 async function fetchStates(){ const r=await fetch((CONFIG.HA_BASE||"")+"/api/states",{headers:{Authorization:"Bearer "+getToken()},cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status); const m={}; for(const e of await r.json()) m[e.entity_id]=e; return m; }
 async function svc(domain, service, data){ const r=await fetch((CONFIG.HA_BASE||"")+"/api/services/"+domain+"/"+service,{method:"POST",headers:{Authorization:"Bearer "+getToken(),"Content-Type":"application/json"},body:JSON.stringify(data||{}),cache:"no-store"}); if(!r.ok) throw new Error("svc "+domain+"."+service+" → HTTP "+r.status); return r.json().catch(()=>({})); }   // shared write path for Control/Tune/Timeline
 function raw(k){ const id=E[k]||k; return S[id]; }
@@ -3716,7 +3718,30 @@ document.addEventListener('alpine:init', () => {
     speak(text){ if(!window.speechSynthesis) return; speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.rate=.95; speechSynthesis.speak(u); },
 
     /* AI */
-    askAI(q){ if(!q||!q.trim()) return; this.aiOpen=true; this.aiMessages.push({role:'user',text:q}); this.aiInput=""; this.aiThinking=true; this.scrollAI(); setTimeout(()=>{ this.aiThinking=false; this.aiMessages.push({role:'ai',text:this.aiReply(q)}); this.scrollAI(); },700+Math.random()*400); },
+    f2Context(){   // compact live-state brief handed to Claude as the system prompt
+      const zs=(this.zones||[]).map(z=>`Z${z.id}: VWC ${z.vwc}% · ${z.phase} · EC ${z.ec} · floor ${z.floor}% · next ${z.next} · last ${z.lastIrrig} (${z.status})`).join('; ');
+      const snap=(this.snapshot||[]).map(s=>`${s.label} ${s.val}${s.unit||''}`).join(', ');
+      const adv=(this.adv||[]).map(a=>`[${a.sev}] ${a.title} — ${a.detail}`).join(' | ');
+      return ["You are the Plant-State AI co-pilot embedded in the F2 grow-room dashboard for a commercial cannabis facility (Legacy Ag, NZ). You are an expert in crop steering (P0–P3 substrate dryback irrigation), VPD/climate management and cannabis cultivation.",
+        "Answer using ONLY the live data below — never invent numbers. Be a concise, direct advisor: 2–5 short sentences or tight bullets, specific and actionable. Units: VWC %, pore EC mS/cm, VPD kPa, temp °C, CO₂ ppm, PPFD µmol/m²/s.",
+        "HEADLINE: "+this.headline.big+" — "+this.headline.line,
+        "SNAPSHOT: "+snap,
+        "ZONES: "+zs,
+        "ADVISORIES: "+(adv||"none")].join("\n");
+    },
+    async askAI(q){ if(!q||!q.trim()) return; this.aiOpen=true; this.aiMessages.push({role:'user',text:q}); this.aiInput=""; this.aiThinking=true; this.scrollAI();
+      const key=getAIKey();
+      if(!key){ setTimeout(()=>{ this.aiThinking=false; this.aiMessages.push({role:'ai',text:this.aiReply(q)}); this.scrollAI(); },500); return; }   // no key → local heuristic
+      const hist=this.aiMessages.filter(m=>m.role==='user'||m.role==='ai').slice(-8).map(m=>({role:m.role==='ai'?'assistant':'user',content:m.text}));
+      const msgs=[{role:'system',content:this.f2Context()},...hist];
+      try{
+        const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),30000);
+        const r=await fetch(CONFIG.AI.base+'/v1/chat/completions',{method:'POST',signal:ctl.signal,headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({model:CONFIG.AI.model,messages:msgs,max_tokens:700,temperature:0.3})});
+        clearTimeout(to); if(!r.ok) throw new Error('HTTP '+r.status);
+        const j=await r.json(); const reply=j&&j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;
+        this.aiThinking=false; this.aiMessages.push({role:'ai',text:(reply&&reply.trim())?reply.trim():this.aiReply(q)}); this.scrollAI();
+      }catch(e){ this.aiThinking=false; this.aiMessages.push({role:'ai',text:'⚠ Couldn\'t reach the AI service ('+(e.name==='AbortError'?'timed out':e.message)+') — this needs the facility LAN. Local read instead:\n\n'+this.aiReply(q)}); this.scrollAI(); }
+    },
     aiReply(q){ const s=q.toLowerCase();
       if(s.includes("hot")||s.includes("back")) { const bt=num("bl_temp"),at=num("air_temp"); return "Back-left corner: "+fmt(bt,1)+"°C vs "+fmt(at,1)+"°C room ("+fmt(bt-at,1)+"°C hotter).\n\nThis tracks lights-on, not the weather — so it is internal airflow, not the chiller. Those plants transpire against drier air and stress first.\n\nDo this: add a circulation fan aimed at the back-left corner before touching the room RH setpoint. Re-check the gap in 30 minutes."; }
       if(s.includes("ec")||s.includes("salt")) return "Fused pore EC is "+fmt(num("fused_ec"),2)+" against a "+fmt(CONFIG.EC_TARGET,1)+" generative target, trend "+fmt(num("ec_trend"),2)+" mS/cm/h.\n\nThe EC-stack loop is "+(isOn("sw_ecstack")?"on":"off")+". "+(num("fused_ec")<CONFIG.EC_TARGET?"Still climbing toward target — hold steering and let dryback deepen to concentrate the pore EC.":"Near target — steady as she goes.");
