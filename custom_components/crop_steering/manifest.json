@@ -1,15 +1,15 @@
 {
   "domain": "crop_steering",
   "name": "Crop Steering System",
-  "version": "2.3.1",
-  "documentation": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy",
-  "issue_tracker": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues",
-  "dependencies": [],
   "codeowners": [
     "@JakeTheRabbit"
   ],
-  "requirements": [],
   "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy",
   "integration_type": "hub",
-  "iot_class": "local_polling"
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues",
+  "requirements": [],
+  "version": "2.3.1"
 }
