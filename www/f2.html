@@ -1322,7 +1322,7 @@ function buildKpis(){ const h=computeHeadline(...Object.values(runRules())); con
     {label:"Open advisories",value:open,icon:"alerts",tint:open?"text-amber-400":"text-emerald-400",sub:"need you"},
   ]; }
 const FLOOR_ROOMS=[   // 2x2 mini floor-plan; lit = any of the room's lights on
-  {key:'F2',label:'F2',col:0,row:0,lights:['light.led_f2_r1_f2_r1_led','light.led_f2_r2_f2_r2_led','light.office_lights']},
+  {key:'F2',label:'F2',col:0,row:0,lights:['light.led_f2_r1_f2_r1_led','light.led_f2_r2_f2_r2_led','light.office_light_main_spectrum','light.under_canopy_1_veg_undercanopy_light_2']},
   {key:'Veg',label:'Veg',col:1,row:0,lights:['light.veg_r1_lights_veg_right_level_1','light.veg_l1_lights_vegel_left_level_1']},
   {key:'F1',label:'F1',col:0,row:1,lights:['light.f1_light_group']},
   {key:'Vault',label:'Vault',col:1,row:1,lights:['light.vault_lights']},
@@ -3647,7 +3647,7 @@ const CLIMATE_GROUPS = [
   {name:'AC / cooling', icon:'wind', ids:['climate.f2_ac_pid','climate.f2_ac_wall_f2_ac_wall','climate.f2_ac_door_f2_ac_door']},
   {name:'Dehumidification', icon:'haze', ids:['humidifier.f2_dehumidifier','switch.f2_dehumidifiers_group','switch.f2_dehumidifiers_relay_1','switch.f2_dehumidifiers_relay_2','switch.f2_dehumidifiers_relay_3','switch.f2_dehumidifiers_relay_4']},
   {name:'CO₂', icon:'haze', ids:['switch.f2_co2','switch.f2_co2_led','input_number.f2_co2_target_input','input_number.f2_co2_day_target_input','input_number.f2_co2_night_target_input','input_number.f2_co2_tolerance_input','input_boolean.f2_co2_tank_empty','input_boolean.f2_co2_tank_replaced']},
-  {name:'Lighting', icon:'bulb', ids:['light.led_f2_r1_f2_r1_led','light.led_f2_r2_f2_r2_led','light.office_lights','switch.f2_lights_contactor_ssr_f1_lights_contactor','light.f2_work_light','switch.f2_work_light']},
+  {name:'Lighting', icon:'bulb', ids:['light.led_f2_r1_f2_r1_led','light.led_f2_r2_f2_r2_led','light.office_light_main_spectrum','light.under_canopy_1_veg_undercanopy_light_2','switch.f2_lights_contactor_ssr_f1_lights_contactor','light.f2_work_light','switch.f2_work_light']},
   {name:'Room & access', icon:'radio', ids:['switch.f2_door_relay','switch.f2_detect_2','switch.f2_motion_2']},
   {name:'Climate-Sense thresholds', icon:'doc', collapsed:true, ids:['input_number.csig_f2_high_vpd','input_number.csig_f2_high_ec','input_number.csig_f2_high_ppfd','input_number.csig_f2_high_root_temp','input_number.csig_f2_low_root_temp','input_number.csig_f2_low_vwc','input_number.csig_f2_min_cooling','input_number.csig_f2_warm_leaf_delta','input_number.csig_f2_co2_enriched','input_number.csig_f2_co2_ppfd_min','input_number.csig_f2_cwsi_nwsb_intercept','input_number.csig_f2_cwsi_nwsb_slope','input_number.csig_f2_cwsi_wsb_delta']},
   {name:'Sensor mapping', icon:'doc', collapsed:true, ids:['input_text.csig_f2_air_temp','input_text.csig_f2_humidity','input_text.csig_f2_co2','input_text.csig_f2_ppfd','input_text.csig_f2_leaf_temp','input_text.csig_f2_root_temp','input_text.csig_f2_ec','input_text.csig_f2_vwc']},
@@ -3655,7 +3655,7 @@ const CLIMATE_GROUPS = [
   {name:'Camera & recording', icon:'eye', collapsed:true, ids:['switch.f2_recordings_2','switch.f2_snapshots_2','switch.f2_review_alerts_2','switch.f2_review_detections_2']},
   {name:'Device restarts', icon:'radio', collapsed:true, ids:['switch.f2_ac_wall_restart','switch.f2_ac_door_restart','switch.f2_dehumidifiers_restart','switch.f2_scd41_env3_dlight_poe_restart','switch.led_f2_r1_restart','switch.led_f2_r2_restart','button.air_q_entrance_restart','button.airq_f2_refresh_display']},
 ];
-const CTL_LABELS={'light.office_lights':'Row 3 LED (office)'};   // office fixture is the Row-3 grow light
+const CTL_LABELS={'light.office_light_main_spectrum':'Row 3 LED (F2)','light.under_canopy_1_veg_undercanopy_light_2':'F2 under-canopy'};   // Row 3 = office main-spectrum; under-canopy moved to F2
 const SETPOINT_LIVE={   // climate setpoint entity → live sensor (CONFIG.E key) + band, so you see current-vs-target while configuring
   'input_number.f2_setpoint_temp_day':{k:'air_temp',band:'air_temp'},'input_number.f2_setpoint_rh':{k:'rh',band:'rh'},
   'input_number.f2_setpoint_vpd':{k:'air_vpd',band:'air_vpd'},'input_number.f2_target_vpd':{k:'leaf_vpd',band:'leaf_vpd'},
