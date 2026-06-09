@@ -381,8 +381,8 @@
           <span x-show="adv.length" class="absolute -top-1 -right-1 min-w-5 h-5 px-1 grid place-items-center text-[10px] font-bold rounded-full bg-red-500 text-white" x-text="adv.length"></span>
         </button>
         <button class="flex items-center gap-2.5 pl-1 pr-2.5 h-10 rounded-xl glass hover:border-white/20 transition lift">
-          <span class="w-7 h-7 rounded-lg grid place-items-center bg-gradient-to-br from-emerald-400 to-emerald-600 text-[12px] font-bold text-emerald-950">BD</span>
-          <div class="hidden lg:block text-left leading-tight"><div class="text-xs font-medium">B. Disdale</div><div class="text-[10px] text-slate-400">Grower</div></div>
+          <span class="w-7 h-7 rounded-lg grid place-items-center bg-gradient-to-br from-emerald-400 to-emerald-600 text-[12px] font-bold text-emerald-950" x-text="hUser.initials"></span>
+          <div class="hidden lg:block text-left leading-tight"><div class="text-xs font-medium" x-text="hUser.name"></div><div class="text-[10px] text-slate-400">Grower</div></div>
         </button>
       </div>
     </header>
@@ -932,8 +932,9 @@
             <div class="text-center">
               <div class="w-14 h-14 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-3"><span x-html="icons.grid" class="w-7 h-7 block text-emerald-400"></span></div>
               <div class="font-semibold mb-1">3D facility twin</div>
-              <div class="text-[12px] text-slate-400 mb-4 max-w-xs">Live sensor cards on the real floor plan. Loads a ~34 MB model — best on wifi.</div>
-              <button @click="floorLoaded=true" class="h-11 px-6 rounded-xl bg-emerald-500/20 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/30 transition">Load 3D view</button>
+              <div class="text-[12px] text-slate-400 mb-4 max-w-xs" x-text="demo ? 'Interactive 3D twin with live sensor cards, clickable lights/HVAC and white clean-room walls — available in the full install.' : 'Live sensor cards on the real floor plan. Loads a ~34 MB model — best on wifi.'"></div>
+              <button x-show="!demo" @click="floorLoaded=true" class="h-11 px-6 rounded-xl bg-emerald-500/20 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/30 transition">Load 3D view</button>
+              <div x-show="demo" class="text-[11px] text-slate-500">(static demo — the live 3D view runs in your Home Assistant)</div>
             </div>
           </div>
         </div>
@@ -1110,7 +1111,7 @@
 const CONFIG = {
   HA_BASE:"",
   LL_TOKEN:"",
-  AI:{base:"http://192.168.73.55:4000",model:"claude-sonnet-4-6",key:""},   // LiteLLM proxy → Claude (ccproxy). key BLANK in repo; scoped key injected on live deploy / localStorage f2_ai_key for testing
+  AI:{base:"",model:"claude-sonnet-4-6",key:""},   // LiteLLM proxy → Claude. base + key BLANK in repo (no LAN IP / no key); both injected on live deploy. localStorage f2_ai_key for testing
   REFRESH_MS:30000, EC_TARGET:6.0, CO2_DARK_WARN:1800, DOSING_STUCK_MIN:90,
   ZONE_P3_FLOOR:{1:33,2:24,3:34}, HOTSPOT:{deltaWatch:1.5,deltaWarn:2.6,vpdWarn:1.6},
   BANDS:{air_temp:{ok:[24,26],warn:[22.5,27.5]},rh:{ok:[58,65],warn:[52,70]},air_vpd:{ok:[1.0,1.4],warn:[0.8,1.6]},leaf_vpd:{ok:[1.0,1.3],warn:[0.8,1.5]},co2:{ok:[1200,1450],warn:[1000,1700]},ppfd:{ok:[850,1200],warn:[700,1350]}},
@@ -1141,7 +1142,56 @@ const E=CONFIG.E;
 function getToken(){ try{ const t=JSON.parse(localStorage.getItem("hassTokens")); if(t&&t.access_token&&(!t.expires||t.expires>Date.now()+15000)) return t.access_token; }catch(e){} return CONFIG.LL_TOKEN||""; }   // skip an expired HA-frontend token and fall back to the long-lived token
 function getAIKey(){ try{ const k=localStorage.getItem("f2_ai_key"); if(k) return k; }catch(e){} return (CONFIG.AI&&CONFIG.AI.key)||""; }   // scoped LiteLLM key: localStorage override, else the baked one
 async function fetchStates(){ const r=await fetch((CONFIG.HA_BASE||"")+"/api/states",{headers:{Authorization:"Bearer "+getToken()},cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status); const m={}; for(const e of await r.json()) m[e.entity_id]=e; return m; }
-async function svc(domain, service, data){ const r=await fetch((CONFIG.HA_BASE||"")+"/api/services/"+domain+"/"+service,{method:"POST",headers:{Authorization:"Bearer "+getToken(),"Content-Type":"application/json"},body:JSON.stringify(data||{}),cache:"no-store"}); if(!r.ok) throw new Error("svc "+domain+"."+service+" → HTTP "+r.status); return r.json().catch(()=>({})); }   // shared write path for Control/Tune/Timeline
+async function svc(domain, service, data){ if(DEMO) return {};   // demo: writes are no-ops (optimistic UI only)
+  const r=await fetch((CONFIG.HA_BASE||"")+"/api/services/"+domain+"/"+service,{method:"POST",headers:{Authorization:"Bearer "+getToken(),"Content-Type":"application/json"},body:JSON.stringify(data||{}),cache:"no-store"}); if(!r.ok) throw new Error("svc "+domain+"."+service+" → HTTP "+r.status); return r.json().catch(()=>({})); }   // shared write path for Control/Tune/Timeline
+
+// ===== DEMO mode: standalone showcase on perfect "role-model" data (GitHub Pages — no HA, no IP, no token) =====
+const DEMO = new URLSearchParams(location.search).has('demo') || /github\.io$/i.test(location.hostname||"");
+function seedDemo(){
+  const D={}, E=CONFIG.E;
+  const set=(id,state,attrs)=>{ if(id&&D[id]==null) D[id]={entity_id:id,state:String(state),attributes:attrs||{}}; };
+  const iso=m=>new Date(Date.now()+m*60000).toISOString();
+  const ideal={ air_temp:25.2, rh:62, air_vpd:1.15, leaf_vpd:1.12, co2:1300, ppfd:1000, dli:38, target_rh:62,
+    bl_temp:25.6, bl_vpd:1.2, bl_co2:1295, bl_rh:60, leaf_air_delta:1.1, transp_cooling:1.4, cwsi:0.18, leaf_temp:24.1,
+    fused_ec:3.0, avg_ec:3.0, fused_vwc:58, avg_vwc:58, sub_vwc:58, sub_pwec:3.0, sub_temp:22, dryback_pct:14.5,
+    dryback_target:15, dryback_rate:1.2, ec_trend:0.04, ec_target:6, pump_power:0, led_power:680, sensor_health:100, water_temp:20 };
+  for(const k in E){ const v=E[k]; if(typeof v==='string' && ideal[k]!=null) set(v, ideal[k]); }
+  ['sw_system','sw_auto','sw_ecstack'].forEach(k=>{ if(E[k]) set(E[k],'on'); });
+  if(E.dosing_active) set(E.dosing_active,'off'); if(E.next_irrig) set(E.next_irrig, iso(45));
+  if(E.decision) set(E.decision,'Maintaining P2 — pore EC on target'); if(E.activity) set(E.activity,'Z1 P2 shot 5% · 20m ago');
+  [1,2,3].forEach((z,i)=>{ const P='crop_steering_zone_'+z+'_', vwc=[57,59,58][i], ec=[3.0,3.1,2.9][i];
+    set('sensor.'+P+'vwc',vwc); set('sensor.'+P+'ec',ec); set('sensor.'+P+'phase','P2'); set('sensor.'+P+'status','Optimal');
+    set('sensor.'+P+'safety_status','safe'); set('sensor.'+P+'vmax_detected',+(vwc+15.2).toFixed(1)); set('sensor.'+P+'last_irrigation_app',iso(-20));
+    set('sensor.'+P+'daily_water_app',[52,55,50][i]); set('sensor.'+P+'irrigation_count_app',9); set('sensor.'+P+'p3_prediction',26);
+    set('sensor.crop_steering_prediction_zone_'+z+'_next_irrigation_hours',0.6);
+    set('number.'+P+'p2_vwc_threshold',[42,43,43][i]); set('number.'+P+'p3_emergency_vwc_threshold',38);
+    set('number.'+P+'ec_target_gen_p2',6.0); set('number.'+P+'ec_target_veg_p2',3.0); set('number.'+P+'p2_shot_size',5);
+    set('number.'+P+'generative_dryback_target',15); set('number.'+P+'vegetative_dryback_target',12); set('number.'+P+'p1_target_vwc',60);
+    set('input_select.'+P+'phase_control','Auto',{options:['Auto','P0','P1','P2','P3']});
+    set('select.'+P+'steering_mode','Generative',{options:['Vegetative','Generative']});
+    set('select.'+P+'crop_profile','Cannabis_Athena',{options:['Follow Main','Cannabis_Athena','Custom']});
+    set('switch.'+P+'enabled','on'); set('switch.'+P+'manual_override','off'); set('switch.'+P+'dripper_protection','on');
+  });
+  const spVal=id=>{ const m={temp_day:25,leaf_temp:24,target_vpd:1.1,vpd:1.15,rh:62,co2_day:1300,co2_night:450,co2_tolerance:100,co2_target:1300,co2:1400,ppfd:1000,air_velocity:1.8,photoperiod:12,pwec:6,vwc:45}; for(const k in m){ if(id.includes(k)) return m[k]; } return 0; };
+  (typeof CLIMATE_GROUPS!=='undefined'?CLIMATE_GROUPS:[]).forEach(g=>g.ids.forEach(id=>{ const dom=id.split('.')[0];
+    if(dom==='switch'||dom==='input_boolean') set(id, /tank_empty|restart|reboot|overheat/.test(id)?'off':'on');
+    else if(dom==='light') set(id,'on',{brightness:235,supported_color_modes:['brightness']});
+    else if(dom==='climate') set(id,'cool',{temperature:25,current_temperature:25,hvac_modes:['off','cool','heat','heat_cool','fan_only','dry'],hvac_action:'cooling',target_temp_step:1,min_temp:16,max_temp:30});
+    else if(dom==='input_number'||dom==='number') set(id, spVal(id), {min:0,max:2000,step:1,unit_of_measurement:''});
+    else if(dom==='input_text') set(id,'sensor.demo'); else if(dom==='button') set(id,'idle');
+  }));
+  (typeof FLOOR_ROOMS!=='undefined'?FLOOR_ROOMS:[]).forEach(r=>r.lights.forEach(id=>set(id,'on')));
+  set('sensor.aqua_pro_tank_ph',5.9); set('sensor.aqua_pro_tank_ec',2.4); set('sensor.aqua_pro_tank_temperature',20); set('sensor.tank_percentage_full',86);
+  return D;
+}
+function demoHist(ids,hours){ const end=Date.now(), start=end-hours*3600e3, out={__start:start,__end:end};
+  ids.forEach(id=>{ const pts=[];
+    if(/_vwc/.test(id)){ for(let i=0;i<=48;i++){ const t=start+(end-start)*i/48, ph=(i%8)/8; pts.push({t,v:+(52+(1-ph)*7).toFixed(1)}); } }
+    else { let b=58; if(/air_temp|temperature/.test(id))b=25; else if(/humidity|_rh\b/.test(id))b=62; else if(/vpd/.test(id))b=1.15; else if(/co2/.test(id))b=1300; else if(/ppfd/.test(id))b=1000;
+      for(let i=0;i<=48;i++){ const t=start+(end-start)*i/48; pts.push({t,v:+(b+Math.sin(i/6)*b*0.03).toFixed(2)}); } }
+    out[id]=pts; });
+  return out;
+}
 function raw(k){ const id=E[k]||k; return S[id]; }
 function val(k){ const e=raw(k); return e?e.state:null; }
 function num(k){ const v=val(k); if(v==null) return null; const n=parseFloat(v); return isNaN(n)?null:n; }
@@ -3722,7 +3772,7 @@ document.addEventListener('alpine:init', () => {
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
     headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},guardrails:[],telemetry:[],feed:[]}, ctrlZone:1,
-    climateCtl:[], ctlOpen:{}, snapshot:[], zSel:1, zoneDetail:{}, camUrl:'', spOpen:false, spItem:null, floorMini:[],
+    climateCtl:[], ctlOpen:{}, snapshot:[], zSel:1, zoneDetail:{}, camUrl:'', spOpen:false, spItem:null, floorMini:[], hUser:{name:'Grower',initials:'F2'}, demo:DEMO,
     notes:{}, toasts:[], _tid:0, _toastId:0, _acked:{},
     aiMessages:[], aiSuggestions:["Any rooms drifting?","Why the hotspot?","How is the EC tracking?","Is dryback on target?"],
 
@@ -3730,6 +3780,7 @@ document.addEventListener('alpine:init', () => {
       try{ this.notes=JSON.parse(localStorage.getItem("f2.notes"))||{}; }catch(e){}
       this.aiMessages=[{role:'ai',text:"Live F2 context loaded — 3 zones, full sensor fusion. Ask me about a zone, dryback, EC, or the hotspot. I read every sensor so you do not have to."}];
       this.tick();
+      this.fetchUser();
       this._tid=setInterval(()=>this.tick(), CONFIG.REFRESH_MS);
       this.$watch('view',v=>{ this.$nextTick(()=>{ this.mountCharts(); if(v==='timeline'&&window.tlInit) window.tlInit(); if(v==='tune'&&this.seedTune) this.seedTune(); }); });
       this.$watch('zSel',()=>{ this.zoneDetail=buildZoneDetail(this.zSel); });
@@ -3737,7 +3788,24 @@ document.addEventListener('alpine:init', () => {
       this.$watch('zoneModal',v=>{ if(v) this.$nextTick(()=>this.mountZoneHist(v)); });
       this.$watch('cmdOpen',v=>{ if(v) this.$nextTick(()=>this.$refs.cmd&&this.$refs.cmd.focus()); });
     },
+    async fetchUser(){   // live HA user → header chip (no name hardcoded in the repo)
+      const tok=getToken(); if(!tok) return;   // demo / logged-out → keep generic 'Grower / F2'
+      try{
+        const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/api/websocket');
+        const name=await new Promise((resolve,reject)=>{
+          const to=setTimeout(()=>{ try{ws.close()}catch(e){}; reject('timeout'); },5000);
+          ws.onmessage=ev=>{ let m; try{m=JSON.parse(ev.data)}catch(e){return;}
+            if(m.type==='auth_required') ws.send(JSON.stringify({type:'auth',access_token:tok}));
+            else if(m.type==='auth_ok') ws.send(JSON.stringify({id:1,type:'auth/current_user'}));
+            else if(m.type==='result'){ clearTimeout(to); resolve(m.success&&m.result&&m.result.name); try{ws.close()}catch(e){} }
+            else if(m.type==='auth_invalid'){ clearTimeout(to); reject('auth'); try{ws.close()}catch(e){} } };
+          ws.onerror=()=>{ clearTimeout(to); reject('wserr'); };
+        });
+        if(name){ const ini=name.trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase(); this.hUser={name, initials:ini||'F2'}; }
+      }catch(e){ /* keep the generic fallback */ }
+    },
     async tick(){
+      if(DEMO){ S=seedDemo(); this.connected=true; this.connError=""; this.refresh(); return; }   // standalone demo, no network
       try{
         S=await fetchStates(); this.connected=true; this.connError="";
         this.refresh();
@@ -3782,7 +3850,7 @@ document.addEventListener('alpine:init', () => {
       }catch(e){ console.warn('history load failed',e); this['_hts_'+which]=0; }
       finally{ this['_loading_'+which]=false; }
     },
-    async loadHist(ids,hours){ const tok=getToken(); if(!tok||!ids.length) return null;
+    async loadHist(ids,hours){ if(DEMO) return demoHist(ids,hours); const tok=getToken(); if(!tok||!ids.length) return null;
       const end=new Date(), start=new Date(Date.now()-hours*3600e3);
       const url=(CONFIG.HA_BASE||'')+'/api/history/period/'+start.toISOString()+'?filter_entity_id='+ids.join(',')+'&minimal_response&end_time='+encodeURIComponent(end.toISOString());
       const r=await fetch(url,{headers:{Authorization:'Bearer '+tok},cache:'no-store'}); if(!r.ok) throw new Error('history HTTP '+r.status);
@@ -3856,7 +3924,7 @@ document.addEventListener('alpine:init', () => {
       const zs=(this.zones||[]).map(z=>`Z${z.id}: VWC ${z.vwc}% · ${z.phase} · EC ${z.ec} · floor ${z.floor}% · next ${z.next} · last ${z.lastIrrig} (${z.status})`).join('; ');
       const snap=(this.snapshot||[]).map(s=>`${s.label} ${s.val}${s.unit||''}`).join(', ');
       const adv=(this.adv||[]).map(a=>`[${a.sev}] ${a.title} — ${a.detail}`).join(' | ');
-      return ["You are the Plant-State AI co-pilot embedded in the F2 grow-room dashboard for a commercial cannabis facility (Legacy Ag, NZ). You are an expert in crop steering (P0–P3 substrate dryback irrigation), VPD/climate management and cannabis cultivation.",
+      return ["You are the Plant-State AI co-pilot embedded in the F2 grow-room dashboard for a commercial cannabis facility. You are an expert in crop steering (P0–P3 substrate dryback irrigation), VPD/climate management and cannabis cultivation.",
         "Answer using ONLY the live data below — never invent numbers. Be a concise, direct advisor: 2–5 short sentences or tight bullets, specific and actionable. Units: VWC %, pore EC mS/cm, VPD kPa, temp °C, CO₂ ppm, PPFD µmol/m²/s.",
         "HEADLINE: "+this.headline.big+" — "+this.headline.line,
         "SNAPSHOT: "+snap,

@@ -12,6 +12,13 @@
 > If you already run Home Assistant and have moisture sensors in your substrate, you
 > already own everything except the brain. This is the brain.
 
+> **Related project — [open-crop-steering](https://github.com/JakeTheRabbit/open-crop-steering):**
+> an optional AI-**supervisor** layer that sits *on top of* this integration. It authors recipes,
+> proposes setpoints, and writes them to these `number.crop_steering_*` entities — with a
+> tamper-evident audit trail for regulated facilities. It does **not** replace this repo: this
+> **controller** still owns the P0–P3 phase logic, hardware sequencing, and safety gates. Run this
+> on its own, or add that on top.
+
 ---
 
 ## The short version
@@ -162,17 +169,31 @@ hardware → substrate changes → sensors.** Every VWC update can trigger a re-
 
 ## Live demo (no install)
 
-The console ships with a **demo mode** that runs on baked-in mock data — no Home Assistant, no
-token, no hardware. See every page (verdict + health checks, word-threshold zone status, the
-VWC+EC graph, per-zone detail with the detected `Vmax` and overnight prediction, the control
-surface, and the issues drawer) before installing anything:
+**▶ Try the full dashboard live — mock data, nothing to install:**
+**https://jaketherabbit.github.io/HA-Irrigation-Strategy/f2.html?demo**
 
-- **Locally:** open `www/crop_steering.html?demo` in any browser.
-- **Hosted:** serve the `www/` folder on GitHub Pages (or any static host) and visit
-  `…/crop_steering.html?demo` for a fully-interactive demo.
+`f2.html` is the unified operator dashboard. Its **demo mode** runs on baked-in "perfect grow"
+data — no Home Assistant, no token, no hardware, no network. Click through every tab: **Status**
+(advisories + the full live-sensor snapshot + plant-state gauges + the facility floor mini),
+**Zones** (per-zone cockpit — VWC/EC/dryback, water delivered, co-located setpoints), **Tune**
+(the science-grounded visual setpoint editor), **Climate** (24 h history charts + every room
+control), **Operate**, and **Plan** (the grow-week timeline planner). The live install adds the
+camera, the interactive 3D facility twin, and the Ask-AI co-pilot.
 
-Drop `?demo` and point it at your Home Assistant (URL + a long-lived token, stored only in your
-browser) to drive the real thing.
+- **Hosted:** the link above (GitHub Pages — auto-enters demo mode).
+- **Locally:** open `www/f2.html?demo` in any browser. The older single-file console is at
+  `www/crop_steering.html?demo`.
+
+Drop `?demo` and load it from your Home Assistant (`/local/f2.html`, long-lived token stored only
+in your browser) to drive the real thing.
+
+### Screenshots (from the demo)
+
+| Status | Zones | Plan (timeline) |
+|---|---|---|
+| ![Status](img/demo-status.png) | ![Zones](img/demo-zones.png) | ![Plan](img/demo-plan.png) |
+| **Tune editor** | **Climate** | **Operate** |
+| ![Tune](img/demo-tune.png) | ![Climate](img/demo-climate.png) | ![Operate](img/demo-operate.png) |
 
 ---
 
