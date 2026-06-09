@@ -14,15 +14,23 @@ exceptions = types.ModuleType("homeassistant.exceptions")
 helpers = types.ModuleType("homeassistant.helpers")
 entity_registry = types.ModuleType("homeassistant.helpers.entity_registry")
 
+
 class ConfigEntry: ...
+
+
 class HomeAssistant: ...
+
+
 class ConfigEntryNotReady(Exception): ...
+
+
 class Platform(str, Enum):
     SENSOR = "sensor"
     SWITCH = "switch"
     SELECT = "select"
     NUMBER = "number"
     BUTTON = "button"
+
 
 config_entries.ConfigEntry = ConfigEntry
 core.HomeAssistant = HomeAssistant

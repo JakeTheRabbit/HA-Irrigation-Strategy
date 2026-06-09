@@ -1,4 +1,5 @@
 """Unit tests for Crop Steering System calculations."""
+
 import pytest
 from custom_components.crop_steering.calculations import ShotCalculator
 from custom_components.crop_steering.const import (
@@ -16,9 +17,7 @@ class TestShotCalculator:
         # 10L pot, 2 L/hr flow, 5% shot size
         # Expected: (10 * 0.05) / 2 * 3600 = 900 seconds
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=2.0,
-            substrate_vol=10.0,
-            shot_size=5.0
+            dripper_flow=2.0, substrate_vol=10.0, shot_size=5.0
         )
         assert result == 900.0
 
@@ -27,18 +26,14 @@ class TestShotCalculator:
         # 10L pot, 2 L/hr flow, 2% shot size
         # Expected: (10 * 0.02) / 2 * 3600 = 360 seconds
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=2.0,
-            substrate_vol=10.0,
-            shot_size=2.0
+            dripper_flow=2.0, substrate_vol=10.0, shot_size=2.0
         )
         assert result == 360.0
 
     def test_p2_maintenance_shot(self):
         """Test P2 maintenance shot calculation (5%)."""
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=2.0,
-            substrate_vol=10.0,
-            shot_size=5.0
+            dripper_flow=2.0, substrate_vol=10.0, shot_size=5.0
         )
         assert result == 900.0
 
@@ -47,9 +42,7 @@ class TestShotCalculator:
         # 10L pot, 2 L/hr flow, 3% shot size
         # Expected: (10 * 0.03) / 2 * 3600 = 540 seconds
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=2.0,
-            substrate_vol=10.0,
-            shot_size=3.0
+            dripper_flow=2.0, substrate_vol=10.0, shot_size=3.0
         )
         assert result == 540.0
 
@@ -58,9 +51,7 @@ class TestShotCalculator:
         # 15L pot, 3 L/hr flow, 5% shot size
         # Expected: (15 * 0.05) / 3 * 3600 = 900 seconds
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=3.0,
-            substrate_vol=15.0,
-            shot_size=5.0
+            dripper_flow=3.0, substrate_vol=15.0, shot_size=5.0
         )
         assert result == 900.0
 
@@ -69,27 +60,21 @@ class TestShotCalculator:
         # 50L pot, 5 L/hr flow, 5% shot size
         # Expected: (50 * 0.05) / 5 * 3600 = 1800 seconds
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=5.0,
-            substrate_vol=50.0,
-            shot_size=5.0
+            dripper_flow=5.0, substrate_vol=50.0, shot_size=5.0
         )
         assert result == 1800.0
 
     def test_zero_flow_rate(self):
         """Test calculation with zero flow rate returns 0."""
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=0.0,
-            substrate_vol=10.0,
-            shot_size=5.0
+            dripper_flow=0.0, substrate_vol=10.0, shot_size=5.0
         )
         assert result == 0.0
 
     def test_negative_flow_rate(self):
         """Test calculation with negative flow rate."""
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=-2.0,
-            substrate_vol=10.0,
-            shot_size=5.0
+            dripper_flow=-2.0, substrate_vol=10.0, shot_size=5.0
         )
         # Should handle gracefully
         assert result == 0.0
@@ -99,9 +84,7 @@ class TestShotCalculator:
         # 10L pot, 2 L/hr flow, 0.5% shot size
         # Expected: (10 * 0.005) / 2 * 3600 = 90 seconds
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=2.0,
-            substrate_vol=10.0,
-            shot_size=0.5
+            dripper_flow=2.0, substrate_vol=10.0, shot_size=0.5
         )
         assert result == 90.0
 
@@ -110,9 +93,7 @@ class TestShotCalculator:
         # 10L pot, 2 L/hr flow, 15% shot size
         # Expected: (10 * 0.15) / 2 * 3600 = 2700 seconds
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=2.0,
-            substrate_vol=10.0,
-            shot_size=15.0
+            dripper_flow=2.0, substrate_vol=10.0, shot_size=15.0
         )
         assert result == 2700.0
 
@@ -120,9 +101,7 @@ class TestShotCalculator:
         """Test that results are rounded to 1 decimal place."""
         # Should produce a value that tests rounding
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=2.3,
-            substrate_vol=10.0,
-            shot_size=5.0
+            dripper_flow=2.3, substrate_vol=10.0, shot_size=5.0
         )
         # Expected: (10 * 0.05) / 2.3 * 3600 = 782.6086...
         assert result == 782.6
@@ -131,9 +110,7 @@ class TestShotCalculator:
         """Test error handling with invalid inputs."""
         # Should not raise exception
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=None,
-            substrate_vol=10.0,
-            shot_size=5.0
+            dripper_flow=None, substrate_vol=10.0, shot_size=5.0
         )
         assert result == 0.0
 
@@ -277,9 +254,7 @@ class TestEdgeCases:
     def test_very_small_values(self):
         """Test calculation with very small values."""
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=0.1,
-            substrate_vol=1.0,
-            shot_size=1.0
+            dripper_flow=0.1, substrate_vol=1.0, shot_size=1.0
         )
         # Expected: (1 * 0.01) / 0.1 * 3600 = 360 seconds
         assert result == 360.0
@@ -287,9 +262,7 @@ class TestEdgeCases:
     def test_very_large_values(self):
         """Test calculation with very large values."""
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=50.0,
-            substrate_vol=200.0,
-            shot_size=20.0
+            dripper_flow=50.0, substrate_vol=200.0, shot_size=20.0
         )
         # Expected: (200 * 0.20) / 50 * 3600 = 2880 seconds
         assert result == 2880.0
@@ -297,9 +270,7 @@ class TestEdgeCases:
     def test_precision_rounding(self):
         """Test that rounding works correctly."""
         result = ShotCalculator.calculate_shot_duration(
-            dripper_flow=2.7,
-            substrate_vol=11.3,
-            shot_size=4.8
+            dripper_flow=2.7, substrate_vol=11.3, shot_size=4.8
         )
         # Expected: (11.3 * 0.048) / 2.7 * 3600 = 723.2
         assert isinstance(result, float)

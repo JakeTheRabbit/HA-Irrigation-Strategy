@@ -9,7 +9,11 @@ present. Paste the output into HA: Settings -> Dashboards -> + Add -> (3-dot) Ed
 
 Run:  HA_TOKEN=... python scripts/build_lovelace.py
 """
-import json, os, re, sys, urllib.request
+import json
+import os
+import re
+import sys
+import urllib.request
 
 BASE = os.environ.get("HA_BASE", "http://homeassistant.local:8123") + "/api"
 TOK = os.environ.get("HA_TOKEN", "")
