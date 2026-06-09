@@ -2,7 +2,14 @@
 """Headless-CDP verification of the new AROYA-style overlay chart on the Steering Trace view.
 Loads the live dashboard, injects the token, waits for history, then probes drawOverlay()
 for runtime errors, exercises the scrubber + the 1W toggle, and writes screenshots to /tmp."""
-import base64, json, os, subprocess, sys, time, urllib.request, websocket
+import base64
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.request
+import websocket
 
 TOK = os.environ.get("HA_TOKEN", "")
 BASE = os.environ.get("HA_BASE", "http://homeassistant.local:8123")

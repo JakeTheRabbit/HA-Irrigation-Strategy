@@ -4,7 +4,14 @@
 Injects the HA token into localStorage (so the dashboard connects), waits for live
 data, clicks through the views, and writes PNGs into img/. Token comes from HA_TOKEN.
 """
-import base64, json, os, subprocess, sys, time, urllib.request, glob, websocket
+import base64
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.request
+import websocket
 
 TOK = os.environ.get("HA_TOKEN", "")
 BASE = os.environ.get("HA_BASE", "http://homeassistant.local:8123")

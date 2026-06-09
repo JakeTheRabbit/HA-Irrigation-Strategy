@@ -4,7 +4,8 @@
 Single source of truth is the Markdown. Re-run this after editing the .md so the
 HTML guides never drift again:  python scripts/render_guide.py
 """
-import re, markdown
+import re
+import markdown
 
 SRC = "SYSTEM_GUIDE.md"
 md = open(SRC, encoding="utf-8").read()

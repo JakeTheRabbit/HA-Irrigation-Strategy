@@ -38,7 +38,7 @@ jobs:
       - name: Install linters
         run: |
           python -m pip install --upgrade pip
-          pip install ruff==0.5.5 black==24.4.2 yamllint==1.35.1
+          pip install ruff==0.5.5 black==24.4.2 yamllint==1.35.1 pytest==8.2.2
 
       - name: Ruff (lint)
         run: |
@@ -46,21 +46,27 @@ jobs:
           ruff check .
 
       - name: Black (format check)
+        # Scoped to the integration + tests. The AppDaemon engine module is
+        # deployed file-for-file to the live box; reformatting it would bury
+        # real diffs in noise, so it is exempt from the black gate.
         run: |
           black --version
-          black --check .
+          black --check custom_components/ tests/
 
       - name: Yamllint
         run: |
           yamllint --version
-          # Lint YAML and Home Assistant dashboard files
-          yamllint -s . || (echo "YAML lint found issues" && exit 1)
+          yamllint .  # rules in .yamllint (structural gate, style relaxed)
+
+      - name: Pytest (integration calculation helpers)
+        run: |
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v
 
       - name: Hassfest
-        uses: home-assistant/actions/hassfest@v2
+        uses: home-assistant/actions/hassfest@master
 
       - name: HACS Validation (integration)
-        uses: hacs/action@v25
+        uses: hacs/action@main
         with:
           category: integration
 

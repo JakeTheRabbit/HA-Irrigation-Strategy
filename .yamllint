@@ -1,0 +1,17 @@
+---
+# Structural gate, not a style gate: Home Assistant / Lovelace YAML in this
+# repo uses HA-conventional formatting (non-indented sequences, long attribute
+# strings, no document-start). The relaxed profile keeps the checks that catch
+# real breakage (syntax errors, duplicate keys) and demotes style to warnings.
+extends: relaxed
+
+# Untracked local-only paths: the obsolete nested checkout and the
+# gitignored secrets file. CI never sees them.
+ignore: |
+  HA-Irrigation-Strategy/
+  secrets.yaml
+
+rules:
+  line-length: disable
+  # Windows working trees check out CRLF; the index is LF (CI sees LF).
+  new-lines: disable

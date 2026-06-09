@@ -65,8 +65,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
         result = {}
         for zone_id, machine in self.zone_state_machines.items():
             state = machine.state
-            phase_data = state.get_current_phase_data()
-            
+
             # Convert to legacy format
             legacy_data = {
                 'last_irrigation_time': None,
@@ -1447,12 +1446,6 @@ class MasterCropSteeringApp(BaseAsyncApp):
         try:
             now = datetime.now()
             current_time = now.time()
-            phase_map = {
-                'P0': IrrigationPhase.P0_MORNING_DRYBACK,
-                'P1': IrrigationPhase.P1_RAMP_UP,
-                'P2': IrrigationPhase.P2_MAINTENANCE,
-                'P3': IrrigationPhase.P3_PRE_LIGHTS_OFF
-            }
 
             # Check if any zones are in impossible states
             for zone_num in range(1, self.num_zones + 1):
@@ -1699,7 +1692,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
             if applied:
                 self.log(f"🔒 Phase {new} applied to zones {applied} (hold until {hold_until.strftime('%H:%M')})")
             else:
-                self.log(f"⚠️ No zones in Auto mode — system-wide phase change had no effect")
+                self.log("⚠️ No zones in Auto mode — system-wide phase change had no effect")
 
         except Exception as e:
             self.log(f"❌ Error handling phase change: {e}", level='ERROR')
@@ -2093,7 +2086,6 @@ class MasterCropSteeringApp(BaseAsyncApp):
             zone_phase = self.zone_phases.get(zone_num, 'P2')
             zone_group = self._get_zone_group(zone_num)
             zone_priority = self._get_zone_priority(zone_num)
-            zone_profile = self._get_zone_profile(zone_num)
 
             # Get zone-specific profile parameters (fall back to system profile)
             zone_profile_params = profile_params
@@ -2239,7 +2231,6 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         current_shot_count = p1_data.shot_count
         last_shot_time = p1_data.shot_history[-1]['timestamp'] if p1_data.shot_history else None
-        p1_start_time = p1_data.entry_time
         current_shot_size = p1_data.current_shot_size or initial_shot_size
         
         # Update P1 progress with current VWC if needed
@@ -2542,7 +2533,6 @@ class MasterCropSteeringApp(BaseAsyncApp):
         
         if ec_emergency:
             # Emergency flush needed even during dryback
-            flush_target = self._get_zone_number(zone_num, "number.crop_steering_ec_target_flush", 0.8)
             flush_shot_size = 10.0  # Large flush shot
             
             return {
@@ -4601,7 +4591,7 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 for action in report['actions_taken']:
                     self.log(f"  🔧 {action}")
             else:
-                self.log(f"💓 AI Heartbeat: All zones healthy")
+                self.log("💓 AI Heartbeat: All zones healthy")
 
         except Exception as e:
             self.log(f"❌ Error in AI heartbeat: {e}", level='ERROR')
@@ -5310,7 +5300,6 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 return
 
             pre_vwc = irrigation_result.get('pre_vwc')
-            post_vwc = irrigation_result.get('post_vwc')
 
             # Prepare features (simplified)
             features = {

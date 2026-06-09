@@ -22,8 +22,9 @@ does irrigation only — no climate control.
 ## Dev commands
 
 ```bash
-# Lint / format / yaml
-ruff check . && black --check . && yamllint -s .
+# Lint / format / yaml (matches CI; black is scoped — the engine module is
+# deployed file-for-file to the live box and stays exempt from reformatting)
+ruff check . && black --check custom_components/ tests/ && yamllint .
 
 # Tests (integration calculation helpers)
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v
