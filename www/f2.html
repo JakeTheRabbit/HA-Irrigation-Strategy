@@ -493,7 +493,7 @@
         <!-- trends + AI -->
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <div class="xl:col-span-2 glass rounded-2xl p-4 md:p-5">
-            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Live trends</h3><span class="text-[11px] text-slate-500">VPD · pore EC · avg VWC — building live</span></div>
+            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Substrate · last 24h</h3><span class="text-[11px] text-slate-500">per-zone VWC — real history, the steering rhythm</span></div>
             <div class="h-60"><canvas id="trendChart"></canvas></div>
           </div>
           <div class="glass rounded-2xl p-4 md:p-5 flex flex-col">
@@ -597,6 +597,16 @@
             <template x-for="m in climate" :key="m.label">
               <div class="glass rounded-2xl p-4"><div class="text-[11px] uppercase tracking-wider text-slate-400" x-text="m.label"></div><div class="text-2xl font-bold mt-1" :class="m.cls" x-text="m.val"></div><div class="text-[11px] text-slate-500" x-text="m.sub"></div></div>
             </template>
+          </div>
+        </div>
+        <!-- 24h climate history -->
+        <div class="glass rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Climate trends · last 24h</h3><span class="text-[11px] text-slate-500">shaded band = on-target range</span></div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Air temp °C</div><div class="h-40"><canvas id="ccTemp"></canvas></div></div>
+            <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Humidity %</div><div class="h-40"><canvas id="ccRh"></canvas></div></div>
+            <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Air VPD kPa</div><div class="h-40"><canvas id="ccVpd"></canvas></div></div>
+            <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">CO₂ ppm</div><div class="h-40"><canvas id="ccCo2"></canvas></div></div>
           </div>
         </div>
         <!-- ===== F2 room controls — every control + helper, full functionality ===== -->
@@ -3614,12 +3624,56 @@ document.addEventListener('alpine:init', () => {
 
     /* charts */
     cb(){ return {responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:500},plugins:{legend:{display:false}}}; },
-    mountCharts(){ if(this.view==='dashboard') this.mountTrend(); },
-    mountTrend(){ const c=document.getElementById('trendChart'); if(!c) return; const ds=(label,data,color)=>({label,data,borderColor:color,backgroundColor:color+'15',borderWidth:2,tension:.4,pointRadius:0,fill:false});
-      const n=Math.max(HIST.vpd.length,1); const labels=Array.from({length:n},()=>'');
-      if(CHARTS.trend){ CHARTS.trend.data.labels=labels; CHARTS.trend.data.datasets[0].data=[...HIST.vpd].map(v=>v*15); CHARTS.trend.data.datasets[1].data=[...HIST.ec].map(v=>v*4); CHARTS.trend.data.datasets[2].data=[...HIST.vwc]; CHARTS.trend.update('none'); return; }
-      CHARTS.trend=new Chart(c,{type:'line',data:{labels,datasets:[ds('VPD ×15',HIST.vpd.map(v=>v*15),'#fbbf24'),ds('EC ×4',HIST.ec.map(v=>v*4),'#34d399'),ds('Avg VWC',[...HIST.vwc],'#22d3ee')]},
-        options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:500},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:10,usePointStyle:true,font:{size:11}}},tooltip:{backgroundColor:'#11161d'}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}}}}}); },
+    mountCharts(){ if(this.view==='dashboard'){ this.mountTrend(); this.ensureHist('dashboard'); } if(this.view==='climate'){ this.ensureHist('climate'); } },
+    async ensureHist(which){   // fetch REAL /api/history once per 4 min, then (re)draw the relevant charts
+      const now=Date.now();
+      if(this['_h_'+which] && now-this['_hts_'+which]<240000){ this.$nextTick(()=>which==='climate'?this.mountClimateCharts():this.mountTrend()); return; }
+      this['_hts_'+which]=now;
+      try{
+        if(which==='climate'){ const ids=[CONFIG.E.air_temp,CONFIG.E.rh,CONFIG.E.air_vpd,CONFIG.E.co2,CONFIG.E.ppfd].filter(Boolean);
+          this._h_climate=await this.loadHist(ids,24); this.$nextTick(()=>this.mountClimateCharts()); }
+        else { const ids=[1,2,3].map(z=>'sensor.crop_steering_zone_'+z+'_vwc');
+          this._h_dashboard=await this.loadHist(ids,24); this.$nextTick(()=>this.mountTrend()); }
+      }catch(e){ console.warn('history load failed',e); this['_hts_'+which]=0; }
+    },
+    async loadHist(ids,hours){ const tok=getToken(); if(!tok||!ids.length) return null;
+      const end=new Date(), start=new Date(Date.now()-hours*3600e3);
+      const url=(CONFIG.HA_BASE||'')+'/api/history/period/'+start.toISOString()+'?filter_entity_id='+ids.join(',')+'&minimal_response&end_time='+encodeURIComponent(end.toISOString());
+      const r=await fetch(url,{headers:{Authorization:'Bearer '+tok},cache:'no-store'}); if(!r.ok) throw new Error('history HTTP '+r.status);
+      const arr=await r.json(); const out={__start:start.getTime(),__end:end.getTime()};
+      arr.forEach(series=>{ if(!series||!series.length) return; const eid=series[0].entity_id; out[eid]=series.map(p=>({t:Date.parse(p.last_changed||p.last_updated),v:parseFloat(p.state)})).filter(p=>p.t&&!isNaN(p.v)); });
+      return out;
+    },
+    bucketize(series,start,end,N){ const out=new Array(N).fill(null); if(!series||!series.length) return out; const span=(end-start)/N; let si=0,last=null;
+      for(let b=0;b<N;b++){ const bt=start+(b+1)*span; while(si<series.length && series[si].t<=bt){ last=series[si].v; si++; } out[b]=last==null?last:last; }
+      const first=series[0].v; for(let b=0;b<N;b++){ if(out[b]==null) out[b]=first; else break; } return out;
+    },
+    histLabels(start,end,N){ const span=(end-start)/N, out=[]; for(let b=0;b<N;b++){ const d=new Date(start+(b+0.5)*span); out.push(('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)); } return out; },
+    mountTrend(){ const c=document.getElementById('trendChart'); if(!c) return; const H=this._h_dashboard, N=48;
+      const ds=(label,data,color)=>({label,data,borderColor:color,backgroundColor:color+'15',borderWidth:2,tension:.35,pointRadius:0,fill:false,spanGaps:true});
+      let labels,sets;
+      if(H){ const s=H.__start,e=H.__end; labels=this.histLabels(s,e,N); const cols=['#22d3ee','#34d399','#a78bfa'];
+        sets=[1,2,3].map((z,i)=>ds('Zone '+z,this.bucketize(H['sensor.crop_steering_zone_'+z+'_vwc'],s,e,N),cols[i])); }
+      else { const n=Math.max(HIST.vwc.length,1); labels=Array.from({length:n},()=>''); sets=[ds('Avg VWC',[...HIST.vwc],'#22d3ee')]; }
+      if(CHARTS.trend){ CHARTS.trend.data.labels=labels; CHARTS.trend.data.datasets=sets; CHARTS.trend.update('none'); return; }
+      CHARTS.trend=new Chart(c,{type:'line',data:{labels,datasets:sets},
+        options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:500},interaction:{mode:'index',intersect:false},
+          plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:10,usePointStyle:true,font:{size:11}}},tooltip:{backgroundColor:'#11161d',callbacks:{label:x=>x.dataset.label+': '+(x.parsed.y==null?'—':x.parsed.y.toFixed(1)+'%')}}},
+          scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8,autoSkip:true}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10},callback:v=>v+'%'},suggestedMin:30,suggestedMax:70}}}}); },
+    mountClimateCharts(){ const H=this._h_climate, N=48; if(!H) return; const s=H.__start,e=H.__end, labels=this.histLabels(s,e,N);
+      const specs=[ {id:'ccTemp',key:CONFIG.E.air_temp,label:'Air temp',unit:'°C',color:'#fb923c',band:CONFIG.BANDS.air_temp},
+        {id:'ccRh',key:CONFIG.E.rh,label:'Humidity',unit:'%',color:'#22d3ee',band:CONFIG.BANDS.rh},
+        {id:'ccVpd',key:CONFIG.E.air_vpd,label:'Air VPD',unit:'kPa',color:'#fbbf24',band:CONFIG.BANDS.air_vpd},
+        {id:'ccCo2',key:CONFIG.E.co2,label:'CO₂',unit:'ppm',color:'#34d399',band:CONFIG.BANDS.co2} ];
+      specs.forEach(sp=>{ const c=document.getElementById(sp.id); if(!c) return; const data=this.bucketize(H[sp.key],s,e,N); const ok=sp.band&&sp.band.ok;
+        const bandPlugin=ok?{id:'bd'+sp.id,beforeDraw(ch){const a=ch.chartArea,sc=ch.scales.y; if(!a)return; const ctx=ch.ctx,y1=sc.getPixelForValue(ok[1]),y0=sc.getPixelForValue(ok[0]); ctx.save(); ctx.fillStyle='rgba(52,211,153,.08)'; ctx.fillRect(a.left,Math.min(y0,y1),a.right-a.left,Math.abs(y0-y1)); ctx.restore();}}:null;
+        if(CHARTS[sp.id]){ CHARTS[sp.id].data.labels=labels; CHARTS[sp.id].data.datasets[0].data=data; CHARTS[sp.id].update('none'); return; }
+        CHARTS[sp.id]=new Chart(c,{type:'line',data:{labels,datasets:[{label:sp.label,data,borderColor:sp.color,backgroundColor:sp.color+'18',borderWidth:2,tension:.35,pointRadius:0,fill:true,spanGaps:true}]},
+          options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:400},interaction:{mode:'index',intersect:false},
+            plugins:{legend:{display:false},tooltip:{backgroundColor:'#11161d',callbacks:{label:x=>sp.label+': '+(x.parsed.y==null?'—':x.parsed.y.toFixed(sp.unit==='ppm'?0:1)+' '+sp.unit)}}},
+            scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:6,autoSkip:true}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}}}},
+          plugins:bandPlugin?[bandPlugin]:[]}); });
+    },
     mountZoneHist(id){ const c=document.getElementById('zoneHistChart'); if(!c) return; if(CHARTS.zh) CHARTS.zh.destroy(); const z=this.zoneById(id); const base=parseFloat(z.vwc)||45; const data=[],labels=[]; for(let i=0;i<40;i++){ data.push(+(base+Math.sin(i/5)*4-(i<20?(20-i)*0.1:0)+(Math.random()-.5)*1.5).toFixed(1)); labels.push(''); }
       CHARTS.zh=new Chart(c,{type:'line',data:{labels,datasets:[{label:'VWC',data,borderColor:'#22d3ee',backgroundColor:'#22d3ee15',borderWidth:2,tension:.4,pointRadius:0,fill:true}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:400},plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}}}}}); },
 
