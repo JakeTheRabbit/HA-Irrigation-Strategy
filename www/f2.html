@@ -2649,11 +2649,30 @@ function toggleParam(pid) {
 // ============================================================
 let dayCanvas, chartCanvas, ctxDay, ctxChart;   // assigned in tlInit() (the view is display:none at load -> 0-width canvas)
 
+// Each visible param's canvas track must sit at the exact Y of its left-rail row
+// (the rail has section-header rows + variable heights the old ri*ROW_H ignored,
+// which made the lines drift out of alignment). Read the live row geometry.
+function computeRowGeom(vp) {
+  const panel = document.getElementById('leftPanel');
+  const rows = vp.map(p => panel && panel.querySelector('.param-row[data-pid="' + p.id + '"]'));
+  if (!panel || !panel.clientHeight || rows.some(r => !r)) {   // DOM not laid out yet → uniform fallback
+    const ys = vp.map((_, i) => i * ROW_H);
+    return { ys, hs: vp.map(() => ROW_H), totalH: Math.max(vp.length * ROW_H, 100) };
+  }
+  const pr = panel.getBoundingClientRect(), sc = panel.scrollTop;
+  const top = el => el.getBoundingClientRect().top - pr.top + sc;
+  const origin = top(rows[0]);
+  const ys = rows.map(r => Math.round(top(r) - origin));
+  const hs = rows.map(r => Math.round(r.getBoundingClientRect().height));
+  return { ys, hs, totalH: Math.max(ys[ys.length - 1] + hs[hs.length - 1], 100) };
+}
+
 function renderCharts() {
   renderZoneBanner();   // keep the override-count banner live as edits land
   const vp      = visParams.map(id => PARAMS.find(p => p.id === id)).filter(Boolean);
   const totalW  = TOTAL_DAYS * DAY_W;
-  const totalH  = Math.max(vp.length * ROW_H, 100);
+  const geom    = computeRowGeom(vp);   // per-row {ys,hs} aligned to the left rail
+  const totalH  = geom.totalH;
 
   dayCanvas.width   = totalW;
   dayCanvas.height  = HDR_H;
@@ -2661,7 +2680,7 @@ function renderCharts() {
   chartCanvas.height= totalH;
 
   drawDayHeader(ctxDay, totalW);
-  drawChartRows(ctxChart, vp, totalW, totalH);
+  drawChartRows(ctxChart, vp, totalW, totalH, geom);
   syncScroll();
   buildStatusBar(vp);
 }
@@ -2740,7 +2759,7 @@ function drawDayHeader(ctx, totalW) {
   }
 }
 
-function drawChartRows(ctx, vp, totalW, totalH) {
+function drawChartRows(ctx, vp, totalW, totalH, geom) {
   ctx.fillStyle = '#0a0c10';
   ctx.fillRect(0, 0, totalW, totalH);
 
@@ -2761,10 +2780,11 @@ function drawChartRows(ctx, vp, totalW, totalH) {
   ctx.setLineDash([]);
 
   vp.forEach((param, ri) => {
-    const rowY = ri * ROW_H;
+    const rowY = geom.ys[ri];
+    const rowH = geom.hs[ri];
 
     ctx.fillStyle = ri % 2 === 0 ? '#0a0c10' : '#0f1318';
-    ctx.fillRect(0, rowY, totalW, ROW_H);
+    ctx.fillRect(0, rowY, totalW, rowH);
 
     // Param label mini
     ctx.fillStyle = param.color + 'bb';
@@ -2775,26 +2795,26 @@ function drawChartRows(ctx, vp, totalW, totalH) {
     ctx.strokeStyle = 'rgba(255,255,255,0.06)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(0, rowY + ROW_H); ctx.lineTo(totalW, rowY + ROW_H);
+    ctx.moveTo(0, rowY + rowH); ctx.lineTo(totalW, rowY + rowH);
     ctx.stroke();
 
     for (let d = 0; d < TOTAL_DAYS; d += 7) {
       ctx.strokeStyle = 'rgba(255,255,255,0.12)';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(d * DAY_W, rowY); ctx.lineTo(d * DAY_W, rowY + ROW_H);
+      ctx.moveTo(d * DAY_W, rowY); ctx.lineTo(d * DAY_W, rowY + rowH);
       ctx.stroke();
     }
 
     if (selectedDay !== null) {
       ctx.fillStyle = param.color + '22';
-      ctx.fillRect(selectedDay * DAY_W, rowY, DAY_W, ROW_H);
+      ctx.fillRect(selectedDay * DAY_W, rowY, DAY_W, rowH);
     }
 
     if (!recipe[param.id]) return;
 
-    if (param.categorical) drawCategoricalRow(ctx, param, rowY);
-    else drawLineRow(ctx, param, rowY);
+    if (param.categorical) drawCategoricalRow(ctx, param, rowY, rowH);
+    else drawLineRow(ctx, param, rowY, rowH);
 
     // per-row OVR badge when the active zone overrides this param
     if (activeZone !== 0 && paramDiffers(param.id, activeZone)) {
@@ -2808,9 +2828,9 @@ function drawChartRows(ctx, vp, totalW, totalH) {
   });
 }
 
-function drawLineRow(ctx, param, rowY) {
+function drawLineRow(ctx, param, rowY, rowH) {
   const PAD = 7;
-  const chartH = ROW_H - PAD * 2;
+  const chartH = rowH - PAD * 2;
   const eff = d => getVal(param.id, d, activeZone);
   const fac = d => recipe[param.id][d];
   const zoneMode = activeZone !== 0;
@@ -2832,7 +2852,7 @@ function drawLineRow(ctx, param, rowY) {
     for (let d = 0; d < TOTAL_DAYS; d++) {
       if (!hasOverride(param.id, d, activeZone)) continue;
       ctx.fillStyle = ZONE_META[activeZone].color + '22';
-      ctx.fillRect(d * DAY_W, rowY, DAY_W, ROW_H);
+      ctx.fillRect(d * DAY_W, rowY, DAY_W, rowH);
     }
   }
 
@@ -2859,8 +2879,8 @@ function drawLineRow(ctx, param, rowY) {
     const x = d * DAY_W + DAY_W / 2;
     d === 0 ? ctx.moveTo(x, toY(eff(d))) : ctx.lineTo(x, toY(eff(d)));
   }
-  ctx.lineTo((TOTAL_DAYS - 1) * DAY_W + DAY_W / 2, rowY + ROW_H - PAD);
-  ctx.lineTo(DAY_W / 2, rowY + ROW_H - PAD);
+  ctx.lineTo((TOTAL_DAYS - 1) * DAY_W + DAY_W / 2, rowY + rowH - PAD);
+  ctx.lineTo(DAY_W / 2, rowY + rowH - PAD);
   ctx.closePath();
   ctx.fillStyle = param.color + '22';
   ctx.fill();
@@ -2906,7 +2926,8 @@ function drawLineRow(ctx, param, rowY) {
   }
 }
 
-function drawCategoricalRow(ctx, param, rowY) {
+function drawCategoricalRow(ctx, param, rowY, rowH) {
+  const bandH = Math.min(22, rowH - 8), bandTop = rowY + rowH - bandH - 4;
   for (let d = 0; d < TOTAL_DAYS; d++) {
     const x = d * DAY_W;
     const v = getVal(param.id, d, activeZone);
@@ -2915,17 +2936,17 @@ function drawCategoricalRow(ctx, param, rowY) {
     else if (v < 65) { color = '#f59e0b'; label = 'Bal'; }
     else { color = '#ec4899'; label = 'Gen'; }
     ctx.fillStyle = color + '88';
-    ctx.fillRect(x + 1, rowY + ROW_H - 26, DAY_W - 2, 22);
+    ctx.fillRect(x + 1, bandTop, DAY_W - 2, bandH);
     if (activeZone !== 0 && hasOverride(param.id, d, activeZone)) {
       ctx.strokeStyle = ZONE_META[activeZone].color;
       ctx.lineWidth = 2;
-      ctx.strokeRect(x + 1, rowY + ROW_H - 26, DAY_W - 2, 22);
+      ctx.strokeRect(x + 1, bandTop, DAY_W - 2, bandH);
     }
     if (DAY_W > 22) {
       ctx.fillStyle = '#fff';
       ctx.font = '8px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(label, x + DAY_W / 2, rowY + ROW_H - 10);
+      ctx.fillText(label, x + DAY_W / 2, bandTop + bandH - 6);
     }
   }
 }
