@@ -36,7 +36,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: HassFest validation
-      uses: home-assistant/actions/hassfest@v1
+      uses: home-assistant/actions/hassfest@master
 
     - name: HACS validation (integration)
       uses: hacs/action@main
