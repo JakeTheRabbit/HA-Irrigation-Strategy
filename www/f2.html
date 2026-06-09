@@ -513,45 +513,77 @@
 
       </section>
 
-      <!-- ===== ZONES ===== -->
-      <section x-show="view==='zones'" class="fade-enter">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <template x-for="z in zones" :key="'zv-'+z.id">
-            <button @click="openZone(z.id)" class="text-left glass rounded-2xl p-5 lift hover:border-white/15" :class="z.status==='crit'?'ring-glow-crit':z.status==='warn'?'ring-glow-warn':''">
-              <div class="flex items-start justify-between"><div><div class="font-semibold text-lg" x-text="z.name"></div><div class="text-xs text-slate-400">phase <span x-text="z.phase"></span></div></div><span class="text-[10px] font-semibold px-2 py-1 rounded-full" :class="pillClass(z.status)" x-text="statusWord(z.status)"></span></div>
-              <div class="mt-4 flex items-end gap-4">
-                <div class="tankbox shrink-0" style="height:150px;width:70px"><div class="fill" :style="'height:'+z.fillPct+'%'"></div><div class="floor" :style="'bottom:'+z.floorPct+'%'"></div></div>
-                <div class="space-y-2"><div><div class="text-4xl font-bold leading-none" x-text="z.vwc"></div><div class="text-xs text-slate-400">% wet</div></div><div><div class="text-xl font-semibold" x-text="z.ec"></div><div class="text-xs text-slate-400">pore EC</div></div></div>
-              </div>
-              <div class="mt-3 text-xs text-slate-500" x-text="z.note"></div>
+      <!-- ===== ZONES — per-zone live state + co-located setpoints ===== -->
+      <section x-show="view==='zones'" class="fade-enter space-y-4">
+        <!-- zone selector -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <template x-for="z in zones" :key="'zt-'+z.id">
+            <button @click="zSel=z.id" class="px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition" :class="zSel===z.id?'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/30':'glass text-slate-400 hover:text-slate-200'">
+              <span class="w-2 h-2 rounded-full" :class="dotClass(z.status)"></span>Zone <span x-text="z.id"></span> · <span x-text="z.vwc"></span>% · <span class="text-xs opacity-70" x-text="z.phase"></span>
             </button>
           </template>
         </div>
-      </section>
-
-      <!-- ===== CROP STEERING ===== -->
-      <section x-show="view==='irrigation'" class="fade-enter space-y-4">
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <template x-for="s in armChips" :key="s.k">
-            <div class="glass rounded-2xl p-4"><div class="text-[11px] uppercase tracking-wider text-slate-400" x-text="s.k"></div><div class="mt-1 flex items-center gap-2"><span class="w-2 h-2 rounded-full" :class="s.on?'bg-emerald-400':'bg-amber-400'"></span><span class="font-semibold" x-text="s.on?'On':'Off'"></span></div></div>
-          </template>
-        </div>
-        <div class="glass rounded-2xl p-5">
-          <h3 class="text-sm font-semibold mb-4 flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Crop-steering zones</h3>
-          <div class="space-y-3">
-            <template x-for="z in zones" :key="'cs-'+z.id">
-              <div class="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/8">
-                <div class="w-9 h-9 rounded-lg grid place-items-center shrink-0" :class="sevBg(z.status)"><span class="text-xs font-bold" :class="sevText(z.status)" x-text="z.phase"></span></div>
-                <div class="min-w-0 flex-1"><div class="text-sm font-medium" x-text="z.name"></div><div class="text-[11px] text-slate-400">VWC <span x-text="z.vwc"></span>% · EC <span x-text="z.ec"></span> · floor <span x-text="z.floor"></span>%</div></div>
-                <div class="text-right"><div class="text-sm font-semibold" x-text="z.lastIrrig"></div><div class="text-[10px] text-slate-500">last shot</div></div>
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <!-- live state -->
+          <div class="glass rounded-2xl p-5">
+            <div class="flex items-center justify-between">
+              <div><div class="font-semibold text-lg" x-text="zoneDetail.name"></div><div class="text-xs text-slate-400">phase <span x-text="zoneDetail.phase"></span> · <span class="capitalize" x-text="zoneDetail.mode"></span></div></div>
+              <span class="text-[10px] font-semibold px-2 py-1 rounded-full" :class="pillClass(zoneDetail.status)" x-text="statusWord(zoneDetail.status)"></span>
+            </div>
+            <div class="mt-4 flex items-end gap-4">
+              <div class="tankbox shrink-0" style="height:160px;width:74px"><div class="fill" :style="'height:'+zoneDetail.fillPct+'%'"></div><div class="floor" :style="'bottom:'+zoneDetail.floorPct+'%'"></div><div x-show="zoneDetail.fcPct!=null" class="absolute left-0 right-0 border-t border-dashed border-cyan-400/50" :style="'bottom:'+zoneDetail.fcPct+'%'"></div></div>
+              <div class="space-y-2">
+                <div><div class="text-4xl font-bold leading-none" :class="sevText(zoneDetail.status)" x-text="zoneDetail.vwc"></div><div class="text-xs text-slate-400">% wet · floor <span x-text="zoneDetail.floor"></span>% · cap <span x-text="zoneDetail.fieldcap"></span>%</div></div>
+                <div><div class="text-xl font-semibold" x-text="zoneDetail.ec"></div><div class="text-xs text-slate-400">pore EC</div></div>
               </div>
-            </template>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-4 text-sm">
+              <div class="rounded-lg bg-white/[0.03] border border-white/8 p-2.5"><div class="text-[10px] text-slate-400 uppercase tracking-wide">Dryback</div><div class="font-semibold" x-text="zoneDetail.dryback+'% / '+zoneDetail.drybackTarget+'% tgt'"></div></div>
+              <div class="rounded-lg bg-white/[0.03] border border-white/8 p-2.5"><div class="text-[10px] text-slate-400 uppercase tracking-wide">Peak VWC</div><div class="font-semibold" x-text="zoneDetail.peak+'%'"></div></div>
+              <div class="rounded-lg bg-white/[0.03] border border-white/8 p-2.5"><div class="text-[10px] text-slate-400 uppercase tracking-wide">Last shot</div><div class="font-semibold" x-text="zoneDetail.lastShot"></div></div>
+              <div class="rounded-lg bg-white/[0.03] border border-white/8 p-2.5"><div class="text-[10px] text-slate-400 uppercase tracking-wide">Next shot</div><div class="font-semibold" x-text="zoneDetail.nextShot"></div></div>
+            </div>
+            <!-- water delivered today -->
+            <div class="mt-3 rounded-xl bg-cyan-500/[0.06] border border-cyan-400/15 p-3">
+              <div class="text-[11px] text-cyan-300/80 uppercase tracking-wide flex items-center gap-1.5"><span x-html="icons.drop" class="w-3.5 h-3.5 block"></span> Water delivered today</div>
+              <div class="flex items-end gap-4 mt-1"><div><span class="text-2xl font-bold" x-text="zoneDetail.dayL"></span><span class="text-xs text-slate-400"> L zone</span></div><div x-show="zoneDetail.perPlant"><span class="text-lg font-semibold" x-text="zoneDetail.perPlant"></span><span class="text-xs text-slate-400"> L/plant</span></div><div><span class="text-lg font-semibold" x-text="zoneDetail.shots"></span><span class="text-xs text-slate-400"> shots</span></div></div>
+            </div>
+            <button @click="openZone(zSel)" class="mt-3 w-full h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300">Open 24h trend →</button>
           </div>
-        </div>
-        <div class="glass rounded-2xl p-5">
-          <h3 class="text-sm font-semibold mb-3 flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Source water &amp; engine</h3>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <template x-for="m in steeringMeta" :key="m.label"><div class="rounded-xl bg-white/[0.03] border border-white/8 p-3"><div class="text-[11px] text-slate-400" x-text="m.label"></div><div class="font-semibold mt-0.5" :class="m.cls" x-text="m.val"></div></div></template>
+          <!-- controls co-located with live context -->
+          <div class="xl:col-span-2 space-y-3">
+            <div class="glass rounded-2xl p-5">
+              <h3 class="text-sm font-semibold mb-3 flex items-center gap-2"><span x-html="icons.radio" class="w-4 h-4 block text-emerald-400"></span> Zone <span x-text="zSel"></span> setpoints <span class="text-[11px] text-slate-500 font-normal">· live · writes to HA</span></h3>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <template x-for="sel in zoneDetail.selects" :key="sel.id">
+                  <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3">
+                    <div class="flex items-center justify-between gap-2"><span class="text-sm text-slate-300 truncate" x-text="sel.label"></span>
+                      <select @change="ctrlSelect(sel.id,$event.target.value)" class="bg-white/[0.06] border border-white/10 rounded-lg px-2 py-1 text-sm text-slate-200 max-w-[55%]"><template x-for="o in sel.options" :key="o"><option :value="o" :selected="o===sel.value" x-text="o"></option></template></select></div>
+                    <div x-show="sel.ctx" class="text-[11px] text-slate-500 mt-1.5" x-text="sel.ctx"></div>
+                  </div>
+                </template>
+                <template x-for="n in zoneDetail.nums" :key="n.id">
+                  <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3">
+                    <div class="flex items-center justify-between gap-2"><span class="text-sm text-slate-300 truncate" x-text="n.label"></span>
+                      <div class="flex items-center gap-1 shrink-0"><input type="number" :step="n.step" :value="n.val" @change="ctrlNum(n.id,$event.target.value)" class="w-20 bg-white/[0.06] border border-white/10 rounded-lg px-2 py-1 text-sm text-slate-200"><span class="text-[10px] text-slate-500 w-6" x-text="n.unit"></span></div></div>
+                    <div x-show="n.ctx" class="text-[11px] text-emerald-300/70 mt-1.5" x-text="n.ctx"></div>
+                  </div>
+                </template>
+              </div>
+              <div class="divide-y divide-white/6 mt-1">
+                <template x-for="t in zoneDetail.switches" :key="t.id">
+                  <div class="flex items-center justify-between py-2.5"><span class="text-sm text-slate-300" x-text="t.label"></span>
+                    <button @click="ctrlToggle(t.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="t.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="t.on&&'translate-x-5'"></span></button></div>
+                </template>
+              </div>
+            </div>
+            <!-- source water + engine -->
+            <div class="glass rounded-2xl p-5">
+              <h3 class="text-sm font-semibold mb-3 flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Source water &amp; engine</h3>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <template x-for="m in steeringMeta" :key="m.label"><div class="rounded-xl bg-white/[0.03] border border-white/8 p-3"><div class="text-[11px] text-slate-400" x-text="m.label"></div><div class="font-semibold mt-0.5" :class="m.cls" x-text="m.val"></div></div></template>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -601,19 +633,6 @@
             <template x-for="r in raw" :key="r.label"><div class="flex justify-between py-2.5 border-b border-white/6 text-sm"><span class="text-slate-400" x-text="r.label"></span><span class="font-semibold" :class="r.oob?'text-amber-400':''" x-text="r.val"></span></div></template>
           </div>
         </details>
-      </section>
-
-      <!-- ===== ALERTS ===== -->
-      <section x-show="view==='alerts'" class="fade-enter space-y-3">
-        <template x-for="a in adv" :key="'al-'+a.id">
-          <div class="glass rounded-2xl p-4" :class="a.sev==='crit'?'border-l-4 border-l-red-500':'border-l-4 border-l-amber-400'">
-            <div class="flex items-start gap-3"><div class="w-9 h-9 rounded-xl grid place-items-center shrink-0" :class="sevBg(a.sev)"><span x-html="icons[a.icon]||icons.alert" class="w-4.5 h-4.5 block" :class="sevText(a.sev)"></span></div>
-              <div class="min-w-0 flex-1"><div class="text-sm font-semibold" x-text="a.title"></div><p class="text-[13px] text-slate-400 mt-1" x-text="a.detail"></p><div class="text-[13px] text-emerald-300/90 mt-1.5">→ <span x-text="a.action"></span></div></div>
-              <button @click="ackAlert(a.id)" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs border border-white/10 shrink-0">Ack</button>
-            </div>
-          </div>
-        </template>
-        <div x-show="!adv.length" class="glass rounded-2xl p-10 text-center"><div class="w-12 h-12 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-3"><span x-html="icons.check" class="w-6 h-6 block text-emerald-400"></span></div><div class="font-semibold">All clear</div></div>
       </section>
 
       <!-- ===== TUNE (native editor) ===== -->
@@ -1134,6 +1153,49 @@ function buildZones(){ return [1,2,3].map(z=>{ const Z=CONFIG.ZONE(z); const vwc
   const li=S[Z.last_irrig]?.state; let lt="—"; if(li){ const d=(Date.now()-Date.parse(li))/60000; if(!isNaN(d)) lt=d<60?Math.round(d)+"m":Math.round(d/60)+"h"; }
   return {id:z,name:"Zone "+z,vwc:isNaN(vwc)?"—":fmt(vwc,0),ec:isNaN(ec)?"—":fmt(ec,1),phase:ph,status:st,floor:f,fillPct,floorPct,enabled:en,lastIrrig:lt,
     note:safe&&safe!=="safe"?safe.replace(/_/g," "):"looking ok"}; }); }
+function zSt(id){ return S[id]?.state; }
+function zNum(id){ const v=parseFloat(S[id]?.state); return isNaN(v)?null:v; }
+function zOpts(id){ return S[id]?.attributes?.options||[]; }
+function relAgo(iso){ if(!iso) return "—"; const t=Date.parse(iso); if(isNaN(t)) return "—"; const m=(Date.now()-t)/60000; return m<1?"just now":m<60?Math.round(m)+"m ago":(m/60).toFixed(1)+"h ago"; }
+function buildZoneDetail(zid){   // per-zone live state + co-located setpoints (Zones tab, IA Phase 3)
+  const P="crop_steering_zone_"+zid+"_";
+  const vwc=zNum("sensor."+P+"vwc"), ec=zNum("sensor."+P+"ec");
+  const phase=zSt("sensor."+P+"phase")||"—", safe=zSt("sensor."+P+"safety_status")||"";
+  const vmax=zNum("sensor."+P+"vmax_detected"), fc=zNum("number."+P+"p1_target_vwc");
+  const floor=zNum("number."+P+"p3_emergency_vwc_threshold") ?? CONFIG.ZONE_P3_FLOOR[zid];   // live emergency floor, fallback to const
+  const p3pred=zNum("sensor."+P+"p3_prediction");
+  const mode=(zSt("select."+P+"steering_mode")||"Generative").toLowerCase().startsWith("veg")?"veg":"gen";
+  const dbNow=(vmax!=null&&vwc!=null)?Math.max(0,vmax-vwc):null;
+  const dbKey="number."+P+(mode==="veg"?"vegetative":"generative")+"_dryback_target";
+  const li=zSt("sensor."+P+"last_irrigation_app")||zSt("sensor."+P+"last_irrigation");
+  const nextH=zNum("sensor.crop_steering_prediction_zone_"+zid+"_next_irrigation_hours");
+  const dayL=zNum("sensor."+P+"daily_water_app"), shots=zNum("sensor."+P+"irrigation_count_app"), plants=zNum("number."+P+"plant_count");
+  const feed=zNum("sensor.crop_steering_fused_ec");
+  const status=(vwc==null)?"ok":(vwc<=floor?"crit":vwc<=floor+6?"warn":safe==="approaching_saturation"?"warn":"ok");
+  const min=20,max=75, sc=v=>v==null?null:Math.max(0,Math.min(100,(v-min)/(max-min)*100));
+  const selOf=(id,label,ctx)=>S[id]?{id,label,ctx,value:zSt(id),options:zOpts(id)}:null;
+  const numOf=(id,label,unit,ctx,step)=>S[id]?{id,label,unit,ctx,val:zSt(id),step:step||0.5}:null;
+  const swOf=(id,label)=>S[id]?{id,label,on:zSt(id)==="on"}:null;
+  const dbt=zNum(dbKey);
+  return {
+    id:zid, name:"Zone "+zid, phase, mode, status, note:(safe&&safe!=="safe"&&safe!=="Optimal")?safe.replace(/_/g," "):"",
+    vwc:vwc==null?"—":fmt(vwc,1), ec:ec==null?"—":fmt(ec,1), floor, fieldcap:fc==null?"—":fmt(fc,0), peak:vmax==null?"—":fmt(vmax,1),
+    dryback:dbNow==null?"—":fmt(dbNow,1), drybackTarget:dbt==null?"—":fmt(dbt,0),
+    lastShot:relAgo(li), nextShot:nextH==null?"—":(nextH<=0?"now":nextH<1?Math.round(nextH*60)+"m":nextH.toFixed(1)+"h"),
+    dayL:dayL==null?"—":fmt(dayL,1), perPlant:(dayL!=null&&plants)?fmt(dayL/plants,2):null, shots:shots==null?"—":fmt(shots,0),
+    fillPct:sc(vwc)??0, floorPct:sc(floor)??0, fcPct:sc(fc),
+    selects:[ selOf("input_select."+P+"phase_control","Phase pin","auto-follows "+phase),
+      selOf("select."+P+"steering_mode","Steering mode",mode==="veg"?"vegetative · wetter":"generative · drier"),
+      selOf("select."+P+"crop_profile","Crop profile",null) ].filter(Boolean),
+    nums:[ numOf("number."+P+"p2_vwc_threshold","P2 re-water at","%","now "+(vwc==null?"—":fmt(vwc,1))+"% · floor "+floor+"%"),
+      numOf("number."+P+"ec_target_"+mode+"_p2","EC target P2","mS","pore "+(ec==null?"—":fmt(ec,1))+" · feed "+(feed==null?"—":fmt(feed,1))),
+      numOf("number."+P+"p2_shot_size","P2 shot size","%",(shots==null?"":shots+" shots today")),
+      numOf(dbKey,"Dryback target","%","now "+(dbNow==null?"—":fmt(dbNow,1))+"% off peak"),
+      numOf("number."+P+"p3_emergency_vwc_threshold","Emergency floor","%",p3pred==null?"rescue trigger":"overnight low ~"+fmt(p3pred,0)+"%") ].filter(Boolean),
+    switches:[ swOf("switch."+P+"enabled","Zone enabled"), swOf("switch."+P+"manual_override","Manual override"),
+      swOf("switch."+P+"dripper_protection","Dripper protection") ].filter(Boolean),
+  };
+}
 function gaugeVM(icon,label,v,unit,min,max,okLo,okHi,status,plain,dec){ let mk=null,okL=0,okW=0; const track=(v!=null&&min!=null);
   if(track){ mk=Math.max(0,Math.min(100,(v-min)/(max-min)*100)); okL=Math.max(0,(okLo-min)/(max-min)*100); okW=Math.min(100,(okHi-min)/(max-min)*100)-okL; }
   return {icon,label,value:v==null?"—":fmt(v,dec)+(unit?" "+unit:""),plain,status,word:{ok:"good",warn:"act",crit:"urgent",watch:"watch"}[status]||"good",track,okL,okW,mk}; }
@@ -3500,9 +3562,9 @@ document.addEventListener('alpine:init', () => {
     view:'dashboard', sidebarOpen:true, connected:false, connError:"",
     cmdOpen:false, cmdQuery:"", aiOpen:false, aiInput:"", aiThinking:false, zoneModal:null, evOpen:null,
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
-    headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], armChips:[], steeringMeta:[],
+    headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},guardrails:[],telemetry:[],feed:[]}, ctrlZone:1,
-    climateCtl:[], ctlOpen:{}, snapshot:[],
+    climateCtl:[], ctlOpen:{}, snapshot:[], zSel:1, zoneDetail:{},
     notes:{}, toasts:[], _tid:0, _toastId:0, _acked:{},
     aiMessages:[], aiSuggestions:["Any rooms drifting?","Why the hotspot?","How is the EC tracking?","Is dryback on target?"],
 
@@ -3512,6 +3574,7 @@ document.addEventListener('alpine:init', () => {
       this.tick();
       this._tid=setInterval(()=>this.tick(), CONFIG.REFRESH_MS);
       this.$watch('view',v=>{ this.$nextTick(()=>{ this.mountCharts(); if(v==='timeline'&&window.tlInit) window.tlInit(); if(v==='tune'&&this.seedTune) this.seedTune(); }); });
+      this.$watch('zSel',()=>{ this.zoneDetail=buildZoneDetail(this.zSel); });
       this.$watch('zoneModal',v=>{ if(v) this.$nextTick(()=>this.mountZoneHist(v)); });
       this.$watch('cmdOpen',v=>{ if(v) this.$nextTick(()=>this.$refs.cmd&&this.$refs.cmd.focus()); });
     },
@@ -3526,9 +3589,8 @@ document.addEventListener('alpine:init', () => {
       const rr=runRules();
       this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
       this.headline=computeHeadline(this.adv,this.watch);
-      this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl();
+      this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.zones=buildZones(); this.zoneDetail=buildZoneDetail(this.zSel); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl();
       if(window.__tuneReseed) window.__tuneReseed();   // refresh the Tune editor from live HA (respects its hydrated/unsaved-edit guard)
-      this.armChips=[{k:"System",on:isOn("sw_system")},{k:"Auto-water",on:isOn("sw_auto")},{k:"EC-stack",on:isOn("sw_ecstack")},{k:"Dosing",on:isOn("dosing_active")}];
       this.steeringMeta=[{label:"Fused EC",val:fmt(num("fused_ec"),2),cls:"text-slate-200"},{label:"EC target",val:fmt(CONFIG.EC_TARGET,1),cls:"text-slate-200"},{label:"Pump",val:fmt(num("pump_power"),0)+" W",cls:num("pump_power")>100?"text-amber-400":"text-slate-200"},{label:"Next shot",val:this.shortTime(val("next_irrig")),cls:"text-slate-200"}];
       this.hotspotCells=this.buildHotspot();
       this.lastUpdated=Date.now();
