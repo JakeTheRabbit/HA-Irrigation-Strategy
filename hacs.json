@@ -1,7 +1,6 @@
 {
   "name": "Crop Steering System",
   "hacs": "1.6.0",
-  "iot_class": "Local Polling",
   "homeassistant": "2024.3.0",
   "render_readme": true
 }
