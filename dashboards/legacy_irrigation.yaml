@@ -1,0 +1,205 @@
+title: "GW Irrigation"
+views:
+  - title: GW Irrigation
+    path: gw-irrigation
+    icon: mdi:water-sync
+    type: sections
+    max_columns: 4
+    sections:
+
+      # ── How This System Works ────────────────────────────────────────────
+      - type: grid
+        column_span: 4
+        cards:
+          - type: markdown
+            content: >
+              ## GW Irrigation — How It Works
+
+
+              This dashboard controls the **Irrigation timer-based irrigation
+              scheduler**. It is a simple system: every N minutes during the
+              configured time window, it opens each enabled table valve for M
+              seconds, sequentially.
+
+
+              ### How It Runs
+
+              1. The automation `GW Irrigation Scheduler` fires every 5 minutes
+              and checks if enough time has passed since the last cycle
+              (controlled by **Cycle Interval**).
+
+              2. If `Irrigation Allowed` is ON (all safety checks pass), it runs
+              the `irrigation_run_irrigation_cycle` script.
+
+              3. The script opens the **mainline** (pump auto-starts via pressure
+              switch), then loops through tables 1-6. Each enabled table valve
+              opens for **Shot Duration** seconds, then closes. A 3-second gap
+              between tables.
+
+              4. After all tables are done, the mainline closes.
+
+
+              ### Safety Features
+
+              - **Valve Max Runtime** watchdog force-closes any valve left open
+              too long.
+
+              - **Leak sensor** and **tank low** immediately abort and close
+              everything.
+
+              - **Maintenance mode** closes all valves and suspends irrigation.
+
+
+              ### Relationship to Other Systems
+
+              - **Crop Steering AI**: If you are using the Crop Steering
+              dashboard for irrigation, **GW Irrigation Enabled should be OFF**
+              to prevent double-watering. Both systems control the same physical
+              valves.
+
+              - **CO2 & Environment**: Completely independent. Turning GW
+              Irrigation off has no effect on CO2 or temp/RH control.
+
+              - **GW Table Enables**: These flags are respected by BOTH this
+              system and the Crop Steering AI. Turning off a table here blocks
+              it everywhere.
+
+
+              ### Enable Hierarchy
+
+              For the GW scheduler to water a table, ALL of these must be true:
+
+              1. `GW Master Enable` = ON
+
+              2. `GW Irrigation Enabled` = ON
+
+              3. `Maintenance Mode` = OFF
+
+              4. `Table N Enabled` = ON
+
+              5. No leak detected, tank not low
+
+              6. Current time is within the irrigation window
+
+      # ── Master Controls ──────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Master Controls"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_enable
+                name: "GW Master Enable"
+                secondary_info: "Master kill switch — also affects emergency stop script"
+              - entity: input_boolean.irrigation_irrigation_enabled
+                name: "GW Irrigation Enabled"
+                secondary_info: "Timer-based watering — OFF when using Crop Steering AI"
+              - entity: input_boolean.irrigation_maintenance_mode
+                name: "Maintenance Mode"
+                secondary_info: "Closes all valves for tank/plumbing work"
+              - entity: binary_sensor.irrigation_irrigation_allowed
+                name: "Irrigation Allowed"
+                secondary_info: "Read-only — all conditions met for watering"
+              - entity: binary_sensor.irrigation_system_ready
+                name: "System Ready"
+              - entity: binary_sensor.irrigation_lights_on
+                name: "Lights On"
+
+      # ── Status ───────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Safety Status"
+            show_header_toggle: false
+            entities:
+              - entity: binary_sensor.irrigation_leak
+                name: "Leak Detected"
+              - entity: binary_sensor.irrigation_tank_low
+                name: "Tank Low"
+
+      # ── Table Enables ────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Table Enables"
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.irrigation_table_1_enabled
+                name: "Table 1"
+              - entity: input_boolean.irrigation_table_2_enabled
+                name: "Table 2"
+              - entity: input_boolean.irrigation_table_3_enabled
+                name: "Table 3"
+              - entity: input_boolean.irrigation_table_4_enabled
+                name: "Table 4"
+              - entity: input_boolean.irrigation_table_5_enabled
+                name: "Table 5"
+              - entity: input_boolean.irrigation_table_6_enabled
+                name: "Table 6"
+
+      # ── Schedule ─────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: "Schedule"
+            show_header_toggle: false
+            entities:
+              - entity: input_number.irrigation_irrigate_interval_min
+                name: "Cycle Interval (min)"
+                secondary_info: "Minutes between irrigation cycles"
+              - entity: input_number.irrigation_irrigate_duration_sec
+                name: "Shot Duration (sec)"
+                secondary_info: "How long each table valve stays open"
+              - entity: input_datetime.irrigation_irrigate_start_time
+                name: "Window Start"
+                secondary_info: "Irrigation allowed after this time"
+              - entity: input_datetime.irrigation_irrigate_end_time
+                name: "Window End"
+                secondary_info: "Irrigation stops after this time"
+              - entity: input_number.irrigation_valve_max_runtime_sec
+                name: "Valve Max Runtime (sec)"
+                secondary_info: "Safety watchdog — force-closes stuck valves"
+
+      # ── Hardware (Direct Control) ────────────────────────────────────────
+      - type: grid
+        column_span: 4
+        cards:
+          - type: entities
+            title: "Hardware — Direct Relay Control"
+            show_header_toggle: false
+            entities:
+              - type: section
+                label: "Infrastructure"
+              - entity: switch.irrigation_mainline
+                name: "Mainline"
+                secondary_info: "Opens flow to tables — pump follows via pressure switch"
+              - entity: switch.irrigation_mains_water
+                name: "Mains Water"
+                secondary_info: "Fresh water to tank — NOT in irrigation path"
+              - entity: switch.irrigation_manifold
+                name: "Manifold"
+                secondary_info: "Tank filling/mixing — NOT in irrigation path"
+              - entity: switch.irrigation_tank_fill_valve
+                name: "Tank Fill Valve"
+              - entity: switch.irrigation_waste_valve
+                name: "Waste Valve"
+              - entity: switch.irrigation_recirculation_valve
+                name: "Recirculation Valve"
+              - type: section
+                label: "Table Valves"
+              - entity: switch.irrigation_table_1_valve
+                name: "Table 1 Valve"
+              - entity: switch.irrigation_table_2_valve
+                name: "Table 2 Valve"
+              - entity: switch.irrigation_table_3_valve
+                name: "Table 3 Valve"
+              - entity: switch.irrigation_table_4_valve
+                name: "Table 4 Valve"
+              - entity: switch.irrigation_table_5_valve
+                name: "Table 5 Valve"
+              - entity: switch.irrigation_table_6_valve
+                name: "Table 6 Valve"
