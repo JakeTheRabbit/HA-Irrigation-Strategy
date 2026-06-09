@@ -1,0 +1,162 @@
+transition_phase:
+  name: Transition phase
+  description: >-
+    Transition the irrigation system to a target phase (P0 morning dryback,
+    P1 ramp-up, P2 maintenance, P3 pre-lights-off). Fires the
+    crop_steering_phase_transition event consumed by the AppDaemon engine.
+  fields:
+    target_phase:
+      name: Target phase
+      description: Phase to transition to.
+      required: true
+      selector:
+        select:
+          options:
+            - "P0"
+            - "P1"
+            - "P2"
+            - "P3"
+    reason:
+      name: Reason
+      description: Free-text reason recorded with the transition.
+      required: false
+      selector:
+        text:
+    forced:
+      name: Forced
+      description: Bypass transition-condition checks.
+      required: false
+      selector:
+        boolean:
+
+execute_irrigation_shot:
+  name: Execute irrigation shot
+  description: >-
+    Request a timed irrigation shot for a zone. Fires the
+    crop_steering_irrigation_shot event; the AppDaemon engine performs the
+    hardware sequence with its safety checks. The integration never touches
+    hardware directly.
+  fields:
+    zone:
+      name: Zone
+      description: Zone number (must be one of the configured zones).
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 24
+          mode: box
+    duration_seconds:
+      name: Duration
+      description: Shot duration in seconds.
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 3600
+          unit_of_measurement: s
+          mode: box
+    shot_type:
+      name: Shot type
+      description: Which phase logic the shot is attributed to.
+      required: false
+      selector:
+        select:
+          options:
+            - "P1"
+            - "P2"
+            - "P3_emergency"
+
+check_transition_conditions:
+  name: Check transition conditions
+  description: >-
+    Evaluate and publish the current phase-transition conditions without
+    changing phase.
+
+set_manual_override:
+  name: Set manual override
+  description: >-
+    Enable or disable a manual override for a zone, optionally with a
+    timeout. While overridden, the autonomous engine leaves the zone alone.
+  fields:
+    zone:
+      name: Zone
+      description: Zone number.
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 24
+          mode: box
+    timeout_minutes:
+      name: Timeout
+      description: Auto-clear the override after this many minutes (max 24 h).
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 1440
+          unit_of_measurement: min
+          mode: box
+    enable:
+      name: Enable
+      description: True to enable the override, false to clear it.
+      required: false
+      selector:
+        boolean:
+
+custom_shot:
+  name: Custom shot
+  description: >-
+    Operator/orchestrator-facing volumetric shot request. Fires the
+    crop_steering_custom_shot event; the engine applies safety gates and
+    routes to hardware.
+  fields:
+    target_zone:
+      name: Target zone
+      description: Zone number.
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 24
+          mode: box
+    intent:
+      name: Intent
+      description: Why the shot is being fired (recorded for attribution).
+      required: false
+      default: manual
+      selector:
+        select:
+          options:
+            - manual
+            - rescue
+            - rebalance_ec
+            - test_emitter
+            - planned
+    volume_ml:
+      name: Volume
+      description: Shot volume in millilitres.
+      required: true
+      selector:
+        number:
+          min: 10
+          max: 10000
+          unit_of_measurement: mL
+          mode: box
+    target_runoff_pct:
+      name: Target runoff
+      description: Desired runoff percentage for the shot.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 50
+          unit_of_measurement: "%"
+          mode: box
+    tag:
+      name: Tag
+      description: Free-text tag recorded with the shot.
+      required: false
+      selector:
+        text:
