@@ -3648,13 +3648,15 @@ document.addEventListener('alpine:init', () => {
     async ensureHist(which){   // fetch REAL /api/history once per 4 min, then (re)draw the relevant charts
       const now=Date.now();
       if(this['_h_'+which] && now-this['_hts_'+which]<240000){ this.$nextTick(()=>which==='climate'?this.mountClimateCharts():this.mountTrend()); return; }
-      this['_hts_'+which]=now;
+      if(this['_loading_'+which]) return;   // a fetch for this view is already in flight — don't double-issue
+      this['_loading_'+which]=true; this['_hts_'+which]=now;
       try{
         if(which==='climate'){ const ids=[CONFIG.E.air_temp,CONFIG.E.rh,CONFIG.E.air_vpd,CONFIG.E.co2,CONFIG.E.ppfd].filter(Boolean);
           this._h_climate=await this.loadHist(ids,24); this.$nextTick(()=>this.mountClimateCharts()); }
         else { const ids=[1,2,3].map(z=>'sensor.crop_steering_zone_'+z+'_vwc');
           this._h_dashboard=await this.loadHist(ids,24); this.$nextTick(()=>this.mountTrend()); }
       }catch(e){ console.warn('history load failed',e); this['_hts_'+which]=0; }
+      finally{ this['_loading_'+which]=false; }
     },
     async loadHist(ids,hours){ const tok=getToken(); if(!tok||!ids.length) return null;
       const end=new Date(), start=new Date(Date.now()-hours*3600e3);
@@ -3740,7 +3742,10 @@ document.addEventListener('alpine:init', () => {
         clearTimeout(to); if(!r.ok) throw new Error('HTTP '+r.status);
         const j=await r.json(); const reply=j&&j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;
         this.aiThinking=false; this.aiMessages.push({role:'ai',text:(reply&&reply.trim())?reply.trim():this.aiReply(q)}); this.scrollAI();
-      }catch(e){ this.aiThinking=false; this.aiMessages.push({role:'ai',text:'⚠ Couldn\'t reach the AI service ('+(e.name==='AbortError'?'timed out':e.message)+') — this needs the facility LAN. Local read instead:\n\n'+this.aiReply(q)}); this.scrollAI(); }
+      }catch(e){ this.aiThinking=false;
+        const mixed=location.protocol==='https:'&&/^http:/.test(CONFIG.AI.base);
+        const why=mixed?'blocked as mixed content — the dashboard is HTTPS but the AI endpoint is HTTP':(e.name==='AbortError'?'timed out':e.message+' — needs the facility LAN');
+        this.aiMessages.push({role:'ai',text:'⚠ Couldn\'t reach the AI service ('+why+'). Local read instead:\n\n'+this.aiReply(q)}); this.scrollAI(); }
     },
     aiReply(q){ const s=q.toLowerCase();
       if(s.includes("hot")||s.includes("back")) { const bt=num("bl_temp"),at=num("air_temp"); return "Back-left corner: "+fmt(bt,1)+"°C vs "+fmt(at,1)+"°C room ("+fmt(bt-at,1)+"°C hotter).\n\nThis tracks lights-on, not the weather — so it is internal airflow, not the chiller. Those plants transpire against drier air and stress first.\n\nDo this: add a circulation fan aimed at the back-left corner before touching the room RH setpoint. Re-check the gap in 30 minutes."; }
