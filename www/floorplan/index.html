@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cultivation Facility — 3D Floor Plan</title>
+    <style>
+      :root { --fg: #e7e9ee; --panel: rgba(18,20,28,0.82); --line: rgba(255,255,255,0.12); }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0f1117; font-family: Inter, system-ui, -apple-system, sans-serif; color: var(--fg); }
+      #app { display: block; width: 100vw; height: 100vh; }
+
+      .panel {
+        position: fixed; z-index: 10; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 12px;
+        backdrop-filter: blur(8px); padding: 12px 14px; font-size: 12px; line-height: 1.5;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+      }
+      #legend { top: 14px; left: 14px; max-width: 230px; }
+      #legend h1 { margin: 0 0 2px; font-size: 14px; letter-spacing: .2px; }
+      #legend .sub { margin: 0 0 10px; opacity: .6; font-size: 11px; }
+      #legend .row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+      #legend .sw { width: 13px; height: 13px; border-radius: 3px; flex: 0 0 auto; border: 1px solid rgba(255,255,255,.2); }
+      #legend hr { border: none; border-top: 1px solid var(--line); margin: 9px 0; }
+      #legend .grp { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; opacity: .5; margin: 6px 0 2px; }
+
+      #controls { bottom: 14px; left: 14px; display: flex; gap: 6px; padding: 8px; }
+      #controls button {
+        font: inherit; font-size: 12px; color: var(--fg); cursor: pointer;
+        background: rgba(255,255,255,0.06); border: 1px solid var(--line);
+        border-radius: 8px; padding: 6px 11px; transition: background .15s;
+      }
+      #controls button:hover { background: rgba(255,255,255,0.14); }
+      #hint { bottom: 14px; right: 14px; opacity: .5; font-size: 11px; }
+    </style>
+    <script type="module" crossorigin src="./assets/index-BguEmoo_.js"></script>
+  </head>
+  <body>
+    <canvas id="app"></canvas>
+
+    <div id="legend" class="panel">
+      <h1>Cultivation Facility</h1>
+      <p class="sub">14.8 × 16.7 m · 3.7 m clean-room walls · polished concrete</p>
+
+      <div class="grp">Zones</div>
+      <div class="row"><span class="sw" style="background:#2f9e44"></span>Flower Room (×2) · 2 benches ea.</div>
+      <div class="row"><span class="sw" style="background:#69db7c"></span>Veg · 2× double-stack 3×1.2 m</div>
+      <div class="row"><span class="sw" style="background:#adb5bd"></span>Service / Process</div>
+      <div class="row"><span class="sw" style="background:#4dabf7"></span>Office (upstairs)</div>
+
+      <div class="grp">Key</div>
+      <div class="row"><span class="sw" style="background:#fa5252"></span>Siren</div>
+      <div class="row"><span class="sw" style="background:#1f2329"></span>Security camera</div>
+      <div class="row"><span class="sw" style="background:#15aabf"></span>PTZ / Doorbell cam</div>
+      <div class="row"><span class="sw" style="background:#d4af37"></span>Drug safe</div>
+      <div class="row"><span class="sw" style="background:#0b0c0f"></span>PoE switch + UPS</div>
+      <div class="row"><span class="sw" style="background:#37b24d"></span>Disposal area</div>
+      <hr />
+      <div class="row"><span class="sw" style="background:#bfc9ff"></span>LED grow lights</div>
+      <div class="row"><span class="sw" style="background:#1c7ed6"></span>Fertigation / irrigation</div>
+      <div class="row"><span class="sw" style="background:#e9ecef"></span>Dehu / AC / HAF fan</div>
+      <div class="row"><span class="sw" style="background:#aab2ba"></span>Roller door · front entry</div>
+    </div>
+
+    <div id="controls" class="panel">
+      <button id="btn-top">Top view</button>
+      <button id="btn-iso">3D view</button>
+      <button id="btn-walls">Walls</button>
+      <button id="btn-labels">Labels</button>
+    </div>
+
+    <div id="hint" class="panel">drag = orbit · scroll = zoom · right-drag = pan</div>
+
+  </body>
+</html>
