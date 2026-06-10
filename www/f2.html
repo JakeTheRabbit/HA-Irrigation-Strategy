@@ -588,11 +588,11 @@
             <!-- mini 3D of the room -->
             <div class="glass rounded-2xl p-3">
               <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.grid" class="w-4 h-4 block text-emerald-400"></span> Room 3D</h3><button @click="go('floor')" class="text-[11px] text-emerald-300/80 hover:text-emerald-300">open full →</button></div>
-              <button @click="go('floor'); floorLoaded=true; $nextTick(()=>window.initFacilityTwin&&window.initFacilityTwin())" class="w-full rounded-xl border border-white/8 bg-gradient-to-br from-emerald-500/[0.06] to-cyan-500/[0.04] grid place-items-center text-center px-4 hover:border-emerald-400/30 transition" style="height:240px">
+              <button @click="go('floor'); if(!demo) floorLoaded=true" class="w-full rounded-xl border border-white/8 bg-gradient-to-br from-emerald-500/[0.06] to-cyan-500/[0.04] grid place-items-center text-center px-4 hover:border-emerald-400/30 transition" style="height:240px">
                 <div>
                   <div class="w-12 h-12 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-2"><span x-html="icons.grid" class="w-6 h-6 block text-emerald-400"></span></div>
                   <div class="text-[12px] text-slate-300 font-medium">3D facility twin</div>
-                  <div class="text-[11px] text-slate-500 mt-1 max-w-[16rem]">Procedural Three.js floor plan — both storeys, equipment + security layer. Tap to open.</div>
+                  <div class="text-[11px] text-slate-500 mt-1 max-w-[16rem]">Interactive Three.js floor plan — live room states, lights, climate, per-row sensors. Tap to open.</div>
                 </div>
               </button>
             </div>
@@ -1061,40 +1061,32 @@
             <div x-show="!control.feed.length" class="text-slate-500">No recent activity.</div></div></div>
       </section>
 
-      <!-- ===== 3D FLOOR (procedural Three.js facility twin — replaces the Blender model) ===== -->
+      <!-- ===== 3D FLOOR (Three.js glb facility twin via facility-twin/twin.html; procedural initFacilityTwin left dormant for revert) ===== -->
       <section x-show="view==='floor'" class="fade-enter">
         <div class="glass rounded-2xl overflow-hidden relative" style="height:calc(100vh - 160px);min-height:460px">
-          <div x-show="floorLoaded" id="f2t-wrap" class="absolute inset-0">
-            <div id="f2t-stage"></div>
-            <div class="f2t-toolbar">
-              <span class="grp">
-                <button id="f2tG" class="on">Ground</button>
-                <button id="f2tU">Upstairs</button>
-                <button id="f2tB">Both</button>
-              </span>
-              <span class="grp">
-                <button id="f2tOrbit" class="on">Orbit</button>
-                <button id="f2tTop">Top</button>
-              </span>
-              <span class="grp">
-                <label><input type="checkbox" id="f2tLabels" checked> Labels</label>
-                <label><input type="checkbox" id="f2tSec" checked> Security</label>
-                <label><input type="checkbox" id="f2tFov"> FOV</label>
-                <label><input type="checkbox" id="f2tAir"> Airflow</label>
-              </span>
-            </div>
-            <div id="f2t-info"><b>Tip:</b> click any bench, dehumidifier, camera, safe or room floor to identify it.</div>
-          </div>
-          <div x-show="!floorLoaded" class="absolute inset-0 grid place-items-center p-6">
+          <!-- demo: the 34 MB facility model can't stream from GitHub Pages -->
+          <div x-show="demo" class="absolute inset-0 grid place-items-center p-6">
             <div class="text-center">
               <div class="w-14 h-14 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-3"><span x-html="icons.grid" class="w-7 h-7 block text-emerald-400"></span></div>
               <div class="font-semibold mb-1">3D facility twin</div>
-              <div class="text-[12px] text-slate-400 mb-4 max-w-xs">Procedural Three.js floor plan — builds instantly, no 34&nbsp;MB model download. Both storeys, equipment and the full security layer.</div>
-              <button @click="floorLoaded=true; $nextTick(()=>window.initFacilityTwin&&window.initFacilityTwin())" class="h-11 px-6 rounded-xl bg-emerald-500/20 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/30 transition">Load 3D view</button>
+              <div class="text-[12px] text-slate-400 max-w-xs">The interactive Three.js facility model is part of the full install — it streams a ~34&nbsp;MB model from your Home Assistant.</div>
+            </div>
+          </div>
+          <!-- live, loaded: the Three.js glb twin (per-room cards, lights, climate, sensors, heatmap) -->
+          <template x-if="!demo && floorLoaded">
+            <iframe src="/local/facility-twin/twin.html?embed&v=2" class="absolute inset-0 w-full h-full border-0 block" title="F2 facility 3D twin"></iframe>
+          </template>
+          <!-- live, not yet loaded: gate the 34 MB download behind a tap -->
+          <div x-show="!demo && !floorLoaded" class="absolute inset-0 grid place-items-center p-6">
+            <div class="text-center">
+              <div class="w-14 h-14 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-3"><span x-html="icons.grid" class="w-7 h-7 block text-emerald-400"></span></div>
+              <div class="font-semibold mb-1">3D facility twin</div>
+              <div class="text-[12px] text-slate-400 mb-4 max-w-xs">Interactive Three.js model of the facility — live room states, lights, climate and per-row sensors. Streams a ~34&nbsp;MB model from Home Assistant.</div>
+              <button @click="floorLoaded=true" class="h-11 px-6 rounded-xl bg-emerald-500/20 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/30 transition">Load 3D view</button>
             </div>
           </div>
         </div>
-        <div class="text-[11px] text-slate-500 mt-2 px-1 flex items-center gap-1.5"><span x-html="icons.grid" class="w-3.5 h-3.5 block"></span> Drag to orbit, scroll to zoom · click a room or any equipment to identify it.</div>
+        <div class="text-[11px] text-slate-500 mt-2 px-1 flex items-center gap-1.5"><span x-html="icons.grid" class="w-3.5 h-3.5 block"></span> Drag to orbit, scroll to zoom · click a room card to control it · tap a sensor tile to open its dashboard.</div>
       </section>
 
       <!-- ===== TIMELINE (native canvas — Phase D) ===== -->
