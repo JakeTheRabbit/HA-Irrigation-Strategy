@@ -187,9 +187,23 @@ Drop `?demo` and load it from your Home Assistant (`/local/f2.html`, long-lived 
 in your browser) to drive the real thing.
 
 **▶ See how it all connects — interactive 3D system map:**
-**[`www/system-map.html`](www/system-map.html)** — a standalone three.js diagram of the two layers,
-the entity contract between them, the pump→mainline→valve hardware sequence, and the sensor
-feedback loop. Open it locally or from Pages; no install, no data.
+**https://jaketherabbit.github.io/HA-Irrigation-Strategy/system-map.html** — a standalone three.js
+diagram of the two layers, the entity contract between them, the pump→mainline→valve hardware
+sequence, and the sensor feedback loop. No install, no data.
+
+### All live pages
+
+Everything in `www/` is published to GitHub Pages — **[index of all pages](https://jaketherabbit.github.io/HA-Irrigation-Strategy/)**:
+
+| Page | What it is |
+|---|---|
+| [F2 dashboard (demo)](https://jaketherabbit.github.io/HA-Irrigation-Strategy/f2.html?demo) | The unified operator dashboard — the flagship |
+| [Crop Steering console (demo)](https://jaketherabbit.github.io/HA-Irrigation-Strategy/crop_steering.html?demo) | The earlier control console |
+| [Setpoint Tune editor (demo)](https://jaketherabbit.github.io/HA-Irrigation-Strategy/crop_steering_tune.html?demo) | Visual editor for the full setpoint table |
+| [Grow Setpoints Planner](https://jaketherabbit.github.io/HA-Irrigation-Strategy/setpoints.html) | Week-by-week grow-plan timeline |
+| [System Guide](https://jaketherabbit.github.io/HA-Irrigation-Strategy/SYSTEM_GUIDE.html) | The full written system guide |
+| [3D System Map](https://jaketherabbit.github.io/HA-Irrigation-Strategy/system-map.html) | Interactive three.js architecture diagram |
+| [Irrigation Manual](https://jaketherabbit.github.io/HA-Irrigation-Strategy/irrigation-manual.html) | Hardware-side manual — plumbing, valves, pumps |
 
 ### Screenshots (from the demo)
 

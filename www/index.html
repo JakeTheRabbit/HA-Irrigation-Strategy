@@ -3,11 +3,60 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="0; url=./f2.html?demo">
-<link rel="canonical" href="./f2.html?demo">
-<title>F2 Crop-Steering — live demo</title>
+<title>HA Crop Steering — live pages</title>
+<style>
+  :root{--bg:#0b0f14;--card:#111827;--edge:#1f2937;--txt:#e2e8f0;--dim:#94a3b8;--acc:#34d399}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;padding:48px 20px}
+  main{max-width:760px;margin:0 auto}
+  h1{font-size:1.5rem;margin:0 0 4px}
+  .sub{color:var(--dim);margin:0 0 28px;font-size:.95rem}
+  .sub a{color:var(--acc)}
+  a.card{display:block;background:var(--card);border:1px solid var(--edge);border-radius:12px;padding:16px 18px;margin-bottom:12px;text-decoration:none;color:var(--txt);transition:border-color .15s}
+  a.card:hover{border-color:var(--acc)}
+  .t{font-weight:600;font-size:1.05rem}
+  .t .badge{font-size:.7rem;font-weight:700;color:#0b0f14;background:var(--acc);border-radius:999px;padding:2px 8px;margin-left:8px;vertical-align:2px}
+  .d{color:var(--dim);font-size:.88rem;margin-top:4px;line-height:1.4}
+  h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:30px 0 12px}
+</style>
 </head>
-<body style="font-family:system-ui,sans-serif;background:#0b0f14;color:#e2e8f0">
-<p>Redirecting to the <a href="./f2.html?demo" style="color:#34d399">F2 Crop-Steering demo</a>…</p>
+<body>
+<main>
+  <h1>HA Crop Steering — live pages</h1>
+  <p class="sub">Every page runs standalone in the browser — no Home Assistant, no install.
+  Source: <a href="https://github.com/JakeTheRabbit/HA-Irrigation-Strategy">JakeTheRabbit/HA-Irrigation-Strategy</a></p>
+
+  <h2>Dashboards (demo mode, mock data)</h2>
+  <a class="card" href="./f2.html?demo">
+    <div class="t">F2 · Plant-State Intelligence<span class="badge">flagship</span></div>
+    <div class="d">The unified operator dashboard — Status, Zones, Tune, Climate, Operate, Plan. Auto-enters demo mode with baked-in "perfect grow" data.</div>
+  </a>
+  <a class="card" href="./crop_steering.html?demo">
+    <div class="t">F2 Crop Steering console</div>
+    <div class="d">The earlier control console — phase state, per-zone control, settings. Superseded by F2 but fully browsable.</div>
+  </a>
+  <a class="card" href="./crop_steering_tune.html?demo">
+    <div class="t">Setpoint Tune editor</div>
+    <div class="d">The science-grounded visual editor for the full crop-steering setpoint table, standalone.</div>
+  </a>
+  <a class="card" href="./setpoints.html">
+    <div class="t">Grow Setpoints Planner</div>
+    <div class="d">Week-by-week grow plan timeline — light, climate, irrigation and EC targets across the cycle.</div>
+  </a>
+
+  <h2>Documentation</h2>
+  <a class="card" href="./SYSTEM_GUIDE.html">
+    <div class="t">System Guide</div>
+    <div class="d">The full written guide to the crop-steering system — concepts, phases, entities, operation.</div>
+  </a>
+  <a class="card" href="./system-map.html">
+    <div class="t">Interactive 3D System Map</div>
+    <div class="d">A three.js diagram of the two layers, the entity contract, the pump→mainline→valve sequence and the sensor feedback loop.</div>
+  </a>
+  <a class="card" href="./irrigation-manual.html">
+    <div class="t">Irrigation System Manual</div>
+    <div class="d">The hardware-side manual — plumbing, valves, pumps, sensors and maintenance.</div>
+  </a>
+</main>
 </body>
 </html>
