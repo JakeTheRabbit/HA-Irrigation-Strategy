@@ -416,6 +416,22 @@
   .tlroot .chart-pane{ flex:1; min-height:340px; }
 }
 </style>
+<style>
+  /* ===== 3D facility twin (procedural Three.js — replaces the Blender model) ===== */
+  #f2t-wrap{position:relative}
+  #f2t-stage{position:absolute;inset:0}
+  #f2t-stage canvas{display:block}
+  .f2t-toolbar{position:absolute;top:10px;left:10px;z-index:5;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px}
+  .f2t-toolbar .grp{background:rgba(13,18,24,.85);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:5px 8px;display:flex;gap:4px;align-items:center;backdrop-filter:blur(6px)}
+  .f2t-toolbar button{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:7px;padding:3px 10px;color:#cbd5e1;cursor:pointer;font:12px inherit;font-family:inherit}
+  .f2t-toolbar button.on{background:rgba(16,185,129,.25);border-color:rgba(52,211,153,.5);color:#6ee7b7}
+  .f2t-toolbar label{display:flex;align-items:center;gap:4px;color:#cbd5e1;cursor:pointer;padding:0 3px}
+  #f2t-info{position:absolute;left:10px;bottom:10px;z-index:5;background:rgba(13,18,24,.88);color:#e2e8f0;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:9px 14px;font-size:12.5px;max-width:430px;line-height:1.45}
+  #f2t-info b{color:#fbbf24}
+  .f2t-lbl{background:rgba(15,20,26,.85);border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:1px 7px;font:600 11px/1.45 Inter,ui-sans-serif,system-ui,sans-serif;color:#e7ecf2;pointer-events:none;white-space:nowrap}
+  .f2t-lbl small{display:block;font-weight:400;color:#94a3b8;font-size:10px;line-height:1.2}
+  .f2t-lbl.cmp{background:#10b981;color:#06281c;border-color:#10b981;font-size:12px}
+</style>
 </head>
 <body x-data="app" x-cloak @keydown.window="onKey($event)" class="min-h-screen overflow-x-hidden">
 
@@ -463,6 +479,10 @@
         </div>
         <button @click="cmdOpen=true" class="ml-auto hidden sm:flex items-center gap-2 h-10 px-3 rounded-xl glass hover:border-white/20 text-slate-400 text-sm transition w-56 lift">
           <span x-html="icons.search" class="w-4 h-4 block"></span><span>Search · ask AI</span><kbd class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-white/10 border border-white/10">⌘K</kbd>
+        </button>
+        <button @click="pumpOpen=true" class="relative w-10 h-10 grid place-items-center rounded-xl transition lift" :class="pump.deadhead?'bg-rose-500/25 ring-1 ring-rose-400/50 animate-pulse':'glass hover:border-white/20'" aria-label="Pump — manual stop" title="Pump & irrigation — manual stop">
+          <svg viewBox="0 0 24 24" class="w-5 h-5 block" :class="pump.deadhead?'text-rose-200':'text-rose-400'" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
+          <span x-show="pump.pumpOn||pump.deadhead" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 grid place-items-center text-[9px] font-bold rounded-full bg-rose-500 text-white" x-text="pump.powerTxt"></span>
         </button>
         <button @click="go('dashboard'); $nextTick(()=>{const e=document.getElementById('advisories'); if(e) e.scrollIntoView({behavior:'smooth'})})" class="relative w-10 h-10 grid place-items-center rounded-xl glass hover:border-white/20 transition lift" aria-label="Advisories">
           <span x-html="icons.bell" class="w-5 h-5 block text-slate-300"></span>
@@ -568,16 +588,13 @@
             <!-- mini 3D of the room -->
             <div class="glass rounded-2xl p-3">
               <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.grid" class="w-4 h-4 block text-emerald-400"></span> Room 3D</h3><button @click="go('floor')" class="text-[11px] text-emerald-300/80 hover:text-emerald-300">open full →</button></div>
-              <template x-if="!demo">
-                <iframe src="/local/facility-twin/twin.html?v=1" loading="lazy" class="w-full rounded-xl border border-white/8 bg-black block" style="height:240px" title="F2 room 3D twin (live)"></iframe>
-              </template>
-              <div x-show="demo" class="rounded-xl border border-white/8 bg-gradient-to-br from-emerald-500/[0.06] to-cyan-500/[0.04] grid place-items-center text-center px-4" style="height:240px">
+              <button @click="go('floor'); floorLoaded=true; $nextTick(()=>window.initFacilityTwin&&window.initFacilityTwin())" class="w-full rounded-xl border border-white/8 bg-gradient-to-br from-emerald-500/[0.06] to-cyan-500/[0.04] grid place-items-center text-center px-4 hover:border-emerald-400/30 transition" style="height:240px">
                 <div>
                   <div class="w-12 h-12 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-2"><span x-html="icons.grid" class="w-6 h-6 block text-emerald-400"></span></div>
-                  <div class="text-[12px] text-slate-300 font-medium">3D room twin</div>
-                  <div class="text-[11px] text-slate-500 mt-1 max-w-[16rem]">Live model with clickable sensor cards runs in your Home Assistant.</div>
+                  <div class="text-[12px] text-slate-300 font-medium">3D facility twin</div>
+                  <div class="text-[11px] text-slate-500 mt-1 max-w-[16rem]">Procedural Three.js floor plan — both storeys, equipment + security layer. Tap to open.</div>
                 </div>
-              </div>
+              </button>
             </div>
             <!-- room camera -->
             <div class="glass rounded-2xl p-3">
@@ -1044,23 +1061,40 @@
             <div x-show="!control.feed.length" class="text-slate-500">No recent activity.</div></div></div>
       </section>
 
-      <!-- ===== 3D FLOOR (facility twin, iframe — loads only on tap) ===== -->
+      <!-- ===== 3D FLOOR (procedural Three.js facility twin — replaces the Blender model) ===== -->
       <section x-show="view==='floor'" class="fade-enter">
         <div class="glass rounded-2xl overflow-hidden relative" style="height:calc(100vh - 160px);min-height:460px">
-          <template x-if="floorLoaded">
-            <iframe src="/local/facility-twin/twin.html?v=1" class="w-full h-full border-0 block" title="F2 facility 3D twin"></iframe>
-          </template>
+          <div x-show="floorLoaded" id="f2t-wrap" class="absolute inset-0">
+            <div id="f2t-stage"></div>
+            <div class="f2t-toolbar">
+              <span class="grp">
+                <button id="f2tG" class="on">Ground</button>
+                <button id="f2tU">Upstairs</button>
+                <button id="f2tB">Both</button>
+              </span>
+              <span class="grp">
+                <button id="f2tOrbit" class="on">Orbit</button>
+                <button id="f2tTop">Top</button>
+              </span>
+              <span class="grp">
+                <label><input type="checkbox" id="f2tLabels" checked> Labels</label>
+                <label><input type="checkbox" id="f2tSec" checked> Security</label>
+                <label><input type="checkbox" id="f2tFov"> FOV</label>
+                <label><input type="checkbox" id="f2tAir"> Airflow</label>
+              </span>
+            </div>
+            <div id="f2t-info"><b>Tip:</b> click any bench, dehumidifier, camera, safe or room floor to identify it.</div>
+          </div>
           <div x-show="!floorLoaded" class="absolute inset-0 grid place-items-center p-6">
             <div class="text-center">
               <div class="w-14 h-14 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-3"><span x-html="icons.grid" class="w-7 h-7 block text-emerald-400"></span></div>
               <div class="font-semibold mb-1">3D facility twin</div>
-              <div class="text-[12px] text-slate-400 mb-4 max-w-xs" x-text="demo ? 'Interactive 3D twin with live sensor cards, clickable lights/HVAC and white clean-room walls — available in the full install.' : 'Live sensor cards on the real floor plan. Loads a ~34 MB model — best on wifi.'"></div>
-              <button x-show="!demo" @click="floorLoaded=true" class="h-11 px-6 rounded-xl bg-emerald-500/20 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/30 transition">Load 3D view</button>
-              <div x-show="demo" class="text-[11px] text-slate-500">(static demo — the live 3D view runs in your Home Assistant)</div>
+              <div class="text-[12px] text-slate-400 mb-4 max-w-xs">Procedural Three.js floor plan — builds instantly, no 34&nbsp;MB model download. Both storeys, equipment and the full security layer.</div>
+              <button @click="floorLoaded=true; $nextTick(()=>window.initFacilityTwin&&window.initFacilityTwin())" class="h-11 px-6 rounded-xl bg-emerald-500/20 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/30 transition">Load 3D view</button>
             </div>
           </div>
         </div>
-        <div class="text-[11px] text-slate-500 mt-2 px-1 flex items-center gap-1.5"><span x-html="icons.grid" class="w-3.5 h-3.5 block"></span> Drag to orbit, scroll to zoom · tap a sensor tile on a room to jump to its controls.</div>
+        <div class="text-[11px] text-slate-500 mt-2 px-1 flex items-center gap-1.5"><span x-html="icons.grid" class="w-3.5 h-3.5 block"></span> Drag to orbit, scroll to zoom · click a room or any equipment to identify it.</div>
       </section>
 
       <!-- ===== TIMELINE (native canvas — Phase D) ===== -->
@@ -1209,6 +1243,52 @@
   </div>
 </div>
 
+<!-- pump & irrigation — manual / emergency control -->
+<div x-show="pumpOpen" x-cloak class="fixed inset-0 z-[60]" @keydown.escape.window="pumpOpen=false">
+  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="pumpOpen=false"></div>
+  <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:h-fit sm:max-w-md glass-strong border-t sm:border border-white/12 rounded-t-2xl sm:rounded-2xl max-h-[88vh] overflow-y-auto scrollx" x-transition:enter="transition duration-200" x-transition:enter-start="translate-y-8 opacity-0" x-transition:enter-end="translate-y-0 opacity-100">
+    <div class="sticky top-0 glass-strong border-b border-white/8 p-4 flex items-center gap-3 z-10">
+      <div class="w-9 h-9 rounded-xl grid place-items-center bg-rose-500/15 ring-1 ring-rose-400/30"><svg viewBox="0 0 24 24" class="w-5 h-5 block text-rose-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg></div>
+      <div class="flex-1"><div class="font-semibold text-sm">Pump &amp; irrigation</div><div class="text-[11px] text-slate-400">manual control · writes to HA live, no undo</div></div>
+      <button @click="pumpOpen=false" class="w-9 h-9 rounded-lg grid place-items-center bg-white/5 hover:bg-white/10"><span x-html="icons.x" class="w-5 h-5 block"></span></button>
+    </div>
+    <div class="p-4 space-y-4">
+      <div class="rounded-xl border p-3 flex items-center justify-between gap-3" :class="pump.deadhead?'border-rose-500/40 bg-rose-500/10':'border-white/10 bg-white/[0.03]'">
+        <div><div class="text-[10px] uppercase tracking-wide text-slate-400">Main pump power</div><div class="text-2xl font-bold" :class="pump.deadhead?'text-rose-300':(pump.pumpOn?'text-amber-300':'text-emerald-300')" x-text="pump.powerTxt"></div></div>
+        <div x-show="pump.deadhead" class="text-[11px] text-rose-300 text-right max-w-[58%]">Pump pressurised with all valves shut — dead-heading. Stop it now.</div>
+        <div x-show="!pump.deadhead" class="text-[11px] text-right" :class="pump.pumpOn?'text-amber-300/80':'text-emerald-300/80'" x-text="pump.pumpOn?'running':'idle'"></div>
+      </div>
+      <button @click="pumpStopAll()" class="w-full h-14 rounded-xl bg-gradient-to-br from-rose-500 to-red-700 text-white font-bold tracking-wide shadow-lg shadow-red-900/40 hover:from-rose-400 hover:to-red-600 transition flex items-center justify-center gap-2">
+        <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
+        EMERGENCY STOP — ALL OFF
+      </button>
+      <div class="text-[11px] text-slate-500 -mt-2 text-center">disables system + auto, then shuts pump · main line · all 3 valves</div>
+      <div>
+        <div class="text-xs font-semibold text-slate-300 mb-2">Hardware</div>
+        <div class="space-y-1.5">
+          <template x-for="t in pump.hw" :key="t.id">
+            <div class="flex items-center justify-between rounded-lg bg-white/[0.03] border border-white/8 px-3 py-2.5">
+              <div class="flex items-center gap-2 text-sm"><span class="w-1.5 h-1.5 rounded-full" :class="t.on?(t.kind==='pump'?'bg-amber-400':'bg-sky-400'):'bg-slate-600'"></span><span x-text="t.label"></span></div>
+              <button @click="pumpToggle(t.id)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="t.on?(t.kind==='pump'?'bg-amber-500':'bg-sky-500'):'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="t.on&&'translate-x-5'"></span></button>
+            </div>
+          </template>
+        </div>
+      </div>
+      <div>
+        <div class="text-xs font-semibold text-slate-300 mb-2">System gates</div>
+        <div class="space-y-1.5">
+          <template x-for="t in pump.sw" :key="t.id">
+            <div class="flex items-center justify-between rounded-lg bg-white/[0.03] border border-white/8 px-3 py-2.5">
+              <div class="text-sm" x-text="t.label"></div>
+              <button @click="pumpToggle(t.id)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="t.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="t.on&&'translate-x-5'"></span></button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- command palette -->
 <div x-show="cmdOpen" x-cloak class="fixed inset-0 z-[60]" @keydown.escape.window="cmdOpen=false">
   <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="cmdOpen=false"></div>
@@ -1275,6 +1355,8 @@ function seedDemo(){
     dryback_target:15, dryback_rate:1.2, ec_trend:0.04, ec_target:6, pump_power:0, led_power:680, sensor_health:100, water_temp:20 };
   for(const k in E){ const v=E[k]; if(typeof v==='string' && ideal[k]!=null) set(v, ideal[k]); }
   ['sw_system','sw_auto','sw_ecstack'].forEach(k=>{ if(E[k]) set(E[k],'on'); });
+  ['switch.veg_main_pump','switch.espoe_irrigation_relay_2_3','switch.f2_row1','switch.f2_row2','switch.f2_row3'].forEach(id=>set(id,'off'));
+  set('sensor.veg_main_pump_power',0);
   if(E.dosing_active) set(E.dosing_active,'off'); if(E.next_irrig) set(E.next_irrig, iso(45));
   if(E.decision) set(E.decision,'Maintaining P2 — pore EC on target'); if(E.activity) set(E.activity,'Z1 P2 shot 5% · 20m ago');
   [1,2,3].forEach((z,i)=>{ const P='crop_steering_zone_'+z+'_', vwc=[57,59,58][i], ec=[3.0,3.1,2.9][i];
@@ -1572,6 +1654,30 @@ function buildInsights(){ const out=[]; const bt=num("bl_temp"),at=num("air_temp
 
 /* ===================== CONTROL view-model (ops console) ===================== */
 function ex(id){ return !!S[id]; }
+
+/* ===== Pump & irrigation hardware — emergency manual control (always one tap away) ===== */
+const PUMP_HW=[
+  {id:"switch.veg_main_pump",label:"Main pump",kind:"pump"},
+  {id:"switch.espoe_irrigation_relay_2_3",label:"Main line",kind:"line"},
+  {id:"switch.f2_row1",label:"Zone 1 valve",kind:"valve"},
+  {id:"switch.f2_row2",label:"Zone 2 valve",kind:"valve"},
+  {id:"switch.f2_row3",label:"Zone 3 valve",kind:"valve"},
+];
+const PUMP_SW=[
+  {id:"switch.crop_steering_system_enabled",label:"System enabled"},
+  {id:"switch.crop_steering_auto_irrigation_enabled",label:"Auto irrigation"},
+  {id:"input_boolean.nutrient_dosing_active",label:"Dosing active"},
+];
+function buildPump(){
+  const row=o=>({id:o.id,label:o.label,kind:o.kind||"",on:val(o.id)==="on"});
+  const hw=PUMP_HW.filter(o=>ex(o.id)).map(row);
+  const sw=PUMP_SW.filter(o=>ex(o.id)).map(row);
+  const power=num("sensor.veg_main_pump_power");
+  const pumpOn=val("switch.veg_main_pump")==="on";
+  const valvesShut=["switch.f2_row1","switch.f2_row2","switch.f2_row3"].every(id=>val(id)!=="on");
+  const deadhead=(((power!=null&&power>100))||pumpOn)&&valvesShut;
+  return { hw, sw, power, powerTxt:power==null?"—":fmt(power,0)+" W", pumpOn, deadhead, anyHw:hw.some(r=>r.on) };
+}
 function buildControl(){
   const mode=val("select.crop_steering_steering_mode")||"—", phase=val("sensor.crop_steering_app_current_phase")||"—";
   const dbT=mode==="Generative"?num("number.crop_steering_generative_dryback_target"):num("number.crop_steering_vegetative_dryback_target");
@@ -3962,6 +4068,7 @@ document.addEventListener('alpine:init', () => {
 
     view:'dashboard', sidebarOpen:true, connected:false, connError:"",
     cmdOpen:false, cmdQuery:"", aiOpen:false, aiInput:"", aiThinking:false, zoneModal:null, evOpen:null,
+    pumpOpen:false, pump:{hw:[],sw:[],power:null,powerTxt:'—',anyHw:false,deadhead:false,pumpOn:false},
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
     headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},telemetry:[],feed:[]}, ctrlZone:1,
@@ -4010,7 +4117,7 @@ document.addEventListener('alpine:init', () => {
       const rr=runRules();
       this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
       this.headline=computeHeadline(this.adv,this.watch);
-      this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl();
+      this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl(); this.pump=buildPump();
       { const cam=S[CONFIG.E.cam], ct=cam&&cam.attributes&&cam.attributes.access_token; this._camTick=(this._camTick||0)+1;
         this.camUrl=ct?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+CONFIG.E.cam+'?token='+ct+'&_='+this._camTick):''; }
       if(window.__tuneReseed) window.__tuneReseed();   // refresh the Tune editor from live HA (respects its hydrated/unsaved-edit guard)
@@ -4095,6 +4202,20 @@ document.addEventListener('alpine:init', () => {
     seedTune(){ if(window.__tuneReseed) window.__tuneReseed(); },
     async ctrlSvc(domain,service,data){ try{ await svc(domain,service,data); this.toast("Sent"); setTimeout(()=>this.tick(),700); }catch(e){ this.toast("Failed: "+e.message); } },
     ctrlToggle(id,confirmArm){ if(confirmArm && !confirm("Toggle the arm state? This affects live irrigation.")) return; this.ctrlSvc(id.split(".")[0],"toggle",{entity_id:id}); },
+    pumpToggle(id){
+      const on=val(id)==="on", isPump=id==="switch.veg_main_pump";
+      if(isPump && on && !confirm("Turn the MAIN PUMP off?")) return;
+      if(isPump && !on && !confirm("Turn the MAIN PUMP on?\nMake sure a zone valve is open first — running against a closed line dead-heads the pump.")) return;
+      this.ctrlSvc(id.split(".")[0],"toggle",{entity_id:id});
+    },
+    async pumpStopAll(){
+      if(!confirm("EMERGENCY STOP\n\nDisable system + auto irrigation, then shut the main pump, main line, and all zone valves. Halts all watering immediately.\n\nProceed?")) return;
+      const seq=["switch.crop_steering_system_enabled","switch.crop_steering_auto_irrigation_enabled","switch.veg_main_pump","switch.espoe_irrigation_relay_2_3","switch.f2_row1","switch.f2_row2","switch.f2_row3"];
+      try{ for(const id of seq){ if(S[id]) await svc(id.split(".")[0],"turn_off",{entity_id:id}); }
+        this.toast("Emergency stop sent — confirm pump power reads 0 W"); }
+      catch(e){ this.toast("STOP FAILED: "+(e&&e.message||e)); }
+      setTimeout(()=>this.tick(),700);
+    },
     ctrlSelect(id,v){ this.ctrlSvc(id.split(".")[0],"select_option",{entity_id:id,option:v}); },
     ctrlNum(id,v){ if(v!==""&&v!=null) this.ctrlSvc(id.split(".")[0],"set_value",{entity_id:id,value:parseFloat(v)}); },
     stepNum(it,dir){ const step=parseFloat(it.step)||1; let v=(parseFloat(it.val)||0)+dir*step;   // optimistic UI bump + live write
@@ -4180,6 +4301,718 @@ document.addEventListener('alpine:init', () => {
     reduced(){ return window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches; },
   }));
 });
+</script>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+<script>
+/* ============================================================
+   3D facility twin — procedural Three.js floor plan.
+   Replaces the old Blender-exported model (~34 MB) with a
+   data-driven build (<1 s). Loaded lazily on first tap.
+   Live-data hook: window.__f2twin.{scene,tints,...}
+   Units: metres. Plan coords (x, y) -> world (x, h, -y).
+   ============================================================ */
+window.initFacilityTwin = async function () {
+  if (window.__f2twinInit) return; window.__f2twinInit = true;
+  const info = document.getElementById('f2t-info');
+  try {
+    const THREE = await import('three');
+    const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+    const { CSS2DRenderer, CSS2DObject } = await import('three/addons/renderers/CSS2DRenderer.js');
+    buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject);
+  } catch (e) {
+    if (info) info.innerHTML = '<b>3D failed to load:</b> ' + (e && e.message ? e.message : e) + ' — check internet access to cdn.jsdelivr.net';
+  }
+};
+
+function buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
+  const stage = document.getElementById('f2t-stage');
+  const el = id => document.getElementById(id);
+
+  // ---------- renderer / scene / camera ----------
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x12181f);
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 400);
+  camera.position.set(24, 16, 9);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  stage.appendChild(renderer.domElement);
+
+  const labelRenderer = new CSS2DRenderer();
+  labelRenderer.domElement.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden';
+  stage.appendChild(labelRenderer.domElement);
+
+  const CENTER = new THREE.Vector3(7.4, 0.8, -8.35);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.copy(CENTER);
+  controls.enableDamping = true;
+  controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minDistance = 3; controls.maxDistance = 80;
+
+  // ---------- lights / ground ----------
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x6a7268, 0.85));
+  const sun = new THREE.DirectionalLight(0xfff2e0, 1.7);
+  sun.position.set(22, 28, 16);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.bias = -0.0005;
+  sun.shadow.camera.left = -22; sun.shadow.camera.right = 22;
+  sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
+  sun.shadow.camera.far = 90;
+  scene.add(sun);
+
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(60, 48),
+    new THREE.MeshStandardMaterial({ color: 0x1b222a, roughness: 1 }));
+  ground.geometry.rotateX(-Math.PI / 2);
+  ground.position.y = -0.22; ground.receiveShadow = true;
+  scene.add(ground);
+  const grid = new THREE.GridHelper(70, 35, 0x2b3540, 0x232b33);
+  grid.position.y = -0.205;
+  scene.add(grid);
+
+  // ---------- materials ----------
+  const SM = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, ...o });
+  const M = {
+    wall: SM(0xe8e6e0, { roughness: 0.9 }),
+    slab: SM(0xc9cbc4),
+    door: SM(0x8a6a4a, { roughness: 0.7 }),
+    tread: SM(0xb9bdb9),
+    benchTop: SM(0xd8dadd, { roughness: 0.6, metalness: 0.25 }),
+    frame: SM(0x6a6e72, { metalness: 0.4, roughness: 0.5 }),
+    dark: SM(0x33373c, { metalness: 0.3, roughness: 0.55 }),
+    white: SM(0xf2f3f4, { roughness: 0.5 }),
+    steel: SM(0xb6bcc2, { metalness: 0.5, roughness: 0.45 }),
+    black: SM(0x16181c, { roughness: 0.6 }),
+    safeBlue: SM(0x1f4fa3, { metalness: 0.45, roughness: 0.4 }),
+    yellow: SM(0xf6b91e, { emissive: 0xcc8800, emissiveIntensity: 0.45 }),
+    pot: SM(0x222426, { roughness: 0.8 }),
+    leaf: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }),
+    light: SM(0xfafaf2, { emissive: 0xfff3d8, emissiveIntensity: 1.4 }),
+    tank: SM(0xdde2e4, { roughness: 0.5 }),
+    co2: SM(0x7d8a7d, { metalness: 0.35, roughness: 0.5 }),
+    wood: SM(0x9a7b58, { roughness: 0.7 }),
+  };
+
+  // ---------- helpers ----------
+  const pickables = [];
+  const cones = [];
+  const labelObjs = [];
+  const tintsRegistry = [];
+  const DEG = THREE.MathUtils.degToRad;
+
+  function box(w, h, d, mat) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.castShadow = m.receiveShadow = true;
+    return m;
+  }
+  const at = (mesh, x, y, h) => { mesh.position.set(x, h, -y); return mesh; };
+  function tag(g, name, detail) { g.userData = { name, detail }; pickables.push(g); return g; }
+
+  function slabGeo(w, d, t, holes = []) {
+    const s = new THREE.Shape();
+    s.moveTo(0, 0); s.lineTo(w, 0); s.lineTo(w, d); s.lineTo(0, d); s.closePath();
+    for (const [hx, hy, hw, hd] of holes) {
+      const p = new THREE.Path();
+      p.moveTo(hx, hy); p.lineTo(hx + hw, hy); p.lineTo(hx + hw, hy + hd); p.lineTo(hx, hy + hd); p.closePath();
+      s.holes.push(p);
+    }
+    const g = new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: false });
+    g.rotateX(-Math.PI / 2);
+    return g;
+  }
+
+  function wallRun(parent, x1, y1, x2, y2, h, t, ops = [], base = 0) {
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    const g = new THREE.Group();
+    g.position.set(x1, base, -y1);
+    g.rotation.y = Math.atan2(y2 - y1, x2 - x1);
+    const put = (m, lx, ly) => { m.position.set(lx, ly, 0); g.add(m); };
+    let cur = 0;
+    for (const o of [...ops].sort((a, b) => a.at - b.at)) {
+      const s = o.at - o.w / 2, head = o.head ?? 2.05;
+      if (s - cur > 0.01) put(box(s - cur, h, t, M.wall), cur + (s - cur) / 2, h / 2);
+      if (h - head > 0.02) put(box(o.w, h - head, t, M.wall), o.at, head + (h - head) / 2);
+      if (o.door) {
+        const hinge = new THREE.Group(); hinge.position.set(s, 0, 0);
+        const leaf = box(o.w * 0.92, 2.0, 0.045, M.door);
+        leaf.position.set(o.w * 0.46, 1.0, 0);
+        hinge.add(leaf); hinge.rotation.y = -0.5;
+        g.add(hinge);
+      }
+      cur = o.at + o.w / 2;
+    }
+    if (len - cur > 0.01) put(box(len - cur, h, t, M.wall), cur + (len - cur) / 2, h / 2);
+    parent.add(g); return g;
+  }
+
+  function tint(parent, x, y, w, d, color, infoArr) {
+    const m = box(w, 0.02, d, SM(color, { roughness: 1 }));
+    at(m, x + w / 2, y + d / 2, 0.011);
+    m.castShadow = false;
+    if (infoArr) { tag(m, infoArr[0], infoArr[1]); tintsRegistry.push({ name: infoArr[0], mesh: m }); }
+    parent.add(m); return m;
+  }
+
+  function label(parent, html, x, y, h, cls = 'f2t-lbl') {
+    const e = document.createElement('div');
+    e.className = cls; e.innerHTML = html;
+    const o = new CSS2DObject(e);
+    o.position.set(x, h, -y);
+    parent.add(o);
+    labelObjs.push(o);
+    return o;
+  }
+
+  // ---------- storey groups ----------
+  const gf = new THREE.Group(), uf = new THREE.Group();
+  const secGF = new THREE.Group(), secUF = new THREE.Group();
+  const airGF = new THREE.Group();
+  gf.add(secGF, airGF); uf.add(secUF);
+  scene.add(gf, uf);
+  airGF.visible = false;
+
+  const ghost = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(14.83, 3.2, 16.7)),
+    new THREE.LineBasicMaterial({ color: 0x44525e }));
+  ghost.position.set(7.415, 1.6, -8.35);
+  ghost.visible = false;
+  scene.add(ghost);
+
+  // ---------- slabs ----------
+  const gfSlab = new THREE.Mesh(slabGeo(14.83, 16.7, 0.2), M.slab);
+  gfSlab.position.y = -0.2; gfSlab.receiveShadow = true; gfSlab.castShadow = true;
+  gf.add(gfSlab);
+
+  const ufSlab = new THREE.Mesh(slabGeo(14.83, 16.7, 0.25, [[9.7, 5.05, 4.5, 1.4]]), M.slab);
+  ufSlab.position.y = 3.0; ufSlab.receiveShadow = true; ufSlab.castShadow = true;
+  uf.add(ufSlab);
+
+  // ---------- floor tints (pickable room registers) ----------
+  const GREEN = 0xd6e4d2, EPOXY = 0xeceee9, NEUTRAL = 0xe9e7df, CARPET = 0xded9cf;
+  tint(gf, 0.15, 7.35, 4.8, 9.2, EPOXY, ['Flower Room 2 — 44 m²',
+    '3 × rolling bench 1.2×7.6 m · 2 × dehu (on benches) · 4 × carbon filter/fan · 2 wall AC + door AC · drug safe']);
+  tint(gf, 9.88, 7.35, 4.8, 9.2, EPOXY, ['Flower Room 1 — 44 m²',
+    '3 × rolling bench 1.2×7.6 m · 2 × dehu (on benches) · 4 × carbon filter/fan · 2 wall AC + door AC · drug safe · 3500 m³/h horizontal airflow']);
+  tint(gf, 5.10, 9.65, 4.63, 6.9, EPOXY, ['Veg / Prop / Mother — 32 m²',
+    '4 × propagation bench · 2 × filter/fan · 2 × dehu · wall + door AC']);
+  tint(gf, 5.10, 7.35, 4.63, 2.15, GREEN, ['Lobby', 'Airlock zone between flower rooms and veg/prop/mother']);
+  tint(gf, 0.15, 5.85, 9.475, 1.35, GREEN, ['Hallway', 'Main circulation spine · 6U PoE racks at grow-room doors']);
+  tint(gf, 9.55, 6.55, 5.13, 0.65, GREEN, ['Hallway (east)', 'Along stair enclosure']);
+  tint(gf, 8.60, 0.4, 0.95, 5.45, GREEN, ['Hallway (rear)', 'Between irrigation and kitchen · rear exit door · stair access']);
+  tint(gf, 2.10, 0.5, 4.05, 4.95, NEUTRAL, ['Drying / Vault — 20 m²', 'The room IS the vault · 4 drying cabinets · dehu']);
+  tint(gf, 6.30, 0.5, 2.15, 5.2, 0xe3e8ec, ['Irrigation Room', '2 bulk tanks · 4 stock tanks · fertigation cabinets']);
+  tint(gf, 9.70, 1.75, 4.98, 3.2, GREEN, ['Kitchen', 'Counter + sink · fridge · disposal area · WC to the south']);
+  tint(gf, 9.70, 0.4, 4.98, 1.2, 0xdde4ea, ['WC', '2 stalls + basins, entered from kitchen']);
+  tint(gf, 0.15, 0.6, 1.8, 5.1, GREEN, ['Loading Zone — 9 m²', '4.6 m roller door · CO₂ tanks + manifold']);
+  tint(uf, 0.15, 0.15, 14.53, 4.9, CARPET, ['Office — open plan', 'Whole upper floor is the office · workstations + 13U rack at the south-east end']);
+  tint(uf, 0.15, 6.45, 14.53, 10.1, CARPET, ['Office — open plan', 'Open-plan office · PTZ auto-tracking camera for roof intrusion coverage']);
+  tint(uf, 0.15, 5.05, 9.55, 1.4, CARPET, ['Office — open plan', 'West of the stair void']);
+  tint(uf, 14.2, 5.05, 0.48, 1.4, CARPET, ['Stair landing', 'Arrival from the kitchen-side stair']);
+  for (const c of [...uf.children]) if (c.geometry instanceof THREE.BoxGeometry) c.position.y += 3.25;
+
+  // ---------- walls ----------
+  const T = 0.15, H = 3.0, UH = 2.7, UB = 3.25;
+  const WALLS_GF = [
+    [0.075, 0, 0.075, 16.7, [{ at: 2.9, w: 4.6, head: 2.9 }, { at: 6.75, w: 1.0, door: true }]],
+    [0, 16.625, 14.83, 16.625, []],
+    [14.755, 0, 14.755, 16.7, []],
+    [0, 0.075, 14.83, 0.075, [{ at: 9.05, w: 0.95, door: true }]],
+    [5.025, 7.2, 5.025, 16.7, []],
+    [9.805, 7.2, 9.805, 16.7, []],
+    [0, 7.275, 5.1, 7.275, [{ at: 3.95, w: 0.95, door: true }]],
+    [5.025, 9.575, 9.88, 9.575, [{ at: 3.4, w: 0.95, door: true }]],
+    [9.73, 7.275, 14.83, 7.275, [{ at: 0.95, w: 0.95, door: true }]],
+    [2.025, 0, 2.025, 5.85, []],
+    [0, 5.775, 2.1, 5.775, [{ at: 1.1, w: 0.95, door: true }]],
+    [2.025, 5.525, 6.3, 5.525, [{ at: 0.85, w: 0.95, door: true }]],
+    [6.225, 0, 6.225, 5.6, []],
+    [6.225, 5.775, 8.6, 5.775, [{ at: 1.2, w: 0.95, door: true }]],
+    [8.525, 0, 8.525, 5.85, []],
+    [9.625, 0, 9.625, 6.45, [{ at: 4.3, w: 0.95, door: true }, { at: 5.75, w: 1.25, head: 2.6 }]],
+    [9.55, 5.025, 14.83, 5.025, []],
+    [9.55, 6.475, 14.83, 6.475, []],
+    [9.55, 1.675, 14.83, 1.675, [{ at: 0.75, w: 0.9, door: true }]],
+  ];
+  for (const [a, b, c, d, ops] of WALLS_GF) wallRun(gf, a, b, c, d, H, T, ops, 0);
+
+  const WALLS_UF = [
+    [0.075, 0, 0.075, 16.7, []],
+    [0, 16.625, 14.83, 16.625, []],
+    [14.755, 0, 14.755, 16.7, []],
+    [0, 0.075, 14.83, 0.075, []],
+  ];
+  for (const [a, b, c, d, ops] of WALLS_UF) wallRun(uf, a, b, c, d, UH, T, ops, UB);
+
+  // roller door panel (corrugated canvas texture)
+  {
+    const cv = document.createElement('canvas'); cv.width = 64; cv.height = 256;
+    const cx = cv.getContext('2d');
+    cx.fillStyle = '#b9bec4'; cx.fillRect(0, 0, 64, 256);
+    cx.fillStyle = '#9aa0a7';
+    for (let y = 0; y < 256; y += 16) cx.fillRect(0, y, 64, 3);
+    const tex = new THREE.CanvasTexture(cv);
+    const roller = box(0.07, 2.85, 4.6, new THREE.MeshStandardMaterial({ map: tex, metalness: 0.35, roughness: 0.6 }));
+    at(roller, 0.075, 2.9, 1.43);
+    tag(roller, 'Roller door', '4.6 m wide × 2.9 m — loading zone, west elevation');
+    gf.add(roller);
+  }
+
+  // ---------- stairs (up the north side of the kitchen, rising east to the office) ----------
+  {
+    const RISE = 3.25, RUN = 4.5, N = 16, SW = 1.3, X0 = 9.7, YC = 5.75;
+    const sg = new THREE.Group();
+    for (let i = 0; i < N; i++) {
+      const t = box(RUN / N, RISE / N, SW, M.tread);
+      at(t, X0 + (i + 0.5) * RUN / N, YC, (i + 0.5) * RISE / N);
+      sg.add(t);
+    }
+    const ang = Math.atan2(RISE, RUN), rl = Math.hypot(RISE, RUN) + 0.4;
+    for (const side of [YC - SW / 2 - 0.03, YC + SW / 2 + 0.03]) {
+      const rail = box(rl, 0.05, 0.05, M.frame);
+      at(rail, X0 + RUN / 2, side, RISE / 2 + 0.95);
+      rail.rotation.z = ang;
+      sg.add(rail);
+    }
+    tag(sg, 'Stairs', '16 risers along the kitchen’s north side, up to the office level (+3.25 m), entered from the rear hallway');
+    gf.add(sg);
+    const gr = new THREE.Group();
+    const mk = (w, d, x, y) => { const r = box(w, 0.06, d, M.frame); at(r, x, y, UB + 1.0); gr.add(r); };
+    mk(4.5, 0.05, 11.95, 6.42); mk(4.5, 0.05, 11.95, 5.08); mk(0.05, 1.4, 9.72, 5.75);
+    uf.add(gr);
+  }
+
+  // ---------- grow rooms: benches / plants / lights ----------
+  const plantSites = [];
+  function bench(parent, x, y, w, len) {
+    const g = new THREE.Group();
+    const top = box(w, 0.05, len, M.benchTop); at(top, x + w / 2, y + len / 2, 0.72); g.add(top);
+    for (const fy of [y + 0.15, y + len / 2, y + len - 0.15])
+      for (const fx of [x + 0.08, x + w - 0.08])
+        g.add(at(box(0.05, 0.68, 0.05, M.frame), fx, fy, 0.34));
+    g.add(at(box(0.05, 0.05, len - 0.3, M.frame), x + 0.08, y + len / 2, 0.36));
+    g.add(at(box(0.05, 0.05, len - 0.3, M.frame), x + w - 0.08, y + len / 2, 0.36));
+    tag(g, 'Rolling bench', `${w.toFixed(1)} × ${len.toFixed(1)} m — ${(w * len).toFixed(2)} m² canopy`);
+    parent.add(g);
+    return g;
+  }
+  function lightBar(parent, x, y, len) {
+    const b = box(0.12, 0.05, len, M.light);
+    at(b, x, y, 2.3); b.castShadow = false;
+    tag(b, 'Grow light bar', 'LED bar over bench, 2.3 m');
+    parent.add(b);
+  }
+  function addPlants(cx, y0, len, cols, rows, s) {
+    for (let r = 0; r < rows; r++)
+      for (const off of cols)
+        plantSites.push({ x: cx + off, y: y0 + (r + 0.5) * len / rows, s });
+  }
+
+  const FLOWER_BENCH = [
+    { edges: [0.45, 1.95, 3.45] },
+    { edges: [10.18, 11.68, 13.18] }
+  ];
+  for (const fb of FLOWER_BENCH)
+    for (const e of fb.edges) {
+      bench(gf, e, 8.0, 1.2, 7.6);
+      addPlants(e + 0.6, 8.0, 7.6, [-0.3, 0.3], 13, 1.0);
+      lightBar(gf, e + 0.35, 11.8, 7.2);
+      lightBar(gf, e + 0.85, 11.8, 7.2);
+    }
+  for (const e of [5.39, 6.48, 7.57, 8.66]) {
+    bench(gf, e, 10.2, 0.8, 5.7);
+    addPlants(e + 0.4, 10.2, 5.7, [-0.18, 0.18], 9, 0.55);
+    lightBar(gf, e + 0.4, 13.05, 5.4);
+  }
+
+  {
+    const n = plantSites.length;
+    const pots = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.105, 0.085, 0.16, 10), M.pot, n);
+    const canopy = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.21, 1), M.leaf, n);
+    pots.castShadow = canopy.castShadow = true;
+    const d = new THREE.Object3D(), c = new THREE.Color();
+    plantSites.forEach((p, i) => {
+      d.position.set(p.x, 0.80, -p.y); d.scale.setScalar(p.s); d.updateMatrix();
+      pots.setMatrixAt(i, d.matrix);
+      const s = p.s * (0.85 + Math.random() * 0.3);
+      d.position.set(p.x, 0.88 + 0.18 * s, -p.y);
+      d.scale.set(s, s * 0.85, s); d.updateMatrix();
+      canopy.setMatrixAt(i, d.matrix);
+      c.setHSL(0.32 + Math.random() * 0.04, 0.45, 0.30 + Math.random() * 0.08);
+      canopy.setColorAt(i, c);
+    });
+    pots.instanceMatrix.needsUpdate = true;
+    canopy.instanceMatrix.needsUpdate = true;
+    if (canopy.instanceColor) canopy.instanceColor.needsUpdate = true;
+    gf.add(pots, canopy);
+  }
+
+  // ---------- climate equipment ----------
+  function mkDehu(parent, x, y, base = 0) {
+    const g = new THREE.Group(); g.position.set(x, base, -y);
+    const body = box(0.55, 1.0, 0.55, M.white); body.position.y = 0.5;
+    const grill = box(0.45, 0.5, 0.04, M.dark); grill.position.set(0, 0.62, 0.26);
+    const vent = box(0.45, 0.03, 0.45, M.dark); vent.position.y = 1.015;
+    g.add(body, grill, vent);
+    tag(g, 'Dehumidifier', '320 L/day');
+    parent.add(g);
+  }
+  function mkFilter(parent, x, y) {
+    const g = new THREE.Group(); g.position.set(x, 2.45, -y);
+    const cg = new THREE.CylinderGeometry(0.23, 0.23, 0.7, 18); cg.rotateX(Math.PI / 2);
+    const can = new THREE.Mesh(cg, M.steel); can.castShadow = true;
+    const fg = new THREE.CylinderGeometry(0.16, 0.16, 0.35, 18); fg.rotateX(Math.PI / 2);
+    const fan = new THREE.Mesh(fg, M.dark); fan.position.z = 0.55; fan.castShadow = true;
+    for (const z of [-0.25, 0.25]) {
+      const s = box(0.03, 0.34, 0.03, M.frame); s.position.set(0, 0.38, z); g.add(s);
+    }
+    g.add(can, fan);
+    tag(g, 'Carbon filter + inline fan', 'Odour scrubbing, hung at 2.45 m');
+    parent.add(g);
+  }
+  function mkAC(parent, x, y, name) {
+    const g = new THREE.Group(); g.position.set(x, 2.45, -y);
+    const body = box(0.95, 0.32, 0.26, M.white);
+    const vent = box(0.85, 0.05, 0.02, M.dark); vent.position.set(0, -0.1, 0.13);
+    g.add(body, vent);
+    tag(g, name, 'Mini-split head, 2.45 m');
+    parent.add(g);
+  }
+  const FLOWER_EQ = [
+    { dehus: [[1.05, 15.0], [2.55, 8.7]], filters: [[1.8, 13.5], [1.8, 10.5], [3.3, 13.5], [3.3, 10.5]],
+      wallAC: [[1.3, 7.49], [2.8, 7.49]], doorAC: [3.95, 7.49] },
+    { dehus: [[12.28, 15.0], [12.28, 8.7]], filters: [[11.53, 13.5], [11.53, 10.5], [13.03, 13.5], [13.03, 10.5]],
+      wallAC: [[12.0, 7.49], [13.5, 7.49]], doorAC: [10.68, 7.49] },
+  ];
+  for (const eq of FLOWER_EQ) {
+    for (const [x, y] of eq.dehus) mkDehu(gf, x, y, 0.75);
+    for (const [x, y] of eq.filters) mkFilter(gf, x, y);
+    for (const [x, y] of eq.wallAC) mkAC(gf, x, y, 'Wall AC');
+    mkAC(gf, eq.doorAC[0], eq.doorAC[1], 'Door AC');
+  }
+  mkFilter(gf, 5.6, 15.8);
+  mkFilter(gf, 7.4, 11.5);
+  mkDehu(gf, 9.35, 12.3); mkDehu(gf, 9.35, 13.4);
+  mkAC(gf, 6.0, 9.79, 'Wall AC (veg)');
+  mkAC(gf, 8.43, 9.79, 'Door AC (veg)');
+
+  // airflow arrows (toggle)
+  function mkArrow(x, y, dirDeg) {
+    const g = new THREE.Group(); g.position.set(x, 2.05, -y);
+    g.rotation.y = DEG(dirDeg - 90);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x2b7fd9, transparent: true, opacity: 0.85 });
+    const sg2 = new THREE.CylinderGeometry(0.05, 0.05, 1.1, 10); sg2.rotateX(Math.PI / 2);
+    const shaft = new THREE.Mesh(sg2, mat); shaft.position.z = -0.55;
+    const cg2 = new THREE.ConeGeometry(0.14, 0.4, 12); cg2.rotateX(-Math.PI / 2);
+    const head = new THREE.Mesh(cg2, mat); head.position.z = -1.3;
+    g.add(shaft, head);
+    airGF.add(g);
+  }
+  for (const r of [{ w: 1.05, e: 4.05 }, { w: 10.78, e: 13.78 }]) {
+    for (const y of [9.5, 12.0, 14.5]) mkArrow(r.w, y, 90);
+    for (const y of [10.8, 13.3, 15.8]) mkArrow(r.e, y, 270);
+  }
+
+  // ---------- service rooms ----------
+  {
+    const g = new THREE.Group();
+    for (let i = 0; i < 6; i++) {
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 1.4, 12), M.co2);
+      c.castShadow = true; c.position.set(1.72, 0.7, -(1.4 + i * 0.5));
+      const v = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.12, 8), M.steel);
+      v.position.set(1.72, 1.46, -(1.4 + i * 0.5));
+      g.add(c, v);
+    }
+    const pg = new THREE.CylinderGeometry(0.03, 0.03, 2.8, 8); pg.rotateX(Math.PI / 2);
+    const pipe = new THREE.Mesh(pg, M.steel); pipe.position.set(1.9, 1.35, -2.65);
+    g.add(pipe);
+    tag(g, 'CO₂ tanks + manifold', '6 cylinders, loading zone east wall');
+    gf.add(g);
+  }
+  function dryCabinet(parent, cx, y0, y1) {
+    const g = new THREE.Group();
+    const len = y1 - y0, yc = (y0 + y1) / 2;
+    const body = box(0.88, 2.05, len, M.white); at(body, cx, yc, 1.025); g.add(body);
+    const kick = box(0.9, 0.1, len, M.tread); at(kick, cx, yc, 0.05); g.add(kick);
+    tag(g, 'Drying cabinet row', 'Enclosed drying racks — the whole room is the vault');
+    parent.add(g);
+  }
+  for (const cx of [2.6, 3.55, 4.5, 5.45]) dryCabinet(gf, cx, 0.9, 4.9);
+  mkDehu(gf, 2.4, 5.2);
+  {
+    const g = new THREE.Group();
+    for (const [x, y] of [[6.95, 4.7], [7.95, 4.7]]) {
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.6, 20), M.tank);
+      t.castShadow = true; t.position.set(x, 0.8, -y); g.add(t);
+    }
+    for (let i = 0; i < 4; i++) {
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.0, 14), M.tank);
+      t.castShadow = true; t.position.set(6.65, 0.5, -(3.5 - i * 0.6)); g.add(t);
+    }
+    tag(g, 'Irrigation tank bank', '2 bulk reservoirs + 4 stock/dosing tanks (plan: blue circles)');
+    gf.add(g);
+    const cab = box(1.8, 0.9, 0.55, M.wood); at(cab, 7.5, 0.85, 0.45);
+    tag(cab, 'Fertigation cabinets', 'Dosing + controls, south wall');
+    const pump = box(0.3, 0.25, 0.35, M.dark); at(pump, 8.2, 0.85, 0.125);
+    gf.add(cab, pump);
+  }
+  {
+    const counter = box(3.0, 0.9, 0.6, M.white); at(counter, 11.5, 2.05, 0.45);
+    tag(counter, 'Kitchen counter', 'Prep bench with sink + appliances');
+    const sink = box(0.5, 0.06, 0.4, M.dark); at(sink, 10.8, 2.05, 0.93);
+    const fridge = box(0.75, 1.8, 0.75, M.white); at(fridge, 14.25, 4.55, 0.9);
+    tag(fridge, 'Fridge', 'Kitchen north-east corner');
+    const binG = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.22, 0.6, 14), SM(0x3f8a46));
+    binG.castShadow = true; binG.position.set(10.0, 0.3, -4.3);
+    tag(binG, 'Disposal bin', 'Quarantined green-waste disposal area');
+    const binB = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.22, 0.6, 14), M.dark);
+    binB.castShadow = true; binB.position.set(10.65, 0.3, -4.45);
+    const decal = new THREE.Mesh(new THREE.CircleGeometry(0.6, 24),
+      new THREE.MeshBasicMaterial({ color: 0x3f8a46, transparent: true, opacity: 0.22 }));
+    decal.rotation.x = -Math.PI / 2; decal.position.set(10.3, 0.022, -4.35);
+    gf.add(counter, sink, fridge, binG, binB, decal);
+    for (const wx of [10.6, 11.6]) {
+      const wc = box(0.4, 0.4, 0.5, M.white); at(wc, wx, 0.75, 0.2);
+      const tk = box(0.45, 0.5, 0.15, M.white); at(tk, wx, 0.52, 0.55);
+      gf.add(wc, tk);
+    }
+    for (const bx of [13.0, 13.7]) {
+      const basin = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.15, 0.12, 12), M.white);
+      basin.position.set(bx, 0.85, -0.75); basin.castShadow = true;
+      gf.add(basin);
+    }
+  }
+  for (const [x, y] of [[0.5, 7.7], [14.3, 7.7]]) {
+    const s = box(0.45, 0.6, 0.45, M.safeBlue); at(s, x, y, 0.3);
+    tag(s, 'Drug safe', 'Floor-bolted, flower-room exit (plan: blue key symbol)');
+    gf.add(s);
+  }
+  function mkRack(parent, x, y, h, u, base = 0) {
+    const g = new THREE.Group(); g.position.set(x, base + h, -y);
+    const body = box(0.55, u === 13 ? 0.9 : 0.55, 0.32, M.black);
+    const led = box(0.4, 0.03, 0.01, SM(0x2dd06f, { emissive: 0x18a050, emissiveIntensity: 0.8 }));
+    led.position.set(0, (u === 13 ? 0.32 : 0.16), 0.165);
+    g.add(body, led);
+    tag(g, `PoE switch + UPS — ${u}U rack`, u === 13 ? 'Head-end: NVR, switch, UPS (office workstations)' : 'Edge PoE + UPS');
+    parent.add(g);
+  }
+  mkRack(gf, 0.5, 7.04, 1.55, 6);
+  mkRack(gf, 5.5, 9.41, 1.55, 6);
+  mkRack(gf, 10.0, 7.04, 1.55, 6);
+
+  // ---------- upper floor: open-plan office, workstation cluster at the stair end ----------
+  {
+    const deskA = box(0.7, 0.05, 2.4, M.wood); at(deskA, 14.3, 2.6, UB + 0.72);
+    const deskB = box(2.2, 0.05, 0.7, M.wood); at(deskB, 12.5, 0.55, UB + 0.72);
+    const g = new THREE.Group(); g.add(deskA, deskB);
+    for (const [px, py] of [[14.3, 1.45], [14.3, 3.75], [11.45, 0.55], [13.55, 0.55]]) {
+      const p = box(0.05, 0.7, 0.6, M.frame); at(p, px, py, UB + 0.36); g.add(p);
+    }
+    const m1 = box(0.04, 0.3, 0.5, M.dark); at(m1, 14.45, 2.2, UB + 1.05);
+    const m2 = box(0.04, 0.3, 0.5, M.dark); at(m2, 14.45, 3.0, UB + 1.05);
+    const m3 = box(0.5, 0.3, 0.04, M.dark); at(m3, 12.3, 0.42, UB + 1.05);
+    g.add(m1, m2, m3);
+    tag(g, 'Office workstations', 'Monitoring desks at the stair end — triple displays');
+    uf.add(g);
+    for (const [cx, cy] of [[13.6, 2.6], [12.5, 1.35]]) {
+      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.08, 14), M.dark);
+      seat.position.set(cx, UB + 0.45, -cy); seat.castShadow = true;
+      const back = box(0.06, 0.45, 0.45, M.dark); at(back, cx - 0.22, cy, UB + 0.75);
+      uf.add(seat, back);
+    }
+    const printer = box(0.5, 0.35, 0.45, M.white); at(printer, 10.6, 0.55, UB + 0.175);
+    tag(printer, 'Printer', 'Office equipment');
+    uf.add(printer);
+    mkRack(uf, 14.3, 4.35, 0.45, 13, UB);
+  }
+
+  // ---------- security devices ----------
+  function mkSiren(parent, x, y, h) {
+    const g = new THREE.Group(); g.position.set(x, h, -y);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.05, 12), M.white);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 10), M.yellow);
+    dome.position.y = 0.06; dome.scale.y = 1.15;
+    g.add(base, dome);
+    tag(g, 'Siren / strobe', 'Audible + visual alarm');
+    parent.add(g);
+  }
+  function mkCam(parent, x, y, h, aim, o = {}) {
+    const g = new THREE.Group();
+    g.position.set(x, h, -y);
+    g.rotation.order = 'YXZ';
+    g.rotation.y = DEG(aim - 90);
+    g.rotation.x = DEG(o.tilt ?? -10);
+    if (o.dome) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.5, 10), M.steel);
+      pole.position.y = -0.28;
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 12), M.dark);
+      g.add(pole, ball);
+    } else {
+      const bg = new THREE.CylinderGeometry(0.05, 0.05, 0.22, 12); bg.rotateX(Math.PI / 2);
+      const body = new THREE.Mesh(bg, M.white); body.position.z = -0.06;
+      const lg = new THREE.CylinderGeometry(0.052, 0.052, 0.03, 12); lg.rotateX(Math.PI / 2);
+      const lens = new THREE.Mesh(lg, M.dark); lens.position.z = -0.18;
+      const arm = box(0.04, 0.04, 0.12, M.steel); arm.position.z = 0.08;
+      const plate = box(0.11, 0.11, 0.02, M.steel); plate.position.z = 0.15;
+      g.add(body, lens, arm, plate);
+    }
+    const fov = o.fov ?? 52, L = o.len ?? 6;
+    const r = Math.tan(DEG(fov / 2)) * L;
+    const cgeo = new THREE.ConeGeometry(r, L, 20, 1, true);
+    cgeo.translate(0, -L / 2, 0); cgeo.rotateX(Math.PI / 2);
+    const cone = new THREE.Mesh(cgeo, new THREE.MeshBasicMaterial({
+      color: 0xffd76a, transparent: true, opacity: 0.13, side: THREE.DoubleSide, depthWrite: false }));
+    cone.visible = false; cones.push(cone);
+    g.add(cone);
+    tag(g, o.name ?? 'Security camera', o.label ?? '');
+    parent.add(g);
+  }
+
+  mkCam(secGF, 0.35, 12.0, 2.5, -20, { label: 'Flower Room 2 — bench rows' });
+  mkCam(secGF, 4.75, 15.8, 2.5, 215, { label: 'Flower Room 2 — south end + safe' });
+  mkCam(secGF, 2.0, 7.55, 2.55, 90, { len: 8, label: 'Flower Room 2 — centre aisle' });
+  mkCam(secGF, 10.05, 12.0, 2.5, 20, { label: 'Flower Room 1 — bench rows' });
+  mkCam(secGF, 14.5, 15.8, 2.5, 235, { label: 'Flower Room 1 — south end + safe' });
+  mkCam(secGF, 12.85, 7.55, 2.55, 90, { len: 8, label: 'Flower Room 1 — centre aisle' });
+  mkCam(secGF, 5.35, 16.3, 2.5, -55, { label: 'Veg / prop / mother room' });
+  mkCam(secGF, 0.35, 6.55, 2.55, 0, { len: 9, label: 'Hallway — west end, looking east' });
+  mkCam(secGF, 14.45, 6.9, 2.55, 180, { len: 7, label: 'Hallway — east end, looking west' });
+  mkCam(secGF, 2.3, 5.2, 2.35, -50, { label: 'Drying/vault — cabinet row' });
+  mkCam(secGF, 6.0, 0.8, 2.35, 130, { label: 'Drying/vault — rear' });
+  mkCam(secGF, 6.5, 5.45, 2.35, -55, { label: 'Irrigation room' });
+  mkCam(secGF, 9.85, 4.85, 2.4, -40, { label: 'Kitchen + disposal area' });
+  mkCam(secGF, 9.05, 6.1, 2.55, 270, { len: 6, label: 'Rear hallway — exit door + stair foot' });
+  mkCam(secGF, 1.85, 5.4, 2.6, 255, { label: 'Loading zone + roller door' });
+  mkCam(secGF, 0.1, 16.6, 3.05, 135, { len: 8, label: 'Exterior NW corner' });
+  mkCam(secGF, 14.73, 16.6, 3.05, 45, { len: 8, label: 'Exterior NE corner' });
+  mkCam(secGF, 0.1, 0.1, 3.05, 225, { len: 8, label: 'Exterior SW corner' });
+  mkCam(secGF, -0.04, 6.75, 1.35, 180, { fov: 110, len: 4, name: 'Doorbell cam', label: 'Front entry, west elevation' });
+  mkCam(secUF, 9.9, 4.6, UB + 2.3, -50, { len: 8, label: 'Upper office — workstation cluster' });
+  mkCam(secUF, 14.55, 6.7, UB + 2.3, 205, { len: 8, label: 'Stair void + landing' });
+  mkCam(secUF, 0.7, 6.6, UB + 2.3, 15, { dome: true, fov: 70, len: 12, tilt: -6,
+    name: 'PTZ auto-tracking camera', label: 'Roof intrusion coverage' });
+
+  const SIRENS_GF = [
+    [0.35, 16.3, 2.75], [2.5, 16.45, 2.8], [7.35, 16.45, 2.8], [12.0, 16.45, 2.8], [14.45, 16.3, 2.75],
+    [4.6, 7.3, 2.7], [8.9, 7.3, 2.7], [1.0, 5.8, 2.6], [3.2, 5.45, 2.55], [7.3, 5.7, 2.55],
+    [10.6, 3.9, 2.55], [0.3, 0.3, 3.05], [14.5, 0.3, 3.05]
+  ];
+  for (const [x, y, h] of SIRENS_GF) mkSiren(secGF, x, y, h);
+  for (const [x, y, h] of [[13.5, 1.2, UB + 2.25], [0.3, 16.35, UB + 2.5], [14.5, 16.35, UB + 2.5]])
+    mkSiren(secUF, x, y, h);
+
+  // ---------- labels ----------
+  label(gf, 'Flower Room 2<small>44 m² · 3 benches</small>', 2.55, 12.0, 2.7);
+  label(gf, 'Veg / Prop / Mother<small>4 benches</small>', 7.4, 13.0, 2.6);
+  label(gf, 'Flower Room 1<small>44 m² · 3500 m³/h airflow</small>', 12.3, 12.0, 2.7);
+  label(gf, 'Drying / Vault<small>room is the vault</small>', 4.1, 2.8, 2.4);
+  label(gf, 'Irrigation<small>tank bank · fertigation</small>', 7.4, 3.2, 2.4);
+  label(gf, 'Kitchen<small>disposal · WC below</small>', 12.2, 3.4, 2.4);
+  label(gf, 'Hallway<small>rear exit · stairs</small>', 9.05, 2.2, 2.3);
+  label(gf, 'Loading Zone<small>9 m² · roller door · CO₂</small>', 1.05, 3.0, 2.5);
+  label(gf, 'Hallway', 5.0, 6.5, 2.4);
+  label(gf, 'Stairs<small>up to office</small>', 11.95, 5.75, 2.2);
+  label(uf, 'Office<small>whole upper floor · open plan</small>', 7.0, 10.5, UB + 1.5);
+  label(uf, 'Workstations<small>13U rack · monitors</small>', 13.2, 2.0, UB + 1.6);
+  label(gf, 'N', 7.4, 17.9, 0.4, 'f2t-lbl cmp');
+
+  // ---------- picking ----------
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  const infoEl = document.getElementById('f2t-info');
+  let downAt = null;
+  const marker = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xff5533 }));
+  marker.visible = false; scene.add(marker);
+
+  renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+  renderer.domElement.addEventListener('pointerup', e => {
+    if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+    const r = renderer.domElement.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hits = ray.intersectObjects(pickables, true);
+    const hit = hits.find(h => {
+      let o = h.object, vis = true;
+      while (o) { if (!o.visible) vis = false; o = o.parent; }
+      return vis;
+    });
+    if (!hit) return;
+    let o = hit.object;
+    while (o && !(o.userData && o.userData.name)) o = o.parent;
+    if (!o) return;
+    infoEl.innerHTML = `<b>${o.userData.name}</b><br>${o.userData.detail || ''}`;
+    marker.position.copy(hit.point); marker.visible = true;
+    clearTimeout(marker._t); marker._t = setTimeout(() => marker.visible = false, 1600);
+  });
+
+  // ---------- UI ----------
+  function syncLabels() {
+    const on = el('f2tLabels').checked;
+    for (const o of labelObjs) {
+      let vis = on, p = o.parent;
+      while (p) { if (p.visible === false) vis = false; p = p.parent; }
+      o.visible = vis;
+      o.element.style.display = vis ? '' : 'none';
+    }
+  }
+  function setFloor(m) {
+    gf.visible = m !== 'u';
+    uf.visible = m !== 'g';
+    ghost.visible = (m === 'u');
+    for (const [id, k] of [['f2tG', 'g'], ['f2tU', 'u'], ['f2tB', 'b']])
+      el(id).classList.toggle('on', k === m);
+    syncLabels();
+  }
+  el('f2tG').onclick = () => setFloor('g');
+  el('f2tU').onclick = () => setFloor('u');
+  el('f2tB').onclick = () => setFloor('b');
+  setFloor('g');
+
+  function setView(top) {
+    el('f2tOrbit').classList.toggle('on', !top);
+    el('f2tTop').classList.toggle('on', top);
+    if (top) { camera.position.set(7.4, 36, -8.34); controls.target.set(7.4, 0, -8.35); }
+    else { camera.position.set(24, 16, 9); controls.target.copy(CENTER); }
+    controls.update();
+  }
+  el('f2tOrbit').onclick = () => setView(false);
+  el('f2tTop').onclick = () => setView(true);
+
+  el('f2tLabels').onchange = syncLabels;
+  el('f2tSec').onchange = e => { secGF.visible = secUF.visible = e.target.checked; };
+  el('f2tFov').onchange = e => cones.forEach(c => c.visible = e.target.checked);
+  el('f2tAir').onchange = e => { airGF.visible = e.target.checked; };
+
+  // ---------- resize / loop ----------
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    if (!w || !h) return;
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+    labelRenderer.setSize(w, h);
+  }
+  new ResizeObserver(resize).observe(stage);
+  resize();
+
+  renderer.setAnimationLoop(() => {
+    if (!stage.clientWidth) return;   // floor tab hidden — skip work
+    controls.update();
+    renderer.render(scene, camera);
+    labelRenderer.render(scene, camera);
+  });
+
+  // Live-data hook: e.g. window.__f2twin.tints.find(t=>t.name.startsWith('Flower Room 1'))
+  //   .mesh.material.color.set(0xff8866)  — colour a room from HA sensor state.
+  window.__f2twin = { scene, camera, renderer, labelRenderer, controls, tints: tintsRegistry, THREE };
+}
 </script>
 <script defer src="https://unpkg.com/alpinejs@3/dist/cdn.min.js"></script>
 </body>
