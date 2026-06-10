@@ -3922,12 +3922,23 @@ class MasterCropSteeringApp(BaseAsyncApp):
             if phase in (IrrigationPhase.P1_RAMP_UP, IrrigationPhase.P2_MAINTENANCE):
                 data['daily_peak'] = max(float(data['daily_peak']) if data.get('daily_peak') is not None else zone_vwc, zone_vwc)
 
-            # Ratchet max immediately when exceeded mid-irrigation.
-            if zone_vwc > float(data['current_max']):
+            # Ratchet max immediately when exceeded mid-irrigation — but never above a physical
+            # saturation ceiling. The field-capacity over-water block reads current_max, so an
+            # unbounded ratchet let a stuck/spiking probe keep raising the ceiling until the block
+            # was effectively disabled (C5). No real substrate holds >~95% VWC; above that is sensor
+            # error, so refuse to learn from it.
+            VWC_SATURATION_CEILING = 95.0  # % VWC — hard physical bound on the learned field capacity
+            if float(data['current_max']) < zone_vwc <= VWC_SATURATION_CEILING:
                 data['current_max'] = float(zone_vwc)
                 self.log(
                     f"📈 Zone {zone_num}: Adaptive VWC max ratcheted up to {zone_vwc:.1f}%",
                     level='INFO'
+                )
+            elif zone_vwc > VWC_SATURATION_CEILING:
+                self.log(
+                    f"⚠️ Zone {zone_num}: VWC {zone_vwc:.1f}% above saturation ceiling "
+                    f"{VWC_SATURATION_CEILING:.0f}% — not ratcheting field capacity (suspect probe)",
+                    level='WARNING'
                 )
             try:
                 if _adaptive is not None:
@@ -5161,7 +5172,20 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 # P3 → P0: Lights turned on (only from P3, not P2)
                 if lights_just_on and current_phase == IrrigationPhase.P3_PRE_LIGHTS_OFF:
                     await self._transition_zone_to_phase(zone_num, 'P0', 'Lights on - starting morning dryback')
-                
+
+                # Lights OFF -> force the overnight P3 dryback from ANY daytime phase (P0/P1/P2).
+                # Checked BEFORE the per-phase branches so it always wins. None of the normal exits
+                # fire once we are past lights-off: P1->P2 needs the per-zone recovery target (a slow
+                # / cap-starved zone never reaches it); P2->P3 via _should_zone_start_p3 returns False
+                # past lights-off (it measures hours to TOMORROW's lights-off, ~24h > its 3h gate);
+                # and P0 has NO dryback->P3 edge at all. Without this a zone strands in a daytime phase
+                # all night (observed live: Z1:P1, Z2:P2, Z3:P1 at 10pm; a late or restart-induced P0
+                # stranded the same way). Startup state-validation also forces P3, but only on restart
+                # — this makes the correction continuous.
+                elif current_phase != IrrigationPhase.P3_PRE_LIGHTS_OFF \
+                        and not self._are_lights_on(datetime.now().time(), lights_on_time, lights_off_time):
+                    await self._transition_zone_to_phase(zone_num, 'P3', 'Lights off — entering overnight P3 dryback')
+
                 # P0 → P1: Dryback complete or timeout
                 elif current_phase == IrrigationPhase.P0_MORNING_DRYBACK:
                     p0_data = machine.state.p0_data
@@ -5190,17 +5214,6 @@ class MasterCropSteeringApp(BaseAsyncApp):
                             await self._transition_zone_to_phase(zone_num, 'P1', f'Dryback complete: {current_dryback:.1f}%')
                         elif phase_duration >= p0_data.max_duration_minutes:
                             await self._transition_zone_to_phase(zone_num, 'P1', f'P0 timeout: {phase_duration:.0f} minutes')
-
-                # Lights OFF -> force the overnight P3 dryback from P1 or P2. Neither normal exit
-                # fires here: P1->P2 needs the per-zone recovery target (a slow / cap-starved zone
-                # never reaches it) and P2->P3 via _should_zone_start_p3 returns False once we are
-                # PAST lights-off (it measures hours to TOMORROW's lights-off, ~24h > its 3h gate).
-                # Without this a zone strands in P1/P2 all night instead of P3 (observed live on
-                # the lean engine: Z1:P1, Z2:P2, Z3:P1 at 10pm). The startup state-validation
-                # forces P3 as well, but only on restart — this makes the correction continuous.
-                elif current_phase in (IrrigationPhase.P1_RAMP_UP, IrrigationPhase.P2_MAINTENANCE) \
-                        and not self._are_lights_on(datetime.now().time(), lights_on_time, lights_off_time):
-                    await self._transition_zone_to_phase(zone_num, 'P3', 'Lights off — entering overnight P3 dryback')
 
                 # P1 → P2: Recovery complete. Use the PER-ZONE target (zone_1 = 71%, etc.) and
                 # keep p1_data.target_vwc in sync — the dataclass default was a flat 65%, so
