@@ -42,6 +42,9 @@
   @keyframes ping{75%,100%{transform:scale(2.2);opacity:0}}
   .fade-enter{animation:fade .35s ease both}
   @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .flash{animation:flashring 1.6s cubic-bezier(.4,0,.2,1) both}
+  @keyframes flashring{0%{box-shadow:0 0 0 0 rgba(52,211,153,0)}15%{box-shadow:0 0 0 3px rgba(52,211,153,.6),0 0 22px 2px rgba(52,211,153,.45)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+  @media (prefers-reduced-motion:reduce){.flash{animation:none}}
   [x-cloak]{display:none!important}
   .scrollx{scrollbar-width:thin}
   @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
@@ -421,6 +424,7 @@
                       <div x-show="a.firstChecks" class="mt-1.5 flex flex-wrap gap-1.5 items-center"><span class="text-[11px] text-slate-500">First checks:</span><template x-for="c in (a.firstChecks||[])" :key="c"><span class="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/8 text-slate-300" x-text="c"></span></template></div>
                       <div class="mt-2 text-[13px] flex items-start gap-2 p-2.5 rounded-lg bg-white/[0.03] border border-white/8"><span x-html="icons.arrow" class="w-4 h-4 block text-emerald-400 mt-0.5 shrink-0"></span><span><span class="text-slate-300 font-medium">Next step:</span> <span class="text-slate-400" x-text="a.action"></span></span></div>
                       <div class="mt-2.5 flex items-center gap-2 flex-wrap">
+                        <button x-show="a.fix" @click="solve(a.fix)" class="h-9 px-3 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 text-xs font-semibold ring-1 ring-emerald-400/30 inline-flex items-center gap-1.5"><span x-html="icons.arrow" class="w-4 h-4 block"></span> Fix it → <span x-text="a.fix&&a.fix.label"></span></button>
                         <button @click="speak(a.title+'. '+a.detail+'. Next step: '+a.action)" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10 inline-flex items-center gap-1.5"><span x-html="icons.audio" class="w-4 h-4 block"></span> Read</button>
                         <button @click="ackAlert(a.id)" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10">Acknowledge</button>
                         <button x-show="a.evidence" @click="evOpen===a.id?evOpen=null:evOpen=a.id" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10">Evidence</button>
@@ -463,7 +467,7 @@
 
         <!-- live sensor snapshot (all key sensors, glanceable) -->
         <div>
-          <div class="flex items-center justify-between mb-2"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Live snapshot</h2><span class="text-[11px] text-slate-500">every key sensor · adjust in Climate / Zones</span></div>
+          <div class="flex items-center justify-between mb-2"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Live snapshot</h2><span class="text-[11px] text-slate-500">every key sensor · adjust in <button @click="solve({view:'climate',anchor:'cl-controls'})" class="text-emerald-300/80 hover:text-emerald-300">Climate</button> / <button @click="solve({view:'zones',anchor:'zones-list'})" class="text-emerald-300/80 hover:text-emerald-300">Zones</button></span></div>
           <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
             <template x-for="s in snapshot" :key="s.label">
               <div class="glass rounded-xl p-3"><div class="text-[10px] uppercase tracking-wider text-slate-400 truncate" x-text="s.label"></div>
@@ -535,7 +539,7 @@
       <!-- ===== ZONES — per-zone live state + co-located setpoints ===== -->
       <section x-show="view==='zones'" class="fade-enter space-y-4">
         <!-- zone selector -->
-        <div class="flex items-center gap-2 flex-wrap">
+        <div id="zones-list" class="flex items-center gap-2 flex-wrap scroll-mt-28">
           <template x-for="z in zones" :key="'zt-'+z.id">
             <button @click="zSel=z.id" class="px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition" :class="zSel===z.id?'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/30':'glass text-slate-400 hover:text-slate-200'">
               <span class="w-2 h-2 rounded-full" :class="dotClass(z.status)"></span>Zone <span x-text="z.id"></span> · <span x-text="z.vwc"></span>% · <span class="text-xs opacity-70" x-text="z.phase"></span>
@@ -634,7 +638,7 @@
           </div>
         </div>
         <!-- ===== F2 room controls — every control + helper, full functionality ===== -->
-        <div class="flex items-center justify-between pt-1"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.radio" class="w-4 h-4 block text-emerald-400"></span> F2 room controls</h2><span class="text-[11px] text-slate-500">live · writes to HA immediately, no undo</span></div>
+        <div id="cl-controls" class="flex items-center justify-between pt-1 scroll-mt-28"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.radio" class="w-4 h-4 block text-emerald-400"></span> F2 room controls</h2><span class="text-[11px] text-slate-500">live · writes to HA immediately, no undo</span></div>
         <template x-for="g in climateCtl" :key="g.name">
           <div class="glass rounded-2xl p-5">
             <button @click="g.collapsed && (ctlOpen[g.name]=!ctlOpen[g.name])" class="w-full flex items-center justify-between text-left" :class="!g.collapsed&&'cursor-default'">
@@ -697,7 +701,7 @@
         <div class="seg ath"><template x-for="s in ['Clone','Veg','Stretch','Bulk','Finish']" :key="'a'+s"><button :class="athena===s&&'on'" @click="applyAthena(s)" x-text="s"></button></template></div><span class="ttinfo" @mouseenter="showTip('athena','Athena stage presets',$event)" @mouseleave="hideTip()" @click="showTip('athena','Athena stage presets',$event)">ⓘ</span>
         <div class="verdict" x-html="verdict()"></div>
       </div>
-      <div class="steer">
+      <div id="tune-steer" class="steer">
         <div class="lab"><span>Steering dial <span class="ttinfo" @mouseenter="showTip('dial','Steering dial',$event)" @mouseleave="hideTip()" @click="showTip('dial','Steering dial',$event)">ⓘ</span></span><span x-text="dialLabel()"></span></div>
         <input type="range" min="1" max="10" step="0.5" x-model.number="dial" @input="mode = dial>=5.5?'gen':'veg'; applySteer()">
         <div class="ends"><span>🌿 vegetative · shallow dryback</span><span>generative · deep dryback 🌸</span></div>
@@ -866,7 +870,7 @@
       <section x-show="view==='control'" class="fade-enter space-y-4">
         <div class="glass rounded-2xl p-4 flex items-center gap-3 border-l-4 border-l-amber-400/60"><span x-html="icons.alert" class="w-5 h-5 block text-amber-400 shrink-0"></span><span class="text-sm text-slate-300">Facility ops — strategy, arm/pump &amp; adaptive write to HA immediately, no undo. Per-zone setpoints live in <b class="text-slate-200">Zones</b>; recipe in <b class="text-slate-200">Tune</b>.</span></div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div class="glass rounded-2xl p-5 space-y-4">
+          <div id="op-strategy" class="glass rounded-2xl p-5 space-y-4 scroll-mt-28">
             <h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.salt" class="w-4 h-4 block text-emerald-400"></span> Active strategy</h3>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <template x-for="s in control.summary" :key="s.k"><div class="rounded-xl bg-white/[0.03] border border-white/8 p-2.5"><div class="text-[10px] uppercase tracking-wider text-slate-400" x-text="s.k"></div><div class="font-semibold mt-0.5 text-sm" x-text="s.v"></div></div></template>
@@ -877,7 +881,7 @@
                   <template x-for="o in sel.options" :key="o"><option :value="o" :selected="o===sel.value" x-text="o"></option></template></select></label>
             </template>
           </div>
-          <div class="glass rounded-2xl p-5 space-y-3">
+          <div id="op-arm" class="glass rounded-2xl p-5 space-y-3 scroll-mt-28">
             <h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.radio" class="w-4 h-4 block text-emerald-400"></span> Arm &amp; pump</h3>
             <template x-for="t in control.arm" :key="t.id">
               <div class="flex items-center justify-between py-1"><span class="text-sm text-slate-300" x-text="t.label"></span>
@@ -895,9 +899,9 @@
                 <input type="number" :step="n.step" :value="n.val" @change="ctrlNum(n.id,$event.target.value)" class="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-slate-200"></label></template>
           </div>
         </div>
-        <div class="glass rounded-2xl p-5 space-y-3">
+        <div id="op-zones" class="glass rounded-2xl p-5 space-y-3 scroll-mt-28">
           <div class="flex items-center justify-between"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> All zones at a glance</h3>
-            <button @click="go('zones')" class="text-[11px] text-emerald-300/80 hover:text-emerald-300">tune per-zone in Zones →</button></div>
+            <button @click="solve({view:'zones',anchor:'zones-list'})" class="text-[11px] text-emerald-300/80 hover:text-emerald-300">tune per-zone in Zones →</button></div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <template x-for="z in zones" :key="'cz-'+z.id">
               <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3" :class="z.status==='crit'?'ring-1 ring-red-500/40':z.status==='warn'?'ring-1 ring-amber-400/30':''">
@@ -911,7 +915,7 @@
           </div>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div class="glass rounded-2xl p-5"><h3 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.flag" class="w-4 h-4 block text-amber-400"></span> Guardrails <span class="text-[11px] text-slate-500 font-normal">· edit in Tune</span></h3>
+          <div class="glass rounded-2xl p-5"><h3 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.flag" class="w-4 h-4 block text-amber-400"></span> Guardrails <button @click="solve({view:'tune',anchor:'tune-steer'})" class="text-[11px] text-emerald-300/80 hover:text-emerald-300 font-normal">· edit in Tune →</button></h3>
             <div class="divide-y divide-white/6"><template x-for="g in control.guardrails" :key="g.label"><div class="flex justify-between py-2 text-sm"><span class="text-slate-400" x-text="g.label"></span><span class="font-semibold" x-text="g.val"></span></div></template></div></div>
           <div class="glass rounded-2xl p-5"><h3 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Engine</h3>
             <div class="divide-y divide-white/6"><template x-for="t in control.telemetry" :key="t.label"><div class="flex justify-between py-2 text-sm"><span class="text-slate-400" x-text="t.label"></span><span class="font-semibold" :class="t.warn&&'text-amber-400'" x-text="t.val"></span></div></template></div></div>
@@ -1262,38 +1266,38 @@ function worse(a,b){ const o={optimal:0,ok:0,warn:1,crit:2}; return o[b]>o[a]?b:
 /* ===================== rules (verified) ===================== */
 const RULES=[
   function pumpDeadhead(){ const p=num("pump_power"); if(p==null) return null; const off=val("row1")!=="on"&&val("row2")!=="on"&&val("row3")!=="on";
-    if(p>100&&off) return {sev:"crit",icon:"alert",confidence:"high",title:"Pump running dry — turn it off",detail:`The main pump is pulling ${fmt(p,0)} watts with all three zone valves shut. It is pushing against a closed pipe. This has happened on F2 before and can wreck the pump.`,action:"Turn the main pump and mainline OFF now. Confirm power drops to 0 watts.",evidence:`${E.pump_power} = ${fmt(p,0)} W\nrow1=${val("row1")} row2=${val("row2")} row3=${val("row3")}`}; return null; },
+    if(p>100&&off) return {sev:"crit",icon:"alert",confidence:"high",title:"Pump running dry — turn it off",detail:`The main pump is pulling ${fmt(p,0)} watts with all three zone valves shut. It is pushing against a closed pipe. This has happened on F2 before and can wreck the pump.`,action:"Turn the main pump and mainline OFF now. Confirm power drops to 0 watts.",fix:{view:'control',anchor:'op-arm',label:'Operate · pump'},evidence:`${E.pump_power} = ${fmt(p,0)} W\nrow1=${val("row1")} row2=${val("row2")} row3=${val("row3")}`}; return null; },
   function engineHealth(){ const hb=val("heartbeat"),app=val("app_status"),a=ageUpd("heartbeat");
-    if(hb&&hb!=="healthy") return {sev:"warn",icon:"robot",confidence:"high",title:"The steering brain is not happy",detail:`Heartbeat says "${hb}". App says "${app}". Auto-watering may not be responding.`,action:"Check the AppDaemon log over SSH. If stuck near lights-on, push P0 then back to Auto.",evidence:`${E.heartbeat}=${hb}\n${E.app_status}=${app}\nage=${fmt(a,0)} min`};
-    if(a!=null&&a>45) return {sev:"warn",icon:"robot",confidence:"med",title:"No word from the steering brain",detail:`Nothing new from the engine for ${fmt(a,0)} minutes. It may be stopped or stuck.`,action:"Check the AppDaemon add-on is running. Look for a stuck shot.",evidence:`${E.heartbeat} last_updated ${fmt(a,0)} min ago`}; return null; },
+    if(hb&&hb!=="healthy") return {sev:"warn",icon:"robot",confidence:"high",title:"The steering brain is not happy",detail:`Heartbeat says "${hb}". App says "${app}". Auto-watering may not be responding.`,action:"Check the AppDaemon log over SSH. If stuck near lights-on, push P0 then back to Auto.",fix:{view:'control',anchor:'op-arm',label:'Operate · engine'},evidence:`${E.heartbeat}=${hb}\n${E.app_status}=${app}\nage=${fmt(a,0)} min`};
+    if(a!=null&&a>45) return {sev:"warn",icon:"robot",confidence:"med",title:"No word from the steering brain",detail:`Nothing new from the engine for ${fmt(a,0)} minutes. It may be stopped or stuck.`,action:"Check the AppDaemon add-on is running. Look for a stuck shot.",fix:{view:'control',anchor:'op-arm',label:'Operate · engine'},evidence:`${E.heartbeat} last_updated ${fmt(a,0)} min ago`}; return null; },
   function zoneFloor(){ for(const z of [1,2,3]){ const Z=CONFIG.ZONE(z); const v=parseFloat(S[Z.vwc]?.state); if(isNaN(v)) continue; const f=CONFIG.ZONE_P3_FLOOR[z];
-    if(v<=f) return {sev:"crit",icon:"desert",confidence:"high",title:`Zone ${z} is too dry`,detail:`Zone ${z} water level is ${fmt(v,1)}% — at or below its emergency floor of ${f}%. Roots are getting too dry. Stress is close.`,action:`Confirm the engine is firing emergency shots for Zone ${z}. If the system is off, water Zone ${z} by hand now.`,evidence:`${Z.vwc}=${fmt(v,1)}%  floor=${f}%`}; } return null; },
+    if(v<=f) return {sev:"crit",icon:"desert",confidence:"high",title:`Zone ${z} is too dry`,detail:`Zone ${z} water level is ${fmt(v,1)}% — at or below its emergency floor of ${f}%. Roots are getting too dry. Stress is close.`,action:`Confirm the engine is firing emergency shots for Zone ${z}. If the system is off, water Zone ${z} by hand now.`,fix:{view:'zones',anchor:'zones-list',label:'Zones'},evidence:`${Z.vwc}=${fmt(v,1)}%  floor=${f}%`}; } return null; },
   function dosingStuck(){ if(!isOn("dosing_active")) return null; const a=ageMin("dosing_active");
-    if(a!=null&&a>CONFIG.DOSING_STUCK_MIN) return {sev:"warn",icon:"flask",confidence:"med",title:"Dosing flag stuck on",detail:`The dosing flag has been on for ${fmt(a,0)} minutes. While it is on, no watering can happen.`,action:"Confirm tank pH and EC are in range, then switch the dosing flag off so watering can resume.",evidence:`${E.dosing_active}=on for ${fmt(a,0)} min`}; return null; },
+    if(a!=null&&a>CONFIG.DOSING_STUCK_MIN) return {sev:"warn",icon:"flask",confidence:"med",title:"Dosing flag stuck on",detail:`The dosing flag has been on for ${fmt(a,0)} minutes. While it is on, no watering can happen.`,action:"Confirm tank pH and EC are in range, then switch the dosing flag off so watering can resume.",fix:{view:'control',anchor:'op-arm',label:'Operate'},evidence:`${E.dosing_active}=on for ${fmt(a,0)} min`}; return null; },
   function hotspot(){ const bt=num("bl_temp"),at=num("air_temp"),bv=num("bl_vpd"); if(bt==null||at==null) return null; const d=bt-at;
-    if(d>=CONFIG.HOTSPOT.deltaWarn||(bv!=null&&bv>CONFIG.HOTSPOT.vpdWarn)) return {sev:"warn",icon:"fire",confidence:"high",title:"Back-left corner is running hot",detail:`Back-left is ${fmt(bt,1)}°C versus ${fmt(at,1)}°C room — ${fmt(d,1)}°C hotter. Those plants dry out and stress first.`,action:"Check the air-con throw and fans reaching the back-left corner. Re-check the gap in 30 min.",evidence:`${E.bl_temp}=${fmt(bt,1)}  ${E.air_temp}=${fmt(at,1)}  delta=${fmt(d,1)}\n${E.bl_vpd}=${fmt(bv,2)}`}; return null; },
+    if(d>=CONFIG.HOTSPOT.deltaWarn||(bv!=null&&bv>CONFIG.HOTSPOT.vpdWarn)) return {sev:"warn",icon:"fire",confidence:"high",title:"Back-left corner is running hot",detail:`Back-left is ${fmt(bt,1)}°C versus ${fmt(at,1)}°C room — ${fmt(d,1)}°C hotter. Those plants dry out and stress first.`,action:"Check the air-con throw and fans reaching the back-left corner. Re-check the gap in 30 min.",fix:{view:'climate',anchor:'cl-controls',label:'Climate · AC'},evidence:`${E.bl_temp}=${fmt(bt,1)}  ${E.air_temp}=${fmt(at,1)}  delta=${fmt(d,1)}\n${E.bl_vpd}=${fmt(bv,2)}`}; return null; },
   function co2Dark(){ const c=num("co2"); if(c==null) return null;
-    if(!lightsOn()&&c>CONFIG.CO2_DARK_WARN) return {sev:"warn",icon:"haze",confidence:"med",title:"CO₂ is high in the dark",detail:`CO₂ is ${fmt(c,0)} ppm with the lights off. It should fall at night. Either the air is not moving enough, or the sensor has drifted high.`,action:"Check the night venting. Compare the second CO₂ sensor. Calibrate if both read high.",evidence:`${E.co2}=${fmt(c,0)} ppm (PPFD=${fmt(num("ppfd"),0)} → dark)`}; return null; },
+    if(!lightsOn()&&c>CONFIG.CO2_DARK_WARN) return {sev:"warn",icon:"haze",confidence:"med",title:"CO₂ is high in the dark",detail:`CO₂ is ${fmt(c,0)} ppm with the lights off. It should fall at night. Either the air is not moving enough, or the sensor has drifted high.`,action:"Check the night venting. Compare the second CO₂ sensor. Calibrate if both read high.",fix:{view:'climate',anchor:'cl-controls',label:'Climate · CO₂'},evidence:`${E.co2}=${fmt(c,0)} ppm (PPFD=${fmt(num("ppfd"),0)} → dark)`}; return null; },
   function ppfdLow(){ if(!lightsOn()) return null; const p=num("ppfd"); if(p==null) return null;
-    if(p<CONFIG.BANDS.ppfd.warn[0]) return {sev:"warn",icon:"bulb",confidence:"med",title:"Lights are dimmer than they should be",detail:`Light level is ${fmt(p,0)}, under the ${CONFIG.BANDS.ppfd.ok[0]}–${CONFIG.BANDS.ppfd.ok[1]} target. Sustained, this slows growth.`,action:"Check the LED driver, sensor placement and dimming setpoint.",evidence:`${E.ppfd}=${fmt(p,0)}  LED=${fmt(num("led_power"),0)} W`}; return null; },
+    if(p<CONFIG.BANDS.ppfd.warn[0]) return {sev:"warn",icon:"bulb",confidence:"med",title:"Lights are dimmer than they should be",detail:`Light level is ${fmt(p,0)}, under the ${CONFIG.BANDS.ppfd.ok[0]}–${CONFIG.BANDS.ppfd.ok[1]} target. Sustained, this slows growth.`,action:"Check the LED driver, sensor placement and dimming setpoint.",fix:{view:'climate',anchor:'cl-controls',label:'Climate · lighting'},evidence:`${E.ppfd}=${fmt(p,0)}  LED=${fmt(num("led_power"),0)} W`}; return null; },
   function sensorHealth(){ const h=num("sensor_health");
-    if(h!=null&&h<80) return {sev:"warn",icon:"radio",confidence:"high",title:"Some sensors can not be trusted",detail:`Sensor health is ${fmt(h,0)}%. A probe is unreliable — plant readings are less certain until it is fixed.`,action:"Find the bad probe (check each zone reliability) and reseat or replace it.",evidence:`${E.sensor_health}=${fmt(h,0)}%`}; return null; },
+    if(h!=null&&h<80) return {sev:"warn",icon:"radio",confidence:"high",title:"Some sensors can not be trusted",detail:`Sensor health is ${fmt(h,0)}%. A probe is unreliable — plant readings are less certain until it is fixed.`,action:"Find the bad probe (check each zone reliability) and reseat or replace it.",fix:{view:'climate',anchor:'cl-controls',label:'Climate · calibration'},evidence:`${E.sensor_health}=${fmt(h,0)}%`}; return null; },
   function ecDrift(){ const ec=num("fused_ec"); if(ec==null) return null; const tgt=CONFIG.EC_TARGET,tr=num("ec_trend"),gap=ec-tgt;
-    if(Math.abs(gap)>=0.8){ const dir=tr==null?"":(tr>0.05?", climbing":tr<-0.05?", falling":", flat"); return {sev:"watch",icon:"salt",title:`Salt level ${gap<0?"below":"above"} target`,detail:`Pore EC ${fmt(ec,2)} vs ${fmt(tgt,1)} target${dir}. The salt build-up is still settling in.`}; } return null; },
+    if(Math.abs(gap)>=0.8){ const dir=tr==null?"":(tr>0.05?", climbing":tr<-0.05?", falling":", flat"); return {sev:"watch",icon:"salt",title:`Salt level ${gap<0?"below":"above"} target`,detail:`Pore EC ${fmt(ec,2)} vs ${fmt(tgt,1)} target${dir}. The salt build-up is still settling in.`,fix:{view:'tune',anchor:'tune-steer',label:'Tune · EC'}}; } return null; },
   function drybackShallow(){ const d=num("dryback_pct"),t=num("dryback_target"); if(d==null||t==null) return null;
-    if(d<t*0.6) return {sev:"watch",icon:"drop",title:"Not drying back enough",detail:`Dryback ${fmt(d,1)}% vs ${fmt(t,0)}% target. Blocks staying wet — watch the salt level catch up.`}; return null; },
+    if(d<t*0.6) return {sev:"watch",icon:"drop",title:"Not drying back enough",detail:`Dryback ${fmt(d,1)}% vs ${fmt(t,0)}% target. Blocks staying wet — watch the salt level catch up.`,fix:{view:'tune',anchor:'tune-steer',label:'Tune · dryback'}}; return null; },
   function zoneApproaching(){ for(const z of [1,2,3]){ const Z=CONFIG.ZONE(z); const v=parseFloat(S[Z.vwc]?.state); const f=CONFIG.ZONE_P3_FLOOR[z]; const safe=S[Z.safety]?.state;
-    if(!isNaN(v)&&v>f&&v<=f+6) return {sev:"watch",icon:"desert",title:`Zone ${z} getting close to dry`,detail:`Zone ${z} is ${fmt(v,1)}%, within 6% of its ${f}% floor. Watch the next watering.`};
-    if(safe==="approaching_saturation") return {sev:"watch",icon:"wave",title:`Zone ${z} looking wet`,detail:`Zone ${z} flagged as nearly saturated. If it is a real wet trend, ease off the shots.`}; } return null; },
+    if(!isNaN(v)&&v>f&&v<=f+6) return {sev:"watch",icon:"desert",title:`Zone ${z} getting close to dry`,detail:`Zone ${z} is ${fmt(v,1)}%, within 6% of its ${f}% floor. Watch the next watering.`,fix:{view:'zones',anchor:'zones-list',label:'Zones'}};
+    if(safe==="approaching_saturation") return {sev:"watch",icon:"wave",title:`Zone ${z} looking wet`,detail:`Zone ${z} flagged as nearly saturated. If it is a real wet trend, ease off the shots.`,fix:{view:'zones',anchor:'zones-list',label:'Zones'}}; } return null; },
   function hotspotMild(){ const bt=num("bl_temp"),at=num("air_temp"); if(bt==null||at==null) return null; const d=bt-at;
-    if(d>=CONFIG.HOTSPOT.deltaWatch&&d<CONFIG.HOTSPOT.deltaWarn) return {sev:"watch",icon:"thermo",title:"Back-left warming up",detail:`Back-left is ${fmt(d,1)}°C warmer than the room. Not bad yet — watch the airflow.`}; return null; },
-  function phaseImbalance(){ if(isOn("phase_imbalance")) return {sev:"watch",icon:"scale",title:"Zones out of step",detail:"Zones are on different phases. Normal when steering them apart — check none is stuck."}; return null; },
+    if(d>=CONFIG.HOTSPOT.deltaWatch&&d<CONFIG.HOTSPOT.deltaWarn) return {sev:"watch",icon:"thermo",title:"Back-left warming up",detail:`Back-left is ${fmt(d,1)}°C warmer than the room. Not bad yet — watch the airflow.`,fix:{view:'climate',anchor:'cl-controls',label:'Climate · AC'}}; return null; },
+  function phaseImbalance(){ if(isOn("phase_imbalance")) return {sev:"watch",icon:"scale",title:"Zones out of step",detail:"Zones are on different phases. Normal when steering them apart — check none is stuck.",fix:{view:'control',anchor:'op-zones',label:'Operate · zones'}}; return null; },
   function condensation(){ const m=condMargin(),dp=dewPoint(); if(m==null) return null;
-    if(m<1.5) return {sev:"warn",icon:"haze",confidence:"med",title:"Condensation risk — surfaces near dew point",detail:`Dew point is ${fmt(dp,1)}°C and the coldest tracked surface is only ${fmt(m,1)}°C above it. Below that margin water condenses on leaves, walls or coils — a mould and GMP risk.`,action:"Raise night temp a touch, cut RH, or improve airflow to lift the margin back above 2°C.",evidence:`dewpoint=${fmt(dp,1)}°C  margin=${fmt(m,1)}°C  (air ${fmt(num("air_temp"),1)}°C / RH ${fmt(num("rh"),0)}%)`}; return null; },
+    if(m<1.5) return {sev:"warn",icon:"haze",confidence:"med",title:"Condensation risk — surfaces near dew point",detail:`Dew point is ${fmt(dp,1)}°C and the coldest tracked surface is only ${fmt(m,1)}°C above it. Below that margin water condenses on leaves, walls or coils — a mould and GMP risk.`,action:"Raise night temp a touch, cut RH, or improve airflow to lift the margin back above 2°C.",fix:{view:'climate',anchor:'cl-controls',label:'Climate'},evidence:`dewpoint=${fmt(dp,1)}°C  margin=${fmt(m,1)}°C  (air ${fmt(num("air_temp"),1)}°C / RH ${fmt(num("rh"),0)}%)`}; return null; },
   function ecStacking(){ const ec=num("fused_ec"),tr=num("ec_trend"),dr=num("dryback_rate"); if(ec==null) return null;
     if(ec<CONFIG.EC_TARGET||tr==null||tr<=0.02) return null;   // only when already at/above target AND climbing
     const burn=CONFIG.EC_TARGET+1, h=ecHoursToBurn(burn); if(h==null||h>6) return null; const proj=ecForecast(h);
-    return {sev:h<=3?"warn":"watch",icon:"salt",confidence:"med",title:`Pore EC stacking toward burn (~${fmt(h,1)}h)`,detail:`Pore EC is ${fmt(ec,2)} and climbing ${fmt(tr,2)}/h; at the current ${fmt(dr,1)}%/h dryback it projects to ${fmt(burn,1)} mS/cm in about ${fmt(h,1)}h — tip-burn territory.`,action:"Ease the dryback target ~3% or add a maintenance shot to dilute before it stacks.",evidence:`fused_ec=${fmt(ec,2)} trend=${fmt(tr,2)}/h dryback=${fmt(dr,1)}%/h → ${fmt(proj,2)} in ${fmt(h,1)}h`}; return null; },
+    return {sev:h<=3?"warn":"watch",icon:"salt",confidence:"med",title:`Pore EC stacking toward burn (~${fmt(h,1)}h)`,detail:`Pore EC is ${fmt(ec,2)} and climbing ${fmt(tr,2)}/h; at the current ${fmt(dr,1)}%/h dryback it projects to ${fmt(burn,1)} mS/cm in about ${fmt(h,1)}h — tip-burn territory.`,action:"Ease the dryback target ~3% or add a maintenance shot to dilute before it stacks.",fix:{view:'tune',anchor:'tune-steer',label:'Tune · EC'},evidence:`fused_ec=${fmt(ec,2)} trend=${fmt(tr,2)}/h dryback=${fmt(dr,1)}%/h → ${fmt(proj,2)} in ${fmt(h,1)}h`}; return null; },
 ];
 function runRules(){ const adv=[],watch=[]; for(const r of RULES){ let o=null; try{ o=r(); }catch(e){} if(!o) continue; o.id="r-"+(o.title||"").slice(0,16).replace(/\W/g,""); attachCause(o); (o.sev==="watch"?watch:adv).push(o); } adv.sort((a,b)=>(a.sev==="crit"?0:1)-(b.sev==="crit"?0:1)); return {adv,watch}; }
 function computeHeadline(adv,watch){ const crit=adv.filter(a=>a.sev==="crit"),warn=adv.filter(a=>a.sev==="warn");
@@ -3778,9 +3782,9 @@ document.addEventListener('alpine:init', () => {
       scale:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M6 7l-4 7h8zM18 7l-4 7h8zM4 21h16"/></svg>`,
       flag:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></svg>`,
     },
-    nav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'tune',label:'Tune',icon:'scale'},{id:'climate',label:'Climate',icon:'thermo'},{id:'control',label:'Operate',icon:'radio'},{id:'timeline',label:'Plan',icon:'activity'},{id:'floor',label:'3D Floor',icon:'grid'}],
+    nav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'climate',label:'Climate',icon:'thermo'},{id:'control',label:'Operate',icon:'radio'},{id:'tune',label:'Tune',icon:'scale'},{id:'timeline',label:'Plan',icon:'activity'},{id:'floor',label:'3D Floor',icon:'grid'}],
     floorLoaded:false,
-    mobileNav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'tune',label:'Tune',icon:'scale'},{id:'control',label:'Operate',icon:'radio'},{id:'ai',label:'AI',icon:'ai'}],
+    mobileNav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'climate',label:'Climate',icon:'thermo'},{id:'control',label:'Operate',icon:'radio'},{id:'ai',label:'AI',icon:'ai'}],
 
     view:'dashboard', sidebarOpen:true, connected:false, connError:"",
     cmdOpen:false, cmdQuery:"", aiOpen:false, aiInput:"", aiThinking:false, zoneModal:null, evOpen:null,
@@ -3908,6 +3912,11 @@ document.addEventListener('alpine:init', () => {
 
     /* actions */
     go(v){ this.view=v; window.scrollTo({top:0,behavior:this.reduced()?'auto':'smooth'}); },
+    solve(t){ if(!t) return; this.go(t.view);
+      this.$nextTick(()=>{ requestAnimationFrame(()=>{
+        const el=document.getElementById(t.anchor);
+        if(el){ el.scrollIntoView({behavior:(window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'), block:'center'});
+                el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),1600); } }); }); },
     seedTune(){ if(window.__tuneReseed) window.__tuneReseed(); },
     async ctrlSvc(domain,service,data){ try{ await svc(domain,service,data); this.toast("Sent"); setTimeout(()=>this.tick(),700); }catch(e){ this.toast("Failed: "+e.message); } },
     ctrlToggle(id,confirmArm){ if(confirmArm && !confirm("Toggle the arm state? This affects live irrigation.")) return; this.ctrlSvc(id.split(".")[0],"toggle",{entity_id:id}); },
@@ -3975,7 +3984,7 @@ document.addEventListener('alpine:init', () => {
     cmdResults(){ const q=this.cmdQuery.toLowerCase().trim(); const items=[
       ...this.zones.map(z=>({id:'z-'+z.id,label:z.name+" — VWC "+z.vwc+"%",icon:'drop',kind:'zone',act:()=>this.openZone(z.id)})),
       {id:'v-climate',label:'Climate & hotspot',icon:'thermo',kind:'view',act:()=>this.go('climate')},
-      {id:'v-cs',label:'Crop steering',icon:'salt',kind:'view',act:()=>this.go('irrigation')},
+      {id:'v-cs',label:'Crop steering',icon:'salt',kind:'view',act:()=>this.go('tune')},
       {id:'a-ai',label:'Ask Plant-State AI',icon:'ai',kind:'action',act:()=>this.aiOpen=true},
       {id:'a-read',label:'Read the headline aloud',icon:'audio',kind:'action',act:()=>this.speak(this.headline.big+'. '+this.headline.line)},
     ]; if(!q) return items.slice(0,6); return items.filter(i=>i.label.toLowerCase().includes(q)).slice(0,8); },
@@ -3983,7 +3992,7 @@ document.addEventListener('alpine:init', () => {
     onKey(e){ if((e.metaKey||e.ctrlKey)&&e.key==='k'){ e.preventDefault(); this.cmdOpen=!this.cmdOpen; } if(e.key==='/'&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); this.cmdOpen=true; } },
 
     /* format helpers */
-    currentTitle(){ return ({dashboard:'F2 Status',zones:'Zones',irrigation:'Crop Steering',tune:'Crop-Steering Tune',control:'Operate',timeline:'Grow Plan',climate:'Climate',alerts:'Advisories',floor:'3D Floor'})[this.view]||'F2'; },
+    currentTitle(){ return ({dashboard:'F2 Status',zones:'Zones',tune:'Crop-Steering Tune',control:'Operate',timeline:'Grow Plan',climate:'Climate',alerts:'Advisories',floor:'3D Floor'})[this.view]||'F2'; },
     sevBg(s){ return s==='ok'||s==='optimal'?'bg-emerald-500/15':s==='warn'?'bg-amber-400/15':s==='crit'?'bg-red-500/15':'bg-amber-400/15'; },
     sevText(s){ return s==='ok'||s==='optimal'?'text-emerald-400':s==='warn'?'text-amber-400':s==='crit'?'text-red-400':'text-amber-400'; },
     pillClass(s){ return s==='ok'||s==='optimal'?'bg-emerald-500/15 text-emerald-300':s==='warn'?'bg-amber-400/15 text-amber-300':s==='crit'?'bg-red-500/15 text-red-300':'bg-amber-400/15 text-amber-300'; },
