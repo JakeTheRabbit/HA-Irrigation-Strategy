@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e11">
+<title>Crop Steering — System Map</title>
+<!--
+  CROP STEERING · SYSTEM MAP — interactive 3D architecture & data-flow explainer.
+  Standalone, offline-capable. ONLY external dependency: three.js (pinned 0.160) from a CDN.
+  No Home Assistant, no token, no network beyond the three.js CDN. Renders identically
+  as a local file or from GitHub Pages. Palette matches f2.html (emerald/cyan on near-black).
+
+  WHAT IT SHOWS — two layers that talk only through HA entities + service events:
+    1. HA Integration   (custom_components/crop_steering/) — entity surface + config-flow wizard.
+    2. AppDaemon Engine (master_crop_steering_app.py)       — autonomous coordinator, drives hardware.
+  Plus: operator/dashboards, hardware sequence (pump->mainline->zone valves), VWC/EC probes,
+  the P0->P3 phase ring, and the safety layer wrapping the hardware-control path.
+-->
+<style>
+  :root{
+    --bg:#0b0e11; --bg2:#0f1318; --card:#141a21; --card2:#19212a;
+    --hair:rgba(255,255,255,.08); --hair2:rgba(255,255,255,.14);
+    --ink:#e7ecf2; --ink2:#aab4c0; --ink3:#727d8a;
+    --ok:#34d399; --okdim:#10b981; --accent2:#22d3ee; --warn:#fbbf24;
+    --p0:#8b93a1; --p1:#38bdf8; --p2:#34d399; --p3:#fbbf24; --ec:#f472b6; --crit:#f87171;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden;
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;}
+  #app{position:fixed;inset:0}
+  canvas{display:block;touch-action:none}
+  ::selection{background:rgba(52,211,153,.25)}
+
+  /* ---- node CSS2D labels ---- */
+  .lbl{
+    font-size:11.5px;font-weight:600;letter-spacing:.01em;color:var(--ink);
+    background:linear-gradient(180deg,rgba(20,26,33,.92),rgba(15,19,24,.92));
+    border:1px solid var(--hair);border-radius:8px;padding:4px 9px;white-space:nowrap;
+    box-shadow:0 6px 20px -10px rgba(0,0,0,.8);pointer-events:auto;cursor:pointer;
+    transition:border-color .15s,transform .15s,box-shadow .15s;user-select:none;
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  }
+  .lbl .k{display:block;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:1px}
+  .lbl:hover{border-color:var(--hair2);transform:translateY(-1px)}
+  .lbl.sel{border-color:var(--ok);box-shadow:0 0 0 1px rgba(52,211,153,.5),0 8px 26px -10px rgba(52,211,153,.5)}
+  .lbl.dim{opacity:.4}
+  .lbl.phase{font-size:10.5px;padding:3px 8px}
+
+  /* ---- title / intro card ---- */
+  .panel{position:absolute;border-radius:16px;
+    background:linear-gradient(180deg,var(--card),var(--bg2));
+    border:1px solid var(--hair);box-shadow:0 18px 50px -24px rgba(0,0,0,.8);
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);}
+  #intro{top:18px;left:18px;max-width:360px;padding:18px 18px 16px;z-index:5}
+  #intro.min{padding:11px 14px}
+  .kicker{display:inline-flex;align-items:center;gap:7px;font-size:10.5px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--ok);background:rgba(52,211,153,.1);
+    border:1px solid rgba(52,211,153,.25);padding:4px 10px;border-radius:999px}
+  .kicker .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  #intro h1{font-size:1.32rem;font-weight:800;letter-spacing:-.02em;margin:11px 0 5px;
+    background:linear-gradient(135deg,#6ee7b7,#34d399 50%,#22d3ee);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  #intro p{color:var(--ink2);font-size:.86rem;line-height:1.5;margin:0 0 4px}
+  #intro .two{display:flex;gap:8px;margin-top:11px}
+  #intro .lyr{flex:1;border:1px solid var(--hair);border-radius:10px;padding:8px 9px;background:var(--card2)}
+  #intro .lyr b{font-size:.78rem;display:block;margin-bottom:2px}
+  #intro .lyr.int b{color:var(--accent2)} #intro .lyr.eng b{color:var(--ok)}
+  #intro .lyr span{font-size:.7rem;color:var(--ink3);line-height:1.35;display:block}
+  .introtoggle{position:absolute;top:14px;right:14px;width:24px;height:24px;border-radius:7px;
+    border:1px solid var(--hair);background:var(--card2);color:var(--ink2);cursor:pointer;
+    font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
+  .introtoggle:hover{color:var(--ink);border-color:var(--hair2)}
+
+  /* ---- detail side panel ---- */
+  #detail{top:18px;right:18px;width:340px;max-height:calc(100% - 36px);overflow-y:auto;
+    padding:0;z-index:6;transform:translateX(calc(100% + 26px));transition:transform .32s cubic-bezier(.4,0,.2,1)}
+  #detail.open{transform:none}
+  #detail .dhead{padding:16px 18px 13px;border-bottom:1px solid var(--hair);position:sticky;top:0;
+    background:linear-gradient(180deg,var(--card),rgba(20,26,33,.96));-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);z-index:2}
+  #detail .dlayer{font-size:10px;font-weight:700;letter-spacing:.11em;text-transform:uppercase}
+  #detail h2{font-size:1.12rem;font-weight:800;letter-spacing:-.01em;margin:6px 0 0}
+  #detail .dbody{padding:14px 18px 20px}
+  #detail .role{font-size:.86rem;color:var(--ink2);line-height:1.52;margin:0 0 14px}
+  #detail .sect{font-size:9.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--ink3);margin:0 0 7px}
+  #detail .ents{display:flex;flex-direction:column;gap:5px;margin:0 0 14px}
+  #detail code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:var(--ink);
+    background:var(--card2);border:1px solid var(--hair);border-radius:7px;padding:5px 9px;display:block;
+    overflow-x:auto;white-space:nowrap}
+  #detail .flows{display:flex;flex-direction:column;gap:6px}
+  #detail .flow{display:flex;gap:8px;align-items:flex-start;font-size:.78rem;color:var(--ink2);line-height:1.4}
+  #detail .flow .ar{flex:none;font-weight:800;width:14px;text-align:center}
+  #detail .flow.in .ar{color:var(--accent2)} #detail .flow.out .ar{color:var(--ok)}
+  #detail .dclose{position:absolute;top:13px;right:14px;width:26px;height:26px;border-radius:8px;
+    border:1px solid var(--hair);background:var(--card2);color:var(--ink2);cursor:pointer;font-size:15px;
+    display:flex;align-items:center;justify-content:center;padding:0;z-index:3}
+  #detail .dclose:hover{color:var(--ink);border-color:var(--hair2)}
+
+  /* ---- legend ---- */
+  #legend{left:18px;bottom:18px;padding:13px 15px;z-index:5;max-width:230px}
+  #legend .lh{font-size:9.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--ink3);margin-bottom:9px}
+  #legend .row{display:flex;align-items:center;gap:9px;font-size:.76rem;color:var(--ink2);margin-bottom:6px}
+  #legend .row:last-child{margin-bottom:0}
+  #legend .sw{width:13px;height:13px;border-radius:4px;flex:none;border:1px solid rgba(255,255,255,.18)}
+  #legend .ln{width:18px;height:0;flex:none;border-top:2px solid;position:relative}
+  #legend .ln:after{content:"";position:absolute;right:-1px;top:-3px;width:5px;height:5px;border-radius:50%;background:currentColor}
+  #legend hr{border:0;border-top:1px solid var(--hair);margin:9px 0}
+
+  /* ---- controls / tour ---- */
+  #controls{right:18px;bottom:18px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;
+    max-width:min(560px,calc(100% - 36px));z-index:5;background:none;border:0;box-shadow:none;padding:0}
+  .btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 13px;border-radius:10px;
+    font-weight:600;font-size:12.5px;border:1px solid var(--hair);cursor:pointer;
+    background:linear-gradient(180deg,var(--card),var(--bg2));color:var(--ink2);
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);transition:.15s;font-family:inherit}
+  .btn:hover{color:var(--ink);border-color:var(--hair2);transform:translateY(-1px)}
+  .btn.primary{background:linear-gradient(135deg,#34d399,#10b981);color:#06281c;border-color:transparent}
+  .btn.primary:hover{filter:brightness(1.06)}
+  .btn.on{border-color:var(--ok);color:var(--ok)}
+  .btn svg{width:14px;height:14px}
+
+  /* ---- tour caption ---- */
+  #tourcap{left:50%;bottom:70px;transform:translateX(-50%) translateY(12px);opacity:0;pointer-events:none;
+    padding:11px 18px;max-width:min(520px,calc(100% - 36px));text-align:center;z-index:7;
+    transition:opacity .35s,transform .35s}
+  #tourcap.show{opacity:1;transform:translateX(-50%)}
+  #tourcap .tstep{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:3px}
+  #tourcap .ttext{font-size:.84rem;color:var(--ink2);line-height:1.45}
+
+  /* ---- loading / error ---- */
+  #boot{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;
+    gap:14px;z-index:20;background:var(--bg);transition:opacity .5s}
+  #boot.gone{opacity:0;pointer-events:none}
+  #boot .spin{width:34px;height:34px;border-radius:50%;border:3px solid rgba(52,211,153,.18);
+    border-top-color:var(--ok);animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #boot .bt{font-size:.84rem;color:var(--ink3);letter-spacing:.02em}
+  #boot.err .spin{display:none}
+  #boot .errbox{display:none;max-width:420px;text-align:center;padding:0 24px}
+  #boot.err .errbox{display:block}
+  #boot.err .bt{display:none}
+  #boot .errbox h3{color:var(--warn);font-size:1rem;margin:0 0 8px}
+  #boot .errbox p{color:var(--ink2);font-size:.84rem;line-height:1.5;margin:0}
+  #boot .errbox code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:var(--ink3)}
+
+  /* ---- responsive ---- */
+  @media (max-width:720px){
+    #intro{max-width:none;left:12px;right:12px;top:12px;padding:14px}
+    #intro h1{font-size:1.12rem}
+    #intro .two{display:none}
+    #intro.min .two{display:none}
+    #detail{top:auto;bottom:0;right:0;left:0;width:auto;max-height:62%;border-radius:16px 16px 0 0;
+      transform:translateY(calc(100% + 26px))}
+    #detail.open{transform:none}
+    #legend{display:none}
+    #controls{left:12px;right:12px;bottom:12px;justify-content:center;max-width:none}
+    .btn{height:34px;font-size:12px;padding:0 11px}
+    #tourcap{bottom:64px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #boot .spin{animation:none}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- intro / title card -->
+<div id="intro" class="panel">
+  <button class="introtoggle" id="introToggle" title="Collapse">–</button>
+  <span class="kicker"><span class="dot"></span>System Map</span>
+  <h1>Crop Steering — how it all connects</h1>
+  <p>An interactive 3D map of the autonomous 4-phase irrigation system. Two software layers
+     talk <b>only</b> through Home Assistant entities &amp; service events. Drag to orbit,
+     scroll to zoom, click any node for detail.</p>
+  <div class="two">
+    <div class="lyr int"><b>HA Integration</b><span>Entity surface + setup wizard. Pure calcs. Touches no hardware.</span></div>
+    <div class="lyr eng"><b>AppDaemon Engine</b><span>Reads entities, runs P0–P3 logic, drives the hardware.</span></div>
+  </div>
+</div>
+
+<!-- detail side panel -->
+<div id="detail" class="panel">
+  <button class="dclose" id="detailClose" title="Close">×</button>
+  <div class="dhead">
+    <span class="dlayer" id="dLayer">Layer</span>
+    <h2 id="dTitle">Node</h2>
+  </div>
+  <div class="dbody">
+    <p class="role" id="dRole"></p>
+    <div id="dEntWrap">
+      <p class="sect">Example entities</p>
+      <div class="ents" id="dEnts"></div>
+    </div>
+    <div id="dFlowWrap">
+      <p class="sect">Data &amp; control flow</p>
+      <div class="flows" id="dFlows"></div>
+    </div>
+  </div>
+</div>
+
+<!-- legend -->
+<div id="legend" class="panel">
+  <div class="lh">Layers</div>
+  <div class="row"><span class="sw" style="background:#22d3ee"></span>Operator / Dashboards</div>
+  <div class="row"><span class="sw" style="background:#38bdf8"></span>HA Integration</div>
+  <div class="row"><span class="sw" style="background:#34d399"></span>AppDaemon Engine</div>
+  <div class="row"><span class="sw" style="background:#f472b6"></span>Sensors (VWC / EC)</div>
+  <div class="row"><span class="sw" style="background:#fbbf24"></span>Hardware</div>
+  <hr>
+  <div class="lh">Flow direction</div>
+  <div class="row"><span class="ln" style="color:#34d399"></span>Control writes / commands</div>
+  <div class="row"><span class="ln" style="color:#22d3ee"></span>Sensor &amp; status feedback</div>
+</div>
+
+<!-- tour caption -->
+<div id="tourcap" class="panel"><div class="tstep" id="tStep"></div><div class="ttext" id="tText"></div></div>
+
+<!-- controls -->
+<div id="controls">
+  <button class="btn" id="btnTour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>Guided tour</button>
+  <button class="btn on" id="btnRotate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg>Auto-rotate</button>
+  <button class="btn" id="btnFlows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Flows</button>
+  <button class="btn" id="btnReset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Reset view</button>
+</div>
+
+<!-- loading / CDN-failure -->
+<div id="boot">
+  <div class="spin"></div>
+  <div class="bt">Loading 3D system map…</div>
+  <div class="errbox">
+    <h3>3D engine could not load</h3>
+    <p>This map needs the <code>three.js</code> library from a CDN, which is the only thing it
+       fetches from the network. Check your connection and reload. Everything else in this file
+       is fully self-contained and works offline.</p>
+  </div>
+</div>
+
+<!-- ============================ three.js via importmap (pinned 0.160) ============================ -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+/* If three.js (the only external dep) fails to load, surface a graceful message. */
+let booted = false;
+window.addEventListener('error', (e)=>{ if(!booted && /three|jsdelivr|module/i.test(String(e.message||e.filename||''))) showBootError(); }, true);
+setTimeout(()=>{ if(!booted) showBootError(); }, 12000); // CDN watchdog
+function showBootError(){ const b=document.getElementById('boot'); if(b){ b.classList.add('err'); } }
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* ============================================================================
+   PALETTE  (matches f2.html / the CSS :root above)
+   ============================================================================ */
+const C = {
+  bg:0x0b0e11,
+  ink:0xe7ecf2, ink2:0xaab4c0, ink3:0x727d8a,
+  ok:0x34d399, okdim:0x10b981, cyan:0x22d3ee,
+  p0:0x8b93a1, p1:0x38bdf8, p2:0x34d399, p3:0xfbbf24,
+  ec:0xf472b6, crit:0xf87171, warn:0xfbbf24,
+  dash:0x22d3ee,            // dashboards/operator
+  integ:0x38bdf8,           // integration
+  engine:0x34d399,          // engine
+  hw:0xfbbf24,              // hardware
+  sensor:0xf472b6,          // sensors
+};
+const FLOW_CTRL = C.ok;     // control / command writes (emerald)
+const FLOW_FB   = C.cyan;   // sensor / status feedback (cyan)
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ============================================================================
+   SCENE / CAMERA / RENDERERS
+   ============================================================================ */
+const appEl = document.getElementById('app');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(C.bg);
+scene.fog = new THREE.FogExp2(C.bg, 0.018);
+
+const camera = new THREE.PerspectiveCamera(48, window.innerWidth/window.innerHeight, 0.1, 400);
+const CAM_HOME = new THREE.Vector3(26, 20, 42);
+const TGT_HOME = new THREE.Vector3(0, 1.5, 0);
+camera.position.copy(CAM_HOME);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+appEl.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(window.innerWidth, window.innerHeight);
+labelRenderer.domElement.style.position = 'absolute';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.left = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+appEl.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.target.copy(TGT_HOME);
+controls.minDistance = 12;
+controls.maxDistance = 110;
+controls.maxPolarAngle = Math.PI * 0.92;
+controls.autoRotate = !reduceMotion;
+controls.autoRotateSpeed = 0.45;
+
+/* ---- lighting: cool, premium, low-key ---- */
+scene.add(new THREE.AmbientLight(0x6c7a90, 0.85));
+const key = new THREE.DirectionalLight(0xeaf2ff, 0.9); key.position.set(20, 40, 18); scene.add(key);
+const rim = new THREE.DirectionalLight(0x2bd8c0, 0.45); rim.position.set(-26, 12, -22); scene.add(rim);
+const fill = new THREE.PointLight(0x22d3ee, 0.5, 120); fill.position.set(0, 8, 30); scene.add(fill);
+
+/* ---- ground grid + soft glow disc ---- */
+const grid = new THREE.GridHelper(120, 60, 0x1b2330, 0x141a22);
+grid.position.y = -8.0;
+grid.material.transparent = true; grid.material.opacity = 0.5;
+scene.add(grid);
+const discMat = new THREE.MeshBasicMaterial({ color:0x0e151c, transparent:true, opacity:0.55 });
+const disc = new THREE.Mesh(new THREE.CircleGeometry(48, 64), discMat);
+disc.rotation.x = -Math.PI/2; disc.position.y = -7.98; scene.add(disc);
+
+/* ============================================================================
+   NODE MODEL — the real architecture.
+   Each node: id, layer, position, shape, color, label, and rich detail content.
+   ============================================================================ */
+const LAYERS = {
+  operator: { name:'Operator / Dashboards', color:C.dash },
+  integration:{ name:'HA Integration', color:C.integ },
+  engine: { name:'AppDaemon Engine', color:C.engine },
+  sensors:{ name:'Sensors', color:C.sensor },
+  hardware:{ name:'Hardware', color:C.hw },
+};
+
+// Y bands give the diagram a vertical "stack" story:
+//   dashboards (top) -> integration -> engine (middle, the brain) -> hardware (bottom)
+//   sensors sit low and feed back UP into the engine.
+const NODES = [
+  // ---------- Operator / Dashboards ----------
+  { id:'dash', layer:'operator', pos:[0,15,0], shape:'panel', size:[7,4.2,0.5], color:C.dash,
+    label:'Dashboards', kicker:'Operator',
+    role:'The human surface. The F2 Lovelace dashboard (f2.html) and the tuning UI let an operator set targets and watch the system. Dashboards write setpoints DOWN into the integration and read status sensors BACK to render — they never touch the engine or hardware directly.',
+    ents:['f2.html  (6-tab Lovelace)','setpoints.html · crop_steering_tune.html'],
+    flows:[
+      {dir:'out', t:'Writes setpoints → number.crop_steering_* (in the Integration).'},
+      {dir:'in',  t:'Reads sensor.crop_steering_app_status / activity_log to render.'},
+    ] },
+
+  // ---------- HA Integration ----------
+  { id:'wizard', layer:'integration', pos:[-9,9.5,3], shape:'cyl', size:[1.7,2.6], color:C.integ,
+    label:'Config-Flow Wizard', kicker:'Integration · setup',
+    role:'The one-time setup wizard (no YAML editing). It discovers hardware, asks how many zones, and creates the whole entity surface. After setup it steps aside — the live system runs on entities, not on the wizard.',
+    ents:['custom_components/crop_steering/config_flow.py'],
+    flows:[ {dir:'out', t:'Creates the ~100 crop_steering_* entities at install time.'} ] },
+
+  { id:'entities', layer:'integration', pos:[0,8,4], shape:'box', size:[8.5,3.2,3.2], color:C.integ,
+    label:'Entity Surface · ~100', kicker:'Integration · the contract',
+    role:'The integration\'s core: ~100 Home Assistant entities created via the config-flow UI. This is the ONLY contract between the two layers — numbers are setpoints, switches are toggles, selects are modes, sensors are read-outs. The integration touches NO hardware; it just exposes state and fires service events.',
+    ents:[
+      'number.crop_steering_p2_shot_size  (setpoint)',
+      'switch.crop_steering_ec_stacking_enabled',
+      'select.crop_steering_zone_3_steering_mode',
+      'input_select.crop_steering_zone_1_phase_control',
+    ],
+    flows:[
+      {dir:'in',  t:'Operator/dashboards write setpoints here.'},
+      {dir:'out', t:'Engine reads number./switch./select. state by entity_id.'},
+      {dir:'in',  t:'Engine publishes derived sensor.* values back here.'},
+    ] },
+
+  { id:'calc', layer:'integration', pos:[9,8.5,2], shape:'oct', size:[1.9], color:C.integ,
+    label:'calculations.py', kicker:'Integration · pure',
+    role:'Pure, unit-tested helper math — shot durations, threshold blends, dryback maths. No side effects, no hardware, no I/O. Covered by tests/test_calculations.py so the numbers are trustworthy independent of the live system.',
+    ents:['custom_components/crop_steering/calculations.py','tests/test_calculations.py'],
+    flows:[ {dir:'out', t:'Provides pure helpers used across the entity platforms.'} ] },
+
+  // ---------- AppDaemon Engine (the brain) ----------
+  { id:'engine', layer:'engine', pos:[0,1,0], shape:'core', size:[3.0], color:C.engine,
+    label:'master_crop_steering_app', kicker:'AppDaemon Engine · coordinator',
+    role:'The autonomous coordinator and the ONLY layer that drives hardware. Every tick it reads the integration\'s entities + raw sensors, runs each zone\'s P0→P1→P2→P3 logic, fuses sensors, detects dryback, runs the EC-stacking loop, checks safety gates, sequences the hardware, then publishes status back to HA. One engine, irrigation only — no climate control.',
+    ents:['appdaemon/apps/crop_steering/master_crop_steering_app.py','appdaemon/apps/apps.yaml  (hardware + sensor map)'],
+    flows:[
+      {dir:'in',  t:'Reads number./switch./select. setpoints from the Integration.'},
+      {dir:'in',  t:'Reads raw VWC/EC + source-water + environment sensors.'},
+      {dir:'out', t:'Drives pump → mainline → zone valves in sequence.'},
+      {dir:'out', t:'Publishes app_status / ai_heartbeat / activity_log + per-zone sensors back to HA.'},
+    ] },
+
+  // engine sub-modules — orbit the core
+  { id:'phasesm', layer:'engine', pos:[-7,3.5,-5], shape:'box', size:[2.6,1.6,2.0], color:C.engine,
+    label:'Phase State Machine', kicker:'Engine · decision',
+    role:'Per-zone P0→P1→P2→P3 state machine. Decides when a zone advances a phase based on VWC drift, shot counts, EC ratio and wall-clock. Lights-off forces any P1/P2 zone to P3 so nothing strands mid-cycle overnight; lights-on resets daily counters at the P3→P0 boundary.',
+    ents:['phase_state_machine.py'],
+    flows:[ {dir:'out', t:'Hands the active phase + intent to the irrigation sequencer.'} ] },
+
+  { id:'fusion', layer:'engine', pos:[7,3.5,-5], shape:'box', size:[2.6,1.6,2.0], color:C.engine,
+    label:'Sensor Fusion', kicker:'Engine · perception',
+    role:'Combines multiple raw moisture/EC probes per zone into one trusted VWC/EC value, rejecting dropouts and outliers. Feeds the fused signal sensor.crop_steering_zone_N_vwc that everything else reasons over.',
+    ents:['intelligent_sensor_fusion.py','sensor.crop_steering_zone_1_vwc'],
+    flows:[
+      {dir:'in',  t:'Takes raw per-zone probe readings.'},
+      {dir:'out', t:'Emits fused, de-noised VWC/EC for decisions.'},
+    ] },
+
+  { id:'dryback', layer:'engine', pos:[-7,-1.5,-5], shape:'box', size:[2.6,1.6,2.0], color:C.engine,
+    label:'Dryback Detection', kicker:'Engine · perception',
+    role:'Tracks each zone\'s VWC peak and measures the % -point DROP from that peak (dries-back-BY, never dries-back-TO). P0 waits for the morning dryback target; the overnight P3 dryback resets the cycle. The trigger for steering decisions.',
+    ents:['advanced_dryback_detection.py'],
+    flows:[ {dir:'out', t:'Signals "dryback target hit" → phase advance.'} ] },
+
+  { id:'ecstack', layer:'engine', pos:[7,-1.5,-5], shape:'box', size:[2.6,1.6,2.0], color:C.ec,
+    label:'EC Stacking', kicker:'Engine · generative lever',
+    role:'Autonomous salt lever, active in P2 when switch.crop_steering_ec_stacking_enabled is on (_ec_stack_dryback). Nudges each zone\'s p2_vwc_threshold to drive smoothed pore-EC toward its phase target — deeper dryback concentrates salts. EWMA-smoothed, 30-min cooldown, bounded by the P3 floor and an adaptive ceiling.',
+    ents:['switch.crop_steering_ec_stacking_enabled','number.crop_steering_zone_X_ec_target_gen_p2'],
+    flows:[
+      {dir:'in',  t:'Reads smoothed substrate EC per zone.'},
+      {dir:'out', t:'Adjusts the P2 VWC threshold to hit the EC target.'},
+    ] },
+
+  { id:'profiles', layer:'engine', pos:[-10.5,0.5,1], shape:'oct', size:[1.5], color:C.engine,
+    label:'Crop Profiles + ML', kicker:'Engine · priors',
+    role:'Crop-type priors and an ML irrigation predictor that bias starting targets and anticipate demand. Advisory inputs to the decision loop — the phase logic and safety gates still have final say.',
+    ents:['intelligent_crop_profiles.py','ml_irrigation_predictor.py'],
+    flows:[ {dir:'out', t:'Supplies target priors / demand predictions to the core.'} ] },
+
+  { id:'heartbeat', layer:'engine', pos:[10.5,0.5,1], shape:'oct', size:[1.5], color:C.engine,
+    label:'AI Heartbeat', kicker:'Engine · self-correction',
+    role:'Periodic self-correction loop (_ai_heartbeat). Force-advances a phase stuck > 4 h, flags stale sensors, and flags a zone taking water without VWC rising (drain-through / channelling). Oversight, not a driver — it watches the autonomous loops rather than steering them.',
+    ents:['sensor.crop_steering_ai_heartbeat'],
+    flows:[ {dir:'out', t:'Publishes heartbeat status + nudges stuck zones.'} ] },
+
+  // ---------- Safety layer (wraps the hardware-control path) ----------
+  { id:'safety', layer:'engine', pos:[0,-3.0,-2.5], shape:'shield', size:[5.4], color:C.crit,
+    label:'Safety Gates', kicker:'Engine · guard',
+    role:'A guard wrapping the entire hardware-control path. Before and during every shot: valve-close read-back (a stuck valve triggers an emergency pump stop), field-capacity block, max-EC block, daily volume + shot caps, and the source-water pH/EC gate (won\'t feed out-of-spec water). The _watchdog_check catches a runaway shot or a valve/pump stuck on.',
+    ents:['_watchdog_check  ·  source-water pH/EC gate','sensor.aquaponics_kit_f4f618_ph · sensor.atlas_legacy_1_ec'],
+    flows:[
+      {dir:'in',  t:'Intercepts every irrigation command from the engine.'},
+      {dir:'out', t:'Allows the shot, or blocks + emergency-stops the pump.'},
+    ] },
+
+  // ---------- Hardware (ordered sequence) ----------
+  { id:'pump', layer:'hardware', pos:[-8,-5.5,6], shape:'cyl', size:[1.5,2.4], color:C.hw,
+    label:'Pump  ①', kicker:'Hardware · step 1',
+    role:'Shared irrigation pump — step 1 of the sequence. Primed for ~2 s before any valve opens so the line is pressurised. On shutdown it is the LAST thing off (reverse order), and any safety failure triggers an immediate emergency pump stop.',
+    ents:['switch.veg_main_pump'],
+    flows:[ {dir:'in', t:'Engine primes the pump first (safety-gated).'} ] },
+
+  { id:'mainline', layer:'hardware', pos:[-2.5,-5.5,8], shape:'box', size:[1.8,1.8,1.8], color:C.hw,
+    label:'Mainline Valve  ②', kicker:'Hardware · step 2',
+    role:'Shared mainline solenoid — step 2. Opens ~1 s after the pump primes, feeding the manifold that all zone valves hang off. Closes after the zone valves on shutdown.',
+    ents:['switch.espoe_irrigation_relay_2_3  ("Veg Mainline")'],
+    flows:[ {dir:'in', t:'Opens after pump prime, before any zone valve.'} ] },
+
+  { id:'zones', layer:'hardware', pos:[6,-5.5,7], shape:'valves', size:[3], color:C.hw,
+    label:'Zone Valves  ③ ×N', kicker:'Hardware · step 3',
+    role:'One solenoid valve per zone/row — step 3. The engine opens exactly the target zone, irrigates for the calculated duration, then closes it (read-back verified) before reversing the whole sequence. F2 today: 3 rows.',
+    ents:['switch.f2_row1 · switch.f2_row2 · switch.f2_row3'],
+    flows:[
+      {dir:'in',  t:'Engine opens the target zone valve to irrigate.'},
+      {dir:'out', t:'Close is read-back verified; failure → emergency stop.'},
+    ] },
+
+  // ---------- Sensors (feed back UP) ----------
+  { id:'probes', layer:'sensors', pos:[10,-4,5], shape:'probe', size:[2.6], color:C.sensor,
+    label:'VWC / EC Probes', kicker:'Sensors · per zone',
+    role:'Physical substrate moisture (VWC) and pore-water EC probes, one set per zone. They measure the result of every shot and feed straight back UP into Sensor Fusion — closing the perception loop that drives the next decision.',
+    ents:['raw VWC probes → sensor.crop_steering_zone_N_vwc','raw EC probes → sensor.crop_steering_zone_N_ec'],
+    flows:[ {dir:'out', t:'Feed raw readings into the engine\'s Sensor Fusion.'} ] },
+
+  { id:'envsrc', layer:'sensors', pos:[3,-4,9], shape:'probe', size:[2.0], color:C.sensor,
+    label:'Source-Water + Env', kicker:'Sensors · gating',
+    role:'Source-water pH/EC and room-environment sensors. The source-water pair gates irrigation (out-of-spec water is blocked at the safety layer); environment context informs demand prediction.',
+    ents:['sensor.aquaponics_kit_f4f618_ph','sensor.atlas_legacy_1_ec'],
+    flows:[ {dir:'out', t:'Feed the source-water gate + environment priors.'} ] },
+];
+const nodeById = Object.fromEntries(NODES.map(n=>[n.id,n]));
+
+/* ============================================================================
+   CONNECTIONS — directional flows.
+   kind: 'ctrl' (emerald, commands/writes) | 'fb' (cyan, sensor/status feedback)
+   seq:  optional ordering index used by the hardware-sequence pulse timing.
+   ============================================================================ */
+const LINKS = [
+  // operator -> integration -> engine (control writes)
+  { a:'dash', b:'entities', kind:'ctrl' },
+  { a:'wizard', b:'entities', kind:'ctrl' },
+  { a:'entities', b:'engine', kind:'ctrl' },
+  { a:'calc', b:'entities', kind:'ctrl' },
+
+  // engine internal wiring (treat as control intent)
+  { a:'engine', b:'phasesm', kind:'ctrl' },
+  { a:'engine', b:'fusion', kind:'ctrl' },
+  { a:'engine', b:'dryback', kind:'ctrl' },
+  { a:'engine', b:'ecstack', kind:'ctrl' },
+  { a:'profiles', b:'engine', kind:'ctrl' },
+  { a:'engine', b:'heartbeat', kind:'ctrl' },
+
+  // engine -> safety -> hardware (the ordered control path)
+  { a:'engine', b:'safety', kind:'ctrl' },
+  { a:'safety', b:'pump', kind:'ctrl', seq:0 },
+  { a:'pump', b:'mainline', kind:'ctrl', seq:1 },
+  { a:'mainline', b:'zones', kind:'ctrl', seq:2 },
+
+  // sensors feed back UP into the engine (feedback)
+  { a:'probes', b:'fusion', kind:'fb' },
+  { a:'envsrc', b:'safety', kind:'fb' },
+  { a:'zones', b:'probes', kind:'fb' },          // irrigation result measured by probes
+
+  // engine publishes status back to dashboards (feedback) — closes the loop
+  { a:'engine', b:'entities', kind:'fb' },
+  { a:'entities', b:'dash', kind:'fb' },
+];
+
+/* ============================================================================
+   BUILD GEOMETRY
+   ============================================================================ */
+const nodeGroup = new THREE.Group(); scene.add(nodeGroup);
+const linkGroup = new THREE.Group(); scene.add(linkGroup);
+const labelGroup = new THREE.Group(); scene.add(labelGroup);
+const clickable = []; // meshes that respond to raycast
+
+function emissiveMat(color, opts={}){
+  return new THREE.MeshStandardMaterial({
+    color, emissive:color, emissiveIntensity:opts.emis ?? 0.35,
+    roughness:opts.rough ?? 0.5, metalness:opts.metal ?? 0.25,
+    transparent:true, opacity:opts.opacity ?? 1,
+  });
+}
+function wireOutline(geo, color, scale=1.04){
+  const m = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({color, wireframe:true, transparent:true, opacity:0.16}));
+  m.scale.setScalar(scale); return m;
+}
+
+function buildShape(n){
+  const g = new THREE.Group();
+  let geo, mesh;
+  const col = n.color;
+  switch(n.shape){
+    case 'panel': // dashboard slab
+      geo = new THREE.BoxGeometry(n.size[0], n.size[1], n.size[2]);
+      mesh = new THREE.Mesh(geo, emissiveMat(col,{emis:0.45,rough:0.35,metal:0.4}));
+      g.add(mesh, wireOutline(geo,col,1.02));
+      // little "screen" inset
+      const scr = new THREE.Mesh(new THREE.PlaneGeometry(n.size[0]*0.82, n.size[1]*0.7),
+        new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:0.12}));
+      scr.position.z = n.size[2]/2 + 0.02; g.add(scr);
+      break;
+    case 'box':
+      geo = new THREE.BoxGeometry(n.size[0], n.size[1], n.size[2]);
+      mesh = new THREE.Mesh(geo, emissiveMat(col));
+      g.add(mesh, wireOutline(geo,col));
+      break;
+    case 'cyl':
+      geo = new THREE.CylinderGeometry(n.size[0], n.size[0]*1.05, n.size[1], 28);
+      mesh = new THREE.Mesh(geo, emissiveMat(col,{metal:0.5,rough:0.4}));
+      g.add(mesh, wireOutline(geo,col));
+      break;
+    case 'oct':
+      geo = new THREE.OctahedronGeometry(n.size[0], 0);
+      mesh = new THREE.Mesh(geo, emissiveMat(col,{emis:0.5,metal:0.4}));
+      g.add(mesh, wireOutline(geo,col,1.06));
+      break;
+    case 'core': { // the engine — a glowing icosahedron with a wire shell
+      geo = new THREE.IcosahedronGeometry(n.size[0], 1);
+      mesh = new THREE.Mesh(geo, emissiveMat(col,{emis:0.6,rough:0.3,metal:0.3}));
+      const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(n.size[0]*1.5,1),
+        new THREE.MeshBasicMaterial({color:col, wireframe:true, transparent:true, opacity:0.2}));
+      g.add(mesh, shell);
+      g.userData.spin = shell;
+      break; }
+    case 'shield': { // safety — a translucent dome wrapping the HW path
+      geo = new THREE.SphereGeometry(n.size[0], 30, 20, 0, Math.PI*2, 0, Math.PI*0.62);
+      mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        color:col, emissive:col, emissiveIntensity:0.25, transparent:true, opacity:0.10,
+        side:THREE.DoubleSide, roughness:0.6, metalness:0.1, depthWrite:false }));
+      const wires = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({color:col, wireframe:true, transparent:true, opacity:0.18}));
+      g.add(mesh, wires);
+      break; }
+    case 'valves': { // N zone valves clustered
+      const n3 = 3, sp = 1.7;
+      for(let i=0;i<n3;i++){
+        const vg = new THREE.CylinderGeometry(0.6,0.6,1.5,20);
+        const vm = new THREE.Mesh(vg, emissiveMat(col,{metal:0.5}));
+        vm.position.set((i-(n3-1)/2)*sp, 0, 0);
+        g.add(vm, (()=>{const w=wireOutline(vg,col);w.position.copy(vm.position);return w;})());
+      }
+      break; }
+    case 'probe': { // sensor cluster: thin spikes + bead tops
+      const n3 = 3, sp = 1.0;
+      for(let i=0;i<n3;i++){
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,n.size[0]*0.9,8),
+          new THREE.MeshStandardMaterial({color:col, emissive:col, emissiveIntensity:0.3, metalness:0.6, roughness:0.4}));
+        stem.position.set((i-(n3-1)/2)*sp, 0, (i%2)*0.6-0.3);
+        const bead = new THREE.Mesh(new THREE.SphereGeometry(0.34,16,16), emissiveMat(col,{emis:0.7}));
+        bead.position.set(stem.position.x, n.size[0]*0.45, stem.position.z);
+        g.add(stem, bead);
+      }
+      break; }
+    default:
+      geo = new THREE.SphereGeometry(n.size[0]||1.4, 24, 24);
+      mesh = new THREE.Mesh(geo, emissiveMat(col));
+      g.add(mesh);
+  }
+  g.position.set(...n.pos);
+  g.userData.node = n;
+  g.userData.baseY = n.pos[1];
+  // register all child meshes for raycasting back to this node
+  g.traverse(o=>{ if(o.isMesh){ o.userData.nodeId = n.id; clickable.push(o);} });
+  return g;
+}
+
+NODES.forEach(n=>{
+  const g = buildShape(n);
+  nodeGroup.add(g);
+  n._group = g;
+
+  // CSS2D label
+  const el = document.createElement('div');
+  el.className = 'lbl' + (n.layer==='engine' && n.id!=='engine' ? '' : '');
+  el.innerHTML = `<span class="k">${n.kicker.split('·')[0].trim()}</span>${n.label}`;
+  el.dataset.id = n.id;
+  el.addEventListener('click', (e)=>{ e.stopPropagation(); selectNode(n.id, true); });
+  const lbl = new CSS2DObject(el);
+  // sit the label just above the node
+  const yOff = (n.shape==='panel') ? n.size[1]/2+1.0
+            : (n.shape==='core') ? n.size[0]+1.2
+            : (n.shape==='shield') ? -0.2
+            : (n.size[1]? n.size[1]/2+1.0 : (n.size[0]||1.4)+1.0);
+  lbl.position.set(0, yOff, 0);
+  n._group.add(lbl);
+  n._label = el;
+});
+
+/* ============================================================================
+   LINKS — tube-ish lines + animated flow particles
+   ============================================================================ */
+const flows = []; // {curve, mesh, kind, particles[], speed, seq}
+function makeCurve(a, b){
+  const pa = new THREE.Vector3(...nodeById[a].pos);
+  const pb = new THREE.Vector3(...nodeById[b].pos);
+  const mid = pa.clone().add(pb).multiplyScalar(0.5);
+  // bow the line outward from the world centre so parallel links don't overlap
+  const out = mid.clone().setY(0).normalize().multiplyScalar(2.2);
+  mid.add(out).add(new THREE.Vector3(0, 1.6, 0));
+  return new THREE.CubicBezierCurve3(pa, pa.clone().lerp(mid,0.5), pb.clone().lerp(mid,0.5), pb);
+}
+
+LINKS.forEach(L=>{
+  const curve = makeCurve(L.a, L.b);
+  const color = L.kind==='fb' ? FLOW_FB : FLOW_CTRL;
+
+  // base line
+  const pts = curve.getPoints(40);
+  const lgeo = new THREE.BufferGeometry().setFromPoints(pts);
+  const lmat = new THREE.LineBasicMaterial({ color, transparent:true, opacity:0.22 });
+  const line = new THREE.Line(lgeo, lmat);
+  line.userData.link = L;
+  linkGroup.add(line);
+
+  // flow particles
+  const N = 3;
+  const parts = [];
+  for(let i=0;i<N;i++){
+    const pm = new THREE.Mesh(
+      new THREE.SphereGeometry(0.22, 10, 10),
+      new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.95 })
+    );
+    pm.userData.t = i/N;
+    linkGroup.add(pm);
+    parts.push(pm);
+  }
+  flows.push({ curve, line, mat:lmat, kind:L.kind, parts, link:L,
+    speed: (L.kind==='fb'?0.10:0.13) + Math.random()*0.03 });
+});
+
+/* ============================================================================
+   PHASE RING — P0->P1->P2->P3 as its own labelled sub-graph, orbiting low.
+   ============================================================================ */
+const phaseRing = new THREE.Group();
+phaseRing.position.set(0, -5.2, -10);
+scene.add(phaseRing);
+
+const PHASES = [
+  { id:'P0', name:'Morning Dryback', color:C.p0, ang:Math.PI*0.5,
+    desc:'After lights-on, wait for VWC to drop X% from its overnight peak → P1.' },
+  { id:'P1', name:'Ramp-Up', color:C.p1, ang:Math.PI*0.0,
+    desc:'Progressive shots bring VWC up to the per-zone target → P2.' },
+  { id:'P2', name:'Maintenance', color:C.p2, ang:-Math.PI*0.5,
+    desc:'Threshold top-ups: shoot when VWC drops below the P2 threshold → P3.' },
+  { id:'P3', name:'Pre-Lights-Off', color:C.p3, ang:Math.PI*1.0,
+    desc:'Emergency-only; dry back overnight → P0 at lights-on (daily counters reset here).' },
+];
+const RING_R = 4.6;
+// ring torus
+const ringMesh = new THREE.Mesh(
+  new THREE.TorusGeometry(RING_R, 0.06, 12, 80),
+  new THREE.MeshBasicMaterial({ color:0x2a3543, transparent:true, opacity:0.55 })
+);
+ringMesh.rotation.x = Math.PI/2; phaseRing.add(ringMesh);
+
+// directional arc particles around the ring (shows the cyclic direction)
+const ringParts = [];
+for(let i=0;i<8;i++){
+  const rp = new THREE.Mesh(new THREE.SphereGeometry(0.12,8,8),
+    new THREE.MeshBasicMaterial({color:C.ok, transparent:true, opacity:0.8}));
+  rp.userData.t = i/8; ringParts.push(rp); phaseRing.add(rp);
+}
+
+const phaseNodes = [];
+PHASES.forEach(p=>{
+  const x = Math.cos(p.ang)*RING_R, z = Math.sin(p.ang)*RING_R;
+  const node = new THREE.Mesh(new THREE.SphereGeometry(0.9, 24, 24), emissiveMat(p.color,{emis:0.6}));
+  node.position.set(x, 0, z);
+  node.userData.phaseId = p.id;
+  phaseRing.add(node);
+  clickable.push(node);
+  p._mesh = node;
+
+  const el = document.createElement('div');
+  el.className = 'lbl phase';
+  el.innerHTML = `<span class="k" style="color:${'#'+p.color.toString(16).padStart(6,'0')}">${p.id}</span>${p.name}`;
+  el.addEventListener('click',(e)=>{ e.stopPropagation(); selectPhase(p.id); });
+  const lo = new CSS2DObject(el); lo.position.set(0,1.3,0); node.add(lo);
+  p._label = el;
+  phaseNodes.push(p);
+});
+
+// a small label tag for the ring itself
+(()=>{
+  const el = document.createElement('div');
+  el.className='lbl'; el.style.borderColor='rgba(52,211,153,.35)';
+  el.innerHTML = `<span class="k">Daily cycle</span>P0 → P1 → P2 → P3`;
+  el.addEventListener('click',(e)=>{ e.stopPropagation(); selectPhase('cycle'); });
+  const lo = new CSS2DObject(el); lo.position.set(0, RING_R+1.4, 0); phaseRing.add(lo);
+})();
+
+// faint connector from the engine down to the phase ring (it runs this)
+(()=>{
+  const pa = new THREE.Vector3(...nodeById['phasesm'].pos);
+  const pb = new THREE.Vector3(0,-5.2,-10);
+  const g = new THREE.BufferGeometry().setFromPoints([pa, pb]);
+  const m = new THREE.LineDashedMaterial({color:C.engine, transparent:true, opacity:0.25, dashSize:0.6, gapSize:0.5});
+  const ln = new THREE.Line(g,m); ln.computeLineDistances(); scene.add(ln);
+})();
+
+/* ============================================================================
+   PICKING / SELECTION
+   ============================================================================ */
+const ray = new THREE.Raycaster();
+const ptr = new THREE.Vector2();
+let selectedId = null;
+
+const detailEl = document.getElementById('detail');
+function selectNode(id, focus=false){
+  const n = nodeById[id]; if(!n) return;
+  selectedId = id;
+  clearPhaseSel();
+  // detail panel
+  document.getElementById('dLayer').textContent = LAYERS[n.layer].name;
+  document.getElementById('dLayer').style.color = '#'+LAYERS[n.layer].color.toString(16).padStart(6,'0');
+  document.getElementById('dTitle').textContent = n.label;
+  document.getElementById('dRole').textContent = n.role;
+  const ew = document.getElementById('dEnts'); ew.innerHTML='';
+  (n.ents||[]).forEach(e=>{ const c=document.createElement('code'); c.textContent=e; ew.appendChild(c); });
+  document.getElementById('dEntWrap').style.display = (n.ents&&n.ents.length)?'':'none';
+  const fw = document.getElementById('dFlows'); fw.innerHTML='';
+  (n.flows||[]).forEach(f=>{
+    const d=document.createElement('div'); d.className='flow '+f.dir;
+    d.innerHTML = `<span class="ar">${f.dir==='in'?'◀':'▶'}</span><span>${f.t}</span>`;
+    fw.appendChild(d);
+  });
+  document.getElementById('dFlowWrap').style.display = (n.flows&&n.flows.length)?'':'none';
+  detailEl.classList.add('open');
+
+  // highlight labels + connected links
+  NODES.forEach(o=>o._label.classList.toggle('sel', o.id===id));
+  highlightLinks(id);
+  if(focus) flyTo(new THREE.Vector3(...n.pos), n.shape==='core'?16:11);
+}
+
+function highlightLinks(id){
+  flows.forEach(f=>{
+    const hit = f.link.a===id || f.link.b===id;
+    f.mat.opacity = hit ? 0.6 : (selectedId? 0.08 : 0.22);
+    f.parts.forEach(p=>p.material.opacity = hit ? 1 : (selectedId? 0.25 : 0.9));
+  });
+  // dim unrelated labels lightly
+  if(selectedId){
+    const connected = new Set([id]);
+    flows.forEach(f=>{ if(f.link.a===id)connected.add(f.link.b); if(f.link.b===id)connected.add(f.link.a); });
+    NODES.forEach(o=>o._label.classList.toggle('dim', !connected.has(o.id)));
+  } else {
+    NODES.forEach(o=>o._label.classList.remove('dim'));
+  }
+}
+function clearSelection(){
+  selectedId=null;
+  detailEl.classList.remove('open');
+  NODES.forEach(o=>{o._label.classList.remove('sel');o._label.classList.remove('dim');});
+  flows.forEach(f=>{ f.mat.opacity = 0.22; f.parts.forEach(p=>p.material.opacity=0.9); });
+}
+
+function selectPhase(id){
+  clearSelection();
+  clearPhaseSel();
+  let title,layer='Daily phase cycle',role,ents=[],flowsArr=[];
+  if(id==='cycle'){
+    title='P0 → P1 → P2 → P3';
+    role='The daily steering cycle each zone walks independently. A "grow-day" is one photoperiod (lights-on → lights-on). Lights-off forces any P1/P2 zone to P3 so nothing strands mid-cycle; the daily water + shot counters reset at the P3→P0 (lights-on) transition — not at calendar midnight. Every dryback value is a %-point DROP from peak VWC.';
+    flowsArr=[{dir:'out',t:'Run per-zone by the engine\'s Phase State Machine.'}];
+    PHASES.forEach(p=>p._label.classList.add('sel'));
+  } else {
+    const p = PHASES.find(x=>x.id===id);
+    title = `${p.id} · ${p.name}`; role = p.desc;
+    p._label.classList.add('sel');
+    p._mesh.material.emissiveIntensity = 1.1;
+  }
+  document.getElementById('dLayer').textContent = layer;
+  document.getElementById('dLayer').style.color = '#34d399';
+  document.getElementById('dTitle').textContent = title;
+  document.getElementById('dRole').textContent = role;
+  document.getElementById('dEntWrap').style.display='none';
+  const fw=document.getElementById('dFlows'); fw.innerHTML='';
+  flowsArr.forEach(f=>{const d=document.createElement('div');d.className='flow '+f.dir;
+    d.innerHTML=`<span class="ar">▶</span><span>${f.t}</span>`;fw.appendChild(d);});
+  document.getElementById('dFlowWrap').style.display = flowsArr.length?'':'none';
+  detailEl.classList.add('open');
+  flyTo(new THREE.Vector3(0,-5.2,-10), 16);
+}
+function clearPhaseSel(){
+  PHASES.forEach(p=>{ p._label.classList.remove('sel'); p._mesh.material.emissiveIntensity=0.6; });
+}
+
+function onPointerDown(e){
+  const t = (e.touches&&e.touches[0])||e;
+  ptr.x = (t.clientX/window.innerWidth)*2-1;
+  ptr.y = -(t.clientY/window.innerHeight)*2+1;
+  pointerMoved=false; downX=t.clientX; downY=t.clientY;
+}
+let pointerMoved=false, downX=0, downY=0;
+function onPointerMove(e){
+  const t=(e.touches&&e.touches[0])||e;
+  if(Math.abs(t.clientX-downX)>5||Math.abs(t.clientY-downY)>5) pointerMoved=true;
+}
+function onPointerUp(e){
+  if(pointerMoved) return; // was an orbit drag, not a click
+  const t=(e.changedTouches&&e.changedTouches[0])||e;
+  ptr.x=(t.clientX/window.innerWidth)*2-1;
+  ptr.y=-(t.clientY/window.innerHeight)*2+1;
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObjects(clickable, false);
+  if(hits.length){
+    const o=hits[0].object;
+    if(o.userData.nodeId){ selectNode(o.userData.nodeId, true); return; }
+    if(o.userData.phaseId){ selectPhase(o.userData.phaseId); return; }
+  } else {
+    clearSelection(); clearPhaseSel(); highlightLinks(null);
+  }
+}
+renderer.domElement.addEventListener('pointerdown', onPointerDown);
+renderer.domElement.addEventListener('pointermove', onPointerMove);
+renderer.domElement.addEventListener('pointerup', onPointerUp);
+
+/* ============================================================================
+   CAMERA FLY-TO + presets + guided tour
+   ============================================================================ */
+let flyAnim = null;
+function flyTo(target, dist, dir){
+  controls.autoRotate = false; rotateBtn.classList.remove('on');
+  const camDir = dir || camera.position.clone().sub(controls.target).normalize();
+  const newPos = target.clone().add(camDir.multiplyScalar(dist));
+  flyAnim = { fromP:camera.position.clone(), toP:newPos,
+              fromT:controls.target.clone(), toT:target.clone(), t:0, dur:0.9 };
+}
+function easeInOut(x){ return x<0.5 ? 2*x*x : 1-Math.pow(-2*x+2,2)/2; }
+
+// Guided tour: Setup → Setpoints → Engine loop → Hardware sequence → Feedback
+const TOUR = [
+  { id:'wizard',  step:'1 / 5 · Setup',          text:'A one-time config-flow wizard discovers the hardware and creates the ~100-entity surface. After setup, the live system runs on entities — not the wizard.' },
+  { id:'entities',step:'2 / 5 · Setpoints',      text:'The operator\'s dashboards write setpoints into number./switch./select. entities. This entity surface is the ONLY contract between the two software layers.' },
+  { id:'engine',  step:'3 / 5 · Decision loop',  text:'The AppDaemon engine reads those entities + raw sensors, then runs each zone\'s P0–P3 logic — phase state machine, sensor fusion, dryback, EC-stacking — behind safety gates.' },
+  { id:'safety',  step:'4 / 5 · Hardware sequence', text:'Behind the safety guard, the engine drives hardware in strict order: pump prime → mainline → zone valve → irrigate → shutdown (reverse). Valve-close is read-back verified.', seq:true },
+  { id:'engine',  step:'5 / 5 · Feedback loop',  text:'Probes measure the result and feed back up through Sensor Fusion. The engine publishes app_status / heartbeat / activity_log back to HA, and the dashboards render it — closing the loop.', fb:true },
+];
+let tourIdx = -1, tourActive=false, tourTimer=null;
+const tourCap = document.getElementById('tourcap');
+function startTour(){
+  if(tourActive){ stopTour(); return; }
+  tourActive=true; tourIdx=-1; btnTour.classList.add('on'); btnTour.querySelector('svg').nextSibling.textContent='Stop tour';
+  nextTour();
+}
+function nextTour(){
+  tourIdx++;
+  if(tourIdx>=TOUR.length){ stopTour(); return; }
+  const s = TOUR[tourIdx];
+  if(s.id) {
+    if(['P0','P1','P2','P3'].includes(s.id)) selectPhase(s.id); else selectNode(s.id, true);
+  }
+  document.getElementById('tStep').textContent = s.step;
+  document.getElementById('tText').textContent = s.text;
+  tourCap.classList.add('show');
+  tourTimer = setTimeout(nextTour, 6200);
+}
+function stopTour(){
+  tourActive=false; clearTimeout(tourTimer);
+  tourCap.classList.remove('show');
+  btnTour.classList.remove('on'); btnTour.querySelector('svg').nextSibling.textContent='Guided tour';
+}
+
+/* ============================================================================
+   UI WIRING
+   ============================================================================ */
+const rotateBtn = document.getElementById('btnRotate');
+const btnTour = document.getElementById('btnTour');
+rotateBtn.addEventListener('click', ()=>{
+  controls.autoRotate = !controls.autoRotate;
+  rotateBtn.classList.toggle('on', controls.autoRotate);
+});
+if(reduceMotion){ controls.autoRotate=false; rotateBtn.classList.remove('on'); }
+
+let flowsOn = true;
+document.getElementById('btnFlows').addEventListener('click', (e)=>{
+  flowsOn = !flowsOn;
+  e.currentTarget.classList.toggle('on', !flowsOn);
+  flows.forEach(f=>f.parts.forEach(p=>p.visible=flowsOn));
+  ringParts.forEach(p=>p.visible=flowsOn);
+});
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  clearSelection(); clearPhaseSel();
+  flyAnim = { fromP:camera.position.clone(), toP:CAM_HOME.clone(),
+              fromT:controls.target.clone(), toT:TGT_HOME.clone(), t:0, dur:0.9 };
+});
+btnTour.addEventListener('click', startTour);
+document.getElementById('detailClose').addEventListener('click', ()=>{ clearSelection(); clearPhaseSel(); });
+
+// intro collapse
+const introEl = document.getElementById('intro');
+document.getElementById('introToggle').addEventListener('click', (e)=>{
+  introEl.classList.toggle('min');
+  const min = introEl.classList.contains('min');
+  e.currentTarget.textContent = min ? '+' : '–';
+  introEl.querySelectorAll('h1,p,.two').forEach(n=>n.style.display = min?'none':'');
+});
+
+// pause auto-rotate while the user interacts; (don't auto-resume — respect intent)
+controls.addEventListener('start', ()=>{ if(controls.autoRotate){ controls.autoRotate=false; rotateBtn.classList.remove('on'); } });
+
+/* ============================================================================
+   RESIZE
+   ============================================================================ */
+function onResize(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  labelRenderer.setSize(window.innerWidth, window.innerHeight);
+}
+window.addEventListener('resize', onResize);
+
+/* ============================================================================
+   ANIMATION LOOP
+   ============================================================================ */
+const clock = new THREE.Clock();
+let seqClock = 0; // drives the staged hardware-sequence pulse
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const time = clock.elapsedTime;
+
+  // camera fly-to interpolation
+  if(flyAnim){
+    flyAnim.t += dt/flyAnim.dur;
+    const k = easeInOut(Math.min(flyAnim.t,1));
+    camera.position.lerpVectors(flyAnim.fromP, flyAnim.toP, k);
+    controls.target.lerpVectors(flyAnim.fromT, flyAnim.toT, k);
+    if(flyAnim.t>=1) flyAnim=null;
+  }
+
+  // gentle node bob + engine shell spin
+  if(!reduceMotion){
+    NODES.forEach((n,i)=>{
+      n._group.position.y = n._group.userData.baseY + Math.sin(time*0.7 + i)*0.12;
+    });
+    const core = nodeById['engine']._group;
+    if(core.userData.spin){ core.userData.spin.rotation.y += dt*0.25; core.userData.spin.rotation.x += dt*0.12; }
+    phaseRing.rotation.y += dt*0.04;
+  }
+
+  // flow particles along links
+  if(flowsOn && !reduceMotion){
+    seqClock = (seqClock + dt*0.35) % 1; // 0..1 staged window for the HW sequence
+    flows.forEach(f=>{
+      f.parts.forEach(p=>{
+        p.userData.t += dt*f.speed;
+        if(p.userData.t>1) p.userData.t -= 1;
+        let tt = p.userData.t;
+        // For sequenced HW links, gate the pulse so pump->mainline->zone fire in order
+        let vis = true;
+        if(f.link.seq!==undefined){
+          const slotStart = f.link.seq*0.28;
+          const local = (seqClock - slotStart + 1)%1;
+          vis = local < 0.42;
+        }
+        p.visible = vis;
+        const pos = f.curve.getPointAt(tt);
+        p.position.copy(pos);
+        // fade near the ends
+        const edge = Math.min(tt, 1-tt);
+        p.material.opacity = (selectedId && f.link.a!==selectedId && f.link.b!==selectedId ? 0.25 : 1) * Math.min(1, edge*6+0.25);
+      });
+    });
+    // ring direction particles
+    ringParts.forEach(p=>{
+      p.userData.t += dt*0.06; if(p.userData.t>1)p.userData.t-=1;
+      const a = p.userData.t*Math.PI*2;
+      p.position.set(Math.cos(a)*RING_R, 0, Math.sin(a)*RING_R);
+    });
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+
+/* ============================================================================
+   BOOT
+   ============================================================================ */
+booted = true;
+const boot = document.getElementById('boot');
+boot.classList.add('gone');
+setTimeout(()=>boot.remove(), 600);
+animate();
+
+// expose a tiny debug hook (handy from the console, no effect otherwise)
+window.__systemMap = { selectNode, NODES, LINKS };
+</script>
+</body>
+</html>
