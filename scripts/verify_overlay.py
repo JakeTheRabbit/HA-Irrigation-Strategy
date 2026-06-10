@@ -13,7 +13,7 @@ import websocket
 
 TOK = os.environ.get("HA_TOKEN", "")
 BASE = os.environ.get("HA_BASE", "http://homeassistant.local:8123")
-DESK = BASE + "/local/crop_steering_dashboard.html?v=ovlverify"
+DESK = BASE + "/local/f2.html?v=ovlverify"
 
 chrome = next((p for p in [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
