@@ -256,8 +256,8 @@
 #tuneRoot .ttp-r p{margin:0;color:var(--ink2)}
 #tuneRoot .ttp-f{margin-top:8px;padding-top:7px;border-top:1px solid var(--hair);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;color:var(--accent);word-break:break-word}
 
-  /* ===== ported Timeline CSS, scoped under .tlroot (Phase D) ===== */
-.tlroot{/* plant-state-dashboard palette (jaketherabbit.github.io/plant-state-dashboard) */
+  /* ===== Plan tab — phase-first planner, scoped under .tlroot ===== */
+.tlroot{/* plant-state-dashboard palette */
   --bg:       #0a0c10;
   --bg2:      #0f1318;
   --surface:  #141a21;
@@ -267,95 +267,154 @@
   --muted:    #727d8a;
   --accent:   #34d399;
   --accent2:  #22d3ee;display:flex;flex-direction:column;height:calc(100vh - 7rem);overflow:hidden;min-height:0;font-variant-numeric:tabular-nums}
-.tlroot .topbar{ background: linear-gradient(180deg,var(--surface),var(--bg2)); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
-.tlroot .topbar-title{ font-size: 15px; font-weight: 800; white-space: nowrap; letter-spacing: -0.01em; background:linear-gradient(135deg,#6ee7b7,#34d399 50%,#22d3ee); -webkit-background-clip:text; background-clip:text; color:transparent; }
-/* recipe manager bar */
-.tlroot .recipe-bar{ background:var(--bg2); border-bottom:1px solid var(--border); padding:6px 16px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; flex-shrink:0; font-size:12px; }
-.tlroot .recipe-bar select,.tlroot .recipe-bar input[type=date]{ background:rgba(255,255,255,0.06); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer; color-scheme:dark; }
-.tlroot .recipe-bar select:focus,.tlroot .recipe-bar input[type=date]:focus{ outline:none; border-color:var(--accent); }
-.tlroot .rb-week{ font-size:11px; color:var(--accent2); background:rgba(34,211,238,.08); border:1px solid rgba(34,211,238,.25); padding:2px 9px; border-radius:999px; white-space:nowrap; }
-.tlroot .btn.sm{ padding:3px 9px; font-size:11px; }
-.tlroot .btn.danger:hover{ background:rgba(248,113,113,.18); border-color:rgba(248,113,113,.4); }
-.tlroot .legend-chip{ display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:2px 9px; border-radius:999px; border:1px dashed #8b93a1; color:#aab4c0; background:rgba(139,147,161,.08); cursor:pointer; white-space:nowrap; }
-.tlroot .legend-chip:hover{ color:var(--text); border-color:#cbd5e1; }
-/* phase lane — drag-resizable kanban blocks */
-.tlroot .phase-lane{ position:relative; display:flex; height:46px; flex-shrink:0; background:var(--bg2); border-bottom:1px solid var(--border); user-select:none; overflow:hidden; }
-.tlroot .pl-block{ position:relative; display:flex; flex-direction:column; justify-content:center; padding:0 8px; min-width:0; cursor:pointer; border-right:1px solid rgba(0,0,0,.4); transition:filter .12s; }
-.tlroot .pl-block:hover{ filter:brightness(1.25); }
-.tlroot .pl-block .pl-name{ font-size:11px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.tlroot .pl-block .pl-range{ font-size:9.5px; color:rgba(255,255,255,.78); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.tlroot .pl-block.active{ outline:2px solid #fff; outline-offset:-2px; }
-.tlroot .pl-handle{ position:absolute; top:0; bottom:0; width:13px; transform:translateX(-50%); cursor:col-resize; z-index:5; display:flex; align-items:center; justify-content:center; touch-action:none; }
-.tlroot .pl-handle:after{ content:""; width:3px; border-radius:2px; height:58%; background:rgba(231,236,242,.35); }
-.tlroot .pl-handle:hover:after,.tlroot .pl-handle.drag:after{ background:var(--accent); height:82%; }
-/* left-rail tools (search + category chips) */
-.tlroot .lp-tools{ position:sticky; top:0; z-index:6; background:var(--surface); border-bottom:1px solid var(--border); padding:8px 10px; display:flex; flex-direction:column; gap:6px; }
-.tlroot .lp-search{ width:100%; background:rgba(255,255,255,0.06); border:1px solid var(--border); color:var(--text); padding:5px 8px; border-radius:4px; font-size:12px; }
-.tlroot .lp-search:focus{ outline:none; border-color:var(--accent); }
-.tlroot .cat-chips{ display:flex; gap:4px; flex-wrap:wrap; }
-.tlroot .cat-chip{ font-size:10px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted); cursor:pointer; white-space:nowrap; transition:all .12s; }
-.tlroot .cat-chip.on{ background:rgba(52,211,153,.14); border-color:rgba(52,211,153,.4); color:var(--accent); }
-.tlroot .param-check{ width:13px; height:13px; accent-color:var(--accent); flex-shrink:0; cursor:pointer; }
-.tlroot .param-row.checked{ background:rgba(52,211,153,.07); }
-.tlroot.compact .param-row{ padding:2px 14px; }
-.tlroot.compact .param-section-header{ padding:4px 14px; }
-/* floating bulk-edit toolbar */
-.tlroot .bulk-bar{ position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:30; display:flex; align-items:center; gap:7px; flex-wrap:wrap; background:linear-gradient(180deg,var(--surface2),var(--bg2)); border:1px solid rgba(52,211,153,.35); border-radius:10px; padding:7px 10px; font-size:12px; box-shadow:0 14px 40px -12px #000; max-width:94%; }
-.tlroot .bulk-bar select,.tlroot .bulk-bar input{ background:rgba(255,255,255,0.06); border:1px solid var(--border); color:var(--text); padding:4px 7px; border-radius:4px; font-size:12px; }
-.tlroot .bulk-bar input[type=number]{ width:78px; }
-.tlroot .bulk-bar select:focus,.tlroot .bulk-bar input:focus{ outline:none; border-color:var(--accent); }
 .tlroot .spacer{ flex:1; min-width:8px; }
-.tlroot .btn{ background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color:var(--text); padding:5px 12px; border-radius:4px; cursor:pointer; font-size:12px; white-space:nowrap; transition:background 0.15s; }
+.tlroot .btn{ background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color:var(--text); padding:6px 12px; border-radius:7px; cursor:pointer; font-size:12px; white-space:nowrap; transition:background .15s,border-color .15s; }
 .tlroot .btn:hover{ background: rgba(255,255,255,0.12); }
 .tlroot .btn.active{ background:var(--accent); border-color:var(--accent); color:#06281c; font-weight:700; }
 .tlroot .btn.primary{ background:linear-gradient(135deg,#34d399,#10b981); border-color:transparent; color:#06281c; font-weight:700; }
-.tlroot .layout{ flex:1; display:flex; overflow:hidden; }
-.tlroot .left-panel{ width:250px; background:var(--surface); border-right:1px solid var(--border); overflow-y:auto; flex-shrink:0; }
-.tlroot .left-panel::-webkit-scrollbar{ width:5px; }
-.tlroot .left-panel::-webkit-scrollbar-thumb{ background:rgba(255,255,255,0.15); border-radius:3px; }
-.tlroot .param-section-header{ padding:8px 14px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); background:rgba(255,255,255,0.03); display:flex; align-items:center; gap:5px; }
-.tlroot .param-section-header .dot{ width:7px; height:7px; border-radius:50%; }
-.tlroot .param-row{ display:flex; align-items:center; padding:7px 14px; gap:8px; border-bottom:1px solid rgba(255,255,255,0.05); cursor:pointer; transition:background 0.1s; user-select:none; }
-.tlroot .param-row:hover{ background:rgba(255,255,255,0.05); }
-.tlroot .param-row.dragging{ opacity:0.4; background:rgba(255,255,255,0.08); }
-.tlroot .param-row.drag-over{ border-top:2px solid var(--accent); background:rgba(52,211,153,0.10); }
-.tlroot .drag-handle{ color:rgba(255,255,255,0.2); font-size:12px; cursor:grab; padding:0 2px; flex-shrink:0; }
-.tlroot .drag-handle:active{ cursor:grabbing; }
-.tlroot .param-color{ width:10px; height:10px; border-radius:2px; flex-shrink:0; }
-.tlroot .param-name{ font-size:12px; flex:1; }
-.tlroot .param-unit{ font-size:10px; color:var(--muted); }
-.tlroot .param-vis{ width:18px; height:18px; border-radius:3px; border:1px solid rgba(255,255,255,0.18); display:flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0; }
-.tlroot .param-vis.on{ background:var(--accent); border-color:var(--accent); color:#06281c; }
-.tlroot .chart-area{ flex:1; display:flex; flex-direction:column; overflow:hidden; position:relative; }
-.tlroot .main-scroll{ flex:1; overflow:auto; position:relative; }
-.tlroot .main-scroll::-webkit-scrollbar{ height:8px; width:8px; }
-.tlroot .main-scroll::-webkit-scrollbar-thumb{ background:var(--border); border-radius:3px; }
-.tlroot .main-scroll::-webkit-scrollbar-track{ background:var(--surface); }
-.tlroot .day-editor{ width:290px; background:var(--surface); border-left:1px solid var(--border); flex-shrink:0; overflow-y:auto; display:none; }
-.tlroot .day-editor.open{ display:block; }
-.tlroot .day-editor::-webkit-scrollbar{ width:5px; }
-.tlroot .day-editor::-webkit-scrollbar-thumb{ background:var(--border); }
-.tlroot .de-header{ padding:13px 15px; border-bottom:1px solid var(--border); font-size:14px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
-.tlroot .de-close{ cursor:pointer; color:var(--muted); padding:2px 7px; border-radius:4px; }
-.tlroot .de-close:hover{ background:var(--surface2); color:var(--text); }
-.tlroot .de-body{ padding:14px; }
-.tlroot .de-field{ margin-bottom:12px; }
-.tlroot .de-label{ font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin-bottom:4px; }
-.tlroot .de-input{ width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:var(--text); padding:7px 9px; border-radius:4px; font-size:13px; }
-.tlroot .de-input:focus{ outline:none; border-color:var(--accent); }
-.tlroot .de-row{ display:flex; gap:8px; }
-.tlroot .de-row .de-field{ flex:1; }
-.tlroot .vpd-box{ background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px; margin-bottom:12px; text-align:center; }
-.tlroot .vpd-val{ font-size:26px; font-weight:700; }
-.tlroot .vpd-label{ font-size:10px; color:var(--muted); }
-.tlroot .vpd-zone{ font-size:11px; padding:2px 9px; border-radius:4px; margin-top:5px; display:inline-block; font-weight:600; }
-.tlroot .notes-box{ background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:10px; font-size:12px; color:var(--muted); line-height:1.5; margin-bottom:12px; }
-.tlroot .phase-badge{ display:inline-block; padding:3px 9px; border-radius:4px; font-size:11px; font-weight:600; margin-bottom:12px; }
-.tlroot .apply-btn{ width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:var(--text); padding:7px; border-radius:4px; cursor:pointer; font-size:12px; margin-top:6px; transition:background 0.15s; }
-.tlroot .apply-btn:hover{ background:rgba(255,255,255,0.12); }
-.tlroot .status-bar{ background:linear-gradient(0deg,var(--surface),var(--bg2)); border-top:1px solid var(--border); padding:5px 18px; font-size:11px; color:var(--muted); display:flex; gap:16px; flex-shrink:0; flex-wrap:wrap; }
-.tlroot .status-item strong{ color:var(--text); }
-.tlroot .status-swatch{ width:9px; height:9px; border-radius:2px; display:inline-block; margin-right:4px; }
+.tlroot .btn.sm{ padding:4px 9px; font-size:11px; }
+.tlroot .btn.danger:hover{ background:rgba(248,113,113,.18); border-color:rgba(248,113,113,.4); color:#fecaca; }
+.tlroot .legend-chip{ display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:3px 10px; border-radius:999px; border:1px dashed #8b93a1; color:#aab4c0; background:rgba(139,147,161,.08); cursor:pointer; white-space:nowrap; }
+.tlroot .legend-chip:hover{ color:var(--text); border-color:#cbd5e1; }
+
+/* recipe bar (slim, one row) */
+.tlroot .recipe-bar{ background:linear-gradient(180deg,var(--surface),var(--bg2)); border-bottom:1px solid var(--border); padding:9px 16px; display:flex; align-items:center; gap:9px; flex-shrink:0; font-size:12px; }
+.tlroot .recipe-bar select,.tlroot .recipe-bar input[type=date]{ background:rgba(255,255,255,0.06); border:1px solid var(--border); color:var(--text); padding:6px 9px; border-radius:7px; font-size:12px; cursor:pointer; color-scheme:dark; }
+.tlroot .recipe-bar select:focus,.tlroot .recipe-bar input[type=date]:focus{ outline:none; border-color:var(--accent); }
+.tlroot .rb-pos{ font-size:11px; color:var(--accent2); background:rgba(34,211,238,.08); border:1px solid rgba(34,211,238,.25); padding:3px 10px; border-radius:999px; white-space:nowrap; font-weight:600; }
+.tlroot .rb-sync{ font-size:13px; padding:7px 16px; }
+/* ⋯ overflow menu */
+.tlroot .ov-wrap{ position:relative; }
+.tlroot .ov-btn{ font-size:16px; line-height:1; padding:5px 11px; }
+.tlroot .ov-menu{ position:absolute; right:0; top:calc(100% + 6px); z-index:60; min-width:210px; background:linear-gradient(180deg,var(--surface2),var(--bg2)); border:1px solid var(--border); border-radius:10px; padding:6px; box-shadow:0 18px 50px -14px #000; display:none; flex-direction:column; gap:1px; }
+.tlroot .ov-menu.open{ display:flex; }
+.tlroot .ov-item{ text-align:left; background:none; border:none; color:var(--text); font-size:12.5px; padding:8px 11px; border-radius:7px; cursor:pointer; display:flex; align-items:center; gap:9px; white-space:nowrap; }
+.tlroot .ov-item:hover{ background:rgba(255,255,255,.07); }
+.tlroot .ov-item.danger:hover{ background:rgba(248,113,113,.16); color:#fecaca; }
+.tlroot .ov-sep{ height:1px; background:var(--border); margin:4px 2px; }
+.tlroot .ov-item .ov-ico{ width:16px; text-align:center; color:var(--muted); flex-shrink:0; }
+
+/* phase spine */
+.tlroot .phase-spine{ display:flex; gap:7px; padding:10px 16px; flex-shrink:0; background:var(--bg2); border-bottom:1px solid var(--border); overflow-x:auto; }
+.tlroot .ps-block{ position:relative; flex:1 1 0; min-width:118px; border-radius:10px; padding:9px 10px 8px; cursor:pointer; border:1px solid rgba(0,0,0,.35); user-select:none; transition:transform .12s, box-shadow .12s; overflow:hidden; }
+.tlroot .ps-block:hover{ filter:brightness(1.12); }
+.tlroot .ps-block.active{ box-shadow:0 0 0 2px #fff, 0 8px 22px -8px rgba(0,0,0,.7); transform:translateY(-1px); }
+.tlroot .ps-name{ font-size:12.5px; font-weight:800; color:#fff; letter-spacing:-.01em; }
+.tlroot .ps-meta{ font-size:10px; color:rgba(255,255,255,.82); margin-top:1px; }
+.tlroot .ps-step{ display:flex; align-items:center; gap:7px; margin-top:7px; }
+.tlroot .ps-step button{ width:24px; height:24px; border-radius:7px; border:1px solid rgba(255,255,255,.35); background:rgba(0,0,0,.28); color:#fff; font-size:15px; line-height:1; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; touch-action:manipulation; }
+.tlroot .ps-step button:hover{ background:rgba(0,0,0,.5); }
+.tlroot .ps-step .ps-days{ font-size:11px; color:#fff; font-weight:700; flex:1; text-align:center; }
+.tlroot .ps-handle{ position:absolute; top:0; right:-5px; width:12px; height:100%; cursor:col-resize; z-index:6; display:none; align-items:center; justify-content:center; touch-action:none; }
+@media(hover:hover) and (pointer:fine){ .tlroot .ps-handle{ display:flex; } }
+.tlroot .ps-handle:after{ content:""; width:3px; height:46%; border-radius:2px; background:rgba(255,255,255,.4); }
+.tlroot .ps-handle:hover:after,.tlroot .ps-handle.drag:after{ background:#fff; height:72%; }
+
+/* layer segmented control + zone banner */
+.tlroot .layerbar{ display:flex; align-items:center; gap:10px; padding:8px 16px; flex-shrink:0; border-bottom:1px solid var(--border); background:var(--bg); flex-wrap:wrap; }
+.tlroot .seg{ display:inline-flex; background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:9px; padding:2px; gap:2px; }
+.tlroot .seg button{ border:none; background:none; color:var(--muted); font-size:12px; font-weight:600; padding:5px 13px; border-radius:7px; cursor:pointer; white-space:nowrap; }
+.tlroot .seg button:hover{ color:var(--text); }
+.tlroot .seg button.on{ color:#06281c; font-weight:700; }
+.tlroot .layer-note{ font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:8px; }
+
+/* main layout: editor (work surface) + chart */
+.tlroot .layout{ flex:1; display:flex; overflow:hidden; min-height:0; }
+.tlroot .editor-pane{ flex:1.15; min-width:0; display:flex; flex-direction:column; overflow:hidden; border-right:1px solid var(--border); }
+.tlroot .chart-pane{ flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+.tlroot .pane-scroll{ flex:1; overflow-y:auto; padding:14px 16px 26px; }
+.tlroot .pane-scroll::-webkit-scrollbar{ width:7px; }
+.tlroot .pane-scroll::-webkit-scrollbar-thumb{ background:var(--border); border-radius:4px; }
+
+/* editor header */
+.tlroot .ed-head{ font-size:14px; font-weight:800; letter-spacing:-.01em; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.tlroot .ed-badge{ display:inline-block; padding:3px 10px; border-radius:7px; font-size:11.5px; font-weight:700; }
+.tlroot .ed-sub{ font-size:11.5px; color:var(--muted); margin:5px 0 14px; }
+
+/* setpoint groups */
+.tlroot .grp{ border:1px solid var(--border); border-radius:11px; margin-bottom:11px; overflow:hidden; background:rgba(255,255,255,.015); }
+.tlroot .grp-head{ display:flex; align-items:center; gap:8px; padding:10px 13px; cursor:pointer; user-select:none; background:rgba(255,255,255,.025); }
+.tlroot .grp-head:hover{ background:rgba(255,255,255,.05); }
+.tlroot .grp-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.tlroot .grp-title{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; flex:1; }
+.tlroot .grp-chev{ color:var(--muted); font-size:12px; transition:transform .15s; }
+.tlroot .grp.collapsed .grp-chev{ transform:rotate(-90deg); }
+.tlroot .grp.collapsed .grp-body{ display:none; }
+.tlroot .grp-adv-flag{ font-size:9.5px; color:var(--muted); border:1px solid var(--border); border-radius:999px; padding:1px 7px; }
+.tlroot .grp-body{ padding:4px 0; }
+
+/* a setpoint row with a touch stepper */
+.tlroot .sp-row{ display:flex; align-items:center; gap:11px; padding:8px 13px; border-top:1px solid rgba(255,255,255,.04); }
+.tlroot .sp-row:first-child{ border-top:none; }
+.tlroot .sp-info{ flex:1; min-width:0; }
+.tlroot .sp-name{ font-size:13px; font-weight:600; }
+.tlroot .sp-sub{ font-size:10.5px; color:var(--muted); margin-top:1px; }
+.tlroot .sp-sub .mix{ color:#fbbf24; cursor:pointer; }
+.tlroot .sp-sub .ovr{ cursor:pointer; }
+.tlroot .stepper{ display:flex; align-items:center; gap:1px; flex-shrink:0; }
+.tlroot .stepper button{ width:34px; height:34px; border:1px solid var(--border); background:rgba(255,255,255,.05); color:var(--text); font-size:18px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; }
+.tlroot .stepper button:first-of-type{ border-radius:8px 0 0 8px; }
+.tlroot .stepper button:last-of-type{ border-radius:0 8px 8px 0; }
+.tlroot .stepper button:hover{ background:rgba(255,255,255,.12); }
+.tlroot .stepper button:active{ background:var(--accent); color:#06281c; }
+.tlroot .stepper input{ width:62px; height:34px; text-align:center; border:1px solid var(--border); border-left:none; border-right:none; background:rgba(0,0,0,.28); color:var(--text); font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; }
+.tlroot .stepper input:focus{ outline:none; background:rgba(52,211,153,.1); }
+.tlroot .stepper.ovr input{ background:rgba(245,158,11,.12); }
+.tlroot .stepper .su{ font-size:10px; color:var(--muted); margin-left:6px; align-self:center; min-width:34px; }
+/* computed (derived) read-only pill */
+.tlroot .sp-derived{ font-size:14px; font-weight:700; padding:6px 12px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--border); min-width:74px; text-align:center; }
+.tlroot .sp-derived .du{ font-size:9px; color:var(--muted); font-weight:500; }
+/* categorical segmented (veg↔gen) */
+.tlroot .sp-seg{ display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; flex-shrink:0; }
+.tlroot .sp-seg button{ border:none; background:rgba(255,255,255,.04); color:var(--muted); font-size:11.5px; font-weight:600; padding:7px 11px; cursor:pointer; }
+.tlroot .sp-seg button.on{ color:#fff; }
+
+/* per-day drill-in */
+.tlroot .drill{ border:1px solid var(--border); border-radius:11px; margin-top:6px; overflow:hidden; }
+.tlroot .drill-head{ display:flex; align-items:center; gap:8px; padding:10px 13px; cursor:pointer; user-select:none; font-size:12px; font-weight:700; color:var(--accent2); }
+.tlroot .drill-head:hover{ background:rgba(255,255,255,.04); }
+.tlroot .drill.collapsed .drill-body{ display:none; }
+.tlroot .drill.collapsed .grp-chev{ transform:rotate(-90deg); }
+.tlroot .drill-body{ padding:11px 13px; }
+.tlroot .day-strip{ display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; }
+.tlroot .day-cell{ flex:0 0 auto; width:50px; text-align:center; }
+.tlroot .day-cell .dc-day{ font-size:9px; color:var(--muted); margin-bottom:3px; }
+.tlroot .day-cell input{ width:100%; height:30px; text-align:center; border:1px solid var(--border); border-radius:6px; background:rgba(0,0,0,.28); color:var(--text); font-size:11.5px; }
+.tlroot .day-cell input:focus{ outline:none; border-color:var(--accent); }
+.tlroot .day-cell.ovr input{ background:rgba(245,158,11,.14); border-color:rgba(245,158,11,.5); }
+
+/* focused single-param chart */
+.tlroot .chip-row{ display:flex; gap:6px; overflow-x:auto; padding:11px 16px 9px; flex-shrink:0; border-bottom:1px solid var(--border); }
+.tlroot .pchip{ flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--muted); cursor:pointer; white-space:nowrap; }
+.tlroot .pchip:hover{ color:var(--text); }
+.tlroot .pchip.on{ color:var(--text); font-weight:700; }
+.tlroot .pchip .pc-dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.tlroot .chart-host{ flex:1; min-height:0; position:relative; padding:10px 12px 14px; }
+.tlroot .chart-host svg{ width:100%; height:100%; display:block; }
+.tlroot .chart-cap{ font-size:11px; color:var(--muted); padding:0 16px 9px; flex-shrink:0; }
+.tlroot .chart-cap b{ color:var(--text); }
+
+/* mobile back affordance — hidden on desktop */
+.tlroot .ed-back{ display:none; }
+
+@media (max-width: 760px){
+  .tlroot{ height:calc(100vh - 8.5rem); }
+  .tlroot .recipe-bar{ padding:8px 12px; gap:7px; }
+  .tlroot .recipe-bar #recipePos{ display:none; }
+  .tlroot .phase-spine{ padding:9px 12px; }
+  .tlroot .ps-block{ min-width:138px; flex:0 0 auto; }
+  .tlroot .ps-handle{ display:none; }
+  .tlroot .layout{ flex-direction:column; }
+  .tlroot .editor-pane{ border-right:none; }
+  /* mobile: editor is the full surface; chart drops below it in its own scroll region */
+  .tlroot .editor-pane{ flex:none; max-height:100%; }
+  .tlroot.show-chart .editor-pane{ display:none; }
+  .tlroot:not(.show-chart) .chart-pane{ display:none; }
+  .tlroot .ed-back{ display:inline-flex; align-items:center; gap:6px; }
+  .tlroot .stepper button{ width:40px; height:40px; font-size:20px; }
+  .tlroot .stepper input{ height:40px; width:64px; }
+  .tlroot .chart-pane{ flex:1; min-height:340px; }
+}
 </style>
 </head>
 <body x-data="app" x-cloak @keydown.window="onKey($event)" class="min-h-screen overflow-x-hidden">
@@ -1006,62 +1065,28 @@
 
       <!-- ===== TIMELINE (native canvas — Phase D) ===== -->
       <section x-show="view==='timeline'" class="fade-enter"><div class="tlroot" id="tlRoot">
+
+<!-- recipe bar (slim, one row): dropdown + position chip + prominent Sync + ⋯ menu -->
 <div class="recipe-bar" id="recipeBar"></div>
 
-<div class="topbar">
-  <span class="topbar-title">🌡 Grow Recipe Planner</span>
-  <div class="spacer"></div>
-  <select id="zoneSelect" onchange="setZone(parseInt(this.value))"
-          title="Editing layer — Facility baseline or a per-zone override"
-          style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:12px;cursor:pointer;">
-    <option value="0">🏭 Facility (base)</option>
-    <option value="1">① Zone 1</option>
-    <option value="2">② Zone 2</option>
-    <option value="3">③ Zone 3</option>
-  </select>
-  <button class="btn" id="unitToggle" onclick="toggleViewUnit()" title="Toggle day / week grid (week shows the week-representative value)">Day grid</button>
-  <button class="btn" id="densToggle" onclick="toggleDensity()" title="Toggle row height">Comfy rows</button>
-  <div style="display:flex;gap:2px;">
-    <button class="btn" id="zFit"  onclick="setDayW('fit')"  title="Fit whole grow on screen">⊞ Fit</button>
-    <button class="btn" id="zSm"   onclick="setDayW(14)"  title="Compact">S</button>
-    <button class="btn active" id="zMd" onclick="setDayW(28)"  title="Medium">M</button>
-    <button class="btn" id="zLg"   onclick="setDayW(48)"  title="Large">L</button>
-  </div>
-  <button class="btn" onclick="resetToDefaults()">Reset</button>
-  <button class="btn primary" onclick="openHASync()">⇅ HA Sync</button>
-</div>
+<!-- phase spine: drag-resizable phase blocks; tap to select & edit the whole phase -->
+<div class="phase-spine" id="phaseSpine" title="Tap a phase to edit it · drag the seam or use −/＋ to resize"></div>
 
-<div class="phase-lane" id="phaseLane" title="Drag a seam to resize phases (last seam changes total grow length) · click a block to edit the whole phase"></div>
-
-<div id="zoneBanner" style="display:none;align-items:center;gap:12px;padding:5px 16px;font-size:12px;border-bottom:1px solid var(--border);"></div>
+<!-- layer selector: Facility / Zone 1-3 -->
+<div class="layerbar" id="layerBar"></div>
 
 <div class="layout">
-  <div class="left-panel" id="leftPanel">
-    <div class="lp-tools">
-      <input class="lp-search" id="paramSearch" type="search" placeholder="Filter parameters…" oninput="onParamSearch(this.value)">
-      <div class="cat-chips" id="catChips"></div>
-    </div>
-    <div id="paramList"></div>
+  <!-- editor pane = the MAIN work surface -->
+  <div class="editor-pane">
+    <div class="pane-scroll" id="editorScroll"></div>
   </div>
-
-  <div class="chart-area">
-    <div class="bulk-bar" id="bulkBar" style="display:none"></div>
-    <div class="main-scroll" id="mainScroll">
-      <canvas id="dayCanvas" height="72" style="display:block;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border);"></canvas>
-      <canvas id="chartCanvas" style="display:block;"></canvas>
-    </div>
-  </div>
-
-  <div class="day-editor" id="dayEditor">
-    <div class="de-header">
-      <span id="deTitle">Day 1</span>
-      <span class="de-close" onclick="closeSideEditor()">×</span>
-    </div>
-    <div class="de-body" id="deBody"></div>
+  <!-- focused single-param chart -->
+  <div class="chart-pane">
+    <div class="chip-row" id="chipRow"></div>
+    <div class="chart-cap" id="chartCap"></div>
+    <div class="chart-host" id="chartHost"></div>
   </div>
 </div>
-
-<div class="status-bar" id="statusBar"></div>
 
 <div id="haToast" style="position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:linear-gradient(180deg,var(--surface),var(--bg2));border:1px solid var(--border);color:var(--text);padding:9px 16px;border-radius:9px;font-size:13px;display:none;z-index:200;box-shadow:0 14px 44px -12px #000"></div>
 <div id="haModal" style="position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;z-index:150" onclick="if(event.target===this)closeHASync()">
@@ -1222,7 +1247,7 @@ const CONFIG = {
     bl_temp:"sensor.f2_scd41_back_left_temperature",bl_vpd:"sensor.f2_scd41_back_left_vpd",bl_co2:"sensor.f2_scd41_back_left_co2",
     sub_vwc:"sensor.f2_row_1_vwc",sub_pwec:"sensor.f2_row_1_pwec",sub_temp:"sensor.f2_row_1_temperature",
     pump_power:"sensor.veg_main_pump_power",row1:"switch.f2_row1",row2:"switch.f2_row2",row3:"switch.f2_row3",dosing_active:"input_boolean.nutrient_dosing_active",led_power:"sensor.led_f2_r2_f2_r2_led_power",cam:"camera.flower2_cam_clear",
-    tank_pct:"sensor.f2_tank_level_pct",tank_l:"sensor.f2_tank_litres_remaining",tank_pct_fb:"sensor.tank_percentage_full",tank_l_fb:"sensor.200l_tank_space_remaining",
+    tank_pct:"sensor.f2_tank_level",tank_l:"sensor.f2_tank_litres_remaining",tank_pct_fb:"sensor.tank_percentage_full",tank_l_fb:"sensor.200l_tank_space_remaining",
   },
   ZONE:(z)=>({vwc:`sensor.crop_steering_zone_${z}_vwc`,ec:`sensor.crop_steering_zone_${z}_ec`,phase:`sensor.crop_steering_zone_${z}_phase`,status:`sensor.crop_steering_zone_${z}_status`,safety:`sensor.crop_steering_zone_${z}_safety_status`,last_irrig:`sensor.crop_steering_zone_${z}_last_irrigation_app`,enabled:`switch.crop_steering_zone_${z}_enabled`}),
 };
@@ -1275,7 +1300,7 @@ function seedDemo(){
   }));
   (typeof FLOOR_ROOMS!=='undefined'?FLOOR_ROOMS:[]).forEach(r=>r.lights.forEach(id=>set(id,'on')));
   set('sensor.aqua_pro_tank_ph',5.9); set('sensor.aqua_pro_tank_ec',2.4); set('sensor.aqua_pro_tank_temperature',20); set('sensor.tank_percentage_full',86);
-  set('sensor.f2_tank_level_pct',78); set('sensor.f2_tank_litres_remaining',156); set('sensor.200l_tank_space_remaining',44);   // source-tank fullness for the Status facility-glance bar
+  set('sensor.f2_tank_level',78); set('sensor.f2_tank_litres_remaining',156); set('sensor.200l_tank_space_remaining',44);   // source-tank fullness for the Status facility-glance bar
   // Operate tab — global strategy / guardrails / engine telemetry (perfect role-model)
   set('select.crop_steering_steering_mode','Generative',{options:['Vegetative','Generative']});
   set('select.crop_steering_growth_stage','Generative',{options:['Vegetative','Generative']});
@@ -2726,9 +2751,8 @@ function calcVPD(tempC, rh) {
 // STATE
 // ============================================================
 let recipe      = buildDefaultRecipe();
-let visParams   = PARAMS.filter(p => p.visible).map(p => p.id);
-let selectedDay = null;
-let selectedPhase = null;   // active phase block → zoom + highlight that day range
+let visParams   = PARAMS.filter(p => p.visible).map(p => p.id);   // persisted for forward-compat; not used by the phase-first UI
+let selectedPhase = null;   // active phase block → drives the editor + chart highlight
 
 // ── ZONE STATE ──
 let zones = { 1: {}, 2: {}, 3: {} };
@@ -2740,23 +2764,21 @@ const ZONE_META = {
 };
 let activeZone = 0;
 
-// ── VIEW / SELECTION STATE ──
-let viewUnit   = 'day';          // 'day' | 'week' (week = week-representative values)
-let rowDensity = 'comfy';        // 'comfy' | 'compact'
-let compareId  = null;           // overlay recipe id (session-only)
-let editorMode = null;           // 'day' | 'phase' | null (right side panel)
-let phaseEdId  = null;           // phase id open in the phase editor
-let bulkSel    = null;           // {a,b} inclusive day range selection
-let _selAnchor = null;           // shift+click anchor day
-let selParams  = new Set();      // checked param rows for multi-param bulk apply
-let paramFilter = { q: '', cats: { climate: true, lights: true, irrigation: true, ec: true } };
-const CAT_LABELS  = { climate: 'Climate', lights: 'Lights', irrigation: 'Irrigation', ec: 'EC / Feed' };
-const SECTION_CAT = {
-  'Environment': 'climate', 'Lighting': 'lights',
-  'Root Zone': 'irrigation', 'Steering': 'irrigation', 'Irrigation': 'irrigation', 'Phase Timing': 'irrigation',
-  'Shot Sizes %': 'irrigation', 'Zone Setup': 'irrigation', 'Limits & Hardware': 'irrigation',
-  'Tank / Feed': 'ec', 'Steering EC': 'ec',
-};
+// ── VIEW / SELECTION STATE (phase-first) ──
+let compareId   = null;          // overlay recipe id (session-only) — drawn as a ghost on the focused chart
+let focusParam  = 'temp_day';    // the ONE param shown in the focused chart
+const advOpen   = {};            // collapsed/expanded state per advanced group (session)
+let drillOpen   = false;         // per-day drill-in disclosure (session)
+
+// section ordering + which are "advanced" (collapsed by default — keeps the default view ~18 setpoints)
+const SECTION_ORDER = ['Environment','Lighting','Root Zone','Steering','Irrigation','Tank / Feed',
+  'Steering EC','Phase Timing','Shot Sizes %','Limits & Hardware','Zone Setup'];
+const ADVANCED_SECTIONS = new Set(['Steering EC','Phase Timing','Shot Sizes %','Limits & Hardware','Zone Setup']);
+const SECTION_DOT = { 'Environment':'#ef4444','Lighting':'#fbbf24','Root Zone':'#10b981','Steering':'#ec4899',
+  'Irrigation':'#38bdf8','Tank / Feed':'#fb923c','Steering EC':'#f87171','Phase Timing':'#a78bfa',
+  'Shot Sizes %':'#22d3ee','Limits & Hardware':'#eab308','Zone Setup':'#818cf8' };
+// the everyday params get a chip in the focused-chart selector (derived VPD/DLI viewable too)
+const CHART_CHIP_IDS = ['temp_day','leaf_temp','rh','vpd','co2','ppfd','dli','vwc','pwec','steering','dryback','p1_ml','p2_ml','tank_ec','tank_ph'];
 
 // ── PERSISTENCE — multi-recipe store (f2.recipes), migrates the legacy f2.timeline single-save ──
 const LS_KEY     = 'f2.timeline';   // legacy v2 single-save (read-only now — migrated as "Default recipe")
@@ -2791,8 +2813,9 @@ function hydrate(id) {
   ensureRecipeLen(TOTAL_DAYS);
   zones = normalizeZones(r.zones);
   r.zones = zones;
-  activeZone = 0; selectedDay = null; selectedPhase = null;
-  bulkSel = null; _selAnchor = null; editorMode = null; phaseEdId = null;
+  activeZone = 0;
+  selectedPhase = PHASES[0].id;   // phase-first: open on the first phase
+  drillOpen = false;
 }
 // working globals → store entry
 function packActive() {
@@ -2806,8 +2829,7 @@ function _saveNow() {
   clearTimeout(_saveT); _saveT = null;
   try {
     packActive();
-    recipeStore.visParams = visParams;
-    recipeStore.prefs = { viewUnit, rowDensity };
+    recipeStore.visParams = visParams;   // preserved for forward-compat with older saves
     localStorage.setItem(LS_RECIPES, JSON.stringify(recipeStore));
   } catch (e) { /* quota/full — non-fatal for a planner */ }
 }
@@ -2836,9 +2858,6 @@ function loadStore() {
   }
   if (Array.isArray(recipeStore.visParams) && recipeStore.visParams.length)
     visParams = recipeStore.visParams.filter(id => PARAMS.some(p => p.id === id));
-  const pf = recipeStore.prefs || {};
-  if (pf.viewUnit === 'week') viewUnit = 'week';
-  if (pf.rowDensity === 'compact') rowDensity = 'compact';
   hydrate(recipeStore.activeId);
   _saveNow();
 }
@@ -2856,523 +2875,20 @@ function normalizeZones(z) {
 }
 
 // ============================================================
-// LEFT PANEL
+// PHASE-FIRST PRESENTATION CORE
+// recipe bar · phase spine · layer selector · phase editor · focused chart
+// (data layer below this block — getVal/setVal/HA_SYNC/store — is untouched)
 // ============================================================
-let dragSrcId = null;
 
-// ── PARAM FILTERS (search box + category chips) ──
-function paramMatchesFilter(p) {
-  if (!paramFilter.cats[SECTION_CAT[p.section] || 'irrigation']) return false;
-  if (paramFilter.q) {
-    const q = paramFilter.q;
-    if (!(p.name.toLowerCase().includes(q) || p.id.includes(q) || p.section.toLowerCase().includes(q))) return false;
-  }
-  return true;
-}
-function filteredVisParams() {
-  return visParams.filter(id => { const p = PARAMS.find(x => x.id === id); return p && paramMatchesFilter(p); });
-}
-let _qT = null;
-function onParamSearch(v) {
-  clearTimeout(_qT);
-  _qT = setTimeout(() => { paramFilter.q = (v || '').trim().toLowerCase(); buildLeftPanel(); renderCharts(); }, 150);
-}
-function toggleCat(c) { paramFilter.cats[c] = !paramFilter.cats[c]; renderCatChips(); buildLeftPanel(); renderCharts(); }
-function renderCatChips() {
-  const el = document.getElementById('catChips');
-  if (!el) return;
-  el.innerHTML = Object.keys(CAT_LABELS)
-    .map(c => `<span class="cat-chip ${paramFilter.cats[c] ? 'on' : ''}" onclick="toggleCat('${c}')">${CAT_LABELS[c]}</span>`).join('');
-}
-function toggleSelParam(pid) {
-  const p = PARAMS.find(x => x.id === pid);
-  if (!p || p.derived) return;
-  if (selParams.has(pid)) selParams.delete(pid); else selParams.add(pid);
-  const row = document.querySelector('#paramList .param-row[data-pid="' + pid + '"]');
-  if (row) {
-    row.classList.toggle('checked', selParams.has(pid));
-    const c = row.querySelector('.param-check');
-    if (c) c.checked = selParams.has(pid);
-  }
-  if (bulkSel) showBulkBar();   // refresh the "checked rows (k)" option
+function steeringLabel(v) {
+  v = parseInt(v);
+  return v < 35 ? '🌿 Vegetative' : v < 65 ? '⚖️ Balanced' : '🌸 Generative';
 }
 
-function buildLeftPanel() {
-  const panel = document.getElementById('paramList');
-  if (!panel) return;
-  const lp = document.getElementById('leftPanel');
-  const keepScroll = lp ? lp.scrollTop : 0;
-  panel.innerHTML = '';
-
-  // Show all params in visParams order first, then hidden ones — both honoring the search/category filter
-  const ordered = [
-    ...visParams.map(id => PARAMS.find(p => p.id === id)).filter(Boolean),
-    ...PARAMS.filter(p => !visParams.includes(p.id)),
-  ].filter(paramMatchesFilter);
-
-  // Group into sections preserving order
-  const seen = new Set();
-  for (const p of ordered) {
-    if (seen.has(p.section)) continue;
-    seen.add(p.section);
-    const secParams = ordered.filter(x => x.section === p.section);
-    const secDiv = document.createElement('div');
-    secDiv.innerHTML = `<div class="param-section-header"><div class="dot" style="background:${secParams[0].color}"></div>${p.section}</div>`;
-
-    for (const param of secParams) {
-      const isVis = visParams.includes(param.id);
-      const row = document.createElement('div');
-      row.className = 'param-row' + (selParams.has(param.id) ? ' checked' : '');
-      row.dataset.pid = param.id;
-      row.draggable = true;
-      row.innerHTML = `
-        <span class="drag-handle" title="Drag to reorder">⠿</span>
-        <input type="checkbox" class="param-check" title="Mark for bulk edit (Ctrl+click the row works too)" ${selParams.has(param.id) ? 'checked' : ''} ${param.derived ? 'disabled' : ''}>
-        <div class="param-color" style="background:${param.color}"></div>
-        <div class="param-name">${param.name}${param.derived ? ' <span style="color:var(--muted);font-size:9px">(auto)</span>' : ''}</div>
-        <div class="param-unit">${param.unit}</div>
-        <div class="param-vis ${isVis ? 'on' : ''}" data-pid="${param.id}">✓</div>
-      `;
-
-      // Bulk-edit checkbox
-      const chk = row.querySelector('.param-check');
-      chk.addEventListener('click', e => e.stopPropagation());
-      chk.addEventListener('change', () => toggleSelParam(param.id));
-      // Visibility toggle
-      row.querySelector('.param-vis').addEventListener('click', e => { e.stopPropagation(); toggleParam(param.id); });
-      row.addEventListener('click', e => {
-        if (e.ctrlKey || e.metaKey) { toggleSelParam(param.id); return; }
-        if (!e.target.classList.contains('drag-handle')) toggleParam(param.id);
-      });
-
-      // Drag events
-      row.addEventListener('dragstart', e => {
-        dragSrcId = param.id;
-        row.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', param.id);
-      });
-      row.addEventListener('dragend', () => {
-        row.classList.remove('dragging');
-        panel.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-      });
-      row.addEventListener('dragover', e => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        panel.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        if (dragSrcId !== param.id) row.classList.add('drag-over');
-      });
-      row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
-      row.addEventListener('drop', e => {
-        e.preventDefault();
-        row.classList.remove('drag-over');
-        if (!dragSrcId || dragSrcId === param.id) return;
-        // Reorder visParams
-        const srcInVis = visParams.includes(dragSrcId);
-        const tgtInVis = visParams.includes(param.id);
-        if (srcInVis && tgtInVis) {
-          // Both visible — reorder within visParams
-          const srcIdx = visParams.indexOf(dragSrcId);
-          const tgtIdx = visParams.indexOf(param.id);
-          visParams.splice(srcIdx, 1);
-          visParams.splice(tgtIdx, 0, dragSrcId);
-        } else if (srcInVis && !tgtInVis) {
-          // Dragged onto a hidden row — just move within vis
-          // no-op for hidden targets
-        } else if (!srcInVis && tgtInVis) {
-          // Enable dragged param and insert before target
-          const tgtIdx = visParams.indexOf(param.id);
-          visParams.splice(tgtIdx, 0, dragSrcId);
-        }
-        dragSrcId = null;
-        buildLeftPanel();
-        renderCharts();
-      });
-
-      secDiv.appendChild(row);
-    }
-    panel.appendChild(secDiv);
-  }
-  if (lp) lp.scrollTop = keepScroll;
-}
-
-function toggleParam(pid) {
-  visParams = visParams.includes(pid) ? visParams.filter(x => x !== pid) : [...visParams, pid];
-  buildLeftPanel();
-  renderCharts();
-}
-
-// ============================================================
-// CANVAS
-// ============================================================
-let dayCanvas, chartCanvas, ctxDay, ctxChart;   // assigned in tlInit() (the view is display:none at load -> 0-width canvas)
-
-// Each visible param's canvas track must sit at the exact Y of its left-rail row
-// (the rail has section-header rows + variable heights the old ri*ROW_H ignored,
-// which made the lines drift out of alignment). Read the live row geometry.
-function computeRowGeom(vp) {
-  if (!vp.length) return { ys: [], hs: [], totalH: 100 };   // filters can empty the row set — keep a minimal canvas
-  const panel = document.getElementById('leftPanel');
-  const rows = vp.map(p => panel && panel.querySelector('.param-row[data-pid="' + p.id + '"]'));
-  if (!panel || !panel.clientHeight || rows.some(r => !r)) {   // DOM not laid out yet → uniform fallback
-    const ys = vp.map((_, i) => i * ROW_H);
-    return { ys, hs: vp.map(() => ROW_H), totalH: Math.max(vp.length * ROW_H, 100) };
-  }
-  const pr = panel.getBoundingClientRect(), sc = panel.scrollTop;
-  const top = el => el.getBoundingClientRect().top - pr.top + sc;
-  const origin = top(rows[0]);
-  const ys = rows.map(r => Math.round(top(r) - origin));
-  const hs = rows.map(r => Math.round(r.getBoundingClientRect().height));
-  return { ys, hs, totalH: Math.max(ys[ys.length - 1] + hs[hs.length - 1], 100) };
-}
-
-function renderCharts() {
-  if (!ctxDay) return;   // island not mounted yet
-  renderZoneBanner();   // keep the override-count banner live as edits land
-  const vp      = filteredVisParams().map(id => PARAMS.find(p => p.id === id)).filter(Boolean);   // visible ∩ search/category filters
-  const totalW  = TOTAL_DAYS * DAY_W;
-  const geom    = computeRowGeom(vp);   // per-row {ys,hs} aligned to the left rail
-  const totalH  = geom.totalH;
-
-  dayCanvas.width   = totalW;
-  dayCanvas.height  = HDR_H;
-  chartCanvas.width = totalW;
-  chartCanvas.height= totalH;
-
-  drawDayHeader(ctxDay, totalW);
-  drawChartRows(ctxChart, vp, totalW, totalH, geom);
-  buildStatusBar(vp);
-}
-// rAF-throttled repaint for drag interactions (lane resize, range select)
-let _rafR = false;
-function throttledRender() {
-  if (_rafR) return;
-  _rafR = true;
-  requestAnimationFrame(() => { _rafR = false; renderCharts(); });
-}
-
-function drawDayHeader(ctx, totalW) {
-  ctx.fillStyle = '#111318';
-  ctx.fillRect(0, 0, totalW, HDR_H);
-
-  // Phase bands
-  for (const ph of PHASES) {
-    const x = ph.start * DAY_W, w = (ph.end - ph.start) * DAY_W;
-    const sel = ph.id === selectedPhase;
-    ctx.fillStyle = ph.color + (sel ? 'dd' : '44');
-    ctx.fillRect(x, 0, w, 22);
-    ctx.fillStyle = sel ? '#fff' : ph.color;
-    ctx.font = 'bold 10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(ph.label, x + w / 2, 14);
-  }
-
-  ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  ctx.fillRect(0, 22, totalW, 1);
-
-  for (let d = 0; d < TOTAL_DAYS; d++) {
-    const x        = d * DAY_W;
-    const week     = Math.floor(d / 7);
-    const wd       = WEEK_DATA[Math.min(week, WEEK_DATA.length - 1)];
-    const ph       = PHASES.find(p => d >= p.start && d < p.end) || PHASES[PHASES.length - 1];
-    const isStart  = d % 7 === 0;
-    const isSel    = d === selectedDay;
-
-    if (isSel) {
-      ctx.fillStyle = ph.color + '55';
-      ctx.fillRect(x, 22, DAY_W, HDR_H - 22);
-    }
-
-    ctx.strokeStyle = isStart ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.12)';
-    ctx.lineWidth   = 1;
-    ctx.beginPath();
-    ctx.moveTo(x, 22); ctx.lineTo(x, HDR_H);
-    ctx.stroke();
-
-    if (isStart) {
-      ctx.textAlign = 'left';
-      ctx.fillStyle = ph.color;
-      ctx.font      = `bold ${Math.max(8, Math.min(10, DAY_W))}px sans-serif`;
-      ctx.fillText(`W${week}`, x + 2, 36);
-      if (DAY_W >= 20) {
-        ctx.fillStyle = '#888';
-        ctx.font      = '9px sans-serif';
-        // Truncate stage name based on available width
-        const maxChars = Math.max(3, Math.floor(DAY_W * 7 / 8));
-        const stageName = wd[1].length > maxChars ? wd[1].slice(0, maxChars) + '…' : wd[1];
-        ctx.fillText(stageName, x + 2, 48);
-        const vpdColor = wd[7] < 0.9 ? '#06b6d4' : wd[7] > 1.3 ? '#ef4444' : '#22c55e';
-        ctx.fillStyle  = vpdColor;
-        ctx.font       = 'bold 8px sans-serif';
-        ctx.fillText(`${wd[7]}`, x + 2, 60);
-      }
-    } else if (DAY_W >= 24 && viewUnit === 'day') {
-      ctx.fillStyle = isSel ? '#fff' : '#555';
-      ctx.font      = '9px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(d + 1, x + DAY_W / 2, HDR_H - 3);
-    }
-  }
-
-  // day/week range selection highlight
-  if (bulkSel) {
-    const x = bulkSel.a * DAY_W, w = (bulkSel.b - bulkSel.a + 1) * DAY_W;
-    ctx.fillStyle = 'rgba(52,211,153,0.16)';
-    ctx.fillRect(x, 22, w, HDR_H - 22);
-    ctx.strokeStyle = '#34d399';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(x + 0.75, 22.75, w - 1.5, HDR_H - 23.5);
-  }
-
-  if (selectedDay !== null) {
-    const sx = selectedDay * DAY_W + DAY_W / 2;
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 4]);
-    ctx.beginPath();
-    ctx.moveTo(sx, 22); ctx.lineTo(sx, HDR_H);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-}
-
-function drawChartRows(ctx, vp, totalW, totalH, geom) {
-  ctx.fillStyle = '#0a0c10';
-  ctx.fillRect(0, 0, totalW, totalH);
-
-  vp.forEach((param, ri) => {
-    const rowY = geom.ys[ri];
-    const rowH = geom.hs[ri];
-
-    ctx.fillStyle = ri % 2 === 0 ? '#0a0c10' : '#0f1318';
-    ctx.fillRect(0, rowY, totalW, rowH);
-
-    // Param label mini
-    ctx.fillStyle = param.color + 'bb';
-    ctx.font = 'bold 9px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(param.name, 4, rowY + 12);
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, rowY + rowH); ctx.lineTo(totalW, rowY + rowH);
-    ctx.stroke();
-
-    for (let d = 0; d < TOTAL_DAYS; d += 7) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(d * DAY_W, rowY); ctx.lineTo(d * DAY_W, rowY + rowH);
-      ctx.stroke();
-    }
-
-    if (selectedDay !== null) {
-      ctx.fillStyle = param.color + '22';
-      ctx.fillRect(selectedDay * DAY_W, rowY, DAY_W, rowH);
-    }
-
-    if (!recipe[param.id]) return;
-
-    if (param.categorical) drawCategoricalRow(ctx, param, rowY, rowH);
-    else drawLineRow(ctx, param, rowY, rowH);
-
-    // per-row OVR badge when the active zone overrides this param
-    if (activeZone !== 0 && paramDiffers(param.id, activeZone)) {
-      ctx.font = 'bold 9px sans-serif';   // match the param-label font so the width measures right
-      const lblW = ctx.measureText(param.name).width;
-      ctx.fillStyle = ZONE_META[activeZone].color;
-      ctx.font = 'bold 8px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('● OVR', 8 + lblW + 6, rowY + 12);
-    }
-  });
-
-  // phase column tint + boundaries — drawn AFTER the opaque row backgrounds so they actually show
-  for (const ph of PHASES) {
-    const x = ph.start * DAY_W, w = (ph.end - ph.start) * DAY_W;
-    ctx.fillStyle = ph.color + (ph.id === selectedPhase ? '1c' : '0b');
-    ctx.fillRect(x, 0, w, totalH);
-  }
-  for (const ph of PHASES) {
-    ctx.strokeStyle = ph.color + '44';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(ph.start * DAY_W, 0);
-    ctx.lineTo(ph.start * DAY_W, totalH);
-    ctx.stroke();
-  }
-  ctx.setLineDash([]);
-  // outline the selected phase range
-  if (selectedPhase) {
-    const sp = PHASES.find(p => p.id === selectedPhase);
-    if (sp) {
-      const x = sp.start * DAY_W, w = (sp.end - sp.start) * DAY_W;
-      ctx.strokeStyle = sp.color; ctx.lineWidth = 2;
-      ctx.strokeRect(x + 1, 1, w - 2, totalH - 2);
-    }
-  }
-  // day/week range selection overlay
-  if (bulkSel) {
-    const x = bulkSel.a * DAY_W, w = (bulkSel.b - bulkSel.a + 1) * DAY_W;
-    ctx.fillStyle = 'rgba(52,211,153,0.10)';
-    ctx.fillRect(x, 0, w, totalH);
-    ctx.strokeStyle = 'rgba(52,211,153,0.7)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(x + 0.75, 0); ctx.lineTo(x + 0.75, totalH);
-    ctx.moveTo(x + w - 0.75, 0); ctx.lineTo(x + w - 0.75, totalH);
-    ctx.stroke();
-  }
-}
-
-function drawLineRow(ctx, param, rowY, rowH) {
-  const PAD = 7;
-  const chartH = rowH - PAD * 2;
-  const Q = viewUnit === 'week' ? (d => Math.floor(d / 7) * 7) : (d => d);   // week view → week-representative value (week start)
-  const eff = d => getVal(param.id, Q(d), activeZone);
-  const fac = d => recipe[param.id][Q(d)];
-  const zoneMode = activeZone !== 0;
-  const cmpR = getCompareRecipe();
-  const cmpArr = (cmpR && cmpR.recipe && Array.isArray(cmpR.recipe[param.id]) && cmpR.recipe[param.id].length) ? cmpR.recipe[param.id] : null;
-  const cmpAt = d => cmpArr[Math.min(Q(d), cmpArr.length - 1)];
-
-  // auto-scale across effective + facility (+ compare overlay) series so ghosts share the axis
-  let minV = Infinity, maxV = -Infinity;
-  for (let d = 0; d < TOTAL_DAYS; d++) {
-    const a = eff(d), b = fac(d);
-    if (a < minV) minV = a; if (a > maxV) maxV = a;
-    if (zoneMode) { if (b < minV) minV = b; if (b > maxV) maxV = b; }
-    if (cmpArr) { const c = cmpAt(d); if (c < minV) minV = c; if (c > maxV) maxV = c; }
-  }
-  const range = maxV - minV || 1;
-  const dispMin = minV - range * 0.08;
-  const dispMax = maxV + range * 0.08;
-  const toY = v => rowY + PAD + chartH - ((v - dispMin) / (dispMax - dispMin)) * chartH;
-
-  // override column tint (zone mode)
-  if (zoneMode) {
-    for (let d = 0; d < TOTAL_DAYS; d++) {
-      if (!hasOverride(param.id, d, activeZone)) continue;
-      ctx.fillStyle = ZONE_META[activeZone].color + '22';
-      ctx.fillRect(d * DAY_W, rowY, DAY_W, rowH);
-    }
-  }
-
-  // facility ghost line (zone mode)
-  if (zoneMode) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.strokeStyle = param.color + '55';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
-    for (let d = 0; d < TOTAL_DAYS; d++) {
-      const x = d * DAY_W + DAY_W / 2;
-      d === 0 ? ctx.moveTo(x, toY(fac(d))) : ctx.lineTo(x, toY(fac(d)));
-    }
-    ctx.stroke();
-    ctx.restore();
-    ctx.setLineDash([]);
-  }
-
-  // compare-recipe overlay — dashed muted ghost of the other recipe's facility track (read-only)
-  if (cmpArr) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.strokeStyle = '#8b93a1';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([6, 5]);
-    ctx.globalAlpha = 0.8;
-    for (let d = 0; d < TOTAL_DAYS; d++) {
-      const x = d * DAY_W + DAY_W / 2;
-      d === 0 ? ctx.moveTo(x, toY(cmpAt(d))) : ctx.lineTo(x, toY(cmpAt(d)));
-    }
-    ctx.stroke();
-    ctx.restore();
-    ctx.setLineDash([]);
-  }
-
-  // Area (effective)
-  ctx.save();
-  ctx.beginPath();
-  for (let d = 0; d < TOTAL_DAYS; d++) {
-    const x = d * DAY_W + DAY_W / 2;
-    d === 0 ? ctx.moveTo(x, toY(eff(d))) : ctx.lineTo(x, toY(eff(d)));
-  }
-  ctx.lineTo((TOTAL_DAYS - 1) * DAY_W + DAY_W / 2, rowY + rowH - PAD);
-  ctx.lineTo(DAY_W / 2, rowY + rowH - PAD);
-  ctx.closePath();
-  ctx.fillStyle = param.color + '22';
-  ctx.fill();
-  ctx.restore();
-
-  // Line (effective)
-  ctx.save();
-  ctx.beginPath();
-  ctx.strokeStyle = param.color;
-  ctx.lineWidth = 2;
-  ctx.lineJoin = 'round';
-  for (let d = 0; d < TOTAL_DAYS; d++) {
-    const x = d * DAY_W + DAY_W / 2;
-    d === 0 ? ctx.moveTo(x, toY(eff(d))) : ctx.lineTo(x, toY(eff(d)));
-  }
-  ctx.stroke();
-  ctx.restore();
-
-  // Value labels + dots/diamonds at week boundaries
-  ctx.font = 'bold 8px sans-serif';
-  ctx.textAlign = 'center';
-  for (let d = 0; d < TOTAL_DAYS; d += 7) {
-    const x = d * DAY_W + DAY_W / 2;
-    const y = toY(eff(d));
-    const over = zoneMode && hasOverride(param.id, d, activeZone);
-    if (over) {
-      const r = DAY_W < 16 ? 2.5 : 3.5;
-      ctx.beginPath();
-      ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y);
-      ctx.closePath();
-      ctx.fillStyle = ZONE_META[activeZone].color;
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.arc(x, y, DAY_W < 16 ? 1.5 : 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = param.color;
-      ctx.fill();
-    }
-    if (DAY_W >= 16) {
-      ctx.fillStyle = param.color + 'cc';
-      ctx.fillText(fmtVal(param, eff(d)), x, Math.max(rowY + 10, y - 4));
-    }
-  }
-}
-
-function drawCategoricalRow(ctx, param, rowY, rowH) {
-  const bandH = Math.min(22, rowH - 8), bandTop = rowY + rowH - bandH - 4;
-  const Q = viewUnit === 'week' ? (d => Math.floor(d / 7) * 7) : (d => d);
-  for (let d = 0; d < TOTAL_DAYS; d++) {
-    const x = d * DAY_W;
-    const v = getVal(param.id, Q(d), activeZone);
-    let color, label;
-    if (v < 35) { color = '#22c55e'; label = 'Veg'; }
-    else if (v < 65) { color = '#f59e0b'; label = 'Bal'; }
-    else { color = '#ec4899'; label = 'Gen'; }
-    ctx.fillStyle = color + '88';
-    ctx.fillRect(x + 1, bandTop, DAY_W - 2, bandH);
-    if (activeZone !== 0 && hasOverride(param.id, d, activeZone)) {
-      ctx.strokeStyle = ZONE_META[activeZone].color;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x + 1, bandTop, DAY_W - 2, bandH);
-    }
-    if (DAY_W > 22) {
-      ctx.fillStyle = '#fff';
-      ctx.font = '8px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(label, x + DAY_W / 2, bandTop + bandH - 6);
-    }
-  }
-}
-
+// the active phase block; defaults to the first phase
+function activePhase() { return PHASES.find(p => p.id === selectedPhase) || PHASES[0]; }
+function paramById(id) { return PARAMS.find(p => p.id === id); }
+// format a value at the param's precision (step-aware)
 function fmtVal(param, v) {
   if (!param) return '';
   if (param.step < 0.1) return (+v).toFixed(2);
@@ -3380,282 +2896,573 @@ function fmtVal(param, v) {
   return Math.round(v).toString();
 }
 
-// ============================================================
-// CLICK / DRAG → SELECT DAY OR DAY-RANGE
-// ============================================================
-function getClickDay(e, canvas) {
-  // the canvases ARE the scrolled content, so their rect already accounts for scrollLeft
-  const rect = canvas.getBoundingClientRect();
-  return Math.max(0, Math.min(TOTAL_DAYS - 1, Math.floor((e.clientX - rect.left) / DAY_W)));
+// ── repaint orchestrator (replaces the old multi-canvas renderCharts) ──
+function renderPlan() {
+  renderRecipeBar();
+  renderPhaseSpine();
+  renderLayerBar();
+  renderEditor();
+  renderChipRow();
+  renderFocusedChart();
 }
-function snapRangeToUnit(a, b) {
-  if (viewUnit === 'week') { a = Math.floor(a / 7) * 7; b = Math.min(TOTAL_DAYS - 1, Math.floor(b / 7) * 7 + 6); }
-  return { a, b };
+// kept name so existing callers (recipe CRUD, setVal-driven flows) still work
+function renderCharts() { renderFocusedChart(); renderEditorLive(); }
+let _rafR = false;
+function throttledRender() {
+  if (_rafR) return;
+  _rafR = true;
+  requestAnimationFrame(() => { _rafR = false; renderFocusedChart(); });
 }
-let _ptr = null;   // in-progress canvas pointer gesture {day,x,moved}
-function tlPointerDown(e, canvas) {
-  if (e.button !== 0) return;
-  _ptr = { day: getClickDay(e, canvas), x: e.clientX, moved: false };
-  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
-}
-function tlPointerMove(e, canvas) {
-  if (!_ptr) return;
-  if (!_ptr.moved && Math.abs(e.clientX - _ptr.x) < 5) return;   // 5px threshold before it becomes a drag-select
-  _ptr.moved = true;
-  const d = getClickDay(e, canvas);
-  bulkSel = snapRangeToUnit(Math.min(_ptr.day, d), Math.max(_ptr.day, d));
-  throttledRender();
-}
-function tlPointerUp(e, canvas) {
-  if (!_ptr) return;
-  const p = _ptr; _ptr = null;
-  try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
-  if (p.moved) { _selAnchor = p.day; showBulkBar(); renderCharts(); return; }    // drag finished → toolbar
-  const day = getClickDay(e, canvas);
-  if (e.shiftKey && _selAnchor !== null) {                                       // shift+click = span from anchor
-    bulkSel = snapRangeToUnit(Math.min(_selAnchor, day), Math.max(_selAnchor, day));
-    showBulkBar(); renderCharts(); return;
-  }
-  _selAnchor = day;
-  if (viewUnit === 'week') {                                                     // week grid: click selects the whole week
-    bulkSel = snapRangeToUnit(day, day);
-    showBulkBar(); renderCharts(); return;
-  }
-  bulkSel = null; hideBulkBar();                                                 // plain click resets any range selection
-  selectedDay = day;
-  openDayEditor(day);
-  renderCharts();
-}
-// click-away (outside toolbar / chart / rail / editors) clears the selection
-function tlClickAway(e) {
-  if (!bulkSel || !tlVisible()) return;
-  const t = e.target;
-  if (t && t.closest && (t.closest('#bulkBar') || t.closest('#mainScroll') || t.closest('#leftPanel') || t.closest('#dayEditor') || t.closest('#recipeBar'))) return;
-  clearBulkSel(true);
-}
-function tlVisible() { const el = document.getElementById('tlRoot'); return !!(el && el.offsetParent !== null); }
 
 // ============================================================
-// DAY EDITOR
+// RECIPE BAR — dropdown + position chip + Sync + ⋯ menu
 // ============================================================
-function openDayEditor(day) {
-  const week = Math.floor(day / 7);
-  const ph   = PHASES.find(p => day >= p.start && day < p.end) || PHASES[PHASES.length - 1];
-  const wd   = WEEK_DATA[Math.min(week, WEEK_DATA.length - 1)];
-  editorMode = 'day'; phaseEdId = null;
-  document.getElementById('deTitle').textContent = `Day ${day + 1} — ${wd[1]}`;
-  document.getElementById('dayEditor').classList.add('open');
-  buildEditorFields(day, ph, week, wd);
+let _ovOpen = false;
+function recipePosChip(r) {
+  if (!r || !r.growStartDate) return '';
+  const t = Date.parse(r.growStartDate);
+  if (isNaN(t)) return '';
+  const dayN = Math.floor((Date.now() - t) / 864e5);
+  if (dayN < 0) return `<span class="rb-pos" id="recipePos">starts in ${Math.ceil(-dayN)}d</span>`;
+  const day = Math.min(dayN, TOTAL_DAYS - 1);
+  const wk  = Math.floor(day / 7);
+  return `<span class="rb-pos" id="recipePos">Week ${wk} · Day ${day + 1}</span>`;
 }
-
-function closeDayEditor() {
-  selectedDay = null;
-  editorMode = null; phaseEdId = null;
-  document.getElementById('dayEditor').classList.remove('open');
-  renderCharts();
-}
-
-// shared close for the right-side panel (day editor OR phase editor)
-function closeSideEditor() {
-  if (editorMode === 'phase') {
-    editorMode = null; phaseEdId = null;
-    document.getElementById('dayEditor').classList.remove('open');
-    renderCharts();
-    return;
-  }
-  closeDayEditor();
-}
-
-const HAND_CODED = new Set([
-  'temp_day','leaf_temp','rh','air_velocity','co2','photoperiod','ppfd',
-  'vwc','pwec','steering','dryback','p0_ml','p1_ml','p2_ml','p3_ml','tank_ph','tank_ec',
-  'vpd','dli'  // derived, shown in the VPD box / DLI line
-]);
-
-function buildEditorFields(day, ph, week, wd) {
-  const body = document.getElementById('deBody');
-  const vpd  = getVal('vpd',day);
-  const vpdColor = vpd < 0.9 ? '#06b6d4' : vpd > 1.3 ? '#ef4444' : '#22c55e';
-  const vpdLabel = vpd < 0.9 ? 'LOW — Propagation/Veg zone' : vpd > 1.3 ? 'HIGH — Late flower zone' : 'OPTIMAL — Flower zone';
-
-  body.innerHTML = `
-    <div class="phase-badge" style="background:${ph.color}33;color:${ph.color}">${ph.label}</div>
-    <div class="vpd-box">
-      <div class="vpd-val" style="color:${vpdColor}">${vpd}</div>
-      <div class="vpd-label">VPD (kPa)</div>
-      <div class="vpd-zone" style="background:${vpdColor}22;color:${vpdColor}">${vpdLabel}</div>
-    </div>
-    ${wd[9] ? `<div class="notes-box">📝 ${wd[9]}</div>` : ''}
-
-    <div class="de-row">
-      <div class="de-field">
-        <div class="de-label">Room Temp (°C)</div>
-        <input class="de-input" type="number" step="0.5" min="18" max="35" value="${getVal('temp_day',day)}"
-          onchange="updateVal('temp_day',${day},this.value); recalcVPD(${day})">
+function renderRecipeBar() {
+  const bar = document.getElementById('recipeBar');
+  const act = activeRecipe();
+  if (!bar || !act) return;
+  const ids = Object.keys(recipeStore.recipes);
+  const opts = ids.map(id => `<option value="${id}" ${id === recipeStore.activeId ? 'selected' : ''}>${rEsc(recipeOptionLabel(recipeStore.recipes[id]))}</option>`).join('');
+  const cmp = getCompareRecipe();
+  bar.innerHTML = `
+    <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Recipe</span>
+    <select id="recipeSelect" onchange="switchRecipe(this.value)" style="max-width:300px" title="Active recipe — drives the editor, chart and HA Sync">${opts}</select>
+    ${recipePosChip(act)}
+    ${cmp ? `<span class="legend-chip" onclick="setCompare('')" title="Remove the compare overlay">╌╌ vs ${rEsc(cmp.name)} ✕</span>` : ''}
+    <span class="spacer"></span>
+    <button class="btn primary rb-sync" onclick="openHASync()" title="Preview &amp; push this recipe's current week to Home Assistant">⇅ HA Sync</button>
+    <div class="ov-wrap">
+      <button class="btn ov-btn" onclick="toggleOvMenu(event)" title="More actions" aria-label="More actions">⋯</button>
+      <div class="ov-menu ${_ovOpen ? 'open' : ''}" id="ovMenu">
+        <button class="ov-item" onclick="closeOvMenu();newRecipe()"><span class="ov-ico">＋</span>New recipe</button>
+        <button class="ov-item" onclick="closeOvMenu();dupRecipe()"><span class="ov-ico">⧉</span>Duplicate</button>
+        <button class="ov-item" onclick="closeOvMenu();renameRecipe()"><span class="ov-ico">✎</span>Rename</button>
+        <button class="ov-item" onclick="closeOvMenu();promptGrowStart()"><span class="ov-ico">📅</span>Set start date…</button>
+        <div class="ov-sep"></div>
+        <button class="ov-item" onclick="closeOvMenu();openCompareMenu()"><span class="ov-ico">╌</span>Compare…</button>
+        <button class="ov-item" onclick="closeOvMenu();exportJSON()"><span class="ov-ico">⇪</span>Export JSON</button>
+        <button class="ov-item" onclick="closeOvMenu();importRecipe()"><span class="ov-ico">⇩</span>Import JSON</button>
+        <button class="ov-item" onclick="closeOvMenu();resetToDefaults()"><span class="ov-ico">↺</span>Reset to standard plan</button>
+        <div class="ov-sep"></div>
+        <button class="ov-item danger" onclick="closeOvMenu();deleteRecipe()"><span class="ov-ico">🗑</span>Delete recipe</button>
       </div>
-      <div class="de-field">
-        <div class="de-label">Leaf Temp (°C)</div>
-        <input class="de-input" type="number" step="0.5" min="15" max="32" value="${getVal('leaf_temp',day)}"
-          onchange="updateVal('leaf_temp',${day},this.value)">
-      </div>
-    </div>
-    <div class="de-row">
-      <div class="de-field">
-        <div class="de-label">RH (%)</div>
-        <input class="de-input" type="number" step="1" min="30" max="90" value="${getVal('rh',day)}"
-          onchange="updateVal('rh',${day},this.value); recalcVPD(${day})">
-      </div>
-      <div class="de-field">
-        <div class="de-label">Air Velocity (m/s)</div>
-        <input class="de-input" type="number" step="0.05" min="0" max="3" value="${getVal('air_velocity',day)}"
-          onchange="updateVal('air_velocity',${day},this.value)">
-      </div>
-    </div>
-    <div class="de-row">
-      <div class="de-field">
-        <div class="de-label">CO₂ (ppm)</div>
-        <input class="de-input" type="number" step="50" min="400" max="1800" value="${getVal('co2',day)}"
-          onchange="updateVal('co2',${day},this.value)">
-      </div>
-      <div class="de-field">
-        <div class="de-label">Photoperiod (hrs)</div>
-        <input class="de-input" type="number" step="0.5" min="10" max="24" value="${getVal('photoperiod',day)}"
-          onchange="updateVal('photoperiod',${day},this.value); recalcDLI(${day})">
-      </div>
-    </div>
-    <div class="de-field">
-      <div class="de-label">PPFD (μmol/m²/s)</div>
-      <input class="de-input" type="number" step="25" min="0" max="1400" value="${getVal('ppfd',day)}"
-        onchange="updateVal('ppfd',${day},this.value); recalcDLI(${day})">
-      <div style="margin-top:4px;font-size:10px;color:var(--muted)">DLI: <span id="dliShow">${getVal('dli',day).toFixed(1)}</span> mol/m²/d</div>
-    </div>
-    <div class="de-row">
-      <div class="de-field">
-        <div class="de-label">VWC (%)</div>
-        <input class="de-input" type="number" step="1" min="20" max="80" value="${getVal('vwc',day)}"
-          onchange="updateVal('vwc',${day},this.value)">
-      </div>
-      <div class="de-field">
-        <div class="de-label">PW-EC (mS/cm)</div>
-        <input class="de-input" type="number" step="0.1" min="0.5" max="6" value="${getVal('pwec',day)}"
-          onchange="updateVal('pwec',${day},this.value)">
-      </div>
-    </div>
-    <div class="de-field">
-      <div class="de-label">Plant Steering</div>
-      <input type="range" min="0" max="100" value="${getVal('steering',day)}" style="width:100%"
-        oninput="updateVal('steering',${day},this.value); document.getElementById('steerLabel').textContent=steeringLabel(this.value)">
-      <div id="steerLabel" style="font-size:11px;text-align:center;margin-top:4px;font-weight:600;color:#ec4899">${steeringLabel(getVal('steering',day))}</div>
-    </div>
-
-    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px">💧 Irrigation Strategy</div>
-
-    <div class="de-field">
-      <div class="de-label" style="color:#f43f5e">Overnight Dryback (%)</div>
-      <input class="de-input" type="number" step="1" min="0" max="50" value="${getVal('dryback',day)}"
-        onchange="updateVal('dryback',${day},this.value)">
-      <div style="margin-top:3px;font-size:10px;color:var(--muted)">Target VWC drop from lights-off to first P1</div>
-    </div>
-
-    <div class="de-row">
-      <div class="de-field">
-        <div class="de-label" style="color:#94a3b8">P0 Shot (mL)</div>
-        <input class="de-input" type="number" step="10" min="0" max="500" value="${getVal('p0_ml',day)}"
-          onchange="updateVal('p0_ml',${day},this.value)">
-        <div style="margin-top:2px;font-size:9px;color:var(--muted)">Pre-dawn prime</div>
-      </div>
-      <div class="de-field">
-        <div class="de-label" style="color:#38bdf8">P1 Shot (mL)</div>
-        <input class="de-input" type="number" step="10" min="0" max="500" value="${getVal('p1_ml',day)}"
-          onchange="updateVal('p1_ml',${day},this.value)">
-        <div style="margin-top:2px;font-size:9px;color:var(--muted)">Wake-up / first big shot</div>
-      </div>
-    </div>
-
-    <div class="de-row">
-      <div class="de-field">
-        <div class="de-label" style="color:#0ea5e9">P2 Shots (mL)</div>
-        <input class="de-input" type="number" step="10" min="0" max="400" value="${getVal('p2_ml',day)}"
-          onchange="updateVal('p2_ml',${day},this.value)">
-        <div style="margin-top:2px;font-size:9px;color:var(--muted)">Repeating day shots</div>
-      </div>
-      <div class="de-field">
-        <div class="de-label" style="color:#0369a1">P3 Shot (mL)</div>
-        <input class="de-input" type="number" step="10" min="0" max="400" value="${getVal('p3_ml',day)}"
-          onchange="updateVal('p3_ml',${day},this.value)">
-        <div style="margin-top:2px;font-size:9px;color:var(--muted)">End-of-day set VWC</div>
-      </div>
-    </div>
-
-    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px">🧪 Tank / Feed</div>
-
-    <div class="de-row">
-      <div class="de-field">
-        <div class="de-label" style="color:#fb923c">Tank pH</div>
-        <input class="de-input" type="number" step="0.1" min="5.0" max="7.0" value="${getVal('tank_ph',day)}"
-          onchange="updateVal('tank_ph',${day},this.value)">
-      </div>
-      <div class="de-field">
-        <div class="de-label" style="color:#fbbf24">Tank EC (mS/cm)</div>
-        <input class="de-input" type="number" step="0.1" min="0.5" max="5.0" value="${getVal('tank_ec',day)}"
-          onchange="updateVal('tank_ec',${day},this.value)">
-      </div>
-    </div>
-    <div style="font-size:10px;color:var(--muted);margin-bottom:12px">PW-EC target: <strong style="color:var(--text)">${getVal('pwec',day)} mS/cm</strong> → expect ~${(getVal('pwec',day) * 1.1).toFixed(1)} mS/cm runoff</div>
-
-    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
-    <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Apply to range:</div>
-    <div class="de-row">
-      <div class="de-field">
-        <div class="de-label">From Day</div>
-        <input class="de-input" type="number" min="1" max="${TOTAL_DAYS}" value="${day + 1}" id="rangeFrom">
-      </div>
-      <div class="de-field">
-        <div class="de-label">To Day</div>
-        <input class="de-input" type="number" min="1" max="${TOTAL_DAYS}" value="${Math.min(day + 7, TOTAL_DAYS)}" id="rangeTo">
-      </div>
-    </div>
-    <button class="apply-btn" onclick="applyRange(${day})">Apply to Range</button>
-    <button class="apply-btn" onclick="applyToPhase('${ph.id}',${day})">Apply to Entire Phase: ${ph.label}</button>
-    <button class="apply-btn" onclick="applyToWeek(${week},${day})">Apply to Week ${week}</button>
-  `;
-  body.insertAdjacentHTML('beforeend', renderExtraSetpoints(day));
-}
-
-function renderExtraSetpoints(day) {
-  const extras = PARAMS.filter(p => !p.derived && !p.categorical && !HAND_CODED.has(p.id));
-  if (!extras.length) return '';
-  let html = `<hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px">⚙️ Crop-Steering Setpoints${activeZone !== 0 ? ` — <span style="color:${ZONE_META[activeZone].color}">${ZONE_META[activeZone].label}</span>` : ''}</div>`;
-  let curSection = null;
-  for (const p of extras) {
-    if (p.section !== curSection) {
-      curSection = p.section;
-      html += `<div style="font-size:10px;color:var(--muted);margin:10px 0 4px">${curSection}</div>`;
-    }
-    const ov = hasOverride(p.id, day, activeZone);
-    const val = getVal(p.id, day, activeZone);
-    const facHint = (activeZone !== 0)
-      ? `<span style="font-size:9px;color:var(--muted);margin-left:6px">${ov ? `<span style="cursor:pointer" title="Reset to Facility" onclick="clearOverride('${p.id}',${day})">↺ facility: ${recipe[p.id][day]}</span>` : 'inherits Facility'}</span>`
-      : '';
-    const border = ov ? `border-color:${ZONE_META[activeZone].color};` : '';
-    html += `<div class="de-field">
-      <div class="de-label">${p.name}${p.unit ? ` (${p.unit})` : ''}${facHint}</div>
-      <input class="de-input" style="${border}" type="number" step="${p.step}" min="${p.min}" max="${p.max}" value="${val}"
-        onchange="updateVal('${p.id}',${day},this.value)">
     </div>`;
-  }
-  if (activeZone !== 0) {
-    html += `<button class="apply-btn" onclick="clearDay(${day})">↺ Reset Day ${day + 1} to Facility (this zone)</button>`;
-  }
-  return html;
+}
+function toggleOvMenu(e) { if (e) e.stopPropagation(); _ovOpen = !_ovOpen; const m = document.getElementById('ovMenu'); if (m) m.classList.toggle('open', _ovOpen); }
+function closeOvMenu() { _ovOpen = false; const m = document.getElementById('ovMenu'); if (m) m.classList.remove('open'); }
+function promptGrowStart() {
+  const act = activeRecipe();
+  const v = prompt('Grow start date (YYYY-MM-DD) — drives the live Week/Day position. Blank to clear:', act.growStartDate || '');
+  if (v === null) return;
+  setGrowStart(v.trim());
+  renderRecipeBar();
+}
+// Compare… → a tiny native picker reusing the existing setCompare data path
+function openCompareMenu() {
+  const ids = Object.keys(recipeStore.recipes).filter(id => id !== recipeStore.activeId);
+  if (!ids.length) { haToast('No other recipe to compare against.'); return; }
+  const list = ids.map((id, i) => `${i + 1}. ${recipeStore.recipes[id].name}`).join('\n');
+  const ans = prompt(`Compare the focused chart against which recipe?\n(enter a number, or 0 to clear)\n\n${list}`, '1');
+  if (ans === null) return;
+  const n = parseInt(ans);
+  if (!n) { setCompare(''); return; }
+  if (n >= 1 && n <= ids.length) setCompare(ids[n - 1]);
 }
 
-function steeringLabel(v) {
-  v = parseInt(v);
-  return v < 35 ? '🌿 Vegetative' : v < 65 ? '⚖️ Balanced' : '🌸 Generative';
+// ============================================================
+// PHASE SPINE — resizable phase blocks; tap selects + edits the whole phase
+// ============================================================
+let laneDrag = null;   // {bi, ppd, left}
+function renderPhaseSpine() {
+  const spine = document.getElementById('phaseSpine');
+  if (!spine) return;
+  if (!selectedPhase) selectedPhase = PHASES[0].id;
+  spine.innerHTML = '';
+  PHASES.forEach((ph, i) => {
+    const span = ph.end - ph.start;
+    const el = document.createElement('div');
+    el.className = 'ps-block' + (selectedPhase === ph.id ? ' active' : '');
+    el.dataset.phase = ph.id;
+    el.style.flexGrow = String(span);
+    el.style.background = `linear-gradient(160deg, ${ph.color}f2, ${ph.color}aa)`;
+    el.innerHTML =
+      `<div class="ps-name">${ph.label}</div>` +
+      `<div class="ps-meta">${phaseWeekLabel(ph)} · ${span}d</div>` +
+      `<div class="ps-step">` +
+        `<button title="One day shorter" onclick="event.stopPropagation();stepPhase('${ph.id}',-1)">−</button>` +
+        `<span class="ps-days">${span}d</span>` +
+        `<button title="One day longer" onclick="event.stopPropagation();stepPhase('${ph.id}',1)">＋</button>` +
+      `</div>` +
+      (i < PHASES.length - 1 || i === PHASES.length - 1 ? `<div class="ps-handle" data-bi="${i + 1}" title="${i < PHASES.length - 1 ? 'Drag to resize this phase / the next' : 'Drag to change total grow length'}"></div>` : '');
+    el.addEventListener('click', () => selectPhase(ph.id));
+    const h = el.querySelector('.ps-handle');
+    if (h) h.addEventListener('pointerdown', e => startSeamDrag(e, +h.dataset.bi, h));
+    spine.appendChild(el);
+  });
+}
+function selectPhase(id) {
+  selectedPhase = id;
+  // pull the focused-chart param into a sensible everyday default if it isn't an everyday chip
+  if (!CHART_CHIP_IDS.includes(focusParam)) focusParam = 'temp_day';
+  const root = document.getElementById('tlRoot');
+  if (root) root.classList.remove('show-chart');   // mobile: editor is the surface on phase tap
+  renderPhaseSpine();
+  renderEditor();
+  renderChipRow();
+  renderFocusedChart();
+}
+// −/＋ day stepper on a phase block (touch-friendly): grows/shrinks at the phase's END seam
+function stepPhase(id, dir) {
+  const i = PHASES.findIndex(p => p.id === id);
+  if (i < 0) return;
+  if (i === PHASES.length - 1) {            // last phase → change total grow length
+    const last = PHASES[i];
+    const day = Math.max(last.start + 1, Math.min(MAX_DAYS, last.end + dir));
+    if (day === last.end) return;
+    last.end = day; TOTAL_DAYS = day; ensureRecipeLen(TOTAL_DAYS);
+  } else {                                  // shift the seam to the next phase
+    applyBoundaryDays(i + 1, PHASES[i + 1].start + dir);
+    saveState(); renderPlan(); return;
+  }
+  saveState(); renderPlan();
+}
+// move seam `bi` to `day` (snap whole days, ≥1/phase; seam N stretches the grow)
+function applyBoundaryDays(bi, day) {
+  if (bi < PHASES.length) {
+    const lo = PHASES[bi - 1].start + 1, hi = PHASES[bi].end - 1;
+    day = Math.max(lo, Math.min(hi, day));
+    if (PHASES[bi].start === day) return;
+    PHASES[bi - 1].end = day; PHASES[bi].start = day;
+  } else {
+    const last = PHASES[PHASES.length - 1];
+    day = Math.max(last.start + 1, Math.min(MAX_DAYS, day));
+    if (last.end === day) return;
+    last.end = day; TOTAL_DAYS = day; ensureRecipeLen(TOTAL_DAYS);
+  }
+}
+function startSeamDrag(e, bi, h) {
+  e.preventDefault(); e.stopPropagation();
+  const spine = document.getElementById('phaseSpine');
+  const r = spine.getBoundingClientRect();
+  laneDrag = { bi, ppd: r.width / TOTAL_DAYS, left: r.left - spine.scrollLeft };
+  h.classList.add('drag');
+  try { h.setPointerCapture(e.pointerId); } catch (err) {}
+  const move = ev => { if (!laneDrag) return; applyBoundaryDays(laneDrag.bi, Math.round((ev.clientX - laneDrag.left) / laneDrag.ppd)); throttledSpine(); };
+  const up = () => { laneDrag = null; h.classList.remove('drag'); saveState(); renderPlan(); };
+  h.addEventListener('pointermove', move);
+  h.addEventListener('pointerup', up, { once: true });
+  h.addEventListener('pointercancel', up, { once: true });
+}
+let _spRaf = false;
+function throttledSpine() { if (_spRaf) return; _spRaf = true; requestAnimationFrame(() => { _spRaf = false; renderPhaseSpine(); renderFocusedChart(); renderEditorLive(); }); }
+
+// ============================================================
+// LAYER SELECTOR — Facility / Zone 1-3
+// ============================================================
+function renderLayerBar() {
+  const bar = document.getElementById('layerBar');
+  if (!bar) return;
+  const layers = [{ z: 0, label: 'Facility', color: 'var(--accent)' }].concat(
+    ZONE_IDS.map(z => ({ z, label: ZONE_META[z].label, color: ZONE_META[z].color })));
+  const seg = layers.map(l => {
+    const on = activeZone === l.z;
+    const style = on ? `background:${l.z === 0 ? 'var(--accent)' : l.color};` : '';
+    return `<button class="${on ? 'on' : ''}" style="${style}" onclick="setZone(${l.z})">${l.label}</button>`;
+  }).join('');
+  let note = '';
+  if (activeZone === 0) {
+    note = `<span class="layer-note">Editing the <b style="color:var(--accent)">Facility</b> baseline — every zone inherits unless overridden.</span>`;
+  } else {
+    const m = ZONE_META[activeZone];
+    let pOver = 0, dOver = 0;
+    for (const pid in zones[activeZone]) { pOver++; dOver += Object.keys(zones[activeZone][pid]).length; }
+    note = `<span class="layer-note" style="color:${m.color}">✎ Editing <b>${m.label}</b> overlay` +
+      `<span style="color:var(--muted)">— ${pOver} param(s) / ${dOver} day-cell(s) overridden; blanks inherit Facility</span>` +
+      (dOver ? ` <span class="legend-chip" onclick="clearZone(${activeZone})" title="Clear this zone's overrides">↺ clear overlay</span>` : '') + `</span>`;
+  }
+  bar.innerHTML = `<div class="seg">${seg}</div>${note}`;
+}
+function setZone(z) {
+  activeZone = z;
+  renderLayerBar();
+  renderEditor();
+  renderFocusedChart();
+}
+
+// ============================================================
+// PHASE EDITOR — the MAIN work surface (grouped steppers, all-days write)
+// ============================================================
+// uniform/min/max of a param across a phase, on the active layer
+function phaseUniform(pid, ph) {
+  let v0 = getVal(pid, ph.start, activeZone), uni = true, mn = v0, mx = v0;
+  for (let d = ph.start + 1; d < ph.end; d++) {
+    const v = getVal(pid, d, activeZone);
+    if (v !== v0) uni = false;
+    if (v < mn) mn = v; if (v > mx) mx = v;
+  }
+  return { uniform: uni, v: v0, mn, mx };
+}
+// does the active zone override this param anywhere in the phase?
+function phaseHasOverride(pid, ph) {
+  if (activeZone === 0) return false;
+  const layer = zones[activeZone] && zones[activeZone][pid];
+  if (!layer) return false;
+  for (let d = ph.start; d < ph.end; d++) if (Object.prototype.hasOwnProperty.call(layer, d)) return true;
+  return false;
+}
+function renderEditor() {
+  const host = document.getElementById('editorScroll');
+  if (!host) return;
+  const ph = activePhase();
+  const span = ph.end - ph.start;
+  const layerName = activeZone === 0 ? 'Facility' : ZONE_META[activeZone].label;
+  const layerColor = activeZone === 0 ? 'var(--accent)' : ZONE_META[activeZone].color;
+
+  let html = `<button class="btn sm ed-back" onclick="showChart(false)" style="margin-bottom:10px">‹ phases</button>`;
+  html += `<div class="ed-head"><span class="ed-badge" style="background:${ph.color}33;color:${ph.color}">${ph.label}</span>` +
+          `<span>${phaseWeekLabel(ph)} · D${ph.start + 1}–D${ph.end} · ${span} days</span></div>`;
+  html += `<div class="ed-sub">Edits write all ${span} day(s) on the <b style="color:${layerColor}">${layerName}</b> layer. Tap a phase above to switch.</div>`;
+
+  // group params by section, everyday expanded, advanced collapsed
+  for (const section of SECTION_ORDER) {
+    const ps = PARAMS.filter(p => p.section === section);
+    if (!ps.length) continue;
+    const isAdv = ADVANCED_SECTIONS.has(section);
+    const collapsed = isAdv ? (advOpen[section] ? false : true) : false;
+    const dot = SECTION_DOT[section] || ps[0].color;
+    html += `<div class="grp ${collapsed ? 'collapsed' : ''}" data-sec="${rEsc(section)}">`;
+    html += `<div class="grp-head" onclick="toggleGroup('${rEsc(section)}')">` +
+            `<span class="grp-dot" style="background:${dot}"></span>` +
+            `<span class="grp-title">${section}</span>` +
+            (isAdv ? `<span class="grp-adv-flag">advanced</span>` : '') +
+            `<span class="grp-chev">▾</span></div>`;
+    html += `<div class="grp-body">`;
+    for (const p of ps) html += setpointRow(p, ph);
+    html += `</div></div>`;
+  }
+  html += drillHTML();   // per-day ramp disclosure (collapsed by default)
+  host.innerHTML = html;
+}
+// re-render just the live values inside the editor without rebuilding groups (keeps focus/scroll)
+function renderEditorLive() {
+  const host = document.getElementById('editorScroll');
+  if (!host) return;
+  const ph = activePhase();
+  host.querySelectorAll('[data-sp]').forEach(node => {
+    const pid = node.getAttribute('data-sp');
+    const p = paramById(pid);
+    if (!p) return;
+    const u = phaseUniform(pid, ph);
+    const inp = node.querySelector('input');
+    if (inp && document.activeElement !== inp) inp.value = u.uniform ? fmtVal(p, u.v) : '';
+    const der = node.querySelector('.sp-derived');
+    if (der) der.firstChild && (der.childNodes[0].nodeValue = fmtVal(p, u.v) + ' ');
+    const sub = node.querySelector('.sp-sub');
+    if (sub) sub.innerHTML = subHint(p, ph, u);
+  });
+}
+function subHint(p, ph, u) {
+  const ovr = phaseHasOverride(p.id, ph);
+  let s = '';
+  if (!u.uniform) s += `<span class="mix" onclick="flattenPhase('${p.id}')" title="Tap to flatten to one value">⚠ mixed ${fmtVal(p, u.mn)}–${fmtVal(p, u.mx)} · flatten</span>`;
+  if (ovr) s += `${s ? ' · ' : ''}<span class="ovr" style="color:${ZONE_META[activeZone] ? ZONE_META[activeZone].color : 'var(--muted)'}" onclick="clearPhaseOverride('${p.id}')" title="Reset this phase to Facility">↺ overlay · reset</span>`;
+  return s;
+}
+function setpointRow(p, ph) {
+  const u = phaseUniform(p.id, ph);
+  const ovr = phaseHasOverride(p.id, ph);
+  // derived (VPD/DLI) → read-only computed pill
+  if (p.derived) {
+    return `<div class="sp-row" data-sp="${p.id}">` +
+      `<div class="sp-info"><div class="sp-name">${p.name} <span style="color:var(--muted);font-size:10px">(auto)</span></div>` +
+      `<div class="sp-sub">computed from ${p.id === 'vpd' ? 'temp + RH' : 'PPFD + photoperiod'}</div></div>` +
+      `<div class="sp-derived">${fmtVal(p, u.v)} <span class="du">${p.unit}</span></div></div>`;
+  }
+  // categorical (Plant Steering) → segmented veg/bal/gen
+  if (p.categorical) {
+    const v = u.uniform ? u.v : 50;
+    const segs = [['Veg', 15, '#22c55e'], ['Balanced', 50, '#f59e0b'], ['Generative', 85, '#ec4899']];
+    const seg = segs.map(([lab, val, col]) => {
+      const on = (val < 35 && v < 35) || (val >= 35 && val < 65 && v >= 35 && v < 65) || (val >= 65 && v >= 65);
+      return `<button class="${on ? 'on' : ''}" style="${on ? 'background:' + col : ''}" onclick="setPhaseParam('${p.id}','${ph.id}',${val})">${lab}</button>`;
+    }).join('');
+    return `<div class="sp-row" data-sp="${p.id}">` +
+      `<div class="sp-info"><div class="sp-name">${p.name}</div><div class="sp-sub">${subHint(p, ph, u)}</div></div>` +
+      `<div class="sp-seg">${seg}</div></div>`;
+  }
+  // normal numeric → touch stepper
+  const valStr = u.uniform ? fmtVal(p, u.v) : '';
+  const ph2 = `'${p.id}','${ph.id}'`;
+  return `<div class="sp-row" data-sp="${p.id}">` +
+    `<div class="sp-info"><div class="sp-name">${p.name}</div><div class="sp-sub">${subHint(p, ph, u)}</div></div>` +
+    `<div class="stepper ${ovr ? 'ovr' : ''}">` +
+      `<button onclick="bumpPhase(${ph2},-1)" aria-label="decrease">−</button>` +
+      `<input type="number" inputmode="decimal" step="${p.step}" min="${p.min}" max="${p.max}" value="${valStr}" placeholder="${u.uniform ? '' : 'mixed'}" ` +
+        `onchange="setPhaseParam(${ph2},this.value)" onfocus="this.select()">` +
+      `<button onclick="bumpPhase(${ph2},1)" aria-label="increase">＋</button>` +
+      `<span class="su">${p.unit}</span></div></div>`;
+}
+function toggleGroup(section) {
+  if (ADVANCED_SECTIONS.has(section)) advOpen[section] = !advOpen[section];
+  const node = document.querySelector(`#editorScroll .grp[data-sec="${cssEsc(section)}"]`);
+  if (node) node.classList.toggle('collapsed');
+}
+function cssEsc(s) { return String(s).replace(/["\\]/g, '\\$&'); }
+// write a value to every day of the phase on the active layer
+function setPhaseParam(pid, phaseId, value) {
+  const ph = PHASES.find(p => p.id === phaseId);
+  const p = paramById(pid);
+  if (!ph || !p) return;
+  let v = parseFloat(value);
+  if (isNaN(v)) return;
+  v = Math.min(p.max, Math.max(p.min, v));
+  for (let d = ph.start; d < ph.end; d++) {
+    setVal(pid, d, v);
+    if (p.id === 'temp_day' || p.id === 'rh' || p.id === 'ppfd' || p.id === 'photoperiod') recalcDerived(d);
+  }
+  saveState();
+  renderEditorLive();
+  renderFocusedChart();
+  if (drillOpen) renderDrill();
+}
+// stepper ±1 step (works even when value is "mixed" — seeds from the phase-start value)
+function bumpPhase(pid, phaseId, dir) {
+  const ph = PHASES.find(p => p.id === phaseId);
+  const p = paramById(pid);
+  if (!ph || !p) return;
+  const u = phaseUniform(pid, ph);
+  const base = u.uniform ? u.v : getVal(pid, ph.start, activeZone);
+  const st = p.step || 1;
+  let nv = base + dir * st;
+  nv = Math.min(p.max, Math.max(p.min, nv));
+  nv = parseFloat((Math.round(nv / st) * st).toFixed(4));
+  setPhaseParam(pid, phaseId, nv);
+}
+// "mixed" → flatten every day in the phase to the phase-start value
+function flattenPhase(pid) {
+  const ph = activePhase();
+  setPhaseParam(pid, ph.id, getVal(pid, ph.start, activeZone));
+}
+// reset this phase's override back to Facility (active zone only)
+function clearPhaseOverride(pid) {
+  if (activeZone === 0) return;
+  const ph = activePhase();
+  for (let d = ph.start; d < ph.end; d++) clearOverrideQuiet(pid, d, activeZone);
+  saveState();
+  renderEditor();
+  renderLayerBar();
+  renderFocusedChart();
+}
+// clearOverride without the side-effecting re-render of the old day editor
+function clearOverrideQuiet(pid, day, zone) {
+  const layer = zones[zone] && zones[zone][pid];
+  if (!layer) return;
+  delete layer[day];
+  if (Object.keys(layer).length === 0) delete zones[zone][pid];
+}
+
+// ============================================================
+// PER-DAY DRILL-IN — set a ramp across the phase's days (the 10% case)
+// ============================================================
+function renderChipRow() {
+  const row = document.getElementById('chipRow');
+  if (!row) return;
+  row.innerHTML = CHART_CHIP_IDS.map(id => {
+    const p = paramById(id); if (!p) return '';
+    const on = focusParam === id;
+    return `<button class="pchip ${on ? 'on' : ''}" onclick="setFocusParam('${id}')"><span class="pc-dot" style="background:${p.color}"></span>${p.name}</button>`;
+  }).join('');
+}
+function setFocusParam(id) {
+  focusParam = id;
+  const root = document.getElementById('tlRoot');
+  if (root && root.classList.contains('show-chart')) { /* stay on chart (mobile) */ }
+  renderChipRow();
+  renderFocusedChart();
+}
+
+// ============================================================
+// FOCUSED CHART — ONE param across the whole grow, phase bands behind
+// ============================================================
+function renderFocusedChart() {
+  const host = document.getElementById('chartHost');
+  const cap = document.getElementById('chartCap');
+  if (!host) return;
+  const p = paramById(focusParam) || paramById('temp_day');
+  const W = host.clientWidth || 520, H = host.clientHeight || 320;
+  const padL = 42, padR = 12, padT = 14, padB = 22;
+  const plotW = Math.max(10, W - padL - padR), plotH = Math.max(10, H - padT - padB);
+
+  // series on the active layer
+  const eff = d => getVal(p.id, d, activeZone);
+  const cmpR = getCompareRecipe();
+  const cmpArr = (cmpR && cmpR.recipe && Array.isArray(cmpR.recipe[p.id]) && cmpR.recipe[p.id].length) ? cmpR.recipe[p.id] : null;
+  const facMode = activeZone !== 0;
+
+  // y-domain across effective (+ facility ghost + compare)
+  let mn = Infinity, mx = -Infinity;
+  for (let d = 0; d < TOTAL_DAYS; d++) {
+    const a = eff(d); if (a < mn) mn = a; if (a > mx) mx = a;
+    if (facMode) { const b = recipe[p.id][d]; if (b < mn) mn = b; if (b > mx) mx = b; }
+    if (cmpArr) { const c = cmpArr[Math.min(d, cmpArr.length - 1)]; if (c < mn) mn = c; if (c > mx) mx = c; }
+  }
+  if (!isFinite(mn)) { mn = 0; mx = 1; }
+  const rng = (mx - mn) || Math.max(1, Math.abs(mx) * 0.1);
+  const y0 = mn - rng * 0.12, y1 = mx + rng * 0.12;
+  const X = d => padL + (TOTAL_DAYS <= 1 ? 0 : (d / (TOTAL_DAYS - 1)) * plotW);
+  const Y = v => padT + plotH - ((v - y0) / (y1 - y0)) * plotH;
+
+  const NS = 'http://www.w3.org/2000/svg';
+  let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" xmlns="${NS}">`;
+
+  // phase bands behind
+  for (const ph of PHASES) {
+    const x = X(ph.start), w = X(Math.min(ph.end, TOTAL_DAYS - 1) + (ph.end >= TOTAL_DAYS ? 0 : 0)) - x;
+    const xw = (ph.end - ph.start) / Math.max(1, TOTAL_DAYS - 1) * plotW;
+    const sel = ph.id === selectedPhase;
+    s += `<rect x="${X(ph.start).toFixed(1)}" y="${padT}" width="${Math.max(1, xw).toFixed(1)}" height="${plotH}" fill="${ph.color}" opacity="${sel ? 0.20 : 0.085}"/>`;
+    if (sel) s += `<rect x="${X(ph.start).toFixed(1)}" y="${padT}" width="${Math.max(1, xw).toFixed(1)}" height="${plotH}" fill="none" stroke="${ph.color}" stroke-width="1.5"/>`;
+  }
+  // gridlines + y labels (4)
+  for (let g = 0; g <= 4; g++) {
+    const v = y0 + (y1 - y0) * (g / 4), yy = Y(v);
+    s += `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W - padR}" y2="${yy.toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`;
+    s += `<text x="${padL - 5}" y="${(yy + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#727d8a">${fmtVal(p, v)}</text>`;
+  }
+  // compare ghost (dashed)
+  if (cmpArr) {
+    let d2 = '';
+    for (let d = 0; d < TOTAL_DAYS; d++) { const c = cmpArr[Math.min(d, cmpArr.length - 1)]; d2 += (d ? 'L' : 'M') + X(d).toFixed(1) + ' ' + Y(c).toFixed(1) + ' '; }
+    s += `<path d="${d2}" fill="none" stroke="#8b93a1" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.85"/>`;
+  }
+  // facility ghost when on a zone layer
+  if (facMode) {
+    let d2 = '';
+    for (let d = 0; d < TOTAL_DAYS; d++) { const b = recipe[p.id][d]; d2 += (d ? 'L' : 'M') + X(d).toFixed(1) + ' ' + Y(b).toFixed(1) + ' '; }
+    s += `<path d="${d2}" fill="none" stroke="${p.color}" stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>`;
+  }
+  // effective step line + area
+  let line = '', area = '';
+  for (let d = 0; d < TOTAL_DAYS; d++) {
+    const x = X(d), y = Y(eff(d));
+    if (d === 0) { line += `M${x.toFixed(1)} ${y.toFixed(1)} `; area += `M${x.toFixed(1)} ${(padT + plotH).toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)} `; }
+    else {
+      const xp = X(d - 1), yp = Y(eff(d - 1));
+      line += `L${xp.toFixed(1)} ${y.toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)} `;   // step
+      area += `L${xp.toFixed(1)} ${y.toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)} `;
+    }
+  }
+  area += `L${X(TOTAL_DAYS - 1).toFixed(1)} ${(padT + plotH).toFixed(1)} Z`;
+  s += `<path d="${area}" fill="${p.color}" opacity="0.12"/>`;
+  s += `<path d="${line}" fill="none" stroke="${p.color}" stroke-width="2.25" stroke-linejoin="round"/>`;
+
+  // today marker from the active recipe's grow start
+  const gd = activeRecipe() && activeRecipe().growStartDate ? Date.parse(activeRecipe().growStartDate) : NaN;
+  if (!isNaN(gd)) {
+    const dayN = Math.floor((Date.now() - gd) / 864e5);
+    if (dayN >= 0 && dayN < TOTAL_DAYS) {
+      const tx = X(dayN);
+      s += `<line x1="${tx.toFixed(1)}" y1="${padT}" x2="${tx.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+      s += `<text x="${tx.toFixed(1)}" y="${(padT - 3).toFixed(1)}" text-anchor="middle" font-size="9" fill="#22d3ee" font-weight="700">today</text>`;
+    }
+  }
+  // selected-phase day handles (clickable points at week marks)
+  for (let d = 0; d < TOTAL_DAYS; d += 7) {
+    const x = X(d), y = Y(eff(d));
+    s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${p.color}"/>`;
+  }
+  // transparent click strip → jump to that day's phase
+  s += `<rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}" fill="transparent" style="cursor:pointer" onclick="chartClick(event,this,${TOTAL_DAYS},${padL},${plotW})"/>`;
+  s += `</svg>`;
+  host.innerHTML = s;
+
+  if (cap) {
+    const u = phaseUniform(p.id, activePhase());
+    cap.innerHTML = `<b>${p.name}</b> across the grow · ${p.unit || '—'}` +
+      (facMode ? ` · <span style="color:${ZONE_META[activeZone].color}">${ZONE_META[activeZone].label} solid, Facility dashed</span>` : '') +
+      (cmpArr ? ` · <span style="color:#8b93a1">compare dashed</span>` : '') +
+      ` · selected: <b style="color:${activePhase().color}">${activePhase().label}</b> = ${u.uniform ? fmtVal(p, u.v) : 'mixed'}`;
+  }
+}
+function chartClick(e, rect, total, padL, plotW) {
+  const r = rect.getBoundingClientRect();
+  const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  const day = Math.round(frac * (total - 1));
+  const ph = PHASES.find(p => day >= p.start && day < p.end) || PHASES[PHASES.length - 1];
+  if (ph && ph.id !== selectedPhase) selectPhase(ph.id);
+}
+
+// ============================================================
+// MOBILE — toggle between the editor surface and the chart
+// ============================================================
+function showChart(on) {
+  const root = document.getElementById('tlRoot');
+  if (root) root.classList.toggle('show-chart', !!on);
+  if (on) renderFocusedChart();
+}
+
+// ── per-day drill-in (lives at the bottom of the editor) — set a ramp across the phase's days ──
+function drillHTML() {
+  const ph = activePhase();
+  const p = paramById(focusParam) || paramById('temp_day');
+  const span = ph.end - ph.start;
+  let cells = '';
+  for (let d = ph.start; d < ph.end; d++) {
+    const ovr = activeZone !== 0 && hasOverride(p.id, d, activeZone);
+    cells += `<div class="day-cell ${ovr ? 'ovr' : ''}"><div class="dc-day">D${d + 1}</div>` +
+      `<input type="number" inputmode="decimal" step="${p.step}" min="${p.min}" max="${p.max}" value="${fmtVal(p, getVal(p.id, d, activeZone))}" ` +
+      `onchange="setDayVal('${p.id}',${d},this.value)" onfocus="this.select()" ${p.derived ? 'disabled' : ''}></div>`;
+  }
+  return `<div class="drill ${drillOpen ? '' : 'collapsed'}" id="drillBox">` +
+    `<div class="drill-head" onclick="toggleDrill()"><span class="grp-chev">▾</span> Per-day · ${p.name} ramp across ${ph.label} (${span} days)</div>` +
+    `<div class="drill-body"><div style="font-size:11px;color:var(--muted);margin-bottom:9px">Editing one day creates a day-level value (overrides the phase). Pick the param with the chips on the chart.</div>` +
+    `<div class="day-strip">${cells}</div>` +
+    `<button class="btn sm" style="margin-top:10px" onclick="flattenDrill()">↺ Flatten ${p.name} back to the phase value</button>` +
+    `</div></div>`;
+}
+function toggleDrill() {
+  drillOpen = !drillOpen;
+  const b = document.getElementById('drillBox');
+  if (b) b.classList.toggle('collapsed', !drillOpen);
+}
+function renderDrill() {
+  const b = document.getElementById('drillBox');
+  if (b) b.outerHTML = drillHTML();
+}
+function setDayVal(pid, day, value) {
+  const p = paramById(pid); if (!p) return;
+  let v = parseFloat(value); if (isNaN(v)) return;
+  v = Math.min(p.max, Math.max(p.min, v));
+  setVal(pid, day, v);
+  if (p.id === 'temp_day' || p.id === 'rh' || p.id === 'ppfd' || p.id === 'photoperiod') recalcDerived(day);
+  saveState();
+  renderEditorLive();
+  renderFocusedChart();
+  renderDrill();
+}
+function flattenDrill() {
+  const ph = activePhase();
+  const p = paramById(focusParam); if (!p || p.derived) return;
+  const v = getVal(p.id, ph.start, activeZone);
+  for (let d = ph.start; d < ph.end; d++) {
+    setVal(p.id, d, v);
+    if (p.id === 'temp_day' || p.id === 'rh' || p.id === 'ppfd' || p.id === 'photoperiod') recalcDerived(d);
+  }
+  saveState();
+  renderEditorLive();
+  renderFocusedChart();
+  renderDrill();
 }
 
 // ── ZONE-AWARE RESOLVER / WRITER ──
@@ -3694,8 +3501,7 @@ function clearOverride(paramId, day, zone = activeZone) {
   delete layer[day];
   if (Object.keys(layer).length === 0) delete zones[zone][paramId];
   saveState();
-  if (selectedDay !== null) openDayEditor(selectedDay);
-  renderCharts();
+  renderEditor(); renderLayerBar(); renderFocusedChart();
 }
 function clearDay(day, zone = activeZone) {
   if (zone === 0) return;
@@ -3704,360 +3510,32 @@ function clearDay(day, zone = activeZone) {
     if (Object.keys(zones[zone][pid]).length === 0) delete zones[zone][pid];
   }
   saveState();
-  if (selectedDay !== null) openDayEditor(day);
-  renderCharts();
+  renderEditor(); renderLayerBar(); renderFocusedChart();
 }
 function clearZone(zone) {
   if (zone === 0) return;
   if (!confirm(`Clear all ${ZONE_META[zone].label} overrides? Reverts to Facility.`)) return;
   zones[zone] = {};
   saveState();
-  if (selectedDay !== null) openDayEditor(selectedDay);
-  renderCharts();
+  renderEditor(); renderLayerBar(); renderFocusedChart();
 }
 function recalcDerived(day) {
   setVal('vpd', day, calcVPD(getVal('temp_day', day), getVal('rh', day)));
   setVal('dli', day, +((getVal('ppfd', day) * getVal('photoperiod', day) * 3600) / 1e6).toFixed(2));
 }
 
-function updateVal(paramId, day, value) {
-  setVal(paramId, day, value);
-  renderCharts();
-}
-
-function recalcVPD(day) {
-  recalcDerived(day);
-  const v  = getVal('vpd', day);
-  const el = document.querySelector('#tlRoot .vpd-val');
-  if (el) {
-    el.textContent = v;
-    el.style.color = v < 0.9 ? '#06b6d4' : v > 1.3 ? '#ef4444' : '#22c55e';
-  }
-  renderCharts();
-}
-
-function recalcDLI(day) {
-  recalcDerived(day);
-  const el = document.getElementById('dliShow');
-  if (el) el.textContent = getVal('dli', day).toFixed(1);
-  renderCharts();
-}
-
-function applyRange(fromDay) {
-  const from = parseInt(document.getElementById('rangeFrom').value) - 1;
-  const to   = parseInt(document.getElementById('rangeTo').value)   - 1;
-  for (let d = from; d <= to && d < TOTAL_DAYS; d++) {
-    for (const p of PARAMS.filter(x => !x.derived)) setVal(p.id, d, getVal(p.id, fromDay));
-    recalcDerived(d);
-  }
-  saveState();
-  renderCharts();
-}
-
-function applyToPhase(phaseId, fromDay) {
-  const ph = PHASES.find(p => p.id === phaseId);
-  if (!ph) return;
-  for (let d = ph.start; d < ph.end; d++) {
-    for (const p of PARAMS.filter(x => !x.derived)) setVal(p.id, d, getVal(p.id, fromDay));
-    recalcDerived(d);
-  }
-  saveState();
-  renderCharts();
-}
-
-function applyToWeek(week, fromDay) {
-  const start = week * 7, end = Math.min(start + 7, TOTAL_DAYS);
-  for (let d = start; d < end; d++) {
-    for (const p of PARAMS.filter(x => !x.derived)) setVal(p.id, d, getVal(p.id, fromDay));
-    recalcDerived(d);
-  }
-  saveState();
-  renderCharts();
-}
-
 // ============================================================
-// PHASE LANE — resizable kanban blocks above the timeline
+// PHASE SPINE seam-drag / day-stepper logic lives in the presentation core above.
 // ============================================================
-let laneDrag = null;   // {bi, ppd, left} — px-per-day frozen at drag start so the cursor math stays stable
-function renderPhaseLane() {
-  const lane = document.getElementById('phaseLane');
-  if (!lane) return;
-  lane.innerHTML = '';
-  for (const ph of PHASES) {
-    const span = ph.end - ph.start;
-    const el = document.createElement('div');
-    el.className = 'pl-block' + (selectedPhase === ph.id ? ' active' : '');
-    el.dataset.phase = ph.id;
-    el.style.background = `linear-gradient(180deg, ${ph.color}cc, ${ph.color}88)`;
-    el.style.flex = '0 0 auto';
-    el.style.width = (span / TOTAL_DAYS * 100) + '%';
-    el.innerHTML = `<span class="pl-name">${ph.label}</span><span class="pl-range">${phaseWeekLabel(ph)} · ${span}d</span>`;
-    el.addEventListener('click', () => onPhaseBlockClick(ph.id));
-    lane.appendChild(el);
-  }
-  // seam handles: 1..N-1 between phases, N = end-of-grow (drags total length)
-  for (let i = 1; i <= PHASES.length; i++) {
-    const h = document.createElement('div');
-    h.className = 'pl-handle';
-    h.dataset.bi = i;
-    h.title = i < PHASES.length
-      ? `Drag — resize ${PHASES[i - 1].label} / ${PHASES[i].label}`
-      : 'Drag — change total grow length';
-    const dayB = i < PHASES.length ? PHASES[i].start : PHASES[PHASES.length - 1].end;
-    h.style.left = (dayB / TOTAL_DAYS * 100) + '%';
-    h.addEventListener('pointerdown', e => startLaneDrag(e, i, h));
-    lane.appendChild(h);
-  }
-}
-// update widths/labels in place during a drag (the captured handle must not be rebuilt mid-drag)
-function updateLaneStyles() {
-  const lane = document.getElementById('phaseLane');
-  if (!lane) return;
-  const ppd = laneDrag ? laneDrag.ppd : null;
-  const blocks = lane.querySelectorAll('.pl-block');
-  PHASES.forEach((ph, i) => {
-    const el = blocks[i];
-    if (!el) return;
-    const span = ph.end - ph.start;
-    el.style.width = ppd ? (span * ppd + 'px') : (span / TOTAL_DAYS * 100 + '%');
-    const rng = el.querySelector('.pl-range');
-    if (rng) rng.textContent = phaseWeekLabel(ph) + ' · ' + span + 'd';
-  });
-  lane.querySelectorAll('.pl-handle').forEach(h => {
-    const i = +h.dataset.bi;
-    const dayB = i < PHASES.length ? PHASES[i].start : PHASES[PHASES.length - 1].end;
-    h.style.left = ppd ? (dayB * ppd + 'px') : (dayB / TOTAL_DAYS * 100 + '%');
-  });
-}
-function startLaneDrag(e, bi, h) {
-  e.preventDefault(); e.stopPropagation();
-  const lane = document.getElementById('phaseLane');
-  const r = lane.getBoundingClientRect();
-  laneDrag = { bi, ppd: r.width / TOTAL_DAYS, left: r.left };
-  h.classList.add('drag');
-  try { h.setPointerCapture(e.pointerId); } catch (err) {}
-  updateLaneStyles();   // switch lane to fixed px widths for stable cursor tracking
-  const move = ev => {
-    if (!laneDrag) return;
-    applyBoundary(laneDrag.bi, Math.round((ev.clientX - laneDrag.left) / laneDrag.ppd));
-  };
-  const up = () => {
-    laneDrag = null;
-    h.classList.remove('drag');
-    renderPhaseLane();        // back to % layout (also rebuilds tooltips)
-    renderCharts();
-    if (editorMode === 'phase' && phaseEdId) { const ph = PHASES.find(p => p.id === phaseEdId); if (ph) openPhaseEditor(phaseEdId); }
-    saveState();
-  };
-  h.addEventListener('pointermove', move);
-  h.addEventListener('pointerup', up, { once: true });
-  h.addEventListener('pointercancel', up, { once: true });
-}
-// move seam `bi` to `day` — snap whole days, ≥1 day per phase; seam N stretches/shrinks the whole grow
-function applyBoundary(bi, day) {
-  if (bi < PHASES.length) {
-    const lo = PHASES[bi - 1].start + 1, hi = PHASES[bi].end - 1;
-    day = Math.max(lo, Math.min(hi, day));
-    if (PHASES[bi].start === day) return;
-    PHASES[bi - 1].end = day;
-    PHASES[bi].start = day;
-  } else {
-    const last = PHASES[PHASES.length - 1];
-    day = Math.max(last.start + 1, Math.min(MAX_DAYS, day));
-    if (last.end === day) return;
-    last.end = day;
-    TOTAL_DAYS = day;
-    ensureRecipeLen(TOTAL_DAYS);
-    if (selectedDay !== null && selectedDay >= TOTAL_DAYS) closeDayEditor();
-    if (bulkSel) { bulkSel.a = Math.min(bulkSel.a, TOTAL_DAYS - 1); bulkSel.b = Math.min(bulkSel.b, TOTAL_DAYS - 1); }
-  }
-  updateLaneStyles();
-  throttledRender();
-}
-function onPhaseBlockClick(id) {
-  const wasActive = selectedPhase === id;
-  jumpToPhase(id);   // zoom/scroll (toggles off when re-clicked)
-  if (wasActive) { if (editorMode === 'phase') closeSideEditor(); }
-  else openPhaseEditor(id);
-}
-
 // ============================================================
-// PHASE EDITOR — edit every visible param across a whole phase
-// ============================================================
-function phaseUniform(pid, ph) {
-  let v0 = getVal(pid, ph.start, activeZone), uni = true, mn = v0, mx = v0;
-  for (let d = ph.start + 1; d < ph.end; d++) {
-    const v = getVal(pid, d, activeZone);
-    if (v !== v0) uni = false;
-    if (v < mn) mn = v;
-    if (v > mx) mx = v;
-  }
-  return { uniform: uni, v: v0, mn, mx };
-}
-function openPhaseEditor(phaseId) {
-  const ph = PHASES.find(p => p.id === phaseId);
-  if (!ph) return;
-  editorMode = 'phase'; phaseEdId = phaseId; selectedDay = null;
-  document.getElementById('deTitle').textContent = `${ph.label} — whole phase`;
-  document.getElementById('dayEditor').classList.add('open');
-  buildPhaseEditorFields(ph);
-  renderCharts();
-}
-function buildPhaseEditorFields(ph) {
-  const body = document.getElementById('deBody');
-  const span = ph.end - ph.start;
-  const layer = activeZone !== 0
-    ? `<div style="font-size:11px;color:${ZONE_META[activeZone].color};margin-bottom:10px">✎ writes ${ZONE_META[activeZone].label} overrides for all ${span} days</div>`
-    : `<div style="font-size:11px;color:var(--muted);margin-bottom:10px">✎ writes the Facility track for all ${span} days</div>`;
-  let html = `<div class="phase-badge" style="background:${ph.color}33;color:${ph.color}">${ph.label} · ${phaseWeekLabel(ph)} · D${ph.start + 1}–D${ph.end} · ${span} days</div>` + layer;
-  const vis = filteredVisParams();
-  if (!vis.length) html += `<div class="notes-box">No visible params — adjust the filters in the left rail.</div>`;
-  let curSection = null;
-  for (const id of vis) {
-    const p = PARAMS.find(x => x.id === id);
-    if (!p || p.derived) continue;   // vpd / dli are auto-derived
-    if (p.section !== curSection) {
-      curSection = p.section;
-      html += `<div style="font-size:10px;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.06em">${curSection}</div>`;
-    }
-    const u = phaseUniform(p.id, ph);
-    html += `<div class="de-field">
-      <div class="de-label" style="color:${p.color}">${p.name}${p.unit ? ` (${p.unit})` : ''}${u.uniform ? '' : ` <span style="color:var(--muted)">· mixed ${fmtVal(p, u.mn)}–${fmtVal(p, u.mx)}</span>`}</div>
-      <input class="de-input" type="number" step="${p.step}" min="${p.min}" max="${p.max}" value="${u.uniform ? u.v : ''}" placeholder="${u.uniform ? '' : 'mixed — type to flatten'}"
-        onchange="applyPhaseValue('${p.id}','${ph.id}',this.value)">
-    </div>`;
-  }
-  html += `<button class="apply-btn" onclick="selectPhaseDays('${ph.id}')">⬚ Select these ${span} days for bulk edit</button>`;
-  body.innerHTML = html;
-}
-function applyPhaseValue(pid, phaseId, value) {
-  const ph = PHASES.find(p => p.id === phaseId);
-  const p = PARAMS.find(x => x.id === pid);
-  if (!ph || !p) return;
-  let v = parseFloat(value);
-  if (isNaN(v)) return;
-  v = Math.min(p.max, Math.max(p.min, v));
-  for (let d = ph.start; d < ph.end; d++) {
-    setVal(pid, d, v);
-    if (pid === 'temp_day' || pid === 'rh' || pid === 'ppfd' || pid === 'photoperiod') recalcDerived(d);
-  }
-  renderCharts();
-  buildPhaseEditorFields(ph);   // refresh the uniform/mixed hints
-}
-function selectPhaseDays(phaseId) {
-  const ph = PHASES.find(p => p.id === phaseId);
-  if (!ph) return;
-  bulkSel = { a: ph.start, b: ph.end - 1 };
-  _selAnchor = ph.start;
-  showBulkBar();
-  renderCharts();
-}
-
-// ============================================================
-// BULK EDIT TOOLBAR — set / ± delta / interpolate over a day range
-// ============================================================
-function bulkTargets() {
-  const sel = document.getElementById('bbParam');
-  if (!sel) return [];
-  let ids;
-  if (sel.value === '__checked') ids = [...selParams];
-  else if (sel.value === '__vis') ids = filteredVisParams();
-  else ids = [sel.value];
-  return ids.map(id => PARAMS.find(p => p.id === id)).filter(p => p && !p.derived);
-}
-function showBulkBar() {
-  const bar = document.getElementById('bulkBar');
-  if (!bar || !bulkSel) return;
-  const n = bulkSel.b - bulkSel.a + 1;
-  const vis = filteredVisParams().map(id => PARAMS.find(p => p.id === id)).filter(p => p && !p.derived);
-  const checked = [...selParams].filter(id => PARAMS.some(p => p.id === id && !p.derived));
-  let opts = '';
-  if (checked.length) opts += `<option value="__checked">☑ ${checked.length} checked row(s)</option>`;
-  opts += `<option value="__vis">All visible rows (${vis.length})</option>`;
-  for (const p of vis) opts += `<option value="${p.id}">${p.name}${p.unit ? ' (' + p.unit + ')' : ''}</option>`;
-  bar.innerHTML = `
-    <b style="color:var(--accent)">${n} day${n > 1 ? 's' : ''}</b>
-    <span style="color:var(--muted)">D${bulkSel.a + 1}–D${bulkSel.b + 1}${activeZone !== 0 ? ' · ' + ZONE_META[activeZone].label : ''}</span>
-    <select id="bbParam" title="Which param(s) to write">${opts}</select>
-    <select id="bbMode" title="How to apply" onchange="document.getElementById('bbV2').style.display=this.value==='interp'?'':'none'">
-      <option value="set">Set =</option><option value="delta">Shift ±</option><option value="interp">Interpolate →</option>
-    </select>
-    <input id="bbV1" type="number" step="any" placeholder="value">
-    <input id="bbV2" type="number" step="any" placeholder="end value" style="display:none">
-    <button class="btn sm primary" onclick="applyBulk()">Apply</button>
-    <button class="btn sm" onclick="clearBulkSel(true)" title="Esc clears too">✕</button>`;
-  bar.style.display = 'flex';
-}
-function hideBulkBar() { const b = document.getElementById('bulkBar'); if (b) b.style.display = 'none'; }
-function clearBulkSel(rerender) {
-  bulkSel = null;
-  hideBulkBar();
-  if (rerender !== false) renderCharts();
-}
-function applyBulk() {
-  if (!bulkSel) return;
-  const mode = document.getElementById('bbMode').value;
-  const v1 = parseFloat(document.getElementById('bbV1').value);
-  const v2 = parseFloat(document.getElementById('bbV2').value);
-  const targets = bulkTargets();
-  if (!targets.length) { haToast('No editable params selected.'); return; }
-  if (isNaN(v1)) { haToast('Enter a value first.'); return; }
-  if (mode === 'interp' && targets.length > 1) { haToast('Interpolate needs a single param — pick one.'); return; }
-  if (mode === 'interp' && isNaN(v2)) { haToast('Enter the end value too.'); return; }
-  const a = bulkSel.a, b = bulkSel.b, span = Math.max(1, b - a);
-  for (const p of targets) {
-    const st = p.step || 1;
-    for (let d = a; d <= b; d++) {
-      let nv;
-      if (mode === 'set') nv = v1;
-      else if (mode === 'delta') nv = getVal(p.id, d, activeZone) + v1;
-      else nv = v1 + (v2 - v1) * ((d - a) / span);
-      nv = Math.min(p.max, Math.max(p.min, nv));
-      nv = parseFloat((Math.round(nv / st) * st).toFixed(4));
-      setVal(p.id, d, nv);
-    }
-  }
-  if (targets.some(p => ['temp_day', 'rh', 'ppfd', 'photoperiod'].includes(p.id)))
-    for (let d = a; d <= b; d++) recalcDerived(d);
-  renderCharts();
-  if (editorMode === 'phase' && phaseEdId) { const ph = PHASES.find(p => p.id === phaseEdId); if (ph) buildPhaseEditorFields(ph); }
-  haToast(`Applied to ${b - a + 1} day(s) × ${targets.length} param(s)`);
-}
-// arrow-key nudge: ±1 step on the toolbar's target param(s) across the selection
-function nudgeBulk(dir) {
-  if (!bulkSel) return;
-  const targets = bulkTargets();
-  if (!targets.length) return;
-  for (const p of targets) {
-    const st = p.step || 1;
-    for (let d = bulkSel.a; d <= bulkSel.b; d++) {
-      let nv = getVal(p.id, d, activeZone) + dir * st;
-      nv = Math.min(p.max, Math.max(p.min, nv));
-      setVal(p.id, d, parseFloat(nv.toFixed(4)));
-    }
-  }
-  if (targets.some(p => ['temp_day', 'rh', 'ppfd', 'photoperiod'].includes(p.id)))
-    for (let d = bulkSel.a; d <= bulkSel.b; d++) recalcDerived(d);
-  throttledRender();
-}
-
-// ============================================================
-// KEYBOARD — Esc closes panels, arrows nudge the selection
+// KEYBOARD — Esc closes the HA modal / overflow menu
 // ============================================================
 function tlKeydown(e) {
   if (!tlInited || !tlVisible()) return;
-  const tag = document.activeElement && document.activeElement.tagName;
-  const typing = /INPUT|TEXTAREA|SELECT/.test(tag || '');
   if (e.key === 'Escape') {
     const modal = document.getElementById('haModal');
     if (modal && modal.style.display === 'flex') { closeHASync(); return; }
-    if (bulkSel) { clearBulkSel(true); return; }
-    if (editorMode) { closeSideEditor(); return; }
-    return;
-  }
-  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && bulkSel && !typing) {
-    e.preventDefault();
-    nudgeBulk(e.key === 'ArrowUp' ? 1 : -1);
+    if (_ovOpen) { closeOvMenu(); return; }
   }
 }
 
@@ -4084,40 +3562,12 @@ function getCompareRecipe() {
   const r = recipeStore.recipes[compareId];
   return (r && compareId !== recipeStore.activeId) ? r : null;
 }
-function renderRecipeBar() {
-  const bar = document.getElementById('recipeBar');
-  const act = activeRecipe();
-  if (!bar || !act) return;
-  const ids = Object.keys(recipeStore.recipes);
-  const opts = ids.map(id => `<option value="${id}" ${id === recipeStore.activeId ? 'selected' : ''}>${rEsc(recipeOptionLabel(recipeStore.recipes[id]))}</option>`).join('');
-  const w = growWeekOf(act);
-  const cmpOpts = '<option value="">Compare…</option>' + ids.filter(id => id !== recipeStore.activeId)
-    .map(id => `<option value="${id}" ${id === compareId ? 'selected' : ''}>${rEsc(recipeStore.recipes[id].name)}</option>`).join('');
-  const cmp = getCompareRecipe();
-  bar.innerHTML = `
-    <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Recipe</span>
-    <select id="recipeSelect" onchange="switchRecipe(this.value)" style="max-width:320px" title="Active recipe — drives the chart and HA Sync">${opts}</select>
-    ${w !== null ? `<span class="rb-week">${w >= 0 ? 'grow wk ' + w + ' / ' + totalWeeks() : 'starts in ' + Math.ceil((Date.parse(act.growStartDate) - Date.now()) / 864e5) + 'd'}</span>` : ''}
-    <input type="date" value="${act.growStartDate || ''}" title="Grow start date" onchange="setGrowStart(this.value)">
-    <button class="btn sm" onclick="newRecipe()" title="New blank recipe">＋ New</button>
-    <button class="btn sm" onclick="dupRecipe()" title="Duplicate the current recipe">⧉ Duplicate</button>
-    <button class="btn sm" onclick="renameRecipe()">✎ Rename</button>
-    <button class="btn sm danger" onclick="deleteRecipe()" title="Delete this recipe">🗑</button>
-    <span class="spacer"></span>
-    <select id="compareSelect" onchange="setCompare(this.value)" title="Overlay another recipe's facility track (read-only)">${cmpOpts}</select>
-    ${cmp ? `<span class="legend-chip" onclick="setCompare('')" title="Click to remove the overlay">╌╌ vs ${rEsc(cmp.name)} ✕</span>` : ''}
-    <button class="btn sm" onclick="exportJSON()" title="Download this recipe as JSON">⇪ Export</button>
-    <button class="btn sm" onclick="importRecipe()" title="Import a recipe JSON (added as a new recipe)">⇩ Import</button>`;
-}
+// renderRecipeBar() + the recipe position chip live in the presentation core above.
 function postRecipeSwitchUI() {
-  document.getElementById('dayEditor').classList.remove('open');
-  document.querySelectorAll('#tlRoot .pl-block').forEach(t => t.classList.remove('active'));
-  clearBulkSel(false);
-  renderRecipeBar();
-  renderPhaseLane();
-  renderZoneBanner();
-  buildLeftPanel();
-  renderCharts();
+  closeOvMenu();
+  selectedPhase = PHASES[0].id;
+  if (!CHART_CHIP_IDS.includes(focusParam)) focusParam = 'temp_day';
+  renderPlan();
 }
 function switchRecipe(id) {
   if (!recipeStore.recipes[id] || id === recipeStore.activeId) return;
@@ -4185,109 +3635,6 @@ function setCompare(id) {
   if (compareId && !recipeStore.recipes[compareId]) compareId = null;
   renderRecipeBar();
   renderCharts();
-}
-
-// ============================================================
-// ZOOM / FIT
-// ============================================================
-function setDayW(v) {
-  selectedPhase = null;   // manual zoom clears the phase highlight
-  document.querySelectorAll('#tlRoot .pl-block').forEach(t => t.classList.remove('active'));
-  if (v === 'fit') {
-    const available = document.getElementById('mainScroll').clientWidth || window.innerWidth - 250 - 290;
-    DAY_W = Math.max(8, Math.floor(available / TOTAL_DAYS));
-  } else {
-    DAY_W = v;
-  }
-  // update button states
-  document.querySelectorAll('#tlRoot .topbar .btn').forEach(b => b.classList.remove('active'));
-  const map = {8:'zSm', 14:'zSm', 28:'zMd', 48:'zLg'};
-  if (v === 'fit') document.getElementById('zFit').classList.add('active');
-  else if (map[v]) document.getElementById(map[v]).classList.add('active');
-  renderCharts();
-}
-
-function toggleViewUnit() {
-  viewUnit = viewUnit === 'day' ? 'week' : 'day';
-  const b = document.getElementById('unitToggle');
-  if (b) b.textContent = viewUnit === 'week' ? 'Week grid' : 'Day grid';
-  if (viewUnit === 'week' && bulkSel) { bulkSel = snapRangeToUnit(bulkSel.a, bulkSel.b); showBulkBar(); }
-  renderCharts();
-  saveState();
-}
-
-function toggleDensity() {
-  rowDensity = rowDensity === 'compact' ? 'comfy' : 'compact';
-  const root = document.getElementById('tlRoot');
-  if (root) root.classList.toggle('compact', rowDensity === 'compact');
-  const b = document.getElementById('densToggle');
-  if (b) b.textContent = rowDensity === 'compact' ? 'Compact rows' : 'Comfy rows';
-  renderCharts();
-  saveState();
-}
-
-function setZone(z) {
-  activeZone = z;
-  renderZoneBanner();
-  if (selectedDay !== null) openDayEditor(selectedDay);
-  renderCharts();
-}
-
-function renderZoneBanner() {
-  const sel = document.getElementById('zoneSelect');
-  if (sel) sel.value = String(activeZone);
-  const banner = document.getElementById('zoneBanner');
-  if (!banner) return;
-  if (activeZone === 0) { banner.style.display = 'none'; return; }
-  const m = ZONE_META[activeZone];
-  let paramsOver = 0, daysOver = 0;
-  for (const pid in zones[activeZone]) { paramsOver++; daysOver += Object.keys(zones[activeZone][pid]).length; }
-  banner.style.display = 'flex';
-  banner.style.background = m.color + '18';
-  banner.style.color = m.color;
-  banner.innerHTML =
-    `<strong>Editing ${m.label}</strong>` +
-    `<span style="color:var(--muted)">${paramsOver} param(s) overridden across ${daysOver} day-cell(s) — blank days inherit Facility</span>` +
-    `<button class="btn" style="margin-left:auto" onclick="clearZone(${activeZone})">Clear ${m.label}</button>`;
-}
-
-// ============================================================
-// PHASE JUMP
-// ============================================================
-function jumpToPhase(phaseId) {
-  const ph = PHASES.find(p => p.id === phaseId);
-  if (!ph) return;
-  const scroll = document.getElementById('mainScroll');
-  // toggle: clicking the active phase again zooms back out to Fit
-  if (selectedPhase === phaseId) { selectedPhase = null;
-    document.querySelectorAll('#tlRoot .pl-block').forEach(t => t.classList.remove('active'));
-    setDayW('fit'); return;
-  }
-  selectedPhase = phaseId;
-  document.querySelectorAll('#tlRoot .pl-block').forEach(t => t.classList.toggle('active', t.dataset.phase === phaseId));
-  document.querySelectorAll('#tlRoot .topbar > div .btn').forEach(b => b.classList.remove('active'));   // clear Fit/S/M/L
-  // zoom so the phase fills the viewport, then scroll to it
-  const days  = Math.max(1, ph.end - ph.start);
-  const avail = scroll.clientWidth || (window.innerWidth - 250 - 290);
-  DAY_W = Math.max(16, Math.min(64, Math.floor(avail / days)));
-  renderCharts();
-  requestAnimationFrame(() => scroll.scrollTo({ left: Math.max(0, ph.start * DAY_W - 6), behavior: 'smooth' }));
-}
-
-// ============================================================
-// STATUS BAR
-// ============================================================
-function buildStatusBar(vp) {
-  const d    = selectedDay !== null ? selectedDay : 0;
-  const week = Math.floor(d / 7);
-  const wd   = WEEK_DATA[Math.min(week, WEEK_DATA.length - 1)];
-  const items = ['temp_day','leaf_temp','rh','vpd','co2','ppfd','air_velocity'].map(id => {
-    const p = PARAMS.find(x => x.id === id);
-    if (!p) return '';
-    return `<div class="status-item"><span class="status-swatch" style="background:${p.color}"></span>${p.name}: <strong>${fmtVal(p, recipe[id][d])} ${p.unit}</strong></div>`;
-  }).join('');
-  document.getElementById('statusBar').innerHTML =
-    `<span style="color:var(--muted)">Day ${d+1} / W${week} — ${wd[1]}:</span> ` + items;
 }
 
 // ============================================================
@@ -4363,9 +3710,9 @@ function resetToDefaults() {
     recipe = buildDefaultRecipe();
     zones = { 1: {}, 2: {}, 3: {} };
     activeZone = 0;
-    selectedPhase = null;
+    selectedPhase = PHASES[0].id;
+    drillOpen = false;
     _saveNow();
-    closeSideEditor();
     postRecipeSwitchUI();
   }
 }
@@ -4517,38 +3864,24 @@ async function haToggleAutopilot(on) {
 // INIT
 // ============================================================
 let tlInited=false;
+function tlVisible(){ const el=document.getElementById('tlRoot'); return !!(el && el.offsetParent !== null); }
 window.tlInit=function(){
-  const scroll=document.getElementById('mainScroll'); if(!scroll) return;
+  const root=document.getElementById('tlRoot'); if(!root) return;
   if(!tlInited){
     tlInited=true;
-    dayCanvas=document.getElementById('dayCanvas'); chartCanvas=document.getElementById('chartCanvas');
-    ctxDay=dayCanvas.getContext('2d'); ctxChart=chartCanvas.getContext('2d');
-    // pointer-based: plain click = day editor · drag / shift+click = range select · week grid click = week select
-    for(const cv of [dayCanvas, chartCanvas]){
-      cv.style.touchAction='pan-x pan-y';
-      cv.addEventListener('pointerdown', e=>tlPointerDown(e,cv));
-      cv.addEventListener('pointermove', e=>tlPointerMove(e,cv));
-      cv.addEventListener('pointerup',   e=>tlPointerUp(e,cv));
-      cv.addEventListener('pointercancel', ()=>{ _ptr=null; });
-    }
     loadStore();   // f2.recipes store (migrates legacy f2.timeline as "Default recipe" on first load)
-    document.getElementById('tlRoot').classList.toggle('compact', rowDensity==='compact');
-    const ut=document.getElementById('unitToggle'); if(ut) ut.textContent=viewUnit==='week'?'Week grid':'Day grid';
-    const dt=document.getElementById('densToggle'); if(dt) dt.textContent=rowDensity==='compact'?'Compact rows':'Comfy rows';
-    new ResizeObserver(()=>{ if(scroll.clientWidth>0) renderCharts(); }).observe(scroll);
-    // keep the left rail and the chart rows vertically in sync (was a dead no-op before)
-    const lp=document.getElementById('leftPanel');
-    let _ss=false;
-    scroll.addEventListener('scroll', ()=>{ if(_ss) return; _ss=true; lp.scrollTop=scroll.scrollTop; _ss=false; });
-    lp.addEventListener('scroll',     ()=>{ if(_ss) return; _ss=true; scroll.scrollTop=lp.scrollTop; _ss=false; });
+    if(!selectedPhase) selectedPhase = PHASES[0].id;
+    // repaint the focused chart when the chart pane changes size (responsive auto-fit)
+    const host=document.getElementById('chartHost');
+    if(host && window.ResizeObserver) new ResizeObserver(()=>{ if(host.clientWidth>0) renderFocusedChart(); }).observe(host);
     document.addEventListener('keydown', tlKeydown);
-    document.addEventListener('pointerdown', tlClickAway, true);
+    // outside-click closes the ⋯ overflow menu
+    document.addEventListener('pointerdown', e=>{ if(_ovOpen && !(e.target.closest && e.target.closest('.ov-wrap'))) closeOvMenu(); }, true);
     window.addEventListener('beforeunload', _saveNow);
     document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') _saveNow(); });
-    renderZoneBanner(); renderCatChips(); buildLeftPanel(); renderRecipeBar(); renderPhaseLane();
     setInterval(autopilotTick,60000);
   }
-  renderCharts();   // re-measure + repaint on every show (width is real now)
+  renderPlan();   // full repaint on every show (chart width is real now)
 };
 
 /* ===================== CLIMATE controls — all F2 controls + helpers (data-driven) ===================== */
@@ -4638,11 +3971,13 @@ document.addEventListener('alpine:init', () => {
 
     init(){
       try{ this.notes=JSON.parse(localStorage.getItem("f2.notes"))||{}; }catch(e){}
+      try{ const v=new URLSearchParams(location.search).get('view'); if(v && this.nav.some(n=>n.id===v)) this.view=v; }catch(e){}   // optional ?view=<tab> deep-link
       this.aiMessages=[{role:'ai',text:"Live F2 context loaded — 3 zones, full sensor fusion. Ask me about a zone, dryback, EC, or the hotspot. I read every sensor so you do not have to."}];
       this.tick();
       this.fetchUser();
       this._tid=setInterval(()=>this.tick(), CONFIG.REFRESH_MS);
       this.$watch('view',v=>{ this.$nextTick(()=>{ this.mountCharts(); if(v==='timeline'&&window.tlInit) window.tlInit(); if(v==='tune'&&this.seedTune) this.seedTune(); }); });
+      if(this.view!=='dashboard') this.$nextTick(()=>{ this.mountCharts(); if(this.view==='timeline'&&window.tlInit) window.tlInit(); if(this.view==='tune'&&this.seedTune) this.seedTune(); });   // mount a ?view= deep-linked tab (the $watch above won't fire for the initial value)
       window.addEventListener('message',e=>{ if(e&&e.data&&e.data.type==='f2nav') this.floorNav(e.data); });   // deep-links from the 3D twin iframe
       this.$watch('zoneModal',v=>{ if(v) this.$nextTick(()=>this.mountZoneHist(v)); });
       this.$watch('cmdOpen',v=>{ if(v) this.$nextTick(()=>this.$refs.cmd&&this.$refs.cmd.focus()); });
