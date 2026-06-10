@@ -1,0 +1,150 @@
+###############################################################################
+# Irrigation GROW PACK — 60 TANK LEVEL (pump-runtime estimate)
+# /config/packages/irrigation/60_tank_level.yaml
+#
+# PURPOSE : Estimate how full the feed tank is from how long the pump has run
+#           since the last refill — no level float required.
+#
+# METHOD  : total pump-on seconds from FULL to EMPTY is a constant you measure
+#           once (input_number.f2_tank_full_runtime_s). The pump-on seconds
+#           SINCE the last fill is integrated live (history_stats). Then:
+#               level % = (1 - used_seconds / full_runtime_seconds) * 100
+#           Press the "tank filled" button (or the fill automation) to reset
+#           the baseline to now.
+#
+# CALIBRATE (one time):
+#   1. Fill the tank, press input_button.f2_tank_mark_full.
+#   2. Run normally until empty (watch the pump cut out / float).
+#   3. Read sensor.f2_tank_pump_seconds_used and put that value into
+#      input_number.f2_tank_full_runtime_s. Done — the estimate self-resets on
+#      every refill from then on.
+#
+# Entities consumed by the f2 dashboard tank bar:
+#   sensor.f2_tank_level_pct          (0-100 %)
+#   sensor.f2_tank_litres_remaining   (L)
+###############################################################################
+
+
+input_number:
+  f2_tank_full_runtime_s:
+    name: F2 tank — pump seconds from full to empty (calibration)
+    min: 60
+    max: 36000
+    step: 10
+    unit_of_measurement: s
+    mode: box
+    icon: mdi:timer-cog
+
+  f2_tank_size_l:
+    name: F2 tank — size
+    min: 1
+    max: 2000
+    step: 1
+    unit_of_measurement: L
+    mode: box
+    icon: mdi:cup-water
+
+
+input_datetime:
+  f2_tank_filled_at:
+    name: F2 tank — last filled at
+    has_date: true
+    has_time: true
+
+
+input_button:
+  f2_tank_mark_full:
+    name: F2 tank — mark filled (reset to 100%)
+    icon: mdi:water-plus
+
+
+sensor:
+  # Pump on-time (hours) since the last fill — the live integral.
+  - platform: history_stats
+    name: F2 Tank Pump On Since Fill
+    unique_id: f2_tank_pump_on_since_fill
+    entity_id: switch.veg_main_pump
+    state: "on"
+    type: time
+    start: "{{ states('input_datetime.f2_tank_filled_at') }}"
+    end: "{{ now() }}"
+
+
+template:
+  - sensor:
+      # The same integral expressed in seconds (what you read to calibrate).
+      - name: F2 Tank Pump Seconds Used
+        unique_id: f2_tank_pump_seconds_used
+        unit_of_measurement: s
+        state_class: measurement
+        icon: mdi:pump
+        state: >
+          {{ (states('sensor.f2_tank_pump_on_since_fill') | float(0) * 3600) | round(0) }}
+
+      # Tank level %, clamped 0-100.
+      - name: F2 Tank Level
+        unique_id: f2_tank_level_pct
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:car-coolant-level
+        state: >
+          {% set used = states('sensor.f2_tank_pump_seconds_used') | float(0) %}
+          {% set full = states('input_number.f2_tank_full_runtime_s') | float(0) %}
+          {% if full <= 0 %}
+            unknown
+          {% else %}
+            {{ [[(1 - used / full) * 100, 0] | max, 100] | min | round(0) }}
+          {% endif %}
+        availability: >
+          {{ states('input_number.f2_tank_full_runtime_s') | float(0) > 0 }}
+
+      # Litres remaining = level% * tank size.
+      - name: F2 Tank Litres Remaining
+        unique_id: f2_tank_litres_remaining
+        unit_of_measurement: L
+        state_class: measurement
+        icon: mdi:water
+        state: >
+          {% set pct = states('sensor.f2_tank_level_pct') | float(-1) %}
+          {% set size = states('input_number.f2_tank_size_l') | float(0) %}
+          {% if pct < 0 %}unknown{% else %}{{ (pct / 100 * size) | round(1) }}{% endif %}
+
+
+automation:
+  # Reset the baseline to "now" whenever the tank is marked filled.
+  - id: f2_tank_reset_on_fill
+    alias: "F2 Tank — reset baseline on refill"
+    trigger:
+      - trigger: state
+        entity_id: input_button.f2_tank_mark_full
+      # If a real full-float exists and rises, treat that as a fill too.
+      - trigger: state
+        entity_id: binary_sensor.veg_tank_full_float_tank_level_full
+        to: "on"
+    action:
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.f2_tank_filled_at
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+    mode: single
+
+  # Low-tank advisory (uses the estimate; the dashboard also shows the bar).
+  - id: f2_tank_low_alert
+    alias: "F2 Tank — low level advisory"
+    trigger:
+      - trigger: numeric_state
+        entity_id: sensor.f2_tank_level_pct
+        below: 15
+        for:
+          minutes: 2
+    action:
+      - action: persistent_notification.create
+        data:
+          notification_id: f2_tank_low
+          title: "💧 F2 feed tank low"
+          message: >
+            Estimated tank level is {{ states('sensor.f2_tank_level_pct') }}%
+            ({{ states('sensor.f2_tank_litres_remaining') }} L left). Refill and
+            press “tank filled”.
+    mode: single
