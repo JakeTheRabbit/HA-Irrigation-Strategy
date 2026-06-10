@@ -1026,6 +1026,30 @@
             </template>
           </div>
         </div>
+        <!-- relays & solenoids — full manual hardware control -->
+        <div id="op-relays" class="glass rounded-2xl p-5 space-y-4 scroll-mt-28">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.radio" class="w-4 h-4 block text-emerald-400"></span> Relays &amp; solenoids</h3>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] text-slate-500 hidden sm:inline" x-show="!demo">live · writes to HA, no undo</span>
+              <button @click="pumpOpen=true" class="text-[11px] px-2.5 py-1 rounded-lg bg-rose-500/15 ring-1 ring-rose-400/30 text-rose-300 hover:bg-rose-500/25 transition font-medium">⛔ Stop all</button>
+            </div>
+          </div>
+          <template x-for="g in relays" :key="g.title">
+            <div>
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5" x-text="g.title"></div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                <template x-for="r in g.rows" :key="r.id">
+                  <div class="flex items-center justify-between rounded-lg bg-white/[0.03] border border-white/8 px-3 py-2">
+                    <div class="flex items-center gap-2 min-w-0"><span class="w-1.5 h-1.5 rounded-full shrink-0" :class="r.on?(r.danger?'bg-amber-400':'bg-emerald-400'):'bg-slate-600'"></span><span class="text-sm text-slate-300 truncate" x-text="r.label"></span></div>
+                    <button @click="relayToggle(r.id,r.label,r.danger)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="r.on?(r.danger?'bg-amber-500':'bg-emerald-500'):'bg-white/15'" :title="r.id"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="r.on&&'translate-x-5'"></span></button>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+          <div x-show="!relays.length" class="text-sm text-slate-500">No hardware relays found on this install.</div>
+        </div>
         <div class="glass rounded-2xl p-5 space-y-3">
           <h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.ai" class="w-4 h-4 block text-emerald-400"></span> Adaptive steering</h3>
           <div class="flex items-center justify-between py-1"><span class="text-sm text-slate-300" x-text="control.adaptive.toggle.label||'Adaptive steering enabled'"></span>
@@ -1349,6 +1373,9 @@ function seedDemo(){
   ['sw_system','sw_auto','sw_ecstack'].forEach(k=>{ if(E[k]) set(E[k],'on'); });
   ['switch.veg_main_pump','switch.espoe_irrigation_relay_2_3','switch.f2_row1','switch.f2_row2','switch.f2_row3'].forEach(id=>set(id,'off'));
   set('sensor.veg_main_pump_power',0);
+  // Operate relays/solenoids (idle: pump off, valves shut, dosing off, CO2 on, power present)
+  ['switch.espoe_main_pump_empty','switch.espoe_irrigation_relay_2_1','switch.espoe_irrigation_relay_2_2','switch.veg_solenoid_relays_lt','switch.veg_solenoid_relays_lb','switch.veg_solenoid_right_top','switch.veg_solenoid_relays_r_b','switch.veg_solenoid_relays_waste','switch.veg_solenoid_waste','switch.waste_valve','switch.espoe_peristaltic_pumps_core_pump_power','switch.espoe_peristaltic_pumps_bloom_pump_power','switch.espoe_peristaltic_pumps_balance_pump_power','switch.espoe_peristaltic_pumps_cleanse_pump_power'].forEach(id=>set(id,'off'));
+  set('switch.pump_power_switch','on'); set('switch.veg_co2_relay_veg_co2_relay','on');
   if(E.dosing_active) set(E.dosing_active,'off'); if(E.next_irrig) set(E.next_irrig, iso(45));
   if(E.decision) set(E.decision,'Maintaining P2 — pore EC on target'); if(E.activity) set(E.activity,'Z1 P2 shot 5% · 20m ago');
   [1,2,3].forEach((z,i)=>{ const P='crop_steering_zone_'+z+'_', vwc=[57,59,58][i], ec=[3.0,3.1,2.9][i];
@@ -1669,6 +1696,21 @@ function buildPump(){
   const valvesShut=["switch.f2_row1","switch.f2_row2","switch.f2_row3"].every(id=>val(id)!=="on");
   const deadhead=(((power!=null&&power>100))||pumpOn)&&valvesShut;
   return { hw, sw, power, powerTxt:power==null?"—":fmt(power,0)+" W", pumpOn, deadhead, anyHw:hw.some(r=>r.on) };
+}
+/* ===== Operate hardware: every irrigation relay/solenoid/pump as a live on-off (real entity ids verified against HA) ===== */
+const RELAY_GROUPS=[
+  {title:"Pump",danger:true,ids:[["switch.veg_main_pump","Veg main pump"],["switch.espoe_main_pump_empty","Veg pump"],["switch.pump_power_switch","Pump power"]]},
+  {title:"Mains & manifold",ids:[["switch.espoe_irrigation_relay_2_1","Manifold"],["switch.espoe_irrigation_relay_2_2","Veg mains"],["switch.espoe_irrigation_relay_2_3","Veg mainline"]]},
+  {title:"Zone valves",ids:[["switch.f2_row1","Row 1"],["switch.f2_row2","Row 2"],["switch.f2_row3","Row 3"]]},
+  {title:"Drip solenoids",ids:[["switch.veg_solenoid_relays_lt","Left top"],["switch.veg_solenoid_relays_lb","Left bottom"],["switch.veg_solenoid_right_top","Right top"],["switch.veg_solenoid_relays_r_b","Right bottom"]]},
+  {title:"Waste & drain",ids:[["switch.veg_solenoid_relays_waste","Waste"],["switch.veg_solenoid_waste","Waste (current)"],["switch.waste_valve","Waste valve"]]},
+  {title:"Dosing pumps",danger:true,ids:[["switch.espoe_peristaltic_pumps_core_pump_power","Core"],["switch.espoe_peristaltic_pumps_bloom_pump_power","Bloom"],["switch.espoe_peristaltic_pumps_balance_pump_power","Balance"],["switch.espoe_peristaltic_pumps_cleanse_pump_power","Cleanse"]]},
+  {title:"CO₂",ids:[["switch.veg_co2_relay_veg_co2_relay","Veg CO₂ relay"]]},
+];
+function buildRelays(){
+  return RELAY_GROUPS.map(g=>({ title:g.title,
+    rows:g.ids.filter(([id])=>ex(id)).map(([id,label])=>({id,label,on:val(id)==="on",danger:!!g.danger})) }))
+    .filter(g=>g.rows.length);
 }
 function buildControl(){
   const mode=val("select.crop_steering_steering_mode")||"—", phase=val("sensor.crop_steering_app_current_phase")||"—";
@@ -4060,7 +4102,7 @@ document.addEventListener('alpine:init', () => {
 
     view:'dashboard', sidebarOpen:true, connected:false, connError:"",
     cmdOpen:false, cmdQuery:"", aiOpen:false, aiInput:"", aiThinking:false, zoneModal:null, evOpen:null,
-    pumpOpen:false, pump:{hw:[],sw:[],power:null,powerTxt:'—',anyHw:false,deadhead:false,pumpOn:false},
+    pumpOpen:false, pump:{hw:[],sw:[],power:null,powerTxt:'—',anyHw:false,deadhead:false,pumpOn:false}, relays:[],
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
     headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},telemetry:[],feed:[]}, ctrlZone:1,
@@ -4109,7 +4151,7 @@ document.addEventListener('alpine:init', () => {
       const rr=runRules();
       this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
       this.headline=computeHeadline(this.adv,this.watch);
-      this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl(); this.pump=buildPump();
+      this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl(); this.pump=buildPump(); this.relays=buildRelays();
       { const cam=S[CONFIG.E.cam], ct=cam&&cam.attributes&&cam.attributes.access_token; this._camTick=(this._camTick||0)+1;
         this.camUrl=ct?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+CONFIG.E.cam+'?token='+ct+'&_='+this._camTick):''; }
       if(window.__tuneReseed) window.__tuneReseed();   // refresh the Tune editor from live HA (respects its hydrated/unsaved-edit guard)
@@ -4198,6 +4240,11 @@ document.addEventListener('alpine:init', () => {
       const on=val(id)==="on", isPump=id==="switch.veg_main_pump";
       if(isPump && on && !confirm("Turn the MAIN PUMP off?")) return;
       if(isPump && !on && !confirm("Turn the MAIN PUMP on?\nMake sure a zone valve is open first — running against a closed line dead-heads the pump.")) return;
+      this.ctrlSvc(id.split(".")[0],"toggle",{entity_id:id});
+    },
+    relayToggle(id,label,danger){
+      const on=val(id)==="on";
+      if(danger && !on && !confirm("Turn ON "+label+"?\nThis energises live hardware — make sure the flow path is safe.")) return;
       this.ctrlSvc(id.split(".")[0],"toggle",{entity_id:id});
     },
     async pumpStopAll(){
