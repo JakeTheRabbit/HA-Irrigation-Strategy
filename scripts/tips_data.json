@@ -1324,5 +1324,10 @@
  "Next shot": {
   "title": "Predicted next shot time",
   "body": "When the engine expects to fire the next irrigation, from its prediction sensor. It moves with the live dryback rate, so treat it as an estimate rather than a schedule. If it sits in the past while the blocks keep drying, confirm the system and auto-irrigation switches are armed."
+ },
+ "P1 VWC max": {
+  "title": "P1 ramp-up peak VWC",
+  "body": "The volumetric water content the P1 morning ramp climbs to before the zone hands over to P2 maintenance - the wettest the block gets all day. The engine fires progressively bigger shots until average VWC reaches this peak. Set it at or just under field capacity (60% here); the gap between this peak and the P2 re-water threshold IS the working dryback, so raising it deepens the daily dry-down and lowering it makes the day wetter.",
+  "doc": "docs/SYSTEM_OVERVIEW.md#1-the-p0p3-daily-cycle"
  }
 }
