@@ -922,5 +922,407 @@
  "Zone Setup": {
   "title": "Per-zone setup (advanced)",
   "body": "The three per-zone-only numbers: plant count (scales total volume), max daily volume in litres (a hard daily cap per zone — emergency rescues are exempt), and the shot size multiplier (0.1-5x, a per-row trim for a weak or thirsty row). These have no global version; HA Sync always writes them to each zone's number.crop_steering_zone_N_* entities using that zone's layer values."
+ },
+ "Avg VWC": {
+  "title": "Average root-zone wetness",
+  "body": "Mean volumetric water content across all three zones — the headline number for how wet the blocks are right now. The engine waters each zone individually, but this tells you at a glance whether the room is wet or dry. Read it against field capacity (about 60% here) and the P2 re-water thresholds; mid-40s through the day is normal. A steady fall through the afternoon is the dryback doing its job."
+ },
+ "Pore EC": {
+  "title": "Salt strength in the block",
+  "body": "Fused pore-water EC — the salt concentration the roots actually sit in, in mS/cm. Generative steering deliberately stacks this toward the target shown next to it; too far above risks burn, too far below means diluted feed. The EC-stacking loop nudges irrigation depth to steer it, and a drift of more than about 0.8 off target turns the tile amber.",
+  "doc": "docs/SYSTEM_OVERVIEW.md#ec-stacking-autonomous-p2"
+ },
+ "Plant stress": {
+  "title": "Crop water stress index",
+  "body": "CWSI from 0 to 1, computed from how much the leaves cool themselves versus a well-watered baseline. Below 0.3 the plant is comfortable, 0.3 to 0.5 is mild stress worth watching, and above 0.7 the plant has effectively stopped transpiring and needs attention now. Spikes usually trace to dry blocks, high VPD, or heat."
+ },
+ "Drinking (transpiration)": {
+  "title": "Transpiration cooling check",
+  "body": "How much cooler the leaves are than the air, in degrees C. Transpiring leaves self-cool, so more than about 1 C below air means the plant is drinking well; near zero or warmer than air means stomata have closed and uptake has stalled. If this drops while lights are on, check VPD, block wetness and root temperature."
+ },
+ "Salt level (pore EC)": {
+  "title": "Pore EC versus target",
+  "body": "The fused pore-water EC reading against the steering target. Within about 0.5 mS/cm of target is on plan; more than about 1.2 off is a real miss — high means salts are stacking faster than intended (engine waters wetter to flush), low means feed is being diluted (engine lets it dry deeper). The per-hour trend beside it shows which way it is moving."
+ },
+ "switch.f2_dehumidifiers_relay_2": {
+  "title": "Dehumidifier relay 2",
+  "body": "One of four relays on the f2-dehumidifiers board, each powering its own dehumidifier unit. Normally left on so the unit can cycle under the group control; switch it off only to isolate that one machine for service. Killing dehu capacity mid-flower raises night RH — watch the condensation margin tile after changes."
+ },
+ "switch.f2_dehumidifiers_relay_3": {
+  "title": "Dehumidifier relay 3",
+  "body": "Power relay for the third dehumidifier on the f2-dehumidifiers board. Leave it on for normal operation; off isolates just this unit for maintenance. If night RH starts creeping after a change here, you have lost real dehu capacity — check the condensation margin."
+ },
+ "switch.f2_dehumidifiers_relay_4": {
+  "title": "Dehumidifier relay 4",
+  "body": "Power relay for the fourth dehumidifier on the f2-dehumidifiers board. Keep it on so the unit can run when the room calls for drying. Turning individual relays off is for servicing one machine — use the group switch to stop them all."
+ },
+ "switch.f2_co2_led": {
+  "title": "CO2 controller indicator LED",
+  "body": "The status LED on the F2 CO2 controller hardware — not the gas valve. It has no effect on dosing; keeping it off avoids a stray light point in the room during the dark period. Handy as a quick visual that the controller has power when you are physically in the room."
+ },
+ "input_number.f2_co2_target_input": {
+  "title": "Active CO2 target",
+  "body": "The ppm concentration the CO2 controller is driving toward right now — the valve opens below it, closes above. Enriched flower typically runs 1200 to 1450 ppm in the day and falls back to about 400 at night, since plants only use CO2 under light. Automations write this from the separate day and night targets, so set those instead unless you want a temporary manual override."
+ },
+ "input_boolean.f2_co2_tank_replaced": {
+  "title": "CO2 tank swap flag",
+  "body": "Flip this on right after fitting a fresh CO2 cylinder. It clears the tank-empty alert and resets usage tracking so remaining-gas estimates start from a full bottle. If dosing has stopped and CO2 sits flat at ambient, check the cylinder, swap it, then set this."
+ },
+ "light.f2_work_light": {
+  "title": "F2 work light, dimmable",
+  "body": "The human work light in F2, exposed with dimming. Use it for tasks in the room — never during the flower dark period, since white light leaks stress the crop and risk reflagging. If it shows unavailable the device is offline; check power or restart the board."
+ },
+ "switch.f2_work_light": {
+  "title": "Work light raw relay",
+  "body": "The bare relay behind the F2 work light — same fixture as the light entity, just plain on/off with no dimming. Useful as a fallback if the light entity misbehaves. Same rule applies: keep it off during lights-out in flower."
+ },
+ "switch.f2_door_relay": {
+  "title": "F2 door release relay",
+  "body": "Relay that triggers the F2 door release for room access. Treat it as momentary — fire it to open, then confirm the door re-secured. Unexplained triggers are worth a look on the room camera."
+ },
+ "switch.f2_detect_2": {
+  "title": "Camera object detection",
+  "body": "Enables Frigate object detection (people and similar) on the F2 camera. Leave it on — person detection feeds occupancy logic and security review items. Disable only briefly, for example during long maintenance sessions that would spam events."
+ },
+ "switch.f2_motion_2": {
+  "title": "Camera motion detection",
+  "body": "Enables Frigate motion detection on the F2 camera. Motion gates recording and object detection, so turning it off effectively blinds event capture. Keep it on outside deliberate maintenance windows."
+ },
+ "input_number.csig_f2_high_vpd": {
+  "title": "High VPD alert line",
+  "body": "Climate-Sense trip line: air VPD above this flags the room as too dry, feeding the climate advisories and stress logic. Flower sweet spot is roughly 1.0 to 1.4 kPa, so the 1.4 default sits at the top of band. Raise it only if you are deliberately steering drier air."
+ },
+ "input_number.csig_f2_high_ec": {
+  "title": "High pore-EC alert line",
+  "body": "Substrate EC above this flags that salt stacking has gone too far. Set it at or just above your generative EC ceiling (6.0 mS/cm here). When it trips, expect the engine to water wetter to flush, and check that you are actually getting runoff."
+ },
+ "input_number.csig_f2_high_ppfd": {
+  "title": "High light alert line",
+  "body": "PPFD above this (900 umol/m2/s) flags excessive light load for the canopy. It feeds the light-stress flag together with CO2 and plant-stress signals — unenriched canopies saturate well below 900. If it trips often while CO2 enrichment is running and plants look happy, nudge it up."
+ },
+ "input_number.csig_f2_high_root_temp": {
+  "title": "Root zone too warm",
+  "body": "Substrate temperature above this (26 C) flags the root zone as too warm. Warm roots accelerate pythium and drop dissolved oxygen even when air numbers look fine. If it trips, look at feed-water temperature and floor heat, not just air setpoints."
+ },
+ "input_number.csig_f2_low_root_temp": {
+  "title": "Root zone too cold",
+  "body": "Substrate temperature below this (18 C) flags chilled roots. Cold root zones slow water and nutrient uptake and stall growth even with perfect air climate. Overnight dips below the line usually mean cold feed water or floor losses."
+ },
+ "input_number.csig_f2_low_vwc": {
+  "title": "Low moisture alert line",
+  "body": "VWC below this (35%) flags the block as drying past comfort for the Climate-Sense advisories — it is an alert line, not an irrigation trigger. Keep it above the P3 emergency floor so you hear about a dry-down before the rescue shot has to fire. The actual watering thresholds live on the zone cards."
+ },
+ "input_number.csig_f2_min_cooling": {
+  "title": "Minimum healthy leaf cooling",
+  "body": "The least transpiration cooling (leaf below air, in C) considered healthy under lights — 0.5 C here. Leaves cooling less than this suggest stomata are closing and the plant has slowed drinking. Feeds the plant-stress logic alongside CWSI."
+ },
+ "input_number.csig_f2_warm_leaf_delta": {
+  "title": "Warm leaf alarm offset",
+  "body": "How far the leaf may run above air temperature before it is flagged as a stressed, non-transpiring canopy. At 0.0, any leaf warmer than air counts as a problem under lights. A transpiring canopy should essentially never be warmer than the surrounding air."
+ },
+ "input_number.csig_f2_co2_enriched": {
+  "title": "Enrichment detection threshold",
+  "body": "CO2 above this (800 ppm) tells Climate-Sense the room is running enriched. That shifts expectations — enriched canopies tolerate higher PPFD and harder VPD. Keep it between ambient (about 420) and your day target so daytime enrichment is detected reliably."
+ },
+ "input_number.csig_f2_co2_ppfd_min": {
+  "title": "PPFD where CO2 pays",
+  "body": "Minimum light level (700 umol/m2/s) at which CO2 enrichment is considered worthwhile. Below it photosynthesis is light-limited and the gas is largely wasted, so advisories can call out enrichment running under dim light. Match it to your dimming ramp — ramp periods below this do not need full enrichment."
+ },
+ "input_number.csig_f2_cwsi_nwsb_intercept": {
+  "title": "CWSI baseline intercept",
+  "body": "Calibration constant for the CWSI non-water-stressed baseline: the leaf-air temperature difference a fully transpiring canopy shows at zero VPD. Together with the slope it defines the no-stress line the live leaf reading is compared against. Only adjust after calibrating against a known-unstressed canopy — it rescales the whole stress index."
+ },
+ "input_number.csig_f2_cwsi_nwsb_slope": {
+  "title": "CWSI baseline slope",
+  "body": "How fast the unstressed leaf-air delta falls as VPD rises, in C per kPa (negative). Drier air makes a healthy canopy cool itself harder; this slope encodes that. Miscalibration shows up as a stress index that reads always high or always zero."
+ },
+ "input_number.csig_f2_cwsi_wsb_delta": {
+  "title": "CWSI stressed baseline offset",
+  "body": "The leaf-air delta representing a fully stressed, non-transpiring canopy — 3.5 C warmer than the unstressed baseline here. This anchors the 1.0 end of the CWSI scale. Widening it makes the index less sensitive; narrowing it makes the same leaf temperature read as more stress."
+ },
+ "input_text.csig_f2_air_temp": {
+  "title": "Air temp sensor mapping",
+  "body": "Entity ID of the sensor Climate-Sense uses for F2 air temperature (currently the SCD41 PoE node). Change it only when swapping hardware — a typo here silently breaks VPD, CWSI and every advisory built on air temperature. Paste the full sensor entity ID."
+ },
+ "input_text.csig_f2_humidity": {
+  "title": "Humidity sensor mapping",
+  "body": "Entity ID of the humidity source for F2 Climate-Sense calculations. RH feeds VPD, dew point and the condensation margin, so a wrong mapping corrupts all of them quietly. Only edit when replacing the physical sensor."
+ },
+ "input_text.csig_f2_co2": {
+  "title": "CO2 sensor mapping",
+  "body": "Entity ID of the CO2 reading Climate-Sense uses for F2 (currently the SCD41 PoE node). This is what the enrichment detection and CO2 advisories read. Point it at the sensor you trust most — and recalibrate that sensor rather than remapping when readings drift."
+ },
+ "input_text.csig_f2_ppfd": {
+  "title": "PPFD sensor mapping",
+  "body": "Entity ID of the light sensor used for F2 canopy PPFD. It drives the light-stress flag, the CO2-useful check and DLI context. Update it if the quantum/lux sensor moves or is replaced."
+ },
+ "input_text.csig_f2_leaf_temp": {
+  "title": "Leaf temp sensor mapping",
+  "body": "Entity ID of the infrared leaf temperature source — currently the F1 R1 thermal camera standing in for F2. Leaf temperature drives leaf VPD, transpiration cooling and CWSI, the core plant-state numbers. If the thermal camera moves rooms or gets a dedicated F2 unit, update this."
+ },
+ "input_text.csig_f2_root_temp": {
+  "title": "Substrate temp sensor mapping",
+  "body": "Entity ID of the substrate temperature source (the Row 1 block probe). Feeds the high and low root-temp alert lines. Change only when the probe is moved or replaced."
+ },
+ "input_text.csig_f2_ec": {
+  "title": "Substrate EC sensor mapping",
+  "body": "Entity ID of the pore-EC source for Climate-Sense (the Row 1 block probe's pwEC). This is the raw single-probe EC behind the room's salt advisories. The steering engine fuses several probes separately — this mapping is just for the climate intelligence layer."
+ },
+ "input_text.csig_f2_vwc": {
+  "title": "Substrate VWC sensor mapping",
+  "body": "Entity ID of the block-moisture source for Climate-Sense (the Row 1 probe). Feeds the low-VWC alert line. The irrigation engine uses its own fused multi-probe value, so this only affects advisories, not watering."
+ },
+ "number.air_q_entrance_temperature_offset": {
+  "title": "AirQ temperature correction",
+  "body": "Fixed offset added to the AirQ entrance sensor's raw temperature (currently +2.2 C). Normally written by the calibrate button after you enter a trusted reference reading, but you can trim it by hand. If this node disagrees with the room's other sensors, recalibrate rather than chasing setpoints."
+ },
+ "number.air_q_entrance_humidity_offset": {
+  "title": "AirQ humidity correction",
+  "body": "Fixed offset added to the AirQ entrance sensor's raw RH reading, in percent. Written by the calibrate button from your reference value, or set by hand. A wrong RH offset skews this node's VPD and dew point, so verify against a handheld meter after changes."
+ },
+ "number.air_q_entrance_reference_temperature": {
+  "title": "Reference temp for calibration",
+  "body": "The true room temperature from a trusted handheld meter, entered before pressing the calibrate button. The device computes its own offset from the difference between this and its raw reading. It is an input to calibration, not a live measurement."
+ },
+ "number.air_q_entrance_reference_humidity": {
+  "title": "Reference RH for calibration",
+  "body": "The true room humidity from a trusted meter, entered before pressing the calibrate button. The AirQ derives its humidity offset from the gap between this and its raw reading. Enter it, let readings settle, then press calibrate once."
+ },
+ "number.air_q_entrance_co2_calibration_value": {
+  "title": "CO2 calibration anchor ppm",
+  "body": "The ppm the AirQ's CO2 cells are forced to read when you press a force-calibration button — 400 assumes near-fresh air. Only calibrate with the sensor in air you genuinely know: outdoors (about 420 ppm) or beside a trusted meter. Calibrating inside an enriched room corrupts every future reading."
+ },
+ "number.f2_scd41_env3_dlight_poe_scd41_frc_reference_co2": {
+  "title": "SCD41 FRC reference ppm",
+  "body": "Reference concentration used by the SCD41 forced recalibration (FRC) button — 420 matches outdoor air. Run the sensor in stable, known air for several minutes, then press the FRC button to anchor it here. This sensor is the room's primary CO2 reading, so a bad FRC shifts dosing and every CO2 tile."
+ },
+ "number.f2_scd41_env3_dlight_poe_ppfd_cal_point_1": {
+  "title": "PPFD calibration point 1",
+  "body": "The low-light anchor of the two-point lux-to-PPFD calibration: the PPFD you measured with a quantum meter at a dim level. Paired with the matching captured lux value, the firmware fits the conversion line. Recalibrate after moving the sensor or changing fixtures — the lux-to-PPFD ratio depends on spectrum."
+ },
+ "number.f2_scd41_env3_dlight_poe_ppfd_cal_point_2": {
+  "title": "PPFD calibration point 2",
+  "body": "The high-light anchor of the lux-to-PPFD calibration: the PPFD measured with a quantum meter near full power. With point 1 it defines the conversion the dashboard's PPFD and DLI numbers ride on. Redo both points if fixtures, height or spectrum change."
+ },
+ "number.f2_scd41_env3_dlight_poe_lux_cal_point_1": {
+  "title": "Lux capture, point 1",
+  "body": "The raw lux reading stored for calibration point 1 — normally written by the matching capture button while the room sits at the low dim level. Paired with the PPFD value for the same moment to fit the conversion. Edit by hand only if you logged the lux yourself."
+ },
+ "number.f2_scd41_env3_dlight_poe_lux_cal_point_2": {
+  "title": "Lux capture, point 2",
+  "body": "The raw lux stored for the high calibration point, normally written by its capture button at the bright dim level. Together with the point-2 PPFD it completes the two-point fit. Both captures should be taken with the sensor in its final mounting position."
+ },
+ "number.f2_scd41_env3_dlight_poe_dli_reset_hour": {
+  "title": "DLI counter reset hour",
+  "body": "Hour of day the daily light integral counter resets to zero — 12 here, matching lights-on. Setting it to lights-on means each DLI value covers exactly one photoperiod instead of splitting it across two calendar days. Change it if the light schedule moves."
+ },
+ "number.f2_scd41_env3_dlight_poe_dli_reset_minute": {
+  "title": "DLI counter reset minute",
+  "body": "Minute companion to the DLI reset hour — together they set the exact moment the daily light integral rolls over. Keep it aligned with lights-on so the DLI tile reads one full photoperiod."
+ },
+ "button.airq_f2_co2_external_force_manual_calibration": {
+  "title": "Calibrate external CO2 cell",
+  "body": "Forces the AirQ's external CO2 sensor to read the calibration anchor value (400 ppm) immediately. Press only with the sensor in known air — outdoors or beside a trusted meter — never in an enriched room. One bad press skews readings and dosing until you recalibrate properly."
+ },
+ "button.airq_f2_co2_internal_force_manual_calibration": {
+  "title": "Calibrate internal CO2 cell",
+  "body": "Same as the external calibration but for the AirQ's internal CO2 cell: forces it to the anchor ppm right now. Only press in air of known concentration. The two cells should agree afterwards — a persistent gap means one cell is failing."
+ },
+ "button.air_q_entrance_calibrate_temperature_humidity": {
+  "title": "Apply temp and RH calibration",
+  "body": "Computes and stores temperature and humidity offsets so the AirQ matches the reference values entered above. Fill in reference temp and RH from a trusted meter first, then press once. Confirm the live readings agree with your meter afterwards."
+ },
+ "button.f2_scd41_env3_dlight_poe_scd41_perform_forced_recalibration_frc": {
+  "title": "Run SCD41 forced recalibration",
+  "body": "Executes the SCD41's forced recalibration against the FRC reference ppm. Power the sensor in stable, known air (outdoors is about 420 ppm) for at least three minutes before pressing. This is the room's primary CO2 sensor, so only do this deliberately — it shifts CO2 control and every CO2 reading."
+ },
+ "button.f2_scd41_env3_dlight_poe_capture_lux_cal_point_1": {
+  "title": "Capture lux at point 1",
+  "body": "Stores the sensor's current raw lux as calibration point 1. Set the room to the low dim level you measured with a quantum meter, let it stabilise, then press; enter the matching PPFD in the point-1 field. Half of the two-point lux-to-PPFD calibration."
+ },
+ "button.f2_scd41_env3_dlight_poe_capture_lux_cal_point_2": {
+  "title": "Capture lux at point 2",
+  "body": "Stores the current raw lux as the high calibration point. Run the lights at the bright level you measured with the quantum meter, then press and enter the matching PPFD in the point-2 field. Completes the two-point fit the PPFD and DLI tiles depend on."
+ },
+ "switch.f2_recordings_2": {
+  "title": "F2 camera recording",
+  "body": "Frigate recording for the F2 camera. Leave it on so irrigation events, room access and incidents stay reviewable. Off saves disk but loses footage you cannot get back."
+ },
+ "switch.f2_snapshots_2": {
+  "title": "F2 camera snapshots",
+  "body": "Frigate snapshot capture — a still image saved per detection event on the F2 camera. Currently off; recordings still capture full video. Turn on if you want thumbnail stills in the review feed and notifications."
+ },
+ "switch.f2_review_alerts_2": {
+  "title": "F2 review alerts",
+  "body": "Controls whether F2 camera events generate alert-level items in Frigate's review feed. On means person and priority detections surface for review and can notify. Off silences the alerts without stopping recording."
+ },
+ "switch.f2_review_detections_2": {
+  "title": "F2 review detections",
+  "body": "Controls the lower-priority detection-level items in Frigate's review feed for the F2 camera. On logs every detection for browsing; off keeps the review feed down to alerts only. Recording itself is unaffected."
+ },
+ "switch.f2_ac_wall_restart": {
+  "title": "Restart wall AC controller",
+  "body": "Reboots the f2-ac-wall ESPHome IR controller for the wall mini-split. Use it when the AC stops responding to setpoint changes or its entity goes unavailable. Only the controller reboots — the AC itself keeps running on its last command."
+ },
+ "switch.f2_ac_door_restart": {
+  "title": "Restart door AC controller",
+  "body": "Reboots the f2-ac-door ESPHome IR controller for the door-side mini-split. First fix when that unit ignores setpoint changes or shows unavailable. The AC keeps its last state while the board comes back, usually under a minute."
+ },
+ "switch.f2_dehumidifiers_restart": {
+  "title": "Restart dehumidifier board",
+  "body": "Reboots the f2-dehumidifiers relay board. Use it if the relays stop responding or show unavailable. Relays restore their previous state after boot, so the dehus should come back exactly as they were — verify in the Dehumidification group."
+ },
+ "switch.f2_scd41_env3_dlight_poe_restart": {
+  "title": "Restart main climate node",
+  "body": "Reboots the primary F2 climate node — SCD41 CO2, temperature, RH plus the light/PPFD sensor. Use when readings freeze or the node drops off the network. Expect a minute or two of missing climate data; sensor fusion and the engine ride through it."
+ },
+ "switch.led_f2_r1_restart": {
+  "title": "Restart Row 1 LED controller",
+  "body": "Reboots the led-f2-r1 controller board for the Row 1 fixture. Use it if dimming commands stop taking or the power reading freezes. The fixture keeps running at its last level during the reboot — plants see no interruption."
+ },
+ "switch.led_f2_r2_restart": {
+  "title": "Restart Row 2 LED controller",
+  "body": "Reboots the led-f2-r2 controller board for the Row 2 fixture. Same use as Row 1: unresponsive dimming or a frozen power reading. Light output holds at the last level while the controller comes back."
+ },
+ "button.air_q_entrance_restart": {
+  "title": "Restart AirQ sensor",
+  "body": "Reboots the AirQ entrance sensor node. First fix for frozen or obviously wrong readings. Give it a few minutes to settle after boot — CO2 cells need warm-up before readings are trustworthy."
+ },
+ "button.airq_f2_refresh_display": {
+  "title": "Refresh AirQ display",
+  "body": "Redraws the AirQ's onboard display. Purely cosmetic — use it if the screen shows stale numbers after a calibration or config change. No effect on readings or control."
+ },
+ "App status": {
+  "title": "Engine application state",
+  "body": "The crop-steering app's live state string — safe_idle between actions, irrigating during a shot, and explicit error states if something is wrong. It is the fastest check that the engine is alive and behaving. Anything outside the normal idle/irrigate cycle deserves a look at the activity feed.",
+  "doc": "docs/SYSTEM_OVERVIEW.md#1-the-p0p3-daily-cycle"
+ },
+ "System state": {
+  "title": "Overall engine state",
+  "body": "Whether the steering system as a whole is active or standing down. Active means it is enabled and making decisions; disabled means it is observing without acting. Pairs with the System-enabled and Auto-irrigation arm switches — if those are on but this is not active, the engine itself has a problem."
+ },
+ "Current decision": {
+  "title": "Latest engine decision",
+  "body": "The most recent decision the engine produced — irrigate, wait, or a phase change. Useful for sanity-checking: if it says irrigate but nothing fires, check the arm switches, pump power and zone valves. The reasoning trail is in the activity feed below."
+ },
+ "AI heartbeat": {
+  "title": "Engine health pulse",
+  "body": "A health pulse the engine publishes every cycle, shown with minutes since the last beat. healthy plus a low age means the app is looping normally; a stale age or any other value means the engine has stalled — restart AppDaemon and check its log. Watering stops silently when this dies, so treat a stale heartbeat as urgent."
+ },
+ "P2 VWC adjusted": {
+  "title": "EC-adjusted re-water threshold",
+  "body": "The effective P2 re-water threshold after the EC adjustment. When pore EC runs above target the engine raises this (waters wetter to flush salts); below target it lowers it (drier, stacks EC). Compare it with the per-zone base thresholds to see how hard the EC loop is leaning on irrigation.",
+  "doc": "docs/SYSTEM_OVERVIEW.md#ec-stacking-autonomous-p2"
+ },
+ "Est. daily water": {
+  "title": "Predicted daily water need",
+  "body": "The engine's forecast of total irrigation the room needs today, in litres, built from recent usage and transpiration. Use it for tank planning — around 15 L/day means a 200 L tank covers roughly two weeks. Big day-to-day jumps usually track light intensity or VPD changes."
+ },
+ "Mode": {
+  "title": "Global steering mode",
+  "body": "The room-wide steering style every zone inherits by default. Vegetative waters wetter and more often with gentler drybacks to push structural growth; Generative runs drier, deeper drybacks and stacked EC to push flower. Changing it swaps which dryback target and EC targets the engine uses — zones can still override individually.",
+  "doc": "ENTITIES.md#4-selects"
+ },
+ "Field cap": {
+  "title": "Substrate field capacity",
+  "body": "The VWC percentage where the block cannot hold more water and anything extra becomes runoff — set to 60% here. The engine uses it as the ceiling for ramp-up shots and for runoff estimates. Set it from observation: saturate a block, let it drain for an hour, then read the VWC."
+ },
+ "Block wetness R1": {
+  "title": "Raw Row 1 block moisture",
+  "body": "Volumetric water content straight from the Row 1 substrate probe — one physical sensor, before any fusion or validation. Compare it against fused and average VWC to spot a drifting probe. This same probe also feeds the Climate-Sense substrate mapping."
+ },
+ "Block pore-EC R1": {
+  "title": "Raw Row 1 pore EC",
+  "body": "Pore-water EC straight from the Row 1 probe, in dS/m (numerically the same as mS/cm). It is the single-probe view behind the fused EC number. It reads lower when the block is very wet and concentrates as it dries — that swing is real physics, not sensor error."
+ },
+ "Block temp R1": {
+  "title": "Row 1 substrate temperature",
+  "body": "Root-zone temperature inside the Row 1 block. Roots want roughly 18 to 26 C — cooler slows uptake, warmer invites root disease and drops dissolved oxygen. This probe is also the root-temp source for the Climate-Sense alert lines."
+ },
+ "Back-left temp": {
+  "title": "Back-left corner temperature",
+  "body": "Air temperature from the second climate node in the back-left corner — the room's known hotspot. More than about 2 C above the main sensor flags an airflow problem worth fixing before touching climate setpoints. If the gradient tracks lights-on, the cause is internal circulation, not the cooling plant."
+ },
+ "Back-left VPD": {
+  "title": "Corner microclimate VPD",
+  "body": "VPD computed at the back-left corner node. Divergence from the room VPD reveals a microclimate — pockets of still, humid air breed mildew and drive uneven transpiration across the canopy. Keep corner and room VPD within a couple of tenths of a kPa of each other."
+ },
+ "Fused VWC": {
+  "title": "Fused substrate moisture estimate",
+  "body": "The engine's best single estimate of substrate water content — a validated, outlier-rejected fusion of all healthy probes. This is the number irrigation decisions actually run on, so trust it over any single raw probe. If it diverges hard from a raw reading, the sensor-health number usually explains why."
+ },
+ "Avg EC": {
+  "title": "Room-average pore EC",
+  "body": "Straight average of pore EC across all zone probes, in mS/cm. Good for a quick room-wide salt read; the fused EC is what the EC-stacking loop actually steers on. A big gap between this and the fused value means one probe is being discounted."
+ },
+ "Sensor health": {
+  "title": "Probe validation score",
+  "body": "Percentage of substrate sensors currently passing the engine's validation checks. 100% means all probes trusted; 83% means one is flagged — stuck, drifting or out of range — and excluded from fusion. Falling health means decisions ride on fewer probes, so find and reseat or replace the bad one."
+ },
+ "Next watering": {
+  "title": "Predicted next irrigation time",
+  "body": "The engine's forecast of when the next shot fires, from the live dryback rate and the active phase thresholds. It is a prediction, not a schedule — a faster dryback pulls it earlier. A time in the past with no shot fired means check the arm switches and pump."
+ },
+ "Last decision": {
+  "title": "Most recent decision string",
+  "body": "The last decision the engine emitted — irrigate, wait or a phase transition. Use it to confirm the engine is reacting to the conditions you are seeing on the tiles. The full trail lives in the activity feed."
+ },
+ "Last action": {
+  "title": "Latest engine action",
+  "body": "The newest entry from the engine's activity log — the last thing it actually did, for example a Zone 1 P2 shot. If decisions say irrigate but no actions appear here, the chain from decision to valve is broken: check arm switches, pump and zone relays."
+ },
+ "LED power": {
+  "title": "Row 2 LED power draw",
+  "body": "Live wattage of the F2-R2 LED fixture. It is the truthful lights-on and dim-level signal — 0 W during the day period means a fixture, contactor or controller problem regardless of what the schedule claims. The engine's photoperiod logic is what defines the grow-day, but this confirms the lights physically delivered."
+ },
+ "number.crop_steering_zone_1_p2_vwc_threshold": {
+  "title": "Zone 1 P2 re-water threshold",
+  "body": "During P2 maintenance, Zone 1 gets a top-up shot whenever its VWC falls to this percentage. Raise it to keep the zone wetter, lower it for deeper dives between shots. The EC loop nudges the working value automatically (see P2 VWC adjusted), bounded below by the emergency floor.",
+  "doc": "ENTITIES.md#p2--maintenance"
+ },
+ "number.crop_steering_zone_1_p2_shot_size": {
+  "title": "Zone 1 P2 shot size",
+  "body": "Size of each Zone 1 maintenance shot as a percent of substrate volume — 5% of a 10 L block is about 0.5 L per plant. Small shots of 3 to 6% keep EC stable and avoid runoff; bigger shots flush. If the zone saw-tooths hard or runs off at field capacity, shrink the shot and let frequency carry it.",
+  "doc": "ENTITIES.md#p2--maintenance"
+ },
+ "number.crop_steering_zone_2_p2_vwc_threshold": {
+  "title": "Zone 2 P2 re-water threshold",
+  "body": "During P2 maintenance, Zone 2 fires a top-up shot whenever its VWC drops to this percentage. Higher keeps the zone wetter (vegetative lean); lower allows deeper dives between shots (generative lean). The EC loop shifts the effective value automatically, and the P3 emergency floor backstops it.",
+  "doc": "ENTITIES.md#p2--maintenance"
+ },
+ "number.crop_steering_zone_2_p2_shot_size": {
+  "title": "Zone 2 P2 shot size",
+  "body": "Each Zone 2 maintenance shot as a percent of substrate volume. Typical is 3 to 6% — enough to lift VWC a few points without pushing runoff. Watch the zone's shots-today counter: many tiny shots is normal P2 behaviour, but constant shooting means the threshold or shot size needs rebalancing.",
+  "doc": "ENTITIES.md#p2--maintenance"
+ },
+ "number.crop_steering_zone_3_p2_vwc_threshold": {
+  "title": "Zone 3 P2 re-water threshold",
+  "body": "During P2 maintenance, Zone 3 gets a shot whenever its VWC falls to this percentage. Raise for wetter steering, lower for deeper drybacks between shots. The EC-stacking loop nudges the live value to chase the zone's EC target, bounded by the emergency floor below.",
+  "doc": "ENTITIES.md#p2--maintenance"
+ },
+ "number.crop_steering_zone_3_p2_shot_size": {
+  "title": "Zone 3 P2 shot size",
+  "body": "Each Zone 3 maintenance shot as a percent of substrate volume. Keep it in the 3 to 6% range for stable EC and minimal waste; larger shots dilute and flush. If pore EC will not stack, try a slightly smaller shot rather than a lower threshold first.",
+  "doc": "ENTITIES.md#p2--maintenance"
+ },
+ "select.crop_steering_zone_1_steering_mode": {
+  "title": "Zone 1 steering mode",
+  "body": "Per-zone override of the steering style for Zone 1. Vegetative means wetter, frequent feeds with gentler drybacks and lower EC targets; Generative means drier, deeper drybacks and stacked EC for flower push. It selects which dryback and EC targets this zone runs on — keep zones matched unless deliberately running a comparison."
+ },
+ "select.crop_steering_zone_2_steering_mode": {
+  "title": "Zone 2 steering mode",
+  "body": "Per-zone steering style for Zone 2, overriding the global mode. Vegetative steers wet and frequent; Generative steers dry and salty for bud development. Changing it immediately swaps the dryback target and EC targets the engine applies to this zone."
+ },
+ "select.crop_steering_zone_3_steering_mode": {
+  "title": "Zone 3 steering mode",
+  "body": "Per-zone steering style for Zone 3. Vegetative favours wetter blocks and gentler drybacks for growth; Generative favours deeper drybacks and higher pore EC for flower. Use a per-zone override when one zone's plants are at a different stage or vigour than the rest."
+ },
+ "Pump": {
+  "title": "Main pump power draw",
+  "body": "Live wattage of the main irrigation pump. Near 0 W means idle; it should only jump during a shot, and the value turns amber above 100 W as a running flag. A pump drawing power with no matching shot in the activity feed means a manual run or a stuck relay — investigate."
+ },
+ "Next shot": {
+  "title": "Predicted next shot time",
+  "body": "When the engine expects to fire the next irrigation, from its prediction sensor. It moves with the live dryback rate, so treat it as an estimate rather than a schedule. If it sits in the past while the blocks keep drying, confirm the system and auto-irrigation switches are armed."
  }
 }
