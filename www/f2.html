@@ -452,11 +452,19 @@
     </div>
     <nav class="flex-1 py-3 px-2 space-y-1 overflow-y-auto scrollx">
       <template x-for="item in nav" :key="item.id">
-        <button @click="go(item.id)" @mouseenter="tipShow($event,'nav:'+item.id,item.label)" @mouseleave="tipHide()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60" :class="view===item.id&&'nav-active font-medium'" :title="item.label">
-          <span x-html="icons[item.icon]" class="w-5 h-5 shrink-0 block"></span>
-          <span x-show="sidebarOpen" x-text="item.label" class="truncate"></span>
-          <span x-show="sidebarOpen && item.id==='alerts' && adv.length" x-text="adv.length" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-semibold"></span>
-        </button>
+        <div>
+          <button @click="go(item.id)" @mouseenter="tipShow($event,'nav:'+item.id,item.label)" @mouseleave="tipHide()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60" :class="view===item.id&&'nav-active font-medium'" :title="item.label">
+            <span x-html="icons[item.icon]" class="w-5 h-5 shrink-0 block"></span>
+            <span x-show="sidebarOpen" x-text="item.label" class="truncate"></span>
+            <span x-show="sidebarOpen && item.subs" class="ml-auto text-[10px] text-slate-600" x-text="view===item.id?'▾':'▸'"></span>
+          </button>
+          <!-- folder-tree section index — expands for the active tab, jumps straight to the section -->
+          <div x-show="sidebarOpen && view===item.id && item.subs" x-cloak class="ml-5 pl-3 border-l border-white/10 mb-1">
+            <template x-for="s in (item.subs||[])" :key="s[1]">
+              <button @click="solve({view:item.id,anchor:s[1]})" class="w-full text-left px-2 py-1.5 rounded-lg text-[12px] text-slate-400 hover:text-emerald-300 hover:bg-white/5 transition truncate" x-text="s[0]"></button>
+            </template>
+          </div>
+        </div>
       </template>
     </nav>
     <div class="p-2 border-t border-white/8">
@@ -600,11 +608,12 @@
             </div>
             <!-- room camera -->
             <div class="glass rounded-2xl p-3">
-              <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.eye" class="w-4 h-4 block text-emerald-400"></span> Room camera</h3><span class="text-[11px] text-slate-500">refreshes ~30s</span></div>
-              <template x-if="camUrl">
+              <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.eye" class="w-4 h-4 block text-emerald-400"></span> Room camera</h3>
+                <button @click="camToggle()" class="text-[11px] text-slate-500 hover:text-slate-300 px-1.5 py-0.5 rounded hover:bg-white/5" x-text="camMin?'▸ show':'▾ hide'"></button></div>
+              <template x-if="!camMin && camUrl">
                 <img :src="camUrl" class="w-full rounded-xl border border-white/8 bg-black block" style="height:240px;object-fit:cover" alt="F2 room camera" @error="$el.style.opacity='0.25'" @load="$el.style.opacity='1'">
               </template>
-              <div x-show="!camUrl" class="rounded-xl border border-white/8 bg-black/40 grid place-items-center text-center px-4" style="height:240px">
+              <div x-show="!camMin && !camUrl" class="rounded-xl border border-white/8 bg-black/40 grid place-items-center text-center px-4" style="height:240px">
                 <div class="text-[11px] text-slate-500">Camera feed unavailable<span x-show="demo"> in demo</span>.</div>
               </div>
             </div>
@@ -621,7 +630,7 @@
 
         <!-- live sensor snapshot (all key sensors, glanceable) -->
         <div>
-          <div class="flex items-center justify-between mb-2"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Live snapshot</h2><span class="text-[11px] text-slate-500">every key sensor · adjust in <button @click="solve({view:'climate',anchor:'cl-controls'})" class="text-emerald-300/80 hover:text-emerald-300">Climate</button> / <button @click="solve({view:'zones',anchor:'zones-list'})" class="text-emerald-300/80 hover:text-emerald-300">Zones</button></span></div>
+          <div id="st-snapshot" class="flex items-center justify-between mb-2 scroll-mt-28"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Live snapshot</h2><span class="text-[11px] text-slate-500">every key sensor · adjust in <button @click="solve({view:'climate',anchor:'cl-controls'})" class="text-emerald-300/80 hover:text-emerald-300">Climate</button> / <button @click="solve({view:'zones',anchor:'zones-list'})" class="text-emerald-300/80 hover:text-emerald-300">Zones</button></span></div>
           <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
             <template x-for="s in snapshot" :key="s.label">
               <div class="glass rounded-xl p-3"><div class="text-[10px] uppercase tracking-wider text-slate-400 flex items-center"><span class="truncate" x-text="s.label"></span><span class="tipi" @mouseenter="tipShow($event,s.label)" @mouseleave="tipHide()" @click.stop="tipShow($event,s.label)">ⓘ</span></div>
@@ -632,7 +641,7 @@
         </div>
 
         <!-- facility floor mini → opens the 3D twin -->
-        <button @click="go('floor')" class="glass rounded-2xl p-4 w-full text-left hover:border-white/15 lift block">
+        <button id="st-floor" @click="go(floor)" class="glass rounded-2xl p-4 w-full text-left hover:border-white/15 lift block scroll-mt-28">
           <div class="flex items-center justify-between mb-3"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.grid" class="w-4 h-4 block text-emerald-400"></span> Facility floor</h2><span class="text-[11px] text-emerald-300/80">open 3D twin →</span></div>
           <div class="flex items-center gap-4">
             <div class="grid grid-cols-2 grid-rows-2 gap-1.5 w-44 h-28 shrink-0">
@@ -652,7 +661,7 @@
 
         <!-- plant state gauges -->
         <div>
-          <div class="flex items-center justify-between mb-3"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.lung" class="w-4 h-4 block text-emerald-400"></span> How the plant is doing</h2><span class="text-[11px] text-slate-500">inferred from many sensors</span></div>
+          <div id="st-plant" class="flex items-center justify-between mb-3 scroll-mt-28"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.lung" class="w-4 h-4 block text-emerald-400"></span> How the plant is doing</h2><span class="text-[11px] text-slate-500">inferred from many sensors</span></div>
           <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
             <template x-for="g in plant" :key="g.label">
               <div class="glass rounded-2xl p-4 lift hover:border-white/15">
@@ -670,7 +679,7 @@
         <!-- trends + AI -->
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <div class="xl:col-span-2 glass rounded-2xl p-4 md:p-5">
-            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Substrate · last 24h</h3><span class="text-[11px] text-slate-500">per-zone VWC — real history, the steering rhythm</span></div>
+            <div id="st-trends" class="flex items-center justify-between mb-3 scroll-mt-28"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Substrate · last 24h</h3><span class="text-[11px] text-slate-500">per-zone VWC — real history, the steering rhythm</span></div>
             <div class="h-60"><canvas id="trendChart"></canvas></div>
           </div>
           <div class="glass rounded-2xl p-4 md:p-5 flex flex-col">
@@ -753,13 +762,17 @@
       <!-- ===== CLIMATE ===== -->
       <section x-show="view==='climate'" class="fade-enter space-y-4">
         <!-- room camera -->
-        <div class="glass rounded-2xl p-3" x-show="camUrl" x-cloak>
-          <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.eye" class="w-4 h-4 block text-emerald-400"></span> Room camera</h3><span class="text-[11px] text-slate-500">F2 · refreshes ~30s</span></div>
-          <img :src="camUrl" class="w-full rounded-xl border border-white/8 bg-black" style="aspect-ratio:16/9;object-fit:contain;max-height:420px" alt="F2 room camera" @error="$el.style.opacity='0.25'" @load="$el.style.opacity='1'">
+        <div id="cl-cam" class="glass rounded-2xl p-3 scroll-mt-28" x-show="camUrl" x-cloak>
+          <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.eye" class="w-4 h-4 block text-emerald-400"></span> Room camera</h3>
+            <div class="flex items-center gap-2"><span class="text-[11px] text-slate-500" x-show="!camMin">F2 · refreshes ~30s</span>
+              <button @click="camToggle()" class="text-[11px] text-slate-500 hover:text-slate-300 px-1.5 py-0.5 rounded hover:bg-white/5" x-text="camMin?'▸ show':'▾ hide'"></button></div></div>
+          <template x-if="!camMin">
+            <img :src="camUrl" class="w-full rounded-xl border border-white/8 bg-black" style="aspect-ratio:16/9;object-fit:contain;max-height:420px" alt="F2 room camera" @error="$el.style.opacity='0.25'" @load="$el.style.opacity='1'">
+          </template>
         </div>
         <!-- live metrics first — context for the controls below -->
         <div>
-          <h2 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Live climate</h2>
+          <h2 id="cl-live" class="text-sm font-semibold flex items-center gap-2 mb-3 scroll-mt-28"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Live climate</h2>
           <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             <template x-for="m in climate" :key="m.label">
               <div class="glass rounded-2xl p-4"><div class="text-[11px] uppercase tracking-wider text-slate-400 flex items-center"><span x-text="m.label"></span><span class="tipi" @mouseenter="tipShow($event,m.label)" @mouseleave="tipHide()" @click.stop="tipShow($event,m.label)">ⓘ</span></div><div class="text-2xl font-bold mt-1" :class="m.cls" x-text="m.val"></div><div class="text-[11px] text-slate-500" x-text="m.sub"></div></div>
@@ -768,7 +781,7 @@
         </div>
         <!-- 24h climate history -->
         <div class="glass rounded-2xl p-5">
-          <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Climate trends · last 24h</h3><span class="text-[11px] text-slate-500">shaded band = on-target range</span></div>
+          <div id="cl-trends" class="flex items-center justify-between mb-3 scroll-mt-28"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Climate trends · last 24h</h3><span class="text-[11px] text-slate-500">shaded band = on-target range</span></div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Air temp °C</div><div class="h-40"><canvas id="ccTemp"></canvas></div></div>
             <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Humidity %</div><div class="h-40"><canvas id="ccRh"></canvas></div></div>
@@ -810,13 +823,13 @@
         </template>
 
         <div class="glass rounded-2xl p-5">
-          <h3 class="text-sm font-semibold mb-3 flex items-center gap-2"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Room map — hotspot watch</h3>
+          <h3 id="cl-hotspot" class="text-sm font-semibold mb-3 flex items-center gap-2 scroll-mt-28"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Room map — hotspot watch</h3>
           <div class="grid grid-cols-2 gap-2 max-w-md">
             <template x-for="c in hotspotCells" :key="c.label"><div class="rounded-xl p-3 border flex items-center gap-2 text-sm font-medium" :class="cellClass(c.sev)" :style="c.span?'grid-column:1/-1':''"><span x-text="c.icon"></span><span x-text="c.label"></span><span class="ml-auto font-bold" x-text="c.val"></span></div></template>
           </div>
           <div class="text-[11px] text-slate-500 mt-3">Schematic. Back-left corner tracked separately — it runs hot.</div>
         </div>
-        <details class="glass rounded-2xl overflow-hidden">
+        <details id="cl-raw" class="glass rounded-2xl overflow-hidden scroll-mt-28">
           <summary class="cursor-pointer list-none p-4 text-sm text-slate-300 flex items-center gap-2"><span x-html="icons.doc" class="w-4 h-4 block"></span> All raw readings</summary>
           <div class="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
             <template x-for="r in raw" :key="r.label"><div class="flex justify-between py-2.5 border-b border-white/6 text-sm"><span class="text-slate-400 flex items-center" @mouseenter="tipShow($event,r.label)" @mouseleave="tipHide()"><span x-text="r.label"></span><span class="tipi">ⓘ</span></span><span class="font-semibold" :class="r.oob?'text-amber-400':''" x-text="r.val"></span></div></template>
@@ -1057,7 +1070,7 @@
           <div x-show="!relays.length" class="text-sm text-slate-500">No hardware relays found on this install.</div>
         </div>
         <div class="glass rounded-2xl p-5 space-y-3">
-          <h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.ai" class="w-4 h-4 block text-emerald-400"></span> Adaptive steering</h3>
+          <h3 id="op-adaptive" class="text-sm font-semibold flex items-center gap-2 scroll-mt-28"><span x-html="icons.ai" class="w-4 h-4 block text-emerald-400"></span> Adaptive steering</h3>
           <div class="flex items-center justify-between py-1"><span class="text-sm text-slate-300 flex items-center" @mouseenter="tipShow($event,control.adaptive.toggle.id,'Adaptive steering enabled')" @mouseleave="tipHide()"><span x-text="control.adaptive.toggle.label||'Adaptive steering enabled'"></span><span class="tipi">ⓘ</span></span>
             <button @click="ctrlToggle(control.adaptive.toggle.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="control.adaptive.toggle.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="control.adaptive.toggle.on&&'translate-x-5'"></span></button></div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1082,7 +1095,7 @@
             <div class="min-w-0 flex-1"><div class="text-sm font-semibold">Guardrails &amp; recipe</div><div class="text-[12px] text-slate-400">EC / pH limits, lights, dryback — edit in Tune.</div></div>
             <span x-html="icons.arrow" class="w-4 h-4 block text-emerald-300/80 shrink-0"></span>
           </button>
-          <div class="glass rounded-2xl p-5"><h3 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Engine</h3>
+          <div class="glass rounded-2xl p-5"><h3 id="op-engine" class="text-sm font-semibold flex items-center gap-2 mb-3 scroll-mt-28"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Engine</h3>
             <div class="divide-y divide-white/6"><template x-for="t in control.telemetry" :key="t.label"><div class="flex justify-between py-2 text-sm"><span class="text-slate-400 flex items-center" @mouseenter="tipShow($event,t.label)" @mouseleave="tipHide()"><span x-text="t.label"></span><span class="tipi">ⓘ</span></span><span class="font-semibold" :class="t.warn&&'text-amber-400'" x-text="t.val"></span></div></template></div></div>
         </div>
         <div class="glass rounded-2xl p-5"><h3 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.doc" class="w-4 h-4 block text-slate-400"></span> Recent activity</h3>
@@ -4126,7 +4139,15 @@ document.addEventListener('alpine:init', () => {
       scale:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M6 7l-4 7h8zM18 7l-4 7h8zM4 21h16"/></svg>`,
       flag:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></svg>`,
     },
-    nav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'climate',label:'Climate',icon:'thermo'},{id:'control',label:'Operate',icon:'radio'},{id:'tune',label:'Tune',icon:'scale'},{id:'timeline',label:'Plan',icon:'activity'},{id:'floor',label:'3D Floor',icon:'grid'}],
+    nav:[
+      {id:'dashboard',label:'Status',icon:'dashboard',subs:[['Advisories','advisories'],['Live snapshot','st-snapshot'],['Facility floor','st-floor'],['Plant state','st-plant'],['Substrate 24h','st-trends']]},
+      {id:'zones',label:'Zones',icon:'drop',subs:[['All zones','zones-list']]},
+      {id:'climate',label:'Climate',icon:'thermo',subs:[['Camera','cl-cam'],['Live climate','cl-live'],['Trends 24h','cl-trends'],['Room controls','cl-controls'],['Hotspot map','cl-hotspot'],['Raw readings','cl-raw']]},
+      {id:'control',label:'Operate',icon:'radio',subs:[['Strategy','op-strategy'],['Arm & pump','op-arm'],['Relays & solenoids','op-relays'],['Adaptive','op-adaptive'],['Zones glance','op-zones'],['Engine','op-engine']]},
+      {id:'tune',label:'Tune',icon:'scale',subs:[['Steering dial','tune-steer']]},
+      {id:'timeline',label:'Plan',icon:'activity'},
+      {id:'floor',label:'3D Floor',icon:'grid'}],
+    camMin:(function(){try{return localStorage.getItem('f2.camMin')==='1'}catch(e){return false}})(),
     floorLoaded:false,
     mobileNav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'climate',label:'Climate',icon:'thermo'},{id:'control',label:'Operate',icon:'radio'},{id:'ai',label:'AI',icon:'ai'}],
 
@@ -4273,6 +4294,7 @@ document.addEventListener('alpine:init', () => {
       if(isPump && !on && !confirm("Turn the MAIN PUMP on?\nMake sure a zone valve is open first — running against a closed line dead-heads the pump.")) return;
       this.ctrlSvc(id.split(".")[0],"toggle",{entity_id:id});
     },
+    camToggle(){ this.camMin=!this.camMin; try{localStorage.setItem('f2.camMin',this.camMin?'1':'0')}catch(e){} },
     tipShow(ev){ const t=tipGet.apply(null,[].slice.call(arguments,1)); if(!t){ return; } clearTimeout(this.tipT);
       const r=ev.currentTarget.getBoundingClientRect(), W=330, H=235;
       const x=Math.max(8,Math.min(innerWidth-W-8,r.left-10));
