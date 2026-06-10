@@ -1371,6 +1371,8 @@ let CHARTS={};   // Chart.js instances live here, NOT in Alpine state — Chart 
 let HIST={vpd:[],ec:[],vwc:[]};   // rolling chart history — module scope so NO Alpine-reactive array is ever handed to Chart.js (that triggers an Alpine<->Chart proxy infinite loop).
 const E=CONFIG.E;
 function getToken(){ try{ const t=JSON.parse(localStorage.getItem("hassTokens")); if(t&&t.access_token&&(!t.expires||t.expires>Date.now()+15000)) return t.access_token; }catch(e){} return CONFIG.LL_TOKEN||""; }   // skip an expired HA-frontend token and fall back to the long-lived token
+/* tiny localStorage JSON helper — persists per-browser UI prefs (tab, open cards, acked advisories) across reload/HA-restart */
+const ls={ get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
 function getAIKey(){ try{ const k=localStorage.getItem("f2_ai_key"); if(k) return k; }catch(e){} return (CONFIG.AI&&CONFIG.AI.key)||""; }   // scoped LiteLLM key: localStorage override, else the baked one
 async function fetchStates(){ const r=await fetch((CONFIG.HA_BASE||"")+"/api/states",{headers:{Authorization:"Bearer "+getToken()},cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status); const m={}; for(const e of await r.json()) m[e.entity_id]=e; return m; }
 async function svc(domain, service, data){ if(DEMO) return {};   // demo: writes are no-ops (optimistic UI only)
@@ -4151,15 +4153,15 @@ document.addEventListener('alpine:init', () => {
     floorLoaded:false,
     mobileNav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'climate',label:'Climate',icon:'thermo'},{id:'control',label:'Operate',icon:'radio'},{id:'ai',label:'AI',icon:'ai'}],
 
-    view:'dashboard', sidebarOpen:true, connected:false, connError:"",
-    cmdOpen:false, cmdQuery:"", aiOpen:false, aiInput:"", aiThinking:false, zoneModal:null, evOpen:null,
+    view:ls.get('f2.view','dashboard'), sidebarOpen:ls.get('f2.sidebar',true), connected:false, connError:"",
+    cmdOpen:false, cmdQuery:"", aiOpen:false, aiInput:"", aiThinking:false, zoneModal:null, evOpen:ls.get('f2.evOpen',null),
     pumpOpen:false, pump:{hw:[],sw:[],power:null,powerTxt:'—',anyHw:false,deadhead:false,pumpOn:false}, relays:[],
     tip:null, tipT:null,
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
     headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},telemetry:[],feed:[]}, ctrlZone:1,
-    climateCtl:[], ctlOpen:{}, snapshot:[], camUrl:'', spOpen:false, spItem:null, floorMini:[], tank:{pct:null,litres:null,sev:'ok',bar:'bg-emerald-500',pctText:'—',litresText:null,width:0}, activityFeed:[], hUser:{name:'Grower',initials:'F2'}, demo:DEMO,
-    notes:{}, toasts:[], _tid:0, _toastId:0, _acked:{},
+    climateCtl:[], ctlOpen:ls.get('f2.ctlOpen',{}), snapshot:[], camUrl:'', spOpen:false, spItem:null, floorMini:[], tank:{pct:null,litres:null,sev:'ok',bar:'bg-emerald-500',pctText:'—',litresText:null,width:0}, activityFeed:[], hUser:{name:'Grower',initials:'F2'}, demo:DEMO,
+    notes:{}, toasts:[], _tid:0, _toastId:0, _retry:0, _acked:(function(){ try{ const a=ls.get('f2.acked',{}),cut=Date.now()-18*3600e3,o={}; for(const k in a){ if(a[k]>cut) o[k]=a[k]; } return o; }catch(e){ return {}; } })(),
     aiMessages:[], aiSuggestions:["Any rooms drifting?","Why the hotspot?","How is the EC tracking?","Is dryback on target?"],
 
     init(){
@@ -4174,6 +4176,11 @@ document.addEventListener('alpine:init', () => {
       window.addEventListener('message',e=>{ if(e&&e.data&&e.data.type==='f2nav') this.floorNav(e.data); });   // deep-links from the 3D twin iframe
       this.$watch('zoneModal',v=>{ if(v) this.$nextTick(()=>this.mountZoneHist(v)); });
       this.$watch('cmdOpen',v=>{ if(v) this.$nextTick(()=>this.$refs.cmd&&this.$refs.cmd.focus()); });
+      // persist UI state so the panel remembers where you were across reload / HA restart
+      this.$watch('view',v=>ls.set('f2.view',v));
+      this.$watch('sidebarOpen',v=>ls.set('f2.sidebar',v));
+      this.$watch('ctlOpen',v=>ls.set('f2.ctlOpen',v),{deep:true});   // deep: ctlOpen[name] is mutated in place
+      this.$watch('evOpen',v=>ls.set('f2.evOpen',v));
     },
     async fetchUser(){   // live HA user → header chip (no name hardcoded in the repo)
       const tok=getToken(); if(!tok) return;   // demo / logged-out → keep generic 'Grower / F2'
@@ -4194,9 +4201,12 @@ document.addEventListener('alpine:init', () => {
     async tick(){
       if(DEMO){ S=seedDemo(); this.connected=true; this.connError=""; this.refresh(); return; }   // standalone demo, no network
       try{
-        S=await fetchStates(); this.connected=true; this.connError="";
+        const wasDown=!this.connected; S=await fetchStates(); this.connected=true; this.connError=""; clearTimeout(this._retry);
+        if(wasDown) this.fetchUser();   // reconnected → recover the header user chip
         this.refresh();
-      }catch(e){ this.connected=false; this.connError="Cannot reach Home Assistant ("+e.message+"). Showing last readings."; console.error('F2 tick error:', e && e.stack ? e.stack : e); }
+      }catch(e){ this.connected=false; this.connError="Cannot reach Home Assistant ("+e.message+"). Showing last readings."; console.error('F2 tick error:', e && e.stack ? e.stack : e);
+        clearTimeout(this._retry); this._retry=setTimeout(()=>this.tick(),3500);   // fast retry on drop (e.g. HA restart) instead of waiting the full poll cycle
+      }
     },
     refresh(){
       this.lightsOn=lightsOn(); this.ctx.flower=val("flower_progress")||val("grow_stage")||"F2";
@@ -4286,7 +4296,7 @@ document.addEventListener('alpine:init', () => {
         if(el){ el.scrollIntoView({behavior:(window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'), block:'center'});
                 el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),1600); } }); }); },
     seedTune(){ if(window.__tuneReseed) window.__tuneReseed(); },
-    async ctrlSvc(domain,service,data){ try{ await svc(domain,service,data); this.toast("Sent"); setTimeout(()=>this.tick(),700); }catch(e){ this.toast("Failed: "+e.message); } },
+    async ctrlSvc(domain,service,data){ try{ await svc(domain,service,data); this.toast("Sent"); setTimeout(()=>this.tick(),700); }catch(e){ this.toast(/401|403/.test(e.message)?"HA session expired — reload the page or re-log in to Home Assistant":"Failed: "+e.message); } },
     ctrlToggle(id,confirmArm){ if(confirmArm && !confirm("Toggle the arm state? This affects live irrigation.")) return; this.ctrlSvc(id.split(".")[0],"toggle",{entity_id:id}); },
     pumpToggle(id){
       const on=val(id)==="on", isPump=id==="switch.veg_main_pump";
@@ -4332,7 +4342,7 @@ document.addEventListener('alpine:init', () => {
     ctrlLightBri(id,pct){ this.ctrlSvc("light","turn_on",{entity_id:id,brightness_pct:parseInt(pct)}); },
     openZone(id){ this.zoneModal=id; },
     zoneById(id){ return this.zones.find(z=>z.id===id)||this.zones[0]; },
-    ackAlert(id){ this._acked[id]=true; this.adv=this.adv.filter(a=>a.id!==id); this.toast("Advisory acknowledged"); },
+    ackAlert(id){ this._acked[id]=Date.now(); ls.set('f2.acked',this._acked); this.adv=this.adv.filter(a=>a.id!==id); this.toast("Advisory acknowledged · stays dismissed ~18h"); },
     openInsight(ins){ this.aiOpen=true; this.aiMessages.push({role:'user',text:ins.title}); this.aiThinking=true; this.scrollAI(); setTimeout(()=>{ this.aiThinking=false; this.aiMessages.push({role:'ai',text:ins.body}); this.scrollAI(); },650); },
     saveNotes(){ try{ localStorage.setItem("f2.notes",JSON.stringify(this.notes)); }catch(e){} },
     toast(msg){ const id=++this._toastId; this.toasts.push({id,msg}); setTimeout(()=>{ this.toasts=this.toasts.filter(t=>t.id!==id); },2600); },
