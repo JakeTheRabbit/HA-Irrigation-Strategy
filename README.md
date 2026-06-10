@@ -3,10 +3,10 @@
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
 ![AppDaemon](https://img.shields.io/badge/AppDaemon-4-orange)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
-![Zones](https://img.shields.io/badge/Zones-1%E2%80%936-blue)
+![Zones](https://img.shields.io/badge/Zones-1%E2%80%9324+-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-![Decision-control dashboard — triage / exception centre](img/Dashboard%201.png)
+![F2 operator dashboard — Status tab](img/demo-status.png)
 
 > **Professional crop steering — without the $3,000 controller and the monthly subscription.**
 > If you already run Home Assistant and have moisture sensors in your substrate, you
@@ -149,8 +149,8 @@ hardware → substrate changes → sensors.** Every VWC update can trigger a re-
 
 | Feature | Why it matters |
 |---|---|
-| **Per-zone autonomy** | Each zone (up to 6) runs its own phase machine, targets, and steering mode. Row 1 can be ramping in P1 while Row 3 dries back in P3. |
-| **Sensor fusion** | Front/back sensor pairs per zone are averaged with IQR outlier rejection, so one flaky probe doesn't fire (or block) a shot. |
+| **Per-zone autonomy** | Each zone (the `.env` auto-detects any number; tested to 24) runs its own phase machine, targets, and steering mode. Row 1 can be ramping in P1 while Row 3 dries back in P3. |
+| **Sensor fusion** | Front/back sensor pairs per zone are averaged with outlier rejection (a downward z-score guard for VWC, so a probe dropping out can't trigger a phantom shot), so one flaky probe doesn't fire — or block — a shot. |
 | **Dryback detection** | Peak/valley detection on the VWC curve drives the P0 wait and the overnight target — the engine acts on *real* substrate behaviour, not a guess. |
 | **EC steering** | The current-EC ÷ target-EC ratio nudges the P2 threshold, so the system feeds and dries to hit your EC, not just your moisture. |
 | **Source-water gate** | Irrigation is blocked while source pH/EC are out of range — it won't push bad water into your slabs. |
@@ -163,7 +163,7 @@ hardware → substrate changes → sensors.** Every VWC update can trigger a re-
 | **Predictive overnight (P3)** | Each zone's *own* overnight dryback rate feeds the P3-start timing (was a shared room rate), with a buffer-safe cap so a zone lands on its target dryback by lights-on **without firing overnight emergency shots**. |
 | **Feed-lockout diagnostic** | When a low-VWC zone isn't being fed, it names the exact gate stopping it — tank empty, dosing, flush/fill, source-water gate, EC ceiling, safety lockout, phase pin, disabled, daily cap — and attaches it to the under-watered alert. |
 | **Manual pump modes** | `flush` / `fill` booleans hand the pump to the operator (hose-flood or tank dosing); the engine pauses its own shots and exempts the hardware watchdog while either is on. |
-| **Operator console** | One dependency-free responsive dashboard (`www/crop_steering.html`): a one-glance verdict + system-health checks, word-threshold zone status, an issues drawer with real timestamps, expandable graphs, per-field coaching tooltips, and clickable pump/valve toggles. |
+| **Operator console** | One dependency-free dashboard, `www/f2.html` — Status / Zones / Tune / Climate / Operate / Plan / 3D, with click-to-fix advisories (an issue links you straight to the control that resolves it). [Try it live](#live-demo-no-install). |
 
 ---
 
@@ -181,11 +181,15 @@ control), **Operate**, and **Plan** (the grow-week timeline planner). The live i
 camera, the interactive 3D facility twin, and the Ask-AI co-pilot.
 
 - **Hosted:** the link above (GitHub Pages — auto-enters demo mode).
-- **Locally:** open `www/f2.html?demo` in any browser. The older single-file console is at
-  `www/crop_steering.html?demo`.
+- **Locally:** open `www/f2.html?demo` in any browser.
 
 Drop `?demo` and load it from your Home Assistant (`/local/f2.html`, long-lived token stored only
 in your browser) to drive the real thing.
+
+**▶ See how it all connects — interactive 3D system map:**
+**[`www/system-map.html`](www/system-map.html)** — a standalone three.js diagram of the two layers,
+the entity contract between them, the pump→mainline→valve hardware sequence, and the sensor
+feedback loop. Open it locally or from Pages; no install, no data.
 
 ### Screenshots (from the demo)
 
@@ -292,11 +296,15 @@ doesn't apply to soil beds.
 
 ## Installation
 
-> **Strongly recommended:** install [Studio Code Server](https://github.com/hassio-addons/addon-vscode)
-> and drive the setup with [Claude Code](https://claude.ai/code). This system has to
-> be **matched to your exact entity IDs and substrate** — Claude Code can adapt the
-> mappings, tune thresholds against your real sensor data, and walk you through arming
-> it safely. The steps below are the manual path.
+> ### 🤖 Installing with an AI agent
+> This system has to be **matched to your exact entity IDs and substrate**, which is
+> exactly the kind of adapt-and-verify work an agent is good at. If you run
+> [Claude Code](https://claude.ai/code) (or similar) against your HA config — e.g. via
+> [Studio Code Server](https://github.com/hassio-addons/addon-vscode) — point it at
+> **[`docs/AGENT_INSTALL.md`](docs/AGENT_INSTALL.md)**: a precise, ordered runbook that
+> discovers your hardware entities, writes the `.env`, installs both layers, maps the
+> hardware, and verifies the engine is alive — with the actuation steps gated for your
+> explicit go. The steps below are the same path, done by hand.
 
 ### 1 · Install the integration
 
@@ -345,25 +353,25 @@ the engine alive.
 
 ### 5 · Build the dashboard
 
-Three ready-made dashboards ship in this repo — all built around **decision control**
-(*is the room applying the intended stress, at the right time, in the right zones, with
-trustworthy data, within safe limits?*) instead of a wall of sensors:
+Copy **[`www/f2.html`](www/f2.html)** to your HA `/config/www/` directory and open it at
+`http://<ha>:8123/local/f2.html`. That's the whole dashboard — desktop *and* mobile, every
+view in one file:
 
-| Dashboard | File | What it is |
-|---|---|---|
-| **Standalone — desktop** | [`www/crop_steering_dashboard.html`](www/crop_steering_dashboard.html) | Full decision UI: a triage exception centre, time-aligned steering trace with client-computed dryback, per-zone band gauges + raw probes, a guarded control surface, and a data-trust layer. Open `http://<ha>:8123/local/crop_steering_dashboard.html`. |
-| **Standalone — mobile** | [`www/crop_steering_mobile.html`](www/crop_steering_mobile.html) | The same five views, phone-first with a bottom tab bar. Add to home screen. |
-| **Native Lovelace** | [`crop_steering_lovelace.yaml`](crop_steering_lovelace.yaml) | A native HA dashboard where markdown + Jinja compute the live verdict / exception list / trust — and it covers **every** `crop_steering` entity. Paste into a new dashboard's raw-config editor. |
+- **Status** — advisories first (with click-to-fix: tap an issue, land on the control that
+  resolves it), the full live snapshot, plant-state gauges, the facility floor mini.
+- **Zones** — the per-zone cockpit: VWC / EC / dryback, water delivered, co-located setpoints.
+- **Tune** — the science-grounded visual setpoint editor (yield/potency models, limiting-factor
+  solver, multi-day driver charts).
+- **Climate**, **Operate**, **Plan** (grow-week timeline), and an embedded **3D** facility twin.
 
-The standalone pages need only a long-lived token (entered once, kept in your browser);
-they read live state + 24 h history from the HA REST API, and parse
-`sensor.crop_steering_activity_log` for the per-shot feed. Regenerate the Lovelace YAML
-with `scripts/build_lovelace.py`.
+It's dependency-free and needs only a long-lived token (entered once, kept in your browser); it
+reads live state + 24 h history from the HA REST API and parses `sensor.crop_steering_activity_log`
+for the per-shot feed. Add `?demo` to preview it on mock data with no HA at all.
 
-|  |  |
-|---|---|
-| ![Zones — band gauges + raw probes](img/Dashboard%202.png) | ![Steering trace](img/Dashboard%203.png) |
-| ![Control surface](img/Dashboard%204.png) | ![Mobile](img/Mobile%201.png) |
+**Prefer a native HA dashboard?** [`crop_steering_lovelace.yaml`](crop_steering_lovelace.yaml) is a
+pure-Lovelace alternative where markdown + Jinja compute the live verdict / exception list / trust
+and cover **every** `crop_steering` entity — paste it into a new dashboard's raw-config editor
+(regenerate with `scripts/build_lovelace.py`).
 
 ---
 
@@ -417,9 +425,10 @@ Full routine: `docs/operation_guide.md`. Mental model: `docs/SYSTEM_OVERVIEW.md`
 | `master_crop_steering_app.py` | The coordinator — decisions, phase logic, hardware sequencing, safety, activity feed |
 | `phase_state_machine.py` | Per-zone P0→P1→P2→P3 transitions |
 | `advanced_dryback_detection.py` | Peak/valley detection + dryback % |
-| `intelligent_sensor_fusion.py` | IQR outlier filtering + multi-sensor averaging |
-| `ml_irrigation_predictor.py` | Statistical trend analysis for shot timing |
+| `intelligent_sensor_fusion.py` | Multi-sensor averaging + outlier rejection |
 | `intelligent_crop_profiles.py` | Per-crop / per-stage parameter profiles |
+| `adaptive_steering.py` | Optional self-tuning layer (Vmax, dryback-derived P2, predictive P3) |
+| `ml_irrigation_predictor.py` | Trend-analysis scaffold — **currently inert** (see [`docs/CODE_REVIEW_FINDINGS.md`](docs/CODE_REVIEW_FINDINGS.md)); the live engine is deterministic |
 | `base_async_app.py` | Async base class shared by the modules |
 
 ```
@@ -443,16 +452,20 @@ tests/                             # unit tests (calculation helpers)
 | `crop_steering.execute_irrigation_shot` | `zone`, `duration_seconds` | Fire a shot through the safe hardware sequence |
 | `crop_steering.check_transition_conditions` | — | Evaluate + log the current decision reasoning |
 | `crop_steering.set_manual_override` | `zone` | Toggle per-zone manual control |
+| `crop_steering.custom_shot` | `target_zone`, `volume_ml`, `intent` | Volumetric shot (rescue / EC-rebalance / test) with intent tagging |
 
 ---
 
 ## Docs
 
 - **`docs/SYSTEM_OVERVIEW.md`** — the whole-stack mental model
+- **`docs/AGENT_INSTALL.md`** — step-by-step runbook for an AI agent to install + set up
 - **`docs/installation_guide.md`** — the long-form install walkthrough
 - **`docs/operation_guide.md`** — daily operator routine
 - **`docs/troubleshooting.md`** — when something's off
+- **`docs/CODE_REVIEW_FINDINGS.md`** — engine review: what's verified, what's inert, what's tracked
 - **`ENTITIES.md`** — every entity, explained
+- **`www/system-map.html`** — interactive 3D map of the architecture + data flow
 
 ---
 
