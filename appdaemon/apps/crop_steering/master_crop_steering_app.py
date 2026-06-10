@@ -5209,8 +5209,19 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         dryback_target = p0_data.target_dryback_percentage
                         current_dryback = p0_data.current_dryback_percentage
                         phase_duration = machine.get_phase_duration().total_seconds() / 60  # minutes
-                        
-                        if current_dryback >= dryback_target:
+
+                        # ALREADY-DRY BYPASS — after downtime (sensors or the whole system
+                        # off) a zone can enter P0 already below its P2 re-water threshold.
+                        # Dryback-from-peak reads 0% then (peak == current), so the zone
+                        # would strand the full P0 timeout while the crop sits below its
+                        # operating floor (observed live: zones at 25-38% VWC parked in P0).
+                        # Nothing left to dry back — go straight to P1.
+                        rewater = self._get_zone_number(zone_num, "number.crop_steering_p2_vwc_threshold", 60)
+                        if 0 < zone_vwc <= rewater:
+                            await self._transition_zone_to_phase(
+                                zone_num, 'P1',
+                                f'P0 bypass: VWC {zone_vwc:.1f}% already <= re-water threshold {rewater:.1f}%')
+                        elif current_dryback >= dryback_target:
                             await self._transition_zone_to_phase(zone_num, 'P1', f'Dryback complete: {current_dryback:.1f}%')
                         elif phase_duration >= p0_data.max_duration_minutes:
                             await self._transition_zone_to_phase(zone_num, 'P1', f'P0 timeout: {phase_duration:.0f} minutes')
