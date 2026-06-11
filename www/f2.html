@@ -1111,7 +1111,7 @@
                instant load, no model download, serves on the public demo too; in live embed it polls HA
                so rooms glow when their lights are on and a room click deep-links the dashboard -->
           <template x-if="view==='floor'">
-            <iframe src="./floorplan/index.html?embed&v=4" class="absolute inset-0 w-full h-full border-0 block" title="Facility 3D floor plan"></iframe>
+            <iframe src="./floorplan/index.html?embed&v=5" class="absolute inset-0 w-full h-full border-0 block" title="Facility 3D floor plan"></iframe>
           </template>
         </div>
         <div class="text-[11px] text-slate-500 mt-2 px-1 flex items-center gap-1.5"><span x-html="icons.grid" class="w-3.5 h-3.5 block"></span> Drag to orbit, scroll to zoom, right-drag to pan · lit rooms have their lights on · click a grow room to jump to its dashboard.</div>
@@ -4073,9 +4073,9 @@ window.tlInit=function(){
 const CLIMATE_GROUPS = [
   {name:'Climate setpoints', icon:'thermo', ids:['input_number.f2_setpoint_temp_day','input_number.f2_setpoint_rh','input_number.f2_setpoint_vpd','input_number.f2_target_vpd','input_number.f2_setpoint_leaf_temp','input_number.f2_setpoint_co2','input_number.f2_setpoint_ppfd','input_number.f2_setpoint_air_velocity','input_number.f2_setpoint_photoperiod','input_number.f2_setpoint_pwec','input_number.f2_setpoint_vwc']},
   {name:'AC / cooling', icon:'wind', ids:['climate.f2_ac_pid','climate.f2_ac_wall_f2_ac_wall','climate.f2_ac_door_f2_ac_door']},
-  {name:'Dehumidification', icon:'haze', ids:['humidifier.f2_dehumidifier','switch.f2_dehumidifiers_group','switch.f2_dehumidifiers_relay_1','switch.f2_dehumidifiers_relay_2','switch.f2_dehumidifiers_relay_3','switch.f2_dehumidifiers_relay_4']},
+  {name:'Dehumidification', icon:'haze', ids:['switch.f2_dehumidifiers_group','switch.f2_dehumidifiers_relay_1','switch.f2_dehumidifiers_relay_2','switch.f2_dehumidifiers_relay_3','switch.f2_dehumidifiers_relay_4']},
   {name:'CO₂', icon:'haze', ids:['switch.f2_co2','switch.f2_co2_led','input_number.f2_co2_target_input','input_number.f2_co2_day_target_input','input_number.f2_co2_night_target_input','input_number.f2_co2_tolerance_input','input_boolean.f2_co2_tank_empty','input_boolean.f2_co2_tank_replaced']},
-  {name:'Lighting', icon:'bulb', ids:['light.led_f2_r1_f2_r1_led','light.led_f2_r2_f2_r2_led','light.office_light_main_spectrum','light.under_canopy_1_veg_undercanopy_light_2','switch.f2_lights_contactor_ssr_f1_lights_contactor','light.f2_work_light','switch.f2_work_light']},
+  {name:'Lighting', icon:'bulb', ids:['light.led_f2_r1_f2_r1_led','light.led_f2_r2_f2_r2_led','light.office_light_main_spectrum','light.under_canopy_1_veg_undercanopy_light_2','switch.f2_lights_contactor_ssr_f1_lights_contactor','light.f2_work_light']},
   {name:'Room & access', icon:'radio', ids:['switch.f2_door_relay','switch.f2_detect_2','switch.f2_motion_2']},
   {name:'Climate-Sense thresholds', icon:'doc', collapsed:true, ids:['input_number.csig_f2_high_vpd','input_number.csig_f2_high_ec','input_number.csig_f2_high_ppfd','input_number.csig_f2_high_root_temp','input_number.csig_f2_low_root_temp','input_number.csig_f2_low_vwc','input_number.csig_f2_min_cooling','input_number.csig_f2_warm_leaf_delta','input_number.csig_f2_co2_enriched','input_number.csig_f2_co2_ppfd_min','input_number.csig_f2_cwsi_nwsb_intercept','input_number.csig_f2_cwsi_nwsb_slope','input_number.csig_f2_cwsi_wsb_delta']},
   {name:'Sensor mapping', icon:'doc', collapsed:true, ids:['input_text.csig_f2_air_temp','input_text.csig_f2_humidity','input_text.csig_f2_co2','input_text.csig_f2_ppfd','input_text.csig_f2_leaf_temp','input_text.csig_f2_root_temp','input_text.csig_f2_ec','input_text.csig_f2_vwc']},
@@ -4159,7 +4159,7 @@ document.addEventListener('alpine:init', () => {
     tip:null, tipT:null,
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
     headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
-    control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},telemetry:[],feed:[]}, ctrlZone:1,
+    control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},telemetry:[],feed:[]},
     climateCtl:[], ctlOpen:ls.get('f2.ctlOpen',{}), snapshot:[], camUrl:'', spOpen:false, spItem:null, floorMini:[], tank:{pct:null,litres:null,sev:'ok',bar:'bg-emerald-500',pctText:'—',litresText:null,width:0}, activityFeed:[], hUser:{name:'Grower',initials:'F2'}, demo:DEMO,
     notes:{}, toasts:[], _tid:0, _toastId:0, _retry:0, _acked:(function(){ try{ const a=ls.get('f2.acked',{}),cut=Date.now()-18*3600e3,o={}; for(const k in a){ if(a[k]>cut) o[k]=a[k]; } return o; }catch(e){ return {}; } })(),
     aiMessages:[], aiSuggestions:["Any rooms drifting?","Why the hotspot?","How is the EC tracking?","Is dryback on target?"],
@@ -4503,10 +4503,8 @@ function buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
     black: SM(0x16181c, { roughness: 0.6 }),
     safeBlue: SM(0x1f4fa3, { metalness: 0.45, roughness: 0.4 }),
     yellow: SM(0xf6b91e, { emissive: 0xcc8800, emissiveIntensity: 0.45 }),
-    pot: SM(0x222426, { roughness: 0.8 }),
     leaf: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }),
     light: SM(0xfafaf2, { emissive: 0xfff3d8, emissiveIntensity: 1.4 }),
-    tank: SM(0xdde2e4, { roughness: 0.5 }),
     co2: SM(0x7d8a7d, { metalness: 0.35, roughness: 0.5 }),
     wood: SM(0x9a7b58, { roughness: 0.7 }),
   };
@@ -4608,9 +4606,9 @@ function buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
   // ---------- floor tints (pickable room registers) ----------
   const GREEN = 0xd6e4d2, EPOXY = 0xeceee9, NEUTRAL = 0xe9e7df, CARPET = 0xded9cf;
   tint(gf, 0.15, 7.35, 4.8, 9.2, EPOXY, ['Flower Room 2 — 44 m²',
-    '3 × rolling bench 1.2×7.6 m · 2 × dehu (on benches) · 4 × carbon filter/fan · 2 wall AC + door AC · drug safe']);
+    '2 × mobile rack (1.6 × 7.6 m) on floor rails · LED bar canopy · freshly planted on Grodan blocks · dehus, filters, ACs, drug safe']);
   tint(gf, 9.88, 7.35, 4.8, 9.2, EPOXY, ['Flower Room 1 — 44 m²',
-    '3 × rolling bench 1.2×7.6 m · 2 × dehu (on benches) · 4 × carbon filter/fan · 2 wall AC + door AC · drug safe · 3500 m³/h horizontal airflow']);
+    '2 × mobile rack (1.6 × 7.6 m) on floor rails · LED bar canopy · late-flower canopy · 3500 m³/h horizontal airflow · dehus, filters, ACs, drug safe']);
   tint(gf, 5.10, 9.65, 4.63, 6.9, EPOXY, ['Veg / Prop / Mother — 32 m²',
     '4 × propagation bench · 2 × filter/fan · 2 × dehu · wall + door AC']);
   tint(gf, 5.10, 7.35, 4.63, 2.15, GREEN, ['Lobby', 'Airlock zone between flower rooms and veg/prop/mother']);
@@ -4622,7 +4620,9 @@ function buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
   tint(gf, 9.70, 1.75, 4.98, 3.2, GREEN, ['Kitchen', 'Counter + sink · fridge · disposal area · WC to the south']);
   tint(gf, 9.70, 0.4, 4.98, 1.2, 0xdde4ea, ['WC', '2 stalls + basins, entered from kitchen']);
   tint(gf, 0.15, 0.6, 1.8, 5.1, GREEN, ['Loading Zone — 9 m²', '4.6 m roller door · CO₂ tanks + manifold']);
-  tint(uf, 0.15, 0.15, 14.53, 4.9, CARPET, ['Office — open plan', 'Whole upper floor is the office · workstations + 13U rack at the south-east end']);
+  tint(uf, 0.15, 0.15, 9.0, 4.9, CARPET, ['Office — open plan', 'Open-plan zone west of the operations office']);
+  tint(uf, 9.3, 0.15, 5.38, 4.45, CARPET, ['Operations office — 24 m²',
+    'Microscope station · monitor desks · server rack · maintenance whiteboard · spare filtration (modelled from photo)']);
   tint(uf, 0.15, 6.45, 14.53, 10.1, CARPET, ['Office — open plan', 'Open-plan office · PTZ auto-tracking camera for roof intrusion coverage']);
   tint(uf, 0.15, 5.05, 9.55, 1.4, CARPET, ['Office — open plan', 'West of the stair void']);
   tint(uf, 14.2, 5.05, 0.48, 1.4, CARPET, ['Stair landing', 'Arrival from the kitchen-side stair']);
@@ -4654,10 +4654,13 @@ function buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
   for (const [a, b, c, d, ops] of WALLS_GF) wallRun(gf, a, b, c, d, H, T, ops, 0);
 
   const WALLS_UF = [
+    // perimeter + operations-office partition (door by the stair landing)
     [0.075, 0, 0.075, 16.7, []],
     [0, 16.625, 14.83, 16.625, []],
     [14.755, 0, 14.755, 16.7, []],
     [0, 0.075, 14.83, 0.075, []],
+    [9.225, 0.15, 9.225, 4.75, []],
+    [9.15, 4.675, 14.83, 4.675, [{ at: 5.1, w: 0.9, door: true }]],
   ];
   for (const [a, b, c, d, ops] of WALLS_UF) wallRun(uf, a, b, c, d, UH, T, ops, UB);
 
@@ -4699,69 +4702,189 @@ function buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
     uf.add(gr);
   }
 
-  // ---------- grow rooms: benches / plants / lights ----------
-  const plantSites = [];
+  // ---------- grow rooms: mobile racking + LED canopies (modelled from room photos) ----------
+  function cyl(r, h, mat, seg = 14) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat);
+    m.castShadow = m.receiveShadow = true;
+    return m;
+  }
+  M.tray = SM(0xb9c0b4, { roughness: 0.9 });
+  M.rail = SM(0x9aa0a6, { metalness: 0.6, roughness: 0.4 });
+
+  const barSites = [];   // LED canopy bars (instanced)
+  function mobileRack(parent, x0, y0, w, len, name) {
+    const g = new THREE.Group();
+    for (const lx of [x0 + 0.08, x0 + w - 0.08]) g.add(at(box(0.1, 0.12, len, M.dark), lx, y0 + len / 2, 0.24));
+    for (let i = 0; i < 4; i++)
+      for (const lx of [x0 + 0.1, x0 + w - 0.1])
+        g.add(at(box(0.09, 0.14, 0.18, M.black), lx, y0 + 0.5 + i * (len - 1) / 3, 0.1));
+    g.add(at(box(w, 0.05, len, M.tray), x0 + w / 2, y0 + len / 2, 0.75));
+    for (const lx of [x0 + 0.02, x0 + w - 0.02]) g.add(at(box(0.04, 0.12, len, M.white), lx, y0 + len / 2, 0.8));
+    const bays = 4;
+    for (let i = 0; i <= bays; i++) {
+      const yy = y0 + 0.06 + i * (len - 0.12) / bays;
+      for (const lx of [x0 + 0.05, x0 + w - 0.05]) g.add(at(box(0.08, 2.35, 0.06, M.white), lx, yy, 1.35));
+    }
+    for (const lx of [x0 + 0.05, x0 + w - 0.05]) g.add(at(box(0.07, 0.08, len, M.white), lx, y0 + len / 2, 2.46));
+    for (const [lx, dir] of [[x0 + 0.05, 1], [x0 + w - 0.05, -1]]) {
+      const dg = box(0.04, 0.04, 2.4, M.white);
+      at(dg, lx, y0 + len * 0.3, 1.6); dg.rotation.x = 0.62 * dir; g.add(dg);
+      const dg2 = box(0.04, 0.04, 2.4, M.white);
+      at(dg2, lx, y0 + len * 0.7, 1.6); dg2.rotation.x = -0.62 * dir; g.add(dg2);
+    }
+    for (const lx of [x0 + 0.3, x0 + w - 0.3]) g.add(at(box(0.05, 0.05, len, M.black), lx, y0 + len / 2, 2.18));
+    for (const lx of [x0 + 0.22, x0 + w - 0.22]) {
+      const tube = cyl(0.012, len - 0.2, M.white, 8); tube.geometry.rotateX(Math.PI / 2);
+      at(tube, lx, y0 + len / 2, 0.82); g.add(tube);
+    }
+    const nBars = Math.floor(len / 0.34);
+    for (let i = 0; i < nBars; i++) barSites.push({ x: x0 + w / 2, y: y0 + 0.25 + i * (len - 0.5) / (nBars - 1) });
+    tag(g, name, `Mobile rack on floor rails — ${w.toFixed(1)} × ${len.toFixed(1)} m deck, LED canopy at 2.2 m`);
+    parent.add(g);
+  }
+  // galvanised floor rails (racks slide sideways across the room)
+  for (const rx of [0.3, 10.03]) {
+    for (let i = 0; i < 5; i++) {
+      const rail = box(4.5, 0.025, 0.09, M.rail);
+      at(rail, rx + 2.25, 8.5 + i * 1.7, 0.014);
+      gf.add(rail);
+    }
+  }
+  mobileRack(gf, 0.35, 8.0, 1.6, 7.6, 'Mobile rack — Flower 2');
+  mobileRack(gf, 3.15, 8.0, 1.6, 7.6, 'Mobile rack — Flower 2');
+  mobileRack(gf, 10.1, 8.0, 1.6, 7.6, 'Mobile rack — Flower 1');
+  mobileRack(gf, 12.9, 8.0, 1.6, 7.6, 'Mobile rack — Flower 1');
+
+  // veg/prop/mother: 4 narrower propagation benches
   function bench(parent, x, y, w, len) {
     const g = new THREE.Group();
     const top = box(w, 0.05, len, M.benchTop); at(top, x + w / 2, y + len / 2, 0.72); g.add(top);
     for (const fy of [y + 0.15, y + len / 2, y + len - 0.15])
       for (const fx of [x + 0.08, x + w - 0.08])
         g.add(at(box(0.05, 0.68, 0.05, M.frame), fx, fy, 0.34));
-    g.add(at(box(0.05, 0.05, len - 0.3, M.frame), x + 0.08, y + len / 2, 0.36));
-    g.add(at(box(0.05, 0.05, len - 0.3, M.frame), x + w - 0.08, y + len / 2, 0.36));
-    tag(g, 'Rolling bench', `${w.toFixed(1)} × ${len.toFixed(1)} m — ${(w * len).toFixed(2)} m² canopy`);
+    tag(g, 'Propagation bench', `${w.toFixed(1)} × ${len.toFixed(1)} m`);
     parent.add(g);
-    return g;
   }
-  function lightBar(parent, x, y, len) {
-    const b = box(0.12, 0.05, len, M.light);
-    at(b, x, y, 2.3); b.castShadow = false;
-    tag(b, 'Grow light bar', 'LED bar over bench, 2.3 m');
-    parent.add(b);
-  }
-  function addPlants(cx, y0, len, cols, rows, s) {
-    for (let r = 0; r < rows; r++)
-      for (const off of cols)
-        plantSites.push({ x: cx + off, y: y0 + (r + 0.5) * len / rows, s });
-  }
-
-  const FLOWER_BENCH = [
-    { edges: [0.45, 1.95, 3.45] },
-    { edges: [10.18, 11.68, 13.18] }
-  ];
-  for (const fb of FLOWER_BENCH)
-    for (const e of fb.edges) {
-      bench(gf, e, 8.0, 1.2, 7.6);
-      addPlants(e + 0.6, 8.0, 7.6, [-0.3, 0.3], 13, 1.0);
-      lightBar(gf, e + 0.35, 11.8, 7.2);
-      lightBar(gf, e + 0.85, 11.8, 7.2);
-    }
   for (const e of [5.39, 6.48, 7.57, 8.66]) {
     bench(gf, e, 10.2, 0.8, 5.7);
-    addPlants(e + 0.4, 10.2, 5.7, [-0.18, 0.18], 9, 0.55);
-    lightBar(gf, e + 0.4, 13.05, 5.4);
+    const b = box(0.12, 0.05, 5.4, M.light);
+    at(b, e + 0.4, 13.05, 2.3); b.castShadow = false;
+    tag(b, 'Grow light bar', 'LED bar over bench, 2.3 m');
+    gf.add(b);
   }
 
+  // instanced LED canopy bars over the flower racks
   {
-    const n = plantSites.length;
-    const pots = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.105, 0.085, 0.16, 10), M.pot, n);
-    const canopy = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.21, 1), M.leaf, n);
-    pots.castShadow = canopy.castShadow = true;
-    const d = new THREE.Object3D(), c = new THREE.Color();
-    plantSites.forEach((p, i) => {
-      d.position.set(p.x, 0.80, -p.y); d.scale.setScalar(p.s); d.updateMatrix();
-      pots.setMatrixAt(i, d.matrix);
-      const s = p.s * (0.85 + Math.random() * 0.3);
-      d.position.set(p.x, 0.88 + 0.18 * s, -p.y);
-      d.scale.set(s, s * 0.85, s); d.updateMatrix();
-      canopy.setMatrixAt(i, d.matrix);
-      c.setHSL(0.32 + Math.random() * 0.04, 0.45, 0.30 + Math.random() * 0.08);
-      canopy.setColorAt(i, c);
+    const bars = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1.72, 0.035, 0.07),
+      SM(0xfaf8f2, { emissive: 0xffe9da, emissiveIntensity: 1.8 }), barSites.length);
+    bars.castShadow = false;
+    const d = new THREE.Object3D();
+    barSites.forEach((p, i) => {
+      d.position.set(p.x, 2.16, -p.y); d.rotation.set(0, 0, 0); d.scale.setScalar(1);
+      d.updateMatrix(); bars.setMatrixAt(i, d.matrix);
     });
-    pots.instanceMatrix.needsUpdate = true;
-    canopy.instanceMatrix.needsUpdate = true;
-    if (canopy.instanceColor) canopy.instanceColor.needsUpdate = true;
-    gf.add(pots, canopy);
+    bars.instanceMatrix.needsUpdate = true;
+    gf.add(bars);
+  }
+
+  // instanced Grodan blocks + plants, stage-aware per room
+  {
+    const blockSites = [], babySites = [], bloomSites = [], colaSites = [];
+    // Flower 2: freshly planted — young plants on blocks, 3 columns per rack
+    for (const cx of [1.15, 3.95])
+      for (const off of [-0.55, 0, 0.55])
+        for (let r = 0; r < 12; r++) {
+          const y = 8.45 + r * 0.58;
+          blockSites.push({ x: cx + off, y, h: 0.84 });
+          babySites.push({ x: cx + off, y, s: 0.45 + Math.random() * 0.3 });
+        }
+    // Veg: small plants on blocks on the benches
+    for (const e of [5.39, 6.48, 7.57, 8.66])
+      for (const off of [-0.18, 0.18])
+        for (let r = 0; r < 9; r++) {
+          const y = 10.5 + r * 0.57;
+          blockSites.push({ x: e + 0.4 + off, y, h: 0.81 });
+          babySites.push({ x: e + 0.4 + off, y, s: 0.38 + Math.random() * 0.2 });
+        }
+    // Flower 1: continuous late-flower canopy + standing colas
+    for (const cx of [10.9, 13.7])
+      for (const off of [-0.6, -0.2, 0.2, 0.6])
+        for (let r = 0; r < 18; r++)
+          bloomSites.push({ x: cx + off, y: 8.3 + r * 0.41, s: 0.95 + Math.random() * 0.5 });
+    for (const cx of [10.9, 13.7])
+      for (const off of [-0.45, 0.05, 0.5])
+        for (let r = 0; r < 9; r++)
+          colaSites.push({ x: cx + off + (Math.random() - 0.5) * 0.2, y: 8.6 + r * 0.8, s: 0.8 + Math.random() * 0.5 });
+
+    const d = new THREE.Object3D(), c = new THREE.Color();
+    const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(0.15, 0.13, 0.15),
+      SM(0xf0ede6, { roughness: 0.95 }), blockSites.length);
+    blockSites.forEach((p, i) => {
+      d.position.set(p.x, p.h, -p.y); d.rotation.set(0, 0, 0); d.scale.setScalar(1);
+      d.updateMatrix(); blocks.setMatrixAt(i, d.matrix);
+    });
+    const baby = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.16, 1), M.leaf, babySites.length);
+    babySites.forEach((p, i) => {
+      d.position.set(p.x, 0.92 + 0.14 * p.s, -p.y); d.scale.set(p.s, p.s * 1.25, p.s);
+      d.updateMatrix(); baby.setMatrixAt(i, d.matrix);
+      c.setHSL(0.32 + Math.random() * 0.04, 0.5, 0.34 + Math.random() * 0.08);
+      baby.setColorAt(i, c);
+    });
+    const bloom = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.24, 1), M.leaf, bloomSites.length);
+    bloomSites.forEach((p, i) => {
+      d.position.set(p.x, 1.05 + 0.12 * p.s, -p.y); d.scale.set(p.s, p.s * 0.8, p.s);
+      d.updateMatrix(); bloom.setMatrixAt(i, d.matrix);
+      const purple = Math.random() < 0.45;
+      c.setHSL(purple ? 0.79 : 0.3, purple ? 0.18 : 0.3, 0.38 + Math.random() * 0.14);
+      bloom.setColorAt(i, c);
+    });
+    const cola = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.13, 1), M.leaf, colaSites.length);
+    colaSites.forEach((p, i) => {
+      d.position.set(p.x, 1.32 + 0.18 * p.s, -p.y); d.scale.set(p.s * 0.8, p.s * 2.6, p.s * 0.8);
+      d.updateMatrix(); cola.setMatrixAt(i, d.matrix);
+      const purple = Math.random() < 0.5;
+      c.setHSL(purple ? 0.8 : 0.27, 0.15, 0.5 + Math.random() * 0.15);
+      cola.setColorAt(i, c);
+    });
+    for (const m of [blocks, baby, bloom, cola]) {
+      m.castShadow = true;
+      m.instanceMatrix.needsUpdate = true;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      gf.add(m);
+    }
+  }
+
+  // clip fans, CO₂ + hose reel, roller stool (photo details)
+  function clipFan(parent, x, y, h, yaw) {
+    const g = new THREE.Group(); g.position.set(x, h, -y); g.rotation.y = DEG(yaw - 90);
+    const clamp = box(0.05, 0.09, 0.05, M.white); clamp.position.y = -0.14;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.013, 8, 18), M.white);
+    const blades = new THREE.Mesh(new THREE.CircleGeometry(0.085, 16),
+      new THREE.MeshStandardMaterial({ color: 0xdfe3e6, side: THREE.DoubleSide, roughness: 0.6 }));
+    blades.position.z = 0.005;
+    const hub = cyl(0.025, 0.05, M.white, 10); hub.geometry.rotateX(Math.PI / 2); hub.position.z = -0.03;
+    g.add(clamp, ring, blades, hub);
+    tag(g, 'Clip fan', 'Canopy airflow');
+    parent.add(g);
+  }
+  clipFan(gf, 0.45, 9.6, 1.9, 20); clipFan(gf, 4.65, 12.5, 1.9, 200); clipFan(gf, 2.55, 16.3, 2.0, 270);
+  clipFan(gf, 10.2, 9.6, 1.9, 20); clipFan(gf, 14.45, 12.5, 1.9, 200); clipFan(gf, 12.3, 16.3, 2.0, 270);
+  clipFan(gf, 7.0, 16.2, 1.9, 270);
+  {
+    const co2 = cyl(0.1, 1.2, M.steel, 14); at(co2, 12.05, 16.1, 0.6);
+    tag(co2, 'CO₂ cylinder', 'Room enrichment bottle, north end');
+    const reelMount = box(0.06, 0.2, 0.2, M.black); at(reelMount, 12.65, 16.4, 1.5);
+    const reel = cyl(0.16, 0.09, M.black, 18); reel.geometry.rotateX(Math.PI / 2);
+    at(reel, 12.65, 16.3, 1.5);
+    const rg = new THREE.Group(); rg.add(reelMount, reel);
+    tag(rg, 'Hose reel', 'Hand-water / wash-down reel');
+    const stoolBase = cyl(0.16, 0.03, M.dark, 14); at(stoolBase, 12.3, 10.5, 0.06);
+    const stoolPost = cyl(0.02, 0.32, M.black, 8); at(stoolPost, 12.3, 10.5, 0.24);
+    const stoolSeat = cyl(0.15, 0.05, SM(0xc23b2e, { roughness: 0.6 }), 16); at(stoolSeat, 12.3, 10.5, 0.43);
+    const sg2 = new THREE.Group(); sg2.add(stoolBase, stoolPost, stoolSeat);
+    tag(sg2, 'Roller stool', 'Aisle work seat');
+    gf.add(co2, rg, sg2);
   }
 
   // ---------- climate equipment ----------
@@ -4796,13 +4919,13 @@ function buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
     parent.add(g);
   }
   const FLOWER_EQ = [
-    { dehus: [[1.05, 15.0], [2.55, 8.7]], filters: [[1.8, 13.5], [1.8, 10.5], [3.3, 13.5], [3.3, 10.5]],
+    { dehus: [[1.15, 15.0], [3.95, 8.7]], filters: [[1.15, 13.5], [1.15, 10.5], [3.95, 13.5], [3.95, 10.5]],
       wallAC: [[1.3, 7.49], [2.8, 7.49]], doorAC: [3.95, 7.49] },
-    { dehus: [[12.28, 15.0], [12.28, 8.7]], filters: [[11.53, 13.5], [11.53, 10.5], [13.03, 13.5], [13.03, 10.5]],
+    { dehus: [[10.9, 15.0], [13.7, 8.7]], filters: [[10.9, 13.5], [10.9, 10.5], [13.7, 13.5], [13.7, 10.5]],
       wallAC: [[12.0, 7.49], [13.5, 7.49]], doorAC: [10.68, 7.49] },
   ];
   for (const eq of FLOWER_EQ) {
-    for (const [x, y] of eq.dehus) mkDehu(gf, x, y, 0.75);
+    for (const [x, y] of eq.dehus) mkDehu(gf, x, y, 0.78);
     for (const [x, y] of eq.filters) mkFilter(gf, x, y);
     for (const [x, y] of eq.wallAC) mkAC(gf, x, y, 'Wall AC');
     mkAC(gf, eq.doorAC[0], eq.doorAC[1], 'Door AC');
@@ -4825,7 +4948,7 @@ function buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
     g.add(shaft, head);
     airGF.add(g);
   }
-  for (const r of [{ w: 1.05, e: 4.05 }, { w: 10.78, e: 13.78 }]) {
+  for (const r of [{ w: 1.15, e: 3.95 }, { w: 10.9, e: 13.7 }]) {
     for (const y of [9.5, 12.0, 14.5]) mkArrow(r.w, y, 90);
     for (const y of [10.8, 13.3, 15.8]) mkArrow(r.e, y, 270);
   }
@@ -4856,22 +4979,94 @@ function buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
   }
   for (const cx of [2.6, 3.55, 4.5, 5.45]) dryCabinet(gf, cx, 0.9, 4.9);
   mkDehu(gf, 2.4, 5.2);
+  // irrigation room — dosing wall + barrels + workbench (modelled from photo)
   {
-    const g = new THREE.Group();
-    for (const [x, y] of [[6.95, 4.7], [7.95, 4.7]]) {
-      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.6, 20), M.tank);
-      t.castShadow = true; t.position.set(x, 0.8, -y); g.add(t);
+    M.blue = SM(0x2456b8, { roughness: 0.6 });
+    M.tabScreen = SM(0x101720, { emissive: 0x1d2c4a, emissiveIntensity: 0.9, roughness: 0.4 });
+    const panel = box(0.05, 1.45, 3.3, M.white); at(panel, 6.38, 3.1, 1.55);
+    tag(panel, 'Dosing wall', 'Pump board · manifold · controller · dashboard tablet');
+    gf.add(panel);
+    const pg = new THREE.Group();
+    for (let i = 0; i < 6; i++) {
+      const yy = 1.85 + i * 0.26;
+      const head = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 14), M.white);
+      head.geometry.rotateZ(Math.PI / 2);
+      head.castShadow = true; head.position.set(6.45, 2.0, -yy);
+      const tube = box(0.018, 0.42, 0.018, M.dark); tube.position.set(6.44, 1.76, -yy);
+      pg.add(head, tube);
     }
-    for (let i = 0; i < 4; i++) {
-      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.0, 14), M.tank);
-      t.castShadow = true; t.position.set(6.65, 0.5, -(3.5 - i * 0.6)); g.add(t);
+    tag(pg, 'Dosing pumps', '6-channel peristaltic nutrient dosers');
+    gf.add(pg);
+    const mg2 = new THREE.Group();
+    const mani = cyl(0.035, 2.7, M.black, 12); mani.geometry.rotateX(Math.PI / 2);
+    at(mani, 6.48, 2.75, 1.52); mg2.add(mani);
+    for (let i = 0; i < 6; i++) {
+      const v = box(0.06, 0.09, 0.06, M.dark); at(v, 6.48, 1.85 + i * 0.26, 1.4); mg2.add(v);
     }
-    tag(g, 'Irrigation tank bank', '2 bulk reservoirs + 4 stock/dosing tanks (plan: blue circles)');
-    gf.add(g);
-    const cab = box(1.8, 0.9, 0.55, M.wood); at(cab, 7.5, 0.85, 0.45);
-    tag(cab, 'Fertigation cabinets', 'Dosing + controls, south wall');
-    const pump = box(0.3, 0.25, 0.35, M.dark); at(pump, 8.2, 0.85, 0.125);
-    gf.add(cab, pump);
+    const gauge = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.04, 14), M.white);
+    gauge.geometry.rotateZ(Math.PI / 2); gauge.position.set(6.47, 1.68, -3.5); mg2.add(gauge);
+    const sol = box(0.09, 0.12, 0.16, M.black); at(sol, 6.48, 4.0, 1.52); mg2.add(sol);
+    tag(mg2, 'Dosing manifold', 'Injection manifold, valves + pressure gauge');
+    gf.add(mg2);
+    for (const hh of [1.32, 1.18]) {
+      const pipe = cyl(0.025, 3.8, M.white, 10); pipe.geometry.rotateX(Math.PI / 2);
+      at(pipe, 6.46, 3.3, hh); gf.add(pipe);
+    }
+    const ctrl = box(0.08, 0.42, 0.32, M.white); at(ctrl, 6.42, 2.5, 2.5);
+    const ledG = box(0.012, 0.03, 0.03, SM(0x2dd06f, { emissive: 0x18c060, emissiveIntensity: 1.6 }));
+    at(ledG, 6.38, 2.42, 2.55);
+    const ledR = box(0.012, 0.03, 0.03, SM(0xe05545, { emissive: 0xc03020, emissiveIntensity: 1.6 }));
+    at(ledR, 6.38, 2.58, 2.55);
+    const cg3 = new THREE.Group(); cg3.add(ctrl, ledG, ledR);
+    tag(cg3, 'Irrigation controller', 'Enclosure with run/fault indicators');
+    gf.add(cg3);
+    const tab = box(0.03, 0.24, 0.34, M.tabScreen); at(tab, 6.42, 4.35, 1.55);
+    tag(tab, 'Dashboard tablet', 'Live zone dashboard on the wall');
+    gf.add(tab);
+    const bloomB = cyl(0.21, 0.62, M.blue, 18); at(bloomB, 7.05, 4.85, 0.31);
+    const bloomLid = cyl(0.215, 0.05, M.black, 18); at(bloomLid, 7.05, 4.85, 0.655);
+    const phMon = box(0.03, 0.12, 0.16, SM(0xeef0f2, { emissive: 0x1da6a0, emissiveIntensity: 0.5 }));
+    at(phMon, 6.42, 4.85, 1.05);
+    const bg2 = new THREE.Group(); bg2.add(bloomB, bloomLid, phMon);
+    tag(bg2, 'Bloom barrel — 60 L', 'Batch tank with pH/EC monitor');
+    gf.add(bg2);
+    const feedB = cyl(0.30, 0.93, M.blue, 20); at(feedB, 7.95, 4.7, 0.465);
+    const feedLid = cyl(0.305, 0.06, M.black, 20); at(feedLid, 7.95, 4.7, 0.96);
+    const feedPump = box(0.3, 0.13, 0.16, M.dark); at(feedPump, 7.95, 4.7, 1.05);
+    const fg2 = new THREE.Group(); fg2.add(feedB, feedLid, feedPump);
+    tag(fg2, 'Feed barrel — 220 L', 'Main batch reservoir with top pump');
+    gf.add(fg2);
+    const bg3 = new THREE.Group();
+    const benchTop = box(0.55, 0.05, 1.7, M.wood); at(benchTop, 6.62, 1.85, 0.85); bg3.add(benchTop);
+    for (const ly of [1.05, 2.65]) for (const lx of [6.42, 6.82])
+      bg3.add(at(box(0.05, 0.82, 0.05, M.black), lx, ly, 0.41));
+    bg3.add(at(box(0.5, 0.04, 1.6, M.dark), 6.62, 1.85, 0.22));
+    for (const jy of [1.25, 1.55])
+      bg3.add(at(box(0.17, 0.26, 0.17, M.white), 6.6, jy, 1.005));
+    bg3.add(at(box(0.05, 0.03, 0.6, SM(0xe8c020)), 6.62, 2.2, 0.895));
+    bg3.add(at(box(0.12, 0.06, 0.2, M.dark), 6.66, 2.5, 0.905));
+    tag(bg3, 'Workbench', 'Nutrient jugs, spirit level, tools');
+    gf.add(bg3);
+    const underBarrel = cyl(0.18, 0.5, M.blue, 16); at(underBarrel, 6.6, 2.1, 0.25);
+    tag(underBarrel, 'Stock barrel — 60 L', 'Under-bench batch barrel');
+    for (const jy of [1.2, 1.45]) gf.add(at(box(0.17, 0.3, 0.12, M.white), 6.62, jy, 0.15));
+    const bin = box(0.45, 0.85, 0.5, SM(0x2e4d33, { roughness: 0.8 })); at(bin, 6.62, 0.72, 0.425);
+    tag(bin, 'Wheelie bin', 'Green waste');
+    const stool1 = box(0.35, 0.2, 0.4, SM(0xd9531e)); at(stool1, 7.35, 1.3, 0.1);
+    const stool2 = box(0.25, 0.2, 0.28, SM(0xd9531e)); at(stool2, 7.38, 1.34, 0.3);
+    const stG = new THREE.Group(); stG.add(stool1, stool2);
+    tag(stG, 'Step stool', 'EasyStep');
+    gf.add(underBarrel, bin, stG);
+    const cart = new THREE.Group();
+    for (const hh of [0.28, 0.82]) cart.add(at(box(0.45, 0.04, 0.7, SM(0x9aa2a8)), 8.0, 1.0, hh));
+    for (const lx of [7.8, 8.2]) for (const ly of [0.7, 1.3])
+      cart.add(at(box(0.03, 0.84, 0.03, SM(0x80888e)), lx, ly, 0.42));
+    tag(cart, 'Utility cart', 'Fittings + tools trolley');
+    gf.add(cart);
+    const hose = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.014, 8, 24), SM(0x8a2f24));
+    hose.rotation.x = -Math.PI / 2; hose.position.set(7.5, 0.03, -2.7); hose.castShadow = true;
+    tag(hose, 'Hose coil', 'Wash-down hose on the floor');
+    gf.add(hose);
   }
   {
     const counter = box(3.0, 0.9, 0.6, M.white); at(counter, 11.5, 2.05, 0.45);
@@ -4917,30 +5112,225 @@ function buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
   mkRack(gf, 5.5, 9.41, 1.55, 6);
   mkRack(gf, 10.0, 7.04, 1.55, 6);
 
-  // ---------- upper floor: open-plan office, workstation cluster at the stair end ----------
+  // ---------- upper floor: operations office, rebuilt from the room photo ----------
   {
-    const deskA = box(0.7, 0.05, 2.4, M.wood); at(deskA, 14.3, 2.6, UB + 0.72);
-    const deskB = box(2.2, 0.05, 0.7, M.wood); at(deskB, 12.5, 0.55, UB + 0.72);
-    const g = new THREE.Group(); g.add(deskA, deskB);
-    for (const [px, py] of [[14.3, 1.45], [14.3, 3.75], [11.45, 0.55], [13.55, 0.55]]) {
-      const p = box(0.05, 0.7, 0.6, M.frame); at(p, px, py, UB + 0.36); g.add(p);
+    M.deskTop = SM(0xf4f5f6, { roughness: 0.45 });
+    M.legGray = SM(0x8a8f94, { metalness: 0.4, roughness: 0.5 });
+    M.screen = SM(0x10131a, { roughness: 0.3, emissive: 0x1a2740, emissiveIntensity: 0.7 });
+    M.red = SM(0xc23b2e, { roughness: 0.6 });
+    M.cardboard = SM(0xa8845c, { roughness: 0.95 });
+    M.filterWhite = SM(0xeae6dc, { roughness: 0.9 });
+
+    // west wall: maintenance whiteboard (canvas texture) + 2026 planner + leaning boards
+    {
+      const cv = document.createElement('canvas'); cv.width = 512; cv.height = 384;
+      const c = cv.getContext('2d');
+      c.fillStyle = '#fbfbf9'; c.fillRect(0, 0, 512, 384);
+      c.strokeStyle = '#b9c0c6'; c.lineWidth = 6; c.strokeRect(3, 3, 506, 378);
+      c.fillStyle = '#2a3036'; c.font = 'bold 22px sans-serif';
+      c.fillText('Daily Maintenance', 22, 40); c.fillText('Monthly Maintenance', 270, 40);
+      c.font = '15px sans-serif'; c.fillStyle = '#4a5258';
+      ['Assess tank pH & EC — F1 & F2', 'Verify recipe + dosing', '#F1 saturation check', '#F1 hand water',
+       '#F2 saturation', '#F2 hand water', 'Inspect stock tanks', 'Notes for handover']
+        .forEach((t, i) => c.fillText('· ' + t, 22, 72 + i * 26));
+      ['F1 tank clean', 'F2 tank clean', 'Manifold clean — now', 'Monthly reset due', 'Order plumbing for F1', 'Urgent tasks']
+        .forEach((t, i) => c.fillText('· ' + t, 270, 72 + i * 30));
+      const wb = new THREE.Mesh(new THREE.PlaneGeometry(1.25, 0.92),
+        new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(cv), roughness: 0.6 }));
+      wb.rotation.y = Math.PI / 2; wb.position.set(9.31, UB + 1.72, -1.7);
+      tag(wb, 'Maintenance whiteboard', 'Daily + monthly task lists, watering log');
+      const tray = box(0.04, 0.03, 1.1, M.steel); at(tray, 9.33, 1.7, UB + 1.24);
+      uf.add(wb, tray);
+
+      const pv = document.createElement('canvas'); pv.width = 256; pv.height = 384;
+      const p = pv.getContext('2d');
+      p.fillStyle = '#eef4fa'; p.fillRect(0, 0, 256, 384);
+      p.fillStyle = '#3f7fc2'; p.fillRect(0, 0, 256, 46);
+      p.fillStyle = '#ffffff'; p.font = 'bold 17px sans-serif'; p.fillText('Collins 2026 WALL PLANNER', 8, 30);
+      p.strokeStyle = '#b9cbdd';
+      for (let r = 0; r < 12; r++) for (let q = 0; q < 8; q++) p.strokeRect(8 + q * 30, 56 + r * 26, 30, 26);
+      const poster = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.96),
+        new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(pv), roughness: 0.85 }));
+      poster.rotation.y = Math.PI / 2; poster.position.set(9.30, UB + 1.78, -2.85);
+      tag(poster, '2026 wall planner', 'Collins year planner');
+      uf.add(poster);
+
+      const b1 = box(0.04, 1.2, 0.9, M.white); at(b1, 9.5, 0.9, UB + 0.62); b1.rotation.z = -0.16;
+      tag(b1, 'Spare whiteboard', 'Leaning on the office wall');
+      const b2 = box(0.03, 1.0, 0.8, SM(0xf6f3ea)); at(b2, 9.78, 0.7, UB + 0.52); b2.rotation.z = -0.22;
+      uf.add(b1, b2);
     }
-    const m1 = box(0.04, 0.3, 0.5, M.dark); at(m1, 14.45, 2.2, UB + 1.05);
-    const m2 = box(0.04, 0.3, 0.5, M.dark); at(m2, 14.45, 3.0, UB + 1.05);
-    const m3 = box(0.5, 0.3, 0.04, M.dark); at(m3, 12.3, 0.42, UB + 1.05);
-    g.add(m1, m2, m3);
-    tag(g, 'Office workstations', 'Monitoring desks at the stair end — triple displays');
-    uf.add(g);
-    for (const [cx, cy] of [[13.6, 2.6], [12.5, 1.35]]) {
-      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.08, 14), M.dark);
-      seat.position.set(cx, UB + 0.45, -cy); seat.castShadow = true;
-      const back = box(0.06, 0.45, 0.45, M.dark); at(back, cx - 0.22, cy, UB + 0.75);
-      uf.add(seat, back);
+
+    // shelving (west pair + east pair) + printer + drawers
+    function shelfU(x, y, wY, dX, h, tiers) {
+      const g = new THREE.Group();
+      for (const py of [y - wY / 2 + 0.03, y + wY / 2 - 0.03])
+        for (const px of [x - dX / 2 + 0.03, x + dX / 2 - 0.03])
+          g.add(at(box(0.05, h, 0.05, M.black), px, py, UB + h / 2));
+      for (let i = 0; i <= tiers; i++)
+        g.add(at(box(dX, 0.035, wY, M.wood), x, y, UB + 0.08 + i * ((h - 0.16) / tiers)));
+      return g;
     }
-    const printer = box(0.5, 0.35, 0.45, M.white); at(printer, 10.6, 0.55, UB + 0.175);
-    tag(printer, 'Printer', 'Office equipment');
+    const sh1 = shelfU(9.68, 0.95, 1.05, 0.45, 1.95, 4);
+    tag(sh1, 'Shelving — consumables', 'Power strips, gauges, jars');
+    const sh2 = shelfU(9.68, 2.15, 1.05, 0.45, 1.95, 4);
+    tag(sh2, 'Shelving — printer + stock', 'HP printer, boxed spares, cabling');
+    uf.add(sh1, sh2);
+    const printer = box(0.42, 0.3, 0.36, M.white); at(printer, 9.68, 2.15, UB + 1.13);
+    tag(printer, 'HP printer', 'Label + paperwork printer');
     uf.add(printer);
-    mkRack(uf, 14.3, 4.35, 0.45, 13, UB);
+    for (const [bx, by, bh] of [[9.68, 0.75, 0.6], [9.7, 1.2, 0.6], [9.66, 1.9, 0.6]])
+      uf.add(at(box(0.32, 0.22, 0.3, M.cardboard), bx, by, UB + bh + 0.11));
+
+    // floor filter spares + hung filtration rig
+    {
+      const g = new THREE.Group();
+      const f1 = cyl(0.18, 0.6, M.filterWhite); at(f1, 10.13, 3.25, UB + 0.3);
+      const f2 = cyl(0.15, 0.34, M.black); at(f2, 10.13, 3.25, UB + 0.77);
+      const f3 = cyl(0.16, 0.9, M.black); at(f3, 9.83, 3.8, UB + 0.45);
+      const f4 = cyl(0.13, 0.3, M.dark); at(f4, 9.83, 3.8, UB + 1.05);
+      g.add(f1, f2, f3, f4);
+      tag(g, 'Filter spares', 'Carbon filters + inline fans, floor stock');
+      uf.add(g);
+      const rig = new THREE.Group();
+      const mk2 = (y0, parts) => {
+        let yy = y0;
+        for (const [r, len, mat] of parts) {
+          const cc = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 16), mat);
+          cc.geometry.rotateX(Math.PI / 2); cc.castShadow = true;
+          cc.position.set(9.9, UB + 2.35, -(yy + len / 2));
+          rig.add(cc); yy += len;
+        }
+      };
+      mk2(1.1, [[0.16, 0.5, M.filterWhite], [0.13, 0.38, M.black], [0.11, 0.3, M.dark]]);
+      mk2(2.45, [[0.14, 0.45, M.filterWhite], [0.12, 0.36, M.black]]);
+      tag(rig, 'Spare filtration rig', 'Carbon filter + inline fans on straps');
+      uf.add(rig);
+    }
+
+    // desk island + monitors + microscope + clutter
+    function ssDesk(x, y, w, d2) {
+      const g = new THREE.Group();
+      g.add(at(box(w, 0.04, d2, M.deskTop), x, y, UB + 0.74));
+      for (const lx of [x - w / 2 + 0.25, x + w / 2 - 0.25]) {
+        g.add(at(box(0.1, 0.66, 0.12, M.legGray), lx, y, UB + 0.4));
+        g.add(at(box(0.12, 0.05, d2 - 0.15, M.legGray), lx, y, UB + 0.05));
+      }
+      return g;
+    }
+    const d1 = ssDesk(11.98, 2.05, 2.0, 0.8);
+    tag(d1, 'Workbench desk', 'Sit-stand desk — microscope + lab work');
+    const d2 = ssDesk(12.48, 2.85, 2.0, 0.8);
+    tag(d2, 'Monitor desk', 'Sit-stand desk — monitoring workstation');
+    uf.add(d1, d2);
+    function monitor(x, y, w, h, yaw) {
+      const g = new THREE.Group();
+      const pole = cyl(0.022, 0.42, M.black, 10); pole.position.y = 0.21; g.add(pole);
+      const scr = box(w, h, 0.03, M.screen); scr.position.set(0, 0.45, 0.22); g.add(scr);
+      g.position.set(x, UB + 0.76, -y); g.rotation.y = yaw;
+      return g;
+    }
+    const mons = new THREE.Group();
+    mons.add(monitor(12.28, 3.15, 0.92, 0.4, 0));
+    mons.add(monitor(13.23, 3.05, 0.6, 0.36, -0.5));
+    mons.add(monitor(11.63, 3.15, 0.36, 0.58, 0.25));
+    tag(mons, 'Monitors', 'Arm-mounted displays — dashboards + code');
+    uf.add(mons);
+    {
+      const ms = new THREE.Group();
+      ms.add(at(box(0.3, 0.04, 0.24, M.white), 11.28, 1.95, UB + 0.78));
+      const pole = cyl(0.025, 0.42, M.steel, 12); at(pole, 11.28, 2.05, UB + 1.0); ms.add(pole);
+      ms.add(at(box(0.1, 0.16, 0.2, M.white), 11.28, 1.93, UB + 1.18));
+      const glow = new THREE.Mesh(new THREE.CircleGeometry(0.045, 16),
+        new THREE.MeshBasicMaterial({ color: 0x66aaff }));
+      glow.rotation.x = -Math.PI / 2; glow.position.set(11.28, UB + 0.785, -1.95); ms.add(glow);
+      tag(ms, 'Trinocular microscope', 'Boom-arm scope — trichome + IPM checks');
+      uf.add(ms);
+      const roll = cyl(0.06, 0.24, M.white, 14); at(roll, 11.83, 1.9, UB + 0.88);
+      const bowl = cyl(0.09, 0.05, M.steel, 16); at(bowl, 11.58, 1.93, UB + 0.79);
+      const bot1 = cyl(0.035, 0.2, SM(0x2e2e34), 10); at(bot1, 12.13, 2.1, UB + 0.86);
+      const paper = box(0.28, 0.004, 0.2, M.white); at(paper, 11.78, 2.1, UB + 0.765);
+      uf.add(roll, bowl, bot1, paper);
+    }
+
+    // chairs: two red Sayl-style + one black
+    function sayl(x, y, yaw) {
+      const g = new THREE.Group();
+      for (let i = 0; i < 5; i++) {
+        const leg = box(0.26, 0.03, 0.05, M.black); leg.position.set(0.13, 0.04, 0);
+        const piv = new THREE.Group(); piv.add(leg); piv.rotation.y = i * Math.PI * 2 / 5; g.add(piv);
+      }
+      const gas = cyl(0.025, 0.25, M.black, 10); gas.position.y = 0.2; g.add(gas);
+      const seat = box(0.45, 0.06, 0.42, M.dark); seat.position.y = 0.45; g.add(seat);
+      const back = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.5, 14, 1, true, -0.7, 1.4),
+        new THREE.MeshStandardMaterial({ color: 0xc23b2e, roughness: 0.7, side: THREE.DoubleSide }));
+      back.castShadow = true; back.position.set(0, 0.78, 0.26); g.add(back);
+      g.position.set(x, UB, -y); g.rotation.y = yaw;
+      return g;
+    }
+    const reds = new THREE.Group();
+    reds.add(sayl(11.63, 1.3, 0.15)); reds.add(sayl(12.33, 1.2, -0.2));
+    tag(reds, 'Sayl chairs', 'Red mesh-back task chairs');
+    uf.add(reds);
+    {
+      const g = new THREE.Group();
+      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.08, 14), M.dark);
+      seat.position.set(13.63, UB + 0.5, -2.4); seat.castShadow = true;
+      const back = box(0.46, 0.6, 0.07, M.dark); at(back, 13.85, 2.4, UB + 0.88); back.rotation.z = -0.12;
+      g.add(seat, back);
+      tag(g, 'Task chair', 'Black office chair');
+      uf.add(g);
+    }
+
+    // east wall: server rack + organiser shelving + pedestal + bin
+    {
+      const g = new THREE.Group();
+      g.add(at(box(0.8, 2.05, 0.62, M.black), 14.23, 2.75, UB + 1.025));
+      g.add(at(box(0.02, 1.9, 0.56, SM(0x1d2025, { roughness: 0.4, metalness: 0.3 })), 13.81, 2.75, UB + 1.0));
+      for (let i = 0; i < 6; i++) {
+        const led = box(0.012, 0.02, 0.02, SM(0x2dd06f, { emissive: 0x18c060, emissiveIntensity: 1.5 }));
+        at(led, 13.8, 2.52 + (i % 3) * 0.16, UB + 0.4 + i * 0.24);
+        g.add(led);
+      }
+      const mon = box(0.5, 0.32, 0.03, M.screen); at(mon, 14.18, 2.75, UB + 2.22);
+      mon.rotation.y = -0.4; g.add(mon);
+      tag(g, 'Server rack', 'NVR · PoE switches · UPS head-end (replaces 13U symbol)');
+      uf.add(g);
+      const sh3 = shelfU(14.28, 1.0, 1.2, 0.45, 1.9, 4);
+      tag(sh3, 'Shelving — organiser drawers', 'White part drawers, consumables');
+      uf.add(sh3);
+      for (let t = 0; t < 3; t++) for (let i = 0; i < 2; i++)
+        uf.add(at(box(0.3, 0.34, 0.26, M.white), 14.28, 0.72 + i * 0.5, UB + 0.27 + t * 0.45));
+      const ped = box(0.4, 0.55, 0.5, M.white); at(ped, 13.63, 1.7, UB + 0.275);
+      tag(ped, 'Drawer pedestal', 'Under-desk drawers');
+      const bin2 = cyl(0.16, 0.4, M.white, 14); at(bin2, 14.13, 2.1, UB + 0.2);
+      uf.add(ped, bin2);
+    }
+
+    // north partition: AC head + backdrop sheet; floor clutter
+    {
+      const acB = box(0.92, 0.3, 0.22, M.white); at(acB, 12.23, 4.5, UB + 2.3);
+      const acV = box(0.8, 0.05, 0.02, M.dark); at(acV, 12.23, 4.39, UB + 2.18);
+      const acg = new THREE.Group(); acg.add(acB, acV);
+      tag(acg, 'Mini-split AC', 'Office climate head');
+      const sheet = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.5),
+        new THREE.MeshStandardMaterial({ color: 0xf5f5f2, roughness: 0.95, side: THREE.DoubleSide }));
+      sheet.position.set(13.2, UB + 1.4, -4.52); sheet.castShadow = true;
+      tag(sheet, 'Backdrop sheet', 'White photography / inspection backdrop');
+      uf.add(acg, sheet);
+      const bag = box(0.36, 0.42, 0.24, SM(0x2c2f33, { roughness: 0.9 })); at(bag, 12.63, 1.35, UB + 0.21);
+      bag.rotation.y = 0.5;
+      tag(bag, 'Backpack', 'Dropped by the desk');
+      const hoodie = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8), SM(0xb9bcc0, { roughness: 1 }));
+      hoodie.scale.set(1.2, 0.35, 0.9); hoodie.position.set(13.13, UB + 0.1, -1.05); hoodie.castShadow = true;
+      tag(hoodie, 'Hoodie pile', 'Laundry happens later');
+      const cb1 = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8),
+        new THREE.MeshStandardMaterial({ color: 0xf5f5f2, roughness: 0.95 }));
+      cb1.scale.set(1.3, 0.45, 1.0); cb1.position.set(13.73, UB + 0.11, -0.9); cb1.castShadow = true;
+      tag(cb1, 'Coverall bags', 'Clean-room suits, bagged');
+      const crate = box(0.3, 0.3, 0.3, M.black); at(crate, 13.98, 0.55, UB + 0.15);
+      uf.add(bag, hoodie, cb1, crate);
+    }
   }
 
   // ---------- security devices ----------
@@ -5019,18 +5409,18 @@ function buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
     mkSiren(secUF, x, y, h);
 
   // ---------- labels ----------
-  label(gf, 'Flower Room 2<small>44 m² · 3 benches</small>', 2.55, 12.0, 2.7);
+  label(gf, 'Flower Room 2<small>44 m² · racks · early veg</small>', 2.55, 12.0, 2.7);
   label(gf, 'Veg / Prop / Mother<small>4 benches</small>', 7.4, 13.0, 2.6);
-  label(gf, 'Flower Room 1<small>44 m² · 3500 m³/h airflow</small>', 12.3, 12.0, 2.7);
+  label(gf, 'Flower Room 1<small>44 m² · racks · late flower</small>', 12.3, 12.0, 2.7);
   label(gf, 'Drying / Vault<small>room is the vault</small>', 4.1, 2.8, 2.4);
-  label(gf, 'Irrigation<small>tank bank · fertigation</small>', 7.4, 3.2, 2.4);
+  label(gf, 'Irrigation<small>dosing wall · barrels</small>', 7.4, 3.2, 2.4);
   label(gf, 'Kitchen<small>disposal · WC below</small>', 12.2, 3.4, 2.4);
   label(gf, 'Hallway<small>rear exit · stairs</small>', 9.05, 2.2, 2.3);
   label(gf, 'Loading Zone<small>9 m² · roller door · CO₂</small>', 1.05, 3.0, 2.5);
   label(gf, 'Hallway', 5.0, 6.5, 2.4);
   label(gf, 'Stairs<small>up to office</small>', 11.95, 5.75, 2.2);
-  label(uf, 'Office<small>whole upper floor · open plan</small>', 7.0, 10.5, UB + 1.5);
-  label(uf, 'Workstations<small>13U rack · monitors</small>', 13.2, 2.0, UB + 1.6);
+  label(uf, 'Office<small>open plan · PTZ roof cam</small>', 7.0, 10.5, UB + 1.5);
+  label(uf, 'Operations office<small>scope station · server rack</small>', 12.0, 2.6, UB + 2.05);
   label(gf, 'N', 7.4, 17.9, 0.4, 'f2t-lbl cmp');
 
   // ---------- picking ----------
