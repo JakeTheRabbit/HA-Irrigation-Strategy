@@ -453,15 +453,15 @@
     <nav class="flex-1 py-3 px-2 space-y-1 overflow-y-auto scrollx">
       <template x-for="item in nav" :key="item.id">
         <div>
-          <button @click="go(item.id)" @mouseenter="tipShow($event,'nav:'+item.id,item.label)" @mouseleave="tipHide()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60" :class="view===item.id&&'nav-active font-medium'" :title="item.label">
+          <button @click="go(item.id)" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60" :class="view===item.id&&'nav-active font-medium'" :title="item.label">
             <span x-html="icons[item.icon]" class="w-5 h-5 shrink-0 block"></span>
             <span x-show="sidebarOpen" x-text="item.label" class="truncate"></span>
             <span x-show="sidebarOpen && item.subs" class="ml-auto text-[10px] text-slate-600" x-text="view===item.id?'▾':'▸'"></span>
           </button>
           <!-- folder-tree section index — expands for the active tab, jumps straight to the section -->
           <div x-show="sidebarOpen && view===item.id && item.subs" x-cloak class="ml-5 pl-3 border-l border-white/10 mb-1">
-            <template x-for="s in (item.subs||[])" :key="s[1]">
-              <button @click="solve({view:item.id,anchor:s[1]})" class="w-full text-left px-2 py-1.5 rounded-lg text-[12px] text-slate-400 hover:text-emerald-300 hover:bg-white/5 transition truncate" x-text="s[0]"></button>
+            <template x-for="s in (item.subs||[])" :key="s[0]">
+              <button @click="navSub(item.id,s)" class="w-full text-left px-2 py-1.5 rounded-lg text-[12px] text-slate-400 hover:text-emerald-300 hover:bg-white/5 transition truncate" x-text="s[0]"></button>
             </template>
           </div>
         </div>
@@ -484,6 +484,7 @@
           <div class="hidden sm:flex items-center gap-2 text-[11px] text-slate-400 leading-tight">
             <span x-text="ctx.flower||'F2'"></span><span class="text-slate-600">•</span>
             <span x-text="lightsOn?'☀ lights on':'🌙 dark'"></span><span class="text-slate-600">•</span>
+            <span class="inline-flex items-center gap-1" :title="'Signal-to-noise maturity — next: '+maturity.next"><span class="w-1.5 h-1.5 rounded-full" :class="maturity.rung>=4?'bg-emerald-400':maturity.rung>=3?'bg-amber-400':'bg-slate-500'"></span><span x-text="'SNR '+maturity.rung+' · '+maturity.name"></span></span><span class="text-slate-600">•</span>
             <span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" :class="connected?'bg-emerald-400':'bg-red-500'"></span><span x-text="connected?('updated '+ago(lastUpdated)):'disconnected'"></span></span>
           </div>
         </div>
@@ -493,6 +494,12 @@
         <button @click="pumpOpen=true" @mouseenter="tipShow($event,'Pump e-stop')" @mouseleave="tipHide()" class="relative w-10 h-10 grid place-items-center rounded-xl transition lift" :class="pump.deadhead?'bg-rose-500/25 ring-1 ring-rose-400/50 animate-pulse':'glass hover:border-white/20'" aria-label="Pump — manual stop" title="Pump & irrigation — manual stop">
           <svg viewBox="0 0 24 24" class="w-5 h-5 block" :class="pump.deadhead?'text-rose-200':'text-rose-400'" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
           <span x-show="pump.pumpOn||pump.deadhead" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 grid place-items-center text-[9px] font-bold rounded-full bg-rose-500 text-white" x-text="pump.powerTxt"></span>
+        </button>
+        <button @click="wiz=true; wizStep=0" class="hidden sm:flex items-center gap-1.5 h-10 px-3 rounded-xl glass hover:border-white/20 text-slate-300 text-sm transition lift" aria-label="Setup wizard" title="Guided setup — configure the whole grow for an optimal start">
+          <span x-html="icons.book" class="w-4 h-4 block text-emerald-300"></span><span class="hidden lg:inline">Setup</span>
+        </button>
+        <button @click="toggleEasy()" class="flex items-center gap-1.5 h-10 px-3 rounded-xl text-sm transition lift" :class="easy?'bg-emerald-500/20 ring-1 ring-emerald-400/40 text-emerald-200':'glass hover:border-white/20 text-slate-300'" :aria-label="easy?'Switch to Pro mode':'Switch to Easy mode'" :title="easy?'Pro mode — full dashboard':'Easy mode — only what you need'">
+          <span x-html="easy?icons.leaf:icons.dashboard" class="w-4 h-4 block"></span><span x-text="easy?'Easy':'Pro'"></span>
         </button>
         <button @click="go('dashboard'); $nextTick(()=>{const e=document.getElementById('advisories'); if(e) e.scrollIntoView({behavior:'smooth'})})" class="relative w-10 h-10 grid place-items-center rounded-xl glass hover:border-white/20 transition lift" aria-label="Advisories">
           <span x-html="icons.bell" class="w-5 h-5 block text-slate-300"></span>
@@ -511,6 +518,188 @@
       <span class="font-semibold shrink-0" x-text="(adv.filter(a=>a.sev==='crit').length?adv.filter(a=>a.sev==='crit').length+' urgent · ':'')+adv.length+' to sort out'"></span>
       <span class="truncate opacity-80" x-text="adv[0]&&adv[0].title"></span>
       <span class="ml-auto text-[11px] opacity-70 shrink-0">view →</span>
+    </div>
+
+    <!-- ================= SETUP WIZARD ================= -->
+    <div x-show="wiz" x-cloak class="fixed inset-0 z-50" @keydown.escape.window="wiz=false">
+      <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="wiz=false"></div>
+      <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:max-w-lg sm:h-fit bg-[#0f1722] border-t sm:border border-white/12 rounded-t-3xl sm:rounded-3xl p-6 pb-[calc(20px+env(safe-area-inset-bottom))] max-h-[92vh] overflow-y-auto">
+        <div class="flex items-center gap-3 mb-1">
+          <span x-html="icons.book" class="w-5 h-5 block text-emerald-300"></span>
+          <div class="font-bold text-lg">Setup wizard</div>
+          <button @click="wiz=false" class="ml-auto w-8 h-8 rounded-lg grid place-items-center bg-white/5 hover:bg-white/10"><span x-html="icons.x" class="w-4 h-4 block"></span></button>
+        </div>
+        <div class="text-[12px] text-slate-400 mb-4"><span x-text="'Step '+(wizStep+1)+' of '+wizSteps.length"></span> · <span x-text="wizSteps[wizStep]"></span></div>
+        <div class="flex gap-1 mb-5"><template x-for="(s,i) in wizSteps" :key="i"><div class="h-1 flex-1 rounded-full" :class="i<=wizStep?'bg-emerald-400':'bg-white/10'"></div></template></div>
+
+        <div x-show="wizStep===0" class="space-y-3">
+          <div class="text-xl font-bold">Let's dial in F2 for a strong start.</div>
+          <div class="text-slate-300 text-sm leading-relaxed">Five quick questions. At the end you'll see exactly what the controller will do and <b>why</b>, then you choose whether to apply it. Nothing is written to Home Assistant until you press Apply — and everything stays editable in the Tune tab afterwards.</div>
+        </div>
+
+        <div x-show="wizStep===1" class="space-y-3">
+          <div class="text-base font-semibold">What matters most this run?</div>
+          <template x-for="o in [{k:'yield',t:'Max yield',d:'Biggest harvest. Strong feed, generous shots, full photoperiod.'},{k:'potency',t:'Max potency',d:'Highest %THC. Leaner late feed + deeper finish dryback — small yield trade-off.'},{k:'balanced',t:'Balanced',d:'Textbook grow — strong yield, clean finish, no deliberate stress.'}]" :key="o.k">
+            <button @click="wizData.goal=o.k" class="w-full text-left p-4 rounded-2xl border transition" :class="wizData.goal===o.k?'border-emerald-400/60 bg-emerald-500/10':'border-white/10 hover:border-white/20'">
+              <div class="font-semibold" :class="wizData.goal===o.k?'text-emerald-200':'text-slate-100'" x-text="o.t"></div>
+              <div class="text-[12px] text-slate-400 mt-0.5" x-text="o.d"></div>
+            </button>
+          </template>
+        </div>
+
+        <div x-show="wizStep===2" class="space-y-3">
+          <div class="text-base font-semibold">Where is the crop right now?</div>
+          <div class="text-[12px] text-slate-400">Loads the Athena preset for EC and phase targets.</div>
+          <template x-for="o in [{k:'Clone',d:'Rooting / early veg — gentle, low EC.'},{k:'Veg',d:'Vegetative bulk — building frame.'},{k:'Stretch',d:'Early flower stretch — transition.'},{k:'Bulk',d:'Flower bulking — peak demand.'},{k:'Finish',d:'Ripening / flush — lean and dry.'}]" :key="o.k">
+            <button @click="wizData.stage=o.k" class="w-full text-left p-3 rounded-xl border transition" :class="wizData.stage===o.k?'border-emerald-400/60 bg-emerald-500/10':'border-white/10 hover:border-white/20'">
+              <span class="font-semibold" :class="wizData.stage===o.k?'text-emerald-200':'text-slate-100'" x-text="o.k"></span>
+              <span class="text-[12px] text-slate-400 ml-2" x-text="o.d"></span>
+            </button>
+          </template>
+        </div>
+
+        <div x-show="wizStep===3" class="space-y-4">
+          <div class="text-base font-semibold">How hard do you want to steer?</div>
+          <div class="flex items-center justify-between text-[12px]"><span class="text-emerald-300">🌿 Vegetative</span><span class="font-bold text-lg" x-text="wizData.dial.toFixed(1)"></span><span class="text-pink-300">Generative 🌸</span></div>
+          <input type="range" min="1" max="10" step="0.5" x-model.number="wizData.dial" class="w-full">
+          <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3 text-[13px] text-slate-300">
+            <span x-text="wizData.dial<3?'Deep vegetative — shallow dryback, frequent shots, max bulk. Best early.':wizData.dial<5.5?'Vegetative / balanced — moderate dryback, healthy growth.':wizData.dial<7.5?'Generative — deeper dryback drives flower and resin. Standard flower.':'Hard generative — deep dryback, lean. Strong signal, watch for stress.'"></span>
+            <div class="text-[12px] text-slate-500 mt-1.5">→ overnight dryback ≈ <b class="text-slate-300" x-text="wizPlan().db+'%'"></b></div>
+          </div>
+        </div>
+
+        <div x-show="wizStep===4" class="space-y-3">
+          <div class="text-base font-semibold">Block &amp; dripper hardware</div>
+          <div class="text-[12px] text-slate-400">Sizes the shots — get these right and the mL figures land where you expect.</div>
+          <label class="flex items-center justify-between gap-3"><span class="text-sm text-slate-200">Substrate per plant <span class="text-slate-500">(L)</span></span><input type="number" step="0.5" x-model.number="wizData.substrate" class="w-24 bg-white/[0.06] border border-white/10 rounded-lg px-2 py-1.5 text-sm text-right"></label>
+          <label class="flex items-center justify-between gap-3"><span class="text-sm text-slate-200">Drippers per plant</span><input type="number" step="1" x-model.number="wizData.drippers" class="w-24 bg-white/[0.06] border border-white/10 rounded-lg px-2 py-1.5 text-sm text-right"></label>
+          <label class="flex items-center justify-between gap-3"><span class="text-sm text-slate-200">Dripper flow <span class="text-slate-500">(L/h)</span></span><input type="number" step="0.1" x-model.number="wizData.flow" class="w-24 bg-white/[0.06] border border-white/10 rounded-lg px-2 py-1.5 text-sm text-right"></label>
+        </div>
+
+        <div x-show="wizStep===5" class="space-y-3">
+          <div class="text-base font-semibold">Here's what the controller will do</div>
+          <template x-for="r in wizPlan().rows" :key="r.label">
+            <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3">
+              <div class="flex items-center justify-between gap-2"><span class="text-[12px] text-slate-400 shrink-0" x-text="r.label"></span><span class="text-sm font-semibold text-emerald-200 text-right" x-text="r.val"></span></div>
+              <div class="text-[11px] text-slate-500 mt-1 leading-snug" x-text="r.why"></div>
+            </div>
+          </template>
+          <div class="text-[11px] text-slate-500 leading-snug pt-1">Apply writes the steering + stage setpoints into the Tune editor and (if you choose) to Home Assistant for the active Tune zone + facility globals. Switch zones in Tune to push the others. Everything stays editable.</div>
+        </div>
+
+        <div class="flex items-center gap-2 mt-6">
+          <button x-show="wizStep>0" @click="wizStep--" class="h-11 px-4 rounded-xl glass hover:border-white/20 text-slate-300 text-sm">← Back</button>
+          <div class="flex-1"></div>
+          <button x-show="wizStep<5" @click="wizStep++" class="h-11 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-semibold text-sm">Next →</button>
+          <template x-if="wizStep===5">
+            <div class="flex gap-2">
+              <button @click="wizApply(false)" class="h-11 px-4 rounded-xl glass hover:border-white/20 text-slate-200 text-sm">Stage in Tune</button>
+              <button @click="wizApply(true)" class="h-11 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-semibold text-sm">Apply to HA</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= EASY MODE — only what you need, with the why ================= -->
+    <div x-show="easy" x-cloak class="fixed inset-x-0 bottom-0 top-16 z-20 overflow-y-auto" style="background:#0b0f14">
+      <div class="max-w-3xl mx-auto px-4 py-6 space-y-5 pb-28">
+
+        <!-- 1. STATUS + WHY -->
+        <div class="rounded-3xl p-6 border" :class="headline.sev==='ok'?'bg-emerald-500/10 border-emerald-400/25':headline.sev==='crit'?'bg-red-500/10 border-red-400/30':'bg-amber-400/10 border-amber-400/25'">
+          <div class="flex items-center gap-3">
+            <span x-html="icons.leaf" class="w-7 h-7 block shrink-0" :class="headline.sev==='ok'?'text-emerald-400':headline.sev==='crit'?'text-red-400':'text-amber-400'"></span>
+            <div class="text-2xl font-bold" x-text="headline.big"></div>
+            <span class="ml-auto inline-flex items-center gap-1.5 text-xs text-slate-400 shrink-0"><span class="w-2 h-2 rounded-full" :class="connected?'bg-emerald-400':'bg-red-500'"></span><span x-text="connected?('updated '+ago(lastUpdated)):'offline'"></span></span>
+          </div>
+          <div class="text-slate-300 mt-2 leading-snug" x-text="headline.line"></div>
+        </div>
+
+        <!-- 2. WHAT IT'S DOING RIGHT NOW (reasoning — no secrets) -->
+        <div class="rounded-2xl glass p-5">
+          <div class="flex items-center gap-2 text-[11px] uppercase tracking-wider text-slate-400 mb-2"><span x-html="icons.robot" class="w-4 h-4 block text-emerald-400"></span> What the system is doing right now</div>
+          <div class="text-base text-slate-100 leading-snug" x-text="decisionTxt()"></div>
+          <div x-show="nextIrrigTxt()" class="text-[13px] text-slate-400 mt-2">Next watering in <b class="text-emerald-300" x-text="nextIrrigTxt()"></b></div>
+        </div>
+
+        <!-- 3. VITALS — value · target · why -->
+        <div class="grid grid-cols-2 gap-3">
+          <template x-for="v in easyVitals()" :key="v.label">
+            <div class="rounded-2xl glass p-4">
+              <div class="flex items-center justify-between"><span class="text-[12px] text-slate-400" x-text="v.label"></span><span class="w-2 h-2 rounded-full" :class="v.sev==='ok'?'bg-emerald-400':v.sev==='crit'?'bg-red-500':'bg-amber-400'"></span></div>
+              <div class="text-2xl font-bold mt-0.5" :class="v.sev==='ok'?'text-slate-100':v.sev==='crit'?'text-red-300':'text-amber-300'"><span x-text="v.val"></span><span class="text-sm text-slate-500" x-text="' '+v.unit"></span></div>
+              <div class="text-[11px] text-slate-500 mt-1 leading-snug" x-text="v.why"></div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 4. NEEDS YOU — advisories with checkable evidence -->
+        <div x-show="adv.length" class="space-y-2">
+          <div class="text-[11px] uppercase tracking-wider text-slate-400">Needs you</div>
+          <template x-for="a in adv" :key="a.id">
+            <div class="rounded-2xl border p-4" :class="a.sev==='crit'?'bg-red-500/10 border-red-400/30':'bg-amber-400/8 border-amber-400/25'">
+              <div class="flex items-start gap-2">
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold" :class="a.sev==='crit'?'text-red-200':'text-amber-100'" x-text="a.title"></div>
+                  <div class="text-[13px] text-slate-300 mt-1 leading-snug" x-text="a.detail"></div>
+                  <div x-show="advSpark(a)" class="mt-2 rounded-lg bg-black/30 border border-white/8 p-2" x-html="advSpark(a)"></div>
+                  <div x-show="a.action" class="text-[13px] text-emerald-200/90 mt-1.5">→ <span x-text="a.action"></span></div>
+                  <button x-show="a.fixLabel" @click="advApply(a)" class="mt-2 h-10 px-3.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-200 text-[13px] font-bold ring-1 ring-amber-400/40 inline-flex items-center gap-1.5">⚡ <span x-text="a.fixLabel"></span></button>
+                  <button x-show="a.evidence" @click="easyEvOpen=(easyEvOpen===a.id?null:a.id)" class="text-[11px] text-slate-400 hover:text-slate-200 mt-2 underline decoration-dotted">why? show evidence</button>
+                  <pre x-show="easyEvOpen===a.id" x-cloak class="text-[11px] text-slate-400 mt-1.5 whitespace-pre-wrap font-mono bg-black/30 rounded-lg p-2 overflow-x-auto" x-text="a.evidence"></pre>
+                </div>
+                <div class="flex flex-col gap-1.5 shrink-0">
+                  <button x-show="a.fix" @click="if(a.fix){toggleEasy(); solve(a.fix)}" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200">Fix →</button>
+                  <button @click="ackAlert(a.id)" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400">Got it</button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 5. ZONES (simple) -->
+        <div class="rounded-2xl glass p-5">
+          <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-3">Zones</div>
+          <div class="space-y-3">
+            <template x-for="z in zones" :key="z.id">
+              <div class="flex items-center gap-3">
+                <div class="w-16 text-sm font-medium text-slate-200 shrink-0" x-text="z.name"></div>
+                <div class="px-2 py-0.5 rounded text-[11px] font-bold shrink-0" :class="sevBg(z.status)+' '+sevText(z.status)" x-text="z.phase"></div>
+                <div class="flex-1 h-2.5 rounded-full bg-white/8 overflow-hidden"><div class="h-full rounded-full" :class="z.status==='crit'?'bg-red-500':z.status==='warn'?'bg-amber-400':'bg-cyan-400'" :style="'width:'+Math.max(2,Math.min(100,z.fillPct||z.vwc||0))+'%'"></div></div>
+                <div class="w-12 text-right text-sm tabular-nums shrink-0"><span x-text="z.vwc"></span><span class="text-slate-500">%</span></div>
+                <button @click="ctrlToggle('switch.crop_steering_zone_'+z.id+'_enabled',false)" class="relative w-9 h-5 rounded-full transition shrink-0" :class="z.enabled?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition" :class="z.enabled&&'translate-x-4'"></span></button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 6. LEVERS — only the few you pull -->
+        <div class="rounded-2xl glass p-5">
+          <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-3">Controls</div>
+          <div class="divide-y divide-white/6">
+            <template x-for="t in control.arm" :key="t.id">
+              <div class="flex items-center justify-between py-2.5">
+                <span class="text-sm text-slate-200" x-text="t.label"></span>
+                <button @click="ctrlToggle(t.id,true)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="t.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="t.on&&'translate-x-5'"></span></button>
+              </div>
+            </template>
+          </div>
+          <div class="grid grid-cols-2 gap-3 mt-4">
+            <button @click="pumpOpen=true" class="h-12 rounded-xl bg-gradient-to-br from-rose-500 to-red-700 text-white font-bold flex items-center justify-center gap-2"><span x-html="icons.power" class="w-5 h-5 block"></span> Emergency stop</button>
+            <button @click="toggleEasy(); go('tune')" class="h-12 rounded-xl glass hover:border-white/20 text-slate-200 font-medium flex items-center justify-center gap-2"><span x-html="icons.scale" class="w-5 h-5 block text-emerald-300"></span> Steer / tune</button>
+          </div>
+        </div>
+
+        <!-- 7. RECENT ACTIVITY — the why-trail -->
+        <div x-show="activityFeed.length" class="rounded-2xl glass p-5">
+          <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-2">Recent activity</div>
+          <div class="space-y-1.5 text-[13px] text-slate-300 font-mono">
+            <template x-for="(line,i) in activityFeed.slice(0,8)" :key="i"><div x-text="line"></div></template>
+          </div>
+        </div>
+
+        <div class="text-center pt-2"><button @click="toggleEasy()" class="text-[12px] text-slate-500 hover:text-slate-300 underline decoration-dotted">Switch to Pro mode for the full dashboard</button></div>
+      </div>
     </div>
 
     <main class="flex-1 px-4 md:px-6 py-5 md:py-6 max-w-[1500px] w-full mx-auto">
@@ -535,11 +724,14 @@
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-2 flex-wrap"><span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded" :class="a.sev==='crit'?'bg-red-500 text-white':'bg-amber-400 text-amber-950'" x-text="a.sev==='crit'?'Urgent':'Advisory'"></span><span class="text-sm font-semibold" x-text="a.title"></span></div>
                       <p class="text-[13px] text-slate-400 mt-1.5 leading-relaxed" x-text="a.detail"></p>
+                      <!-- the signal this advisory is about — arrow on the offending reading, band + control limits for context -->
+                      <div x-show="advSpark(a)" class="mt-2 rounded-lg bg-black/30 border border-white/8 p-2" x-html="advSpark(a)"></div>
                       <div x-show="a.cause" class="mt-2 text-[12.5px] flex items-start gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-amber-400 mt-0.5 shrink-0"></span><span><span class="text-amber-300/90 font-medium">Likely cause:</span> <span class="text-slate-400" x-text="a.cause"></span></span></div>
                       <div x-show="a.firstChecks" class="mt-1.5 flex flex-wrap gap-1.5 items-center"><span class="text-[11px] text-slate-500">First checks:</span><template x-for="c in (a.firstChecks||[])" :key="c"><span class="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/8 text-slate-300" x-text="c"></span></template></div>
                       <div class="mt-2 text-[13px] flex items-start gap-2 p-2.5 rounded-lg bg-white/[0.03] border border-white/8"><span x-html="icons.arrow" class="w-4 h-4 block text-emerald-400 mt-0.5 shrink-0"></span><span><span class="text-slate-300 font-medium">Next step:</span> <span class="text-slate-400" x-text="a.action"></span></span></div>
                       <div class="mt-2.5 flex items-center gap-2 flex-wrap">
-                        <button x-show="a.fix" @click="solve(a.fix)" class="h-9 px-3 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 text-xs font-semibold ring-1 ring-emerald-400/30 inline-flex items-center gap-1.5"><span x-html="icons.arrow" class="w-4 h-4 block"></span> Fix it → <span x-text="a.fix&&a.fix.label"></span></button>
+                        <button x-show="a.fixLabel" @click="advApply(a)" class="h-9 px-3 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 text-amber-200 text-xs font-bold ring-1 ring-amber-400/40 inline-flex items-center gap-1.5">⚡ <span x-text="a.fixLabel"></span></button>
+                        <button x-show="a.fix" @click="solve(a.fix)" class="h-9 px-3 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 text-xs font-semibold ring-1 ring-emerald-400/30 inline-flex items-center gap-1.5"><span x-html="icons.arrow" class="w-4 h-4 block"></span> Controls → <span x-text="a.fix&&a.fix.label"></span></button>
                         <button @click="speak(a.title+'. '+a.detail+'. Next step: '+a.action)" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10 inline-flex items-center gap-1.5"><span x-html="icons.audio" class="w-4 h-4 block"></span> Read</button>
                         <button @click="ackAlert(a.id)" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10">Acknowledge</button>
                         <button x-show="a.evidence" @click="evOpen===a.id?evOpen=null:evOpen=a.id" class="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium border border-white/10">Evidence</button>
@@ -557,10 +749,14 @@
             </div>
           </div>
           <div>
-            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.eye" class="w-4 h-4 block text-slate-400"></span> Keeping an eye on</h3></div>
-            <div class="glass rounded-2xl divide-y divide-white/8">
-              <template x-for="w in watch" :key="w.id"><div class="p-3.5 flex items-start gap-3"><span class="w-1.5 h-1.5 mt-1.5 rounded-full bg-amber-400 shrink-0"></span><div class="min-w-0"><div class="text-[13px] font-medium" x-text="w.title"></div><div class="text-[11px] text-slate-400 mt-0.5" x-text="w.detail"></div></div></div></template>
-              <div x-show="!watch.length" class="p-6 text-center text-sm text-slate-500">Nothing drifting.</div>
+            <!-- common-cause variation lives behind one quiet line — SPC: don't spend attention on it -->
+            <button @click="watchOpen=!watchOpen" class="w-full glass rounded-2xl p-4 flex items-center gap-3 text-left hover:border-white/15 transition">
+              <span x-html="icons.eye" class="w-4 h-4 block text-slate-500 shrink-0"></span>
+              <span class="text-sm text-slate-400" x-text="watch.length?('Keeping watch on '+watch.length+' thing'+(watch.length>1?'s':'')+' — none needs you'):'Nothing drifting.'"></span>
+              <span x-show="watch.length" class="ml-auto text-[11px] text-slate-600" x-text="watchOpen?'hide ▴':'show ▾'"></span>
+            </button>
+            <div x-show="watchOpen && watch.length" x-cloak class="glass rounded-2xl divide-y divide-white/8 mt-2">
+              <template x-for="w in watch" :key="w.id"><div class="p-3.5 flex items-start gap-3"><span class="w-1.5 h-1.5 mt-1.5 rounded-full bg-amber-400 shrink-0"></span><div class="min-w-0"><div class="text-[13px] font-medium" x-text="w.title"></div><div class="text-[11px] text-slate-400 mt-0.5" x-text="w.detail"></div><div x-show="w.snrNote" class="text-[10px] text-slate-600 mt-0.5" x-text="w.snrNote"></div></div></div></template>
             </div>
           </div>
         </div>
@@ -781,12 +977,14 @@
         </div>
         <!-- 24h climate history -->
         <div class="glass rounded-2xl p-5">
-          <div id="cl-trends" class="flex items-center justify-between mb-3 scroll-mt-28"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Climate trends · last 24h</h3><span class="text-[11px] text-slate-500">shaded band = on-target range</span></div>
+          <div id="cl-trends" class="flex items-center justify-between gap-3 mb-1 scroll-mt-28"><h3 class="text-sm font-semibold flex items-center gap-2 shrink-0"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Climate trends · last 24h</h3>
+            <button @click="csToggle()" class="text-[11px] px-2 py-1 rounded-lg glass hover:border-white/20 shrink-0" :class="chartSmooth?'text-emerald-300':'text-slate-400'" x-text="chartSmooth?'● smoothed':'○ raw'" :title="chartSmooth?'Showing the EWMA-smoothed trend — click for raw':'Showing raw samples — click to smooth'"></button></div>
+          <div class="text-[11px] text-slate-500 mb-3">green band = on-target · grey line = mean · dashed amber = ±2σ control limits · <span class="text-rose-400">red dot</span> = special-cause (outside limits)</div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Air temp °C</div><div class="h-40"><canvas id="ccTemp"></canvas></div></div>
-            <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Humidity %</div><div class="h-40"><canvas id="ccRh"></canvas></div></div>
-            <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Air VPD kPa</div><div class="h-40"><canvas id="ccVpd"></canvas></div></div>
-            <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">CO₂ ppm</div><div class="h-40"><canvas id="ccCo2"></canvas></div></div>
+            <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Air temp °C</div><div class="h-40"><canvas id="ccTemp"></canvas></div><div class="text-[10px] text-slate-600 mt-1">smooth ~20 min · sample 1–5 min · noise ±0.4 °C</div></div>
+            <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Humidity %</div><div class="h-40"><canvas id="ccRh"></canvas></div><div class="text-[10px] text-slate-600 mt-1">smooth ~20 min · sample 1–5 min · noise ±2.5 %</div></div>
+            <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Air VPD kPa</div><div class="h-40"><canvas id="ccVpd"></canvas></div><div class="text-[10px] text-slate-600 mt-1">smooth ~20 min · derived · noise ±0.08 kPa</div></div>
+            <div><div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1">CO₂ ppm</div><div class="h-40"><canvas id="ccCo2"></canvas></div><div class="text-[10px] text-slate-600 mt-1">smooth ~15 min · sample 1–5 min · noise ±40 ppm</div></div>
           </div>
         </div>
         <!-- ===== F2 room controls — every control + helper, full functionality ===== -->
@@ -868,6 +1066,16 @@
         <span class="pill">total dryback <b x-text="((g('field_capacity')-overnightLow())/g('field_capacity')*100).toFixed(0)+'%'"></b></span>
         <span class="pill">peak EC <b x-text="peakEC().toFixed(1)"></b></span>
         <span class="pill" x-show="live" style="color:var(--ok)">● live F2</span>
+      </div>
+      <!-- LIVE vs PLAN: where the zone actually is right now compared to the tuned plan -->
+      <div class="readout" style="margin-top:8px" x-show="live && liveCmp()">
+        <template x-if="liveCmp()"><span style="display:contents">
+          <span class="pill" style="border-color:#facc1555"><b style="color:#facc15">now</b><b x-text="' · '+(liveCmp().t).toFixed(1)+'h since lights-on'"></b></span>
+          <span class="pill">VWC plan <b x-text="liveCmp().vwcPlan.toFixed(1)+'%'"></b></span>
+          <span class="pill" :style="liveCmp().vwcD==null?'':'color:'+(Math.abs(liveCmp().vwcD)>4?'#fb7185':'var(--ok)')">live <b x-text="liveCmp().vwcLive!=null?liveCmp().vwcLive.toFixed(1)+'%':'—'"></b><b x-show="liveCmp().vwcD!=null" x-text="' · Δ'+(liveCmp().vwcD>0?'+':'')+liveCmp().vwcD.toFixed(1)"></b></span>
+          <span class="pill">EC plan <b x-text="liveCmp().ecPlan.toFixed(1)"></b></span>
+          <span class="pill" :style="liveCmp().ecD==null?'':'color:'+(Math.abs(liveCmp().ecD)>0.6?'#fb7185':'var(--ok)')">live <b x-text="liveCmp().ecLive!=null?liveCmp().ecLive.toFixed(1):'—'"></b><b x-show="liveCmp().ecD!=null" x-text="' · Δ'+(liveCmp().ecD>0?'+':'')+liveCmp().ecD.toFixed(1)"></b></span>
+        </span></template>
       </div>
     </div>
     <!-- ===== LIMITING FACTORS (Liebig minimum) ===== -->
@@ -1473,6 +1681,102 @@ function activeBands(key){ const sk=growStageKey(); return (STAGE_BANDS[sk]&&STA
 function band(key,v){ const b=activeBands(key); if(!b||v==null) return "ok"; if(b.warn){ if(v<b.warn[0]||v>b.warn[1]) return "warn"; } if(b.ok){ if(v<b.ok[0]||v>b.ok[1]) return "watch"; } return "ok"; }
 function bandLabel(key){ const b=activeBands(key); return b&&b.ok?`${b.ok[0]}–${b.ok[1]}`:""; }
 
+/* ===================== Signal-to-Noise discipline (SPC) =====================
+   The engine already filters (IQR/Kalman/fusion); this layer makes the DASHBOARD
+   act only on SIGNAL: control limits from the room's own history, persistence +
+   cross-sensor gates before any alert, drift watch, and a maturity rung. */
+const SENSOR_ATLAS={
+  air_temp:{label:'Air temp',unit:'°C',noiseFloor:0.4,smoothMin:20,cadenceSec:60,persistN:3},
+  rh:{label:'Humidity',unit:'%',noiseFloor:2.5,smoothMin:20,cadenceSec:60,persistN:3},
+  air_vpd:{label:'Air VPD',unit:'kPa',noiseFloor:0.08,smoothMin:20,cadenceSec:60,persistN:3},
+  leaf_vpd:{label:'Leaf VPD',unit:'kPa',noiseFloor:0.08,smoothMin:30,cadenceSec:60,persistN:3},
+  co2:{label:'CO₂',unit:'ppm',noiseFloor:40,smoothMin:15,cadenceSec:60,persistN:3},
+  ppfd:{label:'PPFD',unit:'µmol',noiseFloor:25,smoothMin:10,cadenceSec:60,persistN:3},
+  fused_ec:{label:'Pore EC',unit:'mS/cm',noiseFloor:0.15,smoothMin:30,cadenceSec:60,persistN:4},
+  avg_vwc:{label:'VWC',unit:'%',noiseFloor:2.5,smoothMin:20,cadenceSec:60,persistN:4},
+  dryback_pct:{label:'Dryback',unit:'%',noiseFloor:1.5,smoothMin:30,cadenceSec:60,persistN:4},
+  bl_temp:{label:'Back-left',unit:'°C',noiseFloor:0.4,smoothMin:20,cadenceSec:60,persistN:3},
+};
+const STAT={};   // key -> [{t,v}] ring buffer of raw samples → control limits + WE patterns
+function statPush(key,v){ if(v==null||isNaN(v)) return; const a=STAT[key]||(STAT[key]=[]); a.push({t:Date.now(),v:+v}); if(a.length>160) a.shift(); }
+function statPushAll(){ for(const k in SENSOR_ATLAS){ const v=num(k); if(v!=null) statPush(k,v); } }
+function stVals(key){ return (STAT[key]||[]).map(p=>p.v); }
+function stMean(a){ return a.length?a.reduce((s,x)=>s+x,0)/a.length:null; }
+function stStd(a){ if(a.length<2) return 0; const m=stMean(a); return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-1)); }
+function stMedian(a){ if(!a.length) return null; const s=[...a].sort((x,y)=>x-y),n=s.length; return n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2; }
+function ewmaArr(a,lambda){ lambda=lambda||0.35; const out=[]; let e=null; for(const x of a){ if(x==null){ out.push(null); continue; } e=(e==null)?x:lambda*x+(1-lambda)*e; out.push(+e.toFixed(3)); } return out; }
+function stLimits(key){ const a=stVals(key); if(a.length<8) return null; const m=stMean(a),sd=stStd(a); return {mean:m,sd,ucl:m+2*sd,lcl:m-2*sd,u3:m+3*sd,l3:m-3*sd,n:a.length}; }
+// Western-Electric style pattern flags (8 in a row one direction = drift; all on one side = shift)
+function stPattern(key){ const a=stVals(key); if(a.length<8) return {trend:false,shift:false,dir:0}; const lim=stLimits(key); const last=a.slice(-8);
+  let inc=true,dec=true; for(let i=1;i<last.length;i++){ if(last[i]<=last[i-1]) inc=false; if(last[i]>=last[i-1]) dec=false; }
+  const above=last.every(x=>x>lim.mean), below=last.every(x=>x<lim.mean);
+  return {trend:inc||dec, shift:above||below, dir:inc?1:dec?-1:0}; }
+// the 3-gate SPC test — is a flagged reading SIGNAL (act) or NOISE (ignore)?
+function snrGate(key){ const at=SENSOR_ATLAS[key]; const v=num(key);
+  if(!at||v==null) return {signal:true,why:'un-modelled — not gated'};   // fail-open: never silence an un-modelled alert
+  const a=stVals(key), lim=stLimits(key), bnd=activeBands(key);
+  const oob=(x)=>(lim&&(x>lim.ucl||x<lim.lcl))||(bnd&&bnd.warn&&(x<bnd.warn[0]||x>bnd.warn[1]));
+  const ref=lim?lim.mean:(bnd&&bnd.ok?(bnd.ok[0]+bnd.ok[1])/2:v);
+  let beyond=oob(v); if(Math.abs(v-ref)<at.noiseFloor) beyond=false;   // sub-noise-floor = physically meaningless
+  const recent=a.slice(-at.persistN); const persist=recent.length>=at.persistN&&recent.every(oob);
+  let conf=num("sensor.crop_steering_sensor_fusion_confidence"); if(conf!=null&&conf>1.5) conf/=100; const agree=conf==null?true:conf>=0.6;
+  const signal=beyond&&persist&&agree;
+  const why=!beyond?'within control limits / sub-noise — common-cause, leave it'
+    :!persist?`not persistent yet (need ${at.persistN} reads out)`
+    :!agree?`sensors disagree (fusion ${fmt(conf,2)}) — likely a bad probe, not the room`
+    :'beyond limits, persistent, sensors agree';
+  return {signal,why,beyond,persist,agree,lim}; }
+// rules whose trigger rides a NOISY signal → SPC-gated. Safety/event rules (pump, zone-floor, dosing, engine) stay un-gated.
+const SNR_RULE_KEY={ ecDrift:'fused_ec', ecStacking:'fused_ec', drybackShallow:'dryback_pct', hotspot:'bl_temp', hotspotMild:'bl_temp', co2Dark:'co2', ppfdLow:'ppfd', condensation:'air_temp' };
+// drift watch — slow one-way movement (the "dangerous" noise that masquerades as a real trend)
+function driftRule(){ for(const key of ['fused_ec','air_temp','rh','co2']){ const at=SENSOR_ATLAS[key],p=stPattern(key),lim=stLimits(key),a=stVals(key);
+  if(p.trend&&lim&&lim.n>=8&&Math.abs(a[a.length-1]-a[a.length-8])>2*at.noiseFloor)
+    return {sev:"watch",icon:"radio",title:`${at.label} drifting ${p.dir>0?'up':'down'} — check calibration`,detail:`${at.label} has moved one direction for 8 readings straight. Slow one-way drift is the noise that fools you — it looks like a real trend. Cross-check a second probe / calibrate before steering on it.`,fix:{view:'climate',anchor:'cl-controls',label:'Climate · calibration'},evidence:`8-pt one-way ${p.dir>0?'rise':'fall'} on ${at.label}; σ=${fmt(lim.sd,2)}`}; } return null; }
+// SNR maturity rung (1 Blind .. 5 Tuned)
+function maturityScore(){ let rung=2; const haveLimits=Object.keys(SENSOR_ATLAS).some(k=>stLimits(k)); if(haveLimits) rung=4;   // limits present + alerts SPC-gated
+  if(rung>=4&&num("sensor.crop_steering_sensor_fusion_confidence")!=null&&zoneCV()!=null) rung=5;
+  const names=['','Blind','Logged','Filtered','Controlled','Tuned'];
+  const next=['','Add sensors','Stop watching live; smooth','Add control limits','Track uniformity (CV)','Refine & share SOPs'][rung];
+  return {rung,name:names[rung],next}; }
+// signal-rich KPIs (vs vanity instantaneous reads)
+function timeInRange(key,hours){ const a=STAT[key]||[]; if(!a.length) return null; const cut=Date.now()-(hours||6)*3600e3,w=a.filter(p=>p.t>=cut); if(!w.length) return null; const b=activeBands(key); if(!b||!b.ok) return null; return Math.round(w.filter(p=>p.v>=b.ok[0]&&p.v<=b.ok[1]).length/w.length*100); }
+function zoneCV(){ const v=[1,2,3].map(z=>parseFloat(S[CONFIG.ZONE(z).vwc]?.state)).filter(x=>!isNaN(x)); if(v.length<2) return null; const m=stMean(v),sd=stStd(v); return m?+(sd/m*100).toFixed(1):null; }
+function dliVsPlan(){ const d=num("dli"); if(d==null) return null; const tgt=({clone:12,veg:28,stretch:38,bulk:42,finish:32})[growStageKey()]||40; return {delivered:+d.toFixed(1),planned:tgt,pct:Math.round(d/tgt*100)}; }
+// per-zone + pump channels tracked too, so advisory evidence sparks have a series to draw
+SENSOR_ATLAS['pump_power']={label:'Pump power',unit:'W',noiseFloor:30,smoothMin:5,cadenceSec:60,persistN:2};
+for(const z of [1,2,3]) SENSOR_ATLAS['sensor.crop_steering_zone_'+z+'_vwc']={label:'Zone '+z+' VWC',unit:'%',noiseFloor:2.5,smoothMin:20,cadenceSec:60,persistN:4};
+// which signal each advisory is ABOUT — drives the evidence spark drawn inside the card
+const ADV_METRIC={ pumpDeadhead:()=>'pump_power', hotspot:()=>'bl_temp', hotspotMild:()=>'bl_temp', co2Dark:()=>'co2', ppfdLow:()=>'ppfd',
+  ecDrift:()=>'fused_ec', ecStacking:()=>'fused_ec', drybackShallow:()=>'dryback_pct', condensation:()=>'air_temp',
+  zoneFloor:o=>{const m=(o.title||'').match(/Zone (\d)/); return m?'sensor.crop_steering_zone_'+m[1]+'_vwc':null;},
+  zoneApproaching:o=>{const m=(o.title||'').match(/Zone (\d)/); return m?'sensor.crop_steering_zone_'+m[1]+'_vwc':null;} };
+// one-tap fixes, confirm-gated; only actions the audit called safely automatable. Rescue shots go through the ENGINE's event path = all its safety checks still apply.
+const FIX_ACTIONS={
+  pumpDeadhead:{label:'Stop pump now',noConfirm:true,run(app){ return app.pumpStopAll(); }},   // pumpStopAll carries its own confirm
+  dosingStuck:{label:'Clear dosing flag',confirm:'Clear the dosing flag so watering resumes?\nONLY if tank pH and EC are confirmed in range — clearing mid-tank-job sends bad feed.',run(){ return svc('input_boolean','turn_off',{entity_id:'input_boolean.nutrient_dosing_active'}); }},
+  zoneFloor:{label:o=>{const m=(o.title||'').match(/Zone (\d)/);return 'Rescue shot Zone '+(m?m[1]:'?')+' · 60s';},confirm:'Fire a 60-second P3-emergency rescue shot for this zone?\nThe engine still runs every one of its safety checks first.',run(app,o){ const m=(o.title||'').match(/Zone (\d)/); if(!m) throw new Error('zone?'); return svc('crop_steering','execute_irrigation_shot',{zone:+m[1],duration_seconds:60,shot_type:'P3_emergency'}); }},
+  ecStacking:{label:'Ease dryback −3%',confirm:'Lower every zone\'s generative dryback target by 3 points?\nWaters sooner → dilutes the salt stack.',async run(){ for(const z of [1,2,3]){ const id='number.crop_steering_zone_'+z+'_generative_dryback_target'; const v=num(id); if(v!=null) await svc('number','set_value',{entity_id:id,value:Math.max(5,+(v-3).toFixed(1))}); } }},
+  drybackShallow:{label:'Deepen dryback +3%',confirm:'Raise every zone\'s generative dryback target by 3 points?\nBlocks dry further before re-water.',async run(){ for(const z of [1,2,3]){ const id='number.crop_steering_zone_'+z+'_generative_dryback_target'; const v=num(id); if(v!=null) await svc('number','set_value',{entity_id:id,value:Math.min(70,+(v+3).toFixed(1))}); } }},
+};
+// evidence spark: the advisory's signal, with band/limits/floor context and an arrow on the offending reading
+function advSparkSvg(o){ const key=o&&o.metric; if(!key) return ''; const at=SENSOR_ATLAS[key]||{}, pts=STAT[key]||[]; if(pts.length<6) return '';
+  const vs=pts.map(p=>p.v), W=260,Hh=64,PL=4,PR=62,PT=8,PB=8, lim=stLimits(key), bnd=activeBands(key);
+  const zm=key.match(/zone_(\d)_vwc/), floor=zm?CONFIG.ZONE_P3_FLOOR[+zm[1]]:null;
+  let lo=Math.min(...vs), hi=Math.max(...vs);
+  if(lim){ lo=Math.min(lo,lim.lcl); hi=Math.max(hi,lim.ucl); } if(bnd&&bnd.ok){ lo=Math.min(lo,bnd.ok[0]); hi=Math.max(hi,bnd.ok[1]); } if(floor!=null) lo=Math.min(lo,floor);
+  const pad=(hi-lo)*0.12||1; lo-=pad; hi+=pad;
+  const X=i=>PL+i/(vs.length-1)*(W-PL-PR), Y=v=>PT+(1-(v-lo)/(hi-lo))*(Hh-PT-PB);
+  let s=`<svg viewBox="0 0 ${W} ${Hh}" class="w-full h-16 block" preserveAspectRatio="none" role="img" aria-label="${(at.label||key)} evidence">`;
+  if(bnd&&bnd.ok) s+=`<rect x="${PL}" y="${Y(bnd.ok[1]).toFixed(1)}" width="${W-PL-PR}" height="${Math.max(1,Y(bnd.ok[0])-Y(bnd.ok[1])).toFixed(1)}" fill="rgba(52,211,153,.10)"/>`;
+  if(lim) [lim.ucl,lim.lcl].forEach(v=>{ s+=`<line x1="${PL}" x2="${W-PR}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="rgba(232,116,59,.55)" stroke-dasharray="3 3" stroke-width="1"/>`; });
+  if(floor!=null) s+=`<line x1="${PL}" x2="${W-PR}" y1="${Y(floor).toFixed(1)}" y2="${Y(floor).toFixed(1)}" stroke="#f87171" stroke-dasharray="4 3" stroke-width="1.2"/><text x="${PL+2}" y="${(Y(floor)-3).toFixed(1)}" font-size="8" fill="#f87171">floor ${floor}%</text>`;
+  s+=`<polyline points="${vs.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ')}" fill="none" stroke="#94e2c0" stroke-width="1.6"/>`;
+  const lx=X(vs.length-1), ly=Y(vs[vs.length-1]);
+  s+=`<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5" fill="#fb7185" stroke="#0a0c10" stroke-width="1.5"/>`;
+  s+=`<path d="M${(lx+17).toFixed(1)},${ly.toFixed(1)} l-9,-5 v3.2 h-4 v3.6 h4 v3.2 z" fill="#fb7185"/>`;
+  s+=`<text x="${(lx+21).toFixed(1)}" y="${(ly+3.5).toFixed(1)}" font-size="10" font-weight="700" fill="#fb7185">${(+vs[vs.length-1]).toFixed(1)}${at.unit?' '+at.unit:''}</text></svg>`;
+  return s; }
+
 /* ---- Derived: dew point / condensation margin (Magnus) + EC-stacking forecast ---- */
 function dewPoint(){ const T=num("air_temp"),R=num("rh"); if(T==null||R==null) return null; const a=17.625,b=243.04,g=Math.log(Math.max(1,R)/100)+(a*T)/(b+T); return (b*g)/(a-g); }
 function coldSurface(){ const m=[num("bl_temp"),num("sub_temp")].filter(x=>x!=null); const at=num("air_temp"); if(!m.length&&at==null) return null; return (m.length?Math.min(...m):at)-1.5; }
@@ -1534,7 +1838,11 @@ const RULES=[
     const burn=CONFIG.EC_TARGET+1, h=ecHoursToBurn(burn); if(h==null||h>6) return null; const proj=ecForecast(h);
     return {sev:h<=3?"warn":"watch",icon:"salt",confidence:"med",title:`Pore EC stacking toward burn (~${fmt(h,1)}h)`,detail:`Pore EC is ${fmt(ec,2)} and climbing ${fmt(tr,2)}/h; at the current ${fmt(dr,1)}%/h dryback it projects to ${fmt(burn,1)} mS/cm in about ${fmt(h,1)}h — tip-burn territory.`,action:"Ease the dryback target ~3% or add a maintenance shot to dilute before it stacks.",fix:{view:'tune',anchor:'tune-steer',label:'Tune · EC'},evidence:`fused_ec=${fmt(ec,2)} trend=${fmt(tr,2)}/h dryback=${fmt(dr,1)}%/h → ${fmt(proj,2)} in ${fmt(h,1)}h`}; return null; },
 ];
-function runRules(){ const adv=[],watch=[]; for(const r of RULES){ let o=null; try{ o=r(); }catch(e){} if(!o) continue; o.id="r-"+(o.title||"").slice(0,16).replace(/\W/g,""); attachCause(o); (o.sev==="watch"?watch:adv).push(o); } adv.sort((a,b)=>(a.sev==="crit"?0:1)-(b.sev==="crit"?0:1)); return {adv,watch}; }
+function runRules(){ const adv=[],watch=[]; for(const r of RULES.concat([driftRule])){ let o=null; try{ o=r(); }catch(e){} if(!o) continue;
+    const key=SNR_RULE_KEY[r.name]; if(key){ const g=snrGate(key); o.snr=g; if(!g.signal){ o.sev="watch"; o.snrNote=g.why; } }   // SPC gate: a noisy breach is common-cause until it's beyond limits, persistent, and sensors agree
+    o.rule=r.name; try{ const mk=ADV_METRIC[r.name]; if(mk) o.metric=mk(o); const fa=FIX_ACTIONS[r.name]; if(fa) o.fixLabel=typeof fa.label==='function'?fa.label(o):fa.label; }catch(e){}   // evidence spark + one-tap fix
+    o.id="r-"+(o.title||"").slice(0,16).replace(/\W/g,""); attachCause(o); (o.sev==="watch"?watch:adv).push(o); }
+  adv.sort((a,b)=>(a.sev==="crit"?0:1)-(b.sev==="crit"?0:1)); return {adv,watch}; }
 function computeHeadline(adv,watch){ const crit=adv.filter(a=>a.sev==="crit"),warn=adv.filter(a=>a.sev==="warn");
   if(crit.length) return {sev:"crit",big:`${crit.length} urgent thing${crit.length>1?"s":""} — act now`,line:crit[0].title+(crit.length>1?` and ${crit.length-1} more`:"")+". See the cards below."};
   if(warn.length) return {sev:"warn",big:`${warn.length} thing${warn.length>1?"s":""} to sort out`,line:warn.map(a=>a.title).slice(0,2).join(". ")+"."};
@@ -1628,14 +1936,15 @@ function buildPlant(){ const out=[];
   out.push({icon:"flag",label:"Stress flags",value:any?"Active":"All clear",plain:`Roots ${ss?"⚠️":"✅"} · Light load ${ls?"⚠️":"✅"}`,status:any?"warn":"ok",word:any?"act":"good",track:false});
   return out; }
 function buildKpis(){ const h=computeHeadline(...Object.values(runRules())); const avgVwc=num("avg_vwc"),ec=num("fused_ec"),db=num("dryback_pct"),dt=num("dryback_target"),vpd=num("air_vpd");
-  const open=runRules().adv.length;
   return [
     {label:"F2 status",value:h.sev==="ok"?"Optimal":h.sev==="warn"?"Attention":h.sev==="crit"?"Critical":"Watch",icon:"leaf",tint:h.sev==="ok"?"text-emerald-400":h.sev==="warn"?"text-amber-400":h.sev==="crit"?"text-red-400":"text-amber-400",sub:(val("grow_stage")||"F2")},
     {label:"Avg wetness",value:fmt(avgVwc,0),unit:"%",icon:"drop",tint:"text-cyan-400",sub:"all zones"},
     {label:"Pore EC",value:fmt(ec,1),unit:"/ "+fmt(CONFIG.EC_TARGET,1),icon:"salt",tint:Math.abs((ec||0)-CONFIG.EC_TARGET)>1.2?"text-amber-400":"text-emerald-400",sub:"trend "+fmt(num("ec_trend"),2)+"/h"},
     {label:"Dryback",value:fmt(db,0),unit:"%",icon:"drop",tint:"text-slate-400",sub:"target "+fmt(dt,0)+"%"},
-    {label:"Air VPD",value:fmt(vpd,2),unit:"kPa",icon:"wind",tint:band("air_vpd",vpd)!=="ok"?"text-amber-400":"text-emerald-400",sub:band("air_vpd",vpd)==="ok"?"in band":"out of band"},
-    {label:"Open advisories",value:open,icon:"alerts",tint:open?"text-amber-400":"text-emerald-400",sub:"need you"},
+    // signal-rich, not instantaneous (paper §10): VPD as time-in-range (falls back to the live read until stats build), uniformity as CV
+    (function(){ const t=timeInRange('air_vpd',6); if(t!=null) return {label:"VPD in-range",value:t,unit:"%",icon:"wind",tint:t>=80?'text-emerald-400':t>=60?'text-amber-400':'text-red-400',sub:"last 6h"};
+      return {label:"Air VPD",value:fmt(vpd,2),unit:"kPa",icon:"wind",tint:band("air_vpd",vpd)!=="ok"?"text-amber-400":"text-emerald-400",sub:band("air_vpd",vpd)==="ok"?"in band":"out of band"}; })(),
+    (function(){ const cv=zoneCV(); return {label:"Zone uniformity",value:cv==null?'—':cv,unit:cv==null?'':'% CV',icon:"scale",tint:cv==null?'text-slate-400':cv<=6?'text-emerald-400':cv<=12?'text-amber-400':'text-red-400',sub:"lower = tighter"}; })(),
   ]; }
 const FLOOR_ROOMS=[   // 2x2 mini floor-plan; lit = any of the room's lights on
   {key:'F2',label:'F2',col:0,row:0,lights:['light.led_f2_r1_f2_r1_led','light.led_f2_r2_f2_r2_led','light.office_light_main_spectrum','light.under_canopy_1_veg_undercanopy_light_2']},
@@ -1679,7 +1988,7 @@ function buildClimate(){ const b=(k)=>band(k,num(k))!=="ok"?"text-amber-400":"te
     {label:"Leaf VPD",val:fmt(num("leaf_vpd"),2)+" kPa",sub:"target 1.0–1.3",cls:"text-slate-200"},
     {label:"CO₂",val:fmt(num("co2"),0)+" ppm",sub:lightsOn()?"target 1200–1450":"dark",cls:lightsOn()?b("co2"):"text-slate-200"},
     {label:"PPFD",val:lightsOn()?fmt(num("ppfd"),0):"dark",sub:"µmol/m²/s",cls:"text-slate-200"},
-    {label:"DLI today",val:fmt(num("dli"),1),sub:"mol/m²",cls:"text-slate-200"},
+    {label:"DLI today",val:fmt(num("dli"),1),sub:(function(){const d=dliVsPlan();return d?("vs plan "+d.pct+"% ("+d.planned+" mol)"):"mol/m²";})(),cls:(function(){const d=dliVsPlan();return d&&Math.abs(d.pct-100)>12?"text-amber-400":"text-slate-200";})()},
     {label:"Back-left",val:fmt(num("bl_temp"),1)+" °C",sub:"hotspot watch",cls:(num("bl_temp")-num("air_temp"))>=CONFIG.HOTSPOT.deltaWarn?"text-amber-400":"text-emerald-400"},
   ]; }
 function buildRaw(){ const items=[["Air temp","air_temp","°C","air_temp"],["Humidity","rh","%","rh"],["Air VPD","air_vpd","kPa","air_vpd"],["Leaf VPD","leaf_vpd","kPa","leaf_vpd"],["CO₂","co2","ppm",lightsOn()?"co2":null],["PPFD","ppfd","µmol",lightsOn()?"ppfd":null],["DLI","dli","mol",null],["Block wetness R1","sub_vwc","%",null],["Block pore-EC R1","sub_pwec","dS/m",null],["Block temp R1","sub_temp","°C",null],["Back-left temp","bl_temp","°C",null],["Back-left VPD","bl_vpd","kPa",null],["Fused VWC","fused_vwc","%",null],["Avg EC","avg_ec","mS/cm",null],["Sensor health","sensor_health","%",null],["Next watering","next_irrig","",null],["Last decision","decision","",null],["Last action","activity","",null],["LED power","led_power","W",null]];
@@ -2568,8 +2877,36 @@ function editor(){
         else if(draggable) s+=`<circle cx="${bx}" cy="${by}" r="10" fill="${b.col}" opacity="${this.drag===b.drag?.25:.12}"/>`;
         s+=`</g>`;
       }
+      // ── LIVE overlay: where this zone ACTUALLY is right now vs the plan ──
+      const ln=this.liveNow();
+      if(ln){ const lx=x(ln.t);
+        s+=`<line x1="${lx}" y1="${PT}" x2="${lx}" y2="${PT+PH}" stroke="#facc15" stroke-width="1.4" stroke-dasharray="2 3" opacity=".85"/>`;
+        s+=`<text x="${lx}" y="${PT-2}" text-anchor="middle" font-size="9.5" font-weight="700" fill="#facc15">now</text>`;
+        if(ln.vwc!=null){ const vy=y(clamp(ln.vwc,this.VMIN,this.VMAX));
+          s+=`<circle cx="${lx}" cy="${vy}" r="11" fill="none" stroke="#fde047" stroke-width="1.6" opacity=".5"><animate attributeName="r" values="7;13;7" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;.1;.6" dur="2s" repeatCount="indefinite"/></circle>`;
+          s+=`<circle cx="${lx}" cy="${vy}" r="6" fill="#fde047" stroke="#0a0c10" stroke-width="2"/>`;
+          s+=`<text x="${lx+10}" y="${vy-6}" font-size="10.5" font-weight="800" fill="#fde047">live ${ln.vwc.toFixed(1)}%</text>`; }
+        if(ln.ec!=null){ const ey=this.ecToY(clamp(ln.ec,0,10));
+          s+=`<circle cx="${lx}" cy="${ey}" r="5.5" fill="#fb7185" stroke="#0a0c10" stroke-width="2"/>`;
+          s+=`<text x="${lx+10}" y="${ey+4}" font-size="10" font-weight="800" fill="#fb7185">live EC ${ln.ec.toFixed(1)}</text>`; }
+      }
       return s;
     },
+    // current live reading for the active zone, placed on the day clock (t = hours since lights-on)
+    liveNow(){
+      if(!this.live) return null;
+      const z=this.zone;
+      let vwc=num('sensor.crop_steering_zone_'+z+'_vwc'); if(vwc==null && typeof TUNE_RAW!=='undefined' && TUNE_RAW[z]) vwc=num(TUNE_RAW[z].vwc);
+      let ec=num('sensor.crop_steering_zone_'+z+'_ec'); if(ec==null) ec=num('fused_ec');
+      if(vwc==null && ec==null) return null;
+      const d=new Date(), hod=d.getHours()+d.getMinutes()/60, t=(((hod-this.G.lights_on)%24)+24)%24;
+      return {vwc, ec, t};
+    },
+    // plan-vs-live comparison at "now" (plan = the sim value at the same clock time)
+    liveCmp(){ const ln=this.liveNow(); if(!ln) return null;
+      const vp=this.vAt(ln.t), ep=this.ecAt(ln.t);
+      return { t:ln.t, vwcLive:ln.vwc, vwcPlan:vp, vwcD:(ln.vwc!=null?ln.vwc-vp:null),
+               ecLive:ln.ec, ecPlan:ep, ecD:(ln.ec!=null?ln.ec-ep:null) }; },
 
     onDown(e){ const h=e.target.closest&&e.target.closest('[data-h]'); if(h){ this.drag=h.getAttribute('data-h'); try{e.currentTarget.setPointerCapture(e.pointerId)}catch(_){} return; } const b=e.target.closest&&e.target.closest('[data-band]'); if(b) this.hot=b.getAttribute('data-band'); },
     onHover(e){ if(this.drag) return; const g=e.target.closest&&e.target.closest('[data-hk]'); const k=g&&g.getAttribute('data-hk'); this.hov = k||null; },
@@ -4140,6 +4477,11 @@ document.addEventListener('alpine:init', () => {
       wave:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0 3 2 4.5 0M2 17c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0 3 2 4.5 0"/></svg>`,
       scale:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M6 7l-4 7h8zM18 7l-4 7h8zM4 21h16"/></svg>`,
       flag:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></svg>`,
+      book:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+      gauge:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14 4 6"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>`,
+      power:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10M18.36 6.64a9 9 0 1 1-12.73 0"/></svg>`,
+      sun:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`,
+      grid:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
     },
     nav:[
       {id:'dashboard',label:'Status',icon:'dashboard',subs:[['Advisories','advisories'],['Live snapshot','st-snapshot'],['Facility floor','st-floor'],['Plant state','st-plant'],['Substrate 24h','st-trends']]},
@@ -4147,18 +4489,20 @@ document.addEventListener('alpine:init', () => {
       {id:'climate',label:'Climate',icon:'thermo',subs:[['Camera','cl-cam'],['Live climate','cl-live'],['Trends 24h','cl-trends'],['Room controls','cl-controls'],['Hotspot map','cl-hotspot'],['Raw readings','cl-raw']]},
       {id:'control',label:'Operate',icon:'radio',subs:[['Strategy','op-strategy'],['Arm & pump','op-arm'],['Relays & solenoids','op-relays'],['Adaptive','op-adaptive'],['Zones glance','op-zones'],['Engine','op-engine']]},
       {id:'tune',label:'Tune',icon:'scale',subs:[['Steering dial','tune-steer']]},
-      {id:'timeline',label:'Plan',icon:'activity'},
+      {id:'timeline',label:'Plan',icon:'activity',subs:[['Recipe & sync','recipeBar'],['Phase timeline','phaseSpine'],['Environment','Environment','sec'],['Lighting','Lighting','sec'],['Root Zone','Root Zone','sec'],['Steering','Steering','sec'],['Irrigation','Irrigation','sec'],['Tank / Feed','Tank / Feed','sec'],['Steering EC','Steering EC','sec'],['Phase Timing','Phase Timing','sec'],['Shot Sizes %','Shot Sizes %','sec'],['Limits & Hardware','Limits & Hardware','sec'],['Zone Setup','Zone Setup','sec'],['Facility layer','0','zone'],['Zone 1','1','zone'],['Zone 2','2','zone'],['Zone 3','3','zone'],['Parameter chart','chartHost']]},
       {id:'floor',label:'3D Floor',icon:'grid'}],
     camMin:(function(){try{return localStorage.getItem('f2.camMin')==='1'}catch(e){return false}})(),
     floorLoaded:false,
     mobileNav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'climate',label:'Climate',icon:'thermo'},{id:'control',label:'Operate',icon:'radio'},{id:'ai',label:'AI',icon:'ai'}],
 
     view:ls.get('f2.view','dashboard'), sidebarOpen:ls.get('f2.sidebar',true), connected:false, connError:"",
+    easy:ls.get('f2.easy',!DEMO), wiz:false, wizStep:0, wizData:{goal:'balanced',stage:'Bulk',dial:7,strain:'',substrate:6,drippers:2,flow:2.0},   // calm view is the DEFAULT on a fresh browser (paper §10: attention is finite); Pro is one tap, choice persists. Demo stays Pro to showcase.
+    easyEvOpen:null, watchOpen:false,
     cmdOpen:false, cmdQuery:"", aiOpen:false, aiInput:"", aiThinking:false, zoneModal:null, evOpen:ls.get('f2.evOpen',null),
     pumpOpen:false, pump:{hw:[],sw:[],power:null,powerTxt:'—',anyHw:false,deadhead:false,pumpOn:false}, relays:[],
     tip:null, tipT:null,
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
-    headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
+    headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], maturity:{rung:2,name:'Logged',next:''}, chartSmooth:ls.get('f2.chartSmooth',true), zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},telemetry:[],feed:[]},
     climateCtl:[], ctlOpen:ls.get('f2.ctlOpen',{}), snapshot:[], camUrl:'', spOpen:false, spItem:null, floorMini:[], tank:{pct:null,litres:null,sev:'ok',bar:'bg-emerald-500',pctText:'—',litresText:null,width:0}, activityFeed:[], hUser:{name:'Grower',initials:'F2'}, demo:DEMO,
     notes:{}, toasts:[], _tid:0, _toastId:0, _retry:0, _acked:(function(){ try{ const a=ls.get('f2.acked',{}),cut=Date.now()-18*3600e3,o={}; for(const k in a){ if(a[k]>cut) o[k]=a[k]; } return o; }catch(e){ return {}; } })(),
@@ -4167,6 +4511,7 @@ document.addEventListener('alpine:init', () => {
     init(){
       try{ this.notes=JSON.parse(localStorage.getItem("f2.notes"))||{}; }catch(e){}
       try{ const v=new URLSearchParams(location.search).get('view'); if(v && this.nav.some(n=>n.id===v)) this.view=v; }catch(e){}   // optional ?view=<tab> deep-link
+      try{ const qs=new URLSearchParams(location.search); if(qs.has('wizard')){ this.wiz=true; this.wizStep=0; } else if(!localStorage.getItem('f2.wizSeen') && !DEMO && !this.easy){ this.wiz=true; this.wizStep=0; localStorage.setItem('f2.wizSeen','1'); } }catch(e){}   // first-run setup wizard (once, Pro mode only — never popped over the calm easy view), or ?wizard to replay
       this.aiMessages=[{role:'ai',text:"Live F2 context loaded — 3 zones, full sensor fusion. Ask me about a zone, dryback, EC, or the hotspot. I read every sensor so you do not have to."}];
       this.tick();
       this.fetchUser();
@@ -4210,10 +4555,11 @@ document.addEventListener('alpine:init', () => {
     },
     refresh(){
       this.lightsOn=lightsOn(); this.ctx.flower=val("flower_progress")||val("grow_stage")||"F2";
+      statPushAll();   // feed the SPC stats store from this tick (control limits build over the session)
       const rr=runRules();
       this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
       this.headline=computeHeadline(this.adv,this.watch);
-      this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl(); this.pump=buildPump(); this.relays=buildRelays();
+      this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl(); this.pump=buildPump(); this.relays=buildRelays(); this.maturity=maturityScore();
       { const cam=S[CONFIG.E.cam], ct=cam&&cam.attributes&&cam.attributes.access_token; this._camTick=(this._camTick||0)+1;
         this.camUrl=ct?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+CONFIG.E.cam+'?token='+ct+'&_='+this._camTick):''; }
       if(window.__tuneReseed) window.__tuneReseed();   // refresh the Tune editor from live HA (respects its hydrated/unsaved-edit guard)
@@ -4276,14 +4622,24 @@ document.addEventListener('alpine:init', () => {
         {id:'ccRh',key:CONFIG.E.rh,label:'Humidity',unit:'%',color:'#22d3ee',band:CONFIG.BANDS.rh},
         {id:'ccVpd',key:CONFIG.E.air_vpd,label:'Air VPD',unit:'kPa',color:'#fbbf24',band:CONFIG.BANDS.air_vpd},
         {id:'ccCo2',key:CONFIG.E.co2,label:'CO₂',unit:'ppm',color:'#34d399',band:CONFIG.BANDS.co2} ];
-      specs.forEach(sp=>{ const c=document.getElementById(sp.id); if(!c) return; const data=this.bucketize(H[sp.key],s,e,N); const ok=sp.band&&sp.band.ok;
-        const bandPlugin=ok?{id:'bd'+sp.id,beforeDraw(ch){const a=ch.chartArea,sc=ch.scales.y; if(!a)return; const ctx=ch.ctx,y1=sc.getPixelForValue(ok[1]),y0=sc.getPixelForValue(ok[0]); ctx.save(); ctx.fillStyle='rgba(52,211,153,.08)'; ctx.fillRect(a.left,Math.min(y0,y1),a.right-a.left,Math.abs(y0-y1)); ctx.restore();}}:null;
-        if(CHARTS[sp.id]){ CHARTS[sp.id].data.labels=labels; CHARTS[sp.id].data.datasets[0].data=data; CHARTS[sp.id].update('none'); return; }
-        CHARTS[sp.id]=new Chart(c,{type:'line',data:{labels,datasets:[{label:sp.label,data,borderColor:sp.color,backgroundColor:sp.color+'18',borderWidth:2,tension:.35,pointRadius:0,fill:true,spanGaps:true}]},
+      // shared plugin: target band (green) + control limits — centerline (solid) + ±2σ (dashed amber), read from ch.$csLim
+      const csLimPlugin={id:'csLim',beforeDraw(ch){ const L=ch.$csLim,a=ch.chartArea; if(!a||!L) return; const sc=ch.scales.y,ctx=ch.ctx;
+        if(L.ok){ const y1=sc.getPixelForValue(L.ok[1]),y0=sc.getPixelForValue(L.ok[0]); ctx.save(); ctx.fillStyle='rgba(52,211,153,.08)'; ctx.fillRect(a.left,Math.min(y0,y1),a.right-a.left,Math.abs(y0-y1)); ctx.restore(); }
+        if(L.m!=null){ ctx.save(); const ym=sc.getPixelForValue(L.m); ctx.strokeStyle='rgba(148,163,184,.4)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(a.left,ym); ctx.lineTo(a.right,ym); ctx.stroke();
+          ctx.setLineDash([4,4]); ctx.strokeStyle='rgba(232,116,59,.5)'; [L.ucl,L.lcl].forEach(v=>{ const y=sc.getPixelForValue(v); ctx.beginPath(); ctx.moveTo(a.left,y); ctx.lineTo(a.right,y); ctx.stroke(); }); ctx.restore(); } }};
+      specs.forEach(sp=>{ const c=document.getElementById(sp.id); if(!c) return;
+        const rawd=this.bucketize(H[sp.key],s,e,N), vals=rawd.filter(x=>x!=null);
+        const m=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null, sd=vals.length>1?Math.sqrt(vals.reduce((a,b)=>a+(b-m)*(b-m),0)/(vals.length-1)):0;
+        const ucl=m==null?null:m+2*sd, lcl=m==null?null:m-2*sd, ok=sp.band&&sp.band.ok;
+        const data=this.chartSmooth?ewmaArr(rawd):rawd;
+        const ptCol=rawd.map(x=>(x!=null&&ucl!=null&&(x>ucl||x<lcl))?'#fb7185':'rgba(0,0,0,0)'), ptRad=rawd.map(x=>(x!=null&&ucl!=null&&(x>ucl||x<lcl))?3:0);
+        const csLim={m,ucl,lcl,ok};
+        if(CHARTS[sp.id]){ const ch=CHARTS[sp.id]; ch.$csLim=csLim; ch.data.labels=labels; const D=ch.data.datasets[0]; D.data=data; D.pointBackgroundColor=ptCol; D.pointRadius=ptRad; ch.update('none'); return; }
+        CHARTS[sp.id]=new Chart(c,{type:'line',data:{labels,datasets:[{label:sp.label,data,borderColor:sp.color,backgroundColor:sp.color+'18',borderWidth:2,tension:.35,pointRadius:ptRad,pointBackgroundColor:ptCol,pointBorderWidth:0,fill:true,spanGaps:true}]},
           options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:400},interaction:{mode:'index',intersect:false},
             plugins:{legend:{display:false},tooltip:{backgroundColor:'#11161d',callbacks:{label:x=>sp.label+': '+(x.parsed.y==null?'—':x.parsed.y.toFixed(sp.unit==='ppm'?0:1)+' '+sp.unit)}}},
             scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:6,autoSkip:true}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}}}},
-          plugins:bandPlugin?[bandPlugin]:[]}); });
+          plugins:[csLimPlugin]}); CHARTS[sp.id].$csLim=csLim; });
     },
     mountZoneHist(id){ const c=document.getElementById('zoneHistChart'); if(!c) return; if(CHARTS.zh) CHARTS.zh.destroy(); const z=this.zoneById(id); const base=parseFloat(z.vwc)||45; const data=[],labels=[]; for(let i=0;i<40;i++){ data.push(+(base+Math.sin(i/5)*4-(i<20?(20-i)*0.1:0)+(Math.random()-.5)*1.5).toFixed(1)); labels.push(''); }
       CHARTS.zh=new Chart(c,{type:'line',data:{labels,datasets:[{label:'VWC',data,borderColor:'#22d3ee',backgroundColor:'#22d3ee15',borderWidth:2,tension:.4,pointRadius:0,fill:true}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:400},plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}}}}}); },
@@ -4295,6 +4651,17 @@ document.addEventListener('alpine:init', () => {
         const el=document.getElementById(t.anchor);
         if(el){ el.scrollIntoView({behavior:(window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'), block:'center'});
                 el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),1600); } }); }); },
+    // sidebar sub-item dispatch — kind in s[2]: undefined=id-scroll (solve), 'sec'=Plan editor section (expand+scroll), 'zone'=Plan layer switch
+    navSub(view,s){ const kind=s[2];
+      if(!kind){ this.solve({view,anchor:s[1]}); return; }
+      this.go(view); const beh=this.reduced()?'auto':'smooth'; let tries=0;
+      const run=()=>{
+        if(kind==='zone'){ if(window.setZone){ window.setZone(+s[1]); const lb=document.getElementById('layerBar'); if(lb){ lb.scrollIntoView({behavior:beh,block:'center'}); lb.classList.add('flash'); setTimeout(()=>lb.classList.remove('flash'),1600); } return; } }
+        else if(kind==='sec'){ const host=document.getElementById('editorScroll'); const node=host&&host.querySelector('.grp[data-sec="'+s[1].replace(/["\\]/g,'\\$&')+'"]');
+          if(node){ if(node.classList.contains('collapsed')&&window.toggleGroup) window.toggleGroup(s[1]); node.scrollIntoView({behavior:beh,block:'start'}); node.classList.add('flash'); setTimeout(()=>node.classList.remove('flash'),1600); return; } }
+        if(tries++<25) setTimeout(run,50);
+      };
+      this.$nextTick(run); },
     seedTune(){ if(window.__tuneReseed) window.__tuneReseed(); },
     async ctrlSvc(domain,service,data){ try{ await svc(domain,service,data); this.toast("Sent"); setTimeout(()=>this.tick(),700); }catch(e){ this.toast(/401|403/.test(e.message)?"HA session expired — reload the page or re-log in to Home Assistant":"Failed: "+e.message); } },
     ctrlToggle(id,confirmArm){ if(confirmArm && !confirm("Toggle the arm state? This affects live irrigation.")) return; this.ctrlSvc(id.split(".")[0],"toggle",{entity_id:id}); },
@@ -4343,6 +4710,59 @@ document.addEventListener('alpine:init', () => {
     openZone(id){ this.zoneModal=id; },
     zoneById(id){ return this.zones.find(z=>z.id===id)||this.zones[0]; },
     ackAlert(id){ this._acked[id]=Date.now(); ls.set('f2.acked',this._acked); this.adv=this.adv.filter(a=>a.id!==id); this.toast("Advisory acknowledged · stays dismissed ~18h"); },
+    toggleEasy(){ this.easy=!this.easy; ls.set('f2.easy',this.easy); },
+    csToggle(){ this.chartSmooth=!this.chartSmooth; ls.set('f2.chartSmooth',this.chartSmooth); this.$nextTick(()=>this.mountClimateCharts()); },
+    advSpark(a){ try{ return advSparkSvg(a); }catch(e){ return ''; } },
+    async advApply(a){ const fa=FIX_ACTIONS[a.rule]; if(!fa) return;
+      if(!fa.noConfirm && !confirm((a.fixLabel||'Apply fix')+'\n\n'+fa.confirm)) return;
+      try{ await fa.run(this,a); this.toast('Applied: '+(a.fixLabel||'fix')+' — verifying…'); setTimeout(()=>this.tick(),900); }
+      catch(e){ this.toast('Failed: '+e.message); } },
+    // the engine's own words on what it's doing right now — the trust/no-secrets surface
+    decisionTxt(){ return val('decision')||"No decision reported yet."; },
+    nextIrrigTxt(){ const v=val('next_irrig'); if(v==null||v==="") return null; const n=parseFloat(v); return isNaN(n)?String(v):(n<1?Math.round(n*60)+" min":n.toFixed(1)+" h"); },
+    // a handful of vitals with target + plain-language status + WHY, for easy mode
+    easyVitals(){
+      const mk=(label,key,unit,dec,bandKey,why)=>{ const v=num(key); const st=bandKey?band(bandKey,v):'ok';
+        return {label, val:v==null?'—':fmt(v,dec), unit, sev:st, why}; };
+      const ec=num('fused_ec'), ecOff=Math.abs((ec||0)-CONFIG.EC_TARGET);
+      const db=num('dryback_pct'), dt=num('dryback_target');
+      return [
+        mk('Wetness','avg_vwc','%',0,null,'Average water in the blocks. The controller tops up when it dips below the P2 line and lets it dry back overnight.'),
+        {label:'Pore EC', val:ec==null?'—':fmt(ec,1), unit:'mS/cm', sev:ecOff>1.2?'warn':'ok', why:'Salt strength at the roots. Target '+fmt(CONFIG.EC_TARGET,1)+'. Small shots stack it up; big shots / runoff flush it down.'},
+        {label:'Dryback', val:db==null?'—':fmt(db,0), unit:'%', sev:(db!=null&&dt!=null&&db<dt*0.6)?'warn':'ok', why:'How far the blocks dried from peak. Target '+fmt(dt,0)+'%. Deeper dryback steers generative; shallow steers vegetative.'},
+        mk('Air VPD','air_vpd','kPa',2,'air_vpd','Leaf push for transpiration. In band = comfortable. Too high stresses, too low invites mould and weak transpiration.'),
+      ];
+    },
+    // ── SETUP WIZARD ──
+    wizSteps:['Welcome','Your goal','Growth stage','Steering','Hardware','Review & apply'],
+    wizPlan(){ const d=this.wizData, gf=Math.max(0,Math.min(1,(d.dial-1)/9));
+      const db=Math.round(18+gf*30);
+      const steer=d.dial<3?'deep vegetative':d.dial<5?'vegetative':d.dial<5.5?'balanced':d.dial<7.5?'generative':'hard generative';
+      const ec=({Clone:1.8,Veg:2.6,Stretch:3.0,Bulk:3.4,Finish:3.0})[d.stage]||3.0;
+      const goalNote=({yield:'Feed kept strong, shots generous — biomass first. Potency rides genetics.',potency:'Leaner late feed + deeper finish dryback — small %THC gain for a small yield cost.',balanced:'Textbook targets — strong frame, clean finish, no deliberate stress.'})[d.goal];
+      return { steer, db, ec, rows:[
+        {label:'Steering', val:d.dial.toFixed(1)+' · '+steer, why:'How hard the plant is pushed generative. Sets dryback depth and shot timing across all 3 zones.'},
+        {label:'Overnight dryback', val:db+'%', why:'Blocks dry this far from peak before lights-on. Deeper = more generative signal; shallower = vegetative bulk.'},
+        {label:'Stage (Athena)', val:d.stage, why:'Loads the '+d.stage+' EC and phase targets — pore EC around '+ec.toFixed(1)+' mS/cm.'},
+        {label:'Goal', val:d.goal, why:goalNote},
+        {label:'Hardware', val:d.substrate+' L · '+d.drippers+' drip/plant · '+d.flow+' L/h', why:'Substrate + dripper sizing — drives shot volume in mL and the daily water budget.'},
+      ]};
+    },
+    wizApply(writeHA){
+      const el=document.getElementById('tuneRoot');
+      let ed=null; try{ if(el && window.Alpine) ed=Alpine.$data(el); }catch(e){}
+      if(!ed){ this.toast('Tune editor not ready — open the Tune tab once, then retry'); return; }
+      const d=this.wizData;
+      if('substrate_volume' in ed.G) ed.G.substrate_volume=d.substrate;
+      if('drippers_per_plant' in ed.G) ed.G.drippers_per_plant=d.drippers;
+      if('dripper_flow_rate' in ed.G) ed.G.dripper_flow_rate=d.flow;
+      ed.dial=Math.max(1,Math.min(10,d.dial)); ed.mode=ed.dial>=5.5?'gen':'veg';
+      ed.applyAthena(d.stage); ed.applySteer(); ed.persist();
+      this.wiz=false; if(this.easy) this.toggleEasy();
+      this.go('tune');
+      if(writeHA && getToken()) this.$nextTick(()=>{ try{ ed.applyToHA(); }catch(e){} });
+      else this.toast('Recipe staged in Tune — review the curve, then Apply to HA');
+    },
     openInsight(ins){ this.aiOpen=true; this.aiMessages.push({role:'user',text:ins.title}); this.aiThinking=true; this.scrollAI(); setTimeout(()=>{ this.aiThinking=false; this.aiMessages.push({role:'ai',text:ins.body}); this.scrollAI(); },650); },
     saveNotes(){ try{ localStorage.setItem("f2.notes",JSON.stringify(this.notes)); }catch(e){} },
     toast(msg){ const id=++this._toastId; this.toasts.push({id,msg}); setTimeout(()=>{ this.toasts=this.toasts.filter(t=>t.id!==id); },2600); },
