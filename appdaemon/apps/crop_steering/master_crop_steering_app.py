@@ -4076,8 +4076,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     ec_deficit = target_ec - current_ec
                     if ec_deficit > 0.5:  # Significant deficit
                         return {
-                            'needs_irrigation': True,
-                            'reason': f'EC stacking: building EC from {current_ec:.2f} to {target_ec:.2f} target',
+                            'needs_irrigation': False,
+                            'reason': f'EC stacking: hold for dryback to build EC {current_ec:.2f}->{target_ec:.2f} (withhold water; irrigating sub-target feed cannot raise pore-EC)',
                             'confidence': 0.7,
                             'ec_ratio': ec_ratio,
                             'action': 'stack'
