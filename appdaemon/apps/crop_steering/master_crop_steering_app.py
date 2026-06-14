@@ -3570,19 +3570,35 @@ class MasterCropSteeringApp(BaseAsyncApp):
             return None
 
     async def _handle_critical_ec(self, ec_level: float):
-        """Handle critical EC levels."""
+        """Handle critical EC levels. Throttled (1 alert / 30 min) + deduped (fixed
+        notification_id / phone tag) so a sustained critical EC cannot spam thousands of
+        cards. The EC-update callback invokes this on every sensor reading while EC > critical."""
         try:
             self.log(f"🚨 Critical EC level handling: {ec_level:.2f} mS/cm")
-            
+
+            # Anti-spam throttle: at most one alert per 30 min (lazy-init attr, no __init__ edit).
+            now = datetime.now()
+            last = getattr(self, '_last_critical_ec_notify', None)
+            if last is not None and (now - last).total_seconds() < 1800:
+                return
+            self._last_critical_ec_notify = now
+
             # Alert via configured notification service
             notification_service = self.config.get('notification_service', 'notify.persistent_notification')
-            if notification_service and notification_service.startswith('notify.'):
+            if notification_service == 'notify.persistent_notification':
+                # Fixed notification_id -> repeats REPLACE the single card instead of stacking 1000s.
+                await self.call_service('persistent_notification/create',
+                                notification_id='crop_steering_critical_ec',
+                                title='🚨 Crop Steering — Critical EC',
+                                message=f"Critical EC level detected: {ec_level:.2f} mS/cm (throttled to 1/30min)")
+            elif notification_service and notification_service.startswith('notify.'):
                 service_name = notification_service.replace('.', '/')
-                await self.call_service(service_name, 
-                                message=f"🚨 Critical EC level detected: {ec_level:.2f} mS/cm")
+                await self.call_service(service_name,
+                                message=f"🚨 Critical EC level detected: {ec_level:.2f} mS/cm",
+                                data={'tag': 'crop_steering_critical_ec'})
             else:
                 self.log(f"📱 Critical EC Alert: {ec_level:.2f} mS/cm")
-            
+
         except Exception as e:
             self.log(f"❌ Error handling critical EC: {e}", level='ERROR')
 
