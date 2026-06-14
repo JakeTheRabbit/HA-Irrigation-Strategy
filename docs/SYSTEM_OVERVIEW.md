@@ -76,6 +76,29 @@ photoperiod's data across two dates).
 > **Dryback semantics:** every "dryback" value is a *percentage-point drop from peak
 > VWC* — how much it dries back **by**, not the VWC it dries back **to**.
 
+#### Worked example — one zone, one grow-day
+
+Setpoints for this zone: lights **08:00 → 20:00** (12 h photoperiod); field capacity /
+P1 target ≈ **64 % VWC**; P0 morning-dryback target **8 %**; P2 re-water threshold
+**57 %**; P3 emergency floor **40 %**. The **peak** the engine remembers is **64 %** — the
+field-capacity high it last refilled to at the end of yesterday's P1.
+
+| Clock | Phase | VWC | What happens & why |
+|---|---|---|---|
+| 08:00 | **P0** | **57 %** | Lights on. Peak (yesterday's refill) = **64 %**; it dried to 57 % overnight — already **7 %** down. The engine **waits, no water**, for a full **8 %** dryback from peak. |
+| 08:00→08:45 | **P0** | 57 → **56 %** | One more point of dryback. 64 − 8 = **56 %**. The instant VWC hits 56 %, the 8 % target is met → exit P0. **Dried back *by* 8, dried back *to* 56** — that's the whole semantics. *(If overnight had already passed 56 %, P0 exits immediately — the "already-dry bypass.")* |
+| 08:45 | **P1** | **56 %** | Ramp-up: progressive shots, each slightly bigger, climbing toward the **64 % field-capacity target**. |
+| 08:45→09:30 | **P1** | 56 → **64 %** | ~3 shots refill to 64 % → target reached → exit P1. *(If it stalled, max-shots or a wall-clock timeout would exit it anyway.)* This 64 % is the day's new **peak**. |
+| 09:30→17:00 | **P2** | sawtooth **57–62 %** | Maintenance. Every time VWC drops **below the 57 % threshold**, one top-up fires; it rises a few points, dries back, repeats — the daytime sawtooth. *(EC stacking can nudge that 57 % up or down through the day.)* |
+| ~17:00 | **P2 → P3** | — | A few hours before lights-off the engine **stops maintaining** and lets it ride down → **P3**. |
+| 17:00→08:00 | **P3** | ~60 → **57 %** | Overnight dryback through the dark. **No watering** unless VWC would breach the **40 % floor** — only then a rescue shot. This overnight Δ is the generative steering signal. Ends ~57 % → ready for tomorrow's P0. |
+| 08:00 (next) | **P0** | — | Lights on. **Daily water + shot counters reset here** (not at midnight) — this is the real grow-day boundary. Back to the top. |
+
+So *"dryback 8 %"* means **"dried from 64 down to 56"** (a distance, not a destination), while
+*"P2 threshold 57 %"* means **"re-water whenever it falls under 57"** (a destination). Two setpoints,
+two different reference points, same unit — which is exactly why the bare numbers confuse people, and
+why the table walks the actual VWC.
+
 ### EC stacking (autonomous, P2)
 
 When `switch.crop_steering_ec_stacking_enabled` is on, the engine closes a loop on

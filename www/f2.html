@@ -712,6 +712,19 @@
           <span class="text-sm text-slate-300" x-text="connError||'Connecting to Home Assistant…'"></span>
         </div>
 
+        <!-- zone quick-controls — enable/disable + jump, right on the main page -->
+        <div class="grid grid-cols-3 gap-3">
+          <template x-for="z in zones" :key="z.id">
+            <div class="glass rounded-2xl p-3 flex items-center gap-2.5" :class="!z.enabled&&'opacity-60'">
+              <button @click="zoneModal=z.id" class="flex-1 min-w-0 text-left">
+                <div class="flex items-center gap-2"><span class="text-sm font-semibold" x-text="z.name"></span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0" :class="sevBg(z.status)+' '+sevText(z.status)" x-text="z.phase"></span></div>
+                <div class="text-[11px] text-slate-400 mt-0.5"><span class="font-semibold" :class="sevText(z.status)" x-text="z.vwc"></span>% wet · EC <span x-text="z.ec"></span></div>
+              </button>
+              <button @click.stop="ctrlToggle('switch.crop_steering_zone_'+z.id+'_enabled',false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="z.enabled?'bg-emerald-500':'bg-white/15'" :title="z.enabled?'Zone enabled — tap to disable':'Zone disabled — tap to enable'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="z.enabled&&'translate-x-5'"></span></button>
+            </div>
+          </template>
+        </div>
+
         <!-- ADVISORIES (lead section — alerts first) -->
         <div id="advisories" class="grid grid-cols-1 xl:grid-cols-3 gap-4 scroll-mt-28">
           <div class="xl:col-span-2">
@@ -951,6 +964,37 @@
           <h3 class="text-sm font-semibold mb-3 flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Source water &amp; engine</h3>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <template x-for="m in steeringMeta" :key="m.label"><div class="rounded-xl bg-white/[0.03] border border-white/8 p-3"><div class="text-[11px] text-slate-400 flex items-center"><span x-text="m.label"></span><span class="tipi" @mouseenter="tipShow($event,m.label)" @mouseleave="tipHide()" @click.stop="tipShow($event,m.label)">ⓘ</span></div><div class="font-semibold mt-0.5" :class="m.cls" x-text="m.val"></div></div></template>
+          </div>
+
+          <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <!-- volume fed vs daily target — a barrel filling per zone -->
+            <div>
+              <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-2">Volume fed vs daily cap</div>
+              <div class="grid grid-cols-3 gap-3">
+                <template x-for="w in waterBars()" :key="w.id">
+                  <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3 flex flex-col items-center gap-1.5">
+                    <span class="text-[11px] text-slate-400" x-text="w.name"></span>
+                    <div class="relative w-10 h-20 rounded-md border border-white/15 overflow-hidden bg-white/[0.02]">
+                      <div class="absolute bottom-0 inset-x-0 transition-all duration-500" :class="w.sev==='crit'?'bg-red-500/70':w.sev==='warn'?'bg-amber-400/70':'bg-cyan-400/60'" :style="'height:'+(w.pct==null?0:w.pct)+'%'"></div>
+                      <div class="absolute inset-0 grid place-items-center text-[11px] font-bold" :class="(w.pct||0)>=50?'text-white':'text-slate-300'" x-text="w.pct==null?'—':w.pct+'%'"></div>
+                    </div>
+                    <span class="text-[11px] font-semibold" :class="w.sev==='crit'?'text-red-400':w.sev==='warn'?'text-amber-400':'text-slate-200'"><span x-text="w.dayL==null?'—':w.dayL.toFixed(0)"></span><span class="text-slate-500 font-normal"> / <span x-text="w.maxD==null?'∞':w.maxD.toFixed(0)"></span> L</span></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <!-- irrigation frequency — shots so far + next shot per zone -->
+            <div>
+              <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-2">Irrigation frequency · today</div>
+              <div class="space-y-2.5">
+                <template x-for="w in waterBars()" :key="'f'+w.id">
+                  <div class="rounded-xl bg-white/[0.03] border border-white/8 p-2.5">
+                    <div class="flex items-center justify-between text-[12px] mb-1.5"><span class="text-slate-300 font-medium" x-text="w.name"></span><span class="text-slate-400"><b class="text-slate-100" x-text="w.shots==null?'—':w.shots"></b> shots · next <b class="text-cyan-300" x-text="w.nextTxt"></b></span></div>
+                    <div class="h-2 rounded-full bg-white/8 overflow-hidden"><div class="h-full rounded-full bg-emerald-400/70 transition-all duration-500" :style="'width:'+(w.shots==null?0:Math.min(100,w.shots/20*100))+'%'"></div></div>
+                  </div>
+                </template>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -1319,7 +1363,7 @@
                instant load, no model download, serves on the public demo too; in live embed it polls HA
                so rooms glow when their lights are on and a room click deep-links the dashboard -->
           <template x-if="view==='floor'">
-            <iframe src="./floorplan/index.html?embed&v=5" class="absolute inset-0 w-full h-full border-0 block" title="Facility 3D floor plan"></iframe>
+            <iframe src="./floorplan/index.html?embed&v=9" class="absolute inset-0 w-full h-full border-0 block" title="Facility 3D floor plan"></iframe>
           </template>
         </div>
         <div class="text-[11px] text-slate-500 mt-2 px-1 flex items-center gap-1.5"><span x-html="icons.grid" class="w-3.5 h-3.5 block"></span> Drag to orbit, scroll to zoom, right-drag to pan · lit rooms have their lights on · click a grow room to jump to its dashboard.</div>
@@ -1421,7 +1465,7 @@
               </template>
             </div>
           </div>
-          <div class="rounded-2xl bg-white/[0.03] border border-white/8 p-4"><div class="text-xs font-semibold text-slate-300 mb-2">24h wetness</div><div class="h-40"><canvas id="zoneHistChart"></canvas></div></div>
+          <div class="rounded-2xl bg-white/[0.03] border border-white/8 p-4"><div class="flex items-center justify-between mb-2"><div class="text-xs font-semibold text-slate-300">24h VWC + pore EC</div><div class="text-[10px] text-slate-500">red — floor · pink — EC target</div></div><div class="h-48"><canvas id="zoneHistChart"></canvas></div></div>
           <div class="rounded-2xl bg-white/[0.03] border border-white/8 p-4"><div class="text-xs font-semibold text-slate-300 mb-2">Operator notes</div><textarea x-model="notes['z'+z.id]" @input.debounce.600="saveNotes()" rows="2" placeholder="Log an observation…" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 resize-none"></textarea></div>
         </div>
       </div>
@@ -1608,7 +1652,7 @@ function seedDemo(){
   [1,2,3].forEach((z,i)=>{ const P='crop_steering_zone_'+z+'_', vwc=[57,59,58][i], ec=[3.0,3.1,2.9][i];
     set('sensor.'+P+'vwc',vwc); set('sensor.'+P+'ec',ec); set('sensor.'+P+'phase','P2'); set('sensor.'+P+'status','Optimal');
     set('sensor.'+P+'safety_status','safe'); set('sensor.'+P+'vmax_detected',+(vwc+15.2).toFixed(1)); set('sensor.'+P+'last_irrigation_app',iso(-20));
-    set('sensor.'+P+'daily_water_app',[52,55,50][i]); set('sensor.'+P+'irrigation_count_app',9); set('sensor.'+P+'p3_prediction',26);
+    set('sensor.'+P+'daily_water_app',[52,55,50][i]); set('sensor.'+P+'irrigation_count_app',[11,9,7][i]); set('sensor.'+P+'p3_prediction',26); set('number.'+P+'max_daily_volume',[150,120,90][i]);
     set('sensor.crop_steering_prediction_zone_'+z+'_next_irrigation_hours',0.6);
     set('number.'+P+'p2_vwc_threshold',[42,43,43][i]); set('number.'+P+'p3_emergency_vwc_threshold',38);
     set('number.'+P+'ec_target_gen_p2',6.0); set('number.'+P+'ec_target_veg_p2',3.0); set('number.'+P+'p2_shot_size',5);
@@ -1649,6 +1693,7 @@ function seedDemo(){
 function demoHist(ids,hours){ const end=Date.now(), start=end-hours*3600e3, out={__start:start,__end:end};
   ids.forEach(id=>{ const pts=[];
     if(/_vwc/.test(id)){ for(let i=0;i<=48;i++){ const t=start+(end-start)*i/48, ph=(i%8)/8; pts.push({t,v:+(52+(1-ph)*7).toFixed(1)}); } }
+    else if(/_ec($|_)/.test(id)){ for(let i=0;i<=48;i++){ const t=start+(end-start)*i/48, ph=(i%8)/8; pts.push({t,v:+(3.0+ph*1.2).toFixed(2)}); } }   // pore-EC stacks through the dryback, dips on the shot
     else { let b=58; if(/air_temp|temperature/.test(id))b=25; else if(/humidity|_rh\b/.test(id))b=62; else if(/vpd/.test(id))b=1.15; else if(/co2/.test(id))b=1300; else if(/ppfd/.test(id))b=1000;
       for(let i=0;i<=48;i++){ const t=start+(end-start)*i/48; pts.push({t,v:+(b+Math.sin(i/6)*b*0.03).toFixed(2)}); } }
     out[id]=pts; });
@@ -4641,8 +4686,27 @@ document.addEventListener('alpine:init', () => {
             scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:6,autoSkip:true}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}}}},
           plugins:[csLimPlugin]}); CHARTS[sp.id].$csLim=csLim; });
     },
-    mountZoneHist(id){ const c=document.getElementById('zoneHistChart'); if(!c) return; if(CHARTS.zh) CHARTS.zh.destroy(); const z=this.zoneById(id); const base=parseFloat(z.vwc)||45; const data=[],labels=[]; for(let i=0;i<40;i++){ data.push(+(base+Math.sin(i/5)*4-(i<20?(20-i)*0.1:0)+(Math.random()-.5)*1.5).toFixed(1)); labels.push(''); }
-      CHARTS.zh=new Chart(c,{type:'line',data:{labels,datasets:[{label:'VWC',data,borderColor:'#22d3ee',backgroundColor:'#22d3ee15',borderWidth:2,tension:.4,pointRadius:0,fill:true}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:400},plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}}}}}); },
+    async mountZoneHist(id){ const c=document.getElementById('zoneHistChart'); if(!c) return; if(CHARTS.zh){ CHARTS.zh.destroy(); CHARTS.zh=null; }
+      const Z=CONFIG.ZONE(id), N=48; let H=null; try{ H=await this.loadHist([Z.vwc,Z.ec],24); }catch(e){}
+      const cc=document.getElementById('zoneHistChart'); if(!cc) return;   // modal closed mid-fetch
+      if(!H){ return; }
+      const s=H.__start,e=H.__end, labels=this.histLabels(s,e,N);
+      let vwcD=this.bucketize(H[Z.vwc],s,e,N), ecD=this.bucketize(H[Z.ec],s,e,N);
+      if(this.chartSmooth){ vwcD=ewmaArr(vwcD); ecD=ewmaArr(ecD); }
+      const z=this.zoneById(id), floor=parseFloat(z.floor), ecTgt=num('ec_target')||CONFIG.EC_TARGET;
+      // floor line (VWC axis, red dashed) + EC target (right axis, pink dashed) for context
+      const refPlugin={id:'zref',beforeDraw(ch){ const a=ch.chartArea,ctx=ch.ctx; if(!a) return;
+        const yv=ch.scales.yV; if(yv&&!isNaN(floor)){ const y=yv.getPixelForValue(floor); ctx.save(); ctx.strokeStyle='rgba(248,113,113,.55)'; ctx.setLineDash([4,3]); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(a.left,y); ctx.lineTo(a.right,y); ctx.stroke(); ctx.restore(); }
+        const ye=ch.scales.yE; if(ye&&ecTgt!=null){ const y=ye.getPixelForValue(ecTgt); ctx.save(); ctx.strokeStyle='rgba(244,114,182,.4)'; ctx.setLineDash([4,3]); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(a.left,y); ctx.lineTo(a.right,y); ctx.stroke(); ctx.restore(); } }};
+      CHARTS.zh=new Chart(cc,{type:'line',data:{labels,datasets:[
+        {label:'VWC %',data:vwcD,yAxisID:'yV',borderColor:'#22d3ee',backgroundColor:'#22d3ee15',borderWidth:2,tension:.35,pointRadius:0,fill:true,spanGaps:true},
+        {label:'pore EC',data:ecD,yAxisID:'yE',borderColor:'#f472b6',backgroundColor:'transparent',borderWidth:2,tension:.35,pointRadius:0,fill:false,spanGaps:true}
+      ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:400},interaction:{mode:'index',intersect:false},
+        plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:9,usePointStyle:true,font:{size:10}}},tooltip:{backgroundColor:'#11161d',callbacks:{label:x=>x.dataset.label+': '+(x.parsed.y==null?'—':x.parsed.y.toFixed(1)+(x.dataset.yAxisID==='yV'?' %':' mS'))}}},
+        scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:6,autoSkip:true}},
+          yV:{position:'left',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#22d3ee',font:{size:10},callback:v=>v+'%'}},
+          yE:{position:'right',grid:{display:false},ticks:{color:'#f472b6',font:{size:10}},suggestedMin:0}}},
+        plugins:[refPlugin]}); },
 
     /* actions */
     go(v){ this.view=v; window.scrollTo({top:0,behavior:this.reduced()?'auto':'smooth'}); },
@@ -4717,6 +4781,14 @@ document.addEventListener('alpine:init', () => {
       if(!fa.noConfirm && !confirm((a.fixLabel||'Apply fix')+'\n\n'+fa.confirm)) return;
       try{ await fa.run(this,a); this.toast('Applied: '+(a.fixLabel||'fix')+' — verifying…'); setTimeout(()=>this.tick(),900); }
       catch(e){ this.toast('Failed: '+e.message); } },
+    // per-zone water budget + shot frequency for the barrel + frequency cards
+    waterBars(){ return [1,2,3].map(z=>{ const P='crop_steering_zone_'+z+'_';
+      const dayL=num('sensor.'+P+'daily_water_app'), maxD=num('number.'+P+'max_daily_volume');
+      const shots=num('sensor.'+P+'irrigation_count_app'), nh=num('sensor.crop_steering_prediction_zone_'+z+'_next_irrigation_hours');
+      const pct=(dayL!=null&&maxD)?Math.min(100,Math.round(dayL/maxD*100)):null;
+      const nextTxt=nh==null?'—':(nh<=0?'now':nh<1?Math.round(nh*60)+'m':nh.toFixed(1)+'h');
+      return { id:z, name:'Zone '+z, dayL, maxD, pct, shots, nextTxt,
+        sev: pct==null?'ok':pct>=100?'crit':pct>=85?'warn':'ok' }; }); },
     // the engine's own words on what it's doing right now — the trust/no-secrets surface
     decisionTxt(){ return val('decision')||"No decision reported yet."; },
     nextIrrigTxt(){ const v=val('next_irrig'); if(v==null||v==="") return null; const n=parseFloat(v); return isNaN(n)?String(v):(n<1?Math.round(n*60)+" min":n.toFixed(1)+" h"); },
