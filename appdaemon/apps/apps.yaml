@@ -60,6 +60,19 @@ master_crop_steering:
     notify_service: notify.mobile_app_s23ultra
     override_minutes: 30
 
+# lean_crop_steering: the distilled re-implementation (single file, pure decide() core,
+# 29/29 unit tests pass). STAGED — runs ALONGSIDE master in SHADOW: with
+# input_boolean.lean_actuate_enabled OFF (or absent → fail-safe off) it computes + logs
+# every decision ("WOULD fire / WOULD transition") but touches NO hardware. Master keeps
+# driving the grow. Only after ≥3 photoperiods of logged shadow-parity vs master, a
+# firing-disabled hardware dry-run, then a supervised cutover (disable master here, flip
+# the flag) does lean actuate. Hardware/sensor map + lights 10/22 are baked as F2 defaults
+# in the app, so this entry is minimal; uncomment to deploy (needs an AppDaemon restart).
+# lean_crop_steering:
+#   module: crop_steering.lean_crop_steering
+#   class: LeanCropSteering
+#   log_level: INFO
+
 # Python modules the engine references when available (all features degrade gracefully
 # to pure-Python if these aren't installed in the AppDaemon environment).
 global_modules:
