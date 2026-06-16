@@ -883,21 +883,21 @@
           </div>
         </div>
 
-        <!-- facility floor mini → opens the 3D twin -->
-        <button id="st-floor" @click="go(floor)" class="glass rounded-2xl p-4 w-full text-left hover:border-white/15 lift block scroll-mt-28">
-          <div class="flex items-center justify-between mb-3"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.grid" class="w-4 h-4 block text-emerald-400"></span> Facility floor</h2><span class="text-[11px] text-emerald-300/80">open 3D twin →</span></div>
-          <div class="flex items-center gap-4">
-            <div class="grid grid-cols-2 grid-rows-2 gap-1.5 w-44 h-28 shrink-0">
+        <!-- facility floor mini → opens the 3D twin (compact full-width strip) -->
+        <button id="st-floor" @click="go(floor)" class="glass rounded-2xl px-4 py-3 w-full text-left hover:border-white/15 lift block scroll-mt-28">
+          <div class="flex items-center gap-4 flex-wrap">
+            <div class="flex items-center gap-2 shrink-0"><span x-html="icons.grid" class="w-4 h-4 block text-emerald-400"></span><span class="text-sm font-semibold">Facility floor</span></div>
+            <div class="flex items-center gap-2 flex-1 min-w-[180px]">
               <template x-for="r in floorMini" :key="r.key">
-                <div class="rounded-lg border flex items-center justify-center text-[11px] font-semibold transition-colors" :style="'grid-column:'+(r.col+1)+';grid-row:'+(r.row+1)" :class="r.lit?'bg-amber-300/25 border-amber-300/50 text-amber-100':'bg-white/[0.02] border-white/8 text-slate-500'">
-                  <span x-text="r.label"></span>
+                <div class="flex-1 min-w-0 rounded-lg border px-3 py-2 flex items-center justify-center gap-1.5 text-[12px] font-semibold transition-colors" :class="r.lit?'bg-amber-300/20 border-amber-300/50 text-amber-100':'bg-white/[0.02] border-white/8 text-slate-500'" :title="r.lit?'lights on':'dark'">
+                  <span class="w-2 h-2 rounded-full shrink-0" :class="r.lit?'bg-amber-300':'bg-slate-600'"></span>
+                  <span x-text="r.label" class="truncate"></span>
                 </div>
               </template>
             </div>
-            <div class="text-[12px] text-slate-400">
-              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-amber-300/60"></span> lights on</div>
-              <div class="flex items-center gap-1.5 mt-1"><span class="w-2.5 h-2.5 rounded bg-white/10"></span> dark</div>
-              <div class="mt-2 text-slate-300 font-medium" x-text="floorMini.filter(r=>r.lit).length+' / '+floorMini.length+' rooms lit'"></div>
+            <div class="flex items-center gap-3 shrink-0">
+              <span class="text-[12px] text-slate-300 font-medium" x-text="floorMini.filter(r=>r.lit).length+' / '+floorMini.length+' lit'"></span>
+              <span class="text-[11px] text-emerald-300/80">open 3D twin →</span>
             </div>
           </div>
         </button>
