@@ -823,6 +823,27 @@
           </div>
         </div>
 
+        <!-- substrate VWC + pore-EC trend (moved high — core steering view) + AI -->
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div class="xl:col-span-2 glass rounded-2xl p-4 md:p-5">
+            <div id="st-trends" class="flex items-center justify-between gap-3 mb-3 scroll-mt-28"><h3 class="text-sm font-semibold flex items-center gap-2 shrink-0"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Substrate VWC + pore EC · <span x-text="rangeLabel()"></span></h3><span class="inline-flex rounded-lg overflow-hidden border border-white/10 shrink-0" title="≤2 days = full-resolution history · longer = hourly long-term statistics (kept beyond the 14-day recorder window)"><template x-for="r in ['24h','3d','7d','30d']" :key="r"><button @click="setRange(r)" :class="gRange===r?'bg-emerald-500/80 text-slate-900 font-bold':'text-slate-400 hover:bg-white/5'" class="px-2.5 py-1 text-[11px] transition" x-text="r"></button></template></span></div>
+            <div class="h-72"><canvas id="trendChart"></canvas></div>
+          </div>
+          <div class="glass rounded-2xl p-4 md:p-5 flex flex-col">
+            <h3 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.ai" class="w-4 h-4 block text-emerald-400"></span> Plant-State AI</h3>
+            <div class="space-y-2.5 flex-1 overflow-y-auto scrollx pr-1" style="max-height:14rem">
+              <template x-for="ins in insights" :key="ins.id">
+                <button @click="openInsight(ins)" class="w-full text-left p-3 rounded-xl bg-white/[0.03] border border-white/8 hover:border-emerald-400/30 hover:bg-emerald-500/[0.06] transition">
+                  <div class="flex items-center gap-2 mb-1"><span class="w-1.5 h-1.5 rounded-full" :class="dotClass(ins.sev)"></span><span class="text-xs font-semibold" x-text="ins.title"></span></div>
+                  <div class="text-[11px] text-slate-400 line-clamp-2" x-text="ins.summary"></div>
+                </button>
+              </template>
+              <div x-show="!insights.length" class="text-center text-sm text-slate-500 py-6">Reading F2…</div>
+            </div>
+            <button @click="aiOpen=true" class="mt-3 w-full h-10 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/25 transition">Open AI co-pilot</button>
+          </div>
+        </div>
+
         <!-- ===== facility glance: source tank · live 3D · room camera · activity ===== -->
         <div class="space-y-3">
           <!-- source tank fullness bar -->
@@ -916,27 +937,6 @@
                 <div x-show="g.track" class="track mt-2"><div class="okband" :style="'left:'+g.okL+'%;width:'+g.okW+'%'"></div><div class="marker" :class="markerBg(g.status)" :style="'left:'+g.mk+'%'"></div></div>
               </div>
             </template>
-          </div>
-        </div>
-
-        <!-- trends + AI -->
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div class="xl:col-span-2 glass rounded-2xl p-4 md:p-5">
-            <div id="st-trends" class="flex items-center justify-between gap-3 mb-3 scroll-mt-28"><h3 class="text-sm font-semibold flex items-center gap-2 shrink-0"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Substrate · <span x-text="rangeLabel()"></span></h3><span class="inline-flex rounded-lg overflow-hidden border border-white/10 shrink-0" title="≤2 days = full-resolution history · longer = hourly long-term statistics (kept beyond the 14-day recorder window)"><template x-for="r in ['24h','3d','7d','30d']" :key="r"><button @click="setRange(r)" :class="gRange===r?'bg-emerald-500/80 text-slate-900 font-bold':'text-slate-400 hover:bg-white/5'" class="px-2.5 py-1 text-[11px] transition" x-text="r"></button></template></span></div>
-            <div class="h-60"><canvas id="trendChart"></canvas></div>
-          </div>
-          <div class="glass rounded-2xl p-4 md:p-5 flex flex-col">
-            <h3 class="text-sm font-semibold flex items-center gap-2 mb-3"><span x-html="icons.ai" class="w-4 h-4 block text-emerald-400"></span> Plant-State AI</h3>
-            <div class="space-y-2.5 flex-1 overflow-y-auto scrollx pr-1" style="max-height:14rem">
-              <template x-for="ins in insights" :key="ins.id">
-                <button @click="openInsight(ins)" class="w-full text-left p-3 rounded-xl bg-white/[0.03] border border-white/8 hover:border-emerald-400/30 hover:bg-emerald-500/[0.06] transition">
-                  <div class="flex items-center gap-2 mb-1"><span class="w-1.5 h-1.5 rounded-full" :class="dotClass(ins.sev)"></span><span class="text-xs font-semibold" x-text="ins.title"></span></div>
-                  <div class="text-[11px] text-slate-400 line-clamp-2" x-text="ins.summary"></div>
-                </button>
-              </template>
-              <div x-show="!insights.length" class="text-center text-sm text-slate-500 py-6">Reading F2…</div>
-            </div>
-            <button @click="aiOpen=true" class="mt-3 w-full h-10 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/25 transition">Open AI co-pilot</button>
           </div>
         </div>
 
@@ -4816,7 +4816,7 @@ document.addEventListener('alpine:init', () => {
       try{
         if(which==='climate'){ const ids=[CONFIG.E.air_temp,CONFIG.E.rh,CONFIG.E.air_vpd,CONFIG.E.co2,CONFIG.E.ppfd].filter(Boolean);
           this._h_climate=await this.loadHist(ids,24); this.$nextTick(()=>this.mountClimateCharts()); }
-        else { const ids=[1,2,3].map(z=>'sensor.crop_steering_zone_'+z+'_vwc'); const R=this.RANGES[this.gRange]||{hours:24,stat:false};
+        else { const ids=[1,2,3].flatMap(z=>['sensor.crop_steering_zone_'+z+'_vwc','sensor.crop_steering_zone_'+z+'_ec']); const R=this.RANGES[this.gRange]||{hours:24,stat:false};
           this._h_dashboard=await (R.stat?this.loadStats(ids,R.hours):this.loadHist(ids,R.hours)); this.$nextTick(()=>this.mountTrend()); }
       }catch(e){ console.warn('history load failed',e); this['_hts_'+which]=0; }
       finally{ this['_loading_'+which]=false; }
@@ -4856,17 +4856,21 @@ document.addEventListener('alpine:init', () => {
       const first=series[0].v; for(let b=0;b<N;b++){ if(out[b]==null) out[b]=first; else break; } return out;
     },
     histLabels(start,end,N){ const span=(end-start)/N, longSpan=(end-start)>2*86400e3, out=[]; for(let b=0;b<N;b++){ const d=new Date(start+(b+0.5)*span); out.push(longSpan?((d.getMonth()+1)+'/'+d.getDate()):(('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2))); } return out; },
-    mountTrend(){ const c=document.getElementById('trendChart'); if(!c) return; const H=this._h_dashboard; const _sp=H?(H.__end-H.__start):864e5, N=_sp>20*864e5?90:_sp>5*864e5?72:48;
-      const ds=(label,data,color)=>({label,data,borderColor:color,backgroundColor:color+'15',borderWidth:2,tension:.35,pointRadius:0,fill:false,spanGaps:true});
+    mountTrend(){ const c=document.getElementById('trendChart'); if(!c) return; const H=this._h_dashboard; const _sp=H?(H.__end-H.__start):864e5, N=_sp>20*864e5?160:_sp>5*864e5?120:96;   // higher resolution so small drybacks show
+      const ds=(label,data,color,axis,dash)=>({label,data,borderColor:color,backgroundColor:'transparent',borderWidth:axis==='yE'?1.4:2,tension:.15,pointRadius:0,fill:false,spanGaps:true,yAxisID:axis,borderDash:dash||[]});   // low tension = drybacks visible; EC dashed + thinner, same zone colour
       let labels,sets;
       if(H){ const s=H.__start,e=H.__end; labels=this.histLabels(s,e,N); const cols=['#22d3ee','#34d399','#a78bfa'];
-        sets=[1,2,3].map((z,i)=>ds('Zone '+z,this.bucketize(H['sensor.crop_steering_zone_'+z+'_vwc'],s,e,N),cols[i])); }
-      else { const n=Math.max(HIST.vwc.length,1); labels=Array.from({length:n},()=>''); sets=[ds('Avg VWC',[...HIST.vwc],'#22d3ee')]; }
+        const vwc=[1,2,3].map((z,i)=>ds('Z'+z+' VWC',this.bucketize(H['sensor.crop_steering_zone_'+z+'_vwc'],s,e,N),cols[i],'yV'));
+        const ec=[1,2,3].map((z,i)=>ds('Z'+z+' EC',this.bucketize(H['sensor.crop_steering_zone_'+z+'_ec'],s,e,N),cols[i],'yE',[5,3]));
+        sets=[...vwc,...ec]; }
+      else { const n=Math.max(HIST.vwc.length,1); labels=Array.from({length:n},()=>''); sets=[ds('Avg VWC',[...HIST.vwc],'#22d3ee','yV')]; }
       if(CHARTS.trend){ CHARTS.trend.data.labels=labels; CHARTS.trend.data.datasets=sets; CHARTS.trend.update('none'); return; }
       CHARTS.trend=new Chart(c,{type:'line',data:{labels,datasets:sets},
         options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:500},interaction:{mode:'index',intersect:false},
-          plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:10,usePointStyle:true,font:{size:11}}},tooltip:{backgroundColor:'#11161d',callbacks:{label:x=>x.dataset.label+': '+(x.parsed.y==null?'—':x.parsed.y.toFixed(1)+'%')}}},
-          scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8,autoSkip:true}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10},callback:v=>v+'%'},suggestedMin:30,suggestedMax:70}}}}); },
+          plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:14,usePointStyle:false,font:{size:11}}},tooltip:{backgroundColor:'#11161d',callbacks:{label:x=>x.dataset.label+': '+(x.parsed.y==null?'—':x.dataset.yAxisID==='yE'?x.parsed.y.toFixed(2)+' mS/cm':x.parsed.y.toFixed(1)+'%')}}},
+          scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8,autoSkip:true}},
+            yV:{position:'right',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#67e8f9',font:{size:10},callback:v=>v+'%'},min:20,max:70,title:{display:true,text:'VWC %',color:'#67e8f9',font:{size:10}}},
+            yE:{position:'right',grid:{display:false},ticks:{color:'#c4b5fd',font:{size:10}},min:0,max:10,title:{display:true,text:'pore EC',color:'#c4b5fd',font:{size:10}}}}}}); },
     mountClimateCharts(){ const H=this._h_climate, N=48; if(!H) return; const s=H.__start,e=H.__end, labels=this.histLabels(s,e,N);
       const specs=[ {id:'ccTemp',key:CONFIG.E.air_temp,label:'Air temp',unit:'°C',color:'#fb923c',band:CONFIG.BANDS.air_temp},
         {id:'ccRh',key:CONFIG.E.rh,label:'Humidity',unit:'%',color:'#22d3ee',band:CONFIG.BANDS.rh},
