@@ -1086,6 +1086,117 @@
   <h1><span class="grad">Every setpoint, on the curve.</span></h1>
   <p class="sub">A full-day <b>physics simulation</b>, not a drawing: the environment (PPFD, CO₂, temp, RH → VPD) sets a transpiration rate that drys the substrate back; the crop-steering controller fires shots; each shot mixes <b>feed EC</b> into the pore by the litres applied (<b>shot % × substrate L</b>); when VWC hits <b>field capacity</b> the overshoot runs off and flushes salt out, pulling pore EC toward the feed EC. The white line is VWC, the pink line is <b>pore EC on the right 0–10 axis</b>. Edit any field or drag a glowing handle and the whole day re-solves. Environment seeded live from F2; everything else from <code>number.crop_steering_*</code>.</p>
 
+  <!-- ===== SETPOINTS MATRIX — every value · every zone · edit one or all (redesign centerpiece) ===== -->
+  <style>
+  .spm{margin:14px 0 22px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.02);overflow:hidden}
+  .spm-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.07);flex-wrap:wrap}
+  .spm-title{font-weight:700;font-size:15px}
+  .spm-sub{font-size:11px;color:#94a3b8;font-weight:400;margin-left:8px}
+  .spm-actions{display:flex;align-items:center;gap:8px}
+  .spm-edits{font-size:11px;color:#fbbf24;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);border-radius:999px;padding:2px 9px}
+  .spm-btn{font-size:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:#cbd5e1;border-radius:9px;padding:6px 11px;cursor:pointer}
+  .spm-btn:hover{background:rgba(255,255,255,.09)}
+  .spm-btn.primary{background:#0e7490;border-color:#0e7490;color:#fff;font-weight:600}
+  .spm-tablewrap{overflow-x:auto}
+  .spm-table{width:100%;border-collapse:collapse;font-size:13px}
+  .spm-table thead th{position:sticky;top:0;z-index:2;background:#0b1220;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;text-align:center;padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.1)}
+  .spm-table thead th.spm-paramh{text-align:left;padding-left:16px;width:40%}
+  .spm-table thead th.spm-allh{color:#38bdf8}
+  .spm-grp td{padding:9px 16px;background:rgba(255,255,255,.025);border-top:1px solid rgba(255,255,255,.06);cursor:pointer;font-weight:600;font-size:12px;user-select:none}
+  .spm-badge{display:inline-block;min-width:20px;text-align:center;color:#fff;font-size:10px;font-weight:700;border-radius:5px;padding:1px 5px;margin:0 6px}
+  .spm-gtag{font-size:10px;color:#c4b5fd;background:rgba(167,139,250,.14);border-radius:999px;padding:1px 7px;margin-left:8px;font-weight:600}
+  .spm-row td{padding:5px 8px;border-top:1px solid rgba(255,255,255,.04);text-align:center;vertical-align:middle}
+  .spm-row:hover td{background:rgba(255,255,255,.02)}
+  .spm-param{text-align:left!important;padding-left:16px!important}
+  .spm-pname{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
+  .spm-pn{font-weight:600;color:#e2e8f0}
+  .spm-pd{font-size:11px;color:#94a3b8;font-weight:400}
+  .spm-info{cursor:pointer;color:#64748b;font-size:11px;user-select:none}
+  .spm-info:hover{color:#cbd5e1}
+  .spm-detail{font-size:11px;color:#cbd5e1;background:rgba(255,255,255,.03);border-left:2px solid #38bdf8;margin:5px 0 2px;padding:6px 10px;border-radius:0 6px 6px 0;text-align:left;line-height:1.5}
+  .spm-detail b{color:#93c5fd}
+  .spm-stepper{display:inline-flex;align-items:center;gap:1px;border:1px solid rgba(255,255,255,.1);border-radius:8px;overflow:hidden;background:rgba(0,0,0,.18)}
+  .spm-stepper button{width:22px;height:26px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:15px;line-height:1}
+  .spm-stepper button:hover{background:rgba(255,255,255,.1);color:#fff}
+  .spm-stepper input{width:44px;height:26px;border:none;background:transparent;color:#e2e8f0;text-align:center;font-size:13px;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+  .spm-stepper input::-webkit-outer-spin-button,.spm-stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .spm-allcell .spm-stepper{border-color:rgba(56,189,248,.4);background:rgba(56,189,248,.08)}
+  .spm-allcell.mixed input{color:#fbbf24}
+  .spm-dirty input{color:#fbbf24;font-weight:600}
+  .spm-dot{display:inline-block;width:5px;height:5px;border-radius:50%;margin:0 3px}
+  .spm-dot.ok{background:#10b981}.spm-dot.wr{background:#fbbf24}
+  .spm-lock{color:#a78bfa;font-size:11px;margin-left:4px}
+  .spm-mut{color:#475569}
+  .spm-row.spm-global td{background:rgba(167,139,250,.04)}
+  </style>
+  <div class="spm">
+    <div class="spm-head">
+      <div><span class="spm-title">Setpoints</span><span class="spm-sub">every value · every zone · edit one or all</span></div>
+      <div class="spm-actions">
+        <span class="spm-edits" x-show="mxEditCount()>0" x-text="mxEditCount()+' to write'"></span>
+        <button class="spm-btn" @click="pullFromHA()">⟳ Pull live</button>
+        <button class="spm-btn primary" @click="applyAllToHA()">Apply all → HA</button>
+      </div>
+    </div>
+    <div class="spm-tablewrap">
+      <table class="spm-table">
+        <thead><tr>
+          <th class="spm-paramh">Parameter</th>
+          <th class="spm-allh">All zones</th>
+          <th>Zone 1</th><th>Zone 2</th><th>Zone 3</th>
+        </tr></thead>
+        <tbody>
+          <template x-for="r in mxRows()" :key="r.t==='g'?('g'+r.g.k):('f'+r.f.key)">
+            <tr :class="r.t==='g'?'spm-grp':(isGlobal(r.f.key)?'spm-row spm-global':'spm-row')" @click="r.t==='g'?mxToggle(r.g.k):null">
+              <template x-if="r.t==='g'">
+                <td colspan="5"><span x-text="mxOpen[r.g.k]?'▾':'▸'"></span><span class="spm-badge" :style="'background:'+r.g.col" x-text="r.g.ph"></span><span x-text="r.g.name"></span><span class="spm-gtag" x-show="isGlobal(r.g.fields[0].key)">whole room</span></td>
+              </template>
+              <template x-if="r.t==='f'">
+                <td class="spm-param">
+                  <div class="spm-pname">
+                    <span class="spm-pn" x-text="r.f.label||r.f.key"></span>
+                    <span class="spm-pd" x-text="rowTip(r.f.key).d||''"></span>
+                    <span class="spm-info" @click.stop="mxTipToggle(r.f.key)" x-show="rowTip(r.f.key).a||rowTip(r.f.key).f" x-text="mxTip===r.f.key?'▾ less':'▸ how'"></span>
+                  </div>
+                  <div class="spm-detail" x-show="mxTip===r.f.key" x-cloak>
+                    <template x-if="rowTip(r.f.key).a"><div><b>Affects:</b> <span x-text="rowTip(r.f.key).a"></span></div></template>
+                    <template x-if="rowTip(r.f.key).b"><div><b>Driven by:</b> <span x-text="rowTip(r.f.key).b"></span></div></template>
+                    <template x-if="rowTip(r.f.key).f"><div><b>Rule of thumb:</b> <span x-text="rowTip(r.f.key).f"></span></div></template>
+                  </div>
+                </td>
+              </template>
+              <template x-if="r.t==='f'">
+                <td class="spm-allcell" :class="isMixed(r.f.key)&&'mixed'">
+                  <span class="spm-stepper">
+                    <button @click.stop="bumpAll(r.f.key,-1)">−</button>
+                    <input type="text" inputmode="decimal" :value="allDisplay(r.f.key)" @change="setAll(r.f.key,$event.target.value)" @click.stop>
+                    <button @click.stop="bumpAll(r.f.key,1)">+</button>
+                  </span>
+                  <span x-show="isGlobal(r.f.key)" class="spm-lock">🔒</span>
+                </td>
+              </template>
+              <template x-for="z in [1,2,3]" :key="'z'+z">
+                <template x-if="r.t==='f'">
+                  <td :class="(!isGlobal(r.f.key)&&cellDirty(r.f.key,z))&&'spm-dirty'">
+                    <template x-if="!isGlobal(r.f.key)">
+                      <span class="spm-stepper">
+                        <button @click.stop="bumpZone(r.f.key,z,-1)">−</button>
+                        <input type="text" inputmode="decimal" :value="fmtCell(r.f.key,Z[z][r.f.key])" @change="setZoneVal(r.f.key,z,$event.target.value)" @click.stop>
+                        <button @click.stop="bumpZone(r.f.key,z,1)">+</button>
+                        <span class="spm-dot" :class="cellDirty(r.f.key,z)?'wr':'ok'"></span>
+                      </span>
+                    </template>
+                    <template x-if="isGlobal(r.f.key)"><span class="spm-mut">·</span></template>
+                  </td>
+                </template>
+              </template>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="layout">
     <!-- ===== SECTION A: irrigation graph + its controls ===== -->
     <div class="gridrow">
@@ -2477,6 +2588,36 @@ function editor(){
     dialLabel(){ const v=this.dial; const t=v<3?"deep vegetative":v<5?"vegetative":v<5.5?"balanced":v<7.5?"generative":"hard generative"; return v.toFixed(1)+" · "+t; },
     applyAthena(s){ const a=ATHENA[s]; if(!a) return; for(const k in a) this.G[k]=a[k]; this.athena=s; SIMKEY=null; ENVK=null; this.persist(); },
     applySteer(){ const gf=clamp((this.dial-1)/9,0,1); for(const z of [1,2,3]) for(const k in STEER){ const m=META[k], v=STEER[k][0]+(STEER[k][1]-STEER[k][0])*gf; this.Z[z][k]=clamp(rstep(v,m.step),m.min,m.max); } SIMKEY=null; this.persist(); },   // dial writes the steered setpoints across all zones
+
+    /* ===== Setpoints matrix: param × zone, see-all + edit-all (the redesign centerpiece) ===== */
+    mxOpen:{P0:true,P1:true,P2:true,P3:true,ST:true,ZN:true,EN:false,RM:false,SF:false,HW:false},   // collapsible phase groups
+    mxTip:null,                                                                                       // key of the row whose a/b/f detail is expanded
+    isGlobal(k){ return k in this.G; },                                                               // global (whole-room) vs per-zone — same check g() uses
+    mxRows(){ const out=[]; for(const g of this.groups()){ out.push({t:'g',g}); if(this.mxOpen[g.k]) for(const f of g.fields) out.push({t:'f',g,f}); } return out; },   // flat row list (group headers + fields) so one Alpine x-for renders the whole table
+    mxToggle(k){ this.mxOpen[k]=!this.mxOpen[k]; },
+    mxTipToggle(k){ this.mxTip=this.mxTip===k?null:k; },
+    fmtCell(k,v){ if(v==null) return '—'; const m=META[k]; const d=(m&&m.step<1)?(m.step<0.1?2:1):0; return Number(v).toFixed(d); },
+    zoneVals(k){ return [this.Z[1][k],this.Z[2][k],this.Z[3][k]]; },
+    isMixed(k){ if(this.isGlobal(k)) return false; const v=this.zoneVals(k); return !(v[0]===v[1]&&v[1]===v[2]); },   // zones differ → ALL cell shows "mixed"
+    allDisplay(k){ if(this.isGlobal(k)) return this.fmtCell(k,this.G[k]); return this.isMixed(k)?'mixed':this.fmtCell(k,this.Z[1][k]); },
+    _cv(k,v){ const m=META[k]; return clamp(rstep(+v,m.step),m.min,m.max); },
+    setAll(k,v){ if(isNaN(parseFloat(v))) return; const cv=this._cv(k,v); if(this.isGlobal(k)) this.G[k]=cv; else for(const z of [1,2,3]) this.Z[z][k]=cv; SIMKEY=null; this.persist(); },   // ALL column writes every zone at once
+    bumpAll(k,dir){ const m=META[k]; if(this.isGlobal(k)){ this.G[k]=clamp(rstep(this.G[k]+dir*m.step,m.step),m.min,m.max); } else for(const z of [1,2,3]){ this.Z[z][k]=clamp(rstep(this.Z[z][k]+dir*m.step,m.step),m.min,m.max); } SIMKEY=null; this.persist(); },   // delta keeps per-zone offsets (deepen everyone by one notch)
+    setZoneVal(k,z,v){ if(isNaN(parseFloat(v))) return; this.Z[z][k]=this._cv(k,v); SIMKEY=null; this.persist(); },
+    bumpZone(k,z,dir){ const m=META[k]; this.Z[z][k]=clamp(rstep(this.Z[z][k]+dir*m.step,m.step),m.min,m.max); SIMKEY=null; this.persist(); },
+    cellLive(k,z){ const id=this.isGlobal(k)?('number.crop_steering_'+(TUNE_GK[k]||k)):('number.crop_steering_zone_'+z+'_'+k); return num(id); },
+    cellDirty(k,z){ const lv=this.cellLive(k,z), ev=this.isGlobal(k)?this.G[k]:this.Z[z][k]; return lv!=null&&ev!=null&&Math.abs(lv-ev)>1e-6; },   // edited ≠ live (will write)
+    mxEditCount(){ let n=0; for(const z of [1,2,3]) for(const k of TUNE_ZK){ if(this.cellDirty(k,z)) n++; } for(const k in TUNE_GK){ if(this.cellDirty(k,1)) n++; } return n; },
+    rowTip(k){ return FIELDTIPS[k]||synthTip(k)||{}; },
+    applyAllToHA(){   // diff ALL three zones + globals vs live, ONE confirm, write every changed number.* (widened applyToHA)
+      if(!getToken()){ this.save(); return; }
+      const rows=[];
+      for(const z of [1,2,3]) for(const k of TUNE_ZK){ const id='number.crop_steering_zone_'+z+'_'+k, cur=num(id), nv=this.Z[z][k]; if(cur!=null&&nv!=null&&Math.abs(cur-nv)>1e-6) rows.push([id,cur,nv]); }
+      for(const k in TUNE_GK){ const id='number.crop_steering_'+TUNE_GK[k], cur=num(id), nv=this.G[k]; if(cur!=null&&nv!=null&&Math.abs(cur-nv)>1e-6) rows.push([id,cur,nv]); }
+      if(!rows.length){ alert('Nothing changed across any zone.'); return; }
+      if(!confirm('Apply '+rows.length+' change'+(rows.length>1?'s':'')+' across all zones? Writes live to the controller.\n\n'+rows.map(r=>'• '+r[0].replace('number.crop_steering_','')+':  '+r[1]+' → '+r[2]).join('\n'))) return;
+      rows.forEach(r=>svc('number','set_value',{entity_id:r[0],value:r[2]})); this.saved=true; setTimeout(()=>this.saved=false,1600);
+    },
 
     /* accessors */
     g(k){ if(k in this.G) return this.G[k]; return this.Z[ZOVR||this.zone][k]; },
