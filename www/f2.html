@@ -789,6 +789,40 @@
           </div>
         </div>
 
+        <!-- ===== LIVE COUPLED STATE — light → air → leaf → root, big + glanceable ===== -->
+        <div id="coupled-anchor" class="scroll-mt-28">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Live coupled state</h2>
+            <span class="text-[11px] text-slate-500 hidden sm:block">☀️ light → 🌬️ air → 🍃 leaf → 💧 root · the chain you steer by</span>
+          </div>
+          <div class="grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(225px,1fr))">
+            <template x-for="cs in coupledStages" :key="cs.key">
+              <div class="glass rounded-2xl p-4" :style="'border-top:3px solid '+cs.color">
+                <div class="flex items-center gap-2 mb-3">
+                  <span class="text-base" x-text="cs.emoji"></span>
+                  <span class="font-semibold text-[13px]" :style="'color:'+cs.color" x-text="cs.name"></span>
+                  <span class="text-[10px] text-slate-500 ml-auto uppercase tracking-wide" x-text="cs.sub"></span>
+                </div>
+                <div class="space-y-3">
+                  <template x-for="it in cs.items" :key="it.label">
+                    <div class="flex items-end justify-between gap-2">
+                      <div class="flex items-baseline gap-1 tabular-nums">
+                        <span class="text-[26px] font-bold leading-none" :class="it.status==='crit'?'text-red-400':it.status==='warn'?'text-amber-400':it.status==='watch'?'text-amber-300':'text-emerald-300'" x-text="it.val"></span>
+                        <span class="text-[11px] text-slate-500" x-text="it.unit"></span>
+                        <span class="text-xs" :style="it.arrow>0?'color:#34d399':(it.arrow<0?'color:#38bdf8':'color:#475569')" x-text="it.arrow>0?'▲':(it.arrow<0?'▼':'·')"></span>
+                      </div>
+                      <div class="text-right min-w-0">
+                        <div class="text-[11px] text-slate-300 leading-tight truncate" x-text="it.label"></div>
+                        <div class="text-[10px] text-slate-600 leading-tight truncate" x-text="it.hint"></div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
         <!-- ===== facility glance: source tank · live 3D · room camera · activity ===== -->
         <div class="space-y-3">
           <!-- source tank fullness bar -->
@@ -1273,37 +1307,8 @@
         </template>
       </div>
     </div>
-    <!-- ===== LIVE COUPLED STATE ===== -->
-    <div class="panel glass">
-      <div class="ch" id="tune-coupled"><h2>Live coupled state</h2><span class="chs">the levers a grower actually steers by — the picture shows what each is (cube drying back, leaf losing heat, roots breathing). Change any setpoint and watch them move in sync (▲▼ = which way each just shifted).</span></div>
-      <div class="vizgrid">
-        <template x-for="c in coupledUseful()" :key="c.key">
-          <div class="vizcard csr" :class="('g-'+c.grp)+(c.wide?' wide':'')" :title="c.label+' — '+c.tip">
-            <div class="vizart" x-html="c.viz"></div>
-            <div class="vizfoot">
-              <div class="vizval"><b x-text="c.disp"></b><i x-text="c.unit"></i><b class="arr" :style="c.dir>0?'color:var(--ok)':(c.dir<0?'color:#42a5f5':'opacity:.25')" x-text="c.dir>0?'▲':(c.dir<0?'▼':'·')"></b></div>
-              <div class="vizlab"><span class="csr-w" :style="'color:'+c.wc" x-text="c.word||'·'"></span><span x-text="c.label"></span></div>
-            </div>
-          </div>
-        </template>
-      </div>
-      <div class="clegend"><span><i style="background:var(--p1)"></i>atmosphere</span><span><i style="background:var(--p2)"></i>plant</span><span><i style="background:var(--p3)"></i>root-zone</span><span><i style="background:var(--ec)"></i>room balance</span></div>
-      <details class="engdrawer">
-        <summary>Facility &amp; engineering detail · <span x-text="coupledEng().length"></span> derived values</summary>
-        <div class="cstate engmini">
-          <template x-for="c in coupledEng()" :key="c.key">
-            <div class="csr mini" :class="'g-'+c.grp" :title="c.label+' — '+c.tip">
-              <div class="csr-top">
-                <span class="csr-w" :style="'color:'+c.wc" x-text="c.word||'·'"></span>
-                <span class="csr-lab" x-text="c.label"></span>
-                <span class="csr-v"><b x-text="c.disp"></b><i x-text="c.unit"></i></span>
-              </div>
-              <div class="csbar"><div class="csband" x-show="c.bandW>0" :style="'left:'+c.bandL+'%;width:'+c.bandW+'%'"></div><div class="cstick" :style="'left:'+c.pos+'%;background:'+c.wc"></div></div>
-            </div>
-          </template>
-        </div>
-      </details>
-    </div>
+    <!-- Live coupled state moved to Overview (buildCoupled) — kept out of the Setpoints editor per redesign -->
+
       </div>
       <aside class="scol"><div class="srail">
         <template x-for="grp in groups().filter(g=>['P0','P1','P2','P3','ST','ZN','HW'].includes(g.k))" :key="grp.k">
@@ -2093,6 +2098,37 @@ function buildPlant(){ const out=[];
   const ss=isOn("substrate_stress"),ls=isOn("light_stress"),any=ss||ls;
   out.push({icon:"flag",label:"Stress flags",value:any?"Active":"All clear",plain:`Roots ${ss?"⚠️":"✅"} · Light load ${ls?"⚠️":"✅"}`,status:any?"warn":"ok",word:any?"act":"good",track:false});
   return out; }
+/* ===== Live coupled state — the light → air → leaf → root chain a grower steers by, big + glanceable (Overview) ===== */
+let CHAIN_PREV={};
+function buildCoupled(){
+  const dirArrow=(k,v)=>{ if(v==null) return 0; const p=CHAIN_PREV[k]; CHAIN_PREV[k]=v; if(p==null||Math.abs(v-p)<1e-6) return 0; return v>p?1:-1; };   // ▲/▼ vs the previous 30s refresh
+  const it=(k,label,val,unit,dec,status,hint)=>({label,val:val==null?'—':fmt(val,dec),unit,status:status||'ok',arrow:dirArrow(k,val),hint:hint||''});
+  const on=lightsOn(), B=(k)=>num(k)==null?'ok':band(k,num(k));
+  const ec=num('fused_ec'),db=num('dryback_pct'),dt=num('dryback_target'),vwc=num('avg_vwc'),cwsi=num('cwsi'),tc=num('transp_cooling');
+  const cwsiS=cwsi==null?'ok':(cwsi<0.3?'ok':cwsi<0.5?'watch':'warn');
+  const dbS=(db==null||dt==null)?'ok':(db<dt*0.6?'watch':db>dt*1.4?'warn':'ok');
+  const ecS=ec==null?'ok':(Math.abs(ec-CONFIG.EC_TARGET)<0.5?'ok':Math.abs(ec-CONFIG.EC_TARGET)<1.2?'watch':'warn');
+  const vwcS=vwc==null?'ok':(vwc<35?'warn':vwc<45?'watch':'ok');
+  const tcS=tc==null?'ok':(tc>1?'ok':tc>0.4?'watch':'warn');
+  return [
+    {key:'light',name:'Light',emoji:'☀️',color:'#f59e0b',sub:'the driver',items:[
+      it('ppfd','Light on canopy', on?num('ppfd'):0,'µmol',0, on?B('ppfd'):'ok','PPFD now'),
+      it('dli','Light today',num('dli'),'mol',1,'ok','DLI accumulated') ]},
+    {key:'air',name:'Air',emoji:'🌬️',color:'#38bdf8',sub:'the demand',items:[
+      it('air_temp','Temp',num('air_temp'),'°C',1,B('air_temp'),''),
+      it('rh','Humidity',num('rh'),'%',0,B('rh'),''),
+      it('air_vpd','Air VPD',num('air_vpd'),'kPa',2,B('air_vpd'),'how thirsty the air is'),
+      it('co2','CO₂', on?num('co2'):null,'ppm',0, on?B('co2'):'ok', on?'':'lights off') ]},
+    {key:'leaf',name:'Leaf',emoji:'🍃',color:'#34d399',sub:'the response',items:[
+      it('leaf_vpd','Leaf VPD', on?num('leaf_vpd'):null,'kPa',2, on?B('leaf_vpd'):'ok','dryness at the leaf'),
+      it('transp_cooling','Drinking',num('transp_cooling'),'°C',1,tcS,'leaf cooler than air'),
+      it('cwsi','Stress',cwsi,'',2,cwsiS,'0 calm → 1 stressed') ]},
+    {key:'root',name:'Root',emoji:'💧',color:'#22d3ee',sub:'the result',items:[
+      it('avg_vwc','Wetness',vwc,'%',0,vwcS,'avg VWC, all zones'),
+      it('dryback_pct','Dryback',db,'%',1,dbS, dt!=null?('target '+fmt(dt,0)+'%'):''),
+      it('fused_ec','Pore EC',ec,'mS/cm',2,ecS,'salt at the root') ]},
+  ];
+}
 function buildKpis(){ const h=computeHeadline(...Object.values(runRules())); const avgVwc=num("avg_vwc"),ec=num("fused_ec"),db=num("dryback_pct"),dt=num("dryback_target"),vpd=num("air_vpd");
   return [
     {label:"F2 status",value:h.sev==="ok"?"Optimal":h.sev==="warn"?"Attention":h.sev==="crit"?"Critical":"Watch",icon:"leaf",tint:h.sev==="ok"?"text-emerald-400":h.sev==="warn"?"text-amber-400":h.sev==="crit"?"text-red-400":"text-amber-400",sub:(val("grow_stage")||"F2")},
@@ -4675,9 +4711,9 @@ document.addEventListener('alpine:init', () => {
       grid:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
     },
     nav:[
-      {id:'dashboard',label:'Overview',icon:'dashboard',subs:[['Advisories','advisories'],['Live snapshot','st-snapshot'],['Plant state','st-plant'],['Facility floor','st-floor'],['Substrate 24h','st-trends']]},
+      {id:'dashboard',label:'Overview',icon:'dashboard',subs:[['Advisories','advisories'],['Coupled state','coupled-anchor'],['Live snapshot','st-snapshot'],['Plant state','st-plant'],['Facility floor','st-floor'],['Substrate 24h','st-trends']]},
       {id:'zones',label:'Zones',icon:'drop',subs:[['All zones','zones-list'],['Source water & engine','zones-src']]},
-      {id:'tune',label:'Setpoints',icon:'scale',subs:[['Setpoints table','spm-anchor'],['Steering & day curve','tune-steer'],['Limiting factors','tune-liebig'],['Coupled state','tune-coupled'],['Room environment','tune-env']]},
+      {id:'tune',label:'Setpoints',icon:'scale',subs:[['Setpoints table','spm-anchor'],['Steering & day curve','tune-steer'],['Limiting factors','tune-liebig'],['Room environment','tune-env']]},
       {id:'climate',label:'Climate',icon:'thermo',subs:[['Camera','cl-cam'],['Live climate','cl-live'],['Trends 24h','cl-trends'],['Room controls','cl-controls'],['Hotspot map','cl-hotspot'],['Raw readings','cl-raw']]},
       {id:'control',label:'Operate',icon:'radio',subs:[['Strategy','op-strategy'],['Arm & pump','op-arm'],['Relays & solenoids','op-relays'],['Adaptive','op-adaptive'],['Zones glance','op-zones'],['Engine','op-engine']]},
       {id:'timeline',label:'Plan',icon:'activity',subs:[['Recipe & sync','recipeBar'],['Phase timeline','phaseSpine'],['Environment','Environment','sec'],['Lighting','Lighting','sec'],['Root Zone','Root Zone','sec'],['Steering','Steering','sec'],['Irrigation','Irrigation','sec'],['Tank / Feed','Tank / Feed','sec'],['Steering EC','Steering EC','sec'],['Phase Timing','Phase Timing','sec'],['Shot Sizes %','Shot Sizes %','sec'],['Limits & Hardware','Limits & Hardware','sec'],['Zone Setup','Zone Setup','sec'],['Facility layer','0','zone'],['Zone 1','1','zone'],['Zone 2','2','zone'],['Zone 3','3','zone'],['Parameter chart','chartHost']]},
@@ -4693,7 +4729,7 @@ document.addEventListener('alpine:init', () => {
     pumpOpen:false, pump:{hw:[],sw:[],power:null,powerTxt:'—',anyHw:false,deadhead:false,pumpOn:false}, relays:[],
     tip:null, tipT:null,
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
-    headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], maturity:{rung:2,name:'Logged',next:''}, chartSmooth:ls.get('f2.chartSmooth',true), gRange:ls.get('f2.gRange','24h'), zones:[], plant:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
+    headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], maturity:{rung:2,name:'Logged',next:''}, chartSmooth:ls.get('f2.chartSmooth',true), gRange:ls.get('f2.gRange','24h'), zones:[], plant:[], coupledStages:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},telemetry:[],feed:[]},
     climateCtl:[], ctlOpen:ls.get('f2.ctlOpen',{}), snapshot:[], camUrl:'', spOpen:false, spItem:null, floorMini:[], tank:{pct:null,litres:null,sev:'ok',bar:'bg-emerald-500',pctText:'—',litresText:null,width:0}, activityFeed:[], hUser:{name:'Grower',initials:'F2'}, demo:DEMO,
     notes:{}, toasts:[], _tid:0, _toastId:0, _retry:0, _acked:(function(){ try{ const a=ls.get('f2.acked',{}),cut=Date.now()-18*3600e3,o={}; for(const k in a){ if(a[k]>cut) o[k]=a[k]; } return o; }catch(e){ return {}; } })(),
@@ -4750,7 +4786,7 @@ document.addEventListener('alpine:init', () => {
       const rr=runRules();
       this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
       this.headline=computeHeadline(this.adv,this.watch);
-      this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.plant=buildPlant(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl(); this.pump=buildPump(); this.relays=buildRelays(); this.maturity=maturityScore();
+      this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.plant=buildPlant(); this.coupledStages=buildCoupled(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl(); this.pump=buildPump(); this.relays=buildRelays(); this.maturity=maturityScore();
       { const cam=S[CONFIG.E.cam], ct=cam&&cam.attributes&&cam.attributes.access_token; this._camTick=(this._camTick||0)+1;
         this.camUrl=ct?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+CONFIG.E.cam+'?token='+ct+'&_='+this._camTick):''; }
       if(window.__tuneReseed) window.__tuneReseed();   // refresh the Tune editor from live HA (respects its hydrated/unsaved-edit guard)
