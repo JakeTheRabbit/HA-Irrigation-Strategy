@@ -789,17 +789,50 @@ class MasterCropSteeringApp(BaseAsyncApp):
             return zone_value
         return self._get_number_entity_value(system_entity, default)
 
-    def _get_zone_schedule(self, zone_num: int) -> Dict[str, time]:
-        """Get the light schedule - SYSTEM-WIDE not per-zone (zones share same lights)."""
+    def _read_valid_lights_hour(self, entity_id: str):
+        """Return an int hour 0-23 from a lights-hour number entity ONLY if it reads cleanly;
+        None on unavailable/unknown/out-of-range. Callers fall back to the last-good schedule,
+        NOT a hardcoded default — a dirty read collapsing to the old on=12 default is exactly
+        what made the engine think lights were off before noon and force every zone into P3."""
         try:
-            # All zones use the same system-wide light schedule
-            # Get system-wide light hours from number entities
-            on_hour = int(self._get_number_entity_value("number.crop_steering_lights_on_hour", 12))
-            off_hour = int(self._get_number_entity_value("number.crop_steering_lights_off_hour", 0))
-            return {'lights_on': time(on_hour, 0), 'lights_off': time(off_hour, 0)}
+            ent = entity_id
+            if not self.entity_exists(ent) and ent.startswith("number.") and "crop_steering_" not in ent:
+                cand = ent.replace("number.", "number.crop_steering_", 1)
+                if self.entity_exists(cand):
+                    ent = cand
+            raw = self.get_entity_value(ent, default=None)
+            if raw is None or str(raw).strip().lower() in ("", "unknown", "unavailable", "none"):
+                return None
+            h = int(float(raw))
+            return h if 0 <= h <= 23 else None
+        except Exception:
+            return None
+
+    def _get_zone_schedule(self, zone_num: int) -> Dict[str, time]:
+        """Get the light schedule - SYSTEM-WIDE not per-zone (zones share same lights).
+        HARDENED: only update from a CLEAN read of the lights-hour entities; on a dirty read
+        (entity momentarily unavailable after a reload/restart) reuse the last cleanly-read
+        schedule instead of the old on=12/off=0 default, which silently stranded the whole
+        room in P3 (engine saw 'lights off before noon' and force-dropped every zone)."""
+        try:
+            on_hour = self._read_valid_lights_hour("number.crop_steering_lights_on_hour")
+            off_hour = self._read_valid_lights_hour("number.crop_steering_lights_off_hour")
+            if on_hour is not None and off_hour is not None:
+                self._lights_sched_good = {'lights_on': time(on_hour, 0), 'lights_off': time(off_hour, 0)}
+                return self._lights_sched_good
+            cached = getattr(self, "_lights_sched_good", None)
+            if cached is not None:
+                self.log(f"⚠️ Lights-hour read dirty (on={on_hour}, off={off_hour}); reusing last-good "
+                         f"{cached['lights_on'].strftime('%H:%M')}-{cached['lights_off'].strftime('%H:%M')} "
+                         f"instead of a default.", level='WARNING')
+                return cached
+            # No cache yet AND dirty read (entities down at startup): a daytime default fails SAFE
+            # (won't force P3), unlike the old 12/0. 10:00-22:00 = the documented F2 schedule.
+            self.log("⚠️ Lights schedule unreadable and no cache yet; assuming 10:00-22:00 (fail-safe).", level='WARNING')
+            return {'lights_on': time(10, 0), 'lights_off': time(22, 0)}
         except Exception as e:
             self.log(f"❌ Error getting system light schedule: {e}", level='ERROR')
-            return {'lights_on': time(12, 0), 'lights_off': time(0, 0)}
+            return getattr(self, "_lights_sched_good", {'lights_on': time(10, 0), 'lights_off': time(22, 0)})
 
     def _validate_required_entities(self) -> bool:
         """Validate that all required entities exist before startup."""
@@ -5212,6 +5245,17 @@ class MasterCropSteeringApp(BaseAsyncApp):
                         and not self._are_lights_on(datetime.now().time(), lights_on_time, lights_off_time):
                     await self._transition_zone_to_phase(zone_num, 'P3', 'Lights off — entering overnight P3 dryback')
 
+                # SELF-HEAL: a zone wrongly stranded in P3 while lights are CONFIRMED ON and we are
+                # NOT yet in the pre-lights-off window must recover, not sit emergency-only all day.
+                # The only legitimate lights-on P3 is the ~3h before lights-off (gated by
+                # _should_zone_start_p3). Without this, a single bad force-P3 — a dirty schedule
+                # read or a safety/emergency stop — stranded every zone in P3 until the next
+                # lights-on edge (observed live 11:03 -> all three P3 for the rest of the day).
+                elif current_phase == IrrigationPhase.P3_PRE_LIGHTS_OFF \
+                        and self._are_lights_on(datetime.now().time(), lights_on_time, lights_off_time) \
+                        and not await self._should_zone_start_p3(zone_num, lights_on_time, lights_off_time):
+                    await self._transition_zone_to_phase(zone_num, 'P1', 'Recovery — stranded in P3 while lights on; resuming ramp-up')
+
                 # P0 → P1: Dryback complete or timeout
                 elif current_phase == IrrigationPhase.P0_MORNING_DRYBACK:
                     p0_data = machine.state.p0_data
@@ -5504,15 +5548,26 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 # by the dosing automation, not a fault. Stand down instead of killing the
                 # circulation pump (which would dump concentrate into the manifold).
                 if self._is_dosing_active():
+                    self._wd_hw_anomaly = 0
                     await self._publish_status(
                         status='safe_idle',
                         message='Tank dosing/fill active — watchdog standing down (pump circulating)'
                     )
                     return
-                self.log("🚨 Watchdog: hardware ON while irrigation_in_progress=False. Executing emergency stop.", level='ERROR')
+                # DEBOUNCE: require the anomaly on 2 consecutive 60s checks before stopping, so a
+                # momentary hardware-on at the dosing->irrigation handoff (flags just cleared, pump
+                # still settling) doesn't trip a full emergency stop. That stop is what knocked the
+                # room offline and — with a coincident schedule glitch — stranded every zone in P3.
+                self._wd_hw_anomaly = getattr(self, '_wd_hw_anomaly', 0) + 1
+                if self._wd_hw_anomaly < 2:
+                    self.log("⚠️ Watchdog: hardware ON outside irrigation context — strike 1/2, re-checking in 60s.", level='WARNING')
+                    await self._publish_status(status='warning', message='Hardware on outside context — debouncing (1/2)')
+                    return
+                self._wd_hw_anomaly = 0
+                self.log("🚨 Watchdog: hardware ON while irrigation_in_progress=False (confirmed 2 checks). Executing emergency stop.", level='ERROR')
                 await self._publish_status(
                     status='error',
-                    message='Hardware on outside irrigation context; emergency stop executed'
+                    message='Hardware on outside irrigation context (confirmed); emergency stop executed'
                 )
                 await self._emergency_stop()
                 return
@@ -5530,7 +5585,8 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     self.irrigation_in_progress = False
                     return
 
-            # Healthy idle/running status heartbeat
+            # Healthy idle/running status heartbeat — anomaly absent this tick, clear the debounce
+            self._wd_hw_anomaly = 0
             if hardware_on:
                 await self._publish_status(status='irrigating', message='Watchdog heartbeat: hardware active')
             else:
