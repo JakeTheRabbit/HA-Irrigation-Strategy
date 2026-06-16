@@ -960,7 +960,7 @@
           </template>
         </div>
         <!-- source water + engine (global context, shared across zones) -->
-        <div class="glass rounded-2xl p-5">
+        <div id="zones-src" class="glass rounded-2xl p-5 scroll-mt-28">
           <h3 class="text-sm font-semibold mb-3 flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Source water &amp; engine</h3>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <template x-for="m in steeringMeta" :key="m.label"><div class="rounded-xl bg-white/[0.03] border border-white/8 p-3"><div class="text-[11px] text-slate-400 flex items-center"><span x-text="m.label"></span><span class="tipi" @mouseenter="tipShow($event,m.label)" @mouseleave="tipHide()" @click.stop="tipShow($event,m.label)">ⓘ</span></div><div class="font-semibold mt-0.5" :class="m.cls" x-text="m.val"></div></div></template>
@@ -1129,7 +1129,7 @@
   .spm-mut{color:#475569}
   .spm-row.spm-global td{background:rgba(167,139,250,.04)}
   </style>
-  <div class="spm">
+  <div class="spm" id="spm-anchor">
     <div class="spm-head">
       <div><span class="spm-title">Setpoints</span><span class="spm-sub">every value · every zone · edit one or all</span></div>
       <div class="spm-actions">
@@ -1235,7 +1235,7 @@
     </div>
     <!-- ===== LIMITING FACTORS (Liebig minimum) ===== -->
     <div class="panel glass">
-      <div class="ch"><h2>Limiting factors — Zone <span x-text="zone"></span></h2><span class="chs">Liebig's law of the minimum — your ceiling is set by the worst factor, not the average. Biggest bottleneck first; fix it, then the next.</span></div>
+      <div class="ch" id="tune-liebig"><h2>Limiting factors — Zone <span x-text="zone"></span></h2><span class="chs">Liebig's law of the minimum — your ceiling is set by the worst factor, not the average. Biggest bottleneck first; fix it, then the next.</span></div>
       <div class="lim2">
         <template x-for="goal in [{k:'y',name:'Max yield'},{k:'p',name:'Max potency'}]" :key="goal.k">
           <div class="limcol">
@@ -1275,7 +1275,7 @@
     </div>
     <!-- ===== LIVE COUPLED STATE ===== -->
     <div class="panel glass">
-      <div class="ch"><h2>Live coupled state</h2><span class="chs">the levers a grower actually steers by — the picture shows what each is (cube drying back, leaf losing heat, roots breathing). Change any setpoint and watch them move in sync (▲▼ = which way each just shifted).</span></div>
+      <div class="ch" id="tune-coupled"><h2>Live coupled state</h2><span class="chs">the levers a grower actually steers by — the picture shows what each is (cube drying back, leaf losing heat, roots breathing). Change any setpoint and watch them move in sync (▲▼ = which way each just shifted).</span></div>
       <div class="vizgrid">
         <template x-for="c in coupledUseful()" :key="c.key">
           <div class="vizcard csr" :class="('g-'+c.grp)+(c.wide?' wide':'')" :title="c.label+' — '+c.tip">
@@ -1342,7 +1342,7 @@
       <div class="gcol">
     <!-- ===== ROOM ENVIRONMENT GRAPHS ===== -->
     <div class="panel glass envstack">
-      <div class="ch"><h2>Room environment · 24h</h2><span class="chs">same lights-aligned timeline as the irrigation card — read root-zone, air, light & balances as one synchronized story.</span></div>
+      <div class="ch" id="tune-env"><h2>Room environment · 24h</h2><span class="chs">same lights-aligned timeline as the irrigation card — read root-zone, air, light & balances as one synchronized story.</span></div>
       <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_climate','Climate · VPD',$event)" @mouseleave="hideTip()" @click="showTip('chart_climate','Climate · VPD',$event)">ⓘ</span> Climate · VPD <i style="color:#f472b6">leaf</i> <i style="color:#7dd3fc">air</i> · <i style="color:#fb923c">temp</i> <i style="color:#60a5fa">RH</i><b>green = in-band 0.8–1.4 kPa · drag temp/RH dots</b></div><div class="minicwrap" @pointerdown="miniDown('climate',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="climateChart()"></div></div>
       <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_dew','Dew point & condensation margin',$event)" @mouseleave="hideTip()" @click="showTip('chart_dew','Dew point & condensation margin',$event)">ⓘ</span> Dew point & condensation margin · <i style="color:#fb923c">leaf temp</i> <i style="color:#60a5fa">dew point</i><b style="color:#f87171">red ribbon = &lt;3°C → condensation risk</b></div><div class="minicwrap" @pointerdown="miniDown('dew',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dewChart()"></div></div>
       <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_moist','Moisture balance',$event)" @mouseleave="hideTip()" @click="showTip('chart_moist','Moisture balance',$event)">ⓘ</span> Moisture balance · <i style="color:#34d399">transpiration in</i> <i style="color:#f472b6">dehum capacity out</i><b>fill above the line → RH will climb · drag dehum</b></div><div class="minicwrap" @pointerdown="miniDown('moist',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="moistChart()"></div></div>
@@ -4675,11 +4675,11 @@ document.addEventListener('alpine:init', () => {
       grid:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
     },
     nav:[
-      {id:'dashboard',label:'Status',icon:'dashboard',subs:[['Advisories','advisories'],['Live snapshot','st-snapshot'],['Facility floor','st-floor'],['Plant state','st-plant'],['Substrate 24h','st-trends']]},
-      {id:'zones',label:'Zones',icon:'drop',subs:[['All zones','zones-list']]},
+      {id:'dashboard',label:'Overview',icon:'dashboard',subs:[['Advisories','advisories'],['Live snapshot','st-snapshot'],['Plant state','st-plant'],['Facility floor','st-floor'],['Substrate 24h','st-trends']]},
+      {id:'zones',label:'Zones',icon:'drop',subs:[['All zones','zones-list'],['Source water & engine','zones-src']]},
+      {id:'tune',label:'Setpoints',icon:'scale',subs:[['Setpoints table','spm-anchor'],['Steering & day curve','tune-steer'],['Limiting factors','tune-liebig'],['Coupled state','tune-coupled'],['Room environment','tune-env']]},
       {id:'climate',label:'Climate',icon:'thermo',subs:[['Camera','cl-cam'],['Live climate','cl-live'],['Trends 24h','cl-trends'],['Room controls','cl-controls'],['Hotspot map','cl-hotspot'],['Raw readings','cl-raw']]},
       {id:'control',label:'Operate',icon:'radio',subs:[['Strategy','op-strategy'],['Arm & pump','op-arm'],['Relays & solenoids','op-relays'],['Adaptive','op-adaptive'],['Zones glance','op-zones'],['Engine','op-engine']]},
-      {id:'tune',label:'Tune',icon:'scale',subs:[['Steering dial','tune-steer']]},
       {id:'timeline',label:'Plan',icon:'activity',subs:[['Recipe & sync','recipeBar'],['Phase timeline','phaseSpine'],['Environment','Environment','sec'],['Lighting','Lighting','sec'],['Root Zone','Root Zone','sec'],['Steering','Steering','sec'],['Irrigation','Irrigation','sec'],['Tank / Feed','Tank / Feed','sec'],['Steering EC','Steering EC','sec'],['Phase Timing','Phase Timing','sec'],['Shot Sizes %','Shot Sizes %','sec'],['Limits & Hardware','Limits & Hardware','sec'],['Zone Setup','Zone Setup','sec'],['Facility layer','0','zone'],['Zone 1','1','zone'],['Zone 2','2','zone'],['Zone 3','3','zone'],['Parameter chart','chartHost']]},
       {id:'floor',label:'3D Floor',icon:'grid'}],
     camMin:(function(){try{return localStorage.getItem('f2.camMin')==='1'}catch(e){return false}})(),
