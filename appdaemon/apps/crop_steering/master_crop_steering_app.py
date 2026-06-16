@@ -1521,7 +1521,15 @@ class MasterCropSteeringApp(BaseAsyncApp):
             if new in ['unavailable', 'unknown', None]:
                 return
 
-            with self.lock:
+            # Non-blocking acquire: the async decision loop holds self.lock across irrigation
+            # shots (up to ~5 min). This sync callback runs on an AppDaemon worker thread (thread-0),
+            # a DIFFERENT thread from the event loop, so a BLOCKING acquire stalls thread-0 for the
+            # whole shot and the VWC callback queue explodes (qsize 90+). Skip this tick instead -
+            # VWC updates arrive every few seconds and the next one processes once the shot's await
+            # releases the lock.
+            if not self.lock.acquire(blocking=False):
+                return
+            try:
                 vwc_value = float(new)
                 timestamp = datetime.now()
 
@@ -1566,7 +1574,9 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 # Log significant changes
                 if fusion_result['is_outlier']:
                     self.log(f"⚠️ VWC outlier detected: {entity} = {vwc_value}%")
-                
+            finally:
+                self.lock.release()
+
         except Exception as e:
             self.log(f"❌ Error processing VWC update: {e}", level='ERROR')
 
