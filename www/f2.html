@@ -977,6 +977,16 @@
           <h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> All zones · live state &amp; setpoints <span class="text-[11px] text-slate-500 font-normal">· writes to HA live</span></h2>
           <span class="text-[11px] text-slate-500">setpoints in <button @click="solve({view:'tune',anchor:'spm-anchor'})" class="text-emerald-300/80 hover:text-emerald-300">Steering</button></span>
         </div>
+        <!-- manual hardware: pump + mainline + zone solenoids + E-STOP (writes live) -->
+        <div class="glass rounded-2xl p-3 flex items-center gap-2 flex-wrap">
+          <span class="text-[11px] uppercase tracking-wide text-slate-500 font-bold mr-1">Manual hardware</span>
+          <template x-for="h in pump.hw" :key="'zh'+h.id">
+            <button @click="pumpToggle(h.id)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] transition" :class="h.on?'bg-emerald-500/20 border-emerald-400/40 text-emerald-200':'bg-white/[0.03] border-white/10 text-slate-400 hover:bg-white/5'">
+              <span class="w-1.5 h-1.5 rounded-full" :class="h.on?'bg-emerald-400':'bg-slate-600'"></span><span x-text="h.label"></span></button>
+          </template>
+          <span x-show="pump.power!=null" class="text-[11px] text-slate-500" x-text="'· pump '+pump.powerTxt+' W'"></span>
+          <button @click="pumpStopAll()" class="ml-auto px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-400/40 text-red-300 text-[12px] font-semibold hover:bg-red-500/25">⛔ E-STOP</button>
+        </div>
         <!-- all zones, side by side -->
         <div id="zones-list" class="grid gap-4 scroll-mt-28" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
           <template x-for="z in zones" :key="'zc-'+z.id">
@@ -1023,6 +1033,10 @@
                 <button @click="fireShot(z.id)" class="h-9 px-3 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/30 text-cyan-200 text-[12px] font-medium" title="Fire a manual 60s shot">💧 Shot</button>
               </div>
               <button @click="openZone(z.id)" class="mt-2 w-full h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-400">Diagnose · all setpoints &amp; 24h trend →</button>
+              <div class="mt-3 pt-3 border-t border-white/6">
+                <div class="flex items-center justify-between mb-1"><span class="text-[11px] font-semibold text-slate-400">24h VWC + pore EC</span><span class="text-[10px] text-slate-600">VWC% L · EC R</span></div>
+                <div class="h-32"><canvas :id="'zmini'+z.id"></canvas></div>
+              </div>
             </div>
           </template>
         </div>
@@ -2268,8 +2282,8 @@ function buildHwStatus(){
   const hw=HW.map(h=>Object.assign({},h,{on:S[h.id]?.state==='on'}));
   const pw=num('pump_power'), anyValve=hw.some(h=>h.kind==='valve'&&h.on), deadhead=pw!=null&&pw>100&&!anyValve;
   const z=buildZones(), engOk=(val('heartbeat')==='healthy');
-  const zones=[1,2,3].map(i=>{ const Z=z[i-1]; const dayL=num('sensor.crop_steering_zone_'+i+'_daily_water_app');
-    const cap=num('number.crop_steering_zone_'+i+'_max_daily_volume'), shots=num('sensor.crop_steering_zone_'+i+'_irrigation_count_app');
+  const zones=[1,2,3].map(i=>{ const Z=z[i-1]; const dayL=zNum('sensor.crop_steering_zone_'+i+'_daily_water_app');
+    const cap=zNum('number.crop_steering_zone_'+i+'_max_daily_volume'), shots=zNum('sensor.crop_steering_zone_'+i+'_irrigation_count_app');
     const valveOn=hw.find(h=>h.zone===i)?.on;
     const light=!Z.enabled?'off':Z.status==='crit'?'bad':Z.status==='warn'?'warn':engOk?'ok':'warn';
     const workTxt=!Z.enabled?'disabled':Z.status==='crit'?'fault':Z.status==='warn'?'watch':valveOn?'watering':'working';
@@ -5002,7 +5016,7 @@ document.addEventListener('alpine:init', () => {
 
     /* charts */
     cb(){ return {responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:500},plugins:{legend:{display:false}}}; },
-    mountCharts(){ if(this.view==='dashboard'){ this.mountTrend(); this.ensureHist('dashboard'); } if(this.view==='climate'){ this.ensureHist('climate'); } },
+    mountCharts(){ if(this.view==='dashboard'){ this.mountTrend(); this.ensureHist('dashboard'); } if(this.view==='climate'){ this.ensureHist('climate'); } if(this.view==='zones'){ this.$nextTick(()=>this.mountZoneMinis()); } },
     async ensureHist(which){   // fetch REAL /api/history once per 4 min, then (re)draw the relevant charts
       const now=Date.now();
       if(this['_h_'+which] && now-this['_hts_'+which]<240000){ this.$nextTick(()=>which==='climate'?this.mountClimateCharts():this.mountTrend()); return; }
@@ -5090,6 +5104,20 @@ document.addEventListener('alpine:init', () => {
             scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:6,autoSkip:true}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}}}},
           plugins:[csLimPlugin]}); CHARTS[sp.id].$csLim=csLim; });
     },
+    async mountZoneMinis(){ for(const z of [1,2,3]){ const c=document.getElementById('zmini'+z); if(!c) continue;
+        const ids=['sensor.crop_steering_zone_'+z+'_vwc','sensor.crop_steering_zone_'+z+'_ec'];
+        let H; try{ H=await this.loadHist(ids,24); }catch(e){ continue; } if(!H) continue;
+        const s=H.__start,e=H.__end,N=96, labels=this.histLabels(s,e,N);
+        const vwc=this.bucketize(H[ids[0]],s,e,N), ec=this.bucketize(H[ids[1]],s,e,N);
+        if(CHARTS['zm'+z]){ const ch=CHARTS['zm'+z]; ch.data.labels=labels; ch.data.datasets[0].data=vwc; ch.data.datasets[1].data=ec; ch.update('none'); continue; }
+        CHARTS['zm'+z]=new Chart(c,{type:'line',data:{labels,datasets:[
+          {data:vwc,borderColor:'#22d3ee',borderWidth:1.6,tension:.15,pointRadius:0,fill:false,spanGaps:true,yAxisID:'yV'},
+          {data:ec,borderColor:'#a78bfa',borderWidth:1.3,tension:.15,pointRadius:0,fill:false,spanGaps:true,yAxisID:'yE',borderDash:[4,3]}]},
+          options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
+            plugins:{legend:{display:false},tooltip:{enabled:false}},
+            scales:{x:{display:false},
+              yV:{position:'left',min:20,max:70,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#67e8f9',font:{size:8},maxTicksLimit:4}},
+              yE:{position:'right',min:0,max:10,grid:{display:false},ticks:{color:'#c4b5fd',font:{size:8},maxTicksLimit:4}}}}}); } },
     async mountZoneHist(id){ const c=document.getElementById('zoneHistChart'); if(!c) return; if(CHARTS.zh){ CHARTS.zh.destroy(); CHARTS.zh=null; }
       const Z=CONFIG.ZONE(id), N=48; let H=null; try{ H=await this.loadHist([Z.vwc,Z.ec],24); }catch(e){}
       const cc=document.getElementById('zoneHistChart'); if(!cc) return;   // modal closed mid-fetch
@@ -5189,8 +5217,8 @@ document.addEventListener('alpine:init', () => {
       catch(e){ this.toast('Failed: '+e.message); } },
     // per-zone water budget + shot frequency for the barrel + frequency cards
     waterBars(){ return [1,2,3].map(z=>{ const P='crop_steering_zone_'+z+'_';
-      const dayL=num('sensor.'+P+'daily_water_app'), maxD=num('number.'+P+'max_daily_volume');
-      const shots=num('sensor.'+P+'irrigation_count_app'), nh=num('sensor.crop_steering_prediction_zone_'+z+'_next_irrigation_hours');
+      const dayL=zNum('sensor.'+P+'daily_water_app'), maxD=zNum('number.'+P+'max_daily_volume');
+      const shots=zNum('sensor.'+P+'irrigation_count_app'), nh=zNum('sensor.crop_steering_prediction_zone_'+z+'_next_irrigation_hours');
       const pct=(dayL!=null&&maxD)?Math.min(100,Math.round(dayL/maxD*100)):null;
       const nextTxt=nh==null?'—':(nh<=0?'now':nh<1?Math.round(nh*60)+'m':nh.toFixed(1)+'h');
       return { id:z, name:'Zone '+z, dayL, maxD, pct, shots, nextTxt,
