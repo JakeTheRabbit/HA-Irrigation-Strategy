@@ -1066,13 +1066,37 @@
             <img :src="camUrl" class="w-full rounded-xl border border-white/8 bg-black" style="aspect-ratio:16/9;object-fit:contain;max-height:420px" alt="F2 room camera" @error="$el.style.opacity='0.25'" @load="$el.style.opacity='1'">
           </template>
         </div>
-        <!-- live metrics first — context for the controls below -->
-        <div>
-          <h2 id="cl-live" class="text-sm font-semibold flex items-center gap-2 mb-3 scroll-mt-28"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Live climate</h2>
-          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            <template x-for="m in climate" :key="m.label">
-              <div class="glass rounded-2xl p-4"><div class="text-[11px] uppercase tracking-wider text-slate-400 flex items-center"><span x-text="m.label"></span><span class="tipi" @mouseenter="tipShow($event,m.label)" @mouseleave="tipHide()" @click.stop="tipShow($event,m.label)">ⓘ</span></div><div class="text-2xl font-bold mt-1" :class="m.cls" x-text="m.val"></div><div class="text-[11px] text-slate-500" x-text="m.sub"></div></div>
-            </template>
+        <!-- live climate — vitals tiles, STICKY so it stays as a reference while you scroll the controls below -->
+        <div class="sticky top-2 z-20">
+          <div class="glass rounded-2xl p-4">
+            <div class="flex items-center justify-between mb-3">
+              <h2 id="cl-live" class="text-sm font-semibold flex items-center gap-2 scroll-mt-28"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Live climate</h2>
+              <span class="text-[11px] text-slate-500 hidden sm:block">dot in the green = on target · pinned while you tune below</span>
+            </div>
+            <div class="vt-grid">
+              <template x-for="g in vitals.filter(v=>['light','air','leaf'].includes(v.key))" :key="'cl'+g.key">
+                <div class="vt-grp">
+                  <div class="vt-grp-h"><span class="w-2 h-2 rounded-full" :style="'background:'+g.color"></span><span class="vt-grp-name" :style="'color:'+g.color" x-text="g.name"></span><span class="vt-grp-sub" x-text="g.sub"></span></div>
+                  <template x-for="t in g.tiles" :key="'clt'+t.key">
+                    <div class="vt-tile" :title="t.tip">
+                      <div class="vt-row">
+                        <span class="vt-label" x-text="t.label"></span>
+                        <span class="vt-valwrap">
+                          <span class="vt-val" :class="(t.status==='crit'||t.status==='bad')?'vt-bad':t.status==='warn'?'vt-warn':t.status==='watch'?'vt-watch':'vt-ok'" x-text="t.val"></span>
+                          <span class="vt-unit" x-text="t.unit"></span>
+                          <span class="vt-arrow" :style="t.trend>0?'color:#34d399':(t.trend<0?'color:#38bdf8':'color:#475569')" x-text="t.trend>0?'▲':(t.trend<0?'▼':'·')"></span>
+                        </span>
+                      </div>
+                      <div class="vt-bar" x-show="t.dotPct!=null">
+                        <div class="vt-band" :style="'left:'+t.bandL+'%;width:'+t.bandW+'%'"></div>
+                        <div class="vt-dot" :class="(t.status==='crit'||t.status==='bad')?'vt-bg-bad':t.status==='warn'?'vt-bg-warn':t.status==='watch'?'vt-bg-watch':'vt-bg-ok'" :style="'left:'+t.dotPct+'%'"></div>
+                      </div>
+                      <div class="vt-need" x-show="t.need==='raise'||t.need==='lower'" x-text="t.need==='raise'?'↑ needs to rise':'↓ needs to fall'"></div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
           </div>
         </div>
         <!-- 24h climate history -->
@@ -1089,36 +1113,48 @@
         </div>
         <!-- ===== F2 room controls — every control + helper, full functionality ===== -->
         <div id="cl-controls" class="flex items-center justify-between pt-1 scroll-mt-28"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.radio" class="w-4 h-4 block text-emerald-400"></span> F2 room controls</h2><span class="text-[11px] text-slate-500">live · writes to HA immediately, no undo</span></div>
-        <template x-for="g in climateCtl" :key="g.name">
-          <div class="glass rounded-2xl p-5">
-            <button @click="g.collapsed && (ctlOpen[g.name]=!ctlOpen[g.name])" class="w-full flex items-center justify-between text-left" :class="!g.collapsed&&'cursor-default'">
-              <span class="text-sm font-semibold flex items-center gap-2"><span x-html="icons[g.icon]||icons.radio" class="w-4 h-4 block text-emerald-400"></span><span x-text="g.name"></span><span class="text-[11px] text-slate-500 font-normal" x-text="'· '+g.items.length"></span></span>
-              <span x-show="g.collapsed" x-html="ctlOpen[g.name]?icons.collapse:icons.expand" class="w-4 h-4 block text-slate-400"></span>
-            </button>
-            <div x-show="!g.collapsed || ctlOpen[g.name]" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mt-3">
-              <template x-for="it in g.items" :key="it.id">
-                <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3 relative">
-                  <span class="tipi absolute top-1.5 right-1.5 z-10" @mouseenter="tipShow($event,it.id,it.label)" @mouseleave="tipHide()" @click.stop="tipShow($event,it.id,it.label)">ⓘ</span>
-                  <template x-if="it.type==='toggle'"><div class="flex items-center justify-between gap-2"><span class="text-sm text-slate-300 min-w-0 truncate" x-text="it.label"></span><button @click="!it.un&&ctrlToggle(it.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="it.un?'bg-white/10 opacity-40 cursor-not-allowed':it.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="it.on&&'translate-x-5'"></span></button></div></template>
-                  <template x-if="it.type==='num'"><div>
-                    <div class="flex items-center justify-between gap-2 mb-2"><span class="text-[13px] text-slate-300 truncate" x-text="it.label"></span>
-                      <span x-show="it.live" class="text-[10px] px-1.5 py-0.5 rounded-full shrink-0" :class="sevBg(it.live?.sev)"><span :class="sevText(it.live?.sev)" x-text="'now '+(it.live?.val)+(it.unit||'')"></span></span></div>
-                    <div class="flex items-center gap-2">
-                      <button @click="stepNum(it,-1)" class="w-11 h-11 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/20 border border-white/10 text-xl text-slate-200 grid place-items-center shrink-0 select-none" aria-label="decrease">−</button>
-                      <button @click="openSp(it)" class="flex-1 h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.09] border border-white/10 flex items-baseline justify-center gap-1"><span class="text-lg font-bold text-slate-100" x-text="it.val"></span><span class="text-[11px] text-slate-500" x-text="it.unit"></span></button>
-                      <button @click="stepNum(it,1)" class="w-11 h-11 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/20 border border-white/10 text-xl text-slate-200 grid place-items-center shrink-0 select-none" aria-label="increase">+</button></div>
-                    <div x-show="it.live?.band" class="text-[10px] text-slate-500 mt-1.5 text-center" x-text="it.live?.band ? ('on-target '+(it.live?.band?.[0])+'–'+(it.live?.band?.[1])) : ''"></div></div></template>
-                  <template x-if="it.type==='text'"><div><div class="text-[11px] text-slate-400 mb-1 truncate" x-text="it.label"></div><input type="text" :value="it.value" @change="ctrlText(it.id,$event.target.value)" class="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"></div></template>
-                  <template x-if="it.type==='button'"><button @click="ctrlBtn(it.id)" class="w-full h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 truncate px-2" x-text="it.label"></button></template>
-                  <template x-if="it.type==='light'"><div><div class="flex items-center justify-between gap-2"><span class="text-sm text-slate-300 truncate" x-text="it.label"></span><button @click="!it.un&&ctrlToggle(it.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="it.un?'bg-white/10 opacity-40':it.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="it.on&&'translate-x-5'"></span></button></div><input x-show="it.hasBri&&it.on" type="range" min="1" max="100" :value="it.bri||100" @change="ctrlLightBri(it.id,$event.target.value)" class="w-full mt-2 accent-emerald-500"></div></template>
-                  <template x-if="it.type==='climate'"><div><div class="flex items-center justify-between"><span class="text-sm font-medium text-slate-200 truncate" x-text="it.label"></span><span class="text-[11px] text-slate-400">now <b x-text="it.cur!=null?it.cur+'°':'—'"></b></span></div>
-                    <div class="flex flex-wrap gap-1 mt-2"><template x-for="m in it.modes" :key="m"><button @click="ctrlClimateMode(it.id,m)" class="px-2 py-1 rounded-md text-[11px] capitalize" :class="it.mode===m?'bg-emerald-500/25 text-emerald-300':'bg-white/5 text-slate-400'" x-text="m.replace('_',' ')"></button></template></div>
-                    <div class="flex items-center gap-2 mt-2"><button @click="ctrlClimateTemp(it.id,it.temp-it.step)" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-lg leading-none">−</button><div class="flex-1 text-center font-bold text-lg" x-text="it.temp+'°'"></div><button @click="ctrlClimateTemp(it.id,it.temp+it.step)" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-lg leading-none">+</button></div></div></template>
-                </div>
-              </template>
+        <div class="glass rounded-2xl overflow-hidden">
+          <template x-for="g in climateCtl" :key="g.name">
+            <div>
+              <button @click="g.collapsed && (ctlOpen[g.name]=!ctlOpen[g.name])" class="w-full flex items-center justify-between text-left px-4 py-2.5 bg-white/[0.025] border-t border-white/[0.06]" :class="!g.collapsed&&'cursor-default'">
+                <span class="text-[13px] font-semibold flex items-center gap-2"><span x-html="icons[g.icon]||icons.radio" class="w-4 h-4 block text-emerald-400"></span><span x-text="g.name"></span><span class="text-[11px] text-slate-500 font-normal" x-text="'· '+g.items.length"></span></span>
+                <span x-show="g.collapsed" x-html="ctlOpen[g.name]?icons.collapse:icons.expand" class="w-4 h-4 block text-slate-400"></span>
+              </button>
+              <div x-show="!g.collapsed || ctlOpen[g.name]">
+                <template x-for="it in g.items" :key="it.id">
+                  <div class="flex items-center justify-between gap-3 px-4 py-2 border-t border-white/[0.04] hover:bg-white/[0.02]">
+                    <span class="text-[13px] text-slate-300 min-w-0 flex items-center gap-1.5">
+                      <span class="truncate" x-text="it.label"></span>
+                      <span class="tipi shrink-0" @mouseenter="tipShow($event,it.id,it.label)" @mouseleave="tipHide()" @click.stop="tipShow($event,it.id,it.label)">ⓘ</span>
+                      <span x-show="it.type==='num'&&it.live?.band" class="text-[10px] text-slate-600 shrink-0 hidden sm:inline" x-text="it.live?.band?('target '+(it.live?.band?.[0])+'–'+(it.live?.band?.[1])):''"></span>
+                    </span>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <template x-if="it.type==='toggle'||it.type==='light'"><div class="flex items-center gap-2">
+                        <input x-show="it.type==='light'&&it.hasBri&&it.on" type="range" min="1" max="100" :value="it.bri||100" @change="ctrlLightBri(it.id,$event.target.value)" class="w-20 accent-emerald-500">
+                        <button @click="!it.un&&ctrlToggle(it.id,false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="it.un?'bg-white/10 opacity-40 cursor-not-allowed':it.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="it.on&&'translate-x-5'"></span></button>
+                      </div></template>
+                      <template x-if="it.type==='num'"><div class="flex items-center gap-1.5">
+                        <span x-show="it.live" class="text-[10px] px-1.5 py-0.5 rounded-full" :class="sevBg(it.live?.sev)"><span :class="sevText(it.live?.sev)" x-text="'now '+(it.live?.val)+(it.unit||'')"></span></span>
+                        <span class="inline-flex items-center rounded-lg border border-white/10 overflow-hidden bg-black/20">
+                          <button @click="stepNum(it,-1)" class="w-8 h-8 text-slate-300 hover:bg-white/10 text-lg leading-none">−</button>
+                          <button @click="openSp(it)" class="px-2.5 h-8 flex items-baseline gap-1 hover:bg-white/5"><span class="text-sm font-bold text-slate-100" x-text="it.val"></span><span class="text-[10px] text-slate-500" x-text="it.unit"></span></button>
+                          <button @click="stepNum(it,1)" class="w-8 h-8 text-slate-300 hover:bg-white/10 text-lg leading-none">+</button>
+                        </span>
+                      </div></template>
+                      <template x-if="it.type==='text'"><input type="text" :value="it.value" @change="ctrlText(it.id,$event.target.value)" class="w-32 bg-white/[0.06] border border-white/10 rounded-lg px-2 py-1 text-xs text-slate-200 font-mono"></template>
+                      <template x-if="it.type==='button'"><button @click="ctrlBtn(it.id)" class="h-8 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 px-3">Run</button></template>
+                      <template x-if="it.type==='climate'"><div class="flex items-center gap-2 flex-wrap justify-end">
+                        <span class="text-[11px] text-slate-400">now <b x-text="it.cur!=null?it.cur+'°':'—'"></b></span>
+                        <div class="flex gap-1"><template x-for="m in it.modes" :key="m"><button @click="ctrlClimateMode(it.id,m)" class="px-1.5 py-0.5 rounded text-[10px] capitalize" :class="it.mode===m?'bg-emerald-500/25 text-emerald-300':'bg-white/5 text-slate-400'" x-text="m.replace('_',' ')"></button></template></div>
+                        <span class="inline-flex items-center rounded-lg border border-white/10 overflow-hidden bg-black/20"><button @click="ctrlClimateTemp(it.id,it.temp-it.step)" class="w-8 h-8 text-slate-300 hover:bg-white/10 text-lg leading-none">−</button><span class="px-2 font-bold text-sm" x-text="it.temp+'°'"></span><button @click="ctrlClimateTemp(it.id,it.temp+it.step)" class="w-8 h-8 text-slate-300 hover:bg-white/10 text-lg leading-none">+</button></span>
+                      </div></template>
+                    </div>
+                  </div>
+                </template>
+              </div>
             </div>
-          </div>
-        </template>
+          </template>
+        </div>
 
         <div class="glass rounded-2xl p-5">
           <h3 id="cl-hotspot" class="text-sm font-semibold mb-3 flex items-center gap-2 scroll-mt-28"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Room map — hotspot watch</h3>
@@ -1411,7 +1447,40 @@
 
       <!-- ===== CONTROL (native ops console) ===== -->
       <section x-show="view==='control'" class="fade-enter space-y-4">
-        <div class="glass rounded-2xl p-4 flex items-center gap-3 border-l-4 border-l-amber-400/60"><span x-html="icons.alert" class="w-5 h-5 block text-amber-400 shrink-0"></span><span class="text-sm text-slate-300">Facility ops — strategy, arm/pump &amp; adaptive write to HA immediately, no undo. Per-zone setpoints live in <b class="text-slate-200">Zones</b>; recipe in <b class="text-slate-200">Tune</b>.</span></div>
+        <div class="glass rounded-2xl p-4 flex items-center gap-3 border-l-4 border-l-amber-400/60"><span x-html="icons.alert" class="w-5 h-5 block text-amber-400 shrink-0"></span><span class="text-sm text-slate-300">Facility ops — strategy, arm/pump &amp; adaptive write to HA immediately, no undo. Per-zone setpoints live in <b class="text-slate-200">Zones</b>; recipe in <b class="text-slate-200">Setpoints</b>.</span></div>
+        <!-- live readings — so you can see what you're configuring against (sticky reference) -->
+        <div class="sticky top-2 z-20">
+          <div class="glass rounded-2xl p-4">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Live readings</h2>
+              <span class="text-[11px] text-slate-500 hidden sm:block">what you're steering against · pinned while you configure</span>
+            </div>
+            <div class="vt-grid">
+              <template x-for="g in vitals.filter(v=>['air','leaf','root'].includes(v.key))" :key="'op'+g.key">
+                <div class="vt-grp">
+                  <div class="vt-grp-h"><span class="w-2 h-2 rounded-full" :style="'background:'+g.color"></span><span class="vt-grp-name" :style="'color:'+g.color" x-text="g.name"></span><span class="vt-grp-sub" x-text="g.sub"></span></div>
+                  <template x-for="t in g.tiles" :key="'opt'+t.key">
+                    <div class="vt-tile" :title="t.tip">
+                      <div class="vt-row">
+                        <span class="vt-label" x-text="t.label"></span>
+                        <span class="vt-valwrap">
+                          <span class="vt-val" :class="(t.status==='crit'||t.status==='bad')?'vt-bad':t.status==='warn'?'vt-warn':t.status==='watch'?'vt-watch':'vt-ok'" x-text="t.val"></span>
+                          <span class="vt-unit" x-text="t.unit"></span>
+                          <span class="vt-arrow" :style="t.trend>0?'color:#34d399':(t.trend<0?'color:#38bdf8':'color:#475569')" x-text="t.trend>0?'▲':(t.trend<0?'▼':'·')"></span>
+                        </span>
+                      </div>
+                      <div class="vt-bar" x-show="t.dotPct!=null">
+                        <div class="vt-band" :style="'left:'+t.bandL+'%;width:'+t.bandW+'%'"></div>
+                        <div class="vt-dot" :class="(t.status==='crit'||t.status==='bad')?'vt-bg-bad':t.status==='warn'?'vt-bg-warn':t.status==='watch'?'vt-bg-watch':'vt-bg-ok'" :style="'left:'+t.dotPct+'%'"></div>
+                      </div>
+                      <div class="vt-split" x-show="t.split" x-text="'⚠ zones split '+t.split"></div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div id="op-strategy" class="glass rounded-2xl p-5 space-y-4 scroll-mt-28">
             <h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.salt" class="w-4 h-4 block text-emerald-400"></span> Active strategy</h3>
@@ -1480,9 +1549,9 @@
           </div>
         </button>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <button @click="solve({view:'tune',anchor:'tune-steer'})" class="glass rounded-2xl p-5 text-left hover:border-white/15 lift flex items-center gap-3">
+          <button @click="solve({view:'tune',anchor:'spm-anchor'})" class="glass rounded-2xl p-5 text-left hover:border-white/15 lift flex items-center gap-3">
             <span class="w-10 h-10 rounded-xl grid place-items-center bg-amber-400/15 shrink-0"><span x-html="icons.flag" class="w-5 h-5 block text-amber-400"></span></span>
-            <div class="min-w-0 flex-1"><div class="text-sm font-semibold">Guardrails &amp; recipe</div><div class="text-[12px] text-slate-400">EC / pH limits, lights, dryback — edit in Tune.</div></div>
+            <div class="min-w-0 flex-1"><div class="text-sm font-semibold">Guardrails &amp; setpoints</div><div class="text-[12px] text-slate-400">EC / pH limits, lights, dryback — edit in the Setpoints table.</div></div>
             <span x-html="icons.arrow" class="w-4 h-4 block text-emerald-300/80 shrink-0"></span>
           </button>
           <div class="glass rounded-2xl p-5"><h3 id="op-engine" class="text-sm font-semibold flex items-center gap-2 mb-3 scroll-mt-28"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Engine</h3>
