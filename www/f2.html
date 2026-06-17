@@ -5118,8 +5118,8 @@ document.addEventListener('alpine:init', () => {
         options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:500},interaction:{mode:'index',intersect:false},
           plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:14,usePointStyle:false,font:{size:11}}},tooltip:{backgroundColor:'#11161d',callbacks:{label:x=>x.dataset.label+': '+(x.parsed.y==null?'—':x.dataset.yAxisID==='yE'?x.parsed.y.toFixed(2)+' mS/cm':x.parsed.y.toFixed(1)+'%')}}},
           scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8,autoSkip:true}},
-            yV:{position:'right',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#67e8f9',font:{size:10},callback:v=>v+'%'},min:20,max:70,title:{display:true,text:'VWC %',color:'#67e8f9',font:{size:10}}},
-            yE:{position:'right',grid:{display:false},ticks:{color:'#c4b5fd',font:{size:10}},min:0,max:10,title:{display:true,text:'pore EC',color:'#c4b5fd',font:{size:10}}}}},
+            yV:{position:'right',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#67e8f9',font:{size:10},callback:v=>v+'%'},suggestedMin:25,suggestedMax:65,grace:'5%',title:{display:true,text:'VWC %',color:'#67e8f9',font:{size:10}}},
+            yE:{position:'right',grid:{display:false},ticks:{color:'#c4b5fd',font:{size:10}},suggestedMin:0,suggestedMax:6,grace:'5%',title:{display:true,text:'pore EC',color:'#c4b5fd',font:{size:10}}}}},
         plugins:[drybackPlugin]}); CHARTS.trend.$dryback=dbInfo; },
 
     /* ===== AROYA-style full-width Substrate view ===== */
@@ -5160,8 +5160,8 @@ document.addEventListener('alpine:init', () => {
       CHARTS.sub=new Chart(c,{type:'line',data:{labels,datasets:sets},options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:400},interaction:{mode:'index',intersect:false},
         plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:14,font:{size:11}}},tooltip:{backgroundColor:'#11161d',callbacks:{label:x=>x.dataset.label+': '+(x.parsed.y==null?'—':x.dataset.yAxisID==='yE'?x.parsed.y.toFixed(2)+' mS/cm':x.parsed.y.toFixed(1)+'%')}}},
         scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:10},maxTicksLimit:12,autoSkip:true}},
-          yV:{position:'left',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#67e8f9',font:{size:11},callback:v=>v+'%'},min:20,max:75,title:{display:true,text:'VWC %',color:'#67e8f9'}},
-          yE:{position:'right',grid:{display:false},ticks:{color:'#c4b5fd',font:{size:11}},min:0,max:10,title:{display:true,text:'pore EC mS/cm',color:'#c4b5fd'}}}},
+          yV:{position:'left',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#67e8f9',font:{size:11},callback:v=>v+'%'},suggestedMin:25,suggestedMax:65,grace:'5%',title:{display:true,text:'VWC %',color:'#67e8f9'}},
+          yE:{position:'right',grid:{display:false},ticks:{color:'#c4b5fd',font:{size:11}},suggestedMin:0,suggestedMax:6,grace:'5%',title:{display:true,text:'pore EC mS/cm',color:'#c4b5fd'}}}},
         plugins:[dryPlugin,fcPlugin]}); CHARTS.sub.$dryback=dbInfo; },
     mountClimateCharts(){ const H=this._h_climate, N=48; if(!H) return; const s=H.__start,e=H.__end, labels=this.histLabels(s,e,N);
       const specs=[ {id:'ccTemp',key:CONFIG.E.air_temp,label:'Air temp',unit:'°C',color:'#fb923c',band:CONFIG.BANDS.air_temp},
