@@ -850,6 +850,7 @@
                 <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[11px]" :class="h.on?'bg-emerald-500/15 border-emerald-400/40 text-emerald-200':'bg-white/[0.02] border-white/8 text-slate-500'"><span class="w-1.5 h-1.5 rounded-full" :class="h.on?'bg-emerald-400':'bg-slate-600'"></span><span x-text="h.label"></span></span>
               </template>
               <span x-show="hwStatus.deadhead" class="px-2 py-1 rounded-lg bg-red-500/20 border border-red-400/40 text-red-300 text-[11px] font-semibold">⚠ pump dead-head</span>
+              <button @click="pumpOpen=true" class="px-2.5 py-1 rounded-lg bg-white/5 border border-white/12 text-[11px] text-slate-300 hover:bg-white/10">⚙ Manual / E-STOP</button>
             </div>
           </div>
           <div class="grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
@@ -870,6 +871,12 @@
                 </div>
                 <div class="h-1.5 rounded-full bg-white/8 overflow-hidden"><div class="h-full rounded-full transition-all" :class="z.pct>90?'bg-red-500':z.pct>70?'bg-amber-400':'bg-cyan-500'" :style="'width:'+z.pct+'%'"></div></div>
               </div>
+            </template>
+          </div>
+          <div class="mt-3 pt-3 border-t border-white/8 flex items-center gap-x-5 gap-y-1 flex-wrap text-[12px]">
+            <span class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Engine</span>
+            <template x-for="t in control.telemetry" :key="'eng'+t.label">
+              <span class="text-slate-400"><span x-text="t.label"></span>: <b :class="t.warn&&'text-amber-400'" x-text="t.val"></b></span>
             </template>
           </div>
         </div>
@@ -968,7 +975,7 @@
       <section x-show="view==='zones'" class="fade-enter space-y-4">
         <div class="flex items-center justify-between flex-wrap gap-2">
           <h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> All zones · live state &amp; setpoints <span class="text-[11px] text-slate-500 font-normal">· writes to HA live</span></h2>
-          <span class="text-[11px] text-slate-500">recipe in <button @click="solve({view:'tune',anchor:'tune-steer'})" class="text-emerald-300/80 hover:text-emerald-300">Tune</button> · ops in <button @click="go('control')" class="text-emerald-300/80 hover:text-emerald-300">Operate</button></span>
+          <span class="text-[11px] text-slate-500">setpoints in <button @click="solve({view:'tune',anchor:'spm-anchor'})" class="text-emerald-300/80 hover:text-emerald-300">Steering</button></span>
         </div>
         <!-- all zones, side by side -->
         <div id="zones-list" class="grid gap-4 scroll-mt-28" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
@@ -1181,6 +1188,23 @@
       <button @click="go('timeline')" class="px-4 py-2 text-[13px] font-semibold text-slate-400 hover:bg-white/5">🗓 Schedule · recipe</button>
     </div>
     <span class="text-[12px] text-slate-500">live values across all zones · edit any cell, then Apply to HA</span>
+  </div>
+  <!-- strategy & system bar (folded from the old Operate tab) -->
+  <div class="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5 mb-3 flex items-center gap-x-5 gap-y-2 flex-wrap" x-show="view==='tune'">
+    <span class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">System</span>
+    <template x-for="t in control.arm" :key="'sb'+t.id">
+      <label class="flex items-center gap-2 text-[12px] text-slate-300"><span x-text="t.label"></span>
+        <button @click="ctrlToggle(t.id,t.confirmArm)" class="relative w-9 h-5 rounded-full transition shrink-0" :class="t.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition" :class="t.on&&'translate-x-4'"></span></button></label>
+    </template>
+    <span class="text-[10px] uppercase tracking-wide text-slate-500 font-bold ml-1">Strategy</span>
+    <template x-for="sel in control.strategy" :key="'sb'+sel.id">
+      <label class="flex items-center gap-2 text-[12px] text-slate-300"><span x-text="sel.label"></span>
+        <select @change="ctrlSelect(sel.id,$event.target.value)" class="bg-white/[0.06] border border-white/10 rounded-lg px-2 py-1 text-[12px] text-slate-200">
+          <template x-for="o in sel.options" :key="o"><option :value="o" :selected="o===sel.value" x-text="o"></option></template></select></label>
+    </template>
+    <label class="flex items-center gap-2 text-[12px] text-slate-300" x-show="control.adaptive.toggle.id"><span x-text="control.adaptive.toggle.label||'Adaptive'"></span>
+      <button @click="ctrlToggle(control.adaptive.toggle.id,false)" class="relative w-9 h-5 rounded-full transition shrink-0" :class="control.adaptive.toggle.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition" :class="control.adaptive.toggle.on&&'translate-x-4'"></span></button></label>
+    <span class="text-[11px] text-amber-300/70 ml-auto">⚡ writes to HA live</span>
   </div>
   <span class="kicker" x-show="view==='analyze'">🔬 F2 physics &amp; limiting factors</span>
   <h1 x-show="view==='analyze'"><span class="grad">Why the day looks the way it does.</span></h1>
@@ -2075,14 +2099,14 @@ function worse(a,b){ const o={optimal:0,ok:0,warn:1,crit:2}; return o[b]>o[a]?b:
 /* ===================== rules (verified) ===================== */
 const RULES=[
   function pumpDeadhead(){ const p=num("pump_power"); if(p==null) return null; const off=val("row1")!=="on"&&val("row2")!=="on"&&val("row3")!=="on";
-    if(p>100&&off) return {sev:"crit",icon:"alert",confidence:"high",title:"Pump running dry — turn it off",detail:`The main pump is pulling ${fmt(p,0)} watts with all three zone valves shut. It is pushing against a closed pipe. This has happened on F2 before and can wreck the pump.`,action:"Turn the main pump and mainline OFF now. Confirm power drops to 0 watts.",fix:{view:'control',anchor:'op-arm',label:'Operate · pump'},evidence:`${E.pump_power} = ${fmt(p,0)} W\nrow1=${val("row1")} row2=${val("row2")} row3=${val("row3")}`}; return null; },
+    if(p>100&&off) return {sev:"crit",icon:"alert",confidence:"high",title:"Pump running dry — turn it off",detail:`The main pump is pulling ${fmt(p,0)} watts with all three zone valves shut. It is pushing against a closed pipe. This has happened on F2 before and can wreck the pump.`,action:"Turn the main pump and mainline OFF now. Confirm power drops to 0 watts.",fix:{view:'dashboard',anchor:'hw-status',label:'Operate · pump'},evidence:`${E.pump_power} = ${fmt(p,0)} W\nrow1=${val("row1")} row2=${val("row2")} row3=${val("row3")}`}; return null; },
   function engineHealth(){ const hb=val("heartbeat"),app=val("app_status"),a=ageUpd("heartbeat");
-    if(hb&&hb!=="healthy") return {sev:"warn",icon:"robot",confidence:"high",title:"The steering brain is not happy",detail:`Heartbeat says "${hb}". App says "${app}". Auto-watering may not be responding.`,action:"Check the AppDaemon log over SSH. If stuck near lights-on, push P0 then back to Auto.",fix:{view:'control',anchor:'op-arm',label:'Operate · engine'},evidence:`${E.heartbeat}=${hb}\n${E.app_status}=${app}\nage=${fmt(a,0)} min`};
-    if(a!=null&&a>45) return {sev:"warn",icon:"robot",confidence:"med",title:"No word from the steering brain",detail:`Nothing new from the engine for ${fmt(a,0)} minutes. It may be stopped or stuck.`,action:"Check the AppDaemon add-on is running. Look for a stuck shot.",fix:{view:'control',anchor:'op-arm',label:'Operate · engine'},evidence:`${E.heartbeat} last_updated ${fmt(a,0)} min ago`}; return null; },
+    if(hb&&hb!=="healthy") return {sev:"warn",icon:"robot",confidence:"high",title:"The steering brain is not happy",detail:`Heartbeat says "${hb}". App says "${app}". Auto-watering may not be responding.`,action:"Check the AppDaemon log over SSH. If stuck near lights-on, push P0 then back to Auto.",fix:{view:'dashboard',anchor:'hw-status',label:'Operate · engine'},evidence:`${E.heartbeat}=${hb}\n${E.app_status}=${app}\nage=${fmt(a,0)} min`};
+    if(a!=null&&a>45) return {sev:"warn",icon:"robot",confidence:"med",title:"No word from the steering brain",detail:`Nothing new from the engine for ${fmt(a,0)} minutes. It may be stopped or stuck.`,action:"Check the AppDaemon add-on is running. Look for a stuck shot.",fix:{view:'dashboard',anchor:'hw-status',label:'Operate · engine'},evidence:`${E.heartbeat} last_updated ${fmt(a,0)} min ago`}; return null; },
   function zoneFloor(){ for(const z of [1,2,3]){ const Z=CONFIG.ZONE(z); const v=parseFloat(S[Z.vwc]?.state); if(isNaN(v)) continue; const f=CONFIG.ZONE_P3_FLOOR[z];
     if(v<=f) return {sev:"crit",icon:"desert",confidence:"high",title:`Zone ${z} is too dry`,detail:`Zone ${z} water level is ${fmt(v,1)}% — at or below its emergency floor of ${f}%. Roots are getting too dry. Stress is close.`,action:`Confirm the engine is firing emergency shots for Zone ${z}. If the system is off, water Zone ${z} by hand now.`,fix:{view:'zones',anchor:'zones-list',label:'Zones'},evidence:`${Z.vwc}=${fmt(v,1)}%  floor=${f}%`}; } return null; },
   function dosingStuck(){ if(!isOn("dosing_active")) return null; const a=ageMin("dosing_active");
-    if(a!=null&&a>CONFIG.DOSING_STUCK_MIN) return {sev:"warn",icon:"flask",confidence:"med",title:"Dosing flag stuck on",detail:`The dosing flag has been on for ${fmt(a,0)} minutes. While it is on, no watering can happen.`,action:"Confirm tank pH and EC are in range, then switch the dosing flag off so watering can resume.",fix:{view:'control',anchor:'op-arm',label:'Operate'},evidence:`${E.dosing_active}=on for ${fmt(a,0)} min`}; return null; },
+    if(a!=null&&a>CONFIG.DOSING_STUCK_MIN) return {sev:"warn",icon:"flask",confidence:"med",title:"Dosing flag stuck on",detail:`The dosing flag has been on for ${fmt(a,0)} minutes. While it is on, no watering can happen.`,action:"Confirm tank pH and EC are in range, then switch the dosing flag off so watering can resume.",fix:{view:'dashboard',anchor:'hw-status',label:'Operate'},evidence:`${E.dosing_active}=on for ${fmt(a,0)} min`}; return null; },
   function hotspot(){ const bt=num("bl_temp"),at=num("air_temp"),bv=num("bl_vpd"); if(bt==null||at==null) return null; const d=bt-at;
     if(d>=CONFIG.HOTSPOT.deltaWarn||(bv!=null&&bv>CONFIG.HOTSPOT.vpdWarn)) return {sev:"warn",icon:"fire",confidence:"high",title:"Back-left corner is running hot",detail:`Back-left is ${fmt(bt,1)}°C versus ${fmt(at,1)}°C room — ${fmt(d,1)}°C hotter. Those plants dry out and stress first.`,action:"Check the air-con throw and fans reaching the back-left corner. Re-check the gap in 30 min.",fix:{view:'climate',anchor:'cl-controls',label:'Climate · AC'},evidence:`${E.bl_temp}=${fmt(bt,1)}  ${E.air_temp}=${fmt(at,1)}  delta=${fmt(d,1)}\n${E.bl_vpd}=${fmt(bv,2)}`}; return null; },
   function co2Dark(){ const c=num("co2"); if(c==null) return null;
@@ -2100,7 +2124,7 @@ const RULES=[
     if(safe==="approaching_saturation") return {sev:"watch",icon:"wave",title:`Zone ${z} looking wet`,detail:`Zone ${z} flagged as nearly saturated. If it is a real wet trend, ease off the shots.`,fix:{view:'zones',anchor:'zones-list',label:'Zones'}}; } return null; },
   function hotspotMild(){ const bt=num("bl_temp"),at=num("air_temp"); if(bt==null||at==null) return null; const d=bt-at;
     if(d>=CONFIG.HOTSPOT.deltaWatch&&d<CONFIG.HOTSPOT.deltaWarn) return {sev:"watch",icon:"thermo",title:"Back-left warming up",detail:`Back-left is ${fmt(d,1)}°C warmer than the room. Not bad yet — watch the airflow.`,fix:{view:'climate',anchor:'cl-controls',label:'Climate · AC'}}; return null; },
-  function phaseImbalance(){ if(isOn("phase_imbalance")) return {sev:"watch",icon:"scale",title:"Zones out of step",detail:"Zones are on different phases. Normal when steering them apart — check none is stuck.",fix:{view:'control',anchor:'op-zones',label:'Operate · zones'}}; return null; },
+  function phaseImbalance(){ if(isOn("phase_imbalance")) return {sev:"watch",icon:"scale",title:"Zones out of step",detail:"Zones are on different phases. Normal when steering them apart — check none is stuck.",fix:{view:'zones',anchor:'zones-list',label:'Zones'}}; return null; },
   function condensation(){ const m=condMargin(),dp=dewPoint(); if(m==null) return null;
     if(m<1.5) return {sev:"warn",icon:"haze",confidence:"med",title:"Condensation risk — surfaces near dew point",detail:`Dew point is ${fmt(dp,1)}°C and the coldest tracked surface is only ${fmt(m,1)}°C above it. Below that margin water condenses on leaves, walls or coils — a mould and GMP risk.`,action:"Raise night temp a touch, cut RH, or improve airflow to lift the margin back above 2°C.",fix:{view:'climate',anchor:'cl-controls',label:'Climate'},evidence:`dewpoint=${fmt(dp,1)}°C  margin=${fmt(m,1)}°C  (air ${fmt(num("air_temp"),1)}°C / RH ${fmt(num("rh"),0)}%)`}; return null; },
   function ecStacking(){ const ec=num("fused_ec"),tr=num("ec_trend"),dr=num("dryback_rate"); if(ec==null) return null;
@@ -4884,11 +4908,10 @@ document.addEventListener('alpine:init', () => {
       {id:'zones',label:'Zones',icon:'drop',subs:[['All zones','zones-list'],['Source water & engine','zones-src']]},
       {id:'tune',label:'Steering',icon:'scale',subs:[['Now · setpoints','tune','view'],['Schedule · recipe','timeline','view'],['Setpoints table','spm-anchor'],['Steering & day curve','tune-steer']]},
       {id:'analyze',label:'Analyze',icon:'activity',subs:[['Limiting factors','tune-liebig'],['Drivers & environment','tune-env']]},
-      {id:'climate',label:'Climate',icon:'thermo',subs:[['Live climate','cl-live'],['Trends 24h','cl-trends'],['Room controls','cl-controls'],['Hotspot map','cl-hotspot'],['Raw readings','cl-raw']]},
-      {id:'control',label:'Operate',icon:'radio',subs:[['Strategy','op-strategy'],['Arm & pump','op-arm'],['Relays & solenoids','op-relays'],['Adaptive','op-adaptive'],['Engine','op-engine']]}],
+      {id:'climate',label:'Climate',icon:'thermo',subs:[['Live climate','cl-live'],['Trends 24h','cl-trends'],['Room controls','cl-controls'],['Hotspot map','cl-hotspot'],['Raw readings','cl-raw']]}],
     camMin:(function(){try{return localStorage.getItem('f2.camMin')==='1'}catch(e){return false}})(),
     floorLoaded:false,
-    mobileNav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'climate',label:'Climate',icon:'thermo'},{id:'control',label:'Operate',icon:'radio'},{id:'ai',label:'AI',icon:'ai'}],
+    mobileNav:[{id:'dashboard',label:'Overview',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'tune',label:'Steering',icon:'scale'},{id:'climate',label:'Climate',icon:'thermo'},{id:'ai',label:'AI',icon:'ai'}],
 
     view:ls.get('f2.view','dashboard'), sidebarOpen:ls.get('f2.sidebar',true), connected:false, connError:"",
     easy:ls.get('f2.easy',!DEMO), wiz:false, wizStep:0, wizData:{goal:'balanced',stage:'Bulk',dial:7,strain:'',substrate:6,drippers:2,flow:2.0},   // calm view is the DEFAULT on a fresh browser (paper §10: attention is finite); Pro is one tap, choice persists. Demo stays Pro to showcase.
