@@ -790,34 +790,85 @@
         </div>
 
         <!-- ===== LIVE COUPLED STATE — light → air → leaf → root, big + glanceable ===== -->
-        <div id="coupled-anchor" class="scroll-mt-28">
+        <!-- ===== VITALS — one tile per metric · coupled chain · band-bar + dot + smoothed trend ===== -->
+        <style>
+        .vt-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(215px,1fr))}
+        .vt-grp{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:12px 13px}
+        .vt-grp-h{display:flex;align-items:center;gap:7px;margin-bottom:9px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.06)}
+        .vt-grp-name{font-weight:700;font-size:13px}
+        .vt-grp-sub{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-left:auto}
+        .vt-tile{padding:7px 0}.vt-tile+.vt-tile{border-top:1px solid rgba(255,255,255,.04)}
+        .vt-row{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+        .vt-label{font-size:12px;color:#cbd5e1}
+        .vt-valwrap{display:flex;align-items:baseline;gap:3px;font-variant-numeric:tabular-nums}
+        .vt-val{font-size:20px;font-weight:700;line-height:1}.vt-unit{font-size:10px;color:#64748b}.vt-arrow{font-size:12px;margin-left:1px}
+        .vt-bar{position:relative;height:6px;border-radius:4px;background:rgba(255,255,255,.06);margin-top:6px}
+        .vt-band{position:absolute;top:0;bottom:0;background:rgba(52,211,153,.30);border-radius:3px}
+        .vt-dot{position:absolute;top:50%;width:9px;height:9px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 2px rgba(11,18,32,.9)}
+        .vt-need{font-size:10px;margin-top:3px;color:#fbbf24}.vt-split{font-size:10px;color:#fbbf24;margin-top:3px}
+        .vt-ok{color:#34d399}.vt-warn{color:#fbbf24}.vt-bad{color:#f87171}.vt-watch{color:#fcd34d}
+        .vt-bg-ok{background:#34d399}.vt-bg-warn{background:#fbbf24}.vt-bg-bad{background:#f87171}.vt-bg-watch{background:#fcd34d}
+        </style>
+        <div id="vitals" class="scroll-mt-28">
           <div class="flex items-center justify-between mb-2">
-            <h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Live coupled state</h2>
-            <span class="text-[11px] text-slate-500 hidden sm:block">☀️ light → 🌬️ air → 🍃 leaf → 💧 root · the chain you steer by</span>
+            <h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> Vitals</h2>
+            <span class="text-[11px] text-slate-500 hidden sm:block">☀️ light → 🌬️ air → 🍃 leaf → 💧 root · dot in the green = on target · ▲▼ = trend</span>
           </div>
-          <div class="grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(225px,1fr))">
-            <template x-for="cs in coupledStages" :key="cs.key">
-              <div class="glass rounded-2xl p-4" :style="'border-top:3px solid '+cs.color">
-                <div class="flex items-center gap-2 mb-3">
-                  <span class="text-base" x-text="cs.emoji"></span>
-                  <span class="font-semibold text-[13px]" :style="'color:'+cs.color" x-text="cs.name"></span>
-                  <span class="text-[10px] text-slate-500 ml-auto uppercase tracking-wide" x-text="cs.sub"></span>
-                </div>
-                <div class="space-y-3">
-                  <template x-for="it in cs.items" :key="it.label">
-                    <div class="flex items-end justify-between gap-2">
-                      <div class="flex items-baseline gap-1 tabular-nums">
-                        <span class="text-[26px] font-bold leading-none" :class="it.status==='crit'?'text-red-400':it.status==='warn'?'text-amber-400':it.status==='watch'?'text-amber-300':'text-emerald-300'" x-text="it.val"></span>
-                        <span class="text-[11px] text-slate-500" x-text="it.unit"></span>
-                        <span class="text-xs" :style="it.arrow>0?'color:#34d399':(it.arrow<0?'color:#38bdf8':'color:#475569')" x-text="it.arrow>0?'▲':(it.arrow<0?'▼':'·')"></span>
-                      </div>
-                      <div class="text-right min-w-0">
-                        <div class="text-[11px] text-slate-300 leading-tight truncate" x-text="it.label"></div>
-                        <div class="text-[10px] text-slate-600 leading-tight truncate" x-text="it.hint"></div>
-                      </div>
+          <div class="vt-grid">
+            <template x-for="g in vitals" :key="g.key">
+              <div class="vt-grp">
+                <div class="vt-grp-h"><span class="w-2 h-2 rounded-full" :style="'background:'+g.color"></span><span class="vt-grp-name" :style="'color:'+g.color" x-text="g.name"></span><span class="vt-grp-sub" x-text="g.sub"></span></div>
+                <template x-for="t in g.tiles" :key="t.key">
+                  <div class="vt-tile" :title="t.tip">
+                    <div class="vt-row">
+                      <span class="vt-label" x-text="t.label"></span>
+                      <span class="vt-valwrap">
+                        <span class="vt-val" :class="(t.status==='crit'||t.status==='bad')?'vt-bad':t.status==='warn'?'vt-warn':t.status==='watch'?'vt-watch':'vt-ok'" x-text="t.val"></span>
+                        <span class="vt-unit" x-text="t.unit"></span>
+                        <span class="vt-arrow" :style="t.trend>0?'color:#34d399':(t.trend<0?'color:#38bdf8':'color:#475569')" x-text="t.trend>0?'▲':(t.trend<0?'▼':'·')"></span>
+                      </span>
                     </div>
-                  </template>
+                    <div class="vt-bar" x-show="t.dotPct!=null">
+                      <div class="vt-band" :style="'left:'+t.bandL+'%;width:'+t.bandW+'%'"></div>
+                      <div class="vt-dot" :class="(t.status==='crit'||t.status==='bad')?'vt-bg-bad':t.status==='warn'?'vt-bg-warn':t.status==='watch'?'vt-bg-watch':'vt-bg-ok'" :style="'left:'+t.dotPct+'%'"></div>
+                    </div>
+                    <div class="vt-need" x-show="t.need==='raise'||t.need==='lower'" x-text="t.need==='raise'?'↑ needs to rise':'↓ needs to fall'"></div>
+                    <div class="vt-split" x-show="t.split" x-text="'⚠ zones split '+t.split"></div>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- ===== LIVE IRRIGATION STATUS — what's open now · fed today per zone · zone working light ===== -->
+        <div id="hw-status" class="glass rounded-2xl p-4 scroll-mt-28">
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Irrigation — live</h2>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <template x-for="h in hwStatus.hw" :key="h.id">
+                <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[11px]" :class="h.on?'bg-emerald-500/15 border-emerald-400/40 text-emerald-200':'bg-white/[0.02] border-white/8 text-slate-500'"><span class="w-1.5 h-1.5 rounded-full" :class="h.on?'bg-emerald-400':'bg-slate-600'"></span><span x-text="h.label"></span></span>
+              </template>
+              <span x-show="hwStatus.deadhead" class="px-2 py-1 rounded-lg bg-red-500/20 border border-red-400/40 text-red-300 text-[11px] font-semibold">⚠ pump dead-head</span>
+            </div>
+          </div>
+          <div class="grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+            <template x-for="z in hwStatus.zones" :key="z.id">
+              <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-2.5 h-2.5 rounded-full shrink-0" :class="z.light==='ok'?'bg-emerald-400':z.light==='warn'?'bg-amber-400':z.light==='bad'?'bg-red-500':'bg-slate-600'" :style="z.light==='ok'?'box-shadow:0 0 7px #34d399':''"></span>
+                    <span class="font-semibold text-sm" x-text="z.name"></span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded shrink-0" :class="z.valveOn?'bg-cyan-500/20 text-cyan-300':'bg-white/5 text-slate-500'" x-text="z.valveOn?'valve open':z.phase"></span>
+                  </div>
+                  <span class="text-[11px] font-medium" :class="z.light==='ok'?'text-emerald-300':z.light==='warn'?'text-amber-300':z.light==='bad'?'text-red-300':'text-slate-500'" x-text="z.workTxt"></span>
                 </div>
+                <div class="flex items-baseline gap-1.5 mb-1">
+                  <span class="text-lg font-bold tabular-nums text-cyan-300" x-text="z.dayTxt"></span>
+                  <span class="text-[11px] text-slate-500">/ <span x-text="z.capTxt"></span> L fed today</span>
+                  <span class="text-[10px] text-slate-600 ml-auto" x-text="z.shots+' shots'"></span>
+                </div>
+                <div class="h-1.5 rounded-full bg-white/8 overflow-hidden"><div class="h-full rounded-full transition-all" :class="z.pct>90?'bg-red-500':z.pct>70?'bg-amber-400':'bg-cyan-500'" :style="'width:'+z.pct+'%'"></div></div>
               </div>
             </template>
           </div>
@@ -892,18 +943,6 @@
           </div>
         </div>
 
-        <!-- live sensor snapshot (all key sensors, glanceable) -->
-        <div>
-          <div id="st-snapshot" class="flex items-center justify-between mb-2 scroll-mt-28"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.thermo" class="w-4 h-4 block text-emerald-400"></span> Live snapshot</h2><span class="text-[11px] text-slate-500">every key sensor · adjust in <button @click="solve({view:'climate',anchor:'cl-controls'})" class="text-emerald-300/80 hover:text-emerald-300">Climate</button> / <button @click="solve({view:'zones',anchor:'zones-list'})" class="text-emerald-300/80 hover:text-emerald-300">Zones</button></span></div>
-          <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
-            <template x-for="s in snapshot" :key="s.label">
-              <div class="glass rounded-xl p-3"><div class="text-[10px] uppercase tracking-wider text-slate-400 flex items-center"><span class="truncate" x-text="s.label"></span><span class="tipi" @mouseenter="tipShow($event,s.label)" @mouseleave="tipHide()" @click.stop="tipShow($event,s.label)">ⓘ</span></div>
-                <div class="mt-1 flex items-end gap-1"><span class="text-xl md:text-2xl font-bold tracking-tight" :class="sevText(s.sev)" x-text="s.val"></span><span class="text-[10px] text-slate-500 mb-0.5" x-text="s.unit"></span></div>
-                <div class="text-[10px] text-slate-500 mt-0.5 truncate" x-text="s.sub"></div></div>
-            </template>
-          </div>
-        </div>
-
         <!-- facility floor mini → opens the 3D twin (compact full-width strip) -->
         <button id="st-floor" @click="go(floor)" class="glass rounded-2xl px-4 py-3 w-full text-left hover:border-white/15 lift block scroll-mt-28">
           <div class="flex items-center gap-4 flex-wrap">
@@ -922,23 +961,6 @@
             </div>
           </div>
         </button>
-
-        <!-- plant state gauges -->
-        <div>
-          <div id="st-plant" class="flex items-center justify-between mb-3 scroll-mt-28"><h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.lung" class="w-4 h-4 block text-emerald-400"></span> How the plant is doing</h2><span class="text-[11px] text-slate-500">inferred from many sensors</span></div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
-            <template x-for="g in plant" :key="g.label">
-              <div class="glass rounded-2xl p-4 lift hover:border-white/15">
-                <div class="flex items-center gap-3"><span class="w-9 h-9 rounded-xl grid place-items-center shrink-0" :class="sevBg(g.status)"><span x-html="icons[g.icon]" class="w-4.5 h-4.5 block" :class="sevText(g.status)"></span></span>
-                  <span class="font-semibold text-sm" x-text="g.label"></span><span class="tipi" @mouseenter="tipShow($event,g.label)" @mouseleave="tipHide()" @click.stop="tipShow($event,g.label)">ⓘ</span>
-                  <span class="ml-auto text-[10px] font-bold px-2 py-1 rounded-full" :class="pillClass(g.status)" x-text="g.word"></span></div>
-                <div class="mt-3 text-2xl font-bold" x-text="g.value"></div>
-                <div class="text-[12px] text-slate-400 min-h-[2.4em]" x-text="g.plain"></div>
-                <div x-show="g.track" class="track mt-2"><div class="okband" :style="'left:'+g.okL+'%;width:'+g.okW+'%'"></div><div class="marker" :class="markerBg(g.status)" :style="'left:'+g.mk+'%'"></div></div>
-              </div>
-            </template>
-          </div>
-        </div>
 
       </section>
 
@@ -2080,6 +2102,68 @@ function buildZoneDetail(zid){   // per-zone live state + co-located setpoints (
 function gaugeVM(icon,label,v,unit,min,max,okLo,okHi,status,plain,dec){ let mk=null,okL=0,okW=0; const track=(v!=null&&min!=null);
   if(track){ mk=Math.max(0,Math.min(100,(v-min)/(max-min)*100)); okL=Math.max(0,(okLo-min)/(max-min)*100); okW=Math.min(100,(okHi-min)/(max-min)*100)-okL; }
   return {icon,label,value:v==null?"—":fmt(v,dec)+(unit?" "+unit:""),plain,status,word:{ok:"good",warn:"act",crit:"urgent",watch:"watch"}[status]||"good",track,okL,okW,mk}; }
+/* ===== Unified Vitals — ONE tile per metric, coupled chain, band-bar + dot + smoothed trend (replaces coupled-state + snapshot + plant gauges) ===== */
+function vitalTrend(statKey){ const a=statKey&&STAT[statKey]; if(!a||a.length<4) return 0;   // ▲/▼/· vs ~12 min ago (smoothed), flat within noiseFloor
+  const now=a[a.length-1].t, recent=stMean(a.slice(-3).map(p=>p.v)); let past=null;
+  for(let i=a.length-1;i>=0;i--){ if(now-a[i].t>=12*60e3){ past=a[i].v; break; } }
+  if(past==null) past=a[0].v; const nf=(SENSOR_ATLAS[statKey]&&SENSOR_ATLAS[statKey].noiseFloor)||0;
+  const d=recent-past; return Math.abs(d)<=nf?0:(d>0?1:-1); }
+function vTile(o){   // o={key,statKey,label,val,unit,dec,scale:[min,max],band:[lo,hi],status,tip,split}
+  const v=(o.val==null||isNaN(o.val))?null:+o.val, sc=o.scale||[0,100];
+  const inb=(o.band&&v!=null)?(v>=o.band[0]&&v<=o.band[1]):null;
+  const status=o.status||(inb==null?'ok':inb?'ok':'watch');
+  const pct=v==null?null:Math.max(0,Math.min(100,(v-sc[0])/(sc[1]-sc[0])*100));
+  const bL=o.band?Math.max(0,Math.min(100,(o.band[0]-sc[0])/(sc[1]-sc[0])*100)):0;
+  const bR=o.band?Math.max(0,Math.min(100,(o.band[1]-sc[0])/(sc[1]-sc[0])*100)):0;
+  const need=(o.band&&v!=null)?(v<o.band[0]?'raise':v>o.band[1]?'lower':'ok'):'';
+  return {key:o.key,label:o.label,val:v==null?'—':fmt(v,o.dec==null?1:o.dec),unit:o.unit||'',status,
+    trend:vitalTrend(o.statKey),dotPct:pct,bandL:bL,bandW:Math.max(0,bR-bL),need,tip:o.tip||'',split:o.split||null,flag:false}; }
+function buildVitals(){ const on=lightsOn(), bs=(k)=>{ const b=activeBands(k); return b&&b.ok?b.ok:null; };
+  const ect=CONFIG.EC_TARGET, dt=num('dryback_target'), ddt=dt||15, ecLo=ect-0.5, ecHi=ect+0.5;
+  const zVal=(m)=>[1,2,3].map(z=>num('sensor.crop_steering_zone_'+z+'_'+m)).filter(x=>x!=null);
+  const spread=a=>a.length>1?Math.max(...a)-Math.min(...a):0;
+  const splitOf=(m,thr,dec)=>spread(zVal(m))>thr?[1,2,3].map(z=>fmt(num('sensor.crop_steering_zone_'+z+'_'+m),dec)).join('/'):null;
+  const cwsi=num('cwsi'),tc=num('transp_cooling'),cm=condMargin(),bl=num('bl_temp'),at=num('air_temp'),ef=ecForecast(3),db=num('dryback_pct'),ec=num('fused_ec');
+  const T=(key,statKey,label,val,unit,dec,scale,band,status,tip,split)=>vTile({key,statKey,label,val,unit,dec,scale,band,status,tip,split});
+  return [
+    {key:'light',name:'Light',sub:'the driver',color:'#f59e0b',tiles:[
+      T('ppfd','ppfd','PPFD', on?num('ppfd'):0,'µmol',0,[0,1400],bs('ppfd'),null,'Light hitting the canopy now. Below the band = under-lit; above = bleach risk.'),
+      T('dli',null,'DLI today',num('dli'),'mol',1,[0,60],[30,45],null,'Daily light total so far. ~30–45 mol for flower with CO₂.') ]},
+    {key:'air',name:'Air',sub:'the demand',color:'#38bdf8',tiles:[
+      T('air_temp','air_temp','Temp',num('air_temp'),'°C',1,[18,32],bs('air_temp'),null,'Room air temperature.'),
+      T('rh','rh','Humidity',num('rh'),'%',0,[40,80],bs('rh'),null,'Relative humidity. Too high invites mould; too low spikes VPD.'),
+      T('air_vpd','air_vpd','Air VPD',num('air_vpd'),'kPa',2,[0,2.5],bs('air_vpd'),null,'How thirsty the air is — the transpiration driver.'),
+      T('co2','co2','CO₂', on?num('co2'):null,'ppm',0,[400,1800],bs('co2'),null,'CO₂ for photosynthesis (judged only while lit).') ]},
+    {key:'leaf',name:'Leaf',sub:'the response',color:'#34d399',tiles:[
+      T('leaf_vpd','leaf_vpd','Leaf VPD', on?num('leaf_vpd'):null,'kPa',2,[0,2.5],bs('leaf_vpd'),null,'Vapour deficit right at the leaf — the real transpiration driver.'),
+      T('transp',null,'Drinking',tc,'°C',1,[0,3],[1,3],(tc==null?'ok':tc>1?'ok':tc>0.4?'watch':'warn'),'Leaf cooler than air = transpiring well. Higher is better.'),
+      T('cwsi',null,'Stress',cwsi,'',2,[0,1],[0,0.3],(cwsi==null?'ok':cwsi<0.3?'ok':cwsi<0.5?'watch':'warn'),'Crop water-stress index. 0 calm → 1 stressed. Lower is better.') ]},
+    {key:'root',name:'Root',sub:'the result',color:'#22d3ee',tiles:[
+      T('avg_vwc','avg_vwc','Wetness',num('avg_vwc'),'%',0,[20,75],[45,60],null,'Average substrate moisture across all zones.',splitOf('vwc',10,0)),
+      T('dryback_pct','dryback_pct','Dryback',db,'%',1,[0,Math.max(10,ddt*1.6)],[ddt*0.85,ddt*1.15],null,'% dried back from peak. Target '+fmt(ddt,0)+'%.'),
+      T('fused_ec','fused_ec','Pore EC',ec,'mS/cm',2,[0,Math.max(6,ect*1.6)],[ecLo,ecHi],null,'Salt the roots sit in. Target '+fmt(ect,1)+'.',splitOf('ec',0.8,1)) ]},
+    {key:'watch',name:'Watch',sub:'risk',color:'#fb7185',tiles:[
+      T('cond',null,'Condensation',cm,'°C',1,[0,8],[2.5,8],(cm==null?'ok':cm<1.5?'warn':cm<2.5?'watch':'ok'),'Coldest surface minus dew point. Under 2.5°C → condensation/mould risk. Higher is better.'),
+      T('hotspot','bl_temp','Hotspot Δ',(bl!=null&&at!=null)?bl-at:null,'°C',1,[-2,4],[-1,1.5],null,'Back-left corner vs room air. High = an airflow problem.'),
+      T('ec3h',null,'Pore EC ~3h',ef,'mS/cm',2,[0,Math.max(6,ect*1.6)],[0,ect+0.4],(ef==null?'ok':ef>=ect+0.6?'watch':'ok'),'Projected pore EC in 3h if the current trend holds.'),
+      (function(){ const ss=isOn('substrate_stress'),ls=isOn('light_stress'),any=ss||ls; return {key:'flags',label:'Stress flags',val:any?'Active':'Clear',unit:'',status:any?'warn':'ok',trend:0,dotPct:null,bandL:0,bandW:0,need:'',tip:'Roots '+(ss?'⚠':'✓')+' · Light load '+(ls?'⚠':'✓'),split:null,flag:true}; })() ]},
+  ]; }
+/* ===== Live irrigation/hardware status — what's open now · fed-today per zone · zone working light ===== */
+function buildHwStatus(){
+  const HW=[{id:'switch.veg_main_pump',label:'Pump',kind:'pump'},{id:'switch.espoe_irrigation_relay_2_3',label:'Mainline',kind:'line'},
+    {id:'switch.f2_row1',label:'Z1 valve',kind:'valve',zone:1},{id:'switch.f2_row2',label:'Z2 valve',kind:'valve',zone:2},{id:'switch.f2_row3',label:'Z3 valve',kind:'valve',zone:3}];
+  const hw=HW.map(h=>Object.assign({},h,{on:S[h.id]?.state==='on'}));
+  const pw=num('pump_power'), anyValve=hw.some(h=>h.kind==='valve'&&h.on), deadhead=pw!=null&&pw>100&&!anyValve;
+  const z=buildZones(), engOk=(val('heartbeat')==='healthy');
+  const zones=[1,2,3].map(i=>{ const Z=z[i-1]; const dayL=num('sensor.crop_steering_zone_'+i+'_daily_water_app');
+    const cap=num('number.crop_steering_zone_'+i+'_max_daily_volume'), shots=num('sensor.crop_steering_zone_'+i+'_irrigation_count_app');
+    const valveOn=hw.find(h=>h.zone===i)?.on;
+    const light=!Z.enabled?'off':Z.status==='crit'?'bad':Z.status==='warn'?'warn':engOk?'ok':'warn';
+    const workTxt=!Z.enabled?'disabled':Z.status==='crit'?'fault':Z.status==='warn'?'watch':valveOn?'watering':'working';
+    return {id:i,name:'Zone '+i,enabled:Z.enabled,status:Z.status,phase:Z.phase,light,workTxt,valveOn:!!valveOn,
+      dayL:dayL==null?null:dayL,dayTxt:dayL==null?'—':fmt(dayL,0),cap:cap==null?null:cap,capTxt:cap==null?'∞':fmt(cap,0),
+      shots:shots==null?'—':fmt(shots,0),pct:(dayL!=null&&cap)?Math.max(0,Math.min(100,dayL/cap*100)):0}; });
+  return {hw,pw,pwTxt:pw==null?'—':fmt(pw,0),deadhead,anyOn:hw.some(h=>h.on),pumpOn:hw[0].on,zones}; }
 function buildPlant(){ const out=[];
   const cwsi=num("cwsi"); const cs=cwsi==null?"ok":(cwsi<0.3?"ok":cwsi<0.5?"watch":cwsi<0.7?"warn":"crit");
   out.push(gaugeVM("lung","Plant stress",cwsi,"",0,1,0,0.3,cs,cwsi==null?"":(cwsi<0.3?"Comfortable — not stressed.":cwsi<0.5?"A little stressed.":"Stressed — needs attention."),2));
@@ -4711,7 +4795,7 @@ document.addEventListener('alpine:init', () => {
       grid:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
     },
     nav:[
-      {id:'dashboard',label:'Overview',icon:'dashboard',subs:[['Advisories','advisories'],['Coupled state','coupled-anchor'],['Live snapshot','st-snapshot'],['Plant state','st-plant'],['Facility floor','st-floor'],['Substrate 24h','st-trends']]},
+      {id:'dashboard',label:'Overview',icon:'dashboard',subs:[['Advisories','advisories'],['Vitals','vitals'],['Irrigation','hw-status'],['Substrate 24h','st-trends'],['Facility floor','st-floor']]},
       {id:'zones',label:'Zones',icon:'drop',subs:[['All zones','zones-list'],['Source water & engine','zones-src']]},
       {id:'tune',label:'Setpoints',icon:'scale',subs:[['Setpoints table','spm-anchor'],['Steering & day curve','tune-steer'],['Limiting factors','tune-liebig'],['Room environment','tune-env']]},
       {id:'climate',label:'Climate',icon:'thermo',subs:[['Camera','cl-cam'],['Live climate','cl-live'],['Trends 24h','cl-trends'],['Room controls','cl-controls'],['Hotspot map','cl-hotspot'],['Raw readings','cl-raw']]},
@@ -4729,7 +4813,7 @@ document.addEventListener('alpine:init', () => {
     pumpOpen:false, pump:{hw:[],sw:[],power:null,powerTxt:'—',anyHw:false,deadhead:false,pumpOn:false}, relays:[],
     tip:null, tipT:null,
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
-    headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], maturity:{rung:2,name:'Logged',next:''}, chartSmooth:ls.get('f2.chartSmooth',true), gRange:ls.get('f2.gRange','24h'), zones:[], plant:[], coupledStages:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
+    headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], maturity:{rung:2,name:'Logged',next:''}, chartSmooth:ls.get('f2.chartSmooth',true), gRange:ls.get('f2.gRange','24h'), zones:[], plant:[], coupledStages:[], vitals:[], hwStatus:{hw:[],zones:[],deadhead:false,anyOn:false,pumpOn:false,pwTxt:'—'}, climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},telemetry:[],feed:[]},
     climateCtl:[], ctlOpen:ls.get('f2.ctlOpen',{}), snapshot:[], camUrl:'', spOpen:false, spItem:null, floorMini:[], tank:{pct:null,litres:null,sev:'ok',bar:'bg-emerald-500',pctText:'—',litresText:null,width:0}, activityFeed:[], hUser:{name:'Grower',initials:'F2'}, demo:DEMO,
     notes:{}, toasts:[], _tid:0, _toastId:0, _retry:0, _acked:(function(){ try{ const a=ls.get('f2.acked',{}),cut=Date.now()-18*3600e3,o={}; for(const k in a){ if(a[k]>cut) o[k]=a[k]; } return o; }catch(e){ return {}; } })(),
@@ -4786,7 +4870,7 @@ document.addEventListener('alpine:init', () => {
       const rr=runRules();
       this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
       this.headline=computeHeadline(this.adv,this.watch);
-      this.kpis=buildKpis(); this.snapshot=buildSnapshot(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.plant=buildPlant(); this.coupledStages=buildCoupled(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl(); this.pump=buildPump(); this.relays=buildRelays(); this.maturity=maturityScore();
+      this.kpis=buildKpis(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.vitals=buildVitals(); this.hwStatus=buildHwStatus(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl(); this.pump=buildPump(); this.relays=buildRelays(); this.maturity=maturityScore();
       { const cam=S[CONFIG.E.cam], ct=cam&&cam.attributes&&cam.attributes.access_token; this._camTick=(this._camTick||0)+1;
         this.camUrl=ct?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+CONFIG.E.cam+'?token='+ct+'&_='+this._camTick):''; }
       if(window.__tuneReseed) window.__tuneReseed();   // refresh the Tune editor from live HA (respects its hydrated/unsaved-edit guard)
