@@ -453,13 +453,13 @@
     <nav class="flex-1 py-3 px-2 space-y-1 overflow-y-auto scrollx">
       <template x-for="item in nav" :key="item.id">
         <div>
-          <button @click="go(item.id)" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60" :class="view===item.id&&'nav-active font-medium'" :title="item.label">
+          <button @click="go(item.id)" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60" :class="(view===item.id||(item.id==='tune'&&view==='timeline'))&&'nav-active font-medium'" :title="item.label">
             <span x-html="icons[item.icon]" class="w-5 h-5 shrink-0 block"></span>
             <span x-show="sidebarOpen" x-text="item.label" class="truncate"></span>
             <span x-show="sidebarOpen && item.subs" class="ml-auto text-[10px] text-slate-600" x-text="view===item.id?'▾':'▸'"></span>
           </button>
           <!-- folder-tree section index — expands for the active tab, jumps straight to the section -->
-          <div x-show="sidebarOpen && view===item.id && item.subs" x-cloak class="ml-5 pl-3 border-l border-white/10 mb-1">
+          <div x-show="sidebarOpen && (view===item.id||(item.id==='tune'&&view==='timeline')) && item.subs" x-cloak class="ml-5 pl-3 border-l border-white/10 mb-1">
             <template x-for="s in (item.subs||[])" :key="s[0]">
               <button @click="navSub(item.id,s)" class="w-full text-left px-2 py-1.5 rounded-lg text-[12px] text-slate-400 hover:text-emerald-300 hover:bg-white/5 transition truncate" x-text="s[0]"></button>
             </template>
@@ -1172,11 +1172,19 @@
       </section>
 
       <!-- ===== TUNE (native editor) ===== -->
-      <section x-show="view==='tune'" x-data="editor()" class="fade-enter tuneroot" id="tuneRoot">
+      <section x-show="view==='tune'||view==='analyze'" x-data="editor()" class="fade-enter tuneroot" id="tuneRoot">
 <div class="wrap">
-  <span class="kicker">🎛️ F2 Crop-Steering Editor · live setpoints</span>
-  <h1><span class="grad">Every setpoint, on the curve.</span></h1>
-  <p class="sub">A full-day <b>physics simulation</b>, not a drawing: the environment (PPFD, CO₂, temp, RH → VPD) sets a transpiration rate that drys the substrate back; the crop-steering controller fires shots; each shot mixes <b>feed EC</b> into the pore by the litres applied (<b>shot % × substrate L</b>); when VWC hits <b>field capacity</b> the overshoot runs off and flushes salt out, pulling pore EC toward the feed EC. The white line is VWC, the pink line is <b>pore EC on the right 0–10 axis</b>. Edit any field or drag a glowing handle and the whole day re-solves. Environment seeded live from F2; everything else from <code>number.crop_steering_*</code>.</p>
+  <!-- Steering: Now ⇄ Schedule toggle (the Setpoints+Plan merge) -->
+  <div class="flex items-center gap-3 flex-wrap mb-3" x-show="view==='tune'">
+    <div class="inline-flex rounded-xl overflow-hidden border border-white/15">
+      <button @click="go('tune')" class="px-4 py-2 text-[13px] font-semibold bg-emerald-500/85 text-slate-900">⚙ Now · setpoints</button>
+      <button @click="go('timeline')" class="px-4 py-2 text-[13px] font-semibold text-slate-400 hover:bg-white/5">🗓 Schedule · recipe</button>
+    </div>
+    <span class="text-[12px] text-slate-500">live values across all zones · edit any cell, then Apply to HA</span>
+  </div>
+  <span class="kicker" x-show="view==='analyze'">🔬 F2 physics &amp; limiting factors</span>
+  <h1 x-show="view==='analyze'"><span class="grad">Why the day looks the way it does.</span></h1>
+  <p class="sub" x-show="view==='analyze'">A full-day <b>physics simulation</b>, not a drawing: the environment (PPFD, CO₂, temp, RH → VPD) sets a transpiration rate that drys the substrate back; the crop-steering controller fires shots; each shot mixes <b>feed EC</b> into the pore by the litres applied (<b>shot % × substrate L</b>); when VWC hits <b>field capacity</b> the overshoot runs off and flushes salt out, pulling pore EC toward the feed EC. The white line is VWC, the pink line is <b>pore EC on the right 0–10 axis</b>. Edit any field or drag a glowing handle and the whole day re-solves. Environment seeded live from F2; everything else from <code>number.crop_steering_*</code>.</p>
 
   <!-- ===== SETPOINTS MATRIX — every value · every zone · edit one or all (redesign centerpiece) ===== -->
   <style>
@@ -1221,7 +1229,7 @@
   .spm-mut{color:#475569}
   .spm-row.spm-global td{background:rgba(167,139,250,.04)}
   </style>
-  <div class="spm" id="spm-anchor">
+  <div class="spm" id="spm-anchor" x-show="view==='tune'">
     <div class="spm-head">
       <div><span class="spm-title">Setpoints</span><span class="spm-sub">every value · every zone · edit one or all</span></div>
       <div class="spm-actions">
@@ -1290,8 +1298,8 @@
   </div>
 
   <div class="layout">
-    <!-- ===== SECTION A: irrigation graph + its controls ===== -->
-    <div class="gridrow">
+    <!-- ===== SECTION A: irrigation graph + its controls (Steering · Now day-sim) ===== -->
+    <div class="gridrow" x-show="view==='tune'">
       <div class="gcol">
     <div class="panel glass">
       <div class="topbar">
@@ -1325,8 +1333,8 @@
         </span></template>
       </div>
     </div>
-    <!-- ===== LIMITING FACTORS (Liebig minimum) ===== -->
-    <div class="panel glass">
+    <!-- ===== LIMITING FACTORS (Liebig minimum) — Analyze ===== -->
+    <div class="panel glass" x-show="view==='analyze'">
       <div class="ch" id="tune-liebig"><h2>Limiting factors — Zone <span x-text="zone"></span></h2><span class="chs">Liebig's law of the minimum — your ceiling is set by the worst factor, not the average. Biggest bottleneck first; fix it, then the next.</span></div>
       <div class="lim2">
         <template x-for="goal in [{k:'y',name:'Max yield'},{k:'p',name:'Max potency'}]" :key="goal.k">
@@ -1368,7 +1376,7 @@
     <!-- Live coupled state moved to Overview (buildCoupled) — kept out of the Setpoints editor per redesign -->
 
       </div>
-      <aside class="scol"><div class="srail">
+      <aside class="scol" style="display:none"><div class="srail">
         <template x-for="grp in groups().filter(g=>['P0','P1','P2','P3','ST','ZN','HW'].includes(g.k))" :key="grp.k">
           <div class="grp" :class="hot===grp.k&&'hot'" :style="'--ph:'+grp.col" @mouseenter="hot=grp.k">
             <div class="gh"><span class="dot" :style="'background:'+grp.col"></span><span x-show="grp.ph" class="ph" :style="'background:'+grp.col" x-text="grp.ph"></span><h3 x-text="grp.name"></h3></div>
@@ -1391,8 +1399,8 @@
       </div></aside>
     </div>
 
-    <!-- ===== MULTI-DAY DRIVERS (scrollable) ===== -->
-    <div class="panel glass">
+    <!-- ===== MULTI-DAY DRIVERS (scrollable) — Analyze ===== -->
+    <div class="panel glass" x-show="view==='analyze'">
       <div class="ch"><h2>Dryback vs drivers · multi-day <span class="ttinfo" @mouseenter="showTip('chart_multi','Dryback vs drivers · multi-day',$event)" @mouseleave="hideTip()" @click="showTip('chart_multi','Dryback vs drivers · multi-day',$event)">ⓘ</span></h2><span class="chs">the steady-state day repeated — scroll to read how the dryback rate tracks PPFD, leaf VPD, temp &amp; CO₂.
         <span class="dseg"><button :class="gdays===1&&'on'" @click="gdays=1">1d</button><button :class="gdays===2&&'on'" @click="gdays=2">2d</button><button :class="gdays===3&&'on'" @click="gdays=3">3d</button></span>
         <button class="btn xs2" x-show="live" @click="reqHistory()">overlay live VWC</button></span></div>
@@ -1400,8 +1408,8 @@
       <div class="mdscroll" x-html="multiChart()"></div>
     </div>
 
-    <!-- ===== SECTION B: environment graphs + climate/room controls ===== -->
-    <div class="gridrow">
+    <!-- ===== SECTION B: environment graphs — Analyze ===== -->
+    <div class="gridrow" x-show="view==='analyze'">
       <div class="gcol">
     <!-- ===== ROOM ENVIRONMENT GRAPHS ===== -->
     <div class="panel glass envstack">
@@ -1416,7 +1424,7 @@
     </div>
 
       </div>
-      <aside class="scol"><div class="srail">
+      <aside class="scol" style="display:none"><div class="srail">
         <template x-for="grp in groups().filter(g=>['EN','RM','SF'].includes(g.k))" :key="grp.k">
           <div class="grp" :class="hot===grp.k&&'hot'" :style="'--ph:'+grp.col" @mouseenter="hot=grp.k">
             <div class="gh"><span class="dot" :style="'background:'+grp.col"></span><span x-show="grp.ph" class="ph" :style="'background:'+grp.col" x-text="grp.ph"></span><h3 x-text="grp.name"></h3></div>
@@ -1578,6 +1586,14 @@
 
       <!-- ===== TIMELINE (native canvas — Phase D) ===== -->
       <section x-show="view==='timeline'" class="fade-enter"><div class="tlroot" id="tlRoot">
+
+<div class="flex items-center gap-3 flex-wrap" style="padding:14px 16px 2px">
+  <div class="inline-flex rounded-xl overflow-hidden border border-white/15">
+    <button @click="go('tune')" class="px-4 py-2 text-[13px] font-semibold text-slate-400 hover:bg-white/5">⚙ Now · setpoints</button>
+    <button @click="go('timeline')" class="px-4 py-2 text-[13px] font-semibold bg-emerald-500/85 text-slate-900">🗓 Schedule · recipe</button>
+  </div>
+  <span class="text-[12px] text-slate-500">the recipe driving the setpoints across the grow</span>
+</div>
 
 <!-- recipe bar (slim, one row): dropdown + position chip + prominent Sync + ⋯ menu -->
 <div class="recipe-bar" id="recipeBar"></div>
@@ -4866,11 +4882,10 @@ document.addEventListener('alpine:init', () => {
     nav:[
       {id:'dashboard',label:'Overview',icon:'dashboard',subs:[['Advisories','advisories'],['Vitals','vitals'],['Irrigation','hw-status'],['Substrate 24h','st-trends'],['Facility floor','st-floor']]},
       {id:'zones',label:'Zones',icon:'drop',subs:[['All zones','zones-list'],['Source water & engine','zones-src']]},
-      {id:'tune',label:'Setpoints',icon:'scale',subs:[['Setpoints table','spm-anchor'],['Steering & day curve','tune-steer'],['Limiting factors','tune-liebig'],['Room environment','tune-env']]},
-      {id:'climate',label:'Climate',icon:'thermo',subs:[['Camera','cl-cam'],['Live climate','cl-live'],['Trends 24h','cl-trends'],['Room controls','cl-controls'],['Hotspot map','cl-hotspot'],['Raw readings','cl-raw']]},
-      {id:'control',label:'Operate',icon:'radio',subs:[['Strategy','op-strategy'],['Arm & pump','op-arm'],['Relays & solenoids','op-relays'],['Adaptive','op-adaptive'],['Zones glance','op-zones'],['Engine','op-engine']]},
-      {id:'timeline',label:'Plan',icon:'activity',subs:[['Recipe & sync','recipeBar'],['Phase timeline','phaseSpine'],['Environment','Environment','sec'],['Lighting','Lighting','sec'],['Root Zone','Root Zone','sec'],['Steering','Steering','sec'],['Irrigation','Irrigation','sec'],['Tank / Feed','Tank / Feed','sec'],['Steering EC','Steering EC','sec'],['Phase Timing','Phase Timing','sec'],['Shot Sizes %','Shot Sizes %','sec'],['Limits & Hardware','Limits & Hardware','sec'],['Zone Setup','Zone Setup','sec'],['Facility layer','0','zone'],['Zone 1','1','zone'],['Zone 2','2','zone'],['Zone 3','3','zone'],['Parameter chart','chartHost']]},
-      {id:'floor',label:'3D Floor',icon:'grid'}],
+      {id:'tune',label:'Steering',icon:'scale',subs:[['Now · setpoints','tune','view'],['Schedule · recipe','timeline','view'],['Setpoints table','spm-anchor'],['Steering & day curve','tune-steer']]},
+      {id:'analyze',label:'Analyze',icon:'activity',subs:[['Limiting factors','tune-liebig'],['Drivers & environment','tune-env']]},
+      {id:'climate',label:'Climate',icon:'thermo',subs:[['Live climate','cl-live'],['Trends 24h','cl-trends'],['Room controls','cl-controls'],['Hotspot map','cl-hotspot'],['Raw readings','cl-raw']]},
+      {id:'control',label:'Operate',icon:'radio',subs:[['Strategy','op-strategy'],['Arm & pump','op-arm'],['Relays & solenoids','op-relays'],['Adaptive','op-adaptive'],['Engine','op-engine']]}],
     camMin:(function(){try{return localStorage.getItem('f2.camMin')==='1'}catch(e){return false}})(),
     floorLoaded:false,
     mobileNav:[{id:'dashboard',label:'Status',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'climate',label:'Climate',icon:'thermo'},{id:'control',label:'Operate',icon:'radio'},{id:'ai',label:'AI',icon:'ai'}],
@@ -4890,7 +4905,7 @@ document.addEventListener('alpine:init', () => {
 
     init(){
       try{ this.notes=JSON.parse(localStorage.getItem("f2.notes"))||{}; }catch(e){}
-      try{ const v=new URLSearchParams(location.search).get('view'); if(v && this.nav.some(n=>n.id===v)) this.view=v; }catch(e){}   // optional ?view=<tab> deep-link
+      try{ const v=new URLSearchParams(location.search).get('view'); if(v && (this.nav.some(n=>n.id===v)||['timeline','floor'].includes(v))) this.view=v; }catch(e){}   // optional ?view=<tab> deep-link (timeline=Steering·Schedule, floor reached via Overview — kept addressable though off the top nav)
       try{ const qs=new URLSearchParams(location.search); if(qs.has('wizard')){ this.wiz=true; this.wizStep=0; } else if(!localStorage.getItem('f2.wizSeen') && !DEMO && !this.easy){ this.wiz=true; this.wizStep=0; localStorage.setItem('f2.wizSeen','1'); } }catch(e){}   // first-run setup wizard (once, Pro mode only — never popped over the calm easy view), or ?wizard to replay
       this.aiMessages=[{role:'ai',text:"Live F2 context loaded — 3 zones, full sensor fusion. Ask me about a zone, dryback, EC, or the hotspot. I read every sensor so you do not have to."}];
       this.tick();
@@ -5080,6 +5095,7 @@ document.addEventListener('alpine:init', () => {
     // sidebar sub-item dispatch — kind in s[2]: undefined=id-scroll (solve), 'sec'=Plan editor section (expand+scroll), 'zone'=Plan layer switch
     navSub(view,s){ const kind=s[2];
       if(!kind){ this.solve({view,anchor:s[1]}); return; }
+      if(kind==='view'){ this.go(s[1]); return; }
       this.go(view); const beh=this.reduced()?'auto':'smooth'; let tries=0;
       const run=()=>{
         if(kind==='zone'){ if(window.setZone){ window.setZone(+s[1]); const lb=document.getElementById('layerBar'); if(lb){ lb.scrollIntoView({behavior:beh,block:'center'}); lb.classList.add('flash'); setTimeout(()=>lb.classList.remove('flash'),1600); } return; } }
