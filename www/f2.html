@@ -1007,18 +1007,22 @@
                 <div class="rounded-lg bg-white/[0.03] border border-white/8 p-2"><div class="text-base font-semibold" x-text="z.lastIrrig"></div><div class="text-[10px] text-slate-400 uppercase tracking-wide">last</div></div>
                 <div class="rounded-lg bg-white/[0.03] border border-white/8 p-2"><div class="text-base font-semibold" x-text="z.next"></div><div class="text-[10px] text-slate-400 uppercase tracking-wide">next</div></div>
               </div>
-              <!-- inline setpoints (most-used) -->
+              <!-- per-zone selects (steering mode + phase pin — manual, not in the matrix) -->
               <div class="mt-3 pt-3 border-t border-white/6 space-y-2">
                 <template x-for="sel in z.selects" :key="sel.id">
                   <div class="flex items-center justify-between gap-2"><span class="text-[12px] text-slate-300 truncate flex items-center" @mouseenter="tipShow($event,sel.id,sel.label)" @mouseleave="tipHide()"><span class="truncate" x-text="sel.label"></span><span class="tipi">ⓘ</span></span>
                     <select @change="ctrlSelect(sel.id,$event.target.value)" class="bg-white/[0.06] border border-white/10 rounded-lg px-2 py-1 text-[12px] text-slate-200 max-w-[60%]"><template x-for="o in sel.options" :key="o"><option :value="o" :selected="o===sel.value" x-text="o"></option></template></select></div>
                 </template>
-                <template x-for="n in z.nums" :key="n.id">
-                  <div class="flex items-center justify-between gap-2"><span class="text-[12px] text-slate-300 truncate flex items-center" @mouseenter="tipShow($event,n.id,n.label)" @mouseleave="tipHide()"><span class="truncate" x-text="n.label"></span><span class="tipi">ⓘ</span></span>
-                    <div class="flex items-center gap-1 shrink-0"><input type="number" :step="n.step" :value="n.val" @change="ctrlNum(n.id,$event.target.value)" class="w-16 bg-white/[0.06] border border-white/10 rounded-lg px-2 py-1 text-[12px] text-slate-200"><span class="text-[10px] text-slate-500 w-4" x-text="n.unit"></span></div></div>
-                </template>
+                <!-- setpoints READ-ONLY here — one config owner is Steering -->
+                <div class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 pt-0.5">
+                  <template x-for="n in z.nums" :key="n.id"><span><span x-text="n.label"></span> <b class="text-slate-300" x-text="n.val"></b><span x-text="n.unit"></span></span></template>
+                </div>
               </div>
-              <button @click="openZone(z.id)" class="mt-3 w-full h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300">All setpoints &amp; 24h trend →</button>
+              <div class="mt-2 flex gap-2">
+                <button @click="solve({view:'tune',anchor:'spm-anchor'})" class="flex-1 h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[12px] text-slate-300">✎ Edit setpoints in Steering →</button>
+                <button @click="fireShot(z.id)" class="h-9 px-3 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/30 text-cyan-200 text-[12px] font-medium" title="Fire a manual 60s shot">💧 Shot</button>
+              </div>
+              <button @click="openZone(z.id)" class="mt-2 w-full h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-400">Diagnose · all setpoints &amp; 24h trend →</button>
             </div>
           </template>
         </div>
@@ -5159,6 +5163,7 @@ document.addEventListener('alpine:init', () => {
     },
     ctrlSelect(id,v){ this.ctrlSvc(id.split(".")[0],"select_option",{entity_id:id,option:v}); },
     ctrlNum(id,v){ if(v!==""&&v!=null) this.ctrlSvc(id.split(".")[0],"set_value",{entity_id:id,value:parseFloat(v)}); },
+    fireShot(z){ if(!confirm('Fire a manual 60-second shot on Zone '+z+'? Writes live to the controller (engine safety checks still apply).')) return; this.ctrlSvc('crop_steering','execute_irrigation_shot',{zone:z,duration_seconds:60,shot_type:'manual'}); },
     stepNum(it,dir){ const step=parseFloat(it.step)||1; let v=(parseFloat(it.val)||0)+dir*step;   // optimistic UI bump + live write
       if(it.min!=null&&it.min!=='') v=Math.max(parseFloat(it.min),v); if(it.max!=null&&it.max!=='') v=Math.min(parseFloat(it.max),v);
       v=parseFloat((Math.round(v/step)*step).toFixed(4)); it.val=String(v); this.ctrlNum(it.id,v); },
