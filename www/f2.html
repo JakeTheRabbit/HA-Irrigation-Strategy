@@ -1026,6 +1026,7 @@
                 <!-- setpoints READ-ONLY here — one config owner is Steering -->
                 <div class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 pt-0.5">
                   <template x-for="n in z.nums" :key="n.id"><span><span x-text="n.label"></span> <b class="text-slate-300" x-text="n.val"></b><span x-text="n.unit"></span></span></template>
+                  <span>P3 dryback <b class="text-slate-300" x-text="z.drybackTarget"></b>%</span>
                 </div>
               </div>
               <div class="mt-2 flex gap-2">
