@@ -712,6 +712,30 @@
           <span class="text-sm text-slate-300" x-text="connError||'Connecting to Home Assistant…'"></span>
         </div>
 
+        <!-- BEEFY ENGINE ALERTS — persistent notifications + engine safety flags + starved-row check -->
+        <div x-show="adv.some(a=>a._engine)" x-cloak class="space-y-3">
+          <template x-for="a in adv.filter(a=>a._engine)" :key="a.id">
+            <div class="rounded-2xl p-4 md:p-5 flex items-start gap-4 border-l-8 shadow-xl" :class="a.sev==='crit'?'bg-red-500/20 border-l-red-500 ring-1 ring-red-500/40':'bg-amber-400/15 border-l-amber-400 ring-1 ring-amber-400/30'">
+              <div class="relative w-12 h-12 md:w-14 md:h-14 rounded-2xl grid place-items-center shrink-0" :class="a.sev==='crit'?'bg-red-500/30':'bg-amber-400/25'">
+                <span x-html="icons[a.icon]||icons.alert" class="w-7 h-7 block" :class="a.sev==='crit'?'text-red-300':'text-amber-300'"></span>
+                <span x-show="a.sev==='crit'" class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 animate-ping"></span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[11px] font-black uppercase tracking-wide px-2.5 py-1 rounded-lg shrink-0" :class="a.sev==='crit'?'bg-red-500 text-white':'bg-amber-400 text-amber-950'" x-text="a.sev==='crit'?'⚠ Critical':'⚠ Warning'"></span>
+                  <span class="text-base md:text-lg font-bold text-white" x-text="a.title"></span>
+                </div>
+                <p class="text-sm text-slate-200/90 mt-1.5 leading-relaxed" x-text="a.detail"></p>
+                <p x-show="a.action" class="text-[13px] text-slate-300 mt-2 flex items-start gap-2"><span x-html="icons.arrow" class="w-4 h-4 block text-emerald-400 mt-0.5 shrink-0"></span><span x-text="a.action"></span></p>
+                <div class="mt-3 flex items-center gap-2 flex-wrap">
+                  <button x-show="a.fix" @click="solve(a.fix)" class="h-10 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-bold inline-flex items-center gap-2">Go to <span x-text="a.fix&&a.fix.label"></span> →</button>
+                  <button @click="ackAlert(a.id)" class="h-10 px-4 rounded-xl bg-black/30 hover:bg-black/50 text-slate-200 text-sm font-semibold">Dismiss</button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
         <!-- zone quick-controls — enable/disable + jump, right on the main page -->
         <div class="grid grid-cols-3 gap-3">
           <template x-for="z in zones" :key="z.id">
@@ -728,9 +752,9 @@
         <!-- ADVISORIES (lead section — alerts first) -->
         <div id="advisories" class="grid grid-cols-1 xl:grid-cols-3 gap-4 scroll-mt-28">
           <div class="xl:col-span-2">
-            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.alerts" class="w-4 h-4 block text-amber-400"></span> Advisories — what needs you</h3><span class="text-xs text-slate-500" x-text="adv.length+' active'"></span></div>
+            <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.alerts" class="w-4 h-4 block text-amber-400"></span> Advisories — what needs you</h3><span class="text-xs text-slate-500" x-text="adv.filter(a=>!a._engine).length+' active'"></span></div>
             <div class="space-y-2.5">
-              <template x-for="a in adv" :key="a.id">
+              <template x-for="a in adv.filter(a=>!a._engine)" :key="a.id">
                 <div class="glass rounded-2xl p-4 fade-enter" :class="a.sev==='crit'?'border-l-4 border-l-red-500':'border-l-4 border-l-amber-400'">
                   <div class="flex items-start gap-3">
                     <div class="w-9 h-9 rounded-xl grid place-items-center shrink-0" :class="sevBg(a.sev)"><span x-html="icons[a.icon]||icons.alert" class="w-4.5 h-4.5 block" :class="sevText(a.sev)"></span></div>
@@ -1057,10 +1081,51 @@
               <button @click="openZone(z.id)" class="mt-2 w-full h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-400">Diagnose · all setpoints &amp; 24h trend →</button>
               <div class="mt-3 pt-3 border-t border-white/6">
                 <div class="flex items-center justify-between mb-1"><span class="text-[11px] font-semibold text-slate-400">24h VWC + pore EC</span><span class="text-[10px] text-slate-600">VWC% L · EC R</span></div>
-                <div class="h-32"><canvas :id="'zmini'+z.id"></canvas></div>
+                <div class="h-32 cursor-pointer group relative" @click="openZone(z.id)" title="Open full 24h chart + setpoints"><canvas :id="'zmini'+z.id"></canvas><span class="absolute top-1 right-1 text-[9px] text-slate-500 group-hover:text-cyan-300 opacity-0 group-hover:opacity-100 transition">expand ⤢</span></div>
               </div>
             </div>
           </template>
+        </div>
+        <!-- ===== PER-ZONE RECIPE (independent lean-recipe editor — writes per-zone entities live) ===== -->
+        <div id="zones-recipe" class="scroll-mt-28" x-data="zoneRecipes()">
+          <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.scale" class="w-4 h-4 block text-emerald-400"></span> Per-zone recipe <span class="text-[11px] text-slate-500 font-normal">· each zone independent · writes to HA live</span></h3>
+            <span class="text-[11px] text-slate-500">edit a value → <kbd class="px-1 py-0.5 rounded bg-white/8 border border-white/10 text-[10px]">Enter</kbd> or blur to save</span>
+          </div>
+          <div class="grid gap-4" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+            <template x-for="r in recipes" :key="'rc-'+r.z">
+              <div class="glass rounded-2xl p-4">
+                <!-- header: strain (editable) -->
+                <div class="flex items-center justify-between gap-2 mb-3">
+                  <span class="font-semibold text-base">Zone <span x-text="r.z"></span></span>
+                  <span class="text-[10px] uppercase tracking-wide text-slate-500">recipe</span>
+                </div>
+                <label class="block mb-3">
+                  <span class="text-[11px] text-slate-400 flex items-center gap-1.5 mb-1">Strain <span class="text-[10px] text-slate-600" x-text="'input_text.crop_steering_zone_'+r.z+'_strain'"></span></span>
+                  <div class="relative">
+                    <input type="text" :value="r.strain" @change="saveText(r.z,'strain',$event.target.value,$event)" @keydown.enter="$event.target.blur()"
+                      placeholder="e.g. Gelato #41" class="w-full bg-white/[0.06] border border-white/10 focus:border-emerald-400/50 rounded-lg px-2.5 py-2 text-sm text-slate-100 outline-none transition" />
+                    <span x-show="flash['t'+r.z]" x-cloak class="absolute right-2 top-1/2 -translate-y-1/2 text-[11px]" :class="flash['t'+r.z]==='ok'?'text-emerald-400':'text-rose-400'" x-text="flash['t'+r.z]==='ok'?'✓ saved':'✕ failed'"></span>
+                  </div>
+                </label>
+                <!-- recipe number inputs -->
+                <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                  <template x-for="f in r.fields" :key="f.key">
+                    <label class="block" :class="f.span&&'col-span-2'">
+                      <span class="text-[11px] text-slate-400 flex items-center gap-1 mb-1"><span x-text="f.label"></span><span x-show="f.unit" class="text-slate-600" x-text="'('+f.unit+')'"></span></span>
+                      <div class="relative">
+                        <input type="number" :step="f.step" :min="f.min" :max="f.max" :value="f.val"
+                          @change="saveNum(r.z,f,$event.target.value,$event)" @keydown.enter="$event.target.blur()"
+                          class="w-full bg-white/[0.06] border border-white/10 focus:border-emerald-400/50 rounded-lg px-2.5 py-1.5 text-sm text-slate-100 outline-none transition tabular-nums" />
+                        <span x-show="flash[f.fk]" x-cloak class="absolute right-2 top-1/2 -translate-y-1/2 text-[11px]" :class="flash[f.fk]==='ok'?'text-emerald-400':'text-rose-400'" x-text="flash[f.fk]==='ok'?'✓':'✕'"></span>
+                      </div>
+                    </label>
+                  </template>
+                </div>
+                <p x-show="err[r.z]" x-cloak class="mt-2 text-[11px] text-rose-300" x-text="err[r.z]"></p>
+              </div>
+            </template>
+          </div>
         </div>
         <!-- source water + engine (global context, shared across zones) -->
         <div id="zones-src" class="glass rounded-2xl p-5 scroll-mt-28">
@@ -1074,8 +1139,8 @@
             <div>
               <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-2">Volume fed vs daily cap</div>
               <div class="grid grid-cols-3 gap-3">
-                <template x-for="w in waterBars()" :key="w.id">
-                  <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3 flex flex-col items-center gap-1.5">
+                <template x-for="w in water" :key="w.id">
+                  <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3 flex flex-col items-center gap-1.5 cursor-pointer hover:border-cyan-400/40 hover:bg-cyan-400/[0.04] transition" @click="editMaxVol(w.id)" title="Click to set daily volume cap">
                     <span class="text-[11px] text-slate-400" x-text="w.name"></span>
                     <div class="relative w-10 h-20 rounded-md border border-white/15 overflow-hidden bg-white/[0.02]">
                       <div class="absolute bottom-0 inset-x-0 transition-all duration-500" :class="w.sev==='crit'?'bg-red-500/70':w.sev==='warn'?'bg-amber-400/70':'bg-cyan-400/60'" :style="'height:'+(w.pct==null?0:w.pct)+'%'"></div>
@@ -1090,10 +1155,51 @@
             <div>
               <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-2">Irrigation frequency · today</div>
               <div class="space-y-2.5">
-                <template x-for="w in waterBars()" :key="'f'+w.id">
+                <template x-for="w in water" :key="'f'+w.id">
                   <div class="rounded-xl bg-white/[0.03] border border-white/8 p-2.5">
                     <div class="flex items-center justify-between text-[12px] mb-1.5"><span class="text-slate-300 font-medium" x-text="w.name"></span><span class="text-slate-400"><b class="text-slate-100" x-text="w.shots==null?'—':w.shots"></b> shots · next <b class="text-cyan-300" x-text="w.nextTxt"></b></span></div>
                     <div class="h-2 rounded-full bg-white/8 overflow-hidden"><div class="h-full rounded-full bg-emerald-400/70 transition-all duration-500" :style="'width:'+(w.shots==null?0:Math.min(100,w.shots/20*100))+'%'"></div></div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- ===== FEED & NUTRIENT TANKS ===== -->
+        <div id="zones-tanks" class="glass rounded-2xl p-5 scroll-mt-28">
+          <h3 class="text-sm font-semibold mb-3 flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Feed &amp; nutrient tanks</h3>
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- batch / feed tank + chemistry -->
+            <div class="rounded-xl bg-white/[0.03] border border-white/8 p-4 flex flex-col gap-3">
+              <div class="flex items-center justify-between"><span class="text-xs font-semibold text-slate-300">Batch / feed tank</span>
+                <span class="text-[11px] font-semibold" :class="tanks.feed.sev==='crit'?'text-red-400':tanks.feed.sev==='warn'?'text-amber-400':'text-emerald-400'" x-text="tanks.feed.pct==null?'—':Math.round(tanks.feed.pct)+'%'"></span></div>
+              <div class="flex items-end gap-3">
+                <div class="relative w-12 h-24 rounded-md border border-white/15 overflow-hidden bg-white/[0.02] shrink-0">
+                  <div class="absolute bottom-0 inset-x-0 transition-all duration-500" :class="tanks.feed.sev==='crit'?'bg-red-500/70':tanks.feed.sev==='warn'?'bg-amber-400/70':'bg-cyan-400/60'" :style="'height:'+(tanks.feed.pct==null?0:Math.max(0,Math.min(100,tanks.feed.pct)))+'%'"></div></div>
+                <div class="flex-1 space-y-1.5 text-[12px]">
+                  <div class="flex justify-between"><span class="text-slate-400">Remaining</span><b class="text-slate-100" x-text="tanks.feed.litres==null?'—':Math.round(tanks.feed.litres)+' L'"></b></div>
+                  <div class="flex justify-between"><span class="text-slate-400">Feed pH</span><b :class="tanks.feed.phOk?'text-emerald-300':'text-amber-300'" x-text="tanks.feed.phTxt"></b></div>
+                  <div class="flex justify-between"><span class="text-slate-400">Feed EC</span><b class="text-slate-100" x-text="tanks.feed.ecTxt+' mS/cm'"></b></div>
+                  <div class="flex justify-between"><span class="text-slate-400">Pore EC</span><b class="text-violet-300" x-text="tanks.feed.fecTxt"></b></div>
+                  <div class="flex justify-between" x-show="tanks.feed.pumpH!=null"><span class="text-slate-400">Pump since fill</span><b class="text-slate-300" x-text="tanks.feed.pumpH==null?'—':tanks.feed.pumpH.toFixed(1)+' h'"></b></div>
+                </div>
+              </div>
+              <div class="text-[11px] text-slate-500" x-show="tanks.dose.active && tanks.dose.active!=='Idle'">Dosing now: <span class="text-cyan-300 font-semibold" x-text="tanks.dose.active"></span></div>
+            </div>
+            <!-- nutrient stock tanks -->
+            <div class="lg:col-span-2">
+              <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-2">Nutrient stock tanks</div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <template x-for="st in tanks.stock" :key="st.key">
+                  <div class="rounded-xl bg-white/[0.03] border border-white/8 p-3 flex flex-col items-center gap-1.5">
+                    <span class="text-[11px] font-semibold text-slate-300" x-text="st.name"></span>
+                    <div class="relative w-9 h-16 rounded-md border border-white/15 overflow-hidden bg-white/[0.02]">
+                      <div class="absolute bottom-0 inset-x-0 transition-all duration-500" :class="st.sev==='crit'?'bg-red-500/70':st.sev==='warn'?'bg-amber-400/70':'bg-emerald-400/55'" :style="'height:'+(st.pct==null?0:Math.max(0,Math.min(100,st.pct)))+'%'"></div>
+                      <div class="absolute inset-0 grid place-items-center text-[10px] font-bold text-white" x-text="st.pctTxt+'%'"></div>
+                    </div>
+                    <span class="text-[11px] text-slate-200" x-text="st.lTxt+' L'"></span>
+                    <span class="text-[10px]" :class="st.sev==='crit'?'text-red-400':st.sev==='warn'?'text-amber-400':'text-slate-500'" x-text="st.doseTxt+' doses left'"></span>
+                    <span class="text-[9px] text-slate-600" x-show="st.usedTxt!==null" x-text="'used '+st.usedTxt+' ml'"></span>
                   </div>
                 </template>
               </div>
@@ -1915,8 +2021,27 @@ function getToken(){ try{ const t=JSON.parse(localStorage.getItem("hassTokens"))
 const ls={ get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
 function getAIKey(){ try{ const k=localStorage.getItem("f2_ai_key"); if(k) return k; }catch(e){} return (CONFIG.AI&&CONFIG.AI.key)||""; }   // scoped LiteLLM key: localStorage override, else the baked one
 async function fetchStates(){ const r=await fetch((CONFIG.HA_BASE||"")+"/api/states",{headers:{Authorization:"Bearer "+getToken()},cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status); const m={}; for(const e of await r.json()) m[e.entity_id]=e; return m; }
+// Historical series from InfluxDB, proxied through HA's agency_sensor_analytics endpoint (same-origin, HA-auth, no CORS,
+// auto-downsampled ~800pts/range). Returns the SAME {__start,__end, eid:[{t,v}]} shape as loadHist so all chart code is untouched.
+// Returns null when influx has nothing for these ids → caller falls back to the HA recorder / long-term statistics.
+async function loadInflux(ids,startMs,endMs){ const tok=getToken(); if(!tok||!ids.length) return null;
+  const url=(CONFIG.HA_BASE||"")+"/api/agency_sensor_analytics/history?entities="+encodeURIComponent(ids.join(","))+"&start="+new Date(startMs).toISOString()+"&end="+new Date(endMs).toISOString();
+  const r=await fetch(url,{headers:{Authorization:"Bearer "+tok},cache:"no-store"}); if(!r.ok) throw new Error("influx HTTP "+r.status);
+  const d=await r.json(); const out={__start:startMs,__end:endMs}; let any=false;
+  ids.forEach(eid=>{ const pts=(d[eid]||[]).map(p=>({t:+p.time,v:+p.value})).filter(p=>p.t&&!isNaN(p.v)); out[eid]=pts; if(pts.length) any=true; });
+  return any?out:null; }
+// Dashed engine-target lines on VWC/EC history charts: P2 VWC threshold (yV) + P2 EC target (yE), read from ch.$dryback.{vt,et}.
+// Lets the grower eyeball how far actual is tracking off the steering setpoint. Shared by mountTrend + mountSubChart.
+const TGT_PLUGIN={id:'tgt',beforeDraw(ch){ const D=ch.$dryback; if(!D) return; const a=ch.chartArea,ctx=ch.ctx;
+  const draw=(axis,val,col,lbl,side,below)=>{ const Y=ch.scales[axis]; if(!Y||val==null) return; const y=Y.getPixelForValue(val);
+    ctx.save(); ctx.strokeStyle=col+'80'; ctx.setLineDash([6,4]); ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(a.left,y); ctx.lineTo(a.right,y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=col; ctx.font='600 10px Inter,sans-serif'; ctx.textAlign=side; ctx.textBaseline=below?'top':'bottom'; ctx.fillText(lbl, side==='right'?a.right-6:a.left+6, below?y+3:y-3); ctx.restore(); };
+  draw('yV',D.vt,'#67e8f9','VWC target '+(D.vt!=null?D.vt.toFixed(0)+'%':'')+(D.single?'':' avg'),'left',true);
+  draw('yE',D.et,'#c4b5fd','EC target '+(D.et!=null?D.et.toFixed(1):'')+(D.single?'':' avg'),'right',false); }};
 async function svc(domain, service, data){ if(DEMO) return {};   // demo: writes are no-ops (optimistic UI only)
   const r=await fetch((CONFIG.HA_BASE||"")+"/api/services/"+domain+"/"+service,{method:"POST",headers:{Authorization:"Bearer "+getToken(),"Content-Type":"application/json"},body:JSON.stringify(data||{}),cache:"no-store"}); if(!r.ok) throw new Error("svc "+domain+"."+service+" → HTTP "+r.status); return r.json().catch(()=>({})); }   // shared write path for Control/Tune/Timeline
+async function evt(event_type, data){ if(DEMO) return {};   // fire an HA event the AppDaemon engine listens for (bypasses the broken execute_irrigation_shot service)
+  const r=await fetch((CONFIG.HA_BASE||"")+"/api/events/"+event_type,{method:"POST",headers:{Authorization:"Bearer "+getToken(),"Content-Type":"application/json"},body:JSON.stringify(data||{}),cache:"no-store"}); if(!r.ok) throw new Error("event "+event_type+" → HTTP "+r.status); return r.json().catch(()=>({})); }
 
 // ===== DEMO mode: standalone showcase on perfect "role-model" data (GitHub Pages — no HA, no IP, no token) =====
 const DEMO = new URLSearchParams(location.search).has('demo') || /github\.io$/i.test(location.hostname||"");
@@ -1944,7 +2069,10 @@ function seedDemo(){
     set('sensor.crop_steering_prediction_zone_'+z+'_next_irrigation_hours',0.6);
     set('number.'+P+'p2_vwc_threshold',[42,43,43][i]); set('number.'+P+'p3_emergency_vwc_threshold',38);
     set('number.'+P+'ec_target_gen_p2',6.0); set('number.'+P+'ec_target_veg_p2',3.0); set('number.'+P+'p2_shot_size',5);
+    set('number.'+P+'ec_target_gen_p0',4.0); set('number.'+P+'ec_target_gen_p1',5.0);
     set('number.'+P+'generative_dryback_target',15); set('number.'+P+'vegetative_dryback_target',12); set('number.'+P+'p1_target_vwc',60);
+    set('number.'+P+'maximum_ec',[9,9.5,8.5][i]); set('number.'+P+'field_capacity',[70,72,68][i]); set('number.'+P+'watchdog_hours',[3,2.5,3.5][i]);
+    set('input_text.'+P+'strain',['Gelato #41','Wedding Cake','Papaya'][i],{});
     set('input_select.'+P+'phase_control','Auto',{options:['Auto','P0','P1','P2','P3']});
     set('select.'+P+'steering_mode','Generative',{options:['Vegetative','Generative']});
     set('select.'+P+'crop_profile','Cannabis_Athena',{options:['Follow Main','Cannabis_Athena','Custom']});
@@ -2088,7 +2216,7 @@ const ADV_METRIC={ pumpDeadhead:()=>'pump_power', hotspot:()=>'bl_temp', hotspot
 const FIX_ACTIONS={
   pumpDeadhead:{label:'Stop pump now',noConfirm:true,run(app){ return app.pumpStopAll(); }},   // pumpStopAll carries its own confirm
   dosingStuck:{label:'Clear dosing flag',confirm:'Clear the dosing flag so watering resumes?\nONLY if tank pH and EC are confirmed in range — clearing mid-tank-job sends bad feed.',run(){ return svc('input_boolean','turn_off',{entity_id:'input_boolean.nutrient_dosing_active'}); }},
-  zoneFloor:{label:o=>{const m=(o.title||'').match(/Zone (\d)/);return 'Rescue shot Zone '+(m?m[1]:'?')+' · 60s';},confirm:'Fire a 60-second P3-emergency rescue shot for this zone?\nThe engine still runs every one of its safety checks first.',run(app,o){ const m=(o.title||'').match(/Zone (\d)/); if(!m) throw new Error('zone?'); return svc('crop_steering','execute_irrigation_shot',{zone:+m[1],duration_seconds:60,shot_type:'P3_emergency'}); }},
+  zoneFloor:{label:o=>{const m=(o.title||'').match(/Zone (\d)/);return 'Rescue shot Zone '+(m?m[1]:'?')+' · 60s';},confirm:'Fire a 60-second P3-emergency rescue shot for this zone?\nThe engine still runs every one of its safety checks first.',run(app,o){ const m=(o.title||'').match(/Zone (\d)/); if(!m) throw new Error('zone?'); return evt('crop_steering_manual_irrigation',{zone:+m[1],duration:60}); }},
   ecStacking:{label:'Ease dryback −3%',confirm:'Lower every zone\'s generative dryback target by 3 points?\nWaters sooner → dilutes the salt stack.',async run(){ for(const z of [1,2,3]){ const id='number.crop_steering_zone_'+z+'_generative_dryback_target'; const v=num(id); if(v!=null) await svc('number','set_value',{entity_id:id,value:Math.max(5,+(v-3).toFixed(1))}); } }},
   drybackShallow:{label:'Deepen dryback +3%',confirm:'Raise every zone\'s generative dryback target by 3 points?\nBlocks dry further before re-water.',async run(){ for(const z of [1,2,3]){ const id='number.crop_steering_zone_'+z+'_generative_dryback_target'; const v=num(id); if(v!=null) await svc('number','set_value',{entity_id:id,value:Math.min(70,+(v+3).toFixed(1))}); } }},
 };
@@ -2207,6 +2335,49 @@ function buildZones(){ return [1,2,3].map(z=>{ const Z=CONFIG.ZONE(z); const vwc
 function zSt(id){ return S[id]?.state; }
 function zNum(id){ const v=parseFloat(S[id]?.state); return isNaN(v)?null:v; }
 function zOpts(id){ return S[id]?.attributes?.options||[]; }
+// Per-zone lean-recipe editor (Zones tab). Each zone fully independent; writes the per-zone
+// number entities via the shared svc() write path. Snapshot-on-load model (like the Tune editor)
+// so a live refresh never clobbers a field mid-edit. EVERY field here is per-zone-addressable:
+// the lean engine (appdaemon/apps/crop_steering/lean_crop_steering.py _zone_num) reads
+// number.crop_steering_zone_<z>_<field> FIRST and only falls back to the global as a template
+// default — so maximum_ec, field_capacity and watchdog_hours are real per-zone tunables.
+// The numeric per-zone entities are created as number.* by the crop_steering integration
+// (custom_components/crop_steering/number.py PER_ZONE_STEERING_KEYS); strain is input_text
+// from deploy/f2_zone_recipes.yaml.
+function zoneRecipes(){
+  const PER=[
+    {key:'p1_target_vwc',label:'P1 target VWC',unit:'%',step:0.5,min:0,max:100},
+    {key:'p2_vwc_threshold',label:'P2 re-water VWC',unit:'%',step:0.5,min:0,max:100},
+    {key:'p2_shot_size',label:'P2 shot size',unit:'%',step:0.5,min:0,max:50},
+    {key:'ec_target_gen_p0',label:'EC target · P0',unit:'mS',step:0.1,min:0,max:15},
+    {key:'ec_target_gen_p1',label:'EC target · P1',unit:'mS',step:0.1,min:0,max:15},
+    {key:'ec_target_gen_p2',label:'EC target · P2',unit:'mS',step:0.1,min:0,max:15},
+    {key:'generative_dryback_target',label:'Gen dryback target',unit:'% drop',step:0.5,min:0,max:70},
+    {key:'maximum_ec',label:'Maximum EC',unit:'mS',step:0.1,min:0,max:15},
+    {key:'field_capacity',label:'Field capacity',unit:'%',step:0.5,min:0,max:100},
+    {key:'watchdog_hours',label:'Watchdog (starvation)',unit:'h',step:0.5,min:0,max:12},
+    {key:'max_daily_volume',label:'Max daily volume',unit:'L',step:0.5,min:0,max:200,span:true},
+  ];
+  const mk=(z)=>({
+    z,
+    strain: zSt('input_text.crop_steering_zone_'+z+'_strain') ?? '',
+    fields: PER.map(f=>({...f, fk:f.key+z, id:'number.crop_steering_zone_'+z+'_'+f.key, val:zNum('number.crop_steering_zone_'+z+'_'+f.key)})),
+  });
+  return {
+    recipes:[1,2,3].map(mk),
+    flash:{}, err:{},
+    _set(k,v){ this.flash={...this.flash,[k]:v}; if(v==='ok') setTimeout(()=>{ const f={...this.flash}; delete f[k]; this.flash=f; },1400); },
+    refresh(z){ const i=this.recipes.findIndex(r=>r.z===z); if(i>=0) this.recipes.splice(i,1,mk(z)); },
+    async saveText(z,key,raw,ev){ const id='input_text.crop_steering_zone_'+z+'_'+key; const v=(raw||'').trim();
+      try{ await svc('input_text','set_value',{entity_id:id,value:v}); if(!DEMO&&S[id]) S[id].state=v; this.err={...this.err,[z]:''}; this._set('t'+z,'ok'); }
+      catch(e){ this._set('t'+z,'err'); this.err={...this.err,[z]:(/401|403/.test(e.message)?'HA session expired — reload the page':'Save failed: '+e.message)}; } },
+    async saveNum(z,f,raw,ev){ const n=parseFloat(raw);
+      if(raw===''||isNaN(n)){ this._set(f.fk,'err'); this.err={...this.err,[z]:f.label+': enter a number'}; if(ev) ev.target.value=(f.val==null?'':f.val); return; }
+      const v=Math.max(f.min,Math.min(f.max,n));
+      try{ await svc('number','set_value',{entity_id:f.id,value:v}); if(!DEMO&&S[f.id]) S[f.id].state=String(v); f.val=v; if(ev&&v!==n) ev.target.value=v; this.err={...this.err,[z]:''}; this._set(f.fk,'ok'); }
+      catch(e){ this._set(f.fk,'err'); this.err={...this.err,[z]:(/401|403/.test(e.message)?'HA session expired — reload the page':'Save failed: '+e.message)}; } },
+  };
+}
 function relAgo(iso){ if(!iso) return "—"; const t=Date.parse(iso); if(isNaN(t)) return "—"; const m=(Date.now()-t)/60000; return m<1?"just now":m<60?Math.round(m)+"m ago":(m/60).toFixed(1)+"h ago"; }
 function buildZoneDetail(zid){   // per-zone live state + co-located setpoints (Zones tab, IA Phase 3)
   const P="crop_steering_zone_"+zid+"_";
@@ -2406,6 +2577,21 @@ function buildTank(){   // Status facility-glance: source-tank fullness bar (pri
   return {pct,litres,sev,bar,pctText:pct==null?"—":fmt(pct,0),litresText:litres==null?null:fmt(litres,0),
     phText:ph==null?null:fmt(ph,2),ecText:ec==null?null:fmt(ec,2),phOk:ph==null?true:(ph>=5.6&&ph<=6.4),
     width:pct==null?0:Math.max(0,Math.min(100,pct))}; }
+function buildTanks(){   // Feed/batch tank + nutrient stock tanks (Core/Bloom/Balance/Cleanse) + feed chemistry — for the Zones "Feed & tanks" card
+  const g=i=>{ const v=parseFloat(S[i]?.state); return isNaN(v)?null:v; };
+  const fp=num('tank_pct'), fl=num('tank_l');
+  const feed={ pct:fp==null?num('tank_pct_fb'):fp, litres:fl==null?num('tank_l_fb'):fl, ph:num('src_ph'), ec:num('src_ec'), fec:num('fused_ec'),
+    pumpH:g('sensor.f2_tank_pump_on_since_fill'), pumpS:g('sensor.f2_tank_pump_seconds_used') };
+  feed.sev=feed.pct==null?'ok':(feed.pct>50?'ok':feed.pct>=20?'warn':'crit');
+  feed.phOk=feed.ph==null?true:(feed.ph>=5.6&&feed.ph<=6.4);
+  feed.phTxt=feed.ph==null?'—':fmt(feed.ph,2); feed.ecTxt=feed.ec==null?'—':fmt(feed.ec,2); feed.fecTxt=feed.fec==null?'—':fmt(feed.fec,2);
+  const stock=['core','bloom','balance','cleanse'].map(k=>{
+    const pct=g('sensor.'+k+'_tank_2'), l=g('sensor.'+k+'_tank_remaining_l'), doses=g('sensor.'+k+'_doses_remaining'), used=g('sensor.'+k+'_delivered_since_fill');
+    const sev=pct==null?'ok':(pct>40?'ok':pct>=15?'warn':'crit');
+    return { key:k, name:k.charAt(0).toUpperCase()+k.slice(1), pct, litres:l, doses, used, sev,
+      pctTxt:pct==null?'—':fmt(pct,0), lTxt:l==null?'—':fmt(l,0), doseTxt:doses==null?'—':fmt(doses,0), usedTxt:used==null?null:fmt(used,0) }; });
+  const dose={ active:S['sensor.f1_batch_dose_active_pump']?.state||null, recipe:g('sensor.f1_batch_recipe_total_ml'), last:g('sensor.f1_batch_last_dose_total_ml') };
+  return { feed, stock, dose }; }
 function buildActivityFeed(){   // Status: recent events from the engine activity log (compact "what's happening now")
   const fa=S["sensor.crop_steering_activity_log"], raw=(fa&&fa.attributes&&fa.attributes.feed)||(fa&&fa.state)||"";
   return String(raw).split("\n").map(l=>l.replace(/[<>]/g,"").trim()).filter(Boolean).slice(0,12); }
@@ -2829,18 +3015,23 @@ function editor(){
       this.mode = this.dial>=5.5?'gen':'veg'; this.live=!!getToken(); this.seedFromHA(false);
       window.__tuneReseed = ()=>this.seedFromHA(false);
     },
-    seedFromHA(explicit){   // read live setpoints straight from f2's shared HA state (S) via num(); no iframe/postMessage
+    seedFromHA(force){   // live HA number.* setpoints are the source of truth. Adopt any value that changed externally (matrix / HA dev-tools / other device → pulls through), but preserve the user's own un-applied edits until they Apply or Pull. force=true (Pull live) overwrites everything. Replaces the old hydrated-gate that turned Tune into a stale localStorage island.
       if(!getToken()){ this.live=false; return; }
       this.live=true;
-      if(this.hydrated && !explicit){ this.liveWaiting=true; return; }
-      const put=(o,k,v)=>{ const m=META[k]; o[k]=(m&&v!=null&&!isNaN(v))?clamp(rstep(+v,m.step),m.min,m.max):v; };
+      const probe=num('number.crop_steering_zone_1_p2_vwc_threshold');
+      if(probe==null){ this.liveWaiting=true; return; }   // HA state not loaded yet — retry on the next poll
+      const L0=this._live0||(this._live0={}); let chg=false, envChg=false;
+      const put=(o,k,dk,v)=>{ const m=META[k]; const nv=(m&&v!=null&&!isNaN(v))?clamp(rstep(+v,m.step),m.min,m.max):v;
+        if(force || !(dk in L0) || L0[dk]!==nv){ if(o[k]!==nv){ o[k]=nv; chg=true; } }   // live moved (or first seed / Pull) → adopt; otherwise keep the local edit
+        L0[dk]=nv; };
       try{
-        for(const z of [1,2,3]){ for(const k of TUNE_ZK){ const v=num('number.crop_steering_zone_'+z+'_'+k); if(v!=null) put(this.Z[z],k,v); } }
-        for(const k in TUNE_GK){ const v=num('number.crop_steering_'+TUNE_GK[k]); if(v!=null) put(this.G,k,v); }
-        const t=num('air_temp'); if(t!=null) put(this.G,'temp',t);
-        const rh=num('rh'); if(rh!=null) put(this.G,'rh',rh);
-        const rt=num('sub_temp'); if(rt!=null) put(this.G,'root_temp',rt);
-        SIMKEY=null; ENVK=null; PREV={}; this.liveWaiting=false; this.hydrated=true; this.persist();
+        for(const z of [1,2,3]){ for(const k of TUNE_ZK){ const v=num('number.crop_steering_zone_'+z+'_'+k); if(v!=null) put(this.Z[z],k,z+'.'+k,v); } }
+        for(const k in TUNE_GK){ const v=num('number.crop_steering_'+TUNE_GK[k]); if(v!=null) put(this.G,k,'G.'+k,v); }
+        const setG=(k,v)=>{ if(v!=null && this.G[k]!==v){ this.G[k]=v; envChg=true; } };
+        setG('temp',num('air_temp')); setG('rh',num('rh')); setG('root_temp',num('sub_temp'));
+        this.liveWaiting=false; this.hydrated=true;
+        if(chg){ SIMKEY=null; this.persist(); }
+        if(chg||envChg){ ENVK=null; PREV={}; }
       }catch(e){ console.warn('tune seed failed:',e.message); }
     },
     pullFromHA(){ this.seedFromHA(true); },   // explicit: overwrite my edits with current live HA values
@@ -3296,10 +3487,9 @@ function editor(){
       s+=`</svg>`; return s; },
     reqHistory(){ if(!getToken()){ alert('Live history overlay needs a connected dashboard.'); return; }
       const sid=(TUNE_RAW[this.zone]||{}).vwc; if(!sid) return; const days=this.gdays;
-      const end=new Date(), start=new Date(end.getTime()-days*24*3600*1000);
-      fetch((CONFIG.HA_BASE||'')+'/api/history/period/'+start.toISOString()+'?filter_entity_id='+sid+'&minimal_response&end_time='+encodeURIComponent(end.toISOString()),{headers:{Authorization:'Bearer '+getToken()}})
-        .then(r=>r.json()).then(arr=>{ const a=(arr&&arr[0])||[]; if(!a.length) return; const t0=new Date(a[0].last_changed||a[0].last_updated).getTime();
-          const pts=a.map(o=>{const v=parseFloat(o.state),tt=new Date(o.last_changed||o.last_updated).getTime();return [(tt-t0)/3600000,v];}).filter(p=>!isNaN(p[1])&&isFinite(p[0])); this.histPts=pts.length?pts:null; })
+      const end=Date.now(), start=end-days*24*3600*1000;
+      loadInflux([sid],start,end).then(H=>{ const a=H&&H[sid]; if(!a||!a.length){ this.histPts=null; return; } const t0=a[0].t;
+          const pts=a.map(o=>[(o.t-t0)/3600000,o.v]).filter(p=>!isNaN(p[1])&&isFinite(p[0])); this.histPts=pts.length?pts:null; })
         .catch(e=>console.warn('tune history failed:',e.message)); },
 
     svgBody(){
@@ -4949,10 +5139,11 @@ document.addEventListener('alpine:init', () => {
       {id:'zones',label:'Zones',icon:'drop',subs:[['All zones','zones-list'],['Source water & engine','zones-src']]},
       {id:'tune',label:'Steering',icon:'scale',subs:[['Now · setpoints','tune','view'],['Schedule · recipe','timeline','view'],['Setpoints table','spm-anchor'],['Steering & day curve','tune-steer']]},
       {id:'analyze',label:'Analyze',icon:'activity',subs:[['Limiting factors','tune-liebig'],['Drivers & environment','tune-env']]},
-      {id:'climate',label:'Climate',icon:'thermo',subs:[['Live climate','cl-live'],['Trends 24h','cl-trends'],['Room controls','cl-controls'],['Hotspot map','cl-hotspot'],['Raw readings','cl-raw']]}],
+      {id:'climate',label:'Climate',icon:'thermo',subs:[['Live climate','cl-live'],['Trends 24h','cl-trends'],['Room controls','cl-controls'],['Hotspot map','cl-hotspot'],['Raw readings','cl-raw']]},
+      {id:'floor',label:'Floorplan',icon:'grid',subs:[]}],
     camMin:(function(){try{return localStorage.getItem('f2.camMin')==='1'}catch(e){return false}})(),
     floorLoaded:false,
-    mobileNav:[{id:'dashboard',label:'Overview',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'tune',label:'Steering',icon:'scale'},{id:'climate',label:'Climate',icon:'thermo'},{id:'ai',label:'AI',icon:'ai'}],
+    mobileNav:[{id:'dashboard',label:'Overview',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'tune',label:'Steering',icon:'scale'},{id:'floor',label:'Floor',icon:'grid'},{id:'climate',label:'Climate',icon:'thermo'},{id:'ai',label:'AI',icon:'ai'}],
 
     view:ls.get('f2.view','dashboard'), sidebarOpen:ls.get('f2.sidebar',true), connected:false, connError:"",
     easy:ls.get('f2.easy',!DEMO), wiz:false, wizStep:0, wizData:{goal:'balanced',stage:'Bulk',dial:7,strain:'',substrate:6,drippers:2,flow:2.0},   // calm view is the DEFAULT on a fresh browser (paper §10: attention is finite); Pro is one tap, choice persists. Demo stays Pro to showcase.
@@ -4961,9 +5152,9 @@ document.addEventListener('alpine:init', () => {
     pumpOpen:false, pump:{hw:[],sw:[],power:null,powerTxt:'—',anyHw:false,deadhead:false,pumpOn:false}, relays:[],
     tip:null, tipT:null,
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
-    headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], maturity:{rung:2,name:'Logged',next:''}, chartSmooth:ls.get('f2.chartSmooth',true), gRange:ls.get('f2.gRange','24h'), subZone:ls.get('f2.subZone','all'), subFieldCap:ls.get('f2.subFieldCap',true), subOverlay:ls.get('f2.subOverlay',false), zones:[], plant:[], coupledStages:[], vitals:[], hwStatus:{hw:[],zones:[],deadhead:false,anyOn:false,pumpOn:false,pwTxt:'—'}, climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
+    headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], maturity:{rung:2,name:'Logged',next:''}, chartSmooth:ls.get('f2.chartSmooth',true), gRange:ls.get('f2.gRange','24h'), subZone:ls.get('f2.subZone','all'), subFieldCap:ls.get('f2.subFieldCap',true), subOverlay:ls.get('f2.subOverlay',false), zones:[], plant:[], coupledStages:[], vitals:[], hwStatus:{hw:[],zones:[],deadhead:false,anyOn:false,pumpOn:false,pwTxt:'—'}, water:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},telemetry:[],feed:[]},
-    climateCtl:[], ctlOpen:ls.get('f2.ctlOpen',{}), snapshot:[], camUrl:'', spOpen:false, spItem:null, floorMini:[], tank:{pct:null,litres:null,sev:'ok',bar:'bg-emerald-500',pctText:'—',litresText:null,width:0}, activityFeed:[], hUser:{name:'Grower',initials:'F2'}, demo:DEMO,
+    climateCtl:[], ctlOpen:ls.get('f2.ctlOpen',{}), snapshot:[], camUrl:'', spOpen:false, spItem:null, floorMini:[], tank:{pct:null,litres:null,sev:'ok',bar:'bg-emerald-500',pctText:'—',litresText:null,width:0}, tanks:{feed:{},stock:[],dose:{}}, activityFeed:[], hUser:{name:'Grower',initials:'F2'}, demo:DEMO,
     notes:{}, toasts:[], _tid:0, _toastId:0, _retry:0, _acked:(function(){ try{ const a=ls.get('f2.acked',{}),cut=Date.now()-18*3600e3,o={}; for(const k in a){ if(a[k]>cut) o[k]=a[k]; } return o; }catch(e){ return {}; } })(),
     aiMessages:[], aiSuggestions:["Any rooms drifting?","Why the hotspot?","How is the EC tracking?","Is dryback on target?"],
 
@@ -5017,8 +5208,9 @@ document.addEventListener('alpine:init', () => {
       statPushAll();   // feed the SPC stats store from this tick (control limits build over the session)
       const rr=runRules();
       this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
+      const _ea=this.buildEngineAlerts().filter(a=>!this._acked[a.id]); this.adv=[..._ea,...this.adv];   // engine alerts first (loud)
       this.headline=computeHeadline(this.adv,this.watch);
-      this.kpis=buildKpis(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.vitals=buildVitals(); this.hwStatus=buildHwStatus(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl(); this.pump=buildPump(); this.relays=buildRelays(); this.maturity=maturityScore();
+      this.kpis=buildKpis(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.tanks=buildTanks(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.vitals=buildVitals(); this.hwStatus=buildHwStatus(); this.water=this.waterBars(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl(); this.pump=buildPump(); this.relays=buildRelays(); this.maturity=maturityScore();
       { const cam=S[CONFIG.E.cam], ct=cam&&cam.attributes&&cam.attributes.access_token; this._camTick=(this._camTick||0)+1;
         this.camUrl=ct?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+CONFIG.E.cam+'?token='+ct+'&_='+this._camTick):''; }
       if(window.__tuneReseed) window.__tuneReseed();   // refresh the Tune editor from live HA (respects its hydrated/unsaved-edit guard)
@@ -5049,7 +5241,7 @@ document.addEventListener('alpine:init', () => {
         if(which==='climate'){ const ids=[CONFIG.E.air_temp,CONFIG.E.rh,CONFIG.E.air_vpd,CONFIG.E.co2,CONFIG.E.ppfd].filter(Boolean);
           this._h_climate=await this.loadHist(ids,24); this.$nextTick(()=>this.mountClimateCharts()); }
         else { const ids=[1,2,3].flatMap(z=>['sensor.crop_steering_zone_'+z+'_vwc','sensor.crop_steering_zone_'+z+'_ec']); const R=this.RANGES[this.gRange]||{hours:24,stat:false};
-          this._h_dashboard=await (R.stat?this.loadStats(ids,R.hours):this.loadHist(ids,R.hours)); this.$nextTick(()=>this.mountTrend()); }
+          this._h_dashboard=await this.loadHist(ids,R.hours,R.stat); this.$nextTick(()=>this.mountTrend()); }
       }catch(e){ console.warn('history load failed',e); this['_hts_'+which]=0; }
       finally{ this['_loading_'+which]=false; }
     },
@@ -5075,11 +5267,13 @@ document.addEventListener('alpine:init', () => {
             fin(out); } };
       });
     },
-    async loadHist(ids,hours){ if(DEMO) return demoHist(ids,hours); const tok=getToken(); if(!tok||!ids.length) return null;
-      const end=new Date(), start=new Date(Date.now()-hours*3600e3);
-      const url=(CONFIG.HA_BASE||'')+'/api/history/period/'+start.toISOString()+'?filter_entity_id='+ids.join(',')+'&minimal_response&end_time='+encodeURIComponent(end.toISOString());
+    async loadHist(ids,hours,stat){ if(DEMO) return demoHist(ids,hours); const tok=getToken(); if(!tok||!ids.length) return null;
+      const end=Date.now(), start=end-hours*3600e3;
+      try{ const inf=await loadInflux(ids,start,end); if(inf) return inf; }catch(e){ console.warn('influx hist failed, falling back',e.message); }   // InfluxDB is the source of truth
+      if(stat) return await this.loadStats(ids,hours);   // long-range fallback: HA long-term statistics (WS)
+      const url=(CONFIG.HA_BASE||'')+'/api/history/period/'+new Date(start).toISOString()+'?filter_entity_id='+ids.join(',')+'&minimal_response&end_time='+encodeURIComponent(new Date(end).toISOString());
       const r=await fetch(url,{headers:{Authorization:'Bearer '+tok},cache:'no-store'}); if(!r.ok) throw new Error('history HTTP '+r.status);
-      const arr=await r.json(); const out={__start:start.getTime(),__end:end.getTime()};
+      const arr=await r.json(); const out={__start:start,__end:end};
       arr.forEach(series=>{ if(!series||!series.length) return; const eid=series[0].entity_id; out[eid]=series.map(p=>({t:Date.parse(p.last_changed||p.last_updated),v:parseFloat(p.state)})).filter(p=>p.t&&!isNaN(p.v)); });
       return out;
     },
@@ -5101,7 +5295,7 @@ document.addEventListener('alpine:init', () => {
         const ec=[1,2,3].map((z,i)=>ds('Z'+z+' EC',this.bucketize(H['sensor.crop_steering_zone_'+z+'_ec'],s,e,N),cols[i],'yE',[5,3]));
         sets=[...vwc,...ec];
         const avg=labels.map((_,i)=>{ const vs=vwc.map(d=>d.data[i]).filter(v=>v!=null); return vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:null; });
-        dbInfo={dbs:this._detectDrybacks(avg)}; }
+        const T=this._zoneTargets([1,2,3]); dbInfo={dbs:this._detectDrybacks(avg),vt:T.vt,et:T.et,single:false}; }
       else { const n=Math.max(HIST.vwc.length,1); labels=Array.from({length:n},()=>''); sets=[ds('Avg VWC',[...HIST.vwc],'#22d3ee','yV')]; }
       if(CHARTS.trend){ CHARTS.trend.$dryback=dbInfo; CHARTS.trend.data.labels=labels; CHARTS.trend.data.datasets=sets; CHARTS.trend.update('none'); return; }
       const drybackPlugin={id:'dryback',afterDatasetsDraw(ch){ const D=ch.$dryback; if(!D||!D.dbs||!D.dbs.length) return; const X=ch.scales.x,Y=ch.scales.yV,ctx=ch.ctx; ctx.save();
@@ -5120,24 +5314,32 @@ document.addEventListener('alpine:init', () => {
           scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8,autoSkip:true}},
             yV:{position:'right',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#67e8f9',font:{size:10},callback:v=>v+'%'},suggestedMin:25,suggestedMax:65,grace:'5%',title:{display:true,text:'VWC %',color:'#67e8f9',font:{size:10}}},
             yE:{position:'right',grid:{display:false},ticks:{color:'#c4b5fd',font:{size:10}},suggestedMin:0,suggestedMax:6,grace:'5%',title:{display:true,text:'pore EC',color:'#c4b5fd',font:{size:10}}}}},
-        plugins:[drybackPlugin]}); CHARTS.trend.$dryback=dbInfo; },
+        plugins:[drybackPlugin,TGT_PLUGIN]}); CHARTS.trend.$dryback=dbInfo; },
 
     /* ===== AROYA-style full-width Substrate view ===== */
     async ensureSubHist(){ const R=this.RANGES[this.gRange]||{hours:24,stat:false}; const ids=[1,2,3].flatMap(z=>['sensor.crop_steering_zone_'+z+'_vwc','sensor.crop_steering_zone_'+z+'_ec']);
-      try{ this._h_sub=await (R.stat?this.loadStats(ids,R.hours):this.loadHist(ids,R.hours)); }catch(e){ this._h_sub=null; }
+      try{ this._h_sub=await this.loadHist(ids,R.hours,R.stat); }catch(e){ this._h_sub=null; }
       if(this.subOverlay && !R.stat){ try{ this._h_subPrev=await this.loadHistOffset(ids,R.hours,R.hours); }catch(e){ this._h_subPrev=null; } } else this._h_subPrev=null;
       this.$nextTick(()=>this.mountSubChart()); },
     async loadHistOffset(ids,hours,offset){ if(DEMO) return demoHist(ids,hours); const tok=getToken(); if(!tok||!ids.length) return null;
-      const end=new Date(Date.now()-offset*3600e3), start=new Date(Date.now()-(offset+hours)*3600e3);
-      const url=(CONFIG.HA_BASE||'')+'/api/history/period/'+start.toISOString()+'?filter_entity_id='+ids.join(',')+'&minimal_response&end_time='+encodeURIComponent(end.toISOString());
+      const end=Date.now()-offset*3600e3, start=Date.now()-(offset+hours)*3600e3;
+      try{ const inf=await loadInflux(ids,start,end); if(inf) return inf; }catch(e){}   // InfluxDB primary; recorder fallback below
+      const url=(CONFIG.HA_BASE||'')+'/api/history/period/'+new Date(start).toISOString()+'?filter_entity_id='+ids.join(',')+'&minimal_response&end_time='+encodeURIComponent(new Date(end).toISOString());
       const r=await fetch(url,{headers:{Authorization:'Bearer '+tok},cache:'no-store'}); if(!r.ok) throw new Error('hist '+r.status);
-      const arr=await r.json(); const out={__start:start.getTime(),__end:end.getTime()};
+      const arr=await r.json(); const out={__start:start,__end:end};
       arr.forEach(series=>{ if(!series||!series.length) return; const eid=series[0].entity_id; out[eid]=series.map(p=>({t:Date.parse(p.last_changed||p.last_updated),v:parseFloat(p.state)})).filter(p=>p.t&&!isNaN(p.v)); });
       return out; },
     setSubZone(z){ this.subZone=z; ls.set('f2.subZone',z); this.mountSubChart(); },
     toggleFieldCap(){ this.subFieldCap=!this.subFieldCap; ls.set('f2.subFieldCap',this.subFieldCap); this.mountSubChart(); },
     toggleSubOverlay(){ this.subOverlay=!this.subOverlay; ls.set('f2.subOverlay',this.subOverlay); this.ensureSubHist(); },
     setSubRange(r){ if(!this.RANGES[r]) return; this.gRange=r; ls.set('f2.gRange',r); this.ensureSubHist(); },
+    // engine P2 targets for the visible zones → dashed reference lines (avg when several zones shown)
+    _zoneTargets(zlist){ const vt=[],et=[]; zlist.forEach(z=>{ const P='crop_steering_zone_'+z+'_';
+        const v=zNum('number.'+P+'p2_vwc_threshold'); if(v!=null) vt.push(v);
+        const mode=(zSt('select.'+P+'steering_mode')||'Generative').toLowerCase().startsWith('veg')?'veg':'gen';
+        const e=zNum('number.'+P+'ec_target_'+mode+'_p2'); if(e!=null) et.push(e); });
+      const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+      return {vt:avg(vt),et:avg(et),single:zlist.length===1}; },
     mountSubChart(){ const c=document.getElementById('subChart'); if(!c) return; const H=this._h_sub; if(!H) return;
       const _sp=H.__end-H.__start, N=_sp>20*864e5?200:_sp>5*864e5?160:120, s=H.__start,e=H.__end, labels=this.histLabels(s,e,N);
       const cols=['#22d3ee','#34d399','#a78bfa']; const zlist=this.subZone==='all'?[1,2,3]:[+this.subZone];
@@ -5147,7 +5349,7 @@ document.addEventListener('alpine:init', () => {
         sets.push(mk('Z'+z+' EC',this.bucketize(H['sensor.crop_steering_zone_'+z+'_ec'],s,e,N),cols[i],'yE',[5,3],1.4)); });
       if(this.subOverlay && this._h_subPrev){ const P=this._h_subPrev; zlist.forEach(z=>{ const i=z-1; sets.push(mk('Z'+z+' VWC ·prev',this.bucketize(P['sensor.crop_steering_zone_'+z+'_vwc'],P.__start,P.__end,N),cols[i]+'66','yV',[2,3],1.4)); }); }
       const avg=labels.map((_,k)=>{ const vs=zlist.map(z=>this.bucketize(H['sensor.crop_steering_zone_'+z+'_vwc'],s,e,N)[k]).filter(v=>v!=null); return vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:null; });
-      const fc=zNum('number.crop_steering_field_capacity'); const dbInfo={dbs:this._detectDrybacks(avg),fc:this.subFieldCap?fc:null};
+      const fc=zNum('number.crop_steering_field_capacity'); const T=this._zoneTargets(zlist); const dbInfo={dbs:this._detectDrybacks(avg),fc:this.subFieldCap?fc:null,vt:T.vt,et:T.et,single:T.single};
       if(CHARTS.sub){ CHARTS.sub.$dryback=dbInfo; CHARTS.sub.data.labels=labels; CHARTS.sub.data.datasets=sets; CHARTS.sub.update('none'); return; }
       const dryPlugin={id:'dryback2',afterDatasetsDraw(ch){ const D=ch.$dryback; if(!D||!D.dbs||!D.dbs.length) return; const X=ch.scales.x,Y=ch.scales.yV,ctx=ch.ctx; ctx.save();
         D.dbs.forEach(d=>{ const px=X.getPixelForValue(d.pi),py=Y.getPixelForValue(d.pv),tx=X.getPixelForValue(d.ti),ty=Y.getPixelForValue(d.tv);
@@ -5162,7 +5364,7 @@ document.addEventListener('alpine:init', () => {
         scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:10},maxTicksLimit:12,autoSkip:true}},
           yV:{position:'left',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#67e8f9',font:{size:11},callback:v=>v+'%'},suggestedMin:25,suggestedMax:65,grace:'5%',title:{display:true,text:'VWC %',color:'#67e8f9'}},
           yE:{position:'right',grid:{display:false},ticks:{color:'#c4b5fd',font:{size:11}},suggestedMin:0,suggestedMax:6,grace:'5%',title:{display:true,text:'pore EC mS/cm',color:'#c4b5fd'}}}},
-        plugins:[dryPlugin,fcPlugin]}); CHARTS.sub.$dryback=dbInfo; },
+        plugins:[dryPlugin,fcPlugin,TGT_PLUGIN]}); CHARTS.sub.$dryback=dbInfo; },
     mountClimateCharts(){ const H=this._h_climate, N=48; if(!H) return; const s=H.__start,e=H.__end, labels=this.histLabels(s,e,N);
       const specs=[ {id:'ccTemp',key:CONFIG.E.air_temp,label:'Air temp',unit:'°C',color:'#fb923c',band:CONFIG.BANDS.air_temp},
         {id:'ccRh',key:CONFIG.E.rh,label:'Humidity',unit:'%',color:'#22d3ee',band:CONFIG.BANDS.rh},
@@ -5187,20 +5389,28 @@ document.addEventListener('alpine:init', () => {
             scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:6,autoSkip:true}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}}}},
           plugins:[csLimPlugin]}); CHARTS[sp.id].$csLim=csLim; });
     },
-    async mountZoneMinis(){ for(const z of [1,2,3]){ const c=document.getElementById('zmini'+z); if(!c) continue;
-        const ids=['sensor.crop_steering_zone_'+z+'_vwc','sensor.crop_steering_zone_'+z+'_ec'];
-        let H; try{ H=await this.loadHist(ids,24); }catch(e){ continue; } if(!H) continue;
+    async mountZoneMinis(){
+      // fetch all three zones first, then derive ONE shared VWC/EC axis so the zones are directly comparable — a zone that runs higher lifts every chart's scale, not just its own
+      const Hs={}; let vlo=Infinity,vhi=-Infinity,ehi=-Infinity;
+      for(const z of [1,2,3]){ const ids=['sensor.crop_steering_zone_'+z+'_vwc','sensor.crop_steering_zone_'+z+'_ec'];
+        let H; try{ H=await this.loadHist(ids,24); }catch(e){ continue; } if(!H) continue; Hs[z]={H,ids};
+        (H[ids[0]]||[]).forEach(p=>{ if(p.v<vlo)vlo=p.v; if(p.v>vhi)vhi=p.v; });
+        (H[ids[1]]||[]).forEach(p=>{ if(p.v>ehi)ehi=p.v; }); }
+      if(!isFinite(vlo)){ vlo=20; vhi=70; } if(!isFinite(ehi)){ ehi=10; }
+      const vMin=Math.max(0,Math.floor((vlo-3)/5)*5), vMax=Math.ceil((vhi+3)/5)*5, eMin=0, eMax=Math.max(6,Math.ceil(ehi+0.5));
+      for(const z of [1,2,3]){ const c=document.getElementById('zmini'+z); if(!c||!Hs[z]) continue; const {H,ids}=Hs[z];
         const s=H.__start,e=H.__end,N=96, labels=this.histLabels(s,e,N);
         const vwc=this.bucketize(H[ids[0]],s,e,N), ec=this.bucketize(H[ids[1]],s,e,N);
-        if(CHARTS['zm'+z]){ const ch=CHARTS['zm'+z]; ch.data.labels=labels; ch.data.datasets[0].data=vwc; ch.data.datasets[1].data=ec; ch.update('none'); continue; }
+        if(CHARTS['zm'+z]){ const ch=CHARTS['zm'+z]; ch.data.labels=labels; ch.data.datasets[0].data=vwc; ch.data.datasets[1].data=ec;
+          ch.options.scales.yV.min=vMin; ch.options.scales.yV.max=vMax; ch.options.scales.yE.min=eMin; ch.options.scales.yE.max=eMax; ch.update('none'); continue; }
         CHARTS['zm'+z]=new Chart(c,{type:'line',data:{labels,datasets:[
           {data:vwc,borderColor:'#22d3ee',borderWidth:1.6,tension:.15,pointRadius:0,fill:false,spanGaps:true,yAxisID:'yV'},
           {data:ec,borderColor:'#a78bfa',borderWidth:1.3,tension:.15,pointRadius:0,fill:false,spanGaps:true,yAxisID:'yE',borderDash:[4,3]}]},
           options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
             plugins:{legend:{display:false},tooltip:{enabled:false}},
             scales:{x:{display:false},
-              yV:{position:'left',min:20,max:70,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#67e8f9',font:{size:8},maxTicksLimit:4}},
-              yE:{position:'right',min:0,max:10,grid:{display:false},ticks:{color:'#c4b5fd',font:{size:8},maxTicksLimit:4}}}}}); } },
+              yV:{position:'left',min:vMin,max:vMax,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#67e8f9',font:{size:8},maxTicksLimit:4}},
+              yE:{position:'right',min:eMin,max:eMax,grid:{display:false},ticks:{color:'#c4b5fd',font:{size:8},maxTicksLimit:4}}}}}); } },
     async mountZoneHist(id){ const c=document.getElementById('zoneHistChart'); if(!c) return; if(CHARTS.zh){ CHARTS.zh.destroy(); CHARTS.zh=null; }
       const Z=CONFIG.ZONE(id), N=48; let H=null; try{ H=await this.loadHist([Z.vwc,Z.ec],24); }catch(e){}
       const cc=document.getElementById('zoneHistChart'); if(!cc) return;   // modal closed mid-fetch
@@ -5274,7 +5484,7 @@ document.addEventListener('alpine:init', () => {
     },
     ctrlSelect(id,v){ this.ctrlSvc(id.split(".")[0],"select_option",{entity_id:id,option:v}); },
     ctrlNum(id,v){ if(v!==""&&v!=null) this.ctrlSvc(id.split(".")[0],"set_value",{entity_id:id,value:parseFloat(v)}); },
-    fireShot(z){ if(!confirm('Fire a manual 60-second shot on Zone '+z+'? Writes live to the controller (engine safety checks still apply).')) return; this.ctrlSvc('crop_steering','execute_irrigation_shot',{zone:z,duration_seconds:60,shot_type:'manual'}); },
+    fireShot(z){ if(!confirm('Fire a manual 60-second shot on Zone '+z+'? Writes live to the controller (engine safety checks still apply).')) return; evt('crop_steering_manual_irrigation',{zone:z,duration:60}).then(()=>this.toast('Zone '+z+': 60s shot fired')).catch(e=>this.toast('Shot failed: '+e.message)); },
     stepNum(it,dir){ const step=parseFloat(it.step)||1; let v=(parseFloat(it.val)||0)+dir*step;   // optimistic UI bump + live write
       if(it.min!=null&&it.min!=='') v=Math.max(parseFloat(it.min),v); if(it.max!=null&&it.max!=='') v=Math.min(parseFloat(it.max),v);
       v=parseFloat((Math.round(v/step)*step).toFixed(4)); it.val=String(v); this.ctrlNum(it.id,v); },
@@ -5289,8 +5499,47 @@ document.addEventListener('alpine:init', () => {
     ctrlText(id,v){ this.ctrlSvc("input_text","set_value",{entity_id:id,value:v}); },
     ctrlLightBri(id,pct){ this.ctrlSvc("light","turn_on",{entity_id:id,brightness_pct:parseInt(pct)}); },
     openZone(id){ this.zoneModal=id; },
+    editMaxVol(z){   // click a barrel → set that zone's daily volume cap (writes number.crop_steering_zone_N_max_daily_volume)
+      const id='number.crop_steering_zone_'+z+'_max_daily_volume', cur=zNum(id);
+      const v=prompt('Zone '+z+' — max daily volume cap (L):', cur==null?'':String(cur));
+      if(v==null) return; const n=parseFloat(v);
+      if(isNaN(n)||n<0){ alert('Enter a number ≥ 0.'); return; }
+      svc('number','set_value',{entity_id:id,value:n}).then(()=>{ this.toast('Zone '+z+' cap → '+n+' L'); setTimeout(()=>this.tick(),700); })
+        .catch(e=>this.toast(/401|403/.test(e.message)?'HA session expired — reload':'Failed: '+e.message)); },
     zoneById(id){ return this.zones.find(z=>z.id===id)||this.zones[0]; },
-    ackAlert(id){ this._acked[id]=Date.now(); ls.set('f2.acked',this._acked); this.adv=this.adv.filter(a=>a.id!==id); this.toast("Advisory acknowledged · stays dismissed ~18h"); },
+    ackAlert(id){ if(id.indexOf('persistent_notification.')===0){ try{ svc('persistent_notification','dismiss',{notification_id:id.slice(24)}); }catch(e){} } this._acked[id]=Date.now(); ls.set('f2.acked',this._acked); this.adv=this.adv.filter(a=>a.id!==id); this.toast("Alert dismissed · stays cleared ~18h"); },
+    // ENGINE ALERTS — the loud channel: HA persistent notifications (engine -> phone/bell), engine safety flags,
+    // and a cross-zone "starved row" check. Returned as adv items tagged _engine so the beefy banner renders them.
+    buildEngineAlerts(){
+      const out=[], st=(e)=>(S[e]||{}).state, at=(e)=>(S[e]||{}).attributes||{};
+      // 1) HA persistent notifications (the engine's real alerts)
+      for(const k in S){
+        if(k.indexOf('persistent_notification.')!==0) continue;
+        const a=at(k), title=(a.title||'Notification').toString(), msg=(a.message||st(k)||'').toString();
+        const crit=/critical|emergenc|burn|lockout|stuck|fault|fail|🚨|🛑/i.test(title+' '+msg);
+        out.push({id:k,_engine:true,src:'pn',sev:crit?'crit':'warn',icon:'alert',title:title,detail:msg.replace(/\s+/g,' ').slice(0,260),action:'Alert from the crop-steering engine — dismiss once handled.'});
+      }
+      // 2) engine safety flags (system + per-zone)
+      const sys=st('sensor.crop_steering_system_safety_status');
+      if(sys && /warn|critical|emerg/i.test(sys))
+        out.push({id:'sys-safety',_engine:true,src:'safety',sev:/crit|emerg/i.test(sys)?'crit':'warn',icon:'alert',title:'Engine safety: '+sys.replace(/_/g,' '),detail:'The crop-steering engine raised a system-level safety flag.',action:'Check zones + feed; it clears when the condition resolves.',fix:{view:'zones',anchor:'zones-list',label:'Zones'}});
+      const MSG={approaching_saturation:'Getting too wet — near saturation. Ease off shots and check the slab is actually draining.',approaching_ec_limit:'Pore EC climbing toward the burn ceiling — needs a dilution/flush shot or a leaner feed.',saturated:'Slab saturated — holding too much water. Let it dry back; check drainage.',high_ec:'Pore EC over target — dilute or lower feed EC.',dry:'Running dry — needs water now.'};
+      for(const z of [1,2,3]){
+        const zs=st('sensor.crop_steering_zone_'+z+'_safety_status'); const low=(zs||'').toLowerCase();
+        if(zs && !['safe','optimal','unknown','unavailable','normal',''].includes(low)){
+          const crit=/ec_limit|emerg|critical|dry/i.test(zs);
+          out.push({id:'z'+z+'-safety',_engine:true,src:'safety',sev:crit?'crit':'warn',icon:'drop',title:'Zone '+z+': '+zs.replace(/_/g,' '),detail:MSG[low]||('Engine flagged Zone '+z+' ('+zs+').'),action:'Open the zone for VWC/EC + history.',fix:{view:'zones',anchor:'zones-list',label:'Zones'}});
+        }
+      }
+      // 3) starved row — cross-zone daily-volume parity (same room => zones should drink alike)
+      const vols=[1,2,3].map(z=>({z,v:parseFloat(st('sensor.crop_steering_zone_'+z+'_daily_water_app'))})).filter(x=>!isNaN(x.v));
+      if(vols.length>=2){
+        const sorted=vols.map(x=>x.v).slice().sort((a,b)=>a-b), med=sorted[Math.floor(sorted.length/2)];
+        for(const x of vols) if(med>=5 && x.v<0.4*med)
+          out.push({id:'starve-z'+x.z,_engine:true,src:'starve',sev:'crit',icon:'alert',title:'Zone '+x.z+' STARVED — '+x.v.toFixed(0)+' L vs ~'+med.toFixed(0)+' L on the other rows',detail:'Under the same light, Zone '+x.z+' has had far less water than its siblings. Usually a stuck/outlier probe, a closed valve, or a delivery fault — not a happy plant.',action:'Check the row by hand and the probe placement — move the probe to a representative plant if it reads wetter than its neighbours.',fix:{view:'zones',anchor:'zones-list',label:'Zones'}});
+      }
+      return out.sort((a,b)=>(a.sev==='crit'?0:1)-(b.sev==='crit'?0:1));
+    },
     toggleEasy(){ this.easy=!this.easy; ls.set('f2.easy',this.easy); },
     csToggle(){ this.chartSmooth=!this.chartSmooth; ls.set('f2.chartSmooth',this.chartSmooth); this.$nextTick(()=>this.mountClimateCharts()); },
     advSpark(a){ try{ return advSparkSvg(a); }catch(e){ return ''; } },

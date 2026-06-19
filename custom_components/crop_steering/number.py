@@ -109,6 +109,20 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement="mS/cm",
         mode="box",
     ),
+    # Lights-on starvation watchdog (lean engine): max dry time before the backstop
+    # shot fires. 0 disables it. The AppDaemon lean engine reads this global plus a
+    # per-zone override (number.crop_steering_zone_N_watchdog_hours); bounds match its
+    # _PARAM_BOUNDS["watchdog_hours"] = (0, 12).
+    NumberEntityDescription(
+        key="watchdog_hours",
+        name="Watchdog Hours",
+        icon="mdi:timer-alert",
+        native_min_value=0.0,
+        native_max_value=12.0,
+        native_step=0.5,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        mode="box",
+    ),
     NumberEntityDescription(
         key="vegetative_dryback_target",
         name="Vegetative Dryback Target",
@@ -490,6 +504,7 @@ DEFAULT_VALUES = {
     "drippers_per_plant": 2,
     "field_capacity": 70.0,
     "maximum_ec": 9.0,
+    "watchdog_hours": 3.0,
     "vegetative_dryback_target": 50.0,
     "generative_dryback_target": 40.0,
     "p1_target_vwc": 65.0,
@@ -529,8 +544,11 @@ DEFAULT_VALUES = {
 }
 
 # Steering params that ALSO get per-zone overrides (number.crop_steering_zone_N_<...>).
-# Hardware/substrate (substrate_volume, dripper_flow_rate, drippers_per_plant,
-# field_capacity, maximum_ec) and system (lights_*) stay GLOBAL only.
+# Hardware/substrate (substrate_volume, dripper_flow_rate, drippers_per_plant) and
+# system (lights_*) stay GLOBAL only. field_capacity / maximum_ec / watchdog_hours are
+# per-zone here because the lean engine's _zone_num reads the per-zone number.* first and
+# falls back to the global — without the per-zone entity those three silently use the
+# global/default and the f2 per-zone editor writes number.set_value to a missing entity.
 PER_ZONE_STEERING_KEYS = [
     "vegetative_dryback_target", "generative_dryback_target",
     "p0_minimum_wait_time", "p0_maximum_wait_time", "p0_dryback_drop_percent",
@@ -542,6 +560,7 @@ PER_ZONE_STEERING_KEYS = [
     "ec_target_flush",
     "ec_target_veg_p0", "ec_target_veg_p1", "ec_target_veg_p2", "ec_target_veg_p3",
     "ec_target_gen_p0", "ec_target_gen_p1", "ec_target_gen_p2", "ec_target_gen_p3",
+    "field_capacity", "maximum_ec", "watchdog_hours",
 ]
 
 _DESC_BY_KEY = {d.key: d for d in NUMBER_DESCRIPTIONS}
