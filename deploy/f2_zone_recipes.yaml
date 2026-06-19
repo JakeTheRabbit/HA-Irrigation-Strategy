@@ -1,0 +1,43 @@
+# F2 Zone Recipes — the per-zone control surface the lean engine reads that the
+# crop_steering integration does NOT already create.
+#
+# IMPORTANT — domain matters. The lean engine reads its numeric per-zone params by the
+# number. domain (lean_crop_steering.py _zone_num: number.crop_steering_zone_X_<param>,
+# global fallback number.crop_steering_<param>), and f2.html reads/writes them the same
+# way (number.set_value). An input_number: helper CANNOT emit a number.* entity, so the
+# three genuinely-missing numeric params — maximum_ec, field_capacity, watchdog_hours —
+# are now created as real number.crop_steering_zone_X_* entities by the integration
+# (custom_components/crop_steering/number.py PER_ZONE_STEERING_KEYS), NOT here. Reload
+# Custom Components (or restart HA) after pulling the integration change.
+#
+# This package therefore only carries the two surfaces the integration does NOT make:
+#   input_text.crop_steering_zone_X_strain   free-text strain / cultivar label
+#                                            (f2.html reads/writes this via input_text)
+#   input_boolean.lean_actuate_enabled       the single LIVE-actuation arming flag the
+#                                            lean engine reads (default OFF -> SHADOW)
+#
+# Drop this file in the HA packages dir and reload (Developer Tools -> YAML -> restart),
+# or restart HA.
+
+input_text:
+  crop_steering_zone_1_strain:
+    name: Zone 1 Strain
+    max: 40
+    icon: mdi:cannabis
+  crop_steering_zone_2_strain:
+    name: Zone 2 Strain
+    max: 40
+    icon: mdi:cannabis
+  crop_steering_zone_3_strain:
+    name: Zone 3 Strain
+    max: 40
+    icon: mdi:cannabis
+
+input_boolean:
+  # The ONLY entity the lean engine uniquely depends on to actuate. OFF -> the engine
+  # computes + logs every decision but touches no hardware (SHADOW). Flip ON only after
+  # shadow parity vs master is proven AND master is disabled in apps.yaml. Keep it OFF in
+  # this file so deploying the package never arms actuation.
+  lean_actuate_enabled:
+    name: Lean Engine Actuate (LIVE)
+    icon: mdi:toggle-switch-off
