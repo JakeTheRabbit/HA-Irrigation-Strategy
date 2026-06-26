@@ -1,6 +1,6 @@
 """Offline unit tests for the pure crop-steering core. No HA, no I/O."""
 from crop_steering_engine import (
-    decide, ZoneParams, ZoneSnapshot, ec_adjust, pick_sibling, feed_grace_ok,
+    decide, ZoneParams, ZoneSnapshot, ec_adjust, ec_pid, pick_sibling, feed_grace_ok,
     cross_zone_outliers, validate_params, zone_safety_status, system_safety_status, zone_status_label,
 )
 
@@ -86,6 +86,21 @@ def test_p2_anti_short_cycle():
     assert decide(S(phase="P2", vwc=55, ec=10, feed_ec=3, minutes_since_shot=30), p)[2] is True   # gap ok -> flush
     # a genuinely DRY zone still tops up even when it's too soon to EC-correct (VWC top-ups stay ungated)
     assert fire(S(phase="P2", vwc=40, ec=7.5, ec_smooth=7.5, feed_ec=3, minutes_since_shot=3), p) is True
+
+
+def test_ec_pid():
+    base = 45.0
+    # EC above target -> positive offset (threshold up -> water sooner -> dilute)
+    off, integ, err = ec_pid(6.0, 5.0, base, 0.0, 0.0, (0.5, 0.1, 0.0))
+    assert off > 0 and err == 1.0 and integ == 1.0
+    # EC below target -> negative offset (deeper dryback -> stack)
+    off2, _, err2 = ec_pid(4.0, 5.0, base, 0.0, 0.0, (0.5, 0.1, 0.0))
+    assert off2 < 0 and err2 == -1.0
+    # anti-windup clamp: a huge error + wound-up integral can't exceed +/-20% of base (9.0)
+    off3, integ3, _ = ec_pid(20.0, 5.0, base, 100.0, 0.0, (5.0, 1.0, 0.0))
+    assert abs(off3) <= 0.20 * base + 1e-6 and abs(integ3) <= 9.0 + 1e-6
+    # at target with no I -> zero
+    assert ec_pid(5.0, 5.0, base, 0.0, 0.0, (0.5, 0.0, 0.0))[0] == 0.0
 
 
 def test_status_helpers():

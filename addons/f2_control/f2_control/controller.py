@@ -19,7 +19,7 @@ from datetime import date, datetime, timedelta, timezone
 import requests
 
 from crop_steering_engine import (
-    decide, ZoneParams, ZoneSnapshot, validate_params, pick_sibling, feed_grace_ok,
+    decide, ZoneParams, ZoneSnapshot, validate_params, pick_sibling, feed_grace_ok, ec_pid,
     cross_zone_outliers, zone_safety_status, system_safety_status, zone_status_label,
 )
 
@@ -126,7 +126,8 @@ class Controller:
     def _fresh_zone(self):
         return {"phase": "P2", "peak": 0.0, "win": [], "last_shot": None, "shots": 0,
                 "daily_vol": 0.0, "ec_smooth": None, "last_phase_change": datetime.now(),
-                "ec_offset": 0.0, "last_ec_steer": None, "last_daily_reset": None}
+                "ec_offset": 0.0, "ec_integral": 0.0, "ec_prev_err": 0.0,
+                "last_ec_steer": None, "last_daily_reset": None}
 
     def _load_state(self):
         st = {z: self._fresh_zone() for z in self.zones}
@@ -140,7 +141,7 @@ class Controller:
             if not isinstance(d, dict):
                 continue
             s = st[z]
-            for k in ("phase", "peak", "shots", "daily_vol", "ec_smooth", "ec_offset"):
+            for k in ("phase", "peak", "shots", "daily_vol", "ec_smooth", "ec_offset", "ec_integral", "ec_prev_err"):
                 if d.get(k) is not None:
                     s[k] = d[k]
             for k in ("last_shot", "last_phase_change", "last_ec_steer"):
@@ -163,6 +164,7 @@ class Controller:
             out[str(z)] = {"phase": s.get("phase"), "peak": s.get("peak"), "shots": s.get("shots"),
                            "daily_vol": s.get("daily_vol"), "ec_smooth": s.get("ec_smooth"),
                            "ec_offset": float(s.get("ec_offset") or 0.0),
+                           "ec_integral": float(s.get("ec_integral") or 0.0), "ec_prev_err": float(s.get("ec_prev_err") or 0.0),
                            "last_shot": ls.isoformat() if isinstance(ls, datetime) else None,
                            "last_phase_change": lpc.isoformat() if isinstance(lpc, datetime) else None,
                            "last_ec_steer": les.isoformat() if isinstance(les, datetime) else None,
@@ -527,7 +529,15 @@ class Controller:
                 base = self._zone_num(zone, "p2_vwc_threshold", 45)
                 les = st.get("last_ec_steer")
                 if les is None or (now - les).total_seconds() >= 1800:
-                    st["ec_offset"] = self._step_ec_offset(float(st.get("ec_offset", 0.0)), snap.ec_smooth, p.ec_target_p2, base)
+                    if self._on("input_boolean.crop_steering_ec_pid_enabled", False):
+                        gains = (self._num("input_number.crop_steering_ec_pid_kp", 0.4),
+                                 self._num("input_number.crop_steering_ec_pid_ki", 0.15),
+                                 self._num("input_number.crop_steering_ec_pid_kd", 0.0))
+                        off, integ, perr = ec_pid(snap.ec_smooth, p.ec_target_p2, base,
+                                                  float(st.get("ec_integral", 0.0)), float(st.get("ec_prev_err", 0.0)), gains)
+                        st["ec_offset"], st["ec_integral"], st["ec_prev_err"] = off, integ, perr
+                    else:
+                        st["ec_offset"] = self._step_ec_offset(float(st.get("ec_offset", 0.0)), snap.ec_smooth, p.ec_target_p2, base)
                     st["last_ec_steer"] = now
                     self._save_state()
             decisions[zone] = (fire, size, reason)

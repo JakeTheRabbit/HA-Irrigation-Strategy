@@ -83,6 +83,24 @@ def ec_adjust(size: float, ec: float, target: float) -> float:
     return size
 
 
+def ec_pid(ec_smooth, ec_target, base_threshold, integral, prev_error, gains, clamp_frac=0.20):
+    """PURE PID on pore-EC error -> a P2-threshold offset (VWC %). Optional, flag-gated upgrade
+    to the stepped EC-steer (ec_offset). error = ec_smooth - ec_target:
+      EC too HIGH  -> positive offset -> threshold up -> water sooner -> dilute (EC down)
+      EC too LOW   -> negative offset -> threshold down -> deeper dryback -> stack (EC up)
+    gains = (kp, ki, kd), evaluated per tick (dt folded into the gains). The output and the integral
+    are both clamped to +/- clamp_frac*base_threshold (anti-windup). Returns (offset, new_integral, error)."""
+    kp, ki, kd = gains
+    error = ec_smooth - ec_target
+    integral = integral + error
+    lim = clamp_frac * base_threshold
+    if ki > 0:                                   # anti-windup: hold the I-term inside the output band
+        integral = max(-lim / ki, min(lim / ki, integral))
+    out = kp * error + ki * integral + kd * (error - prev_error)
+    out = max(-lim, min(lim, out))
+    return round(out, 2), integral, error
+
+
 def decide(s: ZoneSnapshot, p: ZoneParams):
     """PURE control step. Returns (new_phase, new_p2_threshold, fire, size, reason).
 

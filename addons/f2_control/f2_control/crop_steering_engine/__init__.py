@@ -10,6 +10,7 @@ from .core import (
     ZoneParams,
     ZoneSnapshot,
     ec_adjust,
+    ec_pid,
     decide,
     pick_sibling,
     feed_grace_ok,
@@ -21,7 +22,7 @@ from .core import (
 )
 
 __all__ = [
-    "PHASES", "ZoneParams", "ZoneSnapshot", "ec_adjust", "decide", "pick_sibling",
+    "PHASES", "ZoneParams", "ZoneSnapshot", "ec_adjust", "ec_pid", "decide", "pick_sibling",
     "feed_grace_ok", "cross_zone_outliers", "validate_params",
     "zone_safety_status", "system_safety_status", "zone_status_label",
 ]

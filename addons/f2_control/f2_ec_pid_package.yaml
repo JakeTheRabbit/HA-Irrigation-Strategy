@@ -1,0 +1,26 @@
+# F2 EC-steering PID — OFF by default. Deploy to /config/packages then reload_all.
+# Flip ec_pid_enabled ON to use a real PID (Kp/Ki/Kd, anti-windup) on the P2 EC error instead of
+# the stepped EC-offset. The state machine + stepped offset remain the fallback when this is OFF.
+input_boolean:
+  crop_steering_ec_pid_enabled:
+    name: F2 EC PID enabled
+    icon: mdi:sine-wave
+input_number:
+  crop_steering_ec_pid_kp:
+    name: F2 EC PID Kp
+    min: 0
+    max: 5
+    step: 0.05
+    initial: 0.4
+  crop_steering_ec_pid_ki:
+    name: F2 EC PID Ki
+    min: 0
+    max: 2
+    step: 0.05
+    initial: 0.15
+  crop_steering_ec_pid_kd:
+    name: F2 EC PID Kd
+    min: 0
+    max: 2
+    step: 0.05
+    initial: 0.0
