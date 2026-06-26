@@ -115,10 +115,14 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
 - **Testing:** `tests/test_calculations.py` covers the integration calc helpers; no
   real hardware needed (input_boolean/number simulate pumps/sensors).
 - **Deploying engine changes:** copy changed modules to `addons/f2_control/` on the
-  live box and restart the f2-control add-on from Supervisor (clean restart is more
-  predictable than file-watch). Integration changes: Developer Tools → YAML → Reload
-  Custom Components. For `crop-steering-engine` package changes, update the package
-  source and restart the add-on.
+  live box, then **Rebuild** the add-on from Supervisor (⋮ → Rebuild) — the Dockerfile
+  `COPY f2_control /app` bakes the code into the image at build time, so a plain
+  **restart reuses the old image and does NOT pick up code changes** (it only re-reads
+  the config.yaml options). Rebuild = re-COPY + restart. (Interim without a rebuild:
+  the running build's shot sizing reads the add-on Configuration options `substrate_l`/
+  `flow_lps`, so editing those + Save corrects shot length on the old image.) Integration
+  changes: Developer Tools → YAML → Reload Custom Components. For `crop-steering-engine`
+  package changes, update the package source and Rebuild the add-on.
 - **Commit style:** conventional commits (`feat:`/`fix:`/`docs:`/`chore:`) with a
   `Co-Authored-By: Claude` trailer when written via Claude Code. One active branch:
   `main`. Retired branches are kept as `archive/*` tags.
