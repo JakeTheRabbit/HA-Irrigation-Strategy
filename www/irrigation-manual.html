@@ -55,7 +55,7 @@ pre{background:var(--code-bg);border:1px solid var(--hair);border-radius:10px;pa
 <button class="print-btn no-print" onclick="window.print()">Print Manual</button>
 
 <h1>F2 Irrigation System Manual</h1>
-<p><strong>Version 2.4.0</strong> — Last updated June 2026</p>
+<p><strong>Version 2.5.0</strong> — Last updated June 2026</p>
 
 <div class="toc no-print">
   <h3>Table of Contents</h3>
@@ -303,7 +303,7 @@ Drippers → Plants → Substrate → Runoff
   <div class="step">Go to <strong>Command Center → Crop Steering</strong> section.</div>
   <div class="step">Set <strong>Steering Mode</strong>: "Vegetative" for veg growth, "Generative" for flower.</div>
   <div class="step">Set <strong>Crop Type</strong>: "Cannabis_Athena" is preconfigured with Athena nutrient targets.</div>
-  <div class="step">Review shot calculations — P1/P2/P3 durations should show non-zero values. If they show 0.0s, check that substrate volume and dripper flow rate are set (see <a href="#tuning">Tuning</a>).</div>
+  <div class="step">Review shot calculations — P1/P2/P3 durations should show non-zero values. If they show 0.0s, check that substrate volume and dripper flow rate are set (see <a href="#tuning">Tuning</a>). As of v2.5.0, shot duration is computed live from the substrate config (<code>substrate_volume</code>, <code>plant_count</code>, <code>drippers_per_plant</code>, <code>dripper_flow_rate</code>) — these values <strong>must be accurate</strong> or every shot will be mis-sized.</div>
   <div class="step">Once confident in sensor readings and hardware, install the f2-control add-on (see <a href="#f2control">Section 9</a>) and flip the kill switch ON to enable autonomous steering.</div>
 </div>
 
@@ -344,17 +344,32 @@ Drippers → Plants → Substrate → Runoff
   <tr><td>Schedule</td><td>Irrigation timing, valve controls, table enables, scripts</td><td>Changing irrigation timing, manual valve control</td></tr>
 </table>
 
+<h3>overview.html — Mobile One-Pager (v2.5.0)</h3>
+<p><code>www/overview.html</code> is a compact mobile dashboard designed for a quick status check without opening the full operator console. It has three tabs:</p>
+<table>
+  <tr><th>Tab</th><th>What It Shows</th></tr>
+  <tr><td><strong>Steer</strong></td><td>Per-zone vitals (VWC, EC, substrate temp) alongside their targets; current P0–P3 phase per zone</td></tr>
+  <tr><td><strong>Controls</strong></td><td>Room climate (temp, VPD, CO2, PPFD, DLI); pump, light, and zone control switches</td></tr>
+  <tr><td><strong>Dosing</strong></td><td>Veg-room peristaltic dosing pump controls — these drive the nutrient dosing pumps that feed the F2 room from the veg room</td></tr>
+</table>
+<p>Open <code>overview.html</code> on a phone browser pointed at your HA URL. It auto-refreshes and requires no separate installation.</p>
+
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2 id="tuning">8. Tuning Your Parameters</h2>
 
 <h3>Substrate &amp; Hardware</h3>
 <p>These must match your physical setup. Find them in <strong>Settings → Devices → Crop Steering System</strong> or edit <code>/config/crop_steering.env</code>.</p>
 
+<div class="warning">
+  <strong>Shot sizing is live-computed (v2.5.0).</strong> The engine calculates shot duration from <code>substrate_volume × shot_fraction ÷ (plant_count × drippers_per_plant × dripper_flow_rate)</code> on every poll. Stale or default values here directly mis-size every irrigation shot — verify these against your actual hardware before enabling autonomous mode.
+</div>
+
 <table>
   <tr><th>Parameter</th><th>What It Means</th><th>Default</th><th>How To Measure</th></tr>
   <tr><td>Substrate Volume</td><td>Volume of growing media per pot (litres)</td><td>10.0 L</td><td>Check your pot size</td></tr>
-  <tr><td>Dripper Flow Rate</td><td>How fast each dripper delivers water (L/hr)</td><td>2.0 L/hr</td><td>Time how long to fill a measuring cup</td></tr>
+  <tr><td>Plant Count</td><td>Number of plants per zone</td><td>1</td><td>Count plants in the zone</td></tr>
   <tr><td>Drippers Per Plant</td><td>Number of drippers in each pot</td><td>2</td><td>Count them</td></tr>
+  <tr><td>Dripper Flow Rate</td><td>How fast each dripper delivers water (L/hr)</td><td>2.0 L/hr</td><td>Time how long to fill a measuring cup</td></tr>
   <tr><td>Field Capacity</td><td>Maximum VWC your substrate can hold</td><td>70%</td><td>Saturate substrate, read VWC when dripping stops</td></tr>
 </table>
 
@@ -436,6 +451,28 @@ Drippers → Plants → Substrate → Runoff
 </table>
 
 <p>* Requires physical sensor to be installed and mapped.</p>
+
+<h3>v2.5.0 Safety Additions</h3>
+
+<div class="info">
+  <strong>Source-water gate (pH + EC):</strong> Before opening any valve the engine checks both the source-water pH and EC against configured limits. Either value out of range blocks the shot. A configurable grace period allows transient probe noise without aborting; if a probe is dead or unavailable the gate is <strong>fail-closed</strong> — no shot fires. Set the pH and EC limits via the <code>crop_steering_source_water_*</code> entities.
+</div>
+
+<div class="info">
+  <strong>Fail-closed hardware writes:</strong> If a pump, mainline, or zone-valve command fails (no-response or read-back mismatch), the shot is <strong>aborted immediately</strong> and does not count toward the zone's shot tally. The engine does not retry partial sequences — it shuts down cleanly and logs the fault. This prevents under-watering from silently accumulating against the daily cap.
+</div>
+
+<div class="info">
+  <strong>P2 EC-correction min-interval (anti-short-cycle):</strong> When EC is high and the engine raises the VWC threshold to trigger more frequent flushes, a minimum interval between consecutive P2 shots is enforced. This prevents the EC-correction logic from short-cycling the pump repeatedly in a short window. Adjust via <code>number.crop_steering_p2_min_interval_minutes</code>.
+</div>
+
+<h3>Optional PID EC Loop</h3>
+<p>An optional PID-based EC correction loop is available but <strong>off by default</strong>. When enabled, the engine replaces the simple high/low EC threshold adjustments in P2 with a continuous PID controller that trims the VWC target in real time to converge on the zone's EC target.</p>
+<ul>
+  <li><strong>Enable:</strong> flip <code>input_boolean.crop_steering_ec_pid_enabled</code> ON.</li>
+  <li><strong>Tune:</strong> set proportional/integral/derivative gains via <code>input_number.crop_steering_ec_pid_kp</code>, <code>…_ki</code>, <code>…_kd</code>.</li>
+  <li>Start with the defaults and only adjust if EC is oscillating. Leave OFF until you have several days of stable P2 data to baseline against.</li>
+</ul>
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2 id="troubleshooting">11. Troubleshooting</h2>
@@ -551,7 +588,7 @@ Drippers → Plants → Substrate → Runoff
 </table>
 
 <hr>
-<p class="foot" style="text-align:center">F2 Irrigation System Manual v2.4.0 — June 2026</p>
+<p class="foot" style="text-align:center">F2 Irrigation System Manual v2.5.0 — June 2026</p>
 
 </div>
 </body>
