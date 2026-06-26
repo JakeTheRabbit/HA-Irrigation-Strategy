@@ -289,6 +289,7 @@ class Controller:
             max_ec=self._zone_num(zone, "maximum_ec", 9),
             stacking_on=self._on("switch.crop_steering_ec_stacking_enabled", False),
             watchdog_hours=self._zone_num(zone, "watchdog_hours", 3),
+            min_daily_volume=self._num(f"input_number.crop_steering_zone_{zone}_min_daily_litres", 0.0),
         )
         p, warns = validate_params(raw)
         for w in warns:

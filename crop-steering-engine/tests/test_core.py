@@ -24,6 +24,23 @@ def ph(s, p): return decide(s, p)[0]
 def fire(s, p): return decide(s, p)[2]
 
 
+def test_min_daily_floor():
+    p = P(min_daily_volume=10)
+    # under floor, lights-on, VWC above the rewater threshold (no top-up) but with room -> FLOOR fires
+    _, _, f, _, r = decide(S(phase="P2", vwc=50, ec=6, ec_smooth=6, daily_vol=3), p)
+    assert f is True and "MIN-DAILY" in r
+    assert fire(S(phase="P2", vwc=50, ec=6, ec_smooth=6, daily_vol=12), p) is False   # floor met -> no fire
+    assert fire(S(phase="P3", vwc=50, ec=6, ec_smooth=6, daily_vol=3, lights_on=False), p) is False  # lights-off -> never
+    assert fire(S(phase="P2", vwc=69, ec=6, ec_smooth=6, daily_vol=3), p) is False     # slab full (no room) -> hold
+    assert fire(S(phase="P2", vwc=50, ec=6, ec_smooth=6, daily_vol=3, minutes_since_shot=2), p) is False  # spacing
+    assert fire(S(phase="P2", vwc=50, ec=6, ec_smooth=6, daily_vol=0), P()) is False   # default min_daily=0 -> off
+
+
+def test_validate_min_daily_le_max():
+    p, w = validate_params(P(min_daily_volume=400, max_daily_volume=300))
+    assert p.min_daily_volume == 300 and any("min_daily_volume" in x for x in w)
+
+
 def test_phase_transitions():
     assert ph(S(lights_on=False, phase="P2"), P()) == "P3"
     assert ph(S(phase="P3", lights_just_on=True, vwc=42), P()) == "P0"
