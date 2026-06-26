@@ -40,6 +40,10 @@ class ZoneParams:
     #                                     anti short-cycle: a no-runoff nibble every tick STACKS EC instead
     #                                     of diluting it (the pump-cycling failure mode). Let each shot drain
     #                                     + re-read before the next. VWC top-ups stay ungated (self-limiting).
+    min_daily_volume: float = 0.0   # MIN litres/zone/day floor during lights-on (per-plant water safety; 0 = off).
+    #                                 Forces spaced maintenance shots if a zone is under-drinking even when its
+    #                                 VWC never trips the threshold (the cross-zone-divergence / starved-row class).
+    #                                 Clamped < max_daily_volume; never overrides the hard cap.
 
 
 @dataclass
@@ -207,6 +211,17 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
             and s.minutes_since_shot > p.watchdog_hours * 60.0 and s.vwc < p2_thr):
         fire, size, ir = True, p.p2_shot_size, f"WATCHDOG {s.minutes_since_shot / 60.0:.1f}h no water (VWC {s.vwc:.0f}<{p2_thr:.0f})"
 
+    # PRIORITY 4 — MINIMUM DAILY VOLUME floor (per-plant water safety): every enabled zone must put
+    # through at least min_daily_volume L during lights-on. Catches an under-drinking zone whose VWC
+    # never trips the threshold (the cross-zone-divergence / starved-row failure — e.g. a partial dripper
+    # or a too-wet probe). Spaced (p2_min_interval) + room-gated (below field capacity) so it trickles
+    # toward the floor across the day, never dumps. 0 = off.
+    if (not fire and p.min_daily_volume > 0 and s.lights_on
+            and s.daily_vol < p.min_daily_volume
+            and s.vwc < p.field_capacity - 2.0
+            and s.minutes_since_shot >= p.p2_min_interval_min):
+        fire, size, ir = True, p.p2_shot_size, f"MIN-DAILY floor {s.daily_vol:.1f}<{p.min_daily_volume:.1f}L"
+
     # ---- SAFETY: daily cap is a BUDGET, not a wall — emergencies exempt ----
     if fire:
         emergency = (ir.startswith("FLUSH") or ir.startswith("WATCHDOG")
@@ -261,7 +276,7 @@ _PARAM_BOUNDS = {
     "p2_shot_size": (0.5, 20.0), "p1_initial": (0.5, 15.0), "p1_incr": (0.0, 5.0),
     "p1_max_shots": (1.0, 40.0), "p1_time_between_min": (1.0, 120.0),
     "p0_max_wait_min": (5.0, 240.0), "p3_emergency_shot": (0.5, 15.0),
-    "max_daily_volume": (10.0, 2000.0),
+    "max_daily_volume": (10.0, 2000.0), "min_daily_volume": (0.0, 500.0),
 }
 
 
@@ -276,6 +291,12 @@ def validate_params(p):
                 nv = int(nv)
             fixes[name] = nv
             warns.append(f"{name}={v:g} out of [{lo:g},{hi:g}] -> clamped to {nv:g}")
+    # the floor can never exceed the cap (else it would fight the budget block)
+    eff_min = fixes.get("min_daily_volume", p.min_daily_volume)
+    eff_max = fixes.get("max_daily_volume", p.max_daily_volume)
+    if eff_min > eff_max:
+        fixes["min_daily_volume"] = eff_max
+        warns.append(f"min_daily_volume={eff_min:g} > max_daily_volume={eff_max:g} -> clamped to {eff_max:g}")
     return (dataclasses.replace(p, **fixes) if fixes else p), warns
 
 
