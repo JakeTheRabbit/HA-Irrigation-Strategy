@@ -1,0 +1,36 @@
+name: F2 Control
+version: "0.2.0"
+slug: f2_control
+description: >-
+  Standalone crop-steering controller (replaces AppDaemon). Pure engine + plain
+  REST IO + 30-min vitals notification + a hard kill switch. Reads sensors, drives
+  valves with readback, republishes the crop_steering_* status surface.
+url: https://github.com/JakeTheRabbit/f2-control
+arch:
+  - amd64
+  - aarch64
+  - armv7
+init: false
+boot: manual
+startup: application
+homeassistant_api: true
+hassio_api: false
+host_network: false
+options:
+  lights_on_hour: 10
+  lights_off_hour: 22
+  enable_flag: input_boolean.f2_control_enabled
+  notify_service: notify/mobile_app_s23ultra
+  notify_min: 30
+  substrate_l: 6
+  flow_lps: 0.067
+  loop_seconds: 60
+schema:
+  lights_on_hour: float
+  lights_off_hour: float
+  enable_flag: str
+  notify_service: str
+  notify_min: float
+  substrate_l: float
+  flow_lps: float
+  loop_seconds: float

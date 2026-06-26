@@ -4,3 +4,6 @@
 
 [lint.per-file-ignores]
 "scripts/*" = ["E701", "E702"]
+# the AppDaemon engine + its harness are deployed file-for-file to the live box (same reason
+# black is scoped away from them) — the terse one-line style is intentional, real error classes still apply.
+"appdaemon/apps/crop_steering/*" = ["E701", "E702", "E402"]

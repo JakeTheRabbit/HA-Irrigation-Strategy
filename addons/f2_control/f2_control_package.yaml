@@ -1,0 +1,7 @@
+# Deploy to /config/packages/f2_control_package.yaml then reload_all (or restart HA).
+# Creates the HARD KILL SWITCH the F2 Control add-on checks every tick.
+# Default OFF = the add-on computes + publishes + notifies but NEVER actuates. Flip ON to go live.
+input_boolean:
+  f2_control_enabled:
+    name: F2 Control LIVE (kill switch)
+    icon: mdi:water-pump

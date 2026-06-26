@@ -3,83 +3,61 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Irrigation System Manual</title>
+<title>F2 Irrigation System Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-  @media print {
-    body { font-size: 11pt; color: #000; background: #fff; }
-    .no-print { display: none; }
-    h1 { font-size: 18pt; }
-    h2 { font-size: 14pt; page-break-before: always; }
-    h2:first-of-type { page-break-before: avoid; }
-    h3 { font-size: 12pt; }
-    .card { border: 1px solid #999; page-break-inside: avoid; }
-    a { color: #000; text-decoration: underline; }
-    @page { size: A4; margin: 15mm; }
-  }
-  @media screen {
-    body {
-      background: #1a1a2e;
-      color: #e0e0e0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 20px;
-      line-height: 1.6;
-    }
-    h1 { color: #4fc3f7; border-bottom: 2px solid #4fc3f7; padding-bottom: 10px; }
-    h2 { color: #81c784; border-bottom: 1px solid #81c784; padding-bottom: 6px; margin-top: 40px; }
-    h3 { color: #ffb74d; }
-    a { color: #4fc3f7; }
-    .card {
-      background: #16213e;
-      border: 1px solid #333;
-      border-radius: 8px;
-      padding: 16px;
-      margin: 12px 0;
-    }
-    code {
-      background: #0f3460;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.9em;
-    }
-    pre {
-      background: #0f3460;
-      padding: 12px;
-      border-radius: 6px;
-      overflow-x: auto;
-      font-size: 0.85em;
-    }
-    table { border-collapse: collapse; width: 100%; margin: 12px 0; }
-    th, td { border: 1px solid #444; padding: 8px 12px; text-align: left; }
-    th { background: #0f3460; color: #4fc3f7; }
-    tr:nth-child(even) { background: #16213e; }
-    .warning { background: #4a1c1c; border-left: 4px solid #f44336; padding: 12px; margin: 12px 0; border-radius: 4px; }
-    .info { background: #1a3a2a; border-left: 4px solid #4caf50; padding: 12px; margin: 12px 0; border-radius: 4px; }
-    .tip { background: #3a3a1a; border-left: 4px solid #ffb74d; padding: 12px; margin: 12px 0; border-radius: 4px; }
-    .step { counter-increment: step; margin: 8px 0; }
-    .step::before { content: counter(step) ". "; font-weight: bold; color: #4fc3f7; }
-    .steps { counter-reset: step; }
-    .toc a { display: block; padding: 4px 0; text-decoration: none; }
-    .toc a:hover { text-decoration: underline; }
-    .print-btn {
-      position: fixed; bottom: 20px; right: 20px;
-      background: #4fc3f7; color: #000; border: none;
-      padding: 12px 24px; border-radius: 6px; cursor: pointer;
-      font-size: 16px; font-weight: bold; z-index: 100;
-    }
-    .print-btn:hover { background: #81d4fa; }
-  }
+:root{
+  --bg:#0a0c10; --card:#11161d; --card2:#0f141b; --code-bg:#0b0e13;
+  --ink:#e7ecf2; --ink2:#9fb0c3; --ink3:#64748b; --hair:#1f2937;
+  --accent:#34d399; --cyan:#22d3ee; --amber:#fbbf24; --blue:#60a5fa; --purple:#c084fc; --red:#f87171; --orange:#fb923c;
+}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.62 "Roboto","Helvetica Neue",Arial,sans-serif;font-variant-numeric:tabular-nums;}
+.wrap{max-width:1080px;margin:0 auto;padding:30px 22px 100px}
+h1{font-size:30px;line-height:1.15;margin:0 0 6px;letter-spacing:-.4px}
+h2{font-size:21px;margin:40px 0 6px;letter-spacing:-.2px;scroll-margin-top:16px;color:var(--ink)}
+h3{font-size:16px;margin:22px 0 5px;color:var(--ink)}
+p{margin:9px 0;color:var(--ink2)} a{color:var(--accent);text-decoration:none}
+ul,ol{margin:8px 0;padding-left:22px} li{margin:4px 0;color:var(--ink2)}
+.toc{background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:16px 20px;margin:18px 0;font-size:13.5px}
+.toc a{color:var(--ink2);display:block;padding:3px 0} .toc a:hover{color:var(--accent)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:12.7px}
+th,td{border:1px solid var(--hair);padding:8px 9px;vertical-align:top;text-align:left;color:var(--ink2)}
+th{background:var(--card2);color:var(--ink2);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.88em;color:var(--cyan);background:var(--card2);padding:1px 5px;border-radius:4px}
+pre{background:var(--code-bg);border:1px solid var(--hair);border-radius:10px;padding:13px 16px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#d7e3f0;overflow-x:auto}
+.card{background:var(--card);border:1px solid var(--hair);border-radius:11px;padding:14px 16px;margin:12px 0}
+.callout,.warning,.info,.tip{background:var(--card);border:1px solid var(--hair);border-radius:11px;padding:12px 15px;margin:12px 0}
+.warning{border-left:4px solid var(--orange)} .info{border-left:4px solid var(--accent)} .tip{border-left:4px solid var(--cyan)}
+.step{counter-increment:step;margin:8px 0}
+.step::before{content:counter(step) ". ";font-weight:bold;color:var(--accent)}
+.steps{counter-reset:step}
+.print-btn{position:fixed;bottom:20px;right:20px;background:var(--accent);color:#000;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:15px;font-weight:700;z-index:100}
+.print-btn:hover{background:var(--cyan)}
+.foot,footer{color:var(--ink3);font-size:12px;margin-top:46px;border-top:1px solid var(--hair);padding-top:16px}
+@media print{
+  body{background:#fff;color:#000;font-family:"Roboto","Helvetica Neue",Arial,sans-serif}
+  .card,.callout,.warning,.info,.tip,.toc,pre,table{background:#fff;border-color:#bbb;color:#000}
+  th{background:#eee;color:#000}
+  h1,h2,h3{color:#000}
+  h2{page-break-before:always}
+  h2:first-of-type{page-break-before:avoid}
+  a{color:#000;text-decoration:underline}
+  code{background:#eee;color:#000;padding:1px 4px}
+  pre{background:#f5f5f5;border-color:#ccc;color:#000}
+  .no-print{display:none}
+  @page{size:A4;margin:15mm}
+}
 </style>
 </head>
 <body>
+<div class="wrap">
 
 <button class="print-btn no-print" onclick="window.print()">Print Manual</button>
 
-<h1>Irrigation System Manual</h1>
-<p><strong>Version 2.3.1</strong> — Last updated March 2026</p>
+<h1>F2 Irrigation System Manual</h1>
+<p><strong>Version 2.5.0</strong> — Last updated June 2026</p>
 
-<div class="card toc no-print">
+<div class="toc no-print">
   <h3>Table of Contents</h3>
   <a href="#overview">1. System Overview</a>
   <a href="#hardware">2. Hardware Setup</a>
@@ -89,7 +67,7 @@
   <a href="#daily">6. Day-to-Day Operation</a>
   <a href="#dashboard">7. Dashboard Guide</a>
   <a href="#tuning">8. Tuning Your Parameters</a>
-  <a href="#appdaemon">9. AppDaemon Setup (Advanced)</a>
+  <a href="#f2control">9. f2-control Add-on Setup</a>
   <a href="#safety">10. Safety Systems</a>
   <a href="#troubleshooting">11. Troubleshooting</a>
   <a href="#entity-ref">12. Entity Reference</a>
@@ -111,8 +89,12 @@
 </div>
 
 <div class="card">
-  <h3>Layer 3 — AppDaemon (optional, not yet deployed)</h3>
-  <p>Autonomous phase transitions, advanced dryback detection, and ML-based irrigation prediction. Needs separate setup (see <a href="#appdaemon">Section 9</a>).</p>
+  <h3>Layer 3 — f2-control Add-on (deployed — the autonomous coordinator)</h3>
+  <p>The <strong>f2-control</strong> Home Assistant add-on is the deployed autonomous control layer. It is a single synchronous Python process that polls HA over REST every 60 seconds, runs the 4-phase P0–P3 crop-steering engine per zone, fires irrigation shots with hardware readback, republishes the <code>sensor.crop_steering_*</code> surface, and sends 30-minute vitals to the operator's phone. It is gated by a hard kill switch — <code>input_boolean.f2_control_enabled</code> — so you can disable autonomous actuation without removing the add-on. See <a href="#f2control">Section 9</a> for setup.</p>
+</div>
+
+<div class="warning">
+  <strong>Kill switch:</strong> <code>input_boolean.f2_control_enabled</code> — when <strong>OFF</strong>, the add-on continues to read sensors and compute decisions but <strong>never actuates</strong> any valve or pump. Flip it OFF to pause autonomous watering at any time without restarting the add-on.
 </div>
 
 <h3>The Data Flow</h3>
@@ -124,6 +106,8 @@ Raw sensor entities (e.g. sensor.substrate_1_substrate_1_vwc_coco_coir)
 Irrigation contract entities (e.g. sensor.irrigation_table_1_vwc)
     ↓  [crop_steering.env tells the integration where to look]
 Crop Steering entities (e.g. sensor.zone_1_vwc)
+    ↓  [f2-control add-on reads these every 60 s]
+Autonomous P0–P3 decisions → valve actuation
 </pre>
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
@@ -163,8 +147,8 @@ Drippers → Plants → Substrate → Runoff
 <h3>Not Yet Connected</h3>
 <table>
   <tr><th>Sensor/Device</th><th>What It Does</th><th>Impact If Missing</th></tr>
-  <tr><td>Tank low float switch</td><td>Detects low water level</td><td style="color:#f44336">Tank-low safety abort won't trigger</td></tr>
-  <tr><td>Leak sensor</td><td>Detects water leaks</td><td style="color:#f44336">Leak safety abort won't trigger</td></tr>
+  <tr><td>Tank low float switch</td><td>Detects low water level</td><td>Tank-low safety abort won't trigger</td></tr>
+  <tr><td>Leak sensor</td><td>Detects water leaks</td><td>Leak safety abort won't trigger</td></tr>
   <tr><td>Tank pH probe</td><td>Monitors nutrient pH</td><td>pH shows "Unavailable" on dashboard</td></tr>
   <tr><td>Tank EC probe</td><td>Monitors nutrient EC</td><td>EC shows "Unavailable" on dashboard</td></tr>
   <tr><td>Leaf temp sensor</td><td>Accurate VPD calculation</td><td>Falls back to room air temp</td></tr>
@@ -177,27 +161,33 @@ Drippers → Plants → Substrate → Runoff
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2 id="how-it-works">3. How It All Works</h2>
 
-<h3>The Irrigation Cycle</h3>
-<p>Every cycle follows this sequence:</p>
+<h3>The f2-control Engine</h3>
+<p>The deployed workhorse is the <strong>f2-control add-on</strong>. Every 60 seconds it polls all zone sensor entities, runs the 4-phase P0–P3 crop-steering logic independently for each zone, and — if the kill switch is ON — actuates valves accordingly. It does not rely on HA automations for phase logic: all steering decisions live inside the add-on's Python engine.</p>
 
+<p>The sequence for each watering shot is:</p>
 <div class="steps card">
-  <div class="step">The scheduler checks: Is the system enabled? Is it within the irrigation window? Has enough time passed since the last run?</div>
-  <div class="step">If yes, it opens the <strong>mainline valve</strong> (which auto-starts the pump via the pressure switch) and waits 2 seconds.</div>
-  <div class="step">For each enabled table (1 through 6, one at a time): opens the table valve, runs water for the configured duration, closes the valve, waits 3 seconds.</div>
-  <div class="step">After all tables are done, closes the mainline valve (pump stops).</div>
+  <div class="step">Add-on wakes on its 60-second poll; checks kill switch (<code>input_boolean.f2_control_enabled</code> must be ON).</div>
+  <div class="step">Per zone: evaluates current phase (P0–P3) and whether an irrigation shot is due based on live VWC, EC, and the per-zone targets.</div>
+  <div class="step">If a shot is warranted: opens the <strong>mainline valve</strong> (pump auto-starts via pressure switch), waits 2 seconds for line pressure.</div>
+  <div class="step">Opens the zone valve, irrigates for the computed shot duration, closes the zone valve, reads back hardware state to confirm close.</div>
+  <div class="step">Closes the mainline valve (pump stops). Publishes updated <code>sensor.crop_steering_*</code> state. Sends 30-min vitals to operator phone (if configured).</div>
 </div>
 
 <div class="info">
   <strong>Mains water</strong> and <strong>manifold</strong> are for <em>tank filling and mixing only</em> — they are NOT part of the irrigation cycle. Only the mainline valve opens during feeding.
 </div>
 
+<h3>Time-Based Fallback</h3>
+<p>When the f2-control kill switch is OFF, the Layer 1 Irrigation Package handles time-based irrigation at the configured interval. This is the safe fallback mode — the crop steering engine is suspended but plants still get watered.</p>
+
 <h3>What Controls the Cycle</h3>
 <table>
   <tr><th>Setting</th><th>Where to Change It</th><th>Default</th></tr>
+  <tr><td>Kill switch (autonomous mode)</td><td>input_boolean.f2_control_enabled</td><td>OFF (safe)</td></tr>
   <tr><td>Irrigation window start</td><td>Schedule tab → Window Start</td><td>Set in HA</td></tr>
   <tr><td>Irrigation window end</td><td>Schedule tab → Window End</td><td>Set in HA</td></tr>
-  <tr><td>Time between cycles</td><td>Schedule tab → Interval</td><td>60 minutes</td></tr>
-  <tr><td>Duration per table</td><td>Schedule tab → Duration</td><td>60 seconds</td></tr>
+  <tr><td>Time between cycles (fallback)</td><td>Schedule tab → Interval</td><td>60 minutes</td></tr>
+  <tr><td>Duration per table (fallback)</td><td>Schedule tab → Duration</td><td>60 seconds</td></tr>
   <tr><td>Which tables are active</td><td>Zone Control tab → Enabled toggle per table</td><td>All off</td></tr>
   <tr><td>Master on/off</td><td>Command Center → Irrigation System</td><td>Off</td></tr>
 </table>
@@ -214,7 +204,7 @@ Drippers → Plants → Substrate → Runoff
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2 id="phases">4. Crop Steering Phases (P0–P3)</h2>
 
-<p>Crop steering divides each day into 4 phases based on substrate moisture and light cycle. The goal is to control how plants use water and nutrients.</p>
+<p>Crop steering divides each day into 4 phases based on substrate moisture and light cycle. The goal is to control how plants use water and nutrients. The f2-control add-on runs this logic autonomously per zone.</p>
 
 <div class="card">
   <h3>P0 — Morning Dryback</h3>
@@ -236,8 +226,9 @@ Drippers → Plants → Substrate → Runoff
 <div class="card">
   <h3>P2 — Maintenance</h3>
   <p><strong>When:</strong> Field capacity reached → Before lights-off</p>
-  <p><strong>What happens:</strong> Fixed-size maintenance shots whenever VWC drops below threshold (60%).</p>
+  <p><strong>What happens:</strong> Fixed-size maintenance shots whenever VWC drops below the per-zone threshold (default 60%).</p>
   <p><strong>Smart EC adjustment:</strong> If EC is too high (ratio &gt; 1.2), the threshold rises — triggering more frequent irrigation to flush salts. If EC is too low (ratio &lt; 0.8), threshold drops — letting the substrate dry more to concentrate nutrients.</p>
+  <p><strong>EC targets are per-zone</strong> — set via <code>number.crop_steering_zone_X_ec_target_{veg,gen}_pN</code> entities (see <a href="#tuning">Section 8</a>).</p>
   <p><strong>Moves to P3 when:</strong> Approaching lights-off time.</p>
 </div>
 
@@ -276,8 +267,8 @@ Drippers → Plants → Substrate → Runoff
   <div class="step">Go to the <strong>Irrigation → Schedule</strong> tab.</div>
   <div class="step">Set <strong>Window Start</strong> to when you want irrigation to be allowed (e.g. 08:30 — 30 min after lights on).</div>
   <div class="step">Set <strong>Window End</strong> to when irrigation should stop (e.g. 18:00 — 2 hours before lights off).</div>
-  <div class="step">Set <strong>Interval</strong> to how often cycles run (start with 60 minutes).</div>
-  <div class="step">Set <strong>Duration</strong> to how long each table runs per cycle (start with 60 seconds).</div>
+  <div class="step">Set <strong>Interval</strong> to how often cycles run in fallback mode (start with 60 minutes).</div>
+  <div class="step">Set <strong>Duration</strong> to how long each table runs per cycle in fallback mode (start with 60 seconds).</div>
 </div>
 
 <h3>Step 3: Enable the System</h3>
@@ -307,12 +298,13 @@ Drippers → Plants → Substrate → Runoff
   <div class="step">Verify the AC units, dehumidifiers, and CO2 solenoid respond correctly.</div>
 </div>
 
-<h3>Step 6: Configure Crop Steering (Optional)</h3>
+<h3>Step 6: Configure Crop Steering</h3>
 <div class="steps card">
   <div class="step">Go to <strong>Command Center → Crop Steering</strong> section.</div>
   <div class="step">Set <strong>Steering Mode</strong>: "Vegetative" for veg growth, "Generative" for flower.</div>
   <div class="step">Set <strong>Crop Type</strong>: "Cannabis_Athena" is preconfigured with Athena nutrient targets.</div>
-  <div class="step">Review shot calculations — P1/P2/P3 durations should show non-zero values. If they show 0.0s, check that substrate volume and dripper flow rate are set (see <a href="#tuning">Tuning</a>).</div>
+  <div class="step">Review shot calculations — P1/P2/P3 durations should show non-zero values. If they show 0.0s, check that substrate volume and dripper flow rate are set (see <a href="#tuning">Tuning</a>). As of v2.5.0, shot duration is computed live from the substrate config (<code>substrate_volume</code>, <code>plant_count</code>, <code>drippers_per_plant</code>, <code>dripper_flow_rate</code>) — these values <strong>must be accurate</strong> or every shot will be mis-sized.</div>
+  <div class="step">Once confident in sensor readings and hardware, install the f2-control add-on (see <a href="#f2control">Section 9</a>) and flip the kill switch ON to enable autonomous steering.</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
@@ -320,11 +312,12 @@ Drippers → Plants → Substrate → Runoff
 
 <h3>Normal Operation Checklist</h3>
 <ul>
-  <li>Check the <strong>Command Center</strong> — all 6 tables should show VWC values between 30-70%.</li>
-  <li>EC values should be in your target range (typically 2-6 mS/cm depending on stage).</li>
-  <li>Substrate temps should be 20-26°C.</li>
+  <li>Check the <strong>Command Center</strong> — all 6 tables should show VWC values between 30–70%.</li>
+  <li>EC values should be in your target range (typically 2–6 mS/cm depending on stage).</li>
+  <li>Substrate temps should be 20–26°C.</li>
   <li>Safety indicators should all be green/OK.</li>
   <li>Check the <strong>Trends</strong> tab — VWC graphs should show a sawtooth pattern (gradual drop, sharp rise from irrigation).</li>
+  <li>Confirm <code>input_boolean.f2_control_enabled</code> is ON if you want autonomous crop-steering active.</li>
 </ul>
 
 <h3>Changing What Gets Watered</h3>
@@ -333,7 +326,8 @@ Drippers → Plants → Substrate → Runoff
 <h3>Emergency Stop</h3>
 <p>If anything goes wrong:</p>
 <ul>
-  <li>Toggle <strong>Maintenance Mode ON</strong> in the Command Center — this immediately closes all valves.</li>
+  <li><strong>Stop all autonomous watering instantly:</strong> turn OFF <code>input_boolean.f2_control_enabled</code>. The f2-control add-on will suspend all actuation immediately. This is the primary emergency stop for the autonomous engine.</li>
+  <li>Toggle <strong>Maintenance Mode ON</strong> in the Command Center — this immediately closes all valves (covers both autonomous and time-based modes).</li>
   <li>Or call the <code>script.irrigation_emergency_stop</code> service from Developer Tools.</li>
   <li>Or physically switch off the pump/relay board.</li>
 </ul>
@@ -350,21 +344,37 @@ Drippers → Plants → Substrate → Runoff
   <tr><td>Schedule</td><td>Irrigation timing, valve controls, table enables, scripts</td><td>Changing irrigation timing, manual valve control</td></tr>
 </table>
 
+<h3>overview.html — Mobile One-Pager (v2.5.0)</h3>
+<p><code>www/overview.html</code> is a compact mobile dashboard designed for a quick status check without opening the full operator console. It has three tabs:</p>
+<table>
+  <tr><th>Tab</th><th>What It Shows</th></tr>
+  <tr><td><strong>Steer</strong></td><td>Per-zone vitals (VWC, EC, substrate temp) alongside their targets; current P0–P3 phase per zone</td></tr>
+  <tr><td><strong>Controls</strong></td><td>Room climate (temp, VPD, CO2, PPFD, DLI); pump, light, and zone control switches</td></tr>
+  <tr><td><strong>Dosing</strong></td><td>Veg-room peristaltic dosing pump controls — these drive the nutrient dosing pumps that feed the F2 room from the veg room</td></tr>
+</table>
+<p>Open <code>overview.html</code> on a phone browser pointed at your HA URL. It auto-refreshes and requires no separate installation.</p>
+
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2 id="tuning">8. Tuning Your Parameters</h2>
 
 <h3>Substrate &amp; Hardware</h3>
 <p>These must match your physical setup. Find them in <strong>Settings → Devices → Crop Steering System</strong> or edit <code>/config/crop_steering.env</code>.</p>
 
+<div class="warning">
+  <strong>Shot sizing is live-computed (v2.5.0).</strong> The engine calculates shot duration from <code>substrate_volume × shot_fraction ÷ (plant_count × drippers_per_plant × dripper_flow_rate)</code> on every poll. Stale or default values here directly mis-size every irrigation shot — verify these against your actual hardware before enabling autonomous mode.
+</div>
+
 <table>
   <tr><th>Parameter</th><th>What It Means</th><th>Default</th><th>How To Measure</th></tr>
   <tr><td>Substrate Volume</td><td>Volume of growing media per pot (litres)</td><td>10.0 L</td><td>Check your pot size</td></tr>
-  <tr><td>Dripper Flow Rate</td><td>How fast each dripper delivers water (L/hr)</td><td>2.0 L/hr</td><td>Time how long to fill a measuring cup</td></tr>
+  <tr><td>Plant Count</td><td>Number of plants per zone</td><td>1</td><td>Count plants in the zone</td></tr>
   <tr><td>Drippers Per Plant</td><td>Number of drippers in each pot</td><td>2</td><td>Count them</td></tr>
+  <tr><td>Dripper Flow Rate</td><td>How fast each dripper delivers water (L/hr)</td><td>2.0 L/hr</td><td>Time how long to fill a measuring cup</td></tr>
   <tr><td>Field Capacity</td><td>Maximum VWC your substrate can hold</td><td>70%</td><td>Saturate substrate, read VWC when dripping stops</td></tr>
 </table>
 
-<h3>EC Targets (Athena Defaults)</h3>
+<h3>EC Targets — Per-Zone (Athena Defaults)</h3>
+<p>EC targets are set <strong>per zone</strong> using the entities <code>number.crop_steering_zone_X_ec_target_{veg,gen}_pN</code>. The table below shows the default Athena values — adjust per zone as needed based on that zone's runoff EC readings.</p>
 <table>
   <tr><th>Phase</th><th>Vegetative</th><th>Generative</th></tr>
   <tr><td>P0 (Dryback)</td><td>3.0 mS/cm</td><td>4.0 mS/cm</td></tr>
@@ -374,40 +384,43 @@ Drippers → Plants → Substrate → Runoff
 </table>
 
 <div class="tip">
-  <strong>Start conservative.</strong> Run the time-based scheduler for a week while monitoring VWC trends. Once you're confident in the sensor readings and hardware, switch to crop-steering-driven irrigation.
+  <strong>Start conservative.</strong> Run the system in fallback (kill switch OFF) for a week while monitoring VWC trends. Once you're confident in sensor readings and hardware, flip <code>input_boolean.f2_control_enabled</code> ON to enable autonomous crop-steering.
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
-<h2 id="appdaemon">9. AppDaemon Setup (Advanced)</h2>
+<h2 id="f2control">9. f2-control Add-on Setup</h2>
 
-<p>AppDaemon adds autonomous phase transitions — the system automatically moves through P0→P1→P2→P3 based on live sensor data instead of requiring manual phase selection.</p>
+<p>The <strong>f2-control</strong> add-on is the deployed autonomous coordinator. It replaces the earlier AppDaemon engine (AppDaemon is retired; the old <code>master_crop_steering_app.py</code> is kept as a manual rollback only). This section covers installing and enabling f2-control from scratch.</p>
 
 <div class="info">
-  <strong>You don't need AppDaemon to use the system.</strong> The Irrigation Package handles time-based irrigation and the Crop Steering integration provides all the sensor entities and calculations. AppDaemon just adds autonomous decision-making.
+  <strong>What the add-on does:</strong> polls HA sensors every 60 s, runs the 4-phase P0–P3 per-zone crop-steering engine, fires irrigation shots with hardware readback, republishes <code>sensor.crop_steering_*</code> entities, and sends 30-minute operator vitals. All actuation is gated by the kill switch.
 </div>
 
 <h3>Installation Steps</h3>
 <div class="steps card">
-  <div class="step">Install the <strong>AppDaemon</strong> add-on from <strong>Settings → Add-ons → Add-on Store</strong>. Search for "AppDaemon".</div>
-  <div class="step">In the AppDaemon add-on config, add Python packages: <code>scipy</code>, <code>numpy</code>.</div>
-  <div class="step">Start the AppDaemon add-on.</div>
-  <div class="step">Copy the app files from the repo to your AppDaemon apps directory:
-    <pre>cp -r /config/repos/HA-Irrigation-Strategy/appdaemon/apps/crop_steering /config/appdaemon/apps/</pre>
+  <div class="step">Go to <strong>Settings → Add-ons → Add-on Store</strong>. Switch to the <strong>Local</strong> tab. The f2-control add-on should appear if the repo is mounted at <code>/addons/f2-control</code>. Click it and choose <strong>Install</strong>.</div>
+  <div class="step">Once installed, go to the add-on's <strong>Configuration</strong> tab. Set the required options:
+    <ul>
+      <li><strong>zones</strong> — number of active zones (e.g. <code>6</code>)</li>
+      <li><strong>lights_on_hour / lights_off_hour</strong> — your photoperiod start/end hours</li>
+      <li><strong>notify_service</strong> — HA service to call for 30-min vitals (e.g. <code>notify.mobile_app_operator</code>)</li>
+    </ul>
   </div>
-  <div class="step">Copy the AppDaemon configuration:
-    <pre>cp /config/repos/HA-Irrigation-Strategy/appdaemon/apps/crop_steering/apps.yaml /config/appdaemon/apps/crop_steering/</pre>
-  </div>
-  <div class="step">Edit <code>/config/appdaemon/apps/crop_steering/apps.yaml</code> and verify the entity IDs match your setup (they should reference <code>irrigation_*</code> entities).</div>
-  <div class="step">Restart AppDaemon from the add-on page.</div>
-  <div class="step">Check the AppDaemon log for errors: <strong>Settings → Add-ons → AppDaemon → Log</strong>.</div>
-  <div class="step">Once running, new sensors will appear: <code>sensor.crop_steering_app_status</code>, <code>sensor.crop_steering_app_current_phase</code>, etc.</div>
+  <div class="step">Click <strong>Save</strong>, then go to the <strong>Info</strong> tab and click <strong>Start</strong>.</div>
+  <div class="step">Create the kill-switch entity if it doesn't exist. In HA go to <strong>Settings → Helpers → Create Helper → Toggle</strong> and name it <code>f2_control_enabled</code> (entity ID will be <code>input_boolean.f2_control_enabled</code>). Alternatively add it to a <code>packages/</code> YAML file.</div>
+  <div class="step">Check the add-on <strong>Log</strong> tab — you should see <code>[f2-control] started, kill-switch=OFF</code>. No errors means the add-on is running and reading sensors.</div>
+  <div class="step">When you are ready to go live, flip <code>input_boolean.f2_control_enabled</code> to <strong>ON</strong>. The add-on will begin autonomous actuation on the next 60-second poll.</div>
 </div>
 
-<h3>Verifying AppDaemon is Working</h3>
+<div class="warning">
+  <strong>Go live safely:</strong> Before flipping the kill switch ON, confirm substrate probe values are live (not "Unavailable"), the mainline valve responds to manual commands, and you have watched at least one manual irrigation cycle complete without issues.
+</div>
+
+<h3>Verifying the Add-on is Working</h3>
 <ul>
   <li>Check <strong>Developer Tools → States</strong> for <code>sensor.crop_steering_app_status</code> — should show "running".</li>
-  <li>The phase should auto-transition based on sensor data (watch for P0→P1 transition after lights-on dryback).</li>
-  <li>The AppDaemon log will show detailed decision-making output.</li>
+  <li>Watch <code>sensor.crop_steering_app_current_phase</code> per zone — phases should transition through P0→P1 after lights-on dryback.</li>
+  <li>The add-on log will show per-zone decision output on each poll.</li>
 </ul>
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
@@ -415,10 +428,18 @@ Drippers → Plants → Substrate → Runoff
 
 <p>The system has multiple layers of protection. These run independently — if one fails, others still protect your grow.</p>
 
+<div class="warning">
+  <strong>Master safety control — Kill Switch:</strong> <code>input_boolean.f2_control_enabled</code> (OFF) suspends all autonomous actuation instantly. This is the first thing to flip in any emergency related to the autonomous engine.
+</div>
+
 <table>
   <tr><th>Protection</th><th>What It Does</th><th>Automatic?</th></tr>
+  <tr><td><strong>Kill Switch</strong></td><td><code>input_boolean.f2_control_enabled</code> OFF — add-on reads/computes but never actuates any valve or pump</td><td>Manual (instant)</td></tr>
   <tr><td>Master Gate</td><td>Irrigation only runs when: system enabled + not in maintenance + no leak + tank OK + within time window</td><td>Yes</td></tr>
   <tr><td>Valve Watchdog</td><td>If any table valve stays open longer than 3 minutes, force-closes it and alerts you</td><td>Yes</td></tr>
+  <tr><td>Lights-On Watering Watchdog</td><td>Flags any zone that has gone unwatered for more than N hours during lights-on; escalates to operator alert</td><td>Yes</td></tr>
+  <tr><td>Anti-Lockout High-EC Flush</td><td>When pore EC exceeds the safety ceiling, triggers a dilutive flush shot instead of locking the zone out entirely</td><td>Yes</td></tr>
+  <tr><td>Cross-Zone Outlier Detection</td><td>Flags a zone whose water uptake deviates significantly from its siblings — indicates probe fault, blocked dripper, or plant stress</td><td>Yes</td></tr>
   <tr><td>Mains Water Watchdog</td><td>Kills mains water if open for 24 minutes (8x valve limit)</td><td>Yes</td></tr>
   <tr><td>Leak Abort</td><td>Emergency stop on leak detection (needs sensor installed)</td><td>Yes*</td></tr>
   <tr><td>Tank Low Abort</td><td>Closes all valves if tank is low (needs float switch installed)</td><td>Yes*</td></tr>
@@ -431,6 +452,28 @@ Drippers → Plants → Substrate → Runoff
 
 <p>* Requires physical sensor to be installed and mapped.</p>
 
+<h3>v2.5.0 Safety Additions</h3>
+
+<div class="info">
+  <strong>Source-water gate (pH + EC):</strong> Before opening any valve the engine checks both the source-water pH and EC against configured limits. Either value out of range blocks the shot. A configurable grace period allows transient probe noise without aborting; if a probe is dead or unavailable the gate is <strong>fail-closed</strong> — no shot fires. Set the pH and EC limits via the <code>crop_steering_source_water_*</code> entities.
+</div>
+
+<div class="info">
+  <strong>Fail-closed hardware writes:</strong> If a pump, mainline, or zone-valve command fails (no-response or read-back mismatch), the shot is <strong>aborted immediately</strong> and does not count toward the zone's shot tally. The engine does not retry partial sequences — it shuts down cleanly and logs the fault. This prevents under-watering from silently accumulating against the daily cap.
+</div>
+
+<div class="info">
+  <strong>P2 EC-correction min-interval (anti-short-cycle):</strong> When EC is high and the engine raises the VWC threshold to trigger more frequent flushes, a minimum interval between consecutive P2 shots is enforced. This prevents the EC-correction logic from short-cycling the pump repeatedly in a short window. Adjust via <code>number.crop_steering_p2_min_interval_minutes</code>.
+</div>
+
+<h3>Optional PID EC Loop</h3>
+<p>An optional PID-based EC correction loop is available but <strong>off by default</strong>. When enabled, the engine replaces the simple high/low EC threshold adjustments in P2 with a continuous PID controller that trims the VWC target in real time to converge on the zone's EC target.</p>
+<ul>
+  <li><strong>Enable:</strong> flip <code>input_boolean.crop_steering_ec_pid_enabled</code> ON.</li>
+  <li><strong>Tune:</strong> set proportional/integral/derivative gains via <code>input_number.crop_steering_ec_pid_kp</code>, <code>…_ki</code>, <code>…_kd</code>.</li>
+  <li>Start with the defaults and only adjust if EC is oscillating. Leave OFF until you have several days of stable P2 data to baseline against.</li>
+</ul>
+
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2 id="troubleshooting">11. Troubleshooting</h2>
 
@@ -442,6 +485,7 @@ Drippers → Plants → Substrate → Runoff
     <li>Check the current time is within your irrigation window (Schedule tab).</li>
     <li>Check at least one table is enabled (Zone Control tab).</li>
     <li>Check <strong>Developer Tools → States</strong> for <code>binary_sensor.irrigation_irrigation_allowed</code> — should be "on". If "off", check each condition above.</li>
+    <li>If using autonomous mode: check <code>input_boolean.f2_control_enabled</code> is ON and the f2-control add-on is running (Settings → Add-ons → f2-control → Log).</li>
   </ol>
 </div>
 
@@ -492,6 +536,17 @@ Drippers → Plants → Substrate → Runoff
   </ol>
 </div>
 
+<div class="card">
+  <h3>f2-control add-on not actuating</h3>
+  <ol>
+    <li>Check add-on log (Settings → Add-ons → f2-control → Log) for errors.</li>
+    <li>Confirm <code>input_boolean.f2_control_enabled</code> is ON — the add-on silently skips actuation when OFF.</li>
+    <li>Confirm at least one zone is enabled in Zone Control.</li>
+    <li>Verify the add-on configuration options (zones, lights hours) are saved correctly.</li>
+    <li>Restart the add-on from the Info tab if the log shows stale timestamps.</li>
+  </ol>
+</div>
+
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2 id="entity-ref">12. Entity Reference</h2>
 
@@ -507,11 +562,14 @@ Drippers → Plants → Substrate → Runoff
   <tr><td><code>sensor.irrigation_room_1_vpd</code></td><td>Room VPD (averaged)</td></tr>
   <tr><td><code>sensor.irrigation_average_vwc</code></td><td>Average VWC across all tables</td></tr>
   <tr><td><code>sensor.irrigation_average_ec</code></td><td>Average EC across all tables</td></tr>
+  <tr><td><code>sensor.crop_steering_app_status</code></td><td>f2-control add-on runtime status</td></tr>
+  <tr><td><code>sensor.crop_steering_app_current_phase</code></td><td>Current P0–P3 phase per zone</td></tr>
 </table>
 
 <h3>Key Switches</h3>
 <table>
   <tr><th>Entity</th><th>What It Controls</th></tr>
+  <tr><td><code>input_boolean.f2_control_enabled</code></td><td><strong>Kill switch — autonomous actuation on/off</strong></td></tr>
   <tr><td><code>input_boolean.irrigation_enable</code></td><td>Master system on/off</td></tr>
   <tr><td><code>input_boolean.irrigation_maintenance_mode</code></td><td>Maintenance mode (closes all valves)</td></tr>
   <tr><td><code>input_boolean.irrigation_table_N_enabled</code></td><td>Enable/disable table N for irrigation</td></tr>
@@ -530,7 +588,8 @@ Drippers → Plants → Substrate → Runoff
 </table>
 
 <hr>
-<p style="text-align:center; opacity:0.5; font-size:0.9em;">Irrigation System Manual v2.3.1 — Generated March 2026</p>
+<p class="foot" style="text-align:center">F2 Irrigation System Manual v2.5.0 — June 2026</p>
 
+</div>
 </body>
 </html>

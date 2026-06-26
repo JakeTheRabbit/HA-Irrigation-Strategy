@@ -31,9 +31,7 @@ jobs:
           # Custom Component package (HACS)
           zip -r dist/custom_components_crop_steering.zip custom_components/crop_steering \
             -x "**/__pycache__/**" "**/*.pyc" "**/.mypy_cache/**" "**/.pytest_cache/**" "**/.DS_Store" "**/.git/**"
-          # AppDaemon app package
-          zip -r dist/appdaemon_apps_crop_steering.zip appdaemon/apps/crop_steering \
-            -x "**/__pycache__/**" "**/*.pyc" "**/.mypy_cache/**" "**/.pytest_cache/**" "**/.DS_Store" "**/.git/**"
+          # NOTE: appdaemon/ is the retired engine kept in-repo as a manual rollback only — intentionally not shipped.
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -49,6 +47,5 @@ jobs:
         with:
           files: |
             dist/custom_components_crop_steering.zip
-            dist/appdaemon_apps_crop_steering.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

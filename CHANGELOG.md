@@ -7,6 +7,125 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-06-27
+
+### Added
+- **Comprehensive Analyze tab (`www/f2.html`), all live off real F2 entities.** Seven full-width cards:
+  a 24 h equipment-state timeline (lights / pump / mainline / zone valves / recirc / CO2 / dehumidifier),
+  per-zone VWC dryback + pore-EC-vs-target sparklines, water + substrate-temp + phase per zone, climate
+  drivers (air temp / RH / VPD / CO2 / PPFD / DLI), a Liebig limiting-factor ranking (the bottleneck
+  flagged first), and feed pH/EC gauges vs their bands. No Chart.js — inline SVG sparklines + CSS bars,
+  each card with what / good / bad help text.
+- **Minimum daily water floor — per-plant safety.** `input_number.crop_steering_zone_N_min_daily_ml_per_plant`
+  (mL/plant/day; × `plant_count` → a zone-litres floor). **Guaranteed, front-stacked and
+  sensor-independent**: every plant gets its minimum, delivered from lights-on as fast as the
+  anti-short-cycle spacing allows, *regardless of the VWC probe* (a lying/dead probe can't suppress it).
+  The only VWC gate is a hard anti-drown ceiling (`drown_ceiling`, default 90); feed-water + dosing
+  safety still apply. Clamped < `max_daily_volume`. 0 = off. (`addons/f2_control/f2_min_daily_package.yaml`)
+- **Hard max shot-duration cap (flood guard).** `number.crop_steering_max_shot_duration` (default 900 s)
+  clamps the computed shot length and alerts if the raw value exceeds the cap (a substrate/flow misconfig)
+  — the upper bound to match the per-zone minimum-water floor's lower bound.
+
+### Changed
+- **Analyze rebuilt lightweight.** Replaced the collapsing Chart.js auto-fit grid (broken widths) with
+  full-width stacked cards; removes all Chart.js cost on that view.
+- **`www/overview.html`** — per-zone daily water now reads `sensor.crop_steering_zone_N_daily_water_usage`
+  (the live entity; the old name was blank), and the Pore-EC target resolves by the zone's veg/gen
+  steering mode instead of hardcoding generative.
+
+### Fixed
+- **Dashboard mouse-glitch / desktop stutter.** The 3D floorplan (separate WebGL app, `www/floorplan`,
+  built from `three-playground`) ran a perpetual `setAnimationLoop`, rendering a shadow pass at the
+  monitor's native refresh (60–144 Hz) forever and saturating the GPU. Converted to **render-on-demand**
+  (draw only on orbit / zoom / live-data change / door-swing; OrbitControls damping off; shadow baked
+  once at 1024). Idle = 0 animation frames (verified).
+- **`f2.html` 30 s churn.** Tune-editor reseed gated to the active view (was rebuilding its heavy SVG from
+  sensor noise every tick while hidden); the dashboard trend chart skips its re-bucketize when history is
+  unchanged; chart build-animations off; the 30 s poll + chart pipeline pause while the browser tab is
+  backgrounded; the engine-log status dot only pulses when the panel is open.
+- **EC steering double-correction.** Removed a second P2 EC-steer nudge in the pure `decide()` — the IO
+  shell already accumulates and bakes the EC offset into the P2 threshold; `_params` now clamps that
+  offset-threshold to the engine's safe band.
+- **PID cross-photoperiod windup.** The EC-PID integral + previous-error reset on the P0 transition.
+- **Shot-sizing short-cycle.** Shot duration divided per-plant substrate by *zone-total* flow
+  (`plant_count × drippers × flow_rate`), so per-plant 6 L blocks × 36 plants computed shots ~36× too
+  short (~14 s instead of ~324 s for a 6 % shot) → VWC never rose → the pump short-cycled. `_substrate_l`
+  now returns the zone total (per-plant block × plant_count) to match the zone-total flow; enter
+  `substrate_volume` PER-PLANT.
+
+> **Deploy note.** The f2-control add-on bakes its code into the image at build time (`Dockerfile COPY`),
+> so the engine changes in this release require an add-on **Rebuild** (Supervisor → F2 Control → ⋮ →
+> Rebuild), not just a restart, to take effect. (Interim: set the add-on Configuration options
+> `substrate_l` = row-total litres and `flow_lps` = zone flow, then Save, to correct shot length on the
+> running build without a rebuild.)
+
+## [2.5.0] - 2026-06-27
+
+### Added
+- **Mobile control surface — `www/overview.html`.** A lightweight, phone-first one-pager with three
+  tabs: **Steer** (per-zone VWC + target / pore-EC + target / substrate temp / phase / last shot /
+  daily L; room temp, VPD, CO2, PPFD, DLI, total daily water), **Controls** (main pump, flush/fill
+  modes, grow lights, per-zone enable), and **Dosing** (the veg-room peristaltic pumps —
+  Cleanse/Core/Bloom/Balance — feeding F2). Vanilla JS, one 30 s poll, `?demo` mode, confirmed actuation.
+- **PID EC loop** (engine `ec_pid()`, flag-gated, OFF by default). A real Kp/Ki/Kd controller with
+  integral anti-windup and output clamped to ±20 % of the P2 threshold, as an opt-in upgrade to the
+  stepped EC-offset. Enable with `input_boolean.crop_steering_ec_pid_enabled`; gains tunable via
+  `input_number.crop_steering_ec_pid_{kp,ki,kd}` (`addons/f2_control/f2_ec_pid_package.yaml`).
+
+### Changed
+- **Shot sizing reads the LIVE config.** The f2-control add-on now computes shot duration from the real
+  substrate volume + per-zone flow (`plant_count × drippers_per_plant × dripper_flow_rate`) instead of
+  hardcoded options — a mis-set substrate (6 L vs the real 9 L) fired shots ~⅓ too short, so VWC never
+  rose and the pump machine-gunned. Fixed.
+- **`.env` is now authoritative for setpoints** — number entities seed their initial value from the
+  parsed `crop_steering.env` params, falling back to `DEFAULT_VALUES`.
+
+### Fixed
+- **pH half of the source-water gate** — f2-control now gates on feed pH (`irrigation_ph_min/max`, with
+  last-good grace + fail-closed on a dead probe), not just EC. Bad-pH feed no longer waters.
+- **Fail-closed hardware writes** — `ha_call` returns False on non-2xx; a shot aborts (cuts hardware,
+  alerts, does NOT advance shot/daily/last_shot counters) if any pump/mainline/valve command errors.
+- **P2 EC-correction short-cycle** — flush/dilute/rescue shots respect a minimum interval
+  (`p2_min_interval_min`, default 10 min); no-runoff nibbles can no longer stack EC + machine-gun the pump.
+- **`f2.html` lag** — only the active tab rebuilds per 30 s tick, and backdrop-filter blur removed from
+  the ~78 glass cards (fixes cursor/scroll jank).
+- **`services.execute_irrigation_shot`** — zone ids coerced to int (a `zone: 1` call no longer rejects
+  against a `"1"` key after a config-entry reload).
+
+### Removed
+- The retired AppDaemon engine is no longer bundled in the release artifact (kept in-repo as a manual
+  rollback only).
+
+## [2.4.0] - 2026-06-26
+
+### Added — f2-control standalone add-on + extracted crop-steering-engine (AppDaemon retired)
+- **`addons/f2_control/`** — a standalone Home Assistant **add-on** that replaces the AppDaemon engine as the
+  autonomous coordinator. One synchronous Python process, plain REST polling of HA (no asyncio coroutine trap),
+  hardware shots with valve-close readback, republishes the full `sensor.crop_steering_*` status surface, sends
+  30-minute vitals to the operator's phone, and is gated by a hard kill switch `input_boolean.f2_control_enabled`
+  (OFF = reads/computes but never actuates). Installs from the local add-on store; no apps.yaml, no scipy/numpy.
+- **`crop-steering-engine/`** — the pure decision core extracted as a standalone, `pip`-installable Python package
+  (src-layout, offline unit tests, ruff/mypy/pytest CI). No HA, no I/O — `decide()` over two dataclasses, so the
+  same engine runs identically inside the add-on, AppDaemon, or a test. The add-on vendors a copy for a
+  self-contained Docker build.
+- **`www/overview.html`** — a new lightweight, mobile-first one-page vitals/overview (per-zone
+  VWC/EC/phase/last-shot/daily water, system + feed status, kill-switch toggle). Vanilla JS, one 30-second poll,
+  `?demo` standalone mode.
+
+### Changed
+- **`www/f2.html` performance** — the 30-second refresh now only rebuilds the *active* tab's data (off-screen tabs no
+  longer re-render every tick) and the camera frame only refetches while its tile is visible. Fixes the lag/freeze.
+- **`www/irrigation-manual.html`** — restyled to the F2 white-paper dark theme (Home Assistant Roboto font) and
+  updated for the f2-control add-on architecture (kill switch, per-zone EC targets, new safety features).
+
+### Fixed
+- **Engine P2 short-cycle / EC stacking** — P2 EC-correction shots (flush / dilute / rescue) now respect a minimum
+  interval (`p2_min_interval_min`, default 10 min). Small no-runoff shots fired every tick were *stacking* pore EC
+  instead of diluting it, short-cycling the pump. VWC top-ups stay ungated (self-limiting).
+
+### Security
+- Scrubbed operator PII (real names, site label) from tracked config + docs before public release.
+
 ### Added — adaptive steering: self-tuning P1/P2 and predictive P3 (optional, off by default)
 - New drop-in engine module `appdaemon/apps/crop_steering/adaptive_steering.py`, gated by
   `input_boolean.f2_adaptive_steering_enabled`. Wires into `master_crop_steering_app.py` via four
