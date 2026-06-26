@@ -48,7 +48,10 @@ def ha_get(entity):
 
 def ha_call(domain, service, **data):
     try:
-        _S.post(f"{BASE}/services/{domain}/{service}", headers=HDR, json=data, timeout=12)
+        r = _S.post(f"{BASE}/services/{domain}/{service}", headers=HDR, json=data, timeout=12)
+        if r.status_code >= 300:
+            log("call_service FAILED", domain, service, "HTTP", r.status_code)
+            return False
         return True
     except Exception as e:
         log("call_service failed", domain, service, e)
@@ -107,8 +110,12 @@ class Controller:
         self._alerted = {}
         self._activity = []
         self._blind_zones = set()
+        self.feed_ec_sensor = o.get("feed_ec_sensor", "sensor.atlas_legacy_1_ec")
+        self.feed_ph_sensor = o.get("feed_ph_sensor", "sensor.aquaponics_kit_f4f618_ph")
         self._feed_last_good_value = None
         self._feed_last_good_time = None
+        self._feed_ph_last_good = None
+        self._feed_ph_last_good_time = None
         self._was_lights_on = None
         self._last_notify = None
         self._start = datetime.now()
@@ -211,13 +218,22 @@ class Controller:
         return f
 
     def _read_feed_ec(self):
-        feed = self._read_sensor("sensor.atlas_legacy_1_ec", lo=0, hi=20)
+        feed = self._read_sensor(self.feed_ec_sensor, lo=0, hi=20)
         if feed is not None:
             lo = self._num("number.crop_steering_irrigation_ec_min", 0)
             hi = self._num("number.crop_steering_irrigation_ec_max", 0)
             if (lo <= 0 or feed >= lo) and (hi <= 0 or feed <= hi):
                 self._feed_last_good_value, self._feed_last_good_time = feed, datetime.now()
         return feed
+
+    def _read_feed_ph(self):
+        ph = self._read_sensor(self.feed_ph_sensor, lo=0, hi=14)
+        if ph is not None:
+            lo = self._num("number.crop_steering_irrigation_ph_min", 0)
+            hi = self._num("number.crop_steering_irrigation_ph_max", 0)
+            if (lo <= 0 or ph >= lo) and (hi <= 0 or ph <= hi):
+                self._feed_ph_last_good, self._feed_ph_last_good_time = ph, datetime.now()
+        return ph
 
     def _veg(self, zone):
         v, _, _ = ha_get(f"select.crop_steering_zone_{zone}_steering_mode")
@@ -340,6 +356,19 @@ class Controller:
                 return f"source-water EC dead >{self.feed_grace_min:.0f}min — holding (fail-closed)"
             if (lo > 0 and feed < lo) or (hi > 0 and feed > hi):
                 return f"source-water EC {feed:.1f} out of [{lo:g},{hi:g}]"
+        # pH half of the source-water gate — bad-pH feed locks out nutrients / burns roots, so gate it too.
+        ph_lo = self._num("number.crop_steering_irrigation_ph_min", 0)
+        ph_hi = self._num("number.crop_steering_irrigation_ph_max", 0)
+        if ph_lo > 0 or ph_hi > 0:
+            ph = self._read_feed_ph()
+            if ph is None:
+                if feed_grace_ok(datetime.now().timestamp(),
+                                 self._feed_ph_last_good_time.timestamp() if self._feed_ph_last_good_time else None,
+                                 self.feed_grace_min):
+                    return None
+                return f"source-water pH probe dead >{self.feed_grace_min:.0f}min — holding (fail-closed)"
+            if (ph_lo > 0 and ph < ph_lo) or (ph_hi > 0 and ph > ph_hi):
+                return f"source-water pH {ph:.2f} out of [{ph_lo:g},{ph_hi:g}]"
         return None
 
     # ---------- alerts / notify ----------
@@ -367,9 +396,26 @@ class Controller:
         self._busy = True
         valve = self.hw["valves"].get(zone)
         try:
-            ha_call("switch", "turn_on", entity_id=self.hw["pump"]); time.sleep(2)
-            ha_call("switch", "turn_on", entity_id=self.hw["mainline"]); time.sleep(1)
-            ha_call("switch", "turn_on", entity_id=valve); time.sleep(duration_s)
+            # OPEN sequence — FAIL CLOSED: if any service call errors, cut what's on, alert, and DO NOT count the shot
+            # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
+            if not ha_call("switch", "turn_on", entity_id=self.hw["pump"]):
+                self._alert(f"hw_z{zone}", "Shot aborted — pump command failed",
+                            f"Zone {zone}: pump turn_on returned an error. No water delivered, shot NOT counted.")
+                return
+            time.sleep(2)
+            if not ha_call("switch", "turn_on", entity_id=self.hw["mainline"]):
+                ha_call("switch", "turn_off", entity_id=self.hw["pump"])
+                self._alert(f"hw_z{zone}", "Shot aborted — mainline command failed",
+                            f"Zone {zone}: mainline turn_on failed. Pump cut. No water, shot NOT counted.")
+                return
+            time.sleep(1)
+            if not ha_call("switch", "turn_on", entity_id=valve):
+                ha_call("switch", "turn_off", entity_id=self.hw["mainline"])
+                ha_call("switch", "turn_off", entity_id=self.hw["pump"])
+                self._alert(f"hw_z{zone}", "Shot aborted — valve command failed",
+                            f"Zone {zone}: valve {valve} turn_on failed. Pump + mainline cut. No water, shot NOT counted.")
+                return
+            time.sleep(duration_s)
             ha_call("switch", "turn_off", entity_id=valve); time.sleep(1)
             ha_call("switch", "turn_off", entity_id=self.hw["mainline"])
             ha_call("switch", "turn_off", entity_id=self.hw["pump"]); time.sleep(1)
@@ -378,6 +424,7 @@ class Controller:
                 ha_call("switch", "turn_off", entity_id=self.hw["mainline"])
                 self._alert(f"valve_z{zone}", "URGENT — valve stuck open",
                             f"Zone {zone} valve {valve} did not close after shot. Pump + mainline cut.")
+            # only counts a shot that actually opened the full pump->mainline->valve path
             self._advance_shot_counters(zone, size_pct)
         except Exception as e:
             log("shot error", zone, e)

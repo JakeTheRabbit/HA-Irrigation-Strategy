@@ -27,14 +27,19 @@ def get_irrigation_shot_schema(hass: HomeAssistant) -> vol.Schema:
     for entry_id in hass.data.get(DOMAIN, {}):
         config_data = hass.data[DOMAIN].get(entry_id, {})
         if "zones" in config_data:
-            zones.extend(config_data["zones"].keys())
+            # zone keys can come back as strings after a JSON config-entry reload — normalize to int
+            for z in config_data["zones"].keys():
+                try:
+                    zones.append(int(z))
+                except (TypeError, ValueError):
+                    zones.append(z)
     
     # If no zones configured, use default range
     if not zones:
         zones = list(range(1, MAX_ZONES + 1))
     
     return vol.Schema({
-        vol.Required("zone"): vol.In(zones),
+        vol.Required("zone"): vol.All(vol.Coerce(int), vol.In(zones)),
         vol.Required("duration_seconds"): vol.Range(min=1, max=3600),
         vol.Optional("shot_type"): vol.In(["P1", "P2", "P3_emergency"]),
     })
