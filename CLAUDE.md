@@ -126,6 +126,28 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
 - **Commit style:** conventional commits (`feat:`/`fix:`/`docs:`/`chore:`) with a
   `Co-Authored-By: Claude` trailer when written via Claude Code. One active branch:
   `main`. Retired branches are kept as `archive/*` tags.
+- **Changelog = dual view.** Every release in `CHANGELOG.md` leads with **🌱 In plain English** (anyone
+  can follow it) then **🔧 Technical notes** (entity/code detail). Keep both when adding a release.
+
+## Hard-won operational notes (read before touching the live F2 engine)
+
+- **Deploy = Rebuild, never Restart.** A plain restart re-runs the *baked* image (stale code); only a
+  **Rebuild** re-COPYs `addons/f2_control/`. There is **no API rebuild** with the HA long-lived token —
+  `hassio.addon_rebuild` 400s and the Supervisor proxy 401s (needs the in-container `SUPERVISOR_TOKEN`).
+  So: stage the files, then the operator must Rebuild in the UI. **Never claim an engine change is live
+  off a restart.** (`hassio.addon_restart` *does* work for restarting; it just won't load new code.)
+- **Verify shot length from the live pump, not from "deployed".** A shot's *duration* is the only proof a
+  sizing change took — pull `switch.veg_main_pump` history (`/api/history/period`) and read the on-period
+  seconds. File-copied + md5-matched proves nothing about the running container.
+- **Shot sizing is per-plant, scaled to the row.** `dur = shot% × substrate_l ÷ flow_lps`. `flow_lps` is
+  ZONE-total (`plant_count × drippers_per_plant × dripper_flow_rate ÷ 3600`), so `_substrate_l` must also
+  be ZONE-total = per-plant block × `plant_count`. Enter `…zone_N_substrate_volume` as the **PER-PLANT
+  block**; the engine multiplies by `plant_count`. Get the units wrong and shots are plant_count-times too
+  short → the pump short-cycles (the recurring F2 failure). The old build also reads `substrate_l`/
+  `flow_lps` from the add-on **Configuration options** — an interim way to correct sizing without a rebuild.
+- **F2 facts:** 3 zones × 36 plants; 6 L block/plant; 1 dripper/plant @ 4 L/hr → zone flow 0.04 L/s, zone
+  substrate 216 L, a 6 % shot ≈ 324 s. Lights 10:00–22:00. Feed gate EC 2.3–3.5 / pH 5.8–6.2 — the engine
+  correctly holds while the tank is filling/dosing or feed is out of band (don't mistake that for a bug).
 
 > **Historical note.** An earlier experimental "intelligence" layer (RootSense
 > substrate AI + ClimateSense climate control, under `intelligence/`) was never
