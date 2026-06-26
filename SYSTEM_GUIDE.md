@@ -1005,7 +1005,7 @@ With defaults (4 plants, 2 drippers, 2 L/hr, multiplier 1.0):
 
 ### Notifications
 
-Notifications are sent via `notify.mobile_app_damians_iphone` (configured in `.env` as `NOTIFICATION_SERVICE`). Events that trigger notifications:
+Notifications are sent via `notify.mobile_app_phone` (configured in `.env` as `NOTIFICATION_SERVICE`). Events that trigger notifications:
 - Emergency lockout escalation
 - Manual override enabled/disabled/timeout
 - Critical EC levels

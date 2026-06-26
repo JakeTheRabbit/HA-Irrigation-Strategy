@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-06-26
+
+### Added — f2-control standalone add-on + extracted crop-steering-engine (AppDaemon retired)
+- **`addons/f2_control/`** — a standalone Home Assistant **add-on** that replaces the AppDaemon engine as the
+  autonomous coordinator. One synchronous Python process, plain REST polling of HA (no asyncio coroutine trap),
+  hardware shots with valve-close readback, republishes the full `sensor.crop_steering_*` status surface, sends
+  30-minute vitals to the operator's phone, and is gated by a hard kill switch `input_boolean.f2_control_enabled`
+  (OFF = reads/computes but never actuates). Installs from the local add-on store; no apps.yaml, no scipy/numpy.
+- **`crop-steering-engine/`** — the pure decision core extracted as a standalone, `pip`-installable Python package
+  (src-layout, offline unit tests, ruff/mypy/pytest CI). No HA, no I/O — `decide()` over two dataclasses, so the
+  same engine runs identically inside the add-on, AppDaemon, or a test. The add-on vendors a copy for a
+  self-contained Docker build.
+- **`www/overview.html`** — a new lightweight, mobile-first one-page vitals/overview (per-zone
+  VWC/EC/phase/last-shot/daily water, system + feed status, kill-switch toggle). Vanilla JS, one 30-second poll,
+  `?demo` standalone mode.
+
+### Changed
+- **`www/f2.html` performance** — the 30-second refresh now only rebuilds the *active* tab's data (off-screen tabs no
+  longer re-render every tick) and the camera frame only refetches while its tile is visible. Fixes the lag/freeze.
+- **`www/irrigation-manual.html`** — restyled to the F2 white-paper dark theme (Home Assistant Roboto font) and
+  updated for the f2-control add-on architecture (kill switch, per-zone EC targets, new safety features).
+
+### Fixed
+- **Engine P2 short-cycle / EC stacking** — P2 EC-correction shots (flush / dilute / rescue) now respect a minimum
+  interval (`p2_min_interval_min`, default 10 min). Small no-runoff shots fired every tick were *stacking* pore EC
+  instead of diluting it, short-cycling the pump. VWC top-ups stay ungated (self-limiting).
+
+### Security
+- Scrubbed operator PII (real names, site label) from tracked config + docs before public release.
+
 ### Added — adaptive steering: self-tuning P1/P2 and predictive P3 (optional, off by default)
 - New drop-in engine module `appdaemon/apps/crop_steering/adaptive_steering.py`, gated by
   `input_boolean.f2_adaptive_steering_enabled`. Wires into `master_crop_steering_app.py` via four

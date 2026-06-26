@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0c10">
+<title>F2 · Steer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0c10; --card:#11161d; --card2:#0f141b; --hair:#1f2937;
+  --ink:#e7ecf2; --ink2:#9fb0c3; --ink3:#64748b;
+  --accent:#34d399; --cyan:#22d3ee; --amber:#fbbf24; --blue:#60a5fa; --purple:#c084fc; --red:#f87171; --orange:#fb923c;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.5 "Roboto","Helvetica Neue",Arial,sans-serif;font-variant-numeric:tabular-nums;
+  padding:0 0 env(safe-area-inset-bottom);}
+.wrap{max-width:520px;margin:0 auto;padding:14px 14px 40px}
+a{color:var(--accent);text-decoration:none}
+
+/* header */
+.top{display:flex;align-items:center;gap:10px;padding:6px 2px 12px;position:sticky;top:0;background:linear-gradient(var(--bg) 70%,transparent);z-index:5}
+.brand{font-weight:800;letter-spacing:-.3px;font-size:18px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.muted{color:var(--ink3);font-size:12px}
+.pill{font-size:11px;font-weight:800;letter-spacing:.3px;padding:4px 10px;border-radius:7px;border:1px solid;cursor:pointer;user-select:none}
+.pill.live{color:#06251a;background:var(--accent);border-color:var(--accent)}
+.pill.held{color:var(--amber);background:#2a2008;border-color:#5a4410}
+.spacer{flex:1}
+
+/* system strip */
+.sys{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.sys .cell{background:var(--card);border:1px solid var(--hair);border-radius:11px;padding:9px 11px}
+.sys .k{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink3)}
+.sys .v{font-size:15px;font-weight:700;margin-top:2px}
+.decision{background:var(--card);border:1px solid var(--hair);border-left:3px solid var(--cyan);border-radius:11px;padding:10px 12px;margin-bottom:12px;font-size:13.5px;color:var(--ink2)}
+.decision b{color:var(--ink)}
+
+/* advisory */
+.adv{border-radius:11px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:600;border:1px solid}
+.adv.crit{background:#2a0f12;border-color:#5a1d22;color:#fecaca}
+.adv.warn{background:#2a2008;border-color:#5a4410;color:#fde68a}
+.adv.ok{background:#06251a;border-color:#10402f;color:#bbf7d0}
+
+/* zone cards */
+.zone{background:var(--card);border:1px solid var(--hair);border-radius:14px;padding:13px 14px;margin-bottom:11px}
+.zone .hd{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.zone .name{font-weight:700;font-size:15px}
+.phase{font-size:10.5px;font-weight:800;letter-spacing:.4px;padding:3px 8px;border-radius:6px;border:1px solid}
+.ph-P0{color:var(--purple);border-color:#3b2155;background:#1c1030}
+.ph-P1{color:var(--cyan);border-color:#164e63;background:#06303a}
+.ph-P2{color:var(--accent);border-color:#10402f;background:#06251a}
+.ph-P3{color:var(--blue);border-color:#1e3a5f;background:#0a1d33}
+.saf{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink2)}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px 8px;align-items:end}
+.met .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink3)}
+.met .big{font-size:26px;font-weight:800;line-height:1.05;letter-spacing:-.5px}
+.met .u{font-size:13px;font-weight:600;color:var(--ink3)}
+.met .sub{font-size:12.5px;color:var(--ink2);margin-top:1px}
+.bar{height:5px;border-radius:3px;background:#1b2430;overflow:hidden;margin-top:7px;grid-column:1/-1}
+.bar i{display:block;height:100%;border-radius:3px}
+.zfoot{display:flex;gap:14px;flex-wrap:wrap;margin-top:11px;padding-top:9px;border-top:1px solid var(--hair);font-size:12px;color:var(--ink2)}
+.zfoot b{color:var(--ink);font-weight:700}
+.zen{margin-left:auto;font-size:11px;color:var(--ink3);cursor:pointer}
+
+/* controls */
+.controls{display:flex;gap:9px;margin:14px 0 6px}
+.btn{flex:1;text-align:center;background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:13px;font-weight:700;font-size:13.5px;cursor:pointer}
+.btn.arm{border-color:#5a4410;color:var(--amber)}
+.btn.kill{border-color:#5a1d22;color:var(--red)}
+.foot{color:var(--ink3);font-size:11.5px;text-align:center;margin-top:18px;line-height:1.7}
+.tokbar{background:var(--card);border:1px solid var(--hair);border-radius:11px;padding:12px;margin-bottom:12px}
+.tokbar input{width:100%;background:var(--card2);border:1px solid var(--hair);border-radius:8px;color:var(--ink);padding:9px;font:13px monospace;margin-top:7px}
+.tokbar button{margin-top:8px;width:100%;background:var(--accent);color:#06251a;border:0;border-radius:8px;padding:10px;font-weight:700;cursor:pointer}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="top">
+    <span class="dot" id="connDot" style="background:var(--ink3)"></span>
+    <span class="brand">F2</span>
+    <span class="muted" id="updated">connecting…</span>
+    <span class="spacer"></span>
+    <span class="pill held" id="killPill" onclick="toggleKill()">—</span>
+  </div>
+
+  <div class="tokbar" id="tokbar" hidden>
+    <div style="font-size:13px;color:var(--ink2)">Paste a Home Assistant long-lived token to connect (stored on this device only).</div>
+    <input id="tokInput" type="password" placeholder="eyJhbG…" autocomplete="off">
+    <button onclick="saveTok()">Connect</button>
+  </div>
+
+  <div class="adv" id="adv" hidden></div>
+
+  <div class="sys">
+    <div class="cell"><div class="k">Engine</div><div class="v" id="sysEngine">—</div></div>
+    <div class="cell"><div class="k">System</div><div class="v" id="sysSafe">—</div></div>
+    <div class="cell"><div class="k">Feed EC</div><div class="v" id="sysEc">—</div></div>
+    <div class="cell"><div class="k">Feed pH</div><div class="v" id="sysPh">—</div></div>
+  </div>
+
+  <div class="decision" id="decision">Waiting for the engine…</div>
+
+  <div id="zones"></div>
+
+  <div class="controls">
+    <div class="btn" onclick="location.href='f2.html'">Full dashboard →</div>
+  </div>
+
+  <div class="foot" id="foot">F2 crop steering · standalone overview</div>
+</div>
+
+<script>
+/* ───────────────────────── config (HA_BASE + LL_TOKEN are injected at deploy; empty in the repo) ───────────────────────── */
+const CONFIG = {
+  HA_BASE: "",                 // same-origin when served from /local/ ; full URL otherwise
+  LL_TOKEN: "",                // injected at deploy — never commit a real token
+  POLL_MS: 30000,
+  MAX_ZONES: 6,
+  E: { feed_ec: "", feed_ph: "" }   // optional site feed probes (set at deploy); blank → shown as —
+};
+const DEMO = new URLSearchParams(location.search).has('demo');
+const $ = id => document.getElementById(id);
+
+/* ───────────────────────── token ───────────────────────── */
+function getToken(){ return CONFIG.LL_TOKEN || (function(){ try{ return localStorage.getItem('f2.token')||''; }catch(e){ return ''; } })(); }
+function saveTok(){ try{ localStorage.setItem('f2.token', $('tokInput').value.trim()); }catch(e){} $('tokbar').hidden=true; tick(); }
+
+/* ───────────────────────── data ───────────────────────── */
+let S = {};                    // entity_id -> {state, attributes}
+async function fetchStates(){
+  const tok = getToken();
+  if(!tok) throw new Error('no-token');
+  const r = await fetch((CONFIG.HA_BASE||'') + '/api/states', { headers:{ Authorization:'Bearer '+tok }, cache:'no-store' });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const arr = await r.json(); const out = {};
+  arr.forEach(e => out[e.entity_id] = e);
+  return out;
+}
+const st  = id => (S[id] && S[id].state!=null) ? S[id].state : null;
+const att = (id,a) => (S[id] && S[id].attributes) ? S[id].attributes[a] : null;
+const num = id => { const v=st(id); const f=parseFloat(v); return (v==null||isNaN(f))?null:f; };
+const on  = id => { const v=(st(id)||'').toLowerCase(); return v==='on'||v==='true'||v==='open'||v==='home'; };
+
+/* ───────────────────────── demo (standalone, no HA) ───────────────────────── */
+function demoStates(){
+  const now = new Date(), iso=m=>new Date(now-m*60000).toISOString();
+  const z=(n,vwc,ec,ph,last,saf,daily,fc)=>({
+    ['sensor.crop_steering_zone_'+n+'_vwc']:{state:String(vwc),attributes:{}},
+    ['sensor.crop_steering_zone_'+n+'_ec']:{state:String(ec),attributes:{}},
+    ['sensor.crop_steering_zone_'+n+'_phase']:{state:ph,attributes:{reason:'holding — in band'}},
+    ['sensor.crop_steering_zone_'+n+'_safety_status']:{state:saf,attributes:{}},
+    ['sensor.crop_steering_zone_'+n+'_last_irrigation_app']:{state:iso(last),attributes:{}},
+    ['sensor.crop_steering_zone_'+n+'_daily_water']:{state:String(daily),attributes:{}},
+    ['number.crop_steering_zone_'+n+'_field_capacity']:{state:String(fc),attributes:{}},
+    ['switch.crop_steering_zone_'+n+'_enabled']:{state:'on',attributes:{}},
+  });
+  return Object.assign({
+    'input_boolean.f2_control_enabled':{state:'on',attributes:{}},
+    'sensor.crop_steering_ai_heartbeat':{state:'healthy',attributes:{engine:'f2-control',last_beat:now.toISOString()}},
+    'sensor.crop_steering_app_status':{state:'safe_idle',attributes:{}},
+    'sensor.crop_steering_system_safety_status':{state:'all_safe',attributes:{}},
+    'sensor.crop_steering_current_decision':{state:'Holding — all zones in band',attributes:{}},
+    'sensor.crop_steering_fused_ec':{state:'4.6',attributes:{}},
+    'sensor.crop_steering_source_ph':{state:'6.0',attributes:{}},
+  }, z(1,57,4.6,'P2',14,'optimal',2.1,65), z(2,59,4.7,'P1',38,'optimal',1.9,65), z(3,58,4.8,'P2',9,'optimal',2.3,65));
+}
+
+/* ───────────────────────── render ───────────────────────── */
+function agoStr(iso){ if(!iso) return 'never'; const t=Date.parse(iso); if(isNaN(t)) return '—';
+  const m=(Date.now()-t)/60000; return m<1?'just now':m<60?Math.round(m)+'m ago':(m/60).toFixed(1)+'h ago'; }
+function safClass(s){ s=(s||'').toLowerCase(); if(/unsafe|crit|burn|lockout|exceed|saturat/.test(s)) return 'crit'; if(/warn|approach|low|high/.test(s)) return 'warn'; return 'ok'; }
+function safColor(c){ return c==='crit'?'var(--red)':c==='warn'?'var(--amber)':'var(--accent)'; }
+function vwcColor(v,fc){ if(v==null) return 'var(--ink3)'; if(v>=fc) return 'var(--blue)'; if(v<fc*0.55) return 'var(--red)'; return 'var(--accent)'; }
+
+function detectZones(){ const z=[]; for(let n=1;n<=CONFIG.MAX_ZONES;n++){ if(S['sensor.crop_steering_zone_'+n+'_phase']||S['sensor.crop_steering_zone_'+n+'_vwc']) z.push(n); } return z.length?z:[1,2,3]; }
+
+function render(){
+  // connection + kill switch
+  $('connDot').style.background = 'var(--accent)';
+  $('updated').textContent = 'updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  const live = on('input_boolean.f2_control_enabled');
+  const kp = $('killPill'); kp.textContent = live?'LIVE':'HELD'; kp.className = 'pill '+(live?'live':'held');
+
+  // engine health
+  const hbEngine = att('sensor.crop_steering_ai_heartbeat','engine');
+  const beat = att('sensor.crop_steering_ai_heartbeat','last_beat');
+  const beatMin = beat ? (Date.now()-Date.parse(beat))/60000 : 999;
+  const engOk = hbEngine==='f2-control' && beatMin < 5;
+  $('sysEngine').textContent = engOk ? 'healthy' : (hbEngine? 'stale '+Math.round(beatMin)+'m' : 'offline');
+  $('sysEngine').style.color = engOk ? 'var(--accent)' : 'var(--red)';
+
+  const sysSafe = st('sensor.crop_steering_system_safety_status') || '—';
+  const sysC = safClass(sysSafe);
+  $('sysSafe').textContent = sysSafe.replace(/_/g,' ');
+  $('sysSafe').style.color = safColor(sysC);
+
+  const fec = CONFIG.E.feed_ec ? num(CONFIG.E.feed_ec) : num('sensor.crop_steering_fused_ec');
+  const fph = CONFIG.E.feed_ph ? num(CONFIG.E.feed_ph) : num('sensor.crop_steering_source_ph');
+  $('sysEc').textContent = fec==null?'—':fec.toFixed(2);
+  $('sysPh').textContent = fph==null?'—':fph.toFixed(2);
+  $('sysPh').style.color = fph==null?'var(--ink)':(fph>=5.6&&fph<=6.4?'var(--accent)':'var(--amber)');
+
+  $('decision').innerHTML = '<b>Decision</b> · ' + (st('sensor.crop_steering_current_decision')||'—');
+
+  // advisory banner: worst zone safety + engine/kill state
+  let advTxt='', advC='ok';
+  if(!engOk){ advTxt='⚠ Engine not reporting — check the f2-control add-on'; advC='crit'; }
+  else if(!live){ advTxt='● Kill-switch OFF — autonomous watering is HELD'; advC='warn'; }
+  const advEl=$('adv');
+  if(advTxt){ advEl.hidden=false; advEl.className='adv '+advC; advEl.textContent=advTxt; } else advEl.hidden=true;
+
+  // zones
+  const zones = detectZones();
+  $('zones').innerHTML = zones.map(n=>{
+    const P='sensor.crop_steering_zone_'+n+'_';
+    const vwc=num(P+'vwc'), ec=num(P+'ec'), ph=(''+(st(P+'phase')||'P2')).toUpperCase().slice(0,2);
+    const fc=num('number.crop_steering_zone_'+n+'_field_capacity')||65;
+    const saf=st(P+'safety_status')||'—', sc=safClass(saf);
+    const last=agoStr(st(P+'last_irrigation_app'));
+    const daily=num(P+'daily_water'); const en=S['switch.crop_steering_zone_'+n+'_enabled']?on('switch.crop_steering_zone_'+n+'_enabled'):true;
+    const reason=att(P+'phase','reason')||'';
+    const vpct=vwc==null?0:Math.max(0,Math.min(100,vwc/Math.max(fc*1.15,1)*100));
+    return `<div class="zone">
+      <div class="hd">
+        <span class="name">Zone ${n}</span>
+        <span class="phase ph-${ph}">${ph}</span>
+        <span class="saf"><span class="dot" style="background:${safColor(sc)}"></span>${en?saf.replace(/_/g,' '):'disabled'}</span>
+      </div>
+      <div class="metrics">
+        <div class="met"><div class="lbl">Water (VWC)</div><div class="big" style="color:${vwcColor(vwc,fc)}">${vwc==null?'—':vwc.toFixed(0)}<span class="u">%</span></div><div class="sub">field cap ${fc.toFixed(0)}%</div></div>
+        <div class="met"><div class="lbl">Pore EC</div><div class="big" style="color:var(--ink)">${ec==null?'—':ec.toFixed(1)}</div><div class="sub">${reason||'&nbsp;'}</div></div>
+        <div class="bar"><i style="width:${vpct}%;background:${vwcColor(vwc,fc)}"></i></div>
+      </div>
+      <div class="zfoot">
+        <span>last shot <b>${last}</b></span>
+        ${daily==null?'':'<span>today <b>'+daily.toFixed(1)+' L</b></span>'}
+        <span class="zen" onclick="toggleZone(${n},${en})">${en?'disable':'enable'} zone</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  $('foot').textContent = (DEMO?'DEMO data · ':'') + 'F2 crop steering · ' + zones.length + ' zones · tap LIVE to arm/hold';
+}
+
+/* ───────────────────────── controls (confirmed; live grow) ───────────────────────── */
+async function callService(domain, service, data){
+  if(DEMO){ alert('Demo mode — no commands sent.'); return; }
+  const tok=getToken(); if(!tok){ $('tokbar').hidden=false; return; }
+  await fetch((CONFIG.HA_BASE||'')+'/api/services/'+domain+'/'+service, {
+    method:'POST', headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'}, body:JSON.stringify(data)
+  });
+  setTimeout(tick, 800);
+}
+function toggleKill(){
+  const live=on('input_boolean.f2_control_enabled');
+  const msg=live ? 'HOLD all autonomous watering? (kill-switch OFF)' : 'ARM autonomous watering? The engine will start steering + firing shots.';
+  if(!confirm(msg)) return;
+  callService('input_boolean', live?'turn_off':'turn_on', {entity_id:'input_boolean.f2_control_enabled'});
+}
+function toggleZone(n, en){
+  if(!confirm((en?'Disable':'Enable')+' Zone '+n+'? '+(en?'It will stop being watered.':'It will resume autonomous watering.'))) return;
+  callService('switch', en?'turn_off':'turn_on', {entity_id:'switch.crop_steering_zone_'+n+'_enabled'});
+}
+
+/* ───────────────────────── loop ───────────────────────── */
+async function tick(){
+  try{
+    S = DEMO ? demoStates() : await fetchStates();
+    $('tokbar').hidden = true;
+    render();
+  }catch(e){
+    $('connDot').style.background='var(--red)';
+    if(String(e.message)==='no-token'){ $('updated').textContent='token needed'; $('tokbar').hidden=false; }
+    else { $('updated').textContent='disconnected ('+e.message+')'; }
+  }
+}
+tick();
+setInterval(tick, CONFIG.POLL_MS);
+</script>
+</body>
+</html>
