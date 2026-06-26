@@ -1,7 +1,8 @@
 # Crop Steering for Home Assistant
 
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
-![AppDaemon](https://img.shields.io/badge/AppDaemon-4-orange)
+![HA Add-on](https://img.shields.io/badge/HA%20Add--on-f2--control-41BDF5?logo=home-assistant&logoColor=white)
+![Release](https://img.shields.io/badge/Release-2.4.0-green)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![Zones](https://img.shields.io/badge/Zones-1%E2%80%9324+-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -108,7 +109,7 @@ higher EC. You set it per zone.
 
 ### The architecture
 
-Two layers, clean separation:
+Three pieces, clean separation:
 
 ```mermaid
 flowchart LR
@@ -118,30 +119,39 @@ flowchart LR
   end
   I --> E
 
-  subgraph AD["AppDaemon — the engine"]
-    M["master_crop_steering_app.py"]
-    SM["Per-zone phase\nstate machines"]
-    FU["Sensor fusion\n+ dryback detection"]
-    SAFE["AI heartbeat + watchdog\n+ safety gates"]
+  subgraph ADDON["f2-control add-on — the engine"]
+    C["controller.py\nREST poll · hardware · status republish"]
+    K["kill switch\ninput_boolean.f2_control_enabled"]
   end
+  ENG["crop-steering-engine\npure decide() · offline tests · no I/O"]
 
-  E -- "reads setpoints / state" --> M
-  M --> SM
-  M --> FU
-  M --> SAFE
-  M --> HW[("pump → mainline → zone valve")]
+  E -- "reads setpoints / state (REST)" --> C
+  ENG -- "imported by" --> C
+  K -- "must be ON to actuate" --> C
+  C --> HW[("pump → mainline → zone valve")]
 ```
 
 - **The integration** (`custom_components/crop_steering/`) is the data layer. A
   config-flow wizard creates ~100 entities — every setpoint, switch and diagnostic
   sensor — and exposes pure, unit-tested calculation helpers. It **never touches
   hardware.**
-- **The AppDaemon engine** (`appdaemon/apps/crop_steering/`) is the brain. It reads
-  those entities and your live sensors, decides shots, sequences hardware, and runs
-  the phase logic. It is the **only** thing that drives a valve.
+- **The f2-control add-on** (`addons/f2_control/`) is the brain — a single synchronous
+  Python process that polls HA over REST, decides shots, sequences the hardware (with
+  valve-close readback), republishes the `sensor.crop_steering_*` status surface, sends
+  30-minute vitals to your phone, and is gated by a hard **kill switch**
+  (`input_boolean.f2_control_enabled`, OFF = reads/computes but never actuates). It is
+  the **only** thing that drives a valve.
+- **The engine** (`crop-steering-engine/`) is a standalone, `pip`-installable package: the
+  pure `decide()` core with no HA and no I/O, unit-tested offline, so the exact same
+  logic runs inside the add-on or a test. The add-on vendors a copy for a self-contained
+  build.
 
 The feedback loop is the whole point: **sensors → entities → engine decision →
-hardware → substrate changes → sensors.** Every VWC update can trigger a re-evaluation.
+hardware → substrate changes → sensors.** Every poll can trigger a re-evaluation.
+
+> *Legacy:* the original **AppDaemon engine** (`appdaemon/apps/crop_steering/master_crop_steering_app.py`)
+> is kept as a one-line rollback; the add-on supersedes it. See `www/irrigation-manual.html` for
+> the operator manual and [`CHANGELOG.md`](CHANGELOG.md) for the 2.4.0 release notes.
 
 ---
 

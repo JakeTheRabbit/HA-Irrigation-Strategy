@@ -236,6 +236,13 @@
 #tuneRoot .envstack .envrow:first-of-type .envlab{margin-top:0}
 #tuneRoot svg.mini{width:100%;height:auto;display:block}
 #tuneRoot .minicwrap{touch-action:none}
+/* env charts break out of the page max-width to claim more screen real-estate */
+#tuneRoot .envstack{width:min(96vw,1760px);margin-left:50%;transform:translateX(-50%)}
+#tuneRoot .envrow{margin-bottom:6px}
+/* always-visible "how to read this graph" guide under each chart */
+#tuneRoot .envhow{font-size:11.5px;line-height:1.5;color:var(--ink2);margin:2px 2px 14px;max-width:120ch}
+#tuneRoot .envhow b{color:var(--ink);font-weight:700}
+#tuneRoot .envhow .ok{color:#34d399}#tuneRoot .envhow .bad{color:#f87171}
 #tuneRoot .seg.ath button{font-size:11.5px;padding:7px 9px}
 #tuneRoot .seg.ath button.on{background:#f59e0b;color:#1a0e03;font-weight:700}
 #tuneRoot .gridrow{display:flex;flex-direction:column;gap:14px}
@@ -255,6 +262,72 @@
 #tuneRoot .ttp-r span{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);font-weight:800;padding-top:2px}
 #tuneRoot .ttp-r p{margin:0;color:var(--ink2)}
 #tuneRoot .ttp-f{margin-top:8px;padding-top:7px;border-top:1px solid var(--hair);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;color:var(--accent);word-break:break-word}
+
+  /* ===== Tune redesign: frozen stage (sticky graph + outcome box), zone router, outcome box ===== */
+#tuneRoot .stage-sentinel{height:1px;margin:0;padding:0}
+#tuneRoot .tune-stage{position:sticky;top:0;z-index:30;background:#0a0c10;border-radius:16px;border:1px solid var(--hair);
+    padding:12px;margin:0 0 14px;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);gap:14px;align-items:stretch;
+    transition:box-shadow .18s,border-color .18s}
+#tuneRoot .tune-stage.is-stuck{box-shadow:0 18px 40px -18px rgba(0,0,0,.85);border-color:rgba(255,255,255,.14)}
+#tuneRoot .stage-graph{min-width:0;max-height:46vh;overflow:hidden;display:flex;flex-direction:column}
+#tuneRoot .stage-graph .panel{flex:1;min-height:0;display:flex;flex-direction:column}
+#tuneRoot .stage-graph svg{flex:0 0 auto}
+#tuneRoot .stage-box{min-width:0;max-height:46vh;overflow:auto;border-left:1px solid var(--hair);padding-left:13px}
+#tuneRoot .outcome-mini{display:none}
+/* zone router tab strip */
+#tuneRoot .zone-tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 12px}
+#tuneRoot .ztab{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:11px;border:1px solid var(--hair);
+    background:var(--card2);color:var(--ink2);cursor:pointer;font-size:13px;font-weight:600;position:relative;transition:background .14s,border-color .14s,color .14s}
+#tuneRoot .ztab:hover{background:rgba(255,255,255,.05);color:var(--ink)}
+#tuneRoot .ztab.on{background:linear-gradient(135deg,#34d399,#10b981);color:#06281c;border-color:transparent}
+#tuneRoot .ztab .zdot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--ink3)}
+#tuneRoot .ztab .zdot.ok{background:var(--ok)}#tuneRoot .ztab .zdot.warn{background:var(--p3)}#tuneRoot .ztab .zdot.crit{background:var(--crit)}
+#tuneRoot .ztab.on .zdot{box-shadow:0 0 0 2px rgba(6,40,28,.4)}
+#tuneRoot .zbadge{font-size:10px;font-weight:800;min-width:16px;text-align:center;border-radius:999px;padding:0 5px;background:rgba(251,191,36,.18);color:#fbbf24;border:1px solid rgba(251,191,36,.35)}
+#tuneRoot .ztab.on .zbadge{background:rgba(6,40,28,.25);color:#06281c;border-color:rgba(6,40,28,.3)}
+/* outcome box internals */
+#tuneRoot .ob-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+#tuneRoot .ob-title{font-size:13px;font-weight:800;color:var(--ink);display:flex;align-items:center;gap:7px}
+#tuneRoot .ob-genbar{height:7px;border-radius:5px;background:rgba(255,255,255,.07);overflow:hidden;margin:2px 0 10px;position:relative}
+#tuneRoot .ob-genbar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#34d399,#a3e635 45%,#fbbf24 75%,#f472b6)}
+#tuneRoot .ob-genlab{display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-top:-7px;margin-bottom:9px}
+#tuneRoot .ob-rows{display:grid;gap:1px;margin-bottom:10px}
+#tuneRoot .ob-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,.05);font-size:12px}
+#tuneRoot .ob-row:first-child{border-top:0}
+#tuneRoot .ob-rl{color:var(--ink3);white-space:nowrap}
+#tuneRoot .ob-rv{color:var(--ink);font-weight:700;text-align:right}
+#tuneRoot .ob-rv .u{color:var(--ink3);font-weight:600;font-size:10px;margin-left:2px}
+#tuneRoot .ob-flags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+#tuneRoot .ob-flag{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid}
+#tuneRoot .ob-flag.ok{color:var(--ok);background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.28)}
+#tuneRoot .ob-flag.warn{color:var(--p3);background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.3)}
+#tuneRoot .ob-flag.crit{color:var(--crit);background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3)}
+#tuneRoot .ob-verdict{font-size:12px;color:var(--ink2);line-height:1.45;background:rgba(255,255,255,.025);border:1px solid var(--hair);border-radius:9px;padding:8px 10px;margin-bottom:10px}
+#tuneRoot .ob-verdict b{color:var(--ink)}
+#tuneRoot .ob-drift{font-size:11.5px;font-weight:700;padding:6px 10px;border-radius:9px;margin-bottom:10px;border:1px solid}
+#tuneRoot .ob-drift.ok{color:var(--ok);background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.25)}
+#tuneRoot .ob-drift.warn{color:var(--p3);background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.28)}
+#tuneRoot .ob-drift.crit{color:var(--crit);background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.3)}
+#tuneRoot .ob-sec{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);font-weight:800;margin:4px 0 6px}
+/* outcome box reuses .lim2/.limcol/.limrow but tightened for the narrow column */
+#tuneRoot .stage-box .lim2{grid-template-columns:1fr;gap:9px}
+#tuneRoot .stage-box .limcol{padding:9px 10px}
+#tuneRoot .stage-box .limrow{grid-template-columns:74px 1fr auto auto;gap:6px;font-size:11px}
+/* read-only global reference strip on zone pages */
+#tuneRoot .ref-strip{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:11px;color:var(--ink3);background:rgba(167,139,250,.05);border:1px dashed rgba(167,139,250,.25);border-radius:9px;padding:6px 11px;margin:10px 0 4px}
+#tuneRoot .ref-strip b{color:var(--ink2)}
+#tuneRoot .ref-strip a{color:var(--accent2);cursor:pointer;text-decoration:none;font-weight:600}
+#tuneRoot .ref-strip a:hover{text-decoration:underline}
+/* fan-out button on matrix rows */
+#tuneRoot .fanout{width:22px;height:26px;border:1px solid rgba(56,189,248,.3);border-radius:7px;background:rgba(56,189,248,.08);color:#7dd3fc;cursor:pointer;font-size:13px;line-height:1;flex:none}
+#tuneRoot .fanout:hover{background:rgba(56,189,248,.2);color:#fff}
+@media(max-width:767px){
+  #tuneRoot .tune-stage{grid-template-columns:1fr;gap:10px}
+  #tuneRoot .stage-graph{max-height:34vh}
+  #tuneRoot .stage-box{max-height:none;border-left:0;border-top:1px solid var(--hair);padding-left:0;padding-top:10px}
+  #tuneRoot .outcome-full{display:none}
+  #tuneRoot .outcome-mini{display:block}
+}
 
   /* ===== Plan tab — phase-first planner, scoped under .tlroot ===== */
 .tlroot{/* plant-state-dashboard palette */
@@ -703,6 +776,31 @@
     </div>
 
     <main class="flex-1 px-4 md:px-6 py-5 md:py-6 max-w-[1500px] w-full mx-auto">
+      <!-- ===== ENGINE LOG — live AppDaemon tail (thinking · actions · errors) ===== -->
+      <div x-data="engineLog()" x-init="init()" class="mb-5 rounded-2xl border border-white/8 bg-black/40 overflow-hidden">
+        <div class="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none bg-white/[0.03] border-b border-white/8" @click="toggle()">
+          <span class="w-2 h-2 rounded-full shrink-0" :class="paused?'bg-slate-500':'bg-emerald-400 animate-pulse'"></span>
+          <span class="text-sm font-semibold text-slate-200">Engine log</span>
+          <span class="text-[11px] text-slate-500" x-text="'· '+lines.length+' lines'"></span>
+          <span class="text-[11px] text-red-400 font-semibold px-1.5 rounded bg-red-500/15" x-show="errCount()>0" x-text="errCount()+' err'"></span>
+          <div class="ml-auto flex items-center gap-1.5" @click.stop>
+            <button class="px-2 py-0.5 rounded text-[11px]" :class="filter==='all'?'bg-cyan-500/20 text-cyan-300':'bg-white/5 text-slate-400 hover:text-slate-200'" @click="setFilter('all')">All</button>
+            <button class="px-2 py-0.5 rounded text-[11px]" :class="filter==='warn'?'bg-amber-500/20 text-amber-300':'bg-white/5 text-slate-400 hover:text-slate-200'" @click="setFilter('warn')">Warn+Err</button>
+            <button class="px-2 py-0.5 rounded text-[11px] bg-white/5 text-slate-400 hover:text-slate-200" @click="paused=!paused" x-text="paused?'▶ resume':'❚❚ pause'"></button>
+            <span class="text-slate-400 text-xs w-4 text-center" x-text="open?'▾':'▸'"></span>
+          </div>
+        </div>
+        <div x-show="open" x-ref="logbody" @scroll="onScroll()" class="overflow-y-auto px-3 py-2 font-mono text-[11px] leading-relaxed" style="height:230px;background:#0a0e14">
+          <template x-for="(x,i) in shown()" :key="i">
+            <div class="flex gap-2 whitespace-pre-wrap break-words py-[1px]">
+              <span class="text-slate-600 shrink-0" x-text="x.t"></span>
+              <span class="shrink-0 w-14 font-semibold" :style="'color:'+lvlCol(x)" x-text="x.lvl"></span>
+              <span class="flex-1 min-w-0" :style="'color:'+lvlCol(x)" x-text="x.msg"></span>
+            </div>
+          </template>
+          <div x-show="!shown().length" class="text-slate-600 py-6 text-center" x-text="live?'waiting for engine output…':'engine log needs a connected dashboard'"></div>
+        </div>
+      </div>
 
       <!-- ===== OVERVIEW ===== -->
       <section x-show="view==='dashboard'" class="fade-enter space-y-6">
@@ -1352,6 +1450,56 @@
       <button @click="ctrlToggle(control.adaptive.toggle.id,false)" class="relative w-9 h-5 rounded-full transition shrink-0" :class="control.adaptive.toggle.on?'bg-emerald-500':'bg-white/15'"><span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition" :class="control.adaptive.toggle.on&&'translate-x-4'"></span></button></label>
     <span class="text-[11px] text-amber-300/70 ml-auto">⚡ writes to HA live</span>
   </div>
+
+  <!-- ===== ZONE ROUTER: Room · Zone 1 · 2 · 3 · Compare ===== -->
+  <div class="zone-tabs" x-show="view==='tune'">
+    <template x-for="zt in zoneTabs()" :key="'zt'+zt.id">
+      <button class="ztab" :class="zoneView===zt.id&&'on'" @click="setZoneView(zt.id)">
+        <span class="zdot" :class="zt.sev" x-show="zt.dot"></span>
+        <span x-text="zt.label"></span>
+        <span class="zbadge" x-show="zt.edits>0" x-text="zt.edits"></span>
+      </button>
+    </template>
+    <span class="text-[11px] text-slate-500 ml-1" x-text="zoneViewHint()"></span>
+  </div>
+
+  <!-- ===== FROZEN STAGE: sticky graph + outcome box; the setpoints table scrolls underneath ===== -->
+  <div class="stage-sentinel" x-show="view==='tune'" x-ref="stageSentinel"></div>
+  <div class="tune-stage" x-show="view==='tune'" x-ref="tuneStage">
+    <!-- LEFT: the day-curve graph + its dial / topbar / legend / readout -->
+    <div class="stage-graph">
+      <div class="panel glass">
+        <div class="topbar">
+          <div class="seg ath"><template x-for="s in ['Clone','Veg','Stretch','Bulk','Finish']" :key="'a'+s"><button :class="athena===s&&'on'" @click="applyAthena(s)" x-text="s"></button></template></div><span class="ttinfo" @mouseenter="showTip('athena','Athena stage presets',$event)" @mouseleave="hideTip()" @click="showTip('athena','Athena stage presets',$event)">ⓘ</span>
+          <button class="pill" :style="live?'border-color:#facc1555;color:#facc15':''" @click="toggleLive()" x-text="liveOn?'● Live overlay on':(live?'○ Live overlay':'live n/a')" :title="live?'Overlay the last 24h actual VWC/EC on the graph':'Connect to HA to enable live overlay'"></button>
+          <div class="verdict" x-html="verdict()"></div>
+        </div>
+        <div id="tune-steer" class="steer">
+          <div class="lab"><span>Steering dial <span class="ttinfo" @mouseenter="showTip('dial','Steering dial',$event)" @mouseleave="hideTip()" @click="showTip('dial','Steering dial',$event)">ⓘ</span></span><span x-text="dialLabel()"></span></div>
+          <input type="range" min="1" max="10" step="0.5" x-model.number="dial" @input="mode = dial>=5.5?'gen':'veg'; applySteer()">
+          <div class="ends"><span>🌿 vegetative · shallow dryback</span><span>generative · deep dryback 🌸</span></div>
+        </div>
+        <svg viewBox="0 0 1240 680" @pointerdown="onDown($event)" @pointermove="onMove($event)" @pointerup="drag=null" @pointercancel="drag=null" @mouseover="onHover($event)" @mouseleave="hov=null" x-html="zoneView==='cmp'?cmpSvgBody():svgBody()"></svg>
+        <div class="legend" x-show="zoneView!=='cmp'"><span class="ttinfo" @mouseenter="showTip('chart_irrig','Irrigation curve · 24h sim',$event)" @mouseleave="hideTip()" @click="showTip('chart_irrig','Irrigation curve · 24h sim',$event)" style="margin-right:2px">ⓘ</span><span><i style="background:#e7ecf2"></i>VWC</span><span><i style="background:#f472b6"></i>pore EC</span><span><i style="background:#34d399"></i>field capacity</span><span><i style="background:#f87171"></i>emergency floor</span><span x-show="liveOn" style="color:#fde047">· live actual</span><span style="color:var(--ink3)">· glowing dot = draggable</span></div>
+        <div class="legend" x-show="zoneView==='cmp'"><span><i style="background:#34d399"></i>Zone 1</span><span><i style="background:#38bdf8"></i>Zone 2</span><span><i style="background:#f472b6"></i>Zone 3</span><span style="color:var(--ink3)">· 24h VWC, all zones overlaid</span></div>
+        <div class="readout" style="margin-top:10px" x-show="zoneView!=='cmp'">
+          <span class="pill">first shot <b x-text="fmtMin(firstShotMin())"></b></span>
+          <span class="pill">P1 shots <b x-text="p1ShotCount()"></b></span>
+          <span class="pill">last shot <b x-text="fmtBeforeOff()"></b></span>
+          <span class="pill">total dryback <b x-text="((g('field_capacity')-overnightLow())/g('field_capacity')*100).toFixed(0)+'%'"></b></span>
+          <span class="pill">peak EC <b x-text="peakEC().toFixed(1)"></b></span>
+          <span class="pill" x-show="live" style="color:var(--ok)">● live F2</span>
+        </div>
+      </div>
+    </div>
+    <!-- RIGHT: the outcome box — what this plan produces, + yield/potency tables -->
+    <div class="stage-box">
+      <div class="outcome-full" x-html="outcomeBox()" x-show="zoneView!=='cmp'"></div>
+      <div class="outcome-mini" x-html="outcomeMini()" x-show="zoneView!=='cmp'"></div>
+      <div x-show="zoneView==='cmp'" x-html="compareBox()"></div>
+    </div>
+  </div>
+
   <span class="kicker" x-show="view==='analyze'">🔬 F2 physics &amp; limiting factors</span>
   <h1 x-show="view==='analyze'"><span class="grad">Why the day looks the way it does.</span></h1>
   <p class="sub" x-show="view==='analyze'">A full-day <b>physics simulation</b>, not a drawing: the environment (PPFD, CO₂, temp, RH → VPD) sets a transpiration rate that drys the substrate back; the crop-steering controller fires shots; each shot mixes <b>feed EC</b> into the pore by the litres applied (<b>shot % × substrate L</b>); when VWC hits <b>field capacity</b> the overshoot runs off and flushes salt out, pulling pore EC toward the feed EC. The white line is VWC, the pink line is <b>pore EC on the right 0–10 axis</b>. Edit any field or drag a glowing handle and the whole day re-solves. Environment seeded live from F2; everything else from <code>number.crop_steering_*</code>.</p>
@@ -1401,25 +1549,38 @@
   </style>
   <div class="spm" id="spm-anchor" x-show="view==='tune'">
     <div class="spm-head">
-      <div><span class="spm-title">Setpoints</span><span class="spm-sub">every value · every zone · edit one or all</span></div>
+      <div><span class="spm-title" x-text="matrixTitle()"></span><span class="spm-sub" x-text="matrixSub()"></span></div>
       <div class="spm-actions">
         <span class="spm-edits" x-show="mxEditCount()>0" x-text="mxEditCount()+' to write'"></span>
+        <button class="spm-btn" x-show="typeof zoneView==='number'" @click="copyZoneToAll(zoneView)" :title="'Stage Zone '+zoneView+' values into every zone — then Apply all'" x-text="'Copy Zone '+zoneView+' → all'"></button>
         <button class="spm-btn" @click="pullFromHA()">⟳ Pull live</button>
+        <button class="spm-btn primary" x-show="typeof zoneView==='number'" @click="applyToHA()" x-text="'Apply Zone '+zoneView+' → HA'"></button>
         <button class="spm-btn primary" @click="applyAllToHA()">Apply all → HA</button>
       </div>
+    </div>
+    <!-- read-only reference strip (zone pages): the room-shared values live on the Room page -->
+    <div class="ref-strip" x-show="typeof zoneView==='number'">
+      <span>Room-shared:</span>
+      <span><b x-text="fmtCell('field_capacity',G.field_capacity)+'%'"></b> field cap</span>
+      <span>·</span>
+      <span><b x-text="G.lights_on+':00'"></b> on / <b x-text="G.lights_off+':00'"></b> off</span>
+      <a @click="setZoneView('room')">edit on Room →</a>
     </div>
     <div class="spm-tablewrap">
       <table class="spm-table">
         <thead><tr>
           <th class="spm-paramh">Parameter</th>
-          <th class="spm-allh">All zones</th>
-          <th>Zone 1</th><th>Zone 2</th><th>Zone 3</th>
+          <template x-for="col in matrixCols()" :key="'h'+col">
+            <th :class="col==='all'&&'spm-allh'" x-text="col==='all'?'All zones':('Zone '+col)"></th>
+          </template>
         </tr></thead>
         <tbody>
           <template x-for="r in mxRows()" :key="r.t==='g'?('g'+r.g.k):('f'+r.f.key)">
-            <tr :class="r.t==='g'?'spm-grp':(isGlobal(r.f.key)?'spm-row spm-global':'spm-row')" @click="r.t==='g'?mxToggle(r.g.k):null">
+            <tr :class="r.t==='g'?'spm-grp':(isGlobal(r.f.key)?'spm-row spm-global':'spm-row')" :data-k="r.t==='f'?r.f.key:''"
+                @click="r.t==='g'?mxToggle(r.g.k):null"
+                @mouseenter="r.t==='f'&&(hov=hovKey(r.f.key),_rowLock=true)" @mouseleave="r.t==='f'&&(_rowLock=false,hov=null)">
               <template x-if="r.t==='g'">
-                <td colspan="5"><span x-text="mxOpen[r.g.k]?'▾':'▸'"></span><span class="spm-badge" :style="'background:'+r.g.col" x-text="r.g.ph"></span><span x-text="r.g.name"></span><span class="spm-gtag" x-show="isGlobal(r.g.fields[0].key)">whole room</span></td>
+                <td :colspan="matrixCols().length+2"><span x-text="mxOpen[r.g.k]?'▾':'▸'"></span><span class="spm-badge" :style="'background:'+r.g.col" x-text="r.g.ph"></span><span x-text="r.g.name"></span><span class="spm-gtag" x-show="isGlobal(r.g.fields[0].key)">whole room</span></td>
               </template>
               <template x-if="r.t==='f'">
                 <td class="spm-param">
@@ -1435,28 +1596,42 @@
                   </div>
                 </td>
               </template>
-              <template x-if="r.t==='f'">
-                <td class="spm-allcell" :class="isMixed(r.f.key)&&'mixed'">
-                  <span class="spm-stepper">
-                    <button @click.stop="bumpAll(r.f.key,-1)">−</button>
-                    <input type="text" inputmode="decimal" :value="allDisplay(r.f.key)" @change="setAll(r.f.key,$event.target.value)" @click.stop>
-                    <button @click.stop="bumpAll(r.f.key,1)">+</button>
-                  </span>
-                  <span x-show="isGlobal(r.f.key)" class="spm-lock">🔒</span>
-                </td>
-              </template>
-              <template x-for="z in [1,2,3]" :key="'z'+z">
+              <template x-for="col in matrixCols()" :key="'c'+col">
                 <template x-if="r.t==='f'">
-                  <td :class="(!isGlobal(r.f.key)&&cellDirty(r.f.key,z))&&'spm-dirty'">
-                    <template x-if="!isGlobal(r.f.key)">
-                      <span class="spm-stepper">
-                        <button @click.stop="bumpZone(r.f.key,z,-1)">−</button>
-                        <input type="text" inputmode="decimal" :value="fmtCell(r.f.key,Z[z][r.f.key])" @change="setZoneVal(r.f.key,z,$event.target.value)" @click.stop>
-                        <button @click.stop="bumpZone(r.f.key,z,1)">+</button>
-                        <span class="spm-dot" :class="cellDirty(r.f.key,z)?'wr':'ok'"></span>
+                  <td :class="col==='all'?(isMixed(r.f.key)&&'spm-allcell mixed')||'spm-allcell':((!isGlobal(r.f.key)&&cellDirty(r.f.key,col))&&'spm-dirty')">
+                    <!-- ALL column (compare grid only) -->
+                    <template x-if="col==='all'">
+                      <span style="display:inline-flex;align-items:center;gap:5px">
+                        <span class="spm-stepper">
+                          <button @click.stop="bumpAll(r.f.key,-1)">−</button>
+                          <input type="text" inputmode="decimal" :value="allDisplay(r.f.key)" @change="setAll(r.f.key,$event.target.value)" @click.stop @focus="hov=hovKey(r.f.key)">
+                          <button @click.stop="bumpAll(r.f.key,1)">+</button>
+                        </span>
+                        <span x-show="isGlobal(r.f.key)" class="spm-lock">🔒</span>
                       </span>
                     </template>
-                    <template x-if="isGlobal(r.f.key)"><span class="spm-mut">·</span></template>
+                    <!-- a zone column -->
+                    <template x-if="col!=='all'">
+                      <span style="display:inline-flex;align-items:center;gap:5px">
+                        <template x-if="!isGlobal(r.f.key)">
+                          <span class="spm-stepper">
+                            <button @click.stop="bumpZone(r.f.key,col,-1)">−</button>
+                            <input type="text" inputmode="decimal" :value="fmtCell(r.f.key,Z[col][r.f.key])" @change="setZoneVal(r.f.key,col,$event.target.value)" @click.stop @focus="hov=hovKey(r.f.key)">
+                            <button @click.stop="bumpZone(r.f.key,col,1)">+</button>
+                            <span class="spm-dot" :class="cellDirty(r.f.key,col)?'wr':'ok'"></span>
+                          </span>
+                        </template>
+                        <template x-if="isGlobal(r.f.key)">
+                          <span class="spm-stepper">
+                            <button @click.stop="bumpAll(r.f.key,-1)">−</button>
+                            <input type="text" inputmode="decimal" :value="fmtCell(r.f.key,G[r.f.key])" @change="setAll(r.f.key,$event.target.value)" @click.stop @focus="hov=hovKey(r.f.key)">
+                            <button @click.stop="bumpAll(r.f.key,1)">+</button>
+                          </span>
+                        </template>
+                        <!-- fan-out: copy this zone's value to all zones -->
+                        <button class="fanout" x-show="!isGlobal(r.f.key)&&matrixCols().length===1" @click.stop="setAll(r.f.key,Z[col][r.f.key])" title="Copy this value to all zones">⇉</button>
+                      </span>
+                    </template>
                   </td>
                 </template>
               </template>
@@ -1468,41 +1643,9 @@
   </div>
 
   <div class="layout">
-    <!-- ===== SECTION A: irrigation graph + its controls (Steering · Now day-sim) ===== -->
-    <div class="gridrow" x-show="view==='tune'">
+    <!-- ===== SECTION A (Analyze): limiting factors — the Tune graph now lives in the sticky stage above ===== -->
+    <div class="gridrow" x-show="view==='analyze'">
       <div class="gcol">
-    <div class="panel glass">
-      <div class="topbar">
-        <div class="seg"><template x-for="z in [1,2,3]" :key="'z'+z"><button :class="zone===z&&'on'" @click="zone=z" x-text="'Zone '+z"></button></template></div>
-        <div class="seg ath"><template x-for="s in ['Clone','Veg','Stretch','Bulk','Finish']" :key="'a'+s"><button :class="athena===s&&'on'" @click="applyAthena(s)" x-text="s"></button></template></div><span class="ttinfo" @mouseenter="showTip('athena','Athena stage presets',$event)" @mouseleave="hideTip()" @click="showTip('athena','Athena stage presets',$event)">ⓘ</span>
-        <div class="verdict" x-html="verdict()"></div>
-      </div>
-      <div id="tune-steer" class="steer">
-        <div class="lab"><span>Steering dial <span class="ttinfo" @mouseenter="showTip('dial','Steering dial',$event)" @mouseleave="hideTip()" @click="showTip('dial','Steering dial',$event)">ⓘ</span></span><span x-text="dialLabel()"></span></div>
-        <input type="range" min="1" max="10" step="0.5" x-model.number="dial" @input="mode = dial>=5.5?'gen':'veg'; applySteer()">
-        <div class="ends"><span>🌿 vegetative · shallow dryback</span><span>generative · deep dryback 🌸</span></div>
-      </div>
-      <svg viewBox="0 0 1240 680" @pointerdown="onDown($event)" @pointermove="onMove($event)" @pointerup="drag=null" @pointercancel="drag=null" @mouseover="onHover($event)" @mouseleave="hov=null" x-html="svgBody()"></svg>
-      <div class="legend"><span class="ttinfo" @mouseenter="showTip('chart_irrig','Irrigation curve · 24h sim',$event)" @mouseleave="hideTip()" @click="showTip('chart_irrig','Irrigation curve · 24h sim',$event)" style="margin-right:2px">ⓘ</span><span><i style="background:#e7ecf2"></i>VWC</span><span><i style="background:#f472b6"></i>pore EC</span><span><i style="background:#34d399"></i>field capacity</span><span><i style="background:#f87171"></i>emergency floor</span><span style="color:var(--ink3)">· glowing dot = draggable</span></div>
-      <div class="readout" style="margin-top:10px">
-        <span class="pill">first shot <b x-text="fmtMin(firstShotMin())"></b></span>
-        <span class="pill">P1 shots <b x-text="p1ShotCount()"></b></span>
-        <span class="pill">last shot <b x-text="fmtBeforeOff()"></b></span>
-        <span class="pill">total dryback <b x-text="((g('field_capacity')-overnightLow())/g('field_capacity')*100).toFixed(0)+'%'"></b></span>
-        <span class="pill">peak EC <b x-text="peakEC().toFixed(1)"></b></span>
-        <span class="pill" x-show="live" style="color:var(--ok)">● live F2</span>
-      </div>
-      <!-- LIVE vs PLAN: where the zone actually is right now compared to the tuned plan -->
-      <div class="readout" style="margin-top:8px" x-show="live && liveCmp()">
-        <template x-if="liveCmp()"><span style="display:contents">
-          <span class="pill" style="border-color:#facc1555"><b style="color:#facc15">now</b><b x-text="' · '+(liveCmp().t).toFixed(1)+'h since lights-on'"></b></span>
-          <span class="pill">VWC plan <b x-text="liveCmp().vwcPlan.toFixed(1)+'%'"></b></span>
-          <span class="pill" :style="liveCmp().vwcD==null?'':'color:'+(Math.abs(liveCmp().vwcD)>4?'#fb7185':'var(--ok)')">live <b x-text="liveCmp().vwcLive!=null?liveCmp().vwcLive.toFixed(1)+'%':'—'"></b><b x-show="liveCmp().vwcD!=null" x-text="' · Δ'+(liveCmp().vwcD>0?'+':'')+liveCmp().vwcD.toFixed(1)"></b></span>
-          <span class="pill">EC plan <b x-text="liveCmp().ecPlan.toFixed(1)"></b></span>
-          <span class="pill" :style="liveCmp().ecD==null?'':'color:'+(Math.abs(liveCmp().ecD)>0.6?'#fb7185':'var(--ok)')">live <b x-text="liveCmp().ecLive!=null?liveCmp().ecLive.toFixed(1):'—'"></b><b x-show="liveCmp().ecD!=null" x-text="' · Δ'+(liveCmp().ecD>0?'+':'')+liveCmp().ecD.toFixed(1)"></b></span>
-        </span></template>
-      </div>
-    </div>
     <!-- ===== LIMITING FACTORS (Liebig minimum) — Analyze ===== -->
     <div class="panel glass" x-show="view==='analyze'">
       <div class="ch" id="tune-liebig"><h2>Limiting factors — Zone <span x-text="zone"></span></h2><span class="chs">Liebig's law of the minimum — your ceiling is set by the worst factor, not the average. Biggest bottleneck first; fix it, then the next.</span></div>
@@ -1584,13 +1727,13 @@
     <!-- ===== ROOM ENVIRONMENT GRAPHS ===== -->
     <div class="panel glass envstack">
       <div class="ch" id="tune-env"><h2>Room environment · 24h</h2><span class="chs">same lights-aligned timeline as the irrigation card — read root-zone, air, light & balances as one synchronized story.</span></div>
-      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_climate','Climate · VPD',$event)" @mouseleave="hideTip()" @click="showTip('chart_climate','Climate · VPD',$event)">ⓘ</span> Climate · VPD <i style="color:#f472b6">leaf</i> <i style="color:#7dd3fc">air</i> · <i style="color:#fb923c">temp</i> <i style="color:#60a5fa">RH</i><b>green = in-band 0.8–1.4 kPa · drag temp/RH dots</b></div><div class="minicwrap" @pointerdown="miniDown('climate',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="climateChart()"></div></div>
-      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_dew','Dew point & condensation margin',$event)" @mouseleave="hideTip()" @click="showTip('chart_dew','Dew point & condensation margin',$event)">ⓘ</span> Dew point & condensation margin · <i style="color:#fb923c">leaf temp</i> <i style="color:#60a5fa">dew point</i><b style="color:#f87171">red ribbon = &lt;3°C → condensation risk</b></div><div class="minicwrap" @pointerdown="miniDown('dew',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dewChart()"></div></div>
-      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_moist','Moisture balance',$event)" @mouseleave="hideTip()" @click="showTip('chart_moist','Moisture balance',$event)">ⓘ</span> Moisture balance · <i style="color:#34d399">transpiration in</i> <i style="color:#f472b6">dehum capacity out</i><b>fill above the line → RH will climb · drag dehum</b></div><div class="minicwrap" @pointerdown="miniDown('moist',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="moistChart()"></div></div>
-      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_dli','Light · DLI',$event)" @mouseleave="hideTip()" @click="showTip('chart_dli','Light · DLI',$event)">ⓘ</span> Light · <i style="color:#a3e635">cumulative DLI</i> <i style="color:#6b7682">target pace</i> · <i style="color:#fbbf24">photosynthesis %</i></div><div class="minicwrap" @pointerdown="miniDown('dli',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dliChart()"></div></div>
-      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_leafair','Leaf vs air temp',$event)" @mouseleave="hideTip()" @click="showTip('chart_leafair','Leaf vs air temp',$event)">ⓘ</span> Leaf vs air temp · <i style="color:#fb923c">leaf</i> <i style="color:#7dd3fc">air</i><b>gap = transpirational cooling / stress · drag air</b></div><div class="minicwrap" @pointerdown="miniDown('leafair',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="leafAirChart()"></div></div>
-      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_co2','CO₂ utilization',$event)" @mouseleave="hideTip()" @click="showTip('chart_co2','CO₂ utilization',$event)">ⓘ</span> CO₂ utilization · <i style="color:#a78bfa">room ppm</i> <i style="color:#34d399">canopy uptake g/h</i><b>enriched by day · ambient at night · drag CO₂</b></div><div class="minicwrap" @pointerdown="miniDown('co2',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="co2Chart()"></div></div>
-      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_heat','Heat / cooling',$event)" @mouseleave="hideTip()" @click="showTip('chart_heat','Heat / cooling',$event)">ⓘ</span> Heat / cooling · <i style="color:#f59e0b">sensible load (lights)</i> <i style="color:#60a5fa">AC capacity</i><b>area above the line = under-cooled · drag AC</b></div><div class="minicwrap" @pointerdown="miniDown('heat',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="heatChart()"></div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_climate','Climate · VPD',$event)" @mouseleave="hideTip()" @click="showTip('chart_climate','Climate · VPD',$event)">ⓘ</span> Climate · VPD <i style="color:#f472b6">leaf</i> <i style="color:#7dd3fc">air</i> · <i style="color:#fb923c">temp</i> <i style="color:#60a5fa">RH</i><b>green = in-band 0.8–1.4 kPa · drag temp/RH dots</b></div><div class="minicwrap" @pointerdown="miniDown('climate',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="climateChart()"></div><div class="envhow"><b>How to read:</b> Pink = <b>leaf VPD</b>, the number that actually drives the plant — keep it inside the <span class="ok">green band (0.8–1.4 kPa)</span>. <span class="bad">Above</span> = air too dry, stomata close, growth stalls; <span class="bad">below</span> = air too wet, soft growth &amp; mould risk. Higher temp or lower RH pushes VPD up. Drag the temp / RH dots and watch the pink line move against the band.</div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_dew','Dew point & condensation margin',$event)" @mouseleave="hideTip()" @click="showTip('chart_dew','Dew point & condensation margin',$event)">ⓘ</span> Dew point & condensation margin · <i style="color:#fb923c">leaf temp</i> <i style="color:#60a5fa">dew point</i><b style="color:#f87171">red ribbon = &lt;3°C → condensation risk</b></div><div class="minicwrap" @pointerdown="miniDown('dew',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dewChart()"></div><div class="envhow"><b>How to read:</b> Keep the orange <b>leaf-temp</b> line well above the blue <b>dew-point</b> line. The vertical gap is your safety margin; when it drops under 3 °C the <span class="bad">red ribbon</span> appears and water condenses on leaves &amp; surfaces (botrytis / powdery mildew). The risk window is the coldest part of the night — watch the lights-off side.</div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_moist','Moisture balance',$event)" @mouseleave="hideTip()" @click="showTip('chart_moist','Moisture balance',$event)">ⓘ</span> Moisture balance · <i style="color:#34d399">transpiration in</i> <i style="color:#f472b6">dehum capacity out</i><b>fill above the line → RH will climb · drag dehum</b></div><div class="minicwrap" @pointerdown="miniDown('moist',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="moistChart()"></div><div class="envhow"><b>How to read:</b> Green = water the canopy breathes into the air (transpiration). Pink dashed = what your dehumidifier can pull back out. Wherever green <b>fills above</b> the pink line, RH is climbing faster than you can remove it. Drag the dehum handle to size the gear to the load.</div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_dli','Light · DLI',$event)" @mouseleave="hideTip()" @click="showTip('chart_dli','Light · DLI',$event)">ⓘ</span> Light · <i style="color:#a3e635">cumulative DLI</i> <i style="color:#6b7682">target pace</i> · <i style="color:#fbbf24">photosynthesis %</i></div><div class="minicwrap" @pointerdown="miniDown('dli',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="dliChart()"></div><div class="envhow"><b>How to read:</b> Green = light banked so far today; grey dashed = the pace needed to hit the daily target by lights-off — staying <span class="ok">on or above</span> the dashed line means you'll make target. Yellow (right axis) is photosynthesis efficiency: it plateaus, so light added past the flat part is wasted energy, not extra growth.</div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_leafair','Leaf vs air temp',$event)" @mouseleave="hideTip()" @click="showTip('chart_leafair','Leaf vs air temp',$event)">ⓘ</span> Leaf vs air temp · <i style="color:#fb923c">leaf</i> <i style="color:#7dd3fc">air</i><b>gap = transpirational cooling / stress · drag air</b></div><div class="minicwrap" @pointerdown="miniDown('leafair',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="leafAirChart()"></div><div class="envhow"><b>How to read:</b> A healthy leaf sits a degree or two <span class="ok">below</span> air temp — that gap is transpirational cooling. No gap, or leaf <span class="bad">above</span> air, means the plant has shut its stomata (heat or water stress). A very large gap = very high transpiration; cross-check VPD and irrigation.</div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_co2','CO₂ utilization',$event)" @mouseleave="hideTip()" @click="showTip('chart_co2','CO₂ utilization',$event)">ⓘ</span> CO₂ utilization · <i style="color:#a78bfa">room ppm</i> <i style="color:#34d399">canopy uptake g/h</i><b>enriched by day · ambient at night · drag CO₂</b></div><div class="minicwrap" @pointerdown="miniDown('co2',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="co2Chart()"></div><div class="envhow"><b>How to read:</b> Purple = room CO₂ (enriched ~1200–1400 ppm by day, ambient at night). Green = how fast the canopy is consuming it. If uptake stays high while ppm sags, the plants are <b>CO₂-limited</b> — raise enrichment or fix distribution. At night uptake should fall to near zero.</div></div>
+      <div class="envrow"><div class="envlab"><span class="ttinfo" @mouseenter="showTip('chart_heat','Heat / cooling',$event)" @mouseleave="hideTip()" @click="showTip('chart_heat','Heat / cooling',$event)">ⓘ</span> Heat / cooling · <i style="color:#f59e0b">sensible load (lights)</i> <i style="color:#60a5fa">AC capacity</i><b>area above the line = under-cooled · drag AC</b></div><div class="minicwrap" @pointerdown="miniDown('heat',$event)" @pointermove="miniMove($event)" @pointerup="minidrag=null" @pointercancel="minidrag=null" x-html="heatChart()"></div><div class="envhow"><b>How to read:</b> Orange = sensible heat the lights dump into the room; blue dashed = your AC's cooling capacity. Any area where orange <span class="bad">rises above</span> the blue line = under-cooled, room temp will climb. Drag the AC handle to size cooling to the lighting load.</div></div>
     </div>
 
       </div>
@@ -2723,6 +2866,7 @@ let SIM=null, SIMKEY=null;   // simulation cache in module scope (never Alpine-r
 let ENVS=null, ENVK=null;    // diurnal environment-series cache
 let MINI={};                 // per-mini-chart geometry, for on-graph drag inversion
 let ZOVR=null;               // transient zone override for cross-zone calc (NOT Alpine-reactive — avoids render churn that eats input focus)
+let CMPKEYS=new Set();       // compare view: keys shown once they differ stay visible even after they re-equalize (NOT Alpine-reactive); cleared on leaving compare
 let PREV={};                 // last coupled-state values, for change-direction arrows
 
 /* Athena standard setpoints by stage (from the Setpoints dashboard WEEK_DATA) */
@@ -2999,6 +3143,28 @@ function synthTip(key){
   return null;
 }
 
+function engineLog(){ return {   // live tail of the AppDaemon main log (served at /local/f2_engine.log via appdaemon.yaml main_log)
+  open: ls.get('f2.logOpen', true), lines: [], filter: ls.get('f2.logFilter','all'), paused:false, live:false, _t:0, _atBottom:true,
+  init(){ this.tick(); this._t=setInterval(()=>{ if(!this.paused && this.open) this.tick(); }, 4000); },
+  toggle(){ this.open=!this.open; ls.set('f2.logOpen',this.open); if(this.open){ this._atBottom=true; this.$nextTick(()=>this.tick()); } },
+  setFilter(f){ this.filter=f; ls.set('f2.logFilter',f); },
+  errCount(){ return this.lines.filter(x=>x.lvl==='ERROR'||x.lvl==='CRITICAL'||/error|exception|traceback/i.test(x.msg)).length; },
+  async tick(){ if(DEMO){ this.live=false; return; } const tok=getToken(); if(!tok){ this.live=false; return; }
+    try{ const r=await fetch((CONFIG.HA_BASE||'')+'/local/f2_engine.log',{headers:{Authorization:'Bearer '+tok,'Range':'bytes=-60000'},cache:'no-store'});
+      if(r.status!==200 && r.status!==206){ this.live=false; return; } this.live=true;
+      const txt=await r.text(), arr=txt.split('\n'); if(r.status===206 && arr.length>1) arr.shift();   // drop the partial first line from a range read
+      this.lines=arr.map(l=>this.parse(l)).filter(Boolean).slice(-600);
+      this.$nextTick(()=>{ const el=this.$refs.logbody; if(el && this._atBottom) el.scrollTop=el.scrollHeight; });
+    }catch(e){ this.live=false; }
+  },
+  parse(l){ if(!l||!l.trim()) return null;
+    const m=l.match(/^\d{4}-\d\d-\d\d\s+(\d\d:\d\d:\d\d)(?:\.\d+)?\s+(\w+)\s+[^:]*:\s?(.*)$/);   // "2026-06-20 21:05:17.527 INFO logger: msg"
+    if(!m) return {t:'', lvl:'', msg:l};   // continuation / traceback line — keep raw
+    return {t:m[1], lvl:(m[2]||'').toUpperCase(), msg:m[3]||''}; },
+  shown(){ if(this.filter==='all') return this.lines; return this.lines.filter(x=>x.lvl==='WARNING'||x.lvl==='ERROR'||x.lvl==='CRITICAL'||/error|exception|traceback|fail|warn/i.test(x.msg)); },
+  lvlCol(x){ const L=x.lvl; if(L==='ERROR'||L==='CRITICAL'||/error|exception|traceback/i.test(x.msg)) return '#f87171'; if(L==='WARNING'||/\bwarn/i.test(x.msg)) return '#fbbf24'; if(/\[SHADOW\]|FIRE|watered|irrigat|→\s?P[0-3]|transition/i.test(x.msg)) return '#67e8f9'; return '#94a3b8'; },
+  onScroll(){ const el=this.$refs.logbody; if(!el) return; this._atBottom=(el.scrollHeight-el.scrollTop-el.clientHeight)<50; },
+}; }
 function editor(){
   return {
     W:1240, H:680, PL:42, PR:46, PT:38, PB:70, VMIN:28, VMAX:72, gdays:3, histPts:null,
@@ -3008,13 +3174,74 @@ function editor(){
 
     zone:1, mode:"gen", dial:7, hot:"P1", drag:null, hov:null, saved:false, live:false, athena:"Bulk", minidrag:null, tip:null,
     Z:{}, G:{}, hydrated:false, liveWaiting:false,
+    zoneView:1, _rowLock:false, _stuck:false, liveOn:false, liveHist:null,   // zone router + row-highlight lock + sticky shadow + live overlay
     init(){ this.Z=JSON.parse(JSON.stringify(LIVE)); this.G=Object.assign({},GLOBAL);
       try{ const s=JSON.parse(localStorage.getItem("f2cs.tpl")); if(s&&s.Z){ for(const z in this.Z){ if(s.Z[z]) this.Z[z]=Object.assign({},this.Z[z],s.Z[z]); }   // MERGE saved over defaults so new schema keys aren't lost
         this.G=Object.assign({},GLOBAL); if(s.G) for(const k in GLOBAL){ if(s.G[k]!=null) this.G[k]=s.G[k]; }   // only re-apply stored keys still in the schema — a stale removed key (e.g. old global plant_count) can't shadow a new per-zone field
         if(s.dial) this.dial=s.dial; this.hydrated=true; } }catch(e){}   // restored edits win on reload (hydrated) — no clobber
+      try{ let zv=localStorage.getItem("f2cs.zoneView"); const q=new URLSearchParams(location.search).get('zoneView'); if(q!=null) zv=q;   // ?zoneView= deep-link (room|1|2|3|cmp) overrides the saved page
+        if(zv!=null){ const n=(zv==='room'||zv==='cmp')?zv:+zv; if(n==='room'||n==='cmp'||[1,2,3].includes(n)){ this.zoneView=n; if(typeof n==='number') this.zone=n; } } }catch(e){}
       this.mode = this.dial>=5.5?'gen':'veg'; this.live=!!getToken(); this.seedFromHA(false);
       window.__tuneReseed = ()=>this.seedFromHA(false);
+      // sticky-stage shadow + row scroll-spy (wired once the DOM is laid out)
+      this.$nextTick(()=>this.wireStage());
+      this.$watch('zone',()=>{ if(this.liveOn) this.reqLive(); });
+      this.$watch('gdays',()=>{ if(this.liveOn) this.reqLive(); });
     },
+    /* ===== sticky stage: drop-shadow when stuck + row scroll-spy that drives the graph highlight ===== */
+    wireStage(){
+      try{
+        const sentinel=this.$refs.stageSentinel, stage=this.$refs.tuneStage;
+        if(sentinel&&stage&&'IntersectionObserver' in window){
+          this._stuckObs&&this._stuckObs.disconnect();
+          this._stuckObs=new IntersectionObserver((es)=>{ const e=es[0]; this._stuck=!(e.isIntersecting); stage.classList.toggle('is-stuck', this._stuck); }, {threshold:0});
+          this._stuckObs.observe(sentinel);
+        }
+        // scroll-spy over matrix rows → set hov to the row nearest the top (only when hover/focus isn't holding)
+        const root=document.getElementById('tuneRoot');
+        if(root&&'IntersectionObserver' in window){
+          this._rowObs&&this._rowObs.disconnect();
+          this._rowObs=new IntersectionObserver((es)=>{ if(this._rowLock||this.drag) return;
+            let best=null, bestTop=1e9;
+            es.forEach(e=>{ if(e.isIntersecting){ const top=e.boundingClientRect.top; if(top>=0 && top<bestTop){ bestTop=top; best=e.target; } } });
+            if(best){ const k=best.getAttribute('data-k'); if(k) this.hov=this.hovKey(k); }
+          }, {rootMargin:'-46% 0px -46% 0px', threshold:0});
+          this._spyWired=()=>{ try{ this._rowObs.disconnect(); root.querySelectorAll('.spm-row[data-k]').forEach(el=>this._rowObs.observe(el)); }catch(e){} };
+          this._spyWired();
+          // re-observe after Alpine re-renders the table body (zone switches / group toggles) — MutationObserver, self-limiting
+          const tbody=root.querySelector('#spm-anchor tbody');
+          if(tbody&&'MutationObserver' in window){ this._mutObs&&this._mutObs.disconnect();
+            this._mutObs=new MutationObserver(()=>{ clearTimeout(this._spyT); this._spyT=setTimeout(()=>this._spyWired&&this._spyWired(),120); });
+            this._mutObs.observe(tbody,{childList:true,subtree:true}); }
+        }
+      }catch(e){ console.warn('wireStage failed:',e.message); }
+    },
+    /* ===== zone router ===== */
+    setZoneView(v){ this.zoneView=v; if(v!=='cmp') CMPKEYS.clear(); if(typeof v==='number'){ this.zone=v; if(ZOVR!==null){ ZOVR=null; } } SIMKEY=null;
+      try{ localStorage.setItem("f2cs.zoneView", String(v)); }catch(e){}
+      this.$nextTick(()=>{ this.wireStage(); }); },
+    zoneEdits(z){ if(z==='room'){ let n=0; for(const k in TUNE_GK){ if(this.cellDirty(k,1)) n++; } return n; }
+      if(z==='cmp'){ let n=0; for(const zz of [1,2,3]) for(const k of TUNE_ZK){ if(this.cellDirty(k,zz)) n++; } return n; }
+      let n=0; for(const k of TUNE_ZK){ if(this.cellDirty(k,z)) n++; } return n; },
+    zoneSev(z){ if(z==='room'||z==='cmp') return ''; ZOVR=z; try{ const m=this.sim().meta, FCv=this.g('field_capacity'), low=m.overnightLow, ef=this.g('p3_emergency_vwc_threshold'), pec=this.peakEC();
+        if(low<=ef+1 || pec>=this.ecP2()*1.6) return 'crit'; if(low<=ef+4 || this.peakEC()>=this.ecP2()*1.4) return 'warn'; return 'ok'; } finally{ ZOVR=null; } },
+    zoneTabs(){ const out=[{id:'room',label:'Room',dot:false,edits:this.zoneEdits('room'),sev:''}];
+      for(const z of [1,2,3]) out.push({id:z,label:'Zone '+z,dot:true,edits:this.zoneEdits(z),sev:this.zoneSev(z)});
+      out.push({id:'cmp',label:'Compare',dot:false,edits:this.zoneEdits('cmp'),sev:''}); return out; },
+    zoneViewHint(){ if(this.zoneView==='room') return 'whole-room hardware & guardrails — shared across all zones';
+      if(this.zoneView==='cmp') return 'all three zones overlaid · only the params that differ';
+      return 'Zone '+this.zoneView+' · drag a handle or edit a row, the day re-solves'; },
+    matrixCols(){ if(this.zoneView==='room') return ['all']; if(this.zoneView==='cmp') return [1,2,3]; return [this.zoneView]; },
+    matrixTitle(){ if(this.zoneView==='room') return 'Room setpoints'; if(this.zoneView==='cmp') return 'Compare zones'; return 'Zone '+this.zoneView+' setpoints'; },
+    matrixSub(){ if(this.zoneView==='room') return 'whole-room — written once, applies everywhere'; if(this.zoneView==='cmp') return 'only parameters that differ across zones'; return 'this zone · ⇉ fans a value out to all zones'; },
+    copyZoneToAll(z){ for(const k of TUNE_ZK){ const v=this.Z[z][k]; for(const zz of [1,2,3]) this.Z[zz][k]=v; } SIMKEY=null; this.persist();
+      this.saved=true; setTimeout(()=>this.saved=false,1200); },
+    hovKey(k){ if(this.mode==='gen'){ if(k==='vegetative_dryback_target') return 'generative_dryback_target';
+        if(k==='p3_veg_last_irrigation') return 'p3_gen_last_irrigation'; if(/^ec_target_veg_/.test(k)) return k.replace('veg','gen'); }
+      else { if(k==='generative_dryback_target') return 'vegetative_dryback_target';
+        if(k==='p3_gen_last_irrigation') return 'p3_veg_last_irrigation'; if(/^ec_target_gen_/.test(k)) return k.replace('gen','veg'); }
+      return k; },
+    toggleLive(){ if(!this.live){ return; } this.liveOn=!this.liveOn; if(this.liveOn) this.reqLive(); else { this.liveHist=null; SIMKEY=null; } },
     seedFromHA(force){   // live HA number.* setpoints are the source of truth. Adopt any value that changed externally (matrix / HA dev-tools / other device → pulls through), but preserve the user's own un-applied edits until they Apply or Pull. force=true (Pull live) overwrites everything. Replaces the old hydrated-gate that turned Tune into a stale localStorage island.
       if(!getToken()){ this.live=false; return; }
       this.live=true;
@@ -3050,10 +3277,20 @@ function editor(){
     applySteer(){ const gf=clamp((this.dial-1)/9,0,1); for(const z of [1,2,3]) for(const k in STEER){ const m=META[k], v=STEER[k][0]+(STEER[k][1]-STEER[k][0])*gf; this.Z[z][k]=clamp(rstep(v,m.step),m.min,m.max); } SIMKEY=null; this.persist(); },   // dial writes the steered setpoints across all zones
 
     /* ===== Setpoints matrix: param × zone, see-all + edit-all (the redesign centerpiece) ===== */
-    mxOpen:{P0:true,P1:true,P2:true,P3:true,ST:true,ZN:true,EN:false,RM:false,SF:false,HW:false},   // collapsible phase groups
+    mxOpen:{P0:true,P1:true,P2:true,P3:true,ST:true,ZN:true,EN:true,RM:true,SF:true,HW:true},   // collapsible groups — open by default (global groups only show on the Room page)
     mxTip:null,                                                                                       // key of the row whose a/b/f detail is expanded
     isGlobal(k){ return k in this.G; },                                                               // global (whole-room) vs per-zone — same check g() uses
-    mxRows(){ const out=[]; for(const g of this.groups()){ out.push({t:'g',g}); if(this.mxOpen[g.k]) for(const f of g.fields) out.push({t:'f',g,f}); } return out; },   // flat row list (group headers + fields) so one Alpine x-for renders the whole table
+    mxRows(){ const out=[], zv=this.zoneView;
+      for(const g of this.groups()){ const gGlobal=this.isGlobal(g.fields[0].key);
+        // Room page = global groups only; zone/compare pages = per-zone groups only
+        if(zv==='room'){ if(!gGlobal) continue; }
+        else { if(gGlobal) continue; }
+        let fields=g.fields;
+        if(zv==='cmp') fields=fields.filter(f=>{ if(this.isGlobal(f.key)) return false; if(this.isMixed(f.key)) CMPKEYS.add(f.key); return CMPKEYS.has(f.key); });   // compare → params that differ, kept sticky so they don't vanish when edited to match
+        else fields=fields.filter(f=>zv==='room'?this.isGlobal(f.key):!this.isGlobal(f.key)); // drop any odd-one-out global/zone fields
+        if(!fields.length) continue;
+        out.push({t:'g',g}); if(this.mxOpen[g.k]) for(const f of fields) out.push({t:'f',g,f}); }
+      return out; },   // flat row list (group headers + fields), filtered to the active zone-router page
     mxToggle(k){ this.mxOpen[k]=!this.mxOpen[k]; },
     mxTipToggle(k){ this.mxTip=this.mxTip===k?null:k; },
     fmtCell(k,v){ if(v==null) return '—'; const m=META[k]; const d=(m&&m.step<1)?(m.step<0.1?2:1):0; return Number(v).toFixed(d); },
@@ -3234,46 +3471,46 @@ function editor(){
       let val=ax[0]+(1-(py-m.mPT)/m.PHi)*(ax[1]-ax[0]); const me=META[d.key]; if(!me) return; this.setRaw(d.key, clamp(rstep(val*d.mul,me.step),me.min,me.max)); ENVK=null; },
 
     climateChart(){ const S=this.envSeries(), p=this.photo(), e=this.dayEnv();
-      return this.miniChart({id:'climate', h:158, left:{min:0,max:2.6,label:'VPD kPa',ticks:[0.5,1,1.5,2],bands:[{lo:0.8,hi:1.4}],
+      return this.miniChart({id:'climate', h:210, left:{min:0,max:2.6,label:'VPD kPa',ticks:[0.5,1,1.5,2],bands:[{lo:0.8,hi:1.4}],
           series:[{pts:S.vpdL,color:'#f472b6',w:2.4},{pts:S.vpdA,color:'#7dd3fc',w:1.6,dash:'4 3'}]},
         right:{min:0,max:100,label:'°C · %',ticks:[20,40,60,80],series:[{pts:S.temp,color:'#fb923c',w:1.5,op:.75},{pts:S.rh,color:'#60a5fa',w:1.5,op:.75}]},
         bubbles:[ {t:p*0.45,v:this.vpdLeaf(e),ax:'l',col:'#f472b6',txt:this.vpdLeaf(e).toFixed(2),cap:'leaf VPD',dy:-1},
-          {t:p*0.64,v:this.g('temp'),ax:'r',col:'#fb923c',txt:this.g('temp')+'°',cap:'day temp · drag',k:'temp',dy:-1},
-          {t:p*0.82,v:this.g('rh'),ax:'r',col:'#60a5fa',txt:this.g('rh')+'%',cap:'day RH · drag',k:'rh',dy:1} ] }); },
+          {t:p*0.64,v:this.g('temp'),ax:'r',col:'#fb923c',txt:this.fmtCell('temp',this.g('temp'))+'°',cap:'day temp · drag',k:'temp',dy:-1},
+          {t:p*0.82,v:this.g('rh'),ax:'r',col:'#60a5fa',txt:this.fmtCell('rh',this.g('rh'))+'%',cap:'day RH · drag',k:'rh',dy:1} ] }); },
     dewChart(){ const S=this.envSeries(), p=this.photo();
       let mi=0,mv=99; for(let i=0;i<S.leaf.length;i++){ const m=S.leaf[i][1]-S.dew[i][1]; if(m<mv){mv=m;mi=i;} }
       const extra=(xx,yl)=>{ const top=S.dew.map(q=>xx(q[0]).toFixed(1)+","+yl(q[1]+3).toFixed(1)).join(" ");
         const bot=S.dew.map(q=>xx(q[0]).toFixed(1)+","+yl(q[1]).toFixed(1)).reverse().join(" "); return `<polygon points="${top} ${bot}" fill="rgba(248,113,113,.15)"/>`; };
-      return this.miniChart({id:'dew', h:158, extra, left:{min:8,max:34,label:'°C',ticks:[12,18,24,30],
+      return this.miniChart({id:'dew', h:210, extra, left:{min:8,max:34,label:'°C',ticks:[12,18,24,30],
           series:[{pts:S.leaf,color:'#fb923c',w:2.4},{pts:S.temp,color:'#e7ecf2',w:1.3,dash:'2 3'},{pts:S.dew,color:'#60a5fa',w:2.2,dash:'4 3'}]},
         bubbles:[ {t:S.t[mi],v:S.leaf[mi][1],ax:'l',col:mv<3?'#f87171':'#34d399',txt:mv.toFixed(1)+'°',cap:'min margin',dy:-1},
           {t:p+(24-p)*0.55,v:S.dew[Math.round((p+(24-p)*0.55)*4)]?S.dew[Math.round((p+(24-p)*0.55)*4)][1]:S.dew[S.dew.length-1][1],ax:'l',col:'#60a5fa',txt:(S.dew[S.dew.length-1][1]).toFixed(1)+'°',cap:'night dew',dy:1} ] }); },
     moistChart(){ const S=this.envSeries(), dh=this.g('dehum_capacity')/24, mx=(Math.max(dh*1.3, ...S.transp.map(q=>q[1]))*1.12)||1, dpts=S.t.map(t=>[t,dh]), pk=Math.max(...S.transp.map(q=>q[1]));
-      return this.miniChart({id:'moist', h:150, left:{min:0,max:mx,label:'L/h',ticks:[+(mx*0.25).toFixed(2),+(mx*0.5).toFixed(2),+(mx*0.75).toFixed(2)],
+      return this.miniChart({id:'moist', h:196, left:{min:0,max:mx,label:'L/h',ticks:[+(mx*0.25).toFixed(2),+(mx*0.5).toFixed(2),+(mx*0.75).toFixed(2)],
           series:[{pts:S.transp,color:'#34d399',w:2,fill:'rgba(52,211,153,.16)'},{pts:dpts,color:'#f472b6',w:1.8,dash:'5 4'}]},
-        bubbles:[ {t:this.photo()*0.28,v:dh,ax:'l',col:'#f472b6',txt:this.g('dehum_capacity')+'L/d',cap:'dehum · drag',k:'dehum_capacity',mul:24,dy:-1},
+        bubbles:[ {t:this.photo()*0.28,v:dh,ax:'l',col:'#f472b6',txt:this.fmtCell('dehum_capacity',this.g('dehum_capacity'))+'L/d',cap:'dehum · drag',k:'dehum_capacity',mul:24,dy:-1},
           {t:this.photo()*0.6,v:pk,ax:'l',col:'#34d399',txt:this.dailyWaterL().toFixed(0)+'L/d',cap:'water use',dy:-1} ] }); },
     dliChart(){ const S=this.envSeries(), tot=S.dli[S.dli.length-1][1], photo=this.photo(), tgt=38, target=S.t.map(t=>[t, tgt*Math.min(t,photo)/photo]);
-      return this.miniChart({id:'dli', h:150, left:{min:0,max:Math.max(tot*1.1,42),label:'DLI mol',ticks:[10,20,30,40],
+      return this.miniChart({id:'dli', h:205, left:{min:0,max:Math.max(tot*1.1,42),label:'DLI mol',ticks:[10,20,30,40],
           series:[{pts:S.dli,color:'#a3e635',w:2.6},{pts:target,color:'#6b7682',w:1.4,dash:'4 4'}]},
         right:{min:0,max:100,label:'photo %',ticks:[25,50,75],series:[{pts:S.pn,color:'#fbbf24',w:1.6,op:.7}]},
         bubbles:[ {t:photo*0.92,v:tot,ax:'l',col:'#a3e635',txt:tot.toFixed(0),cap:'DLI mol/d',dy:-1},
           {t:photo*0.5,v:Math.max(...S.pn.map(q=>q[1])),ax:'r',col:'#fbbf24',txt:Math.round(Math.max(...S.pn.map(q=>q[1])))+'%',cap:'photo',dy:1} ] }); },
     leafAirChart(){ const S=this.envSeries(), p=this.photo(), lf=this.leafTemp(this.dayEnv());
-      return this.miniChart({id:'leafair', h:148, left:{min:14,max:36,label:'°C',ticks:[18,24,30],
+      return this.miniChart({id:'leafair', h:196, left:{min:14,max:36,label:'°C',ticks:[18,24,30],
           series:[{pts:S.leaf,color:'#fb923c',w:2.4},{pts:S.temp,color:'#7dd3fc',w:2,dash:'4 3'}]},
         bubbles:[ {t:p*0.45,v:lf,ax:'l',col:'#fb923c',txt:lf.toFixed(1)+'°',cap:'leaf · Δ'+(lf-this.g('temp')).toFixed(1),dy:-1},
-          {t:p*0.68,v:this.g('temp'),ax:'l',col:'#7dd3fc',txt:this.g('temp')+'°',cap:'day air · drag',k:'temp',dy:1} ] }); },
+          {t:p*0.68,v:this.g('temp'),ax:'l',col:'#7dd3fc',txt:this.fmtCell('temp',this.g('temp'))+'°',cap:'day air · drag',k:'temp',dy:1} ] }); },
     co2Chart(){ const S=this.envSeries(), umax=(Math.max(8,...S.uptake.map(q=>q[1]))*1.25)||10, p=this.photo();
-      return this.miniChart({id:'co2', h:148, left:{min:0,max:1700,label:'CO₂ ppm',ticks:[400,800,1200,1600],
+      return this.miniChart({id:'co2', h:200, left:{min:0,max:1700,label:'CO₂ ppm',ticks:[400,800,1200,1600],
           series:[{pts:S.co2,color:'#a78bfa',w:2.4,fill:'rgba(167,139,250,.12)'}]},
         right:{min:0,max:umax,label:'uptake g/h',ticks:[+(umax*0.5).toFixed(0),+umax.toFixed(0)],series:[{pts:S.uptake,color:'#34d399',w:1.8,op:.85}]},
-        bubbles:[ {t:p*0.5,v:this.g('co2'),ax:'l',col:'#a78bfa',txt:this.g('co2'),cap:'day CO₂ · drag',k:'co2',dy:-1},
+        bubbles:[ {t:p*0.5,v:this.g('co2'),ax:'l',col:'#a78bfa',txt:this.fmtCell('co2',this.g('co2')),cap:'day CO₂ · drag',k:'co2',dy:-1},
           {t:p*0.5,v:this.co2UptakeGh(),ax:'r',col:'#34d399',txt:this.co2UptakeGh().toFixed(0)+'g/h',cap:'uptake',dy:1} ] }); },
     heatChart(){ const S=this.envSeries(), cap=this.g('hvac_cooling_kw'), sens=S.lightKw.map(q=>[q[0],q[1]*0.5]), pk=Math.max(...sens.map(q=>q[1])), mx=(Math.max(cap*1.2,pk)*1.1)||1, cp=S.t.map(t=>[t,cap]), p=this.photo();
-      return this.miniChart({id:'heat', h:150, left:{min:0,max:mx,label:'kW',ticks:[+(mx*0.33).toFixed(1),+(mx*0.66).toFixed(1)],
+      return this.miniChart({id:'heat', h:200, left:{min:0,max:mx,label:'kW',ticks:[+(mx*0.33).toFixed(1),+(mx*0.66).toFixed(1)],
           series:[{pts:sens,color:'#f59e0b',w:1.8,fill:'rgba(245,158,11,.15)'},{pts:cp,color:'#60a5fa',w:1.8,dash:'5 4'}]},
-        bubbles:[ {t:p*0.24,v:cap,ax:'l',col:'#60a5fa',txt:cap+'kW',cap:'AC · drag',k:'hvac_cooling_kw',dy:1},
+        bubbles:[ {t:p*0.24,v:cap,ax:'l',col:'#60a5fa',txt:this.fmtCell('hvac_cooling_kw',cap)+'kW',cap:'AC · drag',k:'hvac_cooling_kw',dy:1},
           {t:p*0.58,v:pk,ax:'l',col:pk>cap?'#f87171':'#f59e0b',txt:pk.toFixed(1)+'kW',cap:'sensible ≈50% LED',dy:-1} ] }); },
 
     /* ===== limiting-factor (Liebig minimum) analysis vs max yield & potency ===== */
@@ -3492,6 +3729,33 @@ function editor(){
           const pts=a.map(o=>[(o.t-t0)/3600000,o.v]).filter(p=>!isNaN(p[1])&&isFinite(p[0])); this.histPts=pts.length?pts:null; })
         .catch(e=>console.warn('tune history failed:',e.message)); },
 
+    /* row-focus → graph region highlight. Adds a guide line / band shade / seam glow for the focused param,
+       on top of the existing bubble glow (which already covers params that have a bubble). hov is mode-resolved. */
+    hovHighlight(x,y,W,PL,PR,PT,PH,fc){ const k=this.hov; if(!k) return '';
+      let s=''; const guide=(v,col)=>{ const yy=y(clamp(v,this.VMIN,this.VMAX));
+        s+=`<line x1="${PL}" y1="${yy.toFixed(1)}" x2="${W-PR}" y2="${yy.toFixed(1)}" stroke="${col}" stroke-width="1.6" stroke-dasharray="2 4" opacity=".8"/>`; };
+      const shade=(bk,col)=>{ const b=this.bands().find(z=>z.k===bk); if(!b) return; s+=`<rect x="${x(b.t0).toFixed(1)}" y="${PT}" width="${(x(b.t1)-x(b.t0)).toFixed(1)}" height="${PH}" fill="${col}" opacity=".10"/>`; };
+      const seam=(t,col)=>{ const xx=x(t); s+=`<line x1="${xx.toFixed(1)}" y1="${PT}" x2="${xx.toFixed(1)}" y2="${PT+PH}" stroke="${col}" stroke-width="2.4" opacity=".5"><animate attributeName="opacity" values=".7;.2;.7" dur="1.6s" repeatCount="indefinite"/></line>`; };
+      const bracket=(v0,v1,col)=>{ const y0=y(clamp(v0,this.VMIN,this.VMAX)), y1=y(clamp(v1,this.VMIN,this.VMAX)), xx=W-PR-14;
+        s+=`<line x1="${xx}" y1="${y0.toFixed(1)}" x2="${xx}" y2="${y1.toFixed(1)}" stroke="${col}" stroke-width="2.2" opacity=".75"/><line x1="${xx-4}" y1="${y0.toFixed(1)}" x2="${xx+4}" y2="${y0.toFixed(1)}" stroke="${col}" stroke-width="2"/><line x1="${xx-4}" y1="${y1.toFixed(1)}" x2="${xx+4}" y2="${y1.toFixed(1)}" stroke="${col}" stroke-width="2"/>`; };
+      switch(k){
+        case 'field_capacity': guide(fc,'#34d399'); shade('P1','#34d399'); break;
+        case 'p1_target_vwc': guide(this.g('p1_target_vwc'),'#7dd3fc'); shade('P1','#38bdf8'); break;
+        case 'p2_vwc_threshold': guide(this.g('p2_vwc_threshold'),'#34d399'); shade('P2','#34d399'); break;
+        case 'p2_shot_size': guide(this.g('p2_vwc_threshold')+this.g('p2_shot_size'),'#34d399'); shade('P2','#34d399'); break;
+        case 'p3_emergency_vwc_threshold': guide(this.g('p3_emergency_vwc_threshold'),'#f87171'); shade('P3','#fbbf24'); break;
+        case 'p0_maximum_wait_time': case 'p0_minimum_wait_time': seam(this.firstShotT(),'#aab4c0'); shade('P0','#8b93a1'); break;
+        case 'p0_dryback_drop_percent': shade('P0','#8b93a1'); bracket(fc, this.morningMin(),'#aab4c0'); break;
+        case 'generative_dryback_target': case 'vegetative_dryback_target': shade('P3','#fbbf24'); bracket(fc, this.overnightLow(),'#fbbf24'); break;
+        case 'p3_gen_last_irrigation': case 'p3_veg_last_irrigation': seam(this.lastShotT(),'#fcd34d'); shade('P3','#fbbf24'); break;
+        case 'p1_initial_shot_size': case 'p1_maximum_shot_size': case 'p1_shot_size_increment': case 'p1_time_between_shots': case 'p1_minimum_shots': case 'p1_maximum_shots': shade('P1','#38bdf8'); break;
+        case 'p3_emergency_shot_size': shade('P3','#fbbf24'); guide(this.g('p3_emergency_vwc_threshold'),'#f87171'); break;
+        default:
+          if(/ec_target|feed_ec/.test(k)){ const ey=this.ecToY(this.peakEC()); s+=`<line x1="${PL}" y1="${ey.toFixed(1)}" x2="${W-PR}" y2="${ey.toFixed(1)}" stroke="#f472b6" stroke-width="1.4" stroke-dasharray="2 4" opacity=".7"/>`; }
+          break;
+      }
+      return s; },
+
     svgBody(){
       const W=this.W,PL=this.PL,PR=this.PR,PT=this.PT,PH=this.PH,fc=this.g('field_capacity'),x=t=>this.x(t),y=v=>this.y(v); let s="";
       s+=`<defs><filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
@@ -3509,9 +3773,33 @@ function editor(){
       const ef=this.g('p3_emergency_vwc_threshold'); s+=`<line x1="${PL}" y1="${y(ef)}" x2="${W-PR}" y2="${y(ef)}" stroke="#f87171" stroke-width="1" stroke-dasharray="3 4" opacity=".55"/>`;
       // field capacity line
       s+=`<line x1="${PL}" y1="${y(fc)}" x2="${W-PR}" y2="${y(fc)}" stroke="#34d399" stroke-width="1.4" stroke-dasharray="5 5" opacity=".7"/>`;
+      // ── ROW-FOCUS highlight: the focused setpoint lights its region (guide line / band shade / seam glow) ──
+      s+=this.hovHighlight(x,y,W,PL,PR,PT,PH,fc);
+      // ── LIVE split overlay (clip past/future) — actual on the left, plan on the right ──
+      const liveSplit=this.liveOn && this.liveHist;
+      let tNow=null; { const lnn=this.liveNow(); if(lnn) tNow=lnn.t; }
+      if(liveSplit && tNow!=null){
+        const xN=x(tNow);
+        s+=`<defs><clipPath id="clipPast"><rect x="${PL}" y="${PT-20}" width="${Math.max(0,xN-PL)}" height="${PH+40}"/></clipPath>`
+          +`<clipPath id="clipFuture"><rect x="${xN}" y="${PT-20}" width="${Math.max(0,W-PR-xN)}" height="${PH+40}"/></clipPath></defs>`;
+      }
       // curves
-      s+=`<polyline points="${this.ecPath()}" fill="none" stroke="#f472b6" stroke-width="2.4" opacity=".85" stroke-linejoin="round" stroke-linecap="round"/>`;
-      s+=`<polyline points="${this.vwcPath()}" fill="none" stroke="#e7ecf2" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      if(liveSplit && tNow!=null){
+        // plan: faint ghost in the past, dashed in the future
+        s+=`<polyline points="${this.ecPath()}" fill="none" stroke="#f472b6" stroke-width="2" opacity=".22" stroke-linejoin="round" clip-path="url(#clipPast)"/>`;
+        s+=`<polyline points="${this.vwcPath()}" fill="none" stroke="#e7ecf2" stroke-width="2" opacity=".22" stroke-linejoin="round" clip-path="url(#clipPast)"/>`;
+        s+=`<polyline points="${this.ecPath()}" fill="none" stroke="#f472b6" stroke-width="2.2" opacity=".85" stroke-dasharray="6 4" stroke-linejoin="round" clip-path="url(#clipFuture)"/>`;
+        s+=`<polyline points="${this.vwcPath()}" fill="none" stroke="#e7ecf2" stroke-width="2.3" stroke-dasharray="6 4" stroke-linejoin="round" clip-path="url(#clipFuture)"/>`;
+        // actual: solid amber VWC + solid rose EC, clipped to the past
+        const lh=this.liveHist;
+        if(lh.ec&&lh.ec.length){ const ep=lh.ec.map(p=>x(clamp(p[0],0,24)).toFixed(1)+","+this.ecToY(clamp(p[1],0,10)).toFixed(1)).join(" ");
+          s+=`<polyline points="${ep}" fill="none" stroke="#fb7185" stroke-width="2.4" opacity=".9" stroke-linejoin="round" clip-path="url(#clipPast)"/>`; }
+        if(lh.vwc&&lh.vwc.length){ const vp=lh.vwc.map(p=>x(clamp(p[0],0,24)).toFixed(1)+","+y(clamp(p[1],this.VMIN,this.VMAX)).toFixed(1)).join(" ");
+          s+=`<polyline points="${vp}" fill="none" stroke="#fde047" stroke-width="2.6" stroke-linejoin="round" clip-path="url(#clipPast)"/>`; }
+      } else {
+        s+=`<polyline points="${this.ecPath()}" fill="none" stroke="#f472b6" stroke-width="2.4" opacity=".85" stroke-linejoin="round" stroke-linecap="round"/>`;
+        s+=`<polyline points="${this.vwcPath()}" fill="none" stroke="#e7ecf2" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      }
       // bubbles
       for(const b of this.bubbles()){
         const bx=x(b.t), by=y(b.v), draggable=!!b.drag, lit=!!(this.hov&&b.hk&&b.hk.indexOf(this.hov)>=0), w=Math.max(b.txt.length*7.0+12, 30), h=18;
@@ -3601,6 +3889,126 @@ function editor(){
       let top=clamp(this.tip.y-6,8,Math.max(8,vh-230));
       return 'left:'+left+'px;top:'+top+'px;width:'+W+'px'; },
     reset(){ this.Z[this.zone]=JSON.parse(JSON.stringify(LIVE[this.zone])); },
+
+    /* ===== OUTCOME BOX — what this plan produces for the active zone (right of the graph) ===== */
+    esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); },
+    outcomeMetrics(){   // all read existing functions; sim() is SIMKEY-cached so this is cheap on every drag
+      const m=this.sim().meta, FCv=this.g('field_capacity'), low=m.overnightLow, peak=FCv;
+      const vwcs=this.sim().vwc.map(p=>p[1]); const vmax=Math.max.apply(null,vwcs), vmin=Math.min.apply(null,vwcs);
+      const ecStart=this.sim().ec[0]?this.sim().ec[0][1]:0, ecPeak=this.peakEC();
+      const gf=clamp((this.dial-1)/9,0,1);
+      return { db:this.drybackTarget(), totalDb:(FCv-low)/Math.max(FCv,1)*100, vmax, vmin, shots:m.shots.length,
+        waterL:this.dailyWaterL(), firstShot:this.firstShotMin(), dbRate:this.drybackRatePct(),
+        ecStart, ecPeak, gf, ecP2:this.ecP2() }; },
+    outcomeFlags(){ const M=this.outcomeMetrics(), ef=this.g('p3_emergency_vwc_threshold'), out=[];
+      const m=this.sim().meta, runoff=m.runoffL||0, water=this.dailyWaterL();
+      if(water>0 && runoff>water*0.35) out.push({c:'warn',t:'⚠ over-saturation — heavy runoff'});
+      if(M.vmin<=ef+2) out.push({c:'crit',t:'⛔ drought — trough near floor'});
+      if(M.ecPeak>=M.ecP2*1.6) out.push({c:'crit',t:'⛔ EC burn risk'});
+      else if(M.ecPeak>=M.ecP2*1.35) out.push({c:'warn',t:'⚠ EC stacking hard'});
+      if(this.pathogenRisk()>=0.5) out.push({c:'warn',t:'⚠ root-zone pathogen risk'});
+      if(!out.length) out.push({c:'ok',t:'✓ all in safe band'});
+      return out; },
+    outcomeVerdict(){ const M=this.outcomeMetrics(), t=this.mode==='gen'?'generative':'vegetative';
+      const ecDir=M.ecPeak>M.ecStart+0.3?'stacking':'holding';
+      return `<b>${t==='generative'?'Steering toward FLOWER':'Steering toward VEG'}</b> — a ${M.totalDb.toFixed(0)}% daily dryback over ${M.shots} shot${M.shots===1?'':'s'} (≈${M.waterL.toFixed(0)} L/day), pore-EC ${ecDir} from ${M.ecStart.toFixed(1)} to ${M.ecPeak.toFixed(1)} mS. First shot at ${this.fmtMin(M.firstShot)}.`; },
+    /* yield + potency tables — reuse the .lim2/.limcol/.limrow markup, rendered as an HTML string for the narrow box */
+    limTablesHTML(){ let s=`<div class="lim2">`;
+      [['y','Max yield'],['p','Max potency']].forEach(([k,name])=>{ const P=this.potential(k);
+        const cls=P.pct>=80?'ok':(P.pct>=60?'mid':'low');
+        s+=`<div class="limcol">`;
+        s+=`<div class="limhead"><span class="limgoal">${name}</span><span class="limpot ${cls}"><b>${P.pct}</b>%<i>potential</i></span></div>`;
+        if(k==='p') s+=`<div class="limthc">≈ <b>${P.thc}</b><em>% THC est</em> <i>· baseline ${P.base}%</i></div>`;
+        if(P.top.dir!=='ok'){ s+=`<div class="limtop">⛔ <b>${this.esc(P.top.label)}</b> — ${this.esc(P.top.dir)} toward ${P.top.lo}–${P.top.hi} <i>· ${this.esc(P.top.lever||'')}</i>`;
+          if(P.top.fix) s+=`<div class="limfix">→ set <b>${this.esc(P.top.fix.set)}</b> to <b>${P.top.fix.to}${this.esc(P.top.fix.unit)}</b>${P.top.fix.note?` <i>· ${this.esc(P.top.fix.note)}</i>`:''}</div>`;
+          s+=`</div>`; }
+        else s+=`<div class="limtop ok">✓ every factor in its optimal band</div>`;
+        if(k==='p') s+=`<div class="tradeoff">⇄ THC levers (deeper dryback, leaner feed, cooler finish) trade against yield</div>`;
+        P.list.forEach(f=>{ const rc=f.pct>=80?'ok':(f.pct>=60?'mid':'low');
+          s+=`<div class="limrow ${rc}"><span class="lrl">${this.esc(f.label)}</span><span class="lrbar"><i style="width:${f.pct}%"></i></span><span class="lrv"><b>${f.val}</b><em>${this.esc(f.unit)}</em></span><span class="lrd">${f.dir==='ok'?'✓ in band':(f.dir==='raise'?'▲ raise':'▼ lower')}</span></div>`; });
+        s+=`</div>`; });
+      return s+`</div>`; },
+    driftLine(){ if(!this.live) return ''; const c=this.liveCmp(); if(!c||c.vwcD==null) return '';
+      const d=c.vwcD, ad=Math.abs(d), cls=ad>4?'crit':(ad>2?'warn':'ok');
+      const word=d>0?'wetter':'drier';
+      return `<div class="ob-drift ${cls}">● live · actual VWC ${ad.toFixed(1)}% ${word} than plan${c.ecD!=null?` · EC Δ${c.ecD>0?'+':''}${c.ecD.toFixed(1)}`:''}</div>`; },
+    outcomeBox(){ const M=this.outcomeMetrics();
+      let s=`<div class="ob-head"><span class="ob-title">${this.mode==='gen'?'🌸 Steering toward FLOWER':'🌿 Steering toward VEG'}</span><span style="font-size:11px;color:var(--ink3)">Zone ${this.zone}</span></div>`;
+      s+=`<div class="ob-genbar"><i style="width:${(M.gf*100).toFixed(0)}%"></i></div>`;
+      s+=`<div class="ob-genlab"><span>veg</span><span>${(M.gf*100).toFixed(0)}% generative</span><span>flower</span></div>`;
+      s+=this.driftLine();
+      s+=`<div class="ob-rows">`;
+      const row=(l,v)=>`<div class="ob-row"><span class="ob-rl">${l}</span><span class="ob-rv">${v}</span></div>`;
+      s+=row('Daily dryback', `${M.totalDb.toFixed(0)}<span class="u">%</span>`);
+      s+=row('VWC band', `${M.vmax.toFixed(0)} → ${M.vmin.toFixed(0)}<span class="u">%</span>`);
+      s+=row('Shots / day', `${M.shots} <span class="u">· ${M.waterL.toFixed(0)} L/day</span>`);
+      s+=row('Pore EC', `${M.ecStart.toFixed(1)} → ${M.ecPeak.toFixed(1)}<span class="u">mS</span>`);
+      s+=row('First shot', `${this.fmtMin(M.firstShot)}`);
+      s+=row('Dryback rate', `${M.dbRate.toFixed(1)}<span class="u">%/h peak</span>`);
+      s+=`</div>`;
+      s+=`<div class="ob-flags">`; this.outcomeFlags().forEach(f=>s+=`<span class="ob-flag ${f.c}">${f.t}</span>`); s+=`</div>`;
+      s+=`<div class="ob-verdict">${this.outcomeVerdict()}</div>`;
+      s+=`<div class="ob-sec">Yield &amp; potency ceiling — Liebig minimum</div>`;
+      s+=this.limTablesHTML();
+      return s; },
+    outcomeMini(){ const M=this.outcomeMetrics(), Py=this.potential('y'), Pp=this.potential('p');
+      const fl=this.outcomeFlags()[0];
+      return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px">`
+        +`<b style="color:var(--ink)">${this.mode==='gen'?'🌸 Flower':'🌿 Veg'} Z${this.zone}</b>`
+        +`<span style="color:var(--ink3)">${M.totalDb.toFixed(0)}% dryback · ${M.shots} shots · EC→${M.ecPeak.toFixed(1)}</span>`
+        +`<span style="color:var(--ok)">Y ${Py.pct}%</span><span style="color:var(--p3)">THC ≈${Pp.thc}%</span>`
+        +`<span class="ob-flag ${fl.c}" style="margin-left:auto">${fl.t}</span></div>`; },
+
+    /* ===== COMPARE page: 3 zones' VWC curves overlaid + diff-only table ===== */
+    cmpSvgBody(){ const W=this.W,PL=this.PL,PR=this.PR,PT=this.PT,PH=this.PH,x=t=>this.x(t),y=v=>this.y(v); let s="";
+      s+=`<rect x="${x(this.photo())}" y="${PT}" width="${x(24)-x(this.photo())}" height="${PH}" fill="rgba(255,255,255,.04)"/>`;
+      s+=`<text x="${x(this.photo())+6}" y="${PT+13}" font-size="11" fill="#6b7682">lights off</text>`;
+      for(const gy of [30,40,50,60,70]) s+=`<line x1="${PL}" y1="${y(gy)}" x2="${W-PR}" y2="${y(gy)}" stroke="rgba(255,255,255,.06)"/><text x="${PL-7}" y="${y(gy)+4}" text-anchor="end" font-size="10" fill="#6b7682">${gy}</text>`;
+      for(let h=0;h<=24;h+=3){ s+=`<text x="${x(h)}" y="${PT+PH+15}" text-anchor="middle" font-size="10" fill="#6b7682">${h}h</text>`; }
+      s+=`<text x="${PL-32}" y="${PT-8}" font-size="11" fill="#9aa4b1">VWC %</text>`;
+      const tints={1:'#34d399',2:'#38bdf8',3:'#f472b6'};
+      for(const z of [1,2,3]){ ZOVR=z; try{ const day=this.simDay(); const path=day.vwc.map(p=>x(p[0]).toFixed(1)+","+y(p[1]).toFixed(1)).join(" ");
+          s+=`<polyline points="${path}" fill="none" stroke="${tints[z]}" stroke-width="${this.zone===z?2.8:2}" opacity="${this.zone===z?1:.7}" stroke-linejoin="round" stroke-linecap="round"/>`;
+          s+=`<text x="${W-PR-4}" y="${y(day.vwc[day.vwc.length-1][1])-4}" text-anchor="end" font-size="10" font-weight="700" fill="${tints[z]}">Z${z}</text>`;
+        } finally{ ZOVR=null; } }
+      SIMKEY=null;   // ZOVR sims poisoned the cache key; force a clean re-sim for the active zone next read
+      return s; },
+    cmpDiffRows(){ const out=[]; for(const k of TUNE_ZK){ if(this.isMixed(k)){ const m=META[k];
+        out.push({key:k,label:(m&&m.label)||k,unit:(m&&m.unit)||'',vals:[this.Z[1][k],this.Z[2][k],this.Z[3][k]]}); } } return out; },
+    compareBox(){ let s=`<div class="ob-head"><span class="ob-title">🔬 Zone comparison</span></div>`;
+      s+=`<div class="ob-verdict">The three zones share one room but steer independently. Curves overlaid left; the table below lists only the <b>parameters that differ</b> across zones.</div>`;
+      const rows=this.cmpDiffRows();
+      if(!rows.length){ s+=`<div class="ob-flag ok" style="display:inline-block">✓ all zones identical</div>`; return s; }
+      s+=`<div class="ob-sec">Diverging parameters (${rows.length})</div>`;
+      s+=`<table style="width:100%;border-collapse:collapse;font-size:11.5px"><thead><tr style="color:var(--ink3);text-align:right">`
+        +`<th style="text-align:left;padding:4px 6px;font-weight:700">Param</th><th style="padding:4px 6px;color:#34d399">Z1</th><th style="padding:4px 6px;color:#38bdf8">Z2</th><th style="padding:4px 6px;color:#f472b6">Z3</th></tr></thead><tbody>`;
+      rows.forEach(r=>{ s+=`<tr style="border-top:1px solid rgba(255,255,255,.05)"><td style="text-align:left;padding:4px 6px;color:var(--ink2)">${this.esc(r.label)}</td>`;
+        r.vals.forEach(v=>{ s+=`<td style="text-align:right;padding:4px 6px;color:var(--ink);font-weight:700">${this.fmtCell(r.key,v)}<span style="color:var(--ink3);font-weight:400">${this.esc(r.unit)}</span></td>`; }); s+=`</tr>`; });
+      s+=`</tbody></table>`;
+      s+=`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn xs2" @click="setZoneView(1)">edit Zone 1</button><button class="btn xs2" @click="setZoneView(2)">edit Zone 2</button><button class="btn xs2" @click="setZoneView(3)">edit Zone 3</button></div>`;
+      return s; },
+
+    /* ===== LIVE overlay: fetch the zone's last gdays×24h actual VWC + EC, mapped to graph time (hours since lights-on) ===== */
+    // centered moving-average over the value dimension; window auto-scales with sample density (lag-free, keeps the dryback slope)
+    smoothVals(pts){
+      const n=pts?pts.length:0; if(n<5) return pts;
+      const win=Math.max(5,Math.min(41, Math.round(n/100)*2+1)), half=(win-1)/2, out=new Array(n);
+      for(let i=0;i<n;i++){ let s=0,c=0; const a=Math.max(0,i-half), b=Math.min(n-1,i+half);
+        for(let j=a;j<=b;j++){ s+=pts[j][1]; c++; } out[i]=[pts[i][0], s/c]; }
+      return out;
+    },
+    reqLive(){ if(!getToken()){ this.liveOn=false; this.liveHist=null; return; }
+      const z=this.zone, days=this.gdays;
+      const vwcId=(TUNE_RAW[z]||{}).vwc || ('sensor.crop_steering_zone_'+z+'_vwc');
+      const ecId='sensor.crop_steering_zone_'+z+'_ec';
+      const ids=[vwcId, ecId, 'fused_ec'].filter((v,i,a)=>v&&a.indexOf(v)===i);
+      const end=Date.now(), start=end-days*24*3600*1000, lon=this.G.lights_on;
+      const toGraphT=(ms)=>{ const d=new Date(ms), hod=d.getHours()+d.getMinutes()/60; return (((hod-lon)%24)+24)%24; };
+      loadInflux(ids,start,end).then(H=>{ if(!H){ this.liveHist=null; return; }
+        const map=arr=>(arr||[]).map(o=>[toGraphT(o.t),o.v]).filter(p=>!isNaN(p[1])).sort((a,b)=>a[0]-b[0]);
+        const vwc=this.smoothVals(map(H[vwcId])); const ec=this.smoothVals(map(H[ecId]&&H[ecId].length?H[ecId]:H['fused_ec']));
+        this.liveHist={vwc, ec, key:z+'|'+days}; SIMKEY=null;
+      }).catch(e=>{ console.warn('reqLive failed:',e.message); this.liveHist=null; }); },
   };
 }
 window.editor=editor;
@@ -5210,9 +5618,20 @@ document.addEventListener('alpine:init', () => {
       this.adv=rr.adv.filter(a=>!this._acked[a.id]); this.watch=rr.watch;
       const _ea=this.buildEngineAlerts().filter(a=>!this._acked[a.id]); this.adv=[..._ea,...this.adv];   // engine alerts first (loud)
       this.headline=computeHeadline(this.adv,this.watch);
-      this.kpis=buildKpis(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.tanks=buildTanks(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.vitals=buildVitals(); this.hwStatus=buildHwStatus(); this.water=this.waterBars(); this.climate=buildClimate(); this.raw=buildRaw(); this.insights=buildInsights(); this.control=buildControl(); this.climateCtl=buildClimateCtl(); this.pump=buildPump(); this.relays=buildRelays(); this.maturity=maturityScore();
-      { const cam=S[CONFIG.E.cam], ct=cam&&cam.attributes&&cam.attributes.access_token; this._camTick=(this._camTick||0)+1;
-        this.camUrl=ct?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+CONFIG.E.cam+'?token='+ct+'&_='+this._camTick):''; }
+      const _v=this.view;
+      // Always-on: dashboard tiles + shared data (zones feeds the dashboard hotspot + nav). Cheap, and the default view.
+      this.kpis=buildKpis(); this.floorMini=buildFloorMini(); this.tank=buildTank(); this.tanks=buildTanks(); this.activityFeed=buildActivityFeed(); this.zones=buildZones(); this.vitals=buildVitals(); this.hwStatus=buildHwStatus(); this.water=this.waterBars(); this.maturity=maturityScore();
+      // PERF: only rebuild a heavy off-dashboard section's data when its tab is active. Otherwise the array identity
+      // never changes, so Alpine stops re-diffing those (DOM-resident) hidden sections every 30s — the freeze fix.
+      // go() re-runs refresh() on tab switch, so each tab is fresh the moment you land on it.
+      if(_v==='climate'){ this.climate=buildClimate(); this.climateCtl=buildClimateCtl(); }
+      if(_v==='analyze'){ this.raw=buildRaw(); this.insights=buildInsights(); }
+      if(_v==='control'){ this.control=buildControl(); this.pump=buildPump(); this.relays=buildRelays(); }
+      // PERF: only cache-bust the camera frame when its tile is actually on screen (Overview, not minimized) —
+      // otherwise it re-fetched + decoded a fresh frame off HA every 30s in the background.
+      { const cam=S[CONFIG.E.cam], ct=cam&&cam.attributes&&cam.attributes.access_token;
+        if(this.view==='dashboard' && !this.camMin){ this._camTick=(this._camTick||0)+1;
+          this.camUrl=ct?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+CONFIG.E.cam+'?token='+ct+'&_='+this._camTick):''; } }
       if(window.__tuneReseed) window.__tuneReseed();   // refresh the Tune editor from live HA (respects its hydrated/unsaved-edit guard)
       const sph=num("src_ph"),sec=num("src_ec");   // live feed chemistry (Atlas probes); "—" when the probe is offline
       this.steeringMeta=[{label:"Feed pH",val:sph==null?"—":fmt(sph,2),cls:sph==null?"text-slate-500":(sph>=5.6&&sph<=6.4?"text-emerald-400":"text-amber-400")},{label:"Feed EC",val:sec==null?"—":fmt(sec,2)+" mS/cm",cls:sec==null?"text-slate-500":"text-slate-200"},{label:"Fused EC",val:fmt(num("fused_ec"),2),cls:"text-slate-200"},{label:"EC target",val:fmt(CONFIG.EC_TARGET,1),cls:"text-slate-200"},{label:"Pump",val:fmt(num("pump_power"),0)+" W",cls:num("pump_power")>100?"text-amber-400":"text-slate-200"},{label:"Next shot",val:this.shortTime(val("next_irrig")),cls:"text-slate-200"}];
@@ -5434,7 +5853,7 @@ document.addEventListener('alpine:init', () => {
         plugins:[refPlugin]}); },
 
     /* actions */
-    go(v){ this.view=v; window.scrollTo({top:0,behavior:this.reduced()?'auto':'smooth'}); },
+    go(v){ this.view=v; ls.set('f2.view',v); this.refresh(); window.scrollTo({top:0,behavior:this.reduced()?'auto':'smooth'}); },
     solve(t){ if(!t) return; this.go(t.view);
       this.$nextTick(()=>{ requestAnimationFrame(()=>{
         const el=document.getElementById(t.anchor);
@@ -6759,8 +7178,15 @@ function buildFacilityTwin(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
   new ResizeObserver(resize).observe(stage);
   resize();
 
-  renderer.setAnimationLoop(() => {
-    if (!stage.clientWidth) return;   // floor tab hidden — skip work
+  // ~30fps cap + pause when the tab/window is hidden. A flat-out setAnimationLoop (renders at the
+  // display refresh — 60/120/144Hz — and re-projects every CSS2D label each frame) saturated the GPU
+  // and stuttered the whole desktop. Cap to ~30fps and stop entirely when the stage has no width
+  // (floor tab not shown) or the document is hidden (window backgrounded / different tab).
+  let _t3d = 0;
+  renderer.setAnimationLoop((now) => {
+    if (!stage.clientWidth || document.hidden) return;
+    if (now - _t3d < 33) return;      // ~30fps
+    _t3d = now;
     controls.update();
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);

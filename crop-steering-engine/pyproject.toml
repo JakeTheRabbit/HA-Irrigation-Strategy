@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "crop-steering-engine"
+version = "0.1.0"
+description = "Pure, HA-independent crop-steering decision core (4-phase P0-P3, EC steering, anti-lockout flush, starvation watchdog, daily-budget cap)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.4", "mypy>=1.8"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crop_steering_engine"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
