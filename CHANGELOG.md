@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-06-27
+
 ### Added
 - **Comprehensive Analyze tab (`www/f2.html`), all live off real F2 entities.** Seven full-width cards:
   a 24 h equipment-state timeline (lights / pump / mainline / zone valves / recirc / CO2 / dehumidifier),
@@ -20,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   anti-short-cycle spacing allows, *regardless of the VWC probe* (a lying/dead probe can't suppress it).
   The only VWC gate is a hard anti-drown ceiling (`drown_ceiling`, default 90); feed-water + dosing
   safety still apply. Clamped < `max_daily_volume`. 0 = off. (`addons/f2_control/f2_min_daily_package.yaml`)
-- **Hard max shot-duration cap (flood guard).** `number.crop_steering_max_shot_duration` (default 300 s)
+- **Hard max shot-duration cap (flood guard).** `number.crop_steering_max_shot_duration` (default 900 s)
   clamps the computed shot length and alerts if the raw value exceeds the cap (a substrate/flow misconfig)
   — the upper bound to match the per-zone minimum-water floor's lower bound.
 
@@ -45,12 +47,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shell already accumulates and bakes the EC offset into the P2 threshold; `_params` now clamps that
   offset-threshold to the engine's safe band.
 - **PID cross-photoperiod windup.** The EC-PID integral + previous-error reset on the P0 transition.
+- **Shot-sizing short-cycle.** Shot duration divided per-plant substrate by *zone-total* flow
+  (`plant_count × drippers × flow_rate`), so per-plant 6 L blocks × 36 plants computed shots ~36× too
+  short (~14 s instead of ~324 s for a 6 % shot) → VWC never rose → the pump short-cycled. `_substrate_l`
+  now returns the zone total (per-plant block × plant_count) to match the zone-total flow; enter
+  `substrate_volume` PER-PLANT.
 
-### Known issues
-- **Shot-sizing short-cycle (open).** Shot duration divides per-plant substrate by *zone-total* flow
-  (`plant_count × drippers × flow_rate`), so with per-plant 6 L blocks + 36 plants it computes shots ~36×
-  too short (~14 s instead of ~324 s for a 6 % shot) → VWC never rises → the pump short-cycles. The fix
-  (size from per-plant substrate ÷ per-plant flow, plant_count cancelling) is pending.
+> **Deploy note.** The f2-control add-on bakes its code into the image at build time (`Dockerfile COPY`),
+> so the engine changes in this release require an add-on **Rebuild** (Supervisor → F2 Control → ⋮ →
+> Rebuild), not just a restart, to take effect. (Interim: set the add-on Configuration options
+> `substrate_l` = row-total litres and `flow_lps` = zone flow, then Save, to correct shot length on the
+> running build without a rebuild.)
 
 ## [2.5.0] - 2026-06-27
 
