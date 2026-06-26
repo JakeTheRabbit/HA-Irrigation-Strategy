@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Comprehensive Analyze tab (`www/f2.html`), all live off real F2 entities.** Seven full-width cards:
+  a 24 h equipment-state timeline (lights / pump / mainline / zone valves / recirc / CO2 / dehumidifier),
+  per-zone VWC dryback + pore-EC-vs-target sparklines, water + substrate-temp + phase per zone, climate
+  drivers (air temp / RH / VPD / CO2 / PPFD / DLI), a Liebig limiting-factor ranking (the bottleneck
+  flagged first), and feed pH/EC gauges vs their bands. No Chart.js — inline SVG sparklines + CSS bars,
+  each card with what / good / bad help text.
+- **Minimum daily water floor — per-plant safety.** `input_number.crop_steering_zone_N_min_daily_ml_per_plant`
+  (mL/plant/day; × `plant_count` → a zone-litres floor). **Guaranteed, front-stacked and
+  sensor-independent**: every plant gets its minimum, delivered from lights-on as fast as the
+  anti-short-cycle spacing allows, *regardless of the VWC probe* (a lying/dead probe can't suppress it).
+  The only VWC gate is a hard anti-drown ceiling (`drown_ceiling`, default 90); feed-water + dosing
+  safety still apply. Clamped < `max_daily_volume`. 0 = off. (`addons/f2_control/f2_min_daily_package.yaml`)
+- **Hard max shot-duration cap (flood guard).** `number.crop_steering_max_shot_duration` (default 300 s)
+  clamps the computed shot length and alerts if the raw value exceeds the cap (a substrate/flow misconfig)
+  — the upper bound to match the per-zone minimum-water floor's lower bound.
+
+### Changed
+- **Analyze rebuilt lightweight.** Replaced the collapsing Chart.js auto-fit grid (broken widths) with
+  full-width stacked cards; removes all Chart.js cost on that view.
+- **`www/overview.html`** — per-zone daily water now reads `sensor.crop_steering_zone_N_daily_water_usage`
+  (the live entity; the old name was blank), and the Pore-EC target resolves by the zone's veg/gen
+  steering mode instead of hardcoding generative.
+
+### Fixed
+- **Dashboard mouse-glitch / desktop stutter.** The 3D floorplan (separate WebGL app, `www/floorplan`,
+  built from `three-playground`) ran a perpetual `setAnimationLoop`, rendering a shadow pass at the
+  monitor's native refresh (60–144 Hz) forever and saturating the GPU. Converted to **render-on-demand**
+  (draw only on orbit / zoom / live-data change / door-swing; OrbitControls damping off; shadow baked
+  once at 1024). Idle = 0 animation frames (verified).
+- **`f2.html` 30 s churn.** Tune-editor reseed gated to the active view (was rebuilding its heavy SVG from
+  sensor noise every tick while hidden); the dashboard trend chart skips its re-bucketize when history is
+  unchanged; chart build-animations off; the 30 s poll + chart pipeline pause while the browser tab is
+  backgrounded; the engine-log status dot only pulses when the panel is open.
+- **EC steering double-correction.** Removed a second P2 EC-steer nudge in the pure `decide()` — the IO
+  shell already accumulates and bakes the EC offset into the P2 threshold; `_params` now clamps that
+  offset-threshold to the engine's safe band.
+- **PID cross-photoperiod windup.** The EC-PID integral + previous-error reset on the P0 transition.
+
+### Known issues
+- **Shot-sizing short-cycle (open).** Shot duration divides per-plant substrate by *zone-total* flow
+  (`plant_count × drippers × flow_rate`), so with per-plant 6 L blocks + 36 plants it computes shots ~36×
+  too short (~14 s instead of ~324 s for a 6 % shot) → VWC never rises → the pump short-cycles. The fix
+  (size from per-plant substrate ÷ per-plant flow, plant_count cancelling) is pending.
+
 ## [2.5.0] - 2026-06-27
 
 ### Added
