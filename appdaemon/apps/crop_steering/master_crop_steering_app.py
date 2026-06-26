@@ -135,7 +135,14 @@ class MasterCropSteeringApp(BaseAsyncApp):
         self._sw_bad_count = 0
         self._sw_last_notify = None
         self._sw_blocked = False
-        
+
+        # High-EC flush state: a zone over the max-EC ceiling is HELD in P1 and keeps firing
+        # (lower-EC) ramp shots to dilute the pore, instead of being locked out. Hysteresis +
+        # a not-responding timeout guard against flushing forever on a stuck probe.
+        self._flush_hold = set()                       # zones currently held in P1 flushing
+        self._flush_start: Dict[int, datetime] = {}    # when each zone's flush began (timeout)
+        self._flush_stuck_notified = set()             # zones already alerted as not-responding
+
         # Get number of zones from integration or config
         self.num_zones = self._get_number_of_zones()
         
@@ -2014,6 +2021,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Get predictions
             predictions = self.ml_predictor.predict_irrigation_need(features)
             
+            # NOTE (RETIRED ENGINE): Checks 'prediction_available' and 'model_confidence',
+            # but ml_irrigation_predictor.predict_irrigation_need() returns 'irrigation_need'
+            # and 'confidence' — key mismatch means this branch is always False (no-op).
+            # This is dead code in the retired appdaemon/ rollback engine; not shipped.
             if predictions.get('prediction_available', False):
                 return predictions
             else:
@@ -2304,6 +2315,17 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 }
             }
         
+        # HIGH-EC FLUSH: while pore EC is over the ceiling, keep firing P1 ramp shots to dilute —
+        # past the VWC target / max-shots (the safety gate still enforces dilutive-feed + not-
+        # saturated). This is the "run P1 shots until the EC comes down" behaviour; normal P1
+        # resumes the moment EC recovers (then VWC target -> P2 as usual).
+        if self._ec_flush_state(zone_num).get('flush'):
+            return {
+                'needs_irrigation': True, 'vwc': zone_vwc, 'ec': zone_ec, 'ec_target': ec_target,
+                'shot_size': current_shot_size, 'flush': True,
+                'reason': f"P1 high-EC flush: pore EC {zone_ec:.1f} — diluting (shot {current_shot_count})",
+            }
+
         # Safe VWC string for use in reason messages (zone_vwc may be None)
         vwc_str = f"{zone_vwc:.1f}%" if zone_vwc is not None else "N/A"
 
@@ -2835,6 +2857,91 @@ class MasterCropSteeringApp(BaseAsyncApp):
             return float(v)
         except (ValueError, TypeError):
             return default
+
+    def _source_feed_ec(self):
+        """Numeric feed/source-water EC (veg batch tank), or None. Used by the high-EC flush
+        to confirm the feed is dilutive (feed EC < pore EC) before pushing water through."""
+        try:
+            cfg = self.config.get('source_water', {}) if isinstance(self.config, dict) else {}
+            return self._read_float(cfg.get('ec_sensor', 'sensor.atlas_legacy_1_ec'))
+        except Exception:
+            return None
+
+    def _alert_banner(self, message: str, nid: str):
+        """Operator alert → phone (mobile) AND an HA persistent notification (which also lights
+        the f2 dashboard's alert banner). Best-effort; never raises into the control loop."""
+        try:
+            self._notify_phone(message)
+        except Exception:
+            pass
+        try:
+            self.call_service('persistent_notification/create', title='F2 Crop Steering',
+                              message=message, notification_id=nid)
+        except Exception:
+            pass
+
+    def _ec_flush_state(self, zone_num: int) -> dict:
+        """High-EC flush state for a zone (the user's 'use P1 to bring EC down' model).
+
+        When pore EC is at/over the ceiling, the zone is HELD in P1 and keeps firing (lower-EC)
+        ramp shots to dilute it, instead of being locked out. Returns {'flush': bool, 'ec',
+        'recovery'}. flush=True => hold in P1 + fire dilutive shots. Hysteresis: starts flushing
+        at max_ec-0.5, holds until EC drops under max_ec-2.0. Not-responding timeout (45 min)
+        stops a runaway flush on a stuck probe + alerts once. Guards: saturated slab or
+        non-dilutive feed => don't flush (the safety gate also enforces these at execution).
+        Idempotent — safe to call multiple times per cycle (from the transition + the P1 eval)."""
+        out = {'flush': False, 'ec': None, 'recovery': None}
+        try:
+            zone_ec = self._get_zone_ec(zone_num)
+            out['ec'] = zone_ec
+            if zone_ec is None:
+                return out
+            max_ec = self._get_number_entity_value("number.crop_steering_maximum_ec", 9.0)
+            trigger, recovery = max_ec - 0.5, max_ec - 2.0
+            out['recovery'] = recovery
+            held = zone_num in self._flush_hold
+
+            # Recovered: EC back well under the ceiling -> clear hold + tell the operator once.
+            if zone_ec < recovery:
+                if held:
+                    self._flush_hold.discard(zone_num)
+                    self._flush_start.pop(zone_num, None)
+                    self._flush_stuck_notified.discard(zone_num)
+                    self._alert_banner(
+                        f"✅ F2 Zone {zone_num} EC recovered to {zone_ec:.1f} (under {recovery:.1f}) — flush done, resuming normal steering.",
+                        f"cs_flush_zone_{zone_num}")
+                return out
+
+            # Over the ceiling (or holding within the hysteresis band)?
+            if zone_ec >= trigger or held:
+                # Can a flush actually help? (gate also re-checks at execution)
+                zone_vwc = self._get_zone_vwc(zone_num)
+                if zone_vwc is not None and zone_vwc >= 90.0:
+                    return out  # saturated — can't push more water; let it dry back
+                feed_ec = self._source_feed_ec()
+                if feed_ec is not None and feed_ec >= zone_ec:
+                    return out  # feed not dilutive — would not lower EC
+
+                start = self._flush_start.get(zone_num)
+                if start is None:
+                    self._flush_start[zone_num] = datetime.now()
+                    self._flush_hold.add(zone_num)
+                    self._alert_banner(
+                        f"💦 F2 Zone {zone_num} FLUSHING via P1 — pore EC {zone_ec:.1f} ≥ {trigger:.1f}; ramping low-EC feed ({feed_ec if feed_ec is not None else '?'}) to dilute.",
+                        f"cs_flush_zone_{zone_num}")
+                elif (datetime.now() - start).total_seconds() > 45 * 60:
+                    # Not responding after 45 min — stop flushing + urgent alert (probable fault).
+                    if zone_num not in self._flush_stuck_notified:
+                        self._alert_banner(
+                            f"🚨 F2 Zone {zone_num} EC {zone_ec:.1f} NOT responding to 45-min flush — check probe / feed / drainage.",
+                            f"cs_flush_zone_{zone_num}")
+                        self._flush_stuck_notified.add(zone_num)
+                    return out
+                out['flush'] = True
+            return out
+        except Exception as e:
+            self.log(f"⚠️ ec-flush-state error zone {zone_num}: {e}", level='WARNING')
+            return out
 
     def _source_water_limits(self):
         """(ph_min, ph_max, ec_min, ec_max) from the integration number helpers, with
@@ -5228,6 +5335,19 @@ class MasterCropSteeringApp(BaseAsyncApp):
                 self._update_zone_vwc_capacity(zone_num, zone_vwc, current_phase)
                 self._ec_stack_dryback(zone_num, zone_vwc, self._get_zone_ec(zone_num), current_phase)
 
+                # HIGH-EC FLUSH ("use P1 to bring EC down"): a zone over the EC ceiling is force-held
+                # in P1 so its ramp shots push the lower-EC feed through to dilute the pore, instead
+                # of being locked out. Wins over the normal phase machine WHILE LIGHTS ARE ON; the
+                # overnight lights-off -> P3 dryback below still takes precedence. Clears itself (and
+                # resumes normal transitions) once EC recovers, handled inside _ec_flush_state.
+                if self._are_lights_on(datetime.now().time(), lights_on_time, lights_off_time):
+                    fs = self._ec_flush_state(zone_num)
+                    if fs['flush']:
+                        if current_phase != IrrigationPhase.P1_RAMP_UP:
+                            await self._transition_zone_to_phase(
+                                zone_num, 'P1', f"High-EC flush: pore EC {fs['ec']:.1f} — ramp P1 to dilute")
+                        continue   # hold in P1 (skip P1->P2 etc.) until EC recovers
+
                 # P3 → P0: Lights turned on (only from P3, not P2)
                 if lights_just_on and current_phase == IrrigationPhase.P3_PRE_LIGHTS_OFF:
                     await self._transition_zone_to_phase(zone_num, 'P0', 'Lights on - starting morning dryback')
@@ -7171,13 +7291,28 @@ class MasterCropSteeringApp(BaseAsyncApp):
                     'message': f'Zone {zone} VWC ({zone_vwc:.1f}%) at or above field capacity ({field_capacity:.1f}%) - irrigation blocked to prevent over-watering'
                 }
             
-            # Check maximum EC safety (prevent nutrient burn)
+            # Maximum-EC handling. High pore EC needs water pushed through to DILUTE it (the feed
+            # EC is far below the ceiling), NOT a lockout — locking a salty zone out just lets it
+            # stack higher and strands it (this gate used to block EVERY shot, including the manual
+            # shot + the P1 ramp that would have flushed it). So at high EC we ALLOW any shot — it
+            # dilutes — as long as it can actually help: the slab isn't saturated AND the feed is
+            # dilutive (lower EC than the pore). The source-water pH/EC gate is enforced separately
+            # at the call site, so we never flush with bad feed.
             if zone_ec is not None and zone_ec >= max_ec_limit:
-                return {
-                    'blocked': True,
-                    'reason': 'max_ec_exceeded',
-                    'message': f'Zone {zone} EC ({zone_ec:.1f} mS/cm) at or above safety limit ({max_ec_limit:.1f} mS/cm) - irrigation blocked to prevent nutrient burn'
-                }
+                if zone_vwc is not None and zone_vwc >= 90.0:
+                    return {
+                        'blocked': True,
+                        'reason': 'ec_high_but_saturated',
+                        'message': f'Zone {zone} EC {zone_ec:.1f} high but VWC {zone_vwc:.0f}% saturated - cannot flush; let it dry back'
+                    }
+                feed_ec = self._source_feed_ec()
+                if feed_ec is not None and feed_ec >= zone_ec:
+                    return {
+                        'blocked': True,
+                        'reason': 'ec_high_feed_not_dilutive',
+                        'message': f'Zone {zone} EC {zone_ec:.1f} high but feed EC {feed_ec:.1f} not lower - flush would not dilute'
+                    }
+                # else: dilutive flush — allow (fall through to the remaining gates)
             
             # Check daily water volume limit. EXEMPT emergency rescue: the daily cap is a
             # BUDGET, not a hardware-safety limit. A zone below its emergency VWC floor must

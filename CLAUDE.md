@@ -9,12 +9,14 @@ layers:
 
 1. **HA integration** (`custom_components/crop_steering/`) — entities, config-flow
    wizard, pure calculations, service events. Never touches hardware.
-2. **AppDaemon engine** (`appdaemon/apps/crop_steering/`) — the autonomous
-   coordinator that reads entities, runs the per-zone P0→P1→P2→P3 logic, and drives
-   the hardware.
+2. **f2-control add-on** (`addons/f2_control/`) — the live autonomous coordinator.
+   A single synchronous Python process that polls HA over REST every 60 s, imports
+   the pure `crop-steering-engine` package, runs the per-zone P0→P1→P2→P3 logic,
+   and drives the hardware. Gated by kill switch
+   `input_boolean.f2_control_enabled` (OFF = safe, no actuation).
 
-There is **one engine**: `master_crop_steering_app.py` (+ its supporting libs). It
-does irrigation only — no climate control.
+AppDaemon (`appdaemon/apps/crop_steering/`) is **retired** — kept only as a manual
+rollback. `master_crop_steering_app.py` is not deployed. Do not add features there.
 
 > Start with `docs/SYSTEM_OVERVIEW.md` for the whole-stack mental model, then
 > `README.md`. `ENTITIES.md` is the entity reference.
@@ -22,15 +24,18 @@ does irrigation only — no climate control.
 ## Dev commands
 
 ```bash
-# Lint / format / yaml (matches CI; black is scoped — the engine module is
+# Lint / format / yaml (matches CI; black is scoped — the add-on is
 # deployed file-for-file to the live box and stays exempt from reformatting)
 ruff check . && black --check custom_components/ tests/ && yamllint .
 
-# Tests (integration calculation helpers)
+# Tests — integration calculation helpers
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v
 
-# AppDaemon logs (supervised HA)
-#   ha addons logs a0d7b954_appdaemon     (or: docker logs addon_a0d7b954_appdaemon -f)
+# Tests — crop-steering-engine package
+PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
+
+# f2-control add-on logs (supervised HA)
+#   ha addons logs <f2_control_slug>     (or: docker logs addon_<slug> -f)
 ```
 
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` dodges a broken hydra/omegaconf plugin in some
@@ -43,26 +48,31 @@ local Python installs. CI is unaffected.
 - Services: `transition_phase`, `execute_irrigation_shot`, `check_transition_conditions`, `set_manual_override`.
 - Pure, testable helpers in `calculations.py`.
 
-### 2. AppDaemon engine — `appdaemon/apps/crop_steering/`
-- `master_crop_steering_app.py` — the coordinator. Phase transitions, hardware
-  sequencing, dryback detection, sensor fusion, source-water gating, daily caps,
-  emergency rescue, drain-through detection, the autonomous EC-stacking loop
-  (`_ec_stack_dryback`, gated by `switch.crop_steering_ec_stacking_enabled`), the
-  `_ai_heartbeat` self-correction loop, the `_watchdog_check` hardware watchdog, and the
-  activity feed
-  (`sensor.crop_steering_activity_log`).
-- Supporting libs it imports: `phase_state_machine.py`, `advanced_dryback_detection.py`,
-  `intelligent_sensor_fusion.py`, `intelligent_crop_profiles.py`,
-  `ml_irrigation_predictor.py`, `base_async_app.py`.
-- `apps.yaml` declares the app and holds the per-site hardware + sensor map.
+### 2. f2-control add-on — `addons/f2_control/` (live engine)
+- Single synchronous Python process; polls HA REST API every 60 s.
+- Imports `crop-steering-engine` (pure Python package at `crop-steering-engine/src/`);
+  no AppDaemon dependency.
+- Responsibilities: phase transitions, hardware sequencing, dryback detection,
+  source-water gate (pH + EC, fail-closed on dead probe), fail-closed hardware writes
+  (aborts shot on valve/pump fault), P2 EC-correction min-interval (anti-short-cycle),
+  optional PID EC loop (`input_boolean.crop_steering_ec_pid_enabled`), daily caps,
+  sensor-fusion republish, 30-min operator vitals.
+- Shot duration computed live: `substrate_volume × shot_fraction ÷ (plant_count ×
+  drippers_per_plant × dripper_flow_rate)` — substrate/flow config must be accurate.
+- Add-on config: `addons/f2_control/config.yaml`. Options set via Supervisor UI.
+
+### 3. AppDaemon — `appdaemon/apps/crop_steering/` (retired rollback)
+- `master_crop_steering_app.py` and its supporting libs are **not deployed**.
+- Kept for emergency manual rollback only. Do not add features here.
 
 ### Critical files
 - `custom_components/crop_steering/config_flow.py` — setup wizard.
 - `custom_components/crop_steering/{sensor,number,switch,select}.py` — entity platforms.
 - `custom_components/crop_steering/calculations.py` — pure helpers (tested).
 - `custom_components/crop_steering/const.py` — constants, single source of truth.
-- `appdaemon/apps/crop_steering/master_crop_steering_app.py` — the engine.
-- `appdaemon/apps/apps.yaml` — app declaration + hardware/sensor map.
+- `addons/f2_control/` — live engine (add-on root).
+- `crop-steering-engine/src/` — pure engine package imported by the add-on.
+- `appdaemon/apps/crop_steering/master_crop_steering_app.py` — retired; rollback only.
 
 ## Phase logic (P0–P3)
 
@@ -85,8 +95,8 @@ P3 (Pre-lights-off):  emergency-only; dry back overnight → P0 at lights-on
 Safety checks → Pump prime (2s) → Mainline (1s) → Zone valve → Irrigate → Shutdown (reverse)
 ```
 
-Valve close is read-back verified; failure triggers an emergency pump stop. Lives
-entirely in `master_crop_steering_app.py`.
+Valve close is read-back verified; failure triggers an emergency pump stop and aborts
+the shot. Lives in the f2-control add-on (`addons/f2_control/`).
 
 ## Key entity patterns
 
@@ -99,13 +109,16 @@ entirely in `master_crop_steering_app.py`.
 
 ## Notes
 
-- **Dependencies:** integration = pure HA + voluptuous (no external deps). Engine =
-  scipy + numpy (already in the AppDaemon container).
+- **Dependencies:** integration = pure HA + voluptuous (no external deps). Engine
+  (`crop-steering-engine`) = pure Python, no scipy/numpy; f2-control add-on container
+  installs its own deps from `addons/f2_control/requirements.txt`.
 - **Testing:** `tests/test_calculations.py` covers the integration calc helpers; no
   real hardware needed (input_boolean/number simulate pumps/sensors).
-- **Deploying engine changes:** copy the changed module(s) to the AppDaemon apps dir
-  and restart AppDaemon (the add-on watches files, but a clean restart is more
-  predictable). Integration changes: Developer Tools → YAML → Reload Custom Components.
+- **Deploying engine changes:** copy changed modules to `addons/f2_control/` on the
+  live box and restart the f2-control add-on from Supervisor (clean restart is more
+  predictable than file-watch). Integration changes: Developer Tools → YAML → Reload
+  Custom Components. For `crop-steering-engine` package changes, update the package
+  source and restart the add-on.
 - **Commit style:** conventional commits (`feat:`/`fix:`/`docs:`/`chore:`) with a
   `Co-Authored-By: Claude` trailer when written via Claude Code. One active branch:
   `main`. Retired branches are kept as `archive/*` tags.

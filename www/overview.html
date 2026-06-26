@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0c10">
+<title>F2 · Steer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0c10; --card:#11161d; --card2:#0f141b; --hair:#1f2937;
+  --ink:#e7ecf2; --ink2:#9fb0c3; --ink3:#64748b;
+  --accent:#34d399; --cyan:#22d3ee; --amber:#fbbf24; --blue:#60a5fa; --purple:#c084fc; --red:#f87171; --orange:#fb923c;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Roboto","Helvetica Neue",Arial,sans-serif;font-variant-numeric:tabular-nums;padding:0 0 76px}
+.wrap{max-width:560px;margin:0 auto;padding:12px 12px 24px}
+a{color:var(--accent);text-decoration:none}
+.muted{color:var(--ink3);font-size:12px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+/* header */
+.top{display:flex;align-items:center;gap:9px;padding:6px 2px 10px;position:sticky;top:0;background:linear-gradient(var(--bg) 72%,transparent);z-index:6}
+.brand{font-weight:800;letter-spacing:-.3px;font-size:18px}
+.pill{font-size:11px;font-weight:800;letter-spacing:.3px;padding:4px 10px;border-radius:7px;border:1px solid;cursor:pointer;user-select:none}
+.pill.live{color:#06251a;background:var(--accent);border-color:var(--accent)}
+.pill.held{color:var(--amber);background:#2a2008;border-color:#5a4410}
+.spacer{flex:1}
+
+/* metric strips */
+.strip{display:grid;gap:8px;margin-bottom:11px}
+.s4{grid-template-columns:repeat(4,1fr)} .s3{grid-template-columns:repeat(3,1fr)} .s2{grid-template-columns:1fr 1fr}
+.cell{background:var(--card);border:1px solid var(--hair);border-radius:11px;padding:8px 9px;text-align:center}
+.cell .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink3)}
+.cell .v{font-size:16px;font-weight:700;margin-top:2px}
+.cell .u{font-size:11px;font-weight:600;color:var(--ink3)}
+
+.decision{background:var(--card);border:1px solid var(--hair);border-left:3px solid var(--cyan);border-radius:11px;padding:9px 12px;margin-bottom:11px;font-size:13px;color:var(--ink2)}
+.decision b{color:var(--ink)}
+.adv{border-radius:11px;padding:9px 12px;margin-bottom:11px;font-size:13px;font-weight:600;border:1px solid}
+.adv.crit{background:#2a0f12;border-color:#5a1d22;color:#fecaca}
+.adv.warn{background:#2a2008;border-color:#5a4410;color:#fde68a}
+
+/* zone cards */
+.zone{background:var(--card);border:1px solid var(--hair);border-radius:14px;padding:12px 13px;margin-bottom:10px}
+.zone .hd{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.zone .name{font-weight:700;font-size:15px}
+.phase{font-size:10px;font-weight:800;letter-spacing:.4px;padding:3px 8px;border-radius:6px;border:1px solid}
+.ph-P0{color:var(--purple);border-color:#3b2155;background:#1c1030}
+.ph-P1{color:var(--cyan);border-color:#164e63;background:#06303a}
+.ph-P2{color:var(--accent);border-color:#10402f;background:#06251a}
+.ph-P3{color:var(--blue);border-color:#1e3a5f;background:#0a1d33}
+.saf{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink2)}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.met .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink3)}
+.met .big{font-size:24px;font-weight:800;line-height:1.05;letter-spacing:-.5px}
+.met .u{font-size:12px;font-weight:600;color:var(--ink3)}
+.met .sub{font-size:11.5px;color:var(--ink2);margin-top:1px}
+.bar{height:5px;border-radius:3px;background:#1b2430;overflow:hidden;margin-top:6px;grid-column:1/-1}
+.bar i{display:block;height:100%;border-radius:3px}
+.zfoot{display:flex;gap:13px;flex-wrap:wrap;margin-top:10px;padding-top:8px;border-top:1px solid var(--hair);font-size:12px;color:var(--ink2)}
+.zfoot b{color:var(--ink);font-weight:700}
+.zen{margin-left:auto;font-size:11px;color:var(--ink3);cursor:pointer}
+
+/* control rows */
+.crow{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:11px 13px;margin-bottom:9px}
+.crow .nm{font-weight:600}
+.crow .meta{font-size:11.5px;color:var(--ink3)}
+.toggle{margin-left:auto;font-size:12px;font-weight:800;letter-spacing:.3px;padding:6px 14px;border-radius:8px;border:1px solid;cursor:pointer}
+.toggle.on{color:#06251a;background:var(--accent);border-color:var(--accent)}
+.toggle.off{color:var(--ink3);background:var(--card2);border-color:var(--hair)}
+.sect-h{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink3);margin:16px 2px 8px;font-weight:700}
+
+/* tab bar */
+.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--hair);z-index:10;padding-bottom:env(safe-area-inset-bottom)}
+.tabs button{flex:1;background:none;border:0;color:var(--ink3);font:600 12px Roboto,sans-serif;padding:11px 4px 12px;cursor:pointer}
+.tabs button.act{color:var(--accent)}
+.tabs .ic{display:block;font-size:18px;margin-bottom:1px}
+[hidden]{display:none!important}
+.tokbar{background:var(--card);border:1px solid var(--hair);border-radius:11px;padding:12px;margin-bottom:11px}
+.tokbar input{width:100%;background:var(--card2);border:1px solid var(--hair);border-radius:8px;color:var(--ink);padding:9px;font:13px monospace;margin-top:7px}
+.tokbar button{margin-top:8px;width:100%;background:var(--accent);color:#06251a;border:0;border-radius:8px;padding:10px;font-weight:700}
+.foot{color:var(--ink3);font-size:11.5px;text-align:center;margin-top:16px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <span class="dot" id="connDot" style="background:var(--ink3)"></span>
+    <span class="brand">F2</span>
+    <span class="muted" id="updated">connecting…</span>
+    <span class="spacer"></span>
+    <span class="pill held" id="killPill" onclick="toggleKill()">—</span>
+  </div>
+
+  <div class="tokbar" id="tokbar" hidden>
+    <div style="font-size:13px;color:var(--ink2)">Paste a Home Assistant long-lived token (stored on this device only).</div>
+    <input id="tokInput" type="password" placeholder="eyJhbG…" autocomplete="off">
+    <button onclick="saveTok()">Connect</button>
+  </div>
+
+  <div class="adv" id="adv" hidden></div>
+
+  <!-- ============ TAB: STEER ============ -->
+  <div id="tab-steer">
+    <div class="strip s4">
+      <div class="cell"><div class="k">Engine</div><div class="v" id="sysEngine">—</div></div>
+      <div class="cell"><div class="k">System</div><div class="v" id="sysSafe">—</div></div>
+      <div class="cell"><div class="k">Feed EC</div><div class="v" id="sysEc">—</div></div>
+      <div class="cell"><div class="k">Feed pH</div><div class="v" id="sysPh">—</div></div>
+    </div>
+    <div class="strip s4">
+      <div class="cell"><div class="k">Room °C</div><div class="v" id="cRoom">—</div></div>
+      <div class="cell"><div class="k">VPD</div><div class="v" id="cVpd">—</div></div>
+      <div class="cell"><div class="k">CO₂</div><div class="v" id="cCo2">—</div></div>
+      <div class="cell"><div class="k">PPFD</div><div class="v" id="cPpfd">—</div></div>
+    </div>
+    <div class="strip s2" style="margin-bottom:11px">
+      <div class="cell"><div class="k">DLI today</div><div class="v" id="cDli">—</div></div>
+      <div class="cell"><div class="k">Total water today</div><div class="v" id="cTotL">—</div></div>
+    </div>
+    <div class="decision" id="decision">Waiting for the engine…</div>
+    <div id="zones"></div>
+  </div>
+
+  <!-- ============ TAB: CONTROLS ============ -->
+  <div id="tab-controls" hidden>
+    <div class="sect-h">Irrigation</div>
+    <div id="ctlIrrig"></div>
+    <div class="sect-h">Lights</div>
+    <div id="ctlLight"></div>
+    <div class="sect-h">Zones</div>
+    <div id="ctlZones"></div>
+  </div>
+
+  <!-- ============ TAB: DOSING (veg-room peristaltic pumps feeding F2) ============ -->
+  <div id="tab-dosing" hidden>
+    <div class="sect-h">Veg-room nutrient pumps → F2</div>
+    <div id="dosePumps"></div>
+    <div class="foot">Power toggles dose at the set speed. Confirm before each — these add nutrient to the tank.</div>
+  </div>
+
+  <div class="foot" id="foot"></div>
+  <div class="foot"><a href="f2.html">Full dashboard →</a></div>
+</div>
+
+<div class="tabs">
+  <button id="t-steer" class="act" onclick="setTab('steer')"><span class="ic">📊</span>Steer</button>
+  <button id="t-controls" onclick="setTab('controls')"><span class="ic">🎛️</span>Controls</button>
+  <button id="t-dosing" onclick="setTab('dosing')"><span class="ic">⚗️</span>Dosing</button>
+</div>
+
+<script>
+/* ───── config (HA_BASE + LL_TOKEN injected at deploy; blank in the repo) ───── */
+const CONFIG = {
+  HA_BASE: "", LL_TOKEN: "", POLL_MS: 30000, MAX_ZONES: 6,
+  E: {
+    feed_ec:"", feed_ph:"",
+    room_temp:"sensor.f2_scd41_back_left_temperature", vpd:"sensor.f2_air_vpd",
+    co2:"sensor.airq_co2", ppfd:"sensor.growsensor_eppfd", dli:"sensor.growsensor_edli",
+    light:"light.grow_room_all_lights", pump:"switch.veg_main_pump",
+    flush:"input_boolean.f2_flush_mode", fill:"input_boolean.f2_fill_mode", dosing:"input_boolean.nutrient_dosing_active",
+  },
+  SUBTEMP: {1:"sensor.f2_row_1_temperature", 2:"sensor.veg_sdi12_temperature", 3:"sensor.veg_sdi12_temperature"},
+  DOSE: [
+    {nm:"Cleanse", power:"switch.espoe_peristaltic_pumps_cleanse_pump_power", speed:"number.espoe_peristaltic_pumps_cleanse_pump_speed", dose:"number.espoe_peristaltic_pumps_cleanse_dose_amount"},
+    {nm:"Core",    power:"switch.espoe_peristaltic_pumps_core_pump_power",    speed:"number.espoe_peristaltic_pumps_core_pump_speed",    dose:"number.espoe_peristaltic_pumps_core_dose_amount"},
+    {nm:"Bloom",   power:"switch.espoe_peristaltic_pumps_bloom_pump_power",   speed:"number.espoe_peristaltic_pumps_bloom_pump_speed",   dose:"number.espoe_peristaltic_pumps_bloom_dose_amount"},
+    {nm:"Balance", power:"switch.espoe_peristaltic_pumps_balance_pump_power", speed:"number.espoe_peristaltic_pumps_balance_pump_speed", dose:"number.espoe_peristaltic_pumps_balance_dose_amount"},
+  ],
+};
+const DEMO = new URLSearchParams(location.search).has('demo');
+const $ = id => document.getElementById(id);
+let TAB = 'steer';
+
+function getToken(){ return CONFIG.LL_TOKEN || (function(){ try{ return localStorage.getItem('f2.token')||''; }catch(e){ return ''; } })(); }
+function saveTok(){ try{ localStorage.setItem('f2.token', $('tokInput').value.trim()); }catch(e){} $('tokbar').hidden=true; tick(); }
+
+let S = {};
+async function fetchStates(){
+  const tok = getToken(); if(!tok) throw new Error('no-token');
+  const r = await fetch((CONFIG.HA_BASE||'') + '/api/states', { headers:{ Authorization:'Bearer '+tok }, cache:'no-store' });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const arr = await r.json(); const out = {}; arr.forEach(e => out[e.entity_id] = e); return out;
+}
+const st  = id => (id && S[id] && S[id].state!=null) ? S[id].state : null;
+const num = id => { const v=st(id); const f=parseFloat(v); return (v==null||isNaN(f))?null:f; };
+const on  = id => { const v=(st(id)||'').toLowerCase(); return v==='on'||v==='true'||v==='open'||v==='home'; };
+const att = (id,a) => (S[id]&&S[id].attributes)?S[id].attributes[a]:null;
+const fx  = (v,d,u)=> v==null?'—':(v.toFixed(d)+(u||''));
+
+/* ───── demo (standalone) ───── */
+function demoStates(){
+  const now=new Date(), iso=m=>new Date(now-m*60000).toISOString();
+  const z=(n,vwc,ec,t,ph,saf,daily,thr,tgt,vtgt)=>({
+    ['sensor.crop_steering_zone_'+n+'_vwc']:{state:String(vwc)},['sensor.crop_steering_zone_'+n+'_ec']:{state:String(ec)},
+    ['sensor.crop_steering_zone_'+n+'_phase']:{state:ph,attributes:{reason:'in band'}},['sensor.crop_steering_zone_'+n+'_safety_status']:{state:saf},
+    ['sensor.crop_steering_zone_'+n+'_last_irrigation_app']:{state:iso(daily>0?12:9999)},['sensor.crop_steering_zone_'+n+'_daily_water_usage']:{state:String(daily)},
+    ['number.crop_steering_zone_'+n+'_field_capacity']:{state:'65'},['number.crop_steering_zone_'+n+'_p2_vwc_threshold']:{state:String(thr)},
+    ['number.crop_steering_zone_'+n+'_p1_target_vwc']:{state:String(vtgt)},['number.crop_steering_zone_'+n+'_ec_target_gen_p2']:{state:String(tgt)},
+    ['switch.crop_steering_zone_'+n+'_enabled']:{state:'on'},['switch.crop_steering_zone_'+n+'_manual_override']:{state:'off'},
+    [CONFIG.SUBTEMP[n]]:{state:String(t)},
+  });
+  const d=Object.assign({
+    'input_boolean.f2_control_enabled':{state:'on'},
+    'sensor.crop_steering_ai_heartbeat':{state:'healthy',attributes:{engine:'f2-control',last_beat:now.toISOString()}},
+    'sensor.crop_steering_system_safety_status':{state:'all_safe'},
+    'sensor.crop_steering_current_decision':{state:'Holding — all zones in band'},
+    'sensor.crop_steering_fused_ec':{state:'4.6'},'sensor.crop_steering_source_ph':{state:'6.0'},
+    'sensor.f2_scd41_back_left_temperature':{state:'24.9'},'sensor.f2_air_vpd':{state:'1.05'},
+    'sensor.airq_co2':{state:'1180'},'sensor.growsensor_eppfd':{state:'612'},'sensor.growsensor_edli':{state:'31.4'},
+    'light.grow_room_all_lights':{state:'on'},'switch.veg_main_pump':{state:'off'},
+    'input_boolean.f2_flush_mode':{state:'off'},'input_boolean.f2_fill_mode':{state:'off'},'input_boolean.nutrient_dosing_active':{state:'off'},
+  }, z(1,57,4.6,23.2,'P2','optimal',2.1,43,4.8,60), z(2,59,4.7,23.0,'P1','optimal',1.9,44.7,4.8,62), z(3,58,4.8,23.0,'P2','optimal',2.3,43,4.8,60));
+  CONFIG.DOSE.forEach((p,i)=>{ d[p.power]={state:i===1?'on':'off'}; d[p.speed]={state:'1700'}; d[p.dose]={state:String(150+i*50)}; });
+  return d;
+}
+
+/* ───── render ───── */
+function agoStr(iso){ if(!iso) return 'never'; const t=Date.parse(iso); if(isNaN(t)) return '—'; const m=(Date.now()-t)/60000; return m<1?'just now':m<60?Math.round(m)+'m':( m/60).toFixed(1)+'h'; }
+function safCls(s){ s=(s||'').toLowerCase(); if(/unsafe|crit|burn|lockout|exceed|saturat/.test(s)) return 'crit'; if(/warn|approach|low|high/.test(s)) return 'warn'; return 'ok'; }
+function safCol(c){ return c==='crit'?'var(--red)':c==='warn'?'var(--amber)':'var(--accent)'; }
+function vwcCol(v,fc){ if(v==null) return 'var(--ink3)'; if(v>=fc) return 'var(--blue)'; if(v<fc*0.55) return 'var(--red)'; return 'var(--accent)'; }
+function detectZones(){ const z=[]; for(let n=1;n<=CONFIG.MAX_ZONES;n++){ if(S['sensor.crop_steering_zone_'+n+'_phase']||S['sensor.crop_steering_zone_'+n+'_vwc']) z.push(n); } return z.length?z:[1,2,3]; }
+
+function render(){
+  $('connDot').style.background='var(--accent)';
+  $('updated').textContent='updated '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  const live=on('input_boolean.f2_control_enabled');
+  const kp=$('killPill'); kp.textContent=live?'LIVE':'HELD'; kp.className='pill '+(live?'live':'held');
+
+  // system
+  const hbEng=att('sensor.crop_steering_ai_heartbeat','engine'), beat=att('sensor.crop_steering_ai_heartbeat','last_beat');
+  const beatMin=beat?(Date.now()-Date.parse(beat))/60000:999, engOk=hbEng==='f2-control'&&beatMin<5;
+  $('sysEngine').textContent=engOk?'ok':(hbEng?'stale':'off'); $('sysEngine').style.color=engOk?'var(--accent)':'var(--red)';
+  const ss=st('sensor.crop_steering_system_safety_status')||'—', sc=safCls(ss);
+  $('sysSafe').textContent=ss.replace(/_/g,' ').replace('all ',''); $('sysSafe').style.color=safCol(sc);
+  const fec=CONFIG.E.feed_ec?num(CONFIG.E.feed_ec):num('sensor.crop_steering_fused_ec');
+  const fph=CONFIG.E.feed_ph?num(CONFIG.E.feed_ph):num('sensor.crop_steering_source_ph');
+  $('sysEc').textContent=fx(fec,2); $('sysPh').textContent=fx(fph,2);
+  $('sysPh').style.color=fph==null?'var(--ink)':(fph>=5.6&&fph<=6.4?'var(--accent)':'var(--amber)');
+
+  // climate
+  $('cRoom').innerHTML=fx(num(CONFIG.E.room_temp),1)+'<span class="u">°</span>';
+  $('cVpd').innerHTML=fx(num(CONFIG.E.vpd),2);
+  $('cCo2').innerHTML=fx(num(CONFIG.E.co2),0);
+  $('cPpfd').innerHTML=fx(num(CONFIG.E.ppfd),0);
+  $('cDli').innerHTML=fx(num(CONFIG.E.dli),1);
+
+  $('decision').innerHTML='<b>Decision</b> · '+(st('sensor.crop_steering_current_decision')||'—');
+
+  // advisory
+  let advT='',advC='ok';
+  if(!engOk){ advT='⚠ Engine not reporting — check the f2-control add-on'; advC='crit'; }
+  else if(!live){ advT='● Kill-switch OFF — autonomous watering HELD'; advC='warn'; }
+  const ae=$('adv'); if(advT){ ae.hidden=false; ae.className='adv '+advC; ae.textContent=advT; } else ae.hidden=true;
+
+  // zones
+  const zones=detectZones(); let totL=0;
+  $('zones').innerHTML=zones.map(n=>{
+    const P='sensor.crop_steering_zone_'+n+'_';
+    const vwc=num(P+'vwc'), ec=num(P+'ec'), ph=(''+(st(P+'phase')||'P2')).toUpperCase().slice(0,2);
+    const fc=num('number.crop_steering_zone_'+n+'_field_capacity')||65;
+    const thr=num('number.crop_steering_zone_'+n+'_p2_vwc_threshold');
+    const vtgt=num('number.crop_steering_zone_'+n+'_p1_target_vwc');
+    const smode=(''+(st('select.crop_steering_zone_'+n+'_steering_mode')||'gen')).toLowerCase();
+    const etgt=num('number.crop_steering_zone_'+n+'_ec_target_'+(smode.startsWith('veg')?'veg':'gen')+'_p2');
+    const stmp=num(CONFIG.SUBTEMP[n]);
+    const saf=st(P+'safety_status')||'—', scc=safCls(saf), last=agoStr(st(P+'last_irrigation_app'));
+    const daily=num(P+'daily_water_usage'); if(daily!=null) totL+=daily;
+    const en=S['switch.crop_steering_zone_'+n+'_enabled']?on('switch.crop_steering_zone_'+n+'_enabled'):true;
+    const vpct=vwc==null?0:Math.max(0,Math.min(100,vwc/Math.max(fc*1.15,1)*100));
+    return `<div class="zone">
+      <div class="hd"><span class="name">Zone ${n}</span><span class="phase ph-${ph}">${ph}</span>
+        <span class="saf"><span class="dot" style="background:${safCol(scc)}"></span>${en?saf.replace(/_/g,' '):'disabled'}</span></div>
+      <div class="metrics">
+        <div class="met"><div class="lbl">Water (VWC)</div><div class="big" style="color:${vwcCol(vwc,fc)}">${vwc==null?'—':vwc.toFixed(0)}<span class="u">%</span></div><div class="sub">target ${vtgt==null?'—':vtgt.toFixed(0)}% · cap ${fc.toFixed(0)}%</div></div>
+        <div class="met"><div class="lbl">Pore EC</div><div class="big">${ec==null?'—':ec.toFixed(1)}</div><div class="sub">target ${etgt==null?'—':etgt.toFixed(1)}</div></div>
+        <div class="bar"><i style="width:${vpct}%;background:${vwcCol(vwc,fc)}"></i></div>
+      </div>
+      <div class="zfoot">
+        <span>sub temp <b>${stmp==null?'—':stmp.toFixed(1)+'°'}</b></span>
+        <span>last <b>${last}</b></span>
+        ${daily==null?'':'<span>today <b>'+daily.toFixed(1)+' L</b></span>'}
+        <span class="zen" onclick="toggleZone(${n},${en})">${en?'disable':'enable'}</span>
+      </div></div>`;
+  }).join('');
+  $('cTotL').innerHTML=zones.length?totL.toFixed(1)+'<span class="u"> L</span>':'—';
+
+  // controls tab
+  $('ctlIrrig').innerHTML=
+    ctlRow('Main pump', CONFIG.E.pump, num('sensor.veg_main_pump_power')!=null?fx(num('sensor.veg_main_pump_power'),0,' W'):'')
+    + ctlRow('Flush mode', CONFIG.E.flush, 'hand the pump to a manual flush')
+    + ctlRow('Fill mode', CONFIG.E.fill, 'tank fill / dosing — pauses steering')
+    + ctlRow('Dosing active', CONFIG.E.dosing, 'tank dosing in progress', true);
+  $('ctlLight').innerHTML=
+    ctlRow('Grow lights', CONFIG.E.light, 'PPFD '+fx(num(CONFIG.E.ppfd),0)+' · DLI '+fx(num(CONFIG.E.dli),1));
+  $('ctlZones').innerHTML=zones.map(n=>{
+    const en=on('switch.crop_steering_zone_'+n+'_enabled'), ov=on('switch.crop_steering_zone_'+n+'_manual_override');
+    return ctlRow('Zone '+n+' enabled','switch.crop_steering_zone_'+n+'_enabled','manual override: '+(ov?'ON':'off'));
+  }).join('');
+
+  // dosing tab
+  $('dosePumps').innerHTML=CONFIG.DOSE.map(p=>{
+    const pon=on(p.power), spd=num(p.speed), dose=num(p.dose);
+    return `<div class="crow"><div><div class="nm">${p.nm}</div><div class="meta">${fx(spd,0,' rpm')} · dose ${fx(dose,0,' ml')}</div></div>
+      <span class="toggle ${pon?'on':'off'}" onclick="toggleEnt('${p.power}',${pon},'${p.nm} pump')">${pon?'RUN':'off'}</span></div>`;
+  }).join('');
+
+  $('foot').textContent=(DEMO?'DEMO · ':'')+'F2 · '+zones.length+' zones';
+}
+function ctlRow(nm, ent, meta, readonly){
+  const v=on(ent);
+  const tgl=readonly?`<span class="toggle ${v?'on':'off'}" style="cursor:default">${v?'ON':'off'}</span>`
+    :`<span class="toggle ${v?'on':'off'}" onclick="toggleEnt('${ent}',${v},'${nm}')">${v?'ON':'off'}</span>`;
+  return `<div class="crow"><div><div class="nm">${nm}</div><div class="meta">${meta||''}</div></div>${tgl}</div>`;
+}
+
+/* ───── controls (confirmed; live grow) ───── */
+async function callService(domain, service, data){
+  if(DEMO){ alert('Demo — no commands sent.'); return; }
+  const tok=getToken(); if(!tok){ $('tokbar').hidden=false; return; }
+  await fetch((CONFIG.HA_BASE||'')+'/api/services/'+domain+'/'+service,{method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify(data)});
+  setTimeout(tick,800);
+}
+function domainOf(ent){ return ent.split('.')[0]; }
+function toggleEnt(ent, isOn, label){
+  if(!confirm((isOn?'Turn OFF':'Turn ON')+' '+label+'?')) return;
+  callService(domainOf(ent), isOn?'turn_off':'turn_on', {entity_id:ent});
+}
+function toggleKill(){
+  const live=on('input_boolean.f2_control_enabled');
+  if(!confirm(live?'HOLD all autonomous watering? (kill-switch OFF)':'ARM autonomous watering? The engine will steer + fire shots.')) return;
+  callService('input_boolean', live?'turn_off':'turn_on', {entity_id:'input_boolean.f2_control_enabled'});
+}
+function toggleZone(n,en){
+  if(!confirm((en?'Disable':'Enable')+' Zone '+n+'?')) return;
+  callService('switch', en?'turn_off':'turn_on', {entity_id:'switch.crop_steering_zone_'+n+'_enabled'});
+}
+
+/* ───── tabs + loop ───── */
+function setTab(t){ TAB=t; ['steer','controls','dosing'].forEach(x=>{ $('tab-'+x).hidden=(x!==t); $('t-'+x).className=(x===t?'act':''); }); window.scrollTo(0,0); }
+async function tick(){
+  try{ S=DEMO?demoStates():await fetchStates(); $('tokbar').hidden=true; render(); }
+  catch(e){ $('connDot').style.background='var(--red)';
+    if(String(e.message)==='no-token'){ $('updated').textContent='token needed'; $('tokbar').hidden=false; }
+    else $('updated').textContent='disconnected ('+e.message+')'; }
+}
+tick(); setInterval(tick, CONFIG.POLL_MS);
+</script>
+</body>
+</html>

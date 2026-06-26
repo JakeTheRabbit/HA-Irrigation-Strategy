@@ -1,0 +1,147 @@
+# F2 FEED / TANK PHONE ALERTS  — standalone, engine-independent.
+# Fires off raw HA state (not the AppDaemon engine) so it STILL alerts when the engine is wedged /
+# restarting — which is exactly when zones sat unwatered for hours this week.
+# Signals: input_boolean.nutrient_dosing_active = tank fill/dose in progress (irrigation paused);
+#          source-water feed pH/EC (sensor.aquaponics_kit_f4f618_ph + sensor.atlas_legacy_1_ec) vs the
+#          irrigation gate bounds (number.crop_steering_irrigation_{ph,ec}_{min,max}).
+# All alerts -> notify.mobile_app_s23ultra (the S23 Ultra). Deploy: Samba H:\packages -> reload_all (no restart).
+
+template:
+  - binary_sensor:
+      - name: "F2 Feed Out Of Range"
+        unique_id: f2_feed_out_of_range
+        device_class: problem
+        availability: >
+          {{ states('sensor.aquaponics_kit_f4f618_ph') not in ['unknown','unavailable','none','']
+             and states('sensor.atlas_legacy_1_ec') not in ['unknown','unavailable','none',''] }}
+        state: >
+          {% set ph = states('sensor.aquaponics_kit_f4f618_ph') | float(0) %}
+          {% set ec = states('sensor.atlas_legacy_1_ec') | float(0) %}
+          {% set phmin = states('number.crop_steering_irrigation_ph_min') | float(0) %}
+          {% set phmax = states('number.crop_steering_irrigation_ph_max') | float(99) %}
+          {% set ecmin = states('number.crop_steering_irrigation_ec_min') | float(0) %}
+          {% set ecmax = states('number.crop_steering_irrigation_ec_max') | float(0) %}
+          {{ (ph < phmin) or (ph > phmax) or (ecmin > 0 and ec < ecmin) or (ecmax > 0 and ec > ecmax) }}
+        attributes:
+          cause: >
+            {% set ph = states('sensor.aquaponics_kit_f4f618_ph') | float(0) %}
+            {% set ec = states('sensor.atlas_legacy_1_ec') | float(0) %}
+            {% set phmin = states('number.crop_steering_irrigation_ph_min') | float(0) %}
+            {% set phmax = states('number.crop_steering_irrigation_ph_max') | float(99) %}
+            {% set ecmin = states('number.crop_steering_irrigation_ec_min') | float(0) %}
+            {% set ecmax = states('number.crop_steering_irrigation_ec_max') | float(0) %}
+            {% set m = [] %}
+            {% if ph < phmin %}{% set m = m + ['pH %.2f too LOW (min %.1f) -> add pH-up'|format(ph, phmin)] %}{% endif %}
+            {% if ph > phmax %}{% set m = m + ['pH %.2f too HIGH (max %.1f) -> add pH-down'|format(ph, phmax)] %}{% endif %}
+            {% if ecmin > 0 and ec < ecmin %}{% set m = m + ['EC %.1f too LOW (min %.1f) -> dose nutrients'|format(ec, ecmin)] %}{% endif %}
+            {% if ecmax > 0 and ec > ecmax %}{% set m = m + ['EC %.1f too HIGH (max %.1f) -> dilute with water'|format(ec, ecmax)] %}{% endif %}
+            {{ m | join('  ·  ') }}
+
+automation:
+  # 1) Tank fill / dose STARTED
+  - id: f2_tank_fill_started
+    alias: F2 Tank - fill/dose STARTED (phone)
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: input_boolean.nutrient_dosing_active
+        from: "off"
+        to: "on"
+    action:
+      - service: notify.mobile_app_s23ultra
+        data:
+          title: "🪣 F2 tank filling / dosing"
+          message: >
+            Tank fill/dose started — F2 irrigation is PAUSED until it finishes.
+            Feed now pH {{ states('sensor.aquaponics_kit_f4f618_ph') }} / EC {{ states('sensor.atlas_legacy_1_ec') }}.
+          data:
+            tag: f2_tank_fill
+            channel: F2 Crop Steering
+
+  # 2) Tank fill / dose DONE  (flags if it finished still out of range)
+  - id: f2_tank_fill_done
+    alias: F2 Tank - fill/dose DONE (phone)
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: input_boolean.nutrient_dosing_active
+        from: "on"
+        to: "off"
+    action:
+      - service: notify.mobile_app_s23ultra
+        data:
+          title: "✅ F2 tank fill/dose done"
+          message: >
+            Fill/dose complete — feed pH {{ states('sensor.aquaponics_kit_f4f618_ph') }} /
+            EC {{ states('sensor.atlas_legacy_1_ec') }}
+            (want pH {{ states('number.crop_steering_irrigation_ph_min') }}-{{ states('number.crop_steering_irrigation_ph_max') }} /
+            EC {{ states('number.crop_steering_irrigation_ec_min') }}-{{ states('number.crop_steering_irrigation_ec_max') }}).
+            {{ '⚠️ STILL OUT OF RANGE — irrigation stays BLOCKED, fix the tank.'
+               if is_state('binary_sensor.f2_feed_out_of_range','on')
+               else 'In range — irrigation can resume.' }}
+          data:
+            tag: f2_tank_fill
+            channel: F2 Crop Steering
+
+  # 3) Feed OUT OF GATE -> irrigation blocked. Immediate (3-min debounce) anytime + re-remind every
+  #    30 min DURING lights-on (no overnight spam). Only while NOT dosing (a dose is an expected transient).
+  - id: f2_feed_out_of_range_alert
+    alias: F2 Feed - OUT OF GATE, irrigation BLOCKED (phone)
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.f2_feed_out_of_range
+        to: "on"
+        for: "00:03:00"
+        id: trip
+      - platform: time_pattern
+        minutes: "/30"
+        id: remind
+    condition:
+      - condition: state
+        entity_id: binary_sensor.f2_feed_out_of_range
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.nutrient_dosing_active
+        state: "off"
+      - condition: template
+        value_template: >
+          {{ trigger.id == 'trip'
+             or (now().hour >= states('number.crop_steering_lights_on_hour')|int(10)
+                 and now().hour < states('number.crop_steering_lights_off_hour')|int(22)) }}
+    action:
+      - service: notify.mobile_app_s23ultra
+        data:
+          title: "⚠️ F2 FEED OUT OF RANGE — irrigation BLOCKED"
+          message: >
+            F2 won't water until the tank is fixed:
+            {{ state_attr('binary_sensor.f2_feed_out_of_range','cause') }}
+          data:
+            tag: f2_feed_oor
+            channel: F2 Crop Steering
+
+  # 4) Feed BACK in range -> clear + resume note
+  - id: f2_feed_back_in_range
+    alias: F2 Feed - back in range (phone)
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.f2_feed_out_of_range
+        from: "on"
+        to: "off"
+        for: "00:02:00"
+    action:
+      - service: notify.mobile_app_s23ultra
+        data:
+          message: clear_notification
+          data:
+            tag: f2_feed_oor
+      - service: notify.mobile_app_s23ultra
+        data:
+          title: "✅ F2 feed back in range"
+          message: >
+            Feed pH {{ states('sensor.aquaponics_kit_f4f618_ph') }} /
+            EC {{ states('sensor.atlas_legacy_1_ec') }} back in band — irrigation can resume.
+          data:
+            tag: f2_feed_oor
+            channel: F2 Crop Steering

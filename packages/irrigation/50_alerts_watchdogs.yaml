@@ -313,7 +313,7 @@ automation:
   - id: irrigation_ambient_light_dark_period_alert
     alias: "Irrigation Ambient Light Detected During Dark Period"
     description: >
-      Notify Stephan and Damian if DLight Ambient Light Sensor detects light
+      Notify the operators if DLight Ambient Light Sensor detects light
       above 10 lux while lights are off. Possible light leak or equipment left on.
     trigger:
       - trigger: numeric_state
@@ -326,13 +326,13 @@ automation:
         entity_id: binary_sensor.irrigation_lights_on
         state: "off"
     action:
-      - action: notify.mobile_app_stephans_iphone
+      - action: notify.mobile_app_phone_2
         data:
           title: "💡 Light Detected — Dark Period"
           message: >
             DLight sensor reads {{ states('sensor.ambient_light_sensor_illuminance') }} lux
             while lights are OFF. Possible light leak or equipment left on.
-      - action: notify.mobile_app_damians_iphone
+      - action: notify.mobile_app_phone
         data:
           title: "💡 Light Detected — Dark Period"
           message: >

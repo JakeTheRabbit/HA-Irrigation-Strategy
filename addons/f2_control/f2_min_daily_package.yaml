@@ -1,0 +1,31 @@
+# F2 minimum daily water floor (per-plant water safety).
+# Per-zone minimum millilitres PER PLANT PER DAY the engine must put through during
+# lights-on, even if VWC never trips the rewater threshold — catches an under-drinking
+# zone (partial dripper, too-wet probe, the cross-zone-divergence failure). 0 = OFF.
+# The engine converts to a zone litres floor: min_daily_volume(L) = mL/plant x plant_count / 1000
+# (plant_count = number.crop_steering_zone_N_plant_count; F2 = 36/zone, so 300 mL/plant -> 10.8 L).
+# The engine reads input_number.crop_steering_zone_N_min_daily_ml_per_plant in _params.
+# Deploy: copy to /config/packages on the box, then reload_all (no restart for the helpers);
+# the engine picks them up on its next add-on restart.
+input_number:
+  crop_steering_zone_1_min_daily_ml_per_plant:
+    name: F2 Zone 1 min daily mL/plant
+    min: 0
+    max: 2000
+    step: 10
+    unit_of_measurement: mL
+    icon: mdi:water-alert
+  crop_steering_zone_2_min_daily_ml_per_plant:
+    name: F2 Zone 2 min daily mL/plant
+    min: 0
+    max: 2000
+    step: 10
+    unit_of_measurement: mL
+    icon: mdi:water-alert
+  crop_steering_zone_3_min_daily_ml_per_plant:
+    name: F2 Zone 3 min daily mL/plant
+    min: 0
+    max: 2000
+    step: 10
+    unit_of_measurement: mL
+    icon: mdi:water-alert

@@ -1,0 +1,5 @@
+# The add-on is a dense single-process IO shell; allow the terse one-line style it's written in.
+line-length = 120
+
+[lint]
+ignore = ["E701", "E702"]
