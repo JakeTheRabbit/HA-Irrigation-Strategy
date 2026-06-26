@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-06-27
+
+### Added
+- **Mobile control surface — `www/overview.html`.** A lightweight, phone-first one-pager with three
+  tabs: **Steer** (per-zone VWC + target / pore-EC + target / substrate temp / phase / last shot /
+  daily L; room temp, VPD, CO2, PPFD, DLI, total daily water), **Controls** (main pump, flush/fill
+  modes, grow lights, per-zone enable), and **Dosing** (the veg-room peristaltic pumps —
+  Cleanse/Core/Bloom/Balance — feeding F2). Vanilla JS, one 30 s poll, `?demo` mode, confirmed actuation.
+- **PID EC loop** (engine `ec_pid()`, flag-gated, OFF by default). A real Kp/Ki/Kd controller with
+  integral anti-windup and output clamped to ±20 % of the P2 threshold, as an opt-in upgrade to the
+  stepped EC-offset. Enable with `input_boolean.crop_steering_ec_pid_enabled`; gains tunable via
+  `input_number.crop_steering_ec_pid_{kp,ki,kd}` (`addons/f2_control/f2_ec_pid_package.yaml`).
+
+### Changed
+- **Shot sizing reads the LIVE config.** The f2-control add-on now computes shot duration from the real
+  substrate volume + per-zone flow (`plant_count × drippers_per_plant × dripper_flow_rate`) instead of
+  hardcoded options — a mis-set substrate (6 L vs the real 9 L) fired shots ~⅓ too short, so VWC never
+  rose and the pump machine-gunned. Fixed.
+- **`.env` is now authoritative for setpoints** — number entities seed their initial value from the
+  parsed `crop_steering.env` params, falling back to `DEFAULT_VALUES`.
+
+### Fixed
+- **pH half of the source-water gate** — f2-control now gates on feed pH (`irrigation_ph_min/max`, with
+  last-good grace + fail-closed on a dead probe), not just EC. Bad-pH feed no longer waters.
+- **Fail-closed hardware writes** — `ha_call` returns False on non-2xx; a shot aborts (cuts hardware,
+  alerts, does NOT advance shot/daily/last_shot counters) if any pump/mainline/valve command errors.
+- **P2 EC-correction short-cycle** — flush/dilute/rescue shots respect a minimum interval
+  (`p2_min_interval_min`, default 10 min); no-runoff nibbles can no longer stack EC + machine-gun the pump.
+- **`f2.html` lag** — only the active tab rebuilds per 30 s tick, and backdrop-filter blur removed from
+  the ~78 glass cards (fixes cursor/scroll jank).
+- **`services.execute_irrigation_shot`** — zone ids coerced to int (a `zone: 1` call no longer rejects
+  against a `"1"` key after a config-entry reload).
+
+### Removed
+- The retired AppDaemon engine is no longer bundled in the release artifact (kept in-repo as a manual
+  rollback only).
+
 ## [2.4.0] - 2026-06-26
 
 ### Added — f2-control standalone add-on + extracted crop-steering-engine (AppDaemon retired)
