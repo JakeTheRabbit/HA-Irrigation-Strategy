@@ -479,8 +479,13 @@ class Controller:
 
     # ---- shot sizing from LIVE config (not a hardcoded option) — a shot is size% of substrate volume ----
     def _substrate_l(self, zone):
-        """Substrate volume (L). Per-zone number first, then the global, then the option fallback."""
-        return self._zone_num(zone, "substrate_volume", self.substrate_l)
+        """ZONE-TOTAL substrate (L) = per-plant block x plant_count. The substrate_volume entity is the
+        PER-PLANT block size (e.g. 6 L); flow_lps is zone-total (plant_count x drippers x L/hr), so the
+        duration + daily-volume math need zone-total substrate or shots come out plant_count-times short
+        (the machine-gun: per-plant 6 L / zone flow -> ~36x too short, VWC never rises)."""
+        per_plant = self._zone_num(zone, "substrate_volume", self.substrate_l)
+        pc = self._zone_num(zone, "plant_count", 0)
+        return per_plant * pc if pc > 0 else per_plant
 
     def _zone_flow_lps(self, zone):
         """Real zone delivery rate (L/s) = plants x drippers/plant x dripper L/hr / 3600. Fallback to the option."""
@@ -503,7 +508,9 @@ class Controller:
             log(f"Z{zone} {st['phase']} BLOCKED ({block}): would {reason}")
         elif fire:
             raw_dur = size / 100.0 * self._substrate_l(zone) / max(self._zone_flow_lps(zone), 0.001)
-            max_dur = self._num("number.crop_steering_max_shot_duration", 300)   # hard flood cap (s); default 300
+            max_dur = self._num("number.crop_steering_max_shot_duration", 900)   # hard flood cap (s); default 900
+            #   a correct 6 % shot of a 6 L block at 4 L/hr is ~324 s; big P1/flush shots reach ~860 s, so the
+            #   cap sits at 900 s — above any legit shot, but catches a gross substrate/flow misconfig
             dur = max(5, min(int(max_dur), int(raw_dur)))
             if raw_dur > max_dur:   # a legit F2 shot is <60s — hitting the cap means a substrate/flow misconfig
                 self._alert(f"durcap_z{zone}", "Shot duration capped (flood guard)",
