@@ -24,6 +24,10 @@ addopts = "-q"
 [tool.ruff]
 line-length = 120
 
+[tool.ruff.lint]
+# the core + tests use a terse one-line style on purpose (extracted verbatim from the engine)
+ignore = ["E701", "E702"]
+
 [tool.mypy]
 python_version = "3.10"
 ignore_missing_imports = true
