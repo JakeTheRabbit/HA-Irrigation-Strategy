@@ -2021,6 +2021,10 @@ class MasterCropSteeringApp(BaseAsyncApp):
             # Get predictions
             predictions = self.ml_predictor.predict_irrigation_need(features)
             
+            # NOTE (RETIRED ENGINE): Checks 'prediction_available' and 'model_confidence',
+            # but ml_irrigation_predictor.predict_irrigation_need() returns 'irrigation_need'
+            # and 'confidence' — key mismatch means this branch is always False (no-op).
+            # This is dead code in the retired appdaemon/ rollback engine; not shipped.
             if predictions.get('prediction_available', False):
                 return predictions
             else:

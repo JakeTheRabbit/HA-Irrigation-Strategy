@@ -565,6 +565,61 @@ PER_ZONE_STEERING_KEYS = [
 
 _DESC_BY_KEY = {d.key: d for d in NUMBER_DESCRIPTIONS}
 
+# Maps entry.data["parameters"] key → number entity key (where names differ).
+# Keys that share the same name on both sides are also listed so the lookup is
+# complete and doesn't need a separate "same name" fallback branch.
+PARAM_TO_ENTITY_KEY: dict[str, str] = {
+    # Substrate
+    "substrate_volume": "substrate_volume",
+    "dripper_flow_rate": "dripper_flow_rate",
+    "drippers_per_plant": "drippers_per_plant",
+    "field_capacity": "field_capacity",
+    "max_ec": "maximum_ec",
+    # P0
+    "p0_veg_dryback": "vegetative_dryback_target",
+    "p0_gen_dryback": "generative_dryback_target",
+    "p0_min_wait": "p0_minimum_wait_time",
+    "p0_max_wait": "p0_maximum_wait_time",
+    # P1
+    "p1_initial_shot_size": "p1_initial_shot_size",
+    "p1_shot_increment": "p1_shot_size_increment",
+    "p1_max_shot_size": "p1_maximum_shot_size",
+    "p1_time_between_shots": "p1_time_between_shots",
+    "p1_target_vwc": "p1_target_vwc",
+    "p1_max_shots": "p1_maximum_shots",
+    "p1_min_shots": "p1_minimum_shots",
+    # P2
+    "p2_shot_size": "p2_shot_size",
+    "p2_vwc_threshold": "p2_vwc_threshold",
+    "p2_ec_high_threshold": "p2_ec_high_threshold",
+    "p2_ec_low_threshold": "p2_ec_low_threshold",
+    # P3
+    "p3_veg_last_irrigation": "p3_veg_last_irrigation",
+    "p3_gen_last_irrigation": "p3_gen_last_irrigation",
+    "p3_emergency_vwc": "p3_emergency_vwc_threshold",
+    "p3_emergency_shot_size": "p3_emergency_shot_size",
+    # EC targets
+    "ec_target_veg_p0": "ec_target_veg_p0",
+    "ec_target_veg_p1": "ec_target_veg_p1",
+    "ec_target_veg_p2": "ec_target_veg_p2",
+    "ec_target_veg_p3": "ec_target_veg_p3",
+    "ec_target_gen_p0": "ec_target_gen_p0",
+    "ec_target_gen_p1": "ec_target_gen_p1",
+    "ec_target_gen_p2": "ec_target_gen_p2",
+    "ec_target_gen_p3": "ec_target_gen_p3",
+}
+
+# Reverse map: entity key → parsed parameter value (built at setup time).
+# Used by CropSteeringNumber to seed its initial value.
+def _build_entity_seed(entry_data: dict) -> dict[str, float]:
+    """Return {entity_key: value} from the config entry's parsed parameters."""
+    params = entry_data.get("parameters", {})
+    seed: dict[str, float] = {}
+    for param_key, entity_key in PARAM_TO_ENTITY_KEY.items():
+        if param_key in params:
+            seed[entity_key] = params[param_key]
+    return seed
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -573,17 +628,25 @@ async def async_setup_entry(
 ) -> None:
     """Set up Crop Steering number entities."""
     numbers = []
-    
+
+    # Build a seed map {entity_key: parsed_value} from the config entry's
+    # .env parameters.  Empty dict when no parameters were parsed (manual setup).
+    entry_seed = _build_entity_seed(entry.data)
+
     # Add main number entities
     for description in NUMBER_DESCRIPTIONS:
-        numbers.append(CropSteeringNumber(entry, description))
-    
+        numbers.append(CropSteeringNumber(entry, description, entity_seed=entry_seed))
+
     # Get number of zones from config
     config_data = hass.data[DOMAIN][entry.entry_id]
     num_zones = config_data.get(CONF_NUM_ZONES, 1)
-    
+
     # Add zone-specific number entities
     for zone_num in range(1, num_zones + 1):
+        # Pull per-zone tunables from the parsed .env (zones dict), falling back
+        # to the legacy hard-coded defaults when absent.
+        zone_cfg = entry.data.get("zones", {}).get(zone_num, {})
+
         # Zone plant count
         numbers.append(CropSteeringNumber(
             entry,
@@ -597,9 +660,9 @@ async def async_setup_entry(
                 mode="box",
             ),
             zone_num=zone_num,
-            default_value=4
+            default_value=zone_cfg.get("plant_count", 4),
         ))
-        
+
         # Zone water limits
         numbers.append(CropSteeringNumber(
             entry,
@@ -614,9 +677,9 @@ async def async_setup_entry(
                 mode="box",
             ),
             zone_num=zone_num,
-            default_value=20.0
+            default_value=zone_cfg.get("max_daily_volume", 20.0),
         ))
-        
+
         # Zone-specific shot sizes
         numbers.append(CropSteeringNumber(
             entry,
@@ -631,7 +694,7 @@ async def async_setup_entry(
                 mode="box",
             ),
             zone_num=zone_num,
-            default_value=1.0
+            default_value=zone_cfg.get("shot_multiplier", 1.0),
         ))
 
         # Per-zone copy of every steering parameter (AppDaemon falls back to global).
@@ -651,6 +714,7 @@ async def async_setup_entry(
                 ),
                 zone_num=zone_num,
                 default_value=DEFAULT_VALUES.get(_key),
+                entity_seed=entry_seed,
             ))
 
     async_add_entities(numbers)
@@ -664,8 +728,16 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         description: NumberEntityDescription,
         zone_num: int = None,
         default_value: float = None,
+        entity_seed: dict | None = None,
     ) -> None:
-        """Initialize the number entity."""
+        """Initialize the number entity.
+
+        Initial value priority (highest → lowest):
+          1. explicit default_value arg (caller already resolved a per-zone param)
+          2. entity_seed[base_key]  — parsed from the .env via PARAM_TO_ENTITY_KEY
+          3. DEFAULT_VALUES[key]    — module-level hardcoded fallback
+          4. description.native_min_value
+        """
         self.entity_description = description
         self._entry = entry
         self._zone_num = zone_num
@@ -673,15 +745,26 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         self._attr_name = description.name
         # Set object_id to include crop_steering prefix for entity_id generation
         self._attr_object_id = f"{DOMAIN}_{description.key}"
-        
-        # Default values shared with per-zone entities (module-level DEFAULT_VALUES).
-        default_values = DEFAULT_VALUES
 
-        # Use provided default or lookup from dict
         if default_value is not None:
+            # Caller supplied an explicit value (e.g. zone tunables from .env zones dict).
             self._attr_native_value = default_value
         else:
-            self._attr_native_value = default_values.get(description.key, description.native_min_value)
+            # For per-zone steering entities the description key is "zone_N_<base>"; strip
+            # the zone prefix so the seed lookup uses the bare entity key.
+            base_key = description.key
+            if zone_num is not None:
+                prefix = f"zone_{zone_num}_"
+                if base_key.startswith(prefix):
+                    base_key = base_key[len(prefix):]
+
+            seed_value = (entity_seed or {}).get(base_key)
+            if seed_value is not None:
+                self._attr_native_value = seed_value
+            else:
+                self._attr_native_value = DEFAULT_VALUES.get(
+                    description.key, description.native_min_value
+                )
 
     async def async_added_to_hass(self) -> None:
         """Restore state when added to hass."""

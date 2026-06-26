@@ -187,6 +187,11 @@ class SimplifiedIrrigationPredictor:
             irrigation_need = max(0.0, min(1.0, irrigation_need))
             confidence = max(0.1, min(0.95, confidence))
             
+            # NOTE (RETIRED ENGINE): Keys returned here are 'irrigation_need' and 'confidence'.
+            # The caller (master_crop_steering_app.py) checks 'prediction_available' and
+            # 'model_confidence' — those keys are never set here, so the ML path is always
+            # a no-op. This mismatch is intentional dead code; appdaemon/ is the retired
+            # rollback engine and is not shipped.
             return {
                 'irrigation_need': irrigation_need,
                 'confidence': confidence,
