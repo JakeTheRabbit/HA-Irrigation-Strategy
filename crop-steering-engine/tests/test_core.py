@@ -31,7 +31,8 @@ def test_min_daily_floor():
     assert f is True and "MIN-DAILY" in r
     assert fire(S(phase="P2", vwc=50, ec=6, ec_smooth=6, daily_vol=12), p) is False   # floor met -> no fire
     assert fire(S(phase="P3", vwc=50, ec=6, ec_smooth=6, daily_vol=3, lights_on=False), p) is False  # lights-off -> never
-    assert fire(S(phase="P2", vwc=69, ec=6, ec_smooth=6, daily_vol=3), p) is False     # slab full (no room) -> hold
+    assert fire(S(phase="P2", vwc=69, ec=6, ec_smooth=6, daily_vol=3), p) is True      # SENSOR-INDEPENDENT: fires even when "wet"
+    assert fire(S(phase="P2", vwc=95, ec=6, ec_smooth=6, daily_vol=3), p) is False     # drown ceiling (>=90) holds -> never flood
     assert fire(S(phase="P2", vwc=50, ec=6, ec_smooth=6, daily_vol=3, minutes_since_shot=2), p) is False  # spacing
     assert fire(S(phase="P2", vwc=50, ec=6, ec_smooth=6, daily_vol=0), P()) is False   # default min_daily=0 -> off
 

@@ -41,9 +41,12 @@ class ZoneParams:
     #                                     of diluting it (the pump-cycling failure mode). Let each shot drain
     #                                     + re-read before the next. VWC top-ups stay ungated (self-limiting).
     min_daily_volume: float = 0.0   # MIN litres/zone/day floor during lights-on (per-plant water safety; 0 = off).
-    #                                 Forces spaced maintenance shots if a zone is under-drinking even when its
-    #                                 VWC never trips the threshold (the cross-zone-divergence / starved-row class).
-    #                                 Clamped < max_daily_volume; never overrides the hard cap.
+    #                                 GUARANTEED + FRONT-STACKED + SENSOR-INDEPENDENT: every plant gets this much,
+    #                                 delivered from lights-on as fast as spacing allows, regardless of the VWC
+    #                                 threshold — a lying/dead probe cannot suppress it. Clamped < max_daily_volume.
+    drown_ceiling: float = 90.0     # the ONLY VWC gate on the min-daily floor: a hard anti-drown limit well above
+    #                                 field capacity. Below it, the floor fires regardless of the probe; at/above it
+    #                                 the floor holds (never flood). 90 ~= unreachable in coco -> truly probe-blind.
 
 
 @dataclass
@@ -211,16 +214,17 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
             and s.minutes_since_shot > p.watchdog_hours * 60.0 and s.vwc < p2_thr):
         fire, size, ir = True, p.p2_shot_size, f"WATCHDOG {s.minutes_since_shot / 60.0:.1f}h no water (VWC {s.vwc:.0f}<{p2_thr:.0f})"
 
-    # PRIORITY 4 — MINIMUM DAILY VOLUME floor (per-plant water safety): every enabled zone must put
-    # through at least min_daily_volume L during lights-on. Catches an under-drinking zone whose VWC
-    # never trips the threshold (the cross-zone-divergence / starved-row failure — e.g. a partial dripper
-    # or a too-wet probe). Spaced (p2_min_interval) + room-gated (below field capacity) so it trickles
-    # toward the floor across the day, never dumps. 0 = off.
+    # PRIORITY 4 — MINIMUM DAILY VOLUME floor (per-plant water safety, GUARANTEED + FRONT-STACKED +
+    # SENSOR-INDEPENDENT): every enabled zone MUST put through at least min_daily_volume L per photoperiod.
+    # It fires from lights-on as fast as the anti-short-cycle spacing allows (so the minimum lands early /
+    # front-stacked) and REGARDLESS of the VWC threshold — a lying or dead probe cannot starve a plant.
+    # The ONLY VWC gate is the hard anti-drown ceiling (never flood). Feed-water + dosing safety still apply
+    # in the IO shell (we never water with bad feed, even for the floor). 0 = off.
     if (not fire and p.min_daily_volume > 0 and s.lights_on
             and s.daily_vol < p.min_daily_volume
-            and s.vwc < p.field_capacity - 2.0
+            and s.vwc < p.drown_ceiling
             and s.minutes_since_shot >= p.p2_min_interval_min):
-        fire, size, ir = True, p.p2_shot_size, f"MIN-DAILY floor {s.daily_vol:.1f}<{p.min_daily_volume:.1f}L"
+        fire, size, ir = True, p.p2_shot_size, f"MIN-DAILY floor {s.daily_vol:.1f}<{p.min_daily_volume:.1f}L (guaranteed)"
 
     # ---- SAFETY: daily cap is a BUDGET, not a wall — emergencies exempt ----
     if fire:
@@ -277,6 +281,7 @@ _PARAM_BOUNDS = {
     "p1_max_shots": (1.0, 40.0), "p1_time_between_min": (1.0, 120.0),
     "p0_max_wait_min": (5.0, 240.0), "p3_emergency_shot": (0.5, 15.0),
     "max_daily_volume": (10.0, 2000.0), "min_daily_volume": (0.0, 500.0),
+    "drown_ceiling": (50.0, 100.0),
 }
 
 

@@ -291,6 +291,7 @@ class Controller:
             watchdog_hours=self._zone_num(zone, "watchdog_hours", 3),
             min_daily_volume=self._num(f"input_number.crop_steering_zone_{zone}_min_daily_ml_per_plant", 0.0)
             * self._zone_num(zone, "plant_count", 0) / 1000.0,   # mL/plant x plants -> zone-L floor (0 if either unset)
+            drown_ceiling=self._zone_num(zone, "min_floor_drown_ceiling", 90),   # hard anti-drown VWC cap on the floor
         )
         p, warns = validate_params(raw)
         for w in warns:
