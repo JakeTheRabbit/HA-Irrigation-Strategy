@@ -1798,43 +1798,55 @@
 </div>
       </section>
 
-      <!-- ===== ANALYZE (lightweight live read-outs + how to read them) ===== -->
+      <!-- ===== ANALYZE (comprehensive live read-outs, real entities + how to read them) ===== -->
       <section x-show="view==='analyze'" class="fade-enter">
         <div class="an-head">
           <h2>Analyze — what the day is telling you</h2>
-          <p>Live off the last 24&nbsp;h + current state. <span class="g">Green = good</span>, <span class="b">red = watch out</span>. No heavy charts — reads instantly.</p>
+          <p>Every card reads live off your real F2 sensors (last 24&nbsp;h + now). <span class="g">Green = in band</span>, <span class="b">red = out of band</span>. Each one says what it is, what good and bad look like, and what to do.</p>
         </div>
         <div class="an-stack">
 
           <div class="an-card">
-            <div class="an-t">🕐 Last 24&nbsp;h — equipment state <span class="sub">lights · pump · zone valves</span></div>
+            <div class="an-t">🕐 Equipment — last 24&nbsp;h <span class="sub">lights · pump · mainline · valves · recirc · CO₂ · dehu</span></div>
             <div class="an-tl" x-html="anTimeline"><div class="an-row"><span class="lab">…</span><span class="an-track"></span></div></div>
             <div class="an-axis"><span>−24h</span><span>−12h</span><span>now</span></div>
-            <div class="an-help"><b>What:</b> when each thing was on (gold) vs off (grey) across the day. <span class="g">Good:</span> lights one clean block matching your photoperiod; pump = short, spaced bursts; valves cycling in step. <span class="b">Bad:</span> pump machine-gunning (many tiny bursts back-to-back → shots too small) or a valve stuck on/off. This is the at-a-glance health of the hardware.</div>
+            <div class="an-help"><b>What:</b> when each piece of hardware was on (coloured) vs off (grey). <span class="g">Good:</span> lights one clean block = your photoperiod; pump = short spaced bursts; valves cycling in step; recirc closed during a shot. <span class="b">Bad:</span> pump machine-gunning (many tiny bursts back-to-back → shots too small) or a valve stuck. At-a-glance hardware health.</div>
           </div>
 
           <div class="an-card">
-            <div class="an-t">💧 Moisture (VWC) — 24&nbsp;h dryback <span class="sub">per zone · peak → now</span></div>
+            <div class="an-t">💧 Substrate moisture (VWC) — 24&nbsp;h dryback <span class="sub">per zone</span></div>
             <div class="an-sparks" x-html="anVwc"><div class="an-spk"><span class="lab">…</span></div></div>
             <div class="an-help"><b>What:</b> each zone's substrate moisture trace. <span class="g">Good:</span> a clean sawtooth — jumps on a shot, drifts down (dryback). <span class="b">Bad:</span> a flatline (not steering → EC stacks) or a cliff to the floor (over-water then starve). Generative wants a 40–50% dryback off the daily peak.</div>
           </div>
 
           <div class="an-card">
-            <div class="an-t">🧂 Pore EC vs target — 24&nbsp;h <span class="sub">dashed = your target</span></div>
+            <div class="an-t">🧂 Pore EC vs target — 24&nbsp;h <span class="sub">per zone · dashed = target</span></div>
             <div class="an-sparks" x-html="anEc"><div class="an-spk"><span class="lab">…</span></div></div>
-            <div class="an-help"><b>What:</b> root-zone salt per zone against its EC target. <span class="g">Good:</span> tracking near the dashed target. <span class="b">Bad:</span> climbing away (stacking — shots too small / no runoff) or sitting well below (feed too weak). Rising EC while VWC is flat = the slab isn't flushing → needs a bigger, draining shot. <b>Pore should run ≈1–1.5× the feed EC</b> — far above that and it's stacking.</div>
+            <div class="an-help"><b>What:</b> root-zone salt per zone vs its EC target (value goes <span class="b">red</span> when &gt;1.3× target, <span class="g">green</span> in band). <span class="g">Good:</span> tracking near the dashed line. <span class="b">Bad:</span> climbing away (stacking — shots too small / no runoff) or well below (feed too weak). Rising EC while VWC is flat = the slab isn't flushing → needs a bigger, draining shot. Pore should run ≈1–1.5× the feed EC.</div>
           </div>
 
           <div class="an-card">
-            <div class="an-t">🚰 Water delivered today <span class="sub">litres this photoperiod</span></div>
+            <div class="an-t">🚰 Water · substrate temp · phase <span class="sub">per zone, today</span></div>
             <div class="an-bars" x-html="anWater"><div class="an-bar"><span class="lab">…</span></div></div>
-            <div class="an-help"><b>What:</b> litres each zone has drunk since lights-on. <span class="g">Good:</span> same-room zones land in the same ballpark. <span class="b">Bad:</span> one zone far higher (draining / channelling / leak — water in, VWC not rising) or near zero (stuck valve, or too wet to ever hit threshold).</div>
+            <div class="an-help"><b>What:</b> litres each zone drank since lights-on, its root-zone temp, and its current phase. <span class="g">Good:</span> same-room zones drink alike; substrate 20–24°C. <span class="b">Bad:</span> one zone far higher (channelling / leak — water in, VWC not rising) or near zero (stuck valve / too wet); cold roots (&lt;18°C) slow uptake.</div>
           </div>
 
           <div class="an-card">
-            <div class="an-t">🌡️ VPD now <span class="sub">transpiration driver</span></div>
-            <div class="an-bars" x-html="anVpd"><div class="an-bar"><span class="lab">…</span></div></div>
-            <div class="an-help"><b>What:</b> air vapour-pressure deficit — how hard the plant pulls water. <span class="g">Good:</span> in the band (≈0.8–1.1&nbsp;kPa veg, 1.2–1.5 flower). <span class="b">Bad:</span> too low (sluggish uptake, disease risk) or too high (stress, stomata close, EC spikes). VPD swings explain VWC swings.</div>
+            <div class="an-t">🌡️ Climate drivers — 24&nbsp;h <span class="sub">these set the transpiration + dryback rate</span></div>
+            <div class="an-sparks" x-html="anClimate"><div class="an-spk"><span class="lab">…</span></div></div>
+            <div class="an-help"><b>What:</b> air temp, humidity, VPD, CO₂, light (PPFD) and daily light total (DLI) — the environment that drives how fast the plants drink. Value is <span class="g">green</span> in band, <span class="b">red</span> out. <span class="g">Good:</span> VPD 0.8–1.5&nbsp;kPa, temp 20–28°C, RH 55–65%, CO₂ 800–1400&nbsp;ppm, DLI 20–45. <span class="b">Bad:</span> any out of band — that's usually <i>why</i> a dryback is too fast or too slow.</div>
+          </div>
+
+          <div class="an-card">
+            <div class="an-t">🎯 Limiting factor (Liebig) <span class="sub">your ceiling = the worst factor, not the average</span></div>
+            <div class="an-bars" x-html="anLiebig"><div class="an-bar"><span class="lab">…</span></div></div>
+            <div class="an-help"><b>What:</b> every environmental factor ranked by how far it is <i>outside</i> its ideal band. The ⛔ at top is your current bottleneck — fix that first, the bar shows how far off. <span class="g">Good:</span> all green / short bars. <span class="b">Bad:</span> a long red bar = the one thing capping yield or potency right now. Liebig's law: the worst input sets the ceiling.</div>
+          </div>
+
+          <div class="an-card">
+            <div class="an-t">⚗️ Feed / source water <span class="sub">what's going IN the dripper</span></div>
+            <div class="an-bars" x-html="anFeed"><div class="an-bar"><span class="lab">…</span></div></div>
+            <div class="an-help"><b>What:</b> tank pH and EC — the marker is the live reading, the green band is the target. <span class="g">Good:</span> pH 5.5–6.5, feed EC 2.0–3.5&nbsp;mS. <span class="b">Bad:</span> off-band feed blocks irrigation (the engine won't water with bad water) and is the usual cause of a zone sitting dry. Fix the feed before chasing the substrate.</div>
           </div>
 
         </div>
@@ -5635,7 +5647,7 @@ document.addEventListener('alpine:init', () => {
     tip:null, tipT:null,
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
     headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], maturity:{rung:2,name:'Logged',next:''}, chartSmooth:ls.get('f2.chartSmooth',true), gRange:ls.get('f2.gRange','24h'), subZone:ls.get('f2.subZone','all'), subFieldCap:ls.get('f2.subFieldCap',true), subOverlay:ls.get('f2.subOverlay',false), zones:[], plant:[], coupledStages:[], vitals:[], hwStatus:{hw:[],zones:[],deadhead:false,anyOn:false,pumpOn:false,pwTxt:'—'}, water:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
-    anTimeline:'', anVwc:'', anEc:'', anWater:'', anVpd:'',   // Analyze view: lightweight HTML strings (no Chart.js)
+    anTimeline:'', anVwc:'', anEc:'', anWater:'', anVpd:'', anClimate:'', anLiebig:'', anFeed:'',   // Analyze view: lightweight HTML strings (no Chart.js)
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},telemetry:[],feed:[]},
     climateCtl:[], ctlOpen:ls.get('f2.ctlOpen',{}), snapshot:[], camUrl:'', spOpen:false, spItem:null, floorMini:[], tank:{pct:null,litres:null,sev:'ok',bar:'bg-emerald-500',pctText:'—',litresText:null,width:0}, tanks:{feed:{},stock:[],dose:{}}, activityFeed:[], hUser:{name:'Grower',initials:'F2'}, demo:DEMO,
     notes:{}, toasts:[], _tid:0, _toastId:0, _retry:0, _acked:(function(){ try{ const a=ls.get('f2.acked',{}),cut=Date.now()-18*3600e3,o={}; for(const k in a){ if(a[k]>cut) o[k]=a[k]; } return o; }catch(e){ return {}; } })(),
@@ -5727,19 +5739,30 @@ document.addEventListener('alpine:init', () => {
     /* charts */
     cb(){ return {responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:500},plugins:{legend:{display:false}}}; },
     mountCharts(){ if(this.view==='dashboard'){ this.mountTrend(); this.ensureHist('dashboard'); } if(this.view==='climate'){ this.ensureHist('climate'); } if(this.view==='zones'){ this.$nextTick(()=>this.mountZoneMinis()); } if(this.view==='substrate'){ this.ensureSubHist(); } if(this.view==='analyze'){ this.ensureAnalyze(); } },
-    /* ===== Analyze: lightweight live read-outs — HTML strings via x-html, no Chart.js ===== */
-    _anRows(){ return [
-      {id:'light.grow_room_all_lights', lab:'Lights', col:'#fbbf24'},
+    /* ===== Analyze: comprehensive live read-outs (real entities, no Chart.js) ===== */
+    _anEquip(){ return [
+      {id:'switch.f2_lights_contactor_ssr_f1_lights_contactor', lab:'Lights', col:'#fbbf24'},
       {id:'switch.veg_main_pump', lab:'Pump', col:'#22d3ee'},
+      {id:'switch.espoe_irrigation_relay_2_3', lab:'Mainline', col:'#38bdf8'},
       {id:'switch.f2_row1', lab:'Zone 1 valve', col:'#34d399'},
       {id:'switch.f2_row2', lab:'Zone 2 valve', col:'#34d399'},
-      {id:'switch.f2_row3', lab:'Zone 3 valve', col:'#34d399'} ]; },
+      {id:'switch.f2_row3', lab:'Zone 3 valve', col:'#34d399'},
+      {id:'switch.espoe_irrigation_relay_2_1', lab:'Recirc', col:'#a78bfa'},
+      {id:'switch.f2_co2', lab:'CO₂', col:'#f472b6'},
+      {id:'switch.f2_dehumidifiers_group', lab:'Dehumidifier', col:'#60a5fa'} ]; },
+    _anClimate(){ return [
+      {id:'sensor.f2_scd41_back_left_temperature', lab:'Air temp', unit:'°C', dec:1, lo:20, hi:28, col:'#fb923c'},
+      {id:'sensor.f2_scd41_back_left_humidity', lab:'Humidity', unit:'%', dec:0, lo:55, hi:65, col:'#22d3ee'},
+      {id:'sensor.f2_air_vpd', lab:'Air VPD', unit:' kPa', dec:2, lo:0.8, hi:1.5, col:'#fbbf24'},
+      {id:'sensor.airq_co2', lab:'CO₂', unit:' ppm', dec:0, lo:800, hi:1400, col:'#34d399'},
+      {id:'sensor.growsensor_eppfd', lab:'PPFD', unit:'', dec:0, lo:null, hi:null, col:'#a78bfa'},
+      {id:'sensor.growsensor_edli', lab:'DLI', unit:' mol', dec:1, lo:20, hi:45, col:'#f472b6'} ]; },
     ensureAnalyze(){ const now=Date.now();
       if(this._h_an && now-(this._hts_an||0)<240000){ this.mountAnalyze(); return; }
       if(this._loading_an) return; this._loading_an=true; this._hts_an=now;
-      const ids=[1,2,3].flatMap(z=>['sensor.crop_steering_zone_'+z+'_vwc','sensor.crop_steering_zone_'+z+'_ec']);
-      Promise.all([ this.loadHist(ids,24,false).catch(()=>null), this.loadStateHist(this._anRows().map(r=>r.id),24).catch(()=>null) ])
-        .then(([H,St])=>{ this._h_an=H; this._st_an=St; this.mountAnalyze(); })
+      const subIds=[1,2,3].flatMap(z=>['sensor.crop_steering_zone_'+z+'_vwc','sensor.crop_steering_zone_'+z+'_ec']);
+      Promise.all([ this.loadHist(subIds,24,false).catch(()=>null), this.loadHist(this._anClimate().map(c=>c.id),24,false).catch(()=>null), this.loadStateHist(this._anEquip().map(r=>r.id),24).catch(()=>null) ])
+        .then(([H,C,St])=>{ this._h_an=H; this._c_an=C; this._st_an=St; this.mountAnalyze(); })
         .catch(()=>{ this._hts_an=0; }).finally(()=>{ this._loading_an=false; }); },
     async loadStateHist(ids,hours){ const end=Date.now(), start=end-hours*3600e3;
       if(DEMO) return this._demoStateHist(ids,start,end);
@@ -5754,12 +5777,13 @@ document.addEventListener('alpine:init', () => {
       }catch(e){ return {__start:start,__end:end}; } },
     _demoStateHist(ids,start,end){ const out={__start:start,__end:end}, span=end-start, r=a=>{ const x=Math.sin(a*99.7)*1e4; return x-Math.floor(x); };
       ids.forEach((id,k)=>{ const segs=[];
-        if(/light/.test(id)){ segs.push({t0:start+span*0.18,t1:start+span*0.78}); }
-        else if(/pump/.test(id)){ let t=start+span*0.20; while(t<start+span*0.76){ segs.push({t0:t,t1:t+span*0.006}); t+=span*(0.045+r(t/1e6+k)*0.03); } }
+        if(/light|dehum/.test(id)){ segs.push({t0:start+span*0.15,t1:start+span*0.80}); }
+        else if(/co2/.test(id)){ let t=start+span*0.18; while(t<start+span*0.78){ segs.push({t0:t,t1:t+span*0.02}); t+=span*(0.07+r(t/1e6+k)*0.03); } }
+        else if(/pump|relay_2_3/.test(id)){ let t=start+span*0.20; while(t<start+span*0.76){ segs.push({t0:t,t1:t+span*0.006}); t+=span*(0.045+r(t/1e6+k)*0.03); } }
         else { let t=start+span*(0.22+k*0.02); while(t<start+span*0.74){ segs.push({t0:t,t1:t+span*0.009}); t+=span*(0.09+r(t/1e6+k)*0.04); } }
         out[id]=segs; });
       return out; },
-    _anSpk(lab,data,color,target,unit,dec){ const pts=data.filter(v=>v!=null);
+    _anSpk(lab,data,color,target,unit,dec,vcol){ const pts=data.filter(v=>v!=null);
       if(!pts.length) return '<div class="an-spk"><span class="lab" style="color:'+color+'">'+lab+'</span><span class="v">—</span></div>';
       let mn=Math.min(...pts), mx=Math.max(...pts); if(target!=null){ mn=Math.min(mn,target); mx=Math.max(mx,target); } const rng=(mx-mn)||1, N=data.length;
       const X=i=>i/(N-1)*100, Y=v=>31-(v-mn)/rng*30;
@@ -5768,30 +5792,51 @@ document.addEventListener('alpine:init', () => {
       const tgt=target==null?'':'<line x1="0" y1="'+Y(target).toFixed(2)+'" x2="100" y2="'+Y(target).toFixed(2)+'" stroke="#fbbf24" stroke-width="0.7" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/>';
       return '<div class="an-spk"><span class="lab" style="color:'+color+'">'+lab+'</span>'
         +'<svg viewBox="0 0 100 32" preserveAspectRatio="none">'+tgt+'<path d="'+dd.trim()+'" fill="none" stroke="'+color+'" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>'
-        +'<span class="v">'+last.toFixed(dec)+unit+(target!=null?' / '+target.toFixed(dec):'')+'</span></div>'; },
-    mountAnalyze(){ const cols=['#22d3ee','#34d399','#a78bfa'], H=this._h_an, St=this._st_an;
-      // 24h equipment-state timeline (gold = on, track bg = off)
+        +'<span class="v" style="color:'+(vcol||'#cbd5e1')+'">'+last.toFixed(dec)+unit+(target!=null?' / '+target.toFixed(dec):'')+'</span></div>'; },
+    _anGauge(lab,cur,lo,hi,dec,unit){ const span=(hi-lo)||1, mn=lo-span*0.6, mx=hi+span*0.6, rng=mx-mn;
+      const inb=cur!=null&&cur>=lo&&cur<=hi, col=cur==null?'#64748b':inb?'#34d399':'#f87171';
+      const pct=cur==null?0:Math.max(0,Math.min(100,(cur-mn)/rng*100)), bl=(lo-mn)/rng*100, bw=(hi-lo)/rng*100;
+      return '<div class="an-bar"><span class="lab" style="width:64px">'+lab+'</span><span class="trk">'
+        +'<span style="position:absolute;left:'+bl.toFixed(0)+'%;width:'+bw.toFixed(0)+'%;top:0;bottom:0;background:rgba(52,211,153,.16)"></span>'
+        +'<span style="position:absolute;left:'+pct.toFixed(1)+'%;top:-3px;bottom:-3px;width:3px;border-radius:2px;background:'+col+'"></span></span>'
+        +'<span class="v" style="color:'+col+'">'+(cur==null?'—':cur.toFixed(dec)+unit)+' <span style="color:#64748b">('+lo+'–'+hi+')</span></span></div>'; },
+    mountAnalyze(){ const cols=['#22d3ee','#34d399','#a78bfa'], H=this._h_an, C=this._c_an, St=this._st_an;
+      // 1 — equipment-state timeline
       if(St){ const s=St.__start,e=St.__end,sp=(e-s)||1;
-        this.anTimeline=this._anRows().map(row=>{ const segs=St[row.id]||[];
+        this.anTimeline=this._anEquip().map(row=>{ const segs=St[row.id]||[];
           const bars=segs.map(g=>{ const L=Math.max(0,(g.t0-s)/sp*100), W=Math.max(0.4,(g.t1-g.t0)/sp*100); return '<span class="an-seg" style="left:'+L.toFixed(2)+'%;width:'+W.toFixed(2)+'%;background:'+row.col+'"></span>'; }).join('');
           const on=zSt(row.id)==='on';
           return '<div class="an-row"><span class="lab">'+row.lab+'</span><span class="an-track">'+bars+'</span><span class="nowv" style="color:'+(on?row.col:'#64748b')+'">'+(on?'on':'off')+'</span></div>'; }).join('');
       } else this.anTimeline='<div class="an-row"><span class="lab">—</span><span class="an-track"></span><span class="nowv">—</span></div>';
-      // VWC + EC sparklines (per zone)
+      // 2/3 — VWC + EC sparklines per zone
       const ecT=[1,2,3].map(z=>{ const m=(zSt('select.crop_steering_zone_'+z+'_steering_mode')||'gen').toLowerCase().startsWith('veg')?'veg':'gen'; return zNum('number.crop_steering_zone_'+z+'_ec_target_'+m+'_p2'); });
       if(H){ const s=H.__start,e=H.__end,N=80;
         this.anVwc=[1,2,3].map((z,i)=>this._anSpk('Z'+z,this.bucketize(H['sensor.crop_steering_zone_'+z+'_vwc'],s,e,N),cols[i],null,'%',0)).join('');
-        this.anEc=[1,2,3].map((z,i)=>this._anSpk('Z'+z,this.bucketize(H['sensor.crop_steering_zone_'+z+'_ec'],s,e,N),cols[i],ecT[i],'',2)).join('');
-      } else { this.anVwc=this.anEc='<div class="an-spk"><span class="v">no history</span></div>'; }
-      // water today
+        this.anEc=[1,2,3].map((z,i)=>{ const ec=zNum('sensor.crop_steering_zone_'+z+'_ec'), tg=ecT[i], vc=(ec!=null&&tg!=null)?(ec>tg*1.3?'#f87171':ec<tg*0.7?'#60a5fa':'#34d399'):'#cbd5e1';
+          return this._anSpk('Z'+z,this.bucketize(H['sensor.crop_steering_zone_'+z+'_ec'],s,e,N),cols[i],tg,'',2,vc); }).join('');
+      } else { this.anVwc=this.anEc='<div class="an-spk"><span class="v">no history yet</span></div>'; }
+      // 4 — water + substrate temp + phase per zone
+      const subT={1:'sensor.f2_row_1_temperature',2:'sensor.veg_sdi12_temperature',3:'sensor.veg_sdi12_temperature'};
       const w=[1,2,3].map(z=>zNum('sensor.crop_steering_zone_'+z+'_daily_water_usage')||0), wmax=Math.max(...w,1);
-      this.anWater=[1,2,3].map((z,i)=>'<div class="an-bar"><span class="lab">Z'+z+'</span><span class="trk"><i style="width:'+(w[i]/wmax*100).toFixed(1)+'%;background:'+cols[i]+'"></i></span><span class="v">'+w[i].toFixed(1)+' L</span></div>').join('');
-      // VPD now vs band (0.8-1.5)
-      const vpd=num('air_vpd'), lo=0.4, hi=1.8, pct=vpd==null?0:Math.max(0,Math.min(100,(vpd-lo)/(hi-lo)*100));
-      const inb=vpd!=null&&vpd>=0.8&&vpd<=1.5, col=vpd==null?'#64748b':inb?'#34d399':(vpd<0.8?'#60a5fa':'#f87171');
-      this.anVpd='<div class="an-bar"><span class="lab">VPD</span><span class="trk">'
-        +'<span style="position:absolute;left:'+((0.8-lo)/(hi-lo)*100).toFixed(0)+'%;width:'+((1.5-0.8)/(hi-lo)*100).toFixed(0)+'%;top:0;bottom:0;background:rgba(52,211,153,.16)"></span>'
-        +'<i style="width:'+pct.toFixed(1)+'%;background:'+col+'"></i></span><span class="v">'+(vpd==null?'—':vpd.toFixed(2)+' kPa')+'</span></div>'; },
+      this.anWater=[1,2,3].map((z,i)=>{ const t=zNum(subT[z]), ph=zSt('sensor.crop_steering_zone_'+z+'_phase')||'—';
+        return '<div class="an-bar"><span class="lab">Z'+z+'</span><span class="trk"><i style="width:'+(w[i]/wmax*100).toFixed(1)+'%;background:'+cols[i]+'"></i></span><span class="v" style="width:132px">'+w[i].toFixed(1)+' L · '+(t==null?'—':t.toFixed(1)+'°')+' · '+ph+'</span></div>'; }).join('');
+      // 5 — climate drivers sparklines
+      if(C){ const s=C.__start,e=C.__end,N=80;
+        this.anClimate=this._anClimate().map(c=>{ const cur=zNum(c.id), band=(c.lo!=null), inb=band&&cur!=null&&cur>=c.lo&&cur<=c.hi, vc=cur==null?'#64748b':band?(inb?'#34d399':'#f87171'):'#cbd5e1';
+          return this._anSpk(c.lab,this.bucketize(C[c.id],s,e,N),c.col,null,c.unit,c.dec,vc); }).join('');
+      } else this.anClimate='<div class="an-spk"><span class="v">no history yet</span></div>';
+      // 6 — limiting factors (Liebig): ranked distance outside the ideal band
+      const facs=[], pf=(lab,cur,lo,hi,unit,dec)=>{ if(cur==null) return; let dist=0,dir='in'; if(cur<lo){dist=(lo-cur)/((hi-lo)||1);dir='low';} else if(cur>hi){dist=(cur-hi)/((hi-lo)||1);dir='high';} facs.push({lab,cur,unit,dec,dist,dir}); };
+      pf('Air VPD',zNum('sensor.f2_air_vpd'),0.8,1.5,' kPa',2);
+      pf('Air temp',zNum('sensor.f2_scd41_back_left_temperature'),20,28,'°',1);
+      pf('Humidity',zNum('sensor.f2_scd41_back_left_humidity'),55,65,'%',0);
+      pf('CO₂',zNum('sensor.airq_co2'),800,1400,'',0);
+      pf('Pore EC (worst)',Math.max(zNum('sensor.crop_steering_zone_1_ec')||0,zNum('sensor.crop_steering_zone_2_ec')||0,zNum('sensor.crop_steering_zone_3_ec')||0)||null,3,6,'',1);
+      facs.sort((a,b)=>b.dist-a.dist);
+      this.anLiebig=facs.length?facs.map((f,i)=>{ const ok=f.dist<=0.001, worst=i===0&&!ok, col=ok?'#34d399':worst?'#f87171':'#fbbf24', tag=ok?'in band':(f.dir==='high'?'too high':'too low');
+        return '<div class="an-bar"><span class="lab" style="width:124px">'+(worst?'⛔ ':'')+f.lab+'</span><span class="trk"><i style="width:'+(ok?2:Math.min(100,f.dist*100)).toFixed(0)+'%;background:'+col+'"></i></span><span class="v" style="width:122px;color:'+col+'">'+f.cur.toFixed(f.dec)+f.unit+' · '+tag+'</span></div>'; }).join(''):'<div class="an-bar"><span class="v">no readings</span></div>';
+      // 7 — feed / source water
+      this.anFeed=this._anGauge('Feed pH',zNum('sensor.aquaponics_kit_f4f618_ph'),5.5,6.5,2,'')+this._anGauge('Feed EC',zNum('sensor.atlas_legacy_1_ec'),2.0,3.5,2,' mS'); },
     async ensureHist(which){   // fetch REAL /api/history once per 4 min, then (re)draw the relevant charts
       const now=Date.now();
       if(this['_h_'+which] && now-this['_hts_'+which]<240000){ this.$nextTick(()=>which==='climate'?this.mountClimateCharts():this.mountTrend()); return; }
