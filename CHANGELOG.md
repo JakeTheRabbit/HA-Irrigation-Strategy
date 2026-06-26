@@ -2,12 +2,39 @@
 
 All notable changes to the Advanced Automated Crop Steering System will be documented in this file.
 
+**Two views per release.** Each version leads with **🌱 In plain English** — what changed and why it
+matters, written so anyone can follow it without knowing the internals — followed by **🔧 Technical
+notes**, the entity- and code-level detail for developers and AI agents working on the repo.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
 ## [2.6.0] - 2026-06-27
+
+### 🌱 In plain English
+- **The Analyze page is rebuilt and actually useful.** It now shows your room at a glance: a 24-hour
+  timeline of when the lights, pump and each zone's valves ran; simple graphs of each zone's moisture
+  and salt level; your climate (temperature, humidity, VPD, CO₂, light); a "what's holding you back"
+  ranking that points at the single worst factor; and your feed water's pH and EC. Every card has a
+  plain note on what good and bad look like.
+- **The dashboard no longer makes your mouse stutter.** The 3D room view used to render non-stop in the
+  background and bog down the whole computer — now it only draws when you're looking at it.
+- **The pump short-cycling is fixed.** It was firing tiny bursts because it sized each watering for one
+  plant's worth of substrate instead of the whole row, so the moisture never rose and it kept re-firing.
+  Waterings are now the right length.
+- **A guaranteed minimum daily water per plant (optional safety).** You can set how many millilitres each
+  plant *must* get per day; the system delivers it early in the day regardless of what the moisture probe
+  says — so a faulty or badly-placed sensor can't quietly starve a plant. Off until you set a number.
+- **A safety limit on how long any single watering can run**, so a wrong setting can't flood the room.
+- Smaller fixes to the salt-steering control and the feed-water safety checks.
+
+> **To get these on your live system:** the engine runs as a Home Assistant add-on that bundles its code
+> when it's built — so after updating the files you must **Rebuild** the add-on (Add-ons → F2 Control → ⋮
+> → Rebuild), not just restart it. The dashboards update on a normal browser hard-refresh.
+
+### 🔧 Technical notes
 
 ### Added
 - **Comprehensive Analyze tab (`www/f2.html`), all live off real F2 entities.** Seven full-width cards:
@@ -60,6 +87,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > running build without a rebuild.)
 
 ## [2.5.0] - 2026-06-27
+
+### 🌱 In plain English
+- **A phone-friendly control page** (`overview.html`): per-zone moisture, EC and targets, room climate, and
+  the pump / light / dosing controls all on one mobile screen.
+- **Optional precision salt-steering (a PID controller)** for substrate EC — more accurate than the simple
+  version, off by default.
+- **Waterings are sized from your real hardware** (substrate size + dripper flow) instead of a fixed guess.
+- **It won't water with bad feed water** — now checks pH as well as EC, and fails safe if a probe dies.
+- **No more pump machine-gunning on salt corrections** — those waterings now wait a minimum gap so they
+  flush properly instead of stacking salt.
+
+### 🔧 Technical notes
 
 ### Added
 - **Mobile control surface — `www/overview.html`.** A lightweight, phone-first one-pager with three

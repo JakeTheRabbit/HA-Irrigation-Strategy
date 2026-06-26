@@ -179,6 +179,8 @@ hardware → substrate changes → sensors.** Every poll can trigger a re-evalua
 | **Fail-closed actuation** | A failed pump/mainline/valve service call aborts the shot (cuts hardware, alerts) and is **not** counted — state, daily volume and "last shot" never lie after an auth/service error. |
 | **Anti-short-cycle** | P2 EC-correction shots (flush/dilute/rescue) respect a minimum interval, so a no-runoff nibble can't stack EC and machine-gun the pump. |
 | **PID EC loop** *(optional)* | A real Kp/Ki/Kd controller (integral anti-windup, clamped) on the pore-EC error as a drop-in upgrade to the stepped EC-steer. Off by default, behind one switch, gains tunable. |
+| **Minimum daily water floor** *(optional)* | A guaranteed **mL-per-plant-per-day** baseline, front-loaded and **sensor-independent** — a lying or dead VWC probe can't quietly starve a plant. A hard anti-drown ceiling is the only thing that holds it; bad feed water still blocks it. Off until you set a number per zone. |
+| **Max shot-duration cap** | A hard ceiling on any single shot's run-time (default 900 s) — a substrate/flow fat-finger can't turn one watering into a multi-hour flood. |
 
 ---
 
@@ -304,7 +306,8 @@ stop.
 
 **Software**
 - **Home Assistant** 2024.3.0+ (HA OS / Supervised recommended — you need add-ons).
-- **AppDaemon 4** add-on (this is where the engine runs — required).
+- **The f2-control add-on** (this repo's `addons/f2_control/` — the live engine; you install it in
+  step 4). *AppDaemon is **not** required — it's a retired rollback path.*
 - **HACS** (recommended, for one-click integration install).
 
 **Hardware — per zone**
@@ -390,6 +393,13 @@ hardware with valve-close readback + fail-closed writes, republishes the `sensor
 surface, and pings your phone every 30 min. *(The retired AppDaemon engine stays in `appdaemon/` as a
 one-line rollback.)*
 
+> **Updating the engine later — Rebuild, don't Restart.** The add-on bundles its Python into the
+> container image when it's **built** (`Dockerfile COPY`). After you change anything under
+> `addons/f2_control/`, use **Add-ons → F2 Control → ⋮ → Rebuild** — a plain **Restart keeps the old
+> code** (it only re-reads the Configuration options, not the Python). Rebuild re-copies the code and
+> restarts. *(Shot length lives in the Python, but is also driven by the `substrate_l`/`flow_lps`
+> Configuration options on the running build — handy if you ever need to correct sizing without a rebuild.)*
+
 ### 5 · Build the dashboard
 
 Copy **[`www/f2.html`](www/f2.html)** to your HA `/config/www/` directory and open it at
@@ -464,6 +474,11 @@ Full routine: `docs/operation_guide.md`. Mental model: `docs/SYSTEM_OVERVIEW.md`
 
 ## Under the hood
 
+> **Note:** the module table below describes the **retired AppDaemon engine** (`appdaemon/`), kept only
+> as a rollback. The **live** engine is `addons/f2_control/f2_control/controller.py` (the thin IO shell:
+> read sensors → `decide()` → drive valves) plus the pure `crop-steering-engine` package (the phase
+> logic + safety, unit-tested with no HA). The list is retained as a reference for the original design.
+
 | Module | Job |
 |---|---|
 | `master_crop_steering_app.py` | The coordinator — decisions, phase logic, hardware sequencing, safety, activity feed |
@@ -476,14 +491,15 @@ Full routine: `docs/operation_guide.md`. Mental model: `docs/SYSTEM_OVERVIEW.md`
 | `base_async_app.py` | Async base class shared by the modules |
 
 ```
-custom_components/crop_steering/   # HA integration — entities, wizard, calculations
-appdaemon/apps/crop_steering/      # the engine + supporting modules
-  └── apps.yaml                    # YOUR hardware + sensor map lives here
+custom_components/crop_steering/   # HA integration — entities, config-flow wizard, pure calculations
+addons/f2_control/                 # the LIVE engine (the f2-control add-on) — deploy here, then Rebuild
+crop-steering-engine/src/          # the pure decide() engine package the add-on imports (offline-tested)
+appdaemon/apps/crop_steering/      # retired AppDaemon engine — kept only as a one-line manual rollback
 packages/irrigation/               # HA package YAML (recorder, helpers)
-dashboards/                        # Lovelace starting points
+www/                               # operator dashboards (f2.html, overview.html) + the 3D floorplan
 docs/                              # SYSTEM_OVERVIEW + install / operation / troubleshooting
 templates/                         # 2 / 4 / 6-zone .env starters
-tests/                             # unit tests (calculation helpers)
+tests/ · crop-steering-engine/tests/   # unit tests (integration helpers + the pure engine)
 ```
 
 ---
