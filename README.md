@@ -2,7 +2,7 @@
 
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
 ![HA Add-on](https://img.shields.io/badge/HA%20Add--on-f2--control-41BDF5?logo=home-assistant&logoColor=white)
-![Release](https://img.shields.io/badge/Release-2.4.0-green)
+![Release](https://img.shields.io/badge/Release-2.5.0-green)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![Zones](https://img.shields.io/badge/Zones-1%E2%80%9324+-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -174,6 +174,11 @@ hardware → substrate changes → sensors.** Every poll can trigger a re-evalua
 | **Feed-lockout diagnostic** | When a low-VWC zone isn't being fed, it names the exact gate stopping it — tank empty, dosing, flush/fill, source-water gate, EC ceiling, safety lockout, phase pin, disabled, daily cap — and attaches it to the under-watered alert. |
 | **Manual pump modes** | `flush` / `fill` booleans hand the pump to the operator (hose-flood or tank dosing); the engine pauses its own shots and exempts the hardware watchdog while either is on. |
 | **Operator console** | One dependency-free dashboard, `www/f2.html` — Status / Zones / Tune / Climate / Operate / Plan / 3D, with click-to-fix advisories (an issue links you straight to the control that resolves it). [Try it live](#live-demo-no-install). |
+| **Mobile control surface** | `www/overview.html` — a phone-first one-pager (**Steer / Controls / Dosing**): per-zone VWC + target / pore-EC + target / substrate temp, room climate (temp / VPD / CO₂ / PPFD / DLI), pump + light + zone controls, and the veg-room peristaltic dosing pumps feeding F2. |
+| **Live shot sizing** | The f2-control add-on computes each shot's run-time from your *real* substrate volume + per-zone flow (plants × drippers × L/hr), so a `%`-of-substrate shot delivers exactly that — no hardcoded guess. |
+| **Fail-closed actuation** | A failed pump/mainline/valve service call aborts the shot (cuts hardware, alerts) and is **not** counted — state, daily volume and "last shot" never lie after an auth/service error. |
+| **Anti-short-cycle** | P2 EC-correction shots (flush/dilute/rescue) respect a minimum interval, so a no-runoff nibble can't stack EC and machine-gun the pump. |
+| **PID EC loop** *(optional)* | A real Kp/Ki/Kd controller (integral anti-windup, clamped) on the pore-EC error as a drop-in upgrade to the stepped EC-steer. Off by default, behind one switch, gains tunable. |
 
 ---
 
@@ -283,6 +288,12 @@ flowchart LR
     C6 -- yes --> FIRE(["✅ Pump prime → mainline → valve → irrigate → shutdown"])
 ```
 
+The **source-water gate checks both pH and EC** (with a last-known-good grace window, and
+fail-closed if a feed probe dies). The whole engine is gated by a hard **kill switch**
+(`input_boolean.f2_control_enabled`, OFF = never actuates). Service-call writes are **fail-closed** —
+a failed pump/mainline/valve command aborts the shot and is not counted — and P2 EC-correction shots
+respect a **minimum interval** so a no-runoff nibble can't machine-gun the pump.
+
 Plus hardware sequencing that prevents overlapping shots, drain-through back-off,
 per-zone manual overrides and phase pins for maintenance, and an instant emergency
 stop.
@@ -360,20 +371,24 @@ homeassistant:
   packages: !include_dir_named packages
 ```
 
-### 4 · Install the engine (AppDaemon)
+### 4 · Install the engine (f2-control add-on)
 
-1. Install the **AppDaemon 4** add-on.
-2. Copy `appdaemon/apps/crop_steering/` into your AppDaemon `apps/` directory.
-3. Copy `appdaemon/apps/apps.yaml` and **edit the hardware block** — the pump,
-   mainline, per-zone valve switches, and the VWC/EC sensor entity IDs for *your*
-   room. This file is where the engine learns your physical layout.
-4. Copy `appdaemon.yaml` to the AppDaemon config root and set your latitude/longitude
-   and timezone.
-5. Restart AppDaemon. On supervised HA the config path is
-   `/addon_configs/a0d7b954_appdaemon/`.
+1. Copy `addons/f2_control/` into your HA `/addons/` directory (Samba/SSH), then
+   **Settings → Add-ons → Add-on Store → ⋮ → Reload** — *F2 Control* appears under **Local add-ons**.
+2. Open it → **Install**. In **Configuration** set the lights hours, your notify service, and (if they
+   differ from the defaults) the feed EC/pH sensor entity IDs + the pump / mainline / per-zone valve
+   map. Substrate volume + per-zone plant/dripper/flow are read live from the integration's number
+   entities, so a shot's `%`-of-substrate run-time is always correct.
+3. Create the kill switch `input_boolean.f2_control_enabled` (a Helper, or deploy
+   `addons/f2_control/f2_control_package.yaml` to `/config/packages` + reload). **OFF = safe** — the
+   add-on reads, computes and notifies but never opens a valve.
+4. **Start** it — the log shows `starting | kill-switch … | token present: True`. Flip the kill switch
+   **ON** to go live.
 
-Watch the AppDaemon log for `Master Crop Steering Application … initialized!` — that's
-the engine alive.
+It's a single synchronous Python process: polls HA over REST (no AppDaemon, no asyncio), drives the
+hardware with valve-close readback + fail-closed writes, republishes the `sensor.crop_steering_*`
+surface, and pings your phone every 30 min. *(The retired AppDaemon engine stays in `appdaemon/` as a
+one-line rollback.)*
 
 ### 5 · Build the dashboard
 
@@ -391,6 +406,11 @@ view in one file:
 It's dependency-free and needs only a long-lived token (entered once, kept in your browser); it
 reads live state + 24 h history from the HA REST API and parses `sensor.crop_steering_activity_log`
 for the per-shot feed. Add `?demo` to preview it on mock data with no HA at all.
+
+**On your phone?** Also copy **[`www/overview.html`](www/overview.html)** — a lightweight one-pager
+(open at `/local/overview.html`) with **Steer / Controls / Dosing** tabs: per-zone vitals + targets +
+substrate temp, room climate (temp / VPD / CO₂ / PPFD / DLI), pump + light + zone controls, and the
+veg-room peristaltic dosing pumps. `?demo` works standalone.
 
 **Prefer a native HA dashboard?** [`crop_steering_lovelace.yaml`](crop_steering_lovelace.yaml) is a
 pure-Lovelace alternative where markdown + Jinja compute the live verdict / exception list / trust

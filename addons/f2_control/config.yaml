@@ -1,5 +1,5 @@
 name: F2 Control
-version: "0.1.0"
+version: "0.1.1"
 slug: f2_control
 description: >-
   Standalone crop-steering controller (replaces AppDaemon). Pure engine + plain
