@@ -30,8 +30,10 @@
   ::-webkit-scrollbar{width:10px;height:10px}
   ::-webkit-scrollbar-thumb{background:#1f2630;border-radius:9px;border:2px solid #0a0c10}
   ::-webkit-scrollbar-track{background:transparent}
-  .glass{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.08)}
-  .glass-strong{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03));-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1)}
+  /* PERF: no backdrop-filter — blur on ~78 .glass cards makes the compositor re-blur on every repaint (cursor/scroll jank).
+     Slightly more opaque solid-ish bg keeps the translucent card look without the per-frame cost. */
+  .glass{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.025));border:1px solid rgba(255,255,255,.08)}
+  .glass-strong{background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.035));border:1px solid rgba(255,255,255,.1)}
   .ring-glow-ok{box-shadow:0 0 0 1px rgba(16,185,129,.22),0 8px 30px -12px rgba(16,185,129,.4)}
   .ring-glow-warn{box-shadow:0 0 0 1px rgba(251,191,36,.28),0 8px 30px -12px rgba(251,191,36,.5)}
   .ring-glow-crit{box-shadow:0 0 0 1px rgba(239,68,68,.32),0 8px 34px -12px rgba(239,68,68,.55)}
@@ -497,7 +499,7 @@
   #f2t-stage{position:absolute;inset:0}
   #f2t-stage canvas{display:block}
   .f2t-toolbar{position:absolute;top:10px;left:10px;z-index:5;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px}
-  .f2t-toolbar .grp{background:rgba(13,18,24,.85);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:5px 8px;display:flex;gap:4px;align-items:center;backdrop-filter:blur(6px)}
+  .f2t-toolbar .grp{background:rgba(13,18,24,.85);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:5px 8px;display:flex;gap:4px;align-items:center}
   .f2t-toolbar button{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:7px;padding:3px 10px;color:#cbd5e1;cursor:pointer;font:12px inherit;font-family:inherit}
   .f2t-toolbar button.on{background:rgba(16,185,129,.25);border-color:rgba(52,211,153,.5);color:#6ee7b7}
   .f2t-toolbar label{display:flex;align-items:center;gap:4px;color:#cbd5e1;cursor:pointer;padding:0 3px}
@@ -595,7 +597,7 @@
 
     <!-- ================= SETUP WIZARD ================= -->
     <div x-show="wiz" x-cloak class="fixed inset-0 z-50" @keydown.escape.window="wiz=false">
-      <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="wiz=false"></div>
+      <div class="absolute inset-0 bg-black/70" @click="wiz=false"></div>
       <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:max-w-lg sm:h-fit bg-[#0f1722] border-t sm:border border-white/12 rounded-t-3xl sm:rounded-3xl p-6 pb-[calc(20px+env(safe-area-inset-bottom))] max-h-[92vh] overflow-y-auto">
         <div class="flex items-center gap-3 mb-1">
           <span x-html="icons.book" class="w-5 h-5 block text-emerald-300"></span>
@@ -1955,7 +1957,7 @@
 
 <!-- zone modal -->
 <div x-show="zoneModal" x-cloak class="fixed inset-0 z-50" @keydown.escape.window="zoneModal=null">
-  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="zoneModal=null"></div>
+  <div class="absolute inset-0 bg-black/60" @click="zoneModal=null"></div>
   <div class="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl md:rounded-3xl rounded-t-3xl glass-strong border-white/12 max-h-[92vh] overflow-y-auto scrollx" x-transition:enter="transition duration-300" x-transition:enter-start="translate-y-full md:opacity-0" x-transition:enter-end="translate-y-0 md:opacity-100">
     <template x-if="zoneModal">
       <div x-data="{z:zoneById(zoneModal), zd:buildZoneDetail(zoneModal)}">
@@ -2011,7 +2013,7 @@
 
 <!-- setpoint tuner — bottom sheet on phone, centered card on desktop -->
 <div x-show="spOpen" x-cloak class="fixed inset-0 z-50" @keydown.escape.window="spOpen=false">
-  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="spOpen=false"></div>
+  <div class="absolute inset-0 bg-black/60" @click="spOpen=false"></div>
   <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:max-w-sm sm:h-fit bg-[#11161d] border-t sm:border border-white/10 rounded-t-3xl sm:rounded-2xl p-5 pb-[calc(20px+env(safe-area-inset-bottom))]" style="max-height:92vh;overflow:auto">
     <template x-if="spItem">
       <div>
@@ -2037,7 +2039,7 @@
 
 <!-- AI co-pilot -->
 <div x-show="aiOpen" x-cloak class="fixed inset-0 z-50" @keydown.escape.window="aiOpen=false">
-  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="aiOpen=false"></div>
+  <div class="absolute inset-0 bg-black/60" @click="aiOpen=false"></div>
   <div class="absolute right-0 top-0 h-full w-full sm:max-w-md glass-strong border-l border-white/12 flex flex-col" x-transition:enter="transition duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0">
     <div class="p-4 border-b border-white/8 flex items-center gap-3"><div class="w-9 h-9 rounded-xl grid place-items-center bg-emerald-500/15 ring-1 ring-emerald-400/30"><span x-html="icons.ai" class="w-5 h-5 block text-emerald-400"></span></div><div class="flex-1"><div class="font-semibold text-sm">Plant-State AI</div><div class="text-[11px] text-slate-400">Claude · live F2 context</div></div><button @click="aiOpen=false" class="w-9 h-9 rounded-lg grid place-items-center bg-white/5 hover:bg-white/10"><span x-html="icons.x" class="w-5 h-5 block"></span></button></div>
     <div class="flex-1 overflow-y-auto scrollx p-4 space-y-3" id="aiScroll">
@@ -2053,7 +2055,7 @@
 
 <!-- pump & irrigation — manual / emergency control -->
 <div x-show="pumpOpen" x-cloak class="fixed inset-0 z-[60]" @keydown.escape.window="pumpOpen=false">
-  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="pumpOpen=false"></div>
+  <div class="absolute inset-0 bg-black/70" @click="pumpOpen=false"></div>
   <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:h-fit sm:max-w-md glass-strong border-t sm:border border-white/12 rounded-t-2xl sm:rounded-2xl max-h-[88vh] overflow-y-auto scrollx" x-transition:enter="transition duration-200" x-transition:enter-start="translate-y-8 opacity-0" x-transition:enter-end="translate-y-0 opacity-100">
     <div class="sticky top-0 glass-strong border-b border-white/8 p-4 flex items-center gap-3 z-10">
       <div class="w-9 h-9 rounded-xl grid place-items-center bg-rose-500/15 ring-1 ring-rose-400/30"><svg viewBox="0 0 24 24" class="w-5 h-5 block text-rose-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg></div>
@@ -2102,7 +2104,7 @@
 
 <!-- command palette -->
 <div x-show="cmdOpen" x-cloak class="fixed inset-0 z-[60]" @keydown.escape.window="cmdOpen=false">
-  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="cmdOpen=false"></div>
+  <div class="absolute inset-0 bg-black/60" @click="cmdOpen=false"></div>
   <div class="absolute top-[12vh] inset-x-4 md:inset-x-0 md:mx-auto md:max-w-xl glass-strong rounded-2xl border border-white/12 overflow-hidden" x-transition:enter="transition duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100">
     <div class="flex items-center gap-2 px-4 border-b border-white/8"><span x-html="icons.search" class="w-4 h-4 block text-slate-400"></span><input x-model="cmdQuery" x-ref="cmd" placeholder="Search zones, views, actions…" class="flex-1 h-12 bg-transparent text-sm focus:outline-none"><kbd class="text-[10px] px-1.5 py-0.5 rounded bg-white/10 border border-white/10">esc</kbd></div>
     <div class="max-h-80 overflow-y-auto scrollx p-2">
