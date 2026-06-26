@@ -92,8 +92,8 @@ class Controller:
         self.hw["valves"] = {int(k): v for k, v in self.hw["valves"].items()}
         self.lights_on_hour = float(o.get("lights_on_hour", 10))
         self.lights_off_hour = float(o.get("lights_off_hour", 22))
-        self.flow_lps = float(o.get("flow_lps", 0.067))
-        self.substrate_l = float(o.get("substrate_l", 6))
+        self.flow_lps = float(o.get("flow_lps", 0.04))     # fallback only — real flow is computed live per zone
+        self.substrate_l = float(o.get("substrate_l", 9))  # fallback only — real volume read live from the integration
         self.enable_flag = o.get("enable_flag", "input_boolean.f2_control_enabled")  # the KILL SWITCH (must be ON)
         self.notify_service = o.get("notify_service", "notify/mobile_app_s23ultra")
         self.notify_min = float(o.get("notify_min", 30))
@@ -359,7 +359,7 @@ class Controller:
         st = self.state[zone]
         st["shots"] += 1
         st["last_shot"] = datetime.now()
-        st["daily_vol"] += size_pct / 100.0 * self.substrate_l
+        st["daily_vol"] += size_pct / 100.0 * self._substrate_l(zone)
         self._save_state()
 
     # ---------- hardware (sync; this process does one thing) ----------
@@ -417,6 +417,20 @@ class Controller:
         ls = st.get("last_shot")
         return (now - ls).total_seconds() / 60.0 if ls else 1e9
 
+    # ---- shot sizing from LIVE config (not a hardcoded option) — a shot is size% of substrate volume ----
+    def _substrate_l(self, zone):
+        """Substrate volume (L). Per-zone number first, then the global, then the option fallback."""
+        return self._zone_num(zone, "substrate_volume", self.substrate_l)
+
+    def _zone_flow_lps(self, zone):
+        """Real zone delivery rate (L/s) = plants x drippers/plant x dripper L/hr / 3600. Fallback to the option."""
+        pc = self._zone_num(zone, "plant_count", 0)
+        dpp = self._zone_num(zone, "drippers_per_plant", 1)
+        fr = self._num("number.crop_steering_dripper_flow_rate", 0)   # L/hr per dripper
+        if pc > 0 and dpp > 0 and fr > 0:
+            return pc * dpp * fr / 3600.0
+        return self.flow_lps
+
     def _act_zone(self, zone, p, snap, decision, block, lights_on, now):
         st = self.state[zone]
         fire, size, reason = decision
@@ -428,7 +442,7 @@ class Controller:
         if fire and block:
             log(f"Z{zone} {st['phase']} BLOCKED ({block}): would {reason}")
         elif fire:
-            dur = max(5, int(size / 100.0 * self.substrate_l / max(self.flow_lps, 0.001)))
+            dur = max(5, int(size / 100.0 * self._substrate_l(zone) / max(self._zone_flow_lps(zone), 0.001)))
             log(f"Z{zone} {st['phase']} FIRE {size}% ~{dur}s — {reason}")
             self._execute_shot(zone, dur, size)
         else:
