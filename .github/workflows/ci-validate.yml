@@ -63,6 +63,14 @@ jobs:
         run: |
           PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v
 
+      - name: Pytest (pure crop-steering-engine — the active decision core)
+        run: |
+          PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
+
+      - name: Lean engine decision harness (146 cases)
+        run: |
+          python appdaemon/apps/crop_steering/test_lean_decide.py
+
       - name: Hassfest
         uses: home-assistant/actions/hassfest@master
 
