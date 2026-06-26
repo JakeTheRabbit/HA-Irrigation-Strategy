@@ -261,9 +261,17 @@ class Controller:
         veg = self._veg(zone)
         sfx = "veg" if veg else "gen"
         base = self._zone_num(zone, "p2_vwc_threshold", 45)
+        p1t = self._zone_num(zone, "p1_target_vwc", 60)
+        fc = self._zone_num(zone, "field_capacity", 70)
+        efloor = self._zone_num(zone, "p3_emergency_vwc_threshold", 40)
+        # EC-steer offset is shell-owned (decide() no longer nudges). Bake it into the
+        # P2 rewater threshold, clamped to the same safe band the engine used: never
+        # below the emergency-floor band, never above the ramp ceiling.
+        p2_thr = base + float(self.state[zone].get("ec_offset", 0.0))
+        p2_thr = max(efloor + 3.0, min(min(p1t, fc) - 1.0, p2_thr))
         raw = ZoneParams(
-            p1_target=self._zone_num(zone, "p1_target_vwc", 60),
-            p2_threshold=base + float(self.state[zone].get("ec_offset", 0.0)),
+            p1_target=p1t,
+            p2_threshold=p2_thr,
             p2_shot_size=self._zone_num(zone, "p2_shot_size", 5),
             p1_initial=self._zone_num(zone, "p1_initial_shot_size", 2),
             p1_incr=self._zone_num(zone, "p1_shot_size_increment", 0.5),
@@ -274,10 +282,10 @@ class Controller:
             ec_target_p0=self._zone_num(zone, f"ec_target_{sfx}_p0", 4),
             ec_target_p1=self._zone_num(zone, f"ec_target_{sfx}_p1", 5),
             ec_target_p2=self._zone_num(zone, f"ec_target_{sfx}_p2", 6),
-            p3_emergency_floor=self._zone_num(zone, "p3_emergency_vwc_threshold", 40),
+            p3_emergency_floor=efloor,
             p3_emergency_shot=self._zone_num(zone, "p3_emergency_shot_size", 2),
             max_daily_volume=self._zone_num(zone, "max_daily_volume", 300),
-            field_capacity=self._zone_num(zone, "field_capacity", 70),
+            field_capacity=fc,
             max_ec=self._zone_num(zone, "maximum_ec", 9),
             stacking_on=self._on("switch.crop_steering_ec_stacking_enabled", False),
             watchdog_hours=self._zone_num(zone, "watchdog_hours", 3),
@@ -519,6 +527,7 @@ class Controller:
                 if new_phase == "P0":
                     st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, snap.vwc
                     st["ec_offset"], st["last_ec_steer"] = 0.0, None
+                    st["ec_integral"], st["ec_prev_err"] = 0.0, 0.0  # no cross-photoperiod PID windup
                     st["last_daily_reset"] = self._grow_day_start(now)
                 if new_phase == "P1":
                     st["shots"] = 0

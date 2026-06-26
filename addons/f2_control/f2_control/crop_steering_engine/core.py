@@ -142,15 +142,12 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
             if hours_needed <= 12 and s.hours_to_lights_on <= hours_needed:
                 phase, treason = "P3", f"predictive P3 (need {hours_needed:.1f}h, {s.hours_to_lights_on:.1f}h to on)"
 
-    # ---- EC STEERING (P2 only) ----
-    if phase == "P2" and p.stacking_on and p.ec_target_p2 > 0:
-        if s.ec_smooth < p.ec_target_p2 * 0.90:
-            p2_thr = p.p2_threshold - 1.0          # deeper dryback -> EC stacks UP
-        elif s.ec_smooth > p.ec_target_p2 * 1.10:
-            p2_thr = p.p2_threshold + 1.0          # water sooner -> dilute
-        lo = p.p3_emergency_floor + 3.0
-        hi = min(p.p1_target, p.field_capacity) - 1.0
-        p2_thr = max(lo, min(hi, p2_thr))
+    # ---- EC STEERING (P2) ----
+    # The IO shell (f2-control add-on) owns the P2 EC-steer: it accumulates a PID/step
+    # ec_offset (anti-windup, persisted, flag-gated) and bakes it into p.p2_threshold
+    # BEFORE calling decide(). Applying a second ec_smooth-based nudge here would
+    # double-correct the operator's tuned offset, so p2_thr just tracks that offset
+    # threshold. (clamped lo/hi inside the shell.)
 
     # ---- IRRIGATION DECISION (priority order) ----
     fire, size, ir = False, 0.0, ""
