@@ -44,6 +44,19 @@
   @keyframes ping{75%,100%{transform:scale(2.2);opacity:0}}
   .fade-enter{animation:fade .35s ease both}
   @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  /* ===== Analyze tab ===== */
+  .an-head{margin:0 0 18px}
+  .an-head h2{margin:0 0 4px;font-size:20px;font-weight:700;color:#e2e8f0}
+  .an-head p{margin:0;font-size:13px;color:#94a3b8;line-height:1.5}
+  .an-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
+  .an-card{background:rgba(17,22,29,.72);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:14px 16px 16px;min-width:0;overflow:hidden}
+  .an-t{font-size:14px;font-weight:600;color:#e2e8f0;margin:0 0 10px}
+  .an-canvas{position:relative;height:200px;width:100%}
+  .an-canvas canvas{max-width:100%}
+  .an-help{margin-top:12px;font-size:12px;line-height:1.55;color:#94a3b8;border-top:1px solid rgba(255,255,255,.06);padding-top:10px}
+  .an-help b{color:#cbd5e1;font-weight:600}
+  .an-help .g{color:#34d399;font-weight:600}
+  .an-help .b{color:#f87171;font-weight:600}
   .flash{animation:flashring 1.6s cubic-bezier(.4,0,.2,1) both}
   @keyframes flashring{0%{box-shadow:0 0 0 0 rgba(52,211,153,0)}15%{box-shadow:0 0 0 3px rgba(52,211,153,.6),0 0 22px 2px rgba(52,211,153,.45)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
   @media (prefers-reduced-motion:reduce){.flash{animation:none}}
@@ -1425,7 +1438,7 @@
       </section>
 
       <!-- ===== TUNE (native editor) ===== -->
-      <section x-show="view==='tune'||view==='analyze'" x-data="editor()" class="fade-enter tuneroot" id="tuneRoot">
+      <section x-show="view==='tune'" x-data="editor()" class="fade-enter tuneroot" id="tuneRoot">
 <div class="wrap">
   <!-- Steering: Now ⇄ Schedule toggle (the Setpoints+Plan merge) -->
   <div class="flex items-center gap-3 flex-wrap mb-3" x-show="view==='tune'">
@@ -1766,6 +1779,41 @@
     <div class="ttp-f" x-show="tip&&tip.f"><span x-text="tip&&tip.f"></span></div>
   </div>
 </div>
+      </section>
+
+      <!-- ===== ANALYZE (live charts + how to read them) ===== -->
+      <section x-show="view==='analyze'" class="fade-enter">
+        <div class="an-head">
+          <h2>Analyze — what the day is telling you</h2>
+          <p>Live charts off the current state + last 24&nbsp;h. Each card says what <span class="g">good</span> and <span class="b">bad</span> look like, and what to do.</p>
+        </div>
+        <div class="an-grid">
+          <div class="an-card">
+            <div class="an-t">💧 Moisture (VWC) — last 24&nbsp;h</div>
+            <div class="an-canvas"><canvas id="anVwc"></canvas></div>
+            <div class="an-help"><b>What:</b> each zone's substrate moisture over the day. <span class="g">Good:</span> a clean sawtooth — VWC jumps on a shot then drifts down (dryback). <span class="b">Bad:</span> a flatline (no dryback → you're not steering, EC stacks) or a cliff that crashes to the floor (over-water then starve). Generative wants a 40–50% dryback from the daily peak.</div>
+          </div>
+          <div class="an-card">
+            <div class="an-t">🧂 Pore EC vs target — last 24&nbsp;h</div>
+            <div class="an-canvas"><canvas id="anEc"></canvas></div>
+            <div class="an-help"><b>What:</b> root-zone salt per zone vs your EC target (dashed). <span class="g">Good:</span> tracking near the target line. <span class="b">Bad:</span> climbing away from it (stacking — shots too small / no runoff) or sitting well below (feed too weak). Rising EC while VWC is flat = the slab isn't flushing — needs a bigger, draining shot.</div>
+          </div>
+          <div class="an-card">
+            <div class="an-t">🚰 Water delivered today — per zone</div>
+            <div class="an-canvas"><canvas id="anWater"></canvas></div>
+            <div class="an-help"><b>What:</b> litres each zone has drunk this photoperiod. <span class="g">Good:</span> zones in the same room land in the same ballpark. <span class="b">Bad:</span> one zone far higher (draining / channelling / a leak — water in, VWC not rising) or near zero (stuck valve, or staying too wet to ever hit threshold).</div>
+          </div>
+          <div class="an-card">
+            <div class="an-t">⚖️ Pore EC vs feed EC — now</div>
+            <div class="an-canvas"><canvas id="anStack"></canvas></div>
+            <div class="an-help"><b>What:</b> each zone's pore EC (bars) against the feed EC going in (dashed). <span class="g">Good:</span> pore ≈ 1–1.5× feed — a healthy working concentration. <span class="b">Bad:</span> pore ≫ feed (salt stacking faster than it flushes) → run a proper runoff flush or lower the feed; pore < feed → under-fed.</div>
+          </div>
+          <div class="an-card">
+            <div class="an-t">🌡️ VPD trend (transpiration driver)</div>
+            <div class="an-canvas"><canvas id="anVpd"></canvas></div>
+            <div class="an-help"><b>What:</b> air vapour-pressure deficit — how hard the plant is pulling water. <span class="g">Good:</span> steady in the band (≈0.8–1.1&nbsp;kPa veg, 1.2–1.5 flower). <span class="b">Bad:</span> too low (sluggish uptake, disease risk) or too high (stress, stomata close, EC spikes). VPD swings explain VWC swings.</div>
+          </div>
+        </div>
       </section>
 
       <!-- ===== CONTROL (native ops console) ===== -->
@@ -5652,7 +5700,45 @@ document.addEventListener('alpine:init', () => {
 
     /* charts */
     cb(){ return {responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:500},plugins:{legend:{display:false}}}; },
-    mountCharts(){ if(this.view==='dashboard'){ this.mountTrend(); this.ensureHist('dashboard'); } if(this.view==='climate'){ this.ensureHist('climate'); } if(this.view==='zones'){ this.$nextTick(()=>this.mountZoneMinis()); } if(this.view==='substrate'){ this.ensureSubHist(); } },
+    mountCharts(){ if(this.view==='dashboard'){ this.mountTrend(); this.ensureHist('dashboard'); } if(this.view==='climate'){ this.ensureHist('climate'); } if(this.view==='zones'){ this.$nextTick(()=>this.mountZoneMinis()); } if(this.view==='substrate'){ this.ensureSubHist(); } if(this.view==='analyze'){ this.ensureAnalyze(); } },
+    /* ===== Analyze: live charts (per-zone VWC/EC history + current-state bars) ===== */
+    ensureAnalyze(){ const now=Date.now();
+      if(this._h_an && now-(this._hts_an||0)<240000){ this.$nextTick(()=>this.mountAnalyze()); return; }
+      if(this._loading_an) return; this._loading_an=true; this._hts_an=now;
+      const ids=[1,2,3].flatMap(z=>['sensor.crop_steering_zone_'+z+'_vwc','sensor.crop_steering_zone_'+z+'_ec']);
+      this.loadHist(ids,24,false).then(H=>{ this._h_an=H; this.$nextTick(()=>this.mountAnalyze()); })
+        .catch(()=>{ this._hts_an=0; }).finally(()=>{ this._loading_an=false; }); },
+    _anOpts(unit){ return {responsive:true,maintainAspectRatio:false,animation:{duration:0},interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:12,usePointStyle:true,font:{size:10}}},tooltip:{backgroundColor:'#11161d'}},
+      scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:7,autoSkip:true}},
+        y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8',font:{size:10},callback:v=>v+unit}}}}; },
+    _anLine(cid,key,unit,targetFn){ const c=document.getElementById(cid); if(!c) return; const H=this._h_an; if(!H) return;
+      const s=H.__start,e=H.__end,N=96,labels=this.histLabels(s,e,N),cols=['#22d3ee','#34d399','#a78bfa'];
+      const sets=[1,2,3].map((z,i)=>({label:'Z'+z,data:this.bucketize(H['sensor.crop_steering_zone_'+z+'_'+key],s,e,N),borderColor:cols[i],backgroundColor:'transparent',borderWidth:1.8,tension:.15,pointRadius:0,spanGaps:true}));
+      if(targetFn){ const t=targetFn(); if(t!=null) sets.push({label:'target',data:labels.map(()=>t),borderColor:'#fbbf24',borderWidth:1,borderDash:[5,4],pointRadius:0}); }
+      if(CHARTS[cid]){ CHARTS[cid].data.labels=labels; CHARTS[cid].data.datasets=sets; CHARTS[cid].update('none'); return; }
+      CHARTS[cid]=new Chart(c,{type:'line',data:{labels,datasets:sets},options:this._anOpts(unit)}); },
+    mountAnalyze(){ const cols=['#22d3ee','#34d399','#a78bfa'];
+      this._anLine('anVwc','vwc','%');
+      this._anLine('anEc','ec','',()=>{ const t=[1,2,3].map(z=>zNum('number.crop_steering_zone_'+z+'_ec_target_gen_p2')).filter(x=>x!=null); return t.length?Math.round(t.reduce((a,b)=>a+b,0)/t.length*10)/10:null; });
+      // water today (bar)
+      const wc=document.getElementById('anWater');
+      if(wc){ const data=[1,2,3].map(z=>zNum('sensor.crop_steering_zone_'+z+'_daily_water_usage')||0);
+        if(CHARTS.anWater){ CHARTS.anWater.data.datasets[0].data=data; CHARTS.anWater.update('none'); }
+        else CHARTS.anWater=new Chart(wc,{type:'bar',data:{labels:['Z1','Z2','Z3'],datasets:[{data,backgroundColor:cols,borderRadius:5}]},
+          options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:11}}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8',font:{size:10},callback:v=>v+'L'}}}}}); }
+      // pore EC now vs feed (bar + feed line)
+      const sc=document.getElementById('anStack'), feed=num('src_ec');
+      if(sc){ const pore=[1,2,3].map(z=>zNum('sensor.crop_steering_zone_'+z+'_ec')||0);
+        const dss=[{type:'bar',label:'pore EC',data:pore,backgroundColor:cols,borderRadius:5}];
+        if(feed!=null) dss.push({type:'line',label:'feed EC',data:[feed,feed,feed],borderColor:'#fbbf24',borderDash:[5,4],borderWidth:1.5,pointRadius:0});
+        if(CHARTS.anStack){ CHARTS.anStack.data.datasets[0].data=pore; if(feed!=null&&CHARTS.anStack.data.datasets[1]) CHARTS.anStack.data.datasets[1].data=[feed,feed,feed]; CHARTS.anStack.update('none'); }
+        else CHARTS.anStack=new Chart(sc,{data:{labels:['Z1','Z2','Z3'],datasets:dss},options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:12,usePointStyle:true,font:{size:10}}}},scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:11}}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8',font:{size:10}}}}}}); }
+      // VPD (in-memory rolling)
+      const vc=document.getElementById('anVpd'), d=(typeof HIST!=='undefined'&&HIST.vpd)?[...HIST.vpd]:[];
+      if(vc){ const labels=d.map(()=>'');
+        if(CHARTS.anVpd){ CHARTS.anVpd.data.labels=labels; CHARTS.anVpd.data.datasets[0].data=d; CHARTS.anVpd.update('none'); }
+        else CHARTS.anVpd=new Chart(vc,{type:'line',data:{labels,datasets:[{label:'VPD kPa',data:d,borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.10)',fill:true,borderWidth:1.8,tension:.25,pointRadius:0}]},options:this._anOpts('')}); } },
     async ensureHist(which){   // fetch REAL /api/history once per 4 min, then (re)draw the relevant charts
       const now=Date.now();
       if(this['_h_'+which] && now-this['_hts_'+which]<240000){ this.$nextTick(()=>which==='climate'?this.mountClimateCharts():this.mountTrend()); return; }
