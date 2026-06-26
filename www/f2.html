@@ -44,15 +44,32 @@
   @keyframes ping{75%,100%{transform:scale(2.2);opacity:0}}
   .fade-enter{animation:fade .35s ease both}
   @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  /* ===== Analyze tab ===== */
-  .an-head{margin:0 0 18px}
+  /* ===== Analyze tab — lightweight full-width rows (no canvas) ===== */
+  .an-head{margin:0 0 16px}
   .an-head h2{margin:0 0 4px;font-size:20px;font-weight:700;color:#e2e8f0}
   .an-head p{margin:0;font-size:13px;color:#94a3b8;line-height:1.5}
-  .an-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
-  .an-card{background:rgba(17,22,29,.72);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:14px 16px 16px;min-width:0;overflow:hidden}
-  .an-t{font-size:14px;font-weight:600;color:#e2e8f0;margin:0 0 10px}
-  .an-canvas{position:relative;height:200px;width:100%}
-  .an-canvas canvas{max-width:100%}
+  .an-stack{display:flex;flex-direction:column;gap:14px}
+  .an-card{background:rgba(17,22,29,.72);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:14px 16px 16px}
+  .an-t{font-size:14px;font-weight:600;color:#e2e8f0;margin:0 0 12px;display:flex;align-items:center;gap:7px}
+  .an-t .sub{font-size:11px;font-weight:400;color:#64748b;margin-left:auto}
+  .an-tl{display:flex;flex-direction:column;gap:7px}
+  .an-row{display:flex;align-items:center;gap:10px}
+  .an-row .lab{width:90px;flex:none;font-size:12px;color:#cbd5e1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .an-track{position:relative;flex:1;height:18px;border-radius:5px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);overflow:hidden}
+  .an-seg{position:absolute;top:0;bottom:0}
+  .an-row .nowv{width:48px;flex:none;font-size:11px;text-align:left}
+  .an-axis{display:flex;justify-content:space-between;font-size:10px;color:#64748b;margin:7px 0 0 100px;padding-right:58px}
+  .an-sparks{display:flex;flex-direction:column;gap:9px}
+  .an-spk{display:flex;align-items:center;gap:10px}
+  .an-spk .lab{width:34px;flex:none;font-size:12px;font-weight:700}
+  .an-spk svg{flex:1;height:34px;display:block;overflow:visible}
+  .an-spk .v{width:70px;flex:none;font-size:12px;color:#cbd5e1;text-align:right;font-variant-numeric:tabular-nums}
+  .an-bars{display:flex;flex-direction:column;gap:9px}
+  .an-bar{display:flex;align-items:center;gap:10px}
+  .an-bar .lab{width:44px;flex:none;font-size:12px;color:#cbd5e1}
+  .an-bar .trk{position:relative;flex:1;height:12px;border-radius:999px;background:rgba(255,255,255,.05);overflow:hidden}
+  .an-bar .trk i{position:absolute;left:0;top:0;bottom:0;border-radius:999px}
+  .an-bar .v{width:78px;flex:none;font-size:12px;color:#cbd5e1;text-align:right;font-variant-numeric:tabular-nums}
   .an-help{margin-top:12px;font-size:12px;line-height:1.55;color:#94a3b8;border-top:1px solid rgba(255,255,255,.06);padding-top:10px}
   .an-help b{color:#cbd5e1;font-weight:600}
   .an-help .g{color:#34d399;font-weight:600}
@@ -794,7 +811,7 @@
       <!-- ===== ENGINE LOG — live AppDaemon tail (thinking · actions · errors) ===== -->
       <div x-data="engineLog()" x-init="init()" class="mb-5 rounded-2xl border border-white/8 bg-black/40 overflow-hidden">
         <div class="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none bg-white/[0.03] border-b border-white/8" @click="toggle()">
-          <span class="w-2 h-2 rounded-full shrink-0" :class="paused?'bg-slate-500':'bg-emerald-400 animate-pulse'"></span>
+          <span class="w-2 h-2 rounded-full shrink-0" :class="paused?'bg-slate-500':(open?'bg-emerald-400 animate-pulse':'bg-emerald-400')"></span>
           <span class="text-sm font-semibold text-slate-200">Engine log</span>
           <span class="text-[11px] text-slate-500" x-text="'· '+lines.length+' lines'"></span>
           <span class="text-[11px] text-red-400 font-semibold px-1.5 rounded bg-red-500/15" x-show="errCount()>0" x-text="errCount()+' err'"></span>
@@ -1781,38 +1798,45 @@
 </div>
       </section>
 
-      <!-- ===== ANALYZE (live charts + how to read them) ===== -->
+      <!-- ===== ANALYZE (lightweight live read-outs + how to read them) ===== -->
       <section x-show="view==='analyze'" class="fade-enter">
         <div class="an-head">
           <h2>Analyze — what the day is telling you</h2>
-          <p>Live charts off the current state + last 24&nbsp;h. Each card says what <span class="g">good</span> and <span class="b">bad</span> look like, and what to do.</p>
+          <p>Live off the last 24&nbsp;h + current state. <span class="g">Green = good</span>, <span class="b">red = watch out</span>. No heavy charts — reads instantly.</p>
         </div>
-        <div class="an-grid">
+        <div class="an-stack">
+
           <div class="an-card">
-            <div class="an-t">💧 Moisture (VWC) — last 24&nbsp;h</div>
-            <div class="an-canvas"><canvas id="anVwc"></canvas></div>
-            <div class="an-help"><b>What:</b> each zone's substrate moisture over the day. <span class="g">Good:</span> a clean sawtooth — VWC jumps on a shot then drifts down (dryback). <span class="b">Bad:</span> a flatline (no dryback → you're not steering, EC stacks) or a cliff that crashes to the floor (over-water then starve). Generative wants a 40–50% dryback from the daily peak.</div>
+            <div class="an-t">🕐 Last 24&nbsp;h — equipment state <span class="sub">lights · pump · zone valves</span></div>
+            <div class="an-tl" x-html="anTimeline"><div class="an-row"><span class="lab">…</span><span class="an-track"></span></div></div>
+            <div class="an-axis"><span>−24h</span><span>−12h</span><span>now</span></div>
+            <div class="an-help"><b>What:</b> when each thing was on (gold) vs off (grey) across the day. <span class="g">Good:</span> lights one clean block matching your photoperiod; pump = short, spaced bursts; valves cycling in step. <span class="b">Bad:</span> pump machine-gunning (many tiny bursts back-to-back → shots too small) or a valve stuck on/off. This is the at-a-glance health of the hardware.</div>
           </div>
+
           <div class="an-card">
-            <div class="an-t">🧂 Pore EC vs target — last 24&nbsp;h</div>
-            <div class="an-canvas"><canvas id="anEc"></canvas></div>
-            <div class="an-help"><b>What:</b> root-zone salt per zone vs your EC target (dashed). <span class="g">Good:</span> tracking near the target line. <span class="b">Bad:</span> climbing away from it (stacking — shots too small / no runoff) or sitting well below (feed too weak). Rising EC while VWC is flat = the slab isn't flushing — needs a bigger, draining shot.</div>
+            <div class="an-t">💧 Moisture (VWC) — 24&nbsp;h dryback <span class="sub">per zone · peak → now</span></div>
+            <div class="an-sparks" x-html="anVwc"><div class="an-spk"><span class="lab">…</span></div></div>
+            <div class="an-help"><b>What:</b> each zone's substrate moisture trace. <span class="g">Good:</span> a clean sawtooth — jumps on a shot, drifts down (dryback). <span class="b">Bad:</span> a flatline (not steering → EC stacks) or a cliff to the floor (over-water then starve). Generative wants a 40–50% dryback off the daily peak.</div>
           </div>
+
           <div class="an-card">
-            <div class="an-t">🚰 Water delivered today — per zone</div>
-            <div class="an-canvas"><canvas id="anWater"></canvas></div>
-            <div class="an-help"><b>What:</b> litres each zone has drunk this photoperiod. <span class="g">Good:</span> zones in the same room land in the same ballpark. <span class="b">Bad:</span> one zone far higher (draining / channelling / a leak — water in, VWC not rising) or near zero (stuck valve, or staying too wet to ever hit threshold).</div>
+            <div class="an-t">🧂 Pore EC vs target — 24&nbsp;h <span class="sub">dashed = your target</span></div>
+            <div class="an-sparks" x-html="anEc"><div class="an-spk"><span class="lab">…</span></div></div>
+            <div class="an-help"><b>What:</b> root-zone salt per zone against its EC target. <span class="g">Good:</span> tracking near the dashed target. <span class="b">Bad:</span> climbing away (stacking — shots too small / no runoff) or sitting well below (feed too weak). Rising EC while VWC is flat = the slab isn't flushing → needs a bigger, draining shot. <b>Pore should run ≈1–1.5× the feed EC</b> — far above that and it's stacking.</div>
           </div>
+
           <div class="an-card">
-            <div class="an-t">⚖️ Pore EC vs feed EC — now</div>
-            <div class="an-canvas"><canvas id="anStack"></canvas></div>
-            <div class="an-help"><b>What:</b> each zone's pore EC (bars) against the feed EC going in (dashed). <span class="g">Good:</span> pore ≈ 1–1.5× feed — a healthy working concentration. <span class="b">Bad:</span> pore ≫ feed (salt stacking faster than it flushes) → run a proper runoff flush or lower the feed; pore < feed → under-fed.</div>
+            <div class="an-t">🚰 Water delivered today <span class="sub">litres this photoperiod</span></div>
+            <div class="an-bars" x-html="anWater"><div class="an-bar"><span class="lab">…</span></div></div>
+            <div class="an-help"><b>What:</b> litres each zone has drunk since lights-on. <span class="g">Good:</span> same-room zones land in the same ballpark. <span class="b">Bad:</span> one zone far higher (draining / channelling / leak — water in, VWC not rising) or near zero (stuck valve, or too wet to ever hit threshold).</div>
           </div>
+
           <div class="an-card">
-            <div class="an-t">🌡️ VPD trend (transpiration driver)</div>
-            <div class="an-canvas"><canvas id="anVpd"></canvas></div>
-            <div class="an-help"><b>What:</b> air vapour-pressure deficit — how hard the plant is pulling water. <span class="g">Good:</span> steady in the band (≈0.8–1.1&nbsp;kPa veg, 1.2–1.5 flower). <span class="b">Bad:</span> too low (sluggish uptake, disease risk) or too high (stress, stomata close, EC spikes). VPD swings explain VWC swings.</div>
+            <div class="an-t">🌡️ VPD now <span class="sub">transpiration driver</span></div>
+            <div class="an-bars" x-html="anVpd"><div class="an-bar"><span class="lab">…</span></div></div>
+            <div class="an-help"><b>What:</b> air vapour-pressure deficit — how hard the plant pulls water. <span class="g">Good:</span> in the band (≈0.8–1.1&nbsp;kPa veg, 1.2–1.5 flower). <span class="b">Bad:</span> too low (sluggish uptake, disease risk) or too high (stress, stomata close, EC spikes). VPD swings explain VWC swings.</div>
           </div>
+
         </div>
       </section>
 
@@ -1941,7 +1965,7 @@
                instant load, no model download, serves on the public demo too; in live embed it polls HA
                so rooms glow when their lights are on and a room click deep-links the dashboard -->
           <template x-if="view==='floor'">
-            <iframe src="./floorplan/index.html?embed&v=9" class="absolute inset-0 w-full h-full border-0 block" title="Facility 3D floor plan"></iframe>
+            <iframe src="./floorplan/index.html?embed&v=10" class="absolute inset-0 w-full h-full border-0 block" title="Facility 3D floor plan"></iframe>
           </template>
         </div>
         <div class="text-[11px] text-slate-500 mt-2 px-1 flex items-center gap-1.5"><span x-html="icons.grid" class="w-3.5 h-3.5 block"></span> Drag to orbit, scroll to zoom, right-drag to pan · lit rooms have their lights on · click a grow room to jump to its dashboard.</div>
@@ -5611,6 +5635,7 @@ document.addEventListener('alpine:init', () => {
     tip:null, tipT:null,
     lastUpdated:Date.now(), lightsOn:false, ctx:{flower:""},
     headline:{sev:"ok",big:"Connecting…",line:"Reading F2 state."}, kpis:[], maturity:{rung:2,name:'Logged',next:''}, chartSmooth:ls.get('f2.chartSmooth',true), gRange:ls.get('f2.gRange','24h'), subZone:ls.get('f2.subZone','all'), subFieldCap:ls.get('f2.subFieldCap',true), subOverlay:ls.get('f2.subOverlay',false), zones:[], plant:[], coupledStages:[], vitals:[], hwStatus:{hw:[],zones:[],deadhead:false,anyOn:false,pumpOn:false,pwTxt:'—'}, water:[], climate:[], raw:[], hotspotCells:[], adv:[], watch:[], insights:[], steeringMeta:[],
+    anTimeline:'', anVwc:'', anEc:'', anWater:'', anVpd:'',   // Analyze view: lightweight HTML strings (no Chart.js)
     control:{summary:[],arm:[],adaptive:{toggle:{},nums:[]},strategy:[],zones:{1:{selects:[],switches:[]},2:{selects:[],switches:[]},3:{selects:[],switches:[]}},telemetry:[],feed:[]},
     climateCtl:[], ctlOpen:ls.get('f2.ctlOpen',{}), snapshot:[], camUrl:'', spOpen:false, spItem:null, floorMini:[], tank:{pct:null,litres:null,sev:'ok',bar:'bg-emerald-500',pctText:'—',litresText:null,width:0}, tanks:{feed:{},stock:[],dose:{}}, activityFeed:[], hUser:{name:'Grower',initials:'F2'}, demo:DEMO,
     notes:{}, toasts:[], _tid:0, _toastId:0, _retry:0, _acked:(function(){ try{ const a=ls.get('f2.acked',{}),cut=Date.now()-18*3600e3,o={}; for(const k in a){ if(a[k]>cut) o[k]=a[k]; } return o; }catch(e){ return {}; } })(),
@@ -5624,6 +5649,7 @@ document.addEventListener('alpine:init', () => {
       this.tick();
       this.fetchUser();
       this._tid=setInterval(()=>this.tick(), CONFIG.REFRESH_MS);
+      document.addEventListener('visibilitychange',()=>{ if(document.hidden){ clearInterval(this._tid); this._tid=null; } else if(!this._tid){ this.tick(); this._tid=setInterval(()=>this.tick(), CONFIG.REFRESH_MS); } });   // PERF: stop the 30s poll + chart pipeline while the browser tab is backgrounded; resume + catch up on return
       this.$watch('view',v=>{ this.$nextTick(()=>{ this.mountCharts(); if(v==='timeline'&&window.tlInit) window.tlInit(); if(v==='tune'&&this.seedTune) this.seedTune(); }); });
       if(this.view!=='dashboard') this.$nextTick(()=>{ this.mountCharts(); if(this.view==='timeline'&&window.tlInit) window.tlInit(); if(this.view==='tune'&&this.seedTune) this.seedTune(); });   // mount a ?view= deep-linked tab (the $watch above won't fire for the initial value)
       window.addEventListener('message',e=>{ if(e&&e.data&&e.data.type==='f2nav') this.floorNav(e.data); });   // deep-links from the 3D twin iframe
@@ -5682,7 +5708,7 @@ document.addEventListener('alpine:init', () => {
       { const cam=S[CONFIG.E.cam], ct=cam&&cam.attributes&&cam.attributes.access_token;
         if(this.view==='dashboard' && !this.camMin){ this._camTick=(this._camTick||0)+1;
           this.camUrl=ct?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+CONFIG.E.cam+'?token='+ct+'&_='+this._camTick):''; } }
-      if(window.__tuneReseed) window.__tuneReseed();   // refresh the Tune editor from live HA (respects its hydrated/unsaved-edit guard)
+      if(_v==='tune' && window.__tuneReseed) window.__tuneReseed();   // PERF: only reseed the (heavy SVG) Tune editor when it's the active view — was rebuilding it from sensor noise every 30s while hidden
       const sph=num("src_ph"),sec=num("src_ec");   // live feed chemistry (Atlas probes); "—" when the probe is offline
       this.steeringMeta=[{label:"Feed pH",val:sph==null?"—":fmt(sph,2),cls:sph==null?"text-slate-500":(sph>=5.6&&sph<=6.4?"text-emerald-400":"text-amber-400")},{label:"Feed EC",val:sec==null?"—":fmt(sec,2)+" mS/cm",cls:sec==null?"text-slate-500":"text-slate-200"},{label:"Fused EC",val:fmt(num("fused_ec"),2),cls:"text-slate-200"},{label:"EC target",val:fmt(CONFIG.EC_TARGET,1),cls:"text-slate-200"},{label:"Pump",val:fmt(num("pump_power"),0)+" W",cls:num("pump_power")>100?"text-amber-400":"text-slate-200"},{label:"Next shot",val:this.shortTime(val("next_irrig")),cls:"text-slate-200"}];
       this.hotspotCells=this.buildHotspot();
@@ -5701,44 +5727,71 @@ document.addEventListener('alpine:init', () => {
     /* charts */
     cb(){ return {responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:500},plugins:{legend:{display:false}}}; },
     mountCharts(){ if(this.view==='dashboard'){ this.mountTrend(); this.ensureHist('dashboard'); } if(this.view==='climate'){ this.ensureHist('climate'); } if(this.view==='zones'){ this.$nextTick(()=>this.mountZoneMinis()); } if(this.view==='substrate'){ this.ensureSubHist(); } if(this.view==='analyze'){ this.ensureAnalyze(); } },
-    /* ===== Analyze: live charts (per-zone VWC/EC history + current-state bars) ===== */
+    /* ===== Analyze: lightweight live read-outs — HTML strings via x-html, no Chart.js ===== */
+    _anRows(){ return [
+      {id:'light.grow_room_all_lights', lab:'Lights', col:'#fbbf24'},
+      {id:'switch.veg_main_pump', lab:'Pump', col:'#22d3ee'},
+      {id:'switch.f2_row1', lab:'Zone 1 valve', col:'#34d399'},
+      {id:'switch.f2_row2', lab:'Zone 2 valve', col:'#34d399'},
+      {id:'switch.f2_row3', lab:'Zone 3 valve', col:'#34d399'} ]; },
     ensureAnalyze(){ const now=Date.now();
-      if(this._h_an && now-(this._hts_an||0)<240000){ this.$nextTick(()=>this.mountAnalyze()); return; }
+      if(this._h_an && now-(this._hts_an||0)<240000){ this.mountAnalyze(); return; }
       if(this._loading_an) return; this._loading_an=true; this._hts_an=now;
       const ids=[1,2,3].flatMap(z=>['sensor.crop_steering_zone_'+z+'_vwc','sensor.crop_steering_zone_'+z+'_ec']);
-      this.loadHist(ids,24,false).then(H=>{ this._h_an=H; this.$nextTick(()=>this.mountAnalyze()); })
+      Promise.all([ this.loadHist(ids,24,false).catch(()=>null), this.loadStateHist(this._anRows().map(r=>r.id),24).catch(()=>null) ])
+        .then(([H,St])=>{ this._h_an=H; this._st_an=St; this.mountAnalyze(); })
         .catch(()=>{ this._hts_an=0; }).finally(()=>{ this._loading_an=false; }); },
-    _anOpts(unit){ return {responsive:true,maintainAspectRatio:false,animation:{duration:0},interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:12,usePointStyle:true,font:{size:10}}},tooltip:{backgroundColor:'#11161d'}},
-      scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:7,autoSkip:true}},
-        y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8',font:{size:10},callback:v=>v+unit}}}}; },
-    _anLine(cid,key,unit,targetFn){ const c=document.getElementById(cid); if(!c) return; const H=this._h_an; if(!H) return;
-      const s=H.__start,e=H.__end,N=96,labels=this.histLabels(s,e,N),cols=['#22d3ee','#34d399','#a78bfa'];
-      const sets=[1,2,3].map((z,i)=>({label:'Z'+z,data:this.bucketize(H['sensor.crop_steering_zone_'+z+'_'+key],s,e,N),borderColor:cols[i],backgroundColor:'transparent',borderWidth:1.8,tension:.15,pointRadius:0,spanGaps:true}));
-      if(targetFn){ const t=targetFn(); if(t!=null) sets.push({label:'target',data:labels.map(()=>t),borderColor:'#fbbf24',borderWidth:1,borderDash:[5,4],pointRadius:0}); }
-      if(CHARTS[cid]){ CHARTS[cid].data.labels=labels; CHARTS[cid].data.datasets=sets; CHARTS[cid].update('none'); return; }
-      CHARTS[cid]=new Chart(c,{type:'line',data:{labels,datasets:sets},options:this._anOpts(unit)}); },
-    mountAnalyze(){ const cols=['#22d3ee','#34d399','#a78bfa'];
-      this._anLine('anVwc','vwc','%');
-      this._anLine('anEc','ec','',()=>{ const t=[1,2,3].map(z=>zNum('number.crop_steering_zone_'+z+'_ec_target_gen_p2')).filter(x=>x!=null); return t.length?Math.round(t.reduce((a,b)=>a+b,0)/t.length*10)/10:null; });
-      // water today (bar)
-      const wc=document.getElementById('anWater');
-      if(wc){ const data=[1,2,3].map(z=>zNum('sensor.crop_steering_zone_'+z+'_daily_water_usage')||0);
-        if(CHARTS.anWater){ CHARTS.anWater.data.datasets[0].data=data; CHARTS.anWater.update('none'); }
-        else CHARTS.anWater=new Chart(wc,{type:'bar',data:{labels:['Z1','Z2','Z3'],datasets:[{data,backgroundColor:cols,borderRadius:5}]},
-          options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:11}}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8',font:{size:10},callback:v=>v+'L'}}}}}); }
-      // pore EC now vs feed (bar + feed line)
-      const sc=document.getElementById('anStack'), feed=num('src_ec');
-      if(sc){ const pore=[1,2,3].map(z=>zNum('sensor.crop_steering_zone_'+z+'_ec')||0);
-        const dss=[{type:'bar',label:'pore EC',data:pore,backgroundColor:cols,borderRadius:5}];
-        if(feed!=null) dss.push({type:'line',label:'feed EC',data:[feed,feed,feed],borderColor:'#fbbf24',borderDash:[5,4],borderWidth:1.5,pointRadius:0});
-        if(CHARTS.anStack){ CHARTS.anStack.data.datasets[0].data=pore; if(feed!=null&&CHARTS.anStack.data.datasets[1]) CHARTS.anStack.data.datasets[1].data=[feed,feed,feed]; CHARTS.anStack.update('none'); }
-        else CHARTS.anStack=new Chart(sc,{data:{labels:['Z1','Z2','Z3'],datasets:dss},options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:12,usePointStyle:true,font:{size:10}}}},scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:11}}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8',font:{size:10}}}}}}); }
-      // VPD (in-memory rolling)
-      const vc=document.getElementById('anVpd'), d=(typeof HIST!=='undefined'&&HIST.vpd)?[...HIST.vpd]:[];
-      if(vc){ const labels=d.map(()=>'');
-        if(CHARTS.anVpd){ CHARTS.anVpd.data.labels=labels; CHARTS.anVpd.data.datasets[0].data=d; CHARTS.anVpd.update('none'); }
-        else CHARTS.anVpd=new Chart(vc,{type:'line',data:{labels,datasets:[{label:'VPD kPa',data:d,borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.10)',fill:true,borderWidth:1.8,tension:.25,pointRadius:0}]},options:this._anOpts('')}); } },
+    async loadStateHist(ids,hours){ const end=Date.now(), start=end-hours*3600e3;
+      if(DEMO) return this._demoStateHist(ids,start,end);
+      const tok=getToken(); if(!tok||!ids.length) return {__start:start,__end:end};
+      const url=(CONFIG.HA_BASE||'')+'/api/history/period/'+new Date(start).toISOString()+'?filter_entity_id='+ids.join(',')+'&minimal_response&end_time='+encodeURIComponent(new Date(end).toISOString());
+      try{ const r=await fetch(url,{headers:{Authorization:'Bearer '+tok},cache:'no-store'}); if(!r.ok) throw 0;
+        const arr=await r.json(); const out={__start:start,__end:end};
+        arr.forEach(series=>{ if(!series||!series.length) return; const eid=series[0].entity_id; const segs=[];
+          for(let i=0;i<series.length;i++){ const t0=Math.max(Date.parse(series[i].last_changed||series[i].last_updated),start), t1=i+1<series.length?Date.parse(series[i+1].last_changed||series[i+1].last_updated):end; if(t1>t0&&series[i].state==='on') segs.push({t0,t1}); }
+          out[eid]=segs; });
+        return out;
+      }catch(e){ return {__start:start,__end:end}; } },
+    _demoStateHist(ids,start,end){ const out={__start:start,__end:end}, span=end-start, r=a=>{ const x=Math.sin(a*99.7)*1e4; return x-Math.floor(x); };
+      ids.forEach((id,k)=>{ const segs=[];
+        if(/light/.test(id)){ segs.push({t0:start+span*0.18,t1:start+span*0.78}); }
+        else if(/pump/.test(id)){ let t=start+span*0.20; while(t<start+span*0.76){ segs.push({t0:t,t1:t+span*0.006}); t+=span*(0.045+r(t/1e6+k)*0.03); } }
+        else { let t=start+span*(0.22+k*0.02); while(t<start+span*0.74){ segs.push({t0:t,t1:t+span*0.009}); t+=span*(0.09+r(t/1e6+k)*0.04); } }
+        out[id]=segs; });
+      return out; },
+    _anSpk(lab,data,color,target,unit,dec){ const pts=data.filter(v=>v!=null);
+      if(!pts.length) return '<div class="an-spk"><span class="lab" style="color:'+color+'">'+lab+'</span><span class="v">—</span></div>';
+      let mn=Math.min(...pts), mx=Math.max(...pts); if(target!=null){ mn=Math.min(mn,target); mx=Math.max(mx,target); } const rng=(mx-mn)||1, N=data.length;
+      const X=i=>i/(N-1)*100, Y=v=>31-(v-mn)/rng*30;
+      let dd='',started=false; for(let i=0;i<N;i++){ if(data[i]==null) continue; dd+=(started?'L':'M')+X(i).toFixed(2)+' '+Y(data[i]).toFixed(2)+' '; started=true; }
+      const last=pts[pts.length-1];
+      const tgt=target==null?'':'<line x1="0" y1="'+Y(target).toFixed(2)+'" x2="100" y2="'+Y(target).toFixed(2)+'" stroke="#fbbf24" stroke-width="0.7" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/>';
+      return '<div class="an-spk"><span class="lab" style="color:'+color+'">'+lab+'</span>'
+        +'<svg viewBox="0 0 100 32" preserveAspectRatio="none">'+tgt+'<path d="'+dd.trim()+'" fill="none" stroke="'+color+'" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>'
+        +'<span class="v">'+last.toFixed(dec)+unit+(target!=null?' / '+target.toFixed(dec):'')+'</span></div>'; },
+    mountAnalyze(){ const cols=['#22d3ee','#34d399','#a78bfa'], H=this._h_an, St=this._st_an;
+      // 24h equipment-state timeline (gold = on, track bg = off)
+      if(St){ const s=St.__start,e=St.__end,sp=(e-s)||1;
+        this.anTimeline=this._anRows().map(row=>{ const segs=St[row.id]||[];
+          const bars=segs.map(g=>{ const L=Math.max(0,(g.t0-s)/sp*100), W=Math.max(0.4,(g.t1-g.t0)/sp*100); return '<span class="an-seg" style="left:'+L.toFixed(2)+'%;width:'+W.toFixed(2)+'%;background:'+row.col+'"></span>'; }).join('');
+          const on=zSt(row.id)==='on';
+          return '<div class="an-row"><span class="lab">'+row.lab+'</span><span class="an-track">'+bars+'</span><span class="nowv" style="color:'+(on?row.col:'#64748b')+'">'+(on?'on':'off')+'</span></div>'; }).join('');
+      } else this.anTimeline='<div class="an-row"><span class="lab">—</span><span class="an-track"></span><span class="nowv">—</span></div>';
+      // VWC + EC sparklines (per zone)
+      const ecT=[1,2,3].map(z=>{ const m=(zSt('select.crop_steering_zone_'+z+'_steering_mode')||'gen').toLowerCase().startsWith('veg')?'veg':'gen'; return zNum('number.crop_steering_zone_'+z+'_ec_target_'+m+'_p2'); });
+      if(H){ const s=H.__start,e=H.__end,N=80;
+        this.anVwc=[1,2,3].map((z,i)=>this._anSpk('Z'+z,this.bucketize(H['sensor.crop_steering_zone_'+z+'_vwc'],s,e,N),cols[i],null,'%',0)).join('');
+        this.anEc=[1,2,3].map((z,i)=>this._anSpk('Z'+z,this.bucketize(H['sensor.crop_steering_zone_'+z+'_ec'],s,e,N),cols[i],ecT[i],'',2)).join('');
+      } else { this.anVwc=this.anEc='<div class="an-spk"><span class="v">no history</span></div>'; }
+      // water today
+      const w=[1,2,3].map(z=>zNum('sensor.crop_steering_zone_'+z+'_daily_water_usage')||0), wmax=Math.max(...w,1);
+      this.anWater=[1,2,3].map((z,i)=>'<div class="an-bar"><span class="lab">Z'+z+'</span><span class="trk"><i style="width:'+(w[i]/wmax*100).toFixed(1)+'%;background:'+cols[i]+'"></i></span><span class="v">'+w[i].toFixed(1)+' L</span></div>').join('');
+      // VPD now vs band (0.8-1.5)
+      const vpd=num('air_vpd'), lo=0.4, hi=1.8, pct=vpd==null?0:Math.max(0,Math.min(100,(vpd-lo)/(hi-lo)*100));
+      const inb=vpd!=null&&vpd>=0.8&&vpd<=1.5, col=vpd==null?'#64748b':inb?'#34d399':(vpd<0.8?'#60a5fa':'#f87171');
+      this.anVpd='<div class="an-bar"><span class="lab">VPD</span><span class="trk">'
+        +'<span style="position:absolute;left:'+((0.8-lo)/(hi-lo)*100).toFixed(0)+'%;width:'+((1.5-0.8)/(hi-lo)*100).toFixed(0)+'%;top:0;bottom:0;background:rgba(52,211,153,.16)"></span>'
+        +'<i style="width:'+pct.toFixed(1)+'%;background:'+col+'"></i></span><span class="v">'+(vpd==null?'—':vpd.toFixed(2)+' kPa')+'</span></div>'; },
     async ensureHist(which){   // fetch REAL /api/history once per 4 min, then (re)draw the relevant charts
       const now=Date.now();
       if(this['_h_'+which] && now-this['_hts_'+which]<240000){ this.$nextTick(()=>which==='climate'?this.mountClimateCharts():this.mountTrend()); return; }
@@ -5794,7 +5847,9 @@ document.addEventListener('alpine:init', () => {
       for(let i=W;i<n-W;i++){ if(arr[i]==null) continue; let mx=true; for(let j=i-W;j<=i+W;j++){ if(arr[j]!=null&&arr[j]>arr[i]+0.01){ mx=false; break; } } if(mx&&(!peaks.length||i-peaks[peaks.length-1]>W*2)) peaks.push(i); }
       for(let k=0;k<peaks.length;k++){ const pi=peaks[k], end=k+1<peaks.length?peaks[k+1]:n-1; let ti=pi,tv=arr[pi]; for(let j=pi;j<=end;j++){ if(arr[j]!=null&&arr[j]<tv){ tv=arr[j]; ti=j; } } const db=arr[pi]-tv; if(db>=2) out.push({pi,ti,pv:arr[pi],tv,db}); }
       return out; },
-    mountTrend(){ const c=document.getElementById('trendChart'); if(!c) return; const H=this._h_dashboard; const _sp=H?(H.__end-H.__start):864e5, N=_sp>20*864e5?160:_sp>5*864e5?120:96;   // higher resolution so small drybacks show
+    mountTrend(){ const c=document.getElementById('trendChart'); if(!c) return; const H=this._h_dashboard;
+      if(H && CHARTS.trend && CHARTS.trend.$srcH===H) return;   // PERF: history only refetches every 4min — skip the 30s re-bucketize+dryback-rescan when H is unchanged
+      const _sp=H?(H.__end-H.__start):864e5, N=_sp>20*864e5?160:_sp>5*864e5?120:96;   // higher resolution so small drybacks show
       const ds=(label,data,color,axis,dash)=>({label,data,borderColor:color,backgroundColor:'transparent',borderWidth:axis==='yE'?1.4:2,tension:.15,pointRadius:0,fill:false,spanGaps:true,yAxisID:axis,borderDash:dash||[]});   // low tension = drybacks visible; EC dashed + thinner, same zone colour
       let labels,sets,dbInfo=null;
       if(H){ const s=H.__start,e=H.__end; labels=this.histLabels(s,e,N); const cols=['#22d3ee','#34d399','#a78bfa'];
@@ -5804,7 +5859,7 @@ document.addEventListener('alpine:init', () => {
         const avg=labels.map((_,i)=>{ const vs=vwc.map(d=>d.data[i]).filter(v=>v!=null); return vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:null; });
         const T=this._zoneTargets([1,2,3]); dbInfo={dbs:this._detectDrybacks(avg),vt:T.vt,et:T.et,single:false}; }
       else { const n=Math.max(HIST.vwc.length,1); labels=Array.from({length:n},()=>''); sets=[ds('Avg VWC',[...HIST.vwc],'#22d3ee','yV')]; }
-      if(CHARTS.trend){ CHARTS.trend.$dryback=dbInfo; CHARTS.trend.data.labels=labels; CHARTS.trend.data.datasets=sets; CHARTS.trend.update('none'); return; }
+      if(CHARTS.trend){ CHARTS.trend.$srcH=H; CHARTS.trend.$dryback=dbInfo; CHARTS.trend.data.labels=labels; CHARTS.trend.data.datasets=sets; CHARTS.trend.update('none'); return; }
       const drybackPlugin={id:'dryback',afterDatasetsDraw(ch){ const D=ch.$dryback; if(!D||!D.dbs||!D.dbs.length) return; const X=ch.scales.x,Y=ch.scales.yV,ctx=ch.ctx; ctx.save();
         D.dbs.forEach(d=>{ const px=X.getPixelForValue(d.pi),py=Y.getPixelForValue(d.pv),tx=X.getPixelForValue(d.ti),ty=Y.getPixelForValue(d.tv);
           ctx.fillStyle='#22d3ee'; ctx.beginPath(); ctx.arc(px,py,3.2,0,6.3); ctx.fill();
@@ -5816,12 +5871,12 @@ document.addEventListener('alpine:init', () => {
           ctx.fillStyle='#fde68a'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(lbl,tx,ly); });
         ctx.restore(); } };
       CHARTS.trend=new Chart(c,{type:'line',data:{labels,datasets:sets},
-        options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:500},interaction:{mode:'index',intersect:false},
+        options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},interaction:{mode:'index',intersect:false},
           plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:14,usePointStyle:false,font:{size:11}}},tooltip:{backgroundColor:'#11161d',callbacks:{label:x=>x.dataset.label+': '+(x.parsed.y==null?'—':x.dataset.yAxisID==='yE'?x.parsed.y.toFixed(2)+' mS/cm':x.parsed.y.toFixed(1)+'%')}}},
           scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8,autoSkip:true}},
             yV:{position:'right',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#67e8f9',font:{size:10},callback:v=>v+'%'},suggestedMin:25,suggestedMax:65,grace:'5%',title:{display:true,text:'VWC %',color:'#67e8f9',font:{size:10}}},
             yE:{position:'right',grid:{display:false},ticks:{color:'#c4b5fd',font:{size:10}},suggestedMin:0,suggestedMax:6,grace:'5%',title:{display:true,text:'pore EC',color:'#c4b5fd',font:{size:10}}}}},
-        plugins:[drybackPlugin,TGT_PLUGIN]}); CHARTS.trend.$dryback=dbInfo; },
+        plugins:[drybackPlugin,TGT_PLUGIN]}); CHARTS.trend.$dryback=dbInfo; CHARTS.trend.$srcH=H; },
 
     /* ===== AROYA-style full-width Substrate view ===== */
     async ensureSubHist(){ const R=this.RANGES[this.gRange]||{hours:24,stat:false}; const ids=[1,2,3].flatMap(z=>['sensor.crop_steering_zone_'+z+'_vwc','sensor.crop_steering_zone_'+z+'_ec']);
@@ -5866,7 +5921,7 @@ document.addEventListener('alpine:init', () => {
           ctx.fillStyle='rgba(17,22,29,.92)'; ctx.strokeStyle='rgba(251,191,36,.55)'; if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(tx-w/2,ly-8,w,16,4); ctx.fill(); ctx.stroke(); } else ctx.fillRect(tx-w/2,ly-8,w,16);
           ctx.fillStyle='#fde68a'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(lbl,tx,ly); }); ctx.restore(); } };
       const fcPlugin={id:'fc',beforeDraw(ch){ const D=ch.$dryback; if(!D||D.fc==null) return; const a=ch.chartArea,Y=ch.scales.yV,ctx=ch.ctx,y=Y.getPixelForValue(D.fc); ctx.save(); ctx.strokeStyle='rgba(52,211,153,.55)'; ctx.setLineDash([7,4]); ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(a.left,y); ctx.lineTo(a.right,y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle='#34d399'; ctx.font='600 10px Inter,sans-serif'; ctx.textAlign='left'; ctx.textBaseline='bottom'; ctx.fillText('field capacity '+D.fc.toFixed(0)+'%',a.left+6,y-3); ctx.restore(); } };
-      CHARTS.sub=new Chart(c,{type:'line',data:{labels,datasets:sets},options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:400},interaction:{mode:'index',intersect:false},
+      CHARTS.sub=new Chart(c,{type:'line',data:{labels,datasets:sets},options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},interaction:{mode:'index',intersect:false},
         plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:14,font:{size:11}}},tooltip:{backgroundColor:'#11161d',callbacks:{label:x=>x.dataset.label+': '+(x.parsed.y==null?'—':x.dataset.yAxisID==='yE'?x.parsed.y.toFixed(2)+' mS/cm':x.parsed.y.toFixed(1)+'%')}}},
         scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:10},maxTicksLimit:12,autoSkip:true}},
           yV:{position:'left',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#67e8f9',font:{size:11},callback:v=>v+'%'},suggestedMin:25,suggestedMax:65,grace:'5%',title:{display:true,text:'VWC %',color:'#67e8f9'}},
@@ -5891,7 +5946,7 @@ document.addEventListener('alpine:init', () => {
         const csLim={m,ucl,lcl,ok};
         if(CHARTS[sp.id]){ const ch=CHARTS[sp.id]; ch.$csLim=csLim; ch.data.labels=labels; const D=ch.data.datasets[0]; D.data=data; D.pointBackgroundColor=ptCol; D.pointRadius=ptRad; ch.update('none'); return; }
         CHARTS[sp.id]=new Chart(c,{type:'line',data:{labels,datasets:[{label:sp.label,data,borderColor:sp.color,backgroundColor:sp.color+'18',borderWidth:2,tension:.35,pointRadius:ptRad,pointBackgroundColor:ptCol,pointBorderWidth:0,fill:true,spanGaps:true}]},
-          options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:400},interaction:{mode:'index',intersect:false},
+          options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},interaction:{mode:'index',intersect:false},
             plugins:{legend:{display:false},tooltip:{backgroundColor:'#11161d',callbacks:{label:x=>sp.label+': '+(x.parsed.y==null?'—':x.parsed.y.toFixed(sp.unit==='ppm'?0:1)+' '+sp.unit)}}},
             scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:6,autoSkip:true}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#64748b',font:{size:10}}}}},
           plugins:[csLimPlugin]}); CHARTS[sp.id].$csLim=csLim; });
@@ -5933,7 +5988,7 @@ document.addEventListener('alpine:init', () => {
       CHARTS.zh=new Chart(cc,{type:'line',data:{labels,datasets:[
         {label:'VWC %',data:vwcD,yAxisID:'yV',borderColor:'#22d3ee',backgroundColor:'#22d3ee15',borderWidth:2,tension:.35,pointRadius:0,fill:true,spanGaps:true},
         {label:'pore EC',data:ecD,yAxisID:'yE',borderColor:'#f472b6',backgroundColor:'transparent',borderWidth:2,tension:.35,pointRadius:0,fill:false,spanGaps:true}
-      ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:this.reduced()?0:400},interaction:{mode:'index',intersect:false},
+      ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},interaction:{mode:'index',intersect:false},
         plugins:{legend:{display:true,labels:{color:'#94a3b8',boxWidth:9,usePointStyle:true,font:{size:10}}},tooltip:{backgroundColor:'#11161d',callbacks:{label:x=>x.dataset.label+': '+(x.parsed.y==null?'—':x.parsed.y.toFixed(1)+(x.dataset.yAxisID==='yV'?' %':' mS'))}}},
         scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:6,autoSkip:true}},
           yV:{position:'left',grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#22d3ee',font:{size:10},callback:v=>v+'%'}},
