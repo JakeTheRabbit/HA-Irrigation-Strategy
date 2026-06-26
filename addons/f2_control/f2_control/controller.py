@@ -502,7 +502,12 @@ class Controller:
         if fire and block:
             log(f"Z{zone} {st['phase']} BLOCKED ({block}): would {reason}")
         elif fire:
-            dur = max(5, int(size / 100.0 * self._substrate_l(zone) / max(self._zone_flow_lps(zone), 0.001)))
+            raw_dur = size / 100.0 * self._substrate_l(zone) / max(self._zone_flow_lps(zone), 0.001)
+            max_dur = self._num("number.crop_steering_max_shot_duration", 300)   # hard flood cap (s); default 300
+            dur = max(5, min(int(max_dur), int(raw_dur)))
+            if raw_dur > max_dur:   # a legit F2 shot is <60s — hitting the cap means a substrate/flow misconfig
+                self._alert(f"durcap_z{zone}", "Shot duration capped (flood guard)",
+                            f"Zone {zone}: computed {int(raw_dur)}s > {int(max_dur)}s cap — clamped. Check substrate volume / flow config.")
             log(f"Z{zone} {st['phase']} FIRE {size}% ~{dur}s — {reason}")
             self._execute_shot(zone, dur, size)
         else:
