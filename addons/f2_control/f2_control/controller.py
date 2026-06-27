@@ -91,7 +91,9 @@ class Controller:
         if zones_opt:
             self.zones = {int(k): v for k, v in zones_opt.items()}
         else:
-            n = int(o.get("num_zones", 3))
+            # auto-detect zone count from the integration's fused sensors (configure once);
+            # fall back to the option if HA isn't reachable yet at startup.
+            n = self._detect_zones(int(o.get("num_zones", 3)))
             self.zones = {
                 z: {
                     "vwc": f"sensor.crop_steering_vwc_zone_{z}",
@@ -105,8 +107,13 @@ class Controller:
             "valves": {1: "switch.f2_row1", 2: "switch.f2_row2", 3: "switch.f2_row3"},
         }
         self.hw["valves"] = {int(k): v for k, v in self.hw["valves"].items()}
-        self.lights_on_hour = float(o.get("lights_on_hour", 10))
-        self.lights_off_hour = float(o.get("lights_off_hour", 22))
+        # Lights come from the integration (number.crop_steering_lights_on_hour / _off_hour)
+        # so they're configured once in the UI; the add-on options are only a fallback.
+        self._opt_lon = float(o.get("lights_on_hour", 10))
+        self._opt_loff = float(o.get("lights_off_hour", 22))
+        self.lights_on_hour = self._opt_lon
+        self.lights_off_hour = self._opt_loff
+        self._lights_logged = False
         self.flow_lps = float(o.get("flow_lps", 0.04))     # fallback only — real flow is computed live per zone
         self.substrate_l = float(o.get("substrate_l", 9))  # fallback only — real volume read live from the integration
         self.enable_flag = o.get("enable_flag", "input_boolean.f2_control_enabled")  # the KILL SWITCH (must be ON)
@@ -204,6 +211,26 @@ class Controller:
             return self._num(per, default)
         return self._num(f"number.crop_steering_{suffix}", default)
 
+    def _num_or_none(self, entity):
+        """Read a number entity as float, or None if it doesn't exist / isn't a number."""
+        v, _, _ = ha_get(entity)
+        try:
+            return float(v) if v not in (None, "unknown", "unavailable", "") else None
+        except Exception:
+            return None
+
+    def _detect_zones(self, fallback):
+        """Count zones from the integration's fused VWC sensors. Returns the number of
+        consecutive sensor.crop_steering_vwc_zone_N that exist, or `fallback` if none do
+        (e.g. HA not reachable yet at startup)."""
+        n = 0
+        for z in range(1, 25):
+            state, _, _ = ha_get(f"sensor.crop_steering_vwc_zone_{z}")
+            if state is None:
+                break
+            n += 1
+        return n or fallback
+
     def _on(self, entity, default=False):
         v, _, _ = ha_get(entity)
         if v in (None, "unknown", "unavailable", ""):
@@ -267,6 +294,30 @@ class Controller:
 
     def _grow_day_start(self, now):
         return now.date() if (now.hour + now.minute / 60.0) >= self.lights_on_hour else (now - timedelta(days=1)).date()
+
+    def _refresh_lights(self):
+        """Lights are configured once in the integration. Read them live from
+        number.crop_steering_lights_on_hour / _off_hour each loop, falling back to the
+        add-on option if the entities are missing. Log the source once, and alert once if
+        the integration value disagrees with the (now-legacy) add-on option."""
+        lon = self._num_or_none("number.crop_steering_lights_on_hour")
+        loff = self._num_or_none("number.crop_steering_lights_off_hour")
+        if lon is not None and loff is not None:
+            src = "integration"
+        else:
+            lon, loff, src = self._opt_lon, self._opt_loff, "add-on option (integration entity missing)"
+        if not self._lights_logged:
+            log(f"config: lights {int(lon)}:00-{int(loff)}:00 (source: {src})")
+            if src == "integration" and (lon != self._opt_lon or loff != self._opt_loff):
+                self._alert(
+                    "lights_source",
+                    "Lights now read from the integration",
+                    f"Engine uses {int(lon)}:00-{int(loff)}:00 from the integration. The add-on "
+                    f"option still says {int(self._opt_lon)}:00-{int(self._opt_loff)}:00 — if the "
+                    "integration value is wrong, set number.crop_steering_lights_on_hour / _off_hour.",
+                )
+            self._lights_logged = True
+        self.lights_on_hour, self.lights_off_hour = float(lon), float(loff)
 
     # ---------- params + snapshot ----------
     def _params(self, zone):
@@ -537,6 +588,7 @@ class Controller:
     def loop_once(self, now):
         if self._busy:
             return
+        self._refresh_lights()
         lights_on = self._lights_on(now)
         was_off = not (self._was_lights_on if self._was_lights_on is not None else lights_on)
         lights_just_on = lights_on and was_off

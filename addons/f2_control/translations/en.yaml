@@ -1,22 +1,23 @@
 configuration:
   num_zones:
-    name: Number of zones
+    name: Number of zones (fallback)
     description: >-
-      How many irrigation zones to steer. The engine reads each zone's FUSED sensors
-      sensor.crop_steering_vwc_zone_N and sensor.crop_steering_ec_zone_N, which the
-      integration builds by averaging every probe you map to that zone. So to add more
-      probes per zone, add them in the integration (Crop Steering) UI - not here.
+      Normally AUTO-DETECTED from the integration's sensor.crop_steering_vwc_zone_N. This
+      value is only used if Home Assistant isn't reachable at startup. Add more probes per
+      zone in the Crop Steering UI - the engine reads each zone's FUSED
+      sensor.crop_steering_vwc_zone_N / ec_zone_N (an average of every probe you map).
   lights_on_hour:
-    name: Lights-on hour
+    name: Lights-on hour (fallback)
     description: >-
-      Hour of the day (0-23, local time) your grow lights turn ON. This starts
-      each grow-day - the daily water and shot counters reset at lights-on.
-      Example: 10 means 10:00 am.
+      Lights are read live from the integration (number.crop_steering_lights_on_hour) so you
+      set them ONCE in the Crop Steering UI. This option is only a fallback used if that
+      entity is missing. Hour 0-23; lights-on starts the grow-day.
   lights_off_hour:
-    name: Lights-off hour
+    name: Lights-off hour (fallback)
     description: >-
-      Hour (0-23) your lights turn OFF. At lights-off the engine forces every
-      zone into the overnight dry-back phase (P3). Example: 22 means 10:00 pm.
+      Fallback only - lights are read live from the integration
+      (number.crop_steering_lights_off_hour). Hour 0-23; at lights-off every zone is forced
+      into the overnight dry-back phase (P3).
   enable_flag:
     name: Kill-switch entity
     description: >-
