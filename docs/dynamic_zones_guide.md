@@ -2,184 +2,213 @@
 
 ## Overview
 
-The Crop Steering System supports dynamic zone configuration, allowing you to configure anywhere from 1 to 6 irrigation zones based on your actual setup. The system automatically creates all necessary entities and adjusts its operation based on your configured zones.
+The Crop Steering integration supports a **variable number of irrigation zones**.
+You declare zones in your `crop_steering.env` file (or the setup wizard) and the
+integration auto-detects the count, then creates every per-zone entity for you.
+There is no fixed zone limit in practice — the config-flow allows 1–24 zones and
+the `.env` parser simply counts the `ZONE_N_SWITCH` entries it finds.
 
-## Key Features
+The live engine (the **f2-control add-on**) reads those same per-zone entities and
+runs the P0→P1→P2→P3 phase logic **independently for every configured zone, every
+cycle**. Zones are not chosen by a scoring algorithm — each one is evaluated on its
+own readings on each ~60 s poll.
 
-### 🚀 Dynamic Zone Support
-- Configure 1-6 zones based on your actual hardware
-- Automatic entity creation for each configured zone
-- Zone-specific sensors, switches, and analytics
-- Intelligent zone selection for optimal irrigation
+> This guide is the per-zone reference. For end-to-end setup see
+> `docs/AGENT_INSTALL.md` and the README; for the entity catalogue see `ENTITIES.md`.
 
-### 🔧 Flexible Configuration
-- Recommended: Configure through the GUI setup wizard
-- Optional: Load zones from an existing `crop_steering.env` file
-- Per-zone sensor configuration (front/back VWC and EC)
-- Zone enable/disable switches for seasonal adjustments
+## How zone count is detected
 
-### 📊 Per-Zone Monitoring
-- Individual VWC and EC readings per zone
-- Zone status indicators
-- Last irrigation tracking
-- Zone-specific analytics and history
+The integration scans `crop_steering.env` for keys matching `ZONE_<N>_SWITCH`.
+Every distinct `<N>` that has a valid switch (and at least one VWC and one EC
+sensor) becomes a zone. Zone numbers may be sparse — `ZONE_1`, `ZONE_3`, `ZONE_5`
+is detected as 3 zones. The detected count is stored as `num_zones` and drives how
+many of each per-zone entity get created.
 
-## Configuration Methods
+`custom_components/crop_steering/env_parser.py` is the single source of truth for
+this parsing.
 
-### Method 1: GUI Configuration (Recommended)
+## Configuration methods
 
-1. Go to Settings → Devices & Services
-2. Add the “Crop Steering System” integration
-3. Choose “Advanced Setup”
-4. Configure hardware and zones:
-   - Pump and main line entities
-   - Zone valve entities
-   - Optional per-zone sensors: VWC (front/back), EC (front/back)
-5. Finish and reload Home Assistant if prompted
+### Method 1: Load from crop_steering.env (recommended)
 
-### Method 2: Load from crop_steering.env (Existing setups)
+1. Copy `crop_steering.env.example` to `/config/crop_steering.env`.
+2. Fill in your hardware, zones, and per-zone sensors.
+3. Add the **Crop Steering System** integration and choose
+   **"Load from crop_steering.env file"**.
+4. The integration parses the file, reports how many zones it detected, and
+   creates all entities.
 
-1. Place `crop_steering.env` in your Home Assistant config directory
-2. Start the integration setup and choose “Load from file”
-3. The integration will parse zones and sensors from the file
+### Method 2: Setup wizard (manual UI entry)
 
-Example entries:
+Add the integration and pick **Advanced Setup** instead, then enter the zone count
+and map pump / main line / per-zone valve and sensor entities by hand. The `.env`
+path is preferred because it auto-detects the zone count and is easy to re-edit.
+
+## Per-zone .env keys
+
+Required per zone:
+
 ```env
-ZONE_1_SWITCH=switch.zone_1_valve
-ZONE_1_VWC_FRONT=sensor.z1_vwc_front
-ZONE_1_VWC_BACK=sensor.z1_vwc_back
-ZONE_1_EC_FRONT=sensor.z1_ec_front
-ZONE_1_EC_BACK=sensor.z1_ec_back
-
-ZONE_2_SWITCH=switch.zone_2_valve
-# ... etc
+ZONE_1_SWITCH=switch.irrigation_relay_1
 ```
 
-## Created Entities
+Sensors — two accepted formats:
 
-For each configured zone, the system creates:
+```env
+# Flexible (preferred): comma-separated list of any length; all valid
+# readings are averaged.
+ZONE_1_VWC_SENSORS=sensor.z1_vwc_a,sensor.z1_vwc_b,sensor.z1_vwc_c
+ZONE_1_EC_SENSORS=sensor.z1_ec_a,sensor.z1_ec_b
+
+# Legacy front/back pair (still supported):
+ZONE_1_VWC_FRONT=sensor.vwc_zone_1_front
+ZONE_1_VWC_BACK=sensor.vwc_zone_1_back
+ZONE_1_EC_FRONT=sensor.ec_zone_1_front
+ZONE_1_EC_BACK=sensor.ec_zone_1_back
+```
+
+If both formats are present, `VWC_SENSORS` / `EC_SENSORS` win. A zone is skipped
+(with a warning in the log) if it has no switch, no VWC sensor, or no EC sensor.
+
+Optional per-zone tunables (defaults shown):
+
+```env
+ZONE_1_PLANT_COUNT=4          # plants in the zone — scales shot volume
+ZONE_1_MAX_DAILY_VOLUME=20.0  # liters/day safety cap
+ZONE_1_SHOT_MULTIPLIER=1.0    # per-zone shot-size adjustment factor
+```
+
+## Entities created per zone
+
+For each configured zone `X`, the integration creates:
 
 ### Switches
-- `switch.crop_steering_zone_X_enabled` - Enable/disable zone
-- `switch.crop_steering_zone_X_manual_override` - Manual control mode
+- `switch.crop_steering_zone_X_enabled` — enable / disable the zone
+- `switch.crop_steering_zone_X_manual_override` — manual control mode
+- `switch.crop_steering_zone_X_dripper_protection` — blocked-dripper guard
+  (ON = abandon emergency irrigation for the row after repeated failed shots)
 
 ### Sensors
-- `sensor.crop_steering_vwc_zone_X` - Average VWC for the zone
-- `sensor.crop_steering_ec_zone_X` - Average EC for the zone
-- `sensor.crop_steering_zone_X_status` - Zone operational status
-- `sensor.crop_steering_zone_X_last_irrigation` - Last irrigation timestamp
+- `sensor.crop_steering_vwc_zone_X` — averaged VWC for the zone
+- `sensor.crop_steering_ec_zone_X` — averaged EC for the zone
+- `sensor.crop_steering_zone_X_status` — zone operational status
+- `sensor.crop_steering_zone_X_last_irrigation` — last irrigation timestamp
+- `sensor.crop_steering_zone_X_daily_water_usage` — liters today
+- `sensor.crop_steering_zone_X_weekly_water_usage` — liters this week
+- `sensor.crop_steering_zone_X_irrigation_count_today` — shot count today
 
-### Global Sensors
-- `sensor.crop_steering_configured_avg_vwc` - Average VWC across all zones
-- `sensor.crop_steering_configured_avg_ec` - Average EC across all zones
+### Per-zone selects / numbers
+- `select.crop_steering_zone_X_phase_control` — Auto / P0 / P1 / P2 / P3 manual pin
+- `select.crop_steering_zone_X_steering_mode` — Vegetative / Generative
+- Per-zone `number.crop_steering_zone_X_*` tunables (substrate volume, thresholds)
 
-## Zone Selection Logic
+### Global (across all configured zones)
+- `sensor.crop_steering_configured_avg_vwc` — average VWC across all zones
+- `sensor.crop_steering_configured_avg_ec` — average EC across all zones
 
-The system intelligently selects which zone to irrigate based on:
+See `ENTITIES.md` for the full list.
 
-1. Zone Enable Status
-2. VWC Need Score
-3. Sensor Reliability
-4. Last Irrigation Time
+## How zones run
 
-Selection Algorithm:
-```python
-need_score = (70 - avg_vwc) / 70
-reliability_score = 1 - (sensor_variance / 10)
-zone_score = need_score * 0.7 + reliability_score * 0.3
-```
+The f2-control add-on polls HA every ~60 s and, for **each** configured zone:
 
-## Services
+1. Skips the zone if `switch.crop_steering_zone_X_enabled` is OFF.
+2. Reads the zone's averaged VWC/EC and its current phase.
+3. Runs that zone's P0→P1→P2→P3 logic and decides whether a shot is due.
+4. If a shot is due, runs the hardware sequence (pump → main line → zone valve)
+   with fail-closed safety checks.
 
-### execute_irrigation_shot
-Accepts dynamic zone numbers:
+All actuation is gated by the global kill switch `input_boolean.f2_control_enabled`
+(OFF = safe, no hardware writes). Each zone is independent — there is no
+"pick one zone to irrigate" arbitration.
+
+## Requesting a manual shot
+
+`crop_steering.execute_irrigation_shot` accepts any configured zone number:
+
 ```yaml
 service: crop_steering.execute_irrigation_shot
 data:
   zone: 2
   duration_seconds: 300
-  shot_type: P2
+  shot_type: P2            # P1 | P2 | P3_emergency (optional)
 ```
 
-## AppDaemon Integration
-
-The AppDaemon modules automatically detect and use configured zones:
-- `master_crop_steering_app.py` – uses zone configuration from env/GUI
-- `intelligent_sensor_fusion.py` – validates sensors per zone
-- `advanced_dryback_detection.py` – dryback and trend analysis
-- `intelligent_crop_profiles.py` – profile parameters
+The integration fires the irrigation event; the f2-control add-on performs the
+actual hardware sequence with its safety checks. The integration never drives
+hardware directly.
 
 ## Troubleshooting
 
-### Missing Zone Entities
-1. Ensure entity IDs are correct in GUI or env file
-2. Verify referenced entities exist in Home Assistant
-3. Restart Home Assistant after configuration changes
+### Missing zone entities
+1. Confirm each zone has a valid `ZONE_N_SWITCH` plus at least one VWC and one EC
+   sensor — zones missing any of these are silently skipped (check the log).
+2. Verify the referenced entity IDs exist in Home Assistant.
+3. Reload the integration (Developer Tools → YAML → Reload Custom Components) or
+   restart HA after editing `.env`.
 
-### Zone Not Irrigating
-1. Check `switch.crop_steering_zone_X_enabled`
-2. Verify zone sensors return numeric values
-3. Confirm zone valve entity responds to commands
-4. Review logs for zone selection details
+### Zone not irrigating
+1. Check `switch.crop_steering_zone_X_enabled` is ON.
+2. Confirm `input_boolean.f2_control_enabled` is ON (the global kill switch).
+3. Verify the zone's VWC/EC sensors return numeric values (not `unavailable` /
+   `unknown`).
+4. Confirm the zone valve entity responds to commands.
+5. Check the add-on log for that zone's phase decision.
 
-### Sensor Validation Errors
-1. Ensure sensor entities return numeric values
-2. Check sensor units (VWC: %, EC: mS/cm)
-3. Verify sensors aren’t `unavailable` or `unknown`
+### Sensor validation errors
+1. Sensors must return numeric values; check units (VWC %, EC mS/cm).
+2. Averaging ignores `unavailable` / `unknown` readings but a zone with **no**
+   valid VWC or EC will be skipped.
 
-## Best Practices
+## Best practices
 
-### Sensor Placement
-- Use both front and back sensors when possible
-- Place sensors at root level in substrate
-- Ensure good sensor-to-substrate contact
-- Calibrate sensors before use
+### Sensor placement
+- Use multiple VWC/EC sensors per zone where possible (the `VWC_SENSORS` /
+  `EC_SENSORS` list format averages them).
+- Place sensors at root level in the substrate with good substrate contact.
+- Calibrate sensors before use.
 
-### AppDaemon v15+ File Locations
-- Automation Modules: `/addon_configs/a0d7b954_appdaemon/apps/crop_steering/`
-- Configuration: `/addon_configs/a0d7b954_appdaemon/appdaemon.yaml`
-- Apps Config: `/addon_configs/a0d7b954_appdaemon/apps/apps.yaml`
-- Samba Access: `\\YOUR_HA_IP\addon_configs\a0d7b954_appdaemon`
-
-### Zone Configuration
-- Start with fewer zones and expand as needed
-- Group plants with similar water needs in same zone
-- Consider growth stages when zoning
-- Use zone enable switches for seasonal changes
+### Zone configuration
+- Group plants with similar water needs into the same zone.
+- Set `ZONE_N_PLANT_COUNT` accurately — it scales shot volume; a wrong count makes
+  shots too short and short-cycles the pump.
+- Use the per-zone enable switch for seasonal changes.
 
 ### Monitoring
-- Check zone status sensors daily
-- Monitor per-zone VWC/EC trends
-- Adjust thresholds based on zone performance
-- Use manual override for testing
+- Watch per-zone status and VWC/EC trends.
+- Use manual override / `execute_irrigation_shot` for testing a single zone.
 
-## Example Configurations
+## Example configurations
 
-### Single Zone Setup
+### Single zone
 ```env
+PUMP_SWITCH=switch.veg_main_pump
+MAIN_LINE_SWITCH=switch.espoe_irrigation_relay_2_3
+
 ZONE_1_SWITCH=switch.greenhouse_valve
-ZONE_1_VWC_FRONT=sensor.teros12_moisture
-ZONE_1_EC_FRONT=sensor.teros12_ec
+ZONE_1_VWC_SENSORS=sensor.teros12_moisture
+ZONE_1_EC_SENSORS=sensor.teros12_ec
+ZONE_1_PLANT_COUNT=36
 ```
 
-### Three Zone Setup
+### Three zones
 ```env
-ZONE_1_SWITCH=switch.veg_table_valve
+PUMP_SWITCH=switch.veg_main_pump
+MAIN_LINE_SWITCH=switch.espoe_irrigation_relay_2_3
+
+ZONE_1_SWITCH=switch.f2_row1
 ZONE_1_VWC_FRONT=sensor.veg_vwc_1
 ZONE_1_VWC_BACK=sensor.veg_vwc_2
 ZONE_1_EC_FRONT=sensor.veg_ec_1
+ZONE_1_PLANT_COUNT=36
 
-ZONE_2_SWITCH=switch.flower1_valve
-ZONE_2_VWC_FRONT=sensor.f1_vwc_front
-ZONE_2_VWC_BACK=sensor.f1_vwc_back
-ZONE_2_EC_FRONT=sensor.f1_ec_front
-ZONE_2_EC_BACK=sensor.f1_ec_back
+ZONE_2_SWITCH=switch.f2_row2
+ZONE_2_VWC_SENSORS=sensor.f1_vwc_front,sensor.f1_vwc_back
+ZONE_2_EC_SENSORS=sensor.f1_ec_front,sensor.f1_ec_back
+ZONE_2_PLANT_COUNT=36
 
-ZONE_3_SWITCH=switch.flower2_valve
+ZONE_3_SWITCH=switch.f2_row3
 ZONE_3_VWC_FRONT=sensor.f2_vwc_front
 ZONE_3_EC_FRONT=sensor.f2_ec_front
+ZONE_3_PLANT_COUNT=36
 ```
-
-## AppDaemon v15+ Compatibility
-
-Fully compatible with AppDaemon v15+ directory changes.

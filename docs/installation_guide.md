@@ -305,7 +305,6 @@ Once you flip the kill switch `input_boolean.f2_control_enabled` **ON**, the sys
 
 ### 📚 Learn More
 - **[Operation Guide](operation_guide.md)** - How to use your system day-to-day
-- **[Dashboard Guide](dashboard_guide.md)** - Understanding the monitoring interface
 - **[Troubleshooting Guide](troubleshooting.md)** - Solutions to common issues
 
 ### 🆘 Need Help?

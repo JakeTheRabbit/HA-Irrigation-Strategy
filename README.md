@@ -511,7 +511,7 @@ Full routine: `docs/operation_guide.md`. Mental model: `docs/SYSTEM_OVERVIEW.md`
 | `intelligent_sensor_fusion.py` | Multi-sensor averaging + outlier rejection |
 | `intelligent_crop_profiles.py` | Per-crop / per-stage parameter profiles |
 | `adaptive_steering.py` | Optional self-tuning layer (Vmax, dryback-derived P2, predictive P3) |
-| `ml_irrigation_predictor.py` | Trend-analysis scaffold — **currently inert** (see [`docs/CODE_REVIEW_FINDINGS.md`](docs/CODE_REVIEW_FINDINGS.md)); the live engine is deterministic |
+| `ml_irrigation_predictor.py` | Trend-analysis scaffold — **currently inert**; the live engine is deterministic |
 | `base_async_app.py` | Async base class shared by the modules |
 
 ```
@@ -547,7 +547,6 @@ tests/ · crop-steering-engine/tests/   # unit tests (integration helpers + the 
 - **`docs/installation_guide.md`** — the long-form install walkthrough
 - **`docs/operation_guide.md`** — daily operator routine
 - **`docs/troubleshooting.md`** — when something's off
-- **`docs/CODE_REVIEW_FINDINGS.md`** — engine review: what's verified, what's inert, what's tracked
 - **`ENTITIES.md`** — every entity, explained
 - **`www/system-map.html`** — interactive 3D map of the architecture + data flow
 
