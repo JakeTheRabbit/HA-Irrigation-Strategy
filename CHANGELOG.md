@@ -11,6 +11,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### f2-control add-on 0.4.0
+
+**🌱 In plain English.** The dashboards now come *inside* the add-on — no more copying
+`f2.html` to `/config/www` over Samba or SSH. After you install the add-on, **F2 Crop
+Steering** appears in your Home Assistant sidebar; open it and you get a Live/Demo chooser.
+**Live** reads your real sensors using your existing HA login (nothing to paste, no URL to
+edit — it works in the mobile app), and **Demo** shows mock data so you can look around
+safely. Thanks to @ChillingSilence (Chill-Division) for the idea (PR #1).
+
+**🔧 Technical notes.**
+- `config.yaml`: `ingress: true`, `ingress_port: 8420`, `panel_icon: mdi:sprout`,
+  `panel_title: F2 Crop Steering`; version 0.3.0 → 0.4.0.
+- `Dockerfile`: `apk add nginx`; serve `/www/public` on 8420; `sed` strips CRLF from `run.sh`
+  (a Windows-checkout shebang issue that otherwise breaks the s6 launch).
+- `run.sh`: starts nginx (daemonizes) then `exec`s the controller as the foreground process,
+  so its SIGTERM safe-valve-off still fires on stop. No s6 service files — avoids the
+  s6-overlay v2/v3 `services.d` ambiguity; nginx dying never touches the engine.
+- `nginx.conf`: static, read-only, gz, logs to stdout; reachable **only** through HA ingress
+  (no `ports:` mapping → not exposed to the LAN).
+- `web-index.html`: the in-panel Live/Demo landing. Live uses `getToken()` →
+  `localStorage.hassTokens` (same origin under ingress) with a one-time token-paste fallback.
+- Single source of truth: `scripts/publish_addon.sh` assembles the add-on web root from the
+  repo `www/` at publish time (no duplicate dashboards committed in the monorepo).
+- **Verified:** `docker build` against `ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20`
+  + run → engine boots (`[f2-control] starting … loop 60s`) **and** nginx serves the dashboards
+  (landing/f2.html/overview 200, unknown path 404). Live-data-through-ingress is the operator's
+  on-box check.
+
 ### f2-control add-on 0.3.0
 
 **🌱 In plain English.** The add-on now has a proper name (“F2 Crop Steering”) and a custom

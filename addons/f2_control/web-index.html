@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F2 Crop Steering</title>
+<style>
+  :root{--bg:#0e1320;--card:#171a21;--edge:#2b313b;--txt:#e6e8eb;--dim:#8b929c;--acc:#4fc3f7;--grn:#43a047}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;padding:32px 18px}
+  main{max-width:640px;margin:0 auto}
+  h1{font-size:1.5rem;margin:0 0 2px;display:flex;align-items:center;gap:10px}
+  .logo{width:30px;height:30px}
+  .sub{color:var(--dim);margin:0 0 24px;font-size:.92rem}
+  a.card{display:block;background:var(--card);border:1px solid var(--edge);border-radius:12px;padding:16px 18px;margin-bottom:12px;text-decoration:none;color:var(--txt);transition:border-color .15s}
+  a.card:hover{border-color:var(--acc)}
+  a.primary{border-color:var(--grn)}
+  .t{font-weight:700;font-size:1.05rem}
+  .t .b{font-size:.66rem;font-weight:800;color:#06222e;background:var(--acc);border-radius:999px;padding:2px 8px;margin-left:8px;vertical-align:2px}
+  .t .b.g{background:var(--grn);color:#06220c}
+  .d{color:var(--dim);font-size:.86rem;margin-top:4px;line-height:1.45}
+  h2{font-size:.74rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:26px 0 10px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .grid a{margin-bottom:0}
+  .note{color:var(--dim);font-size:.8rem;margin-top:20px;line-height:1.5}
+</style>
+</head>
+<body>
+<main>
+  <h1>
+    <svg class="logo" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M128 28 C 168 96, 196 132, 196 166 a 68 68 0 1 1 -136 0 C 60 132, 88 96, 128 28 Z" fill="#1e9bd7"/>
+      <path d="M128 150 m -26 -10 C -2 -36, -2 28, 0 44 Z" fill="none"/>
+      <g transform="translate(128 150) rotate(-18)"><path d="M0 -42 C 28 -27, 28 24, 0 40 C -28 24, -28 -27, 0 -42 Z" fill="#5cc46e"/></g>
+    </svg>
+    F2 Crop Steering
+  </h1>
+  <p class="sub">The operator dashboards, served straight from the add-on. Live uses your Home
+  Assistant login automatically — nothing to paste, no URL to edit.</p>
+
+  <a class="card primary" href="./f2.html">
+    <div class="t">Open dashboard (Live)<span class="b g">live</span></div>
+    <div class="d">The full F2 console — Status, Zones, Tune, Climate, Operate, Plan — reading your
+    real sensors. If your login token isn't picked up automatically, it asks once and remembers it.</div>
+  </a>
+  <a class="card" href="./f2.html?demo">
+    <div class="t">Open dashboard (Demo)<span class="b">demo</span></div>
+    <div class="d">The same dashboard on baked-in "perfect grow" mock data. No sensors, no token —
+    a safe way to look around.</div>
+  </a>
+
+  <h2>Other pages</h2>
+  <div class="grid">
+    <a class="card" href="./overview.html"><div class="t">Mobile vitals</div><div class="d">One-page status, phone-sized.</div></a>
+    <a class="card" href="./setpoints.html"><div class="t">Setpoint planner</div><div class="d">Per-stage recipe table.</div></a>
+    <a class="card" href="./system-map.html"><div class="t">System map</div><div class="d">Interactive 3D architecture.</div></a>
+    <a class="card" href="./irrigation-manual.html"><div class="t">Manual</div><div class="d">How crop steering works.</div></a>
+  </div>
+
+  <p class="note">Served through Home Assistant ingress (authenticated; never exposed to your
+  LAN). The engine runs independently of this page — closing it never stops irrigation.</p>
+</main>
+</body>
+</html>
