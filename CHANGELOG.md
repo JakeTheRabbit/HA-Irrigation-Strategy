@@ -38,6 +38,28 @@ problem.
   of every config and options step (zones 1–24 + all hardware), plus menu labels.
 - Bumped integration `manifest.json` 2.6.0 → 2.7.0 (README badge + this changelog in sync).
 
+### f2-control add-on 0.6.0
+
+**🌱 In plain English.** Configure once. The engine now reads your **lights hours** and
+**zone count** straight from the integration, so you set them in the Crop Steering UI and the
+add-on just follows — no more keeping the add-on options and the integration in sync (the
+class of bug behind the "lights were 2 hours off" problem). The add-on options for these
+become fallbacks used only if the integration isn't reachable.
+
+**🔧 Technical notes.**
+- `controller.py`: zone count is auto-detected from `sensor.crop_steering_vwc_zone_N`
+  (`_detect_zones`, fallback to the `num_zones` option). Lights are read **live each loop**
+  from `number.crop_steering_lights_on_hour` / `_off_hour` (`_refresh_lights`), fallback to
+  the add-on option; the startup log prints the resolved hours + source, and alerts once if
+  the integration value disagrees with the legacy option.
+- config.yaml 0.5.0 → 0.6.0; `num_zones` / `lights_*` options relabelled as fallbacks.
+- **Operator note (live grow):** the engine now reads `number.crop_steering_lights_on_hour`/
+  `_off_hour`. Set those on the dashboard to your real hours **before arming** — the add-on
+  log shows `config: lights HH:00-HH:00 (source: …)`; confirm it's right. If the integration
+  entity is missing it transparently falls back to the add-on option.
+- Verified: `docker build` + run against the HA base image → engine boots and logs
+  `config: lights 10:00-22:00 (source: add-on option …)`; no crash; state tests 5/5.
+
 ### f2-control add-on 0.5.0
 
 **🌱 In plain English.** The engine now reads each zone's sensors from the integration's
