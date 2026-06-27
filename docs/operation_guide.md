@@ -2,20 +2,45 @@
 
 This guide covers daily operation and monitoring of your Crop Steering System for optimal plant health and water efficiency.
 
+> **Who runs the show.** The live autonomous engine is the **f2-control add-on**
+> (`addons/f2_control/`) — a single Python process that polls Home Assistant every
+> 60 s and drives the hardware. The HA integration only provides the entities and
+> setpoints; it never touches hardware. Everything below assumes the add-on is
+> installed, configured, and **armed** (see the kill switch, next).
+
+## ⏻ Arm / disarm (kill switch)
+
+The whole engine is gated by one boolean:
+
+- **`input_boolean.f2_control_enabled`**
+  - **OFF = safe.** The add-on still runs and reports, but performs **no actuation** —
+    no pump, no valves, no shots. This is the disarmed / standby state.
+  - **ON = armed.** The engine executes phase logic and drives hardware.
+
+Flip it from the dashboard or **Developer Tools → States** before you expect the
+system to water. Turning it OFF is the fastest way to stop all irrigation without
+touching the hardware or the add-on.
+
+> `switch.crop_steering_system_enabled` (and the per-zone
+> `switch.crop_steering_zone_X_enabled` switches) are the integration-level
+> enables surfaced on the dashboard. The hard safety stop is
+> `input_boolean.f2_control_enabled` — when in doubt, that's the one to pull.
+
 ## 🔄 Daily Operation Cycle
 
 ### Understanding the 4-Phase System
 
-Your system automatically cycles through 4 phases each day when AppDaemon is installed:
+When armed, the engine cycles each zone independently through 4 phases per
+photoperiod:
 
 **P0 - Morning Dryback (Lights On)**
 - Controlled drying after lights turn on
-- No irrigation until dryback target is reached
+- No irrigation until the dryback target (% drop from peak VWC) is reached
 - Duration: 30 minutes to 2+ hours (configurable)
 
-**P1 - Ramp-Up** 
+**P1 - Ramp-Up**
 - Progressive irrigation with increasing shot sizes
-- Continues until VWC target is achieved
+- Continues until the per-zone VWC target is achieved
 - Shots: 3-10 maximum with size progression
 
 **P2 - Maintenance (Main Day Period)**
@@ -28,14 +53,17 @@ Your system automatically cycles through 4 phases each day when AppDaemon is ins
 - Emergency-only irrigation
 - Prepares plants for lights-off period
 
+> The daily water + shot counters reset at the **P3 → P0 transition (lights-on)** —
+> the real grow-day boundary — not at calendar midnight.
+
 ## 📊 Daily Monitoring Routine
 
 ### Morning Check (First 30 minutes after lights-on)
 
 **System Status:**
 - Check `sensor.crop_steering_current_phase` shows "P0"
-- Verify `switch.crop_steering_system_enabled` is ON
-- Confirm all zone switches are enabled
+- Verify `input_boolean.f2_control_enabled` is ON (armed)
+- Confirm all zone switches (`switch.crop_steering_zone_X_enabled`) are on
 
 **Sensor Readings:**
 - VWC should be stable from overnight (typically 50-65%)
@@ -71,12 +99,12 @@ Your system automatically cycles through 4 phases each day when AppDaemon is ins
 ### Key Parameters to Monitor
 
 **VWC Targets:**
-- `number.crop_steering_p1_target_vwc`: Target for end of P1 (default ~60%)
-- `number.crop_steering_p2_vwc_threshold`: Trigger for P2 irrigation (default ~58%)
+- `number.crop_steering_p1_target_vwc`: Target for end of P1 (default 65%)
+- `number.crop_steering_p2_vwc_threshold`: Trigger for P2 irrigation (default 60%)
 
 **Shot Sizes:**
-- `number.crop_steering_p1_initial_shot_size`: Starting shot volume (default 5%)
-- `number.crop_steering_p2_shot_size`: Maintenance shot volume (default 3%)
+- `number.crop_steering_p1_initial_shot_size`: Starting shot volume (default 2%)
+- `number.crop_steering_p2_shot_size`: Maintenance shot volume (default 5%)
 
 **Dryback Control:**
 
@@ -86,8 +114,8 @@ Your system automatically cycles through 4 phases each day when AppDaemon is ins
 
 - `number.crop_steering_veg_p0_dryback_drop_pct`: Vegetative endpoint, default 12 %.
 - `number.crop_steering_gen_p0_dryback_drop_pct`: Generative endpoint, default 22 %.
-- `number.crop_steering_veg_dryback_target` / `gen_dryback_target`: legacy aliases (same semantic, kept for backward compatibility).
-- `number.crop_steering_p0_dryback_drop_percent`: interpolated current target, written by the IntentResolver every tick — read by the legacy P0-exit predicate.
+- `number.crop_steering_vegetative_dryback_target` / `generative_dryback_target`: legacy aliases (same semantic, kept for backward compatibility).
+- `number.crop_steering_p0_dryback_drop_percent`: interpolated current target, written by the engine every tick — read by the legacy P0-exit predicate.
 
 **Cultivator Intent:**
 
@@ -126,9 +154,10 @@ data:
 ```
 
 **System Offline:**
-- Check AppDaemon is running
-- Verify Home Assistant integration is active
-- Test hardware entities manually
+- Check the **f2-control add-on** is running (Settings → Add-ons → f2-control, or `ha addons logs <f2_control_slug>`)
+- Confirm `input_boolean.f2_control_enabled` is ON (armed) — a disarmed engine reports but never waters
+- Verify the Home Assistant integration is active
+- Test hardware entities manually (pump / mainline / zone valves)
 
 ### Yellow Warnings (Monitor Closely)
 
@@ -190,7 +219,7 @@ data:
 service: crop_steering.transition_phase
 data:
   target_phase: "P2"  # Force specific phase
-  forced: true
+  forced: true        # Bypass transition-condition checks
 ```
 
 **Zone Override:**
@@ -201,6 +230,9 @@ data:
   enable: true
   timeout_minutes: 60  # Auto-disable after 1 hour
 ```
+
+While a zone is overridden, the autonomous engine leaves it alone until the
+override is cleared (or the timeout expires).
 
 ### When to Use Manual Control
 
