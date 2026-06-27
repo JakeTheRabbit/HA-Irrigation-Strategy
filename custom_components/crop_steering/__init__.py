@@ -10,7 +10,6 @@ try:
     from homeassistant.const import Platform
     from homeassistant.core import HomeAssistant
     from homeassistant.exceptions import ConfigEntryNotReady
-    from homeassistant.helpers import entity_registry as er
 except ImportError:  # pragma: no cover - enables non-HA unit tests
     ConfigEntry = Any  # type: ignore
     HomeAssistant = Any  # type: ignore

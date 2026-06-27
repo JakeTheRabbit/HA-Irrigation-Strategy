@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 import voluptuous as vol
 
@@ -168,7 +167,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             
             # Get configuration values
             p1_target_vwc = float(hass.states.get("number.crop_steering_p1_target_vwc").state)
-            p2_threshold = float(hass.states.get("number.crop_steering_p2_vwc_threshold").state)
             ec_flush_target = float(hass.states.get("number.crop_steering_ec_target_flush").state)
             
             transition_reasons = []

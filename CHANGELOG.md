@@ -11,6 +11,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-06-27
+
+**🌱 In plain English.** You can now set the whole thing up — and fix it later — **from the
+Home Assistant UI with dropdowns**, no text file. Pick "Manual UI configuration" at setup and
+it walks you through choosing each zone's valve and **moisture/EC probes (as many as you have
+per zone)**, then your pump, main line, lights and substrate facts. Already installed and
+forgot a sensor? Go to the integration's **Configure → Edit zones & hardware** and add or swap
+sensors, or add a whole zone — no reinstall. **Every field has a help tooltip** explaining what
+it is. This fixes the "I didn't set it up right at the start and there's no way to change it"
+problem.
+
+**🔧 Technical notes.**
+- `config_flow.py`: the manual path (`async_step_zones` → new `async_step_hardware`) now uses
+  HA `EntitySelector`s — per zone: valve `switch`, VWC `sensor` (multiple), EC `sensor`
+  (multiple), plant count; then shared pump/mainline/waste/light + lights hours + substrate
+  volume/dripper/field-capacity/max-EC + optional room sensors + notify. Writes the same
+  config-entry shape as the `.env` path (`zone_switch` + `vwc_sensors`/`ec_sensors` lists +
+  `vwc_front/back` compat).
+- OptionsFlow: `async_step_edit_zones` (count) → new `async_step_edit_zones_map` (entity
+  remap, prefilled) → updates the entry and **reloads** the integration. Replaces the old
+  dead zone submenu.
+- **Multiple probes per zone** are now selectable and flow through to the integration's
+  `_average_sensor_values` fusion (median/average + the engine's outlier rejection).
+- `strings.json` + new `translations/en.json`: `data_description` tooltips on **every field**
+  of every config and options step (zones 1–24 + all hardware), plus menu labels.
+- Bumped integration `manifest.json` 2.6.0 → 2.7.0 (README badge + this changelog in sync).
+
 ### f2-control add-on 0.4.0
 
 **🌱 In plain English.** The dashboards now come *inside* the add-on — no more copying
