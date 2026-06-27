@@ -1,5 +1,5 @@
 name: F2 Crop Steering
-version: "0.3.0"
+version: "0.4.0"
 slug: f2_control
 description: >-
   Autonomous crop-steering engine for Home Assistant. Runs the per-zone
@@ -17,6 +17,10 @@ startup: application
 homeassistant_api: true
 hassio_api: false
 host_network: false
+ingress: true
+ingress_port: 8420
+panel_icon: mdi:sprout
+panel_title: F2 Crop Steering
 options:
   lights_on_hour: 10
   lights_off_hour: 22

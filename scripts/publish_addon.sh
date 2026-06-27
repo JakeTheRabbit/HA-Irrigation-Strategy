@@ -27,6 +27,15 @@ cp -r "$SRC" "$ADDON_REPO/f2_control"
 find "$ADDON_REPO/f2_control" -type d -name __pycache__ -prune -exec rm -rf {} +
 find "$ADDON_REPO/f2_control" -type f -name '*.pyc' -delete
 
+# Assemble the web UI: single source of truth is the repo www/. Copy it into the add-on's
+# nginx web root, then overlay the add-on landing page as index.html (the repo www/index.html
+# is the GitHub-Pages landing; the add-on wants its own Live/Demo chooser).
+WEB="$ADDON_REPO/f2_control/www/public"
+rm -rf "$WEB"; mkdir -p "$WEB"
+cp -r "$MONO/www/." "$WEB/"
+cp "$SRC/web-index.html" "$WEB/index.html"
+rm -f "$ADDON_REPO/f2_control/web-index.html"   # lives only as the web root index, not in the add-on root
+
 cd "$ADDON_REPO"
 git add -A
 if git diff --cached --quiet; then echo "No changes to publish."; exit 0; fi
