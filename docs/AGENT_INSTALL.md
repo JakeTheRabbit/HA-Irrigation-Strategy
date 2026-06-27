@@ -21,14 +21,15 @@ The system has **two layers**:
 
 They talk only through HA entities. Install the integration first, then the add-on.
 
-> **Heads-up on installing the add-on (this trips people up).** This GitHub repo is a
-> **code monorepo**, *not* a Home Assistant add-on repository. You **cannot** add the
-> repo URL in the Add-on Store, and you **cannot** `git clone` the `addons/f2_control`
-> subfolder — HA's "add repository" only scans the top level of a dedicated add-on repo,
-> and a subdirectory isn't a clonable git URL (that's the `remote: Not Found` /
-> `repository '…/addons/f2_control/' not found` error). The add-on installs as a **local
-> add-on**: copy the `addons/f2_control/` folder onto the HA host under `/addons/`, then
-> Reload the store. Full steps in **§5**.
+> **Installing the add-on — two ways (see §5).** *Easiest:* the **dedicated add-on repo** —
+> in HA, Add-on Store → ⋮ → Repositories → add `https://github.com/JakeTheRabbit/f2-control`
+> → *F2 Control* appears in the store → Install. *Dev/offline:* copy the `addons/f2_control/`
+> folder onto the HA host under `/addons/` (local add-on), then Reload the store.
+>
+> **Do NOT** add *this* monorepo's URL or a `.../addons/f2_control` subfolder in the Add-on
+> Store — this repo is a code monorepo with the add-on nested in a subfolder, so HA can't read
+> it (that's the `remote: Not Found / repository '…/addons/f2_control/' not found` error). The
+> `f2-control` repo above exists precisely to give a clean one-click URL.
 
 ---
 
@@ -121,19 +122,22 @@ If these are present, the data layer is good. **No hardware has moved.**
 
 ## 5 · Install the engine (the f2-control add-on)
 
-The engine is a **local add-on**. You copy the folder onto the HA host, the Supervisor
-builds it into a container, and it runs there. It is **not** URL-installable from this
-monorepo (see the heads-up at the top).
+The engine runs as a Home Assistant add-on. Install it one of two ways:
 
-**5.1 — Copy the add-on onto the host.** Put the repo's `addons/f2_control/` folder into
-the HA host's local add-ons directory so the path is **`/addons/f2_control/`** (it must
-contain `config.yaml`, `Dockerfile`, `run.sh`, and the `f2_control/` Python package).
-- *Samba share add-on:* the `addons` share maps to `/addons` — drop the folder in.
-- *SSH / Terminal add-on:* `cp -r /path/to/repo/addons/f2_control /addons/`
-  (or `git clone` the **whole** repo to `/config` first, then copy the subfolder).
+**5.1a — One-click by URL (easiest).** Add-on Store → ⋮ (top-right) → **Repositories** →
+paste **`https://github.com/JakeTheRabbit/f2-control`** → **Add**. *F2 Control* now appears
+in the store. (That dedicated repo has `repository.yaml` at its root + the add-on at the top
+level, so HA can read it. Do **not** add this monorepo's URL — HA can't read the nested
+`addons/f2_control`.)
 
-**5.2 — Make it appear.** Settings → Add-ons → Add-on Store → ⋮ (top-right) → **Reload**.
-*F2 Control* now shows under **Local add-ons**. Open it → **Install** (the first build
+**5.1b — Local copy (dev / offline).** Put the repo's `addons/f2_control/` folder onto the
+HA host so the path is **`/addons/f2_control/`** (it must contain `config.yaml`, `Dockerfile`,
+`run.sh`, and the `f2_control/` Python package). *Samba:* the `addons` share maps to `/addons`.
+*SSH/Terminal:* `cp -r /path/to/repo/addons/f2_control /addons/`. Then Add-on Store → ⋮ →
+**Reload** — it shows under **Local add-ons**.
+
+**5.2 — Install it.** Open **F2 Control** in the store (URL method: it's listed directly;
+local-copy method: under **Local add-ons** after the Reload) → **Install** (the first build
 takes a minute).
 
 **5.3 — Configure it.** On the add-on's **Configuration** tab set:

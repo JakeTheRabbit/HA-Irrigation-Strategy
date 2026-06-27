@@ -376,24 +376,34 @@ homeassistant:
 
 ### 4 · Install the engine (f2-control add-on)
 
-> **This is a *local* add-on — do not add the GitHub URL to the Add-on Store.** This repo is
-> a code monorepo, not an HA add-on repository, and the add-on lives in a subfolder
-> (`addons/f2_control/`). HA's "add repository" only scans the top level of a dedicated
-> add-on repo, and a subdirectory isn't a clonable git URL — pointing the store at the URL (or
-> at `.../addons/f2_control`) gives `remote: Not Found / repository '…' not found`. Copy the
-> folder onto the host instead (step 1).
+**Easiest — one-click by URL.** In Home Assistant: **Settings → Add-ons → Add-on Store → ⋮
+(top-right) → Repositories** → paste the **dedicated add-on repo**:
 
-1. Copy `addons/f2_control/` into your HA `/addons/` directory (Samba/SSH) so the path is
-   `/addons/f2_control/` (with its `config.yaml` + `Dockerfile`), then
-   **Settings → Add-ons → Add-on Store → ⋮ → Reload** — *F2 Control* appears under **Local add-ons**.
-2. Open it → **Install**. In **Configuration** set the lights hours, your notify service, and (if they
-   differ from the defaults) the feed EC/pH sensor entity IDs + the pump / mainline / per-zone valve
-   map. Substrate volume + per-zone plant/dripper/flow are read live from the integration's number
+```
+https://github.com/JakeTheRabbit/f2-control
+```
+
+→ **Add**, close the dialog, and **F2 Control** appears in the store → open it → **Install**.
+
+> Paste that into the **Add-on Store → Repositories** dialog — it's the dedicated add-on repo
+> (`repository.yaml` + the add-on at its root, so HA can read it). Do **not** paste *this*
+> monorepo's URL or a `.../addons/f2_control` subfolder — HA can't read those (that's the
+> `remote: Not Found` error), which is exactly why the add-on repo above exists.
+
+**Or — local copy (dev / offline):** copy `addons/f2_control/` onto the host at
+`/addons/f2_control/`, then **Add-on Store → ⋮ → Reload** → *F2 Control* shows under **Local
+add-ons** → Install. (This monorepo's `addons/f2_control/` is the add-on's source; the
+[`f2-control`](https://github.com/JakeTheRabbit/f2-control) repo is the published copy.)
+
+Either way, then:
+1. In **Configuration** set the lights hours, your notify service, and (if they differ from the
+   defaults) the feed EC/pH sensor entity IDs + the pump / mainline / per-zone valve map.
+   Substrate volume + per-zone plant/dripper/flow are read live from the integration's number
    entities, so a shot's `%`-of-substrate run-time is always correct.
-3. Create the kill switch `input_boolean.f2_control_enabled` (a Helper, or deploy
+2. Create the kill switch `input_boolean.f2_control_enabled` (a Helper, or deploy
    `addons/f2_control/f2_control_package.yaml` to `/config/packages` + reload). **OFF = safe** — the
    add-on reads, computes and notifies but never opens a valve.
-4. **Start** it — the log shows `starting | kill-switch … | token present: True`. Flip the kill switch
+3. **Start** it — the log shows `starting | kill-switch … | token present: True`. Flip the kill switch
    **ON** to go live.
 
 It's a single synchronous Python process: polls HA over REST (no AppDaemon, no asyncio), drives the
