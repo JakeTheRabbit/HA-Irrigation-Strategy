@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-06-28
+
+**🌱 In plain English.** The integration now watches your setup and flags problems in
+**Settings → Repairs** with a plain-language fix — e.g. the kill-switch helper is missing, the
+engine add-on isn't running, a zone has no moisture sensor, or a zone's sensor reads
+unavailable. No more silent misconfiguration; each card clears itself once you fix it.
+
+**🔧 Technical notes.**
+- New `health.py` + hooks in `__init__.py`: a read-only check runs 60 s after setup and every
+  5 min, creating/clearing Home Assistant `issue_registry` issues — `kill_switch_missing`
+  (error), `engine_offline`, `zone_no_sensor`, `fused_sensor_unavailable` (warnings) — each
+  with a `learn_more_url` to the Troubleshooting wiki. Timers are cancelled and issues cleared
+  on unload. Never reads/writes hardware.
+- `strings.json` + `translations/en.json`: an `issues` block (title + description) for each.
+- manifest 2.7.0 → 2.8.0 (README badge + this changelog in sync).
+
 ## [2.7.0] - 2026-06-27
 
 **🌱 In plain English.** You can now set the whole thing up — and fix it later — **from the

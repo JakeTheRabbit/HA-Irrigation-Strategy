@@ -1,4 +1,5 @@
 """The Crop Steering System integration."""
+
 from __future__ import annotations
 
 import logging
@@ -22,20 +23,30 @@ except ImportError:  # pragma: no cover - enables non-HA unit tests
         NUMBER = "number"
         BUTTON = "button"
 
+
 from .const import DOMAIN, CONF_NUM_ZONES
 
 try:
     from .services import async_setup_services, async_unload_services
 except ImportError:  # pragma: no cover - enables non-HA unit tests
+
     async def async_setup_services(_hass: HomeAssistant) -> None:
         return None
 
     async def async_unload_services(_hass: HomeAssistant) -> None:
         return None
 
+
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.SELECT, Platform.NUMBER, Platform.BUTTON]
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.SELECT,
+    Platform.NUMBER,
+    Platform.BUTTON,
+]
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Crop Steering System from a config entry."""
@@ -55,6 +66,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Set up services
     await async_setup_services(hass)
+
+    # Setup health checks -> Home Assistant Repairs (read-only diagnostics)
+    from datetime import timedelta
+
+    from homeassistant.helpers.event import async_call_later, async_track_time_interval
+
+    from .health import run_health_check
+
+    def _hc(_now=None):
+        run_health_check(hass, entry)
+
+    hass.data[DOMAIN].setdefault("_hc_unsubs", {})[entry.entry_id] = [
+        async_call_later(hass, 60, _hc),  # first check once the add-on has booted
+        async_track_time_interval(hass, _hc, timedelta(minutes=5)),  # then periodically
+    ]
 
     _LOGGER.info("Crop Steering System setup complete")
 
@@ -104,10 +130,12 @@ async def _create_test_helpers(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
     # Add zone-specific booleans
     for zone in range(1, num_zones + 1):
-        test_booleans.extend([
-            (f"zone_{zone}_valve", f"Zone {zone} Valve", "mdi:valve"),
-            (f"zone_{zone}_enabled", f"Zone {zone} Enabled", "mdi:check-circle"),
-        ])
+        test_booleans.extend(
+            [
+                (f"zone_{zone}_valve", f"Zone {zone} Valve", "mdi:valve"),
+                (f"zone_{zone}_enabled", f"Zone {zone} Enabled", "mdi:check-circle"),
+            ]
+        )
 
     test_numbers = [
         # Tank Sensors
@@ -118,9 +146,25 @@ async def _create_test_helpers(hass: HomeAssistant, entry: ConfigEntry) -> None:
         ("tank_flow_rate", "Tank Flow Rate", 0, 100, 0.1, "L/min", "mdi:waves"),
         ("tank_pressure", "Tank Pressure", 0, 10, 0.1, "bar", "mdi:gauge"),
         # Environmental
-        ("ambient_temperature", "Ambient Temperature", 0, 50, 0.1, "°C", "mdi:thermometer"),
+        (
+            "ambient_temperature",
+            "Ambient Temperature",
+            0,
+            50,
+            0.1,
+            "°C",
+            "mdi:thermometer",
+        ),
         ("ambient_humidity", "Ambient Humidity", 0, 100, 1, "%", "mdi:water-percent"),
-        ("light_intensity", "Light Intensity", 0, 100000, 100, "lux", "mdi:weather-sunny"),
+        (
+            "light_intensity",
+            "Light Intensity",
+            0,
+            100000,
+            100,
+            "lux",
+            "mdi:weather-sunny",
+        ),
         # System Performance
         ("pump_frequency", "Pump Frequency", 0, 60, 0.1, "Hz", "mdi:sine-wave"),
         ("valve_position", "Valve Position", 0, 100, 1, "%", "mdi:valve"),
@@ -129,13 +173,55 @@ async def _create_test_helpers(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
     # Add zone-specific numbers
     for zone in range(1, num_zones + 1):
-        test_numbers.extend([
-            (f"zone_{zone}_vwc_front", f"Zone {zone} VWC Front", 0, 100, 1, "%", "mdi:water-percent"),
-            (f"zone_{zone}_vwc_back", f"Zone {zone} VWC Back", 0, 100, 1, "%", "mdi:water-percent"),
-            (f"zone_{zone}_ec_front", f"Zone {zone} EC Front", 0, 10, 0.1, "mS/cm", "mdi:lightning-bolt"),
-            (f"zone_{zone}_ec_back", f"Zone {zone} EC Back", 0, 10, 0.1, "mS/cm", "mdi:lightning-bolt"),
-            (f"zone_{zone}_temperature", f"Zone {zone} Temperature", 0, 40, 0.1, "°C", "mdi:thermometer"),
-        ])
+        test_numbers.extend(
+            [
+                (
+                    f"zone_{zone}_vwc_front",
+                    f"Zone {zone} VWC Front",
+                    0,
+                    100,
+                    1,
+                    "%",
+                    "mdi:water-percent",
+                ),
+                (
+                    f"zone_{zone}_vwc_back",
+                    f"Zone {zone} VWC Back",
+                    0,
+                    100,
+                    1,
+                    "%",
+                    "mdi:water-percent",
+                ),
+                (
+                    f"zone_{zone}_ec_front",
+                    f"Zone {zone} EC Front",
+                    0,
+                    10,
+                    0.1,
+                    "mS/cm",
+                    "mdi:lightning-bolt",
+                ),
+                (
+                    f"zone_{zone}_ec_back",
+                    f"Zone {zone} EC Back",
+                    0,
+                    10,
+                    0.1,
+                    "mS/cm",
+                    "mdi:lightning-bolt",
+                ),
+                (
+                    f"zone_{zone}_temperature",
+                    f"Zone {zone} Temperature",
+                    0,
+                    40,
+                    0.1,
+                    "°C",
+                    "mdi:thermometer",
+                ),
+            ]
+        )
 
     # Create input_boolean entities
     for entity_id, name, icon in test_booleans:
@@ -185,18 +271,34 @@ async def _create_test_helpers(hass: HomeAssistant, entry: ConfigEntry) -> None:
             except Exception as e:
                 _LOGGER.warning(f"Could not create {full_entity_id}: {e}")
 
-    _LOGGER.info(f"Test helper creation complete: {len(test_booleans)} booleans, {len(test_numbers)} numbers")
+    _LOGGER.info(
+        f"Test helper creation complete: {len(test_booleans)} booleans, {len(test_numbers)} numbers"
+    )
+
 
 # Note: _install_package_files function removed in v2.0 architecture
 # System now uses AppDaemon modules + integration entities only
 # No package YAML files needed
 
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    # Stop the health-check timers and clear any Repairs issues we raised.
+    for unsub in (
+        hass.data.get(DOMAIN, {}).get("_hc_unsubs", {}).pop(entry.entry_id, [])
+    ):
+        unsub()
+    try:
+        from .health import clear_all
+
+        clear_all(hass)
+    except Exception:  # pragma: no cover - defensive
+        pass
+
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
-        
+
     # Unload services
     await async_unload_services(hass)
-    
+
     return unload_ok
