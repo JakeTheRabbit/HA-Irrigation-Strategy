@@ -21,6 +21,11 @@ The system has **two layers**:
 
 They talk only through HA entities. Install the integration first, then the add-on.
 
+> 📖 **Visual walkthrough:** for a click-by-click guide with HA screenshots + numbered callouts,
+> open **`docs/INSTALL_GUIDE.html`** (live:
+> <https://jaketherabbit.github.io/HA-Irrigation-Strategy/install.html>). This file is the text
+> reference / agent runbook.
+
 > **Installing the add-on — two ways (see §5).** *Easiest:* the **dedicated add-on repo** —
 > in HA, Add-on Store → ⋮ → Repositories → add `https://github.com/JakeTheRabbit/f2-control`
 > → *F2 Control* appears in the store → Install. *Dev/offline:* copy the `addons/f2_control/`
