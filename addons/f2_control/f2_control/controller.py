@@ -81,12 +81,24 @@ def load_options():
 class Controller:
     def __init__(self):
         o = load_options()
-        self.zones = o.get("zones") or {
-            1: {"vwc": "sensor.f2_row_1_vwc",    "ec": "sensor.f2_row_1_pwec"},
-            2: {"vwc": "sensor.veg_sdi12_vwc_2", "ec": "sensor.veg_sdi12_ec_2"},
-            3: {"vwc": "sensor.veg_sdi12_vwc",   "ec": "sensor.veg_sdi12_ec"},
-        }
-        self.zones = {int(k): v for k, v in self.zones.items()}
+        # Sensors are owned by the INTEGRATION: it fuses every probe you map to a zone
+        # (any number — median/average) into sensor.crop_steering_vwc_zone_N and
+        # sensor.crop_steering_ec_zone_N. The engine just reads those fused sensors, so
+        # "add as many probes per zone as you want" is done in the integration UI, not here.
+        # `zones` stays as an explicit override (rarely needed); otherwise we build the
+        # fused-sensor map for `num_zones` zones.
+        zones_opt = o.get("zones")
+        if zones_opt:
+            self.zones = {int(k): v for k, v in zones_opt.items()}
+        else:
+            n = int(o.get("num_zones", 3))
+            self.zones = {
+                z: {
+                    "vwc": f"sensor.crop_steering_vwc_zone_{z}",
+                    "ec": f"sensor.crop_steering_ec_zone_{z}",
+                }
+                for z in range(1, n + 1)
+            }
         self.hw = o.get("hardware") or {
             "pump": "switch.veg_main_pump",
             "mainline": "switch.espoe_irrigation_relay_2_3",
