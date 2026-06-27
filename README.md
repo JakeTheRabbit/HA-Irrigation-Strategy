@@ -376,7 +376,15 @@ homeassistant:
 
 ### 4 · Install the engine (f2-control add-on)
 
-1. Copy `addons/f2_control/` into your HA `/addons/` directory (Samba/SSH), then
+> **This is a *local* add-on — do not add the GitHub URL to the Add-on Store.** This repo is
+> a code monorepo, not an HA add-on repository, and the add-on lives in a subfolder
+> (`addons/f2_control/`). HA's "add repository" only scans the top level of a dedicated
+> add-on repo, and a subdirectory isn't a clonable git URL — pointing the store at the URL (or
+> at `.../addons/f2_control`) gives `remote: Not Found / repository '…' not found`. Copy the
+> folder onto the host instead (step 1).
+
+1. Copy `addons/f2_control/` into your HA `/addons/` directory (Samba/SSH) so the path is
+   `/addons/f2_control/` (with its `config.yaml` + `Dockerfile`), then
    **Settings → Add-ons → Add-on Store → ⋮ → Reload** — *F2 Control* appears under **Local add-ons**.
 2. Open it → **Install**. In **Configuration** set the lights hours, your notify service, and (if they
    differ from the defaults) the feed EC/pH sensor entity IDs + the pump / mainline / per-zone valve

@@ -14,10 +14,21 @@ system end to end. A human can follow it too.
 The system has **two layers**:
 - **Integration** (`custom_components/crop_steering/`) — creates the entities + setup
   wizard. Touches no hardware.
-- **Engine** (`appdaemon/apps/crop_steering/`) — the AppDaemon app that reads those
-  entities + live sensors, runs P0→P1→P2→P3, and drives hardware.
+- **Engine** (`addons/f2_control/`) — the **f2-control add-on**: a single synchronous
+  Python process that reads those entities + live sensors, runs P0→P1→P2→P3, and drives
+  the hardware. (AppDaemon `appdaemon/apps/crop_steering/` is the **retired** rollback —
+  do not install it.)
 
-They talk only through HA entities. Install the integration first, then the engine.
+They talk only through HA entities. Install the integration first, then the add-on.
+
+> **Heads-up on installing the add-on (this trips people up).** This GitHub repo is a
+> **code monorepo**, *not* a Home Assistant add-on repository. You **cannot** add the
+> repo URL in the Add-on Store, and you **cannot** `git clone` the `addons/f2_control`
+> subfolder — HA's "add repository" only scans the top level of a dedicated add-on repo,
+> and a subdirectory isn't a clonable git URL (that's the `remote: Not Found` /
+> `repository '…/addons/f2_control/' not found` error). The add-on installs as a **local
+> add-on**: copy the `addons/f2_control/` folder onto the HA host under `/addons/`, then
+> Reload the store. Full steps in **§5**.
 
 ---
 
@@ -29,8 +40,11 @@ Do not assume; verify each and report findings before proceeding.
    `GET /api/config` → `version`.
 2. **Install method available.** Prefer HACS (Settings → Devices & Services → HACS).
    If absent, plan a manual copy into `/config/custom_components/`.
-3. **AppDaemon 4 add-on.** Settings → Add-ons. If not installed, it will be installed
-   in step 4. (Supervised/HA-OS only — Core installs run AppDaemon separately.)
+3. **Add-on support.** Supervised / HA-OS install (Settings → Add-ons exists). The
+   f2-control add-on is a local add-on you copy onto the host in §5 — AppDaemon is **not**
+   needed. (HA Core, with no Supervisor, can't run add-ons — run the engine another way.)
+4. **Samba or SSH access to the HA host** (the *Samba share* or *Advanced SSH & Web
+   Terminal* add-on), so you can copy files into `/addons/` and `/config/` in §5.
 4. **The hardware exists in HA as entities.** This is the critical pre-req. The engine
    needs, at minimum, per zone: a valve `switch.*`, a VWC `sensor.*`, an EC `sensor.*`;
    and shared: a pump `switch.*` and a mainline `switch.*`. Enumerate what's there:
@@ -105,24 +119,45 @@ If these are present, the data layer is good. **No hardware has moved.**
 
 ---
 
-## 5 · Install the engine (AppDaemon)
+## 5 · Install the engine (the f2-control add-on)
 
-1. Install the **AppDaemon 4** add-on if absent. Its config dir on supervised HA is
-   `/addon_configs/a0d7b954_appdaemon/` (slug `a0d7b954_appdaemon`).
-2. Copy `appdaemon/apps/crop_steering/` → `…/a0d7b954_appdaemon/apps/crop_steering/`.
-3. Copy `appdaemon/apps/apps.yaml` → `…/apps/apps.yaml` and **edit the `hardware:` and
-   `sensors:` blocks** to the confirmed map from step 0 (pump, mainline, per-zone
-   `zone_valves`, and the `vwc:` / `ec:` sensor lists in zone order). This file is where
-   the engine learns the physical layout. `num_zones` must match.
-4. Create a **long-lived token** (HA → Profile → Security → Long-Lived Access Tokens) and
-   put it in `…/a0d7b954_appdaemon/secrets.yaml` as `ha_token:` (and `appdaemon_token:`
-   if the `appdaemon.yaml` references it). **Never** write the token into any file under
-   `/config/www/` or anything web-served, and never commit it.
-5. Set `…/a0d7b954_appdaemon/appdaemon.yaml`: HA url `http://homeassistant:8123`,
-   `token: !secret ha_token`, plus latitude/longitude/timezone.
-6. Restart AppDaemon (the add-on watches files, but a clean restart is more predictable):
-   `sudo docker restart addon_a0d7b954_appdaemon` if the `ha` CLI isn't authenticated in
-   your shell.
+The engine is a **local add-on**. You copy the folder onto the HA host, the Supervisor
+builds it into a container, and it runs there. It is **not** URL-installable from this
+monorepo (see the heads-up at the top).
+
+**5.1 — Copy the add-on onto the host.** Put the repo's `addons/f2_control/` folder into
+the HA host's local add-ons directory so the path is **`/addons/f2_control/`** (it must
+contain `config.yaml`, `Dockerfile`, `run.sh`, and the `f2_control/` Python package).
+- *Samba share add-on:* the `addons` share maps to `/addons` — drop the folder in.
+- *SSH / Terminal add-on:* `cp -r /path/to/repo/addons/f2_control /addons/`
+  (or `git clone` the **whole** repo to `/config` first, then copy the subfolder).
+
+**5.2 — Make it appear.** Settings → Add-ons → Add-on Store → ⋮ (top-right) → **Reload**.
+*F2 Control* now shows under **Local add-ons**. Open it → **Install** (the first build
+takes a minute).
+
+**5.3 — Configure it.** On the add-on's **Configuration** tab set:
+- `lights_on_hour` / `lights_off_hour`, `notify_service` (e.g. `notify/mobile_app_xxx`).
+- If your feed probes differ from the defaults, the feed EC/pH sensor entity ids.
+- `substrate_l` / `flow_lps` are fallbacks only — the live shot size is read from the
+  integration's per-zone `substrate_volume`, `plant_count`, `drippers_per_plant`,
+  `dripper_flow_rate` number entities (set those from the operator's real hardware;
+  wrong values make every shot the wrong length).
+
+**5.4 — Token + kill switch.** The add-on has `homeassistant_api: true`, so it gets its
+HA token automatically — no long-lived token to manage. Create the kill switch
+`input_boolean.f2_control_enabled` (a Helper, or deploy
+`addons/f2_control/f2_control_package.yaml` to `/config/packages` + reload). **OFF = safe**
+— the add-on reads, computes and notifies but never opens a valve.
+
+**5.5 — Start it.** **Start** the add-on; the log shows `starting | kill-switch … | token
+present: True`. Leave the kill switch OFF until §7.
+
+> **Updating the add-on later — Rebuild, NOT Restart.** The Dockerfile bakes the Python
+> into the image at build (`COPY f2_control /app`). After changing any file under
+> `addons/f2_control/`, copy it to `/addons/f2_control/` again and use the add-on's
+> **⋮ → Rebuild** — a plain **Restart re-runs the old baked code** (it only re-reads the
+> Configuration options). Rebuild re-copies the code and restarts.
 
 ---
 
@@ -130,10 +165,11 @@ If these are present, the data layer is good. **No hardware has moved.**
 
 The engine publishes its own heartbeat sensors. Check (via API or Developer Tools → States):
 
-- AppDaemon log shows `Master Crop Steering Application … initialized` and
-  `Authenticated to Home Assistant`.
-- `sensor.crop_steering_app_status` — a real state (e.g. `idle` / `irrigating`), not `unknown`.
-- `sensor.crop_steering_ai_heartbeat` — `healthy`, updating.
+- The **f2-control add-on log** shows `starting | kill-switch … | token present: True`,
+  then per-tick decision lines — no tracebacks.
+- `sensor.crop_steering_ai_heartbeat` — `healthy`, with attribute **`engine: f2-control`**
+  and a `last_beat` that updates every loop (< ~4 min old).
+- `sensor.crop_steering_app_status` — a real state (e.g. `safe_idle` / `irrigating`), not `unknown`.
 - `sensor.crop_steering_activity_log` — a recent human-readable event line.
 - Per-zone `sensor.crop_steering_zone_1_vwc` reads a live number (fusion is running).
 
@@ -146,19 +182,23 @@ If those are populated, both layers are connected and the engine is reading the 
 Everything to here is read/observe-only. Arming makes it actuate. Do this **with the
 operator**, not autonomously:
 
-1. **Observe before firing.** With `switch.crop_steering_system_enabled` ON but
-   `switch.crop_steering_auto_irrigation_enabled` **OFF**, watch a full photoperiod: the
-   activity feed + per-zone phase sensors show exactly what it *would* decide. Confirm the
-   phases march P0→P1→P2→P3 and the reasons make sense.
-2. **Bench-test one shot — 🚦 GATE.** Only on explicit go, fire a single small test shot
-   via `crop_steering.custom_shot` (`target_zone`, small `volume_ml`, `intent:"test_emitter"`)
-   and watch the sequence in the log: pump prime → mainline → zone valve → irrigate →
-   shutdown (reverse), with the valve close read-back verified. Confirm the right valve moved.
-3. **Tune the physical truths first**, then targets to *observed* VWC peaks/troughs (see the
-   README "Implementation" section). A target the substrate can't reach makes a zone chase
-   its tail.
-4. **Enable autonomy — 🚦 GATE.** Only after 1–3 check out, turn on
-   `switch.crop_steering_auto_irrigation_enabled`. Keep watching the first real cycles.
+1. **Observe before firing.** Keep the kill switch `input_boolean.f2_control_enabled`
+   **OFF**. In this state the add-on still reads sensors, runs the full decision every
+   loop, republishes the `crop_steering_*` status, and logs exactly what it *would* fire —
+   but never opens a valve. Watch a full photoperiod: confirm the phases march P0→P1→P2→P3,
+   the per-zone reasons make sense, and the feed gate holds when the tank is filling/dosing.
+2. **Sanity-check shot sizing first — the #1 footgun.** Verify each zone's shot length is
+   sane *before* arming. Live shot duration =
+   `shot% × (substrate_volume × plant_count) ÷ (plant_count × drippers_per_plant × dripper_flow_rate ÷ 3600)`.
+   Enter `substrate_volume` as the **PER-PLANT block size**; the engine scales it to the
+   row. A 6 % shot of a 6 L block at 4 L/h ≈ 5–6 min. If your shots are seconds long, the
+   substrate/flow config is wrong and it will short-cycle.
+3. **Tune targets to *observed* VWC peaks/troughs** (see the README "Implementation"
+   section). A target the substrate can't reach makes a zone chase its tail.
+4. **Arm it — 🚦 GATE.** Only after 1–3 check out, flip `input_boolean.f2_control_enabled`
+   **ON**. The add-on now actuates. Watch the first real cycle live: a fired shot raises VWC,
+   the hardware sequence (pump → mainline → valve → shutdown, valve-close read-back) runs
+   clean, nothing over-waters. **One-line rollback: flip the kill switch OFF.**
 
 ---
 
@@ -166,9 +206,13 @@ operator**, not autonomously:
 
 - [ ] Integration entities present (`number.crop_steering_p1_target_vwc` reads a value).
 - [ ] `.env` reflects the operator-confirmed hardware map + physical truths.
-- [ ] Engine connected: `app_status` / `ai_heartbeat` / `activity_log` live; per-zone VWC reads.
-- [ ] One supervised test shot fired the correct valve through the full safe sequence (gated).
-- [ ] Autonomy enabled only on explicit operator go, first cycles observed.
+- [ ] f2-control add-on installed (local add-on), configured, started; log clean.
+- [ ] Engine connected: `ai_heartbeat` shows `engine: f2-control` + a fresh `last_beat`;
+      `app_status` live; per-zone VWC reads.
+- [ ] Shot sizing sane: `substrate_volume` (per-plant), `plant_count`, dripper flow set —
+      a 6 % shot computes to minutes, not seconds.
+- [ ] Kill switch `input_boolean.f2_control_enabled` armed **ON** only on explicit operator
+      go; first real cycle watched (VWC rises, hardware sequence + valve read-back clean).
 
 Reference: `docs/installation_guide.md` (long-form), `docs/SYSTEM_OVERVIEW.md` (mental
 model), `ENTITIES.md` (entity reference), `docs/troubleshooting.md` (when something's off).
