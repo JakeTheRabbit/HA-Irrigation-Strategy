@@ -38,6 +38,25 @@ problem.
   of every config and options step (zones 1–24 + all hardware), plus menu labels.
 - Bumped integration `manifest.json` 2.6.0 → 2.7.0 (README badge + this changelog in sync).
 
+### f2-control add-on 0.5.0
+
+**🌱 In plain English.** The engine now reads each zone's sensors from the integration's
+**fused per-zone reading**, which averages **every** probe you've mapped to that zone. So you
+can add as many moisture/EC probes per zone as you like in the Crop Steering UI and the engine
+uses all of them (averaged, outliers rejected) — no add-on editing, and it works for any
+number of zones.
+
+**🔧 Technical notes.**
+- `controller.py`: the per-zone sensor map now defaults to `sensor.crop_steering_vwc_zone_N` /
+  `sensor.crop_steering_ec_zone_N` (the integration's `_average_sensor_values` fusion) for
+  `num_zones` zones, instead of hardcoded raw F2 probes. An explicit `zones` option still
+  overrides. Removes the F2-specific zone-sensor hardcoding.
+- `config.yaml`: new `num_zones` option (default 3) + schema; version 0.4.0 → 0.5.0.
+  `translations/en.yaml`: `num_zones` help text.
+- **Operator note (live grow):** on Rebuild, confirm `sensor.crop_steering_vwc_zone_1` reads
+  the same as your raw probe before arming — a single-source fused sensor equals the raw value.
+  If a fused sensor is missing the zone holds (no actuation) rather than mis-steering.
+
 ### f2-control add-on 0.4.0
 
 **🌱 In plain English.** The dashboards now come *inside* the add-on — no more copying

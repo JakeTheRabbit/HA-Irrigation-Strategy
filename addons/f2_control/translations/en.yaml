@@ -1,4 +1,11 @@
 configuration:
+  num_zones:
+    name: Number of zones
+    description: >-
+      How many irrigation zones to steer. The engine reads each zone's FUSED sensors
+      sensor.crop_steering_vwc_zone_N and sensor.crop_steering_ec_zone_N, which the
+      integration builds by averaging every probe you map to that zone. So to add more
+      probes per zone, add them in the integration (Crop Steering) UI - not here.
   lights_on_hour:
     name: Lights-on hour
     description: >-
