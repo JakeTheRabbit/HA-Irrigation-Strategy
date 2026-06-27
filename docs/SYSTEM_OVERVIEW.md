@@ -10,9 +10,15 @@ An autonomous **4-phase crop-steering irrigation controller** for Home Assistant
 
 - A **Home Assistant integration** (`custom_components/crop_steering/`) provides the
   entity surface and a config-flow setup wizard.
-- An **AppDaemon app** (`appdaemon/apps/crop_steering/master_crop_steering_app.py`)
-  reads those entities, runs the per-zone phase logic, and drives the irrigation
-  hardware safely.
+- The **f2-control add-on** (`addons/f2_control/`) reads those entities, runs the per-zone
+  phase logic, and drives the irrigation hardware safely. It imports the pure
+  `crop-steering-engine` package for the decision core.
+
+> **Engine note.** The live engine is the **f2-control add-on**. The AppDaemon app
+> (`appdaemon/apps/crop_steering/master_crop_steering_app.py`) referenced in the diagram
+> and tables below is the **retired rollback** — kept for emergency revert, not deployed.
+> Where this doc says "the AppDaemon engine," read "the f2-control add-on" for the live
+> system; the phase logic + safety behaviour are the same.
 
 It is **irrigation only** — VWC/EC-driven shot scheduling across the daily
 P0 → P1 → P2 → P3 cycle. It does **not** control climate (temp / RH / CO₂); that is
