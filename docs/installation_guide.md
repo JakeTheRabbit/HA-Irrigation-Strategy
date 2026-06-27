@@ -186,8 +186,8 @@ with a fresh `last_beat`, and `sensor.crop_steering_app_status` is live (e.g. `s
 ### Step 3: Add the Integration
 Same as HACS Step 4 above - use the GUI to configure
 
-### Step 4: Install AppDaemon Apps (Optional)
-Same as HACS Step 5 above
+### Step 4: Install the f2-control add-on (for autonomy)
+Same as Step 5 above (copy `addons/f2_control/` to `/addons/`, Reload, Install).
 
 ## 🎛️ System Configuration
 
@@ -251,11 +251,11 @@ If you have an existing setup, you can load from your crop_steering.env file by 
 - Try turning it OFF and ON
 - The state should change immediately
 
-**4. Check AppDaemon (if installed)**
-- Go to **Settings → Add-ons → AppDaemon 4**
-- Click the **"Log"** tab
-- Look for: `Master Crop Steering Application initialized`
-- **If you see errors:** Double-check your token and configuration
+**4. Check the f2-control add-on**
+- Go to **Settings → Add-ons → F2 Control** → **"Log"** tab
+- Look for: `starting | kill-switch … | token present: True`, then clean per-tick lines
+- Confirm `sensor.crop_steering_ai_heartbeat` shows `engine: f2-control` with a fresh `last_beat`
+- **If you changed add-on files:** you must **⋮ → Rebuild** (a Restart runs the old code)
 
 ### 🚨 Troubleshooting Quick Fixes
 
@@ -263,11 +263,11 @@ If you have an existing setup, you can load from your crop_steering.env file by 
 - ✅ **Solution:** Restart Home Assistant and wait 2-3 minutes
 - ✅ **Check:** Settings → System → Logs for any error messages
 
-**Problem: "AppDaemon won't start or shows errors"**
-- ✅ **Check your token:** Go to your Profile → Long-Lived Access Tokens
-- ✅ **Verify URL:** Should be `http://192.168.1.XXX:8123` (use your HA IP)
-- ✅ **Check timezone:** Must match your Home Assistant timezone
-- ✅ **Remember:** The integration works fine without AppDaemon for manual control
+**Problem: "The F2 Control add-on won't start or shows errors"**
+- ✅ **Check the kill switch helper exists:** `input_boolean.f2_control_enabled` must be created
+- ✅ **Check the log** for the failing line; a traceback usually points at a missing entity id
+- ✅ **Changed a file but nothing changed?** Use **⋮ → Rebuild**, not Restart (the image bakes the code)
+- ✅ **Remember:** the integration works fine without the add-on for manual control + dashboards
 
 **Problem: "I only see some of my zones"**
 - ✅ **This is normal:** Entities are only created for the zones you configured
@@ -290,18 +290,19 @@ If you have an existing setup, you can load from your crop_steering.env file by 
    - Set when your lights turn on (0-23 hours)
    - Set when lights turn off with `number.crop_steering_lights_off_hour`
 
-3. **Test manual control:**
-   - Try the service `crop_steering.execute_irrigation_shot`
-   - Set zone=1, duration_seconds=30 for a quick test
+3. **Confirm the engine is alive (no hardware moves):**
+   - `sensor.crop_steering_ai_heartbeat` shows attribute `engine: f2-control`, updating.
+   - `sensor.crop_steering_app_status` is a live state (e.g. `safe_idle`).
+   - Keep the kill switch `input_boolean.f2_control_enabled` **OFF** until you've watched a photoperiod.
 
-### 🤖 If You Installed AppDaemon
-**Your system will now:**
+### 🤖 With the f2-control add-on armed
+Once you flip the kill switch `input_boolean.f2_control_enabled` **ON**, the system will:
 - Automatically transition through phases each day (P0→P1→P2→P3)
-- Make smart irrigation decisions based on your sensors
-- Provide professional monitoring dashboards
-- Run completely autonomously
+- Make smart irrigation decisions from your sensors + the feed-water safety gate
+- Republish the `crop_steering_*` status surface for the dashboards
+- Run autonomously — **one-line rollback is flipping the kill switch OFF**
 
-**Just watch it work!** 📊
+**Then watch the first real cycle: shots should land and VWC should rise.** 📊
 
 ### 📚 Learn More
 - **[Operation Guide](operation_guide.md)** - How to use your system day-to-day
