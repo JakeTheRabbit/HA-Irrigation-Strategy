@@ -1,321 +1,303 @@
-# 🚀 Installation Guide - Beginner Friendly
+# Installation Guide
 
-This step-by-step guide will walk you through installing the Crop Steering System, even if you're new to Home Assistant. We'll cover everything you need to know!
+Plain-English, start-to-finish setup for the Crop Steering System — written so you can follow it even if you are new to Home Assistant. Every step tells you exactly what to click **and why it matters**, so you are never guessing.
 
-## 📋 What You'll Need Before Starting
+> **Prefer pictures?** There is a click-by-click visual version with Home Assistant screenshots and numbered callouts here:
+> **https://jaketherabbit.github.io/HA-Irrigation-Strategy/install.html**
+> This page is the full written reference; use whichever you like.
 
-### ✅ Required Items
-**Home Assistant Setup:**
-- Home Assistant installed and running (any installation method works)
-- Access to Home Assistant web interface
-- Basic familiarity with Home Assistant (know how to navigate to Settings)
+Set aside about **30–45 minutes**. Nothing you do touches your plants until the very last step, so you can work through it calmly.
 
-**Physical Hardware:**
-- At least 1 moisture sensor (VWC) per growing area
-- At least 1 nutrient sensor (EC) per growing area  
-- Water pump that can be controlled by Home Assistant
-- Solenoid valve for main water line
-- Individual zone valves (up to 6 zones supported)
-- Grow lights controlled by Home Assistant
+---
 
-### 🔧 The engine — the f2-control add-on
-The **f2-control add-on** (`addons/f2_control/`, installed in Step 5) is what makes it
-autonomous — automatic phase transitions, sensor fusion, the safe hardware sequence, and
-the 30-min vitals. *(AppDaemon is a retired rollback; you don't install it.)*
+## First, understand what you are installing (this makes every step obvious)
 
-**Integration only:** entities + manual control + dashboards. **+ the f2-control add-on:**
-full autonomous P0→P1→P2→P3 operation. Supervised / HA-OS only (add-ons need the Supervisor).
+The system is **two separate pieces**. You install both, and they do very different jobs:
 
-### 🏠 Home Assistant Knowledge Check
-Before proceeding, make sure you can:
-- Navigate to Settings → Devices & Services
-- Restart Home Assistant when needed
-- Find entities in Developer Tools → States
+| Piece | What it is | What it does | Touches hardware? |
+|---|---|---|---|
+| **The integration** | `custom_components/crop_steering` — installed through HACS | The "brain's notepad". It creates ~100 Home Assistant entities (settings, sensors, switches) and a setup wizard. It does calculations only. | **No — never.** |
+| **The f2-control add-on** | `addons/f2_control` — installed from the Add-on Store | The "engine". A small program that reads your sensors every 60 seconds, decides when to water, and actually drives the pump and valves. | **Yes — it is the only thing that opens a valve.** |
 
-**New to Home Assistant?** Check out the [official documentation](https://www.home-assistant.io/getting-started/) first!
+**Why two pieces?** Safety and clarity. The integration is completely safe to install and explore — it cannot move a drop of water. The engine that *can* move water is separate, and even after you install it, it stays locked behind a **kill switch** until you deliberately arm it. So you can build the whole thing, look around, and confirm everything is correct **before** anything ever turns on.
 
-## 🎯 Installation Methods
+> **Note on AppDaemon:** older versions of this project used AppDaemon. It is **retired** — do not install it. The f2-control add-on replaces it entirely.
 
-**Choose Your Method:**
+---
 
-### Method 1: HACS Installation (Easiest - Recommended)
-✅ **Best for beginners**  
-✅ **Automatic updates**  
-✅ **One-click installation**
+## What you need before you start
 
-### Step 1: Install HACS (If Not Already Installed)
-**Already have HACS?** Skip to Step 2!
+**Home Assistant:**
+- A running Home Assistant on **HA OS** or **Supervised**.
+  - **Why this matters:** the engine is an *add-on*, and add-ons only exist on HA OS / Supervised installs (they need the Supervisor). If you run HA in a plain Docker container or Core install, you can still use the integration for manual control, but you cannot install the add-on engine.
+- **HACS** installed (the Home Assistant Community Store). If you do not have it: https://hacs.xyz/docs/setup/download
+  - **Why:** HACS is the easiest way to install the integration and get update notifications.
+- You should be comfortable doing three things: open **Settings**, **restart** Home Assistant, and look up a value in **Developer Tools → States**.
 
-**Don't have HACS yet?**
-1. Follow the official HACS installation guide: https://hacs.xyz/docs/setup/download
-2. This usually involves downloading a script and running it
-3. Restart Home Assistant
-4. HACS will appear in your sidebar
+**Hardware (already added to Home Assistant as entities):**
+- A **water pump** you can switch on/off (a `switch.` entity).
+- A **main-line valve** (a `switch.`).
+- One **zone valve** per growing area (a `switch.` each).
+- Per zone, at least one **moisture (VWC) sensor** and one **nutrient (EC) sensor** (`sensor.` entities).
+- Your **grow lights** (so the system knows day vs night).
+  - **Why hardware first:** this system *steers* existing hardware. It does not talk to relays or probes directly — it talks to the Home Assistant entities you already have for them. If your pump isn't a working `switch.` in HA yet, set that up first.
 
-### Step 2: Add Our Repository to HACS
-1. **Open HACS** from your Home Assistant sidebar
-2. **Click "Integrations"** tab at the top
-3. **Click the three dots (⋮)** in the top right
-4. **Select "Custom repositories"**
-5. **Fill out the form:**
-   - Repository URL: `https://github.com/JakeTheRabbit/HA-Irrigation-Strategy`
-   - Category: Select `Integration`
-6. **Click "ADD"**
+---
 
-✅ **Success Check:** You should see a confirmation that the repository was added
+## The steps at a glance
 
-### Step 3: Download the Integration
-1. **Stay in HACS → Integrations**
-2. **Search for "Crop Steering"** in the search box
-3. **Click on "Crop Steering System"** when it appears
-4. **Click "DOWNLOAD"** (blue button)
-5. **Wait for download** (you'll see a progress indicator)
-6. **When complete, restart Home Assistant:**
-   - Settings → System → Restart (red "Restart" button)
-   - Wait 2-3 minutes for restart to complete
+1. Install the integration (HACS).
+2. Create your room's map — the `crop_steering.env` file.
+3. Add the integration in Home Assistant (load your map).
+4. Install the engine (the f2-control add-on).
+5. Configure the add-on.
+6. Create the kill switch.
+7. Start the engine and verify — **nothing waters yet.**
+8. Set your hardware numbers (so shot sizes are correct).
+9. Arm it — go live.
 
-✅ **Success Check:** After restart, continue to Step 4
+Do them in order. Each one builds on the last.
 
-### Step 4: Add the Integration to Your System
-1. **Navigate to Settings → Devices & Services**
-2. **Click the blue "+ ADD INTEGRATION" button** (bottom right)
-3. **Search for "Crop Steering"** and select it
-4. **Choose your setup method** (pick what matches your situation):
+---
 
-   **🌟 Advanced Setup (Recommended for most users):**
-   - Configure zones and sensors through easy forms
-   - Best for complete systems with sensors
-   
-   **🔧 Basic Setup:**
-   - Just creates switches for manual control
-   - Good for testing or simple setups
-   
-   **📁 Load from file:**
-   - Only if you have an existing crop_steering.env file
-   - For users upgrading from older versions
+## Step 1 — Install the integration (via HACS)
 
-**Follow the setup wizard** - it will ask you step-by-step for:
-- Number of zones (1-6)
-- Your pump and valve entities
-- Your sensor entities (if any)
+**Why:** this creates all the `crop_steering` entities — the settings and readouts the rest of the system depends on. On its own it touches no hardware.
 
-✅ **Success Check:** You should see "Crop Steering System" in your device list
+1. Open **HACS** from the Home Assistant sidebar.
+2. Click the three-dot menu **(⋮)** in the top-right → **Custom repositories**.
+3. In the dialog:
+   - **Repository:** `https://github.com/JakeTheRabbit/HA-Irrigation-Strategy`
+   - **Type:** `Integration`
+   - Click **Add**.
+   - **Why this URL:** this is the main project repository, added as an *Integration* in HACS. (The add-on in Step 4 uses a *different* URL in a *different* place — don't mix them up.)
+4. Close the dialog. Search HACS for **Crop Steering System** → open it → **Download**.
+5. **Restart Home Assistant:** **Settings → System → Restart**. Wait 2–3 minutes.
+   - **Why restart:** Home Assistant only loads new integration code on a restart.
 
-### Step 5: Add Full Automation (Optional but Recommended)
+**You are done with Step 1 when:** Home Assistant comes back up with no errors in **Settings → System → Logs**.
 
-**🤔 Do I need this step?**
-- **Skip if:** You want manual control only
-- **Do this if:** You want the system to run automatically
+---
 
-**What you get with automation:**
-- ✅ Automatic phase transitions throughout the day (P0→P1→P2→P3)
-- ✅ Smart decisions about when to water
-- ✅ Professional monitoring dashboards
-- ✅ Combines data from multiple sensors intelligently
-- ✅ No daily maintenance required
+## Step 2 — Create your room's map (`crop_steering.env`)
 
-> ⚠️ **The engine is the f2-control add-on — NOT AppDaemon** (AppDaemon is a retired rollback).
+**Why this is the important step:** this file is how the system learns *your* hardware — which switch is which valve, which sensor is in which zone. The setup wizard in Step 3 has a "Manual" option, but **the manual option only asks how many zones you have — it does not collect your entity names.** The `.env` file is the real way to map everything, and it is much faster than clicking through forms.
 
-#### 5a: Add the add-on (pick one)
-**Easiest — one-click by URL:** Settings → Add-ons → Add-on Store → ⋮ (top-right) →
-**Repositories** → paste **`https://github.com/JakeTheRabbit/f2-control`** → **Add**. *F2 Control*
-now appears in the store.
-> Add that **dedicated add-on repo** URL — not this monorepo's URL or a `.../addons/f2_control`
-> subfolder (HA can't read those; that's the `remote: Not Found` error).
+1. Grab a starter template that matches your zone count from the repo's **`templates/`** folder:
+   - `templates/crop_steering.2zone.env`, `crop_steering.4zone.env`, or `crop_steering.6zone.env`.
+   - (Or copy `crop_steering.env.example` and trim it.)
+2. Save it on your Home Assistant as **`/config/crop_steering.env`**.
+   - Use the **Samba**, **Studio Code Server**, or **File editor** add-on to put a file in `/config`.
+3. Edit it so every line points at **your** real entity IDs. Look IDs up in **Developer Tools → States** if unsure. The keys you fill in:
 
-**Or — local copy (dev/offline):** GitHub → **Code → Download ZIP** (or clone the repo), copy
-the **`addons/f2_control/`** folder onto the host so the path is **`/addons/f2_control/`**
-(*Samba:* `\\YOUR_HA_IP\addons\`; *SSH:* `cp -r HA-Irrigation-Strategy/addons/f2_control /addons/`),
-then Add-on Store → ⋮ → **Reload** → it shows under **Local add-ons**.
+   ```ini
+   # --- per zone (repeat the block for each zone you have) ---
+   ZONE_1_SWITCH=switch.your_zone_1_valve      # the valve for this zone
+   ZONE_1_VWC_FRONT=sensor.your_vwc_1_front    # moisture sensor(s)
+   ZONE_1_VWC_BACK=sensor.your_vwc_1_back      # optional 2nd VWC (leave blank if none)
+   ZONE_1_EC_FRONT=sensor.your_ec_1_front      # nutrient (EC) sensor(s)
+   ZONE_1_EC_BACK=sensor.your_ec_1_back        # optional 2nd EC
+   ZONE_1_PLANT_COUNT=36                        # plants in this zone (used for water math)
+   ZONE_1_MAX_DAILY_VOLUME=20.0                 # safety cap, litres/day for this zone
 
-#### 5b: Install + configure
-1. Open **F2 Control** in the store → **Install** (first build takes ~a minute).
-2. Open it → **Install** (the first build takes ~a minute).
-3. **Configuration** tab: set `lights_on_hour` / `lights_off_hour`, your `notify_service`,
-   and (if they differ from defaults) the feed EC/pH sensor ids and the pump / mainline /
-   valve map. Shot sizing is read live from the integration's per-zone `substrate_volume`
-   (PER-PLANT block) / `plant_count` / `drippers_per_plant` / `dripper_flow_rate` numbers —
-   set those to your real hardware or shots come out the wrong length.
+   # --- shared hardware ---
+   PUMP_SWITCH=switch.your_water_pump           # turns on before any shot
+   MAIN_LINE_SWITCH=switch.your_main_valve      # main line solenoid
+   WASTE_SWITCH=                                # optional recirc/waste valve, blank if none
 
-#### 5c: Kill switch + start
-1. Create the kill switch `input_boolean.f2_control_enabled` (a Helper, or deploy
-   `addons/f2_control/f2_control_package.yaml` to `/config/packages` → Developer Tools →
-   **YAML → reload**). **OFF = safe** — the add-on reads/computes/notifies but never opens a valve.
-2. No token to manage — the add-on gets its HA token automatically (`homeassistant_api: true`).
-3. **Start** the add-on. Log shows `starting | kill-switch … | token present: True`. Leave
-   the kill switch **OFF** until you've watched a photoperiod, then flip it ON to go live.
+   # --- lights (so it knows day vs night) ---
+   LIGHT_ENTITY=light.your_grow_lights
+   LIGHTS_ON_TIME=10:00
+   LIGHTS_OFF_TIME=22:00
 
-> **Updating later — Rebuild, NOT Restart.** The Dockerfile bakes the Python into the image
-> at build (`COPY f2_control /app`). After changing any file, copy it to `/addons/f2_control/`
-> again and use the add-on's **⋮ → Rebuild** — a plain Restart re-runs the old baked code.
-
-✅ **Success Check:** `sensor.crop_steering_ai_heartbeat` shows attribute `engine: f2-control`
-with a fresh `last_beat`, and `sensor.crop_steering_app_status` is live (e.g. `safe_idle`).
-
-## Method 2: Manual Installation (Advanced Users)
-
-⚠️ **Use HACS instead if possible** - it's much easier and provides automatic updates!
-
-### Step 1: Download the Repository
-1. Go to https://github.com/JakeTheRabbit/HA-Irrigation-Strategy
-2. Click **Code** → **Download ZIP**
-3. Extract the ZIP file
-
-### Step 2: Copy Integration Files
-1. Copy the `custom_components/crop_steering` folder to your Home Assistant:
-   - Destination: `/config/custom_components/crop_steering/`
-   
-2. The structure should look like:
-   ```
-   /config/
-   └── custom_components/
-       └── crop_steering/
-           ├── __init__.py
-           ├── manifest.json
-           ├── config_flow.py
-           ├── sensor.py
-           ├── switch.py
-           ├── number.py
-           ├── select.py
-           └── (other files)
+   # --- optional room sensors ---
+   TEMPERATURE_SENSOR=sensor.your_room_temp
+   HUMIDITY_SENSOR=sensor.your_room_humidity
    ```
 
-3. Restart Home Assistant
+   - **Why each part:** the `ZONE_n_*` lines map each zone's valve and probes. `PLANT_COUNT` feeds the watering math (more plants = more water per shot). `MAX_DAILY_VOLUME` is a per-zone safety ceiling. `PUMP_SWITCH` / `MAIN_LINE_SWITCH` are the shared plumbing the engine sequences before each shot. The lights tell the system when the grow-day starts and ends.
+   - A blank value (e.g. `ZONE_1_VWC_BACK=`) just means "I don't have that one" — perfectly fine.
 
-### Step 3: Add the Integration
-Same as HACS Step 4 above - use the GUI to configure
+**You are done with Step 2 when:** `/config/crop_steering.env` exists and every filled-in entity ID matches something real in **Developer Tools → States**.
 
-### Step 4: Install the f2-control add-on (for autonomy)
-Same as Step 5 above (copy `addons/f2_control/` to `/addons/`, Reload, Install).
+---
 
-## 🎛️ System Configuration
+## Step 3 — Add the integration in Home Assistant
 
-### 🎯 Basic Configuration (Required)
-The setup wizard will walk you through this:
+**Why:** this reads your `.env` map and actually builds the per-zone entities for your specific setup.
 
-**Zone Setup:**
-- How many growing areas do you have? (1-6 zones)
-- Each zone can have its own sensors and controls
+1. Go to **Settings → Devices & Services**.
+2. Click **+ Add Integration** (bottom-right) → search **Crop Steering** → select it.
+3. When asked how to set up, choose **Load from crop_steering.env file**.
+   - **Why this option:** it reads the map you just made and auto-detects however many zones your file defines (well past 6 if you need them). The other option, "Manual", only sets a zone count and leaves the hardware unmapped, so you'd end up with a half-configured system.
+4. Submit. The integration creates all the `crop_steering_*` entities for your zones.
 
-**Hardware Mapping:**
-- **Water Pump:** The entity that turns your pump on/off
-- **Main Valve:** The solenoid that controls your main water line
-- **Zone Valves:** Individual valves for each growing area
+**You are done with Step 3 when:** **Settings → Devices & Services** shows a **Crop Steering System** device, and in **Developer Tools → States** a filter for `crop_steering` lists many entities (for example `sensor.crop_steering_current_phase`, `switch.crop_steering_zone_1_enabled`, `number.crop_steering_p1_target_vwc`).
 
-*Don't know your entity names?* Check Developer Tools → States
+> At this point the system is fully installed as a **monitor and manual-control** layer. It still cannot move water — there is no engine yet. That's next.
 
-### 🌡️ Sensor Configuration (Optional)
-For each zone, you can add:
+---
 
-**Moisture Monitoring:**
-- **Front VWC Sensor:** Moisture sensor at front of growing area
-- **Back VWC Sensor:** Second moisture sensor for better accuracy
+## Step 4 — Install the engine (the f2-control add-on)
 
-**Nutrient Monitoring:**
-- **Front EC Sensor:** Nutrient/salt level sensor at front
-- **Back EC Sensor:** Second EC sensor for better accuracy
+**Why:** the integration never drives hardware. The f2-control add-on is the program that actually waters — it runs the daily P0→P1→P2→P3 cycle and sequences your pump and valves.
 
-**Environmental Sensors (system-wide):**
-- **Temperature Sensor:** Air temperature
-- **Humidity Sensor:** Relative humidity
-- **VPD Sensor:** Vapor Pressure Deficit (if available)
+**The easy way — add it by URL:**
 
-**💡 Pro Tip:** You can always add more sensors later by reconfiguring the integration
+1. Go to **Settings → Add-ons → Add-on Store**.
+2. Click the three-dot menu **(⋮)** top-right → **Repositories**.
+3. Paste this URL and click **Add**, then close the dialog:
+   ```
+   https://github.com/JakeTheRabbit/f2-control
+   ```
+4. **F2 Control** now appears in the store. Open it → **Install** (the first build takes about a minute).
 
-### Legacy Configuration (crop_steering.env)
-If you have an existing setup, you can load from your crop_steering.env file by selecting "Load from file" during setup.
+> **Use that exact URL.** It is the dedicated add-on repository. Do **not** paste the main project URL from Step 1, and do **not** paste a `.../addons/f2_control` sub-folder link. Home Assistant cannot read those and will say `remote: Not Found / repository '…/addons/f2_control/' not found`. The `f2-control` repository exists precisely to give you one clean, working URL.
 
-## ✅ Test Your Installation
+**Alternative — local copy (only for offline or development):** download the project ZIP, copy the **`addons/f2_control/`** folder onto the host so the path is **`/addons/f2_control/`** (via Samba `\\YOUR_HA_IP\addons\`, or SSH `cp -r HA-Irrigation-Strategy/addons/f2_control /addons/`), then **Add-on Store → ⋮ → Reload** — it appears under **Local add-ons**.
 
-### 🔍 Quick System Check
+**You are done with Step 4 when:** F2 Control shows **Installed** with **Configuration**, **Log**, and **Info** tabs.
 
-**1. Check Integration Status**
-- Go to **Settings → Devices & Services**
-- Look for **"Crop Steering System"** device
-- Should show green "Connected" status
-- Click on it to see all your zones
+---
 
-**2. Verify Entities Were Created**
-- Go to **Developer Tools → States**
-- Type **"crop_steering"** in the filter box
-- You should see many entities like:
-  - `sensor.crop_steering_current_phase`
-  - `switch.crop_steering_system_enabled`
-  - `switch.crop_steering_zone_1_enabled` (for each zone)
-  - `number.crop_steering_p1_target_vwc`
-  - And many more!
+## Step 5 — Configure the add-on
 
-**3. Test Basic Control**
-- Find `switch.crop_steering_system_enabled`
-- Try turning it OFF and ON
-- The state should change immediately
+**Why:** the engine needs to know your light hours (to time the daily cycle) and where to send alerts. These live on the add-on's own **Configuration** tab.
 
-**4. Check the f2-control add-on**
-- Go to **Settings → Add-ons → F2 Control** → **"Log"** tab
-- Look for: `starting | kill-switch … | token present: True`, then clean per-tick lines
-- Confirm `sensor.crop_steering_ai_heartbeat` shows `engine: f2-control` with a fresh `last_beat`
-- **If you changed add-on files:** you must **⋮ → Rebuild** (a Restart runs the old code)
+1. Open **F2 Control → Configuration**.
+2. Set:
+   - **`lights_on_hour` / `lights_off_hour`** — the hour (0–23) your lights turn on and off (e.g. `10` and `22`).
+     - **Why:** this is what the engine uses to decide when the grow-day starts (lights-on resets the daily counters) and when to wind down for the night. The engine reads these here, not from the integration.
+   - **`notify_service`** — your phone's notify service, e.g. `notify/mobile_app_your_phone`.
+     - **Why:** so it can text you vitals and alerts. Find yours in **Developer Tools → Actions** by typing `notify.`.
+   - Leave the rest at their defaults unless you know you need to change them:
+     - `enable_flag` (`input_boolean.f2_control_enabled`) — the kill switch you create in Step 6.
+     - `substrate_l` / `flow_lps` — **fallback** sizing values only; the engine reads your real per-zone hardware numbers live (see Step 8), so these are rarely used.
+     - `loop_seconds` (60), `notify_min` (30 minutes between routine vitals).
+3. Click **Save**.
 
-### 🚨 Troubleshooting Quick Fixes
+> There is **no token to paste.** The add-on gets its Home Assistant access automatically (`homeassistant_api: true`).
 
-**Problem: "I don't see Crop Steering in Add Integration"**
-- ✅ **Solution:** Restart Home Assistant and wait 2-3 minutes
-- ✅ **Check:** Settings → System → Logs for any error messages
+**You are done with Step 5 when:** Configuration is saved with your light hours and notify service.
 
-**Problem: "The F2 Control add-on won't start or shows errors"**
-- ✅ **Check the kill switch helper exists:** `input_boolean.f2_control_enabled` must be created
-- ✅ **Check the log** for the failing line; a traceback usually points at a missing entity id
-- ✅ **Changed a file but nothing changed?** Use **⋮ → Rebuild**, not Restart (the image bakes the code)
-- ✅ **Remember:** the integration works fine without the add-on for manual control + dashboards
+---
 
-**Problem: "I only see some of my zones"**
-- ✅ **This is normal:** Entities are only created for the zones you configured
-- ✅ **Want more zones?** Reconfigure the integration to add them
+## Step 6 — Create the kill switch
 
-**Problem: "My sensors show 'Unknown' or 'None'"**
-- ✅ **Check entity names:** Go to Developer Tools → States and verify your sensor entity names
-- ✅ **Check sensor status:** Make sure your physical sensors are working
+**Why:** this is your master safety switch. While it is **OFF**, the engine still reads sensors, makes decisions, and sends notifications — but it **never opens a valve**. This is what lets you start and watch the engine with zero risk before going live. **OFF = safe.**
 
-## 🎉 You're Done! What's Next?
+Pick one method:
 
-### 🌱 First-Time Setup
-1. **Choose your crop profile:**
-   - Settings → Devices & Services → Crop Steering System → Configure
-   - Select your plant type (Cannabis, Tomato, Lettuce, etc.)
-   - Choose growth stage (Vegetative or Generative)
+- **Easy (UI):** **Settings → Devices & Services → Helpers → + Create Helper → Toggle.** Name it so its entity ID becomes exactly **`input_boolean.f2_control_enabled`**.
+- **Or (file):** copy **`addons/f2_control/f2_control_package.yaml`** into your `/config/packages/` folder, then **Developer Tools → YAML → Reload** (this also defines the same helper).
 
-2. **Set your light schedule:**
-   - Look for `number.crop_steering_lights_on_hour` entity
-   - Set when your lights turn on (0-23 hours)
-   - Set when lights turn off with `number.crop_steering_lights_off_hour`
+**Leave it OFF.**
 
-3. **Confirm the engine is alive (no hardware moves):**
-   - `sensor.crop_steering_ai_heartbeat` shows attribute `engine: f2-control`, updating.
-   - `sensor.crop_steering_app_status` is a live state (e.g. `safe_idle`).
-   - Keep the kill switch `input_boolean.f2_control_enabled` **OFF** until you've watched a photoperiod.
+**You are done with Step 6 when:** `input_boolean.f2_control_enabled` exists (check **Developer Tools → States**) and is **off**.
 
-### 🤖 With the f2-control add-on armed
-Once you flip the kill switch `input_boolean.f2_control_enabled` **ON**, the system will:
-- Automatically transition through phases each day (P0→P1→P2→P3)
-- Make smart irrigation decisions from your sensors + the feed-water safety gate
-- Republish the `crop_steering_*` status surface for the dashboards
-- Run autonomously — **one-line rollback is flipping the kill switch OFF**
+---
 
-**Then watch the first real cycle: shots should land and VWC should rise.** 📊
+## Step 7 — Start the engine and verify (nothing waters yet)
 
-### 📚 Learn More
-- **[Operation Guide](operation_guide.md)** - How to use your system day-to-day
-- **[Troubleshooting Guide](troubleshooting.md)** - Solutions to common issues
+**Why:** before trusting it with your plants, confirm the two layers are actually talking. With the kill switch OFF, this is completely safe — it's a dry run.
 
-### 🆘 Need Help?
-- **GitHub Issues:** https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues
-- **Home Assistant Forum:** Search for "Crop Steering"
-- **Discord:** Join the Home Assistant Discord and ask in #custom-components
+1. **F2 Control → Info → Start.**
+2. Open the **Log** tab. You should see a line like:
+   the startup lines include `kill-switch input_boolean.f2_control_enabled` and
+   `token present: True`, then calm per-zone lines every minute.
+   - **Why this proves it works:** "token present: True" means it can reach Home Assistant; the kill-switch line confirms it sees your safety switch; the per-zone lines mean it is reading sensors and deciding (but not acting, because the switch is OFF).
+3. Confirm in **Developer Tools → States**:
+   - `sensor.crop_steering_ai_heartbeat` has the attribute **`engine: f2-control`** and a fresh `last_beat`.
+   - `sensor.crop_steering_app_status` shows a live state (e.g. `safe_idle`).
 
-### 🎯 Pro Tips
-- **Start conservative:** Use smaller shot sizes and longer intervals initially
-- **Monitor closely:** Watch how your plants respond for the first few days
-- **Adjust gradually:** Small parameter changes work better than big ones
-- **Use test helpers:** The system creates test entities you can use for learning
+**You are done with Step 7 when:** the heartbeat shows `engine: f2-control` and updates, and the log is clean. Both layers are now connected.
 
-**Congratulations! Your advanced crop steering system is ready to optimize your garden! 🌿🚰**
+---
+
+## Step 8 — Set your hardware numbers (so shot sizes are correct)
+
+**Why this matters a lot:** a "shot" is a percentage of your substrate volume, delivered at your drip rate. If the substrate and flow numbers don't match your real hardware, the engine calculates the **wrong duration** — and the classic failure is shots coming out far too short, so the pump rapid-cycles and moisture never rises.
+
+Set these numbers (in **Developer Tools → States**, or on the dashboard) to your real hardware. Most are **system-wide** (one value for the whole system); only plant count is per zone:
+
+- **`number.crop_steering_substrate_volume`** (system-wide) — the **per-plant** block/cube size in litres (for example a 6 L rockwool block = `6`). The engine multiplies this by each zone's plant count to get that zone's total, so enter the **per-plant** figure, not the whole-zone total.
+- **`number.crop_steering_zone_N_plant_count`** (per zone) — plants in zone N (also set from your `.env`).
+- **`number.crop_steering_drippers_per_plant`** (system-wide) — emitters per plant (often `1`).
+- **`number.crop_steering_dripper_flow_rate`** (system-wide) — flow per dripper in litres/hour (e.g. a 4 L/hr Netafim = `4`).
+
+**Worked example (so you can sanity-check yours):** 36 plants, a 6 L block each, one 4 L/hr dripper each →
+zone substrate = 6 × 36 = **216 L**; zone flow = 36 × 1 × 4 ÷ 3600 = **0.04 L/s**; a 6% maintenance shot = 0.06 × 216 ÷ 0.04 = **about 324 seconds (~5.4 minutes)**.
+If your computed shot is a few seconds instead of minutes, your substrate/flow numbers are wrong — fix them before arming.
+
+For the full math, EC targets, and per-stage recipe values, see the **[Operation Guide](operation_guide.md)** and the project wiki's *Configuration & Recipes* page.
+
+**You are done with Step 8 when:** a maintenance shot computes to a sensible duration (minutes, not seconds) for your layout.
+
+---
+
+## Step 9 — Arm it (go live)
+
+**Why the caution:** this is the only step that can move water. Do it deliberately, and watch the first cycle.
+
+1. **Watch one full photoperiod with the kill switch still OFF.** The engine logs what it *would* do. Confirm the decisions look sane (it transitions phases, and the shots it wants are sensible sizes).
+   - **Why:** a free dress-rehearsal. If anything looks wrong, you fix it with zero risk.
+2. When you're satisfied, turn **`input_boolean.f2_control_enabled` ON**.
+3. **Watch the first real cycle.** You should see the pump prime, the main line and a zone valve open, a shot run, and **VWC rise** afterward.
+
+> **Instant rollback:** if anything looks wrong at any time, flip **`input_boolean.f2_control_enabled` OFF**. The engine immediately stops opening valves. That one switch is your stop button, forever.
+
+**You are done when:** a real shot has fired, moisture rose in response, and you're comfortable leaving it running.
+
+---
+
+## Updating the engine later — Rebuild, not Restart
+
+When a new version ships (or you change any add-on file), use the add-on's **⋮ → Rebuild**, or click **Update** when Home Assistant offers it.
+
+**Why:** the add-on bakes its Python code into its container image at **build** time (`Dockerfile COPY`). A plain **Restart re-runs the old baked code** and silently ignores your change. **Rebuild** re-copies the new code, then restarts. If you ever change a file and "nothing happened," this is almost always why.
+
+---
+
+## Troubleshooting quick fixes
+
+**"I don't see Crop Steering when I click Add Integration."**
+Restart Home Assistant and wait 2–3 minutes (new integrations only load on restart). Check **Settings → System → Logs** for errors.
+
+**"Adding the add-on says repository not found."**
+You pasted the wrong URL. In **Add-on Store → ⋮ → Repositories**, use exactly `https://github.com/JakeTheRabbit/f2-control` — not the main project URL and not a sub-folder.
+
+**"The add-on won't start."**
+Make sure the kill-switch helper `input_boolean.f2_control_enabled` exists (Step 6). Read the **Log** tab — a traceback usually names a missing entity ID; fix it in your `.env` and reload the integration.
+
+**"I changed an add-on file but nothing changed."**
+Use **⋮ → Rebuild**, not Restart (see above).
+
+**"The pump fires constantly / shots are only a few seconds."**
+Your substrate/flow numbers are off (Step 8). The most common mistake is entering `substrate_volume` as the whole-zone total instead of the **per-plant** block size. Confirm a real shot is minutes, not seconds.
+
+**"It's not watering even though a zone is dry."**
+This is often correct, not a bug: the engine holds while the feed water is out of range (pH/EC) or while the tank is filling/dosing. Check `sensor.crop_steering_zone_N_phase`'s reason attribute and your feed pH/EC. Full details in the **[Troubleshooting Guide](troubleshooting.md)**.
+
+**"Some sensors show Unknown / None."**
+Verify the entity IDs in your `.env` match real, working entities in **Developer Tools → States**.
+
+---
+
+## Manual installation (advanced — skip if you used HACS)
+
+If you can't use HACS:
+
+1. Download the project ZIP from https://github.com/JakeTheRabbit/HA-Irrigation-Strategy → **Code → Download ZIP**.
+2. Copy **`custom_components/crop_steering`** to **`/config/custom_components/crop_steering/`** so it contains `__init__.py`, `manifest.json`, `config_flow.py`, and the platform files.
+3. Restart Home Assistant, then continue from **Step 2** above.
+4. Install the engine exactly as in **Step 4** (the local-copy alternative).
+
+---
+
+## Learn more
+
+- **[Operation Guide](operation_guide.md)** — running it day to day: arming, the monitoring checklist, and tuning.
+- **[Troubleshooting Guide](troubleshooting.md)** — when something is off.
+- **Project wiki** — Installation, Configuration & Recipes, Safety, Phase Logic, and FAQ pages.
+
+**That's it.** You installed the data layer, mapped your room, installed the engine, proved it works safely, and armed it with a one-flick stop switch. Welcome to autonomous crop steering.
