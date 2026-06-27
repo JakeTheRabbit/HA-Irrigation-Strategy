@@ -580,5 +580,23 @@
         }
       }
     }
+  },
+  "issues": {
+    "kill_switch_missing": {
+      "title": "Crop Steering: kill switch helper missing",
+      "description": "The engine is gated by the helper `input_boolean.f2_control_enabled`, but it doesn't exist — so the F2 Crop Steering add-on can't run. Create it: Settings → Devices & Services → Helpers → Create Helper → Toggle, named so the entity is input_boolean.f2_control_enabled. Leave it OFF until you're ready to irrigate."
+    },
+    "engine_offline": {
+      "title": "Crop Steering: engine not running",
+      "description": "No fresh heartbeat from the add-on (sensor.crop_steering_ai_heartbeat is missing or stale). The integration creates the entities, but the F2 Crop Steering add-on is what actually steers. Install/start it and check its log. If you only use manual control, you can ignore this."
+    },
+    "zone_no_sensor": {
+      "title": "Crop Steering: zone with no moisture sensor",
+      "description": "Zone(s) {zones} have no VWC sensor mapped, so they can't be steered. Add a probe in Settings → Devices & Services → Crop Steering → Configure → Edit zones & hardware."
+    },
+    "fused_sensor_unavailable": {
+      "title": "Crop Steering: zone sensor unavailable",
+      "description": "The moisture sensor for zone(s) {zones} reads unavailable — the probe(s) may be offline or misnamed. Check it in Developer Tools → States and your zone mapping."
+    }
   }
 }
