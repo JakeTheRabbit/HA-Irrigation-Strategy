@@ -18,15 +18,13 @@ This step-by-step guide will walk you through installing the Crop Steering Syste
 - Individual zone valves (up to 6 zones supported)
 - Grow lights controlled by Home Assistant
 
-### 🔧 Optional But Recommended
-**AppDaemon Add-on** - Enables full automation:
-- Automatic phase transitions throughout the day
-- Smart sensor data processing
-- Professional monitoring dashboards
-- Advanced irrigation decisions
+### 🔧 The engine — the f2-control add-on
+The **f2-control add-on** (`addons/f2_control/`, installed in Step 5) is what makes it
+autonomous — automatic phase transitions, sensor fusion, the safe hardware sequence, and
+the 30-min vitals. *(AppDaemon is a retired rollback; you don't install it.)*
 
-**Without AppDaemon:** You get manual control and basic monitoring
-**With AppDaemon:** You get full autonomous operation
+**Integration only:** entities + manual control + dashboards. **+ the f2-control add-on:**
+full autonomous P0→P1→P2→P3 operation. Supervised / HA-OS only (add-ons need the Supervisor).
 
 ### 🏠 Home Assistant Knowledge Check
 Before proceeding, make sure you can:
@@ -116,66 +114,44 @@ Before proceeding, make sure you can:
 - ✅ Combines data from multiple sensors intelligently
 - ✅ No daily maintenance required
 
-#### 5a: Install AppDaemon Add-on
-1. **Go to Settings → Add-ons → Add-on Store**
-2. **Search for "AppDaemon 4"**
-3. **Click on AppDaemon 4** and click **INSTALL**
-4. **DON'T START IT YET** - we need to configure it first
+> ⚠️ **The engine is the f2-control add-on — NOT AppDaemon.** (AppDaemon is a retired
+> rollback; don't install it.) And it's a **local** add-on: you copy its folder onto the
+> host. **Do not** add this GitHub URL in the Add-on Store and **do not** `git clone` the
+> `addons/f2_control` subfolder — this repo is a code monorepo, not an add-on repository,
+> so the URL/clone gives `remote: Not Found / repository '…/addons/f2_control/' not found`.
 
-#### 5b: Get the Automation Files
-**Option A: Download via GitHub (Easiest)**
-1. Go to https://github.com/JakeTheRabbit/HA-Irrigation-Strategy
-2. Click the green **"Code"** button → **"Download ZIP"**
-3. Extract the ZIP file on your computer
-4. Look for the `appdaemon/apps/` folder
+#### 5a: Copy the add-on onto the HA host
+1. Get the files: GitHub → green **Code** → **Download ZIP** (or
+   `git clone https://github.com/JakeTheRabbit/HA-Irrigation-Strategy.git`).
+2. Copy the **`addons/f2_control/`** folder onto the host so the path is **`/addons/f2_control/`**:
+   - **Samba/SMB:** `\\YOUR_HA_IP\addons\` → drop `f2_control` in.
+   - **SSH/Terminal:** `cp -r HA-Irrigation-Strategy/addons/f2_control /addons/`
+   It must contain `config.yaml`, `Dockerfile`, `run.sh`, and the `f2_control/` Python package.
 
-**Option B: Use Git (Advanced Users)**
-```bash
-git clone https://github.com/JakeTheRabbit/HA-Irrigation-Strategy.git
-```
+#### 5b: Install + configure
+1. **Settings → Add-ons → Add-on Store → ⋮ (top-right) → Reload.** *F2 Control* now shows
+   under **Local add-ons**.
+2. Open it → **Install** (the first build takes ~a minute).
+3. **Configuration** tab: set `lights_on_hour` / `lights_off_hour`, your `notify_service`,
+   and (if they differ from defaults) the feed EC/pH sensor ids and the pump / mainline /
+   valve map. Shot sizing is read live from the integration's per-zone `substrate_volume`
+   (PER-PLANT block) / `plant_count` / `drippers_per_plant` / `dripper_flow_rate` numbers —
+   set those to your real hardware or shots come out the wrong length.
 
-#### 5c: Copy Files to AppDaemon
-**Find your AppDaemon folder:**
-- **File Manager:** Browse to `/addon_configs/a0d7b954_appdaemon/apps/`
-- **Samba/SMB:** `\\YOUR_HA_IP\addon_configs\a0d7b954_appdaemon\apps\`
-- **SSH/Terminal:** `/addon_configs/a0d7b954_appdaemon/apps/`
+#### 5c: Kill switch + start
+1. Create the kill switch `input_boolean.f2_control_enabled` (a Helper, or deploy
+   `addons/f2_control/f2_control_package.yaml` to `/config/packages` → Developer Tools →
+   **YAML → reload**). **OFF = safe** — the add-on reads/computes/notifies but never opens a valve.
+2. No token to manage — the add-on gets its HA token automatically (`homeassistant_api: true`).
+3. **Start** the add-on. Log shows `starting | kill-switch … | token present: True`. Leave
+   the kill switch **OFF** until you've watched a photoperiod, then flip it ON to go live.
 
-**Copy these files:**
-From the downloaded files, copy:
-```
-appdaemon/apps/apps.yaml → /addon_configs/a0d7b954_appdaemon/apps/
-appdaemon/apps/crop_steering/ → /addon_configs/a0d7b954_appdaemon/apps/crop_steering/
-```
+> **Updating later — Rebuild, NOT Restart.** The Dockerfile bakes the Python into the image
+> at build (`COPY f2_control /app`). After changing any file, copy it to `/addons/f2_control/`
+> again and use the add-on's **⋮ → Rebuild** — a plain Restart re-runs the old baked code.
 
-#### 5d: Configure AppDaemon
-1. **Edit the main config file:** `/addon_configs/a0d7b954_appdaemon/appdaemon.yaml`
-2. **Add your Home Assistant details:**
-   ```yaml
-   appdaemon:
-     latitude: YOUR_LATITUDE
-     longitude: YOUR_LONGITUDE
-     elevation: YOUR_ELEVATION
-     time_zone: YOUR_TIMEZONE
-     plugins:
-       HASS:
-         type: hass
-         ha_url: http://YOUR_HA_IP:8123
-         token: YOUR_LONG_LIVED_ACCESS_TOKEN
-   ```
-
-**Need a token?**
-- Go to your Profile in Home Assistant (click your username)
-- Scroll down to "Long-Lived Access Tokens"
-- Click "CREATE TOKEN"
-- Copy the token and paste it in the config
-
-#### 5e: Start AppDaemon
-1. **Go to Settings → Add-ons → AppDaemon 4**
-2. **Click "START"**
-3. **Wait 30 seconds, then check the log**
-4. **Look for:** "Master Crop Steering Application initialized"
-
-✅ **Success Check:** If you see that message, automation is working!
+✅ **Success Check:** `sensor.crop_steering_ai_heartbeat` shows attribute `engine: f2-control`
+with a fresh `last_beat`, and `sensor.crop_steering_app_status` is live (e.g. `safe_idle`).
 
 ## Method 2: Manual Installation (Advanced Users)
 
