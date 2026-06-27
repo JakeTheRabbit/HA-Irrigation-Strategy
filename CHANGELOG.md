@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### f2-control add-on 0.3.0
+
+**🌱 In plain English.** The add-on now has a proper name (“F2 Crop Steering”) and a custom
+icon in the Add-on Store, and every setting on its Configuration page has a help description
+(what `notify_service`, the lights hours, the kill switch, etc. actually do). Under the hood:
+the add-on safely remembers each zone's state across restarts and updates — so upgrading never
+wipes your progress or makes you set things up again — and there are now automated tests that
+guarantee that stays true.
+
+**🔧 Technical notes.**
+- Add-on UX: `config.yaml` `name: F2 Crop Steering`, version 0.2.0 → 0.3.0; added `icon.png` +
+  `logo.png`; added `translations/en.yaml` with `configuration:` name/description for all eight
+  options (shown as field help in the Supervisor UI).
+- Documented the persistence + compatibility contract in `CLAUDE.md` (*Compatibility & data*):
+  `/data/state.json` is non-ephemeral; `_load_state` tolerates missing/old/partial state;
+  options read with defaults; stay generic (flagged the F2-specific feed-sensor / `substrate_l`
+  / `flow_lps` defaults as known debt).
+- Tests: `tests/test_state_migration.py` (in-place upgrade — old `state.json` loads: missing
+  file, corrupt JSON, missing/unknown keys, bad timestamp, new zone seeded, save→load round-trip)
+  and `tests/test_version_consistency.py` (manifest == CHANGELOG == README badge). Added
+  `TESTING.md` and `tests/run_ci.sh` (local CI mirror). Both new suites green; full `tests/` 34/34.
+
 ## [2.6.0] - 2026-06-27
 
 ### 🌱 In plain English

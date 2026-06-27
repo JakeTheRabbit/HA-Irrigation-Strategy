@@ -1,0 +1,47 @@
+configuration:
+  lights_on_hour:
+    name: Lights-on hour
+    description: >-
+      Hour of the day (0-23, local time) your grow lights turn ON. This starts
+      each grow-day - the daily water and shot counters reset at lights-on.
+      Example: 10 means 10:00 am.
+  lights_off_hour:
+    name: Lights-off hour
+    description: >-
+      Hour (0-23) your lights turn OFF. At lights-off the engine forces every
+      zone into the overnight dry-back phase (P3). Example: 22 means 10:00 pm.
+  enable_flag:
+    name: Kill-switch entity
+    description: >-
+      The master safety switch. While this input_boolean is OFF the engine reads
+      sensors and makes decisions but NEVER opens a valve (the safe default).
+      Turn it ON to go live. Leave as input_boolean.f2_control_enabled unless you
+      named your helper something else.
+  notify_service:
+    name: Notification service
+    description: >-
+      Where to send vitals and alerts. Use the path form notify/<your_service>,
+      for example notify/mobile_app_pixel_8. Find yours in
+      Developer Tools > Actions by typing "notify".
+  notify_min:
+    name: Minutes between routine notifications
+    description: >-
+      Minimum minutes between routine "vitals" messages so you are not spammed.
+      Urgent alerts ignore this throttle. Default 30.
+  substrate_l:
+    name: Fallback substrate volume (L per plant)
+    description: >-
+      Used ONLY as a fallback if the integration's per-zone substrate_volume
+      number is unset. Normally leave this - real shot sizing is read live from
+      your per-zone hardware numbers (substrate_volume x plant_count).
+  flow_lps:
+    name: Fallback drip flow (L per second)
+    description: >-
+      Used ONLY as a fallback if the per-zone flow cannot be computed from your
+      plant count and dripper settings. Normally leave this - real flow is
+      plant_count x drippers_per_plant x dripper_flow_rate.
+  loop_seconds:
+    name: Decision interval (seconds)
+    description: >-
+      How often the engine wakes to read sensors and decide. Default 60. Lower
+      reacts faster but makes more Home Assistant API calls.

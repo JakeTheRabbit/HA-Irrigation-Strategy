@@ -112,8 +112,11 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
 - **Dependencies:** integration = pure HA + voluptuous (no external deps). Engine
   (`crop-steering-engine`) = pure Python, no scipy/numpy; f2-control add-on container
   installs its own deps from `addons/f2_control/requirements.txt`.
-- **Testing:** `tests/test_calculations.py` covers the integration calc helpers; no
-  real hardware needed (input_boolean/number simulate pumps/sensors).
+- **Testing:** see `TESTING.md`; run `bash tests/run_ci.sh` (mirrors CI). Suites: the pure
+  `decide()` core (`crop-steering-engine/tests`), the lean harness, integration calc helpers
+  (`tests/test_calculations.py`), the add-on **state-migration / in-place-upgrade** contract
+  (`tests/test_state_migration.py`), and **version consistency** (`tests/test_version_consistency.py`).
+  Any change to persisted state, add-on options, or entities needs a test proving an OLD install still loads.
 - **Deploying engine changes:** copy changed modules to `addons/f2_control/` on the
   live box, then **Rebuild** the add-on from Supervisor (⋮ → Rebuild) — the Dockerfile
   `COPY f2_control /app` bakes the code into the image at build time, so a plain
@@ -128,6 +131,45 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
   `main`. Retired branches are kept as `archive/*` tags.
 - **Changelog = dual view.** Every release in `CHANGELOG.md` leads with **🌱 In plain English** (anyone
   can follow it) then **🔧 Technical notes** (entity/code detail). Keep both when adding a release.
+
+## Compatibility & data — never break a live install
+
+This system is live-installed on many boxes, old and new. Every change must upgrade them
+**transparently in place** AND work **zero-setup** on a fresh install. Do not tailor a change
+to one facility and break others.
+
+**State & storage.** The add-on persists per-zone runtime state to **`/data/state.json`**
+(HA-managed, **non-ephemeral** — survives restart and Rebuild): phase, peak VWC, shot/daily
+counters, EC offset/integral, timestamps. Writes are atomic (`tmp` + `os.replace`).
+`/data/options.json` holds the user's add-on config (HA-managed). The engine keeps **no
+database** and writes nothing outside `/data`; the integration stores its config in the HA
+config entry. There is no schema to migrate by hand.
+
+**In-place upgrade (mandatory).**
+- `Controller._load_state` already tolerates a missing file, corrupt JSON, missing keys,
+  unknown legacy keys, bad timestamps, and zones absent from the file (they seed fresh).
+  **Keep it that way.** Adding a state field → add it to `_fresh_zone` with a safe default and
+  read it with `.get(k)` / `is not None`; never assume it exists in an old file.
+- Adding an add-on option → give it a neutral default and read it `o.get("key", default)` so an
+  old `options.json` without the key still works. Never require the operator to wipe state,
+  re-run setup, reconfigure, or hand-migrate a schema.
+- Integration entity changes → additive. Renaming/removing an entity an old install relies on
+  is breaking; avoid or migrate.
+
+**Fresh install (mandatory).** Works with no extra layers — no manual DB/schema step, no
+required post-install migration. Defaults sane out of the box.
+
+**Stay generic.** F2-specific values are **defaults/overrides, never hardcoded assumptions**:
+entity ids (`switch.veg_main_pump`, `sensor.atlas_legacy_1_ec`, …), 36 plants, 6 L block,
+4 L/hr, lights 10–22, feed band EC 2.3–3.5 / pH 5.8–6.2. A change that only works because of
+F2's exact names or numbers is a bug. (**Known debt:** the add-on's `feed_ec_sensor` /
+`feed_ph_sensor` and `substrate_l` / `flow_lps` defaults are F2-specific — make them
+configurable with neutral defaults before a wider release.)
+
+**Prove it.** `tests/test_state_migration.py` locks the backward-compatible load and
+`tests/test_version_consistency.py` keeps versions aligned. Run `bash tests/run_ci.sh`; detail
+in `TESTING.md`. A change to state/options/entities isn't done until a test shows an old
+install still loads.
 
 ## Hard-won operational notes (read before touching the live F2 engine)
 
