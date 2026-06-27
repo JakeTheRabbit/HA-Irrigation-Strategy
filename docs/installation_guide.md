@@ -114,23 +114,22 @@ Before proceeding, make sure you can:
 - ✅ Combines data from multiple sensors intelligently
 - ✅ No daily maintenance required
 
-> ⚠️ **The engine is the f2-control add-on — NOT AppDaemon.** (AppDaemon is a retired
-> rollback; don't install it.) And it's a **local** add-on: you copy its folder onto the
-> host. **Do not** add this GitHub URL in the Add-on Store and **do not** `git clone` the
-> `addons/f2_control` subfolder — this repo is a code monorepo, not an add-on repository,
-> so the URL/clone gives `remote: Not Found / repository '…/addons/f2_control/' not found`.
+> ⚠️ **The engine is the f2-control add-on — NOT AppDaemon** (AppDaemon is a retired rollback).
 
-#### 5a: Copy the add-on onto the HA host
-1. Get the files: GitHub → green **Code** → **Download ZIP** (or
-   `git clone https://github.com/JakeTheRabbit/HA-Irrigation-Strategy.git`).
-2. Copy the **`addons/f2_control/`** folder onto the host so the path is **`/addons/f2_control/`**:
-   - **Samba/SMB:** `\\YOUR_HA_IP\addons\` → drop `f2_control` in.
-   - **SSH/Terminal:** `cp -r HA-Irrigation-Strategy/addons/f2_control /addons/`
-   It must contain `config.yaml`, `Dockerfile`, `run.sh`, and the `f2_control/` Python package.
+#### 5a: Add the add-on (pick one)
+**Easiest — one-click by URL:** Settings → Add-ons → Add-on Store → ⋮ (top-right) →
+**Repositories** → paste **`https://github.com/JakeTheRabbit/f2-control`** → **Add**. *F2 Control*
+now appears in the store.
+> Add that **dedicated add-on repo** URL — not this monorepo's URL or a `.../addons/f2_control`
+> subfolder (HA can't read those; that's the `remote: Not Found` error).
+
+**Or — local copy (dev/offline):** GitHub → **Code → Download ZIP** (or clone the repo), copy
+the **`addons/f2_control/`** folder onto the host so the path is **`/addons/f2_control/`**
+(*Samba:* `\\YOUR_HA_IP\addons\`; *SSH:* `cp -r HA-Irrigation-Strategy/addons/f2_control /addons/`),
+then Add-on Store → ⋮ → **Reload** → it shows under **Local add-ons**.
 
 #### 5b: Install + configure
-1. **Settings → Add-ons → Add-on Store → ⋮ (top-right) → Reload.** *F2 Control* now shows
-   under **Local add-ons**.
+1. Open **F2 Control** in the store → **Install** (first build takes ~a minute).
 2. Open it → **Install** (the first build takes ~a minute).
 3. **Configuration** tab: set `lights_on_hour` / `lights_off_hour`, your `notify_service`,
    and (if they differ from defaults) the feed EC/pH sensor ids and the pump / mainline /
