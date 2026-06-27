@@ -1,10 +1,11 @@
-name: F2 Control
-version: "0.2.0"
+name: F2 Crop Steering
+version: "0.3.0"
 slug: f2_control
 description: >-
-  Standalone crop-steering controller (replaces AppDaemon). Pure engine + plain
-  REST IO + 30-min vitals notification + a hard kill switch. Reads sensors, drives
-  valves with readback, republishes the crop_steering_* status surface.
+  Autonomous crop-steering engine for Home Assistant. Runs the per-zone
+  P0-P1-P2-P3 cycle, drives the pump/valves with read-back, republishes the
+  crop_steering_* status surface, sends 30-min vitals, and is gated by a hard
+  kill switch. Replaces AppDaemon.
 url: https://github.com/JakeTheRabbit/f2-control
 arch:
   - amd64
