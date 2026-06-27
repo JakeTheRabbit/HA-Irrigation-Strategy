@@ -377,9 +377,10 @@ homeassistant:
 ### 4 · Install the engine (f2-control add-on)
 
 > 📖 **Prefer pictures?** A full click-by-click visual walkthrough (HA screenshots + numbered
-> callouts, zero→armed) lives at **[`docs/INSTALL_GUIDE.html`](docs/INSTALL_GUIDE.html)** —
-> open it locally, or view it live at
-> **<https://jaketherabbit.github.io/HA-Irrigation-Strategy/install.html>**.
+> callouts, zero→armed):
+> **[▶ View the install guide](https://jaketherabbit.github.io/HA-Irrigation-Strategy/install.html)**
+> (rendered). Source / offline copy: [`docs/INSTALL_GUIDE.html`](docs/INSTALL_GUIDE.html) — download
+> and open it in a browser (GitHub shows `.html` as source, not rendered).
 
 **Easiest — one-click by URL.** In Home Assistant: **Settings → Add-ons → Add-on Store → ⋮
 (top-right) → Repositories** → paste the **dedicated add-on repo**:
