@@ -23,6 +23,9 @@ echo "Syncing f2_control v$VER  ->  $ADDON_REPO/f2_control"
 
 rm -rf "$ADDON_REPO/f2_control"
 cp -r "$SRC" "$ADDON_REPO/f2_control"
+# don't publish Python bytecode caches
+find "$ADDON_REPO/f2_control" -type d -name __pycache__ -prune -exec rm -rf {} +
+find "$ADDON_REPO/f2_control" -type f -name '*.pyc' -delete
 
 cd "$ADDON_REPO"
 git add -A
