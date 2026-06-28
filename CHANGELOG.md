@@ -11,10 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Crop Steering add-on 0.8.3
+
+**🌱 In plain English.** Uses the original Open Crop Steering logo artwork (leaf + water-drop in a
+green ring) for the add-on icon and logo, instead of a redrawn version.
+
+**🔧 Technical notes.** `icon.png` (cropped circular emblem) + `logo.png` rebuilt from the source
+artwork; version 0.8.2 → 0.8.3. Integration unchanged (the README hero uses the same artwork).
+
 ## [2.9.3] - 2026-06-28
 
-**🌱 In plain English.** Branding + docs refresh. New **Crop Steering** logo (cannabis leaf +
-growth chart). The README now explains, clearly: the **two parts** of the install (the integration
+**🌱 In plain English.** Branding + docs refresh. New **Crop Steering** logo (leaf + water-drop in a
+green ring). The README now explains, clearly: the **two parts** of the install (the integration
 vs the add-on, and which does what), **how the dashboard works** and how to jump between its parts
 (and run it per room), and **how to embed it as a card**. The feature list is brought current.
 
