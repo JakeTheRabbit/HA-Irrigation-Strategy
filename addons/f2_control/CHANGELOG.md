@@ -3,6 +3,12 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.8.0
+- Generic out of the box: the source-water pH/EC feed gate is now **optional**. Set
+  `feed_ec_sensor` / `feed_ph_sensor` to your reservoir probes to enable it; leave them blank to
+  disable it (dosing / tank-fill holds still apply). Removed the hardcoded F2 probe defaults; the
+  substrate/flow fallbacks are neutral placeholders.
+
 ## 0.7.0
 - Renamed **F2 Control → Crop Steering** with a new logo. Proper description + feature list
   (Documentation tab) and this changelog. The dashboards are served as a sidebar panel

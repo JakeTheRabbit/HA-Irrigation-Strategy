@@ -36,17 +36,37 @@ configuration:
     description: >-
       Minimum minutes between routine "vitals" messages so you are not spammed.
       Urgent alerts ignore this throttle. Default 30.
+  feed_ec_sensor:
+    name: Source-water EC sensor (optional)
+    description: >-
+      Entity id of your reservoir / source-water EC probe, e.g.
+      sensor.my_reservoir_ec. When set, the engine gates irrigation on the feed
+      EC being inside number.crop_steering_irrigation_ec_min / _max (fail-closed
+      if the probe dies). LEAVE BLANK if you have no feed-EC probe - the
+      source-water EC gate is then disabled, but dosing / tank-fill holds still
+      apply.
+  feed_ph_sensor:
+    name: Source-water pH sensor (optional)
+    description: >-
+      Entity id of your reservoir / source-water pH probe, e.g.
+      sensor.my_reservoir_ph. When set, the engine gates irrigation on the feed
+      pH being inside number.crop_steering_irrigation_ph_min / _max (fail-closed
+      if the probe dies). LEAVE BLANK if you have no feed-pH probe - the
+      source-water pH gate is then disabled.
   substrate_l:
     name: Fallback substrate volume (L per plant)
     description: >-
-      Used ONLY as a fallback if the integration's per-zone substrate_volume
-      number is unset. Normally leave this - real shot sizing is read live from
-      your per-zone hardware numbers (substrate_volume x plant_count).
+      Last-resort fallback ONLY, used if the integration's per-zone
+      substrate_volume number is unset. The generic default is a safe
+      placeholder - set your real per-plant block size in the Crop Steering UI.
+      Normally leave this: real shot sizing is read live from your per-zone
+      hardware numbers (substrate_volume x plant_count).
   flow_lps:
     name: Fallback drip flow (L per second)
     description: >-
-      Used ONLY as a fallback if the per-zone flow cannot be computed from your
-      plant count and dripper settings. Normally leave this - real flow is
+      Last-resort fallback ONLY, used if the per-zone flow cannot be computed
+      from your plant count and dripper settings. The generic default is a safe
+      placeholder. Normally leave this: real flow is
       plant_count x drippers_per_plant x dripper_flow_rate.
   loop_seconds:
     name: Decision interval (seconds)

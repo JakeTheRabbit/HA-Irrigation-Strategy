@@ -51,6 +51,22 @@ this stage lets you create and wire them.)
   multi-room).
 - `tests/test_room.py` locks "default room stays un-prefixed". manifest 2.8.0 → 2.9.0.
 
+### Crop Steering add-on 0.8.0
+
+**🌱 In plain English.** Works out of the box on any system — no more F2-specific defaults. The
+source-water pH/EC feed gate is now **optional**: leave the two sensor fields blank and that gate
+is simply off (your dosing / tank-fill holds still apply); set them to your reservoir probes to
+turn it on. The fallback substrate/flow numbers are generic placeholders now, not F2's.
+
+**🔧 Technical notes.**
+- `config.yaml`: new optional `feed_ec_sensor` / `feed_ph_sensor` (`str?`, default `""`); removed
+  the hardcoded F2 atlas/aquaponics probe defaults. `substrate_l` 6 → 5, `flow_lps` 0.067 → 0.02
+  as neutral last-resort fallbacks (real shot sizing still reads the per-zone integration
+  numbers). Version 0.7.0 → 0.8.0.
+- `controller.py`: feed sensors read from options; an empty value disables that half of the
+  source-water gate (logged) so a fresh install isn't held by a dead default probe. Tooltips added.
+- Closes the "genericise F2-specific defaults" debt — the add-on now works for anyone, not just F2.
+
 ### Crop Steering add-on 0.7.0
 
 **🌱 In plain English.** The add-on is renamed **F2 Control → Crop Steering** with a new logo,
