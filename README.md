@@ -2,7 +2,7 @@
 
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
 ![HA Add-on](https://img.shields.io/badge/HA%20Add--on-f2--control-41BDF5?logo=home-assistant&logoColor=white)
-![Release](https://img.shields.io/badge/Release-2.10.0-green)
+![Release](https://img.shields.io/badge/Release-2.11.0-green)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![Zones](https://img.shields.io/badge/Zones-1%E2%80%9324-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -173,7 +173,7 @@ See `www/irrigation-manual.html` for the hardware-side operator manual and
 | **Activity feed** | `sensor.crop_steering_activity_log` is a rolling, human-readable feed of every watered / blocked / phase event — the dashboard's black-box recorder. |
 | **No-YAML setup** | A config-flow wizard (entity-picker dropdowns) or a single `.env` file maps your hardware and builds every entity — then **Configure → Edit zones & hardware** changes it later, no reinstall. |
 | **Any number of probes per zone** | The UI wizard maps multiple VWC/EC sensors per zone; the integration fuses them (average + outlier reject) and the engine steers on the fused per-zone value. |
-| **Multiple rooms** | Add the integration again per grow room — each is **fully isolated** (own zones, sensors, pump, setpoints), entities namespaced `crop_steering_<room>_*`, with its own Repairs cards. *(The bundled dashboards currently target the default room; per-room dashboard scoping is on the roadmap.)* |
+| **Multiple rooms** | Add the integration again per grow room — each is **fully isolated and autonomously steered**: its own zones, sensors, pump/mainline/valves, reservoir feed gate, photoperiod, setpoints and Repairs, namespaced `crop_steering_<room>_*`. The one add-on drives them all; a new room comes up behind its own **fail-safe-OFF kill switch** (`switch.crop_steering_<room>_engine_enabled`) until you arm it. *(Per-room **dashboard** scoping — `?room=` — is the remaining roadmap item.)* |
 | **Dashboards in the sidebar** | The add-on serves the operator console + mobile page over HA **ingress** as a sidebar panel — no manual file copy, authenticated, with a Live/Demo toggle. |
 | **Setup health checks** | Misconfiguration — missing kill switch, engine offline, a zone with no sensor, a fused sensor unavailable — surfaces as **fix-it cards in Settings → Repairs** that clear themselves when resolved. |
 | **Configure once** | The add-on reads lights hours + zone count from the integration, so you set them once in the UI; no drift between the two. |

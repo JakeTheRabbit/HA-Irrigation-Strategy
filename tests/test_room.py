@@ -39,3 +39,49 @@ def test_slugify():
     assert room.slugify_room("  Veg!! ") == "veg"
     assert room.slugify_room("") == "room"
     assert room.slugify_room("Room-2") == "room_2"
+
+
+# ----------------------------------------- engine_config descriptor (what the add-on reads)
+
+_HW = {
+    "pump_switch": "switch.veg_pump",
+    "main_line_switch": "switch.veg_main",
+    "feed_ec_sensor": "sensor.veg_res_ec",
+    "feed_ph_sensor": "sensor.veg_res_ph",
+}
+_ZONES = {
+    "1": {"zone_switch": "switch.veg_zone_1"},
+    "2": {"zone_switch": "switch.veg_zone_2"},
+}
+
+
+def test_named_room_engine_config_has_own_kill_switch_and_hardware():
+    d = room.build_engine_config("veg_", "veg", 2, _ZONES, _HW)
+    assert d["prefix"] == "veg_" and d["slug"] == "veg" and d["num_zones"] == 2
+    assert d["pump"] == "switch.veg_pump" and d["mainline"] == "switch.veg_main"
+    assert d["valves"] == {1: "switch.veg_zone_1", 2: "switch.veg_zone_2"}
+    assert (
+        d["enable_flag"] == "switch.crop_steering_veg_engine_enabled"
+    )  # per-room kill switch
+    assert d["feed_ec_sensor"] == "sensor.veg_res_ec"
+    assert d["feed_ph_sensor"] == "sensor.veg_res_ph"
+
+
+def test_default_room_engine_config_uses_global_kill_switch():
+    d = room.build_engine_config(
+        "", "default", 1, {"1": {"zone_switch": "switch.f2_row1"}}, {}
+    )
+    assert (
+        d["enable_flag"] == "input_boolean.f2_control_enabled"
+    )  # default keeps the global kill switch
+    assert d["prefix"] == "" and d["valves"] == {1: "switch.f2_row1"}
+    assert (
+        d["feed_ec_sensor"] == "" and d["feed_ph_sensor"] == ""
+    )  # unset -> gate disabled
+
+
+def test_engine_config_skips_zones_without_a_valve():
+    d = room.build_engine_config(
+        "veg_", "veg", 3, _ZONES, _HW
+    )  # only zones 1,2 have a switch
+    assert d["valves"] == {1: "switch.veg_zone_1", 2: "switch.veg_zone_2"}

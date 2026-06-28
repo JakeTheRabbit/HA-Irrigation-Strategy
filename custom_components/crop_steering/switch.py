@@ -165,7 +165,22 @@ async def async_setup_entry(
     # Add base switches
     for description in BASE_SWITCH_DESCRIPTIONS:
         switches.append(CropSteeringSwitch(entry, description))
-    
+
+    # Per-room engine kill switch — ADDITIONAL rooms only. The default room keeps using
+    # input_boolean.f2_control_enabled (the add-on options' kill switch), so its behaviour is
+    # unchanged. A named room gets its own switch.crop_steering_<slug>_engine_enabled, created
+    # OFF (fail-safe) so the engine never actuates a new room until you arm it. The add-on
+    # reads this entity id from the room's published engine_config descriptor.
+    if room_prefix(entry):
+        switches.append(CropSteeringSwitch(
+            entry,
+            SwitchEntityDescription(
+                key="engine_enabled",
+                name="Engine Enabled (room kill switch)",
+                icon="mdi:power-settings",
+            ),
+        ))
+
     # Add zone-specific switches
     zone_switches = create_zone_switch_descriptions(num_zones)
     for description in zone_switches:

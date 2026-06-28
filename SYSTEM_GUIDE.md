@@ -106,7 +106,7 @@ a failed call aborts the shot, emergency-stops the pump, and is **not** counted.
 - **Transparent in-place upgrades** — state persists across restart/rebuild; old installs load with safe defaults.
 
 ### Multi-room
-- **Fully isolated additional rooms** — add the integration again per room; entities namespaced `crop_steering_<room>_*`, own Repairs cards. *(Per-room dashboard scoping is on the roadmap.)*
+- **Fully isolated additional rooms — autonomously steered** — add the integration again per room and the one add-on drives it too: own zones, sensors, pump/mainline/valves, reservoir feed gate, photoperiod, setpoints, Repairs and state, namespaced `crop_steering_<room>_*`. A new room comes up behind its own **fail-safe-OFF kill switch** (`switch.crop_steering_<room>_engine_enabled`) until you arm it. *(Per-room dashboard scoping is the remaining roadmap item.)*
 
 ### Dashboards & operator surface
 - **Operator console in the sidebar** — served over HA ingress; tabs Overview · Substrate · Zones · Steering · Analyze · Climate · Floorplan.

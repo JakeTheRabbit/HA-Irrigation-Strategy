@@ -11,6 +11,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-06-29
+
+**🌱 In plain English.** **Multiple rooms are now autonomously steered.** Until now you could
+*configure* a second grow room (add the integration again), but the engine only ever watered the
+first one. Now the one add-on drives **every** room — each with its own pump/mainline/valves,
+reservoir pH/EC probes, photoperiod, kill switch and durable state, fully isolated. A new room comes
+up **fail-safe OFF** (its own kill switch starts off) so nothing waters until you arm it. Your existing
+room is **completely unchanged**.
+
+**🔧 Technical notes.**
+- **Integration:** each room now publishes a `sensor.crop_steering_<prefix>engine_config` whose
+  attributes carry the room's hardware map (pump / mainline / per-zone valves), kill switch, feed
+  probes and zone count — the add-on can't read the config entry directly, so this is how it discovers
+  a room. Additional rooms also get a per-room kill switch `switch.crop_steering_<slug>_engine_enabled`
+  (default **OFF**); the default room keeps `input_boolean.f2_control_enabled` unchanged. The setup
+  wizard's hardware step now also collects optional per-room **source-water EC/pH probes**.
+- **Add-on (engine 0.10.0):** refactored the controller around a `Room` abstraction; `loop_once` now
+  iterates rooms (`_loop_room`). Every per-zone entity read/write is namespaced by the room prefix
+  (sensors, numbers, selects, switches, the gates, the published status). Lights, feed gate, kill
+  switch, Vmax tracking and blind-zone handling are all per-room. The **default room is built from the
+  add-on options exactly as before** (prefix "" ⇒ byte-identical entity ids), and additional rooms are
+  discovered from the published descriptors. Shots still serialise across rooms (one `_busy` lock).
+- **State:** `/data/state.json` is now nested by room slug; an **old flat single-room file loads
+  transparently as the `default` room** (and named rooms seed fresh) — proven by
+  `tests/test_state_migration.py`. New `build_engine_config` (pure) + `tests/test_room.py` cases.
+- manifest 2.10.0 → 2.11.0. *(Per-room **dashboard** scoping — `?room=` — is still the remaining
+  roadmap item; the engine and entities are fully multi-room.)*
+
 ### Crop Steering add-on 0.9.1
 
 **🌱 In plain English.** New logo — cannabis leaf + a green growth chart and rising arrow, with the

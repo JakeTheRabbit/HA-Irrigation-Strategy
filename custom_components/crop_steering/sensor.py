@@ -33,7 +33,7 @@ from .const import (
     VWC_SATURATED_THRESHOLD,
     SOFTWARE_VERSION,
 )
-from .room import room_prefix
+from .room import room_prefix, build_engine_config
 from .calculations import ShotCalculator
 
 _LOGGER = logging.getLogger(__name__)
@@ -234,7 +234,55 @@ async def async_setup_entry(
             CropSteeringSensor(entry, description, zones_config, hardware_config)
         )
 
+    # Publish this room's engine config (hardware map + kill switch + zones) so the
+    # f2-control add-on can discover and drive it — multi-room Stage 2.
+    sensors.append(
+        CropSteeringEngineConfigSensor(entry, num_zones, zones_config, hardware_config)
+    )
+
     async_add_entities(sensors)
+
+
+class CropSteeringEngineConfigSensor(SensorEntity):
+    """Publishes this room's config (pump/mainline/valves, kill switch, feed probes, zones)
+    as attributes so the f2-control add-on can DISCOVER and drive the room — the add-on
+    cannot read the integration's config entry directly. The default room is published too
+    (prefix ""), but the add-on builds the default room from its own options and ignores the
+    prefix-"" descriptor, so F2 is unaffected."""
+
+    _attr_should_poll = False
+    _attr_icon = "mdi:cog-transfer-outline"
+
+    def __init__(self, entry, num_zones, zones_config, hardware_config):
+        self._entry = entry
+        self._num_zones = num_zones
+        self._zones = zones_config or {}
+        self._hw = hardware_config or {}
+        self._prefix = room_prefix(entry)
+        self._slug = entry.data.get("room_slug", "default")
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_engine_config"
+        self._attr_name = "Engine config"
+        self._attr_object_id = f"{DOMAIN}_{self._prefix}engine_config"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name="Crop Steering System",
+            manufacturer="Home Assistant Community",
+            model="Professional Irrigation Controller",
+            sw_version=SOFTWARE_VERSION,
+        )
+
+    @property
+    def native_value(self) -> Any:
+        return self._slug
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return build_engine_config(
+            self._prefix, self._slug, self._num_zones, self._zones, self._hw
+        )
 
 
 class CropSteeringSensor(SensorEntity):
