@@ -10,8 +10,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, CONF_NUM_ZONES, PHASES, STEERING_MODES, CROP_TYPES, GROWTH_STAGES, SOFTWARE_VERSION
+from .const import DOMAIN, CONF_NUM_ZONES, PHASES, STEERING_MODES, CROP_TYPES, GROWTH_STAGES, RECIPE_STAGES, RECIPE_PARAMS, SOFTWARE_VERSION
 from .room import room_prefix
+from .recipe import get_manager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,6 +73,13 @@ SELECT_DESCRIPTIONS = [
         name="Irrigation Phase",
         icon="mdi:water-circle",
         options=PHASES,  # Use constant from const.py (P0-P3 only)
+    ),
+    # Named-stage recipe: picking a stage applies its setpoints to the zones.
+    SelectEntityDescription(
+        key="recipe_stage",
+        name="Recipe Stage",
+        icon="mdi:format-list-bulleted-type",
+        options=RECIPE_STAGES,
     ),
     # RootSense v3 — derived view of `number.crop_steering_steering_intent`.
     # Read-mostly: kept as a Select (not a Sensor) so dashboards can use it
@@ -211,6 +219,12 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         if (last_state := await self.async_get_last_state()) is not None:
             if last_state.state in self.options:
                 self._attr_current_option = last_state.state
+        # The recipe stage's source of truth is the server-side recipe Store, not
+        # the restored entity state — reflect the loaded recipe's active stage.
+        if self.entity_description.key == "recipe_stage":
+            mgr = get_manager(self.hass, self._entry)
+            if mgr is not None and mgr.active_stage in self.options:
+                self._attr_current_option = mgr.active_stage
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -248,6 +262,26 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
                     "crop_steering_phase_transition",
                     {"target_phase": option, "reason": "Manual (phase select)", "forced": True},
                 )
+            # Selecting a recipe stage applies its setpoints to the zone numbers.
+            elif self.entity_description.key == "recipe_stage":
+                mgr = get_manager(self.hass, self._entry)
+                if mgr is not None:
+                    await mgr.async_apply(option)
+
+    @property
+    def extra_state_attributes(self):
+        """Expose the full recipe table on the recipe_stage select so the
+        dashboard can read it (and edit via the save_recipe service)."""
+        if self.entity_description.key != "recipe_stage":
+            return None
+        mgr = get_manager(self.hass, self._entry)
+        if mgr is None:
+            return None
+        return {
+            "params": RECIPE_PARAMS,
+            "stages": mgr.recipe.get("stages", {}),
+            "active_stage": mgr.active_stage,
+        }
 
     @property
     def available(self) -> bool:

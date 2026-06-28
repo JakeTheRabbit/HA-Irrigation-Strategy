@@ -2,7 +2,7 @@
 
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
 ![HA Add-on](https://img.shields.io/badge/HA%20Add--on-f2--control-41BDF5?logo=home-assistant&logoColor=white)
-![Release](https://img.shields.io/badge/Release-2.9.4-green)
+![Release](https://img.shields.io/badge/Release-2.10.0-green)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![Zones](https://img.shields.io/badge/Zones-1%E2%80%9324-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -177,6 +177,8 @@ See `www/irrigation-manual.html` for the hardware-side operator manual and
 | **Dashboards in the sidebar** | The add-on serves the operator console + mobile page over HA **ingress** as a sidebar panel — no manual file copy, authenticated, with a Live/Demo toggle. |
 | **Setup health checks** | Misconfiguration — missing kill switch, engine offline, a zone with no sensor, a fused sensor unavailable — surfaces as **fix-it cards in Settings → Repairs** that clear themselves when resolved. |
 | **Configure once** | The add-on reads lights hours + zone count from the integration, so you set them once in the UI; no drift between the two. |
+| **Named-stage recipes** | Pick **Veg / Transition / Bulk / Ripen** from a dropdown and it writes that stage's setpoints (VWC targets, dryback, EC targets, EC ceiling, shot size) into your zones in one move. Stored per room; applies to the existing entities (engine unchanged), every value clamped — no per-stage entity sprawl. |
+| **Vmax advisory** | The engine watches each zone's morning wet-up and publishes the field-capacity ceiling it *actually* reaches (`sensor.crop_steering_zone_N_vmax_detected` + a confidence) so you can steer off the substrate's real ceiling. Advisory — nothing auto-tunes from it. |
 | **Predictive overnight (P3)** | The engine starts a zone's overnight dryback (P3) early when its current dryback rate means it will land on the target dryback by lights-off — so a zone isn't stranded mid-cycle and doesn't need overnight emergency shots to recover. |
 | **Feed-lockout diagnostic** | When a low-VWC zone isn't being fed, the dashboard names the exact gate stopping it — dosing / fill / flush, source-water gate, EC ceiling, daily-volume cap, manual override, zone disabled, kill switch — and attaches it to the under-watered alert. |
 | **Manual pump modes** | The `nutrient_dosing_active` / `f2_fill_mode` / `f2_flush_mode` booleans hand the pump to the operator (hose-flood or tank dosing); the engine pauses **all** its own shots while any of them is on. |

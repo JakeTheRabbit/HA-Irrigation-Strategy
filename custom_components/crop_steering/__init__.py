@@ -56,6 +56,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = entry.data
 
+    # Load this room's named-stage recipe (server-side Store) before the platforms
+    # come up, so the recipe select + sensor can read it on setup.
+    try:
+        from .recipe import RecipeManager
+
+        manager = RecipeManager(hass, entry)
+        await manager.async_init()
+        hass.data[DOMAIN].setdefault("_recipe", {})[entry.entry_id] = manager
+    except Exception as err:  # pragma: no cover - never block setup on the recipe store
+        _LOGGER.warning("Recipe store unavailable: %s", err)
+
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -95,6 +106,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         clear_all(hass, entry.data.get("room_slug", "default"))
     except Exception:  # pragma: no cover - defensive
         pass
+
+    hass.data.get(DOMAIN, {}).get("_recipe", {}).pop(entry.entry_id, None)
 
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
