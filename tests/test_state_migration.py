@@ -101,3 +101,54 @@ def test_save_then_load_roundtrip(tmp_path):
     assert st[1]["shots"] == 3
     assert st[1]["last_shot"] == datetime(2026, 6, 27, 10, 5)
     assert st[1]["last_daily_reset"] == date(2026, 6, 27)
+
+
+# --------------------------------------------------------------------------- options compat
+# An old /data/options.json predates the feed_ec_sensor / feed_ph_sensor keys and may carry
+# the old facility-specific substrate_l / flow_lps numbers. Loading it must still work, must
+# NOT resurrect any F2-specific default entity id, and an unset feed sensor must DISABLE that
+# half of the source-water gate (generic, zero-config-safe) rather than poll a dead entity.
+
+
+def _init(opts, monkeypatch):
+    """Full Controller() with load_options() stubbed to `opts` and no HA reachable (the
+    module-level requests stub makes every ha_get/ha_call a caught no-op)."""
+    monkeypatch.setattr(C, "load_options", lambda: dict(opts))
+    return C.Controller()
+
+
+def test_old_options_without_feed_keys_disables_gate(monkeypatch):
+    # an "old" file: no feed_* keys at all
+    c = _init({"num_zones": 2, "substrate_l": 6, "flow_lps": 0.067}, monkeypatch)
+    assert c.feed_ec_sensor == ""  # no F2 atlas/aquaponics fallback
+    assert c.feed_ph_sensor == ""
+    assert (
+        c._read_feed_ec() is None
+    )  # gate reader short-circuits, never polls an entity
+    assert c._read_feed_ph() is None
+
+
+def test_blank_or_whitespace_feed_sensor_is_disabled(monkeypatch):
+    c = _init({"feed_ec_sensor": "   ", "feed_ph_sensor": ""}, monkeypatch)
+    assert c.feed_ec_sensor == ""
+    assert c.feed_ph_sensor == ""
+    assert c._read_feed_ec() is None
+
+
+def test_feed_sensors_honored_when_explicitly_set(monkeypatch):
+    # F2 (and any operator) keeps its behavior by setting these explicitly
+    opts = {
+        "feed_ec_sensor": "sensor.atlas_legacy_1_ec",
+        "feed_ph_sensor": "sensor.my_ph",
+    }
+    c = _init(opts, monkeypatch)
+    assert c.feed_ec_sensor == "sensor.atlas_legacy_1_ec"
+    assert c.feed_ph_sensor == "sensor.my_ph"
+
+
+def test_substrate_flow_defaults_are_generic_not_f2(monkeypatch):
+    # empty options -> code fallbacks; must be generic placeholders, not F2's real numbers
+    c = _init({}, monkeypatch)
+    assert c.feed_ec_sensor == "" and c.feed_ph_sensor == ""
+    assert c.substrate_l == 5.0
+    assert c.flow_lps == 0.02  # NOT F2's real 0.04

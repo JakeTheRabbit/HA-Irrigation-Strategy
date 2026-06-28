@@ -162,9 +162,13 @@ required post-install migration. Defaults sane out of the box.
 **Stay generic.** F2-specific values are **defaults/overrides, never hardcoded assumptions**:
 entity ids (`switch.veg_main_pump`, `sensor.atlas_legacy_1_ec`, …), 36 plants, 6 L block,
 4 L/hr, lights 10–22, feed band EC 2.3–3.5 / pH 5.8–6.2. A change that only works because of
-F2's exact names or numbers is a bug. (**Known debt:** the add-on's `feed_ec_sensor` /
-`feed_ph_sensor` and `substrate_l` / `flow_lps` defaults are F2-specific — make them
-configurable with neutral defaults before a wider release.)
+F2's exact names or numbers is a bug. (**Resolved in add-on v0.8.0:** `feed_ec_sensor` /
+`feed_ph_sensor` are now optional add-on options with **empty** defaults — unset = that half
+of the source-water gate is disabled (dosing/fill holds still apply), never a fallback to an
+F2 entity id; `substrate_l` / `flow_lps` defaults are now generic last-resort placeholders
+(5 L / 0.02 L/s). **F2 must set `feed_ec_sensor: sensor.atlas_legacy_1_ec` and
+`feed_ph_sensor: sensor.aquaponics_kit_f4f618_ph` in its add-on Configuration** or its
+source-water gate goes dark after the v0.8.0 rebuild.)
 
 **Prove it.** `tests/test_state_migration.py` locks the backward-compatible load and
 `tests/test_version_consistency.py` keeps versions aligned. Run `bash tests/run_ci.sh`; detail
