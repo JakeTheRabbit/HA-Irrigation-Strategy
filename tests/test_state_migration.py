@@ -39,6 +39,21 @@ def _make(zones, state_path):
     return c
 
 
+def test_dripper_settings_drive_flow_without_plant_count(tmp_path):
+    """The dripper flow rate + drippers/plant must drive shot length even if plant_count is
+    unset (0) — not silently fall back to the flow_lps option. Regression for "it ignored my
+    dripper flowrate and drippers per plant"."""
+    c = _make([1], tmp_path / "s.json")
+    c.flow_lps = 0.02  # the fallback that must NOT win
+    c._zone_num = lambda zone, key, default: {"plant_count": 0, "drippers_per_plant": 2}.get(
+        key, default
+    )
+    c._num = lambda ent, default: 1.2 if "dripper_flow_rate" in ent else default
+    flow = c._zone_flow_lps(1)
+    assert abs(flow - (1 * 2 * 1.2 / 3600.0)) < 1e-9  # plant_count defaults to 1 (it cancels)
+    assert flow != 0.02  # did NOT fall back to the option
+
+
 def test_missing_file_yields_fresh_state(tmp_path):
     c = _make([1, 2, 3], tmp_path / "does_not_exist.json")
     st = c._load_state()
