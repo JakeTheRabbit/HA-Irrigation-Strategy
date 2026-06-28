@@ -1,6 +1,7 @@
 """Multi-room namespacing — lock the contract that the DEFAULT room stays un-prefixed so
 existing single-room installs (e.g. F2) keep their exact entity ids, while named rooms get an
 isolated prefix."""
+
 import importlib.util
 import types
 from pathlib import Path
@@ -28,7 +29,9 @@ def test_named_room_is_prefixed():
 
 
 def test_room_prefix_never_raises():
-    assert room.room_prefix(_entry(None)) == ""  # defensive: bad/missing data -> default
+    assert (
+        room.room_prefix(_entry(None)) == ""
+    )  # defensive: bad/missing data -> default
 
 
 def test_slugify():
