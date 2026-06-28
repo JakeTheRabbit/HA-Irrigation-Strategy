@@ -1,9 +1,8 @@
 """Setup health checks, surfaced as Home Assistant Repairs.
 
-Runs shortly after setup and every few minutes. Each problem becomes an actionable card in
-Settings -> Repairs with a plain-language description; it clears itself when fixed. Read-only
-(never changes config or hardware)."""
-
+Runs shortly after setup and every few minutes, per room (config entry). Each problem becomes
+an actionable card in Settings -> Repairs with a plain-language description; it clears itself
+when fixed. Read-only (never changes config or hardware)."""
 from __future__ import annotations
 
 import logging
@@ -14,6 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
+from .room import room_prefix
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,10 +30,15 @@ ISSUE_IDS = (
 )
 
 
-def clear_all(hass: HomeAssistant) -> None:
-    """Remove all crop-steering Repairs issues (on unload)."""
-    for issue_id in ISSUE_IDS:
-        ir.async_delete_issue(hass, DOMAIN, issue_id)
+def _iid(base: str, slug: str) -> str:
+    """Per-room issue id so rooms don't clobber each other's Repairs cards."""
+    return base if slug in ("", "default") else f"{base}_{slug}"
+
+
+def clear_all(hass: HomeAssistant, slug: str = "default") -> None:
+    """Remove a room's crop-steering Repairs issues (on unload)."""
+    for base in ISSUE_IDS:
+        ir.async_delete_issue(hass, DOMAIN, _iid(base, slug))
 
 
 def _issue(hass, present, issue_id, severity, placeholders=None):
@@ -45,7 +50,7 @@ def _issue(hass, present, issue_id, severity, placeholders=None):
             issue_id,
             is_fixable=False,
             severity=severity,
-            translation_key=issue_id,
+            translation_key=_base_key(issue_id),
             translation_placeholders=placeholders or {},
             learn_more_url=DOCS,
         )
@@ -53,33 +58,44 @@ def _issue(hass, present, issue_id, severity, placeholders=None):
         ir.async_delete_issue(hass, DOMAIN, issue_id)
 
 
+def _base_key(issue_id: str) -> str:
+    """Map a per-room issue id back to its base translation key."""
+    for base in ISSUE_IDS:
+        if issue_id == base or issue_id.startswith(base + "_"):
+            return base
+    return issue_id
+
+
 def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Evaluate setup health and create/clear Repairs issues."""
+    """Evaluate one room's setup health and create/clear its Repairs issues."""
     try:
+        prefix = room_prefix(entry)
+        slug = entry.data.get("room_slug", "default")
         zones = entry.data.get("zones", {}) or {}
+        is_default = prefix == ""
 
-        # 1. Kill switch helper missing -> the engine add-on can't run.
-        _issue(
-            hass,
-            hass.states.get(KILL_SWITCH) is None,
-            "kill_switch_missing",
-            ir.IssueSeverity.ERROR,
-        )
+        # Kill switch + engine heartbeat are engine-level — only the default room runs the
+        # engine today (additional rooms are wired in a later add-on release).
+        if is_default:
+            _issue(
+                hass,
+                hass.states.get(KILL_SWITCH) is None,
+                _iid("kill_switch_missing", slug),
+                ir.IssueSeverity.ERROR,
+            )
+            hb = hass.states.get(HEARTBEAT)
+            offline = hb is None
+            if hb is not None:
+                try:
+                    age_min = (
+                        datetime.now(timezone.utc) - hb.last_updated
+                    ).total_seconds() / 60.0
+                    offline = age_min > _STALE_MIN or str(hb.state).lower() in _DEAD
+                except Exception:  # pragma: no cover - defensive
+                    offline = False
+            _issue(hass, offline, _iid("engine_offline", slug), ir.IssueSeverity.WARNING)
 
-        # 2. Engine heartbeat missing or stale -> the f2-control add-on isn't running.
-        hb = hass.states.get(HEARTBEAT)
-        offline = hb is None
-        if hb is not None:
-            try:
-                age_min = (
-                    datetime.now(timezone.utc) - hb.last_updated
-                ).total_seconds() / 60.0
-                offline = age_min > _STALE_MIN or str(hb.state).lower() in _DEAD
-            except Exception:  # pragma: no cover - defensive
-                offline = False
-        _issue(hass, offline, "engine_offline", ir.IssueSeverity.WARNING)
-
-        # 3. A zone with no VWC sensor mapped -> it can't be steered.
+        # A zone with no VWC sensor mapped -> it can't be steered.
         no_sensor = []
         for zid, zc in zones.items():
             vwc = zc.get("vwc_sensors") or [
@@ -90,21 +106,21 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
         _issue(
             hass,
             bool(no_sensor),
-            "zone_no_sensor",
+            _iid("zone_no_sensor", slug),
             ir.IssueSeverity.WARNING,
             {"zones": ", ".join(no_sensor)},
         )
 
-        # 4. A fused per-zone sensor reads unavailable -> probe(s) offline.
+        # A fused per-zone sensor (this room's namespace) reads unavailable.
         dead = []
         for zid in zones:
-            st = hass.states.get(f"sensor.crop_steering_vwc_zone_{zid}")
+            st = hass.states.get(f"sensor.crop_steering_{prefix}vwc_zone_{zid}")
             if st is not None and str(st.state).lower() in _DEAD:
                 dead.append(str(zid))
         _issue(
             hass,
             bool(dead),
-            "fused_sensor_unavailable",
+            _iid("fused_sensor_unavailable", slug),
             ir.IssueSeverity.WARNING,
             {"zones": ", ".join(dead)},
         )

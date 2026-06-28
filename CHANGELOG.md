@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-06-28
+
+**🌱 In plain English.** Multi-room — **Stage 1**. You can now add **more than one grow room**:
+go to Devices & Services → Add Integration → Crop Steering again, give the room a name, and map
+its own zones, sensors, pump and setpoints. Each room is **completely isolated** from the
+others. Your existing setup is the "default" room and is **untouched** — its entities keep
+exactly the same names. (The engine driving the new rooms comes in the next add-on release;
+this stage lets you create and wire them.)
+
+**🔧 Technical notes.**
+- Removed the single-instance lock; each config entry is now a **room**. New `room.py`:
+  the default room uses **no entity prefix** (back-compat), named rooms namespace as
+  `crop_steering_<slug>_*`. Entity `object_id` in every platform (sensor/number/switch/select/
+  button) now prepends `room_prefix(entry)` — `""` for the default room, so existing entity
+  ids are byte-identical.
+- config_flow: `async_step_room` names an additional room (slug → prefix) and routes it through
+  the UI mapping flow; `.env`/manual default-room paths set `room_prefix=""`. Test-helper
+  entities are created only for the default room (no collisions).
+- Health/Repairs are per-room: issue ids suffixed by room slug, fused-sensor checks use the
+  room prefix, kill-switch/engine checks run for the default room only (until the engine is
+  multi-room).
+- `tests/test_room.py` locks "default room stays un-prefixed". manifest 2.8.0 → 2.9.0.
+
 ### Crop Steering add-on 0.7.0
 
 **🌱 In plain English.** The add-on is renamed **F2 Control → Crop Steering** with a new logo,

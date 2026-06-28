@@ -56,9 +56,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = entry.data
 
-    # Only create test helper entities when using manual config (no .env file)
-    # Production systems with real sensors should NOT get test helpers
-    if entry.data.get("config_method") != "env":
+    # Only create test helper entities for a manual (no .env) DEFAULT-room setup. Additional
+    # rooms are real and namespaced, so they don't get (colliding) simulation helpers.
+    if entry.data.get("config_method") != "env" and not entry.data.get("room_prefix"):
         await _create_test_helpers(hass, entry)
 
     # Set up platforms
@@ -291,7 +291,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
         from .health import clear_all
 
-        clear_all(hass)
+        clear_all(hass, entry.data.get("room_slug", "default"))
     except Exception:  # pragma: no cover - defensive
         pass
 

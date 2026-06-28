@@ -27,6 +27,7 @@ from .const import (
     DEFAULT_EC_RATIO, DEFAULT_EC_FALLBACK, VWC_ADJUSTMENT_PERCENT,
     VWC_DRY_THRESHOLD, VWC_SATURATED_THRESHOLD, SOFTWARE_VERSION
 )
+from .room import room_prefix
 from .calculations import ShotCalculator
 
 _LOGGER = logging.getLogger(__name__)
@@ -247,7 +248,7 @@ class CropSteeringSensor(SensorEntity):
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{description.key}"
         self._attr_name = description.name
         # Set object_id to include crop_steering prefix for entity_id generation
-        self._attr_object_id = f"{DOMAIN}_{description.key}"
+        self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}{description.key}"
         
         # Extract zone number from key if this is a zone sensor.
         # Regex matches BOTH `vwc_zone_3` and `zone_3_status`-style keys; the prior

@@ -24,6 +24,7 @@ from .const import (
     CONF_MAIN_LINE_SWITCH,
 )
 from .env_parser import load_env_config
+from .room import slugify_room
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -207,7 +208,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle the initial step - choose config method."""
+        """Initial step. The first config is the default (un-prefixed) room — existing
+        single-room installs are unchanged. Any further config adds another fully-isolated
+        room (own zones/sensors/pump/setpoints), namespaced as crop_steering_<slug>_*."""
+        # A room already exists -> this is an additional room (UI-mapped, prefixed).
+        if self._async_current_entries():
+            return await self.async_step_room()
+
         if user_input is None:
             return self.async_show_form(
                 step_id="user",
@@ -219,18 +226,35 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 },
             )
 
-        # Check if there's an existing entry
-        await self.async_set_unique_id(DOMAIN)
+        await self.async_set_unique_id("default")
         self._abort_if_unique_id_configured()
-
-        # Store user input
         self._data.update(user_input)
+        self._data["room_prefix"] = ""
+        self._data["room_name"] = user_input.get("name", "Crop Steering")
 
-        # Route based on chosen configuration method
         if user_input["config_method"] == "env":
             return await self.async_step_load_env()
-        else:
-            return await self.async_step_manual_zones()
+        return await self.async_step_manual_zones()
+
+    async def async_step_room(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Name an additional, fully-isolated room, then map it in the UI."""
+        if user_input is None:
+            return self.async_show_form(
+                step_id="room",
+                data_schema=vol.Schema({vol.Required("room_name"): str}),
+                description_placeholders={
+                    "info": "Name this room (e.g. Veg, Flower B). It gets its own zones, "
+                    "sensors, pump and setpoints — completely isolated from your other rooms."
+                },
+            )
+        slug = slugify_room(user_input["room_name"])
+        await self.async_set_unique_id(f"room_{slug}")
+        self._abort_if_unique_id_configured()
+        self._data["name"] = user_input["room_name"]
+        self._data["room_name"] = user_input["room_name"]
+        self._data["room_slug"] = slug
+        self._data["room_prefix"] = f"{slug}_"
+        return await self.async_step_manual_zones()
 
     async def async_step_load_env(
         self, user_input: dict[str, Any] | None = None
@@ -291,6 +315,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data={
                     "name": self._data.get("name", "Crop Steering System"),
                     "config_method": "env",
+                    "room_name": self._data.get("room_name", "Crop Steering"),
+                    "room_prefix": "",
+                    "room_slug": "default",
                     "num_zones": env_config["num_zones"],
                     "zones": env_config["zones"],
                     "hardware": env_config["hardware"],
@@ -471,6 +498,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "installation_mode": "manual",
             "config_method": "manual",
             "name": self._data.get("name", "Crop Steering System"),
+            "room_name": self._data.get("room_name", "Crop Steering"),
+            "room_prefix": self._data.get("room_prefix", ""),
+            "room_slug": self._data.get("room_slug", "default"),
             CONF_NUM_ZONES: int(self._data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES)),
             "zones": self._data.get("zones", {}),
             "hardware": _build_hardware(user_input),
