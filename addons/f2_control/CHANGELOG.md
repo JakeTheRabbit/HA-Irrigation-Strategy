@@ -3,6 +3,10 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.8.3
+- Use the original Open Crop Steering logo artwork (leaf + water-drop in a green ring) for the
+  add-on icon and logo, instead of the redrawn version.
+
 ## 0.8.2
 - New logo (cannabis leaf + growth chart), matching the project mark.
 

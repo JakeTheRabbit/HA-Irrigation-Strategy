@@ -8,7 +8,7 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 <p align="center">
-  <img src="img/crop-steering-logo.png" alt="Crop Steering for Home Assistant" width="540">
+  <img src="img/crop-steering-logo.png" alt="Crop Steering for Home Assistant" width="360">
 </p>
 
 ![Operator dashboard — Status tab](img/demo-status.png)
