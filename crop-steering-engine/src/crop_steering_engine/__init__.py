@@ -16,6 +16,7 @@ from .core import (
     feed_grace_ok,
     cross_zone_outliers,
     validate_params,
+    detect_vmax,
     zone_safety_status,
     system_safety_status,
     zone_status_label,
@@ -23,7 +24,7 @@ from .core import (
 
 __all__ = [
     "PHASES", "ZoneParams", "ZoneSnapshot", "ec_adjust", "ec_pid", "decide", "pick_sibling",
-    "feed_grace_ok", "cross_zone_outliers", "validate_params",
+    "feed_grace_ok", "cross_zone_outliers", "validate_params", "detect_vmax",
     "zone_safety_status", "system_safety_status", "zone_status_label",
 ]
 __version__ = "0.1.0"

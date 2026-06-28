@@ -3,6 +3,13 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.9.0
+- **Vmax advisory.** The engine now watches each zone's morning P1 wet-up and publishes the detected
+  field-capacity ceiling as `sensor.crop_steering_zone_N_vmax_detected` (with a confidence attribute).
+  Advisory only — it does **not** change any irrigation decision. Pairs with the integration's
+  named-stage recipes (2.10.0).
+- Re-synced the vendored `crop_steering_engine` with the canonical source.
+
 ## 0.8.3
 - Use the original Open Crop Steering logo artwork (leaf + water-drop in a green ring) for the
   add-on icon and logo, instead of the redrawn version.

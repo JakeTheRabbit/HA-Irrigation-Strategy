@@ -30,11 +30,9 @@ DEFAULT_MAX_EC = 9.0
 # expressed as percentage points. e.g. peak=70%, valley=58% ⇒ dryback = 12.
 # It is NOT the VWC value the substrate dries down *to*.
 #
-# The two endpoints below feed:
-#   - the legacy `master_crop_steering_app` P0 exit predicate, and
-#   - the RootSense IntentResolver, which interpolates between them via the
-#     cultivator-intent slider (-100 = pure generative ⇒ DROP_PCT_GEN,
-#     +100 = pure vegetative ⇒ DROP_PCT_VEG).
+# The two endpoints below feed the cultivator-intent slider, which interpolates
+# between them (-100 = pure generative ⇒ DROP_PCT_GEN, +100 = pure vegetative
+# ⇒ DROP_PCT_VEG).
 #
 # Defaults reflect Athena cannabis guidance (10-15% veg, 20-25% gen). They are
 # *only* defaults; the values are surfaced as HA `number` entities so the
@@ -89,6 +87,72 @@ CROP_TYPES = [
     "Basil",
     "Custom"
 ]
+
+# ---------------------------------------------------------------------------
+# Named-stage recipes
+# ---------------------------------------------------------------------------
+# A recipe is a small DATA table (growth stage -> the handful of setpoints that
+# actually change by stage). Selecting a stage *applies* its row into the
+# existing per-zone `number.crop_steering_*` entities the engine already reads —
+# no new per-stage entities (that sprawl is what produced fat-finger setpoints),
+# no engine change. Stored server-side per room via the HA Store helper.
+RECIPE_STORAGE_VERSION = 1
+RECIPE_STAGES = ["Veg", "Transition", "Bulk", "Ripen", "Custom"]
+
+# The curated knobs a stage drives. Each exists both globally
+# (`number.crop_steering_<param>`) and per zone
+# (`number.crop_steering_zone_N_<param>`); apply writes whichever exist.
+RECIPE_PARAMS = [
+    "p1_target_vwc",
+    "p2_vwc_threshold",
+    "generative_dryback_target",
+    "p0_dryback_drop_percent",
+    "ec_target_gen_p1",
+    "ec_target_gen_p2",
+    "maximum_ec",
+    "p2_shot_size",
+]
+
+# Sane cannabis starting defaults: veg -> ripen drops VWC targets, deepens the
+# dryback, and climbs EC + the EC ceiling (the generative push). Starting points
+# the grower tunes — never claimed as optimal.
+DEFAULT_RECIPE = {
+    "version": RECIPE_STORAGE_VERSION,
+    "active_stage": "Veg",
+    "stages": {
+        "Veg": {
+            "p1_target_vwc": 70.0, "p2_vwc_threshold": 60.0,
+            "generative_dryback_target": 15.0, "p0_dryback_drop_percent": 12.0,
+            "ec_target_gen_p1": 2.0, "ec_target_gen_p2": 2.5,
+            "maximum_ec": 7.0, "p2_shot_size": 5.0,
+        },
+        "Transition": {
+            "p1_target_vwc": 66.0, "p2_vwc_threshold": 56.0,
+            "generative_dryback_target": 22.0, "p0_dryback_drop_percent": 18.0,
+            "ec_target_gen_p1": 2.6, "ec_target_gen_p2": 3.0,
+            "maximum_ec": 8.0, "p2_shot_size": 5.0,
+        },
+        "Bulk": {
+            "p1_target_vwc": 62.0, "p2_vwc_threshold": 50.0,
+            "generative_dryback_target": 32.0, "p0_dryback_drop_percent": 24.0,
+            "ec_target_gen_p1": 3.0, "ec_target_gen_p2": 3.5,
+            "maximum_ec": 9.0, "p2_shot_size": 6.0,
+        },
+        "Ripen": {
+            "p1_target_vwc": 58.0, "p2_vwc_threshold": 46.0,
+            "generative_dryback_target": 42.0, "p0_dryback_drop_percent": 30.0,
+            "ec_target_gen_p1": 3.4, "ec_target_gen_p2": 4.0,
+            "maximum_ec": 10.0, "p2_shot_size": 6.0,
+        },
+        # Custom starts as a copy of Bulk; the operator edits it freely.
+        "Custom": {
+            "p1_target_vwc": 62.0, "p2_vwc_threshold": 50.0,
+            "generative_dryback_target": 32.0, "p0_dryback_drop_percent": 24.0,
+            "ec_target_gen_p1": 3.0, "ec_target_gen_p2": 3.5,
+            "maximum_ec": 9.0, "p2_shot_size": 6.0,
+        },
+    },
+}
 
 # Entity prefixes
 ENTITY_PREFIX = "crop_steering"

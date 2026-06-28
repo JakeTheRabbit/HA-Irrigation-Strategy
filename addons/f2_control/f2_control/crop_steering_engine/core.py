@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """crop_steering_engine.core — the PURE crop-steering decision core.
 
-No Home Assistant, no framework, no I/O. A plain function over two dataclasses,
-unit-testable offline. Extracted verbatim from HA-Irrigation-Strategy's
-lean_crop_steering.py so it can run identically inside the f2-control add-on, a
-standalone async service, a worker, or a test — the host no longer matters.
+No Home Assistant, no I/O. A plain function over two dataclasses, unit-testable
+offline, so it can run identically inside the f2-control add-on, a standalone
+service, a worker, or a test — the host no longer matters.
 """
 import dataclasses
 from dataclasses import dataclass
@@ -269,6 +268,45 @@ def cross_zone_outliers(snaps):
                 if v < 0.4 * med:
                     out.append((z, f"Zone {z} {v:.0f}L vs ~{med:.0f}L on the other rows — under-drinking (probe/valve/delivery?)"))
     return out
+
+
+def detect_vmax(wetup_vwc, min_points=4, plateau_delta=0.6, plateau_runs=2):
+    """PURE. Detect a zone's P1 wet-up ceiling (Vmax) from an ordered series of
+    post-shot VWC readings during the morning ramp.
+
+    A shot that raises VWC by <= `plateau_delta` points is marginal uptake; once
+    `plateau_runs` consecutive marginal shots occur, the substrate has reached its
+    field-capacity ceiling. Returns (vmax, confidence in 0..1), or (None, 0.0) when
+    there isn't enough data or no plateau yet (still wetting up).
+
+    Advisory only: the caller publishes it as a sensor. It does NOT change any
+    irrigation decision in this version.
+    """
+    pts = [float(v) for v in wetup_vwc if v is not None]
+    if len(pts) < min_points:
+        return None, 0.0
+    deltas = [pts[i + 1] - pts[i] for i in range(len(pts) - 1)]
+    run, plateau_at = 0, None
+    for i, d in enumerate(deltas):
+        if d <= plateau_delta:  # marginal / flat / slight drop
+            run += 1
+            if run >= plateau_runs:
+                plateau_at = i + 1  # point index where the plateau locked
+                break
+        else:
+            run = 0
+    if plateau_at is None:
+        return None, 0.0
+    vmax = max(pts[: plateau_at + 1])
+    split = plateau_at - plateau_runs + 1
+    early = [d for d in deltas[:split] if d > 0]
+    tail = deltas[split : plateau_at + 1]
+    early_rate = (sum(early) / len(early)) if early else plateau_delta
+    tail_rate = (sum(abs(d) for d in tail) / len(tail)) if tail else 0.0
+    contrast = (1.0 - tail_rate / early_rate) if early_rate > 0 else 0.0
+    coverage = min(len(pts) / 8.0, 1.0)
+    conf = 0.65 * max(0.0, min(1.0, contrast)) + 0.35 * coverage
+    return round(vmax, 1), round(max(0.0, min(1.0, conf)), 2)
 
 
 # clamp ranges for config validation (the 12.2-EC fat-finger class). (lo, hi) per field.

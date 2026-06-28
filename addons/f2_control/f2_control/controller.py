@@ -20,7 +20,7 @@ import requests
 
 from crop_steering_engine import (
     decide, ZoneParams, ZoneSnapshot, validate_params, pick_sibling, feed_grace_ok, ec_pid,
-    cross_zone_outliers, zone_safety_status, system_safety_status, zone_status_label,
+    cross_zone_outliers, detect_vmax, zone_safety_status, system_safety_status, zone_status_label,
 )
 
 # ---------------------------------------------------------------- HA REST (Supervisor proxy)
@@ -129,6 +129,8 @@ class Controller:
         self._alerted = {}
         self._activity = []
         self._blind_zones = set()
+        self._vmax_wetup = {}  # zone -> P1 wet-up VWC series (non-persisted, resets each P0)
+        self._vmax = {}  # zone -> (vmax, confidence) advisory; published, never steers
         # Source-water feed gate sensors are OPTIONAL and have NO default entity — an empty
         # (or unset) value disables that half of the source-water gate so the add-on works on
         # any install out of the box. Configure your own probe entity ids to enable gating.
@@ -633,6 +635,7 @@ class Controller:
                     st["ec_offset"], st["last_ec_steer"] = 0.0, None
                     st["ec_integral"], st["ec_prev_err"] = 0.0, 0.0  # no cross-photoperiod PID windup
                     st["last_daily_reset"] = self._grow_day_start(now)
+                    self._vmax_wetup[zone] = []  # fresh wet-up curve for today's ramp
                 if new_phase == "P1":
                     st["shots"] = 0
                 st["phase"] = new_phase
@@ -653,6 +656,15 @@ class Controller:
                         st["ec_offset"] = self._step_ec_offset(float(st.get("ec_offset", 0.0)), snap.ec_smooth, p.ec_target_p2, base)
                     st["last_ec_steer"] = now
                     self._save_state()
+            # Vmax advisory: watch the P1 wet-up for the field-capacity ceiling.
+            # Published as a sensor only — it does NOT change any irrigation decision.
+            if st["phase"] == "P1":
+                series = self._vmax_wetup.setdefault(zone, [])
+                series.append(snap.vwc)
+                self._vmax_wetup[zone] = series[-40:]
+                v, c = detect_vmax(self._vmax_wetup[zone])
+                if v is not None:
+                    self._vmax[zone] = (v, c)
             decisions[zone] = (fire, size, reason)
         for zone, p in blind:
             st = self.state[zone]
@@ -679,7 +691,8 @@ class Controller:
             snap = snaps.get(zone)
             pub[zone] = {"phase": self.state[zone]["phase"], "vwc": snap.vwc if snap else None,
                          "ec": snap.ec if snap else None, "fire": fire, "block": block,
-                         "reason": reason, "blind": snap is None, "p": params[zone]}
+                         "reason": reason, "blind": snap is None, "p": params[zone],
+                         "vmax": self._vmax.get(zone)}
         for z, why in cross_zone_outliers(snaps):
             self._alert(f"xzone_{z}", "Zone under-drinking vs siblings", why)
         self._publish_status(pub, now)
@@ -700,6 +713,13 @@ class Controller:
                        {"vwc": d["vwc"], "ec": d["ec"], "field_capacity": p.field_capacity, "max_ec_limit": p.max_ec})
                 ha_set(f"sensor.crop_steering_zone_{zone}_status",
                        zone_status_label(d["phase"], d["fire"], d["block"], d["blind"], d["reason"]), {"reason": d["reason"]})
+                # Advisory Vmax (detected P1 wet-up ceiling); operator eyeballs it,
+                # nothing auto-tunes from it yet.
+                vm = d.get("vmax")
+                if vm and vm[0] is not None:
+                    ha_set(f"sensor.crop_steering_zone_{zone}_vmax_detected", vm[0],
+                           {"confidence": vm[1], "unit_of_measurement": "%",
+                            "friendly_name": f"Zone {zone} detected Vmax (advisory)", "engine": "f2-control"})
                 ls = self.state[zone].get("last_shot")
                 if ls is not None:
                     ha_set(f"sensor.crop_steering_zone_{zone}_last_irrigation_app", ls.isoformat(), {"device_class": "timestamp"})

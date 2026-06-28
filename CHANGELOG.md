@@ -11,6 +11,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-06-29
+
+**🌱 In plain English.** Two of the genuinely useful ideas from the retired engine are back — rebuilt
+lean and safe. **Named-stage recipes:** pick **Veg / Transition / Bulk / Ripen** from a dropdown and
+it writes that stage's setpoints (VWC targets, dryback, EC targets, EC ceiling, shot size) into your
+zones in one move — no more hand-entering every number per stage. **Vmax advisory:** the engine now
+watches each zone's morning wet-up and publishes the **field-capacity ceiling it actually reaches**
+(`sensor.crop_steering_zone_N_vmax_detected`, with a confidence) so you can steer off the substrate's
+real ceiling — advisory only, it changes nothing on its own.
+
+**🔧 Technical notes.**
+- **Recipes (integration):** new `select.crop_steering_recipe_stage` (Veg/Transition/Bulk/Ripen/Custom)
+  — selecting a stage applies its row. The recipe table is stored **server-side per room** via the HA
+  `Store` helper (`.storage/crop_steering_recipes_<entry>`), not entities (no per-stage sprawl) and not
+  browser localStorage. Read it from the select's attributes; author it with the new
+  `crop_steering.save_recipe` service; apply with `crop_steering.apply_recipe`. Applying writes the
+  existing `number.crop_steering_[zone_N_]<param>` entities — **engine unchanged, works with the add-on
+  off**, every value clamped by the number's min/max and still gated by the kill switch. Curated param
+  set (8): `p1_target_vwc`, `p2_vwc_threshold`, `generative_dryback_target`, `p0_dryback_drop_percent`,
+  `ec_target_gen_p1/p2`, `maximum_ec`, `p2_shot_size`. New `recipe.py` (+ `build_targets` pure helper),
+  `tests/test_recipe.py`.
+- **Vmax advisory (engine/add-on 0.9.0):** new pure `detect_vmax()` in `crop-steering-engine` (P1 wet-up
+  plateau detection — marginal-uptake collapse → ceiling + confidence; unit-tested, `tests/test_vmax.py`).
+  The add-on tracks the per-zone P1 wet-up (non-persisted) and publishes
+  `sensor.crop_steering_zone_N_vmax_detected`. **Does not touch any irrigation decision.**
+- Re-synced the add-on's vendored engine copy with the canonical `crop-steering-engine/src` (had drifted
+  by a docstring). manifest 2.9.4 → 2.10.0.
+
 ## [2.9.4] - 2026-06-29
 
 **🌱 In plain English.** Honesty + cleanup pass. The retired **AppDaemon** engine (and its

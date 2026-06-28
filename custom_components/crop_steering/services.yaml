@@ -1,3 +1,38 @@
+apply_recipe:
+  name: Apply recipe stage
+  description: >-
+    Write a named-stage recipe's setpoints into the per-zone number entities the
+    engine reads (VWC targets, dryback, EC targets, EC ceiling, P2 shot size).
+    Operator-initiated; values are clamped by each number's min/max and the kill
+    switch still gates actuation. Omit the stage to re-apply the active one.
+  fields:
+    stage:
+      name: Stage
+      description: Recipe stage to apply. Defaults to the active stage.
+      required: false
+      selector:
+        select:
+          options:
+            - "Veg"
+            - "Transition"
+            - "Bulk"
+            - "Ripen"
+            - "Custom"
+
+save_recipe:
+  name: Save recipe table
+  description: >-
+    Replace the stored recipe table (stage -> setpoints) for every room. Used by
+    the dashboard recipe editor; does not change any live setpoint until a stage
+    is applied.
+  fields:
+    recipe:
+      name: Recipe
+      description: The full recipe object (version, active_stage, stages).
+      required: true
+      selector:
+        object:
+
 transition_phase:
   name: Transition phase
   description: >-
