@@ -27,6 +27,7 @@ Built by evolving the existing repos, keeping the pure `decide()` engine. Shippe
 | D8 | **Four phase/stage application sources + arbitration** | manual / scheduled-auto / LLM-API / follow-zone, resolved into one committed snapshot with per-field attribution. |
 | D9 | **Single tier; hydraulic sensors optional** | No hobbyist/commercial split. Flow/pressure/leak are optional first-class hooks. |
 | D10 | **Strict backward compatibility** | The existing single-room F2 install upgrades transparently; old `/data/state.json` loads; entity changes additive. |
+| D11 | **Two planes; Convex record/sync (AiGrowApp-aligned), phase 1** | **Control plane** = local engine store (safety-critical, no external DB in the decision path). **Record/sync plane** = self-hosted **Convex** using AiGrowApp's schema/bridge (`growRecipes`, `ingestRunSummary`/`cropSteeringSummary`, `sensorReadings`, rooms/genetics/batches) for the future merge. Python Convex client bridges engine ⇄ Convex. Built in phase 1; degrades to local-only if Convex is down. |
 
 ## 3. Terminology (locked)
 
@@ -71,13 +72,23 @@ Built by evolving the existing repos, keeping the pure `decide()` engine. Shippe
 │  └──────────────────────┬──────────────────────────────┘            │
 │   per-room irrigation scheduler (concurrency/prime/settle/queue)    │
 │  Supervisor: per-room deadlines + watchdog + cancellable IO         │
-└───────────────┬──────────────────────────────────┬─────────────────┘
-         valve/pump writes                    serves web dashboard
-                ▼                                  ▼
-            HARDWARE (per room)            multi-room UI + timeline
+│  Convex bridge (Python client): engine store ⇄ record/sync plane    │
+└──────────┬──────────────────┬───────────────────────┬──────────────┘
+   valve/pump writes    serves web dashboard    sync: summaries/history/programs
+          ▼                    ▼                        ▼
+  HARDWARE (per room)  multi-room UI + timeline   ┌───────────────────────────┐
+                                                  │ CONVEX (self-hosted, local)│
+                                                  │ AiGrowApp schema:          │
+                                                  │  growRecipes, sensorReadings,
+                                                  │  cropSteeringSummary,      │
+                                                  │  rooms/genetics/batches    │
+                                                  │ → future AiGrowApp merge   │
+                                                  └───────────────────────────┘
 ```
 
 **Why B (vs extend-in-place):** state lives in the engine, not HA's recorder/state machine, so zone count scales with engine loop budget (batched HA sensor reads remain the only HA-side cost), not with HA entity/recorder limits. The committed-snapshot model and single-owner persistence (below) are natural under B.
+
+**Two planes.** The engine store is the **control plane** — local, fast, fail-closed, the only thing the irrigation decision path depends on. Alongside it runs a **record/sync plane**: a self-hosted **Convex** deployment holding the mergeable domain (programs/recipes, grow-runs + run summaries, sensor history, room/zone/genetics/batch references) aligned to AiGrowApp's schema so the two systems federate. A Python Convex client syncs engine → Convex (summaries, history, a state mirror for dashboards) and Convex → engine (program/recipe edits authored in the shared UI, applied as new committed generations via the gate). Convex being unavailable degrades to local-only operation; it never blocks a shot.
 
 ## 5. Components
 
@@ -114,11 +125,20 @@ One definition per setpoint: unit, min, max, safe default, max-delta-per-apply, 
 
 ### 5.8 Persistence ownership (single owner per datum)
 - **HA config entries** own hardware config.
-- **Engine store** (`/data`) owns programs, overrides, timeline, committed snapshots + generations, runtime counters, faults, `last_applied_grow_day`.
+- **Engine store** (`/data`, control plane) owns programs (active committed generations), overrides, timeline, committed snapshots + generations, runtime counters, faults, `last_applied_grow_day`. Authoritative for live control.
+- **Convex (record/sync plane)** is the system-of-record for the *mergeable domain* — program/recipe definitions authored in the shared UI, grow-runs, run summaries, sensor history, and room/zone/genetics/batch references — aligned to AiGrowApp's schema. Synced, **never in the decision path**.
+- **Conflict rule:** control/runtime data → engine wins. Shared program/recipe *definitions* → Convex (shared UI) is the authoring source, pulled into the engine as new committed program generations via the gate.
 - Startup reconciliation with deterministic precedence; divergence resolved, never silently merged.
 
 ### 5.9 Dashboard
 New multi-room shell: room/facility picker, dynamic zone count, the real draggable grow timeline, the override/source view, per-zone phase + which-source-set-it. Talks to the add-on's web API (it already serves the dashboard). The existing single-facility F2 dashboard (hardcoded zones `[1,2,3]`, `f2_row_*`) is kept as legacy; the multi-room UI is a rewrite, not a parameter flip.
+
+### 5.10 Record/sync plane (Convex / AiGrowApp)
+A self-hosted Convex deployment (Docker; FSL→Apache license — fine for our use) is the federation layer with `stewnight/AiGrowApp`. AiGrowApp is the management/compliance/analytics layer *above* a controller; its crop-steering surface is run-summary/benchmark, not live control — so we align the **shared domain**, not control state:
+- **Programs/recipes** ↔ `growRecipes` (phase model: `durationDays`, environmental targets, `nutrientScheduleReference` targetEC/pH). Our steering-specific fields (P0–P3 targets, dryback, shot strategy) live in our own program objects; the shared subset maps to `growRecipes`.
+- **Grow-runs + run summaries** ↔ `cropSteering.ingestRunSummary` → `batches.cropSteeringSummary` (substrate vwc/poreEC/dryback, irrigation totals, per-zone), with `getBatchBenchmark` / `compareRuns` for benchmarking — **the bridge already exists in AiGrowApp**.
+- **Sensor history** ↔ `sensorReadings`; **rooms/zones** referenced to AiGrowApp `rooms` / `locations` / `batches` / `genetics`.
+- **Bridge:** a Python Convex client in the add-on syncs engine → Convex (summaries, history, a dashboard state mirror) and Convex → engine (program/recipe edits as new committed generations, through the gate). Self-hosted locally now; re-pointable at AiGrowApp's Convex on merge. Reactive subscriptions power both dashboards.
 
 ## 6. The apply-timing model (core UX)
 
@@ -159,6 +179,7 @@ This selector is the same mechanism as the per-setpoint override revert trigger 
 - Programs (Nutrient + Steering schema), stages, substrate profile, central setpoint registry, per-setpoint override with revert triggers, the apply-timing model.
 - Sources: manual + scheduled auto-advance + follow-zone; LLM seam minimal (services accept actor/source/ttl/idempotency, gated + audited).
 - State migration + tests. Small simulator (1–3 rooms / 3–12 zones; stale sensors, relay faults, HA latency, restart, migration, one shared-pump case). Append-only structured audit. Multi-room dashboard shell + draggable timeline + override/source view.
+- **Record/sync plane (Convex / AiGrowApp):** stand up self-hosted Convex; Python bridge syncing run summaries (`ingestRunSummary`), sensor history (`sensorReadings`), and program/recipe definitions (`growRecipes`-aligned) ⇄ the engine; map rooms/zones to AiGrowApp entities. Local-first; optional at runtime (degrades to local-only).
 
 **Later:** full LLM policy framework (least-priv token, allowlist, rate-limit/bounds, dedicated UX); full rootzone-EC strategy model; shared-fertigation/RO/tank resource scheduler; 300-zone load test; full hydraulic fault-mode matrix; dashboard polish.
 
@@ -184,6 +205,7 @@ This selector is the same mechanism as the per-setpoint override revert trigger 
 ## 12. Open items for implementation planning
 
 - Exact transport for the versioned roster (HA service vs websocket vs local file) and the add-on web API surface for the dashboard.
-- Engine store format (SQLite vs structured JSON in `/data`) and its own schema-version/migration.
+- Engine (control-plane) store format (SQLite vs structured JSON in `/data`) and its own schema-version/migration. (Resolved: control state is local, **not** Convex — see §5.8 / §5.10.)
+- Convex deployment shape (self-host Docker topology on the homelab), field-level mapping of our program/steering objects onto `growRecipes` vs our own extension tables, sync cadence + conflict handling, and auth between the add-on and Convex.
 - Precise priority/precedence table for arbitration including override expiry interplay.
 - The draggable-timeline component (reuse `setpoints.html` canvas vs new) and its two-way sync to the engine store.
