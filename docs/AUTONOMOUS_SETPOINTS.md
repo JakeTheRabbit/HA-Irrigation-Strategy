@@ -145,9 +145,8 @@ How to read the shape:
 
 > **Everything below is a design proposal. None of it is implemented.** No entity, module,
 > or service named here exists in the integration or the add-on. If built, it would live in
-> the **f2-control add-on** (`addons/f2_control/`), *not* in AppDaemon — AppDaemon is retired
-> (rollback only). This section is kept as a roadmap of what "make the AI set the setpoints"
-> could responsibly mean.
+> the **f2-control add-on** (`addons/f2_control/`). This section is kept as a roadmap of what
+> "make the AI set the setpoints" could responsibly mean.
 
 The idea: each grow-day, look at where the crop is in its life cycle, what steering bias the
 stage calls for, and which supporting signals are trusted, then **write** the §3 starting

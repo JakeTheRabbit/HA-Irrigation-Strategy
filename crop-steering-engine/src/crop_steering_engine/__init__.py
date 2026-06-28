@@ -1,6 +1,6 @@
 """crop_steering_engine — the pure, HA-independent crop-steering decision core.
 
-Import the engine anywhere (AppDaemon, a standalone async service, a worker, a test):
+Import the engine anywhere (the f2-control add-on, a standalone service, a worker, a test):
 
     from crop_steering_engine import decide, ZoneParams, ZoneSnapshot
     phase, p2_thr, fire, size, reason = decide(snapshot, params)

@@ -21,7 +21,7 @@ The system is **two separate pieces**. You install both, and they do very differ
 
 **Why two pieces?** Safety and clarity. The integration is completely safe to install and explore — it cannot move a drop of water. The engine that *can* move water is separate, and even after you install it, it stays locked behind a **kill switch** until you deliberately arm it. So you can build the whole thing, look around, and confirm everything is correct **before** anything ever turns on.
 
-> **Note on AppDaemon:** older versions of this project used AppDaemon. It is **retired** — do not install it. The f2-control add-on replaces it entirely.
+> **Upgrading from an older release?** Older releases shipped a different engine; this version uses the f2-control add-on — no action needed beyond installing the add-on (Step 4).
 
 ---
 

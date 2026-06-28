@@ -54,7 +54,6 @@ If not using templates, create the file manually:
 
 ```bash
 # Location: /config/crop_steering.env
-# Or on Docker: /addon_configs/a0d7b954_appdaemon/crop_steering.env
 ```
 
 ### Step 2: Configure Your Zones

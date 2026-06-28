@@ -3,7 +3,7 @@ transition_phase:
   description: >-
     Transition the irrigation system to a target phase (P0 morning dryback,
     P1 ramp-up, P2 maintenance, P3 pre-lights-off). Fires the
-    crop_steering_phase_transition event consumed by the AppDaemon engine.
+    crop_steering_phase_transition event consumed by the f2-control add-on engine.
   fields:
     target_phase:
       name: Target phase
@@ -33,7 +33,7 @@ execute_irrigation_shot:
   name: Execute irrigation shot
   description: >-
     Request a timed irrigation shot for a zone. Fires the
-    crop_steering_irrigation_shot event; the AppDaemon engine performs the
+    crop_steering_irrigation_shot event; the f2-control add-on engine performs the
     hardware sequence with its safety checks. The integration never touches
     hardware directly.
   fields:

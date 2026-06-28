@@ -390,7 +390,7 @@ Drippers → Plants → Substrate → Runoff
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2 id="f2control">9. f2-control Add-on Setup</h2>
 
-<p>The <strong>f2-control</strong> add-on is the deployed autonomous coordinator. It replaces the earlier AppDaemon engine (AppDaemon is retired; the old <code>master_crop_steering_app.py</code> is kept as a manual rollback only). This section covers installing and enabling f2-control from scratch.</p>
+<p>The <strong>f2-control</strong> add-on is the deployed autonomous coordinator. It replaces the earlier engine (now retired; the old <code>master_crop_steering_app.py</code> is kept as a manual rollback only). This section covers installing and enabling f2-control from scratch.</p>
 
 <div class="info">
   <strong>What the add-on does:</strong> polls HA sensors every 60 s, runs the 4-phase P0–P3 per-zone crop-steering engine, fires irrigation shots with hardware readback, republishes <code>sensor.crop_steering_*</code> entities, and sends 30-minute operator vitals. All actuation is gated by the kill switch.

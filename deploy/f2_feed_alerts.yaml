@@ -1,5 +1,5 @@
 # F2 FEED / TANK PHONE ALERTS  — standalone, engine-independent.
-# Fires off raw HA state (not the AppDaemon engine) so it STILL alerts when the engine is wedged /
+# Fires off raw HA state (direct from sensors) so it STILL alerts when the engine is wedged /
 # restarting — which is exactly when zones sat unwatered for hours this week.
 # Signals: input_boolean.nutrient_dosing_active = tank fill/dose in progress (irrigation paused);
 #          source-water feed pH/EC (sensor.aquaponics_kit_f4f618_ph + sensor.atlas_legacy_1_ec) vs the

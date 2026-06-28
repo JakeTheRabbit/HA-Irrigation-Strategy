@@ -334,9 +334,9 @@ Look for parsing errors or invalid entity formats
 ## Next Steps
 
 1. **Test with Test Helpers:** The integration creates input_boolean and input_number entities for testing without real hardware
-2. **Configure AppDaemon:** Install AppDaemon add-on for autonomous automation
+2. **Install the engine:** Install the f2-control add-on for autonomous automation
 3. **Tune Parameters:** Use the UI to adjust phase parameters as your crop develops
-4. **Monitor Logs:** Watch AppDaemon logs to understand system behavior
+4. **Monitor Logs:** Watch the f2-control add-on log to understand system behavior
 
 ---
 

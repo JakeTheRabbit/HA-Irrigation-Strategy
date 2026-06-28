@@ -11,6 +11,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.4] - 2026-06-29
+
+**🌱 In plain English.** Honesty + cleanup pass. The retired **AppDaemon** engine (and its
+experimental **adaptive / Vmax** layer) is **removed** from the repo — the f2-control add-on has been
+the only engine for a while, and keeping the dead code around made the docs claim things the live
+system doesn't do. The README is corrected to match the actual code: the self-tuning "Vmax / adaptive
+steering" section is gone (it was never in the live engine), the dashboard tab names and the safety
+gate chain are fixed, and overstated claims (a `>4 h` self-healing watchdog, daily *shot-count* caps,
+`?room=` dashboard scoping) are reworded to what's real. New **[`SYSTEM_GUIDE.html`](SYSTEM_GUIDE.html)**
+(feature list + flowcharts) and **[`docs/DASHBOARDS.md`](docs/DASHBOARDS.md)** (what's wired, what's
+hardcoded to F2, and how to populate the dashboards for your own facility).
+
+**🔧 Technical notes.**
+- **Removed** `appdaemon/` (retired engine + libs + the lean harness), `appdaemon.yaml`, and
+  `packages/f2_adaptive_steering.yaml` (the retired adaptive layer's HA package).
+- **Test coverage preserved:** the 28 useful cases from the deleted `test_lean_decide.py` were ported
+  to `crop-steering-engine/tests/test_decide_edge_cases.py` (imports the active `crop_steering_engine`);
+  engine suite now 39 cases. CI drops the standalone lean-harness step (the engine pytest step already
+  covers it); state-persistence stays covered by `tests/test_state_migration.py`.
+- **README corrected** against the code: deleted the Adaptive/Vmax section; fixed the features table
+  (sensor fusion credited to the integration, watering watchdog vs the fictional self-healing one,
+  daily *volume* cap only, multi-room note); fixed the safety-gate mermaid (field capacity is the P1
+  ceiling, not a pre-shot gate); fixed the dashboard tab names (Overview · Substrate · Zones · Steering
+  · Analyze · Climate · Floorplan); removed the non-functional `?room=` deep-link; clarified the
+  hardware map is set in the integration wizard, not the add-on Configuration. Zones badge `1–24+` → `1–24`.
+- **Scrubbed** every remaining AppDaemon reference from docs, CI workflows, `CLAUDE.md`,
+  `crop-steering-engine`, and integration code comments.
+- `SYSTEM_GUIDE.html` rebuilt (self-contained, render-verified) and mirrored to `www/`; `SYSTEM_GUIDE.md`
+  rewritten to match. manifest 2.9.3 → 2.9.4.
+
 ### Crop Steering add-on 0.8.3
 
 **🌱 In plain English.** Uses the original Open Crop Steering logo artwork (leaf + water-drop in a

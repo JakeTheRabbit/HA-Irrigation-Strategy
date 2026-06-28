@@ -240,7 +240,7 @@ views.append(v5)
 placed = set(re.findall(r"(?:number|switch|select|sensor|input_select|input_boolean|automation|binary_sensor)\.[a-z0-9_]+", json.dumps(views)))
 missing = [e for e in CS if e not in placed]
 v6 = {"title": "All Entities", "path": "all", "icon": "mdi:format-list-checkbox", "cards": [
-    {"type": "markdown", "content": "## Complete entity reference\nEvery crop_steering entity, guaranteed present. Legacy blueprint automations are listed but **superseded** by the AppDaemon engine."}]}
+    {"type": "markdown", "content": "## Complete entity reference\nEvery crop_steering entity, guaranteed present. Legacy blueprint automations are listed but **superseded** by the f2-control add-on engine."}]}
 for dom in ("number", "switch", "select", "input_select", "sensor"):
     ids = of(dom)
     if ids: v6["cards"].append(ent_card(f"All {dom} ({len(ids)})", ids))

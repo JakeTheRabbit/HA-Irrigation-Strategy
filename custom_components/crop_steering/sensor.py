@@ -61,7 +61,7 @@ BASE_SENSOR_DESCRIPTIONS = [
         native_unit_of_measurement=UnitOfVolume.LITERS,
         icon="mdi:water",
     ),
-    # dryback_percentage is OWNED BY THE ENGINE (AppDaemon set_state from
+    # dryback_percentage is OWNED BY THE ENGINE (the add-on set_state from
     # _update_dryback_entities — computed per-zone from peak vs current VWC). It was a
     # coordinator-backed descriptor here whose native_value was always None, so it
     # perpetually re-asserted `unknown` and clobbered the engine's publish. Removed so
@@ -483,7 +483,7 @@ class CropSteeringSensor(SensorEntity):
 
     def _get_zone_daily_water_usage(self, zone_num: int) -> float:
         """Get daily water usage for zone."""
-        # Check AppDaemon sensor for daily usage
+        # Check the engine sensor for daily usage
         usage_sensor = self.hass.states.get(
             f"sensor.crop_steering_zone_{zone_num}_daily_water_app"
         )
@@ -496,7 +496,7 @@ class CropSteeringSensor(SensorEntity):
 
     def _get_zone_weekly_water_usage(self, zone_num: int) -> float:
         """Get weekly water usage for zone."""
-        # Check AppDaemon sensor for weekly usage
+        # Check the engine sensor for weekly usage
         usage_sensor = self.hass.states.get(
             f"sensor.crop_steering_zone_{zone_num}_weekly_water_app"
         )
@@ -509,7 +509,7 @@ class CropSteeringSensor(SensorEntity):
 
     def _get_zone_irrigation_count_today(self, zone_num: int) -> int:
         """Get today's irrigation count for zone."""
-        # Check AppDaemon sensor for count
+        # Check the engine sensor for count
         count_sensor = self.hass.states.get(
             f"sensor.crop_steering_zone_{zone_num}_irrigation_count_app"
         )
@@ -630,9 +630,9 @@ class CropSteeringSensor(SensorEntity):
             return DEFAULT_EC_FALLBACK
 
     def _get_current_phase(self) -> str:
-        """Get current irrigation phase from AppDaemon sensor."""
+        """Get current irrigation phase from the engine sensor."""
         try:
-            # Check if there's a sensor from AppDaemon
+            # Check if there's a sensor from the engine
             phase_sensor = self.hass.states.get(
                 "sensor.crop_steering_app_current_phase"
             )

@@ -1,7 +1,7 @@
 # System Overview — Crop-Steering Irrigation Engine
 
 > **Read this first.** Single source of truth for how the system fits together:
-> Home Assistant entities → AppDaemon engine → hardware. If something doesn't
+> Home Assistant entities → f2-control add-on → hardware. If something doesn't
 > match this doc, the doc wins until it's updated.
 
 ## What this is
@@ -13,12 +13,6 @@ An autonomous **4-phase crop-steering irrigation controller** for Home Assistant
 - The **f2-control add-on** (`addons/f2_control/`) reads those entities, runs the per-zone
   phase logic, and drives the irrigation hardware safely. It imports the pure
   `crop-steering-engine` package for the decision core.
-
-> **Engine note.** The live engine is the **f2-control add-on**. The AppDaemon app
-> (`appdaemon/apps/crop_steering/master_crop_steering_app.py`) referenced in the diagram
-> and tables below is the **retired rollback** — kept for emergency revert, not deployed.
-> Where this doc says "the AppDaemon engine," read "the f2-control add-on" for the live
-> system; the phase logic + safety behaviour are the same.
 
 It is **irrigation only** — VWC/EC-driven shot scheduling across the daily
 P0 → P1 → P2 → P3 cycle. It does **not** control climate (temp / RH / CO₂); that is
@@ -46,17 +40,15 @@ valve per row.**
 └────────────────────────────┬───────────────────────────────────┘
                              │  reads entity state / listens for events
 ┌────────────────────────────▼───────────────────────────────────┐
-│  APPDAEMON ENGINE   appdaemon/apps/crop_steering/               │
-│   master_crop_steering_app.py — the autonomous coordinator      │
+│  f2-control add-on (engine)   addons/f2_control/                │
+│   controller.py — the autonomous coordinator                    │
 │     · per-zone P0 → P1 → P2 → P3 state machines                 │
 │     · sensor fusion + dryback detection                         │
 │     · source-water pH/EC gate · daily volume/shot caps          │
 │     · emergency rescue · drain-through detection                │
 │     · _ai_heartbeat self-correction · _watchdog_check safety    │
 │     · activity feed → sensor.crop_steering_activity_log         │
-│   + libs: phase_state_machine · advanced_dryback_detection ·    │
-│     intelligent_sensor_fusion · intelligent_crop_profiles ·     │
-│     ml_irrigation_predictor · base_async_app                    │
+│   imports the pure crop-steering-engine package for decisions   │
 │  The ONLY layer that drives hardware.                           │
 └────────────────────────────┬───────────────────────────────────┘
                              ▼  pump prime → mainline → zone valve → irrigate → shutdown
@@ -165,7 +157,8 @@ or the dashboard does not affect it.
 | Zone EC | `sensor.crop_steering_zone_1..3_ec` |
 | Source-water pH / EC | `sensor.aquaponics_kit_f4f618_ph` · `sensor.atlas_legacy_1_ec` |
 
-Hardware wiring + the F2 sensor map live in `appdaemon/apps/apps.yaml`.
+Hardware wiring + the F2 sensor map are set in the f2-control add-on's Configuration
+options and the integration's `.env` entity map.
 
 ## 6. Dashboards
 

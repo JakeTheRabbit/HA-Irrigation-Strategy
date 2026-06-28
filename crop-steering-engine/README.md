@@ -1,8 +1,10 @@
 # crop-steering-engine
 
 The **pure, HA-independent crop-steering decision core**, extracted from
-`HA-Irrigation-Strategy`'s lean engine so it can run identically inside AppDaemon,
-a standalone async control service, a worker, or a test — **the host no longer matters.**
+`HA-Irrigation-Strategy`'s lean engine so it can run identically inside the f2-control
+add-on, a standalone async control service, a worker, or a test — **the host no longer
+matters.** It is a pure-Python package with no runtime framework dependency; the
+f2-control add-on imports it.
 
 ```python
 from crop_steering_engine import decide, ZoneParams, ZoneSnapshot
@@ -24,6 +26,6 @@ pytest          # offline unit tests, no hardware
 ruff check .
 ```
 
-This package is the foundation of the standalone control service that replaces the
-AppDaemon runtime. The agronomic upgrade (peak-VWC-target, two-loop PID, sump-measured
-runoff) lands here as new pure functions, validated offline before the service ships them.
+This package is the foundation of the f2-control add-on, the live control service. The
+agronomic upgrade (peak-VWC-target, two-loop PID, sump-measured runoff) lands here as new
+pure functions, validated offline before the service ships them.

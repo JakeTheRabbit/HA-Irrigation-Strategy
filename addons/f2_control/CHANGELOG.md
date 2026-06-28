@@ -44,4 +44,4 @@ The full project changelog (integration + add-on) lives at
 
 ## 0.2.0
 - First standalone add-on release: pure crop-steering engine + REST IO + 30-min vitals,
-  gated by the kill switch. Replaces the retired AppDaemon engine.
+  gated by the kill switch. Replaces the retired legacy engine.

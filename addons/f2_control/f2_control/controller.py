@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """F2 Control — standalone crop-steering controller (Home Assistant add-on).
 
-The anti-AppDaemon: ONE sync process, plain REST polling of HA, no asyncio, no
+The synchronous I/O shell: ONE sync process, plain REST polling of HA, no asyncio, no
 coroutine trap. Imports the pure crop-steering-engine for decisions; this file is
 the thin IO shell (read sensors -> decide -> drive valves with readback) plus
 durable state, status republish, a 30-min vitals notification, and a hard kill-switch.

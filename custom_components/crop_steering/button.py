@@ -57,7 +57,7 @@ class CropSteeringTriggerButton(ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Handle button press — fire event for AppDaemon to pick up."""
+        """Handle button press — fire event for the engine to pick up."""
         self.hass.bus.async_fire(
             "crop_steering_trigger_zone_shot",
             {"zone": self._zone_num, "source": "button"},

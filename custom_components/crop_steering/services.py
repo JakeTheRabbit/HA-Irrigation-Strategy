@@ -51,7 +51,7 @@ MANUAL_OVERRIDE_SCHEMA = vol.Schema({
 
 # RootSense v3 — operator and orchestrator-facing custom shot service.
 # Fires `crop_steering_custom_shot` event; the IrrigationOrchestrator
-# AppDaemon app picks it up, applies safety gates (anomaly suppression,
+# The engine picks it up, applies safety gates (anomaly suppression,
 # manual-override respect, flush cooldown), and routes to hardware via
 # `crop_steering_irrigation_shot`. The integration itself never touches
 # hardware — keeps the existing separation of concerns.
@@ -115,7 +115,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         # Log the transition
         _LOGGER.info(f"Phase transitioned to {target_phase}: {reason}")
         
-        # Fire event for automation/AppDaemon to handle
+        # Fire event for automation / the engine to handle
         hass.bus.async_fire(
             "crop_steering_phase_transition",
             {
@@ -134,7 +134,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         
         _LOGGER.info(f"Irrigation shot requested: Zone {zone}, {duration}s, type: {shot_type}")
         
-        # Fire event for hardware control (AppDaemon will handle the actual irrigation sequence)
+        # Fire event for hardware control (the engine performs the actual irrigation sequence)
         hass.bus.async_fire(
             "crop_steering_irrigation_shot",
             {
@@ -210,7 +210,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         """RootSense v3 — fire a custom irrigation shot.
 
         Pure event-router: validates schema, logs intent, fires
-        `crop_steering_custom_shot`. The IrrigationOrchestrator AppDaemon
+        `crop_steering_custom_shot`. The f2-control add-on engine
         app applies safety gates and routes the actual hardware call.
         """
         zone = call.data["target_zone"]
@@ -252,7 +252,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             blocking=True,
         )
         
-        # Fire event for AppDaemon to handle timeout logic
+        # Fire event for the engine to handle timeout logic
         if enable and timeout_minutes:
             hass.bus.async_fire(
                 "crop_steering_manual_override",
