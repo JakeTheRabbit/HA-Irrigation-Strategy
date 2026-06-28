@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Crop Steering add-on 0.9.1
+
+**🌱 In plain English.** New logo — cannabis leaf + a green growth chart and rising arrow, with the
+Home Assistant and Python marks.
+
+**🔧 Technical notes.** Rebuilt `img/crop-steering-logo.png` (README hero) + add-on `icon.png` (emblem,
+squared) / `logo.png` from the new artwork; add-on 0.9.0 → 0.9.1. Integration unchanged.
+
 ## [2.10.0] - 2026-06-29
 
 **🌱 In plain English.** Two of the genuinely useful ideas from the retired engine are back — rebuilt
