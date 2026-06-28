@@ -106,7 +106,7 @@ a failed call aborts the shot, emergency-stops the pump, and is **not** counted.
 - **Transparent in-place upgrades** — state persists across restart/rebuild; old installs load with safe defaults.
 
 ### Multi-room
-- **Fully isolated additional rooms — autonomously steered** — add the integration again per room and the one add-on drives it too: own zones, sensors, pump/mainline/valves, reservoir feed gate, photoperiod, setpoints, Repairs and state, namespaced `crop_steering_<room>_*`. A new room comes up behind its own **fail-safe-OFF kill switch** (`switch.crop_steering_<room>_engine_enabled`) until you arm it. *(Per-room dashboard scoping is the remaining roadmap item.)*
+- **Fully isolated additional rooms — autonomously steered** — add the integration again per room and the one add-on drives it too: own zones, sensors, pump/mainline/valves, reservoir feed gate, photoperiod, setpoints, Repairs and state, namespaced `crop_steering_<room>_*`. A new room comes up behind its own **fail-safe-OFF kill switch** (`switch.crop_steering_<room>_engine_enabled`) until you arm it. View any room's dashboard with **`?room=<slug>`** (e.g. `f2.html?room=f1`).
 
 ### Dashboards & operator surface
 - **Operator console in the sidebar** — served over HA ingress; tabs Overview · Substrate · Zones · Steering · Analyze · Climate · Floorplan.
@@ -118,7 +118,7 @@ a failed call aborts the shot, emergency-stops the pump, and is **not** counted.
 
 - **No climate control.** It is irrigation only — it reads climate sensors for context (the dashboard shows VPD/CO₂/DLI) but does not drive AC, dehumidifiers or lights.
 - **No machine-learning / adaptive self-tuning.** No ML predictor, Kalman fusion, adaptive `Vmax` detection or crop-profile AI. An experimental "intelligence" layer that aimed at those was retired; the integration still exposes a few inert `*_intelligence_*` switches the live engine ignores. `sensor.crop_steering_ai_heartbeat` is a liveness ping, not a self-tuning brain.
-- **No per-zone `?room=` dashboard scoping yet.** Rooms are isolated at the entity level; scoping a dashboard to a named room is on the roadmap.
+- **Facility-specific dashboard tiles don't scope per room.** `?room=<slug>` scopes the crop-steering core (zones, phases, VWC/EC, setpoints, advisories, switches), but tiles wired to non-`crop_steering_` facility entities (camera, tank, climate probes) stay on the default room.
 
 ---
 
