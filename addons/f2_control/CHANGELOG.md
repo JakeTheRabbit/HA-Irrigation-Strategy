@@ -3,6 +3,9 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.8.2
+- New logo (cannabis leaf + growth chart), matching the project mark.
+
 ## 0.8.1
 - Fix: the dripper flow rate + drippers/plant now drive shot length even if a per-zone plant
   count is unset (it used to fall back to a generic flow value). Plant count cancels out of the
