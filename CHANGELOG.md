@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Crop Steering add-on 0.7.0
+
+**🌱 In plain English.** The add-on is renamed **F2 Control → Crop Steering** with a new logo,
+a proper description + feature list, and a changelog you can open from the Info page. The
+operator dashboards show as a **sidebar panel** (toggle *Show in sidebar* on the add-on's Info
+tab). ("F2" was just one grow room — this drives any number of zones.)
+
+**🔧 Technical notes.** `config.yaml` `name`/`panel_title` → "Crop Steering"; new `icon.png` +
+`logo.png` (Open Crop Steering mark); `DOCS.md` (Documentation tab) + add-on `CHANGELOG.md`
+(Info-page Changelog link); version 0.6.0 → 0.7.0. Slug stays `f2_control` (kill switch
+`input_boolean.f2_control_enabled` unchanged) so existing installs aren't orphaned.
+
 ## [2.8.0] - 2026-06-28
 
 **🌱 In plain English.** The integration now watches your setup and flags problems in
