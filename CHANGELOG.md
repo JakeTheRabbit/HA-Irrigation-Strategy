@@ -11,6 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.3] - 2026-06-28
+
+**🌱 In plain English.** Branding + docs refresh. New **Crop Steering** logo (cannabis leaf +
+growth chart). The README now explains, clearly: the **two parts** of the install (the integration
+vs the add-on, and which does what), **how the dashboard works** and how to jump between its parts
+(and run it per room), and **how to embed it as a card**. The feature list is brought current.
+
+**🔧 Technical notes.**
+- New `img/crop-steering-logo.png` (README hero) + add-on `icon.png` / `logo.png`.
+- README: a two-part install table; the wizard step rewritten (entity-picker dropdowns, 1–24+ zones,
+  Configure→Edit zones, multi-room, Settings→Repairs); the dashboard section rewritten (served as a
+  sidebar **ingress** panel, the tab bar, `?room=` deep-links, an `iframe`/Webpage **card**, and the
+  Lovelace alternative); new feature rows (multi-room, sidebar dashboards, health checks,
+  configure-once, multi-probe per zone). manifest 2.9.2 → 2.9.3.
+
+### Crop Steering add-on 0.8.2
+
+**🌱 In plain English.** New logo, matching the project mark.
+
+**🔧 Technical notes.** New `icon.png` + `logo.png`; version 0.8.1 → 0.8.2.
+
 ## [2.9.2] - 2026-06-28
 
 **🌱 In plain English.** Fixes the log warnings about EC sensors using "mS/cm which is not a

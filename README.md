@@ -2,12 +2,16 @@
 
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
 ![HA Add-on](https://img.shields.io/badge/HA%20Add--on-f2--control-41BDF5?logo=home-assistant&logoColor=white)
-![Release](https://img.shields.io/badge/Release-2.9.2-green)
+![Release](https://img.shields.io/badge/Release-2.9.3-green)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![Zones](https://img.shields.io/badge/Zones-1%E2%80%9324+-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-![F2 operator dashboard — Status tab](img/demo-status.png)
+<p align="center">
+  <img src="img/crop-steering-logo.png" alt="Crop Steering for Home Assistant" width="540">
+</p>
+
+![Operator dashboard — Status tab](img/demo-status.png)
 
 > **Professional crop steering — without the $3,000 controller and the monthly subscription.**
 > If you already run Home Assistant and have moisture sensors in your substrate, you
@@ -168,7 +172,12 @@ hardware → substrate changes → sensors.** Every poll can trigger a re-evalua
 | **Hardware watchdog** | Catches a valve or pump stuck on and emergency-stops; every shot's valve close is read-back verified. |
 | **Bounded by design** | Per-zone daily **volume** and **shot-count** caps stop runaway watering — but **emergency rescue is exempt**, so a genuinely dry plant is never denied water by a budget. |
 | **Activity feed** | `sensor.crop_steering_activity_log` is a rolling, human-readable feed of every watered / blocked / phase event — the dashboard's black-box recorder. |
-| **No-YAML setup** | A config-flow wizard (or a single `.env` file) maps your hardware and builds every entity. |
+| **No-YAML setup** | A config-flow wizard (entity-picker dropdowns) or a single `.env` file maps your hardware and builds every entity — then **Configure → Edit zones & hardware** changes it later, no reinstall. |
+| **Any number of probes per zone** | The UI wizard maps multiple VWC/EC sensors per zone; the integration fuses them (average + outlier reject) and the engine steers on the fused per-zone value. |
+| **Multiple rooms** | Add the integration again per grow room — each is **fully isolated** (own zones, sensors, pump, setpoints), entities namespaced `crop_steering_<room>_*`, dashboards scoped with `?room=`. |
+| **Dashboards in the sidebar** | The add-on serves the operator console + mobile page over HA **ingress** as a sidebar panel — no manual file copy, authenticated, with a Live/Demo toggle. |
+| **Setup health checks** | Misconfiguration — missing kill switch, engine offline, a zone with no sensor, a sensor unavailable — surfaces as **fix-it cards in Settings → Repairs**. |
+| **Configure once** | The add-on reads lights hours + zone count from the integration, so you set them once in the UI; no drift between the two. |
 | **Adaptive steering** *(optional)* | Detects each zone's true P1 moisture ceiling (`Vmax`), then derives the P2 trigger as `Vmax × (1 − dryback%)` per zone and ramps the P1 target up over days — each zone dries back the right % from *its own* measured ceiling. Off by default, behind one switch. |
 | **Predictive overnight (P3)** | Each zone's *own* overnight dryback rate feeds the P3-start timing (was a shared room rate), with a buffer-safe cap so a zone lands on its target dryback by lights-on **without firing overnight emergency shots**. |
 | **Feed-lockout diagnostic** | When a low-VWC zone isn't being fed, it names the exact gate stopping it — tank empty, dosing, flush/fill, source-water gate, EC ceiling, safety lockout, phase pin, disabled, daily cap — and attaches it to the under-watered alert. |
@@ -334,6 +343,17 @@ doesn't apply to soil beds.
 
 ## Installation
 
+**Crop Steering is two pieces, and you install both — in two different places.**
+
+| | What it is | Installed via | Touches hardware? |
+|---|---|---|---|
+| **1. The integration** | The *data + setup* layer. A UI wizard creates ~100 `crop_steering_*` entities (every setpoint, sensor, switch) and lets you map your hardware with dropdowns. | **HACS** | **No — ever** |
+| **2. The Crop Steering add-on** | The *engine*. Reads your sensors, decides shots, drives the pump/valves — and serves the **dashboards** as a sidebar panel. Gated by a hard kill switch. | **Add-on Store** | **Yes — the only thing that opens a valve** |
+
+The integration is the brain's notepad; the add-on is the brain. **Install the integration first,
+map your room, then the add-on.** Nothing moves a drop of water until the add-on is installed **and**
+its kill switch is flipped on — so you can build and explore the whole thing safely first.
+
 > ### 🤖 Installing with an AI agent
 > This system has to be **matched to your exact entity IDs and substrate**, which is
 > exactly the kind of adapt-and-verify work an agent is good at. If you run
@@ -351,18 +371,24 @@ Via HACS → Integrations → **Custom repositories** → add this repo as an *I
 
 Then **Settings → Devices & Services → Add Integration → Crop Steering System**.
 
-### 2 · Tell it about your room (wizard or `.env`)
+### 2 · Tell it about your room (UI wizard or `.env`)
 
-The wizard offers two paths:
+Two paths:
 
-- **`crop_steering.env` file (recommended).** Copy `crop_steering.env.example` to
-  `/config/crop_steering.env`, fill in your zone count and entity mappings (there are
-  annotated 2 / 4 / 6-zone starters in `templates/`), then choose *"Load from
-  crop_steering.env"*. Zones are auto-detected.
-- **Manual.** Pick a zone count (1–6) and map the pump, mainline, per-zone valves and
-  sensors in the UI.
+- **UI wizard (no file needed).** Choose *Manual UI configuration*; pick a zone count (1–24+), then
+  for each zone pick its **valve switch** and **moisture / EC sensors** — *as many probes per zone as
+  you like; they're fused (averaged, outliers rejected)* — from dropdowns, followed by your pump,
+  mainline, lights and substrate facts. Every field has a tooltip.
+- **`crop_steering.env` file.** Copy a `templates/` starter (2 / 4 / 6-zone) to
+  `/config/crop_steering.env`, fill in your entity mappings, then choose *"Load from
+  crop_steering.env"* — zones auto-detected.
 
-Either way, the integration builds all ~100 `crop_steering_*` entities.
+Either way the integration builds all ~100 `crop_steering_*` entities.
+
+> **Forgot a sensor, or want to add/swap one later?** Integration → **Configure → Edit zones &
+> hardware** — no reinstall. **Running more than one grow room?** Add the integration *again* and name
+> the room; each room is **fully isolated** (its own zones, sensors, pump and setpoints), and your
+> first room is unchanged. Setup problems show up as fix-it cards in **Settings → Repairs**.
 
 ### 3 · Add the HA package
 
@@ -389,7 +415,7 @@ homeassistant:
 https://github.com/JakeTheRabbit/f2-control
 ```
 
-→ **Add**, close the dialog, and **F2 Control** appears in the store → open it → **Install**.
+→ **Add**, close the dialog, and **Crop Steering** appears in the store → open it → **Install**.
 
 > Paste that into the **Add-on Store → Repositories** dialog — it's the dedicated add-on repo
 > (`repository.yaml` + the add-on at its root, so HA can read it). Do **not** paste *this*
@@ -398,7 +424,7 @@ https://github.com/JakeTheRabbit/f2-control
 
 **Or — local copy (dev / offline):** copy `addons/f2_control/` onto the host at
 `/addons/f2_control/`, then **Add-on Store → ⋮ → Reload** → *F2 Control* shows under **Local
-add-ons** → Install. (This monorepo's `addons/f2_control/` is the add-on's source; the
+add-ons** → Install. *(In the store it's named **Crop Steering**.)* (This monorepo's `addons/f2_control/` is the add-on's source; the
 [`f2-control`](https://github.com/JakeTheRabbit/f2-control) repo is the published copy.)
 
 Either way, then:
@@ -419,37 +445,56 @@ one-line rollback.)*
 
 > **Updating the engine later — Rebuild, don't Restart.** The add-on bundles its Python into the
 > container image when it's **built** (`Dockerfile COPY`). After you change anything under
-> `addons/f2_control/`, use **Add-ons → F2 Control → ⋮ → Rebuild** — a plain **Restart keeps the old
+> `addons/f2_control/`, use **Add-ons → Crop Steering → ⋮ → Rebuild** — a plain **Restart keeps the old
 > code** (it only re-reads the Configuration options, not the Python). Rebuild re-copies the code and
 > restarts. *(Shot length lives in the Python, but is also driven by the `substrate_l`/`flow_lps`
 > Configuration options on the running build — handy if you ever need to correct sizing without a rebuild.)*
 
-### 5 · Build the dashboard
+### 5 · The dashboard
 
-Copy **[`www/f2.html`](www/f2.html)** to your HA `/config/www/` directory and open it at
-`http://<ha>:8123/local/f2.html`. That's the whole dashboard — desktop *and* mobile, every
-view in one file:
+**You don't have to copy anything — the add-on serves the dashboards for you.** With the Crop
+Steering add-on installed, a **Crop Steering** entry appears in your HA **sidebar** (it runs over HA
+**ingress** — authenticated, never exposed to your LAN). If you don't see it, toggle **Show in
+sidebar** on the add-on's Info tab. Open it and you get a **Live / Demo** chooser:
 
-- **Status** — advisories first (with click-to-fix: tap an issue, land on the control that
-  resolves it), the full live snapshot, plant-state gauges, the facility floor mini.
+- **Live** reads your real sensors using your existing HA login — nothing to paste, no URL to edit
+  (works in the mobile app).
+- **Demo** is baked-in mock data, so you can click around with nothing connected.
+
+**It's one page with tabs along the top — click a tab to move between its parts:**
+
+- **Status** — advisories first (tap an issue → land on the control that fixes it), the full live
+  snapshot, plant-state gauges, the facility-floor mini.
 - **Zones** — the per-zone cockpit: VWC / EC / dryback, water delivered, co-located setpoints.
-- **Tune** — the science-grounded visual setpoint editor (yield/potency models, limiting-factor
-  solver, multi-day driver charts).
+- **Tune** — the visual setpoint editor (yield/potency models, limiting-factor solver, driver charts).
 - **Climate**, **Operate**, **Plan** (grow-week timeline), and an embedded **3D** facility twin.
 
-It's dependency-free and needs only a long-lived token (entered once, kept in your browser); it
-reads live state + 24 h history from the HA REST API and parses `sensor.crop_steering_activity_log`
-for the per-shot feed. Add `?demo` to preview it on mock data with no HA at all.
+It reads live state + 24 h history from the HA REST API and parses `sensor.crop_steering_activity_log`
+for the per-shot feed.
 
-**On your phone?** Also copy **[`www/overview.html`](www/overview.html)** — a lightweight one-pager
-(open at `/local/overview.html`) with **Steer / Controls / Dosing** tabs: per-zone vitals + targets +
-substrate temp, room climate (temp / VPD / CO₂ / PPFD / DLI), pump + light + zone controls, and the
-veg-room peristaltic dosing pumps. `?demo` works standalone.
+**Linking to a specific room or page.** Each page is its own file, so you can deep-link:
+`…/overview.html` (mobile one-pager), `…/setpoints.html` (recipe planner), `…/system-map.html` (3D
+map). For **multiple rooms**, append `?room=<name>` to scope the view to that room — e.g.
+`…/f2.html?room=flower_b` reads that room's `crop_steering_flower_b_*` entities. `?demo` on any page
+runs it standalone on mock data.
 
-**Prefer a native HA dashboard?** [`crop_steering_lovelace.yaml`](crop_steering_lovelace.yaml) is a
-pure-Lovelace alternative where markdown + Jinja compute the live verdict / exception list / trust
-and cover **every** `crop_steering` entity — paste it into a new dashboard's raw-config editor
-(regenerate with `scripts/build_lovelace.py`).
+**Embedding it as a card** (inside an existing Lovelace dashboard): add a **Webpage** card (or an
+`iframe` card in YAML) pointing at the dashboard URL and it shows as a card on any view:
+
+```yaml
+type: iframe
+url: /local/f2.html      # or the add-on's ingress URL
+aspect_ratio: 75%
+```
+
+Prefer **native HA cards**? [`crop_steering_lovelace.yaml`](crop_steering_lovelace.yaml) is a
+pure-Lovelace alternative (markdown + Jinja compute the live verdict / exception list and cover every
+`crop_steering` entity) — paste it into a new dashboard's raw-config editor (regenerate with
+`scripts/build_lovelace.py`).
+
+**Manual / offline copy.** You can still drop **[`www/f2.html`](www/f2.html)** into `/config/www/`
+and open `/local/f2.html` (phone one-pager: **[`www/overview.html`](www/overview.html)** →
+`/local/overview.html`) — both work standalone, dependency-free, with a long-lived token entered once.
 
 ---
 
