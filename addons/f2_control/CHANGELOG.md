@@ -3,6 +3,13 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.10.1
+- **Per-room dashboards (`?room=<slug>`).** The operator console (`f2.html`) and the mobile one-pager
+  (`overview.html`) now scope to an additional room with `?room=f1` etc. — every `crop_steering_*`
+  read/write is routed to that room's entities (two chokepoints, no per-id edits), the kill-switch
+  button controls the **room's** kill switch, and a badge shows which room you're viewing. No `?room=`
+  (default room) is unchanged.
+
 ## 0.10.0
 - **Multi-room engine.** One add-on now drives **every** configured room, not just the first.
   Refactored around a `Room` abstraction; each room is a fully self-contained control loop with its

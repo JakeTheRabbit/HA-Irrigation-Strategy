@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Crop Steering add-on 0.10.1
+
+**🌱 In plain English.** Per-room dashboards. View (and drive) any additional room by adding
+`?room=<slug>` to the dashboard URL — e.g. `f2.html?room=f1` or `overview.html?room=f1`. A green badge
+shows which room you're looking at, and the kill-switch button controls *that* room's kill switch.
+
+**🔧 Technical notes.** Two chokepoints in `www/f2.html` + `www/overview.html` — `fetchStates` aliases
+every `crop_steering_<slug>_*` entity onto the un-prefixed id the UI reads, and `svc`/`callService`
+rewrites `entity_id` on writes — so all ~150 entity references scope to the room without per-id edits.
+The kill switch is resolved per room explicitly (`switch.crop_steering_<slug>_engine_enabled` vs the
+default `input_boolean.f2_control_enabled`). No `?room=` ⇒ identity no-op (default room unchanged).
+Facility tiles (camera/tank/climate, not `crop_steering_`-namespaced) stay on the default room.
+
 ## [2.11.0] - 2026-06-29
 
 **🌱 In plain English.** **Multiple rooms are now autonomously steered.** Until now you could

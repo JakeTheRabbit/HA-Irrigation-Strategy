@@ -2245,11 +2245,26 @@ let S={};
 let CHARTS={};   // Chart.js instances live here, NOT in Alpine state — Chart objects have circular refs and Alpine's deep proxy recurses into a stack overflow if they become reactive.
 let HIST={vpd:[],ec:[],vwc:[]};   // rolling chart history — module scope so NO Alpine-reactive array is ever handed to Chart.js (that triggers an Alpine<->Chart proxy infinite loop).
 const E=CONFIG.E;
+/* ===== room scoping (?room=<slug>): view + drive an ADDITIONAL room's crop_steering_<slug>_* entities =====
+   Two chokepoints (fetchStates alias + svc rewrite) scope every crop_steering_* read/write without
+   touching the 125 entity-id sites. RP="" (no ?room=) is a no-op — the default room is unchanged.
+   F2-facility entities (f2_*, atlas, scd41, tank, camera) are NOT crop_steering_-namespaced, so the
+   climate/camera/tank tiles stay default-room; the crop-steering core (zones/phases/VWC-EC/setpoints) scopes. */
+const ROOM=(new URLSearchParams(location.search).get('room')||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+const RP=ROOM?ROOM+'_':'';
+function roomScope(id){ if(!RP||typeof id!=='string') return id; if(id.indexOf('crop_steering_'+RP)>=0) return id; return id.replace(/(^|\.)crop_steering_/, '$1crop_steering_'+RP); }
+function roomScopeData(d){ if(!RP||!d||!d.entity_id) return d; const e=d.entity_id; return {...d, entity_id: Array.isArray(e)? e.map(roomScope): roomScope(e)}; }
+if(RP){ try{ document.title='['+ROOM.toUpperCase()+'] Crop Steering';
+  addEventListener('DOMContentLoaded',()=>{ const b=document.createElement('div'); b.textContent='Viewing room: '+ROOM.toUpperCase();
+    b.style.cssText='position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:99999;background:#4f9e36;color:#fff;font:600 12px Inter,sans-serif;padding:3px 14px;border-radius:0 0 8px 8px;box-shadow:0 2px 8px #0006';
+    document.body.appendChild(b); }); }catch(e){} }
 function getToken(){ try{ const t=JSON.parse(localStorage.getItem("hassTokens")); if(t&&t.access_token&&(!t.expires||t.expires>Date.now()+15000)) return t.access_token; }catch(e){} return CONFIG.LL_TOKEN||""; }   // skip an expired HA-frontend token and fall back to the long-lived token
 /* tiny localStorage JSON helper — persists per-browser UI prefs (tab, open cards, acked advisories) across reload/HA-restart */
 const ls={ get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
 function getAIKey(){ try{ const k=localStorage.getItem("f2_ai_key"); if(k) return k; }catch(e){} return (CONFIG.AI&&CONFIG.AI.key)||""; }   // scoped LiteLLM key: localStorage override, else the baked one
-async function fetchStates(){ const r=await fetch((CONFIG.HA_BASE||"")+"/api/states",{headers:{Authorization:"Bearer "+getToken()},cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status); const m={}; for(const e of await r.json()) m[e.entity_id]=e; return m; }
+async function fetchStates(){ const r=await fetch((CONFIG.HA_BASE||"")+"/api/states",{headers:{Authorization:"Bearer "+getToken()},cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status); const m={}; for(const e of await r.json()) m[e.entity_id]=e;
+  if(RP){ const seg='.crop_steering_'+RP; Object.keys(m).forEach(id=>{ const i=id.indexOf(seg); if(i>=0){ m[id.slice(0,i)+'.crop_steering_'+id.slice(i+seg.length)]=m[id]; } }); }   // scope reads to the room: alias crop_steering_<RP>* onto the un-prefixed ids the UI reads
+  return m; }
 // Historical series from InfluxDB, proxied through HA's agency_sensor_analytics endpoint (same-origin, HA-auth, no CORS,
 // auto-downsampled ~800pts/range). Returns the SAME {__start,__end, eid:[{t,v}]} shape as loadHist so all chart code is untouched.
 // Returns null when influx has nothing for these ids → caller falls back to the HA recorder / long-term statistics.
@@ -2268,6 +2283,7 @@ const TGT_PLUGIN={id:'tgt',beforeDraw(ch){ const D=ch.$dryback; if(!D) return; c
   draw('yV',D.vt,'#67e8f9','VWC target '+(D.vt!=null?D.vt.toFixed(0)+'%':'')+(D.single?'':' avg'),'left',true);
   draw('yE',D.et,'#c4b5fd','EC target '+(D.et!=null?D.et.toFixed(1):'')+(D.single?'':' avg'),'right',false); }};
 async function svc(domain, service, data){ if(DEMO) return {};   // demo: writes are no-ops (optimistic UI only)
+  data=roomScopeData(data);   // scope writes to the room: rewrite entity_id crop_steering_* -> crop_steering_<RP>*
   const r=await fetch((CONFIG.HA_BASE||"")+"/api/services/"+domain+"/"+service,{method:"POST",headers:{Authorization:"Bearer "+getToken(),"Content-Type":"application/json"},body:JSON.stringify(data||{}),cache:"no-store"}); if(!r.ok) throw new Error("svc "+domain+"."+service+" → HTTP "+r.status); return r.json().catch(()=>({})); }   // shared write path for Control/Tune/Timeline
 async function evt(event_type, data){ if(DEMO) return {};   // fire an HA event the add-on engine listens for (bypasses the broken execute_irrigation_shot service)
   const r=await fetch((CONFIG.HA_BASE||"")+"/api/events/"+event_type,{method:"POST",headers:{Authorization:"Bearer "+getToken(),"Content-Type":"application/json"},body:JSON.stringify(data||{}),cache:"no-store"}); if(!r.ok) throw new Error("event "+event_type+" → HTTP "+r.status); return r.json().catch(()=>({})); }

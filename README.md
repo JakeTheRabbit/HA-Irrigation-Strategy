@@ -173,7 +173,7 @@ See `www/irrigation-manual.html` for the hardware-side operator manual and
 | **Activity feed** | `sensor.crop_steering_activity_log` is a rolling, human-readable feed of every watered / blocked / phase event — the dashboard's black-box recorder. |
 | **No-YAML setup** | A config-flow wizard (entity-picker dropdowns) or a single `.env` file maps your hardware and builds every entity — then **Configure → Edit zones & hardware** changes it later, no reinstall. |
 | **Any number of probes per zone** | The UI wizard maps multiple VWC/EC sensors per zone; the integration fuses them (average + outlier reject) and the engine steers on the fused per-zone value. |
-| **Multiple rooms** | Add the integration again per grow room — each is **fully isolated and autonomously steered**: its own zones, sensors, pump/mainline/valves, reservoir feed gate, photoperiod, setpoints and Repairs, namespaced `crop_steering_<room>_*`. The one add-on drives them all; a new room comes up behind its own **fail-safe-OFF kill switch** (`switch.crop_steering_<room>_engine_enabled`) until you arm it. *(Per-room **dashboard** scoping — `?room=` — is the remaining roadmap item.)* |
+| **Multiple rooms** | Add the integration again per grow room — each is **fully isolated and autonomously steered**: its own zones, sensors, pump/mainline/valves, reservoir feed gate, photoperiod, setpoints and Repairs, namespaced `crop_steering_<room>_*`. The one add-on drives them all; a new room comes up behind its own **fail-safe-OFF kill switch** (`switch.crop_steering_<room>_engine_enabled`) until you arm it. View any room's dashboard with **`?room=<slug>`** (e.g. `f2.html?room=f1`). |
 | **Dashboards in the sidebar** | The add-on serves the operator console + mobile page over HA **ingress** as a sidebar panel — no manual file copy, authenticated, with a Live/Demo toggle. |
 | **Setup health checks** | Misconfiguration — missing kill switch, engine offline, a zone with no sensor, a fused sensor unavailable — surfaces as **fix-it cards in Settings → Repairs** that clear themselves when resolved. |
 | **Configure once** | The add-on reads lights hours + zone count from the integration, so you set them once in the UI; no drift between the two. |
@@ -446,6 +446,14 @@ for the per-shot feed.
 `…/overview.html` (mobile one-pager), `…/setpoints.html` (recipe planner), `…/system-map.html` (3D
 map). Adding `?demo` to a dashboard page (`f2.html`, `overview.html`, `crop_steering.html`) runs it
 standalone on mock data.
+
+**Multiple rooms — `?room=<slug>`.** To view (and drive) an additional room, append `?room=` with its
+slug — e.g. `…/f2.html?room=f1` or `…/overview.html?room=f1` reads that room's `crop_steering_f1_*`
+entities and writes back to them (a green "Viewing room: F1" badge confirms it). The kill-switch button
+in a room view controls that **room's** kill switch (`switch.crop_steering_f1_engine_enabled`), not the
+default room's. Note: facility tiles that aren't `crop_steering_`-namespaced (camera, tank, climate
+probes) stay on the default room — the crop-steering core (zones, phases, VWC/EC, setpoints, advisories)
+is what scopes.
 
 **Embedding it as a card** (inside an existing Lovelace dashboard): add a **Webpage** card (or an
 `iframe` card in YAML) pointing at the dashboard URL and it shows as a card on any view:

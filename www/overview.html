@@ -171,6 +171,15 @@ const CONFIG = {
   ],
 };
 const DEMO = new URLSearchParams(location.search).has('demo');
+// room scoping (?room=<slug>): view/drive an additional room's crop_steering_<slug>_* entities.
+// RP="" (no ?room=) is a no-op. Two chokepoints: fetchStates alias (reads) + svc rewrite (writes).
+const ROOM = (new URLSearchParams(location.search).get('room')||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+const RP = ROOM ? ROOM+'_' : '';
+function roomScope(id){ if(!RP||typeof id!=='string') return id; if(id.indexOf('crop_steering_'+RP)>=0) return id; return id.replace(/(^|\.)crop_steering_/, '$1crop_steering_'+RP); }
+// The kill switch isn't crop_steering_-namespaced, so resolve it per room explicitly: the default
+// room uses input_boolean.f2_control_enabled; an additional room uses its own engine_enabled switch.
+const KILL_ENT = RP ? 'switch.crop_steering_'+RP+'engine_enabled' : 'input_boolean.f2_control_enabled';
+const KILL_DOM = KILL_ENT.split('.')[0];
 const $ = id => document.getElementById(id);
 let TAB = 'steer';
 
@@ -182,7 +191,9 @@ async function fetchStates(){
   const tok = getToken(); if(!tok) throw new Error('no-token');
   const r = await fetch((CONFIG.HA_BASE||'') + '/api/states', { headers:{ Authorization:'Bearer '+tok }, cache:'no-store' });
   if(!r.ok) throw new Error('HTTP '+r.status);
-  const arr = await r.json(); const out = {}; arr.forEach(e => out[e.entity_id] = e); return out;
+  const arr = await r.json(); const out = {}; arr.forEach(e => out[e.entity_id] = e);
+  if(RP){ const seg='.crop_steering_'+RP; Object.keys(out).forEach(id=>{ const i=id.indexOf(seg); if(i>=0){ out[id.slice(0,i)+'.crop_steering_'+id.slice(i+seg.length)]=out[id]; } }); }   // scope reads to the room
+  return out;
 }
 const st  = id => (id && S[id] && S[id].state!=null) ? S[id].state : null;
 const num = id => { const v=st(id); const f=parseFloat(v); return (v==null||isNaN(f))?null:f; };
@@ -227,7 +238,7 @@ function detectZones(){ const z=[]; for(let n=1;n<=CONFIG.MAX_ZONES;n++){ if(S['
 function render(){
   $('connDot').style.background='var(--accent)';
   $('updated').textContent='updated '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  const live=on('input_boolean.f2_control_enabled');
+  const live=on(KILL_ENT);
   const kp=$('killPill'); kp.textContent=live?'LIVE':'HELD'; kp.className='pill '+(live?'live':'held');
 
   // system
@@ -321,6 +332,7 @@ function ctlRow(nm, ent, meta, readonly){
 async function callService(domain, service, data){
   if(DEMO){ alert('Demo — no commands sent.'); return; }
   const tok=getToken(); if(!tok){ $('tokbar').hidden=false; return; }
+  if(RP && data && data.entity_id){ data={...data, entity_id: roomScope(data.entity_id)}; }   // scope writes to the room
   await fetch((CONFIG.HA_BASE||'')+'/api/services/'+domain+'/'+service,{method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify(data)});
   setTimeout(tick,800);
 }
@@ -330,9 +342,9 @@ function toggleEnt(ent, isOn, label){
   callService(domainOf(ent), isOn?'turn_off':'turn_on', {entity_id:ent});
 }
 function toggleKill(){
-  const live=on('input_boolean.f2_control_enabled');
-  if(!confirm(live?'HOLD all autonomous watering? (kill-switch OFF)':'ARM autonomous watering? The engine will steer + fire shots.')) return;
-  callService('input_boolean', live?'turn_off':'turn_on', {entity_id:'input_boolean.f2_control_enabled'});
+  const live=on(KILL_ENT);
+  if(!confirm(live?'HOLD all autonomous watering? (kill-switch OFF)':'ARM autonomous watering? The engine will steer + fire shots.'+(RP?'\n('+ROOM.toUpperCase()+' room)':''))) return;
+  callService(KILL_DOM, live?'turn_off':'turn_on', {entity_id:KILL_ENT});
 }
 function toggleZone(n,en){
   if(!confirm((en?'Disable':'Enable')+' Zone '+n+'?')) return;
