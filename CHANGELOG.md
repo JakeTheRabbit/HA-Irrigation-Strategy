@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.2] - 2026-06-28
+
+**🌱 In plain English.** Fixes the log warnings about EC sensors using "mS/cm which is not a
+valid unit for device class voltage". The EC sensors were mistakenly tagged as *voltage* — they
+measure conductivity, so the wrong tag is removed. The value and unit (mS/cm) are unchanged.
+
+**🔧 Technical notes.**
+- `sensor.py`: removed `device_class=SensorDeviceClass.VOLTAGE` from the EC sensors
+  (`configured_avg_ec`, `ec_zone_N`). EC now reports mS/cm with no (incorrect) device class →
+  no more unit-validation warnings. manifest 2.9.1 → 2.9.2.
+
+> **Not a code bug:** "the engine ignored my dripper flow rate / drippers per plant" is the
+> **old add-on** (0.2.0), which reads its own options, not the per-zone integration numbers.
+> Add-on **0.5.0+** reads `number.crop_steering_dripper_flow_rate` + per-zone `drippers_per_plant`
+> live — update the **Crop Steering add-on to 0.8.0**.
+
 ## [2.9.1] - 2026-06-28
 
 **🌱 In plain English.** Bug fixes. The integration no longer spams the log trying to create
