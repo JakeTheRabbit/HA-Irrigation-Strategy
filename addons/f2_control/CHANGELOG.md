@@ -3,6 +3,15 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.10.0
+- **Multi-room engine.** One add-on now drives **every** configured room, not just the first.
+  Refactored around a `Room` abstraction; each room is a fully self-contained control loop with its
+  own pump/mainline/valves, reservoir pH/EC feed gate, photoperiod, kill switch and durable state,
+  namespaced `crop_steering_<slug>_*`. Additional rooms are discovered from the integration's published
+  `sensor.crop_steering_<prefix>engine_config` descriptors and come up **fail-safe OFF**
+  (`switch.crop_steering_<slug>_engine_enabled`, default off). The default room is byte-identical to
+  before. `/data/state.json` is nested by room; an old flat single-room file still loads transparently.
+
 ## 0.9.1
 - New logo (cannabis leaf + green growth chart + rising arrow, with the Home Assistant and Python
   marks). Updated the add-on icon and logo.

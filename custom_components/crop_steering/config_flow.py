@@ -101,6 +101,11 @@ def _hardware_schema(hardware: dict | None = None, params: dict | None = None) -
     _ent("pump_switch", _sw_sel())
     _ent("main_line_switch", _sw_sel())
     _ent("waste_switch", _sw_sel())
+    # Per-room source-water probes (optional). Map this room's reservoir EC/pH probes to
+    # enable its source-water gate; leave empty to disable that gate for the room. (The
+    # default room can also set these via the add-on options.)
+    _ent("feed_ec_sensor", _sensor_one())
+    _ent("feed_ph_sensor", _sensor_one())
     _ent("light_entity", _light_sel())
     out[vol.Optional("lights_on_hour", default=params.get("lights_on_hour", 12))] = (
         vol.All(vol.Coerce(int), vol.Range(min=0, max=23))
@@ -162,6 +167,8 @@ def _build_hardware(data: dict) -> dict:
         "pump_switch": data.get("pump_switch", ""),
         "main_line_switch": data.get("main_line_switch", ""),
         "waste_switch": data.get("waste_switch", ""),
+        "feed_ec_sensor": data.get("feed_ec_sensor", ""),
+        "feed_ph_sensor": data.get("feed_ph_sensor", ""),
         "light_entity": data.get("light_entity", ""),
         "temperature_sensor": data.get("temperature_sensor", ""),
         "humidity_sensor": data.get("humidity_sensor", ""),
