@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.1] - 2026-06-28
+
+**🌱 In plain English.** Bug fixes. The integration no longer spams the log trying to create
+test helpers (a dead feature), and the **Configure** (gear) button works again. Also — there's
+now a proper **GitHub release**, so HACS will actually offer the update; earlier versions
+(2.7–2.9) were pushed but never released, which is why the new setup wizard hadn't shown up yet.
+
+**🔧 Technical notes.**
+- Removed `_create_test_helpers` — it called the non-existent `input_boolean.create` /
+  `input_number.create` services (the "Action input_boolean.create not found" spam, 56×). The
+  simulation helper entities are gone.
+- OptionsFlow no longer assigns `self.config_entry` (read-only in modern HA → 500 on the
+  Configure dialog); uses an internal `self._entry`.
+- Dropped a stale "v2.3.1" startup log line; removed the now-unused import. manifest 2.9.0 →
+  2.9.1, and **tagged a release** so HACS surfaces the UI setup wizard, reconfigure flow,
+  multi-room and Repairs.
+
 ## [2.9.0] - 2026-06-28
 
 **🌱 In plain English.** Multi-room — **Stage 1**. You can now add **more than one grow room**:

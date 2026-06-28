@@ -210,7 +210,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Initial step. The first config is the default (un-prefixed) room — existing
         single-room installs are unchanged. Any further config adds another fully-isolated
-        room (own zones/sensors/pump/setpoints), namespaced as crop_steering_<slug>_*."""
+        room (own zones/sensors/pump/setpoints), namespaced as crop_steering_<slug>_*.
+        """
         # A room already exists -> this is an additional room (UI-mapped, prefixed).
         if self._async_current_entries():
             return await self.async_step_room()
@@ -236,7 +237,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_load_env()
         return await self.async_step_manual_zones()
 
-    async def async_step_room(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_room(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
         """Name an additional, fully-isolated room, then map it in the UI."""
         if user_input is None:
             return self.async_show_form(
@@ -580,7 +583,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry):
         """Initialize options flow."""
-        self.config_entry = config_entry
+        self._entry = config_entry
         self._edit_num: int | None = None
 
     async def async_step_init(
@@ -601,7 +604,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Reload configuration from .env file."""
-        if self.config_entry.data.get("config_method") != "env":
+        if self._entry.data.get("config_method") != "env":
             return self.async_abort(
                 reason="not_env_config",
                 description_placeholders={
@@ -616,9 +619,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
             # Update config entry
             self.hass.config_entries.async_update_entry(
-                self.config_entry,
+                self._entry,
                 data={
-                    **self.config_entry.data,
+                    **self._entry.data,
                     "num_zones": env_config["num_zones"],
                     "zones": env_config["zones"],
                     "hardware": env_config["hardware"],
@@ -642,19 +645,17 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """Edit irrigation parameters via UI."""
         if user_input is not None:
             # Update parameters in config entry
-            new_data = {**self.config_entry.data}
+            new_data = {**self._entry.data}
             if "parameters" not in new_data:
                 new_data["parameters"] = {}
             new_data["parameters"].update(user_input)
 
-            self.hass.config_entries.async_update_entry(
-                self.config_entry, data=new_data
-            )
+            self.hass.config_entries.async_update_entry(self._entry, data=new_data)
 
             return self.async_create_entry(title="", data={})
 
         # Get current parameters
-        current_params = self.config_entry.data.get("parameters", {})
+        current_params = self._entry.data.get("parameters", {})
 
         return self.async_show_form(
             step_id="edit_parameters",
@@ -688,7 +689,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Reconfigure zones — step 1: how many zones (add or remove)."""
-        cur = int(self.config_entry.data.get("num_zones", 1))
+        cur = int(self._entry.data.get("num_zones", 1))
         if user_input is None:
             return self.async_show_form(
                 step_id="edit_zones",
@@ -712,9 +713,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Reconfigure zones — step 2: remap valves/sensors and shared hardware."""
         num = getattr(self, "_edit_num", None) or int(
-            self.config_entry.data.get("num_zones", 1)
+            self._entry.data.get("num_zones", 1)
         )
-        data = self.config_entry.data
+        data = self._entry.data
         if user_input is None:
             schema = {
                 **_zone_schema(num, data.get("zones", {})),
@@ -740,8 +741,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 **_build_parameters(user_input),
             },
         }
-        self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
-        await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+        self.hass.config_entries.async_update_entry(self._entry, data=new_data)
+        await self.hass.config_entries.async_reload(self._entry.entry_id)
         return self.async_create_entry(title="", data={})
 
     async def async_step_edit_features(
@@ -749,18 +750,16 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Edit feature flags."""
         if user_input is not None:
-            new_data = {**self.config_entry.data}
+            new_data = {**self._entry.data}
             if "features" not in new_data:
                 new_data["features"] = {}
             new_data["features"].update(user_input)
 
-            self.hass.config_entries.async_update_entry(
-                self.config_entry, data=new_data
-            )
+            self.hass.config_entries.async_update_entry(self._entry, data=new_data)
 
             return self.async_create_entry(title="", data={})
 
-        current_features = self.config_entry.data.get("features", {})
+        current_features = self._entry.data.get("features", {})
 
         return self.async_show_form(
             step_id="edit_features",
