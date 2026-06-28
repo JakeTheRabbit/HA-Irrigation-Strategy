@@ -3,6 +3,10 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.9.1
+- New logo (cannabis leaf + green growth chart + rising arrow, with the Home Assistant and Python
+  marks). Updated the add-on icon and logo.
+
 ## 0.9.0
 - **Vmax advisory.** The engine now watches each zone's morning P1 wet-up and publishes the detected
   field-capacity ceiling as `sensor.crop_steering_zone_N_vmax_detected` (with a confidence attribute).
