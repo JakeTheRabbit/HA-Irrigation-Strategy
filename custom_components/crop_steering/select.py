@@ -11,6 +11,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN, CONF_NUM_ZONES, PHASES, STEERING_MODES, CROP_TYPES, GROWTH_STAGES, SOFTWARE_VERSION
+from .room import room_prefix
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -185,7 +186,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{description.key}"
         self._attr_name = description.name
         # Set object_id to include crop_steering prefix for entity_id generation
-        self._attr_object_id = f"{DOMAIN}_{description.key}"
+        self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}{description.key}"
         self._attr_options = description.options
         
         # Set default values based on entity type

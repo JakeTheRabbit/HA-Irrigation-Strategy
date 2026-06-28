@@ -13,6 +13,16 @@
           "config_method": "UI = pick entities with dropdowns. .env = read your crop_steering.env text file."
         }
       },
+      "room": {
+        "title": "Add a room",
+        "description": "{info}",
+        "data": {
+          "room_name": "Room name"
+        },
+        "data_description": {
+          "room_name": "A name for this grow room (e.g. Veg, Flower B). It gets its own zones, sensors, pump and setpoints, fully isolated from your other rooms."
+        }
+      },
       "manual_zones": {
         "title": "How many zones?",
         "description": "{info}",
