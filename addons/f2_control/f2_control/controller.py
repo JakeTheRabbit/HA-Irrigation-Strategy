@@ -573,11 +573,14 @@ class Controller:
         return per_plant * pc if pc > 0 else per_plant
 
     def _zone_flow_lps(self, zone):
-        """Real zone delivery rate (L/s) = plants x drippers/plant x dripper L/hr / 3600. Fallback to the option."""
-        pc = self._zone_num(zone, "plant_count", 0)
+        """Real zone delivery rate (L/s) = plants x drippers/plant x dripper L/hr / 3600.
+        plant_count CANCELS against the zone-total substrate in the duration math, so default it
+        to 1 here — that way the dripper flow rate + drippers/plant ALWAYS drive shot length even
+        when plant_count hasn't been set. Only fall back to the option if drippers/flow are unset."""
+        pc = self._zone_num(zone, "plant_count", 0) or 1
         dpp = self._zone_num(zone, "drippers_per_plant", 1)
         fr = self._num("number.crop_steering_dripper_flow_rate", 0)   # L/hr per dripper
-        if pc > 0 and dpp > 0 and fr > 0:
+        if dpp > 0 and fr > 0:
             return pc * dpp * fr / 3600.0
         return self.flow_lps
 

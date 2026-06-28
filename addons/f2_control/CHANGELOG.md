@@ -3,6 +3,11 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.8.1
+- Fix: the dripper flow rate + drippers/plant now drive shot length even if a per-zone plant
+  count is unset (it used to fall back to a generic flow value). Plant count cancels out of the
+  duration maths, so it no longer gates the dripper settings.
+
 ## 0.8.0
 - Generic out of the box: the source-water pH/EC feed gate is now **optional**. Set
   `feed_ec_sensor` / `feed_ph_sensor` to your reservoir probes to enable it; leave them blank to

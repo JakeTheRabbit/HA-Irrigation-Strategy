@@ -67,6 +67,19 @@ this stage lets you create and wire them.)
   multi-room).
 - `tests/test_room.py` locks "default room stays un-prefixed". manifest 2.8.0 → 2.9.0.
 
+### Crop Steering add-on 0.8.1
+
+**🌱 In plain English.** Fixes "it ignored my dripper flow rate and drippers per plant." The
+engine only used those numbers when a per-zone **plant count** was also set; if plant count was
+blank it quietly fell back to a generic flow value. Now your dripper flow rate + drippers/plant
+**always** drive how long each shot runs (plant count cancels out of that maths anyway).
+
+**🔧 Technical notes.**
+- `controller.py` `_zone_flow_lps`: dropped the `plant_count > 0` gate (plant_count cancels against
+  the zone-total substrate in the duration), defaulting it to 1; falls back to the `flow_lps`
+  option only if `drippers_per_plant` or `dripper_flow_rate` is unset. 0.8.0 → 0.8.1.
+- `tests/test_state_migration.py`: regression test that dripper settings drive flow at plant_count=0.
+
 ### Crop Steering add-on 0.8.0
 
 **🌱 In plain English.** Works out of the box on any system — no more F2-specific defaults. The
