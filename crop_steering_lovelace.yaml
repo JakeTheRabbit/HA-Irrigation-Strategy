@@ -897,7 +897,7 @@ views:
   - type: markdown
     content: '## Complete entity reference
 
-      Every crop_steering entity, guaranteed present. Legacy blueprint automations are listed but **superseded** by the AppDaemon engine.'
+      Every crop_steering entity, guaranteed present. Legacy blueprint automations are listed but **superseded** by the f2-control add-on engine.'
   - type: entities
     title: All number (137)
     state_color: true

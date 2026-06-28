@@ -11,12 +11,10 @@ on:
         options:
           - all
           - integration
-          - appdaemon
   push:
     branches: [ main ]
     paths:
       - 'custom_components/**'
-      - 'appdaemon/**'
       - 'hacs.json'
       - 'README.md'
   pull_request:
@@ -92,53 +90,10 @@ jobs:
         print('✓ Integration structure validation passed')
         "
 
-  validate-appdaemon:
-    runs-on: ubuntu-latest
-    name: Validate AppDaemon Modules
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Install AppDaemon and PyYAML
-      run: |
-        python -m pip install --upgrade pip
-        pip install appdaemon pyyaml
-
-    - name: Validate Python syntax
-      run: |
-        python -m py_compile appdaemon/apps/crop_steering/master_crop_steering_app.py
-        python -m py_compile appdaemon/apps/crop_steering/ml_irrigation_predictor.py
-        python -m py_compile appdaemon/apps/crop_steering/intelligent_sensor_fusion.py
-        python -m py_compile appdaemon/apps/crop_steering/advanced_dryback_detection.py
-        python -m py_compile appdaemon/apps/crop_steering/intelligent_crop_profiles.py
-        python -m py_compile appdaemon/apps/crop_steering/phase_state_machine.py
-        echo "✓ Python syntax validation passed"
-
-    - name: Validate apps.yaml
-      run: |
-        python -c "
-        import yaml
-        import sys
-
-        try:
-            with open('appdaemon/apps/apps.yaml') as f:
-                config = yaml.safe_load(f)
-            print('✓ apps.yaml validation passed')
-        except Exception as e:
-            print(f'apps.yaml validation failed: {e}')
-            sys.exit(1)
-        "
-
   installation-test:
     runs-on: ubuntu-latest
     name: Full Installation Test
-    needs: [validate-integration, validate-appdaemon]
+    needs: [validate-integration]
 
     steps:
     - name: Checkout repository
@@ -156,14 +111,6 @@ jobs:
         cp -r custom_components/crop_steering /tmp/ha_config/custom_components/
         echo "✓ Integration files copied successfully"
 
-    - name: Simulate AppDaemon installation
-      run: |
-        echo "Simulating AppDaemon apps installation..."
-        mkdir -p /tmp/appdaemon_config/apps
-        cp -r appdaemon/apps/crop_steering /tmp/appdaemon_config/apps/
-        cp appdaemon/apps/apps.yaml /tmp/appdaemon_config/apps/
-        echo "✓ AppDaemon files copied successfully"
-
     - name: Confirm zero external dependencies
       run: |
         echo "This project intentionally has no external Python dependencies."
@@ -175,14 +122,11 @@ jobs:
         echo "" >> install_report.md
         echo "## Validation Results" >> install_report.md
         echo "- ✅ Home Assistant Integration: Valid" >> install_report.md
-        echo "- ✅ AppDaemon Modules: Valid" >> install_report.md
         echo "- ✅ Dependencies: None required" >> install_report.md
         echo "- ✅ Full Installation: Success" >> install_report.md
         echo "" >> install_report.md
         echo "## Installation Paths" >> install_report.md
         echo "- Integration: \`custom_components/crop_steering/\`" >> install_report.md
-        echo "- AppDaemon: \`appdaemon/apps/crop_steering/\`" >> install_report.md
-        echo "- Configuration: \`appdaemon/apps/apps.yaml\`" >> install_report.md
 
     - name: Upload installation report
       uses: actions/upload-artifact@v4

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """crop_steering_engine.core — the PURE crop-steering decision core.
 
-No Home Assistant, no AppDaemon, no I/O. A plain function over two dataclasses,
+No Home Assistant, no framework, no I/O. A plain function over two dataclasses,
 unit-testable offline. Extracted verbatim from HA-Irrigation-Strategy's
-lean_crop_steering.py so it can run identically inside AppDaemon, a standalone
-async service, a worker, or a test — the host no longer matters.
+lean_crop_steering.py so it can run identically inside the f2-control add-on, a
+standalone async service, a worker, or a test — the host no longer matters.
 """
 import dataclasses
 from dataclasses import dataclass

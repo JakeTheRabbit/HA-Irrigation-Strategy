@@ -619,7 +619,7 @@
  },
  "sensor.crop_steering_app_status": {
   "title": "Engine app status",
-  "body": "The AppDaemon engine's own status report - active when the loop is running, safe_idle when it has parked itself. Unknown or stale here means the engine process is down and nothing autonomous is happening, regardless of what the switches say. First check when the room has gone quiet: AppDaemon logs."
+  "body": "The add-on engine's own status report - active when the loop is running, safe_idle when it has parked itself. Unknown or stale here means the engine process is down and nothing autonomous is happening, regardless of what the switches say. First check when the room has gone quiet: the add-on log."
  },
  "sensor.crop_steering_system_state": {
   "title": "System state",
@@ -1207,7 +1207,7 @@
  },
  "AI heartbeat": {
   "title": "Engine health pulse",
-  "body": "A health pulse the engine publishes every cycle, shown with minutes since the last beat. healthy plus a low age means the app is looping normally; a stale age or any other value means the engine has stalled — restart AppDaemon and check its log. Watering stops silently when this dies, so treat a stale heartbeat as urgent."
+  "body": "A health pulse the engine publishes every cycle, shown with minutes since the last beat. healthy plus a low age means the app is looping normally; a stale age or any other value means the engine has stalled — restart the Crop Steering add-on and check its log. Watering stops silently when this dies, so treat a stale heartbeat as urgent."
  },
  "P2 VWC adjusted": {
   "title": "EC-adjusted re-water threshold",

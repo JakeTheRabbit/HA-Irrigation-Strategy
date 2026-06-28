@@ -14,7 +14,7 @@
 
   WHAT IT SHOWS — two layers that talk only through HA entities + service events:
     1. HA Integration   (custom_components/crop_steering/) — entity surface + config-flow wizard.
-    2. AppDaemon Engine (master_crop_steering_app.py)       — autonomous coordinator, drives hardware.
+    2. f2-control add-on (controller.py)       — autonomous coordinator, drives hardware.
   Plus: operator/dashboards, hardware sequence (pump->mainline->zone valves), VWC/EC probes,
   the P0->P3 phase ring, and the safety layer wrapping the hardware-control path.
 -->
@@ -177,7 +177,7 @@
      scroll to zoom, click any node for detail.</p>
   <div class="two">
     <div class="lyr int"><b>HA Integration</b><span>Entity surface + setup wizard. Pure calcs. Touches no hardware.</span></div>
-    <div class="lyr eng"><b>AppDaemon Engine</b><span>Reads entities, runs P0–P3 logic, drives the hardware.</span></div>
+    <div class="lyr eng"><b>f2-control add-on</b><span>Reads entities, runs P0–P3 logic, drives the hardware.</span></div>
   </div>
 </div>
 
@@ -206,7 +206,7 @@
   <div class="lh">Layers</div>
   <div class="row"><span class="sw" style="background:#22d3ee"></span>Operator / Dashboards</div>
   <div class="row"><span class="sw" style="background:#38bdf8"></span>HA Integration</div>
-  <div class="row"><span class="sw" style="background:#34d399"></span>AppDaemon Engine</div>
+  <div class="row"><span class="sw" style="background:#34d399"></span>f2-control add-on</div>
   <div class="row"><span class="sw" style="background:#f472b6"></span>Sensors (VWC / EC)</div>
   <div class="row"><span class="sw" style="background:#fbbf24"></span>Hardware</div>
   <hr>
@@ -339,7 +339,7 @@ disc.rotation.x = -Math.PI/2; disc.position.y = -7.98; scene.add(disc);
 const LAYERS = {
   operator: { name:'Operator / Dashboards', color:C.dash },
   integration:{ name:'HA Integration', color:C.integ },
-  engine: { name:'AppDaemon Engine', color:C.engine },
+  engine: { name:'f2-control add-on', color:C.engine },
   sensors:{ name:'Sensors', color:C.sensor },
   hardware:{ name:'Hardware', color:C.hw },
 };
@@ -386,11 +386,11 @@ const NODES = [
     ents:['custom_components/crop_steering/calculations.py','tests/test_calculations.py'],
     flows:[ {dir:'out', t:'Provides pure helpers used across the entity platforms.'} ] },
 
-  // ---------- AppDaemon Engine (the brain) ----------
+  // ---------- f2-control add-on (the brain) ----------
   { id:'engine', layer:'engine', pos:[0,1,0], shape:'core', size:[3.0], color:C.engine,
-    label:'master_crop_steering_app', kicker:'AppDaemon Engine · coordinator',
+    label:'f2-control add-on', kicker:'f2-control engine · coordinator',
     role:'The autonomous coordinator and the ONLY layer that drives hardware. Every tick it reads the integration\'s entities + raw sensors, runs each zone\'s P0→P1→P2→P3 logic, fuses sensors, detects dryback, runs the EC-stacking loop, checks safety gates, sequences the hardware, then publishes status back to HA. One engine, irrigation only — no climate control.',
-    ents:['appdaemon/apps/crop_steering/master_crop_steering_app.py','appdaemon/apps/apps.yaml  (hardware + sensor map)'],
+    ents:['addons/f2_control/controller.py','crop-steering-engine/core.py  (pure decide map)'],
     flows:[
       {dir:'in',  t:'Reads number./switch./select. setpoints from the Integration.'},
       {dir:'in',  t:'Reads raw VWC/EC + source-water + environment sensors.'},
@@ -891,7 +891,7 @@ function easeInOut(x){ return x<0.5 ? 2*x*x : 1-Math.pow(-2*x+2,2)/2; }
 const TOUR = [
   { id:'wizard',  step:'1 / 5 · Setup',          text:'A one-time config-flow wizard discovers the hardware and creates the ~100-entity surface. After setup, the live system runs on entities — not the wizard.' },
   { id:'entities',step:'2 / 5 · Setpoints',      text:'The operator\'s dashboards write setpoints into number./switch./select. entities. This entity surface is the ONLY contract between the two software layers.' },
-  { id:'engine',  step:'3 / 5 · Decision loop',  text:'The AppDaemon engine reads those entities + raw sensors, then runs each zone\'s P0–P3 logic — phase state machine, sensor fusion, dryback, EC-stacking — behind safety gates.' },
+  { id:'engine',  step:'3 / 5 · Decision loop',  text:'The f2-control add-on engine reads those entities + raw sensors, then runs each zone\'s P0–P3 logic — phase state machine, sensor fusion, dryback, EC-stacking — behind safety gates.' },
   { id:'safety',  step:'4 / 5 · Hardware sequence', text:'Behind the safety guard, the engine drives hardware in strict order: pump prime → mainline → zone valve → irrigate → shutdown (reverse). Valve-close is read-back verified.', seq:true },
   { id:'engine',  step:'5 / 5 · Feedback loop',  text:'Probes measure the result and feed back up through Sensor Fusion. The engine publishes app_status / heartbeat / activity_log back to HA, and the dashboards render it — closing the loop.', fb:true },
 ];

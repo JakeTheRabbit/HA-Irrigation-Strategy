@@ -38,9 +38,6 @@ node_modules/
 *.pem
 *.crt
 
-# RootSense AppDaemon SQLite analytics store — local state only
-appdaemon/apps/crop_steering/state/
-
 # Local agent config + python caches
 .claude/
 __pycache__/

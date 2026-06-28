@@ -17,7 +17,6 @@ run "black (format check)"    black --check custom_components/ tests/
 run "yamllint"                yamllint .
 run "pytest — integration + add-on state + version" env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -q
 run "pytest — pure engine core"  env PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
-run "lean decision harness"   python appdaemon/apps/crop_steering/test_lean_decide.py
 
 echo
 if [ "${fail}" -eq 0 ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED — see above"; fi

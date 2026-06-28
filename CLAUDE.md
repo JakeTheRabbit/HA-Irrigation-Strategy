@@ -15,9 +15,6 @@ layers:
    and drives the hardware. Gated by kill switch
    `input_boolean.f2_control_enabled` (OFF = safe, no actuation).
 
-AppDaemon (`appdaemon/apps/crop_steering/`) is **retired** — kept only as a manual
-rollback. `master_crop_steering_app.py` is not deployed. Do not add features there.
-
 > Start with `docs/SYSTEM_OVERVIEW.md` for the whole-stack mental model, then
 > `README.md`. `ENTITIES.md` is the entity reference.
 
@@ -51,7 +48,7 @@ local Python installs. CI is unaffected.
 ### 2. f2-control add-on — `addons/f2_control/` (live engine)
 - Single synchronous Python process; polls HA REST API every 60 s.
 - Imports `crop-steering-engine` (pure Python package at `crop-steering-engine/src/`);
-  no AppDaemon dependency.
+  no external runtime dependency.
 - Responsibilities: phase transitions, hardware sequencing, dryback detection,
   source-water gate (pH + EC, fail-closed on dead probe), fail-closed hardware writes
   (aborts shot on valve/pump fault), P2 EC-correction min-interval (anti-short-cycle),
@@ -61,18 +58,13 @@ local Python installs. CI is unaffected.
   drippers_per_plant × dripper_flow_rate)` — substrate/flow config must be accurate.
 - Add-on config: `addons/f2_control/config.yaml`. Options set via Supervisor UI.
 
-### 3. AppDaemon — `appdaemon/apps/crop_steering/` (retired rollback)
-- `master_crop_steering_app.py` and its supporting libs are **not deployed**.
-- Kept for emergency manual rollback only. Do not add features here.
-
 ### Critical files
 - `custom_components/crop_steering/config_flow.py` — setup wizard.
 - `custom_components/crop_steering/{sensor,number,switch,select}.py` — entity platforms.
 - `custom_components/crop_steering/calculations.py` — pure helpers (tested).
 - `custom_components/crop_steering/const.py` — constants, single source of truth.
-- `addons/f2_control/` — live engine (add-on root).
-- `crop-steering-engine/src/` — pure engine package imported by the add-on.
-- `appdaemon/apps/crop_steering/master_crop_steering_app.py` — retired; rollback only.
+- `addons/f2_control/f2_control/controller.py` — live engine IO shell (read → decide → drive).
+- `crop-steering-engine/src/crop_steering_engine/core.py` — pure `decide()` core imported by the add-on.
 
 ## Phase logic (P0–P3)
 

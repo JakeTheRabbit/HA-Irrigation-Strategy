@@ -34,7 +34,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           # no pip cache: the repo intentionally has no requirements.txt/pyproject
-          # (integration is dependency-free; engine deps live in the AppDaemon container)
+          # (integration is dependency-free)
 
       - name: Install linters
         run: |
@@ -47,9 +47,7 @@ jobs:
           ruff check .
 
       - name: Black (format check)
-        # Scoped to the integration + tests. The AppDaemon engine module is
-        # deployed file-for-file to the live box; reformatting it would bury
-        # real diffs in noise, so it is exempt from the black gate.
+        # Scoped to the integration + tests.
         run: |
           black --version
           black --check custom_components/ tests/
@@ -66,10 +64,6 @@ jobs:
       - name: Pytest (pure crop-steering-engine — the active decision core)
         run: |
           PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
-
-      - name: Lean engine decision harness (146 cases)
-        run: |
-          python appdaemon/apps/crop_steering/test_lean_decide.py
 
       - name: Hassfest
         uses: home-assistant/actions/hassfest@master

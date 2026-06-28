@@ -76,7 +76,7 @@ SELECT_DESCRIPTIONS = [
     # RootSense v3 — derived view of `number.crop_steering_steering_intent`.
     # Read-mostly: kept as a Select (not a Sensor) so dashboards can use it
     # in glance/entity cards without extra templating. The IntentResolver in
-    # the AppDaemon adaptive_irrigation app updates this on every intent
+    # the engine updates this on every intent
     # change. Operators who change it manually trigger a corresponding
     # intent slider update via the existing automation path.
     SelectEntityDescription(
@@ -154,7 +154,7 @@ async def async_setup_entry(
             zone_num=zone_num
         ))
 
-        # Zone Steering Mode (per-row Vegetative/Generative; AppDaemon falls back to global).
+        # Zone Steering Mode (per-row Vegetative/Generative; the engine falls back to global).
         # Retained from the lean branch: the master app's _zone_is_vegetative() reads this
         # for per-zone veg/gen EC-target selection.
         selects.append(CropSteeringSelect(

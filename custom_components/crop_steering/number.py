@@ -111,7 +111,7 @@ NUMBER_DESCRIPTIONS = [
         mode="box",
     ),
     # Lights-on starvation watchdog (lean engine): max dry time before the backstop
-    # shot fires. 0 disables it. The AppDaemon lean engine reads this global plus a
+    # shot fires. 0 disables it. The the engine lean engine reads this global plus a
     # per-zone override (number.crop_steering_zone_N_watchdog_hours); bounds match its
     # _PARAM_BOUNDS["watchdog_hours"] = (0, 12).
     NumberEntityDescription(
@@ -428,7 +428,7 @@ NUMBER_DESCRIPTIONS = [
         mode="box",
     ),
     # Source-Water Quality Gate (global; the veg batch tank feeds every row).
-    # The AppDaemon engine blocks irrigation while the live tank pH/EC sit outside
+    # The engine blocks irrigation while the live tank pH/EC sit outside
     # these limits. Set an EC limit to 0 to disable that half of the check.
     NumberEntityDescription(
         key="irrigation_ph_min",
@@ -698,7 +698,7 @@ async def async_setup_entry(
             default_value=zone_cfg.get("shot_multiplier", 1.0),
         ))
 
-        # Per-zone copy of every steering parameter (AppDaemon falls back to global).
+        # Per-zone copy of every steering parameter (the engine falls back to global).
         for _key in PER_ZONE_STEERING_KEYS:
             _g = _DESC_BY_KEY[_key]
             numbers.append(CropSteeringNumber(

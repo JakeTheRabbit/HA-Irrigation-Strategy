@@ -21,8 +21,8 @@ From the repo root:
 bash tests/run_ci.sh
 ```
 
-That mirrors CI: lint + format + yaml, both pytest suites, and the lean decision harness.
-Run the pieces individually if you prefer:
+That mirrors CI: lint + format + yaml and both pytest suites. Run the pieces individually
+if you prefer:
 
 ```bash
 # Pure decision engine — the active control core
@@ -30,9 +30,6 @@ PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests 
 
 # Integration helpers + add-on state migration + version consistency
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -q
-
-# Lean decision harness (standalone)
-python appdaemon/apps/crop_steering/test_lean_decide.py
 ```
 
 ## What it tests
@@ -43,15 +40,11 @@ anti-lockout high-EC flush, the sensor-independent minimum-daily-water floor, EC
 and `validate_params()` clamping. This is the bug class that has actually bitten the grow,
 testable offline.
 
-### 2. Lean decision harness — `appdaemon/apps/crop_steering/test_lean_decide.py`
-A large table of `(vwc, ec, phase, params)` vectors asserting the expected fire/size and
-transitions. Belt-and-braces coverage of the decision logic.
-
-### 3. Integration calculation helpers — `tests/test_calculations.py`
+### 2. Integration calculation helpers — `tests/test_calculations.py`
 The pure helpers in `custom_components/crop_steering/calculations.py` (no hardware needed;
 input_boolean/number simulate pumps/sensors).
 
-### 4. In-place upgrade / state migration — `tests/test_state_migration.py`
+### 3. In-place upgrade / state migration — `tests/test_state_migration.py`
 **Why it matters:** the add-on persists per-zone runtime state to `/data/state.json` and is
 live-installed on many boxes. A version bump must load an **older** state file transparently.
 These tests lock that contract: a missing file, corrupt JSON, missing keys, an unknown
@@ -59,13 +52,13 @@ legacy key, a bad timestamp, and a zone absent from the file must all be tolerat
 fields fall back to fresh defaults, never an error, never a wipe. Plus a save→load
 round-trip.
 
-### 5. Version consistency — `tests/test_version_consistency.py`
+### 4. Version consistency — `tests/test_version_consistency.py`
 The integration version must match across `manifest.json`, the latest released `CHANGELOG.md`
 heading, and the README badge, so a release can't ship a stale number. (The f2-control
 add-on has its own version line in `addons/f2_control/config.yaml`, synced to the dedicated
 add-on repo by `scripts/publish_addon.sh`.)
 
-### 6. Lint / format / YAML — ruff, black (scoped to `custom_components/` + `tests/`), yamllint
+### 5. Lint / format / YAML — ruff, black (scoped to `custom_components/` + `tests/`), yamllint
 Plus, on GitHub only: **hassfest** and **HACS validation** of the integration.
 
 ## Manual verification checklist (live Home Assistant)

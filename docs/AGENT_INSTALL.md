@@ -16,8 +16,7 @@ The system has **two layers**:
   wizard. Touches no hardware.
 - **Engine** (`addons/f2_control/`) — the **f2-control add-on**: a single synchronous
   Python process that reads those entities + live sensors, runs P0→P1→P2→P3, and drives
-  the hardware. (AppDaemon `appdaemon/apps/crop_steering/` is the **retired** rollback —
-  do not install it.)
+  the hardware. This is the active engine.
 
 They talk only through HA entities. Install the integration first, then the add-on.
 
@@ -47,8 +46,8 @@ Do not assume; verify each and report findings before proceeding.
 2. **Install method available.** Prefer HACS (Settings → Devices & Services → HACS).
    If absent, plan a manual copy into `/config/custom_components/`.
 3. **Add-on support.** Supervised / HA-OS install (Settings → Add-ons exists). The
-   f2-control add-on is a local add-on you copy onto the host in §5 — AppDaemon is **not**
-   needed. (HA Core, with no Supervisor, can't run add-ons — run the engine another way.)
+   f2-control add-on is a local add-on you copy onto the host in §5. (HA Core, with no
+   Supervisor, can't run add-ons — run the engine another way.)
 4. **Samba or SSH access to the HA host** (the *Samba share* or *Advanced SSH & Web
    Terminal* add-on), so you can copy files into `/addons/` and `/config/` in §5.
 4. **The hardware exists in HA as entities.** This is the critical pre-req. The engine

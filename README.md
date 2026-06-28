@@ -2,9 +2,9 @@
 
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
 ![HA Add-on](https://img.shields.io/badge/HA%20Add--on-f2--control-41BDF5?logo=home-assistant&logoColor=white)
-![Release](https://img.shields.io/badge/Release-2.9.3-green)
+![Release](https://img.shields.io/badge/Release-2.9.4-green)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
-![Zones](https://img.shields.io/badge/Zones-1%E2%80%9324+-blue)
+![Zones](https://img.shields.io/badge/Zones-1%E2%80%9324-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 <p align="center">
@@ -153,9 +153,8 @@ flowchart LR
 The feedback loop is the whole point: **sensors → entities → engine decision →
 hardware → substrate changes → sensors.** Every poll can trigger a re-evaluation.
 
-> *Legacy:* the original **AppDaemon engine** (`appdaemon/apps/crop_steering/master_crop_steering_app.py`)
-> is kept as a one-line rollback; the add-on supersedes it. See `www/irrigation-manual.html` for
-> the operator manual and [`CHANGELOG.md`](CHANGELOG.md) for the 2.4.0 release notes.
+See `www/irrigation-manual.html` for the hardware-side operator manual and
+[`CHANGELOG.md`](CHANGELOG.md) for release notes.
 
 ---
 
@@ -164,28 +163,26 @@ hardware → substrate changes → sensors.** Every poll can trigger a re-evalua
 | Feature | Why it matters |
 |---|---|
 | **Per-zone autonomy** | Each zone (the `.env` auto-detects any number; tested to 24) runs its own phase machine, targets, and steering mode. Row 1 can be ramping in P1 while Row 3 dries back in P3. |
-| **Sensor fusion** | Front/back sensor pairs per zone are averaged with outlier rejection (a downward z-score guard for VWC, so a probe dropping out can't trigger a phantom shot), so one flaky probe doesn't fire — or block — a shot. |
-| **Dryback detection** | Peak/valley detection on the VWC curve drives the P0 wait and the overnight target — the engine acts on *real* substrate behaviour, not a guess. |
+| **Sensor fusion** | Map as many VWC/EC probes per zone as you like; the **integration** fuses each zone to one value (average + outlier rejection — a downward guard for VWC) and publishes `sensor.crop_steering_vwc_zone_N` / `ec_zone_N`. The engine steers on that fused value, so one flaky probe can't fire — or block — a shot. |
+| **Dryback detection** | Peak tracking + a dryback-rate slope on the VWC curve drives the P0 wait and the predictive P3 start — the engine acts on *real* substrate behaviour, not a guess. |
 | **EC steering** | The current-EC ÷ target-EC ratio nudges the P2 threshold, so the system feeds and dries to hit your EC, not just your moisture. |
-| **Source-water gate** | Irrigation is blocked while source pH/EC are out of range — it won't push bad water into your slabs. |
-| **Self-healing (`_ai_heartbeat`)** | A periodic watchdog force-advances a phase that's stuck >4 h, flags stale sensors, and flags a zone that takes water without VWC rising (a draining/channelling row or a blocked dripper). |
-| **Hardware watchdog** | Catches a valve or pump stuck on and emergency-stops; every shot's valve close is read-back verified. |
-| **Bounded by design** | Per-zone daily **volume** and **shot-count** caps stop runaway watering — but **emergency rescue is exempt**, so a genuinely dry plant is never denied water by a budget. |
+| **Source-water gate** | Irrigation is blocked while source pH/EC are out of range — it won't push bad water into your slabs. Fail-closed: a dead feed probe (past a grace window) holds rather than feeds blind. |
+| **Lights-on watering watchdog** | A starvation backstop: if an enabled zone gets no water for `watchdog_hours` (default 3) during lights-on while VWC is below threshold, it forces a shot. Plus a **cross-zone under-drink flag** (a zone drinking < 40 % of the room median is surfaced) and a valve-stuck-open readback. *(`sensor.crop_steering_ai_heartbeat` is a liveness ping, not a self-tuning brain.)* |
+| **Fail-closed hardware** | Every shot's valve close is read-back verified; a stuck-open valve cuts pump + mainline and alerts. A failed pump/mainline/valve call aborts the shot and is **not** counted. |
+| **Bounded by design** | A per-zone daily **volume** cap stops runaway watering — but **emergency rescue is exempt**, so a genuinely dry plant is never denied water by a budget. A hard **max shot-duration** ceiling stops a config fat-finger flooding the room. |
 | **Activity feed** | `sensor.crop_steering_activity_log` is a rolling, human-readable feed of every watered / blocked / phase event — the dashboard's black-box recorder. |
 | **No-YAML setup** | A config-flow wizard (entity-picker dropdowns) or a single `.env` file maps your hardware and builds every entity — then **Configure → Edit zones & hardware** changes it later, no reinstall. |
 | **Any number of probes per zone** | The UI wizard maps multiple VWC/EC sensors per zone; the integration fuses them (average + outlier reject) and the engine steers on the fused per-zone value. |
-| **Multiple rooms** | Add the integration again per grow room — each is **fully isolated** (own zones, sensors, pump, setpoints), entities namespaced `crop_steering_<room>_*`, dashboards scoped with `?room=`. |
+| **Multiple rooms** | Add the integration again per grow room — each is **fully isolated** (own zones, sensors, pump, setpoints), entities namespaced `crop_steering_<room>_*`, with its own Repairs cards. *(The bundled dashboards currently target the default room; per-room dashboard scoping is on the roadmap.)* |
 | **Dashboards in the sidebar** | The add-on serves the operator console + mobile page over HA **ingress** as a sidebar panel — no manual file copy, authenticated, with a Live/Demo toggle. |
-| **Setup health checks** | Misconfiguration — missing kill switch, engine offline, a zone with no sensor, a sensor unavailable — surfaces as **fix-it cards in Settings → Repairs**. |
+| **Setup health checks** | Misconfiguration — missing kill switch, engine offline, a zone with no sensor, a fused sensor unavailable — surfaces as **fix-it cards in Settings → Repairs** that clear themselves when resolved. |
 | **Configure once** | The add-on reads lights hours + zone count from the integration, so you set them once in the UI; no drift between the two. |
-| **Adaptive steering** *(optional)* | Detects each zone's true P1 moisture ceiling (`Vmax`), then derives the P2 trigger as `Vmax × (1 − dryback%)` per zone and ramps the P1 target up over days — each zone dries back the right % from *its own* measured ceiling. Off by default, behind one switch. |
-| **Predictive overnight (P3)** | Each zone's *own* overnight dryback rate feeds the P3-start timing (was a shared room rate), with a buffer-safe cap so a zone lands on its target dryback by lights-on **without firing overnight emergency shots**. |
-| **Feed-lockout diagnostic** | When a low-VWC zone isn't being fed, it names the exact gate stopping it — tank empty, dosing, flush/fill, source-water gate, EC ceiling, safety lockout, phase pin, disabled, daily cap — and attaches it to the under-watered alert. |
-| **Manual pump modes** | `flush` / `fill` booleans hand the pump to the operator (hose-flood or tank dosing); the engine pauses its own shots and exempts the hardware watchdog while either is on. |
-| **Operator console** | One dependency-free dashboard, `www/f2.html` — Status / Zones / Tune / Climate / Operate / Plan / 3D, with click-to-fix advisories (an issue links you straight to the control that resolves it). [Try it live](#live-demo-no-install). |
+| **Predictive overnight (P3)** | The engine starts a zone's overnight dryback (P3) early when its current dryback rate means it will land on the target dryback by lights-off — so a zone isn't stranded mid-cycle and doesn't need overnight emergency shots to recover. |
+| **Feed-lockout diagnostic** | When a low-VWC zone isn't being fed, the dashboard names the exact gate stopping it — dosing / fill / flush, source-water gate, EC ceiling, daily-volume cap, manual override, zone disabled, kill switch — and attaches it to the under-watered alert. |
+| **Manual pump modes** | The `nutrient_dosing_active` / `f2_fill_mode` / `f2_flush_mode` booleans hand the pump to the operator (hose-flood or tank dosing); the engine pauses **all** its own shots while any of them is on. |
+| **Operator console** | One dependency-free dashboard, `www/f2.html` — tabs **Overview / Substrate / Zones / Steering / Analyze / Climate / Floorplan** — with click-to-fix advisories (an issue links you straight to the control that resolves it). [Try it live](#live-demo-no-install). |
 | **Mobile control surface** | `www/overview.html` — a phone-first one-pager (**Steer / Controls / Dosing**): per-zone VWC + target / pore-EC + target / substrate temp, room climate (temp / VPD / CO₂ / PPFD / DLI), pump + light + zone controls, and the veg-room peristaltic dosing pumps feeding F2. |
-| **Live shot sizing** | The f2-control add-on computes each shot's run-time from your *real* substrate volume + per-zone flow (plants × drippers × L/hr), so a `%`-of-substrate shot delivers exactly that — no hardcoded guess. |
-| **Fail-closed actuation** | A failed pump/mainline/valve service call aborts the shot (cuts hardware, alerts) and is **not** counted — state, daily volume and "last shot" never lie after an auth/service error. |
+| **Live shot sizing** | The f2-control add-on computes each shot's run-time from your *real* substrate volume + per-zone flow (plants × drippers × L/hr), so a `%`-of-substrate shot delivers exactly that — no hardcoded guess. Published as `sensor.crop_steering_p1/p2/p3_shot_duration_seconds`. |
 | **Anti-short-cycle** | P2 EC-correction shots (flush/dilute/rescue) respect a minimum interval, so a no-runoff nibble can't stack EC and machine-gun the pump. |
 | **PID EC loop** *(optional)* | A real Kp/Ki/Kd controller (integral anti-windup, clamped) on the pore-EC error as a drop-in upgrade to the stepped EC-steer. Off by default, behind one switch, gains tunable. |
 | **Minimum daily water floor** *(optional)* | A guaranteed **mL-per-plant-per-day** baseline, front-loaded and **sensor-independent** — a lying or dead VWC probe can't quietly starve a plant. A hard anti-drown ceiling is the only thing that holds it; bad feed water still blocks it. Off until you set a number per zone. |
@@ -199,12 +196,13 @@ hardware → substrate changes → sensors.** Every poll can trigger a re-evalua
 **https://jaketherabbit.github.io/HA-Irrigation-Strategy/f2.html?demo**
 
 `f2.html` is the unified operator dashboard. Its **demo mode** runs on baked-in "perfect grow"
-data — no Home Assistant, no token, no hardware, no network. Click through every tab: **Status**
-(advisories + the full live-sensor snapshot + plant-state gauges + the facility floor mini),
-**Zones** (per-zone cockpit — VWC/EC/dryback, water delivered, co-located setpoints), **Tune**
-(the science-grounded visual setpoint editor), **Climate** (24 h history charts + every room
-control), **Operate**, and **Plan** (the grow-week timeline planner). The live install adds the
-camera, the interactive 3D facility twin, and the Ask-AI co-pilot.
+data — no Home Assistant, no token, no hardware, no network. Click through every tab: **Overview**
+(advisories first + the full live-sensor snapshot + plant-state gauges + the facility-floor mini),
+**Substrate** (the VWC/EC/dryback trend), **Zones** (per-zone cockpit — VWC/EC/dryback, water
+delivered, co-located setpoints), **Steering** (the science-grounded visual setpoint editor + the
+grow-week recipe/timeline as a subview), **Analyze** (limiting-factor + driver charts), **Climate**
+(24 h history charts + every room control), and **Floorplan**. The live install adds the camera, the
+full interactive 3D facility twin, and the Ask-AI co-pilot.
 
 - **Hosted:** the link above (GitHub Pages — auto-enters demo mode).
 - **Locally:** open `www/f2.html?demo` in any browser.
@@ -241,42 +239,6 @@ Everything in `www/` is published to GitHub Pages — **[index of all pages](htt
 
 ---
 
-## Adaptive steering (optional, self-tuning)
-
-The base engine runs every setpoint you give it. The **adaptive layer**
-(`appdaemon/apps/crop_steering/adaptive_steering.py`) makes the key ones tune themselves to
-each zone's measured behaviour. It is **off by default** and gated by a single switch —
-`input_boolean.f2_adaptive_steering_enabled` — so it changes nothing until you arm it, and
-every write is clamped and confidence-gated.
-
-**1 · Per-zone P1 ceiling (`Vmax`) detection.** During the morning ramp it watches the wet-up
-and decides when a zone has actually hit its field-capacity ceiling by *voting* four independent
-signals — marginal-uptake collapse (ΔVWC per shot fading), peak plateau, pore-EC runoff, and a
-saturating-curve fit — and locks a per-zone `Vmax` with a confidence score
-(`sensor.crop_steering_zone_X_vmax_detected`).
-
-**2 · Dryback-derived P2.** Once `Vmax` is known the P2 trigger is set to
-`Vmax × (1 − dryback_target%)` **per zone, per mode** — so each zone dries back the *right %* from
-its *own* measured ceiling. The EC-stacker still trims around that base.
-
-**3 · Multi-day P1 ramp.** The P1 target climbs a configurable amount each day toward the detected
-`Vmax` (capped below field capacity), so the morning saturation target follows the plant up as the
-root mass fills the block — instead of a static number you hand-crank.
-
-**4 · Predictive overnight cutoff (P3).** Each zone's *own* overnight dryback rate is measured and
-fed into the engine's P3-start timing (previously a single shared rate), and the overnight target
-dryback is capped so the predicted lights-on VWC stays above the P3 emergency floor + a buffer —
-it lands on the dryback target **without needing an overnight emergency shot**. The forecast is
-published as `sensor.crop_steering_zone_X_p3_prediction`.
-
-Control + tuning live in `packages/f2_adaptive_steering.yaml` (the enable switch + confidence /
-climb-rate / margin numbers). The module is a drop-in: it wires into the engine with four small
-hooks in `master_crop_steering_app.py` (an `import`; a `tick()` call at the end of
-`_update_zone_vwc_capacity`; one block in `_get_zone_dryback_rate` for the per-zone rate; and a
-buffer-safe cap in `_should_zone_start_p3`) — documented in the module header.
-
----
-
 ## The safety model
 
 Every shot passes a chain of gates before a valve opens. Nothing gets to the pump
@@ -284,30 +246,33 @@ without clearing all of them:
 
 ```mermaid
 flowchart LR
-    REQ(["Shot requested"]) --> C1{System enabled?}
-    C1 -- no --> STOP(["🚫 Blocked\n(logged to activity feed)"])
-    C1 -- yes --> C2{Zone override OFF?}
+    REQ(["Shot requested"]) --> C0{Kill switch ON?}
+    C0 -- no --> STOP(["🚫 Blocked\n(reason logged + on the dashboard)"])
+    C0 -- yes --> C1{System + zone enabled,\noverride OFF?}
+    C1 -- no --> STOP
+    C1 -- yes --> C2{Not dosing / fill / flush?}
     C2 -- no --> STOP
-    C2 -- yes --> C3{VWC below field capacity?}
+    C2 -- yes --> C3{Source pH/EC in range?\n(fail-closed on dead probe)}
     C3 -- no --> STOP
-    C3 -- yes --> C4{Source pH/EC in range?}
+    C3 -- yes --> C4{Daily volume cap OK?\n(emergency rescue exempt)}
     C4 -- no --> STOP
-    C4 -- yes --> C5{Daily volume + shot caps OK?}
+    C4 -- yes --> C5{Pore-EC under hard max?\n(or a dilutive flush)}
     C5 -- no --> STOP
-    C5 -- yes --> C6{EC under hard max?}
-    C6 -- no --> STOP
-    C6 -- yes --> FIRE(["✅ Pump prime → mainline → valve → irrigate → shutdown"])
+    C5 -- yes --> FIRE(["✅ Pump prime → mainline → valve → irrigate → shutdown"])
 ```
 
-The **source-water gate checks both pH and EC** (with a last-known-good grace window, and
-fail-closed if a feed probe dies). The whole engine is gated by a hard **kill switch**
-(`input_boolean.f2_control_enabled`, OFF = never actuates). Service-call writes are **fail-closed** —
-a failed pump/mainline/valve command aborts the shot and is not counted — and P2 EC-correction shots
+The whole engine is gated by a hard **kill switch** (`input_boolean.f2_control_enabled`,
+OFF = never actuates). The **source-water gate checks both pH and EC** (with a last-known-good
+grace window, fail-closed if a feed probe dies). High pore-EC doesn't lock a zone out — if the feed
+is dilutive the engine **flushes** rather than blocks. Service-call writes are **fail-closed** — a
+failed pump/mainline/valve command aborts the shot and isn't counted — and P2 EC-correction shots
 respect a **minimum interval** so a no-runoff nibble can't machine-gun the pump.
 
-Plus hardware sequencing that prevents overlapping shots, drain-through back-off,
-per-zone manual overrides and phase pins for maintenance, and an instant emergency
-stop.
+> *Field capacity isn't a hard pre-shot gate — it's the **ceiling the P1 ramp targets** and a
+> precondition for EC flushes. A hard anti-drown ceiling (~90 % VWC) is what blocks a flood.*
+
+Plus hardware sequencing that prevents overlapping shots, per-zone manual overrides, and an instant
+emergency stop (safe-off of pump + mainline + all valves on shutdown).
 
 ---
 
@@ -316,7 +281,7 @@ stop.
 **Software**
 - **Home Assistant** 2024.3.0+ (HA OS / Supervised recommended — you need add-ons).
 - **The f2-control add-on** (this repo's `addons/f2_control/` — the live engine; you install it in
-  step 4). *AppDaemon is **not** required — it's a retired rollback path.*
+  step 4). It runs in its own container — no extra runtime to install.
 - **HACS** (recommended, for one-click integration install).
 
 **Hardware — per zone**
@@ -428,20 +393,20 @@ add-ons** → Install. *(In the store it's named **Crop Steering**.)* (This mono
 [`f2-control`](https://github.com/JakeTheRabbit/f2-control) repo is the published copy.)
 
 Either way, then:
-1. In **Configuration** set the lights hours, your notify service, and (if they differ from the
-   defaults) the feed EC/pH sensor entity IDs + the pump / mainline / per-zone valve map.
-   Substrate volume + per-zone plant/dripper/flow are read live from the integration's number
-   entities, so a shot's `%`-of-substrate run-time is always correct.
+1. In the add-on's **Configuration** set the lights hours, your notify service, and (if you use a
+   source-water gate) the feed **EC / pH sensor** entity IDs. The **pump / mainline / per-zone valve
+   map** and the **per-zone substrate / plant / dripper / flow** facts are set in the *integration*
+   setup wizard (step 2) and read live from its number entities — so a shot's `%`-of-substrate
+   run-time is always correct without re-entering hardware here.
 2. Create the kill switch `input_boolean.f2_control_enabled` (a Helper, or deploy
    `addons/f2_control/f2_control_package.yaml` to `/config/packages` + reload). **OFF = safe** — the
    add-on reads, computes and notifies but never opens a valve.
 3. **Start** it — the log shows `starting | kill-switch … | token present: True`. Flip the kill switch
    **ON** to go live.
 
-It's a single synchronous Python process: polls HA over REST (no AppDaemon, no asyncio), drives the
+It's a single synchronous Python process: polls HA over REST (no asyncio event loop), drives the
 hardware with valve-close readback + fail-closed writes, republishes the `sensor.crop_steering_*`
-surface, and pings your phone every 30 min. *(The retired AppDaemon engine stays in `appdaemon/` as a
-one-line rollback.)*
+surface, and pings your phone every 30 min.
 
 > **Updating the engine later — Rebuild, don't Restart.** The add-on bundles its Python into the
 > container image when it's **built** (`Dockerfile COPY`). After you change anything under
@@ -463,20 +428,22 @@ sidebar** on the add-on's Info tab. Open it and you get a **Live / Demo** choose
 
 **It's one page with tabs along the top — click a tab to move between its parts:**
 
-- **Status** — advisories first (tap an issue → land on the control that fixes it), the full live
-  snapshot, plant-state gauges, the facility-floor mini.
+- **Overview** — advisories first (tap an issue → land on the control that fixes it), the full live
+  snapshot, plant-state gauges, the facility-floor mini. (The old "Operate" pump/engine controls live
+  here, under *Irrigation*.)
+- **Substrate** — the VWC / EC / dryback trend over time.
 - **Zones** — the per-zone cockpit: VWC / EC / dryback, water delivered, co-located setpoints.
-- **Tune** — the visual setpoint editor (yield/potency models, limiting-factor solver, driver charts).
-- **Climate**, **Operate**, **Plan** (grow-week timeline), and an embedded **3D** facility twin.
+- **Steering** — the visual setpoint editor (yield/potency models, limiting-factor solver, driver
+  charts); the grow-week **recipe/timeline** planner is a subview here.
+- **Analyze**, **Climate** (24 h history + room controls), and **Floorplan** (the 3D facility twin).
 
 It reads live state + 24 h history from the HA REST API and parses `sensor.crop_steering_activity_log`
 for the per-shot feed.
 
-**Linking to a specific room or page.** Each page is its own file, so you can deep-link:
+**Linking to a specific page.** Each page is its own file, so you can deep-link straight to it:
 `…/overview.html` (mobile one-pager), `…/setpoints.html` (recipe planner), `…/system-map.html` (3D
-map). For **multiple rooms**, append `?room=<name>` to scope the view to that room — e.g.
-`…/f2.html?room=flower_b` reads that room's `crop_steering_flower_b_*` entities. `?demo` on any page
-runs it standalone on mock data.
+map). Adding `?demo` to a dashboard page (`f2.html`, `overview.html`, `crop_steering.html`) runs it
+standalone on mock data.
 
 **Embedding it as a card** (inside an existing Lovelace dashboard): add a **Webpage** card (or an
 `iframe` card in YAML) pointing at the dashboard URL and it shows as a card on any view:
@@ -543,27 +510,21 @@ Full routine: `docs/operation_guide.md`. Mental model: `docs/SYSTEM_OVERVIEW.md`
 
 ## Under the hood
 
-> **Note:** the module table below describes the **retired AppDaemon engine** (`appdaemon/`), kept only
-> as a rollback. The **live** engine is `addons/f2_control/f2_control/controller.py` (the thin IO shell:
-> read sensors → `decide()` → drive valves) plus the pure `crop-steering-engine` package (the phase
-> logic + safety, unit-tested with no HA). The list is retained as a reference for the original design.
+The live engine is two parts: a **thin IO shell** (`addons/f2_control/f2_control/controller.py` —
+read sensors → build a snapshot → `decide()` → drive valves → republish status) wrapped around a
+**pure decision core** (`crop-steering-engine/` — the phase logic + EC steering + safety, with no HA
+and no I/O, unit-tested offline). The shell is the only part that touches Home Assistant or hardware.
 
-| Module | Job |
+| Part | Job |
 |---|---|
-| `master_crop_steering_app.py` | The coordinator — decisions, phase logic, hardware sequencing, safety, activity feed |
-| `phase_state_machine.py` | Per-zone P0→P1→P2→P3 transitions |
-| `advanced_dryback_detection.py` | Peak/valley detection + dryback % |
-| `intelligent_sensor_fusion.py` | Multi-sensor averaging + outlier rejection |
-| `intelligent_crop_profiles.py` | Per-crop / per-stage parameter profiles |
-| `adaptive_steering.py` | Optional self-tuning layer (Vmax, dryback-derived P2, predictive P3) |
-| `ml_irrigation_predictor.py` | Trend-analysis scaffold — **currently inert**; the live engine is deterministic |
-| `base_async_app.py` | Async base class shared by the modules |
+| `addons/f2_control/f2_control/controller.py` | The IO shell — REST poll, snapshot build, hardware sequencing + valve readback, EC-offset/PID accumulation, alerts/vitals, state persistence (`/data/state.json`) |
+| `crop-steering-engine/src/crop_steering_engine/core.py` | The pure `decide()` core — P0→P1→P2→P3 transitions, per-phase irrigation rules, anti-lockout high-EC flush, watchdog, daily-cap budget, `ec_adjust` / `ec_pid` / `validate_params` / `cross_zone_outliers` |
+| `custom_components/crop_steering/` | The HA integration — ~100 entities, config-flow wizard, per-zone sensor fusion, pure calculation helpers; never touches hardware |
 
 ```
-custom_components/crop_steering/   # HA integration — entities, config-flow wizard, pure calculations
+custom_components/crop_steering/   # HA integration — entities, config-flow wizard, sensor fusion, pure calculations
 addons/f2_control/                 # the LIVE engine (the f2-control add-on) — deploy here, then Rebuild
 crop-steering-engine/src/          # the pure decide() engine package the add-on imports (offline-tested)
-appdaemon/apps/crop_steering/      # retired AppDaemon engine — kept only as a one-line manual rollback
 packages/irrigation/               # HA package YAML (recorder, helpers)
 www/                               # operator dashboards (f2.html, overview.html) + the 3D floorplan
 docs/                              # SYSTEM_OVERVIEW + install / operation / troubleshooting
@@ -603,5 +564,5 @@ MIT — use it, fork it, run your room with it.
 
 ## Acknowledgments
 
-Built on the shoulders of the Home Assistant and AppDaemon communities, and everyone
-pushing precision irrigation out from behind closed, expensive controllers.
+Built on the shoulders of the Home Assistant community, and everyone pushing precision
+irrigation out from behind closed, expensive controllers.
