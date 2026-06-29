@@ -1,5 +1,5 @@
 name: Crop Steering
-version: "0.10.1"
+version: "0.10.2"
 slug: f2_control
 description: >-
   Autonomous crop steering for Home Assistant. Runs the daily P0-P1-P2-P3 dryback

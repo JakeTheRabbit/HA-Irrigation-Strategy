@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Crop Steering add-on 0.10.2
+
+**🌱 In plain English.** Fixes the per-zone **"Volume fed vs daily cap"** and **"Irrigation frequency"**
+tiles showing blank (—). The engine now publishes each zone's litres-fed-today + shots-today.
+
+**🔧 Technical notes.** `_publish_status` now emits `sensor.crop_steering_<room>_zone_N_daily_water_app`
+(L, from `state.daily_vol`) and `..._irrigation_count_app` (from `state.shots`) per zone — the dashboard
+already read them; they just weren't being republished. Reset at the P3→P0 lights-on rollover.
+
 ### Crop Steering add-on 0.10.1
 
 **🌱 In plain English.** Per-room dashboards. View (and drive) any additional room by adding

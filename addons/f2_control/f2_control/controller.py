@@ -1181,6 +1181,30 @@ class Controller:
                         ls.isoformat(),
                         {"device_class": "timestamp"},
                     )
+                # Daily volume fed + shot count today — the dashboard's "Volume fed vs cap"
+                # + "Irrigation frequency" tiles read these. The data lives in zone state;
+                # republish it (resets at the P3->P0 lights-on rollover, like the counters).
+                zst = room.state[zone]
+                ha_set(
+                    f"sensor.crop_steering_{px}zone_{zone}_daily_water_app",
+                    round(float(zst.get("daily_vol") or 0.0), 2),
+                    {
+                        "unit_of_measurement": "L",
+                        "device_class": "water",
+                        "state_class": "total",
+                        "friendly_name": f"Zone {zone} water today",
+                        "engine": "f2-control",
+                    },
+                )
+                ha_set(
+                    f"sensor.crop_steering_{px}zone_{zone}_irrigation_count_app",
+                    int(zst.get("shots") or 0),
+                    {
+                        "state_class": "total",
+                        "friendly_name": f"Zone {zone} shots today",
+                        "engine": "f2-control",
+                    },
+                )
             sys_stat, unsafe, warn, safe = system_safety_status(labels)
             ha_set(
                 f"sensor.crop_steering_{px}system_safety_status",
