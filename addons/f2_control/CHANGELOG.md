@@ -3,6 +3,20 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.10.4
+- **Engine Log panel now works.** It used to tail `/local/f2_engine.log`, which the add-on can't write
+  (no `/config` map) — so it was always empty. It now reads the engine's published decision feed
+  (`sensor.crop_steering_activity_log`), room-scoped, and only re-renders when the feed changes (also
+  removes the 4s render churn).
+- **"Next" on the irrigation-frequency card.** The engine now publishes a per-zone next-shot estimate
+  `sensor.crop_steering_<room>_prediction_zone_N_next_irrigation_hours` (P2: time for VWC to dry to the
+  re-water threshold at the current dryback rate; "—" when not computable).
+- **Safety (HA-down observability):** the shot CLOSE sequence now checks every `turn_off` and reads the
+  valve back HA-aware — a failed/unconfirmed close (e.g. HA unreachable mid-shot) raises a CRITICAL
+  alert instead of silently reading as "closed". The shot is still counted (water was delivered) so the
+  daily cap stays honest. NOTE: software cannot close a valve when HA is down — the hardware fail-safe
+  (NC valves, pump-relay default-off, an independent watchdog) is the real guarantee.
+
 ## 0.10.3
 - **Diagnostic:** f2.html logs one `[f2-perf]` console line per 30s tick (JS heap, DOM-node count +
   delta, Chart-instance count) to pinpoint the dashboard lag. Open the console, filter `[f2-perf]`,

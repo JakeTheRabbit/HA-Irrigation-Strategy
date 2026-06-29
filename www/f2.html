@@ -3251,13 +3251,19 @@ function engineLog(){ return {   // live tail of the add-on engine log (served a
   toggle(){ this.open=!this.open; ls.set('f2.logOpen',this.open); if(this.open){ this._atBottom=true; this.$nextTick(()=>this.tick()); } },
   setFilter(f){ this.filter=f; ls.set('f2.logFilter',f); },
   errCount(){ return this.lines.filter(x=>x.lvl==='ERROR'||x.lvl==='CRITICAL'||/error|exception|traceback/i.test(x.msg)).length; },
-  async tick(){ if(DEMO){ this.live=false; return; } const tok=getToken(); if(!tok){ this.live=false; return; }
-    try{ const r=await fetch((CONFIG.HA_BASE||'')+'/local/f2_engine.log',{headers:{Authorization:'Bearer '+tok,'Range':'bytes=-60000'},cache:'no-store'});
-      if(r.status!==200 && r.status!==206){ this.live=false; return; } this.live=true;
-      const txt=await r.text(), arr=txt.split('\n'); if(r.status===206 && arr.length>1) arr.shift();   // drop the partial first line from a range read
-      this.lines=arr.map(l=>this.parse(l)).filter(Boolean).slice(-600);
-      this.$nextTick(()=>{ const el=this.$refs.logbody; if(el && this._atBottom) el.scrollTop=el.scrollHeight; });
-    }catch(e){ this.live=false; }
+  tick(){ if(DEMO){ this.live=false; return; }
+    // The add-on can't write /local/f2_engine.log (it has no /config map), so the old file tail was
+    // always empty. Read the engine's PUBLISHED decision feed instead: sensor.crop_steering_activity_log
+    // attribute "feed" (last ~50 watered/blocked/phase events) from the shared poll store S. Room-scoped
+    // automatically (fetchStates aliases crop_steering_<room>_activity_log). Change-gated so the 4s
+    // interval doesn't re-render when nothing changed (the feed only moves every ~30s).
+    const a = S['sensor.crop_steering_activity_log'];
+    const feed = (a && a.attributes && a.attributes.feed) || null;
+    this.live = feed != null;
+    if(feed === this._lastFeed) return;
+    this._lastFeed = feed;
+    this.lines = feed ? String(feed).split('\n').filter(Boolean).map(l=>this.parse(l)) : [];
+    this.$nextTick(()=>{ const el=this.$refs.logbody; if(el && this._atBottom) el.scrollTop=el.scrollHeight; });
   },
   parse(l){ if(!l||!l.trim()) return null;
     const m=l.match(/^\d{4}-\d\d-\d\d\s+(\d\d:\d\d:\d\d)(?:\.\d+)?\s+(\w+)\s+[^:]*:\s?(.*)$/);   // "2026-06-20 21:05:17.527 INFO logger: msg"
