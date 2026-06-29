@@ -3,6 +3,12 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.10.2
+- **Fix: per-zone "Volume fed vs daily cap" + "Irrigation frequency" tiles were blank (—).** The engine
+  now publishes `sensor.crop_steering_<room>_zone_N_daily_water_app` (litres fed today) and
+  `..._irrigation_count_app` (shots today) — the data was already tracked in zone state, just not
+  republished. Resets at the lights-on (P3→P0) rollover like the other daily counters. (Per room.)
+
 ## 0.10.1
 - **Per-room dashboards (`?room=<slug>`).** The operator console (`f2.html`) and the mobile one-pager
   (`overview.html`) now scope to an additional room with `?room=f1` etc. — every `crop_steering_*`
