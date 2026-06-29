@@ -226,6 +226,10 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
         fire, size, ir = True, p.p2_shot_size, f"MIN-DAILY floor {s.daily_vol:.1f}<{p.min_daily_volume:.1f}L (guaranteed)"
 
     # ---- SAFETY: daily cap is a BUDGET, not a wall — emergencies exempt ----
+    # NOTE: the MIN-DAILY floor above can never be blocked by this cap — the floor only fires while
+    # daily_vol < min_daily_volume, and validate_params() clamps min_daily_volume <= max_daily_volume,
+    # so floor-fires => daily_vol < min <= max => the cap's (daily_vol >= max) test is always false.
+    # The two are mutually exclusive by construction; the floor's "guaranteed" contract holds.
     if fire:
         emergency = (ir.startswith("FLUSH") or ir.startswith("WATCHDOG")
                      or "rescue" in ir or "flush" in ir or "emergency" in ir)

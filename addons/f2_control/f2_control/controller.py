@@ -844,12 +844,31 @@ class Controller:
                 )
                 return
             time.sleep(duration_s)
-            ha_call("switch", "turn_off", entity_id=valve)
+            # CLOSE sequence. A failed close (e.g. HA went unreachable mid-shot) leaves the valve
+            # OPEN and the SOFTWARE CANNOT fix it — only the hardware fail-safe (NC valve /
+            # pump-relay-default-off / independent watchdog) can. So check EVERY turn_off + the
+            # read-back and ALERT loudly on any non-close (the old code ignored turn_off failures
+            # and a dead-HA read-back masked a stuck-open valve as "closed" — silent danger).
+            close_ok = ha_call("switch", "turn_off", entity_id=valve)
             time.sleep(1)
-            ha_call("switch", "turn_off", entity_id=hw["mainline"])
-            ha_call("switch", "turn_off", entity_id=hw["pump"])
+            close_ok = (
+                ha_call("switch", "turn_off", entity_id=hw["mainline"]) and close_ok
+            )
+            close_ok = ha_call("switch", "turn_off", entity_id=hw["pump"]) and close_ok
             time.sleep(1)
-            if self._on(valve, False):
+            vstate, _, _ = ha_get(
+                valve
+            )  # None => HA unreadable; do NOT treat unreadable as "closed"
+            if not close_ok or vstate is None:
+                self._alert(
+                    f"valve_{room.slug}_z{zone}",
+                    "CRITICAL — valve close NOT confirmed",
+                    f"{room.slug} zone {zone}: a turn_off failed or the valve is unreadable "
+                    f"(HA unreachable?). Assume the valve is OPEN — the hardware fail-safe (NC valve / "
+                    f"pump default-off / independent watchdog) is the only thing that can close it now. "
+                    f"Check the row.",
+                )
+            elif self._on(valve, False):
                 ha_call("switch", "turn_off", entity_id=hw["pump"])
                 ha_call("switch", "turn_off", entity_id=hw["mainline"])
                 self._alert(
@@ -857,7 +876,9 @@ class Controller:
                     "URGENT — valve stuck open",
                     f"{room.slug} zone {zone} valve {valve} did not close after shot. Pump + mainline cut.",
                 )
-            # only counts a shot that actually opened the full pump->mainline->valve path
+            # Count the shot — water WAS delivered for the full duration, so daily_vol/last_shot must
+            # reflect it (else the daily cap under-counts and the zone can over-water). The alerts above
+            # cover the close-failure case; the counter stays honest about volume regardless.
             self._advance_shot_counters(room, zone, size_pct)
         except Exception as e:
             log("shot error", room.slug, zone, e)
@@ -1109,6 +1130,18 @@ class Controller:
                 now,
             )
             snap = snaps.get(zone)
+            # Estimated hours to the next P2 top-up: time for VWC to dry from now down to the
+            # (EC-adjusted) re-water threshold at the current dryback rate. Only meaningful in P2;
+            # 0 = due now, None elsewhere. Drives the dashboard's "next" on the frequency card.
+            pz = params[zone]
+            next_h = None
+            if snap is not None and room.state[zone]["phase"] == "P2":
+                if snap.vwc <= pz.p2_threshold:
+                    next_h = 0.0
+                elif snap.dryback_rate and snap.dryback_rate > 0:
+                    next_h = round(
+                        min((snap.vwc - pz.p2_threshold) / snap.dryback_rate, 48.0), 2
+                    )
             pub[zone] = {
                 "phase": room.state[zone]["phase"],
                 "vwc": snap.vwc if snap else None,
@@ -1119,6 +1152,7 @@ class Controller:
                 "blind": snap is None,
                 "p": params[zone],
                 "vmax": room._vmax.get(zone),
+                "next_h": next_h,
             }
         for z, why in cross_zone_outliers(snaps):
             self._alert(
@@ -1205,6 +1239,19 @@ class Controller:
                         "engine": "f2-control",
                     },
                 )
+                # Estimated hours to the next P2 shot (drives the dashboard "next"). Only published
+                # when computable (P2 + a real dryback rate); skipped otherwise so the card shows "—".
+                nh = d.get("next_h")
+                if nh is not None:
+                    ha_set(
+                        f"sensor.crop_steering_{px}prediction_zone_{zone}_next_irrigation_hours",
+                        nh,
+                        {
+                            "unit_of_measurement": "h",
+                            "friendly_name": f"Zone {zone} next irrigation",
+                            "engine": "f2-control",
+                        },
+                    )
             sys_stat, unsafe, warn, safe = system_safety_status(labels)
             ha_set(
                 f"sensor.crop_steering_{px}system_safety_status",

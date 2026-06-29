@@ -11,6 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Crop Steering add-on 0.10.4
+
+**🌱 In plain English.** Dashboard fixes the operator asked for: the **Engine Log** panel now shows
+the engine's live decision feed (it was always empty before), the **"next"** value on the irrigation-
+frequency card is populated, and (with 0.10.2) the per-zone **Volume fed** + **shots** tiles work.
+Plus a safety improvement: if a valve can't be confirmed closed (e.g. HA drops mid-shot) the engine now
+raises a CRITICAL alert instead of silently assuming it closed.
+
+**🔧 Technical notes.**
+- Engine Log → reads `sensor.crop_steering_activity_log` (feed attr) instead of the unwritable
+  `/local/f2_engine.log`; change-gated (also removes the 4s re-render churn — a lag suspect).
+- New per-zone `prediction_zone_N_next_irrigation_hours` published from `decide()` inputs (P2 dry-to-
+  threshold ÷ dryback rate).
+- `_execute_shot` close sequence: check every `turn_off` + HA-aware read-back; alert on
+  failed/unconfirmed close (don't let a dead-HA read mask a stuck-open valve). Shot still counted so
+  the daily cap stays honest. **Software can't close a valve when HA is down — hardware fail-safe is the
+  guarantee** (NC valves, pump default-off, independent watchdog).
+- `core.py`: comment documenting that the MIN-DAILY floor and the daily-volume cap are mutually
+  exclusive by construction (the audit-flagged "floor under-water" case is unreachable —
+  `min_daily_volume <= max_daily_volume` clamp + the floor only fires below `min`). No behaviour change.
+
 ### Crop Steering add-on 0.10.2
 
 **🌱 In plain English.** Fixes the per-zone **"Volume fed vs daily cap"** and **"Irrigation frequency"**
