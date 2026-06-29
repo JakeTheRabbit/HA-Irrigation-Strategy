@@ -5745,7 +5745,19 @@ document.addEventListener('alpine:init', () => {
       const vpd=num("air_vpd"),ec=num("fused_ec"),vwc=num("avg_vwc");
       if(vpd!=null){ this.pushHist('vpd',vpd); this.pushHist('ec',ec); this.pushHist('vwc',vwc); }
       this.$nextTick(()=>this.mountCharts());
+      this._perf();
     },
+    // DIAGNOSTIC (0.10.3): one console line per 30s tick to find the lag's source. Filter the
+    // console by "[f2-perf]". Watch which number climbs: dom -> DOM/detached-node leak; heap with
+    // flat dom -> JS-object leak (closures/charts); charts -> Chart instances accumulating.
+    _perf(){ try{
+      const now=Date.now(); this._perf0=this._perf0||now; const mins=((now-this._perf0)/60000).toFixed(1);
+      const dom=document.getElementsByTagName('*').length, charts=Object.keys(CHARTS).length;
+      const heap=(window.performance&&performance.memory&&performance.memory.usedJSHeapSize)?Math.round(performance.memory.usedJSHeapSize/1048576)+'MB':'n/a';
+      const p=this._perfPrev||{}, dd=(typeof p.dom==='number')?((dom-p.dom>=0?'+':'')+(dom-p.dom)):'·';
+      console.log(`[f2-perf] t=+${mins}m heap=${heap} dom=${dom}(${dd}) charts=${charts} hist=${HIST.vwc.length} adv=${(this.adv||[]).length} acked=${Object.keys(this._acked||{}).length} view=${this.view}`);
+      this._perfPrev={dom,charts};
+    }catch(e){} },
     pushHist(k,v){ const a=HIST[k]; if(!a.length){ for(let i=0;i<20;i++) a.push(v+(Math.random()-.5)*(k==='vwc'?2:k==='ec'?0.2:0.05)); } a.push(v); if(a.length>40) a.shift(); },
     buildHotspot(){ const bt=num("bl_temp"),at=num("air_temp"),bv=num("bl_vpd"); let bl="ok"; if(bt!=null&&at!=null){ const d=bt-at; if(d>=CONFIG.HOTSPOT.deltaWarn||(bv!=null&&bv>CONFIG.HOTSPOT.vpdWarn)) bl="warn"; else if(d>=CONFIG.HOTSPOT.deltaWatch) bl="watch"; }
       const cells=[{label:"Back-left",icon:bl==="ok"?"❄️":"🔥",val:fmt(bt,0)+"°",sev:bl},{label:"Room",icon:"🌡️",val:fmt(at,0)+"°",sev:"ok"}];

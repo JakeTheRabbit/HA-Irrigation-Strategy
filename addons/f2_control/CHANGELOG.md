@@ -3,6 +3,11 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.10.3
+- **Diagnostic:** f2.html logs one `[f2-perf]` console line per 30s tick (JS heap, DOM-node count +
+  delta, Chart-instance count) to pinpoint the dashboard lag. Open the console, filter `[f2-perf]`,
+  leave it until it lags, and watch which number climbs. Harmless; removed once the leak is found.
+
 ## 0.10.2
 - **Fix: per-zone "Volume fed vs daily cap" + "Irrigation frequency" tiles were blank (—).** The engine
   now publishes `sensor.crop_steering_<room>_zone_N_daily_water_app` (litres fed today) and
