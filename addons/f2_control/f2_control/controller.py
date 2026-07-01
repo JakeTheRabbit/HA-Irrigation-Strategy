@@ -180,6 +180,7 @@ class Controller:
         self._state_path = "/data/state.json"
         self._busy = False
         self._alerted = {}
+        self._fused_id_cache = {}  # (prefix,metric,zone) -> resolved fused-sensor entity_id
         self._activity = []
         self._last_notify = None
         self._start = datetime.now()
@@ -465,15 +466,44 @@ class Controller:
 
     def _detect_zones(self, prefix, fallback):
         """Count zones from the integration's fused VWC sensors. Returns the number of
-        consecutive sensor.crop_steering_<prefix>vwc_zone_N that exist, or `fallback` if none
-        do (e.g. HA not reachable yet at startup)."""
+        consecutive fused VWC sensors that exist under EITHER naming convention —
+        sensor.crop_steering_<prefix>vwc_zone_N (current) or the registry-sticky legacy
+        sensor.crop_steering_<prefix>zone_N_vwc — or `fallback` if none do (e.g. HA not
+        reachable yet at startup)."""
         n = 0
         for z in range(1, 25):
-            state, _, _ = ha_get(f"sensor.crop_steering_{prefix}vwc_zone_{z}")
-            if state is None:
-                break
+            new, _, _ = ha_get(f"sensor.crop_steering_{prefix}vwc_zone_{z}")
+            if new is None:
+                old, _, _ = ha_get(f"sensor.crop_steering_{prefix}zone_{z}_vwc")
+                if old is None:
+                    break
             n += 1
         return n or fallback
+
+    def _fused_id(self, prefix, metric, z, override=None):
+        """Resolve a zone's fused sensor entity_id, tolerating BOTH naming conventions.
+
+        The integration's CURRENT object_id is `crop_steering_<prefix>{metric}_zone_N`, but
+        HA entity_ids are sticky to the registry from first creation: a box originally set up
+        under an older integration that keyed the sensor `zone_N_{metric}` KEEPS that id
+        forever, even after the code switched conventions. The engine reads by entity_id, so a
+        mismatch makes it blind (the bug that froze every zone in P2). This probes HA for
+        whichever id actually exists and caches the hit. If neither is present yet (HA not up
+        at startup) it returns the current-convention id WITHOUT caching, so it re-resolves
+        once the entity appears. An explicit `override` (a user-mapped id from the `zones`
+        option) wins when it exists."""
+        key = (prefix, metric, z)
+        hit = self._fused_id_cache.get(key)
+        if hit:
+            return hit
+        current = f"sensor.crop_steering_{prefix}{metric}_zone_{z}"
+        legacy = f"sensor.crop_steering_{prefix}zone_{z}_{metric}"
+        for cand in ([override] if override else []) + [current, legacy]:
+            v, _, _ = ha_get(cand)
+            if v not in (None, "unknown", "unavailable", ""):
+                self._fused_id_cache[key] = cand
+                return cand
+        return override or current
 
     def _on(self, entity, default=False):
         v, _, _ = ha_get(entity)
@@ -649,8 +679,16 @@ class Controller:
 
     def _snapshot(self, room, zone, now, lights_on, lights_just_on):
         st = room.state[zone]
-        vwc = self._read_sensor(room.zones[zone]["vwc"], lo=0, hi=100)
-        ec = self._read_sensor(room.zones[zone]["ec"], lo=0, hi=20)
+        vwc = self._read_sensor(
+            self._fused_id(room.prefix, "vwc", zone, room.zones[zone].get("vwc")),
+            lo=0,
+            hi=100,
+        )
+        ec = self._read_sensor(
+            self._fused_id(room.prefix, "ec", zone, room.zones[zone].get("ec")),
+            lo=0,
+            hi=20,
+        )
         if vwc is None:
             return None, self._params(room, zone)
         if vwc > st["peak"]:
@@ -1010,6 +1048,31 @@ class Controller:
             all_pub[room.slug] = pub
         self._maybe_notify(all_pub, now)
 
+    def _blind_time_transition(self, room, zone, now, lights_on, lights_just_on):
+        """Time-only phase forces for a BLIND zone (dead/missing probe), so it can never
+        strand overnight while `decide()` is skipped: lights-off -> P3, and P3 -> P0 at the
+        new photoperiod (with the daily-counter reset, mirroring the P0 branch in _loop_room).
+        The VWC-driven transitions (P0->P1->P2, predictive P3) need a probe and stay paused."""
+        st = room.state[zone]
+        gds = self._grow_day_start(room, now)
+        new_grow_day = lights_on and (
+            st.get("last_daily_reset") is None or st["last_daily_reset"] < gds
+        )
+        new_phase = None
+        if not lights_on and st["phase"] != "P3":
+            new_phase = "P3"
+        elif st["phase"] == "P3" and (lights_just_on or new_grow_day):
+            new_phase = "P0"
+        if new_phase and new_phase != st["phase"]:
+            if new_phase == "P0":
+                st["daily_vol"], st["shots"] = 0.0, 0
+                st["ec_offset"], st["last_ec_steer"] = 0.0, None
+                st["ec_integral"], st["ec_prev_err"] = 0.0, 0.0
+                st["last_daily_reset"] = gds
+            st["phase"] = new_phase
+            st["last_phase_change"] = now
+            self._save_state()
+
     def _loop_room(self, room, now):
         """One room's full control pass: snapshot -> decide -> act -> build the publish dict.
         Reads/writes only this room's prefixed entities + its own state."""
@@ -1088,16 +1151,22 @@ class Controller:
             decisions[zone] = (fire, size, reason)
         for zone, p in blind:
             st = room.state[zone]
+            # A dead probe must NOT freeze the daily cycle: still honour the time-based
+            # phase forces (lights-off -> P3, P3 -> P0 at the new photoperiod). Only the
+            # VWC-driven transitions are paused while blind.
+            self._blind_time_transition(room, zone, now, lights_on, lights_just_on)
+            looking = f"sensor.crop_steering_{room.prefix}vwc_zone_{zone}"
             if healthy:
                 sib = pick_sibling(p.p1_target, healthy)
                 s_fire, s_size, _ = decisions[sib]
                 decisions[zone] = (s_fire, s_size, f"COPY Z{sib} (VWC probe dead)")
-                if zone not in room._blind_zones:
-                    self._alert(
-                        f"blind_{room.slug}_z{zone}",
-                        "Zone moisture probe dead — copying sibling",
-                        f"{room.slug} zone {zone} copying Zone {sib}.",
-                    )
+                # Re-alert each tick — _alert's 30-min debounce throttles it to a repeating
+                # reminder so a dead probe can't sit unnoticed (the silent-freeze lesson).
+                self._alert(
+                    f"blind_{room.slug}_z{zone}",
+                    f"⚠️ {room.slug} Z{zone} moisture probe dead — copying Z{sib}",
+                    f"No live VWC at {looking}. Mirroring Zone {sib} until it returns.",
+                )
             else:
                 mss = self._minutes_since_shot(st, now)
                 decisions[zone] = (
@@ -1105,12 +1174,13 @@ class Controller:
                     p.p2_shot_size,
                     "FALLBACK schedule (no live probe)",
                 )
-                if zone not in room._blind_zones:
-                    self._alert(
-                        f"blind_{room.slug}_z{zone}",
-                        "Zone probe dead — no live sibling",
-                        f"{room.slug} zone {zone} safe fallback schedule.",
-                    )
+                self._alert(
+                    f"blind_{room.slug}_z{zone}",
+                    f"⚠️ {room.slug} Z{zone} probe dead — blind schedule",
+                    f"No live VWC at {looking} and no healthy sibling. On a "
+                    f"{int(self.blind_fallback_min)}-min blind safety schedule; VWC-driven "
+                    "phase steering is paused until a probe returns.",
+                )
             room._blind_zones.add(zone)
         room._blind_zones = {z for z in room._blind_zones if z not in snaps}
         pub = {}
