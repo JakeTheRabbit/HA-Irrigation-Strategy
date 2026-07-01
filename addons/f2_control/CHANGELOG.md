@@ -3,6 +3,20 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.10.5
+- **Fix: zones could freeze in P2 if the fused-sensor entity_id didn't match.** The engine read
+  each zone's probe at `sensor.crop_steering_<room>vwc_zone_N` / `ec_zone_N`, but on a box first set
+  up under an older integration the HA registry keeps the legacy id `..._zone_N_vwc` / `_zone_N_ec`
+  forever. The mismatch made every zone read as "blind" → `decide()` was skipped → the P0-P3 phase
+  machine stopped (it never even forced P3 at lights-off), and the zones sat on a blind timer. The
+  engine now resolves each fused sensor under **both** naming conventions (and `_detect_zones` counts
+  either), so it finds the probe regardless of which id the registry assigned.
+- **Hardening — a dead probe can no longer strand the daily cycle.** A blind zone still honours the
+  time-based phase forces (lights-off → P3, P3 → P0 at the new photoperiod) even while VWC-driven
+  steering is paused, so it can't freeze overnight. The "probe dead" alert now **repeats** (every
+  ~30 min while blind) with the exact entity_id the engine is looking for, instead of firing once and
+  going silent.
+
 ## 0.10.4
 - **Engine Log panel now works.** It used to tail `/local/f2_engine.log`, which the add-on can't write
   (no `/config` map) — so it was always empty. It now reads the engine's published decision feed
