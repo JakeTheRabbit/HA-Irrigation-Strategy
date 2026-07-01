@@ -11,6 +11,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Crop Steering add-on 0.10.5
+
+**🌱 In plain English.** Fixes a serious silent failure: on some installs the engine couldn't find the
+zone moisture probes at all, so the zones **froze in whatever phase they were in** (they never even
+went to overnight dryback at lights-off) and watering fell back to a dumb timer. This happened when a
+box was first set up under an older version — Home Assistant keeps the original sensor names forever,
+and the engine was only looking for the new ones. The engine now finds your probes under **either**
+naming, and even if a probe truly dies, the daily light-cycle phases keep moving and you get a
+**repeating** phone alert (instead of one easy-to-miss ping) telling you exactly which sensor it wants.
+
+**🔧 Technical notes.**
+- New `Controller._fused_id()`: resolves each zone's fused sensor by probing HA for the current id
+  (`sensor.crop_steering_<room>vwc_zone_N`) then the registry-sticky legacy id (`..._zone_N_vwc`);
+  caches the hit; re-resolves while neither exists yet (HA still booting); an explicit `zones`-option
+  override wins. `_detect_zones` counts zones under either convention.
+- New `Controller._blind_time_transition()`: a blind zone (no readable VWC) still honours the
+  time-based phase forces — lights-off → P3, and P3 → P0 at the new photoperiod including the daily
+  counter/EC-state reset — so a dead probe can never strand the daily cycle. VWC-driven transitions
+  stay paused while blind.
+- The blind alert re-fires on the `_alert` 30-min debounce (was once-per-blindness) and names the
+  exact entity_id being looked for.
+- Regression-locked by `tests/test_blind_and_fused.py` (11 cases: both naming conventions, override,
+  cache/re-resolve semantics, blind P3/P0 forces + counter reset, mid-day hold).
+
 ### Crop Steering add-on 0.10.4
 
 **🌱 In plain English.** Dashboard fixes the operator asked for: the **Engine Log** panel now shows
