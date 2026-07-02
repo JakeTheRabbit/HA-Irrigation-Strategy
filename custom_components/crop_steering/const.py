@@ -80,12 +80,12 @@ GROWTH_STAGES = ["Vegetative", "Generative", "Transition"]
 CROP_TYPES = [
     "Cannabis_Athena",
     "Cannabis_Hybrid",
-    "Cannabis_Indica", 
+    "Cannabis_Indica",
     "Cannabis_Sativa",
     "Tomato",
     "Lettuce",
     "Basil",
-    "Custom"
+    "Custom",
 ]
 
 # ---------------------------------------------------------------------------
@@ -121,35 +121,55 @@ DEFAULT_RECIPE = {
     "active_stage": "Veg",
     "stages": {
         "Veg": {
-            "p1_target_vwc": 70.0, "p2_vwc_threshold": 60.0,
-            "generative_dryback_target": 15.0, "p0_dryback_drop_percent": 12.0,
-            "ec_target_gen_p1": 2.0, "ec_target_gen_p2": 2.5,
-            "maximum_ec": 7.0, "p2_shot_size": 5.0,
+            "p1_target_vwc": 70.0,
+            "p2_vwc_threshold": 60.0,
+            "generative_dryback_target": 15.0,
+            "p0_dryback_drop_percent": 12.0,
+            "ec_target_gen_p1": 2.0,
+            "ec_target_gen_p2": 2.5,
+            "maximum_ec": 7.0,
+            "p2_shot_size": 5.0,
         },
         "Transition": {
-            "p1_target_vwc": 66.0, "p2_vwc_threshold": 56.0,
-            "generative_dryback_target": 22.0, "p0_dryback_drop_percent": 18.0,
-            "ec_target_gen_p1": 2.6, "ec_target_gen_p2": 3.0,
-            "maximum_ec": 8.0, "p2_shot_size": 5.0,
+            "p1_target_vwc": 66.0,
+            "p2_vwc_threshold": 56.0,
+            "generative_dryback_target": 22.0,
+            "p0_dryback_drop_percent": 18.0,
+            "ec_target_gen_p1": 2.6,
+            "ec_target_gen_p2": 3.0,
+            "maximum_ec": 8.0,
+            "p2_shot_size": 5.0,
         },
         "Bulk": {
-            "p1_target_vwc": 62.0, "p2_vwc_threshold": 50.0,
-            "generative_dryback_target": 32.0, "p0_dryback_drop_percent": 24.0,
-            "ec_target_gen_p1": 3.0, "ec_target_gen_p2": 3.5,
-            "maximum_ec": 9.0, "p2_shot_size": 6.0,
+            "p1_target_vwc": 62.0,
+            "p2_vwc_threshold": 50.0,
+            "generative_dryback_target": 32.0,
+            "p0_dryback_drop_percent": 24.0,
+            "ec_target_gen_p1": 3.0,
+            "ec_target_gen_p2": 3.5,
+            "maximum_ec": 9.0,
+            "p2_shot_size": 6.0,
         },
         "Ripen": {
-            "p1_target_vwc": 58.0, "p2_vwc_threshold": 46.0,
-            "generative_dryback_target": 42.0, "p0_dryback_drop_percent": 30.0,
-            "ec_target_gen_p1": 3.4, "ec_target_gen_p2": 4.0,
-            "maximum_ec": 10.0, "p2_shot_size": 6.0,
+            "p1_target_vwc": 58.0,
+            "p2_vwc_threshold": 46.0,
+            "generative_dryback_target": 42.0,
+            "p0_dryback_drop_percent": 30.0,
+            "ec_target_gen_p1": 3.4,
+            "ec_target_gen_p2": 4.0,
+            "maximum_ec": 10.0,
+            "p2_shot_size": 6.0,
         },
         # Custom starts as a copy of Bulk; the operator edits it freely.
         "Custom": {
-            "p1_target_vwc": 62.0, "p2_vwc_threshold": 50.0,
-            "generative_dryback_target": 32.0, "p0_dryback_drop_percent": 24.0,
-            "ec_target_gen_p1": 3.0, "ec_target_gen_p2": 3.5,
-            "maximum_ec": 9.0, "p2_shot_size": 6.0,
+            "p1_target_vwc": 62.0,
+            "p2_vwc_threshold": 50.0,
+            "generative_dryback_target": 32.0,
+            "p0_dryback_drop_percent": 24.0,
+            "ec_target_gen_p1": 3.0,
+            "ec_target_gen_p2": 3.5,
+            "maximum_ec": 9.0,
+            "p2_shot_size": 6.0,
         },
     },
 }
@@ -157,9 +177,12 @@ DEFAULT_RECIPE = {
 # Entity prefixes
 ENTITY_PREFIX = "crop_steering"
 
-# Service names
-SERVICE_START_IRRIGATION = "start_irrigation"
-SERVICE_STOP_IRRIGATION = "stop_irrigation"
-SERVICE_SET_PHASE = "set_phase"
-SERVICE_TRIGGER_ZONE = "trigger_zone_irrigation"
-SERVICE_RECALIBRATE = "recalibrate_sensors"
+# Service names — the single source of truth for the domain's registered services.
+# These MUST match the keys of the SERVICES dict in services.py.
+SERVICE_TRANSITION_PHASE = "transition_phase"
+SERVICE_EXECUTE_IRRIGATION_SHOT = "execute_irrigation_shot"
+SERVICE_CHECK_TRANSITION_CONDITIONS = "check_transition_conditions"
+SERVICE_SET_MANUAL_OVERRIDE = "set_manual_override"
+SERVICE_CUSTOM_SHOT = "custom_shot"
+SERVICE_APPLY_RECIPE = "apply_recipe"
+SERVICE_SAVE_RECIPE = "save_recipe"

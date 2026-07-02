@@ -39,7 +39,9 @@ each zone toward a **vegetative** or **generative** response.
    [full install guide](https://jaketherabbit.github.io/HA-Irrigation-Strategy/install.html).
 2. **Create the kill switch** helper `input_boolean.f2_control_enabled` (Settings → Devices &
    Services → Helpers → Toggle). Leave it **OFF**.
-3. On the **Configuration** tab, set your `notify_service`. Lights/zones come from the
+3. On the **Configuration** tab, optionally set `notify_service` (blank = in-app persistent
+   notifications only) and `hold_entities` (booleans/switches that pause irrigation while ON,
+   e.g. a tank-fill flag). Lights, zones **and the pump/mainline/valve mapping** come from the
    integration automatically.
 4. **Start** the add-on. The **Log** shows `starting … | token present: True`.
 5. Open the **Crop Steering** sidebar panel → use **Demo** to look around, or **Live** for your

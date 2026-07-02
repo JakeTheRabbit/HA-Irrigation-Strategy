@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0c10">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Office · Room</title>
+<!--
+  OFFICE ROOM — CLIMATE · AIR QUALITY · LIGHTS · PRESENCE · SECURITY · VOICE (premium, LIVE Home Assistant)
+  Same F2 design family as home.html / f2.html. Iframed into an HA dashboard tab.
+  SECURITY: token from localStorage.hassTokens when embedded in HA; CONFIG.LL_TOKEN fallback
+  is a FULL-ACCESS token in a no-auth /local file — keep BLANK in the repo, inject on deploy.
+  ?demo = standalone showcase, no HA/token/network.
+-->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+<link rel="icon" href="data:,">
+<style>
+  :root{
+    color-scheme:dark;
+    --bg:#0a0c10; --bg2:#0f1318; --card:#141a21; --card2:#19212a;
+    --hair:rgba(255,255,255,.08); --ink:#e7ecf2; --ink2:#aab4c0; --ink3:#727d8a;
+    --ok:#34d399; --okdim:#10b981; --warn:#fbbf24; --crit:#f87171; --info:#38bdf8;
+    --gold:#f5b942; --cyan:#22d3ee; --pink:#f472b6; --yellow:#facc15; --violet:#b06bff; --orange:#fb923c;
+    --maxw:1280px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(34,211,238,.06), transparent 60%),
+    radial-gradient(1000px 500px at 0% 0%, rgba(52,211,153,.05), transparent 55%), var(--bg);
+    background-attachment:fixed;color:var(--ink);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#1f2630;border-radius:9px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::selection{background:rgba(52,211,153,.25)}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:clamp(12px,2vw,22px)}
+  .glass{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--hair);
+    box-shadow:0 10px 40px -22px rgba(0,0,0,.7);border-radius:18px}
+  .lift{transition:transform .16s cubic-bezier(.4,0,.2,1),box-shadow .16s,border-color .16s,background .16s}
+  @media(hover:hover){.lift:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.18)}}
+  .grad{background:linear-gradient(135deg,#6ee7b7,#34d399 45%,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+  h2.sec{font-size:.92rem;font-weight:800;letter-spacing:.02em;margin:0;display:flex;align-items:center;gap:9px}
+  h2.sec::before{content:"";width:4px;height:1.05em;border-radius:3px;background:linear-gradient(180deg,var(--ok),var(--cyan));flex:none}
+  .pulse{position:relative}
+  .pulse:before{content:"";position:absolute;inset:-4px;border-radius:999px;background:currentColor;opacity:.35;animation:ping 1.9s cubic-bezier(0,0,.2,1) infinite}
+  @keyframes ping{75%,100%{transform:scale(2.3);opacity:0}}
+  .fade{animation:fade .4s ease both}
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .float{animation:float 6s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+  .glowpulse{animation:glowpulse 2.6s ease-in-out infinite}
+  @keyframes glowpulse{0%,100%{filter:drop-shadow(0 0 2px currentColor)}50%{filter:drop-shadow(0 0 9px currentColor)}}
+  .grid{display:grid;gap:12px}
+  .sublabel{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);font-weight:700;margin:10px 0 2px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;padding:0 14px;border-radius:11px;font-weight:700;font-size:12.5px;border:1px solid var(--hair);background:var(--card2);color:var(--ink);cursor:pointer;transition:.14s;user-select:none}
+  .btn:hover{background:rgba(255,255,255,.06)}
+  .btn.primary{background:linear-gradient(135deg,var(--ok),var(--okdim));color:#06281c;border-color:transparent}
+  .btn.danger{background:rgba(248,113,113,.14);border-color:rgba(248,113,113,.35);color:#fecaca}
+  .btn.sm{height:32px;padding:0 11px;font-size:12px}
+  /* air-quality + vitals tiles */
+  .tile{position:relative;display:flex;flex-direction:column;gap:6px;padding:13px 13px 12px;border-radius:14px;background:var(--card2);border:1px solid var(--hair);cursor:pointer;user-select:none;min-height:96px;text-align:left;overflow:hidden}
+  .tile .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(255,255,255,.05);color:var(--cg,var(--ink3))}
+  .tile .nm{font-size:11px;font-weight:700;color:var(--ink2);letter-spacing:.02em;text-transform:uppercase}
+  .tile .vt{font-size:1.55rem;font-weight:800;letter-spacing:-.02em;line-height:1;color:var(--ink)}
+  .tile .vt .u{font-size:.7rem;color:var(--ink3);font-weight:600;margin-left:2px}
+  .tile .sub{font-size:11px;color:var(--ink3);margin-top:auto}
+  .tile .vbar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--cg,var(--ink3));opacity:.85}
+  .tile .vglow{position:absolute;right:-26px;top:-26px;width:80px;height:80px;border-radius:50%;background:var(--cg,transparent);filter:blur(30px);opacity:.2}
+  /* controls */
+  .toggle{width:42px;height:24px;border-radius:999px;background:#2a3340;position:relative;cursor:pointer;flex:none;transition:.18s;border:1px solid var(--hair)}
+  .toggle.on{background:linear-gradient(135deg,var(--ok),var(--okdim))}
+  .toggle:after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.18s}
+  .toggle.on:after{left:21px}
+  .erow{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:11px;background:var(--card2);border:1px solid var(--hair);margin-bottom:7px;flex-wrap:wrap}
+  .erow .eic{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;background:rgba(255,255,255,.05);color:var(--ink3);flex:none}
+  .erow .enm{flex:1;min-width:0;font-size:12.5px}
+  .erow .enm b{display:block;color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .erow .enm span{color:var(--ink3);font-size:10.5px}
+  .erow .ev{font-size:12px;font-weight:700;color:var(--ink2)}
+  .stepper{display:flex;align-items:center;gap:9px}
+  .stepper .sb{width:34px;height:34px;border-radius:9px;border:1px solid var(--hair);background:var(--card2);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;user-select:none}
+  .stepper .sb:hover{background:rgba(255,255,255,.07)}
+  .stepper .sv{min-width:52px;text-align:center;font-weight:800;font-size:1rem}
+  .nrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.05)}
+  .nrow:first-child{border-top:0}
+  .nrow .nl{flex:1;min-width:0;font-size:12.5px;color:var(--ink2)}
+  .chip{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:11px;background:var(--card2);border:1px solid var(--hair);border-left:3px solid var(--cg,var(--ink3));font-size:12px;cursor:pointer}
+  .chip .ci{font-size:17px;color:var(--cg,var(--ink3));flex:none}
+  .chip .cn{color:var(--ink2);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip .cv{font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--cg,var(--ink3))}
+  .batt{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:700;background:var(--card2);border:1px solid var(--hair)}
+  .modebtn{flex:1;min-width:58px;font-size:11px;text-transform:capitalize}
+  .occ{display:flex;align-items:center;gap:13px;padding:14px;border-radius:14px;background:var(--card2);border:1px solid var(--hair)}
+  .occ .oi{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;flex:none}
+  .backdrop{position:fixed;inset:0;z-index:300;background:rgba(4,6,9,.66);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;padding:18px;opacity:0;pointer-events:none;transition:opacity .22s}
+  .backdrop.on{opacity:1;pointer-events:auto}
+  .modal{width:100%;max-width:560px;max-height:86vh;overflow-y:auto;border-radius:20px;background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--hair);box-shadow:0 40px 120px -30px #000;transform:scale(.94) translateY(10px);transition:transform .24s cubic-bezier(.2,.8,.2,1)}
+  .backdrop.on .modal{transform:none}
+  .mhead{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--hair);position:sticky;top:0;background:linear-gradient(180deg,var(--card),rgba(20,26,33,.92));backdrop-filter:blur(8px);z-index:2}
+  .mclose{margin-left:auto;width:32px;height:32px;border-radius:9px;border:1px solid var(--hair);background:var(--card2);color:var(--ink2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .mclose:hover{background:rgba(255,255,255,.07)}
+  .srow{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid rgba(255,255,255,.05);font-size:12.5px}
+  .srow:first-child{border-top:0} .srow .sl{color:var(--ink2);flex:1;min-width:0} .srow .sv{font-weight:700;color:var(--ink)}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(8px);z-index:400;background:var(--card2);border:1px solid var(--hair);border-radius:12px;padding:11px 16px;font-size:13px;box-shadow:0 18px 50px -14px #000;opacity:0;transition:.2s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+  input[type=range]{accent-color:var(--gold)}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:200px">
+      <div class="float" style="width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(52,211,153,.18),rgba(34,211,238,.12));border:1px solid rgba(52,211,153,.25)">
+        <i class="mdi mdi-office-building glowpulse" style="font-size:24px;color:var(--ok)"></i></div>
+      <div><div style="font-size:1.4rem;font-weight:800;letter-spacing:-.02em" class="grad">Office</div>
+        <div style="font-size:11.5px;color:var(--ink3);margin-top:-2px">Climate · Air Quality · Lights · Presence · Security</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div id="clock" style="font-size:13px;color:var(--ink2);font-weight:600"></div>
+      <div id="conn" class="glass" style="display:flex;align-items:center;gap:8px;padding:7px 13px;font-size:12px;font-weight:700;border-radius:12px">
+        <span id="connDot" class="pulse" style="width:8px;height:8px;border-radius:999px;background:var(--ink3);color:var(--ink3)"></span><span id="connTxt">Connecting…</span></div>
+    </div>
+  </header>
+
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(330px,1fr));align-items:start;margin-bottom:16px">
+    <!-- 1. CLIMATE HERO -->
+    <section class="glass" id="climate" style="padding:18px"></section>
+    <!-- 5/6 quick stack: presence + security live in the right column on wide screens -->
+    <div class="grid" style="gap:16px">
+      <section class="glass" id="presence" style="padding:18px"></section>
+      <section class="glass" id="voice" style="padding:18px"></section>
+    </div>
+  </div>
+
+  <!-- 2. AIR QUALITY VITALS -->
+  <section style="margin-bottom:16px">
+    <h2 class="sec" style="margin-bottom:11px"><i class="mdi mdi-air-filter" style="color:var(--cyan)"></i>Air Quality <span style="font-size:11px;color:var(--ink3);font-weight:600;text-transform:none;letter-spacing:0">tap a tile for 24h history</span></h2>
+    <div id="aq" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))"></div>
+  </section>
+
+  <!-- 3. HISTORY CHART -->
+  <section class="glass" style="padding:16px 16px 12px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+      <h2 class="sec"><i class="mdi mdi-chart-line" style="color:var(--cyan)"></i>Temperature &amp; CO₂ · 24h</h2>
+      <span id="histNote" style="font-size:11px;color:var(--ink3)"></span></div>
+    <div style="position:relative;height:230px"><canvas id="histChart"></canvas></div>
+  </section>
+
+  <!-- 4. LIGHTS -->
+  <section class="glass" id="lights" style="padding:18px;margin-bottom:16px"></section>
+
+  <!-- 6. SECURITY & CONTACTS -->
+  <section class="glass" id="security" style="padding:18px;margin-bottom:16px"></section>
+
+  <footer style="text-align:center;color:var(--ink3);font-size:11px;padding:10px 0 22px"><span id="lastUpd">—</span> · F2 design system · <span id="modeTag"></span></footer>
+</div>
+
+<div class="backdrop" id="entBackdrop"><div class="modal" id="entModal"></div></div>
+<div id="toast" class="toast"></div>
+
+<script>
+const CONFIG={HA_BASE:"",LL_TOKEN:"",REFRESH_MS:20000};
+const C={B:'#38bdf8',G:'#34d399',A:'#fbbf24',R:'#f87171',Y:'#facc15',INFO:'#38bdf8',GOLD:'#f5b942',CYAN:'#22d3ee',RED:'#f87171',ORANGE:'#fb923c',VIOLET:'#b06bff',PINK:'#f472b6'};
+const DEMO=new URLSearchParams(location.search).has('demo')||/github\.io$/i.test(location.hostname||"");
+(function seedKioskAuth(){ if(DEMO||!CONFIG.LL_TOKEN) return;
+  try{ const c=JSON.parse(localStorage.getItem('hassTokens')||'null'); if(c&&c.access_token&&(!c.expires||c.expires>Date.now()+15000)) return; }catch(e){}
+  try{ localStorage.setItem('hassTokens',JSON.stringify({access_token:CONFIG.LL_TOKEN,token_type:'Bearer',expires:Date.now()+3650*864e5})); }catch(e){} })();
+
+/* ===================== ENTITY MAP (verified live ids) ===================== */
+const AC='climate.office_ac_office_ac';
+// Office setpoint / schedule controls
+const NUM=[
+  {id:'input_number.office_target_temp',label:'Target temp',icon:'thermometer',unit:'°C',step:0.5,min:10,max:35},
+  {id:'input_number.office_target_rh',label:'Target RH',icon:'water-percent',unit:'%',step:1,min:20,max:80},
+  {id:'input_number.office_day_temp',label:'Day temp',icon:'weather-sunny',unit:'°C',step:0.5,min:10,max:35},
+  {id:'input_number.office_night_temp',label:'Night temp',icon:'weather-night',unit:'°C',step:0.5,min:10,max:35},
+  {id:'input_number.office_deadband',label:'Deadband',icon:'arrow-expand-vertical',unit:'°C',step:0.1,min:0.1,max:5}];
+const BOOL=[
+  {id:'input_boolean.office_enable_dry',label:'Dry mode',icon:'water-off'},
+  {id:'input_boolean.office_ac_cooling_mode',label:'Cooling mode',icon:'snowflake'}];
+const SCHED=[
+  {id:'input_datetime.office_day_start',label:'Day start',icon:'weather-sunset-up'},
+  {id:'input_datetime.office_day_end',label:'Day end',icon:'weather-sunset-down'}];
+// Air-quality tiles — band:[warnLow,goodLow,goodHigh,warnHigh]
+const AQ=[
+  {id:'sensor.air_q_office_temperature',label:'Temp',icon:'thermometer',unit:'°C',dec:1,cg:C.G,band:[18,20,26,30]},
+  {id:'sensor.air_q_office_humidity',label:'Humidity',icon:'water-percent',unit:'%',dec:0,cg:C.B,band:[30,40,60,70]},
+  {id:'sensor.air_q_office_co2_internal',label:'CO₂',icon:'molecule-co2',unit:'ppm',dec:0,cg:C.G,band:[0,0,1000,1500],trend:'sensor.office_co2_trend'},
+  {id:'sensor.air_q_office_pm_2_5',label:'PM2.5',icon:'blur',unit:'µg/m³',dec:1,cg:C.G,band:[0,0,12,35]},
+  {id:'sensor.air_q_office_pm_10',label:'PM10',icon:'weather-dust',unit:'µg/m³',dec:1,cg:C.G,band:[0,0,25,50]},
+  {id:'sensor.air_q_office_voc',label:'VOC',icon:'flask-round-bottom',unit:'',dec:0,cg:C.G,band:[0,0,220,660],cls:'sensor.air_q_office_voc_iaq_classification'},
+  {id:'sensor.office_presence_illuminance',label:'Illuminance',icon:'brightness-6',unit:'lx',dec:0,cg:C.GOLD,band:null}];
+// Lights
+const LIGHTS=[
+  {id:'light.office_lights',name:'Main Lights',icon:'desk-lamp'},
+  {id:'light.air_q_office_led',name:'AirQ LED',icon:'led-on'},
+  {id:'light.office_home_assistant_voice_led_ring',name:'Voice LED Ring',icon:'circle-double'}];
+const LIGHT_POWER='sensor.office_lights_power', LIGHT_ENERGY='sensor.office_lights_energy_daily';
+// Presence / occupancy
+const PRES_BIN='binary_sensor.office_presence_presence', OCC_FUSED='binary_sensor.office_occupied_fused', MOTION_STATE='sensor.office_presence_motion_state';
+// Security & contacts
+const CONTACTS=[
+  {id:'binary_sensor.office_door_contact',name:'Door',win:false},
+  {id:'binary_sensor.office_window_contact',name:'Window',win:true},
+  {id:'binary_sensor.office_server_cabinet_contact',name:'Server Cabinet',win:false}];
+const SMOKE='binary_sensor.office_smoke_alarm_smoke', SMOKE_TEST='button.office_smoke_alarm_selftest';
+const BATT=[
+  {id:'sensor.office_door_battery',name:'Door'},
+  {id:'sensor.office_window_battery',name:'Window'},
+  {id:'sensor.office_server_cabinet_battery',name:'Server Cab'},
+  {id:'sensor.office_smoke_alarm_battery',name:'Smoke'}];
+const SERVER_TEMP='sensor.office_server_cabinet_device_temperature';
+// Voice & media
+const MEDIA='media_player.hallway_kitchen_office', VOICE_SAT='assist_satellite.office_home_assistant_voice_assist_satellite', VOICE_MUTE='switch.office_home_assistant_voice_mute';
+// History chart entities
+const HIST_T='sensor.air_q_office_temperature', HIST_CO2='sensor.air_q_office_co2_internal', HIST_RH='sensor.air_q_office_humidity';
+
+let S={};
+const $=(id)=>document.getElementById(id);
+function getToken(){ try{ const t=JSON.parse(localStorage.getItem("hassTokens")); if(t&&t.access_token&&(!t.expires||t.expires>Date.now()+15000)) return t.access_token; }catch(e){} return CONFIG.LL_TOKEN||""; }
+async function fetchStates(){ const r=await fetch((CONFIG.HA_BASE||"")+"/api/states",{headers:{Authorization:"Bearer "+getToken()},cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status); const m={}; for(const e of await r.json()) m[e.entity_id]=e; return m; }
+async function svc(domain,service,data){ if(DEMO) return {}; const r=await fetch((CONFIG.HA_BASE||"")+"/api/services/"+domain+"/"+service,{method:"POST",headers:{Authorization:"Bearer "+getToken(),"Content-Type":"application/json"},body:JSON.stringify(data||{}),cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status); return r.json().catch(()=>({})); }
+// Historical series from InfluxDB, proxied through HA's agency_sensor_analytics endpoint (same-origin, HA-auth, no CORS).
+async function loadInflux(ids,startMs,endMs){ const tok=getToken(); if(!tok||!ids.length) return null;
+  const url=(CONFIG.HA_BASE||"")+"/api/agency_sensor_analytics/history?entities="+encodeURIComponent(ids.join(","))+"&start="+new Date(startMs).toISOString()+"&end="+new Date(endMs).toISOString();
+  const r=await fetch(url,{headers:{Authorization:"Bearer "+tok},cache:"no-store"}); if(!r.ok) throw new Error("influx HTTP "+r.status);
+  const d=await r.json(); const out={__start:startMs,__end:endMs}; let any=false;
+  ids.forEach(eid=>{ const pts=(d[eid]||[]).map(p=>({t:+new Date(p.time),v:+p.value})).filter(p=>p.t&&!isNaN(p.v)); out[eid]=pts; if(pts.length) any=true; });
+  return any?out:null; }
+// 24h history for the entity modal — InfluxDB first, HA recorder fallback.
+async function histFetch(id,hours){ if(DEMO) return demoHist(); const tok=getToken(); if(!tok) return null; const end=Date.now(), start=end-(hours||24)*3600*1000;
+  try{ const inf=await loadInflux([id],start,end); if(inf&&inf[id]&&inf[id].length) return inf[id].map(p=>p.v); }catch(e){}
+  try{ const r=await fetch((CONFIG.HA_BASE||"")+"/api/history/period/"+new Date(start).toISOString()+"?filter_entity_id="+id+"&minimal_response&no_attributes",{headers:{Authorization:'Bearer '+tok},cache:'no-store'}); if(!r.ok) return null; const d=await r.json(); return (d[0]||[]).map(p=>parseFloat(p.state)).filter(v=>isFinite(v)); }catch(e){ return null; } }
+function demoHist(){ const a=[]; for(let k=0;k<60;k++) a.push(22+Math.sin(k/7)*2+Math.random()*0.5); return a; }
+
+const st=(id)=>{const e=S[id];return e?e.state:undefined;};
+const num=(id)=>{const v=parseFloat(st(id));return isFinite(v)?v:null;};
+const attr=(id,k)=>{const e=S[id];return e&&e.attributes?e.attributes[k]:undefined;};
+const fname=(id)=>attr(id,'friendly_name')||id.split('.').pop().replace(/_/g,' ');
+const ON=(id)=>{const s=st(id);return s==='on'||s==='open'||s==='unlocked'||s==='detected'||s==='wet'||s==='playing'||s==='cooling'||s==='heating'||s==='heat'||s==='cool'||s==='heat_cool'||s==='dry'||s==='fan_only';};
+const fmt=(v,d=0)=>v==null?'—':(Math.round(v*Math.pow(10,d))/Math.pow(10,d)).toLocaleString();
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2600);}
+// band:[warnLow,goodLow,goodHigh,warnHigh] → green inside good, amber in warn margin, red beyond.
+function bandColor(v,band){ if(v==null) return 'var(--ink3)'; if(!band) return C.G; const[wl,gl,gh,wh]=band; if(v<wl||v>wh) return C.R; if(v<gl||v>gh) return C.A; return C.G; }
+
+/* optimistic toggle — flip the clicked toggle + state instantly, revert on error */
+async function toggle(id,ev){ if(ev&&ev.stopPropagation) ev.stopPropagation(); const d=id.split('.')[0],s=st(id); let dom=d,srv='toggle';
+  if(d==='climate'){dom='climate';srv=(ON(id)?'turn_off':'turn_on');}
+  const willOn=!ON(id), tg=ev&&ev.target&&ev.target.closest?ev.target.closest('[data-toggle]'):null, prev=S[id]?S[id].state:undefined;
+  if(tg) tg.classList.toggle('on',willOn); if(S[id]) S[id].state=willOn?'on':'off';
+  if(DEMO){ render(); return; }
+  try{ await svc(dom,srv,{entity_id:id}); }catch(e){ if(tg) tg.classList.toggle('on',!willOn); if(S[id]) S[id].state=prev; toast('⚠ '+e.message); } reconcileSoon(); }
+
+/* ===================== 1. CLIMATE HERO ===================== */
+async function acSetpt(dir){ const a=S[AC]?S[AC].attributes||{}:{}, cur=a.temperature; if(cur==null) return; const step=a.target_temp_step||0.5, nv=+(cur+(dir==='up'?step:-step)).toFixed(1);
+  if(S[AC]) S[AC].attributes.temperature=nv; render();
+  if(!DEMO){ try{ await svc('climate','set_temperature',{entity_id:AC,temperature:nv}); }catch(e){ toast('⚠ '+e.message); } reconcileSoon(); } }
+async function acMode(mode){ if(S[AC]) S[AC].state=mode; render();
+  if(!DEMO){ try{ await svc('climate','set_hvac_mode',{entity_id:AC,hvac_mode:mode}); toast('AC → '+mode.replace(/_/g,' ')); }catch(e){ toast('⚠ '+e.message); } reconcileSoon(); } }
+async function setNumber(id,dir){ const cfg=NUM.find(n=>n.id===id); if(!cfg) return; const cur=num(id); if(cur==null) return;
+  let nv=+(cur+(dir==='up'?cfg.step:-cfg.step)).toFixed(2); nv=Math.max(cfg.min,Math.min(cfg.max,nv));
+  if(S[id]) S[id].state=String(nv); render();
+  if(!DEMO){ try{ await svc('input_number','set_value',{entity_id:id,value:nv}); }catch(e){ toast('⚠ '+e.message); } reconcileSoon(); } }
+function renderClimate(){ const a=S[AC]?S[AC].attributes||{}:{}, cur=a.current_temperature, tgt=a.temperature, mode=st(AC)||'off';
+  const modes=a.hvac_modes||['off','heat_cool','cool','heat','fan_only','dry'];
+  const action=a.hvac_action||'', actCol=action==='cooling'?C.CYAN:action==='heating'?C.ORANGE:action==='drying'?C.B:'var(--ink3)';
+  const modeIc={off:'power',heat_cool:'sun-snowflake-variant',cool:'snowflake',heat:'fire',fan_only:'fan',dry:'water-percent'};
+  const setRows=NUM.map(n=>{ const v=num(n.id); return `<div class="nrow"><i class="mdi mdi-${n.icon}" style="color:var(--ink3);font-size:16px"></i><span class="nl">${n.label}</span>
+    <div class="stepper"><div class="sb" data-num="${n.id}|down">−</div><span class="sv">${v==null?'—':fmt(v,n.step<1?1:0)}<span style="font-size:.7rem;color:var(--ink3)">${n.unit}</span></span><div class="sb" data-num="${n.id}|up">+</div></div></div>`; }).join('');
+  const boolRows=BOOL.map(b=>{ const on=ON(b.id); return `<div class="nrow"><i class="mdi mdi-${b.icon}" style="color:${on?'var(--cyan)':'var(--ink3)'};font-size:16px"></i><span class="nl">${b.label}</span><div class="toggle ${on?'on':''}" data-toggle="${b.id}"></div></div>`; }).join('');
+  const schedRows=SCHED.map(s=>{ const v=st(s.id)||'—'; const hm=(v.length>=5)?v.slice(0,5):v; return `<div class="nrow"><i class="mdi mdi-${s.icon}" style="color:var(--gold);font-size:16px"></i><span class="nl">${s.label}</span><span class="sv" style="font-weight:800">${esc(hm)}</span></div>`; }).join('');
+  $('climate').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <h2 class="sec"><i class="mdi mdi-air-conditioner" style="color:var(--cyan)"></i>Climate</h2>
+      <span style="margin-left:auto;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${actCol}">${action?esc(action):(mode==='off'?'idle':esc(mode.replace(/_/g,' ')))}</span></div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:22px;margin-bottom:14px">
+      <button class="btn" data-acsetpt="down" style="width:46px;height:46px;border-radius:13px;font-size:20px">−</button>
+      <div style="text-align:center"><div style="font-size:3rem;font-weight:800;letter-spacing:-.03em;line-height:1;color:var(--cyan)">${tgt!=null?fmt(tgt,1):'—'}<span style="font-size:1.1rem;color:var(--ink3)">°</span></div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:3px">now <b style="color:var(--ink2)">${cur!=null?fmt(cur,1)+'°':'—'}</b></div></div>
+      <button class="btn" data-acsetpt="up" style="width:46px;height:46px;border-radius:13px;font-size:20px">+</button></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${modes.map(m=>`<button class="btn modebtn ${mode===m?'primary':''}" data-acmode="${m}"><i class="mdi mdi-${modeIc[m]||'thermostat'}"></i>${esc(m.replace(/_/g,' '))}</button>`).join('')}</div>
+    <div class="sublabel">Setpoints</div>${setRows}
+    <div class="sublabel">Modes</div>${boolRows}
+    <div class="sublabel">Day / night schedule</div>${schedRows}`;
+}
+
+/* ===================== 2. AIR QUALITY ===================== */
+function aqTile(c){ const v=num(c.id), col=bandColor(v,c.band), cg=c.band?col:c.cg;
+  let sub=''; if(c.trend){ const tr=num(c.trend); if(tr!=null){ const ar=tr>0.5?'▲':tr<-0.5?'▼':'■'; sub=`<span style="color:${tr>0.5?C.A:tr<-0.5?C.G:'var(--ink3)'}">${ar} ${fmt(Math.abs(tr),1)} ppm/min</span>`; } }
+  else if(c.cls){ const cl=st(c.cls); if(cl&&cl!=='unknown'&&cl!=='unavailable') sub=`<span style="color:${cg}">${esc(cl)}</span>`; }
+  return `<button class="tile lift" style="--cg:${cg}" data-ent="${c.id}"><div class="vglow"></div>
+    <div class="ic"><i class="mdi mdi-${c.icon}"></i></div>
+    <div class="nm">${c.label}</div>
+    <div class="vt">${v==null?'—':fmt(v,c.dec)}<span class="u">${c.unit}</span></div>
+    <div class="sub">${sub||'&nbsp;'}</div><div class="vbar"></div></button>`; }
+function renderAQ(){ $('aq').innerHTML=AQ.map(aqTile).join(''); }
+
+/* ===================== 3. HISTORY CHART ===================== */
+let _histChart=null,_histTs=0;
+async function loadHistChart(force){ if(!force&&Date.now()-_histTs<120000) return; _histTs=Date.now();
+  const end=Date.now(), start=end-24*3600*1000; let H=null;
+  if(DEMO){ H=demoHistChart(start,end); $('histNote').textContent='demo data'; }
+  else { try{ H=await loadInflux([HIST_T,HIST_CO2,HIST_RH],start,end); }catch(e){} if(!H){ $('histNote').textContent=getToken()?'no history available':'connect for history'; return; } $('histNote').textContent='live · InfluxDB'; }
+  const toXY=(arr)=>(arr||[]).map(p=>({x:p.t,y:p.v})).filter(p=>!isNaN(p.y));
+  const ds=[
+    {label:'Temp °C',data:toXY(H[HIST_T]),borderColor:C.G,backgroundColor:C.G+'22',borderWidth:2,pointRadius:0,fill:true,tension:.35,yAxisID:'yT'},
+    {label:'CO₂ ppm',data:toXY(H[HIST_CO2]),borderColor:C.CYAN,backgroundColor:C.CYAN+'14',borderWidth:1.8,pointRadius:0,fill:false,tension:.35,yAxisID:'yC'},
+    {label:'RH %',data:toXY(H[HIST_RH]),borderColor:C.B,backgroundColor:'transparent',borderWidth:1.2,borderDash:[4,3],pointRadius:0,fill:false,tension:.35,yAxisID:'yT',hidden:true}];
+  if(!window.Chart||!$('histChart')) return;
+  if(_histChart) _histChart.destroy();
+  _histChart=new Chart($('histChart'),{type:'line',data:{datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,parsing:false,
+    interaction:{intersect:false,mode:'index'},
+    plugins:{legend:{display:true,labels:{color:'#aab4c0',boxWidth:10,boxHeight:10,font:{size:11},usePointStyle:true}},
+      tooltip:{callbacks:{title:(it)=>it.length?new Date(it[0].parsed.x).toLocaleString([],{hour:'2-digit',minute:'2-digit',month:'short',day:'numeric'}):''}}},
+    scales:{x:{type:'time',time:{unit:'hour',displayFormats:{hour:'HH:mm'}},ticks:{color:'#727d8a',font:{size:10},maxTicksLimit:8},grid:{display:false}},
+      yT:{position:'left',ticks:{color:'#34d399',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'},title:{display:true,text:'°C / %',color:'#727d8a',font:{size:9}}},
+      yC:{position:'right',ticks:{color:'#22d3ee',font:{size:10}},grid:{display:false},title:{display:true,text:'CO₂ ppm',color:'#727d8a',font:{size:9}}}}}});
+}
+function demoHistChart(start,end){ const T=[],CO=[],RH=[],step=(end-start)/96;
+  for(let k=0;k<=96;k++){ const t=start+k*step, h=new Date(t).getHours()+new Date(t).getMinutes()/60, day=(h>=6&&h<22);
+    T.push({t,v:+(22.6+Math.sin((h-9)/24*6.28)*1.6+(Math.random()-.5)*.3).toFixed(2)});
+    CO.push({t,v:Math.round((day?620+Math.sin((h-13)/10*6.28)*260:520)+(Math.random()-.5)*40)});
+    RH.push({t,v:Math.round(50+Math.sin((h-14)/24*6.28)*6+(Math.random()-.5)*2)}); }
+  return {[HIST_T]:T,[HIST_CO2]:CO,[HIST_RH]:RH,__start:start,__end:end}; }
+
+/* ===================== 4. LIGHTS ===================== */
+function lightRow(c){ const a=S[c.id]?S[c.id].attributes||{}:{}, on=ON(c.id);
+  const dimmable=(a.supported_color_modes||[]).some(m=>['brightness','color_temp','hs','rgb','rgbw','rgbww','xy'].includes(m))||a.brightness!=null;
+  const bp=a.brightness!=null?Math.round(a.brightness/255*100):(on?100:0);
+  return `<div class="erow"><div class="eic" style="color:${on?'var(--gold)':'var(--ink3)'}"><i class="mdi mdi-${c.icon}"></i></div>
+    <div class="enm" data-ent="${c.id}" style="cursor:pointer"><b>${c.name}</b><span>${on?(dimmable?bp+'%':'On'):'Off'}</span></div>
+    <div class="toggle ${on?'on':''}" data-toggle="${c.id}"></div>
+    ${dimmable?`<input type="range" min="0" max="100" value="${bp}" data-bright="${c.id}" style="flex-basis:100%;margin-top:9px">`:''}</div>`; }
+async function setBright(id,pct){ const a=S[id]?(S[id].attributes||{}):{}; if(S[id]){ S[id].state=+pct>0?'on':'off'; a.brightness=Math.round(+pct/100*255); }
+  if(!DEMO){ try{ if(+pct<=0) await svc('light','turn_off',{entity_id:id}); else await svc('light','turn_on',{entity_id:id,brightness_pct:+pct}); }catch(e){ toast('⚠ '+e.message); } reconcileSoon(); } }
+function renderLights(){ const pw=num(LIGHT_POWER), en=num(LIGHT_ENERGY);
+  $('lights').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:13px">
+    <h2 class="sec"><i class="mdi mdi-lightbulb-group" style="color:var(--gold)"></i>Lights</h2>
+    <span style="margin-left:auto;display:flex;gap:8px">
+      <span class="batt"><i class="mdi mdi-flash" style="color:var(--gold)"></i>${pw==null?'—':fmt(pw,0)} W</span>
+      <span class="batt"><i class="mdi mdi-lightning-bolt" style="color:var(--cyan)"></i>${en==null?'—':fmt(en,2)} kWh</span></span></div>
+    ${LIGHTS.map(lightRow).join('')}`; }
+
+/* ===================== 5. PRESENCE ===================== */
+function renderPresence(){ const occ=ON(PRES_BIN)||ON(OCC_FUSED); const motion=st(MOTION_STATE); const col=occ?C.G:'var(--ink3)';
+  const sub=(label,id)=>{ const on=ON(id); return `<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink2)"><span style="width:8px;height:8px;border-radius:50%;background:${on?C.G:'var(--ink3)'};box-shadow:${on?'0 0 8px '+C.G:'none'}"></span>${label}</div>`; };
+  $('presence').innerHTML=`<h2 class="sec" style="margin-bottom:13px"><i class="mdi mdi-motion-sensor" style="color:var(--violet)"></i>Presence</h2>
+    <div class="occ" style="border-color:color-mix(in srgb,${col} 30%,var(--hair))">
+      <div class="oi" style="background:color-mix(in srgb,${col} 16%,transparent);color:${col}"><i class="mdi mdi-${occ?'account-check':'account-off'} ${occ?'glowpulse':''}"></i></div>
+      <div style="flex:1"><div style="font-size:1.3rem;font-weight:800;color:${col}">${occ?'Occupied':'Empty'}</div>
+        <div style="font-size:11.5px;color:var(--ink3)">${motion&&motion!=='unknown'&&motion!=='unavailable'?'motion: '+esc(motion):'no recent motion'}</div></div></div>
+    <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap">${sub('Presence sensor',PRES_BIN)}${sub('Fused occupancy',OCC_FUSED)}</div>`; }
+
+/* ===================== 6. SECURITY & CONTACTS ===================== */
+function battColor(v){ if(v==null) return 'var(--ink3)'; return v<20?C.R:v<40?C.A:C.G; }
+async function smokeTest(){ if(DEMO){ toast('Smoke self-test (demo)'); return; }
+  try{ await svc('button','press',{entity_id:SMOKE_TEST}); toast('Smoke self-test triggered'); }catch(e){ toast('⚠ '+e.message); } }
+function renderSecurity(){ const smoke=ON(SMOKE), srvT=num(SERVER_TEMP);
+  const contactChips=CONTACTS.map(c=>{ const o=ON(c.id),col=o?'var(--crit)':'var(--ok)',ic=c.win?(o?'window-open-variant':'window-closed-variant'):(o?'door-open':'door-closed');
+    return `<div class="chip lift" style="--cg:${col}" data-ent="${c.id}"><i class="mdi mdi-${ic} ci"></i><span class="cn">${c.name}</span><span class="cv">${o?'OPEN':'SHUT'}</span></div>`; }).join('');
+  const battChips=BATT.map(b=>{ const v=num(b.id),col=battColor(v); return `<span class="batt lift" style="cursor:pointer" data-ent="${b.id}"><i class="mdi mdi-battery${v==null?'-unknown':v<20?'-alert-variant-outline':''}" style="color:${col}"></i>${b.name} <b style="color:${col}">${v==null?'—':fmt(v,0)+'%'}</b></span>`; }).join('');
+  $('security').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:13px">
+      <h2 class="sec"><i class="mdi mdi-shield-home" style="color:var(--info)"></i>Security &amp; Contacts</h2>
+      ${srvT!=null?`<span style="margin-left:auto" class="batt"><i class="mdi mdi-server" style="color:var(--cyan)"></i>cabinet ${fmt(srvT,1)}°C</span>`:''}</div>
+    <div class="lift" style="display:flex;align-items:center;gap:13px;padding:13px;border-radius:14px;margin-bottom:13px;border:1px solid ${smoke?'var(--crit)':'var(--hair)'};background:${smoke?'rgba(248,113,113,.1)':'var(--card2)'}">
+      <div style="width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:24px;background:color-mix(in srgb,${smoke?'var(--crit)':'var(--ok)'} 16%,transparent);color:${smoke?'var(--crit)':'var(--ok)'}"><i class="mdi mdi-smoke-detector${smoke?'-alert glowpulse':'-variant'}"></i></div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:800;color:${smoke?'var(--crit)':'var(--ink)'}">${smoke?'SMOKE DETECTED':'Smoke Alarm — Clear'}</div><div style="font-size:11px;color:var(--ink3)">${ON(SMOKE)?'investigate now':'no smoke detected'}</div></div>
+      <button class="btn sm" data-smoketest><i class="mdi mdi-bell-ring"></i>Self-test</button></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:13px">${contactChips}</div>
+    <div class="sublabel">Battery</div><div style="display:flex;gap:8px;flex-wrap:wrap">${battChips}</div>`; }
+
+/* ===================== 7. VOICE & MEDIA ===================== */
+async function mediaCmd(srv){ if(DEMO){ if(srv==='media_play_pause'&&S[MEDIA]) S[MEDIA].state=S[MEDIA].state==='playing'?'paused':'playing'; render(); return; }
+  try{ await svc('media_player',srv,{entity_id:MEDIA}); }catch(e){ toast('⚠ '+e.message); } reconcileSoon(); }
+function renderVoice(){ const mState=st(MEDIA)||'idle', playing=mState==='playing', a=S[MEDIA]?S[MEDIA].attributes||{}:{};
+  const title=a.media_title||(mState==='idle'||mState==='off'?'Nothing playing':esc(mState)), artist=a.media_artist||'';
+  const vState=st(VOICE_SAT)||'idle', listening=vState==='listening', muted=ON(VOICE_MUTE);
+  const vCol=listening?C.CYAN:vState==='responding'?C.G:'var(--ink3)';
+  $('voice').innerHTML=`<h2 class="sec" style="margin-bottom:13px"><i class="mdi mdi-cast-audio" style="color:var(--pink)"></i>Voice &amp; Media</h2>
+    <div style="display:flex;align-items:center;gap:11px;padding:11px;border-radius:13px;background:var(--card2);border:1px solid var(--hair);margin-bottom:11px">
+      <div style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;background:color-mix(in srgb,${C.PINK} 14%,transparent);color:${C.PINK}"><i class="mdi mdi-${playing?'music':'music-note-off'}"></i></div>
+      <div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)}</div><div style="font-size:11px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${artist?esc(artist):esc(fname(MEDIA))}</div></div>
+      <div style="display:flex;gap:5px">
+        <button class="btn sm" data-media="media_play_pause" style="width:38px"><i class="mdi mdi-${playing?'pause':'play'}"></i></button>
+        <button class="btn sm" data-media="media_next_track" style="width:38px"><i class="mdi mdi-skip-next"></i></button></div></div>
+    <div style="display:flex;align-items:center;gap:11px;padding:11px;border-radius:13px;background:var(--card2);border:1px solid var(--hair)">
+      <div style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;background:color-mix(in srgb,${vCol} 16%,transparent);color:${vCol}"><i class="mdi mdi-microphone${listening?' glowpulse':'-message'}"></i></div>
+      <div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:700;color:var(--ink)">Voice Assistant</div><div style="font-size:11px;color:${vCol};text-transform:capitalize">${esc(vState)}</div></div>
+      <div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:var(--ink3)">Mute</span><div class="toggle ${muted?'on':''}" data-toggle="${VOICE_MUTE}"></div></div></div>`; }
+
+/* ===================== ENTITY MODAL (24h chart) ===================== */
+let _modalChart=null;
+function entIcon(id){ const a=S[id]?S[id].attributes||{}:{}; if(a.icon) return a.icon.replace('mdi:',''); const d=id.split('.')[0],m={light:'lightbulb',switch:'toggle-switch',lock:'lock',climate:'air-conditioner',media_player:'cast-audio',binary_sensor:'radiobox-marked',sensor:'gauge',input_number:'ray-vertex',input_boolean:'toggle-switch-variant',button:'gesture-tap-button',assist_satellite:'microphone-message'};
+  if(d==='sensor'){const dc=a.device_class;if(dc==='temperature')return'thermometer';if(dc==='humidity')return'water-percent';if(dc==='power')return'flash';if(dc==='carbon_dioxide')return'molecule-co2';if(dc==='battery')return'battery';if(dc==='illuminance')return'brightness-6';if(dc==='pm25')return'blur';}
+  if(d==='binary_sensor'){const dc=a.device_class;if(dc==='door'||dc==='window')return ON(id)?'door-open':'door-closed';if(dc==='smoke')return ON(id)?'smoke-detector-alert':'smoke-detector-variant';if(dc==='occupancy'||dc==='presence'||dc==='motion')return'motion-sensor';}
+  return m[d]||'help-circle'; }
+async function openEntity(id){ const dom=id.split('.')[0],s=st(id),controllable=['light','switch','input_boolean','climate'].includes(dom),isOn=ON(id),bigCol=isOn?'var(--ok)':'var(--ink2)',a=S[id]?S[id].attributes||{}:{};
+  const attrs=Object.entries(a).filter(([k])=>!['friendly_name','icon','supported_features','attribution','device_class','hidden_by'].includes(k)).slice(0,8);
+  $('entModal').innerHTML=`<div class="mhead"><div style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);color:${bigCol}"><i class="mdi mdi-${entIcon(id)}" style="font-size:20px"></i></div><div style="min-width:0"><div style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(fname(id))}</div><div style="font-size:11px;color:var(--ink3);font-family:ui-monospace,monospace">${esc(id)}</div></div><button class="mclose" onclick="closeModal('entBackdrop')">✕</button></div>
+    <div style="padding:18px"><div style="display:flex;align-items:center;gap:14px;margin-bottom:14px"><div style="font-size:2.4rem;font-weight:800;letter-spacing:-.02em;color:${bigCol}">${esc(s==null?'—':s)}${a.unit_of_measurement?`<span style="font-size:1rem;color:var(--ink3)"> ${esc(a.unit_of_measurement)}</span>`:''}</div>${controllable?`<button class="btn ${isOn?'primary':''}" style="margin-left:auto" onclick="toggle('${id}')"><i class="mdi mdi-power"></i>${isOn?'Turn off':'Turn on'}</button>`:''}</div>
+      <div style="position:relative;height:140px;margin-bottom:12px"><canvas id="modalChart"></canvas></div>${attrs.length?`<div class="sublabel">Attributes</div>${attrs.map(([k,v])=>`<div class="srow"><span class="sl">${esc(k.replace(/_/g,' '))}</span><span class="sv" style="max-width:60%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(typeof v==='object'?JSON.stringify(v):v)}</span></div>`).join('')}`:''}</div>`;
+  openModal('entBackdrop'); const hist=await histFetch(id,24); if(_modalChart){_modalChart.destroy();_modalChart=null;} const cv=$('modalChart');
+  if(cv&&window.Chart){ if(hist&&hist.length>1){ _modalChart=new Chart(cv,{type:'line',data:{labels:hist.map((_,i)=>i),datasets:[{data:hist,borderColor:bigCol,backgroundColor:bigCol+'22',borderWidth:2,pointRadius:0,fill:true,tension:.35}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{ticks:{color:'#727d8a',font:{size:9}},grid:{color:'rgba(255,255,255,.05)'}}}}}); } else { cv.parentElement.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--ink3);font-size:12px">No numeric history</div>'; } } }
+function openModal(id){ $(id).classList.add('on'); document.body.style.overflow='hidden'; }
+function closeModal(id){ $(id).classList.remove('on'); document.body.style.overflow=''; if(id==='entBackdrop'&&_modalChart){_modalChart.destroy();_modalChart=null;} }
+
+/* ===================== RENDER + LOOP ===================== */
+function render(){ renderClimate();renderAQ();renderLights();renderPresence();renderSecurity();renderVoice(); $('lastUpd').textContent='Updated '+new Date().toLocaleTimeString(); }
+function setConn(state){ const dot=$('connDot'),txt=$('connTxt'),m={live:['var(--ok)','Live'],demo:['var(--cyan)','Demo'],offline:['var(--crit)','Offline'],connecting:['var(--ink3)','Connecting…']},[col,lab]=m[state]; dot.style.background=col;dot.style.color=col;txt.textContent=lab;txt.style.color=state==='offline'?'var(--crit)':'var(--ink2)'; }
+let _reconcileT=null;
+function reconcileSoon(){ clearTimeout(_reconcileT); _reconcileT=setTimeout(refresh,900); }   // coalesce post-action reconciles into ONE refresh
+async function refresh(){ if(DEMO){ if(!Object.keys(S).length){ S=seedDemo(); } setConn('demo'); render(); loadHistChart(); return; }
+  try{ S=await fetchStates(); setConn('live'); render(); loadHistChart(); }catch(e){ setConn('offline'); toast('⚠ '+(getToken()?e.message:'No token — open inside HA or append ?demo')); } }
+
+document.addEventListener('click',(e)=>{
+  const sb=e.target.closest('[data-num]'); if(sb){ const p=sb.dataset.num.split('|'); setNumber(p[0],p[1]); return; }
+  const asp=e.target.closest('[data-acsetpt]'); if(asp){ acSetpt(asp.dataset.acsetpt); return; }
+  const amd=e.target.closest('[data-acmode]'); if(amd){ acMode(amd.dataset.acmode); return; }
+  const md=e.target.closest('[data-media]'); if(md){ mediaCmd(md.dataset.media); return; }
+  if(e.target.closest('[data-smoketest]')){ smokeTest(); return; }
+  const tg=e.target.closest('[data-toggle]'); if(tg){ toggle(tg.dataset.toggle,e); return; }
+  const en=e.target.closest('[data-ent]'); if(en){ openEntity(en.dataset.ent); return; }
+  const bd=e.target.closest('.backdrop'); if(bd&&e.target===bd){ closeModal(bd.id); return; }
+});
+document.addEventListener('input',(e)=>{ const t=e.target; if(t&&t.matches&&t.matches('[data-bright]')){ const row=t.closest('.erow'),sp=row&&row.querySelector('.enm span'); if(sp) sp.textContent=t.value+'%'; clearTimeout(t._bt); t._bt=setTimeout(()=>setBright(t.dataset.bright,t.value),220); } });
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeModal('entBackdrop'); });
+function tickClock(){ $('clock').textContent=new Date().toLocaleString(undefined,{weekday:'short',hour:'2-digit',minute:'2-digit'}); }
+$('modeTag').textContent=DEMO?'demo mode':'live';
+tickClock(); setInterval(tickClock,30000); setConn(DEMO?'demo':'connecting');
+refresh(); setInterval(refresh,CONFIG.REFRESH_MS);
+
+/* ===================== DEMO SEED ===================== */
+function seedDemo(){ const D={}; const set=(id,state,attrs)=>{D[id]={entity_id:id,state:String(state),attributes:attrs||{},last_changed:new Date().toISOString()};};
+  set(AC,'cool',{current_temperature:23.1,temperature:22.0,target_temp_step:0.5,hvac_action:'cooling',hvac_modes:['off','heat_cool','cool','heat','fan_only','dry']});
+  set('input_number.office_target_temp',22.0,{unit_of_measurement:'°C'});set('input_number.office_target_rh',50,{unit_of_measurement:'%'});
+  set('input_number.office_day_temp',22.0,{unit_of_measurement:'°C'});set('input_number.office_night_temp',20.0,{unit_of_measurement:'°C'});set('input_number.office_deadband',0.5,{unit_of_measurement:'°C'});
+  set('input_boolean.office_enable_dry','off');set('input_boolean.office_ac_cooling_mode','on');
+  set('input_datetime.office_day_start','06:00:00');set('input_datetime.office_day_end','22:00:00');
+  set('sensor.air_q_office_temperature',23.1,{unit_of_measurement:'°C',device_class:'temperature'});set('sensor.air_q_office_humidity',49,{unit_of_measurement:'%',device_class:'humidity'});
+  set('sensor.air_q_office_co2_internal',742,{unit_of_measurement:'ppm',device_class:'carbon_dioxide'});set('sensor.office_co2_trend',-1.4,{unit_of_measurement:'ppm/min'});
+  set('sensor.air_q_office_pm_2_5',4.2,{unit_of_measurement:'µg/m³'});set('sensor.air_q_office_pm_10',7.8,{unit_of_measurement:'µg/m³'});
+  set('sensor.air_q_office_voc',118,{});set('sensor.air_q_office_voc_iaq_classification','Good');set('sensor.office_presence_illuminance',312,{unit_of_measurement:'lx',device_class:'illuminance'});
+  set('light.office_lights','on',{brightness:204,supported_color_modes:['brightness']});
+  set('light.air_q_office_led','off',{supported_color_modes:['rgb']});set('light.office_home_assistant_voice_led_ring','on',{brightness:128,supported_color_modes:['rgb']});
+  set('sensor.office_lights_power',38,{unit_of_measurement:'W',device_class:'power'});set('sensor.office_lights_energy_daily',0.41,{unit_of_measurement:'kWh'});
+  set('binary_sensor.office_presence_presence','on',{device_class:'presence'});set('binary_sensor.office_occupied_fused','on',{device_class:'occupancy'});set('sensor.office_presence_motion_state','large');
+  set('binary_sensor.office_door_contact','off',{device_class:'door'});set('binary_sensor.office_window_contact','off',{device_class:'window'});set('binary_sensor.office_server_cabinet_contact','off',{device_class:'door'});
+  set('binary_sensor.office_smoke_alarm_smoke','off',{device_class:'smoke'});
+  set('sensor.office_door_battery',92,{unit_of_measurement:'%',device_class:'battery'});set('sensor.office_window_battery',78,{unit_of_measurement:'%',device_class:'battery'});
+  set('sensor.office_server_cabinet_battery',64,{unit_of_measurement:'%',device_class:'battery'});set('sensor.office_smoke_alarm_battery',15,{unit_of_measurement:'%',device_class:'battery'});
+  set('sensor.office_server_cabinet_device_temperature',26.4,{unit_of_measurement:'°C',device_class:'temperature'});
+  set('media_player.hallway_kitchen_office','playing',{media_title:'Lo-Fi Beats',media_artist:'Chillhop',friendly_name:'Hallway · Kitchen · Office'});
+  set('assist_satellite.office_home_assistant_voice_assist_satellite','idle');set('switch.office_home_assistant_voice_mute','off');
+  return D; }
+window.toggle=toggle; window.closeModal=closeModal;
+</script>
+</body>
+</html>

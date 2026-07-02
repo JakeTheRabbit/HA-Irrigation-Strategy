@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0c10">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Facility · Command</title>
+<!--
+  FACILITY COMMAND — SECURITY · POWER · ENVIRONMENT · 3D TWIN (premium, LIVE Home Assistant)
+  F2 design philosophy: infer state not noise, calm/exception-first, raw demoted.
+  SECURITY: token from localStorage.hassTokens when embedded in HA; CONFIG.LL_TOKEN fallback
+  is a FULL-ACCESS token in a no-auth /local file — keep BLANK in the repo, inject on deploy.
+  ?demo = standalone showcase, no HA/token/network.
+-->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+<link rel="icon" href="data:,">
+<style>
+  :root{
+    color-scheme:dark;
+    --bg:#0a0c10; --bg2:#0f1318; --card:#141a21; --card2:#19212a;
+    --hair:rgba(255,255,255,.08); --ink:#e7ecf2; --ink2:#aab4c0; --ink3:#727d8a;
+    --ok:#34d399; --okdim:#10b981; --warn:#fbbf24; --crit:#f87171; --info:#38bdf8;
+    --gold:#f5b942; --cyan:#22d3ee; --pink:#f472b6; --yellow:#facc15; --violet:#b06bff; --orange:#fb923c;
+    --maxw:1560px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(34,211,238,.06), transparent 60%),
+    radial-gradient(1000px 500px at 0% 0%, rgba(52,211,153,.05), transparent 55%), var(--bg);
+    background-attachment:fixed;color:var(--ink);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#1f2630;border-radius:9px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::selection{background:rgba(52,211,153,.25)}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:clamp(12px,2vw,24px)}
+  .glass{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--hair);
+    box-shadow:0 10px 40px -22px rgba(0,0,0,.7);border-radius:18px}
+  .lift{transition:transform .16s cubic-bezier(.4,0,.2,1),box-shadow .16s,border-color .16s,background .16s}
+  @media(hover:hover){.lift:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.18)}}
+  .grad{background:linear-gradient(135deg,#6ee7b7,#34d399 45%,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .kicker{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--ok);background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);padding:5px 11px;border-radius:999px;font-weight:700}
+  h2.sec{font-size:.95rem;font-weight:800;letter-spacing:.02em;margin:0;display:flex;align-items:center;gap:9px}
+  h2.sec::before{content:"";width:4px;height:1.05em;border-radius:3px;background:linear-gradient(180deg,var(--ok),var(--cyan));flex:none}
+  .pulse{position:relative}
+  .pulse:before{content:"";position:absolute;inset:-4px;border-radius:999px;background:currentColor;opacity:.35;animation:ping 1.9s cubic-bezier(0,0,.2,1) infinite}
+  @keyframes ping{75%,100%{transform:scale(2.3);opacity:0}}
+  .fade{animation:fade .4s ease both}
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .float{animation:float 6s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+  .glowpulse{animation:glowpulse 2.6s ease-in-out infinite}
+  @keyframes glowpulse{0%,100%{filter:drop-shadow(0 0 2px currentColor)}50%{filter:drop-shadow(0 0 9px currentColor)}}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tab{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:11px;font-size:13px;font-weight:700;
+    color:var(--ink3);background:rgba(255,255,255,.03);border:1px solid var(--hair);cursor:pointer;transition:.15s;white-space:nowrap}
+  .tab:hover{color:var(--ink2);background:rgba(255,255,255,.06)}
+  .tab.on{color:#06281c;background:linear-gradient(135deg,var(--ok),var(--okdim));border-color:transparent;box-shadow:0 6px 20px -8px var(--okdim)}
+  .tab.on .mdi{color:#06281c}
+  .panel{display:none} .panel.on{display:block;animation:fade .35s ease both}
+  .vstrip{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;scroll-snap-type:x mandatory}
+  .vstrip::-webkit-scrollbar{height:6px}
+  .vcard{scroll-snap-align:start;flex:none;min-width:156px;border-radius:15px;padding:12px 13px;background:var(--card2);border:1px solid var(--hair);position:relative;overflow:hidden;cursor:pointer}
+  .vcard .vroom{font-size:11px;font-weight:800;letter-spacing:.03em;color:var(--ink2);display:flex;align-items:center;gap:6px}
+  .vcard .vt{font-size:1.7rem;font-weight:800;letter-spacing:-.03em;line-height:1.05;margin-top:7px}
+  .vcard .vt .u{font-size:.7rem;color:var(--ink3);font-weight:600}
+  .vcard .vrow{display:flex;gap:10px;margin-top:7px;font-size:11px;color:var(--ink3)}
+  .vcard .vrow b{color:var(--ink2);font-weight:700}
+  .vcard .vbar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--cg,var(--ink3));opacity:.9}
+  .vcard .vglow{position:absolute;right:-30px;top:-30px;width:90px;height:90px;border-radius:50%;background:var(--cg,transparent);filter:blur(34px);opacity:.18}
+  .mp{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:color-mix(in srgb,var(--cg) 14%,transparent);color:var(--cg);border:1px solid color-mix(in srgb,var(--cg) 30%,transparent)}
+  .tile{position:relative;display:flex;flex-direction:column;gap:7px;padding:13px 12px 11px;border-radius:14px;background:var(--card2);border:1px solid var(--hair);cursor:pointer;user-select:none;min-height:90px;text-align:left;overflow:hidden}
+  .tile .ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(255,255,255,.05);color:var(--ink3);transition:.16s}
+  .tile .nm{font-size:12px;font-weight:600;color:var(--ink2);line-height:1.2}
+  .tile .stt{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink3);margin-top:auto}
+  .tile.on .ic{background:color-mix(in srgb,var(--ac) 22%,transparent);color:var(--ac);box-shadow:0 0 18px -4px var(--ac)}
+  .tile.on .nm{color:var(--ink)} .tile.on .stt{color:var(--ac)} .tile.on{border-color:color-mix(in srgb,var(--ac) 35%,var(--hair))}
+  .tile:active{transform:scale(.97)}
+  .chip{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:11px;background:var(--card2);border:1px solid var(--hair);border-left:3px solid var(--cg,var(--ink3));font-size:12px;cursor:pointer}
+  .chip .ci{font-size:17px;color:var(--cg,var(--ink3));flex:none}
+  .chip .cn{color:var(--ink2);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip .cv{font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--cg,var(--ink3))}
+  .alert{display:flex;gap:12px;align-items:flex-start;padding:13px 15px;border-radius:14px;border:1px solid var(--cg);background:color-mix(in srgb,var(--cg) 9%,transparent)}
+  .alert .ai{font-size:22px;color:var(--cg);flex:none;margin-top:1px} .alert .at{font-weight:800;font-size:13.5px;color:var(--ink)} .alert .ad{font-size:12px;color:var(--ink2);margin-top:2px;line-height:1.4}
+  .metric{padding:14px 15px;border-radius:14px;background:var(--card2);border:1px solid var(--hair)}
+  .metric .ml{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);font-weight:700}
+  .metric .mv{font-size:1.6rem;font-weight:800;letter-spacing:-.02em;margin-top:3px;line-height:1}
+  .metric .mu{font-size:.72rem;font-weight:600;color:var(--ink3);margin-left:3px} .metric .ms{font-size:11px;color:var(--ink3);margin-top:4px}
+  .pbar{height:9px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+  .pbar i{display:block;height:100%;border-radius:999px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+  .srow{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid rgba(255,255,255,.05);font-size:12.5px}
+  .srow:first-child{border-top:0} .srow .sl{color:var(--ink2);flex:1;min-width:0} .srow .sv{font-weight:700;color:var(--ink)}
+  .sublabel{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);font-weight:700;margin:10px 0 2px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;padding:0 14px;border-radius:11px;font-weight:700;font-size:12.5px;border:1px solid var(--hair);background:var(--card2);color:var(--ink);cursor:pointer;transition:.14s}
+  .btn:hover{background:rgba(255,255,255,.06)}
+  .btn.primary{background:linear-gradient(135deg,var(--ok),var(--okdim));color:#06281c;border-color:transparent}
+  .btn.danger{background:rgba(248,113,113,.14);border-color:rgba(248,113,113,.35);color:#fecaca}
+  .grid{display:grid;gap:12px}
+  .room{position:relative;border-radius:18px;padding:15px;background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--hair);overflow:hidden;cursor:pointer;display:flex;flex-direction:column}
+  .room .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .room .rdot{width:9px;height:9px;border-radius:50%;flex:none}
+  .room .rname{font-weight:800;font-size:15px;letter-spacing:-.01em}
+  .room .rtype{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);font-weight:700}
+  .room .rmetrics{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:11px;min-height:22px}
+  .room .ricons{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+  .room .ri{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;background:rgba(255,255,255,.04);color:var(--ink3);border:1px solid var(--hair)}
+  .room .ri.on{color:var(--ac,#34d399);background:color-mix(in srgb,var(--ac,#34d399) 16%,transparent);border-color:color-mix(in srgb,var(--ac,#34d399) 30%,transparent)}
+  .room .rcount{position:absolute;top:13px;right:14px;font-size:10.5px;color:var(--ink3);font-weight:700}
+  .room .rglow{position:absolute;left:-40px;bottom:-40px;width:140px;height:140px;border-radius:50%;filter:blur(50px);opacity:.16}
+  .backdrop{position:fixed;inset:0;z-index:300;background:rgba(4,6,9,.66);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;padding:18px;opacity:0;pointer-events:none;transition:opacity .22s}
+  .backdrop.on{opacity:1;pointer-events:auto}
+  .modal{width:100%;max-width:560px;max-height:86vh;overflow-y:auto;border-radius:20px;background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--hair);box-shadow:0 40px 120px -30px #000;transform:scale(.94) translateY(10px);transition:transform .24s cubic-bezier(.2,.8,.2,1)}
+  .backdrop.on .modal{transform:none} .modal.wide{max-width:720px}
+  .mhead{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--hair);position:sticky;top:0;background:linear-gradient(180deg,var(--card),rgba(20,26,33,.92));backdrop-filter:blur(8px);z-index:2}
+  .mclose{margin-left:auto;width:32px;height:32px;border-radius:9px;border:1px solid var(--hair);background:var(--card2);color:var(--ink2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .mclose:hover{background:rgba(255,255,255,.07)}
+  .erow{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:11px;background:var(--card2);border:1px solid var(--hair);margin-bottom:7px}
+  .erow .eic{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;background:rgba(255,255,255,.05);color:var(--ink3);flex:none}
+  .erow .enm{flex:1;min-width:0;font-size:12.5px}
+  .erow .enm b{display:block;color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .erow .enm span{color:var(--ink3);font-size:10.5px}
+  .erow .ev{font-size:12px;font-weight:700;color:var(--ink2)}
+  .toggle{width:42px;height:24px;border-radius:999px;background:#2a3340;position:relative;cursor:pointer;flex:none;transition:.18s;border:1px solid var(--hair)}
+  .toggle.on{background:linear-gradient(135deg,var(--ok),var(--okdim))}
+  .toggle:after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.18s}
+  .toggle.on:after{left:21px}
+  .twincover{position:relative;border-radius:18px;overflow:hidden;min-height:420px;display:flex;align-items:center;justify-content:center;background:radial-gradient(700px 360px at 50% 20%,rgba(34,211,238,.12),transparent 60%),linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--hair);cursor:pointer}
+  .twincover .tc-in{text-align:center;z-index:2} .twingrid{position:absolute;inset:0;background-image:linear-gradient(rgba(34,211,238,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,.06) 1px,transparent 1px);background-size:34px 34px;mask:radial-gradient(circle at 50% 45%,#000,transparent 75%)}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(8px);z-index:400;background:var(--card2);border:1px solid var(--hair);border-radius:12px;padding:11px 16px;font-size:13px;box-shadow:0 18px 50px -14px #000;opacity:0;transition:.2s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+  .camcard{border-radius:16px;overflow:hidden;background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--hair)}
+  .camfeed{position:relative;aspect-ratio:16/9;background:#05070c;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer}
+  .camfeed img{width:100%;height:100%;object-fit:cover;display:block}
+  .camfeed .camoff{color:var(--ink3);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .cambadge{position:absolute;left:8px;top:8px;font-size:10px;font-weight:700;color:#dfe6ee;background:rgba(5,7,12,.6);border:1px solid rgba(255,255,255,.1);padding:2px 7px;border-radius:999px;backdrop-filter:blur(4px)}
+  .camlive{position:absolute;right:8px;top:8px;display:flex;align-items:center;gap:4px;font-size:9px;font-weight:800;color:#ff6b6b;background:rgba(5,7,12,.55);padding:2px 6px;border-radius:999px}
+  .camlive i{width:6px;height:6px;border-radius:50%;background:#ff6b6b;display:inline-block;animation:glowpulse 1.6s infinite}
+  .cambody{padding:9px 11px 11px}
+  .camname{font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .camroom{font-size:10px;color:var(--ink3);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:ui-monospace,monospace}
+  .cambtns{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .cbtn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;border-radius:9px;font-size:11.5px;font-weight:700;cursor:pointer;border:1px solid var(--hair);background:var(--card2);color:var(--ink2);transition:.14s;user-select:none}
+  .cbtn:hover{background:rgba(255,255,255,.06)}
+  .cbtn.siren.on{background:rgba(248,113,113,.2);border-color:rgba(248,113,113,.55);color:#fecaca;box-shadow:0 0 16px -4px var(--crit)}
+  .cbtn.flash.on{background:rgba(245,185,66,.2);border-color:rgba(245,185,66,.55);color:#ffe2a0;box-shadow:0 0 16px -4px var(--gold)}
+  .cbtn:active{transform:scale(.96)}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:220px">
+      <div class="float" style="width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(52,211,153,.18),rgba(34,211,238,.12));border:1px solid rgba(52,211,153,.25)">
+        <i class="mdi mdi-shield-home glowpulse" style="font-size:25px;color:var(--ok)"></i></div>
+      <div><div style="font-size:1.4rem;font-weight:800;letter-spacing:-.02em" class="grad">Facility Command</div>
+        <div style="font-size:11.5px;color:var(--ink3);margin-top:-2px">Security · Power · Environment · 3D Twin</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div id="clock" style="font-size:13px;color:var(--ink2);font-weight:600"></div>
+      <div id="conn" class="glass" style="display:flex;align-items:center;gap:8px;padding:7px 13px;font-size:12px;font-weight:700;border-radius:12px">
+        <span id="connDot" class="pulse" style="width:8px;height:8px;border-radius:999px;background:var(--ink3);color:var(--ink3)"></span><span id="connTxt">Connecting…</span></div>
+    </div>
+  </header>
+
+  <div id="vitalsStrip" class="vstrip"></div>
+
+  <nav class="tabs" style="margin:8px 0 18px">
+    <button class="tab on" data-tab="overview"><i class="mdi mdi-view-dashboard-variant"></i>Overview</button>
+    <button class="tab" data-tab="rooms"><i class="mdi mdi-floor-plan"></i>Rooms</button>
+    <button class="tab" data-tab="threed"><i class="mdi mdi-cube-scan"></i>3D Twin</button>
+    <button class="tab" data-tab="power"><i class="mdi mdi-flash"></i>Power</button>
+    <button class="tab" data-tab="cameras"><i class="mdi mdi-cctv"></i>Cameras</button>
+    <button class="tab" data-tab="security"><i class="mdi mdi-shield-lock"></i>Security</button>
+  </nav>
+
+  <section class="panel on" id="tab-overview">
+    <div id="attention" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));margin-bottom:16px"></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:stretch">
+      <div id="capacity" class="glass" style="padding:18px;display:flex;flex-direction:column;justify-content:center"></div>
+      <div id="equip" class="glass" style="padding:18px"></div>
+    </div>
+    <div style="margin-top:16px"><h2 class="sec" style="margin-bottom:11px"><i class="mdi mdi-grid" style="color:var(--cyan)"></i>Rooms at a glance</h2>
+      <div id="roomMini" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr))"></div></div>
+  </section>
+
+  <section class="panel" id="tab-rooms">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+      <h2 class="sec"><i class="mdi mdi-floor-plan" style="color:var(--cyan)"></i>Rooms — every entity</h2>
+      <span style="font-size:11px;color:var(--ink3)">tap a room → all lights · fans · sensors · doors</span></div>
+    <div id="rooms" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))"></div>
+  </section>
+
+  <section class="panel" id="tab-threed">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+      <h2 class="sec"><i class="mdi mdi-cube-scan" style="color:var(--cyan)"></i>3D Floor Plan</h2>
+      <a href="/local/floorplan/index.html?embed" target="_blank" class="btn" style="height:32px;font-size:12px"><i class="mdi mdi-open-in-new"></i>Full screen</a></div>
+    <div id="twinHost"></div>
+  </section>
+
+  <section class="panel" id="tab-cameras">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+      <h2 class="sec"><i class="mdi mdi-cctv" style="color:var(--cyan)"></i>Cameras</h2>
+      <span style="font-size:11px;color:var(--ink3)">tap feed to enlarge · siren &amp; flashlight per camera</span></div>
+    <div id="cameras" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(258px,1fr))"></div>
+  </section>
+
+  <section class="panel" id="tab-power">
+    <h2 class="sec" style="margin-bottom:11px"><i class="mdi mdi-transmission-tower" style="color:var(--cyan)"></i>Power Monitoring</h2>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start">
+      <div class="grid" style="gap:12px"><div id="powerHero" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))"></div><div id="phases" class="glass" style="padding:15px"></div></div>
+      <div class="grid" style="gap:12px">
+        <div class="glass" style="padding:14px 15px 10px"><div class="sublabel" style="margin:0 0 6px">Power (W) · 24h</div><div style="position:relative;height:170px"><canvas id="chartW"></canvas></div></div>
+        <div class="glass" style="padding:14px 15px 10px"><div class="sublabel" style="margin:0 0 6px">Current (A) · 24h</div><div style="position:relative;height:170px"><canvas id="chartA"></canvas></div></div></div>
+    </div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:12px;align-items:start">
+      <div id="energy" class="glass" style="padding:16px"></div><div id="summary" class="glass" style="padding:16px"></div></div>
+  </section>
+
+  <section class="panel" id="tab-security">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px"><h2 class="sec"><i class="mdi mdi-door-open" style="color:var(--info)"></i>Access &amp; Doors</h2><span style="font-size:11px;color:var(--ink3)">tap to toggle</span></div>
+    <div id="access" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(108px,1fr));margin-bottom:20px"></div>
+    <h2 class="sec" style="margin-bottom:11px"><i class="mdi mdi-lightbulb-group" style="color:var(--gold)"></i>Lighting</h2>
+    <div id="lighting" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(108px,1fr));margin-bottom:20px"></div>
+    <h2 class="sec" style="margin-bottom:11px"><i class="mdi mdi-cctv" style="color:var(--crit)"></i>Security Systems</h2>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));align-items:start;margin-bottom:20px">
+      <div id="security" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(108px,1fr))"></div><div id="alarm" class="glass" style="padding:16px"></div></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start;margin-bottom:20px">
+      <div><h2 class="sec" style="margin-bottom:11px"><i class="mdi mdi-door" style="color:var(--info)"></i>Contacts</h2><div id="contacts" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))"></div></div>
+      <div><h2 class="sec" style="margin-bottom:11px"><i class="mdi mdi-water-alert" style="color:var(--info)"></i>Leak Sensors</h2><div id="leaks" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))"></div></div></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start">
+      <div><h2 class="sec" style="margin-bottom:11px"><i class="mdi mdi-server" style="color:var(--cyan)"></i>System Monitor</h2><div id="system" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))"></div></div>
+      <div><h2 class="sec" style="margin-bottom:11px"><i class="mdi mdi-weather-partly-cloudy" style="color:var(--gold)"></i>Weather &amp; Schedule</h2><div id="weather" class="glass" style="padding:16px;margin-bottom:12px"></div><div id="calendar" class="glass" style="padding:16px"></div></div></div>
+  </section>
+
+  <footer style="text-align:center;color:var(--ink3);font-size:11px;padding:14px 0 22px"><span id="lastUpd">—</span> · F2 design system · <span id="modeTag"></span></footer>
+</div>
+
+<div class="backdrop" id="entBackdrop"><div class="modal" id="entModal"></div></div>
+<div class="backdrop" id="roomBackdrop"><div class="modal wide" id="roomModal"></div></div>
+<div id="toast" class="toast"></div>
+
+<script>
+const CONFIG={HA_BASE:"",LL_TOKEN:"",REFRESH_MS:30000,ALARM_ENTITY:"alarm_control_panel.alarmo",TWIN_URL:"/local/floorplan/index.html",SERVICE_CAP_W:21600};
+const C={B:'#38bdf8',G:'#34d399',A:'#fbbf24',R:'#f87171',Y:'#facc15',INFO:'#38bdf8',GOLD:'#f5b942',CYAN:'#22d3ee',RED:'#f87171',ORANGE:'#fb923c',VIOLET:'#b06bff'};
+const DEMO=new URLSearchParams(location.search).has('demo')||/github\.io$/i.test(location.hostname||"");
+(function seedKioskAuth(){ if(DEMO||!CONFIG.LL_TOKEN) return;
+  try{ const c=JSON.parse(localStorage.getItem('hassTokens')||'null'); if(c&&c.access_token&&(!c.expires||c.expires>Date.now()+15000)) return; }catch(e){}
+  try{ localStorage.setItem('hassTokens',JSON.stringify({access_token:CONFIG.LL_TOKEN,token_type:'Bearer',expires:Date.now()+3650*864e5})); }catch(e){} })();
+
+const ACCESS=[
+  {id:'lock.front_door',name:'Front Door',icon:'door-open',ac:C.INFO},{id:'switch.esppoe_3_fd_door_poe_relay',name:'Entrance',icon:'door-open',ac:C.INFO},
+  {id:'switch.entrance_door_relay_backup_switch',name:'Entrance Backup',icon:'door-closed',ac:C.INFO},{id:'switch.operations_door_relay',name:'Operations',icon:'door',ac:C.INFO},
+  {id:'switch.espoe_vault_relay_vault_door_relay',name:'Vault Door',icon:'safe-square',ac:C.INFO},{id:'switch.irrigation_door_relay',name:'Irrigation',icon:'door',ac:C.INFO},
+  {id:'switch.kitchen_door_relay',name:'Kitchen Door',icon:'door',ac:C.INFO},{id:'switch.espoe_f1_gesture_f1_door_poe_relay',name:'F1 Door',icon:'door',ac:C.INFO},
+  {id:'switch.f2_door_relay',name:'F2 Door',icon:'door',ac:C.INFO},{id:'switch.veg_door_relay_veg_door_relay',name:'Veg Door',icon:'door',ac:C.INFO},
+  {id:'lock.assure_touchscreen_deadbolt',name:'Office Lock',icon:'lock-smart',ac:C.INFO}];
+const LIGHTING=[
+  {id:'switch.hallway_lights',name:'Hallway',icon:'led-strip-variant',ac:C.GOLD},{id:'switch.loading_zone_light',name:'Loading Zone',icon:'warehouse',ac:C.GOLD},
+  {id:'light.all_lights_group',name:'All Lights',icon:'lightbulb-group',ac:C.GOLD},{id:'script.flash_outside_lights',name:'Flash Lights',icon:'flashlight',ac:C.GOLD},
+  {id:'input_boolean.outdoor_floodlights',name:'Outdoor Floods',icon:'lightbulb-on',ac:C.GOLD},{id:'input_boolean.indoor_floodlights',name:'Indoor Floods',icon:'ceiling-light',ac:C.GOLD},
+  {id:'light.kitchen_light',name:'Kitchen',icon:'chef-hat',ac:C.GOLD},{id:'light.toilet_lights',name:'Toilet',icon:'toilet',ac:C.GOLD},
+  {id:'light.office_lights',name:'Office',icon:'desk-lamp',ac:C.GOLD},{id:'switch.back_roof_light_master_switch',name:'Back Roof',icon:'lightbulb',ac:C.GOLD},
+  {id:'light.irrigation_room_light',name:'Irrigation',icon:'water-pump',ac:C.GOLD},{id:'light.vault_lights',name:'Vault',icon:'cannabis',ac:C.GOLD},
+  {id:'light.f2_work_light',name:'F2 Work',icon:'cannabis',ac:C.GOLD},{id:'light.veg_work_light',name:'Veg Work',icon:'sprout',ac:C.GOLD}];
+const SECURITY=[
+  {id:'input_boolean.cameras_enable_disable',name:'Cameras',icon:'cctv',ac:C.ORANGE},{id:'switch.outside_cameras_siren_group',name:'Outside Sirens',icon:'alarm-bell',ac:C.RED},
+  {id:'input_boolean.indoor_sirens',name:'Indoor Sirens',icon:'home-alert',ac:C.RED},{id:'input_boolean.outside_notifications',name:'Outside Notify',icon:'bell-alert',ac:C.ORANGE},
+  {id:'switch.switch_7',name:'Panic Alarm',icon:'alarm-light',ac:C.RED}];
+const CONTACTS=[
+  {id:'binary_sensor.front_door_contact',name:'Main Entrance'},{id:'binary_sensor.facility_front_door_contact',name:'Hallway Entry'},{id:'binary_sensor.vault_contact',name:'Drying Room'},
+  {id:'binary_sensor.f1_contact',name:'F1'},{id:'binary_sensor.veg_contact',name:'Veg'},{id:'binary_sensor.operations_door_contact',name:'Operations',win:true},
+  {id:'binary_sensor.control_room_door_contact',name:'Pump Room'},{id:'binary_sensor.office_door_contact',name:'Office'},{id:'binary_sensor.kitchen_door_contact',name:'Kitchen'},
+  {id:'binary_sensor.office_server_cabinet_contact',name:'Office Server'},{id:'binary_sensor.toilet_entrance_contact',name:'Toilet Vestibule'},{id:'binary_sensor.toilet_door_contact',name:'Toilet'},
+  {id:'binary_sensor.tool_cabinet_contact',name:'Tool Cabinet'},{id:'binary_sensor.black_cabinet_contact',name:'Kitchen Cupboard'},{id:'binary_sensor.office_window_contact',name:'Office Window',win:true}];
+const LEAKS=[
+  {id:'binary_sensor.bathroom_sink_2_water_leak',name:'Bathroom Sink'},{id:'binary_sensor.f1_sump_pump_leak_water_leak',name:'F1 Sump Pump'},{id:'binary_sensor.flood_sensor_3_water_leak',name:'Flood Sensor 3'},
+  {id:'binary_sensor.irrigation_room_middle_wall_irrigation_room_leak_sensor',name:'Irrigation Wall'},{id:'binary_sensor.irrigation_room_pumps_corner_water_leak',name:'Irrigation Pumps'},{id:'binary_sensor.stainless_steel_sinks_water_leak',name:'Stainless Sinks'}];
+const PWR={total:'sensor.grow_room_total_power',amps:'sensor.grow_room_total_amps',worst:'sensor.highest_phase_current',
+  a_p:'sensor.shellyem3_08f9e047b5c7_channel_a_power',b_p:'sensor.shellyem3_08f9e047b5c7_channel_b_power',c_p:'sensor.shellyem3_08f9e047b5c7_channel_c_power',
+  a_v:'sensor.shellyem3_08f9e047b5c7_channel_a_voltage',b_v:'sensor.shellyem3_08f9e047b5c7_channel_b_voltage',c_v:'sensor.shellyem3_08f9e047b5c7_channel_c_voltage',
+  a_i:'sensor.shellyem3_08f9e047b5c7_channel_a_current',b_i:'sensor.shellyem3_08f9e047b5c7_channel_b_current',c_i:'sensor.shellyem3_08f9e047b5c7_channel_c_current',
+  a_e:'sensor.shellyem3_08f9e047b5c7_channel_a_energy',b_e:'sensor.shellyem3_08f9e047b5c7_channel_b_energy',c_e:'sensor.shellyem3_08f9e047b5c7_channel_c_energy',
+  a_x:'sensor.shellyem3_08f9e047b5c7_channel_a_energy_returned',b_x:'sensor.shellyem3_08f9e047b5c7_channel_b_energy_returned',c_x:'sensor.shellyem3_08f9e047b5c7_channel_c_energy_returned'};
+const EQUIP=[
+  {id:'switch.espoe_main_pump_empty',grp:'pump'},{id:'switch.f1_irrigation_pump_master_switch',grp:'pump'},{id:'switch.pump_power_switch',grp:'pump'},{id:'switch.kitchen_pump',grp:'pump'},
+  {id:'switch.espoe_peristaltic_pumps_core_pump_power',grp:'pump'},{id:'switch.espoe_peristaltic_pumps_bloom_pump_power',grp:'pump'},{id:'switch.espoe_peristaltic_pumps_balance_pump_power',grp:'pump'},{id:'switch.espoe_peristaltic_pumps_cleanse_pump_power',grp:'pump'},
+  {id:'switch.espoe_irrigation_relay_2_1',grp:'solenoid'},{id:'switch.espoe_irrigation_relay_2_2',grp:'solenoid'},{id:'switch.espoe_irrigation_relay_2_3',grp:'solenoid'},
+  {id:'switch.f1_irrigation_relays_relay_1',grp:'solenoid'},{id:'switch.f1_irrigation_relays_relay_2',grp:'solenoid'},{id:'switch.f1_irrigation_relays_relay_3',grp:'solenoid'},{id:'switch.f1_irrigation_relays_relay_4',grp:'solenoid'},
+  {id:'switch.f2_row1',grp:'solenoid'},{id:'switch.f2_row2',grp:'solenoid'},{id:'switch.f2_row3',grp:'solenoid'},
+  {id:'switch.f2_co2',grp:'co2'},{id:'switch.f1_co2_ssr_tank_1',grp:'co2'},{id:'switch.f1_co2_ssr_tank_2',grp:'co2'},
+  {id:'switch.f2_dehumidifiers_group',grp:'dehum'},{id:'switch.drying_room_dehumidifiers',grp:'dehum'},{id:'switch.f1_front_dehumidifier',grp:'dehum'},{id:'switch.f1_back_dehumidifier',grp:'dehum'},{id:'switch.fi_dehumidifiers_group',grp:'dehum'}];
+const EGRP=[['dehum','Dehum',C.VIOLET,'air-humidifier'],['co2','CO₂',C.G,'molecule-co2'],['solenoid','Solenoids',C.B,'pipe-valve'],['pump','Pumps',C.CYAN,'water-pump']];
+let _equip={ts:0,chart:null};
+const CAMERAS=[
+  {n:'Doorbell',a:'Entrance',cam:'camera.doorbell_clear',siren:'siren.doorbell_siren'},
+  {n:'Entrance',a:'Entrance',cam:'camera.loadingzone_cam_clear',siren:'siren.loadingzone_cam_siren',flood:'light.loadingzone_cam_floodlight'},
+  {n:'Roller Door',a:'Entrance',cam:'camera.roller_door_clear',siren:'siren.roller_door_siren',flood:'light.roller_door_floodlight'},
+  {n:'Car Park',a:'Outside',cam:'camera.car_parks_clear',siren:'siren.car_parks_siren',flood:'light.car_parks_floodlight'},
+  {n:'Driveway West',a:'Outside',cam:'camera.west_driveway_clear',siren:'siren.west_driveway_siren',flood:'light.west_driveway_floodlight'},
+  {n:'Driveway City',a:'Outside',cam:'camera.city_driveway_clear',siren:'siren.city_driveway_siren',flood:'light.city_driveway_floodlight'},
+  {n:'Warehouse PTZ',a:'Warehouse',cam:'camera.reolink_warehouse_ptz_clear',siren:'siren.reolink_warehouse_ptz_siren',flood:'light.reolink_warehouse_ptz_floodlight'},
+  {n:'Hallway',a:'Hallway',cam:'camera.hallway_clear',siren:'siren.hallway_siren',flood:'light.hallway_floodlight'},
+  {n:'Kitchen',a:'Kitchen',cam:'camera.legacy_kitchen_clear',siren:'siren.legacy_kitchen_siren',flood:'light.legacy_kitchen_floodlight'},
+  {n:'Drying Room',a:'Vault',cam:'camera.legacy_office_clear',siren:'siren.legacy_office_siren',flood:'light.legacy_office_floodlight'},
+  {n:'Vault PTZ',a:'Vault',cam:'camera.vault_ptz_clear',siren:'siren.vault_ptz_siren'},
+  {n:'Irrigation',a:'Irrigation',cam:'camera.irrigation_clear',siren:'siren.irrigation_siren',flood:'light.irrigation_floodlight'},
+  {n:'Flower 1',a:'F1',cam:'camera.flower1_cam_clear',siren:'siren.flower1_cam_siren',flood:'light.flower1_cam_floodlight'},
+  {n:'Flower 2',a:'F2',cam:'camera.flower2_cam_clear',siren:'siren.flower2_cam_siren',flood:'light.flower2_cam_floodlight'},
+  {n:'Veg',a:'Veg',cam:'camera.veg_cam_clear',siren:'siren.veg_cam_siren',flood:'light.veg_cam_floodlight'},
+  {n:'Toilet',a:'Toilet',cam:'camera.toilet_clear',siren:'siren.toilet_siren',flood:'light.toilet_floodlight'},
+  {n:'Stairs',a:'Office',cam:'camera.stairs_clear',siren:'siren.stairs_siren',flood:'light.stairs_floodlight'},
+];
+let _camBuilt=false;
+const SYS=[
+  {id:'sensor.system_monitor_processor_use',label:'CPU',unit:'%',min:0,max:100,icon:'cpu-64-bit',segs:[[0,50,C.G],[50,80,C.A],[80,100,C.R]]},
+  {id:'sensor.system_monitor_processor_temperature',label:'CPU Temp',unit:'°C',min:20,max:80,icon:'thermometer',segs:[[20,50,C.G],[50,65,C.A],[65,80,C.R]]},
+  {id:'sensor.system_monitor_memory_usage',label:'Memory',unit:'%',min:0,max:100,icon:'memory',segs:[[0,60,C.G],[60,85,C.A],[85,100,C.R]]},
+  {id:'sensor.system_monitor_disk_use',label:'Disk',unit:'GiB',min:0,max:1000,icon:'harddisk',segs:[[0,700,C.G],[700,900,C.A],[900,1000,C.R]]}];
+const BANDS={temp:{flower:[18,22,28,32],veg:[16,20,28,32],dry:[10,12,18,22],util:[10,16,28,34]},rh:{flower:[40,50,65,75],veg:[55,60,75,85],dry:[45,55,62,70],util:[20,30,70,85]},
+  co2:{flower:[400,800,1500,2000],veg:[400,800,1500,2000],dry:[300,400,900,1500],util:[300,400,1200,2000]},vpd:{flower:[0.8,1.0,1.4,1.8],veg:[0.6,0.8,1.2,1.5],dry:[0.5,0.7,1.0,1.3],util:[0,0,3,4]}};
+const ROOMS={
+  F2:{label:'F2 — Flower',type:'flower',icon:'cannabis',temp:'sensor.f2_scd41_back_left_temperature',rh:'sensor.f2_scd41_back_left_humidity',vpd:'sensor.f2_scd41_back_left_vpd',co2:'sensor.airq_f2_co2_internal',ppfd:'sensor.f2_scd41_env3_dlight_poe_ppfd',lights:['light.led_f2_r1_f2_r1_led','light.led_f2_r2_f2_r2_led'],climate:['climate.f2_ac_wall_f2_ac_wall','climate.f2_ac_door_f2_ac_door'],door:'binary_sensor.f2_door_contact',area:'F2',dash:'/local/f2live.html'},
+  F1:{label:'F1 — Flower',type:'flower',icon:'cannabis',temp:'sensor.f1_scd410_back_left_temperature',rh:'sensor.f1_scd410_back_left_humidity',vpd:'sensor.f1_scd410_back_left_vpd',co2:'sensor.f1_scd41_back_right_co2',ppfd:'sensor.growsensor_eppfd',lights:['light.f1_light_group'],climate:['climate.f1_ac_door_f1_ac_door','climate.f1_ac_wall_f1_ac_wall'],door:'binary_sensor.f1_contact',area:'F1'},
+  Veg:{label:'Veg',type:'veg',icon:'sprout',temp:'sensor.veg_300mm_carbon_fil_temperature',rh:'sensor.veg_300mm_carbon_fil_humidity',vpd:'sensor.veg_300mm_carbon_fil_vpd',co2:'sensor.m5stack_airq_veg_co2',lights:['light.veg_r1_lights_veg_right_level_1','light.veg_l1_lights_vegel_left_level_1'],climate:['climate.veg_ac_left_veg_ac_left','climate.veg_ac_right_veg_ac_right'],door:'binary_sensor.veg_contact',area:'Veg'},
+  Vault:{label:'Vault — Drying',type:'dry',icon:'safe-square',temp:'sensor.drying_vault_scd41_enviii_atom_bme68x_temperature',rh:'sensor.drying_vault_scd41_enviii_atom_bme68x_humidity',vpd:'sensor.drying_vault_scd41_enviii_atom_vpd',co2:'sensor.air_q_vault_co2',lights:['light.vault_lights'],climate:['climate.dryingroom_vault_ac_drying_room_vault_ac'],door:'binary_sensor.vault_contact',area:'Vault/Drying Room'},
+  Irrigation:{label:'Irrigation',type:'util',icon:'water-pump',temp:'sensor.aqua_pro_air_temp',rh:'sensor.aqua_pro_humidity',co2:'sensor.aqua_pro_co2',lights:['light.irrigation_room_light'],climate:[],area:'Irrigation'},
+  Hallway:{label:'Hallway',type:'util',icon:'fridge',temp:'sensor.air_q_hallway_co2_external_temperature',rh:'sensor.air_q_hallway_co2_external_humidity',co2:'sensor.air_q_hallway_co2_external',lights:['light.hallway_lights'],climate:['climate.hallway_ac_hallway'],door:'binary_sensor.facility_front_door_contact',area:'Hallway'},
+  Office:{label:'Office',type:'util',icon:'office-building',temp:'sensor.esppoe_5_office_temperature',rh:'sensor.esppoe_5_office_humidity',co2:'sensor.esppoe_5_office_co2',lights:['light.office_lights'],climate:['climate.office_ac_office_ac'],door:'binary_sensor.office_door_contact',area:'Office',smoke:'binary_sensor.office_smoke_alarm_smoke'},
+  Kitchen:{label:'Kitchen',type:'util',icon:'chef-hat',temp:null,rh:null,lights:['light.kitchen_light'],climate:[],door:'binary_sensor.kitchen_door_contact',area:'Kitchen'},
+  Roof:{label:'Roof',type:'util',icon:'home-roof',temp:'sensor.ruuvi_tag_roof_temperature',rh:'sensor.ruuvi_tag_roof_humidity',lights:[],climate:[],area:null}};
+const ROOM_ORDER=['F2','F1','Veg','Vault','Irrigation','Hallway','Office','Kitchen','Roof'];
+let ROOMALL={};
+
+let S={},CHARTS={},HIST={t:[],w:{total:[],a:[],b:[],c:[]},i:{total:[],a:[],b:[],c:[]}};
+const $=(id)=>document.getElementById(id);
+function getToken(){ try{ const t=JSON.parse(localStorage.getItem("hassTokens")); if(t&&t.access_token&&(!t.expires||t.expires>Date.now()+15000)) return t.access_token; }catch(e){} return CONFIG.LL_TOKEN||""; }
+async function fetchStates(){ const r=await fetch((CONFIG.HA_BASE||"")+"/api/states",{headers:{Authorization:"Bearer "+getToken()},cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status); const m={}; for(const e of await r.json()) m[e.entity_id]=e; return m; }
+async function svc(domain,service,data){ if(DEMO) return {}; const r=await fetch((CONFIG.HA_BASE||"")+"/api/services/"+domain+"/"+service,{method:"POST",headers:{Authorization:"Bearer "+getToken(),"Content-Type":"application/json"},body:JSON.stringify(data||{}),cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status); return r.json().catch(()=>({})); }
+async function histFetch(id,hours){ if(DEMO) return demoHist(); const tok=getToken(); if(!tok) return null; const start=new Date(Date.now()-(hours||24)*3600*1000).toISOString();
+  try{ const r=await fetch((CONFIG.HA_BASE||"")+"/api/history/period/"+start+"?filter_entity_id="+id+"&minimal_response&no_attributes",{headers:{Authorization:'Bearer '+tok},cache:'no-store'}); if(!r.ok) return null; const d=await r.json(); return (d[0]||[]).map(p=>parseFloat(p.state)).filter(v=>isFinite(v)); }catch(e){ return null; } }
+function demoHist(){ const a=[]; for(let k=0;k<60;k++) a.push(20+Math.sin(k/7)*3+Math.random()*0.6); return a; }
+const st=(id)=>{const e=S[id];return e?e.state:undefined;};
+const num=(id)=>{const v=parseFloat(st(id));return isFinite(v)?v:null;};
+const attr=(id,k)=>{const e=S[id];return e&&e.attributes?e.attributes[k]:undefined;};
+const fname=(id)=>attr(id,'friendly_name')||id.split('.').pop().replace(/_/g,' ');
+const ON=(id)=>{const s=st(id);return s==='on'||s==='open'||s==='unlocked'||s==='detected'||s==='wet'||s==='playing'||s==='cooling'||s==='heating'||s==='heat'||s==='cool';};
+const fmt=(v,d=0)=>v==null?'—':(Math.round(v*Math.pow(10,d))/Math.pow(10,d)).toLocaleString();
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2600);}
+function bandColor(metric,type,v){ if(v==null) return 'var(--ink3)'; const b=(BANDS[metric]||{})[type]; if(!b) return C.G; const[wl,gl,gh,wh]=b; if(v<wl||v>wh) return C.R; if(v<gl||v>gh) return C.A; return C.G; }
+
+async function toggle(id,ev){ if(ev) ev.stopPropagation(); const d=id.split('.')[0],s=st(id); let dom=d,srv='toggle';
+  if(d==='lock'){dom='lock';srv=s==='locked'?'unlock':'lock';} else if(d==='script'){dom='script';srv='turn_on';} else if(d==='climate'){dom='climate';srv=(ON(id)?'turn_off':'turn_on');}
+  const willOn=(d==='lock')?s!=='locked':!ON(id), tg=ev&&ev.target&&ev.target.closest?ev.target.closest('[data-toggle]'):null, prev=S[id]?S[id].state:undefined;
+  if(d!=='script'){ if(tg) tg.classList.toggle('on',willOn); if(S[id]) S[id].state=(d==='lock')?(willOn?'locked':'unlocked'):(willOn?'on':'off'); }   // optimistic: flip the clicked toggle + state instantly — no waiting on the poll
+  if(DEMO){ render(); return; }
+  try{ await svc(dom,srv,{entity_id:id}); }catch(e){ if(tg) tg.classList.toggle('on',!willOn); if(S[id]) S[id].state=prev; toast('⚠ '+e.message); } reconcileSoon(); }
+async function alarmCmd(cmd){ const ent=CONFIG.ALARM_ENTITY; let p={entity_id:ent}; if(cmd==='disarm'){const c=prompt('Disarm code (blank if none):');if(c)p.code=c;}
+  if(DEMO){ if(S[ent]) S[ent].state=cmd==='disarm'?'disarmed':(cmd==='arm_away'?'armed_away':'armed_home'); render(); return; }
+  try{ await svc('alarm_control_panel','alarm_'+cmd,p); toast('Alarm '+cmd.replace('_',' ')); }catch(e){ toast('⚠ '+e.message); } reconcileSoon(); }
+
+function segColor(v,segs){ if(v==null||!isFinite(v)) return 'var(--ink3)'; for(const[a,b,c]of segs){ if(v>=a&&v<=b) return c; } return segs.length?segs[segs.length-1][2]:C.G; }
+function gauge(g){ const v=num(g.id),frac=v==null?0:Math.max(0,Math.min(1,(v-g.min)/(g.max-g.min))),col=segColor(v,g.segs),R=46,CIRC=2*Math.PI*R,arc=CIRC*0.75,dash=frac*arc;
+  return `<div class="metric lift" style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:14px 10px 12px;cursor:pointer" data-ent="${g.id}">
+    <div style="position:relative;width:116px;height:116px"><svg viewBox="0 0 110 110" style="transform:rotate(135deg)">
+      <circle cx="55" cy="55" r="${R}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${arc} ${CIRC}"></circle>
+      <circle cx="55" cy="55" r="${R}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${dash} ${CIRC}" style="transition:stroke-dasharray .6s,stroke .3s"></circle></svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center"><i class="mdi mdi-${g.icon}" style="font-size:15px;color:${col};opacity:.9"></i>
+        <div style="font-size:1.4rem;font-weight:800;line-height:1">${v==null?'—':fmt(v,g.unit==='ppm'||g.unit==='GiB'?0:1)}</div><div style="font-size:9.5px;color:var(--ink3);font-weight:600">${g.unit}</div></div></div>
+    <div style="font-size:11.5px;font-weight:700;color:var(--ink2)">${g.label}</div></div>`; }
+
+function alertCard(sev,icon,title,detail,link){ const cg=sev==='crit'?'var(--crit)':sev==='warn'?'var(--warn)':sev==='ok'?'var(--ok)':'var(--info)';
+  const la=link?(link.tab?`data-tab="${link.tab}"`:link.ent?`data-ent="${link.ent}"`:''):'';
+  return `<div class="alert fade${link?' lift':''}" ${la} style="--cg:${cg}${link?';cursor:pointer':''}"><i class="mdi mdi-${icon} ai"></i><div style="flex:1;min-width:0"><div class="at">${esc(title)}</div><div class="ad">${esc(detail)}</div></div>${link?'<i class="mdi mdi-chevron-right" style="color:var(--ink3);font-size:20px;align-self:center;flex:none"></i>':''}</div>`; }
+function computeAlerts(){ const out=[];
+  const wet=LEAKS.filter(l=>ON(l.id)); if(wet.length) out.push({sev:'crit',icon:'water-alert',title:`Water leak detected (${wet.length})`,detail:wet.map(l=>l.name).join(' · '),link:{tab:'security'}});
+  const al=st(CONFIG.ALARM_ENTITY); if(al==='triggered') out.push({sev:'crit',icon:'alarm-light',title:'ALARM TRIGGERED',detail:'Alarmo triggered — investigate now.',link:{tab:'security'}}); else if(al==='pending') out.push({sev:'warn',icon:'shield-alert',title:'Alarm pending',detail:'Entry delay running.',link:{tab:'security'}});
+  if(ON('switch.switch_7')) out.push({sev:'crit',icon:'alarm-light',title:'Front-door panic active',detail:'switch.switch_7 is ON.',link:{tab:'security'}});
+  if(ON('switch.outside_cameras_siren_group')||ON('input_boolean.indoor_sirens')) out.push({sev:'warn',icon:'bullhorn',title:'Siren active',detail:'A siren group is ON.',link:{tab:'cameras'}});
+  if(ON('binary_sensor.high_power_usage_alert')) out.push({sev:'warn',icon:'flash-alert',title:'High power usage',detail:`Total ${fmt(num(PWR.total))} W.`,link:{tab:'power'}});
+  if(ON('binary_sensor.power_imbalance_alert')) out.push({sev:'warn',icon:'scale-unbalanced',title:'Phase imbalance',detail:`Worst phase ${fmt(num(PWR.worst),1)} A.`,link:{tab:'power'}});
+  const load=num('sensor.total_service_load_percentage'); if(load!=null&&load>=85) out.push({sev:load>=95?'crit':'warn',icon:'gauge-full',title:`Service load ${fmt(load)}%`,detail:`Headroom ${fmt(num('sensor.headroom_worst_phase'),1)} A worst phase.`,link:{tab:'power'}});
+  const safe=st('sensor.current_safety_status'); if(safe&&!/ok|safe|normal|nominal/i.test(safe)) out.push({sev:'warn',icon:'shield-half-full',title:'Safety: '+safe,detail:'current_safety_status not OK.',link:{ent:'sensor.current_safety_status'}});
+  const ct=num('sensor.system_monitor_processor_temperature'); if(ct!=null&&ct>=65) out.push({sev:ct>=72?'crit':'warn',icon:'thermometer-alert',title:`HA CPU ${fmt(ct)} °C`,detail:'Host running hot.',link:{ent:'sensor.system_monitor_processor_temperature'}});
+  const unl=ACCESS.filter(a=>a.id.startsWith('lock.')&&st(a.id)==='unlocked'); if(unl.length) out.push({sev:'info',icon:'lock-open-variant',title:`${unl.length} lock${unl.length>1?'s':''} unlocked`,detail:unl.map(a=>a.name).join(' · '),link:unl.length===1?{ent:unl[0].id}:{tab:'security'}});
+  const open=CONTACTS.filter(c=>ON(c.id)); if(open.length) out.push({sev:'info',icon:'door-open',title:`${open.length} contact${open.length>1?'s':''} open`,detail:open.map(c=>c.name).join(' · '),link:open.length===1?{ent:open[0].id}:{tab:'security'}});
+  return out; }
+
+function buildEquipPanel(){ const el=$('equip'); if(!el) return; el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="sublabel" style="margin:0">Equipment runtime · today</div><span style="font-size:10.5px;color:var(--ink3)">since midnight</span></div><div id="equipStats" style="display:flex;gap:7px;flex-wrap:wrap;margin:10px 0 8px"></div><div style="position:relative;height:152px"><canvas id="equipChart"></canvas></div><div style="font-size:10.5px;color:var(--ink3);margin-top:6px">Devices running through the day — pumps · solenoids · CO₂ · dehumidifiers (stacked count).</div>`; }
+function hm(sec){ const m=Math.round(sec/60); return m<60?m+'m':(Math.floor(m/60)+'h '+(m%60)+'m'); }
+async function loadEquip(force){ if(!$('equip')) return; if(!force&&Date.now()-_equip.ts<60000) return; _equip.ts=Date.now();
+  const mid=new Date(); mid.setHours(0,0,0,0); const m0=mid.getTime(),now=Date.now(); let series={};
+  if(DEMO){ series=demoEquip(m0,now); } else { const tok=getToken(); if(!tok) return;
+    try{ const r=await fetch((CONFIG.HA_BASE||'')+'/api/history/period/'+mid.toISOString()+'?filter_entity_id='+EQUIP.map(e=>e.id).join(',')+'&minimal_response',{headers:{Authorization:'Bearer '+tok},cache:'no-store'}); if(!r.ok) return; const data=await r.json();
+      for(const arr of data){ if(arr&&arr.length){ const id=arr[0].entity_id; series[id]=arr.map(p=>({t:new Date(p.last_changed||p.last_updated).getTime(),on:p.state==='on'})); } } }catch(e){ return; } }
+  const iv={},sec={pump:0,solenoid:0,co2:0,dehum:0};
+  for(const e of EQUIP){ const ev=(series[e.id]||[]).slice().sort((a,b)=>a.t-b.t),list=[]; let pt=m0,po=false;
+    for(const p of ev){ const t=Math.max(m0,Math.min(now,p.t)); if(po&&t>pt) list.push([pt,t]); pt=t; po=p.on; }
+    if(po&&now>pt) list.push([pt,now]); iv[e.id]=list; let s=0; for(const a of list) s+=(a[1]-a[0])/1000; sec[e.grp]+=s; }
+  const step=5*60000,labels=[],line={pump:[],solenoid:[],co2:[],dehum:[]};
+  for(let t=m0;t<=now;t+=step){ labels.push(new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})); const c={pump:0,solenoid:0,co2:0,dehum:0};
+    for(const e of EQUIP){ const L=iv[e.id]; if(L&&L.some(z=>t>=z[0]&&t<z[1])) c[e.grp]++; } for(const g in c) line[g].push(c[g]); }
+  $('equipStats').innerHTML=EGRP.map(([g,lab,col,ic])=>`<div class="mp" style="--cg:${col};padding:4px 9px"><i class="mdi mdi-${ic}"></i> ${lab} <b style="color:var(--ink)">${hm(sec[g])}</b></div>`).join('');
+  const dss=EGRP.map(([g,lab,col])=>({label:lab,data:line[g],borderColor:col,backgroundColor:col+'33',borderWidth:1.3,pointRadius:0,fill:true,stepped:'before'}));
+  if(_equip.chart){ _equip.chart.data.labels=labels; _equip.chart.data.datasets.forEach((d,i)=>{d.data=dss[i].data;}); _equip.chart.update('none'); }
+  else if(window.Chart&&$('equipChart')){ _equip.chart=new Chart($('equipChart'),{type:'line',data:{labels,datasets:dss},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{intersect:false,mode:'index'},plugins:{legend:{display:true,labels:{color:'#aab4c0',boxWidth:9,boxHeight:9,font:{size:9},usePointStyle:true}}},scales:{x:{ticks:{color:'#727d8a',font:{size:9},maxTicksLimit:8,autoSkip:true},grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{color:'#727d8a',font:{size:9},stepSize:1},grid:{color:'rgba(255,255,255,.05)'}}}}}); } }
+function demoEquip(m0,now){ const S={},ev=(seq)=>seq.map(z=>({t:m0+z[0]*60000,on:z[1]})).filter(p=>p.t<=now);
+  EQUIP.forEach(e=>{ const seq=[];
+    if(e.grp==='dehum'){ seq.push([0,true]); seq.push([8*60,false]); seq.push([11*60,true]); }
+    else if(e.grp==='co2'){ for(let h=6;h<20;h++){ seq.push([h*60,true]); seq.push([h*60+22,false]); } }
+    else if(e.grp==='solenoid'){ for(let h=6;h<20;h+=2){ seq.push([h*60+5,true]); seq.push([h*60+8,false]); } }
+    else { for(let h=6;h<20;h+=2){ seq.push([h*60+5,true]); seq.push([h*60+9,false]); } }
+    S[e.id]=ev(seq); }); return S; }
+
+function tile(c){ const on=ON(c.id),s=st(c.id),lab=s===undefined?'—':(c.id.startsWith('lock.')?(s==='locked'?'Locked':'Unlocked'):(on?'On':'Off'));
+  return `<button class="tile lift ${on?'on':''}" style="--ac:${c.ac}" data-toggle="${c.id}"><div class="ic"><i class="mdi mdi-${c.icon}"></i></div><div class="nm">${c.name}</div><div class="stt">${lab}</div></button>`; }
+function renderControls(){ $('access').innerHTML=ACCESS.map(tile).join(''); $('lighting').innerHTML=LIGHTING.map(tile).join(''); $('security').innerHTML=SECURITY.map(tile).join(''); }
+function renderAttention(){ const a=computeAlerts(); if(!a.length){ $('attention').innerHTML=alertCard('ok','shield-check','All systems nominal','No leaks, doors secured, power balanced, alarm clear.',{tab:'security'}); return; } const o={crit:0,warn:1,info:2,ok:3}; a.sort((x,y)=>o[x.sev]-o[y.sev]); $('attention').innerHTML=a.map(x=>alertCard(x.sev,x.icon,x.title,x.detail,x.link)).join(''); }
+function renderVitals(){
+  const cell=(v,dec,suf,col)=>`<td style="text-align:center;padding:7px 10px;font-weight:700;font-variant-numeric:tabular-nums;color:${v==null?'var(--ink3)':col}">${v==null?'—':fmt(v,dec)+suf}</td>`;
+  const rows=ROOM_ORDER.map(k=>{ const r=ROOMS[k],t=r.temp?num(r.temp):null,h=r.rh?num(r.rh):null,vp=r.vpd?num(r.vpd):null,co=r.co2?num(r.co2):null,col=bandColor('temp',r.type,t);
+    return `<tr class="lift" data-room="${k}" style="cursor:pointer;border-top:1px solid var(--hair)">
+      <td style="padding:7px 12px;white-space:nowrap"><i class="mdi mdi-${r.icon}" style="color:${col};margin-right:8px"></i><b>${r.label.split(' — ')[0]}</b> <span style="color:var(--ink3);font-size:10px;text-transform:uppercase;letter-spacing:.04em">${r.type}</span></td>
+      ${cell(t,1,'°',col)}${cell(h,0,'%',bandColor('rh',r.type,h))}${cell(vp,2,'',bandColor('vpd',r.type,vp))}${cell(co,0,'',bandColor('co2',r.type,co))}</tr>`; }).join('');
+  const th=(l,a)=>`<th style="text-align:${a||'center'};padding:9px 12px;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3)">${l}</th>`;
+  $('vitalsStrip').innerHTML=`<div class="glass" style="padding:2px 4px;overflow-x:auto;width:100%"><table style="width:100%;border-collapse:collapse;font-size:13.5px"><thead><tr>${th('Room','left')}${th('Temp')}${th('RH')}${th('VPD')}${th('CO₂')}</tr></thead><tbody>${rows}</tbody></table></div>`; }
+function renderCapacity(){ const load=num('sensor.total_service_load_percentage'),totalW=num(PWR.total),headT=num('sensor.headroom_total'),amps=num(PWR.amps);
+  const pct=load!=null?load:(totalW!=null?Math.min(100,totalW/CONFIG.SERVICE_CAP_W*100):null),col=pct==null?C.G:pct>=90?C.R:pct>=75?C.A:C.G,R=52,CIRC=2*Math.PI*R,frac=pct==null?0:Math.max(0,Math.min(1,pct/100)),dash=frac*CIRC;
+  $('capacity').innerHTML=`<div class="sublabel" style="margin:0 0 6px">Total power capacity</div><div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+    <div style="position:relative;width:150px;height:150px;flex:none"><svg viewBox="0 0 120 120" style="transform:rotate(-90deg)"><circle cx="60" cy="60" r="${R}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="11"></circle>
+      <circle cx="60" cy="60" r="${R}" fill="none" stroke="${col}" stroke-width="11" stroke-linecap="round" stroke-dasharray="${dash} ${CIRC}" style="transition:stroke-dasharray .7s,stroke .3s;filter:drop-shadow(0 0 6px ${col})"></circle></svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center"><div style="font-size:2.2rem;font-weight:800;letter-spacing:-.03em;line-height:1;color:${col}">${pct==null?'—':fmt(pct)}<span style="font-size:1rem">%</span></div><div style="font-size:10px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:.05em">of capacity</div></div></div>
+    <div style="flex:1;min-width:150px;display:grid;gap:9px"><div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;font-weight:700">Drawing now</div><div style="font-size:1.5rem;font-weight:800">${fmt((totalW||0)/1000,2)}<span style="font-size:.8rem;color:var(--ink3)"> kW</span></div></div>
+      <div style="display:flex;gap:16px"><div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;font-weight:700">Current</div><div style="font-weight:800">${fmt(amps,1)} A</div></div><div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;font-weight:700">Headroom</div><div style="font-weight:800;color:${C.G}">${fmt(headT,0)} A</div></div></div></div></div>`; }
+function roomCardHTML(k){ const r=ROOMS[k],t=r.temp?num(r.temp):null,h=r.rh?num(r.rh):null,vp=r.vpd?num(r.vpd):null,co=r.co2?num(r.co2):null;
+  const tc=bandColor('temp',r.type,t),hc=bandColor('rh',r.type,h),vc=bandColor('vpd',r.type,vp),cc=bandColor('co2',r.type,co);
+  const lightsOn=(r.lights||[]).some(ON),acOn=(r.climate||[]).some(ON),doorOpen=r.door?ON(r.door):false,all=r.area?ROOMALL[r.area]:null;
+  const count=all?Object.keys(all).reduce((s,kk)=>s+(Array.isArray(all[kk])?all[kk].length:0),0):0;
+  const mp=(lab,v,u,col,id)=>v==null?'':`<span class="mp lift" ${id?`data-ent="${id}"`:''} style="--cg:${col}${id?';cursor:pointer':''}" ${id?'title="Open 24h graph"':''}>${lab} ${fmt(v,u==='kPa'?2:u==='ppm'?0:1)}${u==='°C'?'°':u==='%'?'%':''}</span>`;
+  const smoke=(r.smoke?[].concat(r.smoke):[]).concat((all&&all.smoke)||[]).filter(Boolean), smokeAlarm=smoke.some(ON);
+  return `<div class="room lift" data-room="${k}"><div class="rglow" style="background:${smokeAlarm?C.R:tc}"></div><div class="rcount">${count?count+' entities':''}</div>
+    <div class="rhead"><span class="rdot" style="background:${tc};box-shadow:0 0 10px ${tc}"></span><div><div class="rname">${r.label.split(' — ')[0]}</div><div class="rtype">${r.type}</div></div></div>
+    <div class="rmetrics">${mp('T',t,'°C',tc,r.temp)}${mp('RH',h,'%',hc,r.rh)}${mp('VPD',vp,'kPa',vc,r.vpd)}${mp('CO₂',co,'ppm',cc,r.co2)}</div>
+    <div class="ricons"><div class="ri ${lightsOn?'on':''}" style="--ac:${C.GOLD};cursor:pointer" title="Lights — dimmer" data-lights="${k}"><i class="mdi mdi-lightbulb"></i></div>
+      ${(r.climate&&r.climate.length)?`<div class="ri ${acOn?'on':''}" style="--ac:${C.B};cursor:pointer" title="AC — controller" data-climate="${k}"><i class="mdi mdi-air-conditioner"></i></div>`:''}
+      ${r.door?`<div class="ri ${doorOpen?'on':''}" style="--ac:${C.R};cursor:pointer" title="Door" data-ent="${r.door}"><i class="mdi mdi-door${doorOpen?'-open':''}"></i></div>`:''}
+      ${(all&&all.camera&&all.camera.length)?`<div class="ri" style="cursor:pointer" title="Camera feed" data-roomcam="${r.area}"><i class="mdi mdi-cctv"></i></div>`:''}
+      ${(all&&all.motion&&all.motion.length)?`<div class="ri ${all.motion.some(ON)?'on':''}" style="--ac:${C.VIOLET};cursor:pointer" title="Motion" data-ent="${all.motion[0]}"><i class="mdi mdi-motion-sensor"></i></div>`:''}
+      ${smoke.length?`<div class="ri ${smokeAlarm?'on':''}" style="--ac:${C.R};cursor:pointer" title="Smoke alarm" data-ent="${smoke[0]}"><i class="mdi mdi-smoke-detector${smokeAlarm?'-alert':''}"></i></div>`:''}</div></div>`; }
+function renderRooms(){ $('rooms').innerHTML=ROOM_ORDER.map(roomCardHTML).join(''); $('roomMini').innerHTML=ROOM_ORDER.slice(0,8).map(roomCardHTML).join(''); }
+
+function renderAlarm(){ const s=st(CONFIG.ALARM_ENTITY)||'unknown',map={disarmed:['Disarmed','var(--ok)','shield-off'],armed_away:['Armed Away','var(--crit)','shield-lock'],armed_home:['Armed Home','var(--warn)','shield-home'],armed_night:['Armed Night','var(--warn)','shield-moon'],triggered:['TRIGGERED','var(--crit)','alarm-light'],pending:['Pending','var(--warn)','shield-alert'],arming:['Arming','var(--warn)','shield-sync'],unknown:['Unknown','var(--ink3)','shield-off-outline']},[lab,col,ic]=map[s]||map.unknown;
+  $('alarm').innerHTML=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div style="width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,${col} 16%,transparent);border:1px solid color-mix(in srgb,${col} 35%,transparent)"><i class="mdi mdi-${ic} ${s==='triggered'?'glowpulse':''}" style="font-size:26px;color:${col}"></i></div><div><div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);font-weight:700">Alarm System</div><div style="font-size:1.25rem;font-weight:800;color:${col}">${lab}</div></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn danger" data-alarm="arm_away"><i class="mdi mdi-shield-lock"></i>Arm Away</button><button class="btn" data-alarm="arm_home"><i class="mdi mdi-shield-home"></i>Arm Home</button><button class="btn primary" style="grid-column:1/3" data-alarm="disarm"><i class="mdi mdi-shield-off"></i>Disarm</button></div>`; }
+function renderPower(){ const total=num(PWR.total),amps=num(PWR.amps),worst=num(PWR.worst),load=num('sensor.total_service_load_percentage'),headW=num('sensor.headroom_worst_phase'),avgA=num('sensor.average_amps_per_phase'),lc=load==null?'var(--ink)':load>=95?'var(--crit)':load>=85?'var(--warn)':'var(--ok)';
+  $('powerHero').innerHTML=[`<div class="metric lift" data-ent="${PWR.total}"><div class="ml">Total Power</div><div class="mv">${fmt(total)}<span class="mu">W</span></div><div class="ms">${fmt((total||0)/1000,2)} kW</div></div>`,
+    `<div class="metric lift" data-ent="${PWR.amps}"><div class="ml">Total Current</div><div class="mv">${fmt(amps,1)}<span class="mu">A</span></div><div class="ms">avg ${fmt(avgA,1)} A/φ</div></div>`,
+    `<div class="metric lift" data-ent="${PWR.worst}"><div class="ml">Worst Phase</div><div class="mv" style="color:${worst!=null&&worst>=avgA*1.25?'var(--warn)':'var(--ink)'}">${fmt(worst,1)}<span class="mu">A</span></div><div class="ms">headroom ${fmt(headW,1)} A</div></div>`,
+    `<div class="metric lift" data-ent="sensor.total_service_load_percentage"><div class="ml">Service Load</div><div class="mv" style="color:${lc}">${fmt(load)}<span class="mu">%</span></div><div class="ms">total headroom ${fmt(num('sensor.headroom_total'),0)} A</div></div>`].join('');
+  const ph=[['A',PWR.a_p,PWR.a_v,PWR.a_i,C.R],['B',PWR.b_p,PWR.b_v,PWR.b_i,C.Y],['C',PWR.c_p,PWR.c_v,PWR.c_i,C.B]],maxP=Math.max(1,...ph.map(p=>num(p[1])||0));
+  $('phases').innerHTML=`<div class="sublabel" style="margin-top:0">Per-phase load</div>`+ph.map(([n,pp,vv,ii,col])=>{const p=num(pp)||0,w=Math.min(100,p/maxP*100);return `<div style="margin:11px 0"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span style="color:var(--ink2);font-weight:600"><i class="mdi mdi-power-socket-de" style="color:${col};margin-right:5px"></i>Phase ${n}</span><span style="color:var(--ink)"><b>${fmt(p)}</b> W · ${fmt(num(vv),0)} V · ${fmt(num(ii),2)} A</span></div><div class="pbar"><i style="width:${w}%;background:${col}"></i></div></div>`;}).join('');
+  const ec=(lab,id,ic)=>`<div class="metric" style="padding:11px 12px;cursor:pointer" data-ent="${id}"><div class="ml"><i class="mdi mdi-${ic}"></i> ${lab}</div><div class="mv" style="font-size:1.1rem">${fmt(num(id),2)}<span class="mu">kWh</span></div></div>`;
+  $('energy').innerHTML=`<div class="sublabel" style="margin-top:0">Energy · Import / Export</div><div style="font-size:12.5px;color:var(--ink2);margin-bottom:10px">Imported <b style="color:var(--ink)">${fmt(num('sensor.total_energy_imported'),2)}</b> · Exported <b style="color:var(--ink)">${fmt(num('sensor.total_energy_exported'),2)}</b> kWh</div><div class="grid" style="grid-template-columns:repeat(3,1fr)">${ec('Imp A',PWR.a_e,'transmission-tower-import')}${ec('Imp B',PWR.b_e,'transmission-tower-import')}${ec('Imp C',PWR.c_e,'transmission-tower-import')}${ec('Exp A',PWR.a_x,'transmission-tower-export')}${ec('Exp B',PWR.b_x,'transmission-tower-export')}${ec('Exp C',PWR.c_x,'transmission-tower-export')}</div>`;
+  const badge=(id)=>{const on=ON(id);return `<span style="font-weight:700;font-size:10.5px;text-transform:uppercase;color:${on?'var(--crit)':'var(--ok)'}">${on?'ALERT':'OK'}</span>`;},row=(l,v)=>`<div class="srow"><span class="sl">${l}</span><span class="sv">${v}</span></div>`;
+  $('summary').innerHTML=`<div class="sublabel" style="margin-top:0">System Summary</div>${row('Safety status',`<span style="color:${/ok|safe|normal/i.test(st('sensor.current_safety_status')||'')?'var(--ok)':'var(--warn)'}">${esc(st('sensor.current_safety_status')||'—')}</span>`)}${row('High-power alert',badge('binary_sensor.high_power_usage_alert'))}${row('Phase-imbalance alert',badge('binary_sensor.power_imbalance_alert'))}<div class="sublabel">Load &amp; headroom</div>${row('Highest phase load',fmt(num('sensor.highest_phase_load_percentage'))+' %')}${row('Total service load',fmt(num('sensor.total_service_load_percentage'))+' %')}${row('Headroom worst / total',fmt(num('sensor.headroom_worst_phase'),1)+' / '+fmt(num('sensor.headroom_total'),0)+' A')}<div class="sublabel">Power quality</div>${row('Phase balance I / P',fmt(num('sensor.current_phase_balance'),1)+' / '+fmt(num('sensor.power_phase_balance'),1))}${row('Power factor',fmt(num('sensor.overall_power_factor'),2))}${row('Voltage avg / imbal',fmt(num('sensor.voltage_average'),1)+' V / '+fmt(num('sensor.voltage_imbalance'),2))}${row('Equipment health',fmt(num('sensor.equipment_health_score')))}`; }
+function renderSystem(){ $('system').innerHTML=SYS.map(gauge).join(''); }
+function renderContacts(){ $('contacts').innerHTML=CONTACTS.map(c=>{const o=ON(c.id),col=o?'var(--crit)':'var(--ok)',ic=c.win?(o?'window-open-variant':'window-closed-variant'):(o?'door-open':'door-closed');return `<div class="chip lift" style="--cg:${col}" data-ent="${c.id}"><i class="mdi mdi-${ic} ci"></i><span class="cn">${c.name}</span><span class="cv">${o?'OPEN':'SHUT'}</span></div>`;}).join('');
+  $('leaks').innerHTML=LEAKS.map(l=>{const w=ON(l.id),col=w?'var(--crit)':'var(--ok)';return `<div class="chip lift" style="--cg:${col}" data-ent="${l.id}"><i class="mdi mdi-${w?'water-alert':'water-check'} ci"></i><span class="cn">${l.name}</span><span class="cv">${w?'WET':'DRY'}</span></div>`;}).join(''); }
+function renderWeather(){ const w='weather.forecast_home',cond=st(w)||'—',t=attr(w,'temperature'),hum=attr(w,'humidity'),wind=attr(w,'wind_speed'),fc=(attr(w,'forecast')||[]).slice(0,5);
+  $('weather').innerHTML=`<div style="display:flex;align-items:center;gap:13px;margin-bottom:12px"><i class="mdi mdi-${wIcon(cond)}" style="font-size:38px;color:var(--gold)"></i><div><div style="font-size:1.7rem;font-weight:800;line-height:1">${t==null?'—':fmt(t,1)}°</div><div style="font-size:12px;color:var(--ink2);text-transform:capitalize">${esc(cond.replace(/-/g,' '))}</div></div><div style="margin-left:auto;text-align:right;font-size:11.5px;color:var(--ink3);line-height:1.6"><div><i class="mdi mdi-water-percent"></i> ${fmt(hum)}%</div><div><i class="mdi mdi-weather-windy"></i> ${fmt(wind,1)}</div></div></div>
+    <div class="grid" style="grid-template-columns:repeat(${Math.max(1,fc.length)},1fr);gap:6px">${fc.map(f=>`<div style="text-align:center;background:var(--card2);border:1px solid var(--hair);border-radius:10px;padding:8px 4px"><div style="font-size:10px;color:var(--ink3)">${fDay(f.datetime)}</div><i class="mdi mdi-${wIcon(f.condition)}" style="font-size:18px;color:var(--ink2);margin:3px 0;display:block"></i><div style="font-size:12px;font-weight:700">${fmt(f.temperature)}°</div></div>`).join('')}</div>`; }
+function renderCalendar(){ const c='calendar.f1_schedule',msg=attr(c,'message'),start=attr(c,'start_time'),s=st(c);
+  $('calendar').innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><i class="mdi mdi-calendar-clock" style="font-size:18px;color:var(--cyan)"></i><span style="font-weight:800;font-size:13px">F1 Schedule</span><span style="margin-left:auto;font-weight:700;font-size:10.5px;text-transform:uppercase;color:${s==='on'?'var(--ok)':'var(--ink3)'}">${s==='on'?'ACTIVE':'CLEAR'}</span></div>${msg?`<div style="font-size:13px;font-weight:600;color:var(--ink)">${esc(msg)}</div><div style="font-size:11.5px;color:var(--ink3);margin-top:3px">${start?fDT(start):''}</div>`:`<div style="font-size:12.5px;color:var(--ink3)">No upcoming event.</div>`}`; }
+function wIcon(c){c=(c||'').toLowerCase();const m={'clear-night':'weather-night',sunny:'weather-sunny',partlycloudy:'weather-partly-cloudy',cloudy:'weather-cloudy',rainy:'weather-rainy',pouring:'weather-pouring',snowy:'weather-snowy',fog:'weather-fog',windy:'weather-windy',lightning:'weather-lightning'};return m[c]||'weather-partly-cloudy';}
+function fDay(d){try{return new Date(d).toLocaleDateString(undefined,{weekday:'short'});}catch(e){return'';}}
+function fDT(d){try{return new Date(d).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return'';}}
+
+let _modalChart=null;
+async function openEntity(id){ const dom=id.split('.')[0],s=st(id),controllable=['light','switch','input_boolean','lock','script','fan','climate','cover'].includes(dom),isOn=ON(id),bigCol=isOn?'var(--ok)':'var(--ink2)',a=S[id]?S[id].attributes||{}:{};
+  const attrs=Object.entries(a).filter(([k])=>!['friendly_name','icon','supported_features','attribution','device_class','hidden_by'].includes(k)).slice(0,8);
+  $('entModal').innerHTML=`<div class="mhead"><div style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);color:${bigCol}"><i class="mdi mdi-${entIcon(id)}" style="font-size:20px"></i></div><div style="min-width:0"><div style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(fname(id))}</div><div style="font-size:11px;color:var(--ink3);font-family:ui-monospace,monospace">${esc(id)}</div></div><button class="mclose" onclick="closeModal('entBackdrop')">✕</button></div>
+    <div style="padding:18px"><div style="display:flex;align-items:center;gap:14px;margin-bottom:14px"><div style="font-size:2.4rem;font-weight:800;letter-spacing:-.02em;color:${bigCol}">${esc(s==null?'—':s)}${a.unit_of_measurement?`<span style="font-size:1rem;color:var(--ink3)"> ${esc(a.unit_of_measurement)}</span>`:''}</div>${controllable?`<button class="btn ${isOn?'primary':''}" style="margin-left:auto" onclick="toggle('${id}')"><i class="mdi mdi-power"></i>${dom==='lock'?(s==='locked'?'Unlock':'Lock'):(isOn?'Turn off':'Turn on')}</button>`:''}</div>
+      <div style="position:relative;height:130px;margin-bottom:12px"><canvas id="modalChart"></canvas></div>${attrs.length?`<div class="sublabel">Attributes</div>${attrs.map(([k,v])=>`<div class="srow"><span class="sl">${esc(k.replace(/_/g,' '))}</span><span class="sv" style="max-width:60%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(typeof v==='object'?JSON.stringify(v):v)}</span></div>`).join('')}`:''}</div>`;
+  openModal('entBackdrop'); const hist=await histFetch(id,24); if(_modalChart){_modalChart.destroy();_modalChart=null;} const cv=$('modalChart');
+  if(cv&&window.Chart){ if(hist&&hist.length>1){ _modalChart=new Chart(cv,{type:'line',data:{labels:hist.map((_,i)=>i),datasets:[{data:hist,borderColor:bigCol,backgroundColor:bigCol+'22',borderWidth:2,pointRadius:0,fill:true,tension:.35}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{ticks:{color:'#727d8a',font:{size:9}},grid:{color:'rgba(255,255,255,.05)'}}}}}); } else { cv.parentElement.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--ink3);font-size:12px">No numeric history</div>'; } } }
+function entIcon(id){ const a=S[id]?S[id].attributes||{}:{}; if(a.icon) return a.icon.replace('mdi:',''); const d=id.split('.')[0],m={light:'lightbulb',switch:'toggle-switch',lock:'lock',climate:'air-conditioner',fan:'fan',camera:'cctv',cover:'window-shutter',binary_sensor:'radiobox-marked',sensor:'gauge',script:'script-text',input_boolean:'toggle-switch-variant'};
+  if(d==='sensor'){const dc=a.device_class;if(dc==='temperature')return'thermometer';if(dc==='humidity')return'water-percent';if(dc==='power')return'flash';if(dc==='carbon_dioxide')return'molecule-co2';}
+  if(d==='binary_sensor'){const dc=a.device_class;if(dc==='door'||dc==='window')return ON(id)?'door-open':'door-closed';if(dc==='moisture')return ON(id)?'water-alert':'water-check';if(dc==='motion')return'motion-sensor';}
+  return m[d]||'help-circle'; }
+function entRow(id){ const dom=id.split('.')[0],s=st(id),on=ON(id),ctrl=['light','switch','input_boolean','lock','fan','climate'].includes(dom),col=on?'var(--ok)':'var(--ink3)';
+  return `<div class="erow"><div class="eic" style="color:${col}"><i class="mdi mdi-${entIcon(id)}"></i></div><div class="enm" data-ent="${id}" style="cursor:pointer"><b>${esc(fname(id))}</b><span>${esc(id)}</span></div><div class="ev">${esc(s==null?'—':s)}${attr(id,'unit_of_measurement')?' '+esc(attr(id,'unit_of_measurement')):''}</div>${ctrl?`<div class="toggle ${on?'on':''}" data-toggle="${id}"></div>`:''}</div>`; }
+function openRoom(k){ const r=ROOMS[k],all=r.area?ROOMALL[r.area]:null;
+  const cats=[['Lights','lightbulb',(all&&all.light)||r.lights||[]],['Climate','air-conditioner',(all&&all.climate)||r.climate||[]],['Switches / Fans','toggle-switch',((all&&all.switch)||[]).slice(0,60)],['Sensors','gauge',[].concat((all&&all.temp)||[],(all&&all.humidity)||[],(all&&all.co2)||[],(all&&all.vpd)||[],(all&&all.power)||[])],['Doors','door',[].concat((all&&all.door)||[],r.door?[r.door]:[])],['Leaks','water-alert',(all&&all.leak)||[]],['Motion','motion-sensor',(all&&all.motion)||[]],['Smoke','smoke-detector',[].concat((all&&all.smoke)||[],r.smoke?[].concat(r.smoke):[])],['Cameras','cctv',(all&&all.camera)||[]]];
+  const seen=new Set(),body=cats.map(([title,ic,ids])=>{const u=ids.filter(x=>x&&!seen.has(x)&&(seen.add(x),true));if(!u.length)return'';return `<div style="margin-bottom:14px"><div class="sublabel" style="display:flex;align-items:center;gap:6px;margin:0 0 7px"><i class="mdi mdi-${ic}"></i> ${title} <span style="color:var(--ink3);font-weight:600">${u.length}</span></div>${u.map(entRow).join('')}</div>`;}).join('')||'<div style="color:var(--ink3);font-size:12px;padding:8px">No mapped entities for this room.</div>';
+  const t=r.temp?num(r.temp):null,h=r.rh?num(r.rh):null;
+  $('roomModal').innerHTML=`<div class="mhead"><div style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(52,211,153,.14);color:var(--ok)"><i class="mdi mdi-${r.icon}" style="font-size:21px"></i></div><div><div style="font-weight:800;font-size:15px">${esc(r.label)}</div><div style="font-size:11px;color:var(--ink3)">${t!=null?fmt(t,1)+'°C':''}${h!=null?' · '+fmt(h)+'% RH':''}</div></div><button class="mclose" onclick="closeModal('roomBackdrop')">✕</button></div><div style="padding:16px 18px">${r.dash?`<a class="btn primary" href="${r.dash}" target="_top" style="text-decoration:none;display:inline-flex;margin-bottom:13px"><i class="mdi mdi-open-in-new"></i>Open ${esc(r.label.split(' — ')[0])} dashboard</a>`:''}${body}</div>`;
+  openModal('roomBackdrop'); }
+function openModal(id){ $(id).classList.add('on'); document.body.style.overflow='hidden'; }
+function closeModal(id){ $(id).classList.remove('on'); document.body.style.overflow=''; if(id==='entBackdrop'&&_modalChart){_modalChart.destroy();_modalChart=null;} }
+
+let _twinLoaded=false;
+function mountTwinCover(){ $('twinHost').innerHTML=`<div class="twincover lift" id="twinCover"><div class="twingrid"></div><div class="tc-in"><i class="mdi mdi-cube-scan float" style="font-size:64px;color:var(--cyan);display:block;margin-bottom:10px"></i><div style="font-size:1.2rem;font-weight:800" class="grad">Open 3D Floor Plan</div><div style="font-size:12px;color:var(--ink3);margin-top:5px;max-width:420px;margin-inline:auto">Procedural 3D model of the facility — instant load. Rooms glow when their lights are on; drag to orbit, scroll to zoom.</div><button class="btn primary" style="margin-top:14px"><i class="mdi mdi-play"></i>Open 3D</button></div></div>`; }
+function loadTwin(){ if(_twinLoaded) return; _twinLoaded=true; $('twinHost').innerHTML=`<div style="position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--hair);background:#0a0c10"><iframe src="${CONFIG.TWIN_URL}?embed&v=10" title="3D floor plan" style="width:100%;height:min(80vh,820px);border:0;display:block"></iframe></div>`; }
+
+/* ===================== CAMERAS ===================== */
+function buildCameras(){ if(_camBuilt||!$('cameras')) return; _camBuilt=true;
+  $('cameras').innerHTML=CAMERAS.map((c,i)=>`<div class="camcard lift">
+    <div class="camfeed" data-camview="${i}"><div class="camoff" data-off><i class="mdi mdi-cctv" style="font-size:24px"></i>no feed</div><img data-img="${c.cam}" alt="${esc(c.n)}" style="display:none"><span class="cambadge">${esc(c.a)}</span><span class="camlive" data-live style="display:none"><i></i>LIVE</span></div>
+    <div class="cambody"><div class="camname">${esc(c.n)}</div><div class="camroom">${esc(c.cam.replace('camera.',''))}</div>
+      <div class="cambtns"><div class="cbtn siren" data-siren="${c.siren}" data-name="${esc(c.n)}"><i class="mdi mdi-bullhorn"></i>Siren</div>${c.flood?`<div class="cbtn flash" data-toggle="${c.flood}"><i class="mdi mdi-flashlight"></i>Light</div>`:`<div class="cbtn" style="opacity:.4;cursor:default"><i class="mdi mdi-flashlight-off"></i>—</div>`}</div></div></div>`).join('');
+}
+function camImg(cam){ const tok=attr(cam,'access_token'); return tok?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+cam+'?token='+tok):''; }
+function syncCameras(force){ if(!_camBuilt) return; const active=$('tab-cameras')&&$('tab-cameras').classList.contains('on');
+  CAMERAS.forEach(c=>{
+    const sb=document.querySelector(`[data-siren="${c.siren}"]`); if(sb) sb.classList.toggle('on',ON(c.siren));
+    if(c.flood){ const fb=document.querySelector(`[data-toggle="${c.flood}"]`); if(fb) fb.classList.toggle('on',ON(c.flood)); }
+    const img=document.querySelector(`#cameras [data-img="${c.cam}"]`); if(!img) return;
+    if(active||force){ const tok=attr(c.cam,'access_token'); if(tok){ const card=img.closest('.camfeed');
+      img.onload=()=>{ img.style.display='block'; const o=card.querySelector('[data-off]'); if(o)o.style.display='none'; const l=card.querySelector('[data-live]'); if(l)l.style.display='flex'; };
+      img.onerror=()=>{ img.style.display='none'; const l=card.querySelector('[data-live]'); if(l)l.style.display='none'; };
+      img.src=(CONFIG.HA_BASE||'')+'/api/camera_proxy/'+c.cam+'?token='+tok+'&_='+Math.floor(Date.now()/8000); } }
+  });
+}
+function openCam(i){ const c=CAMERAS[i], src=camImg(c.cam);
+  $('entModal').innerHTML=`<div class="mhead"><div style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(34,211,238,.14);color:var(--cyan)"><i class="mdi mdi-cctv" style="font-size:19px"></i></div><div style="min-width:0"><div style="font-weight:800;font-size:14px">${esc(c.n)}</div><div style="font-size:11px;color:var(--ink3)">${esc(c.a)} · ${esc(c.cam)}</div></div><button class="mclose" onclick="closeModal('entBackdrop')">✕</button></div>
+    <div style="padding:14px"><div style="border-radius:12px;overflow:hidden;background:#05070c;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center">${src?`<img src="${src}" style="width:100%;height:100%;object-fit:contain" onerror="this.style.opacity=.25">`:'<span style="color:var(--ink3);font-size:12px">no feed</span>'}</div>
+      <div class="cambtns" style="margin-top:12px"><div class="cbtn siren ${ON(c.siren)?'on':''}" data-siren="${c.siren}" data-name="${esc(c.n)}"><i class="mdi mdi-bullhorn"></i>Siren</div>${c.flood?`<div class="cbtn flash ${ON(c.flood)?'on':''}" data-toggle="${c.flood}"><i class="mdi mdi-flashlight"></i>Flashlight</div>`:''}</div></div>`;
+  openModal('entBackdrop');
+}
+async function sirenToggle(id,name,ev){ if(ev) ev.stopPropagation(); const on=ON(id);
+  if(!on && !confirm('Sound siren — '+name+'?')) return;
+  if(DEMO){ if(S[id]) S[id].state=on?'off':'on'; syncCameras(true); return; }
+  try{ await svc('siren', on?'turn_off':'turn_on', {entity_id:id}); toast('Siren '+(on?'OFF':'ON')+' · '+name); }catch(e){ toast('⚠ '+e.message); } reconcileSoon();
+}
+
+/* ===== room quick-controls: light dimmer · AC controller · area camera ===== */
+let _lightRoom=null,_climateRoom=null;
+function lightRow(id){ const a=S[id]?S[id].attributes||{}:{}, on=ON(id);
+  const dimmable=(a.supported_color_modes||[]).some(m=>['brightness','color_temp','hs','rgb','rgbw','rgbww','xy'].includes(m))||a.brightness!=null;
+  const bp=a.brightness!=null?Math.round(a.brightness/255*100):(on?100:0);
+  return `<div class="erow" style="flex-wrap:wrap"><div class="eic" style="color:${on?'var(--gold)':'var(--ink3)'}"><i class="mdi mdi-${entIcon(id)}"></i></div>
+    <div class="enm" data-ent="${id}" style="cursor:pointer;flex:1;min-width:0"><b>${esc(fname(id))}</b><span>${on?(dimmable?bp+'%':'On'):'Off'}</span></div>
+    <div class="toggle ${on?'on':''}" data-toggle="${id}"></div>
+    ${dimmable?`<input type="range" min="0" max="100" value="${bp}" data-bright="${id}" style="flex-basis:100%;margin-top:9px;accent-color:var(--gold)">`:''}</div>`; }
+function openLights(k){ const r=ROOMS[k], lights=((r.area&&ROOMALL[r.area]&&ROOMALL[r.area].light)||r.lights||[]).filter(Boolean); _lightRoom=k;
+  if(!lights.length) return openRoom(k);
+  const anyOn=lights.some(ON);
+  $('entModal').innerHTML=`<div class="mhead"><div style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(245,193,7,.14);color:var(--gold)"><i class="mdi mdi-lightbulb-group" style="font-size:20px"></i></div><div><div style="font-weight:800;font-size:14px">${esc(r.label.split(' — ')[0])} · Lights</div><div style="font-size:11px;color:var(--ink3)">${lights.length} fixture${lights.length>1?'s':''}</div></div><button class="mclose" onclick="closeModal('entBackdrop')">✕</button></div>
+    <div style="padding:14px 16px"><div style="display:flex;gap:8px;margin-bottom:13px"><button class="btn ${anyOn?'':'primary'}" data-lightall="${k}|on"><i class="mdi mdi-lightbulb-on"></i>All on</button><button class="btn ${anyOn?'primary':''}" data-lightall="${k}|off"><i class="mdi mdi-lightbulb-off"></i>All off</button></div>${lights.map(lightRow).join('')}</div>`;
+  openModal('entBackdrop'); }
+async function setBright(id,pct){ const a=S[id]?(S[id].attributes||{}):{}; if(S[id]){ S[id].state=+pct>0?'on':'off'; a.brightness=Math.round(+pct/100*255); }
+  if(!DEMO){ try{ if(+pct<=0) await svc('light','turn_off',{entity_id:id}); else await svc('light','turn_on',{entity_id:id,brightness_pct:+pct}); }catch(e){ toast('⚠ '+e.message); } } }
+async function lightAll(k,on){ const r=ROOMS[k], lights=((r.area&&ROOMALL[r.area]&&ROOMALL[r.area].light)||r.lights||[]).filter(Boolean);
+  for(const id of lights){ if(S[id]) S[id].state=on?'on':'off'; if(!DEMO){ try{ await svc('light',on?'turn_on':'turn_off',{entity_id:id}); }catch(e){} } }
+  if(_lightRoom===k) openLights(k); reconcileSoon(); }
+function openClimate(k){ const r=ROOMS[k], cls=((r.area&&ROOMALL[r.area]&&ROOMALL[r.area].climate)||r.climate||[]).filter(Boolean); _climateRoom=k;
+  if(!cls.length) return openRoom(k);
+  const body=cls.map(id=>{ const a=S[id]?S[id].attributes||{}:{}, cur=a.current_temperature, tgt=a.temperature, mode=st(id), modes=(a.hvac_modes||['off','cool','heat','fan_only']);
+    return `<div style="background:var(--card2);border:1px solid var(--hair);border-radius:13px;padding:13px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px"><i class="mdi mdi-air-conditioner" style="color:var(--cyan)"></i><b style="font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(fname(id))}</b><span style="font-size:11px;color:var(--ink3)">${cur!=null?fmt(cur,1)+'° now':''}</span></div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:11px"><button class="btn" data-acsetpt="${id}|down" style="width:44px"><i class="mdi mdi-minus"></i></button><div style="font-size:2rem;font-weight:800;color:var(--cyan);min-width:84px;text-align:center">${tgt!=null?fmt(tgt,1)+'°':'—'}</div><button class="btn" data-acsetpt="${id}|up" style="width:44px"><i class="mdi mdi-plus"></i></button></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${modes.map(m=>`<button class="btn ${mode===m?'primary':''}" style="flex:1;min-width:62px;font-size:11px;text-transform:capitalize" data-acmode="${id}|${m}">${esc(m.replace(/_/g,' '))}</button>`).join('')}</div></div>`; }).join('');
+  $('entModal').innerHTML=`<div class="mhead"><div style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(34,211,238,.14);color:var(--cyan)"><i class="mdi mdi-air-conditioner" style="font-size:20px"></i></div><div><div style="font-weight:800;font-size:14px">${esc(r.label.split(' — ')[0])} · Climate</div><div style="font-size:11px;color:var(--ink3)">${cls.length} unit${cls.length>1?'s':''}</div></div><button class="mclose" onclick="closeModal('entBackdrop')">✕</button></div><div style="padding:14px 16px">${body}</div>`;
+  openModal('entBackdrop'); }
+async function acSetpt(id,dir){ const a=S[id]?S[id].attributes||{}:{}, cur=a.temperature; if(cur==null) return; const step=a.target_temp_step||0.5, nv=+(cur+(dir==='up'?step:-step)).toFixed(1);
+  if(S[id]) S[id].attributes.temperature=nv; if(_climateRoom) openClimate(_climateRoom);
+  if(!DEMO){ try{ await svc('climate','set_temperature',{entity_id:id,temperature:nv}); }catch(e){ toast('⚠ '+e.message); } reconcileSoon(); } }
+async function acMode(id,mode){ if(S[id]) S[id].state=mode; if(_climateRoom) openClimate(_climateRoom);
+  if(!DEMO){ try{ await svc('climate','set_hvac_mode',{entity_id:id,hvac_mode:mode}); toast(fname(id)+' → '+mode); }catch(e){ toast('⚠ '+e.message); } reconcileSoon(); } }
+function openAreaCam(area){ const i=CAMERAS.findIndex(c=>c.a===area); if(i>=0) openCam(i); else toast('No camera mapped for '+area); }
+function chartOpts(){ return {responsive:true,maintainAspectRatio:false,animation:false,interaction:{intersect:false,mode:'index'},plugins:{legend:{display:true,labels:{color:'#aab4c0',boxWidth:10,boxHeight:10,font:{size:10},usePointStyle:true}}},scales:{x:{display:false},y:{ticks:{color:'#727d8a',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}}}}; }
+function mkChart(cid,series){ const ctx=$(cid); if(!ctx||!window.Chart) return null; return new Chart(ctx,{type:'line',data:{labels:HIST.t,datasets:series},options:chartOpts()}); }
+function initCharts(){ if(CHARTS.w||!window.Chart) return; const ds=(l,c,k,store,w)=>({label:l,data:store[k],borderColor:c,backgroundColor:c+'22',borderWidth:w||1.6,pointRadius:0,fill:k==='total',tension:.35});
+  CHARTS.w=mkChart('chartW',[ds('Total',C.G,'total',HIST.w,3),ds('A',C.R,'a',HIST.w),ds('B',C.Y,'b',HIST.w),ds('C',C.B,'c',HIST.w)]); CHARTS.i=mkChart('chartA',[ds('Total',C.G,'total',HIST.i,3),ds('A',C.R,'a',HIST.i),ds('B',C.Y,'b',HIST.i),ds('C',C.B,'c',HIST.i)]); }
+function pushHist(){ const t=new Date().toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}); HIST.t.push(t); HIST.w.total.push(num(PWR.total));HIST.w.a.push(num(PWR.a_p));HIST.w.b.push(num(PWR.b_p));HIST.w.c.push(num(PWR.c_p));HIST.i.total.push(num(PWR.amps));HIST.i.a.push(num(PWR.a_i));HIST.i.b.push(num(PWR.b_i));HIST.i.c.push(num(PWR.c_i));
+  const CAP=240; if(HIST.t.length>CAP){HIST.t.shift();['w','i'].forEach(k=>['total','a','b','c'].forEach(s=>HIST[k][s].shift()));} initCharts(); if(CHARTS.w){CHARTS.w.update('none');CHARTS.i.update('none');} }
+async function seedHistory(){ if(DEMO){ seedDemoHistory(); return; } const tok=getToken(); if(!tok) return; const ids=[PWR.total,PWR.a_p,PWR.b_p,PWR.c_p,PWR.amps,PWR.a_i,PWR.b_i,PWR.c_i],start=new Date(Date.now()-24*3600*1000).toISOString();
+  try{ const r=await fetch((CONFIG.HA_BASE||"")+"/api/history/period/"+start+"?filter_entity_id="+ids.join(',')+"&minimal_response&no_attributes",{headers:{Authorization:'Bearer '+tok},cache:'no-store'}); if(!r.ok) return; const data=await r.json(),byId={}; for(const arr of data){if(arr&&arr.length)byId[arr[0].entity_id]=arr;} const base=byId[PWR.total]; if(!base) return; const step=Math.max(1,Math.floor(base.length/120));
+    for(let k=0;k<base.length;k+=step){ const at=base[k].last_changed||base[k].last_updated; HIST.t.push(at?new Date(at).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}):''); const val=(id)=>{const a=byId[id];if(!a)return null;const i=Math.min(k,a.length-1);const v=parseFloat(a[i].state);return isFinite(v)?v:null;};
+      HIST.w.total.push(val(PWR.total));HIST.w.a.push(val(PWR.a_p));HIST.w.b.push(val(PWR.b_p));HIST.w.c.push(val(PWR.c_p));HIST.i.total.push(val(PWR.amps));HIST.i.a.push(val(PWR.a_i));HIST.i.b.push(val(PWR.b_i));HIST.i.c.push(val(PWR.c_i)); } initCharts(); if(CHARTS.w){CHARTS.w.update('none');CHARTS.i.update('none');} }catch(e){} }
+function seedDemoHistory(){ for(let k=0;k<120;k++){ HIST.t.push(''); const wob=Math.sin(k/9)*900+Math.sin(k/3)*250,tot=11800+wob; HIST.w.total.push(Math.round(tot));HIST.w.a.push(Math.round(tot*0.34));HIST.w.b.push(Math.round(tot*0.33));HIST.w.c.push(Math.round(tot*0.33)); const amp=tot/230; HIST.i.total.push(+amp.toFixed(1));HIST.i.a.push(+(amp*0.34).toFixed(1));HIST.i.b.push(+(amp*0.33).toFixed(1));HIST.i.c.push(+(amp*0.33).toFixed(1)); } initCharts(); if(CHARTS.w){CHARTS.w.update('none');CHARTS.i.update('none');} }
+
+function render(){ renderVitals();renderAttention();renderCapacity();renderRooms();renderControls();renderAlarm();renderPower();renderSystem();renderContacts();renderWeather();renderCalendar();syncCameras(); $('lastUpd').textContent='Updated '+new Date().toLocaleTimeString(); }
+function setConn(state){ const dot=$('connDot'),txt=$('connTxt'),m={live:['var(--ok)','Live'],demo:['var(--cyan)','Demo'],offline:['var(--crit)','Offline'],connecting:['var(--ink3)','Connecting…']},[col,lab]=m[state]; dot.style.background=col;dot.style.color=col;txt.textContent=lab;txt.style.color=state==='offline'?'var(--crit)':'var(--ink2)'; }
+let _reconcileT=null;
+function reconcileSoon(){ clearTimeout(_reconcileT); _reconcileT=setTimeout(refresh,900); }   // coalesce post-action reconciles into ONE refresh — rapid toggles no longer each trigger a full state-fetch + whole-page re-render (the source of the lag)
+async function refresh(){ if(DEMO){ if(!Object.keys(S).length){S=seedDemo();seedHistory();} setConn('demo'); render(); loadEquip(); return; } try{ S=await fetchStates(); setConn('live'); pushHist(); render(); loadEquip(); }catch(e){ setConn('offline'); if(!Object.keys(S).length){ $('attention').innerHTML=alertCard('crit','wifi-off','Cannot reach Home Assistant',(getToken()?'API error: '+e.message:'No token — open inside HA or append ?demo')); } } }
+
+document.addEventListener('click',(e)=>{
+  const tb=e.target.closest('[data-tab]'); if(tb){ document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===tb)); document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on',p.id==='tab-'+tb.dataset.tab)); if(tb.dataset.tab==='threed') loadTwin(); if(tb.dataset.tab==='cameras') syncCameras(true); return; }
+  const sr=e.target.closest('[data-siren]'); if(sr){ sirenToggle(sr.dataset.siren, sr.dataset.name, e); return; }
+  const cv=e.target.closest('[data-camview]'); if(cv){ openCam(+cv.dataset.camview); return; }
+  if(e.target.closest('#twinCover')){ loadTwin(); return; }
+  const tg=e.target.closest('[data-toggle]'); if(tg){ toggle(tg.dataset.toggle,e); return; }
+  const al=e.target.closest('[data-alarm]'); if(al){ alarmCmd(al.dataset.alarm); return; }
+  const lt=e.target.closest('[data-lights]'); if(lt){ openLights(lt.dataset.lights); return; }
+  const cm=e.target.closest('[data-climate]'); if(cm){ openClimate(cm.dataset.climate); return; }
+  const rc=e.target.closest('[data-roomcam]'); if(rc){ openAreaCam(rc.dataset.roomcam); return; }
+  const la=e.target.closest('[data-lightall]'); if(la){ const p=la.dataset.lightall.split('|'); lightAll(p[0],p[1]==='on'); return; }
+  const asp=e.target.closest('[data-acsetpt]'); if(asp){ const p=asp.dataset.acsetpt.split('|'); acSetpt(p[0],p[1]); return; }
+  const amd=e.target.closest('[data-acmode]'); if(amd){ const p=amd.dataset.acmode.split('|'); acMode(p[0],p[1]); return; }
+  const en=e.target.closest('[data-ent]'); if(en){ openEntity(en.dataset.ent); return; }
+  const rm=e.target.closest('[data-room]'); if(rm){ openRoom(rm.dataset.room); return; }
+  const bd=e.target.closest('.backdrop'); if(bd&&e.target===bd){ closeModal(bd.id); return; }
+});
+document.addEventListener('input',(e)=>{ const t=e.target; if(t&&t.matches&&t.matches('[data-bright]')){ const row=t.closest('.erow'),sp=row&&row.querySelector('.enm span'); if(sp) sp.textContent=t.value+'%'; clearTimeout(t._bt); t._bt=setTimeout(()=>setBright(t.dataset.bright,t.value),220); }
+});
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ closeModal('entBackdrop'); closeModal('roomBackdrop'); } });
+function tickClock(){ $('clock').textContent=new Date().toLocaleString(undefined,{weekday:'short',hour:'2-digit',minute:'2-digit'}); }
+$('modeTag').textContent=DEMO?'demo mode':'live';
+mountTwinCover(); buildEquipPanel(); buildCameras(); tickClock(); setInterval(tickClock,30000); setConn(DEMO?'demo':'connecting');
+setInterval(()=>{ if($('tab-cameras')&&$('tab-cameras').classList.contains('on')) syncCameras(true); }, 6000);
+fetch((CONFIG.HA_BASE||"")+'/local/home-rooms.json',{cache:'no-store'}).then(r=>r.ok?r.json():{}).then(j=>{ROOMALL=j||{};render();}).catch(()=>{});
+if(!DEMO) seedHistory();
+refresh(); setInterval(refresh,CONFIG.REFRESH_MS);
+
+function seedDemo(){ const D={}; const set=(id,state,attrs)=>{D[id]={entity_id:id,state:String(state),attributes:attrs||{},last_changed:new Date().toISOString()};};
+  ACCESS.forEach(a=>set(a.id,a.id.startsWith('lock.')?'locked':'off')); LIGHTING.forEach((l,i)=>set(l.id,[0,5,8,11].includes(i)?'on':'off'));
+  set('input_boolean.cameras_enable_disable','on');set('switch.outside_cameras_siren_group','off');set('input_boolean.indoor_sirens','off');set('input_boolean.outside_notifications','on');set('switch.switch_7','off');
+  CONTACTS.forEach(c=>set(c.id,'off')); LEAKS.forEach(l=>set(l.id,'off')); set(CONFIG.ALARM_ENTITY,'armed_away');
+  set(PWR.total,11840);set(PWR.amps,51.5);set(PWR.worst,17.6);[[PWR.a_p,4020],[PWR.b_p,3910],[PWR.c_p,3910],[PWR.a_v,231.4],[PWR.b_v,230.8],[PWR.c_v,232.1],[PWR.a_i,17.6],[PWR.b_i,16.9],[PWR.c_i,17.0],[PWR.a_e,1284.3],[PWR.b_e,1190.7],[PWR.c_e,1207.9],[PWR.a_x,2.1],[PWR.b_x,1.8],[PWR.c_x,2.0]].forEach(([id,v])=>set(id,v));
+  set('sensor.current_safety_status','OK');set('binary_sensor.high_power_usage_alert','off');set('binary_sensor.power_imbalance_alert','off');set('sensor.average_amps_per_phase',17.2);set('sensor.total_service_load_percentage',57);set('sensor.highest_phase_load_percentage',59);set('sensor.highest_phase_current',17.6);set('sensor.headroom_worst_phase',12.4);set('sensor.headroom_total',38.5);set('sensor.current_phase_balance',96.2);set('sensor.power_phase_balance',97.1);set('sensor.overall_power_factor',0.98);set('sensor.equipment_health_score',99);set('sensor.voltage_average',231.4);set('sensor.voltage_imbalance',0.34);set('sensor.total_energy_imported',3682.9);set('sensor.total_energy_exported',5.9);
+  const RV={F2:[25.2,62,1.15,1300],F1:[24.8,60,1.2,1290],Veg:[24.0,68,0.95,1100],Vault:[18.5,58,0.7,650],Irrigation:[22.0,55,null,500],Hallway:[24.6,55,null,720],Office:[23.1,51,null,680],Kitchen:[22.5,50,null,null],Roof:[21.3,58,null,null]};
+  for(const k in RV){const r=ROOMS[k],[t,h,v,co]=RV[k];if(r.temp)set(r.temp,t);if(r.rh)set(r.rh,h);if(r.vpd&&v!=null)set(r.vpd,v);if(r.co2&&co!=null)set(r.co2,co);(r.lights||[]).forEach((l,i)=>set(l,(i===0&&['F2','F1','Veg'].includes(k))?'on':'off'));(r.climate||[]).forEach(c=>set(c,'cool',{hvac_action:'cooling'}));if(r.door)set(r.door,'off');}
+  set('sensor.led_f2_r2_f2_r2_led_power',640);set('sensor.led_f2_r1_f2_r1_led_power',640);
+  set('sensor.system_monitor_processor_use',18);set('sensor.system_monitor_processor_temperature',44);set('sensor.system_monitor_memory_usage',47);set('sensor.system_monitor_disk_use',512);
+  const fdays=[['sunny',24,14],['partlycloudy',22,13],['rainy',19,12],['cloudy',20,12],['sunny',23,14]];
+  set('weather.forecast_home','partlycloudy',{temperature:22.4,humidity:54,wind_speed:11.2,forecast:fdays.map((f,i)=>({datetime:new Date(Date.now()+i*864e5).toISOString(),condition:f[0],temperature:f[1],templow:f[2]}))});
+  set('calendar.f1_schedule','off',{message:'Defoliation — F1 (week 4)',start_time:new Date(Date.now()+36e5).toISOString()});
+  CAMERAS.forEach(c=>{ set(c.cam,'streaming',{access_token:''}); set(c.siren,'off'); if(c.flood) set(c.flood,'off'); });
+  set('siren.car_parks_siren','on'); set('light.roller_door_floodlight','on');   // demo: one siren + one flashlight active
+  return D; }
+window.toggle=toggle; window.closeModal=closeModal;
+</script>
+</body>
+</html>

@@ -62,8 +62,6 @@ views:
       {% if vwc < fl and vwc > 0 %}{% set ns.rows = ns.rows + ['&#128992; **Z'~z~' VWC '~vwc~' &lt; floor '~fl~'** &mdash; under-watered &middot; *why no shot?*'] %}{% endif %}
       {% if vwc > fc %}{% set ns.rows = ns.rows + ['&#128992; **Z'~z~' VWC '~vwc~' &gt; FC '~fc~'** &mdash; over-saturated'] %}{% endif %}{% endfor %}
       {% if not armed %}{% set ns.rows = ns.rows + ['&#128992; **System DISARMED** &mdash; watchdog only &middot; *arm when ready*'] %}{% endif %}
-      {% set gs = states('select.crop_steering_growth_stage')|lower %}{% set gp = states('input_select.growth_phase') %}{% set np = states('input_select.nutrient_phase') %}
-      {% if gp not in ['unknown','unavailable'] and not ('veg' in gs and 'veg' in gp|lower and 'veg' in np|lower) %}{% set ns.rows = ns.rows + ['&#128992; **Strategy selectors disagree** &mdash; '~states('select.crop_steering_growth_stage')~' &middot; '~gp~' &middot; '~np~''] %}{% endif %}
       {% for z in [1,2,3] %}{% set ec = states('sensor.crop_steering_zone_'~z~'_ec')|float(0) %}
       {% set ph = states('sensor.crop_steering_zone_'~z~'_phase') %}{% set pn = '0' if 'P0' in ph else ('1' if 'P1' in ph else ('3' if 'P3' in ph else '2')) %}
       {% set tg = states('number.crop_steering_zone_'~z~'_ec_target_veg_p'~pn)|float(3.2) %}

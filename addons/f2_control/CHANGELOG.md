@@ -3,6 +3,35 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.11.0
+
+> **⚠️ Update the Crop Steering integration BEFORE rebuilding this add-on.** The engine now reads
+> the default room's pump/mainline/valves from the integration's `sensor.crop_steering_engine_config`.
+> On an old integration that doesn't publish it, the default room **holds safe (no watering)** until
+> the integration is updated (the engine re-checks every 5 minutes and resumes on its own).
+
+- **Portability:** default-room hardware comes from the integration's engine_config descriptor —
+  the hardcoded F2 pump/valve fallback is gone. An unmapped room holds safe with a clear
+  "no hardware mapped" reason instead of actuating another install's entities.
+- **Kill switch works mid-shot:** shots are delivered in ≤2 s slices that re-check the kill switch
+  and the zone's manual override; an abort closes the valve immediately and counts only the water
+  actually delivered.
+- **`notify_service` default is now empty** — unset means persistent notifications only (no more
+  default pointing at the developer's phone). If you had it set explicitly, nothing changes.
+- **Dosing/fill/flush holds are now the `hold_entities` option (empty default).** The previously
+  hardcoded F2 hold entities (`input_boolean.nutrient_dosing_active`, `input_boolean.f2_fill_mode`,
+  `input_boolean.f2_flush_mode`, `switch.tank_filling`) are no longer checked automatically —
+  add yours to `hold_entities` in the Configuration tab or that gate stays off.
+- **Live room discovery:** rooms added in the integration UI join within `rediscover_seconds`
+  (default 300 s) without an add-on restart, fail-safe OFF.
+- **Missing-setpoint alerts:** if a `number.crop_steering_*` setpoint entity disappears (per-zone
+  AND global) for 3+ loops, you get one rate-limited alert + a vitals line instead of the engine
+  silently running built-in defaults.
+- **Timezone hardening:** tzdata baked into the image; startup logs the effective local time and
+  alerts if the container clock disagrees with Home Assistant's configured zone.
+- Heartbeat sensors publish the room's `enable_flag` (used by the integration's Repairs health
+  checks); vitals title uses the new `instance_name` option.
+
 ## 0.10.5
 - **Fix: zones could freeze in P2 if the fused-sensor entity_id didn't match.** The engine read
   each zone's probe at `sensor.crop_steering_<room>vwc_zone_N` / `ec_zone_N`, but on a box first set

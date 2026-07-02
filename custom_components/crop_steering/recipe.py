@@ -100,13 +100,16 @@ class RecipeManager:
                 continue  # not every param has a per-zone copy on every install
             try:
                 await self.hass.services.async_call(
-                    "number", "set_value",
+                    "number",
+                    "set_value",
                     {"entity_id": eid, "value": float(val)},
                     blocking=True,
                 )
                 applied += 1
             except Exception as err:  # pragma: no cover - defensive
-                _LOGGER.warning("crop_steering: recipe apply failed for %s: %s", eid, err)
+                _LOGGER.warning(
+                    "crop_steering: recipe apply failed for %s: %s", eid, err
+                )
         self.recipe["active_stage"] = stage
         if self._store is not None:
             await self._store.async_save(self.recipe)
