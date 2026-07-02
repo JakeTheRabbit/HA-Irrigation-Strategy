@@ -23,7 +23,8 @@ echo "Syncing f2_control v$VER  ->  $ADDON_REPO/f2_control"
 
 rm -rf "$ADDON_REPO/f2_control"
 cp -r "$SRC" "$ADDON_REPO/f2_control"
-# don't publish Python bytecode caches
+# don't publish the dev test suite or Python bytecode caches
+rm -rf "$ADDON_REPO/f2_control/tests" "$ADDON_REPO/f2_control/.pytest_cache"
 find "$ADDON_REPO/f2_control" -type d -name __pycache__ -prune -exec rm -rf {} +
 find "$ADDON_REPO/f2_control" -type f -name '*.pyc' -delete
 
