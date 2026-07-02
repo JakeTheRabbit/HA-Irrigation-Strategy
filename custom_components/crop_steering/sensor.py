@@ -643,8 +643,12 @@ class CropSteeringSensor(SensorEntity):
         """Get current EC target based on phase and steering mode."""
         try:
             # Get current phase and mode
-            phase_state = self.hass.states.get(f"select.crop_steering_{self._prefix}irrigation_phase")
-            mode_state = self.hass.states.get(f"select.crop_steering_{self._prefix}steering_mode")
+            phase_state = self.hass.states.get(
+                f"select.crop_steering_{self._prefix}irrigation_phase"
+            )
+            mode_state = self.hass.states.get(
+                f"select.crop_steering_{self._prefix}steering_mode"
+            )
 
             if not phase_state or not mode_state:
                 return DEFAULT_EC_FALLBACK  # Default fallback
@@ -687,7 +691,9 @@ class CropSteeringSensor(SensorEntity):
                 return phase_sensor.state
 
             # Fallback to integration select entity
-            phase_select = self.hass.states.get(f"select.crop_steering_{self._prefix}irrigation_phase")
+            phase_select = self.hass.states.get(
+                f"select.crop_steering_{self._prefix}irrigation_phase"
+            )
             if phase_select and phase_select.state not in ["unknown", "unavailable"]:
                 return phase_select.state
 
@@ -703,7 +709,9 @@ class CropSteeringSensor(SensorEntity):
         shared asyncio.gather, which cascades and freezes the other coordinator sensors
         (the per-zone VWC/EC went 'unknown' from exactly this)."""
         try:
-            s = self.hass.states.get(f"sensor.crop_steering_{self._prefix}app_next_irrigation")
+            s = self.hass.states.get(
+                f"sensor.crop_steering_{self._prefix}app_next_irrigation"
+            )
             if not s or s.state in ("unknown", "unavailable", "", None):
                 return None
             dt = dt_util.parse_datetime(s.state)

@@ -1,4 +1,5 @@
 """Crop Steering System select entities."""
+
 from __future__ import annotations
 
 import logging
@@ -10,28 +11,27 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, CONF_NUM_ZONES, PHASES, STEERING_MODES, CROP_TYPES, GROWTH_STAGES, RECIPE_STAGES, RECIPE_PARAMS, SOFTWARE_VERSION
+from .const import (
+    DOMAIN,
+    CONF_NUM_ZONES,
+    PHASES,
+    STEERING_MODES,
+    CROP_TYPES,
+    GROWTH_STAGES,
+    RECIPE_STAGES,
+    RECIPE_PARAMS,
+    SOFTWARE_VERSION,
+)
 from .room import room_prefix
 from .recipe import get_manager
 
 _LOGGER = logging.getLogger(__name__)
 
 # Zone grouping options
-ZONE_GROUP_OPTIONS = [
-    "Ungrouped",
-    "Group A", 
-    "Group B",
-    "Group C",
-    "Group D"
-]
+ZONE_GROUP_OPTIONS = ["Ungrouped", "Group A", "Group B", "Group C", "Group D"]
 
 # Zone priority levels
-ZONE_PRIORITY_OPTIONS = [
-    "Critical",
-    "High",
-    "Normal", 
-    "Low"
-]
+ZONE_PRIORITY_OPTIONS = ["Critical", "High", "Normal", "Low"]
 
 # Zone-specific crop profiles
 ZONE_CROP_PROFILES = [
@@ -42,7 +42,7 @@ ZONE_CROP_PROFILES = [
     "Cannabis_Balanced_Hybrid",
     "Tomato_Hydroponic",
     "Lettuce_Leafy_Greens",
-    "Custom"
+    "Custom",
 ]
 
 ZONE_PHASE_OVERRIDE_OPTIONS = ["Auto", "P0", "P1", "P2", "P3"]
@@ -91,10 +91,16 @@ SELECT_DESCRIPTIONS = [
         key="steering_mode_derived",
         name="Steering Mode (derived)",
         icon="mdi:tune-vertical-variant",
-        options=["Generative", "Mixed-generative", "Balanced",
-                 "Mixed-vegetative", "Vegetative"],
+        options=[
+            "Generative",
+            "Mixed-generative",
+            "Balanced",
+            "Mixed-vegetative",
+            "Vegetative",
+        ],
     ),
 ]
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -103,80 +109,91 @@ async def async_setup_entry(
 ) -> None:
     """Set up Crop Steering select entities."""
     selects = []
-    
+
     # Add main select entities
     for description in SELECT_DESCRIPTIONS:
         selects.append(CropSteeringSelect(entry, description))
-    
+
     # Get number of zones from config
     config_data = hass.data[DOMAIN][entry.entry_id]
     num_zones = config_data.get(CONF_NUM_ZONES, 1)
-    
+
     # Add zone-specific select entities
     for zone_num in range(1, num_zones + 1):
         # Zone Group
-        selects.append(CropSteeringSelect(
-            entry,
-            SelectEntityDescription(
-                key=f"zone_{zone_num}_group",
-                name=f"Crop Steering Zone {zone_num} Group",
-                options=ZONE_GROUP_OPTIONS,
-                icon="mdi:group",
-            ),
-            zone_num=zone_num
-        ))
-        
+        selects.append(
+            CropSteeringSelect(
+                entry,
+                SelectEntityDescription(
+                    key=f"zone_{zone_num}_group",
+                    name=f"Crop Steering Zone {zone_num} Group",
+                    options=ZONE_GROUP_OPTIONS,
+                    icon="mdi:group",
+                ),
+                zone_num=zone_num,
+            )
+        )
+
         # Zone Priority
-        selects.append(CropSteeringSelect(
-            entry,
-            SelectEntityDescription(
-                key=f"zone_{zone_num}_priority",
-                name=f"Crop Steering Zone {zone_num} Priority",
-                options=ZONE_PRIORITY_OPTIONS,
-                icon="mdi:priority-high",
-            ),
-            zone_num=zone_num
-        ))
-        
+        selects.append(
+            CropSteeringSelect(
+                entry,
+                SelectEntityDescription(
+                    key=f"zone_{zone_num}_priority",
+                    name=f"Crop Steering Zone {zone_num} Priority",
+                    options=ZONE_PRIORITY_OPTIONS,
+                    icon="mdi:priority-high",
+                ),
+                zone_num=zone_num,
+            )
+        )
+
         # Zone Crop Profile
-        selects.append(CropSteeringSelect(
-            entry,
-            SelectEntityDescription(
-                key=f"zone_{zone_num}_crop_profile",
-                name=f"Crop Steering Zone {zone_num} Crop Profile",
-                options=ZONE_CROP_PROFILES,
-                icon="mdi:sprout",
-            ),
-            zone_num=zone_num
-        ))
+        selects.append(
+            CropSteeringSelect(
+                entry,
+                SelectEntityDescription(
+                    key=f"zone_{zone_num}_crop_profile",
+                    name=f"Crop Steering Zone {zone_num} Crop Profile",
+                    options=ZONE_CROP_PROFILES,
+                    icon="mdi:sprout",
+                ),
+                zone_num=zone_num,
+            )
+        )
 
         # Zone Phase Override (native per-zone phase forcing: Auto/P0-P3) — RootSense v3.
-        selects.append(CropSteeringSelect(
-            entry,
-            SelectEntityDescription(
-                key=f"zone_{zone_num}_phase_override",
-                name=f"Zone {zone_num} Phase Override",
-                options=ZONE_PHASE_OVERRIDE_OPTIONS,
-                icon="mdi:state-machine",
-            ),
-            zone_num=zone_num
-        ))
+        selects.append(
+            CropSteeringSelect(
+                entry,
+                SelectEntityDescription(
+                    key=f"zone_{zone_num}_phase_override",
+                    name=f"Zone {zone_num} Phase Override",
+                    options=ZONE_PHASE_OVERRIDE_OPTIONS,
+                    icon="mdi:state-machine",
+                ),
+                zone_num=zone_num,
+            )
+        )
 
         # Zone Steering Mode (per-row Vegetative/Generative; the engine falls back to global).
         # Retained from the lean branch: the master app's _zone_is_vegetative() reads this
         # for per-zone veg/gen EC-target selection.
-        selects.append(CropSteeringSelect(
-            entry,
-            SelectEntityDescription(
-                key=f"zone_{zone_num}_steering_mode",
-                name=f"Crop Steering Zone {zone_num} Steering Mode",
-                options=["Vegetative", "Generative"],
-                icon="mdi:steering",
-            ),
-            zone_num=zone_num
-        ))
+        selects.append(
+            CropSteeringSelect(
+                entry,
+                SelectEntityDescription(
+                    key=f"zone_{zone_num}_steering_mode",
+                    name=f"Crop Steering Zone {zone_num} Steering Mode",
+                    options=["Vegetative", "Generative"],
+                    icon="mdi:steering",
+                ),
+                zone_num=zone_num,
+            )
+        )
 
     async_add_entities(selects)
+
 
 class CropSteeringSelect(SelectEntity, RestoreEntity):
     """Crop Steering select entity with state restoration."""
@@ -196,7 +213,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         # Set object_id to include crop_steering prefix for entity_id generation
         self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}{description.key}"
         self._attr_options = description.options
-        
+
         # Set default values based on entity type
         if "group" in description.key:
             self._attr_current_option = "Ungrouped"
@@ -211,7 +228,9 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         elif description.key == "growth_stage":
             self._attr_current_option = "Vegetative"
         else:
-            self._attr_current_option = description.options[0] if description.options else None
+            self._attr_current_option = (
+                description.options[0] if description.options else None
+            )
 
     async def async_added_to_hass(self) -> None:
         """Restore state when added to hass."""
@@ -260,7 +279,11 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
             if getattr(self.entity_description, "key", None) == "irrigation_phase":
                 self.hass.bus.async_fire(
                     "crop_steering_phase_transition",
-                    {"target_phase": option, "reason": "Manual (phase select)", "forced": True},
+                    {
+                        "target_phase": option,
+                        "reason": "Manual (phase select)",
+                        "forced": True,
+                    },
                 )
             # Selecting a recipe stage applies its setpoints to the zone numbers.
             elif self.entity_description.key == "recipe_stage":

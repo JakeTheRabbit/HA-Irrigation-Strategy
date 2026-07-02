@@ -1,4 +1,5 @@
 """Crop Steering System number entities."""
+
 from __future__ import annotations
 
 import logging
@@ -136,7 +137,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="generative_dryback_target",
-        name="Generative Dryback Target", 
+        name="Generative Dryback Target",
         icon="mdi:water-minus",
         native_min_value=5.0,
         native_max_value=70.0,
@@ -496,10 +497,10 @@ NUMBER_DESCRIPTIONS = [
 # Default values (shared by global + per-zone entities).
 DEFAULT_VALUES = {
     # RootSense v3 additions
-    "steering_intent": 0.0,            # midpoint = balanced
+    "steering_intent": 0.0,  # midpoint = balanced
     "climate_grow_day_offset": 0,
-    "veg_p0_dryback_drop_pct": 12.0,   # Athena veg default
-    "gen_p0_dryback_drop_pct": 22.0,   # Athena generative default
+    "veg_p0_dryback_drop_pct": 12.0,  # Athena veg default
+    "gen_p0_dryback_drop_pct": 22.0,  # Athena generative default
     "substrate_volume": 10.0,
     "dripper_flow_rate": 1.2,
     "drippers_per_plant": 2,
@@ -551,17 +552,38 @@ DEFAULT_VALUES = {
 # falls back to the global — without the per-zone entity those three silently use the
 # global/default and the f2 per-zone editor writes number.set_value to a missing entity.
 PER_ZONE_STEERING_KEYS = [
-    "vegetative_dryback_target", "generative_dryback_target",
-    "p0_minimum_wait_time", "p0_maximum_wait_time", "p0_dryback_drop_percent",
-    "p1_target_vwc", "p1_initial_shot_size", "p1_shot_size_increment",
-    "p1_maximum_shot_size", "p1_time_between_shots", "p1_maximum_shots", "p1_minimum_shots",
-    "p2_vwc_threshold", "p2_shot_size", "p2_ec_high_threshold", "p2_ec_low_threshold",
-    "p3_veg_last_irrigation", "p3_gen_last_irrigation",
-    "p3_emergency_vwc_threshold", "p3_emergency_shot_size",
+    "vegetative_dryback_target",
+    "generative_dryback_target",
+    "p0_minimum_wait_time",
+    "p0_maximum_wait_time",
+    "p0_dryback_drop_percent",
+    "p1_target_vwc",
+    "p1_initial_shot_size",
+    "p1_shot_size_increment",
+    "p1_maximum_shot_size",
+    "p1_time_between_shots",
+    "p1_maximum_shots",
+    "p1_minimum_shots",
+    "p2_vwc_threshold",
+    "p2_shot_size",
+    "p2_ec_high_threshold",
+    "p2_ec_low_threshold",
+    "p3_veg_last_irrigation",
+    "p3_gen_last_irrigation",
+    "p3_emergency_vwc_threshold",
+    "p3_emergency_shot_size",
     "ec_target_flush",
-    "ec_target_veg_p0", "ec_target_veg_p1", "ec_target_veg_p2", "ec_target_veg_p3",
-    "ec_target_gen_p0", "ec_target_gen_p1", "ec_target_gen_p2", "ec_target_gen_p3",
-    "field_capacity", "maximum_ec", "watchdog_hours",
+    "ec_target_veg_p0",
+    "ec_target_veg_p1",
+    "ec_target_veg_p2",
+    "ec_target_veg_p3",
+    "ec_target_gen_p0",
+    "ec_target_gen_p1",
+    "ec_target_gen_p2",
+    "ec_target_gen_p3",
+    "field_capacity",
+    "maximum_ec",
+    "watchdog_hours",
 ]
 
 _DESC_BY_KEY = {d.key: d for d in NUMBER_DESCRIPTIONS}
@@ -610,6 +632,7 @@ PARAM_TO_ENTITY_KEY: dict[str, str] = {
     "ec_target_gen_p3": "ec_target_gen_p3",
 }
 
+
 # Reverse map: entity key → parsed parameter value (built at setup time).
 # Used by CropSteeringNumber to seed its initial value.
 def _build_entity_seed(entry_data: dict) -> dict[str, float]:
@@ -649,76 +672,85 @@ async def async_setup_entry(
         zone_cfg = entry.data.get("zones", {}).get(zone_num, {})
 
         # Zone plant count
-        numbers.append(CropSteeringNumber(
-            entry,
-            NumberEntityDescription(
-                key=f"zone_{zone_num}_plant_count",
-                name=f"Crop Steering Zone {zone_num} Plant Count",
-                icon="mdi:sprout",
-                native_min_value=1,
-                native_max_value=50,
-                native_step=1,
-                mode="box",
-            ),
-            zone_num=zone_num,
-            default_value=zone_cfg.get("plant_count", 4),
-        ))
+        numbers.append(
+            CropSteeringNumber(
+                entry,
+                NumberEntityDescription(
+                    key=f"zone_{zone_num}_plant_count",
+                    name=f"Crop Steering Zone {zone_num} Plant Count",
+                    icon="mdi:sprout",
+                    native_min_value=1,
+                    native_max_value=50,
+                    native_step=1,
+                    mode="box",
+                ),
+                zone_num=zone_num,
+                default_value=zone_cfg.get("plant_count", 4),
+            )
+        )
 
         # Zone water limits
-        numbers.append(CropSteeringNumber(
-            entry,
-            NumberEntityDescription(
-                key=f"zone_{zone_num}_max_daily_volume",
-                name=f"Crop Steering Zone {zone_num} Max Daily Volume",
-                icon="mdi:water-check",
-                native_min_value=0,
-                native_max_value=200,
-                native_step=0.5,
-                native_unit_of_measurement=UnitOfVolume.LITERS,
-                mode="box",
-            ),
-            zone_num=zone_num,
-            default_value=zone_cfg.get("max_daily_volume", 20.0),
-        ))
+        numbers.append(
+            CropSteeringNumber(
+                entry,
+                NumberEntityDescription(
+                    key=f"zone_{zone_num}_max_daily_volume",
+                    name=f"Crop Steering Zone {zone_num} Max Daily Volume",
+                    icon="mdi:water-check",
+                    native_min_value=0,
+                    native_max_value=200,
+                    native_step=0.5,
+                    native_unit_of_measurement=UnitOfVolume.LITERS,
+                    mode="box",
+                ),
+                zone_num=zone_num,
+                default_value=zone_cfg.get("max_daily_volume", 20.0),
+            )
+        )
 
         # Zone-specific shot sizes
-        numbers.append(CropSteeringNumber(
-            entry,
-            NumberEntityDescription(
-                key=f"zone_{zone_num}_shot_size_multiplier",
-                name=f"Crop Steering Zone {zone_num} Shot Size Multiplier",
-                icon="mdi:multiplication",
-                native_min_value=0.1,
-                native_max_value=5.0,
-                native_step=0.1,
-                native_unit_of_measurement=PERCENTAGE,
-                mode="box",
-            ),
-            zone_num=zone_num,
-            default_value=zone_cfg.get("shot_multiplier", 1.0),
-        ))
+        numbers.append(
+            CropSteeringNumber(
+                entry,
+                NumberEntityDescription(
+                    key=f"zone_{zone_num}_shot_size_multiplier",
+                    name=f"Crop Steering Zone {zone_num} Shot Size Multiplier",
+                    icon="mdi:multiplication",
+                    native_min_value=0.1,
+                    native_max_value=5.0,
+                    native_step=0.1,
+                    native_unit_of_measurement=PERCENTAGE,
+                    mode="box",
+                ),
+                zone_num=zone_num,
+                default_value=zone_cfg.get("shot_multiplier", 1.0),
+            )
+        )
 
         # Per-zone copy of every steering parameter (the engine falls back to global).
         for _key in PER_ZONE_STEERING_KEYS:
             _g = _DESC_BY_KEY[_key]
-            numbers.append(CropSteeringNumber(
-                entry,
-                NumberEntityDescription(
-                    key=f"zone_{zone_num}_{_key}",
-                    name=f"Crop Steering Zone {zone_num} {_g.name}",
-                    icon=_g.icon,
-                    native_min_value=_g.native_min_value,
-                    native_max_value=_g.native_max_value,
-                    native_step=_g.native_step,
-                    native_unit_of_measurement=_g.native_unit_of_measurement,
-                    mode="box",
-                ),
-                zone_num=zone_num,
-                default_value=DEFAULT_VALUES.get(_key),
-                entity_seed=entry_seed,
-            ))
+            numbers.append(
+                CropSteeringNumber(
+                    entry,
+                    NumberEntityDescription(
+                        key=f"zone_{zone_num}_{_key}",
+                        name=f"Crop Steering Zone {zone_num} {_g.name}",
+                        icon=_g.icon,
+                        native_min_value=_g.native_min_value,
+                        native_max_value=_g.native_max_value,
+                        native_step=_g.native_step,
+                        native_unit_of_measurement=_g.native_unit_of_measurement,
+                        mode="box",
+                    ),
+                    zone_num=zone_num,
+                    default_value=DEFAULT_VALUES.get(_key),
+                    entity_seed=entry_seed,
+                )
+            )
 
     async_add_entities(numbers)
+
 
 class CropSteeringNumber(NumberEntity, RestoreEntity):
     """Crop Steering number entity with state restoration."""
@@ -757,7 +789,7 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             if zone_num is not None:
                 prefix = f"zone_{zone_num}_"
                 if base_key.startswith(prefix):
-                    base_key = base_key[len(prefix):]
+                    base_key = base_key[len(prefix) :]
 
             seed_value = (entity_seed or {}).get(base_key)
             if seed_value is not None:

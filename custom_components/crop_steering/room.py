@@ -5,6 +5,7 @@ single-room installs (e.g. F2) are completely unchanged. Additional rooms namesp
 entities as ``crop_steering_<slug>_*`` so rooms are fully isolated — own zones, sensors,
 hardware and setpoints, nothing shared.
 """
+
 from __future__ import annotations
 
 import re
