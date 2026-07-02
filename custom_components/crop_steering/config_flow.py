@@ -272,7 +272,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Load configuration from crop_steering.env file."""
         env_path = os.path.join(self.hass.config.config_dir, "crop_steering.env")
 
-        if not os.path.exists(env_path):
+        if not await self.hass.async_add_executor_job(os.path.exists, env_path):
             return self.async_abort(
                 reason="env_not_found",
                 description_placeholders={
@@ -284,8 +284,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         try:
-            # Load and parse .env file
-            env_config = load_env_config(self.hass.config.config_dir)
+            # Load and parse .env file off the event loop (file I/O must not block it)
+            env_config = await self.hass.async_add_executor_job(
+                load_env_config, self.hass.config.config_dir
+            )
 
             if env_config["num_zones"] == 0:
                 return self.async_abort(
@@ -380,14 +382,20 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Load configuration from config.yaml."""
         config_path = os.path.join(self.hass.config.config_dir, "config.yaml")
 
-        if not os.path.exists(config_path):
-            return self.async_abort(reason="yaml_not_found")
+        def _read_yaml():
+            # Existence check + read + parse together, off the event loop.
+            if not os.path.exists(config_path):
+                return None
+            with open(config_path, "r") as f:
+                return yaml.safe_load(f)
 
         try:
-            with open(config_path, "r") as f:
-                config = yaml.safe_load(f)
+            config = await self.hass.async_add_executor_job(_read_yaml)
         except yaml.YAMLError:
             return self.async_abort(reason="yaml_error")
+
+        if config is None:
+            return self.async_abort(reason="yaml_not_found")
 
         # Basic validation
         if not isinstance(config, dict) or "zones" not in config:
@@ -621,8 +629,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             )
 
         try:
-            # Reload .env file
-            env_config = load_env_config(self.hass.config.config_dir)
+            # Reload .env file off the event loop (file I/O must not block it)
+            env_config = await self.hass.async_add_executor_job(
+                load_env_config, self.hass.config.config_dir
+            )
 
             # Update config entry
             self.hass.config_entries.async_update_entry(
