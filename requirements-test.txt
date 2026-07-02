@@ -3,3 +3,5 @@ pytest-cov>=4.1.0
 pytest-homeassistant-custom-component>=0.13.0
 # the add-on controller imports `requests`; its test suite drives the real module
 requests>=2.31.0
+# the dashboard generator (scripts/build_lovelace.py) + its test import pyyaml
+pyyaml>=6.0
