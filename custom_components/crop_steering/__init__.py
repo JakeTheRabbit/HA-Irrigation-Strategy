@@ -9,12 +9,15 @@ from typing import Any
 try:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.const import Platform
-    from homeassistant.core import HomeAssistant
+    from homeassistant.core import HomeAssistant, callback
     from homeassistant.exceptions import ConfigEntryNotReady
 except ImportError:  # pragma: no cover - enables non-HA unit tests
     ConfigEntry = Any  # type: ignore
     HomeAssistant = Any  # type: ignore
     ConfigEntryNotReady = Exception  # type: ignore
+
+    def callback(func):  # type: ignore
+        return func
 
     class Platform:  # type: ignore
         SENSOR = "sensor"
@@ -54,7 +57,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Set up the integration data
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = entry.data
+    hass.data[DOMAIN][entry.entry_id] = _entry_config(entry)
 
     # Load this room's named-stage recipe (server-side Store) before the platforms
     # come up, so the recipe select + sensor can read it on setup.
@@ -80,6 +83,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     from .health import run_health_check
 
+    @callback
     def _hc(_now=None):
         run_health_check(hass, entry)
 
@@ -88,13 +92,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async_track_time_interval(hass, _hc, timedelta(minutes=5)),  # then periodically
     ]
 
+    # Reload the entry when its data/options change (e.g. via the options flow) so
+    # entities pick up the new config without an HA restart.
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+
     _LOGGER.info("Crop Steering System setup complete")
 
     return True
 
 
+def _entry_config(entry: ConfigEntry) -> dict[str, Any]:
+    """Return the active config entry payload with options overriding base data."""
+    return {
+        **(getattr(entry, "data", None) or {}),
+        **(getattr(entry, "options", None) or {}),
+    }
+
+
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the entry when its config is updated (options flow, reconfigure)."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not unload_ok:
+        # Platforms refused to unload — the entry stays loaded, so leave the
+        # health checks, recipe manager and services in place.
+        return False
+
     # Stop the health-check timers and clear any Repairs issues we raised.
     for unsub in (
         hass.data.get(DOMAIN, {}).get("_hc_unsubs", {}).pop(entry.entry_id, [])
@@ -108,11 +135,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pass
 
     hass.data.get(DOMAIN, {}).get("_recipe", {}).pop(entry.entry_id, None)
+    hass.data[DOMAIN].pop(entry.entry_id, None)
 
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
+    # Unload services only when the last loaded room goes away — other loaded
+    # entries (multi-room installs) still rely on the shared domain services.
+    others_loaded = [
+        e
+        for e in hass.config_entries.async_loaded_entries(DOMAIN)
+        if e.entry_id != entry.entry_id
+    ]
+    if not others_loaded:
+        await async_unload_services(hass)
 
-    # Unload services
-    await async_unload_services(hass)
-
-    return unload_ok
+    return True

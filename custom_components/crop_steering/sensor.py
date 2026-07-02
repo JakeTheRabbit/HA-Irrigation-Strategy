@@ -46,13 +46,9 @@ BASE_SENSOR_DESCRIPTIONS = [
         name="Current Phase",
         icon="mdi:water-circle",
     ),
-    SensorEntityDescription(
-        key="irrigation_efficiency",
-        name="Irrigation Efficiency",
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=PERCENTAGE,
-        icon="mdi:water-check",
-    ),
+    # irrigation_efficiency was a descriptor with no native_value implementation —
+    # permanently 'unknown' on every install. Removed (nothing computes it), same
+    # pattern as the dryback_percentage removal below.
     SensorEntityDescription(
         key="water_usage_daily",
         name="Daily Water Usage",
