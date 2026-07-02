@@ -248,25 +248,34 @@ without clearing all of them:
 
 ```mermaid
 flowchart LR
-    REQ(["Shot requested"]) --> C0{"Kill switch clear / OFF?"}
+    REQ["Shot requested"] --> C0{"Kill switch OFF"}
 
-    C0 -- "No" --> STOP(["Blocked<br/>Reason logged + shown on dashboard"])
-    C0 -- "Yes" --> C1{"System and zone enabled?<br/>Override OFF?"}
+    C0 -- No --> STOP["Blocked: log reason and show on dashboard"]
+    C0 -- Yes --> C1{"System enabled and zone enabled"}
 
-    C1 -- "No" --> STOP
-    C1 -- "Yes" --> C2{"Not dosing, filling, or flushing?"}
+    C1 -- No --> STOP
+    C1 -- Yes --> C2{"Override OFF"}
 
-    C2 -- "No" --> STOP
-    C2 -- "Yes" --> C3{"Source pH / EC in range?<br/>Fail-closed on dead probe"}
+    C2 -- No --> STOP
+    C2 -- Yes --> C3{"No dosing fill or flush active"}
 
-    C3 -- "No" --> STOP
-    C3 -- "Yes" --> C4{"Daily volume cap OK?<br/>Emergency rescue exempt"}
+    C3 -- No --> STOP
+    C3 -- Yes --> C4{"Source pH and EC valid"}
 
-    C4 -- "No" --> STOP
-    C4 -- "Yes" --> C5{"Pore EC under hard max?<br/>Or dilutive flush?"}
+    C4 -- No --> STOP
+    C4 -- Yes --> C5{"Probe data alive"}
 
-    C5 -- "No" --> STOP
-    C5 -- "Yes" --> FIRE(["Pump prime → mainline → valve → irrigate → shutdown"])
+    C5 -- No --> STOP
+    C5 -- Yes --> C6{"Daily volume cap OK"}
+
+    C6 -- No --> STOP
+    C6 -- Yes --> C7{"Pore EC below hard max"}
+
+    C7 -- No --> C8{"Dilutive flush allowed"}
+    C8 -- No --> STOP
+    C8 -- Yes --> FIRE["Pump prime then mainline then valve then irrigate then shutdown"]
+
+    C7 -- Yes --> FIRE
 ```
 
 The whole engine is gated by a hard **kill switch** (`input_boolean.f2_control_enabled`,
