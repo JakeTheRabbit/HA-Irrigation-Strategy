@@ -157,9 +157,12 @@ DEFAULT_RECIPE = {
 # Entity prefixes
 ENTITY_PREFIX = "crop_steering"
 
-# Service names
-SERVICE_START_IRRIGATION = "start_irrigation"
-SERVICE_STOP_IRRIGATION = "stop_irrigation"
-SERVICE_SET_PHASE = "set_phase"
-SERVICE_TRIGGER_ZONE = "trigger_zone_irrigation"
-SERVICE_RECALIBRATE = "recalibrate_sensors"
+# Service names — the single source of truth for the domain's registered services.
+# These MUST match the keys of the SERVICES dict in services.py.
+SERVICE_TRANSITION_PHASE = "transition_phase"
+SERVICE_EXECUTE_IRRIGATION_SHOT = "execute_irrigation_shot"
+SERVICE_CHECK_TRANSITION_CONDITIONS = "check_transition_conditions"
+SERVICE_SET_MANUAL_OVERRIDE = "set_manual_override"
+SERVICE_CUSTOM_SHOT = "custom_shot"
+SERVICE_APPLY_RECIPE = "apply_recipe"
+SERVICE_SAVE_RECIPE = "save_recipe"
