@@ -5,6 +5,7 @@ single-room installs (e.g. F2) are completely unchanged. Additional rooms namesp
 entities as ``crop_steering_<slug>_*`` so rooms are fully isolated — own zones, sensors,
 hardware and setpoints, nothing shared.
 """
+
 from __future__ import annotations
 
 import re
@@ -35,8 +36,10 @@ def build_engine_config(prefix, slug, num_zones, zones, hardware):
     shared pump/mainline, the per-room kill switch, and the optional source-water probes.
 
     The default room (prefix "") publishes ``input_boolean.f2_control_enabled`` as its
-    kill switch and is ignored by the add-on (it's built from the add-on options instead);
-    a named room publishes its own ``switch.crop_steering_<slug>_engine_enabled``.
+    kill switch (the add-on's ``enable_flag`` option overrides it; the engine's heartbeat
+    reports the flag actually in use). Since add-on 0.11.0 the default room's hardware map
+    is read from this descriptor too — explicit add-on options take precedence. A named
+    room publishes its own ``switch.crop_steering_<slug>_engine_enabled``.
     """
     zones = zones or {}
     valves = {}

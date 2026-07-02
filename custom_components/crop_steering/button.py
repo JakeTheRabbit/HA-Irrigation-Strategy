@@ -1,4 +1,5 @@
 """Crop Steering System button entities."""
+
 from __future__ import annotations
 
 import logging
@@ -41,7 +42,9 @@ class CropSteeringTriggerButton(ButtonEntity):
         self._zone_num = zone_num
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_zone_{zone_num}_trigger_shot"
         self._attr_name = f"Zone {zone_num} Trigger Shot"
-        self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}zone_{zone_num}_trigger_shot"
+        self._attr_object_id = (
+            f"{DOMAIN}_{room_prefix(entry)}zone_{zone_num}_trigger_shot"
+        )
         self._attr_icon = "mdi:water-pump"
 
     @property

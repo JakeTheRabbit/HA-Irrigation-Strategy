@@ -104,31 +104,38 @@ jobs:
       with:
         python-version: '3.11'
 
+    - name: Install test dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # requests: add-on controller suite; pyyaml: the dashboard-generator test
+        pip install pytest requests pyyaml
+
     - name: Simulate Home Assistant installation
       run: |
         echo "Simulating Home Assistant custom_components installation..."
         mkdir -p /tmp/ha_config/custom_components
         cp -r custom_components/crop_steering /tmp/ha_config/custom_components/
-        echo "✓ Integration files copied successfully"
+        test -f /tmp/ha_config/custom_components/crop_steering/manifest.json
 
-    - name: Confirm zero external dependencies
+    - name: Run the test suites (these must actually pass — no echo-only stubs)
       run: |
-        echo "This project intentionally has no external Python dependencies."
-        echo "✓ Zero-dependency confirmation passed"
+        PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -q
+        PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest addons/f2_control/tests -q
+        PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
 
     - name: Generate installation report
+      if: always()
       run: |
-        echo "# Installation Report" > install_report.md
-        echo "" >> install_report.md
-        echo "## Validation Results" >> install_report.md
-        echo "- ✅ Home Assistant Integration: Valid" >> install_report.md
-        echo "- ✅ Dependencies: None required" >> install_report.md
-        echo "- ✅ Full Installation: Success" >> install_report.md
-        echo "" >> install_report.md
-        echo "## Installation Paths" >> install_report.md
-        echo "- Integration: \`custom_components/crop_steering/\`" >> install_report.md
+        status="${{ job.status }}"
+        {
+          echo "# Installation Report"
+          echo ""
+          echo "- Integration copy: \`custom_components/crop_steering/\`"
+          echo "- Test suites (integration + add-on + engine): **${status}**"
+        } > install_report.md
 
     - name: Upload installation report
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: installation-report

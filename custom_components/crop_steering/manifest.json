@@ -8,8 +8,8 @@
   "dependencies": [],
   "documentation": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy",
   "integration_type": "hub",
-  "iot_class": "local_polling",
+  "iot_class": "calculated",
   "issue_tracker": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues",
   "requirements": [],
-  "version": "2.11.0"
+  "version": "2.12.0"
 }

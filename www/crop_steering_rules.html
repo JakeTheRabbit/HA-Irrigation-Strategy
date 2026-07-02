@@ -1,0 +1,209 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>F2 Crop-Steering — Rules Audit</title>
+<style>
+:root{--bg:#0a0c10;--card:#11161d;--card2:#0e131a;--ink:#e7ecf2;--ink2:#9aa6b2;--ink3:#64748b;--line:#1e2630;--accent:#34d399;--warn:#fbbf24;--crit:#fb7185;--cyan:#22d3ee;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Inter,ui-sans-serif,system-ui,"Segoe UI",Roboto,Arial,sans-serif}
+a{color:var(--cyan);text-decoration:none}
+header{padding:22px 26px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(10,12,16,.96);backdrop-filter:blur(8px);z-index:20}
+h1{margin:0 0 4px;font-size:20px;font-weight:700}
+.sub{color:var(--ink2);font-size:12.5px}
+.wrap{display:flex;gap:0;align-items:flex-start}
+nav{position:sticky;top:84px;align-self:flex-start;min-width:230px;max-height:calc(100vh - 96px);overflow:auto;padding:16px 14px;border-right:1px solid var(--line);font-size:12.5px}
+nav a{display:block;color:var(--ink2);padding:4px 8px;border-radius:6px}
+nav a:hover{background:#ffffff0a;color:var(--ink)}
+main{flex:1;min-width:0;padding:18px 26px 80px}
+.bar{display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+#q{flex:1;min-width:220px;background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:9px 12px;font-size:13px;outline:none}
+#q:focus{border-color:var(--accent)}
+.pill{font-size:11px;color:var(--ink2);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+section{margin:0 0 30px;scroll-margin-top:96px}
+h2{font-size:15px;margin:26px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+h2 .n{color:var(--ink3);font-weight:500;font-size:12px}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:12.7px}
+th,td{text-align:left;padding:9px 11px;vertical-align:top;border-bottom:1px solid var(--line)}
+th{background:var(--card2);color:var(--ink2);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;position:sticky;top:84px}
+tr:last-child td{border-bottom:0}
+tr:hover td{background:#ffffff05}
+code{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:11.5px;color:#cbd5e1;background:#0b1118;border:1px solid var(--line);border-radius:4px;padding:1px 5px;white-space:nowrap}
+.ent{color:var(--cyan)} .sp{color:#a78bfa} .val{color:var(--accent);font-weight:600}
+.ref{color:var(--ink3);font-size:11px;white-space:nowrap}
+.rule{color:var(--ink);font-weight:500}
+.flag{background:#fb71851a;border-left:3px solid var(--crit)}
+.flag td:first-child::before{content:"⚠ ";color:var(--crit)}
+.callout{background:#fbbf2412;border:1px solid #fbbf2440;border-radius:12px;padding:14px 16px;margin:0 0 22px}
+.callout h3{margin:0 0 8px;font-size:14px;color:var(--warn)}
+.callout ul{margin:0;padding-left:18px} .callout li{margin:5px 0;color:var(--ink)}
+.gp{color:var(--ink3)}
+.legend{font-size:11.5px;color:var(--ink2);margin:8px 0 0}
+.legend code{margin-right:4px}
+@media(max-width:820px){nav{display:none}main{padding:16px 14px 60px}th{top:120px}}
+</style></head><body>
+<header>
+  <h1>🌿 F2 Crop-Steering — Complete Rules Audit</h1>
+  <div class="sub">Every decision rule in <code>master_crop_steering_app.py</code> + the HA packages, mapped to the entities it reads and the setpoint that parameterises it. Setpoint values are <b>LIVE from Home Assistant, 2026-06-18</b>. Per-zone values shown as <span class="gp">Z1·Z2·Z3</span>; a per-zone number overrides the global of the same name.</div>
+</header>
+<div class="wrap">
+<nav id="toc"></nav>
+<main>
+  <div class="bar">
+    <input id="q" placeholder="🔎 Filter rules / entities / setpoints — type to narrow every table">
+    <span class="pill" id="count"></span>
+    <span class="pill">~80 rules · 18 categories</span>
+  </div>
+
+  <div class="callout">
+    <h3>⚠ Double-check these (live values that look off)</h3>
+    <ul>
+      <li><code>number.crop_steering_maximum_ec = 11.0</code> — <b>temporary fudge</b> set this session to unblock Z3's salt lockout. The real burn ceiling is ~9. <b>Restore to 9</b> once Z3 EC is back under target (or once the proper high-EC-flush gate fix is deployed).</li>
+      <li><code>number.crop_steering_zone_3_ec_target_gen_p1 = 12.2</code> — almost certainly fat-fingered (every other P1 EC target is ~5). A 12.2 P1 target tells the EC loop Z3 is "low" and to <b>stack salt</b> — a plausible contributor to Z3's EC-10 stacking. Expected ~5.0.</li>
+      <li><code>p0_dryback_drop_percent = 2%</code> (all zones) — P0→P1 after only a 2% drop from peak = almost no morning dryback. Confirm that's intended (shallow steering) vs a leftover.</li>
+      <li><code>zone_3_p1_target_vwc = 78%</code> vs Z1 61 / Z2 60 — Z3 ramps far wetter; with field_capacity 60% it over-saturates (the "stuck at 70% saturated" we saw). Consider ~62–66.</li>
+      <li><code>field_capacity = 60%</code> global, but <code>zone_3_p1_target_vwc = 78%</code> &gt; field capacity — P1 target above the over-water cutoff is contradictory.</li>
+    </ul>
+  </div>
+
+  <div id="tables"></div>
+  <p class="legend">Legend: <code class="ent">entity read</code> = sensor/switch the rule reads · <code class="sp">setpoint</code> = the number/helper that tunes it · <span class="val">live value</span> · <span class="ref">file:line</span>. Hardcoded constants (no entity) are shown as <span class="gp">— hardcoded</span>.</p>
+</main></div>
+<script>
+const DATA = [
+ ["Phase transitions","When a zone moves between P0→P1→P2→P3.",[
+  ["P3 → P0 (lights on)","Within 5 min of lights-on, a P3 zone starts the morning dryback (P0). Only from P3.","select.crop_steering_irrigation_phase, time","number.crop_steering_lights_on_hour","10:00","5345"],
+  ["Any → P3 (lights off)","Any P0/P1/P2 zone is forced to overnight P3 the moment lights are confirmed off. Checked before all other branches.","lights_on_hour, lights_off_hour, zone phase","number.crop_steering_lights_off_hour","22:00","5357"],
+  ["P3 self-heal (stranded)","Zone stuck in P3 while lights ON and not within the 3h pre-lights-off window → forced back to P1.","zone phase, _should_zone_start_p3()","— hardcoded (3h window)","—","5367"],
+  ["P0 → P1 (dryback done / bypass / timeout)","Leave P0 when dryback% ≥ target, OR VWC ≤ rewater floor (already-dry bypass), OR P0 max-wait elapsed.","zone VWC, p0_data.peak_vwc, phase minutes","crop_steering_zone_N_p0_dryback_drop_percent / _p0_maximum_wait_time / _p2_vwc_threshold","drop 2% · wait 30m · floor Z1 35·Z2 43·Z3 48","5391"],
+  ["P1 → P2 (recovered / max shots / ceiling)","Leave P1 when VWC ≥ p1_target, OR shot_count ≥ max_shots, OR 120-min P1 wall-clock.","zone VWC, p1_data.shot_count, phase minutes","crop_steering_zone_N_p1_target_vwc / _p1_maximum_shots","target Z1 61·Z2 60·Z3 78 · maxshots 12","5415"],
+  ["P2 → P3 (predictive)","Enter P3 when hours-to-lights-off ≤ hours-needed-to-hit-dryback-target. Gated: never &gt;3h early, never if VWC &lt; emergency floor.","lights time, dryback rate, zone VWC","crop_steering_zone_N_generative/vegetative_dryback_target","gen Z1 42·Z2 45·Z3 45 · veg 18","5035"],
+  ["Manual phase pin","If the dashboard input_select pins a zone to P0–P3, hold it there (re-asserted every cycle). 'Auto' releases.","input_select.crop_steering_zone_N_phase_control","— (direct pin)","Auto (all)","5318"],
+ ]],
+ ["Irrigation triggers — P0 (morning dryback)","P0 is dryback only; no water unless EC is dangerously high.",[
+  ["P0 EC emergency flush","If EC/target &gt; 2.5, fire a flush (≈10%) even during dryback.","zone EC, ec_target","crop_steering_zone_N_ec_target_gen_p0 / _veg_p0","gen 4.0 · veg 3.0","2591"],
+ ]],
+ ["Irrigation triggers — P1 (ramp-up)","Progressive shots to bring VWC up to target.",[
+  ["P1 shot trigger","Fire when VWC &lt; p1_target. Shot size ramps: initial, +increment each shot, capped at max.","zone VWC, shot_count","crop_steering_zone_N_p1_initial_shot_size / _shot_size_increment / _maximum_shot_size","init 2% · +0.5% · max 5%","2330"],
+  ["P1 inter-shot delay","Minimum cooldown between P1 shots.","last shot time","crop_steering_zone_N_p1_time_between_shots","15 min","—"],
+  ["P1 max-shots ceiling","shot_count ≥ max_shots forces P2 even if target not reached (anti-stall).","shot_count","crop_steering_zone_N_p1_maximum_shots","12","5430"],
+ ]],
+ ["Irrigation triggers — P2 (maintenance)","Top-ups + EC-aware sizing.",[
+  ["P2 VWC top-up","Fire when VWC &lt; p2_threshold to refill toward p1_target.","zone VWC","crop_steering_zone_N_p2_vwc_threshold","Z1 35·Z2 43·Z3 48 %","2423"],
+  ["P2 base shot size","Default P2 shot.","—","crop_steering_zone_N_p2_shot_size","6%","2461"],
+  ["P2 high-EC dilute","EC/target &gt; 1.2 → larger/dilution shot to pull EC down.","zone EC, ec_target","crop_steering_zone_N_p2_ec_high_threshold","1.2","4220"],
+  ["P2 low-EC hold","EC/target &lt; 0.8 → hold water (let feed EC climb; don't chase with water).","zone EC, ec_target","crop_steering_zone_N_p2_ec_low_threshold","0.8","4236"],
+  ["P2 EC rescue flush","EC ≥ max_ec − 1.0 → emergency flush shot (daily-cap exempt).","zone EC, max_ec","number.crop_steering_maximum_ec","11.0 ⚠","4307"],
+ ]],
+ ["Irrigation triggers — P3 (pre-lights-off / overnight)","Emergency only.",[
+  ["P3 VWC emergency","VWC &lt; p3_emergency floor → small rescue shot (×2 if EC extreme).","zone VWC","crop_steering_zone_N_p3_emergency_vwc_threshold / _p3_emergency_shot_size","floor Z1 33·Z2 40·Z3 40 · shot 5%","2504"],
+  ["P3 EC emergency","EC/target &gt; 2.0 → flush even overnight to stop salt burn.","zone EC, ec_target","crop_steering_zone_N_ec_target_gen_p3 / _veg_p3","gen 4.5 · veg 3.0","2533"],
+ ]],
+ ["High-EC FLUSH (new this session)","Push low-EC feed through to dilute a salty zone, in any phase, instead of locking out.",[
+  ["Universal flush trigger","EC ≥ max_ec − margin → flush shot (size escalates with EC excess), in ANY phase, before the normal phase decision.","zone EC, zone VWC, _source_feed_ec()","number.crop_steering_maximum_ec (+ ec_flush_margin opt)","11.0 ⚠ (margin 0.5)","2881"],
+  ["Flush guard — saturated","Block flush if VWC ≥ 90% (can't push into a full slab).","zone VWC","— hardcoded 90%","—","2912"],
+  ["Flush guard — dilutive","Block flush if feed EC ≥ pore EC (wouldn't dilute).","_source_feed_ec(), zone EC","— (feed vs pore)","—","2914"],
+  ["Flush guard — paced cooldown","Min interval between flushes so each drains + re-reads.","_flush_last[zone]","ec_flush_interval_min (opt)","5 min","2927"],
+  ["Flush guard — escalation cap","Stop after N flushes if EC not dropping (stuck probe / no drainage) + alert.","_flush_attempts[zone]","ec_flush_max_attempts (opt)","10","2918"],
+  ["Flush recovered","EC back under ceiling → clear flush state + alert once.","zone EC","number.crop_steering_maximum_ec","11.0 ⚠","2900"],
+ ]],
+ ["Safety gates (block the shot)","Hard interlocks in _check_irrigation_safety_limits. Fail-CLOSED except source water.",[
+  ["Field-capacity block","VWC ≥ field_capacity → block (anti over-water).","zone VWC, _get_zone_vwc_max","number.crop_steering_field_capacity","60%","7280"],
+  ["Max-EC block (normal feed)","EC ≥ max_ec → block NORMAL shots; flush/emergency exempt if dilutive + not saturated.","zone EC, shot_type","number.crop_steering_maximum_ec","11.0 ⚠","7294"],
+  ["Daily volume cap","daily L ≥ zone cap → block (emergency exempt).","zone_water_usage daily_total","crop_steering_zone_N_max_daily_volume","300 L","7320"],
+  ["Extreme saturation","VWC ≥ 90% → block (backup).","zone VWC","— hardcoded 90%","—","7329"],
+  ["Extreme EC","EC ≥ 15 → block (backup).","zone EC","— hardcoded 15.0","—","7337"],
+  ["Min interval (frequency)","&lt; ~10 min since last shot → block normal (manual/emergency exempt).","last irrigation time","timing.min_irrigation_interval (apps.yaml)","300 s","7374"],
+  ["Dripper protection","Per-zone switch ON → blocked-dripper guard caps shots/30min.","switch.crop_steering_zone_N_dripper_protection","crop_steering_blocked_dripper_max_shots_30min","11 (prot OFF all)","—"],
+ ]],
+ ["Source-water gate (veg batch tank)","Out-of-range feed blocks irrigation + phone alert. Fails OPEN on sensor error.",[
+  ["Feed pH band","pH &lt; min or &gt; max → block + alert.","sensor.aquaponics_kit_f4f618_ph","crop_steering_irrigation_ph_min / _max","5.8 – 6.2","2976"],
+  ["Feed EC band","EC &lt; min or &gt; max → block (a 0 limit disables that bound).","sensor.atlas_legacy_1_ec","crop_steering_irrigation_ec_min / _max","2.3 – 3.5","2981"],
+  ["Irrigate-Anyway override","Phone action / event grants a 30-min override of THIS gate only.","mobile_app_notification_action, crop_steering_irrigate_anyway","source_water.override_minutes (apps.yaml)","30 min","3042"],
+  ["Bad-feed alert debounce","≥2 bad reads + blocked ≥30 min → phone alert (once/30 min).","_sw_bad_count, last notify","— hardcoded (2, 1800s)","—","3004"],
+ ]],
+ ["EC steering / stacking","Autonomous EC management. Gated by the stacking switch.",[
+  ["EC-stacking loop","When enabled, adjusts P2 watering to pull EC toward target during dryback (deeper dryback stacks EC up; water sooner dilutes).","switch.crop_steering_ec_stacking_enabled, zone EC, phase","crop_steering_zone_N_p2_vwc_threshold (adjusted)","stacking ON","5342"],
+  ["Per-zone EC targets (gen)","Baseline 'normal' EC by phase (Generative).","phase, growth stage","crop_steering_zone_N_ec_target_gen_p0/p1/p2/p3","Z3 4·12.2⚠·6.5·4.5 (Z1/2 4·5·6·4.5)","—"],
+  ["Per-zone EC targets (veg)","Baseline EC by phase (Vegetative).","phase, growth stage","crop_steering_zone_N_ec_target_veg_p0/p1/p2/p3","3.0·3.0·3.2·3.0","—"],
+  ["EC ratio bands","ratio = EC/target → &gt;1.5 very high, 1.2–1.5 high, 0.8–1.2 ok, &lt;0.8 low.","zone EC, ec_target","crop_steering_zone_N_p2_ec_high/low_threshold","1.2 / 0.8","4276"],
+ ]],
+ ["Dryback detection","Peak tracking + rate, drives P0 exit and P3 timing.",[
+  ["P0 peak tracking","Record VWC at P0 entry as peak; restore on restart.","zone VWC, dryback_detector","— (tracked)","—","516"],
+  ["Dryback %","(peak − current)/peak ×100; used for P0 exit.","peak, current VWC","— (math)","—","5392"],
+  ["Dryback rate (ML)","Per-hour rate from detector, clamped 0.2–8.0 %/h.","dryback_detector prediction","— hardcoded clamp","—","4145"],
+  ["Dryback target (veg/gen)","Overnight dryback target; sets P3 timing.","growth stage, zone VWC","crop_steering_zone_N_vegetative/generative_dryback_target","veg 18 · gen 42/45/45","5078"],
+ ]],
+ ["Manual override / phase pin","Operator locks.",[
+  ["Zone manual override","Switch ON → block that zone entirely (4-layer read: memory→cache→AD→REST).","switch.crop_steering_zone_N_manual_override","— (switch)","off (all)","3089"],
+  ["Manual phase hold expiry","Timed hold expires after 2h → resume auto.","manual_phase_hold[zone]","— hardcoded 2h","—","5304"],
+ ]],
+ ["Hardware sequence + safeguards","The physical shot + interlocks.",[
+  ["Prime → mainline → valve","Pump 2s, mainline 1s, then zone valve (settle between).","config hardware map","— hardcoded 2s/1s","—","3245"],
+  ["Valve read-back","After close, read the valve back; still-on → emergency pump stop.","zone valve state","— (binary)","—","3268"],
+  ["Flood guard","Hard ceiling on any single shot: 900 s.","computed duration","— hardcoded 900s","—","3237"],
+  ["Dosing / fill / flush interlock","Any of tank_filling / nutrient_dosing_active / f2_fill_mode / f2_flush_mode ON → block (pump manual).","_is_dosing_active()","input_boolean.nutrient_dosing_active / f2_fill_mode / f2_flush_mode","all off","3074"],
+  ["Tank-empty float","veg_tank_empty_switch OFF (no water) → block (no dry-pumping). Fails OPEN.","binary_sensor.veg_tank_empty_switch","— (binary)","—","3162"],
+ ]],
+ ["Recirc interlock (package)","Keeps feed going to plants, not looping to tank.",[
+  ["Recirc OFF on irrigation","Mainline OR any row valve opens while recirc open → force recirc OFF + alert.","relay_2_3, f2_row1/2/3, relay_2_1","— (HA automation)","—","f2_recirc_interlock.yaml"],
+ ]],
+ ["Tank level (package)","Pump-runtime estimate, no float.",[
+  ["Level estimate","level% = (1 − pump_seconds_used / full_runtime) ×100.","veg_main_pump on-time, filled_at","input_number.f2_tank_full_runtime_s / _tank_size_l","calibrated","60_tank_level.yaml"],
+  ["Reset on refill","Mark-full button or full-float ON → reset baseline to now.","button / full-float","input_button.f2_tank_mark_full","—","60_tank_level.yaml"],
+ ]],
+ ["Manual pump modes (package)","Fill / flush operator modes.",[
+  ["Mode block","f2_fill_mode or f2_flush_mode ON → engine won't touch the pump.","input_boolean.f2_fill_mode / f2_flush_mode","— (toggles)","off / off","f2_pump_modes.yaml"],
+  ["Mode ON reminder","Either flag on at :00/:30 → phone reminder.","both flags","— hardcoded 30 min","—","f2_pump_modes.yaml"],
+ ]],
+ ["Watchdog / AI heartbeat / self-heal","Background oversight (60s watchdog, 15-min heartbeat).",[
+  ["Startup grace","Skip watchdog checks for 120 s after start.","_startup_time","— hardcoded 120s","—","5647"],
+  ["Hardware-on anomaly","Hardware ON while not irrigating, 2 consecutive checks → emergency stop (dosing exempt).","hw state, irrigation_in_progress","— hardcoded 2-strike","—","5658"],
+  ["Runaway-shot guard","Hardware ON &gt; 1020 s → emergency stop (stuck valve).","_irrigation_start_time","— hardcoded 1020s","—","5692"],
+  ["All-sensors-offline fail-safe","All VWC sensors offline + hardware on → emergency stop.","sensor health, hw state","— (all-offline)","—","5624"],
+  ["Phase stuck P0 &gt;4h","P0 &gt; 240 min during lights-on → force P1.","phase, duration","— hardcoded 240min","—","4634"],
+  ["EC rising trend","EC up across 3 heartbeats by &gt;1.0 → alert.","heartbeat EC history","— hardcoded","—","4663"],
+  ["Hydration fault","≥2 shots, VWC rise &lt;1.5%, still below threshold → alert (channelling/probe).","shots, VWC delta","crop_steering_zone_N_p2_vwc_threshold","—","4681"],
+ ]],
+ ["Notifications & alerts","Operator-facing.",[
+  ["Critical EC","EC &gt; critical_ec → async emergency check + alert.","zone EC","thresholds.critical_ec (apps.yaml)","9.0","2656"],
+  ["Flush start / recovered / stuck","Flush begins / EC recovers / N flushes with no drop → phone + persistent_notification (lights the f2 banner).","flush state","— (composed)","—","2900"],
+  ["Activity log","Rolling human-readable event feed (~40 lines).","all events","sensor.crop_steering_activity_log","—","1050"],
+ ]],
+ ["Global switches & mode (current state)","System-level enables + steering mode.",[
+  ["System / auto / stacking","Master enables. All ON = autonomous steering active.","—","switch.crop_steering_system_enabled / _auto_irrigation_enabled / _ec_stacking_enabled","on / on / on","—"],
+  ["Growth + steering mode","Crop + phase steering mode (drives veg vs gen targets).","—","select.crop_steering_growth_stage / _steering_mode","Generative","—"],
+  ["Per-zone enable","Each zone armed.","—","switch.crop_steering_zone_N_enabled","on (all)","—"],
+ ]],
+];
+const toc=document.getElementById('toc'), tables=document.getElementById('tables');
+let total=0;
+DATA.forEach((cat,i)=>{
+  const id='c'+i;
+  const a=document.createElement('a');a.href='#'+id;a.textContent=cat[0];toc.appendChild(a);
+  const sec=document.createElement('section');sec.id=id;
+  sec.innerHTML='<h2>'+cat[0]+' <span class="n">'+cat[2].length+'</span></h2>'+
+    '<div style="color:var(--ink2);font-size:12px;margin:-4px 0 8px">'+cat[1]+'</div>';
+  const t=document.createElement('table');
+  t.innerHTML='<thead><tr><th style="width:26%">Rule</th><th style="width:22%">Reads</th><th style="width:26%">Setpoint</th><th style="width:14%">Live value</th><th>Ref</th></tr></thead>';
+  const tb=document.createElement('tbody');
+  cat[2].forEach(r=>{
+    total++;
+    const flag=/⚠/.test(r[4])||/⚠/.test(r[3]);
+    const tr=document.createElement('tr'); if(flag) tr.className='flag';
+    const ents=r[2].split(/,\s*/).map(e=>e.startsWith('—')?'<span class="gp">'+e+'</span>':'<code class="ent">'+e+'</code>').join(' ');
+    const sps=r[3].split(/\s*\/\s*/).map(e=>e.startsWith('—')?'<span class="gp">'+e+'</span>':'<code class="sp">'+e+'</code>').join(' / ');
+    tr.innerHTML='<td class="rule">'+r[1]+'</td><td>'+ents+'</td><td>'+sps+'</td><td><span class="val">'+r[4]+'</span></td><td class="ref">'+r[5]+'</td>';
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);sec.appendChild(t);tables.appendChild(sec);
+});
+document.getElementById('count').textContent=total+' rules';
+const q=document.getElementById('q');
+q.addEventListener('input',()=>{
+  const s=q.value.toLowerCase();
+  document.querySelectorAll('#tables section').forEach(sec=>{
+    let any=0;
+    sec.querySelectorAll('tbody tr').forEach(tr=>{const m=tr.textContent.toLowerCase().includes(s);tr.style.display=m?'':'none';if(m)any++;});
+    sec.style.display=any?'':'none';
+  });
+});
+</script></body></html>

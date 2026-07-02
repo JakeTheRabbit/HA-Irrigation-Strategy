@@ -1,4 +1,5 @@
 """Crop Steering System switches."""
+
 from __future__ import annotations
 
 import logging
@@ -118,7 +119,7 @@ BASE_SWITCH_DESCRIPTIONS = [
 def create_zone_switch_descriptions(num_zones: int) -> list[SwitchEntityDescription]:
     """Create switch descriptions for configured zones."""
     zone_switches = []
-    
+
     for zone_num in range(1, num_zones + 1):
         zone_switches.append(
             SwitchEntityDescription(
@@ -127,7 +128,7 @@ def create_zone_switch_descriptions(num_zones: int) -> list[SwitchEntityDescript
                 icon="mdi:water-pump",
             )
         )
-        
+
         # Add per-zone manual override switch
         zone_switches.append(
             SwitchEntityDescription(
@@ -150,6 +151,7 @@ def create_zone_switch_descriptions(num_zones: int) -> list[SwitchEntityDescript
 
     return zone_switches
 
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -157,11 +159,11 @@ async def async_setup_entry(
 ) -> None:
     """Set up Crop Steering switches."""
     switches = []
-    
+
     # Get number of zones from config
     config_data = hass.data[DOMAIN][entry.entry_id]
     num_zones = config_data.get(CONF_NUM_ZONES, 1)
-    
+
     # Add base switches
     for description in BASE_SWITCH_DESCRIPTIONS:
         switches.append(CropSteeringSwitch(entry, description))
@@ -172,21 +174,24 @@ async def async_setup_entry(
     # OFF (fail-safe) so the engine never actuates a new room until you arm it. The add-on
     # reads this entity id from the room's published engine_config descriptor.
     if room_prefix(entry):
-        switches.append(CropSteeringSwitch(
-            entry,
-            SwitchEntityDescription(
-                key="engine_enabled",
-                name="Engine Enabled (room kill switch)",
-                icon="mdi:power-settings",
-            ),
-        ))
+        switches.append(
+            CropSteeringSwitch(
+                entry,
+                SwitchEntityDescription(
+                    key="engine_enabled",
+                    name="Engine Enabled (room kill switch)",
+                    icon="mdi:power-settings",
+                ),
+            )
+        )
 
     # Add zone-specific switches
     zone_switches = create_zone_switch_descriptions(num_zones)
     for description in zone_switches:
         switches.append(CropSteeringSwitch(entry, description))
-    
+
     async_add_entities(switches)
+
 
 class CropSteeringSwitch(SwitchEntity, RestoreEntity):
     """Crop Steering switch with state restoration."""
@@ -203,7 +208,7 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
         self._attr_name = description.name
         # Set object_id to include crop_steering prefix for entity_id generation
         self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}{description.key}"
-        
+
         # Set default states based on switch type
         if description.key == "system_enabled":
             self._attr_is_on = True  # System enabled by default

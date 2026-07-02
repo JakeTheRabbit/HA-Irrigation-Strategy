@@ -164,8 +164,15 @@ class Controller:
     def __init__(self):
         o = load_options()
         # ---- shared (cross-room) config ----
-        self.notify_service = o.get("notify_service", "notify/mobile_app_s23ultra")
+        # notify_service is OPTIONAL with an empty default: unset = no mobile push (persistent
+        # notifications still fire), never a fallback to the developer's phone.
+        self.notify_service = (o.get("notify_service") or "").strip()
         self.notify_min = float(o.get("notify_min", 30))
+        self.instance_name = o.get("instance_name", "Crop Steering")
+        # External operator holds (tank dosing / manual fill / flush). Facility-specific, so
+        # they are an OPTION with an empty default — an install without them never holds on
+        # them. Configure your own input_boolean/switch ids to enable.
+        self.hold_entities = [e for e in (o.get("hold_entities") or []) if e]
         self.feed_grace_min = float(o.get("feed_grace_min", 30))
         self.blind_fallback_min = float(o.get("blind_fallback_min", 90))
         self.loop_seconds = float(o.get("loop_seconds", 60))
@@ -184,21 +191,30 @@ class Controller:
         self._activity = []
         self._last_notify = None
         self._start = datetime.now()
+        self._last_discovery = self._start
+        self.rediscover_seconds = float(o.get("rediscover_seconds", 300))
+        self._defaulted = {}  # entity_id -> consecutive loops it fell back to an engine default
+        self._defaulted_this_loop = set()
+        self._n_defaulted = 0
 
-        # ---- the DEFAULT room: built from add-on options EXACTLY as a single-room install ----
-        # (prefix "" => every entity id is identical to before — F2 is unchanged, and this
-        # path does NOT depend on the integration publishing anything.)
+        # ---- the DEFAULT room ----
+        # Hardware (pump/mainline/valves) comes from the integration's published
+        # engine_config descriptor — the operator maps it once in the Crop Steering UI.
+        # `hardware`/`zones` keys in options.json still win when present, but they are NOT
+        # in the Supervisor schema (the UI rejects unknown keys) — they exist for the test
+        # harness and hand-built dev setups only. There is NO facility-specific fallback:
+        # an unmapped room holds SAFE (see _blocked) rather than actuating another
+        # install's entities.
         # Sensors are owned by the INTEGRATION: it fuses every probe you map to a zone
-        # (any number — median/average) into sensor.crop_steering_vwc_zone_N and
-        # sensor.crop_steering_ec_zone_N. The engine just reads those fused sensors, so
-        # "add as many probes per zone as you want" is done in the integration UI, not here.
+        # into sensor.crop_steering_vwc_zone_N / _ec_zone_N; the engine reads those.
+        desc = self._default_descriptor()
         zones_opt = o.get("zones")
         if zones_opt:
             zones = {int(k): v for k, v in zones_opt.items()}
         else:
             # auto-detect zone count from the integration's fused sensors (configure once);
-            # fall back to the option if HA isn't reachable yet at startup.
-            n = self._detect_zones("", int(o.get("num_zones", 3)))
+            # fall back to the descriptor/option if HA isn't reachable yet at startup.
+            n = self._detect_zones("", int(o.get("num_zones", desc.get("num_zones") or 3)))
             zones = {
                 z: {
                     "vwc": f"sensor.crop_steering_vwc_zone_{z}",
@@ -206,26 +222,42 @@ class Controller:
                 }
                 for z in range(1, n + 1)
             }
-        hw = o.get("hardware") or {
-            "pump": "switch.veg_main_pump",
-            "mainline": "switch.espoe_irrigation_relay_2_3",
-            "valves": {1: "switch.f2_row1", 2: "switch.f2_row2", 3: "switch.f2_row3"},
-        }
+        hw = o.get("hardware")
+        if not hw:
+            valves = {int(k): v for k, v in (desc.get("valves") or {}).items()}
+            if desc.get("pump") and desc.get("mainline") and valves:
+                hw = {
+                    "pump": desc["pump"],
+                    "mainline": desc["mainline"],
+                    "valves": valves,
+                }
+            else:
+                # unmapped — _blocked() holds every zone and alerts until it's configured
+                hw = {"pump": None, "mainline": None, "valves": {}}
         hw["valves"] = {int(k): v for k, v in hw["valves"].items()}
-        # Source-water feed gate sensors are OPTIONAL and have NO default entity — an empty
+        # Source-water feed gate sensors are OPTIONAL and have NO facility default — an empty
         # (or unset) value disables that half of the source-water gate so the add-on works on
-        # any install out of the box. Configure your own probe entity ids to enable gating.
+        # any install out of the box. Option wins, else the integration descriptor's value.
         default_room = Room(
             slug="default",
             prefix="",
             zones=zones,
             hardware=hw,
-            enable_flag=o.get("enable_flag", "input_boolean.f2_control_enabled"),
-            feed_ec_sensor=(o.get("feed_ec_sensor") or "").strip(),
-            feed_ph_sensor=(o.get("feed_ph_sensor") or "").strip(),
+            enable_flag=o.get(
+                "enable_flag",
+                desc.get("enable_flag") or "input_boolean.f2_control_enabled",
+            ),
+            feed_ec_sensor=(o.get("feed_ec_sensor") or desc.get("feed_ec_sensor") or "").strip(),
+            feed_ph_sensor=(o.get("feed_ph_sensor") or desc.get("feed_ph_sensor") or "").strip(),
             opt_lon=self._opt_lon,
             opt_loff=self._opt_loff,
         )
+        if not default_room.hw.get("pump"):
+            log(
+                "config: default room has NO hardware mapped — holding safe. Set the pump, "
+                "mainline and per-zone valves in the Crop Steering integration (or the add-on "
+                "`hardware` option)."
+            )
         self.rooms = [default_room]
         # ---- additional rooms: discovered from the integration's published descriptors ----
         self.rooms.extend(self._discover_rooms())
@@ -266,10 +298,23 @@ class Controller:
                 f"config: {tag}feed gate EC={room.feed_ec_sensor} pH={room.feed_ph_sensor}"
             )
 
+    def _default_descriptor(self):
+        """The DEFAULT room's engine_config descriptor (prefix ""), published by the
+        integration from the config-entry hardware map. Returns {} when it isn't present
+        yet (HA still booting or the integration not set up) — the room then holds until it
+        appears (re-resolved by _rediscover). Explicit add-on options override this."""
+        for ent in ha_get_all():
+            eid = ent.get("entity_id", "")
+            if eid.startswith("sensor.crop_steering_") and eid.endswith("engine_config"):
+                a = ent.get("attributes", {}) or {}
+                if not a.get("prefix"):
+                    return a
+        return {}
+
     def _discover_rooms(self):
         """Find additional rooms from sensor.crop_steering_<prefix>engine_config descriptors
         the integration publishes. The DEFAULT room (prefix "") is skipped — it's built from
-        the add-on options above so F2 works even if the integration hasn't been updated yet.
+        the add-on options + default descriptor above.
         """
         rooms = []
         for ent in ha_get_all():
@@ -377,29 +422,74 @@ class Controller:
                 pass
         return s
 
-    def _load_state(self):
-        """Load /data/state.json into each room. The file is nested by room slug:
-        {"default": {"1": {...}}, "veg": {"1": {...}}}. An OLD single-room file is FLAT
-        ({"1": {...}, "2": {...}}) — it loads transparently as the 'default' room."""
-        for room in self.rooms:
-            room.state = {z: self._fresh_zone() for z in room.zones}
+    def _read_state_file(self):
+        """Parse /data/state.json into a per-room dict. Nested by slug
+        ({"default": {"1": {...}}, "veg": {...}}); an OLD flat single-room file
+        ({"1": {...}}) is mapped to the 'default' room. {} on any read/parse failure."""
         try:
             with open(self._state_path) as fh:
                 saved = json.load(fh)
         except (FileNotFoundError, ValueError, OSError):
-            return
+            return {}
         if not isinstance(saved, dict):
-            return
-        # old flat format: top-level keys are zone numbers, not room slugs -> default room
+            return {}
         flat = any(str(k).isdigit() for k in saved)
-        per_room = {"default": saved} if flat else saved
-        for room in self.rooms:
-            block = per_room.get(room.slug)
-            if not isinstance(block, dict):
-                continue
+        return {"default": saved} if flat else saved
+
+    def _load_room_state(self, room, per_room=None):
+        """Seed one room's zones fresh, then overlay any saved state for its slug."""
+        if per_room is None:
+            per_room = self._read_state_file()
+        room.state = {z: self._fresh_zone() for z in room.zones}
+        block = per_room.get(room.slug)
+        if isinstance(block, dict):
             for z in room.zones:
                 d = block.get(str(z)) or block.get(z)
                 room.state[z] = self._apply_saved_zone(room.state[z], d)
+
+    def _load_state(self):
+        """Load /data/state.json into every room (non-ephemeral, survives restart/Rebuild)."""
+        per_room = self._read_state_file()
+        for room in self.rooms:
+            self._load_room_state(room, per_room)
+
+    def _rediscover(self, now):
+        """Periodic re-scan so rooms added in the integration UI (or whose descriptor wasn't
+        published yet at add-on startup) join without a restart, and so a default room that
+        started unmapped picks up its hardware once HA is up. New rooms join fail-safe OFF
+        (their kill switch defaults off); existing rooms and their runtime state are untouched."""
+        self._last_discovery = now
+        # (1) resolve the default room's hardware/zones if it started unmapped (HA was down)
+        default = self.rooms[0]
+        if default.slug == "default" and not default.hw.get("pump"):
+            desc = self._default_descriptor()
+            valves = {int(k): v for k, v in (desc.get("valves") or {}).items()}
+            if desc.get("pump") and desc.get("mainline") and valves:
+                default.hw = {
+                    "pump": desc["pump"],
+                    "mainline": desc["mainline"],
+                    "valves": valves,
+                }
+                if not default.zones:
+                    n = self._detect_zones("", int(desc.get("num_zones") or len(valves)))
+                    default.zones = {
+                        z: {
+                            "vwc": f"sensor.crop_steering_vwc_zone_{z}",
+                            "ec": f"sensor.crop_steering_ec_zone_{z}",
+                        }
+                        for z in range(1, n + 1)
+                    }
+                    self._load_room_state(default)
+                log(f"config: default room hardware now mapped ({desc['pump']}) — resuming")
+        # (2) add any newly-published additional rooms
+        known = {r.slug for r in self.rooms}
+        for room in self._discover_rooms():
+            if room.slug in known:
+                continue
+            self._load_room_state(room)
+            self.rooms.append(room)
+            self._log_feed_config(room)
+            log(f"room '{room.slug}' discovered live — joined fail-safe OFF")
 
     def _serialize_zone(self, s):
         ls, lpc, les, ldr = (
@@ -449,12 +539,23 @@ class Controller:
         except Exception:
             return float(default)
 
-    def _zone_num(self, room, zone, suffix, default):
+    def _zone_num(self, room, zone, suffix, default, optional=False):
         per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
         v, _, _ = ha_get(per)
         if v not in (None, "unknown", "unavailable", ""):
             return self._num(per, default)
-        return self._num(f"number.crop_steering_{room.prefix}{suffix}", default)
+        glob = f"number.crop_steering_{room.prefix}{suffix}"
+        gv, _, _ = ha_get(glob)
+        if gv not in (None, "unknown", "unavailable", ""):
+            return self._num(glob, default)
+        # Neither the per-zone NOR the global setpoint entity exists → the engine is silently
+        # running its built-in default. On a healthy install the integration creates the global,
+        # so this only trips on a real misconfig (renamed/removed entity). Record it so
+        # _check_defaulted_setpoints can surface it — EXCEPT engine-only knobs the integration
+        # deliberately doesn't create (optional=True): those default by design, never alert.
+        if not optional:
+            self._defaulted_this_loop.add(glob)
+        return float(default)
 
     def _num_or_none(self, entity):
         """Read a number entity as float, or None if it doesn't exist / isn't a number."""
@@ -665,8 +766,8 @@ class Controller:
             * self._zone_num(room, zone, "plant_count", 0)
             / 1000.0,  # mL/plant x plants -> zone-L floor (0 if either unset)
             drown_ceiling=self._zone_num(
-                room, zone, "min_floor_drown_ceiling", 90
-            ),  # hard anti-drown VWC cap on the floor
+                room, zone, "min_floor_drown_ceiling", 90, optional=True
+            ),  # hard anti-drown VWC cap on the floor (engine-only knob — no integration entity)
         )
         p, warns = validate_params(raw)
         for w in warns:
@@ -752,6 +853,12 @@ class Controller:
 
     # ---------- gates ----------
     def _blocked(self, room, zone):
+        hw = room.hw
+        if not (hw.get("pump") and hw.get("mainline") and hw["valves"].get(zone)):
+            return (
+                "no hardware mapped — set the pump, mainline and this zone's valve in the "
+                "Crop Steering integration (or the add-on `hardware` option)"
+            )
         if not self._on(room.enable_flag, False):
             return "f2-control disabled (kill switch off)"
         if not self._on(f"switch.crop_steering_{room.prefix}system_enabled", False):
@@ -766,16 +873,11 @@ class Controller:
             f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override", False
         ):
             return "manual override"
-        # Tank dosing / manual fill-flush holds are external (operator) helpers, not integration
-        # entities — un-prefixed and shared. A room without them simply reads False (not held).
-        for f in (
-            "input_boolean.nutrient_dosing_active",
-            "input_boolean.f2_fill_mode",
-            "input_boolean.f2_flush_mode",
-            "switch.tank_filling",
-        ):
+        # External operator holds (tank dosing / manual fill / flush) are configurable
+        # (self.hold_entities, empty by default) — an install without them never holds here.
+        for f in self.hold_entities:
             if self._on(f, False):
-                return f"dosing/fill ({f.split('.')[-1]})"
+                return f"external hold ({f.split('.')[-1]})"
         # Source-water EC gate — only when a feed-EC sensor is configured. With no feed sensor
         # the gate is disabled (the dosing/fill holds above still apply) so the add-on is safe
         # out of the box on installs without a reservoir probe.
@@ -848,6 +950,27 @@ class Controller:
         self._save_state()
 
     # ---------- hardware (sync; this process does one thing) ----------
+    def _wait_shot(self, room, zone, duration_s):
+        """Deliver the shot in <=2 s slices so an operator kill-switch (turned OFF) or the
+        zone's manual override (turned ON) stops water within a couple of seconds instead of
+        the full shot length — and so one room's long shot doesn't stall every other room.
+        Returns (seconds_elapsed, aborted). The kill switch defaults True on an UNREADABLE
+        read: a transient HA blip must not cut a legitimate in-flight shot; only a definitive
+        OFF (or a definitive override ON) aborts."""
+        elapsed = 0.0
+        step = 2.0
+        while elapsed < duration_s:
+            if not self._on(room.enable_flag, True):
+                return elapsed, True
+            if self._on(
+                f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override", False
+            ):
+                return elapsed, True
+            dt = min(step, duration_s - elapsed)
+            time.sleep(dt)
+            elapsed += dt
+        return elapsed, False
+
     def _execute_shot(self, room, zone, duration_s, size_pct):
         self._busy = True
         hw = room.hw
@@ -881,7 +1004,7 @@ class Controller:
                     f"{room.slug} zone {zone}: valve {valve} turn_on failed. Pump + mainline cut. No water, shot NOT counted.",
                 )
                 return
-            time.sleep(duration_s)
+            elapsed, aborted = self._wait_shot(room, zone, duration_s)
             # CLOSE sequence. A failed close (e.g. HA went unreachable mid-shot) leaves the valve
             # OPEN and the SOFTWARE CANNOT fix it — only the hardware fail-safe (NC valve /
             # pump-relay-default-off / independent watchdog) can. So check EVERY turn_off + the
@@ -914,10 +1037,20 @@ class Controller:
                     "URGENT — valve stuck open",
                     f"{room.slug} zone {zone} valve {valve} did not close after shot. Pump + mainline cut.",
                 )
-            # Count the shot — water WAS delivered for the full duration, so daily_vol/last_shot must
-            # reflect it (else the daily cap under-counts and the zone can over-water). The alerts above
-            # cover the close-failure case; the counter stays honest about volume regardless.
-            self._advance_shot_counters(room, zone, size_pct)
+            # Count the shot — water WAS delivered, so daily_vol/last_shot must reflect it (else the
+            # daily cap under-counts and the zone can over-water). A kill-switch/override abort mid-shot
+            # only delivered part of the shot, so scale the volume by the fraction actually run.
+            delivered_pct = size_pct * (
+                min(1.0, elapsed / duration_s) if duration_s > 0 else 1.0
+            )
+            self._advance_shot_counters(room, zone, delivered_pct)
+            if aborted:
+                self._alert(
+                    f"killshot_{room.slug}_z{zone}",
+                    "Shot cut short — kill switch / override",
+                    f"{room.slug} zone {zone}: shot aborted after {elapsed:.0f}/{duration_s:.0f}s "
+                    "by the kill switch or manual override. Valve closed; partial volume counted.",
+                )
         except Exception as e:
             log("shot error", room.slug, zone, e)
             for ent in (valve, hw["mainline"], hw["pump"]):
@@ -927,10 +1060,13 @@ class Controller:
 
     def _safe_off(self):
         for room in self.rooms:
-            ha_call("switch", "turn_off", entity_id=room.hw["pump"])
-            ha_call("switch", "turn_off", entity_id=room.hw["mainline"])
+            if room.hw.get("pump"):
+                ha_call("switch", "turn_off", entity_id=room.hw["pump"])
+            if room.hw.get("mainline"):
+                ha_call("switch", "turn_off", entity_id=room.hw["mainline"])
             for v in room.hw["valves"].values():
-                ha_call("switch", "turn_off", entity_id=v)
+                if v:
+                    ha_call("switch", "turn_off", entity_id=v)
 
     def _safe_exit(self, *_):
         log("SIGTERM — safing hardware + exiting")
@@ -1037,15 +1173,43 @@ class Controller:
                 )
             log(f"[{room.slug}] Z{zone} {st['phase']} hold — {reason}")
 
+    def _check_defaulted_setpoints(self):
+        """Turn the per-loop 'setpoint entity missing' set into a rate-limited alert once an
+        entity has been missing for >=3 consecutive loops (ignores one-off read blips). Clears
+        automatically when the entity reappears."""
+        cur = self._defaulted_this_loop
+        for eid in list(self._defaulted):
+            if eid not in cur:
+                del self._defaulted[eid]
+        for eid in cur:
+            self._defaulted[eid] = self._defaulted.get(eid, 0) + 1
+        persistent = sorted(e for e, n in self._defaulted.items() if n >= 3)
+        self._n_defaulted = len(persistent)
+        if persistent:
+            self._alert(
+                "defaulted_setpoints",
+                "Setpoint entities missing — using engine defaults",
+                "These setpoint entities don't exist in HA, so the engine is running its "
+                "built-in defaults (reload the integration / check for renamed entities):\n"
+                + "\n".join(persistent[:20]),
+            )
+
     def loop_once(self, now):
         if self._busy:
             return
+        self._defaulted_this_loop = set()
+        if (now - self._last_discovery).total_seconds() >= self.rediscover_seconds:
+            try:
+                self._rediscover(now)
+            except Exception as e:
+                log("rediscover error", e)
         all_pub = {}
         for room in self.rooms:
             self._refresh_lights(room)
             pub = self._loop_room(room, now)
             self._publish_status(room, pub, now)
             all_pub[room.slug] = pub
+        self._check_defaulted_setpoints()
         self._maybe_notify(all_pub, now)
 
     def _blind_time_transition(self, room, zone, now, lights_on, lights_just_on):
@@ -1344,7 +1508,13 @@ class Controller:
             ha_set(
                 f"sensor.crop_steering_{px}ai_heartbeat",
                 "healthy",
-                {"engine": "f2-control", "last_beat": now.isoformat()},
+                {
+                    "engine": "f2-control",
+                    "last_beat": now.isoformat(),
+                    # the kill switch this room ACTUALLY uses — the integration's health
+                    # check reads this so a custom enable_flag isn't flagged as "missing"
+                    "enable_flag": room.enable_flag,
+                },
             )
             fired = [
                 f"Z{z} {d['phase']} {d['reason']}"
@@ -1396,7 +1566,7 @@ class Controller:
             on = self._on(room.enable_flag, False)
             any_live = any_live or on
             feed = self._read_feed_ec(room)
-            head = (f"{room.slug}" if room.prefix else "F2") + (
+            head = (room.slug if room.prefix else self.instance_name) + (
                 " LIVE" if on else " HELD"
             )
             head += f" | feed EC {feed if feed is not None else '—'}"
@@ -1415,14 +1585,17 @@ class Controller:
             blocks.append("\n".join(lines))
         if not blocks:
             return
-        msg = f"{now.strftime('%H:%M')}\n" + "\n".join(blocks)
+        head = now.strftime("%H:%M")
+        if self._n_defaulted:
+            head += f"  ⚠️ {self._n_defaulted} setpoint(s) missing → engine defaults"
+        msg = f"{head}\n" + "\n".join(blocks)
         dom, _, svc = self.notify_service.partition("/")
         if dom and svc:
-            ha_call(dom, svc, title="F2 vitals", message=msg)
+            ha_call(dom, svc, title=f"{self.instance_name} vitals", message=msg)
         ha_call(
             "persistent_notification",
             "create",
-            title="F2 control vitals",
+            title=f"{self.instance_name} vitals",
             message=msg,
             notification_id="f2_vitals",
         )
@@ -1432,15 +1605,54 @@ class Controller:
             {"vitals": msg, "live": any_live},
         )
 
+    def _log_timezone(self):
+        """All phase logic runs on container-local `datetime.now()`. If the Supervisor's TZ
+        injection or tzdata is missing, the container is UTC and every lights/dryback/daily-reset
+        window silently shifts by the site's offset. Log the effective offset at startup and
+        alert if it disagrees with Home Assistant's configured zone."""
+        now_local = datetime.now().astimezone()
+        off = now_local.utcoffset()
+        off_h = off.total_seconds() / 3600.0 if off else 0.0
+        log(
+            f"timezone: container local {now_local:%Y-%m-%d %H:%M} "
+            f"(UTC{off_h:+.1f}h) TZ={os.environ.get('TZ', 'unset')}"
+        )
+        try:
+            r = _S.get(f"{BASE}/config", headers=HDR, timeout=8)
+            ha_tz = (r.json() or {}).get("time_zone") if r.status_code == 200 else None
+        except Exception:
+            ha_tz = None
+        if not ha_tz:
+            return
+        try:
+            from zoneinfo import ZoneInfo
+
+            ha_off = datetime.now(ZoneInfo(ha_tz)).utcoffset().total_seconds() / 3600.0
+        except Exception as e:  # tzdata missing, unknown zone, etc.
+            log("timezone: could not resolve HA zone", ha_tz, e)
+            return
+        if abs(ha_off - off_h) > 0.01:
+            self._alert(
+                "tz_mismatch",
+                "Timezone mismatch — irrigation day may be shifted",
+                f"Add-on container is UTC{off_h:+.1f}h but Home Assistant is {ha_tz} "
+                f"(UTC{ha_off:+.1f}h). Lights / dryback / daily-reset all use container-local "
+                "time, so this shifts the whole photoperiod. Ensure the add-on image has tzdata "
+                "and the Supervisor is injecting TZ.",
+            )
+        else:
+            log(f"timezone: matches Home Assistant ({ha_tz})")
+
     def run(self):
         log(
             "starting | rooms",
             ", ".join(r.slug for r in self.rooms),
             "| notify",
-            self.notify_service,
+            self.notify_service or "(none)",
             f"| loop {self.loop_seconds:.0f}s",
         )
         log("token present:", bool(TOKEN), "| base:", BASE)
+        self._log_timezone()
         while True:
             try:
                 self.loop_once(datetime.now())

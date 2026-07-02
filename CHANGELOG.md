@@ -9,6 +9,86 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0] - 2026-07-03
+
+**🌱 In plain English.** This release makes the system genuinely portable to any Home Assistant —
+not just the facility it was built on — and closes the production-audit findings (#14–#31). The
+biggest changes you'll feel: the engine now learns your pump and valves **from the integration's
+setup wizard** (no more hidden facility defaults), the **kill switch stops water mid-shot** within
+a couple of seconds instead of after the full shot, services can target a specific **room** on
+multi-room installs, and a generated dashboard covers **however many zones you actually have**.
+Fixes a crash that broke every service call on current Home Assistant versions.
+
+**🔧 Technical notes — integration 2.12.0.**
+- **Fix (HA compat):** replaced the removed `hass.helpers.template.now()` with
+  `homeassistant.util.dt.now()` in all six service handlers — `transition_phase`,
+  `execute_irrigation_shot`, `custom_shot`, `set_manual_override` and friends crashed with
+  `AttributeError` on current HA cores (#15).
+- **Multi-room services:** every service accepts an optional `room` slug (documented in
+  `services.yaml`); entity targets and computed sensors resolve the room's prefix instead of
+  hardcoding the default room's ids. An **unknown** room slug raises instead of silently steering
+  the default room (#16). Event payloads gain a `room` key (additive).
+- **Recipes:** `apply_recipe` / `save_recipe` raise `HomeAssistantError` when the recipe store is
+  unavailable instead of silently doing nothing (#27).
+- **Health / Repairs:** the kill-switch and heartbeat checks resolve **per room** — preferring the
+  `enable_flag` the running engine publishes on its heartbeat, then the room's `engine_config`
+  descriptor — so custom kill switches and additional rooms are all monitored, with no false
+  "kill switch missing" cards (#22).
+- **Config flow:** `.env` / `config.yaml` reads moved off the event loop via
+  `async_add_executor_job` (#25).
+- **Metadata / hygiene:** dead `SERVICE_*` constants replaced with the real service names;
+  `iot_class` corrected to `calculated` (#31). `.gitignore` no longer ignores the shipped
+  `custom_components/` and `www/` directories (new files were silently invisible to git); five
+  dashboard files that ship via the publish script are now actually tracked (#29).
+- **Dashboards:** `scripts/build_lovelace.py` is zone-count-driven (1–24, no hardcoded `[1,2,3]`),
+  per-room via `CROP_STEERING_PREFIX`, and free of facility entity ids; the phantom
+  `input_select.growth_phase` / `nutrient_phase` "selectors disagree" false alarm is gone from the
+  generator and the committed sample. The static `dashboards/` and `packages/` files are marked as
+  F2 facility examples (#23, #24).
+- **CI:** the add-on image is built on every PR; the vendored engine copy is diffed against the
+  source package; repo-hygiene gate; the "Full Installation Test" now runs the real test suites
+  instead of echoing success (#17, #18, #19). New dependency-free fake-HA harness drives the real
+  service handlers, health checks, and add-on controller (`tests/`, `addons/f2_control/tests/`).
+
+### Crop Steering add-on 0.11.0 (paired with this release)
+
+**🌱 In plain English.** The engine no longer carries the original facility inside it. It learns
+your pump and valves from the Crop Steering integration, holds safe (with a clear message) if
+nothing is mapped yet, reacts to the kill switch **during** a shot, notices new rooms without a
+restart, and tells you loudly if a setting entity has gone missing instead of quietly running on
+built-in defaults.
+
+**⚠️ Upgrade notes (read before Rebuild).**
+- **Update the integration first.** The engine reads the default room's pump/mainline/valves from
+  `sensor.crop_steering_engine_config`. Rebuilding the add-on while running an old integration
+  that doesn't publish that sensor leaves the default room **held safe** (no watering) until the
+  integration is updated — the engine re-checks every 5 minutes and resumes on its own.
+- **`notify_service` now defaults to empty.** Installs that explicitly set it (F2 does) are
+  unchanged; unset = persistent notifications only, no mobile push.
+- **Dosing/fill/flush holds moved to the `hold_entities` option (empty default).** The four
+  previously hardcoded F2 entities (`input_boolean.nutrient_dosing_active`,
+  `input_boolean.f2_fill_mode`, `input_boolean.f2_flush_mode`, `switch.tank_filling`) are **no
+  longer checked automatically** — F2 must add them to `hold_entities` in the add-on
+  Configuration or its tank-dosing holds go dark after the rebuild (same pattern as the v0.8.0
+  feed-sensor change).
+
+**🔧 Technical notes.**
+- Default-room hardware from the integration descriptor; hardcoded F2 pump/valve fallback removed;
+  unmapped room → `_blocked()` returns "no hardware mapped" and `_safe_off()` tolerates it (#14).
+- `_wait_shot()`: shots delivered in ≤2 s slices re-checking the kill switch and the zone's manual
+  override; aborts run the normal close sequence and count delivered volume proportionally (#20).
+- Periodic `_rediscover()` (default 300 s, `rediscover_seconds` option): late/UI-added rooms join
+  fail-safe OFF; an unmapped default room picks up its hardware once the integration is up (#26).
+- Missing-setpoint surfacing: a setpoint entity absent (per-zone AND global) for ≥3 consecutive
+  loops raises one rate-limited alert + a vitals line; engine-only knobs
+  (`min_floor_drown_ceiling`) are exempt by design (#27).
+- Timezone hardening: `tzdata` in the image; startup logs the effective local offset and alerts if
+  it disagrees with HA's configured zone (#28).
+- Heartbeat sensors now publish the room's `enable_flag` (consumed by the integration's health
+  checks). Vitals branding via `instance_name` option; `sensor.f2_control_vitals` id unchanged.
+- Packaging: tracked placeholder `www/public/index.html` so `docker build` works from a clean
+  checkout; the publish script still overlays the full dashboard set (#17). Version 0.10.5 → 0.11.0.
+
 ## [Unreleased]
 
 ### Crop Steering add-on 0.10.5

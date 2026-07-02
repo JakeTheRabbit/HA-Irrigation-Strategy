@@ -46,13 +46,9 @@ BASE_SENSOR_DESCRIPTIONS = [
         name="Current Phase",
         icon="mdi:water-circle",
     ),
-    SensorEntityDescription(
-        key="irrigation_efficiency",
-        name="Irrigation Efficiency",
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=PERCENTAGE,
-        icon="mdi:water-check",
-    ),
+    # irrigation_efficiency was a descriptor with no native_value implementation —
+    # permanently 'unknown' on every install. Removed (nothing computes it), same
+    # pattern as the dryback_percentage removal below.
     SensorEntityDescription(
         key="water_usage_daily",
         name="Daily Water Usage",
@@ -246,9 +242,10 @@ async def async_setup_entry(
 class CropSteeringEngineConfigSensor(SensorEntity):
     """Publishes this room's config (pump/mainline/valves, kill switch, feed probes, zones)
     as attributes so the f2-control add-on can DISCOVER and drive the room — the add-on
-    cannot read the integration's config entry directly. The default room is published too
-    (prefix ""), but the add-on builds the default room from its own options and ignores the
-    prefix-"" descriptor, so F2 is unaffected."""
+    cannot read the integration's config entry directly. Since add-on 0.11.0 the DEFAULT
+    room's hardware map comes from the prefix-"" descriptor too (explicit add-on options
+    still take precedence), so this sensor is what makes a fresh install actuate at all.
+    """
 
     _attr_should_poll = False
     _attr_icon = "mdi:cog-transfer-outline"
@@ -300,10 +297,13 @@ class CropSteeringSensor(SensorEntity):
         self._entry = entry
         self._zones_config = zones_config
         self._hardware_config = hardware_config
+        # Room prefix ("" for the default room) — every cross-entity read below is
+        # namespaced with it so a second room reads its OWN entities, not room 1's.
+        self._prefix = room_prefix(entry)
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{description.key}"
         self._attr_name = description.name
         # Set object_id to include crop_steering prefix for entity_id generation
-        self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}{description.key}"
+        self._attr_object_id = f"{DOMAIN}_{self._prefix}{description.key}"
 
         # Extract zone number from key if this is a zone sensor.
         # Regex matches BOTH `vwc_zone_3` and `zone_3_status`-style keys; the prior
@@ -496,7 +496,7 @@ class CropSteeringSensor(SensorEntity):
         """Get status for specific zone."""
         # Check if zone is enabled
         zone_enabled = self.hass.states.get(
-            f"switch.crop_steering_zone_{zone_num}_enabled"
+            f"switch.crop_steering_{self._prefix}zone_{zone_num}_enabled"
         )
         if not zone_enabled or zone_enabled.state != "on":
             return "Disabled"
@@ -520,7 +520,7 @@ class CropSteeringSensor(SensorEntity):
         """Return zone last-irrigation as a tz-aware datetime (or None) — see
         _get_next_irrigation_time: a naive string crashes the TIMESTAMP sensor."""
         s = self.hass.states.get(
-            f"sensor.crop_steering_zone_{zone_num}_last_irrigation_app"
+            f"sensor.crop_steering_{self._prefix}zone_{zone_num}_last_irrigation_app"
         )
         if not s or s.state in ("unknown", "unavailable", "", None):
             return None
@@ -533,7 +533,7 @@ class CropSteeringSensor(SensorEntity):
         """Get daily water usage for zone."""
         # Check the engine sensor for daily usage
         usage_sensor = self.hass.states.get(
-            f"sensor.crop_steering_zone_{zone_num}_daily_water_app"
+            f"sensor.crop_steering_{self._prefix}zone_{zone_num}_daily_water_app"
         )
         if usage_sensor and usage_sensor.state not in ["unknown", "unavailable"]:
             try:
@@ -546,7 +546,7 @@ class CropSteeringSensor(SensorEntity):
         """Get weekly water usage for zone."""
         # Check the engine sensor for weekly usage
         usage_sensor = self.hass.states.get(
-            f"sensor.crop_steering_zone_{zone_num}_weekly_water_app"
+            f"sensor.crop_steering_{self._prefix}zone_{zone_num}_weekly_water_app"
         )
         if usage_sensor and usage_sensor.state not in ["unknown", "unavailable"]:
             try:
@@ -559,7 +559,7 @@ class CropSteeringSensor(SensorEntity):
         """Get today's irrigation count for zone."""
         # Check the engine sensor for count
         count_sensor = self.hass.states.get(
-            f"sensor.crop_steering_zone_{zone_num}_irrigation_count_app"
+            f"sensor.crop_steering_{self._prefix}zone_{zone_num}_irrigation_count_app"
         )
         if count_sensor and count_sensor.state not in ["unknown", "unavailable"]:
             try:
@@ -628,7 +628,7 @@ class CropSteeringSensor(SensorEntity):
     def _get_number_value(self, key: str) -> float:
         """Get value from integration number entity."""
         try:
-            entity_id = f"number.crop_steering_{key}"
+            entity_id = f"number.crop_steering_{self._prefix}{key}"
             state = self.hass.states.get(entity_id)
             if state is None:
                 _LOGGER.debug(f"Number entity not found: {entity_id}")
@@ -644,8 +644,12 @@ class CropSteeringSensor(SensorEntity):
         """Get current EC target based on phase and steering mode."""
         try:
             # Get current phase and mode
-            phase_state = self.hass.states.get("select.crop_steering_irrigation_phase")
-            mode_state = self.hass.states.get("select.crop_steering_steering_mode")
+            phase_state = self.hass.states.get(
+                f"select.crop_steering_{self._prefix}irrigation_phase"
+            )
+            mode_state = self.hass.states.get(
+                f"select.crop_steering_{self._prefix}steering_mode"
+            )
 
             if not phase_state or not mode_state:
                 return DEFAULT_EC_FALLBACK  # Default fallback
@@ -682,13 +686,15 @@ class CropSteeringSensor(SensorEntity):
         try:
             # Check if there's a sensor from the engine
             phase_sensor = self.hass.states.get(
-                "sensor.crop_steering_app_current_phase"
+                f"sensor.crop_steering_{self._prefix}app_current_phase"
             )
             if phase_sensor and phase_sensor.state not in ["unknown", "unavailable"]:
                 return phase_sensor.state
 
             # Fallback to integration select entity
-            phase_select = self.hass.states.get("select.crop_steering_irrigation_phase")
+            phase_select = self.hass.states.get(
+                f"select.crop_steering_{self._prefix}irrigation_phase"
+            )
             if phase_select and phase_select.state not in ["unknown", "unavailable"]:
                 return phase_select.state
 
@@ -704,7 +710,9 @@ class CropSteeringSensor(SensorEntity):
         shared asyncio.gather, which cascades and freezes the other coordinator sensors
         (the per-zone VWC/EC went 'unknown' from exactly this)."""
         try:
-            s = self.hass.states.get("sensor.crop_steering_app_next_irrigation")
+            s = self.hass.states.get(
+                f"sensor.crop_steering_{self._prefix}app_next_irrigation"
+            )
             if not s or s.state in ("unknown", "unavailable", "", None):
                 return None
             dt = dt_util.parse_datetime(s.state)
