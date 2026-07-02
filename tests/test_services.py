@@ -81,12 +81,14 @@ def test_set_manual_override_named_room_targets_prefixed_switch():
     assert data["entity_id"] == f"switch.{DOMAIN}_veg_zone_2_manual_override"
 
 
-def test_unknown_room_falls_back_to_default():
+def test_unknown_room_raises_instead_of_steering_default():
+    # Silently acting on a different room than the caller named is the wrong-room
+    # hazard the room parameter exists to prevent — a typo must error, not water room 1.
     hass = ha_stubs.FakeHass()  # no entries → 'ghost' cannot resolve
     h = _handlers(hass)
-    asyncio.run(h["transition_phase"](Call(target_phase="P0", room="ghost")))
-    _domain, _service, data = hass.services.calls[-1]
-    assert data["entity_id"] == f"select.{DOMAIN}_irrigation_phase"
+    with pytest.raises(HomeAssistantError):
+        asyncio.run(h["transition_phase"](Call(target_phase="P0", room="ghost")))
+    assert hass.services.calls == []  # nothing actuated
 
 
 def test_apply_recipe_without_store_raises():

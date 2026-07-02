@@ -200,9 +200,11 @@ class Controller:
         # ---- the DEFAULT room ----
         # Hardware (pump/mainline/valves) comes from the integration's published
         # engine_config descriptor — the operator maps it once in the Crop Steering UI.
-        # Explicit add-on `hardware`/`zones` options still win for power users. There is
-        # NO facility-specific fallback: an unmapped room holds SAFE (see _blocked)
-        # rather than actuating another install's entities.
+        # `hardware`/`zones` keys in options.json still win when present, but they are NOT
+        # in the Supervisor schema (the UI rejects unknown keys) — they exist for the test
+        # harness and hand-built dev setups only. There is NO facility-specific fallback:
+        # an unmapped room holds SAFE (see _blocked) rather than actuating another
+        # install's entities.
         # Sensors are owned by the INTEGRATION: it fuses every probe you map to a zone
         # into sensor.crop_steering_vwc_zone_N / _ec_zone_N; the engine reads those.
         desc = self._default_descriptor()
@@ -537,7 +539,7 @@ class Controller:
         except Exception:
             return float(default)
 
-    def _zone_num(self, room, zone, suffix, default):
+    def _zone_num(self, room, zone, suffix, default, optional=False):
         per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
         v, _, _ = ha_get(per)
         if v not in (None, "unknown", "unavailable", ""):
@@ -549,8 +551,10 @@ class Controller:
         # Neither the per-zone NOR the global setpoint entity exists → the engine is silently
         # running its built-in default. On a healthy install the integration creates the global,
         # so this only trips on a real misconfig (renamed/removed entity). Record it so
-        # _check_defaulted_setpoints can surface it instead of the room drifting unnoticed.
-        self._defaulted_this_loop.add(glob)
+        # _check_defaulted_setpoints can surface it — EXCEPT engine-only knobs the integration
+        # deliberately doesn't create (optional=True): those default by design, never alert.
+        if not optional:
+            self._defaulted_this_loop.add(glob)
         return float(default)
 
     def _num_or_none(self, entity):
@@ -762,8 +766,8 @@ class Controller:
             * self._zone_num(room, zone, "plant_count", 0)
             / 1000.0,  # mL/plant x plants -> zone-L floor (0 if either unset)
             drown_ceiling=self._zone_num(
-                room, zone, "min_floor_drown_ceiling", 90
-            ),  # hard anti-drown VWC cap on the floor
+                room, zone, "min_floor_drown_ceiling", 90, optional=True
+            ),  # hard anti-drown VWC cap on the floor (engine-only knob — no integration entity)
         )
         p, warns = validate_params(raw)
         for w in warns:
@@ -1504,7 +1508,13 @@ class Controller:
             ha_set(
                 f"sensor.crop_steering_{px}ai_heartbeat",
                 "healthy",
-                {"engine": "f2-control", "last_beat": now.isoformat()},
+                {
+                    "engine": "f2-control",
+                    "last_beat": now.isoformat(),
+                    # the kill switch this room ACTUALLY uses — the integration's health
+                    # check reads this so a custom enable_flag isn't flagged as "missing"
+                    "enable_flag": room.enable_flag,
+                },
             )
             fired = [
                 f"Z{z} {d['phase']} {d['reason']}"
