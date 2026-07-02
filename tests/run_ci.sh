@@ -4,7 +4,7 @@
 #
 #   bash tests/run_ci.sh
 #
-# Prereqs (one-off):  pip install ruff==0.5.5 black==24.4.2 yamllint==1.35.1 pytest requests
+# Prereqs (one-off):  pip install ruff==0.5.5 black==24.4.2 yamllint==1.35.1 pytest requests pyyaml
 # See TESTING.md for what each check covers.
 set -uo pipefail
 cd "$(dirname "$0")/.."
