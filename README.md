@@ -556,11 +556,30 @@ tests/ · crop-steering-engine/tests/   # unit tests (integration helpers + the 
 
 ---
 
+## Dashboards
+
+Generate a portable operator dashboard for **your** setup — it reads your Home Assistant
+and covers every `crop_steering` entity for however many zones you configured (1–24),
+with no facility-specific entity IDs:
+
+```bash
+HA_TOKEN=<long-lived token> python scripts/build_lovelace.py
+# per room (multi-room): CROP_STEERING_PREFIX=veg_ python scripts/build_lovelace.py
+```
+
+Paste the generated `crop_steering_lovelace.yaml` into **Settings → Dashboards → + Add →
+Edit raw configuration**. The prebuilt `dashboards/*.yaml` and `www/*.html` files are the
+original **F2 facility's** dashboards (hardcoded to its hardware, 3 zones, and needing the
+HACS *card-mod* resource) — reference only, not portable. See **`docs/DASHBOARDS.md`**.
+
+---
+
 ## Docs
 
 - **`docs/SYSTEM_OVERVIEW.md`** — the whole-stack mental model
 - **`docs/AGENT_INSTALL.md`** — step-by-step runbook for an AI agent to install + set up
 - **`docs/installation_guide.md`** — the long-form install walkthrough
+- **`docs/DASHBOARDS.md`** — the portable dashboard generator + the F2 example files
 - **`docs/operation_guide.md`** — daily operator routine
 - **`docs/troubleshooting.md`** — when something's off
 - **`ENTITIES.md`** — every entity, explained
