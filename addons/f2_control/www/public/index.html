@@ -1,0 +1,59 @@
+<!doctype html>
+<!--
+  Placeholder web root so the add-on image ALWAYS builds from this repo
+  (`Dockerfile: COPY www/public /www/public`). scripts/publish_addon.sh overlays the
+  full dashboard set from the monorepo `www/` when syncing to the JakeTheRabbit/f2-control
+  add-on repo, so end users installing from that repo get the complete UI. A direct build
+  of this directory serves only this landing page — the engine itself is unaffected.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crop Steering</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        background: #0b0f14;
+        color: #dfe7ef;
+        display: grid;
+        place-items: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .card {
+        max-width: 34rem;
+        padding: 2rem;
+        text-align: center;
+        line-height: 1.5;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.4rem;
+      }
+      code {
+        background: #182230;
+        padding: 0.1rem 0.35rem;
+        border-radius: 4px;
+      }
+      a {
+        color: #41bdf5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>🌱 Crop Steering engine is running</h1>
+      <p>
+        The autonomous P0–P3 controller is active. The full operator dashboards are
+        bundled when the add-on is installed from the
+        <a href="https://github.com/JakeTheRabbit/f2-control">f2-control add-on repository</a>.
+      </p>
+      <p>
+        Configure zones, sensors and hardware in the <strong>Crop Steering</strong>
+        integration, then arm the engine with its kill switch
+        (<code>input_boolean.f2_control_enabled</code>).
+      </p>
+    </div>
+  </body>
+</html>

@@ -3,6 +3,7 @@
 Runs shortly after setup and every few minutes, per room (config entry). Each problem becomes
 an actionable card in Settings -> Repairs with a plain-language description; it clears itself
 when fixed. Read-only (never changes config or hardware)."""
+
 from __future__ import annotations
 
 import logging
@@ -17,8 +18,7 @@ from .room import room_prefix
 
 _LOGGER = logging.getLogger(__name__)
 
-KILL_SWITCH = "input_boolean.f2_control_enabled"
-HEARTBEAT = "sensor.crop_steering_ai_heartbeat"
+_DEFAULT_KILL_SWITCH = "input_boolean.f2_control_enabled"
 DOCS = "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/wiki/Troubleshooting"
 _STALE_MIN = 10
 _DEAD = ("unavailable", "unknown", "none", "")
@@ -66,34 +66,52 @@ def _base_key(issue_id: str) -> str:
     return issue_id
 
 
+def _kill_switch(hass: HomeAssistant, prefix: str) -> str:
+    """Resolve the kill-switch entity id this room's engine actually uses.
+
+    A named room uses its own ``switch.crop_steering_<slug>_engine_enabled``. The default
+    room uses whatever the add-on is configured with — published on the engine_config
+    descriptor's ``enable_flag`` attribute — falling back to the documented default so a
+    stock install still reports correctly.
+    """
+    if prefix:
+        return f"switch.{DOMAIN}_{prefix}engine_enabled"
+    desc = hass.states.get(f"sensor.{DOMAIN}_engine_config")
+    if desc is not None:
+        ef = (getattr(desc, "attributes", {}) or {}).get("enable_flag")
+        if ef:
+            return ef
+    return _DEFAULT_KILL_SWITCH
+
+
 def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Evaluate one room's setup health and create/clear its Repairs issues."""
     try:
         prefix = room_prefix(entry)
         slug = entry.data.get("room_slug", "default")
         zones = entry.data.get("zones", {}) or {}
-        is_default = prefix == ""
 
-        # Kill switch + engine heartbeat are engine-level — only the default room runs the
-        # engine today (additional rooms are wired in a later add-on release).
-        if is_default:
-            _issue(
-                hass,
-                hass.states.get(KILL_SWITCH) is None,
-                _iid("kill_switch_missing", slug),
-                ir.IssueSeverity.ERROR,
-            )
-            hb = hass.states.get(HEARTBEAT)
-            offline = hb is None
-            if hb is not None:
-                try:
-                    age_min = (
-                        datetime.now(timezone.utc) - hb.last_updated
-                    ).total_seconds() / 60.0
-                    offline = age_min > _STALE_MIN or str(hb.state).lower() in _DEAD
-                except Exception:  # pragma: no cover - defensive
-                    offline = False
-            _issue(hass, offline, _iid("engine_offline", slug), ir.IssueSeverity.WARNING)
+        # Kill switch + engine heartbeat are per-room: the engine drives EVERY configured
+        # room, each with its own kill switch and prefixed heartbeat. Resolve them per room
+        # so a custom default kill switch and additional rooms are all monitored.
+        kill = _kill_switch(hass, prefix)
+        _issue(
+            hass,
+            hass.states.get(kill) is None,
+            _iid("kill_switch_missing", slug),
+            ir.IssueSeverity.ERROR,
+        )
+        hb = hass.states.get(f"sensor.{DOMAIN}_{prefix}ai_heartbeat")
+        offline = hb is None
+        if hb is not None:
+            try:
+                age_min = (
+                    datetime.now(timezone.utc) - hb.last_updated
+                ).total_seconds() / 60.0
+                offline = age_min > _STALE_MIN or str(hb.state).lower() in _DEAD
+            except Exception:  # pragma: no cover - defensive
+                offline = False
+        _issue(hass, offline, _iid("engine_offline", slug), ir.IssueSeverity.WARNING)
 
         # A zone with no VWC sensor mapped -> it can't be steered.
         no_sensor = []

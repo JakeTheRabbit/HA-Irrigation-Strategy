@@ -93,6 +93,30 @@ def install() -> None:
     cv.boolean = bool
     helpers.config_validation = cv
 
+    ir = _mod("homeassistant.helpers.issue_registry")
+    if not hasattr(ir, "async_create_issue"):
+
+        class IssueSeverity:
+            ERROR = "error"
+            WARNING = "warning"
+
+        def _create(hass, domain, issue_id, **kw):
+            store = getattr(hass, "_issues", None)
+            if store is None:
+                store = {}
+                hass._issues = store
+            store[issue_id] = kw
+
+        def _delete(hass, domain, issue_id):
+            store = getattr(hass, "_issues", None)
+            if store is not None:
+                store.pop(issue_id, None)
+
+        ir.IssueSeverity = IssueSeverity
+        ir.async_create_issue = _create
+        ir.async_delete_issue = _delete
+    helpers.issue_registry = ir
+
     util = _mod("homeassistant.util")
     if not hasattr(util, "__path__"):
         util.__path__ = []
@@ -107,9 +131,10 @@ def install() -> None:
 
 # ------------------------------- fakes for driving handlers -------------------------------
 class FakeState:
-    def __init__(self, state, attributes=None):
+    def __init__(self, state, attributes=None, last_updated=None):
         self.state = state
         self.attributes = attributes or {}
+        self.last_updated = last_updated
 
 
 class FakeStates:
@@ -122,8 +147,8 @@ class FakeStates:
             return None
         return v if isinstance(v, FakeState) else FakeState(v)
 
-    def set(self, entity_id, state, attributes=None):
-        self._m[entity_id] = FakeState(state, attributes)
+    def set(self, entity_id, state, attributes=None, last_updated=None):
+        self._m[entity_id] = FakeState(state, attributes, last_updated)
 
 
 class FakeServices:
@@ -171,3 +196,4 @@ class FakeHass:
         self.bus = FakeBus()
         self.data = data or {}
         self.config_entries = FakeConfigEntries(entries)
+        self._issues = {}  # issue_id -> kwargs (populated by the issue_registry stub)

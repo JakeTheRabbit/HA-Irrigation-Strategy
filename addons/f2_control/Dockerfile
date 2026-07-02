@@ -1,8 +1,10 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
-# nginx serves the bundled crop-steering dashboards on the ingress port (8420)
-RUN apk add --no-cache nginx && rm -rf /var/cache/apk/* /etc/nginx/http.d/*
+# nginx serves the bundled crop-steering dashboards on the ingress port (8420);
+# tzdata lets the container honour the Supervisor-injected TZ so the photoperiod /
+# dryback / daily-reset windows run on real local time, not UTC.
+RUN apk add --no-cache nginx tzdata && rm -rf /var/cache/apk/* /etc/nginx/http.d/*
 
 RUN pip3 install --no-cache-dir requests
 

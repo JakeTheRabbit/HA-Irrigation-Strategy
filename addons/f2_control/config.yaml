@@ -1,5 +1,5 @@
 name: Crop Steering
-version: "0.10.5"
+version: "0.11.0"
 slug: f2_control
 description: >-
   Autonomous crop steering for Home Assistant. Runs the daily P0-P1-P2-P3 dryback
@@ -27,22 +27,29 @@ options:
   lights_on_hour: 10
   lights_off_hour: 22
   enable_flag: input_boolean.f2_control_enabled
-  notify_service: notify/mobile_app_s23ultra
+  notify_service: ""
   notify_min: 30
+  instance_name: Crop Steering
   feed_ec_sensor: ""
   feed_ph_sensor: ""
+  hold_entities: []
   substrate_l: 5
   flow_lps: 0.02
   loop_seconds: 60
+  rediscover_seconds: 300
 schema:
   num_zones: int
   lights_on_hour: float
   lights_off_hour: float
   enable_flag: str
-  notify_service: str
+  notify_service: str?
   notify_min: float
+  instance_name: str?
   feed_ec_sensor: str?
   feed_ph_sensor: str?
+  hold_entities:
+    - str
   substrate_l: float
   flow_lps: float
   loop_seconds: float
+  rediscover_seconds: float
