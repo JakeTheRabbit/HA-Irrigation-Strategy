@@ -56,6 +56,7 @@ def load_env_config(config_dir: str) -> Dict[str, Any]:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _parse_env_file(path: str) -> Dict[str, str]:
     """Read KEY=VALUE pairs, skip comments and blanks."""
     config: Dict[str, str] = {}
@@ -149,7 +150,10 @@ def _parse_zones(raw: Dict[str, str]) -> Dict[int, Dict[str, Any]]:
 
         _LOGGER.info(
             "Zone %d: switch=%s, %d VWC sensor(s), %d EC sensor(s)",
-            n, switch, len(vwc_sensors), len(ec_sensors),
+            n,
+            switch,
+            len(vwc_sensors),
+            len(ec_sensors),
         )
 
     return zones
@@ -174,6 +178,7 @@ def _parse_hardware(raw: Dict[str, str]) -> Dict[str, str]:
 
 def _parse_parameters(raw: Dict[str, str]) -> Dict[str, Any]:
     """Extract substrate, phase, and EC parameters."""
+
     def _f(key: str, default: float) -> float:
         return float(raw.get(key, str(default)))
 
@@ -227,6 +232,7 @@ def _parse_parameters(raw: Dict[str, str]) -> Dict[str, Any]:
 
 def _parse_features(raw: Dict[str, str]) -> Dict[str, bool]:
     """Extract feature flags."""
+
     def _b(key: str, default: bool = False) -> bool:
         val = raw.get(key, str(default)).lower()
         return val in ("true", "1", "yes", "on")

@@ -9,7 +9,9 @@ class ShotCalculator:
     """Helper class for irrigation shot calculations."""
 
     @staticmethod
-    def calculate_shot_duration(dripper_flow: float, substrate_vol: float, shot_size: float) -> float:
+    def calculate_shot_duration(
+        dripper_flow: float, substrate_vol: float, shot_size: float
+    ) -> float:
         """Calculate irrigation shot duration in seconds."""
         try:
             if dripper_flow and dripper_flow > 0:
