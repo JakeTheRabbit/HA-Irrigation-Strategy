@@ -234,3 +234,50 @@ def test_present_setpoint_is_not_flagged():
         assert c._zone_num(room, 1, "p2_shot_size", 5) == 6.0
         c._check_defaulted_setpoints()
     assert c._n_defaulted == 0
+
+
+def test_engine_only_knobs_never_flag_missing_setpoints():
+    # `min_floor_drown_ceiling` (and any optional=True knob) is deliberately NOT an
+    # integration entity. Building params on a healthy install must not raise the
+    # "setpoint entities missing" alert — that would be a permanent false alarm.
+    c, fake = _build(
+        {"num_zones": 1, "hardware": {"pump": "switch.p", "mainline": "switch.m",
+                                      "valves": {"1": "switch.v1"}}},
+        # every REAL setpoint present as a global (values arbitrary)
+        states={
+            f"number.crop_steering_{k}": ("5", {})
+            for k in (
+                "p2_vwc_threshold", "p1_target_vwc", "field_capacity",
+                "p3_emergency_vwc_threshold", "p2_shot_size", "p1_initial_shot_size",
+                "p1_shot_size_increment", "p1_maximum_shots", "p1_time_between_shots",
+                "generative_dryback_target", "vegetative_dryback_target",
+                "p0_maximum_wait_time", "ec_target_gen_p0", "ec_target_gen_p1",
+                "ec_target_gen_p2", "p3_emergency_shot_size", "max_daily_volume",
+                "maximum_ec", "watchdog_hours", "plant_count",
+            )
+        },
+    )
+    room = c.rooms[0]
+    for _ in range(4):
+        c._defaulted_this_loop = set()
+        c._params(room, 1)  # the real production read path
+        c._check_defaulted_setpoints()
+    assert c._n_defaulted == 0, f"false alarms for: {sorted(c._defaulted)}"
+
+
+def test_heartbeat_publishes_enable_flag():
+    # health.py resolves the kill switch from the heartbeat's enable_flag attribute —
+    # the engine must publish it.
+    c, fake = _build(
+        {"num_zones": 1, "enable_flag": "input_boolean.custom_kill",
+         "hardware": {"pump": "switch.p", "mainline": "switch.m",
+                      "valves": {"1": "switch.v1"}}},
+        states={"sensor.crop_steering_vwc_zone_1": ("50", {})},
+    )
+    room = c.rooms[0]
+    pub = {1: {"phase": "P2", "vwc": 50.0, "ec": 3.0, "fire": False, "block": None,
+               "reason": "hold", "blind": False, "p": c._params(room, 1),
+               "vmax": None, "next_h": None}}
+    c._publish_status(room, pub, datetime(2026, 1, 1, 12, 0))
+    state, attrs = fake.sets["sensor.crop_steering_ai_heartbeat"]
+    assert attrs["enable_flag"] == "input_boolean.custom_kill"

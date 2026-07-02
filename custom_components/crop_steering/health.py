@@ -69,18 +69,23 @@ def _base_key(issue_id: str) -> str:
 def _kill_switch(hass: HomeAssistant, prefix: str) -> str:
     """Resolve the kill-switch entity id this room's engine actually uses.
 
-    A named room uses its own ``switch.crop_steering_<slug>_engine_enabled``. The default
-    room uses whatever the add-on is configured with — published on the engine_config
-    descriptor's ``enable_flag`` attribute — falling back to the documented default so a
-    stock install still reports correctly.
+    Best source: the running engine itself — it publishes its configured ``enable_flag``
+    on the room's heartbeat sensor, which covers a custom add-on ``enable_flag`` option.
+    Fallbacks: the room's engine_config descriptor, then the per-room engine_enabled
+    switch (named rooms) or the documented default (default room).
     """
-    if prefix:
-        return f"switch.{DOMAIN}_{prefix}engine_enabled"
-    desc = hass.states.get(f"sensor.{DOMAIN}_engine_config")
+    hb = hass.states.get(f"sensor.{DOMAIN}_{prefix}ai_heartbeat")
+    if hb is not None:
+        ef = (getattr(hb, "attributes", {}) or {}).get("enable_flag")
+        if ef:
+            return ef
+    desc = hass.states.get(f"sensor.{DOMAIN}_{prefix}engine_config")
     if desc is not None:
         ef = (getattr(desc, "attributes", {}) or {}).get("enable_flag")
         if ef:
             return ef
+    if prefix:
+        return f"switch.{DOMAIN}_{prefix}engine_enabled"
     return _DEFAULT_KILL_SWITCH
 
 

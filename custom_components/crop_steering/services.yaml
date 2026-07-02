@@ -63,6 +63,14 @@ transition_phase:
       required: false
       selector:
         boolean:
+    room:
+      name: Room
+      description: >-
+        Room slug for multi-room installs (the name given when adding the room's
+        config entry). Omit for the default room.
+      required: false
+      selector:
+        text:
 
 execute_irrigation_shot:
   name: Execute irrigation shot
@@ -101,12 +109,25 @@ execute_irrigation_shot:
             - "P1"
             - "P2"
             - "P3_emergency"
+    room:
+      name: Room
+      description: Room slug for multi-room installs. Omit for the default room.
+      required: false
+      selector:
+        text:
 
 check_transition_conditions:
   name: Check transition conditions
   description: >-
     Evaluate and publish the current phase-transition conditions without
     changing phase.
+  fields:
+    room:
+      name: Room
+      description: Room slug for multi-room installs. Omit for the default room.
+      required: false
+      selector:
+        text:
 
 set_manual_override:
   name: Set manual override
@@ -139,6 +160,12 @@ set_manual_override:
       required: false
       selector:
         boolean:
+    room:
+      name: Room
+      description: Room slug for multi-room installs. Omit for the default room.
+      required: false
+      selector:
+        text:
 
 custom_shot:
   name: Custom shot
@@ -192,6 +219,12 @@ custom_shot:
     tag:
       name: Tag
       description: Free-text tag recorded with the shot.
+      required: false
+      selector:
+        text:
+    room:
+      name: Room
+      description: Room slug for multi-room installs. Omit for the default room.
       required: false
       selector:
         text:

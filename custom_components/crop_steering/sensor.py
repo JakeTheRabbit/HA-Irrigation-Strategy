@@ -242,9 +242,10 @@ async def async_setup_entry(
 class CropSteeringEngineConfigSensor(SensorEntity):
     """Publishes this room's config (pump/mainline/valves, kill switch, feed probes, zones)
     as attributes so the f2-control add-on can DISCOVER and drive the room — the add-on
-    cannot read the integration's config entry directly. The default room is published too
-    (prefix ""), but the add-on builds the default room from its own options and ignores the
-    prefix-"" descriptor, so F2 is unaffected."""
+    cannot read the integration's config entry directly. Since add-on 0.11.0 the DEFAULT
+    room's hardware map comes from the prefix-"" descriptor too (explicit add-on options
+    still take precedence), so this sensor is what makes a fresh install actuate at all.
+    """
 
     _attr_should_poll = False
     _attr_icon = "mdi:cog-transfer-outline"

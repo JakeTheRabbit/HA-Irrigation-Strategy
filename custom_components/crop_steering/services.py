@@ -35,23 +35,22 @@ def _resolve_prefix(hass: HomeAssistant, room_slug: str | None) -> str:
 
     Omitted or "default" targets the default (un-prefixed) room, so existing
     single-room callers are unchanged. A named slug resolves to that room's
-    ``<slug>_`` prefix via its config entry; an unknown slug falls back to the
-    default room (and is logged) rather than guessing.
+    ``<slug>_`` prefix via its config entry. An unknown slug raises — silently
+    acting on a different room than the caller named is exactly the wrong-room
+    hazard the room parameter exists to prevent.
     """
     if not room_slug or room_slug == "default":
         return ""
-    try:
-        for entry in hass.config_entries.async_entries(DOMAIN):
-            data = getattr(entry, "data", None) or {}
-            if (
-                data.get("room_slug") == room_slug
-                or room_prefix(entry).rstrip("_") == room_slug
-            ):
-                return room_prefix(entry)
-    except Exception:  # pragma: no cover - defensive
-        pass
-    _LOGGER.warning("Unknown room '%s' — falling back to the default room", room_slug)
-    return ""
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        data = getattr(entry, "data", None) or {}
+        if (
+            data.get("room_slug") == room_slug
+            or room_prefix(entry).rstrip("_") == room_slug
+        ):
+            return room_prefix(entry)
+    raise HomeAssistantError(
+        f"Unknown crop_steering room '{room_slug}' — no config entry has that slug"
+    )
 
 
 # Service schemas
