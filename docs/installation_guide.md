@@ -55,6 +55,7 @@ The system is **two separate pieces**. You install both, and they do very differ
 7. Start the engine and verify — **nothing waters yet.**
 8. Set your hardware numbers (so shot sizes are correct).
 9. Arm it — go live.
+10. Set up a dashboard.
 
 Do them in order. Each one builds on the last.
 
@@ -168,8 +169,9 @@ Do them in order. Each one builds on the last.
 2. Set:
    - **`lights_on_hour` / `lights_off_hour`** — the hour (0–23) your lights turn on and off (e.g. `10` and `22`).
      - **Why:** this is what the engine uses to decide when the grow-day starts (lights-on resets the daily counters) and when to wind down for the night. The engine reads these here, not from the integration.
-   - **`notify_service`** — your phone's notify service, e.g. `notify/mobile_app_your_phone`.
-     - **Why:** so it can text you vitals and alerts. Find yours in **Developer Tools → Actions** by typing `notify.`.
+   - **`notify_service`** *(optional)* — your phone's notify service, e.g. `notify/mobile_app_your_phone`.
+     - **Why:** so it can text you vitals and alerts. Find yours in **Developer Tools → Actions** by typing `notify.`. **Leave it blank** and you still get in-app **persistent notifications** — it just won't push to a phone. (There is no built-in default; it never texts a stranger's device.)
+   - **`hold_entities`** *(optional)* — a list of `input_boolean`/`switch` entity IDs that should pause irrigation while ON (e.g. your tank-fill or nutrient-dosing flags). Empty by default.
    - Leave the rest at their defaults unless you know you need to change them:
      - `enable_flag` (`input_boolean.f2_control_enabled`) — the kill switch you create in Step 6.
      - `substrate_l` / `flow_lps` — **fallback** sizing values only; the engine reads your real per-zone hardware numbers live (see Step 8), so these are rarely used.
@@ -250,6 +252,39 @@ For the full math, EC targets, and per-stage recipe values, see the **[Operation
 
 ---
 
+## Step 10 — Dashboards (see your data)
+
+**Why:** the integration and engine give you ~100 entities; a dashboard turns them into a
+readable operator view. You have two options.
+
+**Recommended — generate a portable dashboard for your exact setup.** This reads your
+Home Assistant and builds a dashboard covering **every** `crop_steering` entity for
+however many zones you configured (1–24), with **no** facility-specific entity IDs:
+
+```bash
+HA_TOKEN=<a long-lived token>  python scripts/build_lovelace.py
+```
+
+Then open **Settings → Dashboards → + Add Dashboard → (open it) → ⋮ → Edit dashboard →
+⋮ → Raw configuration editor** and paste the generated `crop_steering_lovelace.yaml`.
+Running **multiple rooms**? Generate one per room:
+
+```bash
+HA_TOKEN=...  CROP_STEERING_PREFIX=veg_  python scripts/build_lovelace.py   # -> crop_steering_lovelace_veg.yaml
+```
+
+**The prebuilt `dashboards/*.yaml` and `www/*.html` files are the original F2 facility's
+dashboards** — kept as a reference, **not portable**. They hardcode that site's probe/
+hardware entity IDs (`sensor.substrate_*`, `switch.f2_row*`, cameras, weather) and are
+laid out for 3 zones, so on a fresh install they show "entity not found". If you copy
+them anyway, some cards need the HACS **card-mod** frontend resource installed first. See
+**[docs/DASHBOARDS.md](DASHBOARDS.md)** and **[dashboards/README.md](../dashboards/README.md)**
+for the details and the remapping notes.
+
+**You are done with Step 10 when:** your dashboard opens with live tiles for every zone.
+
+---
+
 ## Updating the engine later — Rebuild, not Restart
 
 When a new version ships (or you change any add-on file), use the add-on's **⋮ → Rebuild**, or click **Update** when Home Assistant offers it.
@@ -297,6 +332,7 @@ If you can't use HACS:
 ## Learn more
 
 - **[Operation Guide](operation_guide.md)** — running it day to day: arming, the monitoring checklist, and tuning.
+- **[Dashboards](DASHBOARDS.md)** — the portable generator, per-room dashboards, and what the F2 example files need.
 - **[Troubleshooting Guide](troubleshooting.md)** — when something is off.
 - **Project wiki** — Installation, Configuration & Recipes, Safety, Phase Logic, and FAQ pages.
 
