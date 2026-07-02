@@ -12,6 +12,8 @@ confirming the shipped add-on fixes:
 """
 from __future__ import annotations
 
+import os
+import tempfile
 from datetime import datetime
 
 import fake_ha
@@ -25,6 +27,11 @@ def _build(options, states=None):
         fake.set_state(eid, state, attrs)
     fake_ha.install(controller, fake, options)
     c = controller.Controller()
+    # The controller persists to /data/state.json; on a dev box that resolves to a real
+    # writable path and would leak state across tests. Point each build at an isolated
+    # temp file and re-seed fresh so every test starts clean.
+    c._state_path = os.path.join(tempfile.mkdtemp(prefix="f2test_"), "state.json")
+    c._load_state()
     return c, fake
 
 
