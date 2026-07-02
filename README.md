@@ -248,19 +248,25 @@ without clearing all of them:
 
 ```mermaid
 flowchart LR
-    REQ(["Shot requested"]) --> C0{Kill switch ON?}
-    C0 -- no --> STOP(["🚫 Blocked\n(reason logged + on the dashboard)"])
-    C0 -- yes --> C1{System + zone enabled,\noverride OFF?}
-    C1 -- no --> STOP
-    C1 -- yes --> C2{Not dosing / fill / flush?}
-    C2 -- no --> STOP
-    C2 -- yes --> C3{Source pH/EC in range?\n(fail-closed on dead probe)}
-    C3 -- no --> STOP
-    C3 -- yes --> C4{Daily volume cap OK?\n(emergency rescue exempt)}
-    C4 -- no --> STOP
-    C4 -- yes --> C5{Pore-EC under hard max?\n(or a dilutive flush)}
-    C5 -- no --> STOP
-    C5 -- yes --> FIRE(["✅ Pump prime → mainline → valve → irrigate → shutdown"])
+    REQ(["Shot requested"]) --> C0{"Kill switch clear / OFF?"}
+
+    C0 -- "No" --> STOP(["Blocked<br/>Reason logged + shown on dashboard"])
+    C0 -- "Yes" --> C1{"System and zone enabled?<br/>Override OFF?"}
+
+    C1 -- "No" --> STOP
+    C1 -- "Yes" --> C2{"Not dosing, filling, or flushing?"}
+
+    C2 -- "No" --> STOP
+    C2 -- "Yes" --> C3{"Source pH / EC in range?<br/>Fail-closed on dead probe"}
+
+    C3 -- "No" --> STOP
+    C3 -- "Yes" --> C4{"Daily volume cap OK?<br/>Emergency rescue exempt"}
+
+    C4 -- "No" --> STOP
+    C4 -- "Yes" --> C5{"Pore EC under hard max?<br/>Or dilutive flush?"}
+
+    C5 -- "No" --> STOP
+    C5 -- "Yes" --> FIRE(["Pump prime → mainline → valve → irrigate → shutdown"])
 ```
 
 The whole engine is gated by a hard **kill switch** (`input_boolean.f2_control_enabled`,
