@@ -610,10 +610,22 @@
         <button @click="toggleEasy()" class="flex items-center gap-1.5 h-10 px-3 rounded-xl text-sm transition lift" :class="easy?'bg-emerald-500/20 ring-1 ring-emerald-400/40 text-emerald-200':'glass hover:border-white/20 text-slate-300'" :aria-label="easy?'Switch to Pro mode':'Switch to Easy mode'" :title="easy?'Pro mode — full dashboard':'Easy mode — only what you need'">
           <span x-html="easy?icons.leaf:icons.dashboard" class="w-4 h-4 block"></span><span x-text="easy?'Easy':'Pro'"></span>
         </button>
-        <button @click="go('dashboard'); $nextTick(()=>{const e=document.getElementById('advisories'); if(e) e.scrollIntoView({behavior:'smooth'})})" class="relative w-10 h-10 grid place-items-center rounded-xl glass hover:border-white/20 transition lift" aria-label="Advisories">
-          <span x-html="icons.bell" class="w-5 h-5 block text-slate-300"></span>
-          <span x-show="adv.length" class="absolute -top-1 -right-1 min-w-5 h-5 px-1 grid place-items-center text-[10px] font-bold rounded-full bg-red-500 text-white" x-text="adv.length"></span>
-        </button>
+        <div class="relative" @click.outside="notifOpen=false">
+          <button @click="notifOpen=!notifOpen" class="relative w-10 h-10 grid place-items-center rounded-xl glass hover:border-white/20 transition lift" aria-label="Notifications">
+            <span x-html="icons.bell" class="w-5 h-5 block text-slate-300"></span>
+            <span x-show="adv.length" class="absolute -top-1 -right-1 min-w-5 h-5 px-1 grid place-items-center text-[10px] font-bold rounded-full bg-red-500 text-white" x-text="adv.length"></span>
+          </button>
+          <div x-show="notifOpen" x-cloak x-transition class="absolute right-0 top-12 w-80 max-w-[90vw] max-h-[70vh] overflow-y-auto scrollx rounded-2xl app-navbar border border-white/10 shadow-xl z-50">
+            <div class="px-4 py-3 border-b border-white/8 flex items-center justify-between"><span class="text-sm font-semibold">Notifications</span><span class="text-[11px] text-slate-500" x-text="adv.length+' active'"></span></div>
+            <template x-for="a in adv.slice(0,20)" :key="'nf'+a.id">
+              <button @click="notifOpen=false; go('dashboard'); $nextTick(()=>{const e=document.getElementById('advisories'); if(e) e.scrollIntoView({behavior:'smooth'})})" class="w-full text-left px-4 py-3 border-b border-white/6 hover:bg-white/5 transition flex items-start gap-2.5">
+                <span class="w-2 h-2 rounded-full mt-1.5 shrink-0" :class="a.sev==='crit'?'bg-red-500':'bg-amber-400'"></span>
+                <div class="min-w-0"><div class="text-[13px] font-medium truncate" x-text="a.title"></div><div class="text-[11px] text-slate-400 line-clamp-2" x-text="a.detail"></div></div>
+              </button>
+            </template>
+            <div x-show="!adv.length" class="px-4 py-6 text-center text-[13px] text-slate-500">All clear — no active notifications.</div>
+          </div>
+        </div>
         <button class="flex items-center gap-2.5 pl-1 pr-2.5 h-10 rounded-xl glass hover:border-white/20 transition lift">
           <span class="w-7 h-7 rounded-lg grid place-items-center bg-gradient-to-br from-emerald-400 to-emerald-600 text-[12px] font-bold text-emerald-950" x-text="hUser.initials"></span>
           <div class="hidden lg:block text-left leading-tight"><div class="text-xs font-medium" x-text="hUser.name"></div><div class="text-[10px] text-slate-400">Grower</div></div>
@@ -812,31 +824,33 @@
     </div>
 
     <main class="flex-1 px-4 md:px-6 py-5 md:py-6 max-w-[1500px] w-full mx-auto">
-      <!-- ===== ENGINE LOG — live add-on engine tail (thinking · actions · errors) ===== -->
-      <div x-data="engineLog()" x-init="init()" class="mb-5 rounded-2xl border border-white/8 bg-black/40 overflow-hidden">
-        <div class="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none bg-white/[0.03] border-b border-white/8" @click="toggle()">
-          <span class="w-2 h-2 rounded-full shrink-0" :class="paused?'bg-slate-500':(open?'bg-emerald-400 animate-pulse':'bg-emerald-400')"></span>
-          <span class="text-sm font-semibold text-slate-200">Engine log</span>
-          <span class="text-[11px] text-slate-500" x-text="'· '+lines.length+' lines'"></span>
-          <span class="text-[11px] text-red-400 font-semibold px-1.5 rounded bg-red-500/15" x-show="errCount()>0" x-text="errCount()+' err'"></span>
-          <div class="ml-auto flex items-center gap-1.5" @click.stop>
-            <button class="px-2 py-0.5 rounded text-[11px]" :class="filter==='all'?'bg-cyan-500/20 text-cyan-300':'bg-white/5 text-slate-400 hover:text-slate-200'" @click="setFilter('all')">All</button>
-            <button class="px-2 py-0.5 rounded text-[11px]" :class="filter==='warn'?'bg-amber-500/20 text-amber-300':'bg-white/5 text-slate-400 hover:text-slate-200'" @click="setFilter('warn')">Warn+Err</button>
-            <button class="px-2 py-0.5 rounded text-[11px] bg-white/5 text-slate-400 hover:text-slate-200" @click="paused=!paused" x-text="paused?'▶ resume':'❚❚ pause'"></button>
-            <span class="text-slate-400 text-xs w-4 text-center" x-text="open?'▾':'▸'"></span>
+      <!-- ===== ENGINE LOG — own tab (live add-on engine tail: thinking · actions · errors) ===== -->
+      <section x-show="view==='log'" class="fade-enter" x-data="engineLog()" x-init="init(); open=true">
+        <div class="rounded-2xl border border-white/8 bg-black/40 overflow-hidden">
+          <div class="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none bg-white/[0.03] border-b border-white/8" @click="toggle()">
+            <span class="w-2 h-2 rounded-full shrink-0" :class="paused?'bg-slate-500':(open?'bg-emerald-400 animate-pulse':'bg-emerald-400')"></span>
+            <span class="text-sm font-semibold text-slate-200">Engine log</span>
+            <span class="text-[11px] text-slate-500" x-text="'· '+lines.length+' lines'"></span>
+            <span class="text-[11px] text-red-400 font-semibold px-1.5 rounded bg-red-500/15" x-show="errCount()>0" x-text="errCount()+' err'"></span>
+            <div class="ml-auto flex items-center gap-1.5" @click.stop>
+              <button class="px-2 py-0.5 rounded text-[11px]" :class="filter==='all'?'bg-cyan-500/20 text-cyan-300':'bg-white/5 text-slate-400 hover:text-slate-200'" @click="setFilter('all')">All</button>
+              <button class="px-2 py-0.5 rounded text-[11px]" :class="filter==='warn'?'bg-amber-500/20 text-amber-300':'bg-white/5 text-slate-400 hover:text-slate-200'" @click="setFilter('warn')">Warn+Err</button>
+              <button class="px-2 py-0.5 rounded text-[11px] bg-white/5 text-slate-400 hover:text-slate-200" @click="paused=!paused" x-text="paused?'▶ resume':'❚❚ pause'"></button>
+              <span class="text-slate-400 text-xs w-4 text-center" x-text="open?'▾':'▸'"></span>
+            </div>
+          </div>
+          <div x-show="open" x-ref="logbody" @scroll="onScroll()" class="overflow-y-auto px-3 py-2 font-mono text-[11px] leading-relaxed" style="height:calc(100vh - 230px);min-height:230px;background:#0a0e14">
+            <template x-for="(x,i) in shown()" :key="i">
+              <div class="flex gap-2 whitespace-pre-wrap break-words py-[1px]">
+                <span class="text-slate-600 shrink-0" x-text="x.t"></span>
+                <span class="shrink-0 w-14 font-semibold" :style="'color:'+lvlCol(x)" x-text="x.lvl"></span>
+                <span class="flex-1 min-w-0" :style="'color:'+lvlCol(x)" x-text="x.msg"></span>
+              </div>
+            </template>
+            <div x-show="!shown().length" class="text-slate-600 py-6 text-center" x-text="live?'waiting for engine output…':'engine log needs a connected dashboard'"></div>
           </div>
         </div>
-        <div x-show="open" x-ref="logbody" @scroll="onScroll()" class="overflow-y-auto px-3 py-2 font-mono text-[11px] leading-relaxed" style="height:230px;background:#0a0e14">
-          <template x-for="(x,i) in shown()" :key="i">
-            <div class="flex gap-2 whitespace-pre-wrap break-words py-[1px]">
-              <span class="text-slate-600 shrink-0" x-text="x.t"></span>
-              <span class="shrink-0 w-14 font-semibold" :style="'color:'+lvlCol(x)" x-text="x.lvl"></span>
-              <span class="flex-1 min-w-0" :style="'color:'+lvlCol(x)" x-text="x.msg"></span>
-            </div>
-          </template>
-          <div x-show="!shown().length" class="text-slate-600 py-6 text-center" x-text="live?'waiting for engine output…':'engine log needs a connected dashboard'"></div>
-        </div>
-      </div>
+      </section>
 
       <!-- ===== OVERVIEW ===== -->
       <section x-show="view==='dashboard'" class="fade-enter space-y-6">
@@ -870,20 +884,7 @@
           </template>
         </div>
 
-        <!-- zone quick-controls — enable/disable + jump, right on the main page -->
-        <div class="grid grid-cols-3 gap-3">
-          <template x-for="z in zones" :key="z.id">
-            <div class="glass rounded-2xl p-3 flex items-center gap-2.5" :class="!z.enabled&&'opacity-60'">
-              <button @click="zoneModal=z.id" class="flex-1 min-w-0 text-left">
-                <div class="flex items-center gap-2"><span class="text-sm font-semibold" x-text="z.name"></span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0" :class="sevBg(z.status)+' '+sevText(z.status)" x-text="z.phase"></span></div>
-                <div class="text-[11px] text-slate-400 mt-0.5"><span class="font-semibold" :class="sevText(z.status)" x-text="z.vwc"></span>% wet · EC <span x-text="z.ec"></span></div>
-              </button>
-              <button @click.stop="ctrlToggle('switch.crop_steering_zone_'+z.id+'_enabled',false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="z.enabled?'bg-emerald-500':'bg-white/15'" :title="z.enabled?'Zone enabled — tap to disable':'Zone disabled — tap to enable'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="z.enabled&&'translate-x-5'"></span></button>
-            </div>
-          </template>
-        </div>
-
-        <!-- ADVISORIES (lead section — alerts first) -->
+        <!-- ADVISORIES (lead section — notifications first, top of page) -->
         <div id="advisories" class="grid grid-cols-1 xl:grid-cols-3 gap-4 scroll-mt-28">
           <div class="xl:col-span-2">
             <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.alerts" class="w-4 h-4 block text-amber-400"></span> Advisories — what needs you</h3><span class="text-xs text-slate-500" x-text="adv.filter(a=>!a._engine).length+' active'"></span></div>
@@ -932,23 +933,8 @@
           </div>
         </div>
 
-        <!-- headline -->
-        <div class="glass-strong rounded-3xl p-5 md:p-6" :class="headline.sev==='ok'?'ring-glow-ok':headline.sev==='crit'?'ring-glow-crit':'ring-glow-warn'">
-          <div class="flex items-start gap-4">
-            <div class="w-14 h-14 rounded-2xl grid place-items-center shrink-0" :class="sevBg(headline.sev)"><span x-html="headline.sev==='ok'?icons.leaf:headline.sev==='crit'?icons.alert:icons.eye" class="w-7 h-7 block" :class="sevText(headline.sev)"></span></div>
-            <div class="min-w-0 flex-1">
-              <div class="text-xl md:text-2xl font-bold tracking-tight" x-text="headline.big"></div>
-              <div class="text-sm text-slate-400 mt-1" x-text="headline.line"></div>
-            </div>
-            <div class="hidden sm:flex flex-col gap-2 items-end">
-              <button @click="aiOpen=true" class="flex items-center gap-2 h-10 px-4 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/25 transition lift"><span x-html="icons.ai" class="w-4 h-4 block"></span> Ask AI</button>
-              <button @click="speak(headline.big+'. '+headline.line)" class="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-xs hover:bg-white/10 transition"><span x-html="icons.audio" class="w-4 h-4 block"></span> Read aloud</button>
-            </div>
-          </div>
-        </div>
-
         <!-- ===== LIVE COUPLED STATE — light → air → leaf → root, big + glanceable ===== -->
-        <!-- ===== VITALS — one tile per metric · coupled chain · band-bar + dot + smoothed trend ===== -->
+        <!-- ===== VITALS — one tile per metric · coupled chain · band-bar + dot + smoothed trend (sensor info, up top) ===== -->
         <style>
         .vt-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(215px,1fr))}
         .vt-grp{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:12px 13px}
@@ -996,6 +982,82 @@
                 </template>
               </div>
             </template>
+          </div>
+        </div>
+
+        <!-- headline -->
+        <div class="glass-strong rounded-3xl p-5 md:p-6" :class="headline.sev==='ok'?'ring-glow-ok':headline.sev==='crit'?'ring-glow-crit':'ring-glow-warn'">
+          <div class="flex items-start gap-4">
+            <div class="w-14 h-14 rounded-2xl grid place-items-center shrink-0" :class="sevBg(headline.sev)"><span x-html="headline.sev==='ok'?icons.leaf:headline.sev==='crit'?icons.alert:icons.eye" class="w-7 h-7 block" :class="sevText(headline.sev)"></span></div>
+            <div class="min-w-0 flex-1">
+              <div class="text-xl md:text-2xl font-bold tracking-tight" x-text="headline.big"></div>
+              <div class="text-sm text-slate-400 mt-1" x-text="headline.line"></div>
+            </div>
+            <div class="hidden sm:flex flex-col gap-2 items-end">
+              <button @click="aiOpen=true" class="flex items-center gap-2 h-10 px-4 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/25 transition lift"><span x-html="icons.ai" class="w-4 h-4 block"></span> Ask AI</button>
+              <button @click="speak(headline.big+'. '+headline.line)" class="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-xs hover:bg-white/10 transition"><span x-html="icons.audio" class="w-4 h-4 block"></span> Read aloud</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- zone quick-controls — enable/disable + jump, right on the main page -->
+        <div class="grid grid-cols-3 gap-3">
+          <template x-for="z in zones" :key="z.id">
+            <div class="glass rounded-2xl p-3 flex items-center gap-2.5" :class="!z.enabled&&'opacity-60'">
+              <button @click="zoneModal=z.id" class="flex-1 min-w-0 text-left">
+                <div class="flex items-center gap-2"><span class="text-sm font-semibold" x-text="z.name"></span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0" :class="sevBg(z.status)+' '+sevText(z.status)" x-text="z.phase"></span></div>
+                <div class="text-[11px] text-slate-400 mt-0.5"><span class="font-semibold" :class="sevText(z.status)" x-text="z.vwc"></span>% wet · EC <span x-text="z.ec"></span></div>
+              </button>
+              <button @click.stop="ctrlToggle('switch.crop_steering_zone_'+z.id+'_enabled',false)" class="relative w-11 h-6 rounded-full transition shrink-0" :class="z.enabled?'bg-emerald-500':'bg-white/15'" :title="z.enabled?'Zone enabled — tap to disable':'Zone disabled — tap to enable'"><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition" :class="z.enabled&&'translate-x-5'"></span></button>
+            </div>
+          </template>
+        </div>
+
+        <!-- ===== facility glance: source tank · live 3D · room camera (moved up top) · activity ===== -->
+        <div class="space-y-3">
+          <!-- source tank fullness bar -->
+          <div class="glass rounded-2xl p-4">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Source tank</h2>
+              <div class="text-[12px] text-slate-400"><span class="font-semibold" :class="tank.sev==='ok'?'text-emerald-300':tank.sev==='warn'?'text-amber-300':'text-red-300'" x-text="tank.pctText+'% full'"></span><span x-show="tank.litresText" class="text-slate-500"> · <span x-text="tank.litresText"></span> L left</span><span x-show="tank.phText" class="text-slate-500"> · pH <span :class="tank.phOk?'text-emerald-300':'text-amber-300'" x-text="tank.phText"></span></span><span x-show="tank.ecText" class="text-slate-500"> · EC <span class="text-slate-300" x-text="tank.ecText"></span></span></div>
+            </div>
+            <div class="h-4 rounded-full bg-white/[0.06] border border-white/8 overflow-hidden">
+              <div class="h-full rounded-full transition-all duration-700" :class="tank.bar" :style="'width:'+tank.width+'%'"></div>
+            </div>
+            <div class="flex justify-between text-[10px] text-slate-500 mt-1"><span>empty</span><span x-show="tank.sev==='crit'" class="text-red-400 font-medium">refill soon</span><span>full</span></div>
+          </div>
+          <!-- live 3D + camera + activity cluster -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <!-- mini 3D of the room -->
+            <div class="glass rounded-2xl p-3">
+              <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.grid" class="w-4 h-4 block text-emerald-400"></span> Room 3D</h3><button @click="go('floor')" class="text-[11px] text-emerald-300/80 hover:text-emerald-300">open full →</button></div>
+              <button @click="go('floor')" class="w-full rounded-xl border border-white/8 bg-gradient-to-br from-emerald-500/[0.06] to-cyan-500/[0.04] grid place-items-center text-center px-4 hover:border-emerald-400/30 transition" style="height:240px">
+                <div>
+                  <div class="w-12 h-12 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-2"><span x-html="icons.grid" class="w-6 h-6 block text-emerald-400"></span></div>
+                  <div class="text-[12px] text-slate-300 font-medium">3D facility twin</div>
+                  <div class="text-[11px] text-slate-500 mt-1 max-w-[16rem]">Procedural Three.js floor plan — instant load, lit rooms live from HA. Tap to open.</div>
+                </div>
+              </button>
+            </div>
+            <!-- room camera -->
+            <div class="glass rounded-2xl p-3">
+              <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.eye" class="w-4 h-4 block text-emerald-400"></span> Room camera</h3>
+                <button @click="camToggle()" class="text-[11px] text-slate-500 hover:text-slate-300 px-1.5 py-0.5 rounded hover:bg-white/5" x-text="camMin?'▸ show':'▾ hide'"></button></div>
+              <template x-if="!camMin && camUrl">
+                <img :src="camUrl" class="w-full rounded-xl border border-white/8 bg-black block" style="height:240px;object-fit:cover" alt="F2 room camera" @error="$el.style.opacity='0.25'" @load="$el.style.opacity='1'">
+              </template>
+              <div x-show="!camMin && !camUrl" class="rounded-xl border border-white/8 bg-black/40 grid place-items-center text-center px-4" style="height:240px">
+                <div class="text-[11px] text-slate-500">Camera feed unavailable<span x-show="demo"> in demo</span>.</div>
+              </div>
+            </div>
+            <!-- live activity feed -->
+            <div class="glass rounded-2xl p-3 flex flex-col">
+              <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> What's happening</h3><span class="text-[11px] text-slate-500" x-text="activityFeed.length+' events'"></span></div>
+              <div class="rounded-xl bg-black/30 border border-white/8 p-3 overflow-y-auto scrollx space-y-1.5 text-[12px] text-slate-400 font-mono" style="height:240px">
+                <template x-for="(line,i) in activityFeed" :key="i"><div class="leading-snug border-l-2 border-emerald-400/30 pl-2" x-text="line"></div></template>
+                <div x-show="!activityFeed.length" class="text-slate-500 font-sans">No recent activity.</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1057,54 +1119,6 @@
               <div x-show="!insights.length" class="text-center text-sm text-slate-500 py-6">Reading F2…</div>
             </div>
             <button @click="aiOpen=true" class="mt-3 w-full h-10 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-400/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/25 transition">Open AI co-pilot</button>
-          </div>
-        </div>
-
-        <!-- ===== facility glance: source tank · live 3D · room camera · activity ===== -->
-        <div class="space-y-3">
-          <!-- source tank fullness bar -->
-          <div class="glass rounded-2xl p-4">
-            <div class="flex items-center justify-between mb-2">
-              <h2 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.drop" class="w-4 h-4 block text-cyan-400"></span> Source tank</h2>
-              <div class="text-[12px] text-slate-400"><span class="font-semibold" :class="tank.sev==='ok'?'text-emerald-300':tank.sev==='warn'?'text-amber-300':'text-red-300'" x-text="tank.pctText+'% full'"></span><span x-show="tank.litresText" class="text-slate-500"> · <span x-text="tank.litresText"></span> L left</span><span x-show="tank.phText" class="text-slate-500"> · pH <span :class="tank.phOk?'text-emerald-300':'text-amber-300'" x-text="tank.phText"></span></span><span x-show="tank.ecText" class="text-slate-500"> · EC <span class="text-slate-300" x-text="tank.ecText"></span></span></div>
-            </div>
-            <div class="h-4 rounded-full bg-white/[0.06] border border-white/8 overflow-hidden">
-              <div class="h-full rounded-full transition-all duration-700" :class="tank.bar" :style="'width:'+tank.width+'%'"></div>
-            </div>
-            <div class="flex justify-between text-[10px] text-slate-500 mt-1"><span>empty</span><span x-show="tank.sev==='crit'" class="text-red-400 font-medium">refill soon</span><span>full</span></div>
-          </div>
-          <!-- live 3D + camera + activity cluster -->
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <!-- mini 3D of the room -->
-            <div class="glass rounded-2xl p-3">
-              <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.grid" class="w-4 h-4 block text-emerald-400"></span> Room 3D</h3><button @click="go('floor')" class="text-[11px] text-emerald-300/80 hover:text-emerald-300">open full →</button></div>
-              <button @click="go('floor')" class="w-full rounded-xl border border-white/8 bg-gradient-to-br from-emerald-500/[0.06] to-cyan-500/[0.04] grid place-items-center text-center px-4 hover:border-emerald-400/30 transition" style="height:240px">
-                <div>
-                  <div class="w-12 h-12 mx-auto rounded-2xl grid place-items-center bg-emerald-500/15 mb-2"><span x-html="icons.grid" class="w-6 h-6 block text-emerald-400"></span></div>
-                  <div class="text-[12px] text-slate-300 font-medium">3D facility twin</div>
-                  <div class="text-[11px] text-slate-500 mt-1 max-w-[16rem]">Procedural Three.js floor plan — instant load, lit rooms live from HA. Tap to open.</div>
-                </div>
-              </button>
-            </div>
-            <!-- room camera -->
-            <div class="glass rounded-2xl p-3">
-              <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.eye" class="w-4 h-4 block text-emerald-400"></span> Room camera</h3>
-                <button @click="camToggle()" class="text-[11px] text-slate-500 hover:text-slate-300 px-1.5 py-0.5 rounded hover:bg-white/5" x-text="camMin?'▸ show':'▾ hide'"></button></div>
-              <template x-if="!camMin && camUrl">
-                <img :src="camUrl" class="w-full rounded-xl border border-white/8 bg-black block" style="height:240px;object-fit:cover" alt="F2 room camera" @error="$el.style.opacity='0.25'" @load="$el.style.opacity='1'">
-              </template>
-              <div x-show="!camMin && !camUrl" class="rounded-xl border border-white/8 bg-black/40 grid place-items-center text-center px-4" style="height:240px">
-                <div class="text-[11px] text-slate-500">Camera feed unavailable<span x-show="demo"> in demo</span>.</div>
-              </div>
-            </div>
-            <!-- live activity feed -->
-            <div class="glass rounded-2xl p-3 flex flex-col">
-              <div class="flex items-center justify-between mb-2 px-1"><h3 class="text-sm font-semibold flex items-center gap-2"><span x-html="icons.activity" class="w-4 h-4 block text-emerald-400"></span> What's happening</h3><span class="text-[11px] text-slate-500" x-text="activityFeed.length+' events'"></span></div>
-              <div class="rounded-xl bg-black/30 border border-white/8 p-3 overflow-y-auto scrollx space-y-1.5 text-[12px] text-slate-400 font-mono" style="height:240px">
-                <template x-for="(line,i) in activityFeed" :key="i"><div class="leading-snug border-l-2 border-emerald-400/30 pl-2" x-text="line"></div></template>
-                <div x-show="!activityFeed.length" class="text-slate-500 font-sans">No recent activity.</div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -5660,14 +5674,16 @@ document.addEventListener('alpine:init', () => {
       {id:'tune',label:'Steering',icon:'scale',subs:[['Now · setpoints','tune','view'],['Schedule · recipe','timeline','view'],['Setpoints table','spm-anchor'],['Steering & day curve','tune-steer']]},
       {id:'analyze',label:'Analyze',icon:'activity',subs:[['Limiting factors','tune-liebig'],['Drivers & environment','tune-env']]},
       {id:'climate',label:'Climate',icon:'thermo',subs:[['Live climate','cl-live'],['Trends 24h','cl-trends'],['Room controls','cl-controls'],['Hotspot map','cl-hotspot'],['Raw readings','cl-raw']]},
-      {id:'floor',label:'Floorplan',icon:'grid',subs:[]}],
+      {id:'floor',label:'Floorplan',icon:'grid',subs:[]},
+      {id:'control',label:'Control',icon:'power',subs:[['Active strategy','op-strategy'],['Arm & pump','op-arm'],['Relays & solenoids','op-relays'],['Adaptive steering','op-adaptive'],['Engine','op-engine']]},
+      {id:'log',label:'Engine log',icon:'doc',subs:[]}],
     camMin:(function(){try{return localStorage.getItem('f2.camMin')==='1'}catch(e){return false}})(),
     floorLoaded:false,
     mobileNav:[{id:'dashboard',label:'Overview',icon:'dashboard'},{id:'zones',label:'Zones',icon:'drop'},{id:'tune',label:'Steering',icon:'scale'},{id:'floor',label:'Floor',icon:'grid'},{id:'climate',label:'Climate',icon:'thermo'},{id:'ai',label:'AI',icon:'ai'}],
 
     view:ls.get('f2.view','dashboard'), sidebarOpen:ls.get('f2.sidebar',true), connected:false, connError:"",
     easy:ls.get('f2.easy',!DEMO), wiz:false, wizStep:0, wizData:{goal:'balanced',stage:'Bulk',dial:7,strain:'',substrate:6,drippers:2,flow:2.0},   // calm view is the DEFAULT on a fresh browser (paper §10: attention is finite); Pro is one tap, choice persists. Demo stays Pro to showcase.
-    easyEvOpen:null, watchOpen:false,
+    easyEvOpen:null, watchOpen:false, notifOpen:false,
     cmdOpen:false, cmdQuery:"", aiOpen:false, aiInput:"", aiThinking:false, zoneModal:null, evOpen:ls.get('f2.evOpen',null),
     pumpOpen:false, pump:{hw:[],sw:[],power:null,powerTxt:'—',anyHw:false,deadhead:false,pumpOn:false}, relays:[],
     tip:null, tipT:null,
