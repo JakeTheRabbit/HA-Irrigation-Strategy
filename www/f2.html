@@ -34,6 +34,10 @@
      Slightly more opaque solid-ish bg keeps the translucent card look without the per-frame cost. */
   .glass{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.025));border:1px solid rgba(255,255,255,.08)}
   .glass-strong{background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.035));border:1px solid rgba(255,255,255,.1)}
+  /* app-wide sticky/fixed nav bars must be fully opaque — .glass/.glass-strong are near-transparent
+     tints meant for cards over the solid page bg, not for bars that scrolling content passes under */
+  :root{--app-header-h:64px}
+  .app-navbar{background:#0d1117;border-color:rgba(255,255,255,.08)}
   .ring-glow-ok{box-shadow:0 0 0 1px rgba(16,185,129,.22),0 8px 30px -12px rgba(16,185,129,.4)}
   .ring-glow-warn{box-shadow:0 0 0 1px rgba(251,191,36,.28),0 8px 30px -12px rgba(251,191,36,.5)}
   .ring-glow-crit{box-shadow:0 0 0 1px rgba(239,68,68,.32),0 8px 34px -12px rgba(239,68,68,.55)}
@@ -297,7 +301,7 @@
 
   /* ===== Tune redesign: frozen stage (sticky graph + outcome box), zone router, outcome box ===== */
 #tuneRoot .stage-sentinel{height:1px;margin:0;padding:0}
-#tuneRoot .tune-stage{position:sticky;top:0;z-index:30;background:#0a0c10;border-radius:16px;border:1px solid var(--hair);
+#tuneRoot .tune-stage{position:sticky;top:var(--app-header-h);z-index:25;background:#0a0c10;border-radius:16px;border:1px solid var(--hair);
     padding:12px;margin:0 0 14px;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);gap:14px;align-items:stretch;
     transition:box-shadow .18s,border-color .18s}
 #tuneRoot .tune-stage.is-stuck{box-shadow:0 18px 40px -18px rgba(0,0,0,.85);border-color:rgba(255,255,255,.14)}
@@ -581,7 +585,7 @@
 
   <div class="flex-1 min-w-0 flex flex-col pb-20 md:pb-0">
     <!-- header -->
-    <header class="sticky top-0 z-30 glass border-b border-white/8">
+    <header class="sticky top-0 z-30 app-navbar border-b border-white/8">
       <div class="flex items-center gap-3 px-4 md:px-6 h-16">
         <div class="md:hidden w-8 h-8 rounded-lg grid place-items-center bg-emerald-500/15 ring-1 ring-emerald-400/30"><span x-html="icons.leaf" class="text-emerald-400 w-5 h-5 block"></span></div>
         <div class="min-w-0">
@@ -2027,7 +2031,7 @@
 </div>
 
 <!-- mobile bottom nav -->
-<nav class="md:hidden fixed bottom-0 inset-x-0 z-40 glass-strong border-t border-white/10" style="padding-bottom:env(safe-area-inset-bottom)">
+<nav class="md:hidden fixed bottom-0 inset-x-0 z-40 app-navbar border-t border-white/10" style="padding-bottom:env(safe-area-inset-bottom)">
   <div class="grid grid-cols-5">
     <template x-for="item in mobileNav" :key="item.id">
       <button @click="item.id==='ai'?aiOpen=true:go(item.id)" class="flex flex-col items-center gap-1 py-2.5 relative" :class="view===item.id?'text-emerald-400':'text-slate-400'">
