@@ -169,6 +169,47 @@ def test_hold_entities_are_configurable_and_f2_ids_no_longer_hardcoded():
     assert block and "external hold" in block and "my_dose" in block
 
 
+def test_ph_gate_still_runs_while_feed_ec_is_dead_but_in_grace():
+    """A dead feed-EC probe inside its grace window must not bypass the pH gate.
+
+    The EC half used to `return None` on the grace path, which reports the zone as
+    unblocked and skips every check below it — including pH. Bad-pH feed then irrigates.
+    """
+    c, fake = _build(
+        {
+            "num_zones": 1,
+            "feed_ec_sensor": "sensor.feed_ec",
+            "feed_ph_sensor": "sensor.feed_ph",
+            "hardware": {"pump": "switch.p", "mainline": "switch.m",
+                         "valves": {"1": "switch.v1"}},
+        },
+        states={
+            "sensor.crop_steering_vwc_zone_1": ("50", {}),
+            "input_boolean.f2_control_enabled": ("on", {}),
+            "switch.crop_steering_system_enabled": ("on", {}),
+            "switch.crop_steering_auto_irrigation_enabled": ("on", {}),
+            "switch.crop_steering_zone_1_enabled": ("on", {}),
+            "number.crop_steering_irrigation_ec_min": ("1.0", {}),
+            "number.crop_steering_irrigation_ec_max": ("3.5", {}),
+            "number.crop_steering_irrigation_ph_min": ("5.8", {}),
+            "number.crop_steering_irrigation_ph_max": ("6.2", {}),
+            "sensor.feed_ec": ("2.0", {}),      # in band -> banks a last-known-good
+            "sensor.feed_ph": ("6.0", {}),      # in band
+        },
+    )
+    room = c.rooms[0]
+    assert c._blocked(room, 1) is None  # everything healthy and in band
+
+    # EC probe dies, but we are still inside the grace window, so EC alone must not block.
+    fake.set_state("sensor.feed_ec", "unavailable")
+    assert c._blocked(room, 1) is None
+
+    # pH now goes out of band. The dead-but-in-grace EC probe must NOT mask it.
+    fake.set_state("sensor.feed_ph", "4.9")
+    block = c._blocked(room, 1)
+    assert block and "pH" in block, f"pH gate was skipped: {block!r}"
+
+
 def test_notify_service_empty_sends_no_mobile_push():
     c, fake = _build(
         {"num_zones": 1, "hardware": {"pump": "switch.p", "mainline": "switch.m",
