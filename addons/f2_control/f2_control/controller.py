@@ -887,7 +887,7 @@ class Controller:
             hi = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_max", 0)
             if lo > 0 or hi > 0:
                 if feed is None:
-                    if feed_grace_ok(
+                    if not feed_grace_ok(
                         datetime.now().timestamp(),
                         (
                             room._feed_last_good_time.timestamp()
@@ -896,9 +896,11 @@ class Controller:
                         ),
                         self.feed_grace_min,
                     ):
-                        return None
-                    return f"source-water EC dead >{self.feed_grace_min:.0f}min — holding (fail-closed)"
-                if (lo > 0 and feed < lo) or (hi > 0 and feed > hi):
+                        return f"source-water EC dead >{self.feed_grace_min:.0f}min — holding (fail-closed)"
+                    # Inside the grace window we skip the EC band check only — fall through
+                    # so the pH gate below still runs. Returning None here would report the
+                    # zone as unblocked and silently bypass pH entirely.
+                elif (lo > 0 and feed < lo) or (hi > 0 and feed > hi):
                     return f"source-water EC {feed:.1f} out of [{lo:g},{hi:g}]"
         # pH half of the source-water gate — bad-pH feed locks out nutrients / burns roots, so
         # gate it too, but only when a feed-pH sensor is configured.
