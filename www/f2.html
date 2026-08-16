@@ -38,6 +38,10 @@
      tints meant for cards over the solid page bg, not for bars that scrolling content passes under */
   :root{--app-header-h:64px}
   .app-navbar{background:#0d1117;border-color:rgba(255,255,255,.08)}
+  /* Reserve the bottom navigation plus the device safe area. Tailwind's fixed pb-20
+     alone does not account for the extra inset on notched iOS devices. */
+  .app-content{padding-bottom:calc(5rem + env(safe-area-inset-bottom))}
+  @media (min-width:768px){.app-content{padding-bottom:0}}
   .ring-glow-ok{box-shadow:0 0 0 1px rgba(16,185,129,.22),0 8px 30px -12px rgba(16,185,129,.4)}
   .ring-glow-warn{box-shadow:0 0 0 1px rgba(251,191,36,.28),0 8px 30px -12px rgba(251,191,36,.5)}
   .ring-glow-crit{box-shadow:0 0 0 1px rgba(239,68,68,.32),0 8px 34px -12px rgba(239,68,68,.55)}
@@ -583,7 +587,7 @@
     </div>
   </aside>
 
-  <div class="flex-1 min-w-0 flex flex-col pb-20 md:pb-0">
+  <div class="app-content flex-1 min-w-0 flex flex-col">
     <!-- header -->
     <header class="sticky top-0 z-30 app-navbar border-b border-white/8">
       <div class="flex items-center gap-3 px-4 md:px-6 h-16">
