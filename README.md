@@ -610,3 +610,5 @@ MIT — use it, fork it, run your room with it.
 
 Built on the shoulders of the Home Assistant community, and everyone pushing precision
 irrigation out from behind closed, expensive controllers.
+
+> **This repo is free. My 2am dryback debugging is not.** If it saved you a crop, a weekend, or a nervous breakdown — [buy the rabbit a bag of nutes](https://github.com/sponsors/JakeTheRabbit). If it didn't, keep your money. I respect a tight nutrient budget.
