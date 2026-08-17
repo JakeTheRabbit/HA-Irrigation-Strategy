@@ -1,5 +1,7 @@
 # Crop Steering for Home Assistant
 
+> **This repo is free. My 2am dryback debugging is not.** If it saved you a crop, a weekend, or a nervous breakdown — [buy the rabbit a bag of nutes](https://github.com/sponsors/JakeTheRabbit). If it didn't, keep your money. I respect a tight nutrient budget.
+
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3.0+-41BDF5?logo=home-assistant&logoColor=white)
 ![HA Add-on](https://img.shields.io/badge/HA%20Add--on-f2--control-41BDF5?logo=home-assistant&logoColor=white)
 ![Release](https://img.shields.io/badge/Release-2.12.0-green)
@@ -610,5 +612,3 @@ MIT — use it, fork it, run your room with it.
 
 Built on the shoulders of the Home Assistant community, and everyone pushing precision
 irrigation out from behind closed, expensive controllers.
-
-> **This repo is free. My 2am dryback debugging is not.** If it saved you a crop, a weekend, or a nervous breakdown — [buy the rabbit a bag of nutes](https://github.com/sponsors/JakeTheRabbit). If it didn't, keep your money. I respect a tight nutrient budget.
