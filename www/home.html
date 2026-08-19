@@ -144,12 +144,49 @@
   .cambody{padding:9px 11px 11px}
   .camname{font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .camroom{font-size:10px;color:var(--ink3);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:ui-monospace,monospace}
-  .cambtns{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .cambtns{display:grid;grid-template-columns:repeat(auto-fit,minmax(82px,1fr));gap:7px}
   .cbtn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;border-radius:9px;font-size:11.5px;font-weight:700;cursor:pointer;border:1px solid var(--hair);background:var(--card2);color:var(--ink2);transition:.14s;user-select:none}
   .cbtn:hover{background:rgba(255,255,255,.06)}
   .cbtn.siren.on{background:rgba(248,113,113,.2);border-color:rgba(248,113,113,.55);color:#fecaca;box-shadow:0 0 16px -4px var(--crit)}
   .cbtn.flash.on{background:rgba(245,185,66,.2);border-color:rgba(245,185,66,.55);color:#ffe2a0;box-shadow:0 0 16px -4px var(--gold)}
   .cbtn:active{transform:scale(.96)}
+  .dashboard-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+  .dashboard-tools .spacer{flex:1}
+  .ctrl{height:34px;border-radius:9px;border:1px solid var(--hair);background:var(--card2);color:var(--ink2);padding:0 10px;font-size:11.5px;outline:none}
+  .ctrl:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(34,211,238,.12)}
+  .ctrl.search{min-width:180px;flex:1;max-width:300px}
+  .env-collapsed{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:10px}
+  .env-collapsed .spacer{flex:1}
+  .vitals-table.compact td{padding-top:4px!important;padding-bottom:4px!important}
+  .vitals-table th.sortable{cursor:pointer;user-select:none}
+  .vitals-table th.sortable:hover{color:var(--ink2)!important}
+  .empty-state{padding:24px;text-align:center;color:var(--ink3);font-size:12px}
+  .customizer-backdrop{position:fixed;inset:0;z-index:500;background:rgba(4,6,9,.68);backdrop-filter:blur(7px);opacity:0;pointer-events:none;transition:.2s}
+  .customizer-backdrop.on{opacity:1;pointer-events:auto}
+  .customizer{position:absolute;top:0;right:0;width:min(440px,94vw);height:100%;overflow:auto;background:linear-gradient(180deg,var(--card),var(--bg2));border-left:1px solid var(--hair);box-shadow:-30px 0 80px -35px #000;transform:translateX(102%);transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+  .customizer-backdrop.on .customizer{transform:none}
+  .customizer-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;padding:15px 16px;background:rgba(20,26,33,.96);border-bottom:1px solid var(--hair);backdrop-filter:blur(8px)}
+  .customizer-head h2{font-size:15px;font-weight:800;margin:0}
+  .customizer-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:12px 16px 0}
+  .customizer-body{padding:14px 16px 24px}
+  .customizer-panel{display:none}.customizer-panel.on{display:block}
+  .pref-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  .pref-grid label{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);font-weight:700}
+  .pref-grid .ctrl{width:100%;margin-top:4px}
+  .pref-list{display:grid;gap:7px;margin:8px 0 16px}
+  .pref-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:9px;padding:8px 9px;border-radius:10px;background:var(--card2);border:1px solid var(--hair)}
+  .pref-row[draggable="true"]{cursor:grab}.pref-row.dragging{opacity:.45}
+  .pref-row .meta{min-width:0}.pref-row .meta b{display:block;font-size:12px}.pref-row .meta span{display:block;color:var(--ink3);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pref-actions{display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .iconbtn{width:29px;height:29px;border-radius:8px;border:1px solid var(--hair);background:rgba(255,255,255,.035);color:var(--ink2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+  .iconbtn:hover{background:rgba(255,255,255,.08)}
+  .sizebtn{height:27px;min-width:28px;padding:0 6px;border-radius:7px;border:1px solid var(--hair);background:rgba(255,255,255,.035);color:var(--ink3);font-size:10px;font-weight:800;cursor:pointer}
+  .sizebtn.on{color:#06281c;background:var(--ok);border-color:transparent}
+  .camcard.cam-size-m{grid-column:span 2}.camcard.cam-size-l{grid-column:span 3}.camcard.cam-size-full{grid-column:1/-1}
+  .cam-layout-tools{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px;padding-bottom:9px;border-bottom:1px solid var(--hair)}
+  .cam-layout-tools .sizebtn{height:30px}
+  .cam-drag{cursor:grab}.cam-drag.dragging{opacity:.4}
+  @media(max-width:800px){.camcard.cam-size-m,.camcard.cam-size-l{grid-column:1/-1}.dashboard-tools .note{display:none}.pref-grid{grid-template-columns:1fr}.ctrl.search{max-width:none}}
   @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -169,6 +206,14 @@
     </div>
   </header>
 
+  <div id="environmentToolbar" class="dashboard-tools">
+    <button class="btn" data-open-customizer="environment"><i class="mdi mdi-tune-variant"></i>Customize</button>
+    <input id="environmentSearch" class="ctrl search" type="search" placeholder="Filter rooms…" aria-label="Filter environment rooms" data-env-query>
+    <select id="environmentType" class="ctrl" aria-label="Filter by room type" data-env-type><option value="all">All types</option><option value="flower">Flower</option><option value="veg">Veg</option><option value="dry">Drying</option><option value="util">Utility</option></select>
+    <select id="environmentData" class="ctrl" aria-label="Filter by data availability" data-env-data><option value="all">All data</option><option value="complete">Complete rows</option><option value="missing">Missing data</option></select>
+    <span class="spacer"></span><button class="btn" data-env-collapse><i class="mdi mdi-chevron-up"></i>Hide table</button>
+  </div>
+  <div id="environmentCollapsed" class="glass env-collapsed" hidden><i class="mdi mdi-chart-box-outline" style="color:var(--ok);font-size:18px"></i><b>Environment</b><span id="environmentCollapsedCount" style="color:var(--ink3);font-size:11px"></span><span class="spacer"></span><button class="btn" data-env-collapse><i class="mdi mdi-chevron-down"></i>Show</button></div>
   <div id="vitalsStrip" class="vstrip"></div>
 
   <nav class="tabs" style="margin:8px 0 18px">
@@ -205,9 +250,9 @@
   </section>
 
   <section class="panel" id="tab-cameras">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:11px">
       <h2 class="sec"><i class="mdi mdi-cctv" style="color:var(--cyan)"></i>Cameras</h2>
-      <span style="font-size:11px;color:var(--ink3)">tap feed to enlarge · siren &amp; flashlight per camera</span></div>
+      <span class="note" style="font-size:11px;color:var(--ink3);margin-left:auto">tap feed to enlarge · siren &amp; flashlight per camera</span><button class="btn" data-camera-edit><i class="mdi mdi-view-grid-plus"></i>Arrange</button><button class="btn" data-open-customizer="cameras"><i class="mdi mdi-tune-variant"></i>Choose cameras</button></div>
     <div id="cameras" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(258px,1fr))"></div>
   </section>
 
@@ -219,6 +264,7 @@
         <div class="glass" style="padding:14px 15px 10px"><div class="sublabel" style="margin:0 0 6px">Power (W) · 24h</div><div style="position:relative;height:170px"><canvas id="chartW"></canvas></div></div>
         <div class="glass" style="padding:14px 15px 10px"><div class="sublabel" style="margin:0 0 6px">Current (A) · 24h</div><div style="position:relative;height:170px"><canvas id="chartA"></canvas></div></div></div>
     </div>
+    <div id="cost" class="glass" style="padding:15px;margin-top:12px"></div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:12px;align-items:start">
       <div id="energy" class="glass" style="padding:16px"></div><div id="summary" class="glass" style="padding:16px"></div></div>
   </section>
@@ -244,10 +290,16 @@
 
 <div class="backdrop" id="entBackdrop"><div class="modal" id="entModal"></div></div>
 <div class="backdrop" id="roomBackdrop"><div class="modal wide" id="roomModal"></div></div>
+<div class="customizer-backdrop" id="customizerBackdrop" aria-hidden="true"><aside class="customizer" id="customizer" role="dialog" aria-modal="true" aria-labelledby="customizerTitle" tabindex="-1">
+  <div class="customizer-head"><i class="mdi mdi-tune-variant" style="font-size:20px;color:var(--ok)"></i><h2 id="customizerTitle">Customize dashboard</h2><button class="mclose" data-close-customizer aria-label="Close customizer">✕</button></div>
+  <div class="customizer-tabs"><button class="btn" data-customizer-tab="environment">Environment</button><button class="btn" data-customizer-tab="cameras">Cameras</button></div>
+  <div class="customizer-body" id="customizerBody"></div>
+  <div style="position:sticky;bottom:0;display:flex;gap:8px;padding:12px 16px;background:rgba(20,26,33,.96);border-top:1px solid var(--hair)"><button class="btn danger" data-reset-preferences><i class="mdi mdi-restore"></i>Reset defaults</button><span style="flex:1"></span><button class="btn primary" data-close-customizer>Done</button></div>
+</aside></div>
 <div id="toast" class="toast"></div>
 
 <script>
-const CONFIG={HA_BASE:"",LL_TOKEN:"",REFRESH_MS:30000,ALARM_ENTITY:"alarm_control_panel.alarmo",TWIN_URL:"/local/floorplan/index.html",SERVICE_CAP_W:21600};
+const CONFIG={HA_BASE:"",LL_TOKEN:"",REFRESH_MS:30000,ALARM_ENTITY:"alarm_control_panel.alarmo",TWIN_URL:"/local/sentinel/sentinel-gmp-3d.html?v=20260816",SERVICE_CAP_W:21600};
 const C={B:'#38bdf8',G:'#34d399',A:'#fbbf24',R:'#f87171',Y:'#facc15',INFO:'#38bdf8',GOLD:'#f5b942',CYAN:'#22d3ee',RED:'#f87171',ORANGE:'#fb923c',VIOLET:'#b06bff'};
 const DEMO=new URLSearchParams(location.search).has('demo')||/github\.io$/i.test(location.hostname||"");
 (function seedKioskAuth(){ if(DEMO||!CONFIG.LL_TOKEN) return;
@@ -299,23 +351,23 @@ const EQUIP=[
 const EGRP=[['dehum','Dehum',C.VIOLET,'air-humidifier'],['co2','CO₂',C.G,'molecule-co2'],['solenoid','Solenoids',C.B,'pipe-valve'],['pump','Pumps',C.CYAN,'water-pump']];
 let _equip={ts:0,chart:null};
 const CAMERAS=[
-  {n:'Doorbell',a:'Entrance',cam:'camera.doorbell_clear',siren:'siren.doorbell_siren'},
-  {n:'Entrance',a:'Entrance',cam:'camera.loadingzone_cam_clear',siren:'siren.loadingzone_cam_siren',flood:'light.loadingzone_cam_floodlight'},
-  {n:'Roller Door',a:'Entrance',cam:'camera.roller_door_clear',siren:'siren.roller_door_siren',flood:'light.roller_door_floodlight'},
-  {n:'Car Park',a:'Outside',cam:'camera.car_parks_clear',siren:'siren.car_parks_siren',flood:'light.car_parks_floodlight'},
-  {n:'Driveway West',a:'Outside',cam:'camera.west_driveway_clear',siren:'siren.west_driveway_siren',flood:'light.west_driveway_floodlight'},
-  {n:'Driveway City',a:'Outside',cam:'camera.city_driveway_clear',siren:'siren.city_driveway_siren',flood:'light.city_driveway_floodlight'},
-  {n:'Warehouse PTZ',a:'Warehouse',cam:'camera.reolink_warehouse_ptz_clear',siren:'siren.reolink_warehouse_ptz_siren',flood:'light.reolink_warehouse_ptz_floodlight'},
-  {n:'Hallway',a:'Hallway',cam:'camera.hallway_clear',siren:'siren.hallway_siren',flood:'light.hallway_floodlight'},
-  {n:'Kitchen',a:'Kitchen',cam:'camera.legacy_kitchen_clear',siren:'siren.legacy_kitchen_siren',flood:'light.legacy_kitchen_floodlight'},
-  {n:'Drying Room',a:'Vault',cam:'camera.legacy_office_clear',siren:'siren.legacy_office_siren',flood:'light.legacy_office_floodlight'},
-  {n:'Vault PTZ',a:'Vault',cam:'camera.vault_ptz_clear',siren:'siren.vault_ptz_siren'},
-  {n:'Irrigation',a:'Irrigation',cam:'camera.irrigation_clear',siren:'siren.irrigation_siren',flood:'light.irrigation_floodlight'},
-  {n:'Flower 1',a:'F1',cam:'camera.flower1_cam_clear',siren:'siren.flower1_cam_siren',flood:'light.flower1_cam_floodlight'},
-  {n:'Flower 2',a:'F2',cam:'camera.flower2_cam_clear',siren:'siren.flower2_cam_siren',flood:'light.flower2_cam_floodlight'},
-  {n:'Veg',a:'Veg',cam:'camera.veg_cam_clear',siren:'siren.veg_cam_siren',flood:'light.veg_cam_floodlight'},
-  {n:'Toilet',a:'Toilet',cam:'camera.toilet_clear',siren:'siren.toilet_siren',flood:'light.toilet_floodlight'},
-  {n:'Stairs',a:'Office',cam:'camera.stairs_clear',siren:'siren.stairs_siren',flood:'light.stairs_floodlight'},
+  {n:'Doorbell',a:'Entrance',cam:'camera.doorbell_clear',frigate:'db',siren:'siren.doorbell_siren'},
+  {n:'Entrance',a:'Entrance',cam:'camera.loadingzone_cam_clear',frigate:'lz',siren:'siren.loadingzone_cam_siren',flood:'light.loadingzone_cam_floodlight'},
+  {n:'Roller Door',a:'Entrance',cam:'camera.roller_door_clear',frigate:'rd',siren:'siren.roller_door_siren',flood:'light.roller_door_floodlight'},
+  {n:'Car Park',a:'Outside',cam:'camera.car_parks_clear',frigate:'cp',siren:'siren.car_parks_siren',flood:'light.car_parks_floodlight'},
+  {n:'Driveway West',a:'Outside',cam:'camera.west_driveway_clear',frigate:'wd',siren:'siren.west_driveway_siren',flood:'light.west_driveway_floodlight'},
+  {n:'Driveway City',a:'Outside',cam:'camera.city_driveway_clear',frigate:'cd',siren:'siren.city_driveway_siren',flood:'light.city_driveway_floodlight'},
+  {n:'Warehouse PTZ',a:'Warehouse',cam:'camera.reolink_warehouse_ptz_clear',frigate:'ptzwb',siren:'siren.reolink_warehouse_ptz_siren',flood:'light.reolink_warehouse_ptz_floodlight'},
+  {n:'Hallway',a:'Hallway',cam:'camera.hallway_clear',frigate:'hw',siren:'siren.hallway_siren',flood:'light.hallway_floodlight'},
+  {n:'Kitchen',a:'Kitchen',cam:'camera.legacy_kitchen_clear',frigate:'kc',siren:'siren.legacy_kitchen_siren',flood:'light.legacy_kitchen_floodlight'},
+  {n:'Drying Room',a:'Vault',cam:'camera.legacy_office_clear',frigate:'dv',siren:'siren.legacy_office_siren',flood:'light.legacy_office_floodlight'},
+  {n:'Vault PTZ',a:'Vault',cam:'camera.vault_ptz_clear',frigate:'rm',siren:'siren.vault_ptz_siren'},
+  {n:'Irrigation',a:'Irrigation',cam:'camera.irrigation_clear',frigate:'ir',siren:'siren.irrigation_siren',flood:'light.irrigation_floodlight'},
+  {n:'Flower 1',a:'F1',cam:'camera.flower1_cam_clear',frigate:'f1',siren:'siren.flower1_cam_siren',flood:'light.flower1_cam_floodlight'},
+  {n:'Flower 2',a:'F2',cam:'camera.flower2_cam_clear',frigate:'f2',siren:'siren.flower2_cam_siren',flood:'light.flower2_cam_floodlight'},
+  {n:'Veg',a:'Veg',cam:'camera.veg_cam_clear',frigate:'vg',siren:'siren.veg_cam_siren',flood:'light.veg_cam_floodlight'},
+  {n:'Toilet',a:'Toilet',cam:'camera.toilet_clear',frigate:'tl',siren:'siren.toilet_siren',flood:'light.toilet_floodlight'},
+  {n:'Stairs',a:'Office',cam:'camera.stairs_clear',frigate:'st',siren:'siren.stairs_siren',flood:'light.stairs_floodlight'},
 ];
 let _camBuilt=false;
 const SYS=[
@@ -327,7 +379,7 @@ const BANDS={temp:{flower:[18,22,28,32],veg:[16,20,28,32],dry:[10,12,18,22],util
   co2:{flower:[400,800,1500,2000],veg:[400,800,1500,2000],dry:[300,400,900,1500],util:[300,400,1200,2000]},vpd:{flower:[0.8,1.0,1.4,1.8],veg:[0.6,0.8,1.2,1.5],dry:[0.5,0.7,1.0,1.3],util:[0,0,3,4]}};
 const ROOMS={
   F2:{label:'F2 — Flower',type:'flower',icon:'cannabis',temp:'sensor.f2_scd41_back_left_temperature',rh:'sensor.f2_scd41_back_left_humidity',vpd:'sensor.f2_scd41_back_left_vpd',co2:'sensor.airq_f2_co2_internal',ppfd:'sensor.f2_scd41_env3_dlight_poe_ppfd',lights:['light.led_f2_r1_f2_r1_led','light.led_f2_r2_f2_r2_led'],climate:['climate.f2_ac_wall_f2_ac_wall','climate.f2_ac_door_f2_ac_door'],door:'binary_sensor.f2_door_contact',area:'F2',dash:'/local/f2live.html'},
-  F1:{label:'F1 — Flower',type:'flower',icon:'cannabis',temp:'sensor.f1_scd410_back_left_temperature',rh:'sensor.f1_scd410_back_left_humidity',vpd:'sensor.f1_scd410_back_left_vpd',co2:'sensor.f1_scd41_back_right_co2',ppfd:'sensor.growsensor_eppfd',lights:['light.f1_light_group'],climate:['climate.f1_ac_door_f1_ac_door','climate.f1_ac_wall_f1_ac_wall'],door:'binary_sensor.f1_contact',area:'F1'},
+  F1:{label:'F1 — Flower',type:'flower',icon:'cannabis',temp:'sensor.growsensor_temperature',rh:'sensor.growsensor_humidity',leaf:'sensor.growsensor_lst',vpd:'sensor.growsensor_vpd',co2:'sensor.f1_scd41_back_right_co2',ppfd:'sensor.growsensor_eppfd',lights:['light.f1_light_group'],climate:['climate.f1_ac_door_f1_ac_door','climate.f1_ac_wall_f1_ac_wall'],door:'binary_sensor.f1_contact',area:'F1'},
   Veg:{label:'Veg',type:'veg',icon:'sprout',temp:'sensor.veg_300mm_carbon_fil_temperature',rh:'sensor.veg_300mm_carbon_fil_humidity',vpd:'sensor.veg_300mm_carbon_fil_vpd',co2:'sensor.m5stack_airq_veg_co2',lights:['light.veg_r1_lights_veg_right_level_1','light.veg_l1_lights_vegel_left_level_1'],climate:['climate.veg_ac_left_veg_ac_left','climate.veg_ac_right_veg_ac_right'],door:'binary_sensor.veg_contact',area:'Veg'},
   Vault:{label:'Vault — Drying',type:'dry',icon:'safe-square',temp:'sensor.drying_vault_scd41_enviii_atom_bme68x_temperature',rh:'sensor.drying_vault_scd41_enviii_atom_bme68x_humidity',vpd:'sensor.drying_vault_scd41_enviii_atom_vpd',co2:'sensor.air_q_vault_co2',lights:['light.vault_lights'],climate:['climate.dryingroom_vault_ac_drying_room_vault_ac'],door:'binary_sensor.vault_contact',area:'Vault/Drying Room'},
   Irrigation:{label:'Irrigation',type:'util',icon:'water-pump',temp:'sensor.aqua_pro_air_temp',rh:'sensor.aqua_pro_humidity',co2:'sensor.aqua_pro_co2',lights:['light.irrigation_room_light'],climate:[],area:'Irrigation'},
@@ -336,6 +388,24 @@ const ROOMS={
   Kitchen:{label:'Kitchen',type:'util',icon:'chef-hat',temp:null,rh:null,lights:['light.kitchen_light'],climate:[],door:'binary_sensor.kitchen_door_contact',area:'Kitchen'},
   Roof:{label:'Roof',type:'util',icon:'home-roof',temp:'sensor.ruuvi_tag_roof_temperature',rh:'sensor.ruuvi_tag_roof_humidity',lights:[],climate:[],area:null}};
 const ROOM_ORDER=['F2','F1','Veg','Vault','Irrigation','Hallway','Office','Kitchen','Roof'];
+const PREF_KEY='facilityCommand.preferences.v1';
+const ENV_COLUMNS=['room','temp','leaf','rh','vpd','co2'];
+const ENV_LABELS={room:'Room',temp:'Temp',leaf:'Leaf',rh:'RH',vpd:'VPD',co2:'CO₂'};
+const CAMERA_SIZES=['s','m','l','full'];
+const DEFAULT_PREFERENCES={version:1,environment:{collapsed:false,rows:[...ROOM_ORDER],hiddenRows:[],columns:[...ENV_COLUMNS],hiddenColumns:[],query:'',roomType:'all',dataFilter:'all',sort:{column:'manual',direction:'asc'},density:'comfortable',precision:'auto',showUnits:true},cameras:{order:CAMERAS.map(c=>c.cam),hidden:[],sizes:{}}};
+function prefOrder(defaults,saved){ const valid=new Set(defaults),out=[]; for(const x of Array.isArray(saved)?saved:[]) if(valid.has(x)&&!out.includes(x)) out.push(x); for(const x of defaults) if(!out.includes(x)) out.push(x); return out; }
+function prefHidden(defaults,saved){ const valid=new Set(defaults); return [...new Set(Array.isArray(saved)?saved:[])].filter(x=>valid.has(x)); }
+function normalizePreferences(raw){
+  const src=raw&&typeof raw==='object'?raw:{},e=src.environment&&typeof src.environment==='object'?src.environment:{},c=src.cameras&&typeof src.cameras==='object'?src.cameras:{},sort=e.sort&&typeof e.sort==='object'?e.sort:{};
+  const sizes={}; for(const id of CAMERAS.map(x=>x.cam)){ const z=c.sizes&&c.sizes[id]; if(CAMERA_SIZES.includes(z)) sizes[id]=z; }
+  return {version:1,environment:{collapsed:!!e.collapsed,rows:prefOrder(ROOM_ORDER,e.rows),hiddenRows:prefHidden(ROOM_ORDER,e.hiddenRows),columns:prefOrder(ENV_COLUMNS,e.columns),hiddenColumns:prefHidden(ENV_COLUMNS,e.hiddenColumns),query:typeof e.query==='string'?e.query.slice(0,80):'',roomType:['all','flower','veg','dry','util'].includes(e.roomType)?e.roomType:'all',dataFilter:['all','complete','missing'].includes(e.dataFilter)?e.dataFilter:'all',sort:{column:[...ENV_COLUMNS,'manual'].includes(sort.column)?sort.column:'manual',direction:sort.direction==='desc'?'desc':'asc'},density:e.density==='compact'?'compact':'comfortable',precision:['auto','0','1','2'].includes(String(e.precision))?String(e.precision):'auto',showUnits:e.showUnits!==false},cameras:{order:prefOrder(CAMERAS.map(x=>x.cam),c.order),hidden:prefHidden(CAMERAS.map(x=>x.cam),c.hidden),sizes}};
+}
+function loadPreferences(){ try{return normalizePreferences(JSON.parse(localStorage.getItem(PREF_KEY)||'null'));}catch(e){return normalizePreferences(null);} }
+let PREFS=loadPreferences(),_customTab='environment',_cameraEdit=false,_dragItem=null;
+function savePreferences(){ try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS));return true;}catch(e){toast('Layout changed, but this browser could not save it');return false;} }
+function setHidden(list,id,hidden){ const s=new Set(PREFS[list.group][list.key]); hidden?s.add(id):s.delete(id); PREFS[list.group][list.key]=[...s]; }
+function moveIn(list,id,delta){ const i=list.indexOf(id),j=Math.max(0,Math.min(list.length-1,i+delta)); if(i<0||i===j)return; list.splice(i,1);list.splice(j,0,id);savePreferences(); }
+function moveTo(list,id,before){ const i=list.indexOf(id); if(i<0)return; list.splice(i,1); const j=before?list.indexOf(before):-1; list.splice(j<0?list.length:j,0,id); savePreferences(); }
 let ROOMALL={};
 
 let S={},CHARTS={},HIST={t:[],w:{total:[],a:[],b:[],c:[]},i:{total:[],a:[],b:[],c:[]}};
@@ -423,14 +493,29 @@ function tile(c){ const on=ON(c.id),s=st(c.id),lab=s===undefined?'—':(c.id.sta
   return `<button class="tile lift ${on?'on':''}" style="--ac:${c.ac}" data-toggle="${c.id}"><div class="ic"><i class="mdi mdi-${c.icon}"></i></div><div class="nm">${c.name}</div><div class="stt">${lab}</div></button>`; }
 function renderControls(){ $('access').innerHTML=ACCESS.map(tile).join(''); $('lighting').innerHTML=LIGHTING.map(tile).join(''); $('security').innerHTML=SECURITY.map(tile).join(''); }
 function renderAttention(){ const a=computeAlerts(); if(!a.length){ $('attention').innerHTML=alertCard('ok','shield-check','All systems nominal','No leaks, doors secured, power balanced, alarm clear.',{tab:'security'}); return; } const o={crit:0,warn:1,info:2,ok:3}; a.sort((x,y)=>o[x.sev]-o[y.sev]); $('attention').innerHTML=a.map(x=>alertCard(x.sev,x.icon,x.title,x.detail,x.link)).join(''); }
+function roomMetric(k){ const r=ROOMS[k]; return {room:r.label.split(' — ')[0],temp:r.temp?num(r.temp):null,leaf:r.leaf?num(r.leaf):null,rh:r.rh?num(r.rh):null,vpd:r.vpd?num(r.vpd):null,co2:r.co2?num(r.co2):null}; }
+function environmentColumns(){ return PREFS.environment.columns.filter(x=>!PREFS.environment.hiddenColumns.includes(x)); }
+function environmentRows(){
+  const e=PREFS.environment,cols=environmentColumns().filter(x=>x!=='room'),q=e.query.trim().toLowerCase();
+  let rows=e.rows.filter(k=>ROOMS[k]&&!e.hiddenRows.includes(k)).filter(k=>{ const r=ROOMS[k],m=roomMetric(k),values=cols.map(c=>m[c]),missing=values.some(v=>v==null); return (!q||(r.label+' '+r.type).toLowerCase().includes(q))&&(e.roomType==='all'||r.type===e.roomType)&&(e.dataFilter==='all'||(e.dataFilter==='complete'?!missing:missing)); });
+  if(e.sort.column!=='manual'){ const col=e.sort.column,dir=e.sort.direction==='desc'?-1:1; rows=rows.map((k,i)=>({k,i,m:roomMetric(k)})).sort((a,b)=>{ const av=a.m[col],bv=b.m[col]; if(av==null&&bv!=null)return 1;if(av!=null&&bv==null)return-1;if(av==null&&bv==null)return a.i-b.i; const cmp=col==='room'?String(av).localeCompare(String(bv)):Number(av)-Number(bv);return cmp*dir||a.i-b.i; }).map(x=>x.k); }
+  return rows;
+}
+function metricText(v,col){ if(v==null)return'—'; const auto={temp:1,leaf:1,rh:0,vpd:2,co2:0},dec=PREFS.environment.precision==='auto'?auto[col]:Number(PREFS.environment.precision),unit=PREFS.environment.showUnits?({temp:'°',leaf:'°',rh:'%',vpd:'',co2:''}[col]||''):''; return fmt(v,dec)+unit; }
+function renderEnvironmentToolbar(){
+  const e=PREFS.environment,toolbar=$('environmentToolbar'),collapsed=$('environmentCollapsed'); toolbar.hidden=e.collapsed; collapsed.hidden=!e.collapsed; $('vitalsStrip').hidden=e.collapsed;
+  $('environmentSearch').value=e.query; $('environmentType').value=e.roomType; $('environmentData').value=e.dataFilter;
+  $('environmentCollapsedCount').textContent=e.rows.length-e.hiddenRows.length+' rooms configured';
+}
 function renderVitals(){
-  const cell=(v,dec,suf,col)=>`<td style="text-align:center;padding:7px 10px;font-weight:700;font-variant-numeric:tabular-nums;color:${v==null?'var(--ink3)':col}">${v==null?'—':fmt(v,dec)+suf}</td>`;
-  const rows=ROOM_ORDER.map(k=>{ const r=ROOMS[k],t=r.temp?num(r.temp):null,h=r.rh?num(r.rh):null,vp=r.vpd?num(r.vpd):null,co=r.co2?num(r.co2):null,col=bandColor('temp',r.type,t);
-    return `<tr class="lift" data-room="${k}" style="cursor:pointer;border-top:1px solid var(--hair)">
-      <td style="padding:7px 12px;white-space:nowrap"><i class="mdi mdi-${r.icon}" style="color:${col};margin-right:8px"></i><b>${r.label.split(' — ')[0]}</b> <span style="color:var(--ink3);font-size:10px;text-transform:uppercase;letter-spacing:.04em">${r.type}</span></td>
-      ${cell(t,1,'°',col)}${cell(h,0,'%',bandColor('rh',r.type,h))}${cell(vp,2,'',bandColor('vpd',r.type,vp))}${cell(co,0,'',bandColor('co2',r.type,co))}</tr>`; }).join('');
-  const th=(l,a)=>`<th style="text-align:${a||'center'};padding:9px 12px;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3)">${l}</th>`;
-  $('vitalsStrip').innerHTML=`<div class="glass" style="padding:2px 4px;overflow-x:auto;width:100%"><table style="width:100%;border-collapse:collapse;font-size:13.5px"><thead><tr>${th('Room','left')}${th('Temp')}${th('RH')}${th('VPD')}${th('CO₂')}</tr></thead><tbody>${rows}</tbody></table></div>`; }
+  renderEnvironmentToolbar(); if(PREFS.environment.collapsed)return;
+  const cols=environmentColumns(),keys=environmentRows(),e=PREFS.environment;
+  const cell=(v,col,r)=>`<td style="text-align:center;padding:7px 10px;font-weight:700;font-variant-numeric:tabular-nums;color:${v==null?'var(--ink3)':bandColor(col==='leaf'?'temp':col,r.type,v)}">${metricText(v,col)}</td>`;
+  const rows=keys.map(k=>{ const r=ROOMS[k],m=roomMetric(k),tc=bandColor('temp',r.type,m.temp); return `<tr class="lift" data-room="${k}" style="cursor:pointer;border-top:1px solid var(--hair)">${cols.map(col=>col==='room'?`<td style="padding:7px 12px;white-space:nowrap"><i class="mdi mdi-${r.icon}" style="color:${tc};margin-right:8px"></i><b>${esc(m.room)}</b> <span style="color:var(--ink3);font-size:10px;text-transform:uppercase;letter-spacing:.04em">${r.type}</span></td>`:cell(m[col],col,r)).join('')}</tr>`; }).join('');
+  const th=col=>{const active=e.sort.column===col,icon=active?(e.sort.direction==='asc'?'arrow-up':'arrow-down'):'unfold-more-horizontal';return `<th class="sortable" data-env-sort="${col}" style="text-align:${col==='room'?'left':'center'};padding:9px 12px;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:${active?'var(--ok)':'var(--ink3)'}">${ENV_LABELS[col]} <i class="mdi mdi-${icon}"></i></th>`;};
+  const body=rows||`<tr><td colspan="${Math.max(1,cols.length)}"><div class="empty-state"><i class="mdi mdi-filter-off" style="font-size:22px;display:block;margin-bottom:6px"></i>No rooms match this layout and filter. <button class="btn" style="margin-left:8px" data-open-customizer="environment">Customize</button></div></td></tr>`;
+  $('vitalsStrip').innerHTML=`<div class="glass" style="padding:2px 4px;overflow-x:auto;width:100%"><table class="vitals-table ${e.density==='compact'?'compact':''}" style="width:100%;border-collapse:collapse;font-size:13.5px"><thead><tr>${cols.map(th).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
 function renderCapacity(){ const load=num('sensor.total_service_load_percentage'),totalW=num(PWR.total),headT=num('sensor.headroom_total'),amps=num(PWR.amps);
   const pct=load!=null?load:(totalW!=null?Math.min(100,totalW/CONFIG.SERVICE_CAP_W*100):null),col=pct==null?C.G:pct>=90?C.R:pct>=75?C.A:C.G,R=52,CIRC=2*Math.PI*R,frac=pct==null?0:Math.max(0,Math.min(1,pct/100)),dash=frac*CIRC;
   $('capacity').innerHTML=`<div class="sublabel" style="margin:0 0 6px">Total power capacity</div><div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
@@ -469,7 +554,31 @@ function renderPower(){ const total=num(PWR.total),amps=num(PWR.amps),worst=num(
   const ec=(lab,id,ic)=>`<div class="metric" style="padding:11px 12px;cursor:pointer" data-ent="${id}"><div class="ml"><i class="mdi mdi-${ic}"></i> ${lab}</div><div class="mv" style="font-size:1.1rem">${fmt(num(id),2)}<span class="mu">kWh</span></div></div>`;
   $('energy').innerHTML=`<div class="sublabel" style="margin-top:0">Energy · Import / Export</div><div style="font-size:12.5px;color:var(--ink2);margin-bottom:10px">Imported <b style="color:var(--ink)">${fmt(num('sensor.total_energy_imported'),2)}</b> · Exported <b style="color:var(--ink)">${fmt(num('sensor.total_energy_exported'),2)}</b> kWh</div><div class="grid" style="grid-template-columns:repeat(3,1fr)">${ec('Imp A',PWR.a_e,'transmission-tower-import')}${ec('Imp B',PWR.b_e,'transmission-tower-import')}${ec('Imp C',PWR.c_e,'transmission-tower-import')}${ec('Exp A',PWR.a_x,'transmission-tower-export')}${ec('Exp B',PWR.b_x,'transmission-tower-export')}${ec('Exp C',PWR.c_x,'transmission-tower-export')}</div>`;
   const badge=(id)=>{const on=ON(id);return `<span style="font-weight:700;font-size:10.5px;text-transform:uppercase;color:${on?'var(--crit)':'var(--ok)'}">${on?'ALERT':'OK'}</span>`;},row=(l,v)=>`<div class="srow"><span class="sl">${l}</span><span class="sv">${v}</span></div>`;
-  $('summary').innerHTML=`<div class="sublabel" style="margin-top:0">System Summary</div>${row('Safety status',`<span style="color:${/ok|safe|normal/i.test(st('sensor.current_safety_status')||'')?'var(--ok)':'var(--warn)'}">${esc(st('sensor.current_safety_status')||'—')}</span>`)}${row('High-power alert',badge('binary_sensor.high_power_usage_alert'))}${row('Phase-imbalance alert',badge('binary_sensor.power_imbalance_alert'))}<div class="sublabel">Load &amp; headroom</div>${row('Highest phase load',fmt(num('sensor.highest_phase_load_percentage'))+' %')}${row('Total service load',fmt(num('sensor.total_service_load_percentage'))+' %')}${row('Headroom worst / total',fmt(num('sensor.headroom_worst_phase'),1)+' / '+fmt(num('sensor.headroom_total'),0)+' A')}<div class="sublabel">Power quality</div>${row('Phase balance I / P',fmt(num('sensor.current_phase_balance'),1)+' / '+fmt(num('sensor.power_phase_balance'),1))}${row('Power factor',fmt(num('sensor.overall_power_factor'),2))}${row('Voltage avg / imbal',fmt(num('sensor.voltage_average'),1)+' V / '+fmt(num('sensor.voltage_imbalance'),2))}${row('Equipment health',fmt(num('sensor.equipment_health_score')))}`; }
+  $('summary').innerHTML=`<div class="sublabel" style="margin-top:0">System Summary</div>${row('Safety status',`<span style="color:${/ok|safe|normal/i.test(st('sensor.current_safety_status')||'')?'var(--ok)':'var(--warn)'}">${esc(st('sensor.current_safety_status')||'—')}</span>`)}${row('High-power alert',badge('binary_sensor.high_power_usage_alert'))}${row('Phase-imbalance alert',badge('binary_sensor.power_imbalance_alert'))}<div class="sublabel">Load &amp; headroom</div>${row('Highest phase load',fmt(num('sensor.highest_phase_load_percentage'))+' %')}${row('Total service load',fmt(num('sensor.total_service_load_percentage'))+' %')}${row('Headroom worst / total',fmt(num('sensor.headroom_worst_phase'),1)+' / '+fmt(num('sensor.headroom_total'),0)+' A')}<div class="sublabel">Power quality</div>${row('Phase balance I / P',fmt(num('sensor.current_phase_balance'),1)+' / '+fmt(num('sensor.power_phase_balance'),1))}${row('Power factor',fmt(num('sensor.overall_power_factor'),2))}${row('Voltage avg / imbal',fmt(num('sensor.voltage_average'),1)+' V / '+fmt(num('sensor.voltage_imbalance'),2))}${row('Equipment health',fmt(num('sensor.equipment_health_score')))}`;
+  renderCost(); }
+function renderCost(){ const el=$('cost'); if(!el) return;
+  const rate=num('input_number.power_tariff_rate'),fixd=num('input_number.power_daily_fixed_charge'),
+    kD=num('sensor.site_energy_daily'),kW=num('sensor.site_energy_weekly'),kM=num('sensor.site_energy_monthly'),kB=num('sensor.site_energy_billing_period'),
+    cD=num('sensor.site_energy_cost_today'),cM=num('sensor.site_energy_cost_this_month'),cB=num('sensor.site_energy_cost_billing_period'),
+    avg=num('sensor.site_energy_daily_average_mtd'),pk=num('sensor.site_energy_projected_month'),pc=num('sensor.site_energy_projected_month_cost'),
+    hr=num('sensor.site_energy_cost_rate'),imb=num('sensor.phase_imbalance');
+  const money=(v)=>v==null?'—':'$'+fmt(v,2), mul=(a,b)=>(a==null||b==null)?null:a*b;
+  const card=(lab,id,kwh,cost,hot)=>`<div class="metric lift" data-ent="${id}"><div class="ml">${lab}</div><div class="mv"${hot?' style="color:var(--cyan)"':''}>${fmt(kwh)}<span class="mu">kWh</span></div><div class="ms">${money(cost)}</div></div>`;
+  el.innerHTML=`<div class="sublabel" style="margin-top:0">Consumption &amp; cost</div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(128px,1fr))">
+      ${card('Today','sensor.site_energy_daily',kD,cD)}
+      ${card('This week','sensor.site_energy_weekly',kW,mul(kW,rate))}
+      ${card('This month','sensor.site_energy_monthly',kM,cM)}
+      ${card('Bill period · 26th','sensor.site_energy_billing_period',kB,cB,1)}
+      ${card('Daily avg MTD','sensor.site_energy_daily_average_mtd',avg,mul(avg,rate))}
+      ${card('Projected month','sensor.site_energy_projected_month',pk,pc)}
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:12px;font-size:12px;color:var(--ink2)">
+      <span><i class="mdi mdi-cash-fast" style="color:var(--gold);margin-right:5px"></i>Burn rate <b style="color:var(--ink)">${money(hr)}/h</b></span>
+      <span><i class="mdi mdi-tag-outline" style="margin-right:5px"></i><b style="color:var(--ink)">${rate==null?'—':fmt(rate*100,2)+' c/kWh'}</b> + <b style="color:var(--ink)">${fixd==null?'—':fmt(fixd*100,2)+' c/day'}</b> <span style="color:var(--ink3)">incl GST</span></span>
+      <span><i class="mdi mdi-sine-wave" style="margin-right:5px;color:${imb!=null&&imb>=30?'var(--crit)':imb!=null&&imb>=15?'var(--warn)':'var(--ok)'}"></i>Phase imbalance <b style="color:var(--ink)">${fmt(imb,1)} %</b></span>
+      <span style="color:var(--ink3);margin-left:auto">meter reconciled — HA reads ~1.7% under Meridian</span>
+    </div>`; }
 function renderSystem(){ $('system').innerHTML=SYS.map(gauge).join(''); }
 function renderContacts(){ $('contacts').innerHTML=CONTACTS.map(c=>{const o=ON(c.id),col=o?'var(--crit)':'var(--ok)',ic=c.win?(o?'window-open-variant':'window-closed-variant'):(o?'door-open':'door-closed');return `<div class="chip lift" style="--cg:${col}" data-ent="${c.id}"><i class="mdi mdi-${ic} ci"></i><span class="cn">${c.name}</span><span class="cv">${o?'OPEN':'SHUT'}</span></div>`;}).join('');
   $('leaks').innerHTML=LEAKS.map(l=>{const w=ON(l.id),col=w?'var(--crit)':'var(--ok)';return `<div class="chip lift" style="--cg:${col}" data-ent="${l.id}"><i class="mdi mdi-${w?'water-alert':'water-check'} ci"></i><span class="cn">${l.name}</span><span class="cv">${w?'WET':'DRY'}</span></div>`;}).join(''); }
@@ -510,15 +619,19 @@ function mountTwinCover(){ $('twinHost').innerHTML=`<div class="twincover lift" 
 function loadTwin(){ if(_twinLoaded) return; _twinLoaded=true; $('twinHost').innerHTML=`<div style="position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--hair);background:#0a0c10"><iframe src="${CONFIG.TWIN_URL}?embed&v=10" title="3D floor plan" style="width:100%;height:min(80vh,820px);border:0;display:block"></iframe></div>`; }
 
 /* ===================== CAMERAS ===================== */
-function buildCameras(){ if(_camBuilt||!$('cameras')) return; _camBuilt=true;
-  $('cameras').innerHTML=CAMERAS.map((c,i)=>`<div class="camcard lift">
-    <div class="camfeed" data-camview="${i}"><div class="camoff" data-off><i class="mdi mdi-cctv" style="font-size:24px"></i>no feed</div><img data-img="${c.cam}" alt="${esc(c.n)}" style="display:none"><span class="cambadge">${esc(c.a)}</span><span class="camlive" data-live style="display:none"><i></i>LIVE</span></div>
+function orderedVisibleCameras(){ const byId=Object.fromEntries(CAMERAS.map(c=>[c.cam,c])); return PREFS.cameras.order.filter(id=>byId[id]&&!PREFS.cameras.hidden.includes(id)).map(id=>byId[id]); }
+function cameraSizeClass(id){ const z=PREFS.cameras.sizes[id]||'s'; return z==='s'?'':`cam-size-${z}`; }
+function cameraLayoutTools(c){ if(!_cameraEdit)return''; const z=PREFS.cameras.sizes[c.cam]||'s'; return `<div class="cam-layout-tools"><button class="iconbtn" data-move-camera="${c.cam}|-1" title="Move earlier"><i class="mdi mdi-arrow-left"></i></button><button class="iconbtn" data-move-camera="${c.cam}|1" title="Move later"><i class="mdi mdi-arrow-right"></i></button>${CAMERA_SIZES.map(s=>`<button class="sizebtn ${z===s?'on':''}" data-size-camera="${c.cam}|${s}">${s==='full'?'FULL':s.toUpperCase()}</button>`).join('')}<button class="iconbtn" data-hide-camera="${c.cam}" title="Hide camera"><i class="mdi mdi-eye-off"></i></button></div>`; }
+function buildCameras(force){ if((_camBuilt&&!force)||!$('cameras'))return; _camBuilt=true; const cams=orderedVisibleCameras();
+  $('cameras').innerHTML=cams.length?cams.map(c=>`<div class="camcard lift cam-drag ${cameraSizeClass(c.cam)}" data-camera-id="${c.cam}" data-drag-path="cameras.order" data-drag-id="${c.cam}" draggable="${_cameraEdit?'true':'false'}">${cameraLayoutTools(c)}
+    <div class="camfeed" data-camview="${c.cam}"><div class="camoff" data-off><i class="mdi mdi-cctv" style="font-size:24px"></i>no feed</div><img data-img="${c.cam}" alt="${esc(c.n)}" style="display:none"><span class="cambadge">${esc(c.a)}</span><span class="camlive" data-live style="display:none"><i></i>LIVE</span></div>
     <div class="cambody"><div class="camname">${esc(c.n)}</div><div class="camroom">${esc(c.cam.replace('camera.',''))}</div>
-      <div class="cambtns"><div class="cbtn siren" data-siren="${c.siren}" data-name="${esc(c.n)}"><i class="mdi mdi-bullhorn"></i>Siren</div>${c.flood?`<div class="cbtn flash" data-toggle="${c.flood}"><i class="mdi mdi-flashlight"></i>Light</div>`:`<div class="cbtn" style="opacity:.4;cursor:default"><i class="mdi mdi-flashlight-off"></i>—</div>`}</div></div></div>`).join('');
+      <div class="cambtns"><button class="cbtn siren" data-siren="${c.siren}" data-name="${esc(c.n)}"><i class="mdi mdi-bullhorn"></i>Siren</button>${c.flood?`<button class="cbtn flash" data-toggle="${c.flood}"><i class="mdi mdi-flashlight"></i>Light</button>`:`<button class="cbtn" disabled style="opacity:.4;cursor:default"><i class="mdi mdi-flashlight-off"></i>—</button>`}${c.frigate?`<button class="cbtn frigate" data-frigate="${c.frigate}" title="Open alerts and timeline"><i class="mdi mdi-filmstrip"></i>Frigate</button>`:`<button class="cbtn" disabled title="No verified Frigate mapping"><i class="mdi mdi-filmstrip-off"></i>No link</button>`}</div></div></div>`).join(''):`<div class="glass empty-state" style="grid-column:1/-1">No cameras selected. <button class="btn" style="margin-left:8px" data-open-customizer="cameras">Choose cameras</button></div>`;
+  syncCameras(true);
 }
 function camImg(cam){ const tok=attr(cam,'access_token'); return tok?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+cam+'?token='+tok):''; }
 function syncCameras(force){ if(!_camBuilt) return; const active=$('tab-cameras')&&$('tab-cameras').classList.contains('on');
-  CAMERAS.forEach(c=>{
+  orderedVisibleCameras().forEach(c=>{
     const sb=document.querySelector(`[data-siren="${c.siren}"]`); if(sb) sb.classList.toggle('on',ON(c.siren));
     if(c.flood){ const fb=document.querySelector(`[data-toggle="${c.flood}"]`); if(fb) fb.classList.toggle('on',ON(c.flood)); }
     const img=document.querySelector(`#cameras [data-img="${c.cam}"]`); if(!img) return;
@@ -528,10 +641,12 @@ function syncCameras(force){ if(!_camBuilt) return; const active=$('tab-cameras'
       img.src=(CONFIG.HA_BASE||'')+'/api/camera_proxy/'+c.cam+'?token='+tok+'&_='+Math.floor(Date.now()/8000); } }
   });
 }
-function openCam(i){ const c=CAMERAS[i], src=camImg(c.cam);
+const FRIGATE_BASE='http://192.168.73.251:5000';
+function openFrigateCamera(key){ if(!key||!CAMERAS.some(c=>c.frigate===key)){toast('No verified Frigate mapping');return;} window.open(`${FRIGATE_BASE}/review?cameras=${encodeURIComponent(key)}`,'_blank','noopener,noreferrer'); }
+function openCam(id){ const c=CAMERAS.find(x=>x.cam===id); if(!c)return; const src=camImg(c.cam);
   $('entModal').innerHTML=`<div class="mhead"><div style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(34,211,238,.14);color:var(--cyan)"><i class="mdi mdi-cctv" style="font-size:19px"></i></div><div style="min-width:0"><div style="font-weight:800;font-size:14px">${esc(c.n)}</div><div style="font-size:11px;color:var(--ink3)">${esc(c.a)} · ${esc(c.cam)}</div></div><button class="mclose" onclick="closeModal('entBackdrop')">✕</button></div>
     <div style="padding:14px"><div style="border-radius:12px;overflow:hidden;background:#05070c;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center">${src?`<img src="${src}" style="width:100%;height:100%;object-fit:contain" onerror="this.style.opacity=.25">`:'<span style="color:var(--ink3);font-size:12px">no feed</span>'}</div>
-      <div class="cambtns" style="margin-top:12px"><div class="cbtn siren ${ON(c.siren)?'on':''}" data-siren="${c.siren}" data-name="${esc(c.n)}"><i class="mdi mdi-bullhorn"></i>Siren</div>${c.flood?`<div class="cbtn flash ${ON(c.flood)?'on':''}" data-toggle="${c.flood}"><i class="mdi mdi-flashlight"></i>Flashlight</div>`:''}</div></div>`;
+      <div class="cambtns" style="margin-top:12px"><button class="cbtn siren ${ON(c.siren)?'on':''}" data-siren="${c.siren}" data-name="${esc(c.n)}"><i class="mdi mdi-bullhorn"></i>Siren</button>${c.flood?`<button class="cbtn flash ${ON(c.flood)?'on':''}" data-toggle="${c.flood}"><i class="mdi mdi-flashlight"></i>Flashlight</button>`:''}${c.frigate?`<button class="cbtn frigate" data-frigate="${c.frigate}"><i class="mdi mdi-filmstrip"></i>Frigate</button>`:''}</div></div>`;
   openModal('entBackdrop');
 }
 async function sirenToggle(id,name,ev){ if(ev) ev.stopPropagation(); const on=ON(id);
@@ -539,6 +654,24 @@ async function sirenToggle(id,name,ev){ if(ev) ev.stopPropagation(); const on=ON
   if(DEMO){ if(S[id]) S[id].state=on?'off':'on'; syncCameras(true); return; }
   try{ await svc('siren', on?'turn_off':'turn_on', {entity_id:id}); toast('Siren '+(on?'OFF':'ON')+' · '+name); }catch(e){ toast('⚠ '+e.message); } reconcileSoon();
 }
+
+/* ===================== PERSONALIZATION ===================== */
+function prefList(path){ return path==='environment.rows'?PREFS.environment.rows:path==='environment.columns'?PREFS.environment.columns:PREFS.cameras.order; }
+function refreshPersonalized(kind){ if(kind==='environment'){renderVitals();}else{buildCameras(true);} renderCustomizer(); }
+function openCustomizer(tab){ _customTab=tab==='cameras'?'cameras':'environment'; renderCustomizer(); $('customizerBackdrop').classList.add('on'); $('customizerBackdrop').setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; setTimeout(()=>$('customizer').focus(),0); }
+function closeCustomizer(){ $('customizerBackdrop').classList.remove('on'); $('customizerBackdrop').setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
+function prefRow(path,id,label,detail,visible){ return `<div class="pref-row" draggable="true" data-drag-path="${path}" data-drag-id="${id}"><input type="checkbox" ${visible?'checked':''} data-pref-visible="${path}|${id}" aria-label="Show ${esc(label)}"><div class="meta"><b>${esc(label)}</b><span>${esc(detail||id)}</span></div><div class="pref-actions"><button class="iconbtn" data-move-pref="${path}|${id}|-1" title="Move up"><i class="mdi mdi-arrow-up"></i></button><button class="iconbtn" data-move-pref="${path}|${id}|1" title="Move down"><i class="mdi mdi-arrow-down"></i></button></div></div>`; }
+function cameraPrefRow(c){ const visible=!PREFS.cameras.hidden.includes(c.cam),z=PREFS.cameras.sizes[c.cam]||'s'; return `<div class="pref-row" draggable="true" data-drag-path="cameras.order" data-drag-id="${c.cam}"><input type="checkbox" ${visible?'checked':''} data-pref-visible="cameras.order|${c.cam}" aria-label="Show ${esc(c.n)}"><div class="meta"><b>${esc(c.n)}</b><span>${esc(c.a)} · Frigate ${esc(c.frigate||'not mapped')}</span></div><div class="pref-actions"><button class="iconbtn" data-move-pref="cameras.order|${c.cam}|-1" title="Move up"><i class="mdi mdi-arrow-up"></i></button><button class="iconbtn" data-move-pref="cameras.order|${c.cam}|1" title="Move down"><i class="mdi mdi-arrow-down"></i></button>${CAMERA_SIZES.map(s=>`<button class="sizebtn ${z===s?'on':''}" data-size-camera="${c.cam}|${s}">${s==='full'?'FULL':s.toUpperCase()}</button>`).join('')}</div></div>`; }
+function renderCustomizer(){
+  document.querySelectorAll('[data-customizer-tab]').forEach(b=>b.classList.toggle('primary',b.dataset.customizerTab===_customTab)); const body=$('customizerBody'); if(!body)return;
+  if(_customTab==='environment'){
+    body.innerHTML=`<div class="pref-grid"><label>Density<select class="ctrl" data-pref-density><option value="comfortable" ${PREFS.environment.density==='comfortable'?'selected':''}>Comfortable</option><option value="compact" ${PREFS.environment.density==='compact'?'selected':''}>Compact</option></select></label><label>Decimals<select class="ctrl" data-pref-precision><option value="auto" ${PREFS.environment.precision==='auto'?'selected':''}>Automatic</option>${['0','1','2'].map(x=>`<option value="${x}" ${PREFS.environment.precision===x?'selected':''}>${x}</option>`).join('')}</select></label></div><label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:15px"><input type="checkbox" data-pref-units ${PREFS.environment.showUnits?'checked':''}> Show ° and % units</label><div class="sublabel">Rows · drag or use arrows</div><div class="pref-list">${PREFS.environment.rows.map(k=>prefRow('environment.rows',k,ROOMS[k].label,ROOMS[k].type,!PREFS.environment.hiddenRows.includes(k))).join('')}</div><div class="sublabel">Columns · drag or use arrows</div><div class="pref-list">${PREFS.environment.columns.map(k=>prefRow('environment.columns',k,ENV_LABELS[k],'table metric',!PREFS.environment.hiddenColumns.includes(k))).join('')}</div>`;
+  }else{
+    const byId=Object.fromEntries(CAMERAS.map(c=>[c.cam,c])); body.innerHTML=`<p style="color:var(--ink3);font-size:11.5px;margin:0 0 12px">Choose, order, and size each feed. S is one grid cell; Full spans the row.</p><div class="pref-list">${PREFS.cameras.order.map(id=>cameraPrefRow(byId[id])).join('')}</div>`;
+  }
+}
+function setPreferenceVisibility(path,id,visible){ if(path==='environment.rows')setHidden({group:'environment',key:'hiddenRows'},id,!visible); else if(path==='environment.columns')setHidden({group:'environment',key:'hiddenColumns'},id,!visible); else setHidden({group:'cameras',key:'hidden'},id,!visible); savePreferences(); refreshPersonalized(path.startsWith('environment')?'environment':'cameras'); }
+function resetPreferences(){ if(!confirm('Reset the environment and camera layout to defaults?'))return; try{localStorage.removeItem(PREF_KEY);}catch(e){} PREFS=normalizePreferences(null); _cameraEdit=false; savePreferences(); renderVitals();buildCameras(true);renderCustomizer();toast('Dashboard layout reset'); }
 
 /* ===== room quick-controls: light dimmer · AC controller · area camera ===== */
 let _lightRoom=null,_climateRoom=null;
@@ -574,7 +707,7 @@ async function acSetpt(id,dir){ const a=S[id]?S[id].attributes||{}:{}, cur=a.tem
   if(!DEMO){ try{ await svc('climate','set_temperature',{entity_id:id,temperature:nv}); }catch(e){ toast('⚠ '+e.message); } reconcileSoon(); } }
 async function acMode(id,mode){ if(S[id]) S[id].state=mode; if(_climateRoom) openClimate(_climateRoom);
   if(!DEMO){ try{ await svc('climate','set_hvac_mode',{entity_id:id,hvac_mode:mode}); toast(fname(id)+' → '+mode); }catch(e){ toast('⚠ '+e.message); } reconcileSoon(); } }
-function openAreaCam(area){ const i=CAMERAS.findIndex(c=>c.a===area); if(i>=0) openCam(i); else toast('No camera mapped for '+area); }
+function openAreaCam(area){ const c=CAMERAS.find(c=>c.a===area); if(c) openCam(c.cam); else toast('No camera mapped for '+area); }
 function chartOpts(){ return {responsive:true,maintainAspectRatio:false,animation:false,interaction:{intersect:false,mode:'index'},plugins:{legend:{display:true,labels:{color:'#aab4c0',boxWidth:10,boxHeight:10,font:{size:10},usePointStyle:true}}},scales:{x:{display:false},y:{ticks:{color:'#727d8a',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}}}}; }
 function mkChart(cid,series){ const ctx=$(cid); if(!ctx||!window.Chart) return null; return new Chart(ctx,{type:'line',data:{labels:HIST.t,datasets:series},options:chartOpts()}); }
 function initCharts(){ if(CHARTS.w||!window.Chart) return; const ds=(l,c,k,store,w)=>({label:l,data:store[k],borderColor:c,backgroundColor:c+'22',borderWidth:w||1.6,pointRadius:0,fill:k==='total',tension:.35});
@@ -583,8 +716,11 @@ function pushHist(){ const t=new Date().toLocaleTimeString(undefined,{hour:'2-di
   const CAP=240; if(HIST.t.length>CAP){HIST.t.shift();['w','i'].forEach(k=>['total','a','b','c'].forEach(s=>HIST[k][s].shift()));} initCharts(); if(CHARTS.w){CHARTS.w.update('none');CHARTS.i.update('none');} }
 async function seedHistory(){ if(DEMO){ seedDemoHistory(); return; } const tok=getToken(); if(!tok) return; const ids=[PWR.total,PWR.a_p,PWR.b_p,PWR.c_p,PWR.amps,PWR.a_i,PWR.b_i,PWR.c_i],start=new Date(Date.now()-24*3600*1000).toISOString();
   try{ const r=await fetch((CONFIG.HA_BASE||"")+"/api/history/period/"+start+"?filter_entity_id="+ids.join(',')+"&minimal_response&no_attributes",{headers:{Authorization:'Bearer '+tok},cache:'no-store'}); if(!r.ok) return; const data=await r.json(),byId={}; for(const arr of data){if(arr&&arr.length)byId[arr[0].entity_id]=arr;} const base=byId[PWR.total]; if(!base) return; const step=Math.max(1,Math.floor(base.length/120));
-    for(let k=0;k<base.length;k+=step){ const at=base[k].last_changed||base[k].last_updated; HIST.t.push(at?new Date(at).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}):''); const val=(id)=>{const a=byId[id];if(!a)return null;const i=Math.min(k,a.length-1);const v=parseFloat(a[i].state);return isFinite(v)?v:null;};
-      HIST.w.total.push(val(PWR.total));HIST.w.a.push(val(PWR.a_p));HIST.w.b.push(val(PWR.b_p));HIST.w.c.push(val(PWR.c_p));HIST.i.total.push(val(PWR.amps));HIST.i.a.push(val(PWR.a_i));HIST.i.b.push(val(PWR.b_i));HIST.i.c.push(val(PWR.c_i)); } initCharts(); if(CHARTS.w){CHARTS.w.update('none');CHARTS.i.update('none');} }catch(e){} }
+    const pts=(id)=>{const a=byId[id]||[],o=[];for(const p of a){const ts=Date.parse(p.last_changed||p.last_updated||''),v=parseFloat(p.state);if(isFinite(ts)&&isFinite(v))o.push([ts,v]);}return o;};
+    const SER={},PTR={}; for(const id of ids){SER[id]=pts(id);PTR[id]=-1;}
+    const at=(id,ts)=>{const s=SER[id];if(!s.length)return null;let i=PTR[id];while(i+1<s.length&&s[i+1][0]<=ts)i++;PTR[id]=i;return i<0?null:s[i][1];};
+    for(let k=0;k<base.length;k+=step){ const iso=base[k].last_changed||base[k].last_updated,ts=Date.parse(iso||''); if(!isFinite(ts)) continue; HIST.t.push(new Date(ts).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}));
+      HIST.w.total.push(at(PWR.total,ts));HIST.w.a.push(at(PWR.a_p,ts));HIST.w.b.push(at(PWR.b_p,ts));HIST.w.c.push(at(PWR.c_p,ts));HIST.i.total.push(at(PWR.amps,ts));HIST.i.a.push(at(PWR.a_i,ts));HIST.i.b.push(at(PWR.b_i,ts));HIST.i.c.push(at(PWR.c_i,ts)); } initCharts(); if(CHARTS.w){CHARTS.w.update('none');CHARTS.i.update('none');} }catch(e){} }
 function seedDemoHistory(){ for(let k=0;k<120;k++){ HIST.t.push(''); const wob=Math.sin(k/9)*900+Math.sin(k/3)*250,tot=11800+wob; HIST.w.total.push(Math.round(tot));HIST.w.a.push(Math.round(tot*0.34));HIST.w.b.push(Math.round(tot*0.33));HIST.w.c.push(Math.round(tot*0.33)); const amp=tot/230; HIST.i.total.push(+amp.toFixed(1));HIST.i.a.push(+(amp*0.34).toFixed(1));HIST.i.b.push(+(amp*0.33).toFixed(1));HIST.i.c.push(+(amp*0.33).toFixed(1)); } initCharts(); if(CHARTS.w){CHARTS.w.update('none');CHARTS.i.update('none');} }
 
 function render(){ renderVitals();renderAttention();renderCapacity();renderRooms();renderControls();renderAlarm();renderPower();renderSystem();renderContacts();renderWeather();renderCalendar();syncCameras(); $('lastUpd').textContent='Updated '+new Date().toLocaleTimeString(); }
@@ -594,9 +730,21 @@ function reconcileSoon(){ clearTimeout(_reconcileT); _reconcileT=setTimeout(refr
 async function refresh(){ if(DEMO){ if(!Object.keys(S).length){S=seedDemo();seedHistory();} setConn('demo'); render(); loadEquip(); return; } try{ S=await fetchStates(); setConn('live'); pushHist(); render(); loadEquip(); }catch(e){ setConn('offline'); if(!Object.keys(S).length){ $('attention').innerHTML=alertCard('crit','wifi-off','Cannot reach Home Assistant',(getToken()?'API error: '+e.message:'No token — open inside HA or append ?demo')); } } }
 
 document.addEventListener('click',(e)=>{
+  const oc=e.target.closest('[data-open-customizer]'); if(oc){openCustomizer(oc.dataset.openCustomizer);return;}
+  if(e.target.closest('[data-close-customizer]')){closeCustomizer();return;}
+  const ct=e.target.closest('[data-customizer-tab]'); if(ct){_customTab=ct.dataset.customizerTab;renderCustomizer();return;}
+  if(e.target.closest('[data-reset-preferences]')){resetPreferences();return;}
+  if(e.target.closest('[data-env-collapse]')){PREFS.environment.collapsed=!PREFS.environment.collapsed;savePreferences();renderVitals();return;}
+  const es=e.target.closest('[data-env-sort]'); if(es){const col=es.dataset.envSort,sort=PREFS.environment.sort; if(sort.column===col)sort.direction=sort.direction==='asc'?'desc':'asc';else{sort.column=col;sort.direction='asc';}savePreferences();renderVitals();return;}
+  if(e.target.closest('[data-camera-edit]')){_cameraEdit=!_cameraEdit;buildCameras(true);toast(_cameraEdit?'Camera layout controls shown':'Camera layout saved');return;}
+  const fr=e.target.closest('[data-frigate]'); if(fr){openFrigateCamera(fr.dataset.frigate);return;}
+  const mc=e.target.closest('[data-move-camera]'); if(mc){const [id,d]=mc.dataset.moveCamera.split('|');moveIn(PREFS.cameras.order,id,Number(d));buildCameras(true);renderCustomizer();return;}
+  const sc=e.target.closest('[data-size-camera]'); if(sc){const [id,size]=sc.dataset.sizeCamera.split('|');if(CAMERA_SIZES.includes(size)){PREFS.cameras.sizes[id]=size;savePreferences();buildCameras(true);renderCustomizer();}return;}
+  const hc=e.target.closest('[data-hide-camera]'); if(hc){setPreferenceVisibility('cameras.order',hc.dataset.hideCamera,false);return;}
+  const mp=e.target.closest('[data-move-pref]'); if(mp){const [path,id,d]=mp.dataset.movePref.split('|');moveIn(prefList(path),id,Number(d));refreshPersonalized(path.startsWith('environment')?'environment':'cameras');return;}
   const tb=e.target.closest('[data-tab]'); if(tb){ document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===tb)); document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on',p.id==='tab-'+tb.dataset.tab)); if(tb.dataset.tab==='threed') loadTwin(); if(tb.dataset.tab==='cameras') syncCameras(true); return; }
   const sr=e.target.closest('[data-siren]'); if(sr){ sirenToggle(sr.dataset.siren, sr.dataset.name, e); return; }
-  const cv=e.target.closest('[data-camview]'); if(cv){ openCam(+cv.dataset.camview); return; }
+  const cv=e.target.closest('[data-camview]'); if(cv){ openCam(cv.dataset.camview); return; }
   if(e.target.closest('#twinCover')){ loadTwin(); return; }
   const tg=e.target.closest('[data-toggle]'); if(tg){ toggle(tg.dataset.toggle,e); return; }
   const al=e.target.closest('[data-alarm]'); if(al){ alarmCmd(al.dataset.alarm); return; }
@@ -609,10 +757,16 @@ document.addEventListener('click',(e)=>{
   const en=e.target.closest('[data-ent]'); if(en){ openEntity(en.dataset.ent); return; }
   const rm=e.target.closest('[data-room]'); if(rm){ openRoom(rm.dataset.room); return; }
   const bd=e.target.closest('.backdrop'); if(bd&&e.target===bd){ closeModal(bd.id); return; }
+  if(e.target===$('customizerBackdrop')){closeCustomizer();return;}
 });
-document.addEventListener('input',(e)=>{ const t=e.target; if(t&&t.matches&&t.matches('[data-bright]')){ const row=t.closest('.erow'),sp=row&&row.querySelector('.enm span'); if(sp) sp.textContent=t.value+'%'; clearTimeout(t._bt); t._bt=setTimeout(()=>setBright(t.dataset.bright,t.value),220); }
+document.addEventListener('input',(e)=>{ const t=e.target; if(t.matches('[data-env-query]')){PREFS.environment.query=t.value;savePreferences();renderVitals();return;} if(t&&t.matches&&t.matches('[data-bright]')){ const row=t.closest('.erow'),sp=row&&row.querySelector('.enm span'); if(sp) sp.textContent=t.value+'%'; clearTimeout(t._bt); t._bt=setTimeout(()=>setBright(t.dataset.bright,t.value),220); }
 });
-document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ closeModal('entBackdrop'); closeModal('roomBackdrop'); } });
+document.addEventListener('change',(e)=>{const t=e.target;if(t.matches('[data-env-type]')){PREFS.environment.roomType=t.value;savePreferences();renderVitals();return;}if(t.matches('[data-env-data]')){PREFS.environment.dataFilter=t.value;savePreferences();renderVitals();return;}if(t.matches('[data-pref-visible]')){const [path,id]=t.dataset.prefVisible.split('|');setPreferenceVisibility(path,id,t.checked);return;}if(t.matches('[data-pref-density]')){PREFS.environment.density=t.value==='compact'?'compact':'comfortable';savePreferences();renderVitals();renderCustomizer();return;}if(t.matches('[data-pref-precision]')){PREFS.environment.precision=['auto','0','1','2'].includes(t.value)?t.value:'auto';savePreferences();renderVitals();renderCustomizer();return;}if(t.matches('[data-pref-units]')){PREFS.environment.showUnits=t.checked;savePreferences();renderVitals();renderCustomizer();return;}});
+document.addEventListener('dragstart',(e)=>{const row=e.target.closest('[data-drag-path][data-drag-id]');if(!row)return;_dragItem={path:row.dataset.dragPath,id:row.dataset.dragId};row.classList.add('dragging');if(e.dataTransfer)e.dataTransfer.effectAllowed='move';});
+document.addEventListener('dragover',(e)=>{const row=e.target.closest('[data-drag-path][data-drag-id]');if(_dragItem&&row&&row.dataset.dragPath===_dragItem.path)e.preventDefault();});
+document.addEventListener('drop',(e)=>{const row=e.target.closest('[data-drag-path][data-drag-id]');if(!_dragItem||!row||row.dataset.dragPath!==_dragItem.path)return;e.preventDefault();moveTo(prefList(_dragItem.path),_dragItem.id,row.dataset.dragId);const kind=_dragItem.path.startsWith('environment')?'environment':'cameras';_dragItem=null;refreshPersonalized(kind);});
+document.addEventListener('dragend',()=>{document.querySelectorAll('.dragging').forEach(x=>x.classList.remove('dragging'));_dragItem=null;});
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ closeModal('entBackdrop'); closeModal('roomBackdrop'); closeCustomizer(); } });
 function tickClock(){ $('clock').textContent=new Date().toLocaleString(undefined,{weekday:'short',hour:'2-digit',minute:'2-digit'}); }
 $('modeTag').textContent=DEMO?'demo mode':'live';
 mountTwinCover(); buildEquipPanel(); buildCameras(); tickClock(); setInterval(tickClock,30000); setConn(DEMO?'demo':'connecting');
