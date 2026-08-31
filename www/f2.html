@@ -6119,7 +6119,7 @@ document.addEventListener('alpine:init', () => {
       // otherwise it re-fetched + decoded a fresh frame off HA every 30s in the background.
       { const cam=S[CONFIG.E.cam], ct=cam&&cam.attributes&&cam.attributes.access_token;
         if(this.view==='dashboard' && !this.camMin){ this._camTick=(this._camTick||0)+1;
-          this.camUrl=ct?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+CONFIG.E.cam+'?token='+ct+'&_='+this._camTick):''; } }
+          this.camUrl=ct?((CONFIG.HA_BASE||'')+'/api/camera_proxy/'+RID(CONFIG.E.cam)+'?token='+ct+'&_='+this._camTick):''; } }   // path must be this room's real camera — the token above comes from its state, so a logical id here 403s
       if(_v==='tune' && window.__tuneReseed) window.__tuneReseed();   // PERF: only reseed the (heavy SVG) Tune editor when it's the active view — was rebuilding it from sensor noise every 30s while hidden
       const sph=num("src_ph"),sec=num("src_ec");   // live feed chemistry (Atlas probes); "—" when the probe is offline
       this.steeringMeta=[{label:"Feed pH",val:sph==null?"—":fmt(sph,2),cls:sph==null?"text-slate-500":(sph>=5.6&&sph<=6.4?"text-emerald-400":"text-amber-400")},{label:"Feed EC",val:sec==null?"—":fmt(sec,2)+" mS/cm",cls:sec==null?"text-slate-500":"text-slate-200"},{label:"Fused EC",val:fmt(num("fused_ec"),2),cls:"text-slate-200"},{label:"EC target",val:fmt(CONFIG.EC_TARGET,1),cls:"text-slate-200"},{label:"Pump",val:fmt(num("pump_power"),0)+" W",cls:num("pump_power")>100?"text-amber-400":"text-slate-200"},{label:"Next shot",val:this.shortTime(val("next_irrig")),cls:"text-slate-200"}];
