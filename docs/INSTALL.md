@@ -7,7 +7,7 @@
 - Home Assistant OS/Supervised with the app store for the guided controller install. Container/Core users must run the companion controller separately; a true one-click controller install is not available there.
 - Existing HA entities for the actual pump and zone valves, fresh VWC/EC probes, feed-water probes and any configured interlocks. This integration maps entities; it does not provision sensor firmware or pair devices.
 
-This workspace requires integration 2.13.0 and controller 0.12.0. Use matching published versions; the public demo uses isolated sample data.
+This workspace requires integration 2.13.1 and controller 0.12.0. Use matching published versions; the public demo uses isolated sample data.
 
 ## Guided installation
 

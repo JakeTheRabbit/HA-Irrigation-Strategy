@@ -6,7 +6,7 @@ A Home Assistant irrigation controller with a native operator workspace: see the
 
 The demo opens directly in your browser with sample rooms, sensor data and editable plans. No login or Home Assistant installation is required; demo changes stay in your browser.
 
-![Release](https://img.shields.io/badge/Release-2.13.0-green)
+![Release](https://img.shields.io/badge/Release-2.13.1-green)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3+-41BDF5)
 ![License](https://img.shields.io/badge/License-MIT-green)
 

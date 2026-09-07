@@ -55,7 +55,7 @@ VWC_DRY_THRESHOLD = 40
 VWC_SATURATED_THRESHOLD = 70
 
 # Software version - single source of truth
-SOFTWARE_VERSION = "2.13.0"
+SOFTWARE_VERSION = "2.13.1"
 
 # Crop steering phases (P0-P3 only, Manual removed)
 PHASES = ["P0", "P1", "P2", "P3"]

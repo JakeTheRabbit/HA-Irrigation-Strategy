@@ -2,7 +2,7 @@
 
 This review compared every local branch and origin branch against the unified workspace at `b61d7a6999ecbc5029b9b2eca92272c02ba2bedc`, including the working release corrections. Git ancestry and patch equivalence were checked alongside source and complete-tree comparisons.
 
-**No unique controller feature or safety fix requires recovery from a non-main branch.** Retired tips are being preserved through archive references and private backups. At the time of this record, the old branch tips have not yet been deleted; final cleanup status must be verified separately.
+**No unique controller feature or safety fix requires recovery from a non-main branch.** Retired tips are preserved through archive tags and private Git bundles. Cleanup is complete: the main project and dedicated controller repository each have only `main`, locally and on GitHub. Eight remote and eleven local non-main branches were removed from this repository after verification; the controller repository's superseded two-room branch was also archived and removed.
 
 ## Remote branches
 

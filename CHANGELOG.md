@@ -9,6 +9,12 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.1] - 2026-09-08
+
+**🌱 In plain English.** Fix a startup failure when multiple rooms load at once. Every room can now share the native sidebar reliably. Controller 0.12.0 remains the matching version.
+
+**🔧 Technical notes.** Serialize sidebar/static-path registration across concurrent config-entry setup. Live installation exposed the duplicate-panel exception; deterministic concurrent-startup and retry tests cover the correction.
+
 ## [2.13.0] - 2026-09-08
 
 **🌱 In plain English.** One Home Assistant native workspace brings room setup, current readings and whole-grow planning together. The combined VWC/EC planning graph follows each zone's selected day, week and steering profile. Existing installations keep their room identities, setpoints and hydraulic settings.
