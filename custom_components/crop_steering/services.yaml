@@ -374,3 +374,70 @@ strategy_disarm:
       required: true
       selector:
         text:
+
+runs_get:
+  name: Read run records
+  description: Read this room's recorded run metadata. Does not enable irrigation.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+runs_save:
+  name: Save run record
+  description: Register a run with current reference metadata, or edit its dates and name while preserving the original reference.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    record:
+      required: true
+      selector:
+        object:
+runs_archive:
+  name: Archive or restore run record
+  description: Change run visibility without deleting historical reference metadata.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    id:
+      required: true
+      selector:
+        text:
+    archived:
+      required: true
+      selector:
+        boolean:
+runs_import:
+  name: Import run records
+  description: Import at most 100 validated metadata records for the same room. Recorder history is not included.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    runs:
+      required: true
+      selector:
+        object:

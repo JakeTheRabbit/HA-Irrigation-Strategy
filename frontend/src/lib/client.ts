@@ -1,3 +1,5 @@
+import { loadHistoryWindow } from "./comparison-history";
+import type { HistoryRequest } from "./comparison-types";
 import type { OperatorAction } from "./operator-types";
 import type { Change, EntityState, RoomView, Series, States, WriteResult } from "./types";
 import { numeric, validateChange } from "./model";
@@ -66,11 +68,14 @@ export class HaClient {
     path: string,
     data?: unknown,
     service?: { domain: string; action: string },
+    externalSignal?: AbortSignal,
   ): Promise<T> {
+    if (externalSignal?.aborted) throw new DOMException("History request cancelled.", "AbortError");
     if (this.controller.signal.aborted) throw new Error("Connection was closed.");
     const abort = new AbortController();
     const cancel = () => abort.abort();
     this.controller.signal.addEventListener("abort", cancel, { once: true });
+    externalSignal?.addEventListener("abort", cancel, { once: true });
     let timeout: ReturnType<typeof setTimeout> | undefined;
     let onAbort: (() => void) | undefined;
     const deadline = new Promise<never>((_, reject) => {
@@ -79,7 +84,9 @@ export class HaClient {
           new Error(
             this.controller.signal.aborted
               ? "Connection was closed."
-              : "Home Assistant request timed out.",
+              : externalSignal?.aborted
+                ? "History request cancelled."
+                : "Home Assistant request timed out.",
           ),
         );
       abort.signal.addEventListener("abort", onAbort, { once: true });
@@ -121,11 +128,16 @@ export class HaClient {
     } finally {
       clearTimeout(timeout);
       this.controller.signal.removeEventListener("abort", cancel);
+      externalSignal?.removeEventListener("abort", cancel);
       if (onAbort) abort.signal.removeEventListener("abort", onAbort);
     }
   }
   async operator<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
     const allowed = [
+      "runs_get",
+      "runs_save",
+      "runs_archive",
+      "runs_import",
       "strategy_get",
       "strategy_save",
       "strategy_preview",
@@ -159,6 +171,12 @@ export class HaClient {
       domain,
       action,
     });
+  }
+  async historyWindow(request: HistoryRequest) {
+    return loadHistoryWindow(
+      (path, signal) => this.request("GET", path, undefined, undefined, signal),
+      request,
+    );
   }
   async history(entityIds: string[], hours: number, states: States): Promise<Series[]> {
     if (!entityIds.length) return [];

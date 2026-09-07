@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useEffect, useState } from "react";
 import {
   Check,
   Plus,
@@ -177,7 +177,7 @@ export function Setup({
   const [tab, setTab] = useState<"rooms" | "install">("rooms");
   const dirty = !!draft && (isNew || JSON.stringify(draft) !== JSON.stringify(original));
   const connected = ["live", "demo"].includes(controller.connection);
-  useEffect(() => {
+  useLayoutEffect(() => {
     onDirtyChange(dirty);
     return () => onDirtyChange(false);
   }, [dirty, onDirtyChange]);

@@ -168,6 +168,7 @@ jobs:
           node frontend/scripts/verify-dashboard.mjs
           node frontend/scripts/verify-live.mjs
           node frontend/scripts/verify-workspace.mjs
+          node frontend/scripts/verify-steering-visuals.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

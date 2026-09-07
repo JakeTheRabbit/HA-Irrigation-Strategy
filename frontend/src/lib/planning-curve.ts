@@ -26,6 +26,7 @@ export interface PlanningModel {
   warnings: string[];
 }
 export const planningClock = (lightsOn: number, elapsed: number) => {
+  if (!Number.isFinite(lightsOn) || !Number.isFinite(elapsed)) return "—";
   const minutes = Math.round(((((lightsOn + elapsed) % 24) + 24) % 24) * 60) % 1440;
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 };
@@ -177,4 +178,32 @@ export function buildPlanningCurve(
     notes,
     warnings,
   };
+}
+
+export interface PlanningBound {
+  min: number;
+  max: number;
+  step: number;
+}
+export type PlanningBounds = Record<string, PlanningBound>;
+/** Use the HA field's minimum as the step origin; the highest step may be below max. */
+export function changePlanningValue(
+  key: string,
+  value: number,
+  bounds: PlanningBounds,
+  onChange?: (key: string, value: number) => void,
+) {
+  const bound = bounds[key];
+  if (
+    !onChange ||
+    !bound ||
+    ![value, bound.min, bound.max, bound.step].every(Number.isFinite) ||
+    bound.min > bound.max ||
+    bound.step <= 0
+  )
+    return;
+  const maxStep = Math.floor((bound.max - bound.min) / bound.step + 1e-9);
+  const step = Math.min(maxStep, Math.max(0, Math.round((value - bound.min) / bound.step)));
+  const quantized = Number((bound.min + step * bound.step).toFixed(10));
+  onChange(key, quantized);
 }

@@ -1,3 +1,4 @@
+import { DailyWaterSummary } from "@/components/water-delivery";
 import { useState } from "react";
 import { ArrowRight, ArrowUpRight, CircleCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -76,6 +77,7 @@ export function Overview({
         </div>
       )}
       <Metrics metrics={room.metrics} />
+      <DailyWaterSummary controller={controller} />
       <HistoryChart controller={controller} zones={room.zones} />
       <section className="panel">
         <div className="panel-heading">

@@ -1,4 +1,8 @@
 export type OperatorAction =
+  | "runs_get"
+  | "runs_save"
+  | "runs_archive"
+  | "runs_import"
   | "strategy_get"
   | "strategy_save"
   | "strategy_preview"

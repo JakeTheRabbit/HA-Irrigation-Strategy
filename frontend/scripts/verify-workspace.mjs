@@ -680,7 +680,7 @@ try {
         await lp.getByRole("button", { name: "Refresh controller data" }).click();
         await visible(lp.getByText("Grow plan controls this room", { exact: true }));
         const targetCell = lp
-          .locator(".table-scroll tbody tr")
+          .locator(".zone-table-desktop tbody tr")
           .first()
           .locator("td")
           .filter({ hasText: "Plan · P2 base VWC threshold" });

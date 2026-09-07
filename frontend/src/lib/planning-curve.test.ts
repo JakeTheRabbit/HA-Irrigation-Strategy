@@ -1,3 +1,6 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { PlanningCurve } from "../components/planning-curve";
 import { describe, expect, it } from "vitest";
 import { buildPlanningCurve, planningClock } from "./planning-curve";
 const parameters = {
@@ -81,5 +84,88 @@ describe("setpoint planning curve", () => {
   });
   it("rejects ambiguous equal lights-on and lights-off times", () => {
     expect(buildPlanningCurve(parameters, 6, 6).warnings.join(" ")).toMatch(/must differ/);
+  });
+});
+
+describe("HA-bounded curve editing", () => {
+  it("quantizes against the actual minimum and step and never exceeds max", async () => {
+    const { changePlanningValue } = await import("./planning-curve");
+    const calls: [string, number][] = [];
+    const onChange = (key: string, value: number) => calls.push([key, value]);
+    const bounds = { floor: { min: 10.25, max: 60.4, step: 0.5 } };
+    changePlanningValue("floor", 38.4, bounds, onChange);
+    changePlanningValue("floor", -100, bounds, onChange);
+    changePlanningValue("floor", 100, bounds, onChange);
+    expect(calls).toEqual([
+      ["floor", 38.25],
+      ["floor", 10.25],
+      ["floor", 60.25],
+    ]);
+  });
+  it("does not emit changes for unmapped fields, invalid bounds or non-finite input", async () => {
+    const { changePlanningValue } = await import("./planning-curve");
+    let calls = 0;
+    const cb = () => {
+      calls++;
+    };
+    changePlanningValue("missing", 40, {}, cb);
+    changePlanningValue("floor", NaN, { floor: { min: 10, max: 60, step: 0.5 } }, cb);
+    changePlanningValue("floor", 40, { floor: { min: 10, max: 60, step: 0 } }, cb);
+    expect(calls).toBe(0);
+  });
+});
+
+describe("rendered planning curve", () => {
+  const saved = {
+    parameters: {
+      p1_target_vwc: 65,
+      p2_vwc_threshold: 55,
+      field_capacity: 70,
+      dryback_target: 20,
+      ec_target_p2: 4,
+      p3_emergency_vwc_threshold: 38,
+    },
+    lightsOn: 10,
+    lightsOff: 22,
+  };
+  const line = (html: string, key: string) =>
+    html.match(new RegExp(`<line data-planning-line="${key}"[^>]*`))?.[0];
+  it("moves the rendered P3 draft floor immediately and retains the saved ghost line", () => {
+    const render = (floor: number) =>
+      renderToStaticMarkup(
+        createElement(PlanningCurve, {
+          ...saved,
+          parameters: { ...saved.parameters, p3_emergency_vwc_threshold: floor },
+          baseline: saved,
+        }),
+      );
+    const before = render(38),
+      after = render(42.5);
+    expect(line(before, "p3-floor")).not.toEqual(line(after, "p3-floor"));
+    expect(line(before, "baseline-p3-floor")).toEqual(line(after, "baseline-p3-floor"));
+    expect(after).toContain('data-planning-line="baseline-vwc"');
+    expect(after).toContain('data-planning-line="ec"');
+  });
+  it("exposes actual slider bounds and keeps unmapped handles read-only", () => {
+    const html = renderToStaticMarkup(
+      createElement(PlanningCurve, {
+        ...saved,
+        bounds: { p3_emergency_vwc_threshold: { min: 10, max: 60, step: 0.5 } },
+        onChange: () => {},
+        showEditors: false,
+      }),
+    );
+    expect(html).toContain('aria-label="P3 emergency floor" aria-valuemin="10" aria-valuemax="60"');
+    expect(html.match(/role="slider"/g)).toHaveLength(1);
+    expect(html).not.toContain("Precise target controls");
+  });
+  it("omits invalid draft geometry and all draft phase targets if light timing is unavailable", () => {
+    const html = renderToStaticMarkup(
+      createElement(PlanningCurve, { ...saved, parameters: {}, lightsOn: NaN, baseline: saved }),
+    );
+    expect(line(html, "p3-floor")).toBeUndefined();
+    expect(line(html, "baseline-p3-floor")).toBeDefined();
+    expect(html).not.toContain('data-planning-line="vwc"');
+    expect(html).not.toContain("NaN:NaN");
   });
 });

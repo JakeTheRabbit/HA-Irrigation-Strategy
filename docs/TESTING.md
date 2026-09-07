@@ -49,9 +49,10 @@ cd ..
 node frontend/scripts/verify-dashboard.mjs
 node frontend/scripts/verify-live.mjs
 node frontend/scripts/verify-workspace.mjs
+node frontend/scripts/verify-steering-visuals.mjs
 ```
 
-The browser scripts start loopback servers. Demo workflows reject API/external traffic; mocked-HA workflows intercept all API calls. The checks cover all ten pages, desktop/mobile navigation, accessibility, drafts, partial failures, readback, room identity, stale probes, and legacy route compatibility. Screenshots and JSON results are written to `output/playwright/`. This frontend job also runs in GitHub CI. The Python packaging tests verify that the HA and add-on artifacts match and retain room/demo navigation.
+The browser scripts start loopback servers. Demo workflows reject API/external traffic; mocked-HA workflows intercept all API calls. The checks cover all eleven pages, desktop/mobile navigation, accessibility, drafts, partial failures, readback, room identity, stale probes, and legacy route compatibility. Screenshots and JSON results are written to `output/playwright/`. This frontend job also runs in GitHub CI. The Python packaging tests verify that the HA and add-on artifacts match and retain room/demo navigation.
 
 The workspace suite also covers day/week scheduling, reactive VWC/EC previews, profile editing, setup lifecycle, strict response-bearing service contracts, invalid/expired snapshots and draft preservation. Integration tests use a minimal HA fixture, not a running HA instance. HACS/hassfest and an actual Supervisor image build run in CI, not in the local browser harness.
 
@@ -88,9 +89,13 @@ Plus, on GitHub only: **hassfest** and **HACS validation** of the integration.
 
 Deterministic fake clocks and HA responses reproduce request-latency overruns, blind fallback/copy budget bypass, failed hardware closure and error cleanup, persisted shared-hardware holds, explicit recovery, and temporarily absent room descriptors. Tests verify preserved state/counters across restart and rediscovery.
 
+New flow accounting regressions cover runtime caps, integer truncation, minimum durations, partial aborts and sizing edits during delivery. Existing totals are retained.
+
 ### 7. Frontend adapter and lifecycle — `frontend/src/lib/*.test.ts`
 
 Room isolation and canonical identity, sensor freshness, supported entity/parameter validation, finite bounds and steps, write readback, partial batches, request deadlines, stale response cancellation, explicit demo isolation, and recorded history routing.
+
+Run comparison tests cover room-scoped persistent metadata, revision conflicts, immutable captured references, Recorder retention gaps, cancellation, grow-age alignment and daylight-saving boundaries. The compiled visual suite verifies P3 line movement, saved/draft isolation, invalid-edit blocking, explicit zone/per-plant water and comparison workflows.
 
 ## Manual verification checklist (live Home Assistant)
 

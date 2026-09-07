@@ -322,3 +322,73 @@ def test_orphan_fault_with_unusable_hardware_map_holds_until_owner_returns(rig, 
         json.dump({"veg": {"_hardware_fault": bad_fault}}, state_file)
     c._load_state()
     assert c._hardware_fault_block(c.rooms[0]) is not None
+
+
+@pytest.mark.parametrize("shot_percent,max_seconds,expected_seconds", [
+    (2, 60, 60),       # requested 121.5s, capped at 60s
+    (2, 900, 121),     # controller truncates a fractional second
+    (0.01, 900, 5),    # controller minimum run duration
+])
+def test_act_zone_accounts_effective_runtime_at_configured_flow(
+    rig, shot_percent, max_seconds, expected_seconds
+):
+    c, fake, clock = rig
+    room = c.rooms[0]
+    for key, value in {
+        "plant_count": 42, "substrate_volume": 6.75,
+        "drippers_per_plant": 1, "dripper_flow_rate": 4,
+    }.items():
+        fake.set_state(f"number.crop_steering_zone_1_{key}", str(value))
+    fake.set_state("number.crop_steering_max_shot_duration", str(max_seconds))
+    c._act_zone(room, 1, None, None, (True, shot_percent, "accounting regression"),
+                None, True, datetime.now())
+    expected_litres = 42 * 1 * 4 / 3600 * expected_seconds
+    assert room.state[1]["daily_vol"] == pytest.approx(expected_litres)
+    assert c._water_usage(room, 1, datetime.now())[0] == round(expected_litres, 2)
+    assert room.state[1]["shots"] == 1
+    assert clock.seconds == pytest.approx(expected_seconds + 5)
+
+
+def test_capped_shot_partial_abort_uses_configured_flow(rig, monkeypatch):
+    c, fake, clock = rig
+    room = c.rooms[0]
+    for key, value in {
+        "plant_count": 42, "substrate_volume": 6.75,
+        "drippers_per_plant": 1, "dripper_flow_rate": 4,
+    }.items():
+        fake.set_state(f"number.crop_steering_zone_1_{key}", str(value))
+    fake.set_state("number.crop_steering_max_shot_duration", "60")
+    original_wait = c._wait_shot
+    def abort_after_ten(room, zone, duration_s, started=None):
+        clock.sleep(10)
+        fake.set_state(room.enable_flag, "off")
+        return original_wait(room, zone, duration_s, started=started)
+    monkeypatch.setattr(c, "_wait_shot", abort_after_ten)
+    c._act_zone(room, 1, None, None, (True, 2, "partial accounting"),
+                None, True, datetime.now())
+    assert room.state[1]["daily_vol"] == pytest.approx(42 * 4 / 3600 * 10)
+    assert room.state[1]["shots"] == 1
+
+
+def test_inflight_sizing_edits_do_not_rewrite_delivered_litres(rig, monkeypatch):
+    c, fake, _clock = rig
+    room = c.rooms[0]
+    for key, value in {
+        "plant_count": 42, "substrate_volume": 6.75,
+        "drippers_per_plant": 1, "dripper_flow_rate": 4,
+    }.items():
+        fake.set_state(f"number.crop_steering_zone_1_{key}", str(value))
+    fake.set_state("number.crop_steering_max_shot_duration", "60")
+    original_wait = c._wait_shot
+
+    def change_sizing(room, zone, duration_s, started=None):
+        for key, value in {"plant_count": 84, "substrate_volume": 12,
+                           "dripper_flow_rate": 8}.items():
+            fake.set_state(f"number.crop_steering_zone_1_{key}", str(value))
+        return original_wait(room, zone, duration_s, started=started)
+
+    monkeypatch.setattr(c, "_wait_shot", change_sizing)
+    c._act_zone(room, 1, None, None, (True, 2, "sizing race"),
+                None, True, datetime.now())
+    assert room.state[1]["daily_vol"] == pytest.approx(42 * 4 / 3600 * 60)
+    assert c._water_usage(room, 1, datetime.now())[0] == 2.8

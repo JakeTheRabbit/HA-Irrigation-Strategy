@@ -536,18 +536,18 @@ class CropSteeringSensor(SensorEntity):
             return None
         return dt if dt.tzinfo else dt_util.as_local(dt)
 
-    def _get_zone_daily_water_usage(self, zone_num: int) -> float:
-        """Get daily water usage for zone."""
-        # Check the engine sensor for daily usage
+    def _get_zone_daily_water_usage(self, zone_num: int) -> float | None:
+        """Get finite non-negative daily usage, preserving an unavailable source."""
         usage_sensor = self.hass.states.get(
             f"sensor.crop_steering_{self._prefix}zone_{zone_num}_daily_water_app"
         )
         if usage_sensor and usage_sensor.state not in ["unknown", "unavailable"]:
             try:
-                return float(usage_sensor.state)
-            except ValueError:
+                value = float(usage_sensor.state)
+                return value if math.isfinite(value) and value >= 0 else None
+            except (TypeError, ValueError):
                 pass
-        return 0.0
+        return None
 
     def _get_zone_weekly_water_usage(self, zone_num: int) -> float | None:
         """Get weekly water usage for zone."""

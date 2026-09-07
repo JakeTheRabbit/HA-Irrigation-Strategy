@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Empty,
@@ -23,29 +22,15 @@ import {
   time,
   type Page,
 } from "@/components/dashboard";
-import { calibrateDripper, previewShot } from "@/lib/insights-math";
-import type { Controller, Metric, Setting, Zone } from "@/lib/types";
+import { WaterDelivery } from "@/components/water-delivery";
+import { waterParameters } from "@/lib/water-delivery";
+import { calibrateDripper } from "@/lib/insights-math";
+import type { Controller, Metric, Zone } from "@/lib/types";
 import type { SetupDocument, SetupRoom } from "@/lib/operator-types";
 import "./insights.css";
 
-const usable = (value: unknown): value is number =>
-  typeof value === "number" && Number.isFinite(value);
 const asId = (value: unknown) =>
   typeof value === "string" && /^[a-z_]+\.[a-z0-9_]+$/.test(value) ? value : "";
-function configuredSetting(
-  controller: Controller,
-  zoneId: number | undefined,
-  key: string,
-): Setting | undefined {
-  return (
-    controller.room.settings.find(
-      (setting) => setting.zoneId === zoneId && setting.entityId.endsWith("_" + key),
-    ) ||
-    controller.room.settings.find(
-      (setting) => setting.zoneId === undefined && setting.entityId.endsWith("_" + key),
-    )
-  );
-}
 function Reference({ metric, controller }: { metric: Metric; controller: Controller }) {
   const entity = metric.entityId ? controller.states[metric.entityId] : undefined;
   return (
@@ -71,8 +56,7 @@ export function Insights({
     [mappingError, setMappingError] = useState("");
   const [catchMl, setCatchMl] = useState(""),
     [catchMinutes, setCatchMinutes] = useState(""),
-    [useCatchFlow, setUseCatchFlow] = useState(false),
-    [shotPercent, setShotPercent] = useState("");
+    [useCatchFlow, setUseCatchFlow] = useState(false);
   const zone = controller.room.zones.find((item) => item.id === zoneId) || controller.room.zones[0];
   const descriptor = controller.room.entities.find(
     (entity) =>
@@ -106,41 +90,13 @@ export function Insights({
   }, [controller.roomId, controller.connection]);
   useEffect(() => {
     setZoneId(controller.room.zones[0]?.id ?? null);
-    setShotPercent("");
   }, [controller.roomId]);
   const mappedZone = setup?.zones.find((item) => item.id === zone?.id);
-  const read = (key: string, fallback?: number) => {
-    const setting = configuredSetting(controller, zone?.id, key);
-    return setting?.value !== null && setting?.value !== undefined
-      ? setting.value
-      : usable(fallback)
-        ? fallback
-        : null;
-  };
-  const substrate = read("substrate_volume", mappedZone?.substrate_volume),
-    plants = read("plant_count", mappedZone?.plant_count),
-    drippers = read("drippers_per_plant", mappedZone?.drippers_per_plant),
-    configuredFlow = read("dripper_flow_rate", mappedZone?.dripper_flow_rate);
+  const configuredFlow = zone ? waterParameters(controller, zone.id).dripper_flow_rate : null;
   const catchFlow =
     catchMl.trim() && catchMinutes.trim()
       ? calibrateDripper(Number(catchMl), Number(catchMinutes))
       : null;
-  const effectiveFlow = useCatchFlow && catchFlow !== null ? catchFlow : configuredFlow;
-  const percent = shotPercent.trim() ? Number(shotPercent) : read("p2_shot_size");
-  const hydraulicInputs = {
-    substrateL: substrate ?? NaN,
-    plants: plants ?? NaN,
-    drippersPerPlant: drippers ?? NaN,
-    flowLph: effectiveFlow ?? NaN,
-    shotPercent: percent ?? NaN,
-  };
-  const preview = previewShot(hydraulicInputs);
-  const hydraulicMissing = [
-    substrate === null ? "substrate volume" : null,
-    plants === null ? "plant count" : null,
-    drippers === null ? "drippers per plant" : null,
-    effectiveFlow === null ? "dripper flow" : null,
-  ].filter(Boolean);
   const references = zone ? [zone.vwc, zone.target, zone.ec, zone.ecTarget] : [];
   const readyProbes = controller.room.zones.filter(
     (item) => item.vwc.value !== null && item.ec.value !== null,
@@ -221,7 +177,7 @@ export function Insights({
               <strong>
                 {number(zone.water.value)} <small>L</small>
               </strong>
-              <span>{zone.name} · recorded today</span>
+              <span>{zone.name} · all plants, controller estimate today</span>
             </div>
             <div>
               <Waves size={19} />
@@ -238,7 +194,6 @@ export function Insights({
               value={zone.id}
               onChange={(event) => {
                 setZoneId(Number(event.target.value));
-                setShotPercent("");
                 setUseCatchFlow(false);
               }}
             >
@@ -372,210 +327,91 @@ export function Insights({
               </section>
             </TabsContent>
             <TabsContent value="water">
-              <div className="insight-water-grid">
-                <section className="panel">
-                  <div className="panel-heading">
-                    <div>
-                      <h2>Nominal shot calculator</h2>
-                      <p>{zone.name} · based on supplied hydraulic settings</p>
-                    </div>
-                    <Badge variant="outline">Local preview</Badge>
-                  </div>
-                  <div className="insight-calculator">
-                    <div className="insight-hydraulics">
-                      {[
-                        ["Substrate per plant", substrate, "L"],
-                        ["Plant count", plants, ""],
-                        ["Drippers per plant", drippers, ""],
-                        ["Flow per dripper", effectiveFlow, "L/h"],
-                      ].map(([label, value, unit]) => (
-                        <div key={String(label)}>
-                          <span>{label}</span>
-                          <strong>
-                            {number(value as number | null)} <small>{unit}</small>
-                          </strong>
-                        </div>
-                      ))}
-                    </div>
-                    {hydraulicMissing.length > 0 && (
-                      <p className="notice-inline">
-                        Missing configuration: {hydraulicMissing.join(", ")}. Set these values in
-                        Room setup before calculating a duration.
-                      </p>
-                    )}
-                    <Label htmlFor="insight-shot-percent">Shot size · % of substrate volume</Label>
-                    <Input
-                      id="insight-shot-percent"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.5"
-                      value={shotPercent || (percent ?? "")}
-                      placeholder="Enter a shot percentage"
-                      onChange={(event) => setShotPercent(event.target.value)}
-                    />
-                    {preview ? (
-                      <div className="insight-result-grid">
-                        <div>
-                          <span>Nominal zone volume</span>
-                          <strong>
-                            {number(preview.volumeL, 2)} <small>L</small>
-                          </strong>
-                        </div>
-                        <div>
-                          <span>Volume per plant</span>
-                          <strong>
-                            {number(preview.volumeMlPerPlant, 0)} <small>mL</small>
-                          </strong>
-                        </div>
-                        <div>
-                          <span>Nominal valve-open time</span>
-                          <strong>
-                            {number(preview.durationSeconds, 1)} <small>seconds</small>
-                          </strong>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="muted small">
-                        Use known positive hydraulic values and a shot percentage from 0 to 100.
-                      </p>
-                    )}
-                    <p className="small muted">
-                      Volume = substrate litres × plants × shot %. Duration = volume ÷ total dripper
-                      flow. Assumes uniform rated flow; pressure, valve delays, runoff, runtime caps
-                      and controller adjustments are not included.
-                    </p>
-                    {useCatchFlow && (
-                      <p className="notice-inline">
-                        Using your catch-test flow estimate for this local preview only.
-                      </p>
-                    )}
-                  </div>
-                </section>
-                <section className="panel">
-                  <div className="panel-heading">
-                    <div>
-                      <h2>Catch-test calibration</h2>
-                      <p>Estimate actual flow from one dripper</p>
-                    </div>
-                  </div>
-                  <div className="insight-calculator">
-                    <p className="small muted">
-                      Collect water from a representative dripper for a measured duration. Enter the
-                      collected volume per dripper.
-                    </p>
-                    <Label htmlFor="catch-volume">Collected water per dripper · mL</Label>
-                    <Input
-                      id="catch-volume"
-                      type="number"
-                      min="0"
-                      step="1"
-                      placeholder="e.g. 200"
-                      value={catchMl}
-                      onChange={(event) => {
-                        setCatchMl(event.target.value);
-                        setUseCatchFlow(false);
-                      }}
-                    />
-                    <Label htmlFor="catch-time">Collection time · minutes</Label>
-                    <Input
-                      id="catch-time"
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      placeholder="e.g. 3"
-                      value={catchMinutes}
-                      onChange={(event) => {
-                        setCatchMinutes(event.target.value);
-                        setUseCatchFlow(false);
-                      }}
-                    />
-                    <div className="insight-catch-result">
-                      <span>Estimated flow per dripper</span>
-                      <strong>
-                        {number(catchFlow, 2)} <small>{catchFlow !== null ? "L/h" : ""}</small>
-                      </strong>
-                      {catchFlow !== null && configuredFlow !== null && configuredFlow > 0 && (
-                        <p>
-                          {number(
-                            Math.abs(((catchFlow - configuredFlow) / configuredFlow) * 100),
-                            1,
-                          )}
-                          % {catchFlow < configuredFlow ? "below" : "above"} configured{" "}
-                          {number(configuredFlow, 2)} L/h.
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      variant="outline"
-                      disabled={catchFlow === null}
-                      onClick={() => setUseCatchFlow(true)}
-                    >
-                      Use estimate in local preview
-                    </Button>
-                    {useCatchFlow && (
-                      <Button variant="ghost" onClick={() => setUseCatchFlow(false)}>
-                        Return to configured flow
-                      </Button>
-                    )}
-                    <p className="small muted">
-                      This calculator does not write calibration or operate irrigation. Check
-                      several drippers before choosing a configuration change.
-                    </p>
-                  </div>
-                </section>
-              </div>
+              <WaterDelivery
+                controller={controller}
+                zoneId={zone.id}
+                fieldOverrides={
+                  useCatchFlow && catchFlow !== null ? { dripper_flow_rate: catchFlow } : undefined
+                }
+              />
+              {useCatchFlow && (
+                <p className="notice-inline">
+                  Using your catch-test flow estimate for the local calculation only.
+                </p>
+              )}
               <section className="panel">
                 <div className="panel-heading">
                   <div>
-                    <h2>Configured shot references</h2>
-                    <p>Nominal values from this zone’s settings</p>
+                    <h2>Catch-test calibration</h2>
+                    <p>Estimate actual flow from one dripper</p>
                   </div>
                 </div>
-                <div className="table-scroll">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Phase setting</th>
-                        <th>Substrate volume</th>
-                        <th>Zone litres</th>
-                        <th>Nominal seconds</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        ["P1 initial shot", "p1_initial_shot_size"],
-                        ["P2 maintenance shot", "p2_shot_size"],
-                        ["P3 emergency shot", "p3_emergency_shot_size"],
-                      ].map(([label, key]) => {
-                        const setting = configuredSetting(controller, zone.id, key),
-                          result =
-                            setting?.value !== null && setting?.value !== undefined
-                              ? previewShot({ ...hydraulicInputs, shotPercent: setting.value })
-                              : null;
-                        return (
-                          <tr key={key}>
-                            <td>
-                              {label}
-                              {setting && <code className="cell-subtext">{setting.entityId}</code>}
-                            </td>
-                            <td>
-                              {number(setting?.value ?? null)}
-                              {setting?.value !== null && setting?.value !== undefined ? "%" : ""}
-                            </td>
-                            <td>{number(result?.volumeL ?? null, 2)}</td>
-                            <td>{number(result?.durationSeconds ?? null, 1)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="insight-calculator">
+                  <p className="small muted">
+                    Collect water from a representative dripper for a measured duration. Enter the
+                    collected volume per dripper.
+                  </p>
+                  <Label htmlFor="catch-volume">Collected water per dripper · mL</Label>
+                  <Input
+                    id="catch-volume"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="e.g. 200"
+                    value={catchMl}
+                    onChange={(event) => {
+                      setCatchMl(event.target.value);
+                      setUseCatchFlow(false);
+                    }}
+                  />
+                  <Label htmlFor="catch-time">Collection time · minutes</Label>
+                  <Input
+                    id="catch-time"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="e.g. 3"
+                    value={catchMinutes}
+                    onChange={(event) => {
+                      setCatchMinutes(event.target.value);
+                      setUseCatchFlow(false);
+                    }}
+                  />
+                  <div className="insight-catch-result">
+                    <span>Estimated flow per dripper</span>
+                    <strong>
+                      {number(catchFlow, 2)} <small>{catchFlow !== null ? "L/h" : ""}</small>
+                    </strong>
+                    {catchFlow !== null && configuredFlow !== null && configuredFlow > 0 && (
+                      <p>
+                        {number(Math.abs(((catchFlow - configuredFlow) / configuredFlow) * 100), 1)}
+                        % {catchFlow < configuredFlow ? "below" : "above"} configured{" "}
+                        {number(configuredFlow, 2)} L/h.
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    disabled={catchFlow === null}
+                    onClick={() => setUseCatchFlow(true)}
+                  >
+                    Use estimate in local preview
+                  </Button>
+                  {useCatchFlow && (
+                    <Button variant="ghost" onClick={() => setUseCatchFlow(false)}>
+                      Return to configured flow
+                    </Button>
+                  )}
+                  <p className="small muted">
+                    This calculator does not write calibration or operate irrigation. Check several
+                    drippers before choosing a configuration change.
+                  </p>
                 </div>
               </section>
               <p className="footnote">
-                Recorded daily mean: {number(meanShot, 2)} {meanShot !== null ? "L/shot" : ""}.
-                Actual shots can differ by phase and controller adjustment; this mean is not a
-                calibration measurement.
+                Controller-recorded daily mean: {number(meanShot, 2)}{" "}
+                {meanShot !== null ? "L/shot" : ""}. Actual shots can differ by phase and controller
+                adjustment; this mean is not a calibration measurement.
               </p>
             </TabsContent>
             <TabsContent value="map">

@@ -268,3 +268,19 @@ describe("verified transport and demo isolation", () => {
     fetch.mockRestore();
   });
 });
+
+it("exposes zone-specific dripper flow with the actual HA bounds", () => {
+  const states = fixture();
+  const id = "number.crop_steering_f1_zone_1_dripper_flow_rate";
+  states[id] = entity(id, "4", { min: 0.1, max: 20, step: 0.1 });
+  const room = buildRoom(
+    states,
+    discoverRooms(states).find((r) => r.prefix === "f1_")!,
+  );
+  expect(room.zones[0].fields.find((field) => field.entityId === id)).toMatchObject({
+    value: 4,
+    min: 0.1,
+    max: 20,
+    step: 0.1,
+  });
+});

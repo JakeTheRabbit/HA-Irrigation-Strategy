@@ -57,6 +57,7 @@ export function createDemo(now = Date.now()): States {
     });
     const events: LogEvent[] = [];
     number(prefix, "dripper_flow_rate", 4, 0.5, 12, 0.5, "L/h");
+    number(prefix, "max_shot_duration", 120, 5, 3600, 1, "s");
     number(prefix, "lights_on_hour", index ? 8 : 10, 0, 23, 1, "h");
     number(prefix, "lights_off_hour", index ? 20 : 22, 0, 23, 1, "h");
     number(prefix, "irrigation_ec_min", 2.3, 0, 6, 0.1, "mS/cm");
@@ -90,9 +91,13 @@ export function createDemo(now = Date.now()): States {
         index ? "Generative" : "Vegetative",
         { options: ["Vegetative", "Generative"] },
       );
+      number(prefix, `${key}p0_maximum_wait_time`, 60, 5, 240, 1, "min");
+      number(prefix, `${key}generative_dryback_target`, 14, 2, 60, 0.5, "% of peak");
       number(prefix, `${key}p1_target_vwc`, 64 + index * 2, 20, 90, 0.5, "%");
       number(prefix, `${key}p2_vwc_threshold`, 54 + index * 2, 10, 90, 0.5, "%");
       number(prefix, `${key}p1_initial_shot_size`, 6, 0.5, 20, 0.5, "%");
+      number(prefix, `${key}p1_shot_size_increment`, 0.5, 0.05, 10, 0.05, "%");
+      number(prefix, `${key}p1_maximum_shots`, 6, 1, 30, 1);
       number(prefix, `${key}p1_time_between_shots`, 15, 5, 120, 1, "min");
       number(prefix, `${key}p2_shot_size`, 4, 0.5, 20, 0.5, "%");
       number(prefix, `${key}vegetative_dryback_target`, 8, 1, 30, 0.5, "% of peak");

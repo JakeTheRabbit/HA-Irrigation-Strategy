@@ -6,7 +6,7 @@ A Home Assistant irrigation controller with a native operator workspace: see the
 
 The demo opens directly in your browser with sample rooms, sensor data and editable plans. No login or Home Assistant installation is required; demo changes stay in your browser.
 
-![Release](https://img.shields.io/badge/Release-2.13.2-green)
+![Release](https://img.shields.io/badge/Release-2.14.0-green)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3+-41BDF5)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -29,6 +29,18 @@ Choose a room, zone and day or week. The steering slider updates the VWC/EC plan
 
 ![Combined VWC and EC planning graph with per-zone day and week controls](img/grow-plan.png)
 
+## See each change before applying it
+
+Manual setpoints keep the full-day VWC/EC graph beside the selected phase. Raise the P3 emergency threshold and its line moves immediately; the saved line remains visible behind your draft. Review and apply when ready.
+
+![Manual P3 editing with saved and draft VWC/EC curves](img/manual-setpoints.png)
+
+**Compare runs** aligns recorded day/week/month/run-to-date readings with an earlier run at the same grow age, or with a captured target reference. History availability depends on your Home Assistant Recorder retention. Registering an old run now does not recover its old setpoints.
+
+![Recorded VWC and EC comparison against a previous run and target reference](img/run-comparison.png)
+
+Water cards show **zone litres for all plants**, **average mL per plant today**, and **estimated water per runtime**. Total substrate capacity is labelled separately. For example, 42 plants with one 4 L/h dripper each receive an estimated 133 mL per plant / 5.6 L per zone over 120 seconds; a 60-second cap halves that. These estimates require correct flow settings and do not measure uptake or runoff.
+
 ## Set up rooms and sensors
 
 Add or archive rooms and zones, map existing Home Assistant entities, and enter each zone's substrate, plants and drippers.
@@ -46,10 +58,11 @@ Add or archive rooms and zones, map existing Home Assistant entities, and enter 
 
 | Page | Purpose |
 | --- | --- |
-| Overview | Room condition, controller status, combined recorded VWC and EC history |
+| Overview | Room condition, controller status, recorded VWC/EC and daily water per zone/per plant |
 | Zones | Per-zone readings, active phase, targets and enable controls |
 | Grow plan | Per-zone day/week schedule, steering slider, endpoint profiles and a reactive VWC/EC planning curve |
-| Manual setpoints | Review and apply existing controller parameters when a grow plan is not in control |
+| Manual setpoints | Phase-focused controls beside reactive saved/draft VWC/EC curves, with water estimates and reviewed writes |
+| Compare runs | Retained day/week/month/run-to-date history, previous-run alignment and captured target references |
 | Insights | Sensor coverage, equipment mapping and local dripper catch-test calculations |
 | Activity | Available controller/state activity with explicit evidence limits |
 | Sensors | Probe availability, values, units and freshness |

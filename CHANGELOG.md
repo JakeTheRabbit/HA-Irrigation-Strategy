@@ -9,6 +9,18 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.0] - 2026-09-08
+
+**🌱 In plain English.** See the whole day while editing setpoints: the draft VWC/EC curves and P3 emergency floor move immediately beside the saved reference. Compare retained readings over a day, week, month or run-to-date with another run at the same grow age. Water cards distinguish total zone delivery, average per plant and pot capacity, with a local runtime calculator.
+
+**🔧 Technical notes — integration 2.14.0, controller 0.13.0.**
+
+- Add phase-focused manual editing, bounds-aware graph handles, saved/draft overlays and read-only active-plan previews.
+- Add room-scoped, revisioned run metadata with captured target references and Recorder comparisons. Recorded history remains subject to retention; a reference captured today is not a historical target audit.
+- Add explicit all-plant daily zone litres, per-plant averages, nominal phase-shot volumes and capped runtime estimates. P1 series budgets are conditional; daily adaptive shot counts are not predicted.
+- Count new delivered litres from configured flow and elapsed runtime, including duration caps, fractional-second truncation, minimum runtimes and partial aborts. Freeze sizing per shot to prevent in-flight configuration edits changing its recorded volume. Existing totals are preserved.
+- Keep all edits local until reviewed; comparison registration and runtime calculators do not activate irrigation.
+
 ## [2.13.2] - 2026-09-08
 
 - Show each room's configured name in the workspace instead of a generic sensor label.

@@ -12,6 +12,14 @@ Captured on 8 September 2026 from the compiled application with isolated demo da
 
 ![Zone planning and steering controls](../img/grow-plan.png)
 
+## Manual setpoints beside the planning curve
+
+![Saved and draft targets with P3 emergency floor editing](../img/manual-setpoints.png)
+
+## Recorded run comparisons
+
+![Compare VWC and EC over the same grow age](../img/run-comparison.png)
+
 ## Rooms and sensor mapping
 
 ![Room setup](../img/rooms-setup.png)
@@ -20,4 +28,4 @@ Captured on 8 September 2026 from the compiled application with isolated demo da
 
 ![Mobile room overview](../img/mobile-overview.png)
 
-Reproduce these captures with `node frontend/scripts/verify-workspace.mjs` after building the frontend. Historical screenshots live in archive/2026-09-08/img.
+Reproduce these captures with `node frontend/scripts/verify-workspace.mjs` and `node frontend/scripts/verify-steering-visuals.mjs` after building the frontend. Historical screenshots live in archive/2026-09-08/img.

@@ -33,6 +33,7 @@ export type Page =
   | "zones"
   | "strategy"
   | "grow-plan"
+  | "compare"
   | "insights"
   | "setup"
   | "activity"

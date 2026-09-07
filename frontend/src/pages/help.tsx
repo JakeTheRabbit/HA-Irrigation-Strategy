@@ -3,6 +3,14 @@ import { Heading } from "@/components/dashboard";
 import type { Controller } from "@/lib/types";
 const glossary = [
   [
+    "Water per zone and per plant",
+    "Zone water is the total delivered estimate for all plants. Average per plant divides that total by plant count. Substrate litres describe the combined pot capacity; they are not water delivered. Runtime estimates multiply dripper flow by run time and respect the controller duration limit.",
+  ],
+  [
+    "Run comparisons",
+    "Choose a day, week, month or run-to-date to compare recorded VWC and EC. Previous runs align by grow age. Saved target references show when they were captured; backdating a run does not recreate old targets or readings removed by Recorder retention.",
+  ],
+  [
     "VWC",
     "Volumetric water content: the percentage of substrate volume occupied by water. Compare recorded readings with active targets; a nominal shot does not guarantee the same retained-water increase.",
   ],
@@ -95,6 +103,12 @@ export function Help({ controller }: { controller: Controller }) {
                   title: "Manual setpoints",
                   detail: "Understand and review every supported controller parameter.",
                   icon: Gauge,
+                },
+                {
+                  route: "compare",
+                  title: "Compare runs & targets",
+                  detail: "Compare recorded days, weeks and complete runs against reference targets.",
+                  icon: CalendarRange,
                 },
                 {
                   route: "insights",

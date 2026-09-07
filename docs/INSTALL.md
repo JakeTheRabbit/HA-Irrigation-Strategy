@@ -7,7 +7,7 @@
 - Home Assistant OS/Supervised with the app store for the guided controller install. Container/Core users must run the companion controller separately; a true one-click controller install is not available there.
 - Existing HA entities for the actual pump and zone valves, fresh VWC/EC probes, feed-water probes and any configured interlocks. This integration maps entities; it does not provision sensor firmware or pair devices.
 
-This workspace requires integration 2.13.2 and controller 0.12.1. Use matching published versions; the public demo uses isolated sample data.
+This workspace requires integration 2.14.0 and controller 0.13.0. Use matching published versions; the public demo uses isolated sample data.
 
 ## Guided installation
 
@@ -39,8 +39,8 @@ For an existing controller, update it in place from its current app repository. 
 
 1. Back up HA, the controller's persistent data and existing setpoints. Export grow plans if available. Record which engines are enabled.
 2. Turn the affected engines off and wait for the pump, mainline and valves to be OFF. Stop the existing controller while replacing software.
-3. Refresh your existing app repository and update that controller in place to **0.12.1**. A restart alone does not rebuild an old image. Do not install a second copy or enable automatic startup during the upgrade.
-4. Download integration **2.13.2** through HACS and restart HA. Confirm every Crop Steering room finishes loading. Version 2.13.1 fixed the concurrent sidebar-registration error discovered with two rooms during the live upgrade.
+3. Refresh your existing app repository and update that controller in place to **0.13.0**. A restart alone does not rebuild an old image. Do not install a second copy or enable automatic startup during the upgrade.
+4. Download integration **2.14.0** through HACS and restart HA. Confirm every Crop Steering room finishes loading. Version 2.13.1 fixed the concurrent sidebar-registration error discovered with two rooms during the live upgrade.
 5. Start the controller with engines still off. Verify its version, fresh heartbeat, both room descriptors, sensor readings, setup acknowledgement and grow-plan capability. Compare current setpoints and pot/dripper sizing with the backup.
 6. Restore the engines' previous enabled states after these checks. An upgrade does not require arming a recipe or replacing existing values with defaults.
 

@@ -4,7 +4,7 @@
 | --- | --- |
 | frontend/src | React, TypeScript and shadcn UI source; theme, adapter, planning and setup screens |
 | frontend/scripts | Single-file packaging and reproducible browser verification |
-| custom_components/crop_steering | HA config flow, entities, setup/strategy APIs, storage and sidebar registration |
+| custom_components/crop_steering | HA config flow, entities, setup/strategy/run APIs, storage and sidebar registration |
 | addons/f2_control | Companion controller app, hardware coordinator, runtime validation and tests |
 | crop-steering-engine | Pure decision core and its tests; vendored copy must remain identical |
 | www/dashboard.html | Generated static web application |
@@ -20,7 +20,9 @@
 
 Edit source in frontend/src and run the build; do not hand-edit generated dashboards. Small old-name HTML files are intentional compatibility redirects. Runtime entity IDs, room prefixes and the f2_control app slug remain stable; friendly names can change without breaking references.
 
-The integration owns plan/configuration storage. The controller reads one atomic, versioned strategy snapshot, validates freshness and runs the pure decision core before its hardware IO sequence. Configuration revision and controller acknowledgement are distinct so the UI cannot mistake a saved mapping for a running configuration.
+The integration owns plan/configuration storage and per-room run metadata. Run records retain dates, stable zone/sensor IDs and timestamped reference targets; sensor readings stay in HA Recorder, with bounded authenticated history retrieval. Comparison and runtime calculators do not call actuator services.
+
+ The controller reads one atomic, versioned strategy snapshot, validates freshness and runs the pure decision core before its hardware IO sequence. Configuration revision and controller acknowledgement are distinct so the UI cannot mistake a saved mapping for a running configuration.
 
 Historical files in archive are not shipped as active dashboards or installation configuration. They can contain outdated claims and facility examples. The root formerly named config.yaml was archived as configuration.legacy.yaml to prevent Supervisor's recursive app scan from treating it as an app manifest.
 

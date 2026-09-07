@@ -5,8 +5,10 @@ Validation date: 8 September 2026. The workspace is published and an existing tw
 | Feature | Result | Evidence and limits |
 | --- | --- | --- |
 | Native Home Assistant appearance | Implemented; locally tested | Same-origin iframe inherits theme variables and reacts to host theme changes. Roboto and its license are bundled. Explicit light/dark overrides and standalone fallback are supported. Cross-origin inheritance is unavailable by browser design. |
-| All advanced pages in one workspace | Implemented; browser tested | Ten routes share navigation, room context, responsive layout and draft protection. Historical URLs redirect to current routes; archived full dashboards are not active product pages. |
+| All advanced pages in one workspace | Implemented; browser tested | Eleven routes share navigation, room context, responsive layout and draft protection. Historical URLs redirect to current routes; archived full dashboards are not active product pages. |
 | Combined recorded VWC + EC history | Implemented; browser tested | Independent axes/units, zone selection, HA Recorder data and honest missing-history states. Sensor history requires Recorder retention. |
+| Manual preview beside phase controls | Implemented; browser and unit tested | Numeric edits and draggable targets share one local draft; saved VWC/EC and P3 floor remain visible. Exact HA bounds, mode mapping, active-plan read-only state, room/zone isolation and mobile layout are checked. |
+| Run comparison with daily target overlays | Implemented; browser, unit and metadata-service tested | Day/week/month/run-to-date/custom Recorder ranges; previous run aligned to grow age; repeated full-day target references clipped at now. Stored references are timestamped, not a historical setpoint audit. Retention gaps, stale carry-in, daylight saving, request cancellation and room scope are covered. |
 | Reactive combined planning curve | Implemented; browser and unit tested | Selected day/zone profile drives both lines and controls. P0 reference/drop, P1 targets/cadence, P2 target/band, P3 emergency floor. No invented overnight trend or crop-response forecast. |
 | Continuous vegetative/generative steering | Implemented; both legacy modes tested | Explicit endpoint profiles interpolate and quantize against HA parameter bounds/steps; canonical scheduled dryback/EC overrides work regardless of the old mode select. Endpoints need grower review. |
 | Different setpoints per zone | Live preservation verified | All 302 pre-existing numeric entities and 147 other controls retained their states. Six initial planner profiles match the current zone targets; pot/dripper sizing and mappings are preserved. |
@@ -15,7 +17,8 @@ Validation date: 8 September 2026. The workspace is published and an existing tw
 | Room and zone creation/removal | Implemented; flow/API/browser tested | Removal archives stable IDs; restoration preserves identifiers. No automatic renumbering or reuse. Engines and implicated equipment must be readable OFF for mapping mutations. |
 | Sensor mapping | Implemented; locally tested | Search existing HA entities by name/ID and inspect readings/units; multi-probe VWC/EC selection. Backend validates domains, units and conflicting valve roles. Device pairing/firmware provisioning is external. |
 | Installation shortcuts and sidebar | Live in-place upgrade verified | HACS download, Supervisor app update, HA restart, both room entries loading and the automatic native sidebar passed. First installation on a blank HA instance remains untested. |
-| Delivery preview and catch-test calculator | Implemented; unit/browser tested | Pot/plant/dripper math, nominal and capped duration, actual low-flow parity. Catch-test output is a local proposal; no automatic calibration write or proof of flow. |
+| Water per zone, plant and proposed runtime | Implemented; unit/browser/controller tested | Total zone litres, average mL per plant and substrate capacity are distinct. Runtime and phase estimates include engine bounds, duration caps, minimum time and truncation; P1 budgets remain conditional. New counters freeze configured flow per shot and use elapsed runtime, including partial aborts. Old totals are preserved. Missing producer data remains unknown. |
+| Catch-test calculator | Implemented; unit/browser tested | Catch-test output is a local proposal; no automatic calibration write or proof of flow. |
 | Sensor diagnostics and equipment map | Implemented; browser tested | Measured values, freshness/coverage and configured devices; no unsupported yield/potency score. |
 | Reviewed manual setpoint writes | Implemented; mocked-HA browser tested | Explicit selected-room scope, bounds/steps, service calls and readback; partial failures retain drafts. Active plans lock conflicting manual target edits. |
 | Source-water/interlock/volume/duration gates | Implemented; controller regressions | Includes request-latency duration accounting, blind-path caps, shared-hardware fault latch and recovery. Physical valve/pump behavior remains unverified. |
@@ -40,10 +43,11 @@ Validation date: 8 September 2026. The workspace is published and an existing tw
 
 ## Valuable next additions
 
-Measured-flow reconciliation is the strongest next step: compare commanded litres with independent water-meter deltas and identify blocked/leaking lines. Next, align recorded shot events with VWC/EC history, then compare planned versus observed dryback over repeated days. Reliable measurements would support proposal-only recipe adjustments and cultivar-specific profiles. Those features require clean real observations and have not been claimed as implemented here.
+Measured-flow reconciliation is the strongest next step: compare commanded litres with independent water-meter deltas and identify blocked/leaking lines. Next, align recorded shot events with VWC/EC history, then quantify planned versus observed dryback over repeated days beyond the available visual comparisons. Reliable measurements would support proposal-only recipe adjustments and cultivar-specific profiles. Those features require clean real observations and have not been claimed as implemented here.
 
 ## Evidence
 
+- [Visual editing, water and run comparison validation](audits/2026-09-08-visible-steering.md)
 - [Live upgrade and retained settings](audits/2026-09-08-live-upgrade.md)
 - [Release corrections and validation](audits/2026-09-08-release-validation.md)
 - [Branch feature consolidation](audits/2026-09-08-branch-consolidation.md)

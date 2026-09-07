@@ -1,0 +1,189 @@
+.strategy-layout.setpoint-workspace {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+.setpoint-workspace .strategy-zone-picker {
+  position: static;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.setpoint-workspace .strategy-zone-picker > button {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  border-color: var(--border);
+}
+.setpoint-workspace .strategy-zone-picker > p {
+  display: none;
+}
+.setpoint-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.85fr) minmax(420px, 1.15fr);
+  align-items: start;
+  gap: 20px;
+}
+.setpoint-controls,
+.setpoint-preview {
+  min-width: 0;
+}
+.setpoint-preview {
+  position: sticky;
+  top: 16px;
+}
+.setpoint-preview-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.setpoint-preview-context strong {
+  display: block;
+  font-size: 14px;
+}
+.setpoint-preview-context span {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.setpoint-phase-picker {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.setpoint-phase-picker button {
+  width: auto;
+  flex: 0 0 auto;
+  text-align: center;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 12px;
+}
+.setpoint-phase-picker button[aria-pressed="true"] {
+  background: var(--secondary);
+  color: var(--primary-strong);
+  border-color: var(--primary);
+}
+.setpoint-controls .setting-field {
+  grid-template-columns: minmax(0, 1fr) 115px;
+  gap: 12px;
+}
+.setpoint-controls .setting-fields {
+  padding: 0 16px;
+}
+.setpoint-controls .settings-group-heading {
+  padding: 16px;
+}
+.setpoint-mode-visibility {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0 18px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.setpoint-preview-note {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 12px 0;
+}
+.planning-comparison-key {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 0 16px 10px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.planning-comparison-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.planning-comparison-key i {
+  width: 22px;
+  border-top: 2px dashed var(--muted-foreground);
+  opacity: 0.6;
+}
+.planning-comparison-key span:nth-child(2) i {
+  border-top: 2px solid var(--primary);
+  opacity: 1;
+}
+.planning-comparison-key small {
+  flex-basis: 100%;
+}
+.setpoint-preview-zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.setpoint-preview-zone select {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.setpoint-preview-zone p {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.setpoint-preview .planning-phase-legend {
+  gap: 10px;
+}
+.setpoint-preview .planning-phase-legend > span {
+  font-size: 10px;
+}
+.setpoint-expand {
+  display: none;
+}
+@media (max-width: 1150px) {
+  .setpoint-editor-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .setpoint-preview {
+    grid-row: 1;
+    position: static;
+  }
+  .setpoint-expand {
+    display: inline-flex;
+  }
+  .setpoint-preview:not(.is-expanded) .planning-phase-legend,
+  .setpoint-preview:not(.is-expanded) .planning-assumptions,
+  .setpoint-preview:not(.is-expanded) .planning-curve > p.muted,
+  .setpoint-preview:not(.is-expanded) .setpoint-preview-note,
+  .setpoint-preview:not(.is-expanded) .setpoint-water {
+    display: none;
+  }
+  .setpoint-preview:not(.is-expanded) .planning-svg-wrap svg {
+    height: 250px;
+  }
+  .setpoint-preview:not(.is-expanded) .planning-curve .panel-heading p {
+    display: none;
+  }
+}
+@media (max-width: 620px) {
+  .setpoint-preview:not(.is-expanded) .planning-svg-wrap svg {
+    height: 220px;
+  }
+  .setpoint-controls .setting-field {
+    grid-template-columns: minmax(0, 1fr) 110px;
+  }
+  .setpoint-preview-context strong {
+    font-size: 12px;
+  }
+  .setpoint-preview .planning-chart-key {
+    font-size: 10px;
+  }
+}

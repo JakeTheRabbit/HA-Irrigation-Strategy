@@ -114,6 +114,7 @@ try {
     ["zones", "Zones"],
     ["strategy", "Manual setpoints"],
     ["grow-plan", "Grow plan"],
+    ["compare", "Compare runs"],
     ["setup", "Rooms & setup"],
     ["insights", "Insights"],
     ["activity", "Activity"],
@@ -167,7 +168,7 @@ try {
     const field = page.locator('input[id="setting-number.crop_steering_zone_1_p1_target_vwc"]');
     const original = Number(await field.inputValue());
     await field.fill("999");
-    await expectVisible(page.getByText(/Use a value between/));
+    await expectVisible(page.locator('[id="hint-number.crop_steering_zone_1_p1_target_vwc"]'));
     assert.equal(
       await page
         .getByRole("button", { name: /^Review/ })

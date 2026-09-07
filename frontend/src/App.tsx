@@ -46,12 +46,14 @@ import { Help } from "@/pages/help";
 import { GrowPlanner } from "@/pages/grow-planner";
 import { Setup } from "@/pages/setup";
 import { Insights } from "@/pages/insights";
+import { Comparison } from "@/pages/comparison";
 
 const navigation = [
   { id: "overview", label: "Overview", icon: House },
   { id: "zones", label: "Zones", icon: Layers },
   { id: "strategy", label: "Manual setpoints", icon: SlidersHorizontal },
   { id: "grow-plan", label: "Grow plan", icon: CalendarRange },
+  { id: "compare", label: "Compare runs", icon: ChartNoAxesCombined },
   { id: "insights", label: "Insights", icon: ChartNoAxesCombined },
   { id: "activity", label: "Activity", icon: Activity },
   { id: "sensors", label: "Sensors", icon: Radio },
@@ -348,6 +350,13 @@ export default function App() {
             )}
             {page === "grow-plan" && (
               <GrowPlanner
+                key={controller.roomId}
+                controller={controller}
+                onDirtyChange={setWorkspaceDirty}
+              />
+            )}
+            {page === "compare" && (
+              <Comparison
                 key={controller.roomId}
                 controller={controller}
                 onDirtyChange={setWorkspaceDirty}

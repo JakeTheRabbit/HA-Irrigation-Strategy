@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useEffect, useRef, useState } from "react";
 import {
   CalendarRange,
   Download,
@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Heading, Empty, number } from "@/components/dashboard";
+import { WaterDelivery } from "@/components/water-delivery";
 import { PlanningCurve } from "@/components/planning-curve";
 import { syncPlanZones } from "@/lib/sync-plan-zones";
 import type { Controller } from "@/lib/types";
@@ -64,7 +65,7 @@ export function GrowPlanner({
   const [preview, setPreview] = useState<StrategyDocument | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const dirty = !!plan && !!document && JSON.stringify(plan) !== JSON.stringify(document.plan);
-  useEffect(() => {
+  useLayoutEffect(() => {
     onDirtyChange(dirty);
     return () => onDirtyChange(false);
   }, [dirty, onDirtyChange]);
@@ -169,11 +170,6 @@ export function GrowPlanner({
   const columns =
     granularity === "week" ? Math.ceil(lastScheduled / 7) : Math.min(lastScheduled, 366);
   const selectedZone = controller.room.zones.find((z) => z.id === zoneId);
-  const liveField = (key: string) =>
-    selectedZone?.fields.find((f) => f.entityId.endsWith("_" + key))?.value ??
-    controller.room.settings.find((f) => f.zoneId === undefined && f.entityId.endsWith("_" + key))
-      ?.value ??
-    null;
   const configuredLightsOn = controller.room.settings.find((f) =>
     f.entityId.endsWith("_lights_on_hour"),
   )?.value;
@@ -182,19 +178,6 @@ export function GrowPlanner({
   )?.value;
   const lightsOn = configuredLightsOn ?? 0,
     lightsOff = configuredLightsOff ?? 12;
-  const pot = liveField("substrate_volume"),
-    plants = liveField("plant_count"),
-    drippers = liveField("drippers_per_plant"),
-    flow = liveField("dripper_flow_rate");
-  const duration = (shot: number | undefined) =>
-    pot !== null &&
-    drippers !== null &&
-    flow !== null &&
-    flow > 0 &&
-    drippers > 0 &&
-    shot !== undefined
-      ? (((shot / 100) * pot) / (drippers * flow)) * 3600
-      : null;
   function setZone(next: number) {
     setZoneId(next);
     setPreview(null);
@@ -742,32 +725,7 @@ export function GrowPlanner({
                   The curve is a setpoint planning model. Actual moisture, EC and shot timing depend
                   on sensor feedback. Editing a curve target updates both endpoints of this profile.
                 </p>
-                <div className="delivery-grid">
-                  <div>
-                    <span>First shot estimate</span>
-                    <strong>
-                      {number(duration(params.p1_initial_shot_size), 0)} <small>seconds</small>
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Maintenance shot estimate</span>
-                    <strong>
-                      {number(duration(params.p2_shot_size), 0)} <small>seconds</small>
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Zone substrate volume</span>
-                    <strong>
-                      {number(pot !== null && plants !== null ? pot * plants : null)}{" "}
-                      <small>L</small>
-                    </strong>
-                  </div>
-                </div>
-                <p className="muted small">
-                  Duration = shot fraction × pot volume ÷ (drippers per plant × L/h per dripper).
-                  Values above ignore the controller's maximum-duration cap; authoritative capped
-                  values appear in the review.
-                </p>
+                <WaterDelivery controller={controller} zoneId={zoneId} parameters={params} />
               </section>
               <section className="panel workspace-card">
                 <div className="workspace-section-heading">

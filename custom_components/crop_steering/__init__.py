@@ -89,6 +89,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await async_setup_setup_services(hass)
     await async_setup_strategy(hass, entry)
+    from .run_api import async_setup_runs
+
+    await async_setup_runs(hass, entry)
     await async_setup_panel(hass)
 
     # Setup health checks -> Home Assistant Repairs (read-only diagnostics)
@@ -133,7 +136,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unload_ok:
-        # Platforms refused to unload — the entry stays loaded, so leave the
+        # Platforms refused to unload â€” the entry stays loaded, so leave the
         # health checks, recipe manager and services in place.
         return False
 
@@ -153,9 +156,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .strategy import async_unload_strategy
 
     await async_unload_strategy(hass, entry)
+    from .run_api import async_unload_runs
+
+    await async_unload_runs(hass, entry)
     hass.data[DOMAIN].pop(entry.entry_id, None)
 
-    # Unload services only when the last loaded room goes away — other loaded
+    # Unload services only when the last loaded room goes away â€” other loaded
     # entries (multi-room installs) still rely on the shared domain services.
     others_loaded = [
         e

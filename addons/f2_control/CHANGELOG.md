@@ -3,6 +3,12 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.13.0
+
+- Pair with integration 2.14.0 for reactive manual setpoint previews, run comparisons and clear zone/per-plant water calculations.
+- Calculate new delivery counters from configured zone flow and elapsed valve runtime, including capped/truncated/minimum shots and partial aborts. Snapshot sizing before each shot so a mid-shot configuration edit cannot rewrite its volume.
+- Keep existing options, engine flags, room IDs, learned state and old daily/weekly totals. Delivery remains a flow-based estimate, not a meter reading.
+
 ## 0.12.1
 
 - Correct room names in the bundled workspace when HA descriptor sensors share a generic friendly name.

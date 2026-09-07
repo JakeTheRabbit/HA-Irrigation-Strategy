@@ -22,6 +22,7 @@ def sensor(states, prefix=""):
     )
     names = {
         "_get_zone_weekly_water_usage",
+        "_get_zone_daily_water_usage",
         "extra_state_attributes",
         "_average_sensor_values",
     }
@@ -125,3 +126,50 @@ def test_weekly_descriptor_allows_rolling_total_to_decrease():
         keyword.value for keyword in descriptor.keywords if keyword.arg == "state_class"
     )
     assert ast.unparse(state_class) == "SensorStateClass.TOTAL"
+
+
+@pytest.mark.parametrize(
+    "value", [None, "unknown", "unavailable", "", "NaN", "inf", "-inf", "-1", "bad"]
+)
+def test_invalid_daily_source_is_unknown(value):
+    entity = sensor(
+        {
+            "sensor.crop_steering_zone_1_daily_water_app": SimpleNamespace(
+                state=value, attributes={}
+            )
+        }
+    )
+    assert entity._get_zone_daily_water_usage(1) is None
+
+
+@pytest.mark.parametrize("prefix", ["", "veg_"])
+def test_missing_daily_source_does_not_borrow_another_room_or_zone(prefix):
+    other_prefix = "veg_" if not prefix else ""
+    entity = sensor(
+        {
+            f"sensor.crop_steering_{other_prefix}zone_1_daily_water_app": SimpleNamespace(
+                state="999", attributes={}
+            ),
+            f"sensor.crop_steering_{prefix}zone_2_daily_water_app": SimpleNamespace(
+                state="888", attributes={}
+            ),
+        },
+        prefix,
+    )
+    assert entity._get_zone_daily_water_usage(1) is None
+
+
+@pytest.mark.parametrize("value", [0, 1.25])
+def test_daily_consumer_preserves_named_room_zero_and_positive_delivery(value):
+    entity = sensor(
+        {
+            "sensor.crop_steering_zone_1_daily_water_app": SimpleNamespace(
+                state="999", attributes={}
+            ),
+            "sensor.crop_steering_veg_zone_1_daily_water_app": SimpleNamespace(
+                state=str(value), attributes={}
+            ),
+        },
+        "veg_",
+    )
+    assert entity._get_zone_daily_water_usage(1) == value

@@ -33,6 +33,7 @@ const ZONE_PARAMETERS = new Set([
   "substrate_volume",
   "plant_count",
   "drippers_per_plant",
+  "dripper_flow_rate",
   "min_floor_drown_ceiling",
 ]);
 const ROOM_PARAMETERS = new Set([

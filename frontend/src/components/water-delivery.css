@@ -1,0 +1,254 @@
+.wd-water {
+  margin-top: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  container-type: inline-size;
+  container-name: water-delivery;
+}
+.wd-title,
+.wd-capacity,
+.wd-flow-line,
+.wd-runtime,
+.wd-budget {
+  padding: 16px 20px;
+}
+.wd-title h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.wd-title p,
+.wd-runtime-input p,
+.wd-note,
+.wd-capacity small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.wd-title p {
+  margin: 0;
+}
+.wd-capacity {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin: 0;
+  border-block: 1px solid var(--border);
+  background: var(--muted);
+}
+.wd-capacity dt {
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+.wd-capacity dd {
+  margin: 0 0 5px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.wd-capacity small {
+  display: block;
+  max-width: 65ch;
+}
+.wd-flow-line {
+  font-size: 13px;
+  padding-bottom: 0;
+}
+.wd-runtime {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(250px, 2fr);
+  gap: 24px;
+}
+.wd-runtime-input input {
+  margin-top: 8px;
+  max-width: 220px;
+}
+.wd-runtime-input p {
+  max-width: 40ch;
+  margin-bottom: 0;
+}
+.wd-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-content: start;
+}
+.wd-comparison > div {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-width: 0;
+}
+.wd-comparison .wd-effective {
+  border-color: var(--primary);
+  background: var(--secondary);
+}
+.wd-comparison h4,
+.wd-budget h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.wd-comparison strong {
+  display: block;
+  font-size: 19px;
+  overflow-wrap: anywhere;
+}
+.wd-comparison span {
+  font-size: 13px;
+}
+.wd-water > .wd-note,
+.wd-warning,
+.wd-daily > .wd-note {
+  margin: 0;
+  padding: 0 20px 16px;
+}
+.wd-warning {
+  color: var(--warning);
+  padding-top: 14px;
+}
+.wd-shots caption {
+  text-align: left;
+  padding: 12px 20px;
+  font-weight: 600;
+  border-top: 1px solid var(--border);
+}
+.wd-shots small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  margin-top: 4px;
+}
+.wd-budget {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.wd-budget p {
+  font-size: 13px;
+  margin: 0 0 8px;
+  max-width: 75ch;
+}
+.wd-budget .wd-note {
+  font-size: 12px;
+}
+.wd-daily {
+  margin-block: 20px;
+}
+/* Manual setpoints can place this in a narrow column on a wide desktop. */
+@container water-delivery (max-width: 760px) {
+  .wd-capacity,
+  .wd-runtime,
+  .wd-budget {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .wd-title,
+  .wd-capacity,
+  .wd-flow-line,
+  .wd-runtime,
+  .wd-budget {
+    padding-inline: 14px;
+  }
+  .wd-comparison {
+    gap: 8px;
+  }
+  .wd-comparison > div {
+    padding: 10px;
+  }
+  .wd-comparison strong {
+    font-size: 16px;
+  }
+  .wd-shots {
+    min-width: 760px;
+  }
+}
+@media (max-width: 760px) {
+  .wd-capacity,
+  .wd-runtime,
+  .wd-budget {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .wd-title,
+  .wd-capacity,
+  .wd-flow-line,
+  .wd-runtime,
+  .wd-budget {
+    padding-inline: 14px;
+  }
+  .wd-comparison {
+    gap: 8px;
+  }
+  .wd-comparison > div {
+    padding: 10px;
+  }
+  .wd-comparison strong {
+    font-size: 16px;
+  }
+  .wd-daily table {
+    min-width: 570px;
+  }
+  .wd-shots {
+    min-width: 760px;
+  }
+}
+.wd-core-limit,
+.wd-shots .wd-core-limit {
+  display: block;
+  color: var(--warning);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-block: 6px;
+}
+.wd-capacity dd small {
+  font-weight: 400;
+}
+@media (max-width: 760px) {
+  .wd-daily table {
+    min-width: 0;
+  }
+  .wd-daily thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .wd-daily tbody,
+  .wd-daily tr {
+    display: block;
+  }
+  .wd-daily td {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    text-align: right;
+    white-space: normal;
+    padding: 10px 14px;
+  }
+  .wd-daily td::before {
+    content: attr(data-label);
+    text-align: left;
+    color: var(--muted-foreground);
+  }
+  .wd-daily tr + tr {
+    border-top: 1px solid var(--border);
+  }
+}
+.wd-details > summary {
+  padding: 16px 20px;
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 500;
+}
+.wd-details > summary:focus-visible,
+.wd-water .table-scroll:focus-visible,
+.wd-daily .table-scroll:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -3px;
+}

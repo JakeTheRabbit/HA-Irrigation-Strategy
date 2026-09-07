@@ -1,3 +1,4 @@
+import type { HistoryRequest, HistoryWindow } from "./comparison-types";
 import type { OperatorAction } from "./operator-types";
 export interface EntityState {
   entity_id: string;
@@ -106,6 +107,7 @@ export interface Controller {
   connect: (base: string, token: string) => Promise<void>;
   disconnect: () => void;
   write: (changes: Change[]) => Promise<WriteResult>;
+  historyWindow: (request: HistoryRequest) => Promise<HistoryWindow>;
   history: (entityIds: string[], hours: number) => Promise<Series[]>;
   operator: <T>(action: OperatorAction, data?: Record<string, unknown>) => Promise<T>;
 }

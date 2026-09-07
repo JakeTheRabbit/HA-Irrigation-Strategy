@@ -1215,11 +1215,12 @@ class Controller:
         }
         return round(sum(item["litres"] for item in history), 2), attrs
 
-    def _advance_shot_counters(self, room, zone, size_pct):
+    def _advance_shot_counters(self, room, zone, size_pct, *, delivered_l=None):
         st = room.state[zone]
         now = datetime.now()
         self._water_usage(room, zone, now)
-        delivered_l = size_pct / 100.0 * self._substrate_l(room, zone)
+        if delivered_l is None:
+            delivered_l = size_pct / 100.0 * self._substrate_l(room, zone)
         day = self._grow_day_start(room, now).isoformat()
         for item in st["water_history"]:
             if item["grow_day"] == day:
@@ -1368,13 +1369,17 @@ class Controller:
                 time.sleep(min(step, remaining))
         return time.monotonic() - started, False
 
-    def _execute_shot(self, room, zone, duration_s, size_pct):
+    def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None):
         if self._hardware_fault_block(room):
             return
         strategy_hold = self._strategy_preflight(room, zone, datetime.now())
         if strategy_hold:
             log(f"[{room.slug}] Z{zone} shot held: {strategy_hold}")
             return
+        # Freeze hydraulic sizing before opening hardware. Editing plant count,
+        # substrate or dripper configuration mid-shot must not rewrite its litres.
+        nominal_l = (flow_lps * duration_s if flow_lps is not None
+                     else size_pct / 100.0 * self._substrate_l(room, zone))
         self._busy = True
         hw = room.hw
         valve = hw["valves"].get(zone)
@@ -1442,7 +1447,10 @@ class Controller:
             # daily cap under-counts and the zone can over-water). A kill-switch/override abort mid-shot
             # only delivered part of the shot, so scale the volume by the fraction actually run.
             delivered_pct = size_pct * (elapsed / duration_s if duration_s > 0 else 1.0)
-            self._advance_shot_counters(room, zone, delivered_pct)
+            self._advance_shot_counters(
+                room, zone, delivered_pct,
+                delivered_l=nominal_l * (elapsed / duration_s if duration_s > 0 else 1.0),
+            )
             if aborted:
                 self._alert(
                     f"killshot_{room.slug}_z{zone}",
@@ -1589,19 +1597,20 @@ class Controller:
             max_dur = self._num(
                 f"number.crop_steering_{room.prefix}max_shot_duration", 900
             )  # hard flood cap (s); default 900
-            #   a correct 6 % shot of a 6 L block at 4 L/hr is ~324 s; big P1/flush shots reach ~860 s, so the
-            #   cap sits at 900 s — above any legit shot, but catches a gross substrate/flow misconfig
+            # Hydraulic sizing determines nominal runtime; the room's duration
+            # limit bounds every physical shot independently of its requested volume.
             dur = max(5, min(int(max_dur), int(raw_dur)))
-            if (
-                raw_dur > max_dur
-            ):  # a legit F2 shot is <60s — hitting the cap means a substrate/flow misconfig
+            if raw_dur > max_dur:
                 self._alert(
                     f"durcap_{room.slug}_z{zone}",
                     "Shot duration capped (flood guard)",
                     f"{room.slug} zone {zone}: computed {int(raw_dur)}s > {int(max_dur)}s cap — clamped. Check substrate volume / flow config.",
                 )
             log(f"[{room.slug}] Z{zone} {st['phase']} FIRE {size}% ~{dur}s — {reason}")
-            self._execute_shot(room, zone, dur, size)
+            # Count configured flow x actual runtime, including caps, truncation,
+            # the minimum duration and partial aborts. Preserve this flow snapshot
+            # so later sizing edits cannot change an already delivered volume.
+            self._execute_shot(room, zone, dur, size, flow_lps=flow)
         else:
             if "BLOCK" in reason:
                 self._alert(
