@@ -3,6 +3,11 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.13.1
+
+- Read the same-room legacy maximum-shot-duration entity when the canonical entity is absent, matching the dashboard calculator and reviewed edits. Reject an invalid existing duration cap before actuation.
+- Bundle the user-authored recipe library and pair with integration 2.15.0. Existing room identities, options and persistent controller data remain compatible.
+
 ## 0.13.0
 
 - Pair with integration 2.14.0 for reactive manual setpoint previews, run comparisons and clear zone/per-plant water calculations.

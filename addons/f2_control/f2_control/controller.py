@@ -762,6 +762,29 @@ class Controller:
             self._defaulted_this_loop.add(glob)
         return float(default)
 
+    def _room_duration_cap(self, room):
+        """Read the canonical room cap, or its same-room legacy entity if absent."""
+        for suffix in ("max_shot_duration", "maximum_shot_duration"):
+            entity = f"number.crop_steering_{room.prefix}{suffix}"
+            raw, attributes, updated = ha_get(entity)
+            if raw is None and not attributes and updated is None:
+                continue
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):
+                value = None
+            if value is not None and math.isfinite(value) and value >= 5:
+                return value
+            self._alert(
+                f"duration_config_{room.slug}",
+                "Irrigation held — invalid maximum shot duration",
+                f"{entity} must report a finite duration of at least 5 seconds. "
+                "The selected cap is not replaced by a legacy value or default.",
+            )
+            return None
+        # Keep the existing installation fallback only when neither room entity exists.
+        return 900.0
+
     def _num_or_none(self, entity):
         """Read a number entity as float, or None if it doesn't exist / isn't a number."""
         v, _, _ = ha_get(entity)
@@ -1594,9 +1617,9 @@ class Controller:
                 )
                 return
             raw_dur = size / 100.0 * substrate / flow
-            max_dur = self._num(
-                f"number.crop_steering_{room.prefix}max_shot_duration", 900
-            )  # hard flood cap (s); default 900
+            max_dur = self._room_duration_cap(room)
+            if max_dur is None:
+                return
             # Hydraulic sizing determines nominal runtime; the room's duration
             # limit bounds every physical shot independently of its requested volume.
             dur = max(5, min(int(max_dur), int(raw_dur)))

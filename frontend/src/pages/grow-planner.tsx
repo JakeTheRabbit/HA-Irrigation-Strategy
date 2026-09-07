@@ -24,6 +24,7 @@ import {
 import { Heading, Empty, number } from "@/components/dashboard";
 import { WaterDelivery } from "@/components/water-delivery";
 import { PlanningCurve } from "@/components/planning-curve";
+import { RecipeLibrary } from "@/components/recipe-library";
 import { syncPlanZones } from "@/lib/sync-plan-zones";
 import type { Controller } from "@/lib/types";
 import type {
@@ -62,13 +63,14 @@ export function GrowPlanner({
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const [review, setReview] = useState<"save" | "activate" | "disarm" | null>(null);
+  const [libraryDirty, setLibraryDirty] = useState(false);
   const [preview, setPreview] = useState<StrategyDocument | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const dirty = !!plan && !!document && JSON.stringify(plan) !== JSON.stringify(document.plan);
   useLayoutEffect(() => {
-    onDirtyChange(dirty);
+    onDirtyChange(dirty || libraryDirty);
     return () => onDirtyChange(false);
-  }, [dirty, onDirtyChange]);
+  }, [dirty, libraryDirty, onDirtyChange]);
   async function load() {
     if (!controller.roomId) return;
     setBusy(true);
@@ -399,6 +401,30 @@ export function GrowPlanner({
         </section>
       ) : (
         <>
+          <RecipeLibrary
+            key={`${controller.roomId}:${controller.demo ? "demo" : "live"}`}
+            roomId={controller.roomId}
+            roomName={controller.room.room.name}
+            demo={controller.demo}
+            plan={plan}
+            catalog={document.catalog}
+            activeZoneIds={activeZoneIds}
+            dirty={dirty}
+            canLoad={!disabled && !controller.room.strategy.engaged}
+            onDirtyChange={setLibraryDirty}
+            onLoad={(next) => {
+              if (disabled || controller.room.strategy.engaged)
+                throw new Error(
+                  "The grow plan cannot accept a recipe while active, armed, busy or disconnected.",
+                );
+              setPlan(next);
+              setPreview(null);
+              setError("");
+              setNotice(
+                "Recipe loaded into the local draft. Current zone start dates are retained. Review and save before arming.",
+              );
+            }}
+          />
           <section className="panel workspace-card plan-toolbar">
             <div>
               <span className="eyebrow">Plan status</span>

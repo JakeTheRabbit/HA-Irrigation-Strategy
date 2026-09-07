@@ -1,3 +1,4 @@
+import { createUuid } from "./uuid";
 import type { HistoryRequest, RunRecord, RunsDocument } from "./comparison-types";
 import type { States } from "./types";
 import { buildRoom, discoverRooms } from "./model";
@@ -94,7 +95,7 @@ export class RunDemo {
         }));
         const first = previews[0]?.preview.draft;
         doc.runs.push({
-          id: crypto.randomUUID(),
+          id: createUuid(),
           room_id: room.id,
           name: raw.name.trim(),
           start_date: raw.start_date!,

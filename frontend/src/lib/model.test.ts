@@ -284,3 +284,46 @@ it("exposes zone-specific dripper flow with the actual HA bounds", () => {
     step: 0.1,
   });
 });
+
+it("exposes the real same-room legacy duration entity as an editable room safety field", () => {
+  const states = fixture();
+  const legacy = "number.crop_steering_f1_maximum_shot_duration";
+  states[legacy] = entity(legacy, "900", { min: 5, max: 3600, step: 1, unit_of_measurement: "s" });
+  states["number.crop_steering_maximum_shot_duration"] = entity(
+    "number.crop_steering_maximum_shot_duration",
+    "600",
+    { min: 5, max: 3600, step: 1 },
+  );
+  const room = buildRoom(
+    states,
+    discoverRooms(states).find((r) => r.prefix === "f1_")!,
+  );
+  const field = room.settings.find((s) => s.entityId === legacy);
+  expect(field).toMatchObject({
+    entityId: legacy,
+    value: 900,
+    min: 5,
+    max: 3600,
+    step: 1,
+    unit: "s",
+    group: "Safety",
+  });
+  expect(field?.zoneId).toBeUndefined();
+  expect(
+    room.settings.some((s) => s.entityId === "number.crop_steering_maximum_shot_duration"),
+  ).toBe(false);
+});
+
+it("does not offer a shadowed legacy cap as an effective room setting", () => {
+  const states = fixture();
+  const legacy = "number.crop_steering_f1_maximum_shot_duration";
+  const canonical = "number.crop_steering_f1_max_shot_duration";
+  states[legacy] = entity(legacy, "900", { min: 5, max: 3600, step: 1 });
+  states[canonical] = entity(canonical, "unavailable", { min: 5, max: 3600, step: 1 });
+  const room = buildRoom(
+    states,
+    discoverRooms(states).find((r) => r.prefix === "f1_")!,
+  );
+  expect(room.settings.find((s) => s.entityId === canonical)?.value).toBeNull();
+  expect(room.settings.some((s) => s.entityId === legacy)).toBe(false);
+});

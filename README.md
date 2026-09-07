@@ -6,7 +6,7 @@ A Home Assistant irrigation controller with a native operator workspace: see the
 
 The demo opens directly in your browser with sample rooms, sensor data and editable plans. No login or Home Assistant installation is required; demo changes stay in your browser.
 
-![Release](https://img.shields.io/badge/Release-2.14.0-green)
+![Release](https://img.shields.io/badge/Release-2.15.0-green)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3+-41BDF5)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -27,7 +27,11 @@ Home Assistant owns the install/restart confirmations; these links take you dire
 
 Choose a room, zone and day or week. The steering slider updates the VWC/EC planning curve and shows the targets behind it.
 
+Save your own plans in **Grow plan → Recipe library** and reuse them as local drafts. The library is kept in this browser, separated by room and demo/live mode. Loading retains the current zone start dates; saving and arming still use the normal review workflow. [Recipe library and reference sources →](docs/RECIPE_LIBRARY.md)
+
 ![Combined VWC and EC planning graph with per-zone day and week controls](img/grow-plan.png)
+
+![Reusable user-authored plans in the recipe library](img/recipe-library.png)
 
 ## See each change before applying it
 

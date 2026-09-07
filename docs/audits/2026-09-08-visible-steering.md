@@ -29,3 +29,15 @@ Browser evidence is reproducible using docs/TESTING.md. Current product screensh
 ## Boundaries
 
 Planning curves illustrate configured targets; they are not predictions of uptake, EC accumulation or future shot times. Missing Recorder retention cannot be reconstructed. Sparse observations remain isolated points; long unavailable gaps are not connected. Litres are controller/configured-flow estimates, not metered delivery, runoff or crop uptake. This release does not automatically register real runs, arm recipes or change current setpoints.
+
+## In-place installation verification
+
+The published 2.14.0 integration and 0.13.0 controller were installed through HACS and the existing Supervisor app identity on 8 September 2026. GitHub validation, installation, release packaging and Pages deployment all passed.
+
+Before the upgrade, both integration entries, current controls, the controller image and persistent state were backed up. An unsaved browser plan was exported separately and its original tab retained. Both engines were paused and mapped pumps/mainlines/valves read OFF before replacing software. Home Assistant restarted once; both room entries loaded successfully.
+
+Readback matched all 303 existing numeric settings and all 397 captured controls after restoring the previous engine states. Integration data/options, shot counters, daily volume, last-shot/reset records and retained controller state matched their backups. Installed controller Python, decision core and both dashboard copies matched the published source. Both room heartbeats resumed healthy. No recipe was armed and no run dates were invented.
+
+The installed UI loaded recorded VWC and EC for a seven-day window and displayed the daily target reference, range summaries and coverage counts. The public demo loaded independently. These checks validate software and retained data, not physical water delivery.
+
+The UI check identified an older `maximum_shot_duration` entity name which the new calculator did not recognise. Compatibility remediation and its follow-up release are tracked separately; the initial 2.14.0 calculator correctly left that effective estimate unavailable.

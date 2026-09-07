@@ -45,12 +45,23 @@ const ROOM_PARAMETERS = new Set([
   "irrigation_ph_min",
   "irrigation_ph_max",
   "max_shot_duration",
+  "maximum_shot_duration",
 ]);
 export const emptyRoom: Room = {
   id: "",
   name: "No room discovered",
   prefix: "",
 };
+/** Room-only controller cap: a present canonical entity always shadows its legacy alias. */
+export function roomDurationCapEntityId(
+  states: States,
+  room: Room,
+  settings: Setting[] = [],
+): string | undefined {
+  return ["max_shot_duration", "maximum_shot_duration"]
+    .map((suffix) => `number.${ROOT}${room.prefix}${suffix}`)
+    .find((id) => !!states[id] || settings.some((field) => field.entityId === id));
+}
 export function numeric(entity?: EntityState): number | null {
   if (!entity || !entity.state.trim() || ["unknown", "unavailable"].includes(entity.state))
     return null;
@@ -227,7 +238,8 @@ function group(key: string) {
   if (/^ec_target/.test(key)) return "EC targets";
   if (/substrate|plant_count|dripper/.test(key)) return "Hardware sizing";
   if (/light.*hour/.test(key)) return "Schedule";
-  if (/max_|maximum_ec|watchdog|irrigation_(ec|ph)/.test(key)) return "Safety";
+  if (/max_|maximum_shot_duration|maximum_ec|watchdog|irrigation_(ec|ph)/.test(key))
+    return "Safety";
   return "General";
 }
 function setting(entity: EntityState, room: Room): Setting | null {
@@ -250,13 +262,15 @@ function setting(entity: EntityState, room: Room): Setting | null {
   return {
     entityId: entity.entity_id,
     label: title(param),
-    description: /dryback/.test(param)
-      ? "Relative drop as a percentage of peak VWC. Example: 60% peak with a 10% target means 54% VWC."
-      : param === "substrate_volume"
-        ? "Substrate volume per plant; the engine scales by plant count."
-        : match
-          ? `Zone ${match[1]} configuration.`
-          : "Room default; an available zone-specific value takes precedence.",
+    description: ["max_shot_duration", "maximum_shot_duration"].includes(param)
+      ? "Maximum valve-open runtime for every zone in this room."
+      : /dryback/.test(param)
+        ? "Relative drop as a percentage of peak VWC. Example: 60% peak with a 10% target means 54% VWC."
+        : param === "substrate_volume"
+          ? "Substrate volume per plant; the engine scales by plant count."
+          : match
+            ? `Zone ${match[1]} configuration.`
+            : "Room default; an available zone-specific value takes precedence.",
     value: numeric(entity),
     min: Number(min),
     max: Number(max),
@@ -321,6 +335,11 @@ export function buildRoom(states: States, room: Room): RoomView {
   const entities = roomEntities(states, room);
   const settings = entities
     .filter((e) => e.entity_id.startsWith("number."))
+    .filter(
+      (e) =>
+        e.entity_id !== `number.${ROOT}${room.prefix}maximum_shot_duration` ||
+        e.entity_id === roomDurationCapEntityId(states, room),
+    )
     .map((e) => setting(e, room))
     .filter((s): s is Setting => s !== null);
   const choices: Choice[] = entities.flatMap((entity) => {

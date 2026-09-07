@@ -169,6 +169,7 @@ jobs:
           node frontend/scripts/verify-live.mjs
           node frontend/scripts/verify-workspace.mjs
           node frontend/scripts/verify-steering-visuals.mjs
+          node frontend/scripts/verify-recipe-library.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

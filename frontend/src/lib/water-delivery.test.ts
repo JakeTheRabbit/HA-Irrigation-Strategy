@@ -258,3 +258,33 @@ it("surfaces a configured daily budget outside the core's 10–2000 litre limits
   });
   expect(coreWaterValue("max_daily_volume", null).value).toBeNull();
 });
+
+it("reads same-room legacy duration caps and applies exact legacy-ID drafts", () => {
+  const c = controller();
+  const legacy = "number.crop_steering_veg_maximum_shot_duration";
+  c.states[legacy] = { state: "900" } as never;
+  expect(waterParameters(c, 1).max_shot_duration).toBe(900);
+  expect(waterParameters(c, 1, undefined, { [legacy]: 60 }).max_shot_duration).toBe(60);
+  expect(waterParameters(c, 1, undefined, { [legacy]: NaN }).max_shot_duration).toBeNull();
+});
+it("canonical room duration cap wins by existence, including invalid readings", () => {
+  const c = controller();
+  const canonical = "number.crop_steering_veg_max_shot_duration";
+  const legacy = "number.crop_steering_veg_maximum_shot_duration";
+  c.states[legacy] = { state: "900" } as never;
+  c.states[canonical] = { state: "70" } as never;
+  expect(waterParameters(c, 1, undefined, { [legacy]: 60 }).max_shot_duration).toBe(70);
+  expect(
+    waterParameters(c, 1, undefined, { [canonical]: 30, [legacy]: 60 }).max_shot_duration,
+  ).toBe(30);
+  c.states[canonical].state = "unavailable";
+  expect(waterParameters(c, 1, undefined, { [legacy]: 60 }).max_shot_duration).toBeNull();
+});
+it("duration caps stay room-level and never borrow another room", () => {
+  const c = controller();
+  c.states["number.crop_steering_maximum_shot_duration"] = { state: "10" } as never;
+  c.states["number.crop_steering_veg_zone_1_max_shot_duration"] = { state: "20" } as never;
+  expect(waterParameters(c, 1).max_shot_duration).toBeNull();
+  c.states["number.crop_steering_veg_maximum_shot_duration"] = { state: "60" } as never;
+  expect(waterParameters(c, 1).max_shot_duration).toBe(60);
+});

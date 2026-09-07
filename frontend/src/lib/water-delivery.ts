@@ -1,3 +1,4 @@
+import { roomDurationCapEntityId } from "./model";
 import type { Controller, Zone } from "./types";
 
 export const waterParameterKeys = [
@@ -34,6 +35,24 @@ export function waterParameters(
   const prefix = `number.crop_steering_${controller.room.room.prefix}`;
   const zone = controller.room.zones.find((item) => item.id === zoneId);
   const read = (key: WaterParameter): number | null => {
+    if (key === "max_shot_duration") {
+      // This physical limit is room-only, outside plan parameters and zone defaults.
+      if (has(fieldOverrides, key)) return finite(fieldOverrides[key]) ? fieldOverrides[key] : null;
+      const id = roomDurationCapEntityId(
+        controller.states,
+        controller.room.room,
+        controller.room.settings,
+      );
+      if (!id) return null;
+      if (has(fieldOverrides, id)) return finite(fieldOverrides[id]) ? fieldOverrides[id] : null;
+      const state = controller.states[id];
+      if (state) {
+        const raw = state.state.trim();
+        return raw && Number.isFinite(Number(raw)) ? Number(raw) : null;
+      }
+      const field = controller.room.settings.find((item) => item.entityId === id);
+      return finite(field?.value) ? field.value : null;
+    }
     const zoneEntity = `${prefix}zone_${zoneId}_${key}`,
       roomEntity = `${prefix}${key}`;
     for (const candidate of [key, zoneEntity]) {

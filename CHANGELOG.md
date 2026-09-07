@@ -9,6 +9,12 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.0] - 2026-09-08
+
+- Add an empty, room-scoped library for saving and reusing user-authored plans as local drafts. Browser storage is separate for live and demo; loading preserves the current zone start dates and uses existing plan validation/review.
+- Support the legacy same-room `maximum_shot_duration` entity alongside the canonical name in the controller and runtime calculator. Canonical entities take precedence; invalid configured values do not silently acquire another room's cap.
+- Pair with controller 0.13.1. No crop-guide numerical presets or publisher endorsement are included.
+
 ## [2.14.0] - 2026-09-08
 
 **🌱 In plain English.** See the whole day while editing setpoints: the draft VWC/EC curves and P3 emergency floor move immediately beside the saved reference. Compare retained readings over a day, week, month or run-to-date with another run at the same grow age. Water cards distinguish total zone delivery, average per plant and pot capacity, with a local runtime calculator.

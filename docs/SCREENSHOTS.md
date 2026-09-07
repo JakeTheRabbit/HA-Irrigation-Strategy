@@ -20,6 +20,10 @@ Captured on 8 September 2026 from the compiled application with isolated demo da
 
 ![Compare VWC and EC over the same grow age](../img/run-comparison.png)
 
+## User-authored recipe library
+
+![Save and reuse your own plans as local drafts](../img/recipe-library.png)
+
 ## Rooms and sensor mapping
 
 ![Room setup](../img/rooms-setup.png)

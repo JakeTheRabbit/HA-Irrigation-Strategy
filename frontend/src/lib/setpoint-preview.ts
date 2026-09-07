@@ -1,3 +1,4 @@
+import { roomDurationCapEntityId } from "./model";
 import type { RoomView, Setting, States } from "./types";
 import type { PlanningBounds } from "./planning-curve";
 
@@ -96,9 +97,16 @@ export function buildSetpointPreview(
   const fieldOverrides: Record<string, number> = {};
   const issues: string[] = [];
   const readOnly = room.strategy.engaged;
-  const find = (suffix: string) =>
-    room.settings.find((field) => field.entityId === `number.${root}zone_${zoneId}_${suffix}`) ??
-    room.settings.find((field) => field.entityId === `number.${root}${suffix}`);
+  const find = (suffix: string) => {
+    if (suffix === "max_shot_duration") {
+      const id = roomDurationCapEntityId(states, room.room, room.settings);
+      return room.settings.find((field) => field.entityId === id);
+    }
+    return (
+      room.settings.find((field) => field.entityId === `number.${root}zone_${zoneId}_${suffix}`) ??
+      room.settings.find((field) => field.entityId === `number.${root}${suffix}`)
+    );
+  };
   const read = (field: Setting | undefined, local: boolean): number | undefined => {
     if (!field) return undefined;
     const draft = local && !readOnly ? drafts[field.entityId] : undefined;

@@ -97,6 +97,8 @@ Room isolation and canonical identity, sensor freshness, supported entity/parame
 
 Run comparison tests cover room-scoped persistent metadata, revision conflicts, immutable captured references, Recorder retention gaps, cancellation, grow-age alignment and daylight-saving boundaries. The compiled visual suite verifies P3 line movement, saved/draft isolation, invalid-edit blocking, explicit zone/per-plant water and comparison workflows.
 
+Run `node frontend/scripts/verify-recipe-library.mjs` after building to check named library saves on HTTP-style crypto capabilities, export/import, current-date preservation, explicit dirty-draft replacement, room isolation, removal confirmation, corruption recovery export and desktop/mobile accessibility. This suite also runs in CI and captures `img/recipe-library.png` from isolated demo data.
+
 ## Manual verification checklist (live Home Assistant)
 
 The automated suite can't drive real hardware. Before trusting a change on the grow:

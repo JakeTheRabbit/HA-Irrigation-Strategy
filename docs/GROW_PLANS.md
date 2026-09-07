@@ -65,4 +65,6 @@ The P1 maximum-shot budget is conditional. P2 maintenance and P3 emergency shots
 
 ## Current boundaries
 
+For reusable copies of your own schedules, use **Recipe library**. It stores named plans in the current browser and room, supports export/import and loads only into the local draft while retaining current zone start dates. See the [library guide and reference sources](RECIPE_LIBRARY.md).
+
 Plans steer irrigation targets, not tank dosing or environmental equipment. Legacy manual shot and phase override services may emit events without being consumed by this controller; the workspace does not advertise them as working actuator commands. Closed-loop crop-response learning, measured flow reconciliation and automatic recipe optimisation remain future work. See the [feature matrix](FEATURE_MATRIX.md).

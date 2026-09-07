@@ -1,3 +1,5 @@
+import { waterParameters } from "./water-delivery";
+import type { Controller } from "./types";
 import { describe, expect, it } from "vitest";
 import { buildRoom, discoverRooms } from "./model";
 import { buildSetpointPreview, validateSetpoint } from "./setpoint-preview";
@@ -253,4 +255,36 @@ it("rejects incomplete active targets despite a fresh snapshot timestamp", () =>
   const p = buildSetpointPreview(f.room(), f.states, 1, {});
   expect(p.source).toBe("unavailable-plan");
   expect(p.draft.parameters.p1_target_vwc).toBeUndefined();
+});
+
+it("maps a legacy room duration cap and its exact-ID draft into the water preview", () => {
+  const f = fixture();
+  f.numeric("maximum_shot_duration", 900, 5, 3600, 1);
+  const legacy = f.id("maximum_shot_duration");
+  const p = buildSetpointPreview(f.room(), f.states, 1, { [legacy]: { value: "60" } });
+  expect(p.saved.parameters.max_shot_duration).toBe(900);
+  expect(p.draft.parameters.max_shot_duration).toBe(60);
+  expect(p.fields.max_shot_duration.entityId).toBe(legacy);
+  expect(p.fieldOverrides[legacy]).toBe(60);
+  const c = { states: f.states, room: f.room() } as Controller;
+  expect(waterParameters(c, 1, p.draft.parameters, p.fieldOverrides).max_shot_duration).toBe(60);
+  const invalid = buildSetpointPreview(f.room(), f.states, 1, { [legacy]: { value: "" } });
+  expect(invalid.draft.parameters.max_shot_duration).toBeUndefined();
+  expect(invalid.fieldOverrides[legacy]).toBeNaN();
+  expect(
+    waterParameters(c, 1, invalid.draft.parameters, invalid.fieldOverrides).max_shot_duration,
+  ).toBeNull();
+});
+it("keeps existing invalid canonical cap above legacy and ignores invented zone caps", () => {
+  const f = fixture();
+  f.numeric("maximum_shot_duration", 900, 5, 3600, 1);
+  f.numeric("max_shot_duration", 70, 5, 3600, 1);
+  f.numeric("zone_1_max_shot_duration", 5, 5, 3600, 1);
+  const legacy = f.id("maximum_shot_duration");
+  let p = buildSetpointPreview(f.room(), f.states, 1, { [legacy]: { value: "60" } });
+  expect(p.draft.parameters.max_shot_duration).toBe(70);
+  expect(p.fieldOverrides[legacy]).toBeUndefined();
+  f.states[f.id("max_shot_duration")].state = "unavailable";
+  p = buildSetpointPreview(f.room(), f.states, 1, { [legacy]: { value: "60" } });
+  expect(p.draft.parameters.max_shot_duration).toBeUndefined();
 });

@@ -1,0 +1,136 @@
+.recipe-library {
+  margin: 18px 0;
+}
+.recipe-library > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  cursor: pointer;
+}
+.recipe-library > summary::before {
+  content: "▸";
+  color: var(--muted-foreground);
+}
+.recipe-library[open] > summary::before {
+  content: "▾";
+}
+.recipe-library > summary > span {
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.recipe-library-body {
+  padding: 0 20px 16px;
+}
+.recipe-library-actions,
+.recipe-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.recipe-library-actions {
+  margin: 14px 0;
+}
+.recipe-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+}
+.recipe-list > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+.recipe-list strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.recipe-list span:not(.sr-only) {
+  display: block;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 4px;
+}
+.recipe-empty {
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.recipe-dialog {
+  max-height: 85dvh;
+  overflow-y: auto;
+}
+.recipe-form {
+  display: grid;
+  gap: 14px;
+}
+.recipe-form label {
+  display: block;
+  margin-bottom: 6px;
+}
+.recipe-form textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 12px;
+  background: var(--background);
+  color: var(--foreground);
+  resize: vertical;
+}
+.recipe-inspection {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+.recipe-inspection h3 {
+  font-size: 15px;
+}
+.recipe-inspection pre {
+  max-height: 240px;
+  overflow: auto;
+  padding: 12px;
+  background: var(--secondary);
+  border-radius: 6px;
+  font-size: 11px;
+}
+.recipe-inspection summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+.recipe-inspection a {
+  color: var(--primary);
+  font-size: 12px;
+}
+.recipe-notes {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.recipe-replace {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 12px;
+}
+.recipe-replace input {
+  margin-top: 3px;
+}
+@media (max-width: 620px) {
+  .recipe-list > li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .recipe-library-body {
+    padding: 0 14px 14px;
+  }
+  .recipe-library > summary {
+    padding: 14px;
+  }
+}
