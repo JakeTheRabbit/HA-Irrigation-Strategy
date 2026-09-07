@@ -1,12 +1,34 @@
 /** Independent compiled-workspace browser contracts. All actions remain isolated demo/fixtures. */
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
 const out = fileURLToPath(new URL("../../output/playwright/", import.meta.url));
 await mkdir(out, { recursive: true });
-const url = process.env.WORKSPACE_URL || "http://127.0.0.1:5198/dashboard.html?demo=1";
+// CI must exercise the checked-out artifact without relying on a developer's server.
+let server;
+let url = process.env.WORKSPACE_URL;
+if (!url) {
+  const dashboard = await readFile(new URL("../../www/dashboard.html", import.meta.url));
+  server = createServer((req, res) => {
+    const pathname = new URL(req.url, "http://localhost").pathname;
+    if (pathname !== "/" && pathname !== "/dashboard.html") {
+      res.writeHead(404);
+      res.end("Not found");
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+    res.end(dashboard);
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  server.unref();
+  url = `http://127.0.0.1:${server.address().port}/dashboard.html?demo=1`;
+}
 const origin = new URL(url).origin;
 const browser = await chromium.launch({
   headless: true,
@@ -837,5 +859,9 @@ try {
     JSON.stringify({ url, checks, forbidden, pageErrors, accessibility }, null, 2),
   );
   await browser.close();
+  if (server)
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
 }
 if (checks.some((c) => c.status === "fail")) process.exitCode = 1;
