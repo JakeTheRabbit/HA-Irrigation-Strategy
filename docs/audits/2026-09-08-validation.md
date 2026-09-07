@@ -16,7 +16,7 @@ Scope: the working tree on feat/f2-two-room, based on commit972ae2be6307258c0a5a
 | Ruff | Passed repository-wide, excluding historical archive/generated dependency output |
 | Black | Passed integration and tests |
 | YAML structural lint | Passed |
-| Git whitespace check | Passed with CR-at-EOL allowed for Windows working-tree files |
+| Active-source whitespace check | Passed with CR-at-EOL allowed for Windows files; historical archive bytes are preserved, including original trailing blank lines |
 | Engine source/vendor parity | Byte-identical |
 | Compiled dashboard distribution parity | Byte-identical in web, controller ingress and integration |
 | Integration zip packaging | Created locally; CRC and bundled dashboard verified |

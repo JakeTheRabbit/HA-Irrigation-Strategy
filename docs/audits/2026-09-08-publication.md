@@ -10,3 +10,5 @@ Target: existing feat/f2-two-room branch of JakeTheRabbit/HA-Irrigation-Strategy
 - Refreshed full Python, frontend, production-build and browser verification before commit. See the validation record for coverage and runtime limits.
 
 The working branch is unreleased. HACS and the hosted Pages demo use main/release artifacts until the changes are merged and their publication workflows run. The original local audit records remain historical evidence of what was and was not live-tested.
+
+Publication: implementation commit9b7fc76 was pushed successfully to origin/feat/f2-two-room. The active-source whitespace check excludes archive bytes intentionally: archived setpoints.html retains its original final blank line and recorded hash. Fresh verification passed225 Python tests,55 frontend unit tests and36 browser workflow groups. All four screenshot captures were refreshed after the final build.
