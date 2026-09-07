@@ -1,6 +1,8 @@
 # User guide
 
-Use **Overview** to check a room, **Manual setpoints** to review its current configuration, and **Grow plan** to prepare a schedule. Select the room before editing; zone numbers belong to that room.
+Use **Overview** to check a room and **Irrigation plan** for **Today** and **Schedule**. Today shows the current zone targets; Schedule edits the dated plan. Select the room before editing; zone numbers belong to that room.
+
+The unified navigation and overnight-curve changes described here are follow-up UI source awaiting release verification. The recorded live checks in this guide refer to deployed **2.16.0**, which used the earlier Manual setpoints/Grow plan labels. Existing `#/strategy` and `#/grow-plan` bookmarks are preserved as Today and Schedule.
 
 New installation? Start with [Install, upgrade and rollback](INSTALL.md). To try the interface without connecting equipment, open the [interactive demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1).
 
@@ -21,8 +23,8 @@ New installation? Start with [Install, upgrade and rollback](INSTALL.md). To try
 The demo is an isolated software demonstration. Its readings, history, example plans and run records are synthetic; they are not a recommended configuration or evidence from a real grow. A demo tab cannot connect to live Home Assistant.
 
 1. Open **Overview** and switch rooms. Inspect the tank, zone states and combined VWC/EC history.
-2. Open **Manual setpoints**, select a zone and choose **P3**. Edit its emergency floor and compare the moving draft line with the saved reference. Use the review dialog to inspect changes.
-3. Open **Grow plan**. Select a zone and day/week, inspect its endpoint profile and change the steering balance. Compare the schedule and curve.
+2. Open **Irrigation plan → Today**, select a zone and choose **P3**. Edit its emergency floor and compare the moving draft line with the saved reference. Use the review dialog to inspect changes.
+3. Open **Irrigation plan → Schedule**. Select a zone and day/week, inspect its endpoint profile and change the steering balance. Compare the schedule and curve.
 4. Expand **Recipe library** to inspect **Demo • steady schedule** or **Demo • week-by-week changes**, or save your own copy. Samples are added only when that demo room has no stored library yet. Loading affects a local draft; the normal review/save remains separate.
 5. Open **Compare runs**. Select the illustrative current/previous runs and change the history range or target reference. The generated history remains labelled as demo data.
 6. Open **Rooms & setup** to try entity search, room/zone names and mapping review. Demo actions do not call your HA server.
@@ -69,9 +71,11 @@ Use your own installation's recording source. Some systems record an operator co
 
 Unmapped inputs show **Not mapped**; invalid readings show **Unavailable**, **Check units** or **Out of range**. An unknown pump is not shown as off and an unknown tank is not drawn empty. When disconnected, the panel identifies retained readings as last received.
 
-## Edit manual setpoints
+## Irrigation plan → Today
 
-1. Select a room, open **Manual setpoints**, then select a zone. Choose **Room settings** for shared timing/configuration.
+When no schedule owns the room, Today lets you edit the current targets using the steps below. An active schedule replaces those controls with its effective read-only targets and graph; fallback manual inputs are hidden. If the required schedule snapshot is missing or stale, those targets remain unavailable rather than being replaced by manual values.
+
+1. Select a room, open **Irrigation plan → Today**, then select a zone. Choose **Room settings** for shared timing/configuration.
 2. Use the phase selector to keep the relevant controls beside the whole-day VWC/EC preview. On a narrow screen, expand the preview when needed.
 3. Edit a numeric field or a supported graph handle. Both edit the same local draft and respect the HA field's limits and step. The saved reference remains visible for comparison.
 4. Check the parameter's name, unit, selected legacy mode, draft line and water estimate. **Show targets for both steering modes** exposes the other mode's stored references when available.
@@ -79,13 +83,13 @@ Unmapped inputs show **Not mapped**; invalid readings show **Unavailable**, **Ch
 
 Room changes can be previewed against a selected zone. A zone-specific value takes precedence over a room fallback where the controller supports it. Missing or invalid inputs remain missing/invalid instead of becoming an invented curve.
 
-A grow plan that owns the room's targets locks conflicting manual edits. Open **Grow plan** to inspect its state and use the normal disarm/handoff workflow before editing fallback targets. Export or deliberately discard drafts before leaving; a navigation warning is not an automatic backup.
+When a schedule owns the room, use **Irrigation plan → Schedule** to inspect its dated targets and state. Use the normal disarm/handoff workflow and wait for draft status before returning to editable manual targets in Today. Export or deliberately discard drafts before leaving; a navigation warning is not an automatic backup.
 
-## Build and reuse a grow plan
+## Irrigation plan → Schedule
 
 The planner schedules user-defined profiles by zone and grow day. The balance slider interpolates between the profile's explicit vegetative and generative endpoints; it does not select a built-in agronomic prescription. Equal endpoints intentionally produce equal targets at every slider position. Pot/dripper sizing affects water estimates, not the suitability of the endpoint values.
 
-1. Open **Grow plan → Endpoint profiles**. Inspect both endpoints and select the correct **Zone limits**. Duplicate a profile when you need an independent copy. A shared profile affects all schedule blocks referring to it.
+1. Open **Irrigation plan → Schedule → Endpoint profiles**. Inspect both endpoints and select the correct **Zone limits**. Duplicate a profile when you need an independent copy. A shared profile affects all schedule blocks referring to it.
 2. Open **Schedule & curve**. Select a zone and set **Zone grow start date**. Each zone can have its own start date.
 3. Select a day or week in the overview. Assign its **Endpoint profile** and **Steering balance**. Days 1–366 are supported. Range edits preserve surrounding assignments by splitting existing blocks.
 4. Inspect **Zone schedule blocks** for coverage. Fill missing days and resolve overlap, parameter or zone-assignment errors.
@@ -113,14 +117,14 @@ Libraries are isolated by site, browser, room and demo/live mode. They are not a
 
 | View                          | What it shows                                                                                                            | What it does not establish                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Manual/planner VWC–EC curve   | Configured targets, phase references and supported timing, with local draft changes where applicable.                    | Exact future shot times, uptake, runoff or EC accumulation.                                 |
+| Today/Schedule VWC–EC curve   | Configured targets, phase references and supported timing, with local draft changes where applicable.                    | Exact future shot times, uptake, runoff or EC accumulation.                                 |
 | Overview history              | Retained HA Recorder measurements on separate VWC and EC axes.                                                           | Measurements from periods Recorder did not retain.                                          |
 | Water delivered this grow-day | The controller's recorded estimate from its configured flow and elapsed shot runtime, including accounted partial shots. | Independent meter readings, uniform distribution, plant uptake or external irrigation.      |
 | Average mL per plant          | Zone estimated water divided by configured plant count.                                                                  | A measurement from each emitter.                                                            |
 | Total substrate capacity      | Substrate volume per plant multiplied by plant count.                                                                    | Water delivered or water retained.                                                          |
 | Runtime/phase water preview   | A conditional calculation from supplied settings, showing requested versus effective runtime and caps.                   | A guaranteed daily total; feedback-dependent maintenance/emergency shot counts are unknown. |
 
-The planning curve uses separate axes for VWC (%) and root-zone EC. It leaves unsupported/missing sections blank and does not invent an overnight EC trend. A graph handle changes configuration in a draft, not physical equipment.
+The updated planning curve uses separate axes for VWC (%) and root-zone EC, joining configured references across lights-off and overnight to the next lights-on. VWC joins the daytime reference to the relative dryback endpoint; the P3 emergency floor remains a separate protection reference. Dashed EC interpolates from the last daytime anchor to the next morning anchor. There is no P3 EC setpoint or prediction of the physical EC/salt trajectory. Missing values remain gaps rather than being filled with guessed readings. A graph handle changes configuration in a draft, not physical equipment.
 
 Use **Insights → Calibration** to enter an actual catch-test result and inspect the proposed dripper flow. The calculator does not apply that proposal automatically. Historical estimates are not retroactively corrected when flow settings change. For detailed software semantics, see [Steering and planning](GROW_PLANS.md).
 
@@ -153,13 +157,19 @@ Zone and room removal archives stable IDs. **Restore zone** or **Restore room** 
 
 The native HA sidebar normally uses your existing HA session. **Settings → Home Assistant connection** also supports an explicit URL and a long-lived access token for a standalone tab; the token is kept for that tab session and is never put in the URL. A hosted HTTPS page may be unable to access a local HTTP HA server because of browser origin/security rules; use the native sidebar for the normal installation.
 
-Inside a compatible same-origin HA shell, the workspace temporarily collapses HA's sidebar. Use **Home Assistant** at the bottom of the workspace navigation, or the house button labelled **Open Home Assistant menu** in the top bar, to reopen HA's menu. Leaving the workspace restores the prior temporary state; it does not change the saved HA sidebar preference. Standalone and unsupported embeddings keep normal navigation. See [Home Assistant sidebar](HA_SIDEBAR.md) for compatibility details; this source behavior still needs release-specific live verification.
+Inside a compatible same-origin HA shell, the workspace temporarily collapses HA's sidebar. Use **Home Assistant** at the bottom of the workspace navigation, or the house button labelled **Open Home Assistant menu** in the top bar, to reopen HA's menu. Leaving the workspace restores the prior temporary state; it does not change the saved HA sidebar preference. Standalone and unsupported embeddings keep normal navigation. The hide-and-reopen behavior was verified in the actual HA panel on 2.16.0; see [Home Assistant sidebar](HA_SIDEBAR.md) for compatibility limits.
 
 Choose **Settings → Appearance → Home Assistant / system** to inherit the HA theme when embedded on the same origin, or the device theme in standalone mode. **Light** and **Dark** are explicit overrides. Cross-origin embedding cannot read the host theme.
 
 **Sensors** shows values, units, availability and freshness. **Insights** shows coverage, equipment mappings and the local catch-test calculator. **Activity** lists available controller/state records and supports CSV export; it is not an immutable audit of every physical shot. **Help** explains the interface's metrics and limits.
 
 For an existing timed zone hold, Home Assistant exposes the `crop_steering.set_manual_override` action. Its timeout defaults to 60 minutes and accepts 1–1440 minutes; specify the intended zone and room slug (omit the room for the legacy default room). Clearing the hold is distinct from enabling zone/room scheduling. Turning its switch on directly creates an indefinite hold. See the action's fields in HA and the [entity reference](ENTITIES.md); the dashboard does not advertise legacy manual-shot or phase-event services as verified actuator commands.
+
+## Recorded live verification
+
+On 8 September 2026, the deployed **2.16.0** installation completed reviewed MCP preview/apply/readback for tank mappings in both rooms. Each saved setup reached revision **1**, and healthy controller reports acknowledged revision **1**. The F2 panel showed **42%** tank level, **3.06 mS/cm EC**, **pH 5.66**, **17.9 °C**, the explicitly mapped recorded-fill time, and timezone-aware last-irrigation events. The HA sidebar was hidden while in the panel; the Home Assistant button revealed it.
+
+These are recorded checks, not current sensor values. They verify the deployed display and configuration path, not physical filling or water delivery. The follow-up Today/Schedule navigation and overnight-curve update require separate release verification.
 
 ## Connect an LLM with MCP
 
@@ -186,17 +196,17 @@ The MCP server is not a generic HA actuator interface and does not enable engine
 
 ## When something does not look right
 
-| Symptom                                        | Next step                                                                                                                                            |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| No rooms or missing workspace services         | Verify the integration loaded, the controller version matches, and the current HA account can access the entities/services. Refresh after upgrading. |
-| Tank **Not mapped**                            | Set that exact optional display mapping. A similarly named feed or ambient probe is not an implicit fallback.                                        |
-| Last irrigation/fill is missing                | Check the event-producing source and its dated timestamp format. A state update time cannot substitute for the event.                                |
-| A reading shows **Check units**                | Inspect the actual HA unit and choose/repair the appropriate entity. Do not relabel an unrelated quantity to pass validation.                        |
-| Setup is saved but adoption is pending         | Inspect heartbeat/setup blockers; keep affected engines off until the controller acknowledges the revision.                                          |
-| Slider appears to do nothing                   | Inspect both selected endpoint columns. Equal endpoints are deliberately equal at every balance.                                                     |
-| Manual controls are locked                     | Inspect the active/armed/disarming plan or connection state. Use the normal plan handoff, not a conflicting manual write.                            |
-| Cannot load a recipe                           | Check active-zone IDs, current limits, plan state, connection and explicit replacement acknowledgement.                                              |
-| Comparison is blank                            | Check selected run/zone, recorded sensor IDs, dates, Recorder retention and coverage notices. Registering metadata cannot recreate readings.         |
-| A pause was confirmed but equipment remains on | Pause affects scheduling. Inspect the active shot and use the site's established physical shutdown procedure if necessary.                           |
+| Symptom                                        | Next step                                                                                                                                                        |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No rooms or missing workspace services         | Verify the integration loaded, the controller version matches, and the current HA account can access the entities/services. Refresh after upgrading.             |
+| Tank **Not mapped**                            | Set that exact optional display mapping. A similarly named feed or ambient probe is not an implicit fallback.                                                    |
+| Last irrigation/fill is missing                | Check the event-producing source and its dated timestamp format. A state update time cannot substitute for the event.                                            |
+| A reading shows **Check units**                | Inspect the actual HA unit and choose/repair the appropriate entity. Do not relabel an unrelated quantity to pass validation.                                    |
+| Setup is saved but adoption is pending         | Inspect heartbeat/setup blockers; keep affected engines off until the controller acknowledges the revision.                                                      |
+| Slider appears to do nothing                   | Inspect both selected endpoint columns. Equal endpoints are deliberately equal at every balance.                                                                 |
+| Today is read-only                             | Inspect the schedule or connection state. Active schedules show effective read-only targets; use Schedule and the normal boundary handoff before manual editing. |
+| Cannot load a recipe                           | Check active-zone IDs, current limits, plan state, connection and explicit replacement acknowledgement.                                                          |
+| Comparison is blank                            | Check selected run/zone, recorded sensor IDs, dates, Recorder retention and coverage notices. Registering metadata cannot recreate readings.                     |
+| A pause was confirmed but equipment remains on | Pause affects scheduling. Inspect the active shot and use the site's established physical shutdown procedure if necessary.                                       |
 
 For source/test evidence and outstanding commissioning limits, use the [feature matrix](FEATURE_MATRIX.md) and [troubleshooting guide](troubleshooting.md). Software validation does not prove physical delivery or a complete live recipe handoff.

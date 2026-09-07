@@ -321,8 +321,8 @@ export function GrowPlanner({
     return (
       <>
         <Heading
-          title="Grow plan"
-          description="Plan the complete grow, separately for each zone."
+          title="Scheduled targets"
+          description="Schedule the same zone targets across dates."
         />
         <Empty
           title="Add or select a room"
@@ -338,8 +338,8 @@ export function GrowPlanner({
   return (
     <>
       <Heading
-        title="Grow plan"
-        description="Plan each zone day by day. Your steering curve, endpoint profiles and delivery estimates update together."
+        title="Scheduled targets"
+        description="Schedule changes to today’s targets by date, for each zone. Saving a draft does not activate it; an active schedule controls the targets shown in Today."
         action={
           <div className="workspace-actions">
             <Button variant="outline" onClick={exportPlan} disabled={!plan}>

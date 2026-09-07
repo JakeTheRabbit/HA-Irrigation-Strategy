@@ -12,11 +12,11 @@ Captured on 8 September 2026 from the compiled application with isolated demo da
 
 ![Graphical tank level, pump/fill reports and water-quality readings](../img/tank-status.png)
 
-## Combined VWC and EC planning curve
+## Irrigation plan: Schedule and combined VWC/EC curve
 
 ![Zone planning and steering controls](../img/grow-plan.png)
 
-## Manual setpoints beside the planning curve
+## Irrigation plan: Today beside the planning curve
 
 ![Saved and draft targets with P3 emergency floor editing](../img/manual-setpoints.png)
 

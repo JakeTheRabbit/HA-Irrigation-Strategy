@@ -82,7 +82,7 @@ try {
     "P3 floor follows numeric edits; saved baseline and room values remain unchanged",
     async () => {
       await fresh("strategy");
-      await page.getByRole("heading", { name: "Manual setpoints", exact: true }).waitFor();
+      await page.getByRole("heading", { name: "Today’s targets", exact: true }).waitFor();
       await page
         .getByRole("navigation", { name: "Setpoint phase" })
         .getByRole("button", { name: "P3", exact: true })
@@ -250,9 +250,23 @@ try {
         .getByRole("button", { name: "Restore", exact: true })
         .click();
       await page.locator("#desktop-room").selectOption("room:f1_");
-      await page.waitForFunction(() => document.querySelectorAll(".comparison-run-list article").length >= 2);
-      assert.equal(await page.locator(".comparison-run-list article").filter({ hasText: "Previous room run" }).count(), 0);
-      assert.equal(await page.locator(".comparison-run-list article").filter({ hasText: "Current room run" }).count(), 0);
+      await page.waitForFunction(
+        () => document.querySelectorAll(".comparison-run-list article").length >= 2,
+      );
+      assert.equal(
+        await page
+          .locator(".comparison-run-list article")
+          .filter({ hasText: "Previous room run" })
+          .count(),
+        0,
+      );
+      assert.equal(
+        await page
+          .locator(".comparison-run-list article")
+          .filter({ hasText: "Current room run" })
+          .count(),
+        0,
+      );
       await page.setViewportSize({ width: 390, height: 844 });
       await noOverflow();
       await axe("mobile run comparison");

@@ -27,7 +27,7 @@ const DAY = 24 * HOUR;
 const ids: PlanningPhaseId[] = ["P0", "P1", "P2", "P3"];
 
 /** Repeated configured references, never historical applied targets or recorder samples.
- * Lines are split between cycles/phases and clipped at now. Local light boundaries follow
+ * Known adjacent schematic segments connect continuously and are clipped at now. Local light boundaries follow
  * civil time; wait/cadence durations use elapsed minutes across clock changes.
  */
 export function buildComparisonTarget(input: ComparisonTargetInput): ComparisonTarget {
@@ -142,7 +142,18 @@ export function buildComparisonTarget(input: ComparisonTargetInput): ComparisonT
     if (to <= from) return;
     const at = (time: number) =>
       a.value + ((b.value - a.value) * (time - a.time)) / (b.time - a.time);
-    target.push(point(from, at(from)), point(to, at(to)), point(to, null));
+    const firstValue = at(from);
+    const prior = target.at(-1);
+    if (
+      prior &&
+      (Math.abs(prior.time - from) > 1 ||
+        prior.value === null ||
+        Math.abs(prior.value - firstValue) > 0.000001)
+    )
+      target.push(point(from, null));
+    if (!prior || prior.time !== from || prior.value !== firstValue)
+      target.push(point(from, firstValue));
+    target.push(point(to, at(to)));
   };
   // Include the preceding light cycle so a midnight range start retains its overnight part.
   for (
@@ -184,10 +195,13 @@ export function buildComparisonTarget(input: ComparisonTargetInput): ComparisonT
           bp = ids.indexOf(b.phase);
         if (known[ap] && known[bp] && bp - ap <= 1) segment(result.vwc, mapped(a), mapped(b));
       }
-      for (let index = 0; index < plan.phases.length; index++) {
-        if (!known[index]) continue;
-        const points = plan.ec.filter((p) => p.phase === ids[index]);
-        if (points.length === 2) segment(result.ec, mapped(points[0]), mapped(points[1]));
+      for (let index = 1; index < plan.ec.length; index++) {
+        const a = plan.ec[index - 1],
+          b = plan.ec[index];
+        const ap = ids.indexOf(a.phase),
+          bp = ids.indexOf(b.phase);
+        if (!b.breakBefore && known[ap] && known[bp] && bp - ap <= 1)
+          segment(result.ec, mapped(a), mapped(b));
       }
       if (plan.emergencyFloor !== null)
         segment(

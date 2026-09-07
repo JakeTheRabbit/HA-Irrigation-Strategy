@@ -1,3 +1,10 @@
+# 0.13.3
+
+- Combine daily targets and dated plans under Irrigation plan, with Today and Schedule views.
+- Join schematic VWC and EC references through the night and into the next day.
+- Show effective scheduled targets instead of disabled manual fallback fields when a schedule owns the room.
+- Dashboard-only correction; controller decisions and stored settings are unchanged.
+
 # 0.13.2
 
 - Bundle graphical tank/pump telemetry and current zone state with last irrigation timestamps.

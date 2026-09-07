@@ -240,7 +240,7 @@ try {
       await visible(page.getByText("Controller disconnected", { exact: true }));
       await page
         .getByRole("navigation", { name: "Main navigation" })
-        .getByRole("button", { name: "Manual setpoints", exact: true })
+        .getByRole("button", { name: "Irrigation plan", exact: true })
         .click();
       assert.equal(await field("p1_target_vwc").isDisabled(), true);
       assert.equal(await page.locator(".demo-banner").count(), 0);

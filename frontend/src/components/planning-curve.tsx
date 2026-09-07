@@ -9,6 +9,7 @@ import {
   changePlanningValue,
   type PlanningBounds,
   type PlanningPhaseId,
+  type PlanningPoint,
 } from "@/lib/planning-curve";
 
 export interface PlanningCurveProps {
@@ -159,6 +160,13 @@ export function PlanningCurve({
   const targetPath = plan.vwc
     .map((point, index) => `${index ? "L" : "M"}${x(point.hour)},${y(point.value)}`)
     .join(" ");
+  const ecPath = (points: PlanningPoint[]) =>
+    points
+      .map(
+        (point, index) =>
+          `${index && !point.breakBefore ? "L" : "M"}${x(point.hour)},${ey(point.value)}`,
+      )
+      .join(" ");
   return (
     <section className="panel planning-curve" aria-labelledby={`${id}-title`}>
       <div className="panel-heading">
@@ -180,9 +188,22 @@ export function PlanningCurve({
         </span>
         <span>
           <i className="ec-key" />
-          EC target · right (mS/cm)
+          EC schematic · right (mS/cm)
         </span>
       </div>
+      <p className="muted small" style={{ padding: "0 16px 12px", margin: 0 }}>
+        VWC is absolute water content (%). Dryback is a relative drop from the reference peak, not
+        percentage points. Dashed EC connects configured phase anchors through the night; it does
+        not predict EC or salt concentration.
+        {plan.drybackReference !== null && plan.morningDrybackVwc !== null && (
+          <>
+            {" "}
+            Relative dryback: {parameters.dryback_target}% of{" "}
+            {Number(plan.drybackReference.toFixed(2))}% VWC gives a{" "}
+            {Number(plan.morningDrybackVwc.toFixed(2))}% VWC reference endpoint.
+          </>
+        )}
+      </p>
       {baseline && (
         <div className="planning-comparison-key">
           <span>
@@ -286,24 +307,16 @@ export function PlanningCurve({
                   strokeDasharray="4 5"
                 />
               )}
-              {saved.phases.map((phase) => {
-                const points = saved.ec.filter((point) => point.phase === phase.id);
-                return points.length > 0 ? (
-                  <path
-                    key={phase.id}
-                    data-planning-line="baseline-ec"
-                    d={points
-                      .map(
-                        (point, index) => `${index ? "L" : "M"}${x(point.hour)},${ey(point.value)}`,
-                      )
-                      .join(" ")}
-                    fill="none"
-                    stroke="#df78b5"
-                    strokeWidth="1.5"
-                    strokeDasharray="2 6"
-                  />
-                ) : null;
-              })}
+              {saved.ec.length > 0 && (
+                <path
+                  data-planning-line="baseline-ec"
+                  d={ecPath(saved.ec)}
+                  fill="none"
+                  stroke="#df78b5"
+                  strokeWidth="1.5"
+                  strokeDasharray="2 6"
+                />
+              )}
               {saved.emergencyFloor !== null && (
                 <line
                   data-planning-line="baseline-p3-floor"
@@ -336,6 +349,9 @@ export function PlanningCurve({
               {plan.emergencyFloor !== null && (
                 <line
                   data-planning-line="p3-floor"
+                  data-planning-emergency={
+                    plan.emergencyReferenceActive ? "reference-crosses-floor" : undefined
+                  }
                   x1={x(p3.start)}
                   x2={x(24)}
                   y1={y(plan.emergencyFloor)}
@@ -371,24 +387,21 @@ export function PlanningCurve({
                   strokeWidth="2.5"
                 />
               )}
-              {plan.phases.map((phase) => {
-                const points = plan.ec.filter((point) => point.phase === phase.id);
-                return points.length ? (
-                  <path
-                    data-planning-line="ec"
-                    key={phase.id}
-                    d={points
-                      .map(
-                        (point, index) => `${index ? "L" : "M"}${x(point.hour)},${ey(point.value)}`,
-                      )
-                      .join(" ")}
-                    fill="none"
-                    stroke="#df78b5"
-                    strokeWidth="2"
-                    strokeDasharray="6 4"
-                  />
-                ) : null;
-              })}
+              {plan.ec.length > 0 && (
+                <path
+                  data-planning-line="ec"
+                  d={ecPath(plan.ec)}
+                  fill="none"
+                  stroke="#df78b5"
+                  strokeWidth="2"
+                  strokeDasharray="6 4"
+                >
+                  <title>
+                    EC phase-anchor schematic; overnight interpolates to the next morning reference,
+                    not a predicted salt response
+                  </title>
+                </path>
+              )}
               {handles.map((handle) => {
                 const editor = editors.find((item) => item.key === handle.key)!;
                 const position = handle.position as number;
@@ -514,8 +527,8 @@ export function PlanningCurve({
         </p>
       )}
       <p className="muted small" style={{ padding: "0 16px 12px", margin: 0 }}>
-        P3 shows the emergency floor only. No overnight moisture trend or routine watering is
-        predicted.
+        P3 connects the daytime VWC reference to the next morning's relative dryback endpoint. Its
+        emergency floor stays separate; routine watering and actual moisture loss are not predicted.
         {Number.isFinite(parameters.p3_emergency_shot_size)
           ? ` Its ${parameters.p3_emergency_shot_size}% emergency shot is conditional on controller safety checks.`
           : ""}

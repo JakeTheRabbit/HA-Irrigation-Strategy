@@ -45,6 +45,7 @@ const checks = [];
 const pageErrors = [];
 const forbidden = [];
 const accessibility = [];
+const planViewLayouts = [];
 const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },
   acceptDownloads: true,
@@ -80,6 +81,29 @@ async function noOverflow() {
     "Page has horizontal overflow",
   );
 }
+async function planViewsShareRow() {
+  const views = page.getByRole("navigation", { name: "Irrigation plan views" });
+  const [today, schedule] = await Promise.all([
+    views.getByRole("button", { name: "Today", exact: true }).boundingBox(),
+    views.getByRole("button", { name: "Schedule", exact: true }).boundingBox(),
+  ]);
+  assert.ok(today && schedule, "Both irrigation plan view buttons must be visible");
+  assert.ok(
+    Math.abs(today.y - schedule.y) <= 2 &&
+      Math.abs(today.y + today.height - schedule.y - schedule.height) <= 2,
+    "Today and Schedule must share one horizontal row",
+  );
+  assert.ok(
+    schedule.x >= today.x + today.width - 1,
+    "Schedule must sit beside Today without overlap",
+  );
+  planViewLayouts.push({
+    route: new URL(page.url()).hash,
+    viewport: page.viewportSize(),
+    today,
+    schedule,
+  });
+}
 async function axe(label) {
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
@@ -112,8 +136,8 @@ try {
   const routes = [
     ["overview", "Room overview"],
     ["zones", "Zones"],
-    ["strategy", "Manual setpoints"],
-    ["grow-plan", "Grow plan"],
+    ["strategy", "Today’s targets"],
+    ["grow-plan", "Scheduled targets"],
     ["compare", "Compare runs"],
     ["setup", "Rooms & setup"],
     ["insights", "Insights"],
@@ -126,6 +150,7 @@ try {
     await check(`${route}: render, desktop layout and accessibility`, async () => {
       await go(route);
       await expectVisible(page.getByRole("heading", { name: heading, exact: true }));
+      if (["strategy", "grow-plan"].includes(route)) await planViewsShareRow();
       await noOverflow();
       await axe(route);
       await page.screenshot({
@@ -133,6 +158,42 @@ try {
         fullPage: true,
       });
     });
+  await check(
+    "one Irrigation plan entry exposes Today and Schedule with working history",
+    async () => {
+      await go("overview");
+      const primary = page.getByRole("navigation", { name: "Main navigation" });
+      const plan = primary.getByRole("button", { name: "Irrigation plan", exact: true });
+      assert.equal(await plan.count(), 1);
+      assert.equal(
+        await primary.getByRole("button", { name: "Manual setpoints", exact: true }).count(),
+        0,
+      );
+      assert.equal(
+        await primary.getByRole("button", { name: "Grow plan", exact: true }).count(),
+        0,
+      );
+      await plan.click();
+      await expectVisible(page.getByRole("heading", { name: "Today’s targets", exact: true }));
+      const views = page.getByRole("navigation", { name: "Irrigation plan views" });
+      const today = views.getByRole("button", { name: "Today", exact: true });
+      const schedule = views.getByRole("button", { name: "Schedule", exact: true });
+      assert.equal(await today.getAttribute("aria-current"), "page");
+      assert.equal(await schedule.getAttribute("aria-current"), null);
+      await schedule.click();
+      await expectVisible(page.getByRole("heading", { name: "Scheduled targets", exact: true }));
+      assert.equal(new URL(page.url()).hash, "#/grow-plan");
+      assert.equal(await plan.getAttribute("aria-current"), "page");
+      assert.equal(await schedule.getAttribute("aria-current"), "page");
+      assert.equal(await today.getAttribute("aria-current"), null);
+      await page.goBack();
+      await expectVisible(page.getByRole("heading", { name: "Today’s targets", exact: true }));
+      await page.goForward();
+      await expectVisible(page.getByRole("heading", { name: "Scheduled targets", exact: true }));
+      await today.click();
+      await expectVisible(page.getByRole("heading", { name: "Today’s targets", exact: true }));
+    },
+  );
   await check("keyboard skip retains page and browser history works", async () => {
     await go("zones");
     await page.getByRole("link", { name: "Skip to content" }).focus();
@@ -236,11 +297,31 @@ try {
     await go("overview");
     await page.getByRole("button", { name: "Open navigation" }).click();
     await axe("mobile navigation");
-    await page.getByRole("dialog").getByRole("button", { name: "Zones", exact: true }).click();
-    await expectVisible(page.getByRole("heading", { name: "Zones", exact: true }));
+    const mobileMenu = page.getByRole("dialog");
+    assert.equal(
+      await mobileMenu.getByRole("button", { name: "Irrigation plan", exact: true }).count(),
+      1,
+    );
+    assert.equal(
+      await mobileMenu.getByRole("button", { name: "Manual setpoints", exact: true }).count(),
+      0,
+    );
+    assert.equal(
+      await mobileMenu.getByRole("button", { name: "Grow plan", exact: true }).count(),
+      0,
+    );
+    await mobileMenu.getByRole("button", { name: "Irrigation plan", exact: true }).click();
+    await expectVisible(page.getByRole("heading", { name: "Today’s targets", exact: true }));
+    const views = page.getByRole("navigation", { name: "Irrigation plan views" });
+    await views.getByRole("button", { name: "Schedule", exact: true }).click();
+    await expectVisible(page.getByRole("heading", { name: "Scheduled targets", exact: true }));
+    await noOverflow();
+    await views.getByRole("button", { name: "Today", exact: true }).click();
+    await expectVisible(page.getByRole("heading", { name: "Today’s targets", exact: true }));
     for (const [route, heading] of routes) {
       await go(route);
       await expectVisible(page.getByRole("heading", { name: heading, exact: true }));
+      if (["strategy", "grow-plan"].includes(route)) await planViewsShareRow();
       await noOverflow();
       await page.screenshot({
         path: path.join(out, `mobile-${route}.png`),
@@ -260,7 +341,7 @@ try {
 } finally {
   await writeFile(
     path.join(out, "verification.json"),
-    JSON.stringify({ checks, pageErrors, forbidden, accessibility }, null, 2),
+    JSON.stringify({ checks, pageErrors, forbidden, accessibility, planViewLayouts }, null, 2),
   );
   await browser.close();
   await new Promise((resolve) => server.close(resolve));

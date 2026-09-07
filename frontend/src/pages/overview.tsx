@@ -32,7 +32,7 @@ export function Overview({
         description={`A clear view of ${room.room.name.toLowerCase()}: moisture, scheduling and recent activity.`}
         action={
           <Button variant="outline" onClick={() => navigate("grow-plan")}>
-            Grow plan <ArrowUpRight size={16} />
+            Irrigation plan <ArrowUpRight size={16} />
           </Button>
         }
       />

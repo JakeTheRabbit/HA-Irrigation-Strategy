@@ -14,7 +14,6 @@ import {
   Radio,
   RefreshCw,
   Settings2,
-  SlidersHorizontal,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -52,8 +51,7 @@ import { Comparison } from "@/pages/comparison";
 const navigation = [
   { id: "overview", label: "Overview", icon: House },
   { id: "zones", label: "Zones", icon: Layers },
-  { id: "strategy", label: "Manual setpoints", icon: SlidersHorizontal },
-  { id: "grow-plan", label: "Grow plan", icon: CalendarRange },
+  { id: "strategy", label: "Irrigation plan", icon: CalendarRange },
   { id: "compare", label: "Compare runs", icon: ChartNoAxesCombined },
   { id: "insights", label: "Insights", icon: ChartNoAxesCombined },
   { id: "activity", label: "Activity", icon: Activity },
@@ -64,7 +62,7 @@ const navigation = [
 ] as const;
 function readPage(): Page {
   const hash = window.location.hash.replace(/^#\/?/, "").split("?")[0];
-  if (navigation.some((n) => n.id === hash)) return hash as Page;
+  if (hash === "grow-plan" || navigation.some((n) => n.id === hash)) return hash as Page;
   const view = new URLSearchParams(window.location.search).get("view") || "";
   return (
     (
@@ -156,7 +154,7 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    document.title = `${navigation.find((n) => n.id === page)?.label} · ${controller.room.room.name} · Crop Steering`;
+    document.title = `${navigation.find((n) => n.id === (page === "grow-plan" ? "strategy" : page))?.label} · ${controller.room.room.name} · Crop Steering`;
   }, [page, controller.room.room.name]);
   async function refresh() {
     setRefreshing(true);
@@ -222,8 +220,10 @@ export default function App() {
         {navigation.map((item, index) => (
           <button
             key={item.id}
-            className={`${page === item.id ? "active" : ""} ${item.id === "settings" ? "nav-separated" : ""}`}
-            aria-current={page === item.id ? "page" : undefined}
+            className={`${(page === "grow-plan" ? "strategy" : page) === item.id ? "active" : ""} ${item.id === "settings" ? "nav-separated" : ""}`}
+            aria-current={
+              (page === "grow-plan" ? "strategy" : page) === item.id ? "page" : undefined
+            }
             onClick={() => navigate(item.id)}
           >
             <item.icon size={19} />
@@ -297,7 +297,9 @@ export default function App() {
             </Button>
             <span>{controller.room.room.name}</span>
             <ChevronRight size={14} />
-            <strong>{navigation.find((n) => n.id === page)?.label}</strong>
+            <strong>
+              {navigation.find((n) => n.id === (page === "grow-plan" ? "strategy" : page))?.label}
+            </strong>
           </div>
           <div className="connection-info">
             <span className={`connection-label ${controller.connection}`}>
@@ -362,6 +364,27 @@ export default function App() {
             )}
             {page === "zones" && (
               <Zones key={controller.roomId} controller={controller} navigate={navigate} />
+            )}
+            {(page === "strategy" || page === "grow-plan") && (
+              <div className="toolbar" role="navigation" aria-label="Irrigation plan views">
+                <Button
+                  variant={page === "strategy" ? "default" : "outline"}
+                  aria-current={page === "strategy" ? "page" : undefined}
+                  onClick={() => navigate("strategy")}
+                >
+                  Today
+                </Button>
+                <Button
+                  variant={page === "grow-plan" ? "default" : "outline"}
+                  aria-current={page === "grow-plan" ? "page" : undefined}
+                  onClick={() => navigate("grow-plan")}
+                >
+                  Schedule
+                </Button>
+                <span className="muted small">
+                  One set of targets: edit today or schedule changes by date.
+                </span>
+              </div>
             )}
             {page === "strategy" && (
               <Strategy

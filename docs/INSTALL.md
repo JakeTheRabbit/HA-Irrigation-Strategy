@@ -20,7 +20,7 @@ Install the integration and controller together. HACS, the HA integration config
 - An HA administrator account for Rooms & setup and its configuration services.
 - Existing HA entities for the actual pump and zone valves, fresh VWC/EC probes, feed-water probes and any configured interlocks. This integration maps entities; it does not provision sensor firmware or pair devices.
 
-This release documents integration 2.16.0 and controller 0.13.2. Use the matching published pair. The public demo uses isolated synthetic data; its sample plans and records are not installation settings.
+This release documents integration 2.16.1 and controller 0.13.3. Use the matching published pair. The public demo uses isolated synthetic data; its sample plans and records are not installation settings.
 
 ## Guided installation
 
@@ -62,8 +62,8 @@ For an existing controller, update it in place from its current app repository. 
 
 1. Back up HA, the controller's persistent data and existing setpoints. Export grow plans if available. Record which engines are enabled.
 2. Turn the affected engines off and wait for the pump, mainline and valves to be OFF. Stop the existing controller while replacing software.
-3. Refresh your existing app repository and update that controller in place to **0.13.2**. A restart alone does not rebuild an old image. Do not install a second copy or enable automatic startup during the upgrade.
-4. Download integration **2.16.0** through HACS and restart HA. Confirm every Crop Steering room finishes loading. Version 2.13.1 fixed the concurrent sidebar-registration error discovered with two rooms during the live upgrade.
+3. Refresh your existing app repository and update that controller in place to **0.13.3**. A restart alone does not rebuild an old image. Do not install a second copy or enable automatic startup during the upgrade.
+4. Download integration **2.16.1** through HACS and restart HA. Confirm every Crop Steering room finishes loading. Version 2.13.1 fixed the concurrent sidebar-registration error discovered with two rooms during the live upgrade.
 5. Start the controller with engines still off. Verify its version, fresh heartbeat, both room descriptors, sensor readings, setup acknowledgement and grow-plan capability. Compare current setpoints and pot/dripper sizing with the backup.
 6. Restore the engines' previous enabled states after these checks. An upgrade does not require arming a recipe or replacing existing values with defaults.
 

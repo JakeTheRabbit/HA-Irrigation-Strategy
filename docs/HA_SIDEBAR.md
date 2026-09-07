@@ -4,6 +4,12 @@ When opened inside a compatible Home Assistant shell, Crop Steering temporarily 
 
 Leaving Crop Steering restores the prior kiosk state. This does not change Home Assistant's saved sidebar preference. Standalone demos and unsupported or cross-origin embeddings retain their normal navigation.
 
+## Verified native panel behavior
+
+In the actual Home Assistant installation running **Crop Steering 2.16.0** on 8 September 2026, opening the native panel hid the HA sidebar and the **Home Assistant** button revealed it. This confirms that installation's hide-and-reopen path; it does not imply compatibility with every companion app or third-party kiosk extension.
+
+The follow-up UI combines the former Manual setpoints and Grow plan entries into **Irrigation plan → Today / Schedule**. Those are Crop Steering's own navigation views; they do not replace the Home Assistant menu button. Existing `#/strategy` and `#/grow-plan` bookmarks remain valid. The follow-up navigation and graph changes have not yet been verified in a deployed release.
+
 ## Implementation references
 
 The connector independently uses Home Assistant's temporary kiosk/menu interface, the mechanism used by Music Assistant. It does not copy the Music Assistant application or change HA's parent styles.

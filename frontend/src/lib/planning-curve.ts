@@ -3,6 +3,7 @@ export interface PlanningPoint {
   hour: number;
   value: number;
   phase: PlanningPhaseId;
+  breakBefore?: boolean;
 }
 export interface PlanningPhase {
   id: PlanningPhaseId;
@@ -21,6 +22,8 @@ export interface PlanningModel {
   p1Windows: number[];
   p2Envelope: [number, number] | null;
   emergencyFloor: number | null;
+  overnightEndVwc: number | null;
+  emergencyReferenceActive: boolean;
   missing: string[];
   notes: string[];
   warnings: string[];
@@ -124,33 +127,97 @@ export function buildPlanningCurve(
     notes.push(
       "P1 ticks show eligible irrigation windows at the supplied spacing, starting from the illustrated P1 boundary. Sensor feedback may end ramp-up sooner; they are not scheduled or recorded shots.",
     );
-  const vwc: PlanningPoint[] = [];
-  if (reference !== null && morningDryback !== null)
-    vwc.push(
-      { hour: 0, value: reference, phase: "P0" },
-      { hour: p0End, value: morningDryback, phase: "P0" },
+  // Draw a periodic reference cycle. Reusing field capacity at lights-on would
+  // invent overnight rehydration; the next cycle starts at the same endpoint.
+  const daytimeEnd = p3Start > p1End ? p2 : p1End > p0End ? p1 : morningDryback;
+  const overnightEnd =
+    daytimeEnd !== null && morningDryback !== null ? Math.min(daytimeEnd, morningDryback) : null;
+  if (daytimeEnd !== null && morningDryback !== null && morningDryback > daytimeEnd)
+    warnings.push(
+      "The relative dryback endpoint is above the last daytime VWC reference. Overnight is shown flat because those settings do not define a further drop; no rehydration is invented.",
     );
-  if (p1 !== null) vwc.push({ hour: p1End, value: p1, phase: "P1" });
-  if (p2 !== null)
+  const emergencyReferenceActive = floor !== null && overnightEnd !== null && overnightEnd <= floor;
+  if (emergencyReferenceActive)
+    warnings.push(
+      "The overnight reference reaches or crosses the P3 emergency floor. Emergency protection would be relevant at that reading; the chart does not predict or schedule an emergency shot.",
+    );
+  const vwc: PlanningPoint[] = [];
+  if (overnightEnd !== null) {
+    vwc.push({ hour: 0, value: overnightEnd, phase: "P0" });
+    if (p0End > 0) vwc.push({ hour: p0End, value: overnightEnd, phase: "P0" });
+  }
+  if (p1 !== null && p1End > p0End) vwc.push({ hour: p1End, value: p1, phase: "P1" });
+  if (p2 !== null && p3Start > p1End)
     vwc.push(
       { hour: p1End + (p3Start - p1End) * 0.25, value: p2, phase: "P2" },
       { hour: p3Start, value: p2, phase: "P2" },
     );
+  if (daytimeEnd !== null && overnightEnd !== null && p3Start < 24) {
+    vwc.push({ hour: p3Start, value: daytimeEnd, phase: "P3" });
+    if (photoperiod > p3Start && photoperiod < 24)
+      vwc.push({
+        hour: photoperiod,
+        value:
+          daytimeEnd + ((overnightEnd - daytimeEnd) * (photoperiod - p3Start)) / (24 - p3Start),
+        phase: "P3",
+      });
+    vwc.push({ hour: 24, value: overnightEnd, phase: "P3" });
+  }
   notes.push(
-    "P3 has no scheduled VWC target or routine shot cadence. Only its emergency floor is shown; overnight moisture is not forecast. The morning dryback parameter belongs to P0.",
+    "Overnight VWC is a straight planning connection from the last daytime reference to the relative dryback endpoint, then the same value at next lights-on. P0's maximum-wait window is shown at that endpoint. Neither timing nor measured moisture is forecast. The emergency floor is separate, not a desired overnight target.",
   );
   const ec: PlanningPoint[] = [];
-  for (const phase of phases) {
-    const target = value(`ec_target_${phase.id.toLowerCase()}`, 0, 20);
-    if (target !== null)
-      ec.push(
-        { hour: phase.start, value: target, phase: phase.id },
-        { hour: phase.end, value: target, phase: phase.id },
-      );
-    else if (phase.id !== "P3") missing.push(`${phase.id} EC target`);
+  const ecTargets = phases
+    .slice(0, 3)
+    .map((phase) => {
+      const target = value(`ec_target_${phase.id.toLowerCase()}`, 0, 20);
+      if (target === null) missing.push(`${phase.id} EC target`);
+      return { ...phase, target, middle: (phase.start + phase.end) / 2 };
+    })
+    .filter((phase) => phase.end > phase.start);
+  const boundaryValue = (
+    a: (typeof ecTargets)[number],
+    b: (typeof ecTargets)[number],
+    hour: number,
+  ) => a.target! + ((b.target! - a.target!) * (hour - a.middle)) / (b.middle - a.middle);
+  for (let index = 0; index < ecTargets.length; index++) {
+    const phase = ecTargets[index],
+      previous = ecTargets[index - 1],
+      next = ecTargets[index + 1];
+    if (phase.target === null) continue;
+    const start =
+      previous?.target != null ? boundaryValue(previous, phase, phase.start) : phase.target;
+    const end = next?.target != null ? boundaryValue(phase, next, phase.end) : phase.target;
+    ec.push(
+      {
+        hour: phase.start,
+        value: start,
+        phase: phase.id,
+        ...(index > 0 && previous?.target == null ? { breakBefore: true } : {}),
+      },
+      { hour: phase.middle, value: phase.target, phase: phase.id },
+      { hour: phase.end, value: end, phase: phase.id },
+    );
   }
-  if (!Number.isFinite(parameters.ec_target_p3))
-    notes.push("P3 has no scheduled EC target in this plan; its EC line is intentionally omitted.");
+  const firstEc = ecTargets[0]?.target,
+    lastEc = ecTargets.at(-1)?.target;
+  if (firstEc != null && lastEc != null && p3Start < 24) {
+    ec.push({ hour: p3Start, value: lastEc, phase: "P3" });
+    if (photoperiod > p3Start && photoperiod < 24)
+      ec.push({
+        hour: photoperiod,
+        value: lastEc + ((firstEc - lastEc) * (photoperiod - p3Start)) / (24 - p3Start),
+        phase: "P3",
+      });
+    ec.push({ hour: 24, value: firstEc, phase: "P3" });
+  } else {
+    notes.push(
+      "The overnight EC connection needs both the last daytime and next morning phase references. Missing endpoints are left unplotted.",
+    );
+  }
+  notes.push(
+    "EC is a continuous schematic through configured phase anchors. Its dashed overnight connection interpolates to the next morning reference; there is no P3 EC setpoint, salt-balance model or predicted EC response.",
+  );
   const envelope: [number, number] | null =
     p2 !== null && shot !== null ? [p2, Math.min(100, p2 + shot)] : null;
   notes.push(
@@ -174,6 +241,8 @@ export function buildPlanningCurve(
     drybackReference: reference,
     p2Envelope: envelope,
     emergencyFloor: floor,
+    overnightEndVwc: overnightEnd,
+    emergencyReferenceActive,
     missing,
     notes,
     warnings,

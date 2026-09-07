@@ -150,8 +150,8 @@ export function Strategy({
   return (
     <>
       <Heading
-        title="Manual setpoints"
-        description="Adjust a zone beside its daily VWC and EC plan. Draft changes appear immediately; review before applying."
+        title="Today’s targets"
+        description="Current zone targets and their daily curve. When a schedule is active, it owns these targets; use Schedule to change upcoming days."
         action={
           <Button
             disabled={
@@ -169,23 +169,25 @@ export function Strategy({
       />
       {planEngaged && (
         <div className="workspace-message">
-          The active grow plan owns this room's targets. These are stored manual fallback values.{" "}
+          The active schedule owns today’s targets. Edit its dated targets in Schedule.{" "}
           <Button asChild variant="outline">
-            <a href="#/grow-plan">Open grow plan</a>
+            <a href="#/grow-plan">Open schedule</a>
           </Button>
         </div>
       )}
-      <div className="workflow-steps">
-        <span className="active">
-          <i>1</i>Edit draft
-        </span>
-        <span>
-          <i>2</i>Review changes
-        </span>
-        <span>
-          <i>3</i>Apply & verify
-        </span>
-      </div>
+      {!planEngaged && (
+        <div className="workflow-steps">
+          <span className="active">
+            <i>1</i>Edit draft
+          </span>
+          <span>
+            <i>2</i>Review changes
+          </span>
+          <span>
+            <i>3</i>Apply & verify
+          </span>
+        </div>
+      )}
       <div className="strategy-layout setpoint-workspace">
         <aside className="strategy-zone-picker">
           <span className="eyebrow">Configure</span>
@@ -235,197 +237,259 @@ export function Strategy({
           )}
           <div className="setpoint-editor-grid">
             <div className="setpoint-controls">
-              <nav className="setpoint-phase-picker" aria-label="Setpoint phase">
-                {["All", "P0", "P1", "P2", "P3", "Other"]
-                  .filter(
-                    (item) =>
-                      item === "All" ||
-                      (item === "Other"
-                        ? groups.some((group) => !/^P[0-3]/.test(group))
-                        : groups.some((group) => group.startsWith(item))),
-                  )
-                  .map((item) => (
-                    <button
-                      type="button"
-                      key={item}
-                      aria-pressed={phase === item}
-                      onClick={() => setPhase(item)}
-                    >
-                      {item === "Other" ? "Room & limits" : item === "All" ? "All settings" : item}
-                    </button>
-                  ))}
-              </nav>
-              {choices.length > 0 && (
+              {planEngaged ? (
                 <section className="panel settings-group">
                   <div className="settings-group-heading">
-                    <span className="phase-marker">
-                      <SlidersHorizontal size={16} />
-                    </span>
-                    <div>
-                      <h3>Steering mode</h3>
-                      <p>
-                        {zone
-                          ? "The selected mode supplies the EC and morning dryback targets below."
-                          : "The current engine uses each zone's mode, with legacy growth stage as fallback."}
-                      </p>
-                    </div>
+                    <h3>Active scheduled targets</h3>
                   </div>
                   <div className="setting-fields">
-                    {choices.map((choice) => (
-                      <div className="setting-field" key={choice.entityId}>
-                        <div>
-                          <Label htmlFor={`choice-${choice.entityId}`}>
-                            {choice.label}
-                            {drafts[choice.entityId] && <span className="draft-dot" />}
-                          </Label>
-                          <p>
-                            Uses modes reported by Home Assistant. Review the change before
-                            applying.
-                          </p>
+                    {Object.entries(preview.draft.parameters).map(([key, value]) => {
+                      const field =
+                        allSettings.find(
+                          (item) =>
+                            item.zoneId === previewZoneId && item.entityId.endsWith(`_${key}`),
+                        ) ??
+                        allSettings.find(
+                          (item) => item.zoneId === undefined && item.entityId.endsWith(`_${key}`),
+                        );
+                      const ecPhase = key.match(/^ec_target_p([012])$/);
+                      const label =
+                        key === "dryback_target"
+                          ? "Daily dryback target"
+                          : ecPhase
+                            ? `P${ecPhase[1]} EC target`
+                            : (field?.label ?? key.replaceAll("_", " "));
+                      const unit =
+                        key === "dryback_target"
+                          ? "% of peak"
+                          : ecPhase
+                            ? "mS/cm"
+                            : (field?.unit ?? "");
+                      return (
+                        <div className="setting-field" key={key}>
+                          <span>{label}</span>
+                          <strong>
+                            {number(value)} {unit}
+                          </strong>
                         </div>
-                        <div>
-                          <select
-                            id={`choice-${choice.entityId}`}
-                            value={drafts[choice.entityId]?.value ?? choice.value ?? ""}
-                            disabled={
-                              planEngaged || !["live", "demo"].includes(controller.connection)
-                            }
-                            onChange={(event) => {
-                              const value = event.target.value;
-                              setSaved(false);
-                              setDrafts((current) => {
-                                const next = { ...current };
-                                if (value === (current[choice.entityId]?.original ?? choice.value))
-                                  delete next[choice.entityId];
-                                else
-                                  next[choice.entityId] = {
-                                    value,
-                                    original: current[choice.entityId]?.original ?? choice.value,
-                                    label: choice.label,
-                                    zone: zone?.name || "Room settings",
-                                  };
-                                return next;
-                              });
-                            }}
-                          >
-                            <option value="" disabled>
-                              Select a mode
-                            </option>
-                            {choice.options.map((option) => (
-                              <option key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                          {drafts[choice.entityId] && (
-                            <p className="small muted">Currently {choice.value || "unavailable"}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
+                    {preview.source === "unavailable-plan" && (
+                      <p>
+                        Scheduled targets are unavailable. Reconnect to verify the active schedule.
+                      </p>
+                    )}
                   </div>
                 </section>
-              )}
-              {zone && activeMode && (
-                <label className="setpoint-mode-visibility">
-                  <input
-                    type="checkbox"
-                    checked={showInactive}
-                    onChange={(event) => setShowInactive(event.target.checked)}
-                  />
-                  Show targets for both steering modes
-                </label>
-              )}
-              {!fields.length && !choices.length ? (
-                <section className="panel">
-                  <Empty
-                    title="No editable settings available"
-                    detail="This controller has not exposed editable number entities for this selection. Sensor readings cannot be edited."
-                  />
-                </section>
               ) : (
-                shownGroups.map((group) => (
-                  <section className="panel settings-group" key={group}>
-                    <div className="settings-group-heading">
-                      <span className="phase-marker">{group.match(/^P[0-3]/)?.[0] || "•"}</span>
-                      <div>
-                        <h3>{group}</h3>
-                        <p>
-                          {group.startsWith("P0")
-                            ? "Morning preparation before ramp-up."
-                            : group.startsWith("P1")
-                              ? "Bring the substrate toward its daily target."
-                              : group.startsWith("P2")
-                                ? "Maintain moisture through the active window."
-                                : group.startsWith("P3")
-                                  ? "Emergency watering only. The controller determines the cutoff from live dryback."
-                                  : "Configuration reported by the controller."}
-                        </p>
+                <>
+                  <nav className="setpoint-phase-picker" aria-label="Setpoint phase">
+                    {["All", "P0", "P1", "P2", "P3", "Other"]
+                      .filter(
+                        (item) =>
+                          item === "All" ||
+                          (item === "Other"
+                            ? groups.some((group) => !/^P[0-3]/.test(group))
+                            : groups.some((group) => group.startsWith(item))),
+                      )
+                      .map((item) => (
+                        <button
+                          type="button"
+                          key={item}
+                          aria-pressed={phase === item}
+                          onClick={() => setPhase(item)}
+                        >
+                          {item === "Other"
+                            ? "Room & limits"
+                            : item === "All"
+                              ? "All settings"
+                              : item}
+                        </button>
+                      ))}
+                  </nav>
+                  {choices.length > 0 && (
+                    <section className="panel settings-group">
+                      <div className="settings-group-heading">
+                        <span className="phase-marker">
+                          <SlidersHorizontal size={16} />
+                        </span>
+                        <div>
+                          <h3>Steering mode</h3>
+                          <p>
+                            {zone
+                              ? "The selected mode supplies the EC and morning dryback targets below."
+                              : "The current engine uses each zone's mode, with legacy growth stage as fallback."}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="setting-fields">
-                      {visibleFields
-                        .filter((field) => fieldGroup(field) === group)
-                        .map((setting) => {
-                          const draft = drafts[setting.entityId];
-                          const error = draft ? invalid(setting, draft.value) : "";
-                          const stale = draft && draft.original !== setting.value;
-                          return (
-                            <div
-                              className={`setting-field ${draft ? "is-draft" : ""}`}
-                              key={setting.entityId}
-                            >
-                              <div>
-                                <Label htmlFor={`setting-${setting.entityId}`}>
-                                  {setting.label}
-                                  {draft && <span className="draft-dot" title="Unsaved draft" />}
-                                </Label>
-                                <p>
-                                  {setting.description ||
-                                    `Allowed range: ${setting.min}–${setting.max}${setting.unit ? ` ${setting.unit}` : ""}.`}
-                                </p>
-                                <span className="setting-limit">
-                                  {setting.min}–{setting.max} {setting.unit} · step {setting.step}
-                                </span>
-                              </div>
-                              <div className="setting-input">
-                                <div>
-                                  <Input
-                                    id={`setting-${setting.entityId}`}
-                                    type="number"
-                                    min={setting.min}
-                                    max={setting.max}
-                                    step={setting.step}
-                                    value={draft?.value ?? setting.value ?? ""}
-                                    placeholder={setting.value === null ? "Unavailable" : undefined}
-                                    aria-invalid={Boolean(error)}
-                                    aria-describedby={`hint-${setting.entityId}`}
-                                    disabled={
-                                      planEngaged ||
-                                      !["live", "demo"].includes(controller.connection)
-                                    }
-                                    onChange={(e) => edit(setting, e.target.value)}
-                                  />
-                                  <span>{setting.unit}</span>
-                                </div>
-                                <p
-                                  id={`hint-${setting.entityId}`}
-                                  className={error ? "field-error" : "small muted"}
-                                >
-                                  {error ||
-                                    (stale
-                                      ? `Controller now reports ${number(setting.value)}. Review before applying.`
-                                      : draft
-                                        ? `Currently ${number(setting.value)} ${setting.unit}`
-                                        : "")}
-                                </p>
-                              </div>
+                      <div className="setting-fields">
+                        {choices.map((choice) => (
+                          <div className="setting-field" key={choice.entityId}>
+                            <div>
+                              <Label htmlFor={`choice-${choice.entityId}`}>
+                                {choice.label}
+                                {drafts[choice.entityId] && <span className="draft-dot" />}
+                              </Label>
+                              <p>
+                                Uses modes reported by Home Assistant. Review the change before
+                                applying.
+                              </p>
                             </div>
-                          );
-                        })}
-                    </div>
-                  </section>
-                ))
+                            <div>
+                              <select
+                                id={`choice-${choice.entityId}`}
+                                value={drafts[choice.entityId]?.value ?? choice.value ?? ""}
+                                disabled={
+                                  planEngaged || !["live", "demo"].includes(controller.connection)
+                                }
+                                onChange={(event) => {
+                                  const value = event.target.value;
+                                  setSaved(false);
+                                  setDrafts((current) => {
+                                    const next = { ...current };
+                                    if (
+                                      value === (current[choice.entityId]?.original ?? choice.value)
+                                    )
+                                      delete next[choice.entityId];
+                                    else
+                                      next[choice.entityId] = {
+                                        value,
+                                        original:
+                                          current[choice.entityId]?.original ?? choice.value,
+                                        label: choice.label,
+                                        zone: zone?.name || "Room settings",
+                                      };
+                                    return next;
+                                  });
+                                }}
+                              >
+                                <option value="" disabled>
+                                  Select a mode
+                                </option>
+                                {choice.options.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                              {drafts[choice.entityId] && (
+                                <p className="small muted">
+                                  Currently {choice.value || "unavailable"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                  {zone && activeMode && (
+                    <label className="setpoint-mode-visibility">
+                      <input
+                        type="checkbox"
+                        checked={showInactive}
+                        onChange={(event) => setShowInactive(event.target.checked)}
+                      />
+                      Show targets for both steering modes
+                    </label>
+                  )}
+                  {!fields.length && !choices.length ? (
+                    <section className="panel">
+                      <Empty
+                        title="No editable settings available"
+                        detail="This controller has not exposed editable number entities for this selection. Sensor readings cannot be edited."
+                      />
+                    </section>
+                  ) : (
+                    shownGroups.map((group) => (
+                      <section className="panel settings-group" key={group}>
+                        <div className="settings-group-heading">
+                          <span className="phase-marker">{group.match(/^P[0-3]/)?.[0] || "•"}</span>
+                          <div>
+                            <h3>{group}</h3>
+                            <p>
+                              {group.startsWith("P0")
+                                ? "Morning preparation before ramp-up."
+                                : group.startsWith("P1")
+                                  ? "Bring the substrate toward its daily target."
+                                  : group.startsWith("P2")
+                                    ? "Maintain moisture through the active window."
+                                    : group.startsWith("P3")
+                                      ? "Emergency watering only. The controller determines the cutoff from live dryback."
+                                      : "Configuration reported by the controller."}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="setting-fields">
+                          {visibleFields
+                            .filter((field) => fieldGroup(field) === group)
+                            .map((setting) => {
+                              const draft = drafts[setting.entityId];
+                              const error = draft ? invalid(setting, draft.value) : "";
+                              const stale = draft && draft.original !== setting.value;
+                              return (
+                                <div
+                                  className={`setting-field ${draft ? "is-draft" : ""}`}
+                                  key={setting.entityId}
+                                >
+                                  <div>
+                                    <Label htmlFor={`setting-${setting.entityId}`}>
+                                      {setting.label}
+                                      {draft && (
+                                        <span className="draft-dot" title="Unsaved draft" />
+                                      )}
+                                    </Label>
+                                    <p>
+                                      {setting.description ||
+                                        `Allowed range: ${setting.min}–${setting.max}${setting.unit ? ` ${setting.unit}` : ""}.`}
+                                    </p>
+                                    <span className="setting-limit">
+                                      {setting.min}–{setting.max} {setting.unit} · step{" "}
+                                      {setting.step}
+                                    </span>
+                                  </div>
+                                  <div className="setting-input">
+                                    <div>
+                                      <Input
+                                        id={`setting-${setting.entityId}`}
+                                        type="number"
+                                        min={setting.min}
+                                        max={setting.max}
+                                        step={setting.step}
+                                        value={draft?.value ?? setting.value ?? ""}
+                                        placeholder={
+                                          setting.value === null ? "Unavailable" : undefined
+                                        }
+                                        aria-invalid={Boolean(error)}
+                                        aria-describedby={`hint-${setting.entityId}`}
+                                        disabled={
+                                          planEngaged ||
+                                          !["live", "demo"].includes(controller.connection)
+                                        }
+                                        onChange={(e) => edit(setting, e.target.value)}
+                                      />
+                                      <span>{setting.unit}</span>
+                                    </div>
+                                    <p
+                                      id={`hint-${setting.entityId}`}
+                                      className={error ? "field-error" : "small muted"}
+                                    >
+                                      {error ||
+                                        (stale
+                                          ? `Controller now reports ${number(setting.value)}. Review before applying.`
+                                          : draft
+                                            ? `Currently ${number(setting.value)} ${setting.unit}`
+                                            : "")}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </section>
+                    ))
+                  )}
+                </>
               )}
             </div>
             <aside
@@ -440,7 +504,7 @@ export function Strategy({
                   </strong>
                   <span>
                     {preview.readOnly
-                      ? "Active grow plan · read only"
+                      ? "Active schedule · read only"
                       : `${preview.draft.mode ?? "Mode unavailable"} · local draft`}
                   </span>
                 </div>
@@ -481,7 +545,7 @@ export function Strategy({
                 selectedPhase={/^P[0-3]$/.test(phase) ? (phase as PlanningPhaseId) : undefined}
                 description={
                   preview.readOnly
-                    ? "Current grow-plan targets. Manual fallback controls are read only."
+                    ? "Today’s active scheduled targets. Open Schedule to edit the dated plan."
                     : "Drag a target or adjust the controls beside this graph. Nothing is written until you review and apply."
                 }
                 onChange={

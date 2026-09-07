@@ -9,6 +9,14 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.16.1] - 2026-09-08
+
+- Replace competing Manual setpoints and Grow plan navigation with Irrigation plan: Today and Schedule.
+- Show effective active schedule targets in Today; hide misleading fallback controls while a schedule owns the room.
+- Connect VWC and dashed EC planning references across lights-off and overnight to the next lights-on. Missing EC anchors remain gaps; overnight EC is an interpolation, not a prediction.
+- Keep emergency-floor edits and saved-reference overlays independent. Preserve legacy routes and unsaved-draft navigation guards.
+- Bundle the same dashboard in controller 0.13.3; no controller decision changes.
+
 ## [2.16.0] - 2026-09-08
 
 - Add a local MCP connector for LLM-assisted configuration with reviewed, room-scoped proposals and opt-in writes.

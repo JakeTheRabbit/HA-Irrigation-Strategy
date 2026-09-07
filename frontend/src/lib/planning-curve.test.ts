@@ -30,10 +30,12 @@ describe("setpoint planning curve", () => {
     ]);
     expect(plan.p2Envelope).toEqual([58, 62]);
     expect(plan.vwc.filter((point) => point.phase === "P0").map((point) => point.value)).toEqual([
-      70, 56,
+      56, 56,
     ]);
-    expect(plan.vwc.some((point) => point.phase === "P3")).toBe(false);
-    expect(plan.notes.join(" ")).toMatch(/P3.*not.*forecast/i);
+    expect(plan.vwc.filter((point) => point.phase === "P3").map((point) => point.value)).toEqual([
+      58, 56,
+    ]);
+    expect(plan.notes.join(" ")).toMatch(/Neither timing nor measured moisture is forecast/);
     expect(plan.notes.join(" ")).toMatch(/retention/i);
   });
   it("changes supplied VWC, EC and shot targets reactively", () => {
@@ -43,9 +45,7 @@ describe("setpoint planning curve", () => {
       18,
     );
     expect(plan.vwc.some((point) => point.value === 72)).toBe(true);
-    expect(
-      plan.ec.filter((point) => point.phase === "P2").every((point) => point.value === 4),
-    ).toBe(true);
+    expect(plan.ec.some((point) => point.phase === "P2" && point.value === 4)).toBe(true);
     expect(plan.p2Envelope).toEqual([58, 65]);
   });
   it("does not invent absent EC targets or water-content measurements", () => {
@@ -82,6 +82,73 @@ describe("setpoint planning curve", () => {
     ).toEqual([]);
     expect(buildPlanningCurve({}, 6, 18).p1Windows).toEqual([]);
   });
+  it("joins both references at phase boundaries and across the complete day/night cycle", () => {
+    const plan = buildPlanningCurve(parameters, 6, 18);
+    for (const points of [plan.vwc, plan.ec]) {
+      expect(points[0].hour).toBe(0);
+      expect(points.at(-1)!.hour).toBe(24);
+      expect(points.at(-1)!.value).toBe(points[0].value);
+      for (let index = 1; index < points.length; index++) {
+        expect(points[index].hour).toBeGreaterThanOrEqual(points[index - 1].hour);
+        if (points[index].hour === points[index - 1].hour)
+          expect(points[index].value).toBeCloseTo(points[index - 1].value);
+      }
+      expect(
+        points
+          .filter((point) => point.hour === 12)
+          .every((point) => point.value === (points === plan.vwc ? 58 : 3.5)),
+      ).toBe(true);
+    }
+    expect(plan.ec.at(-1)!.value).toBe(parameters.ec_target_p0);
+    expect(plan.notes.join(" ")).toMatch(/no P3 EC setpoint/);
+  });
+  it("keeps the P3 floor independent and marks a crossed emergency reference", () => {
+    const baseline = buildPlanningCurve(parameters, 6, 18);
+    const draft = buildPlanningCurve({ ...parameters, p3_emergency_vwc_threshold: 57 }, 6, 18);
+    expect(draft.vwc).toEqual(baseline.vwc);
+    expect(draft.ec).toEqual(baseline.ec);
+    expect(draft.emergencyReferenceActive).toBe(true);
+    expect(baseline.emergencyReferenceActive).toBe(false);
+    expect(draft.warnings.join(" ")).toMatch(/does not predict or schedule an emergency shot/);
+  });
+  it("does not invent a night rise when the relative endpoint exceeds the daytime reference", () => {
+    const plan = buildPlanningCurve({ ...parameters, dryback_target: 5 }, 6, 18);
+    expect(plan.morningDrybackVwc).toBe(66.5);
+    expect(plan.overnightEndVwc).toBe(58);
+    expect(
+      plan.vwc.filter((point) => point.phase === "P3").every((point) => point.value === 58),
+    ).toBe(true);
+    expect(plan.warnings.join(" ")).toMatch(/no rehydration is invented/);
+  });
+  it("keeps lights-off inside an earlier P3 window continuous and handles collapsed phases", () => {
+    for (const extra of [
+      { p3_last_irrigation: 120 },
+      { p0_maximum_wait_time: 720 },
+      { p0_maximum_wait_time: 600, p1_maximum_shots: 20 },
+    ] as Record<string, number>[]) {
+      const plan = buildPlanningCurve({ ...parameters, ...extra }, 20, 8);
+      for (const points of [plan.vwc, plan.ec]) {
+        expect(points.at(-1)!.hour).toBe(24);
+        expect(points.at(-1)!.value).toBe(points[0].value);
+        expect(
+          points.every(
+            (point) => Number.isFinite(point.value) && point.hour >= 0 && point.hour <= 24,
+          ),
+        ).toBe(true);
+        for (let index = 1; index < points.length; index++) {
+          expect(points[index].hour).toBeGreaterThanOrEqual(points[index - 1].hour);
+          if (points[index].hour === points[index - 1].hour)
+            expect(points[index].value).toBeCloseTo(points[index - 1].value);
+        }
+      }
+    }
+  });
+  it("preserves missing EC gaps instead of connecting across an absent phase target", () => {
+    const { ec_target_p1, ...partial } = parameters;
+    const plan = buildPlanningCurve(partial, 6, 18);
+    expect(plan.ec.some((point) => point.phase === "P1")).toBe(false);
+    expect(plan.ec.find((point) => point.phase === "P2")?.breakBefore).toBe(true);
+  });
   it("rejects ambiguous equal lights-on and lights-off times", () => {
     expect(buildPlanningCurve(parameters, 6, 6).warnings.join(" ")).toMatch(/must differ/);
   });
@@ -116,6 +183,21 @@ describe("HA-bounded curve editing", () => {
 });
 
 describe("rendered planning curve", () => {
+  it("renders one connected VWC and dashed EC path through the night, with explicit schematic labels", () => {
+    const html = renderToStaticMarkup(
+      createElement(PlanningCurve, { parameters, lightsOn: 6, lightsOff: 18 }),
+    );
+    for (const key of ["vwc", "ec"]) {
+      const path = html.match(new RegExp(`<path data-planning-line="${key}"[^>]*d="([^"]+)"`))?.[1];
+      expect(path).toBeTruthy();
+      expect(path!.match(/M/g)).toHaveLength(1);
+      const points = [...path!.matchAll(/[ML]([\d.]+),([\d.]+)/g)];
+      expect(points.at(-1)![2]).toBe(points[0][2]);
+      expect(Number(points.at(-1)![1])).toBeGreaterThan(Number(points[0][1]));
+    }
+    expect(html).toContain("relative drop from the reference peak");
+    expect(html).toContain("Dashed EC connects configured phase anchors");
+  });
   const saved = {
     parameters: {
       p1_target_vwc: 65,

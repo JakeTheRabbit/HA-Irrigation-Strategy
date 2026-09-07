@@ -8,7 +8,7 @@ The demo opens directly in your browser with sample rooms, sensor data and edita
 
 The demo includes clearly labelled synthetic recipes and current/previous runs for exploring comparisons. They demonstrate the software; they are not production recommendations.
 
-![Release](https://img.shields.io/badge/Release-2.16.0-green)
+![Release](https://img.shields.io/badge/Release-2.16.1-green)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3+-41BDF5)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -33,11 +33,17 @@ Map tank sensors in **Rooms & setup**. Display-only tank quality mappings are se
 
 ![Graphical tank and pump status](img/tank-status.png)
 
-## Plan the whole grow
+The recorded 8 September **2.16.0** live check showed F2 tank **42%**, **3.06 mS/cm EC**, **pH 5.66** and **17.9 °C**, plus an explicit recorded-fill source and timezone-aware last-irrigation times. Reviewed MCP tank-mapping proposals applied and read back in both rooms at setup revision **1**; healthy controller reports acknowledged revision **1**. The native HA sidebar was hidden in the panel, and the Home Assistant button reopened it. These are dated observations, not current readings or proof of physical delivery.
 
-Choose a room, zone and day or week. The steering slider updates the VWC/EC planning curve and shows the targets behind it.
+## One irrigation plan: Today and Schedule
 
-Save your own plans in **Grow plan → Recipe library** and reuse them as local drafts. The library is kept in this browser, separated by room and demo/live mode. Loading retains the current zone start dates; saving and arming still use the normal review workflow. [Recipe library and reference sources →](docs/RECIPE_LIBRARY.md)
+**Irrigation plan** brings current targets and dated planning together. **Today** shows editable current targets when no schedule owns the room; an active schedule shows its effective targets and graph as read-only, with fallback manual inputs hidden. **Schedule** edits the dated plan for each zone.
+
+This navigation and the updated overnight curves are part of the follow-up UI source, awaiting their own release verification. The recorded live checks refer to deployed **2.16.0**. Existing `#/strategy` and `#/grow-plan` bookmarks continue to open Today and Schedule respectively.
+
+In **Irrigation plan → Schedule**, choose a room, zone and day or week. The steering slider updates the VWC/EC planning curve and shows the targets behind it.
+
+Save your own plans in **Irrigation plan → Schedule → Recipe library** and reuse them as local drafts. The library is kept in this browser, separated by room and demo/live mode. Loading retains the current zone start dates; saving and arming still use the normal review workflow. [Recipe library and reference sources →](docs/RECIPE_LIBRARY.md)
 
 ![Combined VWC and EC planning graph with per-zone day and week controls](img/grow-plan.png)
 
@@ -45,7 +51,7 @@ Save your own plans in **Grow plan → Recipe library** and reuse them as local 
 
 ## See each change before applying it
 
-Manual setpoints keep the full-day VWC/EC graph beside the selected phase. Raise the P3 emergency threshold and its line moves immediately; the saved line remains visible behind your draft. Review and apply when ready.
+**Irrigation plan → Today** keeps the full-day VWC/EC graph beside the current targets. With no active schedule, raising the P3 emergency threshold moves its draft line immediately while the saved reference remains visible. Review and apply when ready. When a schedule owns the room, Today displays its effective targets and graph without exposing fallback manual controls; use **Schedule** for dated plan changes.
 
 ![Manual P3 editing with saved and draft VWC/EC curves](img/manual-setpoints.png)
 
@@ -70,18 +76,17 @@ Add or archive rooms and zones, map existing Home Assistant entities, and enter 
 
 ## One workspace
 
-| Page | Purpose |
-| --- | --- |
-| Overview | Room condition, controller status, recorded VWC/EC and daily water per zone/per plant |
-| Zones | Per-zone readings, active phase, targets and enable controls |
-| Grow plan | Per-zone day/week schedule, steering slider, endpoint profiles and a reactive VWC/EC planning curve |
-| Manual setpoints | Phase-focused controls beside reactive saved/draft VWC/EC curves, with water estimates and reviewed writes |
-| Compare runs | Retained day/week/month/run-to-date history, previous-run alignment and captured target references |
-| Insights | Sensor coverage, equipment mapping and local dripper catch-test calculations |
-| Activity | Available controller/state activity with explicit evidence limits |
-| Sensors | Probe availability, values, units and freshness |
-| Rooms & setup | Add, configure, archive and restore rooms/zones; search and map existing HA entities |
-| Settings / Help | Connection, inherited HA theme, workflow explanations and limitations |
+| Page                               | Purpose                                                                                                                                             |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Overview                           | Room condition, controller status, recorded VWC/EC and daily water per zone/per plant                                                               |
+| Zones                              | Per-zone readings, active phase, targets and enable controls                                                                                        |
+| Irrigation plan → Today / Schedule | Today shows current editable targets or the active schedule’s read-only effective targets; Schedule edits per-zone dated plans, profiles and curves |
+| Compare runs                       | Retained day/week/month/run-to-date history, previous-run alignment and captured target references                                                  |
+| Insights                           | Sensor coverage, equipment mapping and local dripper catch-test calculations                                                                        |
+| Activity                           | Available controller/state activity with explicit evidence limits                                                                                   |
+| Sensors                            | Probe availability, values, units and freshness                                                                                                     |
+| Rooms & setup                      | Add, configure, archive and restore rooms/zones; search and map existing HA entities                                                                |
+| Settings / Help                    | Connection, inherited HA theme, workflow explanations and limitations                                                                               |
 
 The React/shadcn workspace inherits Home Assistant colors and typography in its same-origin sidebar panel. It bundles Roboto, scripts and styles locally. Standalone use supports light/dark themes; no CDN is needed. Old dashboard addresses redirect into the new workspace.
 
@@ -89,7 +94,7 @@ The React/shadcn workspace inherits Home Assistant colors and typography in its 
 
 The legacy mode selects separate dryback and EC references. A grow plan replaces those two discrete choices with a **0–100% interpolation between explicit vegetative and generative endpoint profiles**, separately scheduled for each zone. Pot size and dripper flow determine estimated water volumes and run times; they cannot determine suitable crop targets by themselves.
 
-The controller runs P0 morning dryback, P1 ramp-up, P2 maintenance and P3 overnight/rescue phases. Dryback is relative to the detected peak: a 60% VWC peak with a 10% dryback target means 54% VWC. The planning graph connects configured VWC and EC targets over the day. It is a schematic, not a forecast of measured plant response.
+The controller runs P0 morning dryback, P1 ramp-up, P2 maintenance and P3 overnight/rescue phases. Dryback is relative to the detected peak: a 60% VWC peak with a 10% dryback target means 54% VWC. The updated planning graph joins the daytime references through lights-off and overnight to the next lights-on. Its dashed EC line interpolates between configured phase anchors; it does not predict salt concentration or the physical EC trajectory. Missing inputs remain gaps. Both curves are planning illustrations, not forecasts of measured plant response.
 
 Plans are saved as drafts, reviewed, and armed for the next local lights-on boundary. Arming never enables pumps or the engine. The controller consumes one versioned plan snapshot; a missing or stale required snapshot holds irrigation. [Planning guide →](docs/GROW_PLANS.md)
 

@@ -94,14 +94,14 @@ export function Help({ controller }: { controller: Controller }) {
               {[
                 {
                   route: "grow-plan",
-                  title: "Grow plan & planning curve",
-                  detail: "Edit daily/weekly steering, profiles and target curves.",
+                  title: "Irrigation plan · Schedule",
+                  detail: "Schedule changes to zone targets by day or week.",
                   icon: CalendarRange,
                 },
                 {
                   route: "strategy",
-                  title: "Manual setpoints",
-                  detail: "Understand and review every supported controller parameter.",
+                  title: "Irrigation plan · Today",
+                  detail: "See current targets and edit them when a schedule is not active.",
                   icon: Gauge,
                 },
                 {
