@@ -28,6 +28,7 @@ Recorded 8 September 2026, Pacific/Auckland.
 - Persistent counters and retained runtime fields matched the stopped pre-upgrade state. Room configuration data/options were unchanged, including the previously verified tank mappings.
 - All **398** existing control values matched the snapshot, allowing equivalent numeric formatting such as `42` and `42.0`.
 - Original engine states restored and read back: **F1 on, F2 off**.
+- Both final heartbeats reported healthy, setup revision **1**, no pending setup and no hardware fault. F2's temporary startup hold cleared on the normal five-minute discovery refresh after its hardware reported off.
 - Controller source, strategy runtime, core, run API and both installed dashboard copies matched published source. The public demo matched that same dashboard build.
 - In the native HA panel, the single Irrigation plan entry opened Today; its Schedule button opened Scheduled targets with stored revision 0. No target or plan writes were performed during this browser verification.
 - The graphical tank readings and timezone-aware last-irrigation events remained visible. The native HA menu recovery button was verified during the preceding 2.16.0 deployment.

@@ -37,7 +37,7 @@ This is a setpoint planning schematic. It does not predict uptake, runoff, salt 
 
 Open **Irrigation plan → Today** and select a zone. The daily graph stays beside the phase controls on a wide screen. The saved reference and draft are shown separately: changing the P3 emergency floor moves its line immediately, while the saved line remains for comparison. Changing a mode uses that mode's dryback and EC values. A shared room value is used only when the controller has no zone-specific value.
 
-Graph edits and form edits share one draft. Invalid fields remain visibly invalid; they do not become zero or silently fall back to a different room. Review and apply still controls when values reach Home Assistant. An active plan owns its targets, so manual fallback fields remain locked until its normal handoff.
+Graph edits and form edits share one draft. Invalid fields remain visibly invalid; they do not become zero or silently fall back to a different room. Review and apply still controls when values reach Home Assistant. When a schedule owns the room, Today shows its effective targets read-only and hides manual fallback inputs. Use Schedule to edit dated targets.
 
 ## Compare a run with targets or a previous run
 
