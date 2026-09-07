@@ -9,6 +9,12 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2.13.2 — 8 September 2026
+
+- Show each room's configured name in the workspace instead of a generic sensor label.
+- Package the corrected workspace in controller 0.12.1; irrigation logic is unchanged from 0.12.0.
+- Document the verified in-place upgrade, preserved settings and consolidated branches.
+
 ## [2.13.1] - 2026-09-08
 
 **🌱 In plain English.** Fix a startup failure when multiple rooms load at once. Every room can now share the native sidebar reliably. Controller 0.12.0 remains the matching version.

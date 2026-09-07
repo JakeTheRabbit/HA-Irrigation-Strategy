@@ -44,6 +44,39 @@ function fixture(): States {
 }
 
 describe("room model", () => {
+  it("uses configured room names when HA gives both descriptor sensors the same generic name", () => {
+    const states = fixture();
+    Object.assign(states["sensor.crop_steering_engine_config"].attributes, {
+      room_name: "Crop Steering",
+      friendly_name: "Crop Steering Engine Configuration",
+    });
+    Object.assign(states["sensor.crop_steering_f1_engine_config"].attributes, {
+      room_name: "  F1  ",
+      friendly_name: "Crop Steering Engine Configuration",
+    });
+    expect(discoverRooms(states)).toEqual([
+      { id: "room:", prefix: "", name: "Crop Steering" },
+      { id: "room:f1_", prefix: "f1_", name: "F1" },
+    ]);
+    states["sensor.crop_steering_f1_engine_config"].attributes.room_name = "Flower One";
+    expect(discoverRooms(states).find((room) => room.id === "room:f1_")).toEqual({
+      id: "room:f1_",
+      prefix: "f1_",
+      name: "Flower One",
+    });
+  });
+  it.each([undefined, null, "", "   ", 42])(
+    "keeps legacy friendly-name and slug fallbacks for an invalid configured name (%s)",
+    (roomName) => {
+      const states = fixture();
+      const attributes = states["sensor.crop_steering_f1_engine_config"].attributes;
+      Object.assign(attributes, { room_name: roomName, friendly_name: "Flower 1 Engine Config" });
+      expect(discoverRooms(states).find((room) => room.id === "room:f1_")?.name).toBe("Flower 1");
+      delete attributes.friendly_name;
+      expect(discoverRooms(states).find((room) => room.id === "room:f1_")?.name).toBe("F1");
+      expect(discoverRooms(states)[0].name).toBe("Default room");
+    },
+  );
   it("never replaces missing F1 data with default room data", () => {
     const states = fixture();
     const rooms = discoverRooms(states);

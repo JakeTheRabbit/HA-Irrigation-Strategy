@@ -1,6 +1,6 @@
 # Validated feature matrix
 
-Validation date: 8 September 2026. This describes the unreleased working tree. **Local verification** means automated tests against source, compiled browser artifacts and fake/mocked HA. It does not mean the changes are installed on a running HA system or that physical water delivery has been verified.
+Validation date: 8 September 2026. The workspace is published and an existing two-room, six-zone Home Assistant installation has been upgraded through HACS and Supervisor. Automated tests cover source, compiled browser artifacts and mocked HA. Live checks cover startup, retained settings, controller adoption and the native dashboard. Physical water delivery and a complete grow-day recipe handoff have not been commissioned. See the [live upgrade record](audits/2026-09-08-live-upgrade.md).
 
 | Feature | Result | Evidence and limits |
 | --- | --- | --- |
@@ -9,12 +9,12 @@ Validation date: 8 September 2026. This describes the unreleased working tree. *
 | Combined recorded VWC + EC history | Implemented; browser tested | Independent axes/units, zone selection, HA Recorder data and honest missing-history states. Sensor history requires Recorder retention. |
 | Reactive combined planning curve | Implemented; browser and unit tested | Selected day/zone profile drives both lines and controls. P0 reference/drop, P1 targets/cadence, P2 target/band, P3 emergency floor. No invented overnight trend or crop-response forecast. |
 | Continuous vegetative/generative steering | Implemented; both legacy modes tested | Explicit endpoint profiles interpolate and quantize against HA parameter bounds/steps; canonical scheduled dryback/EC overrides work regardless of the old mode select. Endpoints need grower review. |
-| Different setpoints per zone | Implemented; locally tested | Per-zone profiles, active targets and pot/dripper sizing; room-level parameters remain shared where appropriate. |
+| Different setpoints per zone | Live preservation verified | All 302 pre-existing numeric entities and 147 other controls retained their states. Six initial planner profiles match the current zone targets; pot/dripper sizing and mappings are preserved. |
 | Whole-grow day/week schedule | Implemented; browser and unit tested | Days1–366, independent zone start dates, inclusive range splitting, weekly overview, daily exceptions, import/export and explicit plan-zone synchronization after setup changes. |
-| Persistent plans and safe activation | Implemented; fake-HA tests and independent review | Draft storage, revision conflicts, preview, explicit arming, next lights-on activation/disarm, coherent expiring snapshots and durable required-plan holds. Actual HA timer/restart commissioning remains outstanding. |
+| Persistent plans and safe activation | Implemented; fake-HA tests and independent review | Draft storage, revision conflicts, preview, explicit arming, next lights-on activation/disarm, coherent expiring snapshots and durable required-plan holds. Live draft reads and controller capability are verified. Recipe activation and a full lights-on handoff remain uncommissioned. |
 | Room and zone creation/removal | Implemented; flow/API/browser tested | Removal archives stable IDs; restoration preserves identifiers. No automatic renumbering or reuse. Engines and implicated equipment must be readable OFF for mapping mutations. |
 | Sensor mapping | Implemented; locally tested | Search existing HA entities by name/ID and inspect readings/units; multi-probe VWC/EC selection. Backend validates domains, units and conflicting valve roles. Device pairing/firmware provisioning is external. |
-| Installation shortcuts and sidebar | Implemented; package/registration tests | HACS/config-flow/app-repository links and automatic integration sidebar. HA confirmations, integration restart, published source and hardware mapping are still required. A complete live HACS/Supervisor install was not run. |
+| Installation shortcuts and sidebar | Live in-place upgrade verified | HACS download, Supervisor app update, HA restart, both room entries loading and the automatic native sidebar passed. First installation on a blank HA instance remains untested. |
 | Delivery preview and catch-test calculator | Implemented; unit/browser tested | Pot/plant/dripper math, nominal and capped duration, actual low-flow parity. Catch-test output is a local proposal; no automatic calibration write or proof of flow. |
 | Sensor diagnostics and equipment map | Implemented; browser tested | Measured values, freshness/coverage and configured devices; no unsupported yield/potency score. |
 | Reviewed manual setpoint writes | Implemented; mocked-HA browser tested | Explicit selected-room scope, bounds/steps, service calls and readback; partial failures retain drafts. Active plans lock conflicting manual target edits. |
@@ -27,7 +27,7 @@ Validation date: 8 September 2026. This describes the unreleased working tree. *
 | Legacy manual-shot/phase-override events | Not validated as actuator commands | Existing services can publish events; this controller is not proven to consume those events. The new UI does not claim these are working physical controls. |
 | Tank dosing and climate actuation | Not implemented by this controller | EC values are root-zone references, not tank dosing commands. Environment controls remain external HA workflows. |
 | Yield/potency prediction or autonomous crop optimisation | Not implemented | Removed misleading claims from the active UI. Neither setpoints nor a schematic establish expected yield. |
-| Live production readiness | Not yet verified | No deployment, restart, engine enable, live setpoint write or physical irrigation test was performed during this refactor. |
+| Live deployment | Verified with stated limits | Running controller source matches the published package. Saved counters and learned state are retained, heartbeats and setup acknowledgements are healthy, and prior engine states were restored. No new recipe was armed and no physical irrigation test was triggered. |
 
 ## Improvements that are now practical
 
@@ -44,6 +44,7 @@ Measured-flow reconciliation is the strongest next step: compare commanded litre
 
 ## Evidence
 
+- [Live upgrade and retained settings](audits/2026-09-08-live-upgrade.md)
 - [Release corrections and validation](audits/2026-09-08-release-validation.md)
 - [Branch feature consolidation](audits/2026-09-08-branch-consolidation.md)
 - [Final validation record](audits/2026-09-08-validation.md)

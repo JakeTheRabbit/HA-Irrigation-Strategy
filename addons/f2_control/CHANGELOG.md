@@ -3,6 +3,11 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.12.1
+
+- Correct room names in the bundled workspace when HA descriptor sensors share a generic friendly name.
+- Pair with integration 2.13.2. Irrigation decisions, options and persistent state format are unchanged from 0.12.0.
+
 ## 0.12.0
 
 Update the Crop Steering integration to 2.13.0 before updating this controller. Existing options, enable flags, room IDs and persistent runtime data are retained.

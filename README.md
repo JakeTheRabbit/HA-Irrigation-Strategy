@@ -6,7 +6,7 @@ A Home Assistant irrigation controller with a native operator workspace: see the
 
 The demo opens directly in your browser with sample rooms, sensor data and editable plans. No login or Home Assistant installation is required; demo changes stay in your browser.
 
-![Release](https://img.shields.io/badge/Release-2.13.1-green)
+![Release](https://img.shields.io/badge/Release-2.13.2-green)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3+-41BDF5)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -74,6 +74,8 @@ Plans are saved as drafts, reviewed, and armed for the next local lights-on boun
 - [Architecture and repository map](docs/REPOSITORY_MAP.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Current screenshots](docs/SCREENSHOTS.md)
+- [Live upgrade verification](docs/audits/2026-09-08-live-upgrade.md)
+- [Branch consolidation and archived features](docs/audits/2026-09-08-branch-consolidation.md)
 - [Development and testing](docs/TESTING.md)
 - [Entity reference](docs/ENTITIES.md)
 

@@ -82,7 +82,7 @@ export function discoverRooms(states: States): Room[] {
   for (const entity of Object.values(states)) {
     if (!/^sensor\.crop_steering_.*engine_config$/.test(entity.entity_id)) continue;
     if (entity.attributes.active === false) continue;
-    const { prefix, slug, num_zones, friendly_name } = entity.attributes;
+    const { prefix, slug, num_zones, room_name, friendly_name } = entity.attributes;
     if (
       typeof prefix !== "string" ||
       !/^(?:[a-z0-9_]+_)?$/.test(prefix) ||
@@ -94,6 +94,9 @@ export function discoverRooms(states: States): Room[] {
     if (rooms.some((r) => r.prefix === prefix)) continue;
     // ':' cannot occur in a validated prefix, including named "f2"/"default".
     const id = `room:${prefix}`;
+    // The sensor's HA friendly name can be generic or retained from an older setup.
+    // The descriptor publishes the actual user-configured room name.
+    const configuredName = typeof room_name === "string" ? room_name.trim() : "";
     const name =
       typeof friendly_name === "string"
         ? friendly_name.replace(/\s*(?:engine configuration|engine config)$/i, "").trim()
@@ -102,6 +105,7 @@ export function discoverRooms(states: States): Room[] {
       id,
       prefix,
       name:
+        configuredName ||
         name ||
         (typeof slug === "string" && slug
           ? title(slug)
