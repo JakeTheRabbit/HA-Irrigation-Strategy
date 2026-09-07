@@ -10,7 +10,7 @@ A more vegetative irrigation approach generally keeps water more available; gene
 
 ## Build a grow
 
-1. Select the room, then **Grow plan**. Set each zone's grow start date.
+1. Select the room, then **Irrigation plan → Schedule**. Set each zone's grow start date.
 2. Open **Endpoint profiles**. Review both endpoint columns; duplicate a profile when a zone needs different bounds. A shared profile affects every schedule block referencing it.
 3. In **Schedule & curve**, select a zone row and week. Set its profile and steering slider. Switch to **Days** for exceptions. Editing a range splits existing blocks and preserves surrounding days.
 4. Review the combined planning curve and hydraulic estimates below. The same selected date, zone and interpolated parameters drive both the curve and preview.
@@ -35,7 +35,7 @@ This is a setpoint planning schematic. It does not predict uptake, runoff, salt 
 
 ## See changes while editing manual setpoints
 
-Open **Manual setpoints** and select a zone. The daily graph stays beside the phase controls on a wide screen. The saved reference and draft are shown separately: changing the P3 emergency floor moves its line immediately, while the saved line remains for comparison. Changing a mode uses that mode's dryback and EC values. A shared room value is used only when the controller has no zone-specific value.
+Open **Irrigation plan → Today** and select a zone. The daily graph stays beside the phase controls on a wide screen. The saved reference and draft are shown separately: changing the P3 emergency floor moves its line immediately, while the saved line remains for comparison. Changing a mode uses that mode's dryback and EC values. A shared room value is used only when the controller has no zone-specific value.
 
 Graph edits and form edits share one draft. Invalid fields remain visibly invalid; they do not become zero or silently fall back to a different room. Review and apply still controls when values reach Home Assistant. An active plan owns its targets, so manual fallback fields remain locked until its normal handoff.
 

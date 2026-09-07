@@ -38,7 +38,7 @@ Room and zone removal means archive. Archived IDs remain reserved, so restoring 
 
 ## Verify the installation
 
-With engines still off, confirm each room loads in the sidebar, the selected room has a current controller heartbeat, mappings show **Mapping acknowledged**, and **Sensors** shows the intended entities/units. Open **Manual setpoints** and verify the existing values. An upgrade should retain each room's current values, zone identities and plant/dripper sizing.
+With engines still off, confirm each room loads in the sidebar, the selected room has a current controller heartbeat, mappings show **Mapping acknowledged**, and **Sensors** shows the intended entities/units. Open **Irrigation plan → Today** and verify the existing values. An upgrade should retain each room's current values, zone identities and plant/dripper sizing.
 
 Open **Overview** and a zone detail panel. A missing optional tank mapping may remain **Not mapped**; a missing required control sensor or controller acknowledgement needs resolution before commissioning. **Last irrigation** is an event record and may legitimately be absent on a new installation. Do not generate a physical shot just to fill that display.
 
@@ -48,7 +48,7 @@ The documented live evidence covers an in-place upgrade of an existing two-room 
 
 In **Sensors**, verify that mapped values are available, fresh and in the expected units. Distinguish pore/substrate EC from feed-water EC. Set room lights-on/off hours and review the zone's water limits, shot sizes and emergency floor. Check controller heartbeat and any holds. Validate pump/valve physical operation and delivered water on site before enabling an engine. HA state readback alone does not prove water flow.
 
-Start with a reviewed manual configuration, or create a draft in **Grow plan**, preview it, save it and arm it. A plan becomes eligible at the next lights-on boundary. Arming does not switch on the engine. An unsupported/old controller cannot activate a plan.
+Start with a reviewed manual configuration, or create a draft in **Irrigation plan → Schedule**, preview it, save it and arm it. A plan becomes eligible at the next lights-on boundary. Arming does not switch on the engine. An unsupported/old controller cannot activate a plan.
 
 ## Manual integration install
 
