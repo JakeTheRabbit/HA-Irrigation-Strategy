@@ -17,3 +17,13 @@ Integration 2.15.0 / controller 0.13.1, 8 September 2026.
 Browser suites cover the existing operator workflows and the new library lifecycle, HTTP-style crypto availability, current-date preservation, dirty-draft replacement, room isolation, confirmed removal, JSON import/export, corrupt-storage retention and mobile accessibility. Independent review found and corrected profile identifier/count mismatches with the backend; expanded import validation covers supported parameter keys, complete endpoints, ordering and step alignment.
 
 The standalone demo and README use screenshots from isolated sample data. Publisher links and access limitations are documented in [Recipe library](../RECIPE_LIBRARY.md). No guide-derived numerical recipes were generated and no live plan was armed.
+
+## Published and installed
+
+Release commit `6129d7d5337329cdb7812437c5b927aac60ff74e` passed GitHub Validate, Installation Workflow, Release packaging and Pages deployment. The public demo returned HTTP200 and matched the packaged dashboard byte-for-byte after line-ending normalization.
+
+The existing two-room, six-zone installation was updated in place through HACS and Supervisor. Integration 2.15.0 and controller 0.13.1 loaded successfully. Backups were taken before stopping the controller; all mapped pumps, mainlines and valves read OFF. Controller options and both integration entries' data/options were preserved. All 303 numeric settings and 397 captured controls matched after restoring the original engine states: F1 enabled, default/F2 disabled. Both heartbeat sensors reported healthy without hardware or strategy faults. Retained shot counters, volume, last-shot/reset records and controller state matched the stopped-state snapshot.
+
+Installed controller Python, decision core and both dashboard copies matched published source. In the native HA sidebar, the previous unavailable duration now reads the existing 900-second cap and produces effective runtime water estimates. The Recipe library opens with its empty state and local save/import controls. The current saved grow plan remains at its original draft revision; the user's separate unsaved browser draft was exported and its tab retained. Run metadata remains empty for both rooms.
+
+This was a software upgrade/readback test. No physical irrigation test, new recipe activation or source-guide preset installation was performed.
