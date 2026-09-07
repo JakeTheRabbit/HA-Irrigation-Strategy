@@ -28,19 +28,22 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
-it("starts each room with no fabricated runs and captures actual demo targets/lights/plants", () => {
+it("adds registrations alongside labelled synthetic runs and captures actual demo targets/lights/plants", () => {
   const states = createDemo(),
     demo = new RunDemo(() => states);
   for (const room of discoverRooms(states)) {
-    expect(demo.call("runs_get", { room_id: room.id }).runs).toEqual([]);
+    const initial = demo.call("runs_get", { room_id: room.id });
+    expect(initial.runs).toHaveLength(3);
+    expect(initial.runs.every((run) => run.name.startsWith("Demo •"))).toBe(true);
     const result = demo.call("runs_save", {
       room_id: room.id,
       expected_revision: 0,
       record: { name: "Real registration", start_date: "2026-05-01", end_date: "2026-08-01" },
     });
+    const registered = result.runs.at(-1)!;
     const view = buildRoom(states, room),
       preview = buildSetpointPreview(view, states, view.zones[0].id, {});
-    expect(result.runs[0].lights).toEqual({
+    expect(registered.lights).toEqual({
       on: preview.draft.lightsOn,
       off: preview.draft.lightsOff,
     });
@@ -54,7 +57,7 @@ it("starts each room with no fabricated runs and captures actual demo targets/li
     const allowed = new Set(
       [...`${schema[1]} ${schema[2]}`.matchAll(/"([a-z0-9_]+)"/g)].map((match) => match[1]),
     );
-    const parameters = result.runs[0].zones[0].parameters;
+    const parameters = registered.zones[0].parameters;
     expect(parameters).toEqual(
       Object.fromEntries(
         Object.entries(preview.draft.parameters).filter(([key]) => allowed.has(key)),
@@ -79,8 +82,8 @@ it("starts each room with no fabricated runs and captures actual demo targets/li
       runs: result.runs,
     });
     expect(imported.runs).toEqual(result.runs);
-    expect(result.runs[0].zones[0].plant_count).toBe(preview.fields.plant_count.value);
-    expect(result.runs[0].zones[0].parameters.p1_initial_shot_size).toBeGreaterThan(0);
+    expect(registered.zones[0].plant_count).toBe(preview.fields.plant_count.value);
+    expect(registered.zones[0].parameters.p1_initial_shot_size).toBeGreaterThan(0);
   }
 });
 it("authorizes archived registered sensors, rejects other rooms and cancels on room change", async () => {

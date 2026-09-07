@@ -1,4 +1,5 @@
 import { DailyWaterSummary } from "@/components/water-delivery";
+import { TankStatus } from "@/components/tank-status";
 import { useState } from "react";
 import { ArrowRight, ArrowUpRight, CircleCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -77,13 +78,12 @@ export function Overview({
         </div>
       )}
       <Metrics metrics={room.metrics} />
-      <DailyWaterSummary controller={controller} />
-      <HistoryChart controller={controller} zones={room.zones} />
+      <TankStatus controller={controller} onConfigure={() => navigate("setup")} />
       <section className="panel">
         <div className="panel-heading">
           <div>
             <h2>Zones at a glance</h2>
-            <p>Current measurements and configured targets</p>
+            <p>Controller state, valve activity and the last recorded irrigation</p>
           </div>
           <Button variant="ghost" onClick={() => navigate("zones")}>
             All zones <ArrowRight size={16} />
@@ -99,6 +99,8 @@ export function Overview({
           />
         )}
       </section>
+      <DailyWaterSummary controller={controller} />
+      <HistoryChart controller={controller} zones={room.zones} />
       <div className="overview-bottom">
         <section className="panel">
           <div className="panel-heading">

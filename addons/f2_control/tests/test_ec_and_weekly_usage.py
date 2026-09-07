@@ -194,3 +194,26 @@ def test_aborted_shot_records_only_delivered_volume_in_weekly_total(rig, monkeyp
     assert room.state[1]["daily_vol"] == pytest.approx(2)
     assert c._water_usage(room, 1, FixedDateTime.now())[0] == 2
     assert any("partial volume counted" in data.get("message", "") for _, _, data in fake.calls)
+
+
+@pytest.mark.parametrize("month", [1, 9])
+def test_last_irrigation_publication_includes_event_local_offset_without_state_migration(
+    rig, month
+):
+    c, fake, room, _ = rig
+    event = datetime(2026, month, 8, 10, 30)
+    room.state[1]["last_shot"] = event
+    probe(fake, "sensor.crop_steering_vwc_zone_1", "60")
+    probe(fake, "sensor.crop_steering_ec_zone_1", "3")
+    fake.set_state(room.enable_flag, "off")
+    pub = c._loop_room(room, FixedDateTime.now())
+    c._publish_status(room, pub, FixedDateTime.now())
+    encoded, attrs = fake.sets["sensor.crop_steering_zone_1_last_irrigation_app"]
+    actual = datetime.fromisoformat(encoded)
+    expected = event.astimezone()
+    assert actual.tzinfo is not None
+    assert actual.utcoffset() == expected.utcoffset()
+    assert actual.timestamp() == expected.timestamp()
+    assert attrs["device_class"] == "timestamp"
+    assert room.state[1]["last_shot"] is event
+    assert event.tzinfo is None

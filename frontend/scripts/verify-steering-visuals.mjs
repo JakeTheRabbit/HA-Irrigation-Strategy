@@ -236,7 +236,7 @@ try {
       await page.getByRole("button", { name: "Export metadata", exact: true }).click();
       const metadata = JSON.parse(await readFile(await (await downloaded).path(), "utf8"));
       assert.equal(metadata.room_id, "room:");
-      assert.equal(metadata.runs.length, 2);
+      assert.equal(metadata.runs.length, 5); // Three sample records plus this workflow's two.
       assert.ok(metadata.runs.every((run) => run.zones.length === 3 && run.captured_at));
       const past = page
         .locator(".comparison-run-list article")
@@ -250,10 +250,9 @@ try {
         .getByRole("button", { name: "Restore", exact: true })
         .click();
       await page.locator("#desktop-room").selectOption("room:f1_");
-      await page
-        .getByText("No runs have been registered for this room.", { exact: false })
-        .waitFor();
-      assert.equal(await page.locator(".comparison-run-list article").count(), 0);
+      await page.waitForFunction(() => document.querySelectorAll(".comparison-run-list article").length >= 2);
+      assert.equal(await page.locator(".comparison-run-list article").filter({ hasText: "Previous room run" }).count(), 0);
+      assert.equal(await page.locator(".comparison-run-list article").filter({ hasText: "Current room run" }).count(), 0);
       await page.setViewportSize({ width: 390, height: 844 });
       await noOverflow();
       await axe("mobile run comparison");

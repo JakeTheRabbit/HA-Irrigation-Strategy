@@ -3,6 +3,7 @@
 import ast
 import logging
 import math
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -23,6 +24,7 @@ def sensor(states, prefix=""):
     names = {
         "_get_zone_weekly_water_usage",
         "_get_zone_daily_water_usage",
+        "_get_zone_last_irrigation",
         "extra_state_attributes",
         "_average_sensor_values",
     }
@@ -35,7 +37,14 @@ def sensor(states, prefix=""):
         name="SensorMethods", bases=[], keywords=[], body=methods, decorator_list=[]
     )
     module = ast.fix_missing_locations(ast.Module(body=[cls], type_ignores=[]))
-    namespace = {"math": math, "_LOGGER": logging.getLogger(__name__)}
+    namespace = {
+        "math": math,
+        "_LOGGER": logging.getLogger(__name__),
+        "dt_util": SimpleNamespace(
+            parse_datetime=datetime.fromisoformat,
+            as_local=lambda value: value.replace(tzinfo=timezone.utc),
+        ),
+    }
     exec(compile(module, str(SOURCE), "exec"), namespace)
     instance = namespace["SensorMethods"]()
     instance.hass = SimpleNamespace(states=SimpleNamespace(get=states.get))
@@ -173,3 +182,42 @@ def test_daily_consumer_preserves_named_room_zero_and_positive_delivery(value):
         "veg_",
     )
     assert entity._get_zone_daily_water_usage(1) == value
+
+
+def test_last_irrigation_wrapper_keeps_legacy_naive_timestamp_unknown():
+    entity = sensor(
+        {
+            "sensor.crop_steering_zone_1_last_irrigation_app": SimpleNamespace(
+                state="2026-09-08T10:30:00"
+            )
+        }
+    )
+    assert entity._get_zone_last_irrigation(1) is None
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["2026-01-08T10:30:00+13:00", "2026-09-08T10:30:00+12:00", "2026-09-07T22:30:00Z"],
+)
+def test_last_irrigation_wrapper_preserves_explicit_event_timestamp(value):
+    entity = sensor(
+        {
+            "sensor.crop_steering_veg_zone_1_last_irrigation_app": SimpleNamespace(
+                state=value
+            )
+        },
+        "veg_",
+    )
+    assert entity._get_zone_last_irrigation(1) == datetime.fromisoformat(value)
+
+
+def test_last_irrigation_wrapper_does_not_borrow_other_room_timestamp():
+    entity = sensor(
+        {
+            "sensor.crop_steering_zone_1_last_irrigation_app": SimpleNamespace(
+                state="2026-09-08T10:30:00+12:00"
+            )
+        },
+        "veg_",
+    )
+    assert entity._get_zone_last_irrigation(1) is None

@@ -1,0 +1,140 @@
+.tank-layout {
+  display: grid;
+  grid-template-columns: 180px minmax(220px, 1fr) minmax(200px, 1fr);
+  gap: 24px;
+  padding: 0 24px 16px;
+  align-items: center;
+}
+.tank-vessel {
+  text-align: center;
+}
+.tank-vessel svg {
+  width: 100%;
+  max-height: 170px;
+}
+.tank-shell {
+  fill: var(--muted);
+  stroke: var(--border);
+  stroke-width: 2;
+}
+.tank-water {
+  fill: var(--primary);
+  opacity: 0.23;
+}
+.tank-waterline {
+  stroke: var(--primary);
+  stroke-width: 2;
+}
+.tank-tick {
+  stroke: var(--muted-foreground);
+}
+.tank-percent {
+  font:
+    600 30px Roboto,
+    sans-serif;
+  fill: var(--foreground);
+}
+.tank-caption {
+  font:
+    13px Roboto,
+    sans-serif;
+  fill: var(--muted-foreground);
+}
+.tank-equipment,
+.tank-quality {
+  display: grid;
+  gap: 16px;
+}
+.tank-pump,
+.tank-fill-record,
+.tank-quality-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.tank-equipment strong,
+.tank-quality strong,
+.tank-equipment time {
+  display: block;
+  line-height: 1.6;
+}
+.tank-pump-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tank-pipe {
+  flex: 1;
+  height: 3px;
+  min-width: 20px;
+  background: var(--border);
+}
+.tank-pump.is-on .tank-pump-icon,
+.tank-pump.is-on > svg {
+  color: var(--primary);
+}
+.tank-pump.is-on .tank-pipe {
+  background: var(--primary);
+}
+.tank-fill-record > svg,
+.tank-quality-item > svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.tank-quality {
+  border-left: 1px solid var(--border);
+  padding-left: 24px;
+}
+.tank-note {
+  padding: 0 24px 20px;
+  margin: 0;
+}
+.tank-quality strong {
+  font-size: 1.2rem;
+}
+@media (max-width: 850px) {
+  .tank-layout {
+    grid-template-columns: 140px 1fr;
+    gap: 16px;
+  }
+  .tank-quality {
+    grid-column: 1/-1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding: 18px 0 0;
+  }
+  .tank-quality-item {
+    align-items: flex-start;
+  }
+  .tank-quality strong {
+    font-size: 1rem;
+  }
+}
+@media (max-width: 480px) {
+  .tank-layout {
+    padding: 0 16px 16px;
+    grid-template-columns: 110px minmax(0, 1fr);
+  }
+  .tank-quality {
+    grid-template-columns: 1fr;
+  }
+  .tank-note {
+    padding: 0 16px 16px;
+  }
+  .tank-pipe,
+  .tank-pump > svg {
+    display: none;
+  }
+  .tank-equipment time {
+    font-size: 0.85rem;
+  }
+  .tank-panel .panel-heading {
+    align-items: flex-start;
+  }
+}

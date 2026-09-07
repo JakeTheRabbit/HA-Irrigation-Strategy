@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import {
   Empty,
   Heading,
+  LastIrrigation,
   MetricValue,
   Status,
   ZoneDetails,
+  ZoneOperatingState,
   ZoneTable,
   type Page,
 } from "@/components/dashboard";
@@ -106,7 +108,11 @@ export function Zones({
                 <h2>{zone.name}</h2>
                 <Status enabled={zone.enabled} />
               </div>
-              <p className="muted">{zone.phase || "Phase unavailable"}</p>
+              <ZoneOperatingState zone={zone} showScheduling={false} />
+              <div className="zone-irrigation-summary">
+                <span className="small muted">Last irrigation</span>
+                <LastIrrigation zone={zone} />
+              </div>
               <div className="zone-card-moisture">
                 <MetricValue metric={zone.vwc} />
                 <span>Moisture · VWC</span>

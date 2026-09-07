@@ -27,6 +27,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { Change, Controller, Metric, Series, Zone } from "@/lib/types";
+import "./zone-state.css";
 
 export type Page =
   | "overview"
@@ -378,15 +379,98 @@ export function HistoryChart({ controller, zones }: { controller: Controller; zo
   );
 }
 
+export function ZoneOperatingState({
+  zone,
+  showScheduling = true,
+}: {
+  zone: Zone;
+  showScheduling?: boolean;
+}) {
+  return (
+    <div className="zone-operating-state">
+      <span className="zone-controller-status" data-zone-status={zone.id}>
+        {zone.status === "Unavailable" ? "Controller status unavailable" : zone.status}
+      </span>
+      <div className="zone-state-flags">
+        <span
+          className={`zone-valve-state${zone.valveOn === true ? " valve-on" : ""}`}
+          data-zone-valve={zone.id}
+          title={
+            zone.valveEntity
+              ? `Reported switch state · ${zone.valveEntity}`
+              : "No valve mapped in this room's engine configuration"
+          }
+        >
+          Valve {zone.valveOn === true ? "on" : zone.valveOn === false ? "off" : "unknown"}
+        </span>
+        <span>
+          {zone.phase === "Unavailable" ? "Phase unavailable" : zone.phase || "Phase unavailable"}
+        </span>
+        {showScheduling && <Status enabled={zone.enabled} />}
+      </div>
+    </div>
+  );
+}
+
+export function LastIrrigation({ zone }: { zone: Zone }) {
+  const { timestamp, issue } = zone.lastIrrigation;
+  if (!timestamp)
+    return (
+      <span className="zone-last-irrigation" data-last-irrigation={zone.id}>
+        <span>Not reported</span>
+        <span className="cell-subtext">{issue}</span>
+      </span>
+    );
+  const date = new Date(timestamp);
+  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60_000));
+  const relative =
+    minutes < 1
+      ? "Less than a minute ago"
+      : new Intl.RelativeTimeFormat(undefined, { numeric: "always" }).format(
+          -(minutes < 60
+            ? minutes
+            : minutes < 1440
+              ? Math.floor(minutes / 60)
+              : Math.floor(minutes / 1440)),
+          minutes < 60 ? "minute" : minutes < 1440 ? "hour" : "day",
+        );
+  const full = date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "short",
+  });
+  return (
+    <time
+      className="zone-last-irrigation"
+      data-last-irrigation={zone.id}
+      dateTime={timestamp}
+      title={timestamp}
+      aria-label={`Last irrigation: ${full}. ${relative}.`}
+    >
+      <span>{relative}</span>
+      <span className="cell-subtext">{full}</span>
+    </time>
+  );
+}
+
 export function ZoneTable({ zones, onSelect }: { zones: Zone[]; onSelect: (zone: Zone) => void }) {
   return (
     <>
-      <div className="table-scroll zone-table-desktop">
+      <div
+        className="table-scroll zone-table-desktop"
+        tabIndex={0}
+        aria-label="Zone readings and irrigation events"
+      >
         <table className="data-table">
           <thead>
             <tr>
               <th>Zone</th>
-              <th>State / phase</th>
+              <th>Current state</th>
+              <th>Last irrigation</th>
               <th>Moisture</th>
               <th>VWC reference</th>
               <th>Root-zone EC</th>
@@ -408,8 +492,10 @@ export function ZoneTable({ zones, onSelect }: { zones: Zone[]; onSelect: (zone:
                   </button>
                 </td>
                 <td>
-                  <Status enabled={zone.enabled} />
-                  <span className="cell-subtext">{zone.phase || "Phase unavailable"}</span>
+                  <ZoneOperatingState zone={zone} />
+                </td>
+                <td>
+                  <LastIrrigation zone={zone} />
                 </td>
                 <td className="numeric">
                   <MetricValue metric={zone.vwc} />
@@ -450,7 +536,11 @@ export function ZoneTable({ zones, onSelect }: { zones: Zone[]; onSelect: (zone:
               <Status enabled={zone.enabled} />
               <ArrowUpRight size={16} />
             </button>
-            <p className="small muted">{zone.phase || "Phase unavailable"}</p>
+            <ZoneOperatingState zone={zone} showScheduling={false} />
+            <div className="zone-irrigation-summary">
+              <span className="small muted">Last irrigation</span>
+              <LastIrrigation zone={zone} />
+            </div>
             <div className="zone-mobile-readings">
               <div>
                 <span>Moisture</span>
@@ -616,11 +706,11 @@ export function ZoneDetails({
           </SheetHeader>
           {zone && (
             <div className="sheet-body">
-              <div className="split-row">
-                <Status enabled={zone.enabled} />
-                <Badge variant="secondary">{zone.phase || "Phase unavailable"}</Badge>
+              <ZoneOperatingState zone={zone} />
+              <div className="zone-irrigation-summary">
+                <span className="small muted">Last irrigation</span>
+                <LastIrrigation zone={zone} />
               </div>
-              <p className="muted">{zone.status}</p>
               <div className="detail-metrics">
                 {[zone.vwc, zone.target, zone.ec, zone.ecTarget, zone.water, zone.shots].map(
                   (m) => (

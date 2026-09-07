@@ -251,6 +251,52 @@ export function readLibrary(storage: RecipeStorage, scope: RecipeScope): Library
     };
   }
 }
+/** Seed only a never-used DEMO key. Existing empty, edited or corrupt libraries are preserved. */
+export function initializeDemoLibrary(
+  storage: RecipeStorage,
+  scope: RecipeScope,
+  samplePlan: GrowPlan,
+  now = Date.now(),
+): LibrarySnapshot {
+  const prior = readLibrary(storage, scope);
+  if (!scope.demo || prior.raw !== null || prior.error) return prior;
+  const plan = importRecipePlan(JSON.stringify(samplePlan));
+  const examples = [
+    { id: "demo-steady", name: "Demo • steady schedule", weekly: false },
+    { id: "demo-weekly", name: "Demo • week-by-week changes", weekly: true },
+  ].map(({ id, name, weekly }) => {
+    const copy = structuredClone(plan);
+    for (const zone of copy.zones) {
+      const original = zone.schedule;
+      const end = Math.min(84, Math.max(...original.map((block) => block.end_day)));
+      zone.schedule = weekly
+        ? Array.from({ length: Math.ceil(end / 7) }, (_, index) => {
+            const start = index * 7 + 1;
+            const block =
+              original.find((item) => item.start_day <= start && item.end_day >= start) ||
+              original[0];
+            return {
+              start_day: start,
+              end_day: Math.min(end, start + 6),
+              profile_id: block.profile_id,
+              bias: block.bias,
+            };
+          })
+        : [{ start_day: 1, end_day: end, profile_id: original[0].profile_id, bias: 50 }];
+    }
+    return normalizeRecipe({
+      id,
+      name,
+      notes:
+        "Synthetic interface example using the existing demo endpoints. Not a cultivation recommendation or a source-guide recipe. Loading changes only the demo draft.",
+      sourceUrl: "",
+      createdAt: new Date(now).toISOString(),
+      plan: copy,
+    });
+  });
+  // One validated write with the same stale-read guard as user saves.
+  return persist(storage, prior, examples);
+}
 function persist(
   storage: RecipeStorage,
   prior: LibrarySnapshot,

@@ -131,3 +131,39 @@ def test_native_env_reload_cannot_bypass_off_gate(flow_module, monkeypatch):
     assert entry.data["zones"]["1"]["special"] == 123
     assert entry.data["zones"]["2"]["active"] is False
     assert entry.data["num_zones"] == 2
+
+
+def test_native_hardware_schema_retains_explicit_tank_telemetry(
+    flow_module, monkeypatch
+):
+    mappings = {
+        "tank_temperature_sensor": "sensor.tank_temp",
+        "tank_ec_sensor": "sensor.tank_ec",
+        "tank_ph_sensor": "sensor.tank_ph",
+        "tank_last_fill_sensor": "sensor.tank_last_fill",
+        "tank_fill_entity": "binary_sensor.tank_filling",
+    }
+    defaults = {}
+    original = flow_module.vol.Optional
+
+    def optional(key, **kwargs):
+        defaults[key] = kwargs.get("default")
+        return original(key, **kwargs)
+
+    monkeypatch.setattr(flow_module.vol, "Optional", optional)
+    schema = flow_module._hardware_schema(mappings)
+    fields = {
+        getattr(key, "schema", getattr(key, "key", None)): (key, selector)
+        for key, selector in schema.items()
+    }
+    for key, value in mappings.items():
+        assert key in fields
+        assert defaults[key] == value
+    assert fields["tank_temperature_sensor"][1]["domain"] == "sensor"
+    assert set(fields["tank_last_fill_sensor"][1]["domain"]) == {
+        "sensor",
+        "input_datetime",
+    }
+    assert set(fields["tank_fill_entity"][1]["domain"]) == {"switch", "binary_sensor"}
+    hardware = flow_module._build_hardware(mappings)
+    assert all(hardware[key] == value for key, value in mappings.items())

@@ -15,6 +15,7 @@ import type { GrowPlan } from "@/lib/operator-types";
 import {
   exportRecipe,
   importRecipePlan,
+  initializeDemoLibrary,
   libraryKey,
   MAX_PLAN_BYTES,
   MAX_RECIPES,
@@ -85,7 +86,11 @@ export function RecipeLibrary({
   }, [dialog?.kind, onDirtyChange]);
   function reload() {
     try {
-      setLibrary(readLibrary(window.localStorage, scope));
+      setLibrary(
+        demo
+          ? initializeDemoLibrary(window.localStorage, scope, plan)
+          : readLibrary(window.localStorage, scope),
+      );
       setError("");
     } catch (e) {
       setError(`Recipe storage is unavailable. ${errorText(e)}`);
@@ -210,8 +215,10 @@ export function RecipeLibrary({
         <div className="recipe-library-body">
           <p className="muted small">
             Your own reusable plans for {roomName}. Stored only in this browser
-            {demo ? " · demo library" : ""}; export copies to keep a backup. The library starts
-            empty.
+            {demo ? " · demo library" : ""}; export copies to keep a backup.{" "}
+            {demo
+              ? "Demo examples are synthetic interface demonstrations, not cultivation recommendations. Your saved demo recipes are preserved."
+              : "The library starts empty."}
           </p>
           <div className="recipe-library-actions">
             <Button

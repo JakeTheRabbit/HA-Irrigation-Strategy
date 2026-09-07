@@ -16,7 +16,7 @@ export function createDemo(now = Date.now()): States {
     states[entity_id] = {
       entity_id,
       state: String(state),
-      attributes,
+      attributes: { ...attributes, synthetic: true },
       last_updated: new Date(now - 18_000).toISOString(),
       last_changed: new Date(now - 180_000).toISOString(),
     };
@@ -47,7 +47,32 @@ export function createDemo(now = Date.now()): States {
       num_zones: 3,
       friendly_name: `${name} engine config`,
       enable_flag: enable,
+      pump: `switch.demo_${prefix}pump`,
+      valves: {
+        1: `switch.demo_${prefix}valve_1`,
+        2: `switch.demo_${prefix}valve_2`,
+        3: `switch.demo_${prefix}valve_3`,
+      },
+      water_level_sensor: `sensor.demo_${prefix}tank_level`,
+      tank_ec_sensor: `sensor.demo_${prefix}tank_ec`,
+      tank_ph_sensor: `sensor.demo_${prefix}tank_ph`,
+      tank_temperature_sensor: `sensor.demo_${prefix}tank_temperature`,
+      tank_last_fill_sensor: `sensor.demo_${prefix}tank_last_fill`,
+      tank_fill_entity: `binary_sensor.demo_${prefix}tank_filling`,
     });
+    put(`switch.demo_${prefix}pump`, index ? "off" : "on");
+    put(`sensor.demo_${prefix}tank_level`, index ? 72 : 42, { unit_of_measurement: "%" });
+    put(`sensor.demo_${prefix}tank_ec`, index ? 2.8 : 3.06, { unit_of_measurement: "mS/cm" });
+    put(`sensor.demo_${prefix}tank_ph`, index ? 5.8 : 5.66, { unit_of_measurement: "pH" });
+    put(`sensor.demo_${prefix}tank_temperature`, index ? 19.2 : 17.6, {
+      unit_of_measurement: "°C",
+    });
+    put(
+      `sensor.demo_${prefix}tank_last_fill`,
+      new Date(now - (index ? 5 : 2) * 3600_000).toISOString(),
+      { device_class: "timestamp" },
+    );
+    put(`binary_sensor.demo_${prefix}tank_filling`, "off");
     put(enable, "on");
     put(`sensor.crop_steering_${prefix}ai_heartbeat`, "online", {
       enable_flag: enable,
@@ -63,6 +88,12 @@ export function createDemo(now = Date.now()): States {
     number(prefix, "irrigation_ec_min", 2.3, 0, 6, 0.1, "mS/cm");
     number(prefix, "irrigation_ec_max", 3.5, 0, 8, 0.1, "mS/cm");
     for (let id = 1; id <= 3; id++) {
+      put(`switch.demo_${prefix}valve_${id}`, !index && id === 1 ? "on" : "off");
+      put(
+        `sensor.crop_steering_${prefix}zone_${id}_last_irrigation_app`,
+        new Date(now - (id * 12 + index * 20) * 60_000).toISOString(),
+        { device_class: "timestamp" },
+      );
       const key = `zone_${id}_`;
       const base = `sensor.crop_steering_${prefix}`;
       put(`${base}vwc_zone_${id}`, 54 + id * 2 + index * 3, {
@@ -78,7 +109,9 @@ export function createDemo(now = Date.now()): States {
         `${base}${key}status`,
         index && id === 3
           ? "Paused — zone disabled for inspection"
-          : "Holding — within target band",
+          : !index && id === 1
+            ? "Demo irrigation pulse — valve on"
+            : "Holding — within target band",
       );
       put(`${base}${key}daily_water_app`, (4.4 + id * 0.9 + index).toFixed(1), {
         unit_of_measurement: "L",

@@ -1,8 +1,8 @@
 import { createUuid } from "./uuid";
 import type { HistoryRequest, RunRecord, RunsDocument } from "./comparison-types";
-import type { States } from "./types";
+import type { Room, States } from "./types";
 import { buildRoom, discoverRooms } from "./model";
-import { daysBetween, validDate } from "./comparison";
+import { addDays, dateInZone, daysBetween, validDate } from "./comparison";
 import { buildSetpointPreview } from "./setpoint-preview";
 import { loadHistoryWindow } from "./comparison-history";
 // Keep the demo's exported metadata compatible with RunStore's strategy-only schema.
@@ -31,14 +31,25 @@ export async function demoHistoryWindow(request: HistoryRequest) {
     const url = new URL(path, "https://demo.invalid/");
     const start = Date.parse(url.pathname.split("/period/")[1]),
       end = Date.parse(url.searchParams.get("end_time")!);
-    return request.entityIds.map((entity_id, index) => {
+    return request.entityIds.map((entity_id) => {
       const rows = [];
+      const seed = [...entity_id].reduce((total, char) => total + char.charCodeAt(0), 0) % 17;
       for (let time = start; time < end; time += 15 * 60_000) {
         const ec = entity_id.includes("ec_zone") || entity_id.endsWith("_ec");
+        // Stable per-entity variation makes rooms, zones and previous dates distinct.
+        // A short synthetic unavailable interval also demonstrates honest chart gaps.
+        const hour = time / 3_600_000;
+        const gap = Math.floor(hour / 24) % 9 === seed % 9 && hour % 24 >= 3 && hour % 24 < 3.75;
         rows.push({
           entity_id,
           last_changed: new Date(time).toISOString(),
-          state: String((ec ? 3.5 : 58) + (ec ? 0.7 : 8) * Math.sin(time / 3_600_000 + index)),
+          state: gap
+            ? "unavailable"
+            : String(
+                (ec ? 3.2 : 55) +
+                  seed * (ec ? 0.025 : 0.25) +
+                  (ec ? 0.7 : 7) * Math.sin(hour / 3.8 + seed),
+              ),
         });
       }
       return rows;
@@ -49,19 +60,90 @@ export async function demoHistoryWindow(request: HistoryRequest) {
 }
 export class RunDemo {
   private documents = new Map<string, RunsDocument>();
-  constructor(private states: () => States) {}
-  call(action: string, data: Record<string, unknown>): RunsDocument {
-    const room = discoverRooms(this.states()).find((r) => r.id === data.room_id);
-    if (!room) throw new Error("Unknown demo room.");
-    const prior = this.documents.get(room.id) || {
-      schema_version: 1 as const,
+  constructor(
+    private states: () => States,
+    private now: () => number = Date.now,
+  ) {}
+  private capture(
+    room: Room,
+    name: string,
+    start_date: string,
+    end_date: string | null,
+  ): RunRecord {
+    const states = this.states();
+    const view = buildRoom(states, room);
+    const previews = view.zones.map((zone) => ({
+      zone,
+      preview: buildSetpointPreview(view, states, zone.id, {}),
+    }));
+    const first = previews[0]?.preview.draft;
+    return {
+      id: createUuid(),
+      room_id: room.id,
+      name,
+      start_date,
+      end_date,
+      time_zone: "Pacific/Auckland",
+      archived: false,
+      captured_at: new Date(this.now()).toISOString(),
+      reference_source: "Synthetic demo configuration captured for this interface example",
+      lights: {
+        on: Number.isFinite(first?.lightsOn) ? first!.lightsOn : null,
+        off: Number.isFinite(first?.lightsOff) ? first!.lightsOff : null,
+      },
+      zones: previews.map(({ zone, preview }) => {
+        const count = preview.fields.plant_count?.value;
+        return {
+          zone_id: zone.id,
+          name: zone.name,
+          vwc_sensor: zone.vwc.entityId,
+          ec_sensor: zone.ec.entityId,
+          plant_count: count && Number.isInteger(count) && count > 0 ? count : null,
+          reference_source: `Synthetic demo ${preview.source} reference`,
+          parameters: Object.fromEntries(
+            Object.entries(preview.draft.parameters).filter(([key]) => runParameterKeys.has(key)),
+          ),
+        };
+      }),
+    };
+  }
+  private seed(room: Room): RunsDocument {
+    const today = dateInZone(this.now(), "Pacific/Auckland");
+    const current = this.capture(
+      room,
+      `Demo • current run — ${room.name.slice(0, 35)}`,
+      addDays(today, -35),
+      null,
+    );
+    const previous = this.capture(
+      room,
+      `Demo • previous run — ${room.name.slice(0, 35)}`,
+      addDays(today, -112),
+      addDays(today, -57),
+    );
+    const archived = this.capture(
+      room,
+      `Demo • archived run — ${room.name.slice(0, 35)}`,
+      addDays(today, -196),
+      addDays(today, -141),
+    );
+    archived.archived = true;
+    const document: RunsDocument = {
+      schema_version: 1,
       room_id: room.id,
       revision: 0,
       time_zone: "Pacific/Auckland",
-      runs: [],
+      runs: [current, previous, archived],
       error: null,
       max_runs: 100,
     };
+    this.documents.set(room.id, document);
+    return document;
+  }
+  call(action: string, data: Record<string, unknown>): RunsDocument {
+    const room = discoverRooms(this.states()).find((r) => r.id === data.room_id);
+    if (!room) throw new Error("Unknown demo room.");
+    const prior = this.documents.get(room.id) || this.seed(room);
     const doc = structuredClone(prior);
     if (action === "runs_get") return doc;
     if (data.expected_revision !== doc.revision)
@@ -88,43 +170,7 @@ export class RunDemo {
           end_date: raw.end_date || null,
         });
       else {
-        const view = buildRoom(this.states(), room);
-        const previews = view.zones.map((zone) => ({
-          zone,
-          preview: buildSetpointPreview(view, this.states(), zone.id, {}),
-        }));
-        const first = previews[0]?.preview.draft;
-        doc.runs.push({
-          id: createUuid(),
-          room_id: room.id,
-          name: raw.name.trim(),
-          start_date: raw.start_date!,
-          end_date: raw.end_date || null,
-          time_zone: doc.time_zone,
-          archived: false,
-          captured_at: new Date().toISOString(),
-          reference_source: "Demo configuration captured at registration",
-          lights: {
-            on: Number.isFinite(first?.lightsOn) ? first!.lightsOn : null,
-            off: Number.isFinite(first?.lightsOff) ? first!.lightsOff : null,
-          },
-          zones: previews.map(({ zone, preview }) => {
-            const count = preview.fields.plant_count?.value;
-            return {
-              zone_id: zone.id,
-              name: zone.name,
-              vwc_sensor: zone.vwc.entityId,
-              ec_sensor: zone.ec.entityId,
-              plant_count: count && Number.isInteger(count) && count > 0 ? count : null,
-              reference_source: `Demo ${preview.source} reference`,
-              parameters: Object.fromEntries(
-                Object.entries(preview.draft.parameters).filter(([key]) =>
-                  runParameterKeys.has(key),
-                ),
-              ),
-            };
-          }),
-        });
+        doc.runs.push(this.capture(room, raw.name.trim(), raw.start_date!, raw.end_date || null));
       }
     } else if (action === "runs_archive") {
       const record = doc.runs.find((r) => r.id === data.id);

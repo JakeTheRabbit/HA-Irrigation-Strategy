@@ -43,6 +43,13 @@ export interface Zone {
   name: string;
   enabledEntity: string | null;
   enabled: boolean | null;
+  valveEntity: string | null;
+  valveOn: boolean | null;
+  lastIrrigation: {
+    entityId: string | null;
+    timestamp: string | null;
+    issue: string | null;
+  };
   phase: string;
   vwc: Metric;
   ec: Metric;

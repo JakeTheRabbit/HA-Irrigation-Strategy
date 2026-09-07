@@ -100,6 +100,16 @@ export function Comparison({
         if (!cancelled) {
           setDocument(value);
           setMetadataError(value.error);
+          if (controller.demo && metadataReload === 0) {
+            const current = value.runs.find(
+              (run) => !run.archived && !run.end_date && run.name.startsWith("Demo • current run"),
+            );
+            const previous = value.runs.find(
+              (run) => !run.archived && run.name.startsWith("Demo • previous run"),
+            );
+            setCurrentId((selected) => selected || current?.id || "");
+            setPreviousId((selected) => selected || previous?.id || "");
+          }
         }
       })
       .catch((error) => {

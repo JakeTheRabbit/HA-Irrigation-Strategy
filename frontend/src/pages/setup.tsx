@@ -157,6 +157,12 @@ const hardwareFields = [
   ["feed_ec_sensor", "Feed-water EC", "ec"],
   ["feed_ph_sensor", "Feed-water pH", "ph"],
   ["light_entity", "Room lights", "light"],
+  ["water_level_sensor", "Tank fill level (%)", "level"],
+  ["tank_ec_sensor", "Tank EC (display)", "ec"],
+  ["tank_ph_sensor", "Tank pH (display)", "ph"],
+  ["tank_temperature_sensor", "Tank temperature", "temperature"],
+  ["tank_last_fill_sensor", "Last recorded tank fill", "timestamp"],
+  ["tank_fill_entity", "Tank filling status", "binary"],
 ] as const;
 export function Setup({
   controller,
@@ -240,9 +246,13 @@ export function Setup({
       .filter((c) =>
         kind === "switch"
           ? c.domain === "switch"
-          : kind === "light"
-            ? ["light", "switch"].includes(c.domain)
-            : c.domain === "sensor",
+          : kind === "timestamp"
+            ? ["sensor", "input_datetime"].includes(c.domain)
+            : kind === "binary"
+              ? ["switch", "binary_sensor"].includes(c.domain)
+              : kind === "light"
+                ? ["light", "switch"].includes(c.domain)
+                : c.domain === "sensor",
       )
       .sort((a, b) => {
         const preferred = (c: SetupCandidate) =>
@@ -598,7 +608,8 @@ export function Setup({
                     <h2>Shared room hardware</h2>
                     <p className="muted">
                       Pump, mainline and source-water probes. Empty feed mappings leave that
-                      source-water gate disabled.
+                      source-water gate disabled. Tank display mappings show readings in Overview;
+                      they do not change feed-water gates or operate the fill valve.
                     </p>
                   </div>
                 </div>

@@ -3,6 +3,14 @@ import { ArrowUpRight, Check, LoaderCircle, Moon, Sun, Monitor } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Heading, ReviewDialog, Status } from "@/components/dashboard";
 import type { Controller } from "@/lib/types";
 import type { ThemePreference, ThemeSource } from "@/lib/ha-theme";
@@ -35,6 +43,7 @@ export function Settings({
   const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
   const [review, setReview] = useState(false);
+  const [resetDemo, setResetDemo] = useState(false);
   async function connect(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -57,6 +66,25 @@ export function Settings({
         description="Manage this tab’s connection, appearance and room scheduling."
       />
       <div className="settings-stack">
+        {controller.demo && (
+          <section className="panel settings-section">
+            <div className="settings-label">
+              <h2>Sample workspace</h2>
+              <p>
+                Synthetic sensor readings, example plans and historical runs let you explore the
+                interface.
+              </p>
+            </div>
+            <div>
+              <Button variant="outline" onClick={() => setResetDemo(true)}>
+                Reset demo session…
+              </Button>
+              <p className="small muted mt-3">
+                Restore the sample rooms and runs. Saved recipes stay in this browser.
+              </p>
+            </div>
+          </section>
+        )}
         <section className="panel settings-section">
           <div className="settings-label">
             <h2>Home Assistant connection</h2>
@@ -212,6 +240,32 @@ export function Settings({
           </div>
         </section>
       </div>
+      {controller.demo && (
+        <Dialog open={resetDemo} onOpenChange={setResetDemo}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reset demo session?</DialogTitle>
+              <DialogDescription>
+                Reload the example rooms, sensor readings, run records and planner drafts. Unsaved
+                demo work and changes to demo runs or room settings will be lost. Saved recipe
+                libraries and live connection data will be kept.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setResetDemo(false)}>
+                Keep exploring
+              </Button>
+              <Button
+                onClick={() => {
+                  if (controller.demo) window.location.reload();
+                }}
+              >
+                Reset demo session
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
       <ReviewDialog
         open={review}
         onOpenChange={setReview}

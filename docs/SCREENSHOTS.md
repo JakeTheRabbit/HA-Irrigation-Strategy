@@ -8,6 +8,10 @@ Captured on 8 September 2026 from the compiled application with isolated demo da
 
 ![Room overview](../img/operator-dashboard.png)
 
+## Tank and pump
+
+![Graphical tank level, pump/fill reports and water-quality readings](../img/tank-status.png)
+
 ## Combined VWC and EC planning curve
 
 ![Zone planning and steering controls](../img/grow-plan.png)

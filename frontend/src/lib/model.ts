@@ -74,6 +74,36 @@ export function readable(entity?: EntityState): boolean {
 function boolean(entity?: EntityState): boolean | null {
   return entity?.state === "on" ? true : entity?.state === "off" ? false : null;
 }
+function lastIrrigation(entity: EntityState | undefined, now: number): Zone["lastIrrigation"] {
+  const result: Zone["lastIrrigation"] = {
+    entityId: entity?.entity_id || null,
+    timestamp: null,
+    issue: "No irrigation timestamp reported",
+  };
+  if (!entity) return result;
+  if (!readable(entity)) return { ...result, issue: "Irrigation timestamp unavailable" };
+  // Only a dated, timezone-aware event state proves when irrigation happened.
+  // last_updated/last_changed describe publication, not irrigation. Old retained
+  // event timestamps remain valid, even when there are no recent sensor updates.
+  const parts = entity.state.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/,
+  );
+  const timestamp = Date.parse(entity.state);
+  const calendar = parts && new Date(`${parts[1]}-${parts[2]}-${parts[3]}T00:00:00Z`);
+  if (
+    !parts ||
+    !Number.isFinite(timestamp) ||
+    calendar?.getUTCFullYear() !== Number(parts[1]) ||
+    (calendar?.getUTCMonth() ?? -1) + 1 !== Number(parts[2]) ||
+    calendar?.getUTCDate() !== Number(parts[3]) ||
+    Number(parts[4]) > 23 ||
+    Number(parts[5]) > 59 ||
+    Number(parts[6]) > 59
+  )
+    return { ...result, issue: "Invalid irrigation timestamp" };
+  if (timestamp > now) return { ...result, issue: "Irrigation timestamp is in the future" };
+  return { ...result, timestamp: new Date(timestamp).toISOString(), issue: null };
+}
 function title(value: string) {
   return value
     .replaceAll("_", " ")
@@ -396,11 +426,20 @@ export function buildRoom(states: States, room: Room): RoomView {
     ? configuredIds.filter((id) => (config!.attributes.active_zone_ids as unknown[]).includes(id))
     : configuredIds;
   const names = config?.attributes.zone_names as Record<string, unknown> | undefined;
+  const valves = config?.attributes.valves;
   const zones: Zone[] = activeIds.map((id) => {
     const z = `zone_${id}_`;
     const phase = resolve(states, room, "sensor", `${z}phase`);
     const enabled = resolve(states, room, "switch", `${z}enabled`);
     const status = resolve(states, room, "sensor", `${z}status`, `${z}safety_status`);
+    const mappedValve =
+      valves && typeof valves === "object" && !Array.isArray(valves)
+        ? (valves as Record<string, unknown>)[String(id)]
+        : undefined;
+    const valveEntity =
+      typeof mappedValve === "string" && /^switch\.[a-z0-9_]+$/.test(mappedValve)
+        ? mappedValve
+        : null;
     const plannedZone = Array.isArray(strategyAttrs.zones)
       ? (strategyAttrs.zones.find(
           (item: unknown) =>
@@ -443,6 +482,12 @@ export function buildRoom(states: States, room: Room): RoomView {
       name: typeof names?.[id] === "string" ? String(names[id]) : "Zone " + id,
       enabledEntity: enabled?.entity_id || null,
       enabled: boolean(enabled),
+      valveEntity,
+      valveOn: valveEntity ? boolean(states[valveEntity]) : null,
+      lastIrrigation: lastIrrigation(
+        resolve(states, room, "sensor", `${z}last_irrigation_app`, `${z}last_irrigation`),
+        now,
+      ),
       phase: readable(phase) ? phase!.state : "Unavailable",
       vwc: readingMetric(
         resolve(states, room, "sensor", `vwc_zone_${id}`, `${z}vwc`),

@@ -534,7 +534,9 @@ class CropSteeringSensor(SensorEntity):
         dt = dt_util.parse_datetime(s.state)
         if dt is None:
             return None
-        return dt if dt.tzinfo else dt_util.as_local(dt)
+        # Legacy producer strings do not identify their timezone. Wait for an
+        # explicit offset instead of assigning a potentially incorrect time.
+        return dt if dt.tzinfo is not None and dt.utcoffset() is not None else None
 
     def _get_zone_daily_water_usage(self, zone_num: int) -> float | None:
         """Get finite non-negative daily usage, preserving an unavailable source."""

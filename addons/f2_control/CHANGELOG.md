@@ -1,3 +1,9 @@
+# 0.13.2
+
+- Bundle graphical tank/pump telemetry and current zone state with last irrigation timestamps.
+- Publish irrigation event timestamps with an explicit timezone offset.
+- Include synthetic demo recipes/runs and the Home Assistant sidebar recovery button.
+
 # Changelog — Crop Steering add-on
 
 The full project changelog (integration + add-on) lives at

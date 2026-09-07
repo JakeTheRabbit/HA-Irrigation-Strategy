@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/sheet";
 import { useController } from "@/lib/use-controller";
 import { useHaTheme } from "@/lib/ha-theme";
+import { useHaShell } from "@/lib/ha-shell";
 import { time, type Page } from "@/components/dashboard";
 import { Overview } from "@/pages/overview";
 import { Zones } from "@/pages/zones";
@@ -102,6 +103,7 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const theme = useHaTheme();
+  const haShell = useHaShell();
   const pageRef = useRef(page);
   const dirtyRef = useRef(false);
   dirtyRef.current = Object.keys(drafts).length > 0 || workspaceDirty;
@@ -233,6 +235,17 @@ export default function App() {
         ))}
       </nav>
       <div className="sidebar-footer">
+        {haShell.available && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              setMobile(false);
+              haShell.toggle();
+            }}
+          >
+            <House size={17} /> Home Assistant
+          </Button>
+        )}
         <span className="small">Configuration changes require review.</span>
       </div>
     </>
@@ -261,6 +274,17 @@ export default function App() {
       </Sheet>
       <div className="app-main">
         <header className="topbar">
+          {haShell.available && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Open Home Assistant menu"
+              title="Home Assistant menu"
+              onClick={haShell.toggle}
+            >
+              <House size={20} />
+            </Button>
+          )}
           <div className="breadcrumbs">
             <Button
               className="mobile-menu"

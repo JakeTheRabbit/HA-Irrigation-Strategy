@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
+from datetime import datetime
 import math
 
 from .const import DOMAIN, MAX_ZONES
@@ -21,6 +22,11 @@ HARDWARE_DOMAINS = {
     "humidity_sensor": {"sensor"},
     "vpd_sensor": {"sensor"},
     "water_level_sensor": {"sensor"},
+    "tank_temperature_sensor": {"sensor"},
+    "tank_ec_sensor": {"sensor"},
+    "tank_ph_sensor": {"sensor"},
+    "tank_last_fill_sensor": {"sensor", "input_datetime"},
+    "tank_fill_entity": {"switch", "binary_sensor"},
 }
 SIZING = {
     "plant_count": (1, 1000, True),
@@ -28,7 +34,12 @@ SIZING = {
     "drippers_per_plant": (1, 20, True),
     "dripper_flow_rate": (0.1, 50, False),
 }
-UNITS = {"vwc": {"%"}, "ec": {"ms/cm", "ds/m"}, "ph": {"ph", ""}}
+UNITS = {
+    "vwc": {"%"},
+    "ec": {"ms/cm", "ds/m"},
+    "ph": {"ph", ""},
+    "tank_temperature": {"°c", "°f", "k"},
+}
 
 
 def effective(entry):
@@ -132,6 +143,43 @@ def _entity(hass, eid, domains, kind=None):
         if unit not in UNITS[kind]:
             raise ValueError(f"{eid}: incompatible {kind.upper()} unit {unit!r}")
     return eid
+
+
+def _tank_timestamp(hass, eid):
+    """Validate an explicit last-fill reading; never infer an event from state metadata."""
+    state = hass.states.get(eid)
+    unit = state.attributes.get("unit_of_measurement")
+    device_class = state.attributes.get("device_class")
+    if (unit is not None and str(unit).strip()) or device_class not in (
+        None,
+        "",
+        "timestamp",
+    ):
+        raise ValueError(f"{eid}: last fill requires a unitless timestamp sensor")
+    if eid.startswith("input_datetime."):
+        if (
+            state.attributes.get("has_date") is not True
+            or state.attributes.get("has_time") is not True
+        ):
+            raise ValueError(
+                f"{eid}: last fill helper must have both date and time enabled"
+            )
+        timestamp = state.attributes.get("timestamp")
+        if type(timestamp) not in (int, float) or not math.isfinite(timestamp):
+            raise ValueError(
+                f"{eid}: last fill helper requires a finite epoch timestamp"
+            )
+        return
+    if state.state in (None, "", "unknown", "unavailable"):
+        return  # The mapping can be saved offline; the overview must show it as unknown.
+    try:
+        value = datetime.fromisoformat(state.state.replace("Z", "+00:00"))
+    except (TypeError, ValueError, AttributeError):
+        raise ValueError(
+            f"{eid}: last fill requires an ISO timestamp with timezone"
+        ) from None
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{eid}: last fill timestamp must include a timezone")
 
 
 def prepare_setup(hass, payload, old=None, entry_id=None):
@@ -256,10 +304,20 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
                 HARDWARE_DOMAINS[key],
                 (
                     "ec"
-                    if key == "feed_ec_sensor"
-                    else "ph" if key == "feed_ph_sensor" else None
+                    if key in ("feed_ec_sensor", "tank_ec_sensor")
+                    else (
+                        "ph"
+                        if key in ("feed_ph_sensor", "tank_ph_sensor")
+                        else (
+                            "tank_temperature"
+                            if key == "tank_temperature_sensor"
+                            else None
+                        )
+                    )
                 ),
             )
+            if key == "tank_last_fill_sensor":
+                _tank_timestamp(hass, value)
         hw[key] = value or ""
     shared = {
         hw.get("pump_switch"),
@@ -422,7 +480,8 @@ def read_setup(hass):
                 "device_class": s.attributes.get("device_class"),
             }
             for s in hass.states.async_all()
-            if s.entity_id.split(".")[0] in {"sensor", "switch", "light"}
+            if s.entity_id.split(".")[0]
+            in {"sensor", "switch", "light", "binary_sensor", "input_datetime"}
         ],
     }
 

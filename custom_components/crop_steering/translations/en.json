@@ -300,7 +300,12 @@
           "humidity_sensor": "Room humidity sensor (optional)",
           "vpd_sensor": "VPD sensor (optional)",
           "water_level_sensor": "Tank level sensor (optional)",
-          "notification_service": "Notification service (optional)"
+          "notification_service": "Notification service (optional)",
+          "tank_temperature_sensor": "Tank water temperature sensor (optional)",
+          "tank_ec_sensor": "Tank EC display sensor (optional)",
+          "tank_ph_sensor": "Tank pH display sensor (optional)",
+          "tank_last_fill_sensor": "Tank last-fill time (optional)",
+          "tank_fill_entity": "Tank filling status (optional)"
         },
         "data_description": {
           "pump_switch": "Main water pump. Leave EMPTY if your system auto-starts the pump when flow opens (constant-pressure).",
@@ -318,7 +323,12 @@
           "humidity_sensor": "Room relative-humidity sensor. Optional, for analytics only.",
           "vpd_sensor": "Vapour-pressure-deficit sensor or template. Optional.",
           "water_level_sensor": "Reservoir/tank level sensor. Optional; triggers low-water alerts.",
-          "notification_service": "Where alerts go, e.g. notify.mobile_app_your_phone. (The add-on engine also has its own notify setting.)"
+          "notification_service": "Where alerts go, e.g. notify.mobile_app_your_phone. (The add-on engine also has its own notify setting.)",
+          "tank_temperature_sensor": "Read-only tank-water temperature in °C, °F or K. This is separate from room/canopy temperature.",
+          "tank_ec_sensor": "Read-only tank EC in mS/cm or dS/m. This mapping does not enable or change the source-water EC gate.",
+          "tank_ph_sensor": "Read-only tank pH. This mapping does not enable or change the source-water pH gate.",
+          "tank_last_fill_sensor": "Timestamp sensor or date-and-time helper recording the last fill. Helpers require both date and time plus a numeric epoch timestamp. A level sensor's last_changed time is not a fill event.",
+          "tank_fill_entity": "Read-only switch or binary sensor indicating filling. The dashboard does not operate this entity."
         }
       },
       "load_env": {
@@ -540,7 +550,12 @@
           "zone_23_name": "Zone 23 label",
           "zone_23_active": "Zone 23 active (off archives this slot)",
           "zone_24_name": "Zone 24 label",
-          "zone_24_active": "Zone 24 active (off archives this slot)"
+          "zone_24_active": "Zone 24 active (off archives this slot)",
+          "tank_temperature_sensor": "Tank water temperature sensor (optional)",
+          "tank_ec_sensor": "Tank EC display sensor (optional)",
+          "tank_ph_sensor": "Tank pH display sensor (optional)",
+          "tank_last_fill_sensor": "Tank last-fill time (optional)",
+          "tank_fill_entity": "Tank filling status (optional)"
         },
         "data_description": {
           "zone_1_switch": "The switch entity that opens zone 1's irrigation valve.",
@@ -654,7 +669,12 @@
           "humidity_sensor": "Room relative-humidity sensor. Optional, for analytics only.",
           "vpd_sensor": "Vapour-pressure-deficit sensor or template. Optional.",
           "water_level_sensor": "Reservoir/tank level sensor. Optional; triggers low-water alerts.",
-          "notification_service": "Where alerts go, e.g. notify.mobile_app_your_phone. (The add-on engine also has its own notify setting.)"
+          "notification_service": "Where alerts go, e.g. notify.mobile_app_your_phone. (The add-on engine also has its own notify setting.)",
+          "tank_temperature_sensor": "Read-only tank-water temperature in °C, °F or K. This is separate from room/canopy temperature.",
+          "tank_ec_sensor": "Read-only tank EC in mS/cm or dS/m. This mapping does not enable or change the source-water EC gate.",
+          "tank_ph_sensor": "Read-only tank pH. This mapping does not enable or change the source-water pH gate.",
+          "tank_last_fill_sensor": "Timestamp sensor or date-and-time helper recording the last fill. Helpers require both date and time plus a numeric epoch timestamp. A level sensor's last_changed time is not a fill event.",
+          "tank_fill_entity": "Read-only switch or binary sensor indicating filling. The dashboard does not operate this entity."
         }
       },
       "edit_parameters": {

@@ -9,6 +9,17 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.16.0] - 2026-09-08
+
+- Add a local MCP connector for LLM-assisted configuration with reviewed, room-scoped proposals and opt-in writes.
+- Seed the isolated demo with synthetic named recipes and current/previous runs; live libraries remain unseeded.
+- Temporarily collapse the Home Assistant sidebar while embedded, with persistent desktop/mobile menu access and restore on leaving.
+
+- Add graphical room tank level, pump and fill status, tank EC/pH/temperature, and recorded fill completion time to Overview.
+- Show controller state, mapped valve status and last irrigation time in zone tables, mobile cards and details.
+- Add optional room-specific tank telemetry mappings, separate from feed-water safety gates. Unknown data stays unknown; level changes are never presented as fill events.
+- Pair with controller 0.13.2 for the bundled dashboard and timezone-aware irrigation event publication.
+
 ## [2.15.0] - 2026-09-08
 
 - Add an empty, room-scoped library for saving and reusing user-authored plans as local drafts. Browser storage is separate for live and demo; loading preserves the current zone start dates and uses existing plan validation/review.

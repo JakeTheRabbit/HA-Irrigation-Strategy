@@ -2004,7 +2004,9 @@ class Controller:
                 if ls is not None:
                     ha_set(
                         f"sensor.crop_steering_{px}zone_{zone}_last_irrigation_app",
-                        ls.isoformat(),
+                        # Internal times stay local-naive; publish the event's local
+                        # UTC offset, including historical daylight-saving changes.
+                        ls.astimezone().isoformat(),
                         {"device_class": "timestamp"},
                     )
                 # Daily volume fed + shot count today — the dashboard's "Volume fed vs cap"

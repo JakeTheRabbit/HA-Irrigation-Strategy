@@ -38,7 +38,7 @@ export class OperatorDemo {
           id,
           name: "Zone " + id,
           active: true,
-          valve: "switch.demo_" + index + "_valve_" + id,
+          valve: "switch.demo_" + room.prefix + "valve_" + id,
           vwc_sensors: ["sensor.crop_steering_" + room.prefix + "vwc_zone_" + id],
           ec_sensors: ["sensor.crop_steering_" + room.prefix + "ec_zone_" + id],
           plant_count: 36,
@@ -47,8 +47,24 @@ export class OperatorDemo {
           dripper_flow_rate: 4,
         })),
         hardware: {
-          pump_switch: "switch.demo_" + index + "_pump",
+          pump_switch: "switch.demo_" + room.prefix + "pump",
           main_line_switch: "switch.demo_" + index + "_mainline",
+          ...Object.fromEntries(
+            [
+              "water_level_sensor",
+              "tank_ec_sensor",
+              "tank_ph_sensor",
+              "tank_temperature_sensor",
+              "tank_last_fill_sensor",
+              "tank_fill_entity",
+            ].map((key) => [
+              key,
+              String(
+                states["sensor.crop_steering_" + room.prefix + "engine_config"]?.attributes[key] ||
+                  "",
+              ),
+            ]),
+          ),
         },
         safety: { ready: false, blockers: [] },
       }));
@@ -121,6 +137,7 @@ export class OperatorDemo {
         p1_target_vwc: [64, 20, 90, 0.5, "%"],
         p2_vwc_threshold: [54, 10, 90, 0.5, "%"],
         p1_initial_shot_size: [6, 0.5, 20, 0.5, "%"],
+        p1_shot_size_increment: [0.5, 0.05, 10, 0.05, "%"],
         p2_shot_size: [4, 0.5, 20, 0.5, "%"],
         p3_emergency_vwc_threshold: [35, 10, 70, 0.5, "%"],
         p3_emergency_shot_size: [3, 0.5, 15, 0.5, "%"],
@@ -146,7 +163,7 @@ export class OperatorDemo {
         p2_shot_size: 3,
       };
       const id = "zone-" + zone.id;
-      profiles.push({ id, name: zone.name + " endpoints", vegetative, generative });
+      profiles.push({ id, name: zone.name + " demo endpoints", vegetative, generative });
       zones.push({
         zone_id: zone.id,
         start_date: dateForDay(localDate(), -13),
@@ -332,6 +349,9 @@ export class OperatorDemo {
               active: target.active,
               friendly_name: target.room_name + " engine config",
               enable_flag: flag,
+              ...target.hardware,
+              pump: target.hardware.pump_switch,
+              valves: Object.fromEntries(target.zones.map((z) => [z.id, z.valve])),
               zone_names: Object.fromEntries(target.zones.map((z) => [z.id, z.name])),
             },
             last_updated: new Date().toISOString(),

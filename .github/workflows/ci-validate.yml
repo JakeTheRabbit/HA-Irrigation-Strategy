@@ -170,8 +170,24 @@ jobs:
           node frontend/scripts/verify-workspace.mjs
           node frontend/scripts/verify-steering-visuals.mjs
           node frontend/scripts/verify-recipe-library.mjs
+          node frontend/scripts/verify-tank-status.mjs
+          node frontend/scripts/verify-ha-shell.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: dashboard-browser-evidence
           path: output/playwright/
+
+  mcp:
+    name: MCP protocol and reviewed configuration workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+      - run: npm ci --prefix mcp-server
+      - run: npm test --prefix mcp-server

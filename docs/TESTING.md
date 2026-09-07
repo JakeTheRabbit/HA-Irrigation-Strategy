@@ -50,6 +50,9 @@ node frontend/scripts/verify-dashboard.mjs
 node frontend/scripts/verify-live.mjs
 node frontend/scripts/verify-workspace.mjs
 node frontend/scripts/verify-steering-visuals.mjs
+node frontend/scripts/verify-recipe-library.mjs
+node frontend/scripts/verify-tank-status.mjs
+node frontend/scripts/verify-ha-shell.mjs
 ```
 
 The browser scripts start loopback servers. Demo workflows reject API/external traffic; mocked-HA workflows intercept all API calls. The checks cover all eleven pages, desktop/mobile navigation, accessibility, drafts, partial failures, readback, room identity, stale probes, and legacy route compatibility. Screenshots and JSON results are written to `output/playwright/`. This frontend job also runs in GitHub CI. The Python packaging tests verify that the HA and add-on artifacts match and retain room/demo navigation.
@@ -57,6 +60,15 @@ The browser scripts start loopback servers. Demo workflows reject API/external t
 The workspace suite also covers day/week scheduling, reactive VWC/EC previews, profile editing, setup lifecycle, strict response-bearing service contracts, invalid/expired snapshots and draft preservation. Integration tests use a minimal HA fixture, not a running HA instance. HACS/hassfest and an actual Supervisor image build run in CI, not in the local browser harness.
 
 ## What it tests
+
+### MCP connector
+
+```sh
+npm ci --prefix mcp-server
+npm test --prefix mcp-server
+```
+
+The MCP suite uses a local fake HA server and the official MCP client. It checks protocol initialization, tool discovery, scoped reads and reviewed proposals, write opt-in, stale revisions, replay/expiry, failed readback and transport errors. It does not require credentials or actuate equipment. Live read-only checks are recorded separately from any configuration writes.
 
 ### 1. Pure decision core — `crop-steering-engine/tests/test_core.py`
 The `decide()` function with no HA and no I/O: phase transitions (P0→P1→P2→P3), the

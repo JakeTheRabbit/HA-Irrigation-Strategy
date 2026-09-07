@@ -6,7 +6,9 @@ A Home Assistant irrigation controller with a native operator workspace: see the
 
 The demo opens directly in your browser with sample rooms, sensor data and editable plans. No login or Home Assistant installation is required; demo changes stay in your browser.
 
-![Release](https://img.shields.io/badge/Release-2.15.0-green)
+The demo includes clearly labelled synthetic recipes and current/previous runs for exploring comparisons. They demonstrate the software; they are not production recommendations.
+
+![Release](https://img.shields.io/badge/Release-2.16.0-green)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3+-41BDF5)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -22,6 +24,14 @@ The demo opens directly in your browser with sample rooms, sensor data and edita
 4. Open **Crop Steering** in the sidebar. Use **Rooms & setup** to map equipment and probes, then **Sensors** to verify readings. Keep the engine off until the installation checks pass.
 
 Home Assistant owns the install/restart confirmations; these links take you directly to the relevant screens. They do not bypass HACS, Supervisor or hardware commissioning. [Complete installation and upgrade guide →](docs/INSTALL.md)
+
+## See the room at a glance
+
+Overview shows the controller state, mapped valve on/off report and last recorded irrigation for every zone. The graphical tank panel shows fill percentage, pump status, filling status, last recorded fill, EC, pH and temperature.
+
+Map tank sensors in **Rooms & setup**. Display-only tank quality mappings are separate from feed-water safety gates. Last fill uses a recorded fill timestamp (timestamp sensor or a date-and-time helper), never a sensor update time. Unmapped or unavailable readings are labelled explicitly.
+
+![Graphical tank and pump status](img/tank-status.png)
 
 ## Plan the whole grow
 
@@ -85,7 +95,12 @@ Plans are saved as drafts, reviewed, and armed for the next local lights-on boun
 
 ## Documentation
 
+To connect an LLM, install the optional [MCP connector](docs/MCP.md). It can inspect rooms, readings, mappings, plans and runs, then prepare specific configuration proposals. Writes require explicit opt-in and review; it does not operate equipment or activate plans.
+
 - [Install, upgrade and rollback](docs/INSTALL.md)
+- [Step-by-step user guide](docs/USER_GUIDE.md)
+- [Connect an LLM with the MCP server](docs/MCP.md)
+- [Home Assistant sidebar and menu button](docs/HA_SIDEBAR.md)
 - [Daily operation and whole-grow planning](docs/GROW_PLANS.md)
 - [Validated feature matrix and limitations](docs/FEATURE_MATRIX.md)
 - [Architecture and repository map](docs/REPOSITORY_MAP.md)

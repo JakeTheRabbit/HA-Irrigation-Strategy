@@ -4,6 +4,7 @@
 | --- | --- |
 | frontend/src | React, TypeScript and shadcn UI source; theme, adapter, planning and setup screens |
 | frontend/scripts | Single-file packaging and reproducible browser verification |
+| mcp-server | Optional local stdio MCP connector, scoped HA configuration tools and protocol tests |
 | custom_components/crop_steering | HA config flow, entities, setup/strategy/run APIs, storage and sidebar registration |
 | addons/f2_control | Companion controller app, hardware coordinator, runtime validation and tests |
 | crop-steering-engine | Pure decision core and its tests; vendored copy must remain identical |

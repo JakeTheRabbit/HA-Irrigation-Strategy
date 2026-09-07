@@ -1,0 +1,47 @@
+.zone-operating-state {
+  display: grid;
+  gap: 7px;
+  min-width: 170px;
+  max-width: 290px;
+  white-space: normal;
+}
+.zone-controller-status {
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.zone-state-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.zone-valve-state {
+  font-weight: 600;
+  color: var(--foreground);
+}
+.zone-last-irrigation {
+  display: grid;
+  gap: 3px;
+  min-width: 140px;
+  max-width: 220px;
+  line-height: 1.45;
+  white-space: normal;
+}
+.zone-irrigation-summary {
+  display: grid;
+  gap: 5px;
+  padding: 12px 0;
+}
+.zone-mobile-row > .zone-operating-state {
+  margin-top: 12px;
+  max-width: none;
+}
+.zone-mobile-row .zone-controller-status,
+.zone-mobile-row .zone-last-irrigation {
+  font-size: 12px;
+}
+.zone-mobile-row .zone-last-irrigation {
+  max-width: none;
+}

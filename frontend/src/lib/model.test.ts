@@ -224,6 +224,131 @@ describe("room model", () => {
   });
 });
 
+describe("zone valve and irrigation event telemetry", () => {
+  const lastShot = "2020-07-01T12:34:56.123456+12:00";
+  const producer = "sensor.crop_steering_zone_1_last_irrigation_app";
+  const wrapper = "sensor.crop_steering_zone_1_last_irrigation";
+  const zone = (states: States, prefix = "") =>
+    buildRoom(
+      states,
+      discoverRooms(states).find((room) => room.prefix === prefix)!,
+    ).zones[0];
+
+  it("uses only the selected room's exact valve mapping, including external entity namespaces", () => {
+    const states = fixture();
+    states["sensor.crop_steering_engine_config"].attributes.valves = { "1": "switch.rack_a" };
+    states["sensor.crop_steering_f1_engine_config"].attributes.valves = { "1": "switch.rack_b" };
+    states["switch.rack_a"] = entity("switch.rack_a", "on");
+    states["switch.rack_b"] = entity("switch.rack_b", "off");
+    expect(zone(states)).toMatchObject({ valveEntity: "switch.rack_a", valveOn: true });
+    expect(zone(states, "f1_")).toMatchObject({ valveEntity: "switch.rack_b", valveOn: false });
+    delete states["sensor.crop_steering_f1_engine_config"].attributes.valves;
+    expect(zone(states, "f1_")).toMatchObject({ valveEntity: null, valveOn: null });
+    expect(zone(states).enabled).toBe(true);
+  });
+  it("finds a legacy engine descriptor by its declared room prefix, not its entity name", () => {
+    const states = fixture();
+    const config = states["sensor.crop_steering_engine_config"];
+    delete states[config.entity_id];
+    config.entity_id = "sensor.crop_steering_system_engine_config";
+    config.attributes.valves = { "1": "switch.rack_a" };
+    states[config.entity_id] = config;
+    states["switch.rack_a"] = entity("switch.rack_a", "on");
+    expect(zone(states)).toMatchObject({ valveEntity: "switch.rack_a", valveOn: true });
+    expect(zone(states, "f1_").valveOn).toBeNull();
+  });
+  it.each([undefined, null, [], "switch.rack_a", {}, { "1": 12 }, { "1": "sensor.rack_a" }])(
+    "does not guess a valve when its mapping is missing or malformed (%j)",
+    (valves) => {
+      const states = fixture();
+      states["sensor.crop_steering_engine_config"].attributes.valves = valves;
+      // A similarly named pump and an enabled scheduling switch prove no valve state.
+      expect(zone(states)).toMatchObject({ valveEntity: null, valveOn: null });
+    },
+  );
+  it.each([undefined, "unknown", "unavailable", "open", "", "ON"])(
+    "keeps a mapped valve's unresolved state unknown (%s)",
+    (value) => {
+      const states = fixture();
+      states["sensor.crop_steering_engine_config"].attributes.valves = { "1": "switch.rack_a" };
+      if (value !== undefined) states["switch.rack_a"] = entity("switch.rack_a", value);
+      expect(zone(states)).toMatchObject({ valveEntity: "switch.rack_a", valveOn: null });
+    },
+  );
+  it("reads the retained producer event state without treating publication time as irrigation", () => {
+    const states = fixture();
+    states[producer] = { ...entity(producer, lastShot), last_updated: "2026-01-01T00:00:00Z" };
+    states[wrapper] = entity(wrapper, "2021-01-01T00:00:00Z");
+    expect(zone(states).lastIrrigation).toEqual({
+      entityId: producer,
+      timestamp: "2020-07-01T00:34:56.123Z",
+      issue: null,
+    });
+    expect(zone(states, "f1_").lastIrrigation.timestamp).toBeNull();
+    const f1Producer = "sensor.crop_steering_f1_zone_1_last_irrigation_app";
+    states[f1Producer] = entity(f1Producer, "2021-02-03T04:05:06Z");
+    expect(zone(states, "f1_").lastIrrigation.timestamp).toBe("2021-02-03T04:05:06.000Z");
+  });
+  it("uses the integration timestamp only when the producer entity is absent", () => {
+    const states = fixture();
+    states[wrapper] = entity(wrapper, lastShot);
+    expect(zone(states).lastIrrigation).toMatchObject({ entityId: wrapper, issue: null });
+    states[producer] = { ...entity(producer, "unavailable"), last_updated: lastShot };
+    expect(zone(states).lastIrrigation).toEqual({
+      entityId: producer,
+      timestamp: null,
+      issue: "Irrigation timestamp unavailable",
+    });
+  });
+  it.each([
+    "10:30",
+    "2020-07-01",
+    "2020-07-01T12:34:56",
+    "2020-02-30T00:00:00Z",
+    "2020-07-01T24:00:00Z",
+    "not a date",
+    "0",
+  ])(
+    "rejects invalid or ambiguous event timestamps (%s), including with valid update metadata",
+    (value) => {
+      const states = fixture();
+      states[producer] = {
+        ...entity(producer, value),
+        last_updated: lastShot,
+        last_changed: lastShot,
+      };
+      expect(zone(states).lastIrrigation).toMatchObject({
+        timestamp: null,
+        issue: "Invalid irrigation timestamp",
+      });
+    },
+  );
+  it("rejects future events, accepts an event at now, and keeps absent events explicit", () => {
+    const now = Date.parse("2026-09-08T00:00:00Z");
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      const states = fixture();
+      expect(zone(states).lastIrrigation).toEqual({
+        entityId: null,
+        timestamp: null,
+        issue: "No irrigation timestamp reported",
+      });
+      states[producer] = entity(producer, "2026-09-08T00:00:00.001Z");
+      expect(zone(states).lastIrrigation).toMatchObject({
+        timestamp: null,
+        issue: "Irrigation timestamp is in the future",
+      });
+      states[producer].state = "2026-09-08T00:00:00Z";
+      expect(zone(states).lastIrrigation).toMatchObject({
+        timestamp: "2026-09-08T00:00:00.000Z",
+        issue: null,
+      });
+    } finally {
+      clock.mockRestore();
+    }
+  });
+});
+
 describe("verified transport and demo isolation", () => {
   it("reports a service success with unchanged readback as failed", async () => {
     const states = fixture();

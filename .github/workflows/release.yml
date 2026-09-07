@@ -40,6 +40,8 @@ jobs:
           # Custom Component package (HACS)
           zip -r dist/custom_components_crop_steering.zip custom_components/crop_steering \
             -x "**/__pycache__/**" "**/*.pyc" "**/.mypy_cache/**" "**/.pytest_cache/**" "**/.DS_Store" "**/.git/**"
+          # Source-only MCP package; never includes local credentials or node_modules.
+          git archive --format=zip --output=dist/crop_steering_mcp_source.zip HEAD mcp-server docs/MCP.md LICENSE
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -55,5 +57,6 @@ jobs:
         with:
           files: |
             dist/custom_components_crop_steering.zip
+            dist/crop_steering_mcp_source.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

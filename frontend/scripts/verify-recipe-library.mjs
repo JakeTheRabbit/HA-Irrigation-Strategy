@@ -81,6 +81,19 @@ try {
     async () => {
       const initial = await downloadPlan(page.getByRole("button", { name: "Export", exact: true }));
       await openLibrary();
+      assert.equal(await library().locator(".recipe-list li").count(), 2);
+      await page
+        .getByRole("button", { name: "Preview recipe Demo • steady schedule", exact: true })
+        .waitFor();
+      await page
+        .getByRole("button", { name: "Preview recipe Demo • week-by-week changes", exact: true })
+        .waitFor();
+      assert.equal(
+        await page.evaluate(() =>
+          localStorage.getItem("crop-steering.recipe-library.v1:live:room%3A"),
+        ),
+        null,
+      );
       await page.getByRole("button", { name: "Save current as recipe", exact: true }).click();
       await page.getByLabel("Recipe name", { exact: true }).fill("My saved plan");
       await page
@@ -88,7 +101,7 @@ try {
         .fill("User-authored example for the browser demo.");
       await page.getByRole("button", { name: "Save to library", exact: true }).click();
       await page.getByRole("dialog").waitFor({ state: "hidden" });
-      assert.equal(await library().locator(".recipe-list li").count(), 1);
+      assert.equal(await library().locator(".recipe-list li").count(), 3);
       const saved = await downloadPlan(
         page.getByRole("button", { name: "Export recipe My saved plan", exact: true }),
       );
@@ -113,7 +126,7 @@ try {
       await page.getByRole("button", { name: "Discard draft", exact: true }).click();
       await page.reload({ waitUntil: "networkidle" });
       await openLibrary();
-      assert.equal(await library().locator(".recipe-list li").count(), 1);
+      assert.equal(await library().locator(".recipe-list li").count(), 3);
       await axe("recipe library desktop");
       await page.evaluate(() => {
         document.activeElement?.blur();
@@ -131,26 +144,28 @@ try {
     await page.locator("#desktop-room").selectOption("room:f1_");
     await library().waitFor();
     await openLibrary();
-    assert.equal(await library().locator(".recipe-list li").count(), 0);
+    assert.equal(await library().locator(".recipe-list li").count(), 2);
     await page.locator("#desktop-room").selectOption("room:");
     await library().waitFor();
     await openLibrary();
     await page.getByRole("button", { name: "Remove recipe My saved plan", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click();
-    assert.equal(await library().locator(".recipe-list li").count(), 1);
+    assert.equal(await library().locator(".recipe-list li").count(), 3);
     await page.getByRole("button", { name: "Remove recipe My saved plan", exact: true }).click();
     await page
       .getByRole("dialog")
       .getByRole("button", { name: "Remove recipe", exact: true })
       .click();
-    await library().getByText("No saved recipes yet.", { exact: false }).waitFor();
-    await page
-      .locator('input[type="file"][aria-label="Import recipe file"]')
-      .setInputFiles({
-        name: "own-plan.json",
-        mimeType: "application/json",
-        buffer: Buffer.from(JSON.stringify(exported)),
-      });
+    assert.equal(await library().locator(".recipe-list li").count(), 2);
+    assert.equal(
+      await page.getByRole("button", { name: "Preview recipe My saved plan", exact: true }).count(),
+      0,
+    );
+    await page.locator('input[type="file"][aria-label="Import recipe file"]').setInputFiles({
+      name: "own-plan.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(exported)),
+    });
     await page.getByLabel("Recipe name", { exact: true }).fill("Imported copy");
     await page.getByRole("button", { name: "Save to library", exact: true }).click();
     await page.getByRole("dialog").waitFor({ state: "hidden" });
@@ -162,6 +177,94 @@ try {
     await page.getByRole("button", { name: "Keep current draft", exact: true }).click();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
+  await check(
+    "First comparison has sample current/previous curves; confirmed reset preserves user recipes and live storage",
+    async () => {
+      const savedDemo = await page.evaluate(() =>
+        localStorage.getItem("crop-steering.recipe-library.v1:demo:room%3A"),
+      );
+      await page.evaluate(() => {
+        localStorage.setItem(
+          "crop-steering.recipe-library.v1:live:room%3A",
+          "live-preservation-sentinel",
+        );
+        sessionStorage.setItem("demo-reset-unrelated-sentinel", "keep");
+        window.location.hash = "#/compare";
+      });
+      await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
+      await page.waitForFunction(() =>
+        document
+          .querySelector('[aria-label="Current run"]')
+          ?.selectedOptions?.[0]?.textContent?.includes("Demo • current run"),
+      );
+      assert.match(
+        await page
+          .getByLabel("Previous run", { exact: true })
+          .locator("option:checked")
+          .innerText(),
+        /Demo • previous run/,
+      );
+      for (const period of ["day", "week", "month", "run"]) {
+        await page.getByLabel("Comparison history range", { exact: true }).selectOption(period);
+        await page.waitForFunction(() => {
+          const button = [...document.querySelectorAll("button")].find((item) =>
+            item.textContent.includes("Refresh history"),
+          );
+          return (
+            button &&
+            !button.disabled &&
+            document.querySelector('[data-comparison-series="previous-vwc"]')
+          );
+        });
+        for (const series of [
+          "current-vwc",
+          "current-ec",
+          "previous-vwc",
+          "previous-ec",
+          "target-vwc",
+          "target-ec",
+        ]) {
+          assert.ok(
+            await page.locator(`[data-comparison-series="${series}"]`).count(),
+            `${period}: ${series}`,
+          );
+        }
+      }
+      await page.evaluate(() => {
+        window.location.hash = "#/settings";
+      });
+      await page.getByRole("button", { name: "Reset demo session…", exact: true }).click();
+      await page.getByRole("button", { name: "Keep exploring", exact: true }).click();
+      assert.equal(await page.getByRole("dialog").count(), 0);
+      await page.getByRole("button", { name: "Reset demo session…", exact: true }).click();
+      await Promise.all([
+        page.waitForEvent("load"),
+        page.getByRole("button", { name: "Reset demo session", exact: true }).click(),
+      ]);
+      assert.equal(
+        await page.evaluate(() =>
+          localStorage.getItem("crop-steering.recipe-library.v1:demo:room%3A"),
+        ),
+        savedDemo,
+      );
+      assert.equal(
+        await page.evaluate(() =>
+          localStorage.getItem("crop-steering.recipe-library.v1:live:room%3A"),
+        ),
+        "live-preservation-sentinel",
+      );
+      assert.equal(
+        await page.evaluate(() => sessionStorage.getItem("demo-reset-unrelated-sentinel")),
+        "keep",
+      );
+      await page.evaluate(() => {
+        window.location.hash = "#/grow-plan";
+      });
+      await library().waitFor();
+      await openLibrary();
+      assert.equal(await library().locator(".recipe-list li").count(), 3);
+    },
+  );
   await check("Corrupt browser storage is retained and blocks replacement", async () => {
     const key = "crop-steering.recipe-library.v1:demo:room%3A";
     await page.evaluate((key) => localStorage.setItem(key, "{broken"), key);
