@@ -85,3 +85,30 @@ def test_engine_config_skips_zones_without_a_valve():
         "veg_", "veg", 3, _ZONES, _HW
     )  # only zones 1,2 have a switch
     assert d["valves"] == {1: "switch.veg_zone_1", 2: "switch.veg_zone_2"}
+
+
+def test_setup_descriptor_preserves_archived_ids_and_exposes_revision():
+    zones = {
+        "1": {"zone_switch": "switch.v1", "active": False, "name": "Front"},
+        "2": {"zone_switch": "switch.v2", "name": "Rear"},
+    }
+    d = room.build_engine_config(
+        "veg_",
+        "veg",
+        2,
+        zones,
+        {},
+        {"setup_revision": 3, "active": False, "room_name": "Veg renamed"},
+    )
+    assert d["active_zone_ids"] == [2]
+    assert d["zone_names"] == {"1": "Front", "2": "Rear"}
+    assert d["valves"] == {1: "switch.v1", 2: "switch.v2"}
+    assert d["setup_revision"] == 3 and d["active"] is False
+    assert d["room_name"] == "Veg renamed"
+
+
+def test_new_default_room_can_use_integration_engine_switch():
+    d = room.build_engine_config(
+        "", "default", 1, {}, {}, {"enable_flag": "switch.crop_steering_engine_enabled"}
+    )
+    assert d["enable_flag"] == "switch.crop_steering_engine_enabled"

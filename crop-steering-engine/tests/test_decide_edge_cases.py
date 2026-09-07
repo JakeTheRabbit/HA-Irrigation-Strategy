@@ -129,7 +129,8 @@ def test_p2_predictive_p3():
                 vwc=55,
                 hours_to_lights_off=2,
                 hours_to_lights_on=2,
-                dryback_rate=10,
+                peak_vwc=60,
+                dryback_rate=2,  # 55 -> 48 VWC is 3.5h, beyond the 2h remaining.
             ),
             P(dryback_target=20),
         )

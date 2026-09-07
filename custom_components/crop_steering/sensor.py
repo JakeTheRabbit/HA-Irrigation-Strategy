@@ -278,7 +278,12 @@ class CropSteeringEngineConfigSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         return build_engine_config(
-            self._prefix, self._slug, self._num_zones, self._zones, self._hw
+            self._prefix,
+            self._slug,
+            self._num_zones,
+            self._zones,
+            self._hw,
+            {**self._entry.data, **self._entry.options},
         )
 
 

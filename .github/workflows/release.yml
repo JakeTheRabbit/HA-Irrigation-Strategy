@@ -23,6 +23,15 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Set up frontend build runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build the bundled operator dashboard
+        run: |
+          npm ci --prefix frontend
+          npm run build --prefix frontend
+
       - name: Create archives
         shell: bash
         run: |

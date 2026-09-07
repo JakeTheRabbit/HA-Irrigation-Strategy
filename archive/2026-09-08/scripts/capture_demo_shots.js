@@ -1,10 +1,10 @@
-// Capture the 6 f2.html?demo tab screenshots for the README gallery.
+// Capture the 6 f2-classic.html?demo tab screenshots for the README gallery.
 // Standalone demo mode (no HA / no token / no LAN) -> renders perfect mock data.
 // Usage: NODE_PATH=$(npm root -g) node scripts/capture_demo_shots.js
 const { chromium } = require('playwright');
 const path = require('path');
 
-const FILE = 'file:///' + path.resolve(__dirname, '..', 'www', 'f2.html').replace(/\\/g, '/') + '?demo';
+const FILE = 'file:///' + path.resolve(__dirname, '..', 'www', 'f2-classic.html').replace(/\\/g, '/') + '?demo';
 const OUT = path.resolve(__dirname, '..', 'img');
 
 // README gallery -> view id mapping

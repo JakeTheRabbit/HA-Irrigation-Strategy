@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 const TIPS = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'tips_data.json'), 'utf8'));
-const FILE = 'file:///' + path.resolve(__dirname, '..', 'www', 'f2.html').replace(/\\/g, '/') + '?demo';
+const FILE = 'file:///' + path.resolve(__dirname, '..', 'www', 'f2-classic.html').replace(/\\/g, '/') + '?demo';
 (async () => {
   const b = await chromium.launch({ channel: 'chrome', headless: true });
   const p = await b.newContext({ viewport: { width: 1440, height: 1100 } }).then(c => c.newPage());

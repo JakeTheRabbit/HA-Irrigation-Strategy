@@ -1,0 +1,128 @@
+[
+  {
+    "source": "img\\Dashboard 1.png",
+    "destination": "archive\\2026-09-08\\img\\Dashboard 1.png",
+    "sha256": "09a246269f0be36ec86499a87ceeb262f3fb540b853b8cf5ebe317c83a4e49db",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\Dashboard 2.png",
+    "destination": "archive\\2026-09-08\\img\\Dashboard 2.png",
+    "sha256": "576bdb9e08e372f11e27fd3ae4e84fc278bb68a1f497d971dee1659a89103efb",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\Dashboard 3.png",
+    "destination": "archive\\2026-09-08\\img\\Dashboard 3.png",
+    "sha256": "a6d5667f4b82648f0a7b4bebfcc0787e85276849482baa4ea0001111d65e53c0",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\Dashboard 4.png",
+    "destination": "archive\\2026-09-08\\img\\Dashboard 4.png",
+    "sha256": "7dfee5a2039cd8535413dd15e5c29f9b54bf2f36abdecd8607af006328add381",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\Dashboard 5.png",
+    "destination": "archive\\2026-09-08\\img\\Dashboard 5.png",
+    "sha256": "3f2b52716b5e639a0d4e31d0e67d9febe3eda4cc824b5de3ebf6e888c684ab30",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\Dashboard Entities.png",
+    "destination": "archive\\2026-09-08\\img\\Dashboard Entities.png",
+    "sha256": "73f8b71017fff80749ca36e96a255a518ce8b1f83e3a3602e83e19acec1bd3dc",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\demo-climate.png",
+    "destination": "archive\\2026-09-08\\img\\demo-climate.png",
+    "sha256": "06b1f129c6ec0dec74b17c7ea50d2788e3032ae83f0f1393af36c787fc0e79ab",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\demo-operate.png",
+    "destination": "archive\\2026-09-08\\img\\demo-operate.png",
+    "sha256": "2ec5464ea13077bd34919630a36c393e3f44e6e6493d17d95cdf759b34e41507",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\demo-plan.png",
+    "destination": "archive\\2026-09-08\\img\\demo-plan.png",
+    "sha256": "56e65edcd6e33d48c5b87e6f3abdba6aa1088a85478a4e6a7054f2f1fe2b457e",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\demo-status.png",
+    "destination": "archive\\2026-09-08\\img\\demo-status.png",
+    "sha256": "109683b05bdcda3c9211349e40910a2b7e3da98a899559c7ca998cb50c710b14",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\demo-tune.png",
+    "destination": "archive\\2026-09-08\\img\\demo-tune.png",
+    "sha256": "0e1f43cc2f4b0346fca64a6072fb3341ce9c464e4a8e54e97bc9e39ab0fd0930",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\demo-zones.png",
+    "destination": "archive\\2026-09-08\\img\\demo-zones.png",
+    "sha256": "549501e089b762e6d651cfa705ae58732086a5cb5a224141617aeb1b038929bb",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\home-demo-overview.png",
+    "destination": "archive\\2026-09-08\\img\\home-demo-overview.png",
+    "sha256": "eb358b9542e9d2aba577e194970734e409d97c573bccce4684421da1115b4022",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\home-demo-roommodal.png",
+    "destination": "archive\\2026-09-08\\img\\home-demo-roommodal.png",
+    "sha256": "31d4abfcd58e2f037856cadda48c4d83be1e42f78a6ae42715777893c058e740",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\home-demo-rooms.png",
+    "destination": "archive\\2026-09-08\\img\\home-demo-rooms.png",
+    "sha256": "9719944a147d20ec3ec683b0fac735a8d560b51aa571e0ade4d4502d76595408",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\home-demo.png",
+    "destination": "archive\\2026-09-08\\img\\home-demo.png",
+    "sha256": "4622762433e9f3c69510ea4ce98a7ebc259ac8d07cf60465c865db0c506b6ed5",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\Integration Device Page.png",
+    "destination": "archive\\2026-09-08\\img\\Integration Device Page.png",
+    "sha256": "b837fb8741c73fe5148d06f5f1d4a959cebcd7a2a6f15b7581e6baaeace835c6",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\Integration Setup Submit Box.png",
+    "destination": "archive\\2026-09-08\\img\\Integration Setup Submit Box.png",
+    "sha256": "749de53df17f990cace7d528c99bc6ce122590d3be04b9eb6c86a82e0aae15d9",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\Mobile 1.png",
+    "destination": "archive\\2026-09-08\\img\\Mobile 1.png",
+    "sha256": "febac7e403e4d3d1b1079b143d2bb72e4e19f8e8f4e1b25f2d40e02758783374",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "img\\Mobile 2.png",
+    "destination": "archive\\2026-09-08\\img\\Mobile 2.png",
+    "sha256": "3cda8cbf3f65f307ab6e8f19ffcf797577d920bf87487d2349f145e4653dc59e",
+    "reason": "superseded screenshot"
+  },
+  {
+    "source": "scripts\\archive-legacy.ps1",
+    "destination": "archive/2026-09-08/tools/archive-legacy.ps1",
+    "sha256": "0633f55065007bc0bb40bd24c3340514516936d0aa53b18ce84fc7fd65511af7",
+    "reason": "completed one-off archive operation"
+  }
+]

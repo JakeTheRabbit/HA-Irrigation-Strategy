@@ -167,6 +167,76 @@ set_manual_override:
       selector:
         text:
 
+setup_read:
+  name: Read room setup
+  description: Return setup capabilities, room configuration and searchable devices. Requires an administrator and a service response.
+
+setup_create:
+  name: Add room
+  description: Create a room through the Home Assistant config flow, after validating mapping and verified OFF hardware. Does not enable irrigation.
+  fields:
+    room_name:
+      required: true
+      selector:
+        text:
+    zones:
+      required: true
+      selector:
+        object:
+    hardware:
+      selector:
+        object:
+
+setup_save:
+  name: Save room setup
+  description: Update one room without changing its IDs. All affected engines and mapped hardware must read OFF. Set active true to restore an archived room.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 2147483647
+          mode: box
+    room_name:
+      required: true
+      selector:
+        text:
+    active:
+      selector:
+        boolean:
+    zones:
+      required: true
+      selector:
+        object:
+    hardware:
+      selector:
+        object:
+
+setup_remove:
+  name: Archive room
+  description: Archive the explicitly selected room after verified OFF checks. Preserves entry IDs, mappings and controller counters for restoration.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 2147483647
+          mode: box
+    confirm_name:
+      required: true
+      selector:
+        text:
+
 custom_shot:
   name: Custom shot
   description: >-
@@ -226,5 +296,79 @@ custom_shot:
       name: Room
       description: Room slug for multi-room installs. Omit for the default room.
       required: false
+      selector:
+        text:
+
+strategy_get:
+  name: Read grow strategy
+  description: Return the room's durable draft, active snapshot, and readable parameter bounds.
+  fields:
+    room_id:
+      name: Room ID
+      description: "Canonical room identity: room: for the default or room:f1_ for a named room."
+      required: true
+      selector:
+        text:
+
+strategy_save:
+  name: Save grow strategy draft
+  description: Validate and save grower-defined endpoints and daily or weekly zone assignments. Does not activate watering.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      description: Revision returned by strategy_get; rejects stale edits.
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    plan:
+      description: Version 1 plan with profiles and per-zone schedules.
+      required: true
+      selector:
+        object:
+
+strategy_preview:
+  name: Preview grow strategy
+  description: Interpolate explicit endpoints and calculate hydraulic shot volumes and durations without writes.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    plan:
+      required: false
+      selector:
+        object:
+    date:
+      description: Optional local grow-day date, YYYY-MM-DD.
+      required: false
+      selector:
+        text:
+
+strategy_activate:
+  name: Arm grow strategy
+  description: Arm a saved draft for the next local lights-on boundary. Requires a compatible controller and readable configuration; never enables hardware.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+strategy_disarm:
+  name: Disarm grow strategy
+  description: Cancel an unstarted plan or return an active plan to legacy setpoints at the next lights-on boundary. Use the engine control to stop irrigation eligibility.
+  fields:
+    room_id:
+      required: true
       selector:
         text:

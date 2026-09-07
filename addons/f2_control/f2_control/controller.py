@@ -19,6 +19,7 @@ Talks to HA through the Supervisor proxy (http://supervisor/core/api) with the
 auto-injected SUPERVISOR_TOKEN. Safe-offs the hardware on exit.
 """
 import json
+import math
 import os
 import signal
 import sys
@@ -26,6 +27,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 
 import requests
+from strategy_runtime import parse_snapshot, parameter_override, strategy_block
 
 from crop_steering_engine import (
     decide,
@@ -53,10 +55,10 @@ def log(*a):
     print("[f2-control]", *a, flush=True)
 
 
-def ha_get(entity):
+def ha_get(entity, timeout=8):
     """Return (state_str, attributes, last_updated_iso) or (None, {}, None)."""
     try:
-        r = _S.get(f"{BASE}/states/{entity}", headers=HDR, timeout=8)
+        r = _S.get(f"{BASE}/states/{entity}", headers=HDR, timeout=timeout)
         if r.status_code != 200:
             return None, {}, None
         d = r.json()
@@ -150,6 +152,9 @@ class Room:
         self._lights_logged = False
         # per-room mutable runtime state
         self.state = {}  # {z: zone_state}
+        self.hardware_fault = (
+            None  # durable hold; explicit OFF + verified hardware recovery
+        )
         self._vmax_wetup = {}  # z -> P1 wet-up VWC series (resets each P0)
         self._vmax = {}  # z -> (vmax, confidence) advisory
         self._blind_zones = set()
@@ -187,13 +192,17 @@ class Controller:
         self._state_path = "/data/state.json"
         self._busy = False
         self._alerted = {}
-        self._fused_id_cache = {}  # (prefix,metric,zone) -> resolved fused-sensor entity_id
+        self._fused_id_cache = (
+            {}
+        )  # (prefix,metric,zone) -> resolved fused-sensor entity_id
         self._activity = []
         self._last_notify = None
         self._start = datetime.now()
         self._last_discovery = self._start
         self.rediscover_seconds = float(o.get("rediscover_seconds", 300))
-        self._defaulted = {}  # entity_id -> consecutive loops it fell back to an engine default
+        self._defaulted = (
+            {}
+        )  # entity_id -> consecutive loops it fell back to an engine default
         self._defaulted_this_loop = set()
         self._n_defaulted = 0
 
@@ -214,7 +223,9 @@ class Controller:
         else:
             # auto-detect zone count from the integration's fused sensors (configure once);
             # fall back to the descriptor/option if HA isn't reachable yet at startup.
-            n = self._detect_zones("", int(o.get("num_zones", desc.get("num_zones") or 3)))
+            n = self._detect_zones(
+                "", int(o.get("num_zones", desc.get("num_zones") or 3))
+            )
             zones = {
                 z: {
                     "vwc": f"sensor.crop_steering_vwc_zone_{z}",
@@ -243,12 +254,13 @@ class Controller:
             prefix="",
             zones=zones,
             hardware=hw,
-            enable_flag=o.get(
-                "enable_flag",
-                desc.get("enable_flag") or "input_boolean.f2_control_enabled",
-            ),
-            feed_ec_sensor=(o.get("feed_ec_sensor") or desc.get("feed_ec_sensor") or "").strip(),
-            feed_ph_sensor=(o.get("feed_ph_sensor") or desc.get("feed_ph_sensor") or "").strip(),
+            enable_flag=self._default_enable_flag(o, desc),
+            feed_ec_sensor=(
+                o.get("feed_ec_sensor") or desc.get("feed_ec_sensor") or ""
+            ).strip(),
+            feed_ph_sensor=(
+                o.get("feed_ph_sensor") or desc.get("feed_ph_sensor") or ""
+            ).strip(),
             opt_lon=self._opt_lon,
             opt_loff=self._opt_loff,
         )
@@ -275,6 +287,7 @@ class Controller:
 
         # state for all rooms (nested by slug; old flat single-room files load as 'default')
         self._load_state()
+        self._apply_setup_descriptors()  # Gate tombstones/revisions before the very first shot.
         signal.signal(signal.SIGTERM, self._safe_exit)
         signal.signal(signal.SIGINT, self._safe_exit)
 
@@ -298,6 +311,21 @@ class Controller:
                 f"config: {tag}feed gate EC={room.feed_ec_sensor} pH={room.feed_ph_sensor}"
             )
 
+    def _default_enable_flag(self, options, descriptor):
+        legacy = "input_boolean.f2_control_enabled"
+        requested = descriptor.get("enable_flag")
+        configured = options.get("enable_flag", legacy)
+        # Fresh native setups have a real integration switch and no legacy YAML
+        # helper. Do not make the old schema default mask that new explicit flag.
+        if (
+            descriptor.get("setup_revision", 0) > 0
+            and requested
+            and configured == legacy
+            and ha_get(legacy)[0] is None
+        ):
+            return requested
+        return configured or requested or legacy
+
     def _default_descriptor(self):
         """The DEFAULT room's engine_config descriptor (prefix ""), published by the
         integration from the config-entry hardware map. Returns {} when it isn't present
@@ -305,7 +333,9 @@ class Controller:
         appears (re-resolved by _rediscover). Explicit add-on options override this."""
         for ent in ha_get_all():
             eid = ent.get("entity_id", "")
-            if eid.startswith("sensor.crop_steering_") and eid.endswith("engine_config"):
+            if eid.startswith("sensor.crop_steering_") and eid.endswith(
+                "engine_config"
+            ):
                 a = ent.get("attributes", {}) or {}
                 if not a.get("prefix"):
                     return a
@@ -325,6 +355,8 @@ class Controller:
             ):
                 continue
             a = ent.get("attributes", {}) or {}
+            if a.get("active", True) is False:
+                continue
             prefix = a.get("prefix", "")
             if not prefix:
                 continue  # the default room is handled from options, never from the sensor
@@ -336,7 +368,7 @@ class Controller:
                         "vwc": f"sensor.crop_steering_{prefix}vwc_zone_{z}",
                         "ec": f"sensor.crop_steering_{prefix}ec_zone_{z}",
                     }
-                    for z in range(1, num + 1)
+                    for z in a.get("active_zone_ids", range(1, num + 1))
                 }
                 hw = {
                     "pump": a.get("pump"),
@@ -439,10 +471,22 @@ class Controller:
     def _load_room_state(self, room, per_room=None):
         """Seed one room's zones fresh, then overlay any saved state for its slug."""
         if per_room is None:
-            per_room = self._read_state_file()
+            per_room = getattr(self, "_saved_room_blocks", None)
+            if per_room is None:
+                per_room = self._read_state_file()
         room.state = {z: self._fresh_zone() for z in room.zones}
+        room.hardware_fault = None
+        room.strategy_required = False
+        room._strategy_persisted = True
         block = per_room.get(room.slug)
         if isinstance(block, dict):
+            room.strategy_required = bool(block.get("_strategy_required", False))
+            fault = block.get("_hardware_fault")
+            if "_hardware_fault" in block:
+                # Old files have no metadata. Malformed new metadata must not clear a hold.
+                room.hardware_fault = self._fault_record(
+                    fault, self._hardware_entities(room)
+                )
             for z in room.zones:
                 d = block.get(str(z)) or block.get(z)
                 room.state[z] = self._apply_saved_zone(room.state[z], d)
@@ -450,6 +494,9 @@ class Controller:
     def _load_state(self):
         """Load /data/state.json into every room (non-ephemeral, survives restart/Rebuild)."""
         per_room = self._read_state_file()
+        # HA descriptors may be temporarily missing at startup. Keep their durable
+        # state independently of discovery, including faults on shared hardware.
+        self._saved_room_blocks = per_room
         for room in self.rooms:
             self._load_room_state(room, per_room)
 
@@ -457,7 +504,8 @@ class Controller:
         """Periodic re-scan so rooms added in the integration UI (or whose descriptor wasn't
         published yet at add-on startup) join without a restart, and so a default room that
         started unmapped picks up its hardware once HA is up. New rooms join fail-safe OFF
-        (their kill switch defaults off); existing rooms and their runtime state are untouched."""
+        (their kill switch defaults off); existing rooms and their runtime state are untouched.
+        """
         self._last_discovery = now
         # (1) resolve the default room's hardware/zones if it started unmapped (HA was down)
         default = self.rooms[0]
@@ -471,7 +519,9 @@ class Controller:
                     "valves": valves,
                 }
                 if not default.zones:
-                    n = self._detect_zones("", int(desc.get("num_zones") or len(valves)))
+                    n = self._detect_zones(
+                        "", int(desc.get("num_zones") or len(valves))
+                    )
                     default.zones = {
                         z: {
                             "vwc": f"sensor.crop_steering_vwc_zone_{z}",
@@ -480,7 +530,9 @@ class Controller:
                         for z in range(1, n + 1)
                     }
                     self._load_room_state(default)
-                log(f"config: default room hardware now mapped ({desc['pump']}) — resuming")
+                log(
+                    f"config: default room hardware now mapped ({desc['pump']}) — resuming"
+                )
         # (2) add any newly-published additional rooms
         known = {r.slug for r in self.rooms}
         for room in self._discover_rooms():
@@ -490,6 +542,113 @@ class Controller:
             self.rooms.append(room)
             self._log_feed_config(room)
             log(f"room '{room.slug}' discovered live — joined fail-safe OFF")
+        self._apply_setup_descriptors()
+
+    def _apply_setup_descriptors(self):
+        """Adopt explicit versioned setup changes only after both maps are safe OFF.
+
+        Missing legacy revision leaves add-on overrides untouched. Tombstones do
+        not delete counters, and missing descriptors never imply room removal.
+        """
+        descriptors = {}
+        for entity in ha_get_all():
+            eid = entity.get("entity_id", "")
+            attrs = entity.get("attributes") or {}
+            if (
+                eid.startswith("sensor.crop_steering_")
+                and eid.endswith("engine_config")
+                and "prefix" in attrs
+            ):
+                descriptors[attrs["prefix"]] = attrs
+        for room in self.rooms:
+            attrs = descriptors.get(room.prefix)
+            if not attrs:
+                continue
+            revision = attrs.get("setup_revision", 0)
+            if type(revision) is not int or revision <= getattr(
+                room, "setup_revision", 0
+            ):
+                continue
+            room._setup_pending = "Setup changed; disarm current and requested engine flags and verify hardware OFF"
+            try:
+                active = attrs.get("active", True)
+                zone_ids = attrs.get(
+                    "active_zone_ids",
+                    list(range(1, int(attrs.get("num_zones", 0)) + 1)),
+                )
+                if (
+                    type(active) is not bool
+                    or not isinstance(zone_ids, list)
+                    or any(type(z) is not int or not 1 <= z <= 64 for z in zone_ids)
+                ):
+                    raise ValueError("Invalid setup active zone list")
+                valves = {int(k): v for k, v in (attrs.get("valves") or {}).items()}
+                desired_hw = {
+                    "pump": attrs.get("pump"),
+                    "mainline": attrs.get("mainline"),
+                    "valves": valves,
+                }
+                desired_flag = attrs.get("enable_flag") or room.enable_flag
+                hardware = set(self._hardware_entities(room)) | {
+                    v
+                    for v in [
+                        desired_hw["pump"],
+                        desired_hw["mainline"],
+                        *valves.values(),
+                    ]
+                    if v
+                }
+                flags = {room.enable_flag, desired_flag}
+                if (
+                    room.prefix == ""
+                    and room.enable_flag == "input_boolean.f2_control_enabled"
+                    and desired_flag == "switch.crop_steering_engine_enabled"
+                    and ha_get(room.enable_flag)[0] is None
+                ):
+                    flags.discard(
+                        room.enable_flag
+                    )  # absent legacy helper on a fresh setup
+                if any(ha_get(flag)[0] != "off" for flag in flags) or any(
+                    ha_get(entity)[0] != "off" for entity in hardware
+                ):
+                    continue
+                if active and (
+                    not desired_hw["pump"]
+                    or not desired_hw["mainline"]
+                    or any(not valves.get(z) for z in zone_ids)
+                ):
+                    raise ValueError("Active setup has incomplete hardware mapping")
+                zones = {
+                    z: {
+                        "vwc": f"sensor.crop_steering_{room.prefix}vwc_zone_{z}",
+                        "ec": f"sensor.crop_steering_{room.prefix}ec_zone_{z}",
+                    }
+                    for z in zone_ids
+                }
+                for zone in zones:
+                    if zone not in room.state:
+                        saved = (
+                            getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}
+                        ).get(str(zone))
+                        room.state[zone] = self._apply_saved_zone(
+                            self._fresh_zone(), saved
+                        )
+                room.zones, room.hw, room.enable_flag = zones, desired_hw, desired_flag
+                room.feed_ec_sensor = attrs.get("feed_ec_sensor") or ""
+                room.feed_ph_sensor = attrs.get("feed_ph_sensor") or ""
+                room.setup_active, room.setup_revision = active, revision
+                room._setup_pending = None
+                self._fused_id_cache = {
+                    key: value
+                    for key, value in self._fused_id_cache.items()
+                    if key[0] != room.prefix
+                }
+                self._save_state()
+                log(
+                    f"room '{room.slug}' setup revision {revision} adopted with verified OFF hardware"
+                )
+            except (TypeError, ValueError, KeyError) as error:
+                room._setup_pending = f"Invalid setup descriptor: {error}"
 
     def _serialize_zone(self, s):
         ls, lpc, les, ldr = (
@@ -514,18 +673,34 @@ class Controller:
         }
 
     def _save_state(self):
-        out = {}
+        # Preserve undiscovered rooms and unknown metadata/zones. A descriptor going
+        # missing must never delete counters or erase a latched shared-hardware hold.
+        out = dict(getattr(self, "_saved_room_blocks", {}))
         for room in self.rooms:
-            out[room.slug] = {
-                str(z): self._serialize_zone(s) for z, s in room.state.items()
-            }
+            prior = out.get(room.slug)
+            block = dict(prior) if isinstance(prior, dict) else {}
+            block.update(
+                {str(z): self._serialize_zone(s) for z, s in room.state.items()}
+            )
+            if getattr(room, "strategy_required", False):
+                block["_strategy_required"] = True
+            else:
+                block.pop("_strategy_required", None)
+            if room.hardware_fault:
+                block["_hardware_fault"] = room.hardware_fault
+            else:
+                block.pop("_hardware_fault", None)
+            out[room.slug] = block
         try:
             tmp = self._state_path + ".tmp"
             with open(tmp, "w") as fh:
                 json.dump(out, fh)
             os.replace(tmp, self._state_path)
+            self._saved_room_blocks = out
+            return True
         except OSError as e:
             log("state save failed", e)
+            return False
 
     # ---------- HA read helpers ----------
     def _num(self, entity, default):
@@ -540,6 +715,11 @@ class Controller:
             return float(default)
 
     def _zone_num(self, room, zone, suffix, default, optional=False):
+        override = parameter_override(
+            getattr(room, "strategy_snapshot", None), zone, suffix
+        )
+        if override is not None:
+            return float(override)
         per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
         v, _, _ = ha_get(per)
         if v not in (None, "unknown", "unavailable", ""):
@@ -858,6 +1038,16 @@ class Controller:
 
     # ---------- gates ----------
     def _blocked(self, room, zone):
+        if getattr(room, "_setup_pending", None):
+            return room._setup_pending
+        if getattr(room, "setup_active", True) is False:
+            return "Room archived in integration setup"
+        planned_hold = strategy_block(getattr(room, "strategy_snapshot", None), zone)
+        if planned_hold:
+            return planned_hold
+        fault = self._hardware_fault_block(room)
+        if fault:
+            return fault
         hw = room.hw
         if not (hw.get("pump") and hw.get("mainline") and hw["valves"].get(zone)):
             return (
@@ -957,31 +1147,154 @@ class Controller:
         self._save_state()
 
     # ---------- hardware (sync; this process does one thing) ----------
-    def _wait_shot(self, room, zone, duration_s):
-        """Deliver the shot in <=2 s slices so an operator kill-switch (turned OFF) or the
-        zone's manual override (turned ON) stops water within a couple of seconds instead of
-        the full shot length — and so one room's long shot doesn't stall every other room.
-        Returns (seconds_elapsed, aborted). The kill switch defaults True on an UNREADABLE
-        read: a transient HA blip must not cut a legitimate in-flight shot; only a definitive
-        OFF (or a definitive override ON) aborts."""
-        elapsed = 0.0
-        step = 2.0
-        while elapsed < duration_s:
-            if not self._on(room.enable_flag, True):
-                return elapsed, True
-            if self._on(
-                f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override", False
+    @staticmethod
+    def _hardware_entities(room):
+        return {
+            e
+            for e in (
+                room.hw.get("pump"),
+                room.hw.get("mainline"),
+                *room.hw.get("valves", {}).values(),
+            )
+            if e
+        }
+
+    @staticmethod
+    def _fault_record(fault, fallback_entities=()):
+        entities = fault.get("entities") if isinstance(fault, dict) else None
+        return {
+            "reason": (
+                str(fault.get("reason", "unconfirmed hardware close"))
+                if isinstance(fault, dict)
+                else "unconfirmed hardware close"
+            ),
+            "entities": (
+                entities
+                if isinstance(entities, list)
+                and entities
+                and all(isinstance(e, str) and e for e in entities)
+                else sorted(fallback_entities)
+            ),
+        }
+
+    def _hardware_fault_block(self, room):
+        entities = self._hardware_entities(room)
+        for owner in self.rooms:
+            fault = owner.hardware_fault
+            if fault and (owner is room or entities.intersection(fault["entities"])):
+                return (
+                    f"hardware fault in {owner.slug}: {fault['reason']}; turn OFF "
+                    f"{owner.enable_flag} and engines sharing this hardware, "
+                    "verify all hardware OFF, then re-arm"
+                )
+        discovered = {r.slug for r in self.rooms}
+        for slug, block in getattr(self, "_saved_room_blocks", {}).items():
+            if (
+                slug in discovered
+                or not isinstance(block, dict)
+                or "_hardware_fault" not in block
             ):
-                return elapsed, True
-            dt = min(step, duration_s - elapsed)
-            time.sleep(dt)
-            elapsed += dt
-        return elapsed, False
+                continue
+            fault = self._fault_record(block["_hardware_fault"])
+            # If orphan metadata is damaged there is no safe hardware mapping to
+            # infer: hold until its owner returns and can be verified explicitly.
+            if not fault["entities"] or entities.intersection(fault["entities"]):
+                return (
+                    f"hardware fault in undiscovered room {slug}: {fault['reason']}; "
+                    "restore the room descriptor before verified disarm/recovery"
+                )
+        return None
+
+    def _latch_hardware_fault(self, room, reason):
+        room.hardware_fault = {
+            "reason": reason,
+            "entities": sorted(self._hardware_entities(room)),
+        }
+        saved = self._save_state()
+        self._alert(
+            f"hardware_fault_{room.slug}",
+            "CRITICAL — hardware hold latched",
+            f"{room.slug}: {reason}. Further pumping on shared hardware is blocked. "
+            f"Turn OFF {room.enable_flag} and every engine sharing this hardware. "
+            "Repair/check every pump and valve; the hold clears only when all affected "
+            "engines and hardware read OFF. "
+            "Then explicitly re-arm. "
+            + (
+                ""
+                if saved
+                else "FAULT STATE COULD NOT BE SAVED — do not restart before repair."
+            ),
+        )
+
+    def _recover_hardware_faults(self):
+        for room in self.rooms:
+            fault = room.hardware_fault
+            if not fault:
+                continue
+            entities = set(fault["entities"])
+            affected = [
+                r
+                for r in self.rooms
+                if r is room or entities.intersection(self._hardware_entities(r))
+            ]
+            if not all(ha_get(r.enable_flag)[0] == "off" for r in affected):
+                continue
+            for affected_room in affected:
+                entities.update(self._hardware_entities(affected_room))
+            if not entities or not all(ha_get(e)[0] == "off" for e in entities):
+                continue
+            room.hardware_fault = None
+            if not self._save_state():
+                room.hardware_fault = fault  # clearing must also survive a restart
+                continue
+            log(
+                f"[{room.slug}] hardware hold cleared: engine OFF and hardware verified OFF; re-arm required"
+            )
+
+    def _wait_shot(self, room, zone, duration_s, started=None):
+        """Wait to a monotonic deadline, including HA latency and valve-open command time.
+
+        Check kill/override between <=2 s sleeps using bounded reads. This remains
+        synchronous: other rooms wait and network/device delays can delay shutdown.
+        Returns actual seconds elapsed and whether a definitive kill OFF / override ON
+        interrupted it. An unreadable flag retains the existing in-flight policy.
+        """
+        started = time.monotonic() if started is None else started
+        deadline = started + duration_s
+        step = 2.0
+        while time.monotonic() < deadline:
+            for entity, stop_state in (
+                (room.enable_flag, "off"),
+                (
+                    f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override",
+                    "on",
+                ),
+            ):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                # Account for network time, and never start an eight-second read when
+                # less than that remains. HTTP/socket scheduling can still overshoot;
+                # return measured time rather than pretending sleep time was delivery.
+                state = ha_get(entity, timeout=min(step, remaining))[0]
+                if state == stop_state:
+                    return time.monotonic() - started, True
+            remaining = deadline - time.monotonic()
+            if remaining > 0:
+                time.sleep(min(step, remaining))
+        return time.monotonic() - started, False
 
     def _execute_shot(self, room, zone, duration_s, size_pct):
+        if self._hardware_fault_block(room):
+            return
+        strategy_hold = self._strategy_preflight(room, zone, datetime.now())
+        if strategy_hold:
+            log(f"[{room.slug}] Z{zone} shot held: {strategy_hold}")
+            return
         self._busy = True
         hw = room.hw
         valve = hw["valves"].get(zone)
+        shutdown_checked = False
         try:
             # OPEN sequence — FAIL CLOSED: if any service call errors, cut what's on, alert, and DO NOT count the shot
             # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
@@ -1002,6 +1315,7 @@ class Controller:
                 )
                 return
             time.sleep(1)
+            valve_started = time.monotonic()
             if not ha_call("switch", "turn_on", entity_id=valve):
                 ha_call("switch", "turn_off", entity_id=hw["mainline"])
                 ha_call("switch", "turn_off", entity_id=hw["pump"])
@@ -1011,45 +1325,39 @@ class Controller:
                     f"{room.slug} zone {zone}: valve {valve} turn_on failed. Pump + mainline cut. No water, shot NOT counted.",
                 )
                 return
-            elapsed, aborted = self._wait_shot(room, zone, duration_s)
+            elapsed, aborted = self._wait_shot(
+                room, zone, duration_s, started=valve_started
+            )
             # CLOSE sequence. A failed close (e.g. HA went unreachable mid-shot) leaves the valve
             # OPEN and the SOFTWARE CANNOT fix it — only the hardware fail-safe (NC valve /
             # pump-relay-default-off / independent watchdog) can. So check EVERY turn_off + the
             # read-back and ALERT loudly on any non-close (the old code ignored turn_off failures
             # and a dead-HA read-back masked a stuck-open valve as "closed" — silent danger).
             close_ok = ha_call("switch", "turn_off", entity_id=valve)
+            # Delivery is estimated, not flow-metered. Include the acknowledgement
+            # interval conservatively because the exact physical close time is unknown.
+            elapsed = max(elapsed, time.monotonic() - valve_started)
             time.sleep(1)
             close_ok = (
                 ha_call("switch", "turn_off", entity_id=hw["mainline"]) and close_ok
             )
             close_ok = ha_call("switch", "turn_off", entity_id=hw["pump"]) and close_ok
             time.sleep(1)
-            vstate, _, _ = ha_get(
-                valve
-            )  # None => HA unreadable; do NOT treat unreadable as "closed"
-            if not close_ok or vstate is None:
-                self._alert(
-                    f"valve_{room.slug}_z{zone}",
-                    "CRITICAL — valve close NOT confirmed",
-                    f"{room.slug} zone {zone}: a turn_off failed or the valve is unreadable "
-                    f"(HA unreachable?). Assume the valve is OPEN — the hardware fail-safe (NC valve / "
-                    f"pump default-off / independent watchdog) is the only thing that can close it now. "
-                    f"Check the row.",
-                )
-            elif self._on(valve, False):
+            # Only a definitive OFF is safe, including pump/mainline read-back.
+            closed = all(
+                ha_get(ent)[0] == "off" for ent in (valve, hw["mainline"], hw["pump"])
+            )
+            if not close_ok or not closed:
                 ha_call("switch", "turn_off", entity_id=hw["pump"])
                 ha_call("switch", "turn_off", entity_id=hw["mainline"])
-                self._alert(
-                    f"valve_{room.slug}_z{zone}",
-                    "URGENT — valve stuck open",
-                    f"{room.slug} zone {zone} valve {valve} did not close after shot. Pump + mainline cut.",
+                self._latch_hardware_fault(
+                    room, f"zone {zone} valve/pump/mainline close not confirmed"
                 )
+            shutdown_checked = True
             # Count the shot — water WAS delivered, so daily_vol/last_shot must reflect it (else the
             # daily cap under-counts and the zone can over-water). A kill-switch/override abort mid-shot
             # only delivered part of the shot, so scale the volume by the fraction actually run.
-            delivered_pct = size_pct * (
-                min(1.0, elapsed / duration_s) if duration_s > 0 else 1.0
-            )
+            delivered_pct = size_pct * (elapsed / duration_s if duration_s > 0 else 1.0)
             self._advance_shot_counters(room, zone, delivered_pct)
             if aborted:
                 self._alert(
@@ -1060,10 +1368,26 @@ class Controller:
                 )
         except Exception as e:
             log("shot error", room.slug, zone, e)
-            for ent in (valve, hw["mainline"], hw["pump"]):
-                ha_call("switch", "turn_off", entity_id=ent)
         finally:
-            self._busy = False
+            try:
+                # Early command failures and unexpected exceptions need the SAME hold
+                # guarantee as normal shutdown; no path may start the next row blindly.
+                if not shutdown_checked:
+                    closing = [
+                        e for e in (valve, hw.get("mainline"), hw.get("pump")) if e
+                    ]
+                    close_ok = True
+                    for ent in closing:
+                        close_ok = (
+                            ha_call("switch", "turn_off", entity_id=ent) and close_ok
+                        )
+                    closed = all(ha_get(ent)[0] == "off" for ent in closing)
+                    if not close_ok or not closed:
+                        self._latch_hardware_fault(
+                            room, f"zone {zone} error cleanup close not confirmed"
+                        )
+            finally:
+                self._busy = False
 
     def _safe_off(self):
         for room in self.rooms:
@@ -1117,11 +1441,25 @@ class Controller:
         to 1 here — that way the dripper flow rate + drippers/plant ALWAYS drive shot length even
         when plant_count hasn't been set. Only fall back to the option if drippers/flow are unset.
         """
+        # Missing legacy sizing can use the option, but explicit invalid sizing
+        # must hold rather than silently substituting a different delivery rate.
+        for suffix in ("drippers_per_plant", "dripper_flow_rate"):
+            for scope in (f"zone_{zone}_", ""):
+                value = self._num_or_none(
+                    f"number.crop_steering_{room.prefix}{scope}{suffix}"
+                )
+                if value is not None:
+                    if not math.isfinite(value) or value <= 0:
+                        return 0.0
+                    break
         pc = self._zone_num(room, zone, "plant_count", 0) or 1
         dpp = self._zone_num(room, zone, "drippers_per_plant", 1)
-        fr = self._num(
-            f"number.crop_steering_{room.prefix}dripper_flow_rate", 0
-        )  # L/hr per dripper
+        fr = self._zone_num(
+            room,
+            zone,
+            "dripper_flow_rate",
+            self._num(f"number.crop_steering_{room.prefix}dripper_flow_rate", 0),
+        )  # L/hr per dripper; preserve the legacy global fallback.
         if dpp > 0 and fr > 0:
             return pc * dpp * fr / 3600.0
         return self.flow_lps
@@ -1149,12 +1487,21 @@ class Controller:
                 f"[{room.slug}] Z{zone} {st['phase']} BLOCKED ({block}): would {reason}"
             )
         elif fire:
-            raw_dur = (
-                size
-                / 100.0
-                * self._substrate_l(room, zone)
-                / max(self._zone_flow_lps(room, zone), 0.001)
-            )
+            flow = self._zone_flow_lps(room, zone)
+            substrate = self._substrate_l(room, zone)
+            if not (
+                math.isfinite(flow)
+                and flow > 0
+                and math.isfinite(substrate)
+                and substrate > 0
+            ):
+                self._alert(
+                    f"sizing_{room.slug}_z{zone}",
+                    "Invalid hydraulic sizing",
+                    "Positive readable substrate and zone flow are required",
+                )
+                return
+            raw_dur = size / 100.0 * substrate / flow
             max_dur = self._num(
                 f"number.crop_steering_{room.prefix}max_shot_duration", 900
             )  # hard flood cap (s); default 900
@@ -1204,6 +1551,7 @@ class Controller:
     def loop_once(self, now):
         if self._busy:
             return
+        self._recover_hardware_faults()
         self._defaulted_this_loop = set()
         if (now - self._last_discovery).total_seconds() >= self.rediscover_seconds:
             try:
@@ -1223,7 +1571,8 @@ class Controller:
         """Time-only phase forces for a BLIND zone (dead/missing probe), so it can never
         strand overnight while `decide()` is skipped: lights-off -> P3, and P3 -> P0 at the
         new photoperiod (with the daily-counter reset, mirroring the P0 branch in _loop_room).
-        The VWC-driven transitions (P0->P1->P2, predictive P3) need a probe and stay paused."""
+        The VWC-driven transitions (P0->P1->P2, predictive P3) need a probe and stay paused.
+        """
         st = room.state[zone]
         gds = self._grow_day_start(room, now)
         new_grow_day = lights_on and (
@@ -1244,9 +1593,70 @@ class Controller:
             st["last_phase_change"] = now
             self._save_state()
 
+    def _strategy_preflight(self, room, zone, now):
+        if getattr(room, "_strategy_batch_invalid", False):
+            return "Strategy changed or held; recompute the irrigation batch on the next loop"
+        previous = getattr(room, "strategy_snapshot", None) or {}
+        before = (
+            previous.get("required", False),
+            previous.get("managed", set()),
+            previous.get("zones", {}),
+        )
+        self._load_strategy_snapshot(room, now)
+        current = room.strategy_snapshot
+        hold = strategy_block(current, zone)
+        if hold:
+            room._strategy_batch_invalid = True
+            return hold
+        after = (
+            current.get("required", False),
+            current.get("managed", set()),
+            current.get("zones", {}),
+        )
+        if before != after:
+            room._strategy_batch_invalid = True
+            return (
+                "Strategy changed; recompute the irrigation decision on the next loop"
+            )
+        return None
+
+    def _load_strategy_snapshot(self, room, now):
+        state, attrs, _ = ha_get(self._cs(room, "sensor", "strategy_plan"))
+        was_required = getattr(room, "strategy_required", False)
+        snapshot = parse_snapshot(
+            state, attrs, room.prefix, now.timestamp(), was_required
+        )
+        if (
+            snapshot["required"]
+            and not snapshot["error"]
+            and snapshot["managed"] != set(room.zones)
+        ):
+            snapshot["error"] = (
+                "Strategy zones do not match room setup; disarm and reconcile the draft"
+            )
+        changed = was_required != snapshot["required"]
+        room.strategy_required = snapshot["required"]
+        if changed:
+            room._strategy_persisted = False
+        if not getattr(room, "_strategy_persisted", True):
+            if self._save_state():
+                room._strategy_persisted = True
+            else:
+                # Never permit activation or a return to legacy behaviour without
+                # preserving that decision across a controller/container restart.
+                room.strategy_required = was_required or snapshot["required"]
+                snapshot["required"] = True
+                snapshot["error"] = "Strategy state could not be persisted"
+        room.strategy_snapshot = snapshot
+
     def _loop_room(self, room, now):
         """One room's full control pass: snapshot -> decide -> act -> build the publish dict.
         Reads/writes only this room's prefixed entities + its own state."""
+        if getattr(room, "setup_active", True) is False:
+            return {}
+        self._load_strategy_snapshot(room, now)
+        # Only a newly computed batch can clear a prior preflight invalidation.
+        room._strategy_batch_invalid = False
         lights_on = self._lights_on(room, now)
         was_off = not (
             room._was_lights_on if room._was_lights_on is not None else lights_on
@@ -1359,6 +1769,19 @@ class Controller:
             if zone not in decisions:
                 continue
             fire, size, reason = decisions[zone]
+            # A dead probe cannot establish an emergency on THIS row. Copy/fallback
+            # shots therefore keep its own budget, even when the sibling is flushing.
+            if (
+                zone not in snaps
+                and fire
+                and room.state[zone]["daily_vol"] >= params[zone].max_daily_volume
+            ):
+                fire, size = False, 0.0
+                reason = (
+                    f"BLOCK daily-cap {room.state[zone]['daily_vol']:.0f}/"
+                    f"{params[zone].max_daily_volume:.0f}L (blind irrigation budget)"
+                )
+                decisions[zone] = (fire, size, reason)
             block = self._blocked(room, zone) if fire else None
             self._act_zone(
                 room,
@@ -1507,9 +1930,14 @@ class Controller:
             room_held = any(
                 d["block"] and "fail-closed" in str(d["block"]) for d in pub.values()
             )
+            hardware_fault = self._hardware_fault_block(room)
             ha_set(
                 f"sensor.crop_steering_{px}app_status",
-                "error" if room_held else ("irrigating" if self._busy else "safe_idle"),
+                (
+                    "error"
+                    if room_held or hardware_fault
+                    else ("irrigating" if self._busy else "safe_idle")
+                ),
                 {"engine": "f2-control", "updated": now.isoformat()},
             )
             ha_set(
@@ -1521,6 +1949,16 @@ class Controller:
                     # the kill switch this room ACTUALLY uses — the integration's health
                     # check reads this so a custom enable_flag isn't flagged as "missing"
                     "enable_flag": room.enable_flag,
+                    "hardware_fault": hardware_fault,
+                    "strategy_snapshot_version": 1,
+                    "setup_lifecycle_version": 1,
+                    "strategy_required": getattr(room, "strategy_required", False),
+                    "strategy_error": (
+                        getattr(room, "strategy_snapshot", None) or {}
+                    ).get("error"),
+                    "setup_revision": getattr(room, "setup_revision", 0),
+                    "setup_active": getattr(room, "setup_active", True),
+                    "setup_pending": getattr(room, "_setup_pending", None),
                 },
             )
             fired = [

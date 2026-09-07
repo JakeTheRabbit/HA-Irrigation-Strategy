@@ -9,6 +9,17 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Replace the dashboard family with one React/shadcn operator workspace using inherited Home Assistant themes, bundled fonts and responsive layouts.
+- Add reactive combined VWC/EC planning curves, recorded dual-axis history and per-zone day/week recipes with continuous steering between explicit endpoint profiles.
+- Add durable plan storage, revisioned preview/save/arm/disarm services and atomic expiring controller snapshots applied at local lights-on boundaries.
+- Add reviewed room/zone lifecycle and searchable sensor mapping with stable IDs, archived restoration, per-zone sizing and controller adoption status.
+- Add local catch-test calculations, sensor diagnostics and equipment maps; remove unsupported yield/potency claims from the active UI.
+- Correct duration accounting, volume-cap bypasses, shared-hardware fault recovery, relative-dryback timing conversion, low-flow sizing and stale sequential-plan decisions.
+- Bundle the dashboard in the integration with automatic sidebar registration, publish app-repository metadata, consolidate install/operation instructions, and archive superseded assets with provenance.
+- Preserve released version numbers until publication. See docs/FEATURE_MATRIX.md for validation evidence and live commissioning limits.
+
 ## [2.12.0] - 2026-07-03
 
 **🌱 In plain English.** This release makes the system genuinely portable to any Home Assistant —
@@ -230,8 +241,8 @@ the only engine for a while, and keeping the dead code around made the docs clai
 system doesn't do. The README is corrected to match the actual code: the self-tuning "Vmax / adaptive
 steering" section is gone (it was never in the live engine), the dashboard tab names and the safety
 gate chain are fixed, and overstated claims (a `>4 h` self-healing watchdog, daily *shot-count* caps,
-`?room=` dashboard scoping) are reworded to what's real. New **[`SYSTEM_GUIDE.html`](SYSTEM_GUIDE.html)**
-(feature list + flowcharts) and **[`docs/DASHBOARDS.md`](docs/DASHBOARDS.md)** (what's wired, what's
+`?room=` dashboard scoping) are reworded to what's real. New **[`SYSTEM_GUIDE.html`](archive/2026-09-08/SYSTEM_GUIDE.html)**
+(feature list + flowcharts) and **[`docs/DASHBOARDS.md`](archive/2026-09-08/docs/DASHBOARDS.md)** (what's wired, what's
 hardcoded to F2, and how to populate the dashboards for your own facility).
 
 **🔧 Technical notes.**

@@ -1,0 +1,174 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>F2 Control &#183; Step-by-Step Installation</title>
+<style>
+ :root{color-scheme:dark}
+ *{box-sizing:border-box}
+ body{margin:0;background:#0e1116;color:#e6e8eb;font-family:Inter,Segoe UI,system-ui,-apple-system,sans-serif;line-height:1.55}
+ .wrap{max-width:880px;margin:0 auto;padding:32px 20px 80px}
+ header.hero{text-align:center;padding:28px 0 12px}
+ .hero .logo{font-size:40px}
+ .hero h1{margin:8px 0 4px;font-size:30px;font-weight:800;letter-spacing:-.5px}
+ .hero p{margin:0;color:#8b929c;font-size:14.5px}
+ .pills{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:16px 0 4px}
+ .pill{background:#1c2027;border:1px solid #2b313b;border-radius:999px;padding:5px 12px;font-size:12px;color:#8b929c}
+ .pill b{color:#03a9f4}
+ .lead{background:#171a21;border:1px solid #2b313b;border-left:4px solid #03a9f4;border-radius:12px;padding:16px 18px;margin:22px 0;font-size:14px}
+ .lead code{color:#7fd7ff}
+ .step{display:flex;gap:0;background:#171a21;border:1px solid #2b313b;border-radius:16px;margin:18px 0;overflow:hidden}
+ .num{flex:0 0 64px;background:linear-gradient(160deg,#03a9f4,#0277bd);color:#04222e;font-size:30px;font-weight:900;display:flex;align-items:flex-start;justify-content:center;padding-top:22px}
+ .body{padding:20px 22px;flex:1;min-width:0}
+ .body h2{margin:0 0 8px;font-size:19px;font-weight:800}
+ .prose{font-size:14px;color:#d5d8dd}
+ .prose code{background:#1c2027;border:1px solid #2b313b;border-radius:5px;padding:1px 6px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7fd7ff;word-break:break-all}
+ .prose ul{margin:6px 0;padding-left:18px} .prose li{margin:5px 0}
+ .warn{display:block;margin-top:10px;background:#2a1212;border:1px solid #ff5252;border-radius:9px;padding:10px 12px;color:#ffb3b3;font-size:13px}
+ .warn code{color:#ff9d9d;background:#3a1414;border-color:#5a1d1d}
+ .ok{display:block;margin-top:10px;background:#10240f;border:1px solid #43a047;border-radius:9px;padding:9px 12px;color:#a6e3a1;font-size:13px}
+ .shot{margin-top:14px;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+ .done{background:#171a21;border:1px solid #2b313b;border-radius:16px;padding:20px 24px;margin-top:26px}
+ .done h2{margin:0 0 10px;font-size:18px}
+ .done li{margin:7px 0;font-size:14px;color:#d5d8dd}
+ footer{text-align:center;color:#8b929c;font-size:12px;margin-top:34px}
+ a{color:#03a9f4}
+</style></head>
+<body><div class="wrap">
+ <header class="hero">
+   <div class="logo">&#127793;</div>
+   <h1>F2 Control &mdash; Installation</h1>
+   <p>Crop-steering for Home Assistant &#183; click-by-click, zero&#8594;100</p>
+   <div class="pills"><span class="pill">HACS integration</span><span class="pill"><b>One-click</b> add-on by URL</span><span class="pill">Kill-switch safe</span></div>
+ </header>
+ <div class="lead"><b>Two pieces.</b> The <b>integration</b> (entities + setup wizard, via HACS) and the
+   <b>f2-control add-on</b> (the engine that drives hardware, via the Add-on Store). Install the integration
+   first, then the add-on. The add-on installs the easy way &mdash; paste one repo URL into the Add-on Store.
+   The numbered <span style="color:#ff5252;font-weight:700">red circles</span> in each shot are exactly what to click.</div>
+ <section class="step">
+      <div class="num">0</div>
+      <div class="body"><h2>Prerequisites</h2><div class="prose"><ul><li>Home Assistant <b>2024.3+</b>, <b>Supervised / HA-OS</b> (you need the Add-on Store).</li><li>Your hardware already in HA as entities: per zone a valve <code>switch.</code>, a VWC <code>sensor.</code>, an EC <code>sensor.</code>; shared pump + mainline <code>switch.</code>.</li><li><b>HACS</b> installed (for the integration), and <b>Samba</b> or <b>SSH</b> if you ever use the local-copy path.</li></ul></div></div>
+    </section><section class="step">
+      <div class="num">1</div>
+      <div class="body"><h2>Install the integration (HACS)</h2><div class="prose">HACS &#8594; Integrations &#8594; &#8942; &#8594; <b>Custom repositories</b>. <b>(1)</b> paste <code>https://github.com/JakeTheRabbit/HA-Irrigation-Strategy</code>, <b>(2)</b> Type = <b>Integration</b>, <b>(3)</b> <b>Add</b>. Then install &#8220;Crop Steering System&#8221; and <b>restart HA</b>. This creates the ~100 <code>crop_steering_*</code> entities. It touches no hardware.</div><div class="shot"><svg viewBox="0 0 640 400" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,system-ui,sans-serif">
+  <defs><marker id="ah" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto">
+    <path d="M1,1 L10,5.5 L1,10 Z" fill="#ff5252"/></marker></defs>
+  <rect x="0" y="0" width="640" height="400" rx="12" fill="#0e1116" stroke="#2b313b" stroke-width="1.5"/>
+  <rect x="0" y="0" width="640" height="34" rx="12" fill="#0a0d12"/>
+  <rect x="0" y="22" width="640" height="12" fill="#0a0d12"/>
+  <circle cx="18" cy="17" r="5" fill="#ff5f57"/><circle cx="36" cy="17" r="5" fill="#febc2e"/><circle cx="54" cy="17" r="5" fill="#28c840"/>
+  <text x="320.0" y="21" text-anchor="middle" font-size="12" fill="#8b929c">Home Assistant &amp;#183; HACS</text>
+  <rect x="0" y="34" width="150" height="366" fill="#11151c"/><circle cx="24" cy="61" r="6" fill="#8b929c"/><text x="40" y="65" font-size="12.5" fill="#8b929c" font-weight="400">Overview</text><circle cx="24" cy="95" r="6" fill="#8b929c"/><text x="40" y="99" font-size="12.5" fill="#8b929c" font-weight="400">History</text><rect x="8" y="114" width="134" height="30" rx="7" fill="#0b3a4a"/><circle cx="24" cy="129" r="6" fill="#03a9f4"/><text x="40" y="133" font-size="12.5" fill="#03a9f4" font-weight="700">Settings</text><circle cx="24" cy="163" r="6" fill="#8b929c"/><text x="40" y="167" font-size="12.5" fill="#8b929c" font-weight="400">Developer Tools</text><text x="180" y="70" font-size="15" font-weight="800" fill="#e6e8eb">HACS &#183; Custom repositories</text><text x="180" y="103" font-size="11" fill="#8b929c">Repository</text><rect x="180" y="110" width="330" height="34" rx="7" fill="#1c2027" stroke="#2b313b"/><text x="192" y="132.0" font-size="12.5" fill="#e6e8eb" font-family="ui-monospace,Consolas,monospace">https://github.com/JakeTheRabbit/HA-Irrigation-Strategy</text><circle cx="525" cy="127" r="15" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="525" y="132" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">1</text><text x="180" y="163" font-size="11" fill="#8b929c">Type</text><rect x="180" y="170" width="180" height="34" rx="7" fill="#1c2027" stroke="#2b313b"/><text x="192" y="192.0" font-size="12.5" fill="#e6e8eb" font-family="ui-monospace,Consolas,monospace">Integration</text><circle cx="375" cy="187" r="15" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="375" y="192" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">2</text><rect x="180" y="225" width="90" height="34" rx="8" fill="#03a9f4"/><text x="225.0" y="247.0" text-anchor="middle" font-size="12.5" font-weight="800" fill="#06222e">ADD</text><circle cx="285" cy="242" r="15" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="285" y="247" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">3</text><text x="180" y="300" font-size="11.5" fill="#8b929c">Then: install &#8220;Crop Steering System&#8221; &#8594; <tspan fill="#ffa000">Restart HA</tspan>.</text>
+</svg></div></div>
+    </section><section class="step">
+      <div class="num">2</div>
+      <div class="body"><h2>Add the engine repository (the easy way)</h2><div class="prose">Settings &#8594; Add-ons &#8594; <b>Add-on Store</b>. <b>(1)</b> click the <b>&#8942;</b> (top-right), <b>(2)</b> choose <b>Repositories</b>.</div><div class="shot"><svg viewBox="0 0 640 400" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,system-ui,sans-serif">
+  <defs><marker id="ah" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto">
+    <path d="M1,1 L10,5.5 L1,10 Z" fill="#ff5252"/></marker></defs>
+  <rect x="0" y="0" width="640" height="400" rx="12" fill="#0e1116" stroke="#2b313b" stroke-width="1.5"/>
+  <rect x="0" y="0" width="640" height="34" rx="12" fill="#0a0d12"/>
+  <rect x="0" y="22" width="640" height="12" fill="#0a0d12"/>
+  <circle cx="18" cy="17" r="5" fill="#ff5f57"/><circle cx="36" cy="17" r="5" fill="#febc2e"/><circle cx="54" cy="17" r="5" fill="#28c840"/>
+  <text x="320.0" y="21" text-anchor="middle" font-size="12" fill="#8b929c">Add-on Store</text>
+  <rect x="0" y="34" width="150" height="366" fill="#11151c"/><circle cx="24" cy="61" r="6" fill="#8b929c"/><text x="40" y="65" font-size="12.5" fill="#8b929c" font-weight="400">Overview</text><circle cx="24" cy="95" r="6" fill="#8b929c"/><text x="40" y="99" font-size="12.5" fill="#8b929c" font-weight="400">History</text><rect x="8" y="114" width="134" height="30" rx="7" fill="#0b3a4a"/><circle cx="24" cy="129" r="6" fill="#03a9f4"/><text x="40" y="133" font-size="12.5" fill="#03a9f4" font-weight="700">Settings</text><circle cx="24" cy="163" r="6" fill="#8b929c"/><text x="40" y="167" font-size="12.5" fill="#8b929c" font-weight="400">Developer Tools</text><text x="180" y="70" font-size="15" font-weight="800" fill="#e6e8eb">Settings &#8250; Add-ons &#8250; Add-on Store</text><rect x="180" y="92" width="430" height="40" rx="8" fill="#1c2027" stroke="#2b313b"/><text x="198" y="117" font-size="12.5" fill="#8b929c">Search the store&#8230;</text><text x="585" y="78" font-size="22" font-weight="900" fill="#e6e8eb">&#8942;</text><circle cx="588" cy="64" r="13" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="588" y="69" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">1</text><rect x="420" y="86" width="190" height="100" rx="9" fill="#222731" stroke="#2b313b"/><text x="434" y="112" font-size="12.5" fill="#e6e8eb" font-weight="400">Check for updates</text><rect x="424" y="122" width="182" height="28" rx="6" fill="#0b3a4a"/><text x="434" y="142" font-size="12.5" fill="#03a9f4" font-weight="700">Repositories</text><text x="434" y="172" font-size="12.5" fill="#e6e8eb" font-weight="400">Reload</text><circle cx="437" cy="124" r="13" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="437" y="129" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">2</text>
+</svg></div></div>
+    </section><section class="step">
+      <div class="num">3</div>
+      <div class="body"><h2>Paste the add-on repo URL</h2><div class="prose"><b>(1)</b> paste <code>https://github.com/JakeTheRabbit/f2-control</code>, <b>(2)</b> <b>Add</b>, then close. <span class='warn'>&#9888; Paste <b>that</b> dedicated add-on-repo URL &mdash; NOT this project&#8217;s monorepo URL, and NOT a <code>&#8230;/addons/f2_control</code> subfolder. Those give <code>remote: Not Found / repository &#8216;&#8230;/addons/f2_control/&#8217; not found</code>. The <code>f2-control</code> repo exists precisely to be the clean one-click URL.</span></div><div class="shot"><svg viewBox="0 0 640 400" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,system-ui,sans-serif">
+  <defs><marker id="ah" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto">
+    <path d="M1,1 L10,5.5 L1,10 Z" fill="#ff5252"/></marker></defs>
+  <rect x="0" y="0" width="640" height="400" rx="12" fill="#0e1116" stroke="#2b313b" stroke-width="1.5"/>
+  <rect x="0" y="0" width="640" height="34" rx="12" fill="#0a0d12"/>
+  <rect x="0" y="22" width="640" height="12" fill="#0a0d12"/>
+  <circle cx="18" cy="17" r="5" fill="#ff5f57"/><circle cx="36" cy="17" r="5" fill="#febc2e"/><circle cx="54" cy="17" r="5" fill="#28c840"/>
+  <text x="320.0" y="21" text-anchor="middle" font-size="12" fill="#8b929c">Add-on Store &amp;#183; Repositories</text>
+  <rect x="0" y="34" width="640" height="366" fill="#0a0d12" opacity="0.55"/><rect x="120" y="80" width="400" height="240" rx="12" fill="#171a21" stroke="#2b313b"/><text x="144" y="118" font-size="15" font-weight="800" fill="#e6e8eb">Manage add-on repositories</text><text x="144" y="143" font-size="11" fill="#8b929c">Add repository</text><rect x="144" y="150" width="352" height="34" rx="7" fill="#1c2027" stroke="#2b313b"/><text x="156" y="172.0" font-size="12.5" fill="#e6e8eb" font-family="ui-monospace,Consolas,monospace">https://github.com/JakeTheRabbit/f2-control</text><circle cx="490" cy="167" r="15" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="490" y="172" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">1</text><rect x="144" y="215" width="80" height="34" rx="8" fill="#03a9f4"/><text x="184.0" y="237.0" text-anchor="middle" font-size="12.5" font-weight="800" fill="#06222e">ADD</text><circle cx="238" cy="232" r="15" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="238" y="237" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">2</text><text x="144" y="285" font-size="11.5" fill="#43a047">&#10003; close the dialog &#8594; <tspan font-weight="700">F2 Control</tspan> now appears in the store.</text>
+</svg></div></div>
+    </section><section class="step">
+      <div class="num">4</div>
+      <div class="body"><h2>Install F2 Control</h2><div class="prose">Open <b>F2 Control</b> in the store &#8594; <b>(1) INSTALL</b>. First build takes a minute.</div><div class="shot"><svg viewBox="0 0 640 400" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,system-ui,sans-serif">
+  <defs><marker id="ah" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto">
+    <path d="M1,1 L10,5.5 L1,10 Z" fill="#ff5252"/></marker></defs>
+  <rect x="0" y="0" width="640" height="400" rx="12" fill="#0e1116" stroke="#2b313b" stroke-width="1.5"/>
+  <rect x="0" y="0" width="640" height="34" rx="12" fill="#0a0d12"/>
+  <rect x="0" y="22" width="640" height="12" fill="#0a0d12"/>
+  <circle cx="18" cy="17" r="5" fill="#ff5f57"/><circle cx="36" cy="17" r="5" fill="#febc2e"/><circle cx="54" cy="17" r="5" fill="#28c840"/>
+  <text x="320.0" y="21" text-anchor="middle" font-size="12" fill="#8b929c">Add-on Store &amp;#183; F2 Control</text>
+  <rect x="0" y="34" width="150" height="366" fill="#11151c"/><circle cx="24" cy="61" r="6" fill="#8b929c"/><text x="40" y="65" font-size="12.5" fill="#8b929c" font-weight="400">Overview</text><circle cx="24" cy="95" r="6" fill="#8b929c"/><text x="40" y="99" font-size="12.5" fill="#8b929c" font-weight="400">History</text><rect x="8" y="114" width="134" height="30" rx="7" fill="#0b3a4a"/><circle cx="24" cy="129" r="6" fill="#03a9f4"/><text x="40" y="133" font-size="12.5" fill="#03a9f4" font-weight="700">Settings</text><circle cx="24" cy="163" r="6" fill="#8b929c"/><text x="40" y="167" font-size="12.5" fill="#8b929c" font-weight="400">Developer Tools</text><rect x="180" y="60" width="60" height="60" rx="12" fill="#222731"/><text x="210" y="98" text-anchor="middle" font-size="26">&#127793;</text><text x="256" y="80" font-size="16" font-weight="800" fill="#e6e8eb">F2 Control</text><text x="256" y="102" font-size="11.5" fill="#8b929c">Crop-steering engine &#183; v0.2.0</text><rect x="450" y="70" width="150" height="34" rx="8" fill="#03a9f4"/><text x="525.0" y="92.0" text-anchor="middle" font-size="12.5" font-weight="800" fill="#06222e">INSTALL</text><circle cx="610" cy="87" r="15" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="610" y="92" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">1</text><rect x="180" y="150" width="420" height="120" rx="9" fill="#1c2027" stroke="#2b313b"/><text x="198" y="178" font-size="12" fill="#8b929c">The autonomous P0&#8594;P1&#8594;P2&#8594;P3 irrigation controller. Reads</text><text x="198" y="198" font-size="12" fill="#8b929c">your VWC/EC sensors, fires shots, republishes status,</text><text x="198" y="218" font-size="12" fill="#8b929c">pings your phone. Gated by a hard kill switch.</text>
+</svg></div></div>
+    </section><section class="step">
+      <div class="num">5</div>
+      <div class="body"><h2>Configure it</h2><div class="prose">On the add-on&#8217;s <b>Configuration</b> tab: set <code>lights_on_hour</code>/<code>lights_off_hour</code>, your <code>notify_service</code>, and the feed EC/pH sensors only if they differ from defaults &#8594; <b>(1) Save</b>. (The HA token is automatic &mdash; nothing to paste.)</div><div class="shot"><svg viewBox="0 0 640 400" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,system-ui,sans-serif">
+  <defs><marker id="ah" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto">
+    <path d="M1,1 L10,5.5 L1,10 Z" fill="#ff5252"/></marker></defs>
+  <rect x="0" y="0" width="640" height="400" rx="12" fill="#0e1116" stroke="#2b313b" stroke-width="1.5"/>
+  <rect x="0" y="0" width="640" height="34" rx="12" fill="#0a0d12"/>
+  <rect x="0" y="22" width="640" height="12" fill="#0a0d12"/>
+  <circle cx="18" cy="17" r="5" fill="#ff5f57"/><circle cx="36" cy="17" r="5" fill="#febc2e"/><circle cx="54" cy="17" r="5" fill="#28c840"/>
+  <text x="320.0" y="21" text-anchor="middle" font-size="12" fill="#8b929c">F2 Control &amp;#183; Configuration</text>
+  <rect x="0" y="34" width="150" height="366" fill="#11151c"/><circle cx="24" cy="61" r="6" fill="#8b929c"/><text x="40" y="65" font-size="12.5" fill="#8b929c" font-weight="400">Overview</text><circle cx="24" cy="95" r="6" fill="#8b929c"/><text x="40" y="99" font-size="12.5" fill="#8b929c" font-weight="400">History</text><rect x="8" y="114" width="134" height="30" rx="7" fill="#0b3a4a"/><circle cx="24" cy="129" r="6" fill="#03a9f4"/><text x="40" y="133" font-size="12.5" fill="#03a9f4" font-weight="700">Settings</text><circle cx="24" cy="163" r="6" fill="#8b929c"/><text x="40" y="167" font-size="12.5" fill="#8b929c" font-weight="400">Developer Tools</text><text x="180" y="66" font-size="14" font-weight="800" fill="#e6e8eb">F2 Control &#183; Configuration</text><text x="180" y="89" font-size="11" fill="#8b929c">lights_on_hour</text><rect x="180" y="96" width="200" height="34" rx="7" fill="#1c2027" stroke="#2b313b"/><text x="192" y="118.0" font-size="12.5" fill="#e6e8eb" font-family="ui-monospace,Consolas,monospace">10</text><text x="400" y="89" font-size="11" fill="#8b929c">lights_off_hour</text><rect x="400" y="96" width="200" height="34" rx="7" fill="#1c2027" stroke="#2b313b"/><text x="412" y="118.0" font-size="12.5" fill="#e6e8eb" font-family="ui-monospace,Consolas,monospace">22</text><text x="180" y="149" font-size="11" fill="#8b929c">notify_service</text><rect x="180" y="156" width="420" height="34" rx="7" fill="#1c2027" stroke="#2b313b"/><text x="192" y="178.0" font-size="12.5" fill="#e6e8eb" font-family="ui-monospace,Consolas,monospace">notify/mobile_app_your_phone</text><text x="180" y="209" font-size="11" fill="#8b929c">feed EC / pH sensors</text><rect x="180" y="216" width="420" height="34" rx="7" fill="#1c2027" stroke="#2b313b"/><text x="192" y="238.0" font-size="12.5" fill="#8b929c" font-family="ui-monospace,Consolas,monospace">(only if different from defaults)</text><rect x="510" y="300" width="90" height="34" rx="8" fill="#43a047"/><text x="555.0" y="322.0" text-anchor="middle" font-size="12.5" font-weight="800" fill="#072">SAVE</text><circle cx="600" cy="317" r="15" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="600" y="322" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">1</text>
+</svg></div></div>
+    </section><section class="step">
+      <div class="num">6</div>
+      <div class="body"><h2>Create the kill switch</h2><div class="prose">Settings &#8594; Devices &amp; Services &#8594; <b>Helpers</b> &#8594; <b>(1) + Create Helper</b> &#8594; <b>Toggle</b>, name it so the entity is <code>input_boolean.f2_control_enabled</code>. <span class='ok'>Leave it <b>OFF</b> &mdash; OFF = safe (reads/computes, never opens a valve).</span></div><div class="shot"><svg viewBox="0 0 640 400" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,system-ui,sans-serif">
+  <defs><marker id="ah" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto">
+    <path d="M1,1 L10,5.5 L1,10 Z" fill="#ff5252"/></marker></defs>
+  <rect x="0" y="0" width="640" height="400" rx="12" fill="#0e1116" stroke="#2b313b" stroke-width="1.5"/>
+  <rect x="0" y="0" width="640" height="34" rx="12" fill="#0a0d12"/>
+  <rect x="0" y="22" width="640" height="12" fill="#0a0d12"/>
+  <circle cx="18" cy="17" r="5" fill="#ff5f57"/><circle cx="36" cy="17" r="5" fill="#febc2e"/><circle cx="54" cy="17" r="5" fill="#28c840"/>
+  <text x="320.0" y="21" text-anchor="middle" font-size="12" fill="#8b929c">Create the kill switch</text>
+  <rect x="0" y="34" width="150" height="366" fill="#11151c"/><circle cx="24" cy="61" r="6" fill="#8b929c"/><text x="40" y="65" font-size="12.5" fill="#8b929c" font-weight="400">Overview</text><circle cx="24" cy="95" r="6" fill="#8b929c"/><text x="40" y="99" font-size="12.5" fill="#8b929c" font-weight="400">History</text><rect x="8" y="114" width="134" height="30" rx="7" fill="#0b3a4a"/><circle cx="24" cy="129" r="6" fill="#03a9f4"/><text x="40" y="133" font-size="12.5" fill="#03a9f4" font-weight="700">Settings</text><circle cx="24" cy="163" r="6" fill="#8b929c"/><text x="40" y="167" font-size="12.5" fill="#8b929c" font-weight="400">Developer Tools</text><text x="180" y="66" font-size="14" font-weight="800" fill="#e6e8eb">Settings &#8250; Devices &amp; Services &#8250; Helpers</text><rect x="470" y="52" width="130" height="34" rx="8" fill="#03a9f4"/><text x="535.0" y="74.0" text-anchor="middle" font-size="12.5" font-weight="800" fill="#06222e">+ CREATE HELPER</text><circle cx="470" cy="52" r="13" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="470" y="57" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">1</text><rect x="180" y="96" width="420" height="150" rx="9" fill="#1c2027" stroke="#2b313b"/><text x="198" y="122" font-size="12" fill="#8b929c">Type: <tspan fill="#e6e8eb" font-weight="700">Toggle</tspan> (input_boolean)</text><text x="198" y="133" font-size="11" fill="#8b929c">Name</text><rect x="198" y="140" width="384" height="34" rx="7" fill="#1c2027" stroke="#2b313b"/><text x="210" y="162.0" font-size="12.5" fill="#e6e8eb" font-family="ui-monospace,Consolas,monospace">f2_control_enabled</text><text x="198" y="206" font-size="12" fill="#8b929c">Entity id becomes <tspan fill="#e6e8eb" font-family="ui-monospace,monospace">input_boolean.f2_control_enabled</tspan></text><rect x="198" y="218" width="180" height="22" rx="11" fill="#3a1212"/><text x="288" y="233" text-anchor="middle" font-size="11" fill="#ff5252" font-weight="700">leave OFF = safe</text>
+</svg></div></div>
+    </section><section class="step">
+      <div class="num">7</div>
+      <div class="body"><h2>Start + verify</h2><div class="prose"><b>(1) Start</b> the add-on. <b>(2)</b> the log shows <code>starting | kill-switch &#8230; | token present: True</code>. <b>(3)</b> in Developer Tools &#8250; States, <code>sensor.crop_steering_ai_heartbeat</code> reads <b>healthy</b> with attribute <code>engine: f2-control</code>. Both layers are now talking.</div><div class="shot"><svg viewBox="0 0 640 400" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,system-ui,sans-serif">
+  <defs><marker id="ah" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto">
+    <path d="M1,1 L10,5.5 L1,10 Z" fill="#ff5252"/></marker></defs>
+  <rect x="0" y="0" width="640" height="400" rx="12" fill="#0e1116" stroke="#2b313b" stroke-width="1.5"/>
+  <rect x="0" y="0" width="640" height="34" rx="12" fill="#0a0d12"/>
+  <rect x="0" y="22" width="640" height="12" fill="#0a0d12"/>
+  <circle cx="18" cy="17" r="5" fill="#ff5f57"/><circle cx="36" cy="17" r="5" fill="#febc2e"/><circle cx="54" cy="17" r="5" fill="#28c840"/>
+  <text x="320.0" y="21" text-anchor="middle" font-size="12" fill="#8b929c">F2 Control &amp;#183; Log</text>
+  <rect x="0" y="34" width="150" height="366" fill="#11151c"/><circle cx="24" cy="61" r="6" fill="#8b929c"/><text x="40" y="65" font-size="12.5" fill="#8b929c" font-weight="400">Overview</text><circle cx="24" cy="95" r="6" fill="#8b929c"/><text x="40" y="99" font-size="12.5" fill="#8b929c" font-weight="400">History</text><rect x="8" y="114" width="134" height="30" rx="7" fill="#0b3a4a"/><circle cx="24" cy="129" r="6" fill="#03a9f4"/><text x="40" y="133" font-size="12.5" fill="#03a9f4" font-weight="700">Settings</text><circle cx="24" cy="163" r="6" fill="#8b929c"/><text x="40" y="167" font-size="12.5" fill="#8b929c" font-weight="400">Developer Tools</text><rect x="470" y="52" width="130" height="34" rx="8" fill="#43a047"/><text x="535.0" y="74.0" text-anchor="middle" font-size="12.5" font-weight="800" fill="#072">START</text><circle cx="470" cy="52" r="13" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="470" y="57" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">1</text><rect x="180" y="96" width="420" height="96" rx="9" fill="#06090d" stroke="#2b313b"/><text x="196" y="120" font-size="11" fill="#43a047" font-family="ui-monospace,Consolas,monospace">starting | kill-switch input_boolean.f2_control_enabled</text><text x="196" y="138" font-size="11" fill="#43a047" font-family="ui-monospace,Consolas,monospace">token present: True</text><text x="196" y="162" font-size="11" fill="#8b929c" font-family="ui-monospace,Consolas,monospace">Z1 P2 hold &#183; Z2 P2 hold &#183; Z3 P2 hold</text><circle cx="300" cy="108" r="13" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="300" y="113" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">2</text><text x="180" y="222" font-size="11.5" fill="#8b929c">Verify in Developer Tools &#8250; States:</text><rect x="180" y="232" width="420" height="46" rx="8" fill="#1c2027" stroke="#2b313b"/><text x="196" y="252" font-size="11" fill="#e6e8eb" font-family="ui-monospace,monospace">sensor.crop_steering_ai_heartbeat = healthy</text><text x="196" y="270" font-size="11" fill="#03a9f4" font-family="ui-monospace,monospace">attributes: engine: f2-control</text><circle cx="560" cy="255" r="13" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="560" y="260" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">3</text>
+</svg></div></div>
+    </section><section class="step">
+      <div class="num">8</div>
+      <div class="body"><h2>Point it at your room</h2><div class="prose">Settings &#8594; Devices &amp; Services &#8594; <b>Add Integration</b> &#8594; Crop Steering System. <b>(1)</b> choose <b>Load from crop_steering.env</b> (fill the template in <code>templates/</code> with your real entity ids + the physical truths: substrate volume, dripper flow, drippers/plant), <b>(2) Submit</b>.</div><div class="shot"><svg viewBox="0 0 640 400" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,system-ui,sans-serif">
+  <defs><marker id="ah" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto">
+    <path d="M1,1 L10,5.5 L1,10 Z" fill="#ff5252"/></marker></defs>
+  <rect x="0" y="0" width="640" height="400" rx="12" fill="#0e1116" stroke="#2b313b" stroke-width="1.5"/>
+  <rect x="0" y="0" width="640" height="34" rx="12" fill="#0a0d12"/>
+  <rect x="0" y="22" width="640" height="12" fill="#0a0d12"/>
+  <circle cx="18" cy="17" r="5" fill="#ff5f57"/><circle cx="36" cy="17" r="5" fill="#febc2e"/><circle cx="54" cy="17" r="5" fill="#28c840"/>
+  <text x="320.0" y="21" text-anchor="middle" font-size="12" fill="#8b929c">Crop Steering &amp;#183; Setup</text>
+  <rect x="0" y="34" width="150" height="366" fill="#11151c"/><circle cx="24" cy="61" r="6" fill="#8b929c"/><text x="40" y="65" font-size="12.5" fill="#8b929c" font-weight="400">Overview</text><circle cx="24" cy="95" r="6" fill="#8b929c"/><text x="40" y="99" font-size="12.5" fill="#8b929c" font-weight="400">History</text><rect x="8" y="114" width="134" height="30" rx="7" fill="#0b3a4a"/><circle cx="24" cy="129" r="6" fill="#03a9f4"/><text x="40" y="133" font-size="12.5" fill="#03a9f4" font-weight="700">Settings</text><circle cx="24" cy="163" r="6" fill="#8b929c"/><text x="40" y="167" font-size="12.5" fill="#8b929c" font-weight="400">Developer Tools</text><text x="180" y="70" font-size="14" font-weight="800" fill="#e6e8eb">Add Integration &#8594; Crop Steering System</text><rect x="180" y="92" width="420" height="150" rx="9" fill="#1c2027" stroke="#2b313b"/><text x="198" y="120" font-size="12" fill="#8b929c">Choose setup source:</text><rect x="198" y="134" width="384" height="34" rx="7" fill="#222731" stroke="#03a9f4"/><text x="214" y="156" font-size="12.5" fill="#e6e8eb">&#9673; Load from crop_steering.env file</text><circle cx="566" cy="151" r="15" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="566" y="156" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">1</text><text x="214" y="196" font-size="12.5" fill="#8b929c">&#9711; Manual (map hardware in the UI)</text><rect x="510" y="300" width="90" height="34" rx="8" fill="#03a9f4"/><text x="555.0" y="322.0" text-anchor="middle" font-size="12.5" font-weight="800" fill="#06222e">SUBMIT</text><circle cx="600" cy="317" r="15" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="600" y="322" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">2</text>
+</svg></div></div>
+    </section><section class="step">
+      <div class="num">9</div>
+      <div class="body"><h2>Arm it safely</h2><div class="prose">Watch a full photoperiod with the kill switch <b>OFF</b> &mdash; the add-on logs what it <i>would</i> fire. Sanity-check shot sizing (a 6% shot should be <b>minutes</b>, not seconds; <code>substrate_volume</code> is the <b>per-plant</b> block size). Only then <b>(1)</b> flip <code>input_boolean.f2_control_enabled</code> <b>ON</b>. Watch the first real cycle: VWC rises, the pump&#8594;mainline&#8594;valve sequence runs clean. <span class='ok'>One-line rollback: flip it OFF.</span></div><div class="shot"><svg viewBox="0 0 640 400" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,system-ui,sans-serif">
+  <defs><marker id="ah" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto">
+    <path d="M1,1 L10,5.5 L1,10 Z" fill="#ff5252"/></marker></defs>
+  <rect x="0" y="0" width="640" height="400" rx="12" fill="#0e1116" stroke="#2b313b" stroke-width="1.5"/>
+  <rect x="0" y="0" width="640" height="34" rx="12" fill="#0a0d12"/>
+  <rect x="0" y="22" width="640" height="12" fill="#0a0d12"/>
+  <circle cx="18" cy="17" r="5" fill="#ff5f57"/><circle cx="36" cy="17" r="5" fill="#febc2e"/><circle cx="54" cy="17" r="5" fill="#28c840"/>
+  <text x="320.0" y="21" text-anchor="middle" font-size="12" fill="#8b929c">Arm it &amp;#183; kill switch</text>
+  <rect x="0" y="34" width="150" height="366" fill="#11151c"/><circle cx="24" cy="61" r="6" fill="#8b929c"/><text x="40" y="65" font-size="12.5" fill="#8b929c" font-weight="400">Overview</text><circle cx="24" cy="95" r="6" fill="#8b929c"/><text x="40" y="99" font-size="12.5" fill="#8b929c" font-weight="400">History</text><rect x="8" y="114" width="134" height="30" rx="7" fill="#0b3a4a"/><circle cx="24" cy="129" r="6" fill="#03a9f4"/><text x="40" y="133" font-size="12.5" fill="#03a9f4" font-weight="700">Settings</text><circle cx="24" cy="163" r="6" fill="#8b929c"/><text x="40" y="167" font-size="12.5" fill="#8b929c" font-weight="400">Developer Tools</text><text x="180" y="70" font-size="14" font-weight="800" fill="#e6e8eb">input_boolean.f2_control_enabled</text><text x="180" y="96" font-size="11.5" fill="#8b929c">Kill switch &#183; OFF = reads/decides but never opens a valve</text><rect x="180" y="120" width="64" height="32" rx="16" fill="#222731" stroke="#2b313b"/><circle cx="198" cy="136" r="12" fill="#8b929c"/><text x="180" y="172" font-size="11" fill="#8b929c">OFF (safe)</text><line x1="270" y1="136" x2="330" y2="136" stroke="#ff5252" stroke-width="3" marker-end="url(#ah)"/><rect x="356" y="120" width="64" height="32" rx="16" fill="#43a047"/><circle cx="402" cy="136" r="12" fill="#fff"/><text x="356" y="172" font-size="11" fill="#43a047" font-weight="700">ON (armed)</text><circle cx="388" cy="136" r="13" fill="#ff5252" stroke="#fff" stroke-width="2.5"/><text x="388" y="141" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">1</text><rect x="180" y="210" width="420" height="70" rx="9" fill="#2a1d05" stroke="#ffa000"/><text x="198" y="236" font-size="11.5" fill="#ffa000" font-weight="700">Before you flip it ON:</text><text x="198" y="256" font-size="11" fill="#e6e8eb">watch a photoperiod OFF first &#183; confirm a 6% shot is MINUTES,</text><text x="198" y="272" font-size="11" fill="#e6e8eb">not seconds (substrate_volume = per-plant block size).</text>
+</svg></div></div>
+    </section>
+ <div class="done">
+   <h2>&#9989; Done-when checklist</h2>
+   <ul>
+     <li>Integration entities present (<code>number.crop_steering_p1_target_vwc</code> reads a value).</li>
+     <li>F2 Control add-on installed from <code>github.com/JakeTheRabbit/f2-control</code>, configured, started; log clean.</li>
+     <li><code>sensor.crop_steering_ai_heartbeat</code> = <b>healthy</b>, attribute <code>engine: f2-control</code>, fresh.</li>
+     <li>Shot sizing sane &mdash; a 6% shot computes to minutes (substrate_volume = per-plant).</li>
+     <li>Kill switch armed <b>ON</b> only after watching a photoperiod; first real cycle watched.</li>
+   </ul>
+ </div>
+ <div class="lead" style="border-left-color:#ffa000"><b>Updating later &mdash; Rebuild, not Restart.</b> The add-on
+   bakes its code into the image when it&#8217;s built. A new version shows an <b>Update</b> (one click). If you ever
+   change add-on files by hand, use the add-on&#8217;s <b>&#8942; &#8594; Rebuild</b> &mdash; a plain <b>Restart re-runs the
+   old code</b>.</div>
+ <footer>F2 Control &#183; <a href="https://github.com/JakeTheRabbit/HA-Irrigation-Strategy">HA-Irrigation-Strategy</a>
+   &#183; add-on: <a href="https://github.com/JakeTheRabbit/f2-control">JakeTheRabbit/f2-control</a></footer>
+</div></body></html>

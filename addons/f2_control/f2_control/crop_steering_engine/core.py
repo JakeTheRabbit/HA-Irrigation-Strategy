@@ -144,7 +144,11 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
         # predictive P3: only if starting dryback NOW would finish by lights-on.
         if s.uptime_min >= 10 and s.vwc >= p.p3_emergency_floor and s.hours_to_lights_off <= 3.0:
             rate = s.dryback_rate if (s.dryback_rate and s.dryback_rate > 0) else 0.1
-            hours_needed = p.dryback_target / rate
+            # Target is relative % of detected peak; measured rate is VWC
+            # percentage points/hour. Predict only the still-needed point drop.
+            target_vwc = s.peak_vwc * (1.0 - p.dryback_target / 100.0)
+            remaining_points = max(0.0, s.vwc - target_vwc)
+            hours_needed = remaining_points / rate if s.peak_vwc > 0 else float("inf")
             if hours_needed <= 12 and s.hours_to_lights_on <= hours_needed:
                 phase, treason = "P3", f"predictive P3 (need {hours_needed:.1f}h, {s.hours_to_lights_on:.1f}h to on)"
 

@@ -1,0 +1,32 @@
+[
+  {
+    "original": "archive\\2026-09-08\\addons\\f2_control\\www\\public\\dashboard-nav.js",
+    "retained": "archive\\2026-09-08\\www\\dashboard-nav.js",
+    "sha256": "ddba212156be06a7446322e5548be7a3fb49d2667d947a25ddc8918323b82775"
+  },
+  {
+    "original": "archive\\2026-09-08\\addons\\f2_control\\www\\public\\floorplan\\index.html",
+    "retained": "archive\\2026-09-08\\www\\floorplan\\index.html",
+    "sha256": "87a68dc4cda5278492410060a1f0f9d14c57a7a108207ec2efe6c8fb9dda54ab"
+  },
+  {
+    "original": "archive\\2026-09-08\\addons\\f2_control\\www\\public\\floorplan\\assets\\index-6rAxXTMW.js",
+    "retained": "archive\\2026-09-08\\www\\floorplan\\assets\\index-6rAxXTMW.js",
+    "sha256": "89d6a2fb67bab241bf4f649dee1d9299a25b7c7f3129b41c3262f870f86580b9"
+  },
+  {
+    "original": "archive\\2026-09-08\\addons\\f2_control\\www\\public\\floorplan\\assets\\index-COm-xLT1.js",
+    "retained": "archive\\2026-09-08\\www\\floorplan\\assets\\index-COm-xLT1.js",
+    "sha256": "83d9c3b4f77782937f1432b3924532c48d7d3158098afe92a1eb86ce14d47ba8"
+  },
+  {
+    "original": "archive\\2026-09-08\\addons\\f2_control\\www\\public\\floorplan\\assets\\index-CTMuWeAY.js",
+    "retained": "archive\\2026-09-08\\www\\floorplan\\assets\\index-CTMuWeAY.js",
+    "sha256": "ada4afbf023cec80c6e070eeb6f6cc046edf4b05a35845fd9e48ac8073787d3f"
+  },
+  {
+    "original": "archive\\2026-09-08\\addons\\f2_control\\www\\public\\floorplan\\assets\\index-DKfIYGEd.js",
+    "retained": "archive\\2026-09-08\\www\\floorplan\\assets\\index-DKfIYGEd.js",
+    "sha256": "dd8238ca2590e0a860323c69fc0c81e52bb196a50098650d6b0ad53f2d03fbed"
+  }
+]

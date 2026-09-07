@@ -1,0 +1,515 @@
+/* Shared native workspace layouts. Colors follow the Home Assistant theme bridge. */
+.workspace-card {
+  padding: 24px;
+  margin-bottom: 20px;
+  min-width: 0;
+}
+.workspace-card h2 {
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0 0 6px;
+}
+.workspace-card h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 6px;
+}
+.workspace-card p {
+  line-height: 1.55;
+}
+.workspace-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.workspace-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.workspace-section-heading > div {
+  min-width: 0;
+}
+.workspace-section-heading p {
+  margin: 4px 0 0;
+}
+.workspace-message {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 16px 0;
+  background: var(--card);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.workspace-message p {
+  margin: 4px 0;
+}
+.workspace-message.error {
+  border-left-color: var(--destructive);
+  color: var(--foreground);
+}
+.workspace-message summary {
+  cursor: pointer;
+}
+.workspace-message ul {
+  padding-left: 20px;
+  margin-top: 8px;
+}
+.workspace-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: 0 0 24px;
+  overflow-x: auto;
+}
+.workspace-tabs button {
+  padding: 14px 18px;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+}
+.workspace-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--primary-strong);
+  color: var(--primary-strong);
+}
+.workspace-tabs button:focus-visible,
+.calendar-cell:focus-visible,
+.schedule-blocks button:focus-visible,
+.mapping-result:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -3px;
+}
+.workspace-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin: 18px 0;
+}
+.workspace-form-grid label,
+.mapping-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.workspace-form-grid select,
+.setup-room-select select {
+  width: 100%;
+  min-height: 40px;
+  background: var(--input-background, var(--card));
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+.workspace-form-grid input {
+  width: 100%;
+}
+.plan-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.plan-state {
+  display: block;
+  text-transform: capitalize;
+  font-size: 20px;
+  font-weight: 500;
+  margin-top: 5px;
+}
+.plan-calendar-scroll {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.plan-calendar {
+  display: grid;
+  gap: 1px;
+  background: var(--border);
+  min-width: 100%;
+}
+.calendar-row {
+  display: contents;
+}
+.calendar-heading,
+.calendar-label {
+  background: var(--card);
+  padding: 12px 10px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.calendar-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  text-align: left;
+  color: var(--foreground);
+  font-size: 14px;
+  border-right: 1px solid var(--border);
+}
+.calendar-label small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  margin-top: 5px;
+}
+.calendar-cell {
+  min-height: 70px;
+  padding: 9px 5px;
+  background: color-mix(in srgb, var(--primary) calc(10% + var(--bias) * 0.2%), var(--card));
+  border: 2px solid transparent;
+  text-align: center;
+  cursor: pointer;
+}
+.calendar-cell span {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+}
+.calendar-cell small {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.calendar-cell.selected {
+  border-color: var(--primary-strong);
+  background: color-mix(in srgb, var(--primary) 28%, var(--card));
+}
+.steering-control {
+  padding: 22px 0;
+  margin-bottom: 8px;
+}
+.steering-control .workspace-section-heading {
+  margin-bottom: 12px;
+}
+.steering-control input[type="range"] {
+  display: block;
+  width: 100%;
+  height: 28px;
+  accent-color: var(--primary-strong);
+  cursor: pointer;
+}
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  margin-top: 5px;
+}
+.delivery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 24px 0 12px;
+}
+.delivery-grid > div {
+  border-top: 1px solid var(--border);
+  padding: 18px 0;
+}
+.delivery-grid span {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  display: block;
+  margin-bottom: 8px;
+}
+.delivery-grid strong {
+  font-size: 24px;
+  font-weight: 500;
+}
+.delivery-grid small {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.short-input {
+  max-width: 86px;
+}
+.schedule-blocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.schedule-blocks button {
+  text-align: left;
+  border: 1px solid var(--border);
+  padding: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--card);
+}
+.schedule-blocks button.selected {
+  border-color: var(--primary-strong);
+}
+.schedule-blocks strong,
+.schedule-blocks span {
+  display: block;
+}
+.schedule-blocks span {
+  margin-top: 6px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px 150px;
+  gap: 24px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.profile-grid p {
+  margin: 5px 0;
+}
+.profile-heading {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  padding-bottom: 10px;
+}
+.profile-heading strong {
+  font-weight: 500;
+}
+.plan-review-dialog {
+  width: calc(100vw - 32px) !important;
+  max-width: 640px !important;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
+.plan-review-zones {
+  max-height: 45vh;
+  overflow: auto;
+}
+.setup-room-select {
+  min-width: 220px;
+  flex: 1;
+  max-width: 380px;
+}
+.setup-room-select label {
+  display: block;
+  margin-bottom: 8px;
+}
+.mapping-picker {
+  min-width: 0;
+}
+.mapping-button {
+  width: 100%;
+  height: auto !important;
+  min-height: 42px;
+  justify-content: space-between !important;
+  text-align: left;
+  white-space: normal !important;
+}
+.mapping-button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.mapping-button svg {
+  flex: none;
+}
+.mapping-id {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  margin-top: 7px;
+}
+.mapping-dialog {
+  width: calc(100vw - 32px) !important;
+  max-width: 680px !important;
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+}
+.mapping-results {
+  max-height: 45vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.mapping-result {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  min-width: 0;
+}
+.mapping-result > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+.mapping-result strong {
+  font-size: 14px;
+  font-weight: 500;
+  display: block;
+}
+.mapping-result small {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  display: block;
+  overflow-wrap: anywhere;
+}
+.mapping-result.selected {
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
+}
+.mapping-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.mapping-result.selected .mapping-check {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary-strong);
+}
+.mapping-reading {
+  text-align: right;
+  font-size: 13px;
+  flex: none;
+  max-width: 90px;
+  overflow-wrap: anywhere;
+}
+.setup-zones {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.setup-zone {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+}
+.setup-zone .workspace-section-heading {
+  margin-bottom: 12px;
+}
+.setup-zone .workspace-section-heading > div {
+  flex: 1;
+  max-width: 330px;
+}
+.sizing-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.archived-zones {
+  padding: 16px 0;
+}
+.archived-zones summary {
+  cursor: pointer;
+  color: var(--muted-foreground);
+  margin-bottom: 16px;
+}
+.install-steps {
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin: 28px 0;
+}
+.install-steps li {
+  display: flex;
+  gap: 18px;
+}
+.step-number {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+}
+.install-steps p {
+  margin: 6px 0 12px;
+}
+@media (max-width: 1000px) {
+  .sizing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .workspace-card {
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .workspace-actions button {
+    font-size: 12px;
+  }
+  .workspace-tabs button {
+    padding: 12px;
+  }
+  .workspace-form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .sizing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .workspace-section-heading {
+    align-items: flex-start;
+  }
+  .profile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .profile-grid > div:first-child,
+  .profile-heading > strong:first-child {
+    grid-column: 1/-1;
+  }
+  .profile-heading {
+    position: sticky;
+    top: 0;
+    background: var(--card);
+    z-index: 1;
+  }
+  .delivery-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .delivery-grid > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 0;
+  }
+  .delivery-grid span {
+    margin: 0;
+  }
+  .delivery-grid strong {
+    font-size: 20px;
+    white-space: nowrap;
+  }
+  .setup-zone {
+    padding: 14px;
+  }
+  .mapping-result {
+    gap: 8px;
+    padding: 12px 8px;
+  }
+  .mapping-reading {
+    max-width: 65px;
+  }
+  .install-steps li {
+    gap: 12px;
+  }
+}

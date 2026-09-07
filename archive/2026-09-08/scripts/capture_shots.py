@@ -16,8 +16,8 @@ import websocket
 TOK = os.environ.get("HA_TOKEN", "")
 BASE = os.environ.get("HA_BASE", "http://homeassistant.local:8123")
 OUT = os.path.join(os.path.dirname(__file__), "..", "img")
-DESK = BASE + "/local/f2.html"
-MOB = BASE + "/local/f2.html"
+DESK = BASE + "/local/f2-classic.html"
+MOB = BASE + "/local/f2-classic.html"
 
 chrome = next((p for p in [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",

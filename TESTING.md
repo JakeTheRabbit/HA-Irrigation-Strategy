@@ -7,11 +7,10 @@ runs the automated suite on every push and pull request
 ## Prerequisites
 
 - **Python 3.11+**
-- One-off: `pip install ruff==0.5.5 black==24.4.2 yamllint==1.35.1 pytest`
+- One-off: `pip install ruff==0.5.5 black==24.4.2 yamllint==1.35.1 pytest requests pyyaml`
+- **Node.js 24** for the dashboard; `npm ci --prefix frontend` installs the pinned dependencies.
 
-The integration is dependency-free and the pure engine has no third-party deps, so the
-tests need nothing else. (The add-on container's own runtime dep, `requests`, is stubbed
-in the state test so it runs offline.)
+The integration and pure engine have no third-party runtime dependencies. Controller tests use a fake HA transport; no test needs production credentials or live hardware.
 
 ## How to run
 
@@ -21,7 +20,7 @@ From the repo root:
 bash tests/run_ci.sh
 ```
 
-That mirrors CI: lint + format + yaml and both pytest suites. Run the pieces individually
+That runs the backend checks: lint, format, YAML, vendored engine identity, repository hygiene and all three Python suites. Run the pieces individually
 if you prefer:
 
 ```bash
@@ -30,7 +29,31 @@ PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests 
 
 # Integration helpers + add-on state migration + version consistency
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -q
+
+# Real add-on controller with fake HA and deterministic clocks
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest addons/f2_control/tests -q
 ```
+
+## Dashboard checks
+
+From the repository root:
+
+```sh
+npm ci --prefix frontend
+npm test --prefix frontend
+npm run build --prefix frontend
+# One-time browser installation (Windows scripts can also use installed Chrome):
+cd frontend
+npx playwright install chromium
+cd ..
+node frontend/scripts/verify-dashboard.mjs
+node frontend/scripts/verify-live.mjs
+node frontend/scripts/verify-workspace.mjs
+```
+
+The browser scripts start loopback servers. Demo workflows reject API/external traffic; mocked-HA workflows intercept all API calls. The checks cover all ten pages, desktop/mobile navigation, accessibility, drafts, partial failures, readback, room identity, stale probes, and legacy route compatibility. Screenshots and JSON results are written to `output/playwright/`. This frontend job also runs in GitHub CI. The Python packaging tests verify that the HA and add-on artifacts match and retain room/demo navigation.
+
+The workspace suite also covers day/week scheduling, reactive VWC/EC previews, profile editing, setup lifecycle, strict response-bearing service contracts, invalid/expired snapshots and draft preservation. Integration tests use a minimal HA fixture, not a running HA instance. HACS/hassfest and an actual Supervisor image build run in CI, not in the local browser harness.
 
 ## What it tests
 
@@ -60,6 +83,14 @@ add-on repo by `scripts/publish_addon.sh`.)
 
 ### 5. Lint / format / YAML — ruff, black (scoped to `custom_components/` + `tests/`), yamllint
 Plus, on GitHub only: **hassfest** and **HACS validation** of the integration.
+
+### 6. Controller safety regressions — `addons/f2_control/tests/test_safety_regressions.py`
+
+Deterministic fake clocks and HA responses reproduce request-latency overruns, blind fallback/copy budget bypass, failed hardware closure and error cleanup, persisted shared-hardware holds, explicit recovery, and temporarily absent room descriptors. Tests verify preserved state/counters across restart and rediscovery.
+
+### 7. Frontend adapter and lifecycle — `frontend/src/lib/*.test.ts`
+
+Room isolation and canonical identity, sensor freshness, supported entity/parameter validation, finite bounds and steps, write readback, partial batches, request deadlines, stale response cancellation, explicit demo isolation, and recorded history routing.
 
 ## Manual verification checklist (live Home Assistant)
 

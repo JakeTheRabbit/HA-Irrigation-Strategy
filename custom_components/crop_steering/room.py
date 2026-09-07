@@ -29,7 +29,7 @@ def room_prefix(entry) -> str:
         return ""
 
 
-def build_engine_config(prefix, slug, num_zones, zones, hardware):
+def build_engine_config(prefix, slug, num_zones, zones, hardware, setup=None):
     """PURE. The room descriptor the f2-control add-on reads from
     ``sensor.crop_steering_<prefix>engine_config`` to DISCOVER and drive an additional room
     (the add-on can't read the config entry directly). Maps each zone's valve switch, the
@@ -54,14 +54,28 @@ def build_engine_config(prefix, slug, num_zones, zones, hardware):
         else f"switch.crop_steering_{prefix}engine_enabled"
     )
     hw = hardware or {}
+    setup = setup or {}
     return {
+        "setup_api_version": 1,
+        "setup_revision": setup.get("setup_revision", 0),
+        "active": setup.get("active", True),
+        "room_name": setup.get("room_name", setup.get("name", slug)),
+        "active_zone_ids": [
+            z
+            for z in range(1, int(num_zones) + 1)
+            if (zones.get(str(z)) or zones.get(z) or {}).get("active", True)
+        ],
+        "zone_names": {
+            str(z): (zones.get(str(z)) or zones.get(z) or {}).get("name", f"Zone {z}")
+            for z in range(1, int(num_zones) + 1)
+        },
         "slug": slug,
         "prefix": prefix,
         "num_zones": int(num_zones),
         "pump": hw.get("pump_switch", ""),
         "mainline": hw.get("main_line_switch", ""),
         "valves": valves,
-        "enable_flag": enable_flag,
+        "enable_flag": setup.get("enable_flag") or enable_flag,
         "feed_ec_sensor": hw.get("feed_ec_sensor", ""),
         "feed_ph_sensor": hw.get("feed_ph_sensor", ""),
     }

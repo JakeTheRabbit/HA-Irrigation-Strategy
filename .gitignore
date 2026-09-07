@@ -44,3 +44,6 @@ node_modules/
 *.key
 *.pem
 *.crt
+
+# Local browser verification artifacts
+output/

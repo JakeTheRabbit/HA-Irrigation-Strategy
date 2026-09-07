@@ -1,11 +1,14 @@
 {
   "domain": "crop_steering",
-  "name": "Crop Steering System",
+  "name": "Crop Steering",
   "codeowners": [
     "@JakeTheRabbit"
   ],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": [
+    "frontend",
+    "http"
+  ],
   "documentation": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy",
   "integration_type": "hub",
   "iot_class": "calculated",

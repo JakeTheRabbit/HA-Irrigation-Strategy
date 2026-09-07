@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) when working in this repository.
 ## What this is
 
 An autonomous **4-phase crop-steering irrigation** system for Home Assistant. Two
-layers:
+runtime layers plus the React/shadcn operator workspace:
 
 1. **HA integration** (`custom_components/crop_steering/`) — entities, config-flow
    wizard, pure calculations, service events. Never touches hardware.
@@ -14,6 +14,8 @@ layers:
    the pure `crop-steering-engine` package, runs the per-zone P0→P1→P2→P3 logic,
    and drives the hardware. Gated by kill switch
    `input_boolean.f2_control_enabled` (OFF = safe, no actuation).
+
+The native UI source is frontend/src. Setup and strategy APIs persist revisioned data; active plans override canonical targets atomically at a local lights-on boundary. See docs/REPOSITORY_MAP.md and docs/GROW_PLANS.md.
 
 > Start with `docs/SYSTEM_OVERVIEW.md` for the whole-stack mental model, then
 > `README.md`. `ENTITIES.md` is the entity reference.
@@ -54,8 +56,7 @@ local Python installs. CI is unaffected.
   (aborts shot on valve/pump fault), P2 EC-correction min-interval (anti-short-cycle),
   optional PID EC loop (`input_boolean.crop_steering_ec_pid_enabled`), daily caps,
   sensor-fusion republish, 30-min operator vitals.
-- Shot duration computed live: `substrate_volume × shot_fraction ÷ (plant_count ×
-  drippers_per_plant × dripper_flow_rate)` — substrate/flow config must be accurate.
+- Shot volume is substrate litres per plant x plants x shot fraction. Duration is shot litres divided by total flow L/s (plants x drippers/plant x L/h/dripper / 3600), followed by the explicit safety cap. Validate positive flow without a hidden clamp.
 - Add-on config: `addons/f2_control/config.yaml`. Options set via Supervisor UI.
 
 ### Critical files
@@ -78,8 +79,7 @@ P3 (Pre-lights-off):  emergency-only; dry back overnight → P0 at lights-on
 - A "grow-day" is one **photoperiod**. The daily water + shot counters reset at the
   **P3→P0 transition (lights-on)**, not at calendar midnight.
 - Lights-off forces any P1/P2 zone to P3 (no zone strands mid-cycle overnight).
-- **Dryback semantics:** every "dryback" value is a *% point drop from peak VWC*
-  (dries-back-by, never dries-back-to).
+- **Dryback semantics:** controller dryback_target is a relative percent of detected peak: (peak - VWC) / peak * 100. At60% peak and10% target, the reference is54% VWC. Rate calculations use VWC percentage points/hour; convert units explicitly.
 
 ## Hardware control sequence
 

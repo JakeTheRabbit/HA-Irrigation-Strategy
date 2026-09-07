@@ -1,0 +1,6 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Crop Steering</title></head><body><p>Opening Crop Steering…</p><noscript><a href="./dashboard.html">Open dashboard</a> · JavaScript is required.</noscript><script>
+const query=new URLSearchParams(location.search);const legacyViews={dashboard:"overview",tune:"strategy",timeline:"grow-plan",recipes:"grow-plan",climate:"sensors",control:"settings",substrate:"insights",analyze:"insights",floor:"setup",floorplan:"setup",log:"activity",logs:"activity"};
+const room=query.get("room");if(!room||!room.startsWith("room:"))query.set("room",room==="f1"?"room:f1_":"room:");
+const view=query.get("view");query.delete("view");const route=legacyViews[view]||"grow-plan";location.replace("./dashboard.html"+(query.size?"?"+query.toString():"")+(location.hash||"#/"+route));
+</script></body></html>

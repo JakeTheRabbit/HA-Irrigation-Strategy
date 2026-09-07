@@ -98,8 +98,11 @@ def test_wait_shot_interrupts_on_kill_switch(monkeypatch):
     )
     room = c.rooms[0]
     calls = {"n": 0}
+    clock = {"seconds": 0.0}
+    monkeypatch.setattr(controller.time, "monotonic", lambda: clock["seconds"])
 
     def fake_sleep(_dt):
+        clock["seconds"] += _dt
         calls["n"] += 1
         if calls["n"] == 1:  # flip the kill switch OFF after the first slice
             fake.set_state("input_boolean.kill", "off")
@@ -117,7 +120,10 @@ def test_wait_shot_runs_full_when_enabled(monkeypatch):
          "enable_flag": "input_boolean.kill"},
         states={"input_boolean.kill": ("on", {})},
     )
-    monkeypatch.setattr(controller.time, "sleep", lambda _dt: None)
+    clock = {"seconds": 0.0}
+    monkeypatch.setattr(controller.time, "monotonic", lambda: clock["seconds"])
+    monkeypatch.setattr(controller.time, "sleep",
+                        lambda dt: clock.__setitem__("seconds", clock["seconds"] + dt))
     elapsed, aborted = c._wait_shot(c.rooms[0], 1, 6)
     assert aborted is False
     assert elapsed == 6
@@ -130,8 +136,14 @@ def test_execute_shot_abort_closes_valve_and_alerts(monkeypatch):
          "enable_flag": "input_boolean.kill"},
         states={"input_boolean.kill": ("on", {})},
     )
-    monkeypatch.setattr(controller.time, "sleep",
-                        lambda _dt: fake.set_state("input_boolean.kill", "off"))
+    clock = {"seconds": 0.0}
+    monkeypatch.setattr(controller.time, "monotonic", lambda: clock["seconds"])
+
+    def sleep(dt):
+        clock["seconds"] += dt
+        fake.set_state("input_boolean.kill", "off")
+
+    monkeypatch.setattr(controller.time, "sleep", sleep)
     c._execute_shot(c.rooms[0], 1, 10, 6)
     # valve driven closed
     assert fake.states["switch.v1"][0] == "off"
