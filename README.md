@@ -39,7 +39,7 @@ The recorded 8 September **2.16.0** live check showed F2 tank **42%**, **3.06 mS
 
 **Irrigation plan** brings current targets and dated planning together. **Today** shows editable current targets when no schedule owns the room; an active schedule shows its effective targets and graph as read-only, with fallback manual inputs hidden. **Schedule** edits the dated plan for each zone.
 
-This navigation and the updated overnight curves are part of the follow-up UI source, awaiting their own release verification. The recorded live checks refer to deployed **2.16.0**. Existing `#/strategy` and `#/grow-plan` bookmarks continue to open Today and Schedule respectively.
+The unified navigation and overnight curves are published and verified live in **2.16.1 / controller 0.13.3**. Both Today and Schedule opened in the native HA panel, all 398 existing control values matched the pre-upgrade snapshot, and the installed dashboard files matched the public demo. See the [release verification](docs/audits/2026-09-08-unified-plan.md). Existing `#/strategy` and `#/grow-plan` bookmarks continue to open Today and Schedule respectively.
 
 In **Irrigation plan → Schedule**, choose a room, zone and day or week. The steering slider updates the VWC/EC planning curve and shows the targets behind it.
 
