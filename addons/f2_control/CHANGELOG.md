@@ -3,6 +3,19 @@
 The full project changelog (integration + add-on) lives at
 <https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md>.
 
+## 0.12.0
+
+Update the Crop Steering integration to 2.13.0 before updating this controller. Existing options, enable flags, room IDs and persistent runtime data are retained.
+
+- Serve the native dashboard with per-zone day/week grow plans and a combined VWC/EC planning graph.
+- Read versioned setup and strategy snapshots, with explicit configuration acknowledgement and safe holds for invalid required plans.
+- Correct low-flow sizing, elapsed duration accounting, volume caps, stale sequential decisions and shared-hardware recovery.
+- Remove historical package examples from the installation bundle; sensor and equipment mapping belongs to the integration.
+
+- Missing pore EC keeps base VWC shot sizing and pauses EC offset/PID adaptation, with a visible degraded status.
+- Feed EC/pH and pore readings require finite values and valid, fresh, timezone-aware timestamps (60 seconds future-skew tolerance).
+- Weekly delivery estimates persist seven grow-day buckets, include interrupted delivery and expose incomplete legacy history.
+
 ## 0.11.0
 
 > **⚠️ Update the Crop Steering integration BEFORE rebuilding this add-on.** The engine now reads

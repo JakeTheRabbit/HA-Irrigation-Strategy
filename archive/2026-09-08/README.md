@@ -13,3 +13,5 @@ Stable runtime entities and the controller slug were preserved. User-owned aigro
 Obsolete screenshots are in img/ with hashes in screenshot-manifest.json. duplicate-manifest.json maps redundant archived copies to the retained identical file; duplicate payloads are not published twice. The completed one-off archive script is retained under tools/.
 
 Unused generated shadcn components are retained under frontend/ and indexed by unused-ui-manifest.json. The active frontend no longer installs their unused cn and next-themes packages.
+
+The final root cleanup archives 36 additional files: original facility dashboards and package/deploy YAML, old environment templates, generated Lovelace sample, unused root demo entry, legacy controller packages, disabled/nested workflows and redundant guide redirect pages. repository-cleanup-manifest.json records their original paths and SHA-256 hashes. Current reference documentation lives in docs/. Archived thresholds and instructions are historical examples.

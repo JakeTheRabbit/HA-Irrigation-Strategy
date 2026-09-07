@@ -249,3 +249,63 @@ def test_archiving_zone_does_not_require_a_removed_moisture_probe():
     result = asyncio.run(api.save_setup(hass, data))
     assert result["active_zone_ids"] == [2]
     assert entry.data["zones"]["1"]["vwc_sensors"] == ["sensor.deleted"]
+
+
+def test_setup_reads_current_hydraulics_before_legacy_defaults_and_preserves_rename():
+    hass, entry, states = rig()
+    entry.data["parameters"].update(
+        substrate_volume=9, dripper_flow_rate=1.2, drippers_per_plant=3
+    )
+    values = {"substrate_volume": 6.75, "dripper_flow_rate": 4, "drippers_per_plant": 1}
+    for key, value in values.items():
+        eid = f"number.crop_steering_veg_{key}"
+        states[eid] = SimpleNamespace(entity_id=eid, state=str(value), attributes={})
+    eid = "number.crop_steering_veg_zone_1_plant_count"
+    states[eid] = SimpleNamespace(entity_id=eid, state="42", attributes={})
+    # A different room and an orphan must never win room-scoped resolution.
+    states["number.crop_steering_zone_1_plant_count"] = SimpleNamespace(
+        state="7", attributes={}
+    )
+    states[eid + "_2"] = SimpleNamespace(state="99", attributes={})
+    current = api.setup_room(hass, entry)
+    assert {key: current["zones"][0][key] for key in api.SIZING} == {
+        **values,
+        "plant_count": 42,
+    }
+    current["room_name"] = "Renamed"
+    current["expected_revision"] = current["revision"]
+    asyncio.run(api.save_setup(hass, current))
+    assert {key: entry.data["zones"]["1"][key] for key in api.SIZING} == {
+        **values,
+        "plant_count": 42,
+    }
+
+
+def test_setup_hydraulics_prefer_zone_and_reject_invalid_live_values():
+    hass, entry, states = rig()
+    for key, value in {
+        "substrate_volume": 8,
+        "plant_count": 21,
+        "dripper_flow_rate": 3,
+        "drippers_per_plant": 2,
+    }.items():
+        eid = f"number.crop_steering_veg_zone_1_{key}"
+        states[eid] = SimpleNamespace(entity_id=eid, state=str(value), attributes={})
+    assert api.setup_room(hass, entry)["zones"][0]["substrate_volume"] == 8
+    for invalid in ["nan", "inf", "unavailable", "0", "1.5"]:
+        states["number.crop_steering_veg_zone_1_plant_count"].state = invalid
+        assert api.setup_room(hass, entry)["zones"][0]["plant_count"] == 4
+
+
+def test_setup_response_shows_explicit_new_sizing_until_entity_reload():
+    hass, entry, states = rig()
+    eid = "number.crop_steering_veg_zone_1_plant_count"
+    states[eid] = SimpleNamespace(entity_id=eid, state="42", attributes={})
+    data = payload()
+    data["zones"][0]["plant_count"] = 36
+    saved = asyncio.run(api.save_setup(hass, data))
+    assert saved["zones"][0]["plant_count"] == 36
+    states[eid] = SimpleNamespace(
+        entity_id=eid, state="38", attributes={"setup_revision": 1, "setup_value": 36}
+    )
+    assert api.setup_room(hass, entry)["zones"][0]["plant_count"] == 38

@@ -6,6 +6,7 @@ offline, so it can run identically inside the f2-control add-on, a standalone
 service, a worker, or a test — the host no longer matters.
 """
 import dataclasses
+import math
 from dataclasses import dataclass
 
 PHASES = ("P0", "P1", "P2", "P3")
@@ -51,7 +52,7 @@ class ZoneParams:
 @dataclass
 class ZoneSnapshot:
     vwc: float
-    ec: float
+    ec: float | None            # None = unavailable/stale; never substitute a low reading
     phase: str                  # 'P0'..'P3'
     peak_vwc: float
     dryback_pct: float
@@ -60,7 +61,7 @@ class ZoneSnapshot:
     phase_minutes: float
     minutes_since_shot: float
     daily_vol: float
-    ec_smooth: float
+    ec_smooth: float | None
     lights_on: bool
     lights_just_on: bool
     hours_to_lights_on: float
@@ -71,9 +72,9 @@ class ZoneSnapshot:
     #                               budget has NOT yet been reset for THIS grow-day (photoperiod).
 
 
-def ec_adjust(size: float, ec: float, target: float) -> float:
+def ec_adjust(size: float, ec: float | None, target: float) -> float:
     """Scale a shot by pore-EC vs target: high EC -> bigger (dilute), low EC -> smaller (conserve)."""
-    if target <= 0:
+    if ec is None or not math.isfinite(ec) or target <= 0:
         return size
     r = ec / target
     if r > 1.5:
@@ -117,6 +118,7 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     phase = s.phase
     p2_thr = p.p2_threshold
     treason = ""
+    ec_known = s.ec is not None and math.isfinite(s.ec)
 
     # ---- PHASE TRANSITIONS (checked before irrigation) ----
     if not s.lights_on and phase != "P3":
@@ -134,8 +136,11 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     elif phase == "P1":
         # Ramp to the ACHIEVABLE ceiling, graduate once pore EC is flushed back to band.
         p1_ceiling = min(p.p1_target, p.field_capacity)
-        if s.vwc >= p1_ceiling and s.ec <= p.ec_target_p1 * 1.15:
+        if s.vwc >= p1_ceiling and ec_known and s.ec <= p.ec_target_p1 * 1.15:
             phase, treason = "P2", f"P1 recovered {s.vwc:.0f}>={p1_ceiling:.0f} EC ok {s.ec:.1f}"
+        elif not ec_known and s.vwc >= p1_ceiling and s.shot_count > 0:
+            # Do not claim EC recovery or keep watering an already-full slab blindly.
+            phase, treason = "P2", "P1 VWC recovered after watering; EC unknown (flush unverified)"
         elif s.shot_count >= p.p1_max_shots:
             phase, treason = "P2", f"P1 max shots {s.shot_count}/{p.p1_max_shots}"
         elif s.phase_minutes >= 120:
@@ -167,7 +172,7 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     interval_ok = s.minutes_since_shot >= p.p2_min_interval_min
 
     # PRIORITY 1 — ANTI-LOCKOUT: high pore EC FLUSHES in ANY phase, never locks out.
-    if s.ec >= p.max_ec:
+    if ec_known and s.ec >= p.max_ec:
         if not (s.feed_ec < s.ec and s.vwc < p.field_capacity - 2.0):
             why = "feed not dilutive" if s.feed_ec >= s.ec else "slab saturated"
             reason = treason + (" | " if treason else "") + f"BLOCK high EC {s.ec:.1f} — {why} (self-clears)"
@@ -184,11 +189,11 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     # PRIORITY 2 — normal per-phase rules
     if not fire:
         if phase == "P0":
-            if p.ec_target_p0 > 0 and s.ec / p.ec_target_p0 > 2.5:
+            if ec_known and p.ec_target_p0 > 0 and s.ec / p.ec_target_p0 > 2.5:
                 fire, size, ir = True, 10.0, f"P0 EC flush {s.ec:.1f}"
         elif phase == "P1":
             p1_ceiling = min(p.p1_target, p.field_capacity)
-            ec_high = s.ec > p.ec_target_p1 * 1.15 and s.feed_ec < s.ec and s.vwc < p.field_capacity - 2.0
+            ec_high = ec_known and s.ec > p.ec_target_p1 * 1.15 and s.feed_ec < s.ec and s.vwc < p.field_capacity - 2.0
             if s.minutes_since_shot >= p.p1_time_between_min and (s.vwc < p1_ceiling or ec_high):
                 raw = min(p.p1_initial + p.p1_incr * s.shot_count,
                           p.p1_initial + p.p1_incr * p.p1_max_shots)
@@ -198,13 +203,13 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
                     ir = f"P1 flush/runoff EC {s.ec:.1f} (at ceiling {p1_ceiling:.0f})"
                 fire, size = True, ec_adjust(raw, s.ec, p.ec_target_p1)
         elif phase == "P2":
-            flush_ok = s.feed_ec < s.ec and s.vwc < p.field_capacity - 2.0
-            if s.ec >= p.max_ec - 1.0:
+            flush_ok = ec_known and s.feed_ec < s.ec and s.vwc < p.field_capacity - 2.0
+            if ec_known and s.ec >= p.max_ec - 1.0:
                 if flush_ok and interval_ok:
                     fire, size, ir = True, p.p2_shot_size * 1.5, f"P2 rescue flush EC {s.ec:.1f}"
                 elif s.vwc < p2_thr:
                     fire, size, ir = True, ec_adjust(p.p2_shot_size, s.ec, p.ec_target_p2), f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}"
-            elif p.ec_target_p2 > 0 and s.ec / p.ec_target_p2 > 1.2 and flush_ok and interval_ok:
+            elif ec_known and p.ec_target_p2 > 0 and s.ec / p.ec_target_p2 > 1.2 and flush_ok and interval_ok:
                 fire, size, ir = True, p.p2_shot_size * 1.5, f"P2 dilute EC {s.ec:.1f}"
             elif s.vwc < p2_thr:
                 fire, size, ir = True, ec_adjust(p.p2_shot_size, s.ec, p.ec_target_p2), f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}"
@@ -241,6 +246,8 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
             fire, ir = False, f"BLOCK daily-cap {s.daily_vol:.0f}/{p.max_daily_volume:.0f}L (budget; emergencies exempt)"
 
     reason = treason + (" | " if (treason and ir) else "") + ir
+    if not ec_known:
+        reason += (" | " if reason else "") + "EC unknown: base VWC watering; salt protection unverified"
     return phase, round(p2_thr, 1), fire, round(size, 1), reason
 
 
@@ -353,7 +360,7 @@ def validate_params(p):
 
 # ---- STATUS REPUBLISH helpers (PURE) — reproduce the master sensor.crop_steering_* vocabulary ----
 _SYS_UNSAFE = ("over_saturated", "ec_limit_exceeded")
-_SYS_WARN = ("approaching_saturation", "approaching_ec_limit")
+_SYS_WARN = ("approaching_saturation", "approaching_ec_limit", "ec_unknown")
 
 
 def zone_safety_status(vwc, ec, field_capacity, max_ec):
@@ -367,6 +374,8 @@ def zone_safety_status(vwc, ec, field_capacity, max_ec):
         return "approaching_saturation"
     if ec is not None and max_ec and ec >= max_ec - 1:
         return "approaching_ec_limit"
+    if ec is None or not math.isfinite(ec):
+        return "ec_unknown"
     return "safe"
 
 

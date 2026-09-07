@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crop Steering — VWC / EC Setpoint Trainer</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c2430; --line:#2a3340;
+    --ink:#e6edf3; --muted:#8b97a7; --accent:#4dabf7;
+    --vwc:#4dabf7; --ec:#ffa94d; --p0:#3b2f4a; --p1:#1f3a2e;
+    --p2:#243b52; --p3:#3a2a2a; --good:#51cf66; --warn:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  header{padding:18px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{margin:0;font-size:18px;font-weight:650}
+  header p{margin:4px 0 0;color:var(--muted);font-size:13px;max-width:880px}
+  .wrap{display:grid;grid-template-columns:340px 1fr;gap:18px;padding:18px 22px;align-items:start}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .panel h2{margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .presets button{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:20px;padding:5px 11px;font-size:12px;cursor:pointer;transition:.15s}
+  .presets button:hover{border-color:var(--accent);color:var(--accent)}
+  .presets button.active{background:var(--accent);border-color:var(--accent);color:#08121d;font-weight:600}
+  .ctl{margin:10px 0}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px}
+  .ctl label .name{color:var(--ink)}
+  .ctl label .val{color:var(--accent);font-variant-numeric:tabular-nums;font-weight:600}
+  .ctl input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+  .ctl .ent{color:var(--muted);font-size:10.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .grp{border-top:1px dashed var(--line);margin-top:14px;padding-top:6px}
+  .grp:first-of-type{border-top:0;margin-top:0}
+  .canvas-wrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  canvas{width:100%;height:auto;display:block;border-radius:8px}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin:12px 2px 0;font-size:12.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+  .stat .k{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  .stat .v{font-size:18px;font-weight:650;margin-top:2px;font-variant-numeric:tabular-nums}
+  .note{color:var(--muted);font-size:12px;margin-top:12px;line-height:1.6}
+  .note code{background:var(--panel2);padding:1px 5px;border-radius:4px;
+    font-family:ui-monospace,Menlo,monospace;color:var(--ink)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .toolbar{display:flex;gap:8px;margin-top:12px}
+  .toolbar button{flex:1;background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:8px;cursor:pointer;font-size:12.5px}
+  .toolbar button:hover{border-color:var(--accent);color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🌱 Crop Steering — VWC / EC Setpoint Trainer</h1>
+  <p>An interactive sandbox for the 4‑phase (P0→P1→P2→P3) daily irrigation cycle. Pick a grow stage,
+     drag the setpoints, and watch how substrate <b style="color:var(--vwc)">VWC</b> and pore‑water
+     <b style="color:var(--ec)">EC</b> respond over one photoperiod. It's a teaching model — the shapes
+     mirror the real engine, the exact numbers won't. Nothing here is connected to live hardware.</p>
+</header>
+
+<div class="wrap">
+  <!-- ───────── CONTROLS ───────── -->
+  <div class="panel">
+    <h2>Grow‑stage presets</h2>
+    <div class="presets" id="presets"></div>
+
+    <div class="grp">
+      <h2>Daily cycle</h2>
+      <div class="ctl"><label><span class="name">Lights on</span><span class="val" id="v_lightson"></span></label>
+        <input type="range" id="lightson" min="0" max="23" step="1"></div>
+      <div class="ctl"><label><span class="name">Photoperiod (light hrs)</span><span class="val" id="v_photo"></span></label>
+        <input type="range" id="photo" min="6" max="20" step="1"></div>
+      <div class="ctl"><label><span class="name">Transpiration rate</span><span class="val" id="v_trans"></span></label>
+        <input type="range" id="trans" min="0.4" max="4" step="0.1"><div class="ent">how fast the plant pulls water down — env driven (%VWC / hr)</div></div>
+    </div>
+
+    <div class="grp">
+      <h2>VWC setpoints</h2>
+      <div class="ctl"><label><span class="name">Field capacity (ceiling)</span><span class="val" id="v_fc"></span></label>
+        <input type="range" id="fc" min="50" max="80" step="1"><div class="ent">number.crop_steering_field_capacity</div></div>
+      <div class="ctl"><label><span class="name">P0 dryback drop</span><span class="val" id="v_p0db"></span></label>
+        <input type="range" id="p0db" min="2" max="30" step="1"><div class="ent">…p0_dryback_drop_percent · % drop from peak → P1</div></div>
+      <div class="ctl"><label><span class="name">P1 target VWC</span><span class="val" id="v_p1"></span></label>
+        <input type="range" id="p1" min="45" max="78" step="1"><div class="ent">…p1_target_vwc · ramp‑up goal</div></div>
+      <div class="ctl"><label><span class="name">P2 maintenance threshold</span><span class="val" id="v_p2"></span></label>
+        <input type="range" id="p2" min="35" max="70" step="1"><div class="ent">…p2_vwc_threshold · top‑up floor</div></div>
+      <div class="ctl"><label><span class="name">P2 shot size</span><span class="val" id="v_shot"></span></label>
+        <input type="range" id="shot" min="1" max="8" step="0.5"><div class="ent">…p2_shot_size · % of substrate vol per shot</div></div>
+      <div class="ctl"><label><span class="name">P3 emergency floor</span><span class="val" id="v_p3"></span></label>
+        <input type="range" id="p3" min="25" max="55" step="1"><div class="ent">…p3_emergency_vwc_threshold · rescue line</div></div>
+    </div>
+
+    <div class="grp">
+      <h2>EC steering</h2>
+      <div class="ctl"><label><span class="name">Feed EC (dripper)</span><span class="val" id="v_feed"></span></label>
+        <input type="range" id="feed" min="0.5" max="6" step="0.1"><div class="ent">EC of the nutrient solution going in (mS/cm)</div></div>
+      <div class="ctl"><label><span class="name">Target pore EC (P2)</span><span class="val" id="v_ectgt"></span></label>
+        <input type="range" id="ectgt" min="1" max="9" step="0.1"><div class="ent">…ec_target_*_p2 · where you want substrate EC to sit</div></div>
+    </div>
+
+    <div class="toolbar">
+      <button id="reset">↺ Reset stage</button>
+      <button id="copy">⧉ Copy setpoints</button>
+    </div>
+  </div>
+
+  <!-- ───────── CHART ───────── -->
+  <div>
+    <div class="canvas-wrap">
+      <canvas id="chart" width="1100" height="560"></canvas>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--vwc)"></i>Substrate VWC (%)</span>
+        <span><i class="dot" style="background:var(--ec)"></i>Pore EC (mS/cm)</span>
+        <span><i class="dot" style="background:#3b2f4a"></i>P0 dryback</span>
+        <span><i class="dot" style="background:#1f3a2e"></i>P1 ramp</span>
+        <span><i class="dot" style="background:#243b52"></i>P2 maintain</span>
+        <span><i class="dot" style="background:#3a2a2a"></i>P3 / dark</span>
+      </div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="note">
+      <b>How to read it.</b> The cycle starts at lights‑on. In <b>P0</b> the substrate dries back from its
+      overnight peak; once it has dropped by your <code>p0_dryback_drop</code> it flips to <b>P1</b> and shots
+      ramp VWC up to <code>p1_target_vwc</code>. <b>P2</b> holds the line — every time VWC falls below
+      <code>p2_vwc_threshold</code> a <code>p2_shot_size</code> shot fires (the sawtooth). A few hours before
+      lights‑off it enters <b>P3</b> and dries back overnight (emergency‑only) until lights‑on resets to P0.
+      <br><br>
+      <b>EC behaviour.</b> As the plant transpires water out, salts concentrate so pore EC <i>rises</i>; each
+      irrigation of lower‑EC feed dilutes it back down. Wider drybacks (generative stages) stack EC higher —
+      that's the lever Ripen/Stretch pull. This is a deliberately simplified illustration of the real engine's
+      behaviour for training intuition.
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Grow-stage presets (starting values from docs/AUTONOMOUS_SETPOINTS.md) ──
+const PRESETS = {
+  "Prop":    {lightson:6, photo:18, trans:0.8, fc:65, p0db:5,  p1:62, p2:58, shot:3, p3:45, feed:1.6, ectgt:1.8},
+  "Veg":     {lightson:6, photo:18, trans:1.4, fc:68, p0db:10, p1:65, p2:60, shot:5, p3:42, feed:2.4, ectgt:2.8},
+  "Stretch": {lightson:7, photo:12, trans:2.2, fc:66, p0db:18, p1:58, p2:50, shot:4, p3:38, feed:3.2, ectgt:4.0},
+  "Bulk":    {lightson:7, photo:12, trans:2.4, fc:68, p0db:14, p1:64, p2:58, shot:5, p3:42, feed:4.0, ectgt:5.5},
+  "Ripen":   {lightson:7, photo:12, trans:2.0, fc:64, p0db:22, p1:55, p2:46, shot:4, p3:36, feed:4.2, ectgt:6.0},
+  "Flush":   {lightson:7, photo:12, trans:1.8, fc:66, p0db:12, p1:62, p2:56, shot:5, p3:42, feed:0.8, ectgt:0.8},
+};
+const KEYS = ["lightson","photo","trans","fc","p0db","p1","p2","shot","p3","feed","ectgt"];
+const FMT = {
+  lightson:v=>String(v).padStart(2,"0")+":00", photo:v=>v+" h", trans:v=>v.toFixed(1)+" %/h",
+  fc:v=>v+" %", p0db:v=>v+" %", p1:v=>v+" %", p2:v=>v+" %", shot:v=>v.toFixed(1)+" %",
+  p3:v=>v+" %", feed:v=>v.toFixed(1)+" mS", ectgt:v=>v.toFixed(1)+" mS"
+};
+let state = {...PRESETS.Veg};
+let activePreset = "Veg";
+
+// ── Build preset buttons ──
+const presetBox = document.getElementById("presets");
+Object.keys(PRESETS).forEach(name=>{
+  const b=document.createElement("button");
+  b.textContent=name; b.dataset.name=name;
+  b.onclick=()=>loadPreset(name);
+  presetBox.appendChild(b);
+});
+function loadPreset(name){
+  activePreset=name; state={...PRESETS[name]};
+  KEYS.forEach(k=>{document.getElementById(k).value=state[k];});
+  syncUI(); render();
+}
+
+// ── Wire sliders ──
+KEYS.forEach(k=>{
+  document.getElementById(k).addEventListener("input",e=>{
+    state[k]=parseFloat(e.target.value); activePreset=null; syncUI(); render();
+  });
+});
+document.getElementById("reset").onclick=()=>{ if(activePreset) loadPreset(activePreset); else loadPreset("Veg"); };
+document.getElementById("copy").onclick=()=>{
+  const txt = KEYS.map(k=>k.padEnd(10)+" = "+state[k]).join("\n");
+  navigator.clipboard?.writeText(txt);
+  const btn=document.getElementById("copy"); const o=btn.textContent;
+  btn.textContent="✓ Copied"; setTimeout(()=>btn.textContent=o,1200);
+};
+
+function syncUI(){
+  KEYS.forEach(k=>{document.getElementById("v_"+k).textContent=FMT[k](state[k]);});
+  document.querySelectorAll("#presets button").forEach(b=>{
+    b.classList.toggle("active", b.dataset.name===activePreset);
+  });
+}
+
+// ── Simulation: walk the 24h cycle in small steps ──
+function simulate(){
+  const s=state, dt=1/60;            // hour step (1 min)
+  const total=24;
+  const onsetP3 = Math.max(2, s.photo*0.25);   // P3 begins this many hrs before lights-off
+  let vwc = s.p3 + (s.fc-s.p3)*0.55;           // overnight low at lights-on
+  // pore EC tracks salt mass / water; start near target
+  let salt = s.ectgt * Math.max(vwc,20);       // pseudo salt mass
+  let peak = vwc, phase="P0", shots=0, water=0;
+  const pts=[];
+  for(let t=0; t<=total; t+=dt){
+    const lit = t < s.photo;                    // lights on during first `photo` hours
+    const drain = lit ? s.trans : s.trans*0.18; // overnight transpiration much lower
+    // passive decline
+    vwc -= drain*dt;
+    // phase logic
+    if(lit){
+      if(phase==="P0"){
+        peak=Math.max(peak,vwc);
+        if(peak - vwc >= s.p0db) phase="P1";
+      } else if(phase==="P1"){
+        if(vwc < s.p1-0.4){
+          const add=Math.min(s.shot*1.3, s.fc-vwc); vwc+=add; salt+=s.feed*add; shots++; water+=add;
+        } else phase="P2";
+      } else if(phase==="P2"){
+        if(t >= s.photo-onsetP3){ phase="P3"; }
+        else if(vwc < s.p2){
+          const add=Math.min(s.shot, s.fc-vwc); vwc+=add; salt+=s.feed*add; shots++; water+=add;
+        }
+      } else if(phase==="P3"){
+        if(vwc < s.p3){ const add=Math.min(s.shot, s.fc-vwc); vwc+=add; salt+=s.feed*add; shots++; water+=add; }
+      }
+    } else {
+      phase="P3";
+      if(vwc < s.p3){ const add=Math.min(s.shot, s.fc-vwc); vwc+=add; salt+=s.feed*add; shots++; water+=add; }
+    }
+    vwc=Math.max(8,Math.min(s.fc,vwc));
+    const ec = salt/Math.max(vwc,12);           // concentrate as water leaves
+    pts.push({t,vwc,ec,phase,lit});
+  }
+  return {pts,shots,water};
+}
+
+// ── Render to canvas ──
+const cv=document.getElementById("chart"), ctx=cv.getContext("2d");
+const W=cv.width, H=cv.height, M={l:52,r:56,t:24,b:42};
+const plotW=W-M.l-M.r, plotH=H-M.t-M.b;
+const VWC_MAX=80, EC_MAX=10, T_MAX=24;
+const x=t=>M.l+(t/T_MAX)*plotW;
+const yV=v=>M.t+(1-v/VWC_MAX)*plotH;
+const yE=e=>M.t+(1-e/EC_MAX)*plotH;
+const PHASE_COL={P0:"#3b2f4a",P1:"#1f3a2e",P2:"#243b52",P3:"#3a2a2a"};
+
+function render(){
+  const {pts,shots,water}=simulate();
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle="#0e1116"; ctx.fillRect(0,0,W,H);
+
+  // phase bands (group consecutive same-phase points)
+  let i=0;
+  while(i<pts.length){
+    let j=i; while(j<pts.length && pts[j].phase===pts[i].phase) j++;
+    const x0=x(pts[i].t), x1=x(pts[Math.min(j,pts.length-1)].t);
+    ctx.fillStyle=PHASE_COL[pts[i].phase]; ctx.globalAlpha=.55;
+    ctx.fillRect(x0,M.t,x1-x0,plotH);
+    ctx.globalAlpha=1;
+    // label
+    if(x1-x0>26){
+      ctx.fillStyle="rgba(230,237,243,.55)"; ctx.font="600 12px sans-serif";
+      ctx.textAlign="center"; ctx.fillText(pts[i].phase,(x0+x1)/2,M.t+15);
+    }
+    i=j;
+  }
+
+  // grid + left (VWC) axis
+  ctx.strokeStyle="#2a3340"; ctx.fillStyle="#8b97a7"; ctx.font="11px sans-serif"; ctx.lineWidth=1;
+  for(let v=0;v<=VWC_MAX;v+=10){
+    const yy=yV(v); ctx.globalAlpha=.5; ctx.beginPath();ctx.moveTo(M.l,yy);ctx.lineTo(W-M.r,yy);ctx.stroke();
+    ctx.globalAlpha=1; ctx.textAlign="right"; ctx.fillStyle="#4dabf7"; ctx.fillText(v,M.l-8,yy+3);
+  }
+  // right (EC) axis ticks
+  for(let e=0;e<=EC_MAX;e+=2){
+    ctx.textAlign="left"; ctx.fillStyle="#ffa94d"; ctx.fillText(e,W-M.r+8,yE(e)+3);
+  }
+  // x axis (hours from lights-on)
+  ctx.fillStyle="#8b97a7"; ctx.textAlign="center";
+  for(let t=0;t<=24;t+=3){ ctx.fillText(t+"h",x(t),H-M.b+18); }
+  ctx.fillText("hours since lights‑on",M.l+plotW/2,H-8);
+
+  // setpoint reference lines
+  const refs=[
+    {v:state.fc, c:"#7048e8", t:"field capacity"},
+    {v:state.p1, c:"#4dabf7", t:"P1 target"},
+    {v:state.p2, c:"#3bc9db", t:"P2 threshold"},
+    {v:state.p3, c:"#ff6b6b", t:"P3 floor"},
+  ];
+  ctx.setLineDash([5,4]); ctx.font="10.5px sans-serif";
+  refs.forEach(r=>{
+    ctx.strokeStyle=r.c; ctx.globalAlpha=.8; ctx.beginPath();
+    ctx.moveTo(M.l,yV(r.v));ctx.lineTo(W-M.r,yV(r.v));ctx.stroke(); ctx.globalAlpha=1;
+    ctx.fillStyle=r.c; ctx.textAlign="left"; ctx.fillText(r.t,M.l+6,yV(r.v)-4);
+  });
+  // EC target line
+  ctx.strokeStyle="#ffa94d"; ctx.globalAlpha=.55; ctx.beginPath();
+  ctx.moveTo(M.l,yE(state.ectgt));ctx.lineTo(W-M.r,yE(state.ectgt));ctx.stroke();
+  ctx.globalAlpha=1; ctx.fillStyle="#ffa94d"; ctx.textAlign="right";
+  ctx.fillText("EC target",W-M.r-6,yE(state.ectgt)-4);
+  ctx.setLineDash([]);
+
+  // EC curve
+  ctx.strokeStyle="#ffa94d"; ctx.lineWidth=2; ctx.beginPath();
+  pts.forEach((p,k)=>{const xx=x(p.t),yy=yE(Math.min(p.ec,EC_MAX)); k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});
+  ctx.stroke();
+
+  // VWC curve
+  ctx.strokeStyle="#4dabf7"; ctx.lineWidth=2.4; ctx.beginPath();
+  pts.forEach((p,k)=>{const xx=x(p.t),yy=yV(p.vwc); k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});
+  ctx.stroke();
+
+  // axis titles
+  ctx.save(); ctx.translate(14,M.t+plotH/2); ctx.rotate(-Math.PI/2);
+  ctx.fillStyle="#4dabf7"; ctx.textAlign="center"; ctx.font="600 11px sans-serif";
+  ctx.fillText("VWC  (%)",0,0); ctx.restore();
+  ctx.save(); ctx.translate(W-12,M.t+plotH/2); ctx.rotate(Math.PI/2);
+  ctx.fillStyle="#ffa94d"; ctx.textAlign="center"; ctx.fillText("EC  (mS/cm)",0,0); ctx.restore();
+
+  // stats
+  const peak=Math.max(...pts.map(p=>p.vwc)), low=Math.min(...pts.map(p=>p.vwc));
+  const ecPeak=Math.max(...pts.map(p=>p.ec));
+  document.getElementById("stats").innerHTML=`
+    <div class="stat"><div class="k">Daily shots</div><div class="v">${shots}</div></div>
+    <div class="stat"><div class="k">Water added</div><div class="v">${water.toFixed(0)}<span style="font-size:12px;color:var(--muted)"> %vol</span></div></div>
+    <div class="stat"><div class="k">VWC peak → low</div><div class="v">${peak.toFixed(0)}→${low.toFixed(0)}</div></div>
+    <div class="stat"><div class="k">Overnight dryback</div><div class="v">${(pts.find(p=>p.t>=state.photo)?.vwc - low>0?(pts.find(p=>p.t>=state.photo).vwc-low):0).toFixed(0)} pt</div></div>
+    <div class="stat"><div class="k">Peak pore EC</div><div class="v" style="color:var(--ec)">${ecPeak.toFixed(1)}</div></div>
+    <div class="stat"><div class="k">EC stack</div><div class="v" style="color:var(--ec)">${(ecPeak-state.feed).toFixed(1)}<span style="font-size:12px;color:var(--muted)"> mS</span></div></div>`;
+}
+
+// init
+loadPreset("Veg");
+</script>
+</body>
+</html>

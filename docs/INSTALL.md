@@ -7,7 +7,7 @@
 - Home Assistant OS/Supervised with the app store for the guided controller install. Container/Core users must run the companion controller separately; a true one-click controller install is not available there.
 - Existing HA entities for the actual pump and zone valves, fresh VWC/EC probes, feed-water probes and any configured interlocks. This integration maps entities; it does not provision sensor firmware or pair devices.
 
-The new workspace/setup/plan features are source changes awaiting release and live commissioning. A link to the public repository will install whatever revision is published there, not an uncommitted local checkout.
+This workspace requires integration 2.13.0 and controller 0.12.0. Use matching published versions; the public demo uses isolated sample data.
 
 ## Guided installation
 
@@ -34,6 +34,8 @@ Copy the entire `custom_components/crop_steering` directory into HA's `/config/c
 Developers build the dashboard using `npm ci --prefix frontend` then `npm run build --prefix frontend`. Packaging generates identical self-contained HTML in the integration, controller and web distribution folders. Compiled HTML is a deliverable, not the editing source.
 
 ## Upgrading an existing installation
+
+For an existing controller, update it in place from its current app repository. Do not install a second controller from a different repository: that creates a different app identity and separate runtime data. The dedicated [controller repository](https://github.com/JakeTheRabbit/f2-control) continues to receive matching releases.
 
 Back up HA and the controller's persistent data. Export grow plans from the planner if available. Update the integration **and** controller together, restart HA, and use the controller's Update/Rebuild action so its image contains the new Python code. A restart alone does not rebuild an old image.
 

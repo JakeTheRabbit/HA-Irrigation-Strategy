@@ -132,8 +132,9 @@ check_transition_conditions:
 set_manual_override:
   name: Set manual override
   description: >-
-    Enable or disable a manual override for a zone, optionally with a
-    timeout. While overridden, the autonomous engine leaves the zone alone.
+    Pause automatic irrigation for one zone until the timeout expires, including
+    across Home Assistant restarts. The default is 60 minutes. Disable clears the
+    hold immediately; turning the switch on directly creates an indefinite hold.
   fields:
     zone:
       name: Zone
@@ -146,7 +147,8 @@ set_manual_override:
           mode: box
     timeout_minutes:
       name: Timeout
-      description: Auto-clear the override after this many minutes (max 24 h).
+      description: Auto-clear after this many minutes; defaults to 60 (max 24 h).
+      default: 60
       required: false
       selector:
         number:

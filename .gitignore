@@ -47,3 +47,7 @@ node_modules/
 
 # Local browser verification artifacts
 output/
+
+# User-generated configuration and optional Lovelace output
+/crop_steering.env
+/crop_steering_lovelace.yaml

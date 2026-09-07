@@ -7,6 +7,7 @@ from copy import deepcopy
 import math
 
 from .const import DOMAIN, MAX_ZONES
+from .sizing import prefer_setup_value
 
 API_VERSION = 1
 HARDWARE_DOMAINS = {
@@ -320,6 +321,46 @@ def configuration_payload(data):
     }
 
 
+def setup_sizing(hass, data, cfg, zone, key):
+    """Expose current hydraulic numbers without resetting a legacy room on save."""
+    prefix = data.get("room_prefix", "")
+    zone_state = hass.states.get(f"number.crop_steering_{prefix}zone_{zone}_{key}")
+    if key in cfg and prefer_setup_value(
+        zone_state.attributes if zone_state else {},
+        data.get("setup_revision", 0),
+        cfg[key],
+    ):
+        # An explicit save wins until its newly configured entity has reloaded.
+        return cfg[key]
+    room_state = hass.states.get(f"number.crop_steering_{prefix}{key}")
+    low, high, integer = SIZING[key]
+    for state in (zone_state, room_state):
+        if state is None:
+            continue
+        try:
+            value = float(state.state)
+        except (ValueError, TypeError):
+            continue
+        if (
+            math.isfinite(value)
+            and low <= value <= high
+            and (not integer or value.is_integer())
+        ):
+            return int(value) if integer else value
+    return cfg.get(
+        key,
+        data.get("parameters", {}).get(
+            key,
+            {
+                "plant_count": 4,
+                "substrate_volume": 6,
+                "drippers_per_plant": 1,
+                "dripper_flow_rate": 2,
+            }[key],
+        ),
+    )
+
+
 def setup_room(hass, entry):
     data = effective(entry)
     zones = []
@@ -336,21 +377,7 @@ def setup_room(hass, entry):
                     or [cfg[k] for k in (f"{kind}_front", f"{kind}_back") if cfg.get(k)]
                     for kind in ("vwc", "ec")
                 },
-                **{
-                    key: cfg.get(
-                        key,
-                        data.get("parameters", {}).get(
-                            key,
-                            {
-                                "plant_count": 4,
-                                "substrate_volume": 6,
-                                "drippers_per_plant": 1,
-                                "dripper_flow_rate": 2,
-                            }[key],
-                        ),
-                    )
-                    for key in SIZING
-                },
+                **{key: setup_sizing(hass, data, cfg, z, key) for key in SIZING},
             }
         )
     blockers = safety_blockers(hass, entry)

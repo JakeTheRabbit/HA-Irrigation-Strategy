@@ -1,7 +1,7 @@
 # Testing
 
 This repo ships an automated test suite plus a manual checklist for the live system. CI
-runs the automated suite on every push and pull request
+runs the automated suite on pushes to main and pull requests targeting main
 (`.github/workflows/ci-validate.yml`); you can run the same thing locally before pushing.
 
 ## Prerequisites

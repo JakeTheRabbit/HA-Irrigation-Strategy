@@ -19,6 +19,10 @@ Validation date: 8 September 2026. This describes the unreleased working tree. *
 | Sensor diagnostics and equipment map | Implemented; browser tested | Measured values, freshness/coverage and configured devices; no unsupported yield/potency score. |
 | Reviewed manual setpoint writes | Implemented; mocked-HA browser tested | Explicit selected-room scope, bounds/steps, service calls and readback; partial failures retain drafts. Active plans lock conflicting manual target edits. |
 | Source-water/interlock/volume/duration gates | Implemented; controller regressions | Includes request-latency duration accounting, blind-path caps, shared-hardware fault latch and recovery. Physical valve/pump behavior remains unverified. |
+| Missing or invalid EC | Implemented; controller/core regressions | Unscaled base VWC watering, suspended EC learning/offset application and degraded status. Salt protection is unverified until EC returns. Configured feed-water gates still apply. |
+| Sensor fusion | Implemented; arithmetic mean | Finite readings are averaged. No automatic outlier rejection or probe weighting is claimed. |
+| Timed manual override | Implemented; lifecycle/service tests | Per-room/zone deadline expires and survives graceful restart/reload. Retrigger/direct switch changes cancel obsolete callbacks. Noncanonical entity IDs are rejected because the controller consumes canonical IDs. Abrupt power-loss persistence follows HA RestoreEntity checkpoints. |
+| Weekly water usage | Implemented; migration/rollover tests | Seven grow-day controller delivery estimates, including partial aborts; old/missing history is marked incomplete. External irrigation and measured flow are not included. |
 | Activity view and CSV export | Implemented with evidence limits | Exports available controller/state information. This is not a complete immutable history of all physical irrigation events. |
 | Legacy manual-shot/phase-override events | Not validated as actuator commands | Existing services can publish events; this controller is not proven to consume those events. The new UI does not claim these are working physical controls. |
 | Tank dosing and climate actuation | Not implemented by this controller | EC values are root-zone references, not tank dosing commands. Environment controls remain external HA workflows. |
@@ -40,6 +44,8 @@ Measured-flow reconciliation is the strongest next step: compare commanded litre
 
 ## Evidence
 
+- [Release corrections and validation](audits/2026-09-08-release-validation.md)
+- [Branch feature consolidation](audits/2026-09-08-branch-consolidation.md)
 - [Final validation record](audits/2026-09-08-validation.md)
 - [Setup API/flow and sidebar](audits/2026-09-08-setup.md)
 - [Strategy implementation and runtime contracts](audits/2026-09-08-strategy.md)
@@ -48,4 +54,4 @@ Measured-flow reconciliation is the strongest next step: compare commanded litre
 - [Theme/history/planning chart](audits/2026-09-08-theme-chart.md)
 - [Insights and calibration](audits/2026-09-08-insights.md)
 
-Reproduce the checks using [TESTING.md](../TESTING.md). Machine-readable browser results and screenshots are generated in the ignored output/playwright folder. The archive retains older reports as dated historical evidence.
+Reproduce the checks using [TESTING.md](TESTING.md). Machine-readable browser results and screenshots are generated in the ignored output/playwright folder. The archive retains older reports as dated historical evidence.

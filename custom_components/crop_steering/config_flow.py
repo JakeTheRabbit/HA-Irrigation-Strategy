@@ -536,7 +536,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 description_placeholders={
                     "info": f"Pick the valve and probe(s) for each of your {num} zones. "
                     "You can choose MORE THAN ONE moisture/EC sensor per zone — the engine "
-                    "averages them and rejects outliers."
+                    "averages valid readings. Outliers are not automatically rejected."
                 },
             )
         self._data["zones"] = _build_zones(num, user_input)

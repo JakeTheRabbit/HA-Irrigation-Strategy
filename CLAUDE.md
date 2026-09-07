@@ -18,7 +18,7 @@ runtime layers plus the React/shadcn operator workspace:
 The native UI source is frontend/src. Setup and strategy APIs persist revisioned data; active plans override canonical targets atomically at a local lights-on boundary. See docs/REPOSITORY_MAP.md and docs/GROW_PLANS.md.
 
 > Start with `docs/SYSTEM_OVERVIEW.md` for the whole-stack mental model, then
-> `README.md`. `ENTITIES.md` is the entity reference.
+> `README.md`. `docs/ENTITIES.md` is the entity reference.
 
 ## Dev commands
 
@@ -79,7 +79,7 @@ P3 (Pre-lights-off):  emergency-only; dry back overnight → P0 at lights-on
 - A "grow-day" is one **photoperiod**. The daily water + shot counters reset at the
   **P3→P0 transition (lights-on)**, not at calendar midnight.
 - Lights-off forces any P1/P2 zone to P3 (no zone strands mid-cycle overnight).
-- **Dryback semantics:** controller dryback_target is a relative percent of detected peak: (peak - VWC) / peak * 100. At60% peak and10% target, the reference is54% VWC. Rate calculations use VWC percentage points/hour; convert units explicitly.
+- **Dryback semantics:** controller dryback_target is a relative percent of detected peak: (peak - VWC) / peak * 100. At 60% peak and 10% target, the reference is 54% VWC. Rate calculations use VWC percentage points/hour; convert units explicitly.
 
 ## Hardware control sequence
 
@@ -104,20 +104,17 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
 - **Dependencies:** integration = pure HA + voluptuous (no external deps). Engine
   (`crop-steering-engine`) = pure Python, no scipy/numpy; f2-control add-on container
   installs its own deps from `addons/f2_control/requirements.txt`.
-- **Testing:** see `TESTING.md`; run `bash tests/run_ci.sh` (mirrors CI). Suites: the pure
+- **Testing:** see `docs/TESTING.md`; run `bash tests/run_ci.sh` (mirrors CI). Suites: the pure
   `decide()` core (`crop-steering-engine/tests`), the lean harness, integration calc helpers
   (`tests/test_calculations.py`), the add-on **state-migration / in-place-upgrade** contract
   (`tests/test_state_migration.py`), and **version consistency** (`tests/test_version_consistency.py`).
   Any change to persisted state, add-on options, or entities needs a test proving an OLD install still loads.
-- **Deploying engine changes:** copy changed modules to `addons/f2_control/` on the
-  live box, then **Rebuild** the add-on from Supervisor (⋮ → Rebuild) — the Dockerfile
-  `COPY f2_control /app` bakes the code into the image at build time, so a plain
-  **restart reuses the old image and does NOT pick up code changes** (it only re-reads
-  the config.yaml options). Rebuild = re-COPY + restart. (Interim without a rebuild:
-  the running build's shot sizing reads the add-on Configuration options `substrate_l`/
-  `flow_lps`, so editing those + Save corrects shot length on the old image.) Integration
-  changes: Developer Tools → YAML → Reload Custom Components. For `crop-steering-engine`
-  package changes, update the package source and Rebuild the add-on.
+- **Deploying changes:** publish a versioned integration release and matching controller
+  app release. Existing app installations must update in place from their current
+  repository to preserve their Supervisor identity and `/data`. A plain restart
+  does not change a baked controller image. Use Supervisor Update for a published
+  release (or Rebuild for local source), then verify the running image and modules.
+  Restart HA after integration updates; see `docs/INSTALL.md` for the current path.
 - **Commit style:** conventional commits (`feat:`/`fix:`/`docs:`/`chore:`) with a
   `Co-Authored-By: Claude` trailer when written via Claude Code. One active branch:
   `main`. Retired branches are kept as `archive/*` tags.
@@ -164,28 +161,20 @@ source-water gate goes dark after the v0.8.0 rebuild.)
 
 **Prove it.** `tests/test_state_migration.py` locks the backward-compatible load and
 `tests/test_version_consistency.py` keeps versions aligned. Run `bash tests/run_ci.sh`; detail
-in `TESTING.md`. A change to state/options/entities isn't done until a test shows an old
+in `docs/TESTING.md`. A change to state/options/entities isn't done until a test shows an old
 install still loads.
 
-## Hard-won operational notes (read before touching the live F2 engine)
+## Operational verification
 
-- **Deploy = Rebuild, never Restart.** A plain restart re-runs the *baked* image (stale code); only a
-  **Rebuild** re-COPYs `addons/f2_control/`. There is **no API rebuild** with the HA long-lived token —
-  `hassio.addon_rebuild` 400s and the Supervisor proxy 401s (needs the in-container `SUPERVISOR_TOKEN`).
-  So: stage the files, then the operator must Rebuild in the UI. **Never claim an engine change is live
-  off a restart.** (`hassio.addon_restart` *does* work for restarting; it just won't load new code.)
-- **Verify shot length from the live pump, not from "deployed".** A shot's *duration* is the only proof a
-  sizing change took — pull `switch.veg_main_pump` history (`/api/history/period`) and read the on-period
-  seconds. File-copied + md5-matched proves nothing about the running container.
-- **Shot sizing is per-plant, scaled to the row.** `dur = shot% × substrate_l ÷ flow_lps`. `flow_lps` is
-  ZONE-total (`plant_count × drippers_per_plant × dripper_flow_rate ÷ 3600`), so `_substrate_l` must also
-  be ZONE-total = per-plant block × `plant_count`. Enter `…zone_N_substrate_volume` as the **PER-PLANT
-  block**; the engine multiplies by `plant_count`. Get the units wrong and shots are plant_count-times too
-  short → the pump short-cycles (the recurring F2 failure). The old build also reads `substrate_l`/
-  `flow_lps` from the add-on **Configuration options** — an interim way to correct sizing without a rebuild.
-- **F2 facts:** 3 zones × 36 plants; 6 L block/plant; 1 dripper/plant @ 4 L/hr → zone flow 0.04 L/s, zone
-  substrate 216 L, a 6 % shot ≈ 324 s. Lights 10:00–22:00. Feed gate EC 2.3–3.5 / pH 5.8–6.2 — the engine
-  correctly holds while the tank is filling/dosing or feed is out of band (don't mistake that for a bug).
+- Preserve current live setpoints, mapping, enable flags, app options and persistent
+  controller state before updating. Historical facility examples are not live truth.
+- Verify installed versions, running module hashes, integration entry state,
+  controller heartbeat, and restored settings after activation. A copied file or
+  successful restart alone does not prove a software update.
+- Verify physical delivery separately. Pump or valve ON history shows an electrical
+  state; only independent flow measurement or a catch test proves delivered water.
+- Shot sizing uses both zone-total substrate and zone-total dripper flow, derived
+  from per-plant pot size, plant count and drippers. Keep the units explicit.
 
 > **Historical note.** An earlier experimental "intelligence" layer (RootSense
 > substrate AI + ClimateSense climate control, under `intelligence/`) was never

@@ -421,6 +421,8 @@ class Controller:
             "ec_prev_err": 0.0,
             "last_ec_steer": None,
             "last_daily_reset": None,
+            "water_history": None,
+            "water_history_legacy_excluded_l": 0.0,
         }
 
     def _apply_saved_zone(self, fresh, d):
@@ -452,6 +454,27 @@ class Controller:
                 s["last_daily_reset"] = date.fromisoformat(d["last_daily_reset"])
             except (ValueError, TypeError):
                 pass
+        history = d.get("water_history")
+        if isinstance(history, list):
+            # Reject malformed/duplicate buckets; old files simply initialize on first use.
+            valid = {}
+            for item in history:
+                try:
+                    day = date.fromisoformat(item["grow_day"])
+                    litres = float(item["litres"])
+                    if not math.isfinite(litres) or litres < 0:
+                        continue
+                    valid[day] = {"grow_day": day.isoformat(), "litres": litres,
+                                  "complete": item.get("complete") is True}
+                except (KeyError, TypeError, ValueError):
+                    continue
+            s["water_history"] = [valid[day] for day in sorted(valid)[-7:]]
+        try:
+            excluded = float(d.get("water_history_legacy_excluded_l", 0.0))
+            if math.isfinite(excluded) and excluded >= 0:
+                s["water_history_legacy_excluded_l"] = excluded
+        except (TypeError, ValueError):
+            pass
         return s
 
     def _read_state_file(self):
@@ -662,6 +685,8 @@ class Controller:
             "peak": s.get("peak"),
             "shots": s.get("shots"),
             "daily_vol": s.get("daily_vol"),
+            "water_history": s.get("water_history"),
+            "water_history_legacy_excluded_l": s.get("water_history_legacy_excluded_l", 0.0),
             "ec_smooth": s.get("ec_smooth"),
             "ec_offset": float(s.get("ec_offset") or 0.0),
             "ec_integral": float(s.get("ec_integral") or 0.0),
@@ -800,19 +825,19 @@ class Controller:
             f = float(v)
         except Exception:
             return None
-        if f < lo or f > hi:
+        if not math.isfinite(f) or f < lo or f > hi:
             return None
         try:
-            if lu:
-                ts = datetime.fromisoformat(str(lu).replace("Z", "+00:00"))
-                if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=timezone.utc)
-                if (
-                    datetime.now(timezone.utc) - ts
-                ).total_seconds() > max_age_min * 60.0:
-                    return None
-        except Exception:
-            pass
+            if not lu:
+                return None
+            ts = datetime.fromisoformat(str(lu).replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                return None
+            age = (datetime.now(timezone.utc) - ts).total_seconds()
+            if age < -60.0 or age > max_age_min * 60.0:
+                return None
+        except (ValueError, TypeError, OverflowError):
+            return None
         return f
 
     def _read_feed_ec(self, room):
@@ -900,7 +925,7 @@ class Controller:
         room.lights_on_hour, room.lights_off_hour = float(lon), float(loff)
 
     # ---------- params + snapshot ----------
-    def _params(self, room, zone):
+    def _params(self, room, zone, ec_known=True):
         veg = self._veg(room, zone)
         sfx = "veg" if veg else "gen"
         base = self._zone_num(room, zone, "p2_vwc_threshold", 45)
@@ -910,7 +935,8 @@ class Controller:
         # EC-steer offset is shell-owned (decide() no longer nudges). Bake it into the
         # P2 rewater threshold, clamped to the same safe band the engine used: never
         # below the emergency-floor band, never above the ramp ceiling.
-        p2_thr = base + float(room.state[zone].get("ec_offset", 0.0))
+        # Keep learned state for recovery, but never apply stale EC steering while blind to EC.
+        p2_thr = base + (float(room.state[zone].get("ec_offset", 0.0)) if ec_known else 0.0)
         p2_thr = max(efloor + 3.0, min(min(p1t, fc) - 1.0, p2_thr))
         raw = ZoneParams(
             p1_target=p1t,
@@ -987,8 +1013,10 @@ class Controller:
             if dt_h > 0:
                 rate = max(0.0, (v0 - vwc) / dt_h)
         if ec is not None:
+            previous = st["ec_smooth"]
             st["ec_smooth"] = (
-                ec if st["ec_smooth"] is None else 0.3 * ec + 0.7 * st["ec_smooth"]
+                ec if previous is None or not math.isfinite(previous)
+                else 0.3 * ec + 0.7 * previous
             )
         feed_live = self._read_feed_ec(room)
         if feed_live is not None:
@@ -1010,7 +1038,7 @@ class Controller:
         new_grow_day = lights_on and (ldr is None or ldr < gds)
         snap = ZoneSnapshot(
             vwc=vwc,
-            ec=(ec if ec is not None else 0.0),
+            ec=ec,
             phase=st["phase"],
             peak_vwc=st["peak"],
             dryback_pct=(
@@ -1025,7 +1053,7 @@ class Controller:
                 else 1e9
             ),
             daily_vol=st["daily_vol"],
-            ec_smooth=(st["ec_smooth"] if st["ec_smooth"] is not None else 0.0),
+            ec_smooth=st["ec_smooth"] if ec is not None else None,
             lights_on=lights_on,
             lights_just_on=lights_just_on,
             hours_to_lights_on=self._hours_to(now, room.lights_on_hour),
@@ -1034,7 +1062,7 @@ class Controller:
             feed_ec=(feed_ec if feed_ec is not None else 3.0),
             new_grow_day=new_grow_day,
         )
-        return snap, self._params(room, zone)
+        return snap, self._params(room, zone, ec_known=ec is not None)
 
     # ---------- gates ----------
     def _blocked(self, room, zone):
@@ -1139,11 +1167,67 @@ class Controller:
         if dom and svc:
             ha_call(dom, svc, title=title, message=message)
 
+    def _water_usage(self, room, zone, now):
+        """Recorded controller delivery over this grow-day and the previous six.
+
+        Buckets follow room lights-on, independently of phase/reset timing. Old counters
+        are never reset here. Import only a dated, current grow-day counter; unknown
+        legacy volume stays in daily_vol and is explicitly excluded from this window.
+        Missing grow-days remain missing (not invented zeroes). The first observed day
+        is partial; subsequent consecutive grow-days have full controller coverage.
+        """
+        st = room.state[zone]
+        today = self._grow_day_start(room, now)
+        cutoff = today - timedelta(days=6)
+        history = st.get("water_history")
+        changed = False
+        if history is None:
+            legacy = float(st.get("daily_vol") or 0.0)
+            legacy = legacy if math.isfinite(legacy) and legacy >= 0 else 0.0
+            dated = st.get("last_daily_reset") == today
+            history = [{"grow_day": today.isoformat(), "litres": legacy if dated else 0.0,
+                        "complete": False}]
+            st["water_history_legacy_excluded_l"] = 0.0 if dated else legacy
+            changed = True
+        history = [item for item in history if cutoff.isoformat() <= item["grow_day"] <= today.isoformat()]
+        if history != st.get("water_history"):
+            changed = True
+        current = next((item for item in history if item["grow_day"] == today.isoformat()), None)
+        if current is None:
+            consecutive = any(item["grow_day"] == (today - timedelta(days=1)).isoformat()
+                              for item in history)
+            current = {"grow_day": today.isoformat(), "litres": 0.0, "complete": consecutive}
+            history.append(current)
+            changed = True
+        st["water_history"] = history[-7:]
+        if changed:
+            self._save_state()
+        complete_days = sum(item["complete"] for item in history)
+        attrs = {
+            "window_start_grow_day": cutoff.isoformat(),
+            "window_end_grow_day": today.isoformat(),
+            "observed_grow_days": len(history),
+            "complete_grow_days": complete_days,
+            "history_complete": complete_days == 7,
+            "coverage": "complete" if complete_days == 7 else "partial_history",
+            "legacy_volume_excluded_l": st.get("water_history_legacy_excluded_l", 0.0),
+            "measurement": "estimated controller delivery; current grow-day to date",
+        }
+        return round(sum(item["litres"] for item in history), 2), attrs
+
     def _advance_shot_counters(self, room, zone, size_pct):
         st = room.state[zone]
+        now = datetime.now()
+        self._water_usage(room, zone, now)
+        delivered_l = size_pct / 100.0 * self._substrate_l(room, zone)
+        day = self._grow_day_start(room, now).isoformat()
+        for item in st["water_history"]:
+            if item["grow_day"] == day:
+                item["litres"] += delivered_l
+                break
         st["shots"] += 1
-        st["last_shot"] = datetime.now()
-        st["daily_vol"] += size_pct / 100.0 * self._substrate_l(room, zone)
+        st["last_shot"] = now
+        st["daily_vol"] += delivered_l
         self._save_state()
 
     # ---------- hardware (sync; this process does one thing) ----------
@@ -1665,12 +1749,21 @@ class Controller:
         snaps, decisions, healthy, blind, params = {}, {}, [], [], {}
         for zone in room.zones:
             st = room.state[zone]
+            self._water_usage(room, zone, now)
             snap, p = self._snapshot(room, zone, now, lights_on, lights_just_on)
             params[zone] = p
             if snap is None:
                 blind.append((zone, p))
                 continue
             snaps[zone] = snap
+            if snap.ec is None:
+                self._alert(
+                    f"ec_unknown_{room.slug}_z{zone}",
+                    f"{room.slug} Z{zone} EC unavailable — base VWC watering",
+                    "No valid, fresh pore EC. EC shot scaling and PID/step learning are paused; "
+                    "salt protection and flushing cannot be verified. Base VWC watering and "
+                    "dry rescue remain active, subject to source-water and volume gates.",
+                )
             healthy.append((zone, p.p1_target))
             new_phase, new_thr, fire, size, reason = decide(snap, p)
             if new_phase != st["phase"]:
@@ -1688,7 +1781,7 @@ class Controller:
                 st["phase"] = new_phase
                 st["last_phase_change"] = now
                 self._save_state()
-            if p.stacking_on and st["phase"] == "P2" and p.ec_target_p2 > 0:
+            if snap.ec is not None and p.stacking_on and st["phase"] == "P2" and p.ec_target_p2 > 0:
                 base = self._zone_num(room, zone, "p2_vwc_threshold", 45)
                 les = st.get("last_ec_steer")
                 if les is None or (now - les).total_seconds() >= 1800:
@@ -1847,6 +1940,9 @@ class Controller:
                     {
                         "vwc": d["vwc"],
                         "ec": d["ec"],
+                        "ec_valid": d["ec"] is not None,
+                        "ec_degraded": d["ec"] is None,
+                        "ec_fallback": "base_vwc" if d["ec"] is None else None,
                         "field_capacity": p.field_capacity,
                         "max_ec_limit": p.max_ec,
                     },
@@ -1893,6 +1989,14 @@ class Controller:
                         "friendly_name": f"Zone {zone} water today",
                         "engine": "f2-control",
                     },
+                )
+                weekly, coverage = self._water_usage(room, zone, now)
+                ha_set(
+                    f"sensor.crop_steering_{px}zone_{zone}_weekly_water_app",
+                    weekly,
+                    {"unit_of_measurement": "L", "device_class": "water",
+                     "state_class": "total", "friendly_name": f"Zone {zone} water over seven grow-days",
+                     "engine": "f2-control", **coverage},
                 )
                 ha_set(
                     f"sensor.crop_steering_{px}zone_{zone}_irrigation_count_app",

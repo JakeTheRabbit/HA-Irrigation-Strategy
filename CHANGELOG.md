@@ -9,7 +9,11 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.13.0] - 2026-09-08
+
+**🌱 In plain English.** One Home Assistant native workspace brings room setup, current readings and whole-grow planning together. The combined VWC/EC planning graph follows each zone's selected day, week and steering profile. Existing installations keep their room identities, setpoints and hydraulic settings.
+
+**🔧 Technical notes — integration 2.13.0, controller 0.12.0.**
 
 - Replace the dashboard family with one React/shadcn operator workspace using inherited Home Assistant themes, bundled fonts and responsive layouts.
 - Add reactive combined VWC/EC planning curves, recorded dual-axis history and per-zone day/week recipes with continuous steering between explicit endpoint profiles.
@@ -18,7 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add local catch-test calculations, sensor diagnostics and equipment maps; remove unsupported yield/potency claims from the active UI.
 - Correct duration accounting, volume-cap bypasses, shared-hardware fault recovery, relative-dryback timing conversion, low-flow sizing and stale sequential-plan decisions.
 - Bundle the dashboard in the integration with automatic sidebar registration, publish app-repository metadata, consolidate install/operation instructions, and archive superseded assets with provenance.
-- Preserve released version numbers until publication. See docs/FEATURE_MATRIX.md for validation evidence and live commissioning limits.
+- Resolve setup hydraulics from the current room/zone number entities so a rename or mapping edit preserves live plant counts, pot size and dripper settings.
+- Archive unused facility examples, environment templates and disabled workflows; add current README screenshots and a public interactive demo link.
+- Preserve base VWC shot sizes while EC is unknown, suspend EC adaptation, and expose degraded EC status (#37).
+- Reject nonfinite or invalid/stale/future-dated feed readings; describe arithmetic sensor averaging and relative dryback accurately (#38, #39).
+- Persist timed manual override deadlines across restart/reload and cancel obsolete callbacks on retrigger/manual changes (#40).
+- Track rolling seven grow-day delivery estimates with explicit partial-history coverage; missing weekly sources remain unknown (#41).
+- Audit all branch tips and retain recoverable archives; use tracked-only controller release packaging.
+- See docs/FEATURE_MATRIX.md for validation evidence and live commissioning limits.
 
 ## [2.12.0] - 2026-07-03
 

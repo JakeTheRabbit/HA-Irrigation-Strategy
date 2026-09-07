@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import logging
+import math
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
 from .room import room_prefix
@@ -209,6 +213,14 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
         self._attr_name = description.name
         # Set object_id to include crop_steering prefix for entity_id generation
         self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}{description.key}"
+        self._is_manual_override = description.key.startswith(
+            "zone_"
+        ) and description.key.endswith("_manual_override")
+        self._override_key = f"{room_prefix(entry)}{description.key}"
+        self._override_deadline: datetime | None = None
+        self._override_cancel = None
+        self._override_generation = 0
+        self._override_loaded = False
 
         # Set default states based on switch type
         if description.key == "system_enabled":
@@ -225,8 +237,106 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
     async def async_added_to_hass(self) -> None:
         """Restore state when added to hass."""
         await super().async_added_to_hass()
-        if (last_state := await self.async_get_last_state()) is not None:
+        last_state = await self.async_get_last_state()
+        if last_state is not None:
             self._attr_is_on = last_state.state == "on"
+        if not self._is_manual_override:
+            return
+        self._override_loaded = True
+        if self._attr_is_on and last_state is not None:
+            raw = last_state.attributes.get("manual_override_expires_at")
+            if isinstance(raw, str):
+                try:
+                    deadline = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                    # A naive timestamp cannot safely identify the intended deadline.
+                    if deadline.tzinfo is not None and deadline.utcoffset() is not None:
+                        deadline = deadline.astimezone(timezone.utc)
+                        if deadline <= dt_util.utcnow():
+                            self._attr_is_on = False
+                        else:
+                            self._schedule_override(deadline)
+                except (ValueError, OverflowError):
+                    _LOGGER.warning(
+                        "Invalid manual override deadline for %s; preserving hold",
+                        self._override_key,
+                    )
+        self.hass.data.setdefault(DOMAIN, {}).setdefault("_manual_overrides", {})[
+            self._override_key
+        ] = self
+
+    def _cancel_override_timer(self) -> None:
+        """Invalidate callbacks already queued as well as the scheduled handle."""
+        self._override_generation += 1
+        if self._override_cancel is not None:
+            self._override_cancel()
+            self._override_cancel = None
+
+    def _schedule_override(self, deadline: datetime) -> None:
+        from homeassistant.helpers.event import async_track_point_in_utc_time
+
+        generation = self._override_generation + 1
+
+        @callback
+        def expire(_now):
+            if not self._override_loaded or generation != self._override_generation:
+                return
+            self._override_cancel = None
+            self._override_generation += 1
+            self._override_deadline = None
+            self._attr_is_on = False
+            self.async_write_ha_state()
+
+        # Schedule first: a scheduler failure must leave an existing timer intact.
+        cancel = async_track_point_in_utc_time(self.hass, expire, deadline)
+        self._cancel_override_timer()
+        self._override_deadline = deadline
+        self._override_cancel = cancel
+
+    async def async_set_manual_override(self, enable: bool, timeout_minutes=60) -> None:
+        """Set a durable timed hold on this loaded logical room/zone switch."""
+        if not self._is_manual_override or not self._override_loaded:
+            raise HomeAssistantError("Manual override switch is not loaded")
+        if not isinstance(enable, bool):
+            raise HomeAssistantError("enable must be a boolean")
+        if enable:
+            if (
+                isinstance(timeout_minutes, bool)
+                or not isinstance(timeout_minutes, (int, float))
+                or not math.isfinite(timeout_minutes)
+                or not 1 <= timeout_minutes <= 1440
+            ):
+                raise HomeAssistantError("timeout_minutes must be within 1–1440")
+            self._schedule_override(
+                dt_util.utcnow() + timedelta(minutes=timeout_minutes)
+            )
+            self._attr_is_on = True
+            self.async_write_ha_state()
+        else:
+            await self.async_turn_off()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Stop callbacks while leaving the saved deadline available to RestoreEntity."""
+        self._override_loaded = False
+        self._cancel_override_timer()
+        registry = self.hass.data.get(DOMAIN, {}).get("_manual_overrides", {})
+        if registry.get(self._override_key) is self:
+            registry.pop(self._override_key)
+        await super().async_will_remove_from_hass()
+
+    @property
+    def extra_state_attributes(self):
+        if not self._is_manual_override:
+            return {}
+        return {
+            "manual_override_expires_at": (
+                self._override_deadline.isoformat() if self._override_deadline else None
+            ),
+            "manual_override_mode": (
+                ("timed" if self._override_deadline else "indefinite")
+                if self._attr_is_on
+                else "off"
+            ),
+        }
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -240,12 +350,16 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
         )
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the switch on."""
+        """Turn on directly; a manual hold stays on until explicitly cleared."""
+        self._cancel_override_timer()
+        self._override_deadline = None
         self._attr_is_on = True
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the switch off."""
+        """Clear the switch and any requested timeout."""
+        self._cancel_override_timer()
+        self._override_deadline = None
         self._attr_is_on = False
         self.async_write_ha_state()
 

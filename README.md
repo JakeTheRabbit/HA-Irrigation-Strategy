@@ -2,11 +2,15 @@
 
 A Home Assistant irrigation controller with a native operator workspace: see the room, plan each zone, map sensors, and review changes before applying them.
 
-![Release](https://img.shields.io/badge/Release-2.12.0-green)
+**[Open interactive demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1)** · [Install](docs/INSTALL.md) · [Feature checklist](docs/FEATURE_MATRIX.md)
+
+The demo opens directly in your browser with sample rooms, sensor data and editable plans. No login or Home Assistant installation is required; demo changes stay in your browser.
+
+![Release](https://img.shields.io/badge/Release-2.13.0-green)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3+-41BDF5)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-> The workspace and grow-plan changes described here are unreleased source changes. The guided installer uses the published main/release version until this branch is merged. Read the [validated feature matrix](docs/FEATURE_MATRIX.md) for local test evidence and outstanding live verification.
+> Read the [validated feature matrix](docs/FEATURE_MATRIX.md) for tested behavior and installation/commissioning limits. Install matching integration and controller versions; a demo is not proof of physical water delivery.
 
 ![Crop Steering operator workspace](img/operator-dashboard.png)
 
@@ -19,7 +23,24 @@ A Home Assistant irrigation controller with a native operator workspace: see the
 
 Home Assistant owns the install/restart confirmations; these links take you directly to the relevant screens. They do not bypass HACS, Supervisor or hardware commissioning. [Complete installation and upgrade guide →](docs/INSTALL.md)
 
-![Reactive combined VWC and EC grow planner](img/grow-plan.png)
+## Plan the whole grow
+
+Choose a room, zone and day or week. The steering slider updates the VWC/EC planning curve and shows the targets behind it.
+
+![Combined VWC and EC planning graph with per-zone day and week controls](img/grow-plan.png)
+
+## Set up rooms and sensors
+
+Add or archive rooms and zones, map existing Home Assistant entities, and enter each zone's substrate, plants and drippers.
+
+![Room and zone setup with sensor mapping](img/rooms-setup.png)
+
+<details>
+<summary>View the mobile dashboard</summary>
+
+<img src="img/mobile-overview.png" alt="Mobile room overview with responsive navigation" width="390">
+
+</details>
 
 ## One workspace
 
@@ -53,9 +74,9 @@ Plans are saved as drafts, reviewed, and armed for the next local lights-on boun
 - [Architecture and repository map](docs/REPOSITORY_MAP.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Current screenshots](docs/SCREENSHOTS.md)
-- [Development and testing](TESTING.md)
-- [Entity reference](ENTITIES.md)
+- [Development and testing](docs/TESTING.md)
+- [Entity reference](docs/ENTITIES.md)
 
 The integration owns configuration, entities and plans. The companion controller owns irrigation decisions and equipment sequencing. Both are needed for autonomous irrigation. This project does not dose nutrients or control climate.
 
-Legacy full dashboards, superseded guides and one-off tools are retained with provenance in [archive/2026-09-08](archive/2026-09-08/README.md). Stable entity IDs and the existing controller slug remain compatible.
+Old facility YAML, package examples, environment templates, full dashboards and superseded guides are retained with hashes in [archive/2026-09-08](archive/2026-09-08/README.md). Stable entity IDs and the existing controller slug remain compatible.
