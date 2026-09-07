@@ -14,10 +14,21 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
 from .room import room_prefix
+from .sizing import SIZING_KEYS, configured_sizing, prefer_setup_value
 
 _LOGGER = logging.getLogger(__name__)
 
 NUMBER_DESCRIPTIONS = [
+    NumberEntityDescription(
+        key="max_shot_duration",
+        name="Maximum Shot Duration",
+        icon="mdi:timer-lock",
+        native_min_value=5,
+        native_max_value=3600,
+        native_step=1,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        mode="box",
+    ),
     # ----- RootSense v3 (added during the main consolidation) -----
     # Cultivator Intent slider feeds the adaptive pillar's IntentResolver.
     NumberEntityDescription(
@@ -496,6 +507,7 @@ NUMBER_DESCRIPTIONS = [
 
 # Default values (shared by global + per-zone entities).
 DEFAULT_VALUES = {
+    "max_shot_duration": 900,
     # RootSense v3 additions
     "steering_intent": 0.0,  # midpoint = balanced
     "climate_grow_day_offset": 0,
@@ -669,7 +681,11 @@ async def async_setup_entry(
     for zone_num in range(1, num_zones + 1):
         # Pull per-zone tunables from the parsed .env (zones dict), falling back
         # to the legacy hard-coded defaults when absent.
-        zone_cfg = entry.data.get("zones", {}).get(zone_num, {})
+        configured_zones = config_data.get("zones") or {}
+        zone_cfg = (
+            configured_zones.get(str(zone_num), configured_zones.get(zone_num, {}))
+            or {}
+        )
 
         # Zone plant count
         numbers.append(
@@ -680,7 +696,7 @@ async def async_setup_entry(
                     name=f"Crop Steering Zone {zone_num} Plant Count",
                     icon="mdi:sprout",
                     native_min_value=1,
-                    native_max_value=50,
+                    native_max_value=1000,
                     native_step=1,
                     mode="box",
                 ),
@@ -688,6 +704,42 @@ async def async_setup_entry(
                 default_value=zone_cfg.get("plant_count", 4),
             )
         )
+
+        # Add only explicitly configured sizing fields. Old installations retain
+        # their existing room-global fallback rather than acquiring new defaults.
+        for sizing_key in (
+            "substrate_volume",
+            "drippers_per_plant",
+            "dripper_flow_rate",
+        ):
+            if sizing_key not in zone_cfg:
+                continue
+            source = _DESC_BY_KEY[sizing_key]
+            numbers.append(
+                CropSteeringNumber(
+                    entry,
+                    NumberEntityDescription(
+                        key=f"zone_{zone_num}_{sizing_key}",
+                        name=f"Crop Steering Zone {zone_num} {source.name}",
+                        icon=source.icon,
+                        native_min_value=(
+                            0.1
+                            if sizing_key == "substrate_volume"
+                            else source.native_min_value
+                        ),
+                        native_max_value=(
+                            20
+                            if sizing_key == "drippers_per_plant"
+                            else source.native_max_value
+                        ),
+                        native_step=source.native_step,
+                        native_unit_of_measurement=source.native_unit_of_measurement,
+                        mode="box",
+                    ),
+                    zone_num=zone_num,
+                    default_value=zone_cfg[sizing_key],
+                )
+            )
 
         # Zone water limits
         numbers.append(
@@ -774,6 +826,14 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         self.entity_description = description
         self._entry = entry
         self._zone_num = zone_num
+        self._setup_value = None
+        self._setup_revision = 0
+        if zone_num is not None:
+            sizing, revision = configured_sizing(entry, zone_num)
+            key = description.key.removeprefix(f"zone_{zone_num}_")
+            if key in SIZING_KEYS and key in sizing:
+                self._setup_value = sizing[key]
+                self._setup_revision = revision
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{description.key}"
         self._attr_name = description.name
         # Set object_id to include crop_steering prefix for entity_id generation
@@ -803,11 +863,25 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         """Restore state when added to hass."""
         await super().async_added_to_hass()
         if (last_state := await self.async_get_last_state()) is not None:
+            if self._setup_value is not None and prefer_setup_value(
+                last_state.attributes, self._setup_revision, self._setup_value
+            ):
+                self._attr_native_value = self._setup_value
+                return
             try:
                 self._attr_native_value = float(last_state.state)
             except (ValueError, TypeError):
                 # Keep default value if restore fails
                 pass
+
+    @property
+    def extra_state_attributes(self):
+        if self._setup_value is not None:
+            return {
+                "setup_revision": self._setup_revision,
+                "setup_value": self._setup_value,
+            }
+        return {}
 
     @property
     def device_info(self) -> DeviceInfo:

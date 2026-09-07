@@ -73,6 +73,8 @@ def _zone_schema(num_zones: int, zones: dict | None = None) -> dict:
             _as_list(zc.get("ec_front")) + _as_list(zc.get("ec_back"))
         )
         pc = zc.get("plant_count", 4)
+        out[vol.Optional(f"zone_{z}_name", default=zc.get("name", f"Zone {z}"))] = str
+        out[vol.Optional(f"zone_{z}_active", default=zc.get("active", True))] = bool
         out[
             (
                 vol.Required(f"zone_{z}_switch", default=sw)
@@ -140,14 +142,21 @@ def _hardware_schema(hardware: dict | None = None, params: dict | None = None) -
     return out
 
 
-def _build_zones(num_zones: int, data: dict) -> dict:
+def _build_zones(num_zones: int, data: dict, existing: dict | None = None) -> dict:
     """Build the config-entry `zones` dict (env_parser shape) from submitted form data."""
-    zones: dict = {}
+    zones: dict = {str(k): {**v, "active": False} for k, v in (existing or {}).items()}
     for z in range(1, int(num_zones) + 1):
         vwc = _as_list(data.get(f"zone_{z}_vwc"))
         ec = _as_list(data.get(f"zone_{z}_ec"))
         zones[str(z)] = {
+            **((existing or {}).get(str(z)) or (existing or {}).get(z) or {}),
             "zone_number": z,
+            "active": data.get(
+                f"zone_{z}_active",
+                ((existing or {}).get(str(z)) or {}).get("active", True),
+            ),
+            "name": data.get(f"zone_{z}_name")
+            or ((existing or {}).get(str(z)) or {}).get("name", f"Zone {z}"),
             "zone_switch": data.get(f"zone_{z}_switch", ""),
             "vwc_sensors": vwc,
             "ec_sensors": ec,
@@ -156,8 +165,12 @@ def _build_zones(num_zones: int, data: dict) -> dict:
             "ec_front": ec[0] if ec else "",
             "ec_back": ec[1] if len(ec) > 1 else "",
             "plant_count": int(data.get(f"zone_{z}_plant_count", 4)),
-            "max_daily_volume": 20.0,
-            "shot_multiplier": 1.0,
+            "max_daily_volume": ((existing or {}).get(str(z)) or {}).get(
+                "max_daily_volume", 20.0
+            ),
+            "shot_multiplier": ((existing or {}).get(str(z)) or {}).get(
+                "shot_multiplier", 1.0
+            ),
         }
     return zones
 
@@ -193,10 +206,10 @@ def _build_parameters(data: dict) -> dict:
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required("name", default="Crop Steering System"): str,
-        vol.Required("config_method", default="env"): vol.In(
+        vol.Required("config_method", default="manual"): vol.In(
             {
-                "env": "Load from crop_steering.env file (Recommended)",
-                "manual": "Manual UI configuration",
+                "manual": "Search and select devices (Recommended)",
+                "env": "Load from crop_steering.env file (advanced)",
             }
         ),
     }
@@ -219,6 +232,34 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         single-room installs are unchanged. Any further config adds another fully-isolated
         room (own zones/sensors/pump/setpoints), namespaced as crop_steering_<slug>_*.
         """
+        if user_input is not None and "setup_payload" in user_input:
+            from .setup_api import prepare_setup, safety_blockers
+
+            try:
+                data = prepare_setup(self.hass, user_input["setup_payload"])
+                named = bool(self._async_current_entries())
+                slug = slugify_room(data["room_name"]) if named else "default"
+                if named and slug == "default":
+                    return self.async_abort(reason="reserved_room_name")
+                await self.async_set_unique_id(f"room_{slug}" if named else "default")
+                self._abort_if_unique_id_configured()
+                data.update(
+                    room_slug=slug,
+                    room_prefix=f"{slug}_" if named else "",
+                    config_method="manual",
+                    setup_revision=1,
+                )
+                data["enable_flag"] = (
+                    f"switch.crop_steering_{data['room_prefix']}engine_enabled"
+                )
+                blockers = safety_blockers(self.hass, proposed=data)
+                if blockers:
+                    raise ValueError("; ".join(blockers))
+                return self.async_create_entry(title=data["room_name"], data=data)
+            except ValueError as err:
+                return self.async_abort(
+                    reason="setup_invalid", description_placeholders={"error": str(err)}
+                )
         # A room already exists -> this is an additional room (UI-mapped, prefixed).
         if self._async_current_entries():
             return await self.async_step_room()
@@ -229,8 +270,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data_schema=STEP_USER_DATA_SCHEMA,
                 description_placeholders={
                     "info": "Choose how to configure the Crop Steering System. "
-                    ".env file is recommended for initial setup (automatic zone detection). "
-                    "UI configuration allows manual entry but requires more steps."
+                    "Select devices with searchable pickers (recommended). "
+                    "Advanced users can import an existing .env file."
                 },
             )
 
@@ -258,6 +299,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 },
             )
         slug = slugify_room(user_input["room_name"])
+        if slug == "default":
+            return self.async_abort(reason="reserved_room_name")
         await self.async_set_unique_id(f"room_{slug}")
         self._abort_if_unique_id_configured()
         self._data["name"] = user_input["room_name"]
@@ -493,7 +536,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 description_placeholders={
                     "info": f"Pick the valve and probe(s) for each of your {num} zones. "
                     "You can choose MORE THAN ONE moisture/EC sensor per zone — the engine "
-                    "averages them and rejects outliers."
+                    "averages valid readings. Outliers are not automatically rejected."
                 },
             )
         self._data["zones"] = _build_zones(num, user_input)
@@ -509,7 +552,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data_schema=vol.Schema(_hardware_schema()),
                 description_placeholders={
                     "info": "Shared plumbing, lights and the substrate facts used to size shots. "
-                    "Leave Pump empty if your system auto-starts the pump on flow."
+                    "Map pump and mainline for automatic irrigation; unmapped rooms stay inhibited."
                 },
             )
         data = {
@@ -525,6 +568,21 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "parameters": _build_parameters(user_input),
             "features": {"ec_stacking": False, "analytics": True, "ml_features": False},
         }
+        data["enable_flag"] = (
+            f"switch.crop_steering_{data['room_prefix']}engine_enabled"
+        )
+        from .setup_api import configuration_payload, prepare_setup, safety_blockers
+
+        try:
+            data = prepare_setup(self.hass, configuration_payload(data), data)
+            blockers = safety_blockers(self.hass, proposed=data)
+            if blockers:
+                raise ValueError("; ".join(blockers))
+        except ValueError as err:
+            return self.async_abort(
+                reason="setup_invalid", description_placeholders={"error": str(err)}
+            )
+        data["setup_revision"] = 1
         return self.async_create_entry(title=data["name"], data=data)
 
     async def _validate_entities(self, user_input: dict) -> dict:
@@ -634,18 +692,44 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 load_env_config, self.hass.config.config_dir
             )
 
-            # Update config entry
-            self.hass.config_entries.async_update_entry(
-                self._entry,
-                data={
-                    **self._entry.data,
-                    "num_zones": env_config["num_zones"],
-                    "zones": env_config["zones"],
-                    "hardware": env_config["hardware"],
-                    "parameters": env_config["parameters"],
-                    "features": env_config["features"],
-                },
+            from .setup_api import (
+                effective,
+                configuration_payload,
+                prepare_setup,
+                safety_blockers,
+                _update,
             )
+
+            prior = effective(self._entry)
+            zones = {
+                str(k): {**v, "active": False}
+                for k, v in prior.get("zones", {}).items()
+            }
+            for key, zone in env_config["zones"].items():
+                zones[str(key)] = {**zones.get(str(key), {}), **zone, "active": True}
+            proposed = {
+                **prior,
+                "num_zones": max(
+                    int(prior.get("num_zones", 1)), env_config["num_zones"]
+                ),
+                "zones": zones,
+                "hardware": {**prior.get("hardware", {}), **env_config["hardware"]},
+                "parameters": {
+                    **prior.get("parameters", {}),
+                    **env_config["parameters"],
+                },
+                "features": {**prior.get("features", {}), **env_config["features"]},
+            }
+            proposed = prepare_setup(
+                self.hass,
+                configuration_payload(proposed),
+                proposed,
+                self._entry.entry_id,
+            )
+            blockers = safety_blockers(self.hass, self._entry, proposed)
+            if blockers:
+                raise ValueError("; ".join(blockers))
+            _update(self.hass, self._entry, proposed)
 
             return self.async_create_entry(
                 title="",
@@ -660,19 +744,23 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Edit irrigation parameters via UI."""
-        if user_input is not None:
-            # Update parameters in config entry
-            new_data = {**self._entry.data}
-            if "parameters" not in new_data:
-                new_data["parameters"] = {}
-            new_data["parameters"].update(user_input)
+        from .setup_api import effective, safety_blockers, _update
 
-            self.hass.config_entries.async_update_entry(self._entry, data=new_data)
+        if user_input is not None:
+            blockers = safety_blockers(self.hass, self._entry)
+            if blockers:
+                return self.async_abort(
+                    reason="setup_invalid",
+                    description_placeholders={"error": "; ".join(blockers)},
+                )
+            new_data = effective(self._entry)
+            new_data["parameters"] = {**new_data.get("parameters", {}), **user_input}
+            _update(self.hass, self._entry, new_data)
 
             return self.async_create_entry(title="", data={})
 
         # Get current parameters
-        current_params = self._entry.data.get("parameters", {})
+        current_params = effective(self._entry).get("parameters", {})
 
         return self.async_show_form(
             step_id="edit_parameters",
@@ -706,7 +794,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Reconfigure zones — step 1: how many zones (add or remove)."""
-        cur = int(self._entry.data.get("num_zones", 1))
+        from .setup_api import effective
+
+        cur = int(effective(self._entry).get("num_zones", 1))
         if user_input is None:
             return self.async_show_form(
                 step_id="edit_zones",
@@ -732,7 +822,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         num = getattr(self, "_edit_num", None) or int(
             self._entry.data.get("num_zones", 1)
         )
-        data = self._entry.data
+        from .setup_api import effective
+
+        data = effective(self._entry)
         if user_input is None:
             schema = {
                 **_zone_schema(num, data.get("zones", {})),
@@ -750,16 +842,36 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             )
         new_data = {
             **data,
-            "num_zones": num,
-            "zones": _build_zones(num, user_input),
+            "num_zones": max(num, int(data.get("num_zones", 1))),
+            "zones": _build_zones(num, user_input, data.get("zones", {})),
             "hardware": {**data.get("hardware", {}), **_build_hardware(user_input)},
             "parameters": {
                 **data.get("parameters", {}),
                 **_build_parameters(user_input),
             },
         }
-        self.hass.config_entries.async_update_entry(self._entry, data=new_data)
-        await self.hass.config_entries.async_reload(self._entry.entry_id)
+        from .setup_api import (
+            configuration_payload,
+            prepare_setup,
+            safety_blockers,
+            _update,
+        )
+
+        try:
+            new_data = prepare_setup(
+                self.hass,
+                configuration_payload(new_data),
+                new_data,
+                self._entry.entry_id,
+            )
+            blockers = safety_blockers(self.hass, self._entry, new_data)
+            if blockers:
+                raise ValueError("; ".join(blockers))
+        except ValueError as err:
+            return self.async_abort(
+                reason="setup_invalid", description_placeholders={"error": str(err)}
+            )
+        _update(self.hass, self._entry, new_data)
         return self.async_create_entry(title="", data={})
 
     async def async_step_edit_features(

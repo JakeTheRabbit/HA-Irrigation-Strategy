@@ -129,7 +129,8 @@ def test_p2_predictive_p3():
                 vwc=55,
                 hours_to_lights_off=2,
                 hours_to_lights_on=2,
-                dryback_rate=10,
+                peak_vwc=60,
+                dryback_rate=2,  # 55 -> 48 VWC is 3.5h, beyond the 2h remaining.
             ),
             P(dryback_target=20),
         )
@@ -674,7 +675,7 @@ def test_zone_safety_status():
     assert zone_safety_status(66, 3.0, 70, 9) == "approaching_saturation"
     assert zone_safety_status(50, 8.5, 70, 9) == "approaching_ec_limit"
     assert zone_safety_status(50, 3.0, 70, 9) == "safe"
-    assert zone_safety_status(None, None, 70, 9) == "safe"  # blind probe -> safe
+    assert zone_safety_status(None, None, 70, 9) == "ec_unknown"  # missing EC is degraded
     assert (
         zone_safety_status(None, 9.5, 70, 9) == "ec_limit_exceeded"
     )  # vwc dead, ec over

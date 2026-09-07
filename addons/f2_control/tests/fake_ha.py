@@ -6,6 +6,10 @@ no /data files.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
+_CURRENT_TIMESTAMP = object()
+
 
 class FakeHA:
     def __init__(self):
@@ -15,11 +19,13 @@ class FakeHA:
         self.sets: dict[str, tuple] = {}  # entity_id -> (state, attributes)
 
     # ---- state helpers ----
-    def set_state(self, entity_id, state, attributes=None, last_updated=None):
+    def set_state(self, entity_id, state, attributes=None, last_updated=_CURRENT_TIMESTAMP):
+        if last_updated is _CURRENT_TIMESTAMP:
+            last_updated = datetime.now(timezone.utc).isoformat()
         self.states[entity_id] = (str(state), attributes or {}, last_updated)
 
     # ---- controller shims ----
-    def ha_get(self, entity):
+    def ha_get(self, entity, timeout=8):
         return self.states.get(entity, (None, {}, None))
 
     def ha_call(self, domain, service, **data):

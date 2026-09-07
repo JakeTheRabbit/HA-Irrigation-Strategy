@@ -51,6 +51,14 @@ PLATFORMS: list[Platform] = [
 ]
 
 
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Register setup responses even before a first room has been configured."""
+    from .setup_api import async_setup_setup_services
+
+    await async_setup_setup_services(hass)
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Crop Steering System from a config entry."""
     _LOGGER.info("Setting up Crop Steering System")
@@ -75,6 +83,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Set up services
     await async_setup_services(hass)
+    from .setup_api import async_setup_setup_services
+    from .strategy import async_setup_strategy
+    from .setup_panel import async_setup_panel
+
+    await async_setup_setup_services(hass)
+    await async_setup_strategy(hass, entry)
+    await async_setup_panel(hass)
 
     # Setup health checks -> Home Assistant Repairs (read-only diagnostics)
     from datetime import timedelta
@@ -135,6 +150,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pass
 
     hass.data.get(DOMAIN, {}).get("_recipe", {}).pop(entry.entry_id, None)
+    from .strategy import async_unload_strategy
+
+    await async_unload_strategy(hass, entry)
     hass.data[DOMAIN].pop(entry.entry_id, None)
 
     # Unload services only when the last loaded room goes away — other loaded
@@ -146,5 +164,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ]
     if not others_loaded:
         await async_unload_services(hass)
+        from .setup_panel import async_unload_panel
+
+        async_unload_panel(hass)
 
     return True

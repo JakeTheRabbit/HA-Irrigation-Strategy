@@ -12,6 +12,8 @@ Confirms three shipped fixes without a live HA:
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -72,13 +74,25 @@ def test_transition_phase_named_room_targets_prefixed_select():
 
 
 def test_set_manual_override_named_room_targets_prefixed_switch():
-    hass = ha_stubs.FakeHass(entries=[_veg_entry()])
+    override = SimpleNamespace(
+        entity_id="switch.crop_steering_veg_zone_2_manual_override",
+        _override_loaded=True,
+        async_set_manual_override=AsyncMock(),
+        extra_state_attributes={
+            "manual_override_expires_at": "2026-01-01T13:00:00+00:00"
+        },
+    )
+    hass = ha_stubs.FakeHass(
+        entries=[_veg_entry()],
+        data={DOMAIN: {"_manual_overrides": {"veg_zone_2_manual_override": override}}},
+    )
     h = _handlers(hass)
     asyncio.run(h["set_manual_override"](Call(zone=2, room="veg", enable=True)))
 
-    _domain, service, data = hass.services.calls[-1]
-    assert service == "turn_on"
-    assert data["entity_id"] == f"switch.{DOMAIN}_veg_zone_2_manual_override"
+    override.async_set_manual_override.assert_awaited_once_with(True, 60)
+    assert hass.services.calls == []
+    assert hass.bus.events[-1][1]["room"] == "veg"
+    assert hass.bus.events[-1][1]["expires_at"] == "2026-01-01T13:00:00+00:00"
 
 
 def test_unknown_room_raises_instead_of_steering_default():

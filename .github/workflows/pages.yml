@@ -1,15 +1,16 @@
 name: Deploy demo to GitHub Pages
 
-# Publishes the token/key/IP-blanked dashboards in www/ to GitHub Pages.
+# Publishes the compiled, self-contained demo workspace in www/ to GitHub Pages.
 # The dashboards auto-enter demo mode (baked-in mock data) when served from *.github.io,
-# so f2.html runs standalone with no Home Assistant, no token, no network.
-# Demo: https://jaketherabbit.github.io/HA-Irrigation-Strategy/f2.html?demo
+# so dashboard.html runs standalone with no Home Assistant or credentials.
+# Demo: https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1
 
 on:
   push:
     branches: [main]
     paths:
       - 'www/**'
+      - 'frontend/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -30,6 +31,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build current workspace
+        run: |
+          npm ci --prefix frontend
+          npm run build --prefix frontend
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

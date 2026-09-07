@@ -30,113 +30,113 @@ jobs:
     name: Validate Home Assistant Integration
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: HassFest validation
-      uses: home-assistant/actions/hassfest@master
+      - name: HassFest validation
+        uses: home-assistant/actions/hassfest@master
 
-    - name: HACS validation (integration)
-      uses: hacs/action@main
-      with:
-        category: integration
-        ignore: brands
+      - name: HACS validation (integration)
+        uses: hacs/action@main
+        with:
+          category: integration
+          ignore: brands
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-    - name: Install Home Assistant core (for typing/validation only)
-      run: |
-        python -m pip install --upgrade pip
-        pip install homeassistant==2024.3.0
+      - name: Install Home Assistant core (for typing/validation only)
+        run: |
+          python -m pip install --upgrade pip
+          pip install homeassistant==2024.3.0
 
-    - name: Validate manifest.json
-      run: |
-        python -c "
-        import json
-        import sys
+      - name: Validate manifest.json
+        run: |
+          python -c "
+          import json
+          import sys
 
-        with open('custom_components/crop_steering/manifest.json') as f:
-            manifest = json.load(f)
+          with open('custom_components/crop_steering/manifest.json') as f:
+              manifest = json.load(f)
 
-        required_fields = ['domain', 'name', 'version', 'documentation', 'codeowners']
-        for field in required_fields:
-            if field not in manifest:
-                print(f'Missing required field: {field}')
-                sys.exit(1)
+          required_fields = ['domain', 'name', 'version', 'documentation', 'codeowners']
+          for field in required_fields:
+              if field not in manifest:
+                  print(f'Missing required field: {field}')
+                  sys.exit(1)
 
-        print('✓ Manifest validation passed')
-        "
+          print('✓ Manifest validation passed')
+          "
 
-    - name: Validate integration structure
-      run: |
-        python -c "
-        import os
-        import sys
+      - name: Validate integration structure
+        run: |
+          python -c "
+          import os
+          import sys
 
-        required_files = [
-            'custom_components/crop_steering/__init__.py',
-            'custom_components/crop_steering/config_flow.py',
-            'custom_components/crop_steering/manifest.json'
-        ]
+          required_files = [
+              'custom_components/crop_steering/__init__.py',
+              'custom_components/crop_steering/config_flow.py',
+              'custom_components/crop_steering/manifest.json'
+          ]
 
-        for file in required_files:
-            if not os.path.exists(file):
-                print(f'Missing required file: {file}')
-                sys.exit(1)
+          for file in required_files:
+              if not os.path.exists(file):
+                  print(f'Missing required file: {file}')
+                  sys.exit(1)
 
-        print('✓ Integration structure validation passed')
-        "
+          print('✓ Integration structure validation passed')
+          "
 
   installation-test:
     runs-on: ubuntu-latest
-    name: Full Installation Test
+    name: Package copy and contract tests
     needs: [validate-integration]
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-    - name: Install test dependencies
-      run: |
-        python -m pip install --upgrade pip
-        # requests: add-on controller suite; pyyaml: the dashboard-generator test
-        pip install pytest requests pyyaml
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # requests: add-on controller suite; pyyaml: the dashboard-generator test
+          pip install pytest requests pyyaml
 
-    - name: Simulate Home Assistant installation
-      run: |
-        echo "Simulating Home Assistant custom_components installation..."
-        mkdir -p /tmp/ha_config/custom_components
-        cp -r custom_components/crop_steering /tmp/ha_config/custom_components/
-        test -f /tmp/ha_config/custom_components/crop_steering/manifest.json
+      - name: Verify manual installation file layout
+        run: |
+          echo "Simulating Home Assistant custom_components installation..."
+          mkdir -p /tmp/ha_config/custom_components
+          cp -r custom_components/crop_steering /tmp/ha_config/custom_components/
+          test -f /tmp/ha_config/custom_components/crop_steering/manifest.json
 
-    - name: Run the test suites (these must actually pass — no echo-only stubs)
-      run: |
-        PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -q
-        PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest addons/f2_control/tests -q
-        PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
+      - name: Run the test suites (these must actually pass — no echo-only stubs)
+        run: |
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -q
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest addons/f2_control/tests -q
+          PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
 
-    - name: Generate installation report
-      if: always()
-      run: |
-        status="${{ job.status }}"
-        {
-          echo "# Installation Report"
-          echo ""
-          echo "- Integration copy: \`custom_components/crop_steering/\`"
-          echo "- Test suites (integration + add-on + engine): **${status}**"
-        } > install_report.md
+      - name: Generate installation report
+        if: always()
+        run: |
+          status="${{ job.status }}"
+          {
+            echo "# Installation Report"
+            echo ""
+            echo "- Integration copy: \`custom_components/crop_steering/\`"
+            echo "- Test suites (integration + add-on + engine): **${status}**"
+          } > install_report.md
 
-    - name: Upload installation report
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: installation-report
-        path: install_report.md
+      - name: Upload installation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installation-report
+          path: install_report.md

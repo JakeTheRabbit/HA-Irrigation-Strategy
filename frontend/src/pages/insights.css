@@ -1,0 +1,405 @@
+.insight-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.insight-summary > div {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 6px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.insight-summary svg {
+  color: var(--primary);
+}
+.insight-summary strong {
+  font-size: 24px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.insight-summary small {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.insight-summary span {
+  grid-column: 2;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.insight-zone-picker {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+.insight-zone-picker label {
+  font-size: 12px;
+}
+.insight-zone-picker select {
+  min-width: 150px;
+}
+.insight-tabs {
+  width: 100%;
+  justify-content: flex-start;
+  margin-bottom: 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  height: auto;
+  min-height: 44px;
+  padding: 4px;
+}
+.insight-tabs button {
+  min-height: 36px;
+  font-size: 12px;
+  gap: 7px;
+  flex: 1;
+}
+.insight-references {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.insight-reference {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 17px;
+  background: var(--surface);
+  min-width: 0;
+}
+.insight-reference > strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+.insight-reference > span {
+  display: block;
+  font-size: 26px;
+  font-weight: 400;
+  margin: 9px 0;
+  font-variant-numeric: tabular-nums;
+}
+.insight-reference small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.insight-reference code {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted-foreground);
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+.insight-findings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 22px;
+  gap: 30px;
+}
+.insight-findings strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.insight-findings p {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.insight-findings small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+.insight-notice {
+  background: var(--warning-bg);
+  color: var(--warning);
+  padding: 13px 20px;
+  margin: 0 20px 18px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.insight-water-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 22px;
+  align-items: start;
+}
+.insight-water-grid > * {
+  min-width: 0;
+}
+.insight-calculator {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.insight-hydraulics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 17px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.insight-hydraulics span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-bottom: 5px;
+}
+.insight-hydraulics strong {
+  font-size: 20px;
+  font-weight: 400;
+}
+.insight-hydraulics small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.insight-result-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  padding: 18px;
+  background: var(--secondary);
+  border-radius: 8px;
+  margin: 3px 0;
+}
+.insight-result-grid > div:last-child {
+  grid-column: 1/-1;
+}
+.insight-result-grid span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  display: block;
+}
+.insight-result-grid strong {
+  display: block;
+  font-size: 26px;
+  font-weight: 400;
+  margin-top: 5px;
+}
+.insight-result-grid small {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.insight-catch-result {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 17px 0;
+}
+.insight-catch-result > span {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.insight-catch-result strong {
+  display: block;
+  font-size: 30px;
+  font-weight: 400;
+  margin-top: 8px;
+}
+.insight-catch-result small {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.insight-catch-result p {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 8px;
+}
+.insight-room-map {
+  padding: 22px;
+}
+.insight-shared-map {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+.insight-shared-map > .insight-mapping {
+  flex: 1;
+  max-width: 360px;
+}
+.insight-shared-map > svg {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+.insight-mapping {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  border-radius: 7px;
+  min-width: 0;
+}
+.insight-mapping > span {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+.insight-mapping > strong {
+  display: block;
+  font-weight: 500;
+  font-size: 12px;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.insight-mapping > code {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 9px;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.insight-mapping > small {
+  display: block;
+  font-size: 10px;
+  margin-top: 6px;
+  color: var(--muted-foreground);
+}
+.insight-zone-map {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+.insight-zone-map > section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 15px;
+  min-width: 0;
+}
+.insight-zone-map > section.selected {
+  border-color: var(--primary);
+}
+.insight-map-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.insight-probe-links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+.insight-probe-links > strong {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+.insight-feed-map {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 22px;
+}
+.insight-mapping-note {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  margin: 0 22px 22px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1100px) {
+  .insight-references {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .insight-water-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .insight-zone-map {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .insight-summary {
+    gap: 8px;
+  }
+  .insight-summary > div {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 13px 10px;
+    gap: 7px;
+  }
+  .insight-summary svg {
+    width: 17px;
+    height: 17px;
+  }
+  .insight-summary strong {
+    font-size: 20px;
+  }
+  .insight-summary span {
+    font-size: 10px;
+  }
+  .insight-summary small {
+    font-size: 10px;
+  }
+  .insight-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .insight-tabs button {
+    justify-content: flex-start;
+    width: 100%;
+  }
+  .insight-references {
+    gap: 9px;
+  }
+  .insight-reference {
+    padding: 13px;
+  }
+  .insight-reference > span {
+    font-size: 22px;
+    overflow-wrap: anywhere;
+  }
+  .insight-reference > strong {
+    font-size: 11px;
+  }
+  .insight-findings {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding: 18px;
+  }
+  .insight-calculator {
+    padding: 18px;
+  }
+  .insight-water-grid .panel-heading {
+    flex-wrap: wrap;
+  }
+  .insight-room-map {
+    padding: 17px;
+  }
+  .insight-zone-map {
+    grid-template-columns: 1fr;
+    padding-top: 18px;
+  }
+  .insight-shared-map {
+    flex-direction: column;
+    gap: 9px;
+    padding-bottom: 18px;
+  }
+  .insight-shared-map > .insight-mapping {
+    width: 100%;
+    max-width: none;
+  }
+  .insight-shared-map > svg {
+    transform: rotate(90deg);
+  }
+  .insight-feed-map {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}

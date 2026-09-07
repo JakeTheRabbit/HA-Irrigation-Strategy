@@ -1,0 +1,144 @@
+{
+  "api_version": 1,
+  "capabilities": {
+    "create": true,
+    "save": true,
+    "remove": true,
+    "restore": true,
+    "stable_zone_ids": true
+  },
+  "limits": {
+    "max_zones": 24
+  },
+  "rooms": [
+    {
+      "entry_id": "one",
+      "revision": 0,
+      "room_name": "Veg",
+      "prefix": "veg_",
+      "slug": "veg",
+      "active": true,
+      "num_zones": 2,
+      "active_zone_ids": [
+        1,
+        2
+      ],
+      "zones": [
+        {
+          "id": 1,
+          "name": "Zone 1",
+          "active": true,
+          "valve": "switch.v1",
+          "vwc_sensors": [],
+          "ec_sensors": [],
+          "plant_count": 4,
+          "substrate_volume": 6,
+          "drippers_per_plant": 1,
+          "dripper_flow_rate": 2
+        },
+        {
+          "id": 2,
+          "name": "Zone 2",
+          "active": true,
+          "valve": "switch.v2",
+          "vwc_sensors": [],
+          "ec_sensors": [],
+          "plant_count": 8,
+          "substrate_volume": 6,
+          "drippers_per_plant": 1,
+          "dripper_flow_rate": 2
+        }
+      ],
+      "hardware": {
+        "pump_switch": "switch.p",
+        "main_line_switch": "switch.m",
+        "waste_switch": "",
+        "light_entity": "",
+        "feed_ec_sensor": "",
+        "feed_ph_sensor": "",
+        "temperature_sensor": "",
+        "humidity_sensor": "",
+        "vpd_sensor": "",
+        "water_level_sensor": ""
+      },
+      "safety": {
+        "ready": true,
+        "blockers": []
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "entity_id": "switch.v1",
+      "name": "switch.v1",
+      "domain": "switch",
+      "state": "off",
+      "unit": "",
+      "device_class": null
+    },
+    {
+      "entity_id": "switch.v2",
+      "name": "switch.v2",
+      "domain": "switch",
+      "state": "off",
+      "unit": "",
+      "device_class": null
+    },
+    {
+      "entity_id": "switch.v3",
+      "name": "switch.v3",
+      "domain": "switch",
+      "state": "off",
+      "unit": "",
+      "device_class": null
+    },
+    {
+      "entity_id": "switch.p",
+      "name": "switch.p",
+      "domain": "switch",
+      "state": "off",
+      "unit": "",
+      "device_class": null
+    },
+    {
+      "entity_id": "switch.m",
+      "name": "switch.m",
+      "domain": "switch",
+      "state": "off",
+      "unit": "",
+      "device_class": null
+    },
+    {
+      "entity_id": "switch.crop_steering_veg_engine_enabled",
+      "name": "switch.crop_steering_veg_engine_enabled",
+      "domain": "switch",
+      "state": "off",
+      "unit": "",
+      "device_class": null
+    },
+    {
+      "entity_id": "sensor.vwc",
+      "name": "sensor.vwc",
+      "domain": "sensor",
+      "state": "50",
+      "unit": "%",
+      "device_class": null
+    },
+    {
+      "entity_id": "sensor.ec",
+      "name": "sensor.ec",
+      "domain": "sensor",
+      "state": "50",
+      "unit": "mS/cm",
+      "device_class": null
+    },
+    {
+      "entity_id": "sensor.temp",
+      "name": "sensor.temp",
+      "domain": "sensor",
+      "state": "50",
+      "unit": "\u00b0C",
+      "device_class": null
+    }
+  ]
+}

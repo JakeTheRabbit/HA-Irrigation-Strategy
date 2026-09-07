@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import re
 from typing import Any
 
@@ -185,7 +186,8 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
                 key=f"zone_{zone_num}_weekly_water_usage",
                 name=f"Zone {zone_num} Weekly Water Usage",
                 device_class=SensorDeviceClass.VOLUME,
-                state_class=SensorStateClass.TOTAL_INCREASING,
+                # Rolling windows decrease when old grow-days leave the total.
+                state_class=SensorStateClass.TOTAL,
                 native_unit_of_measurement=UnitOfVolume.LITERS,
                 icon="mdi:water-outline",
             )
@@ -278,7 +280,12 @@ class CropSteeringEngineConfigSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         return build_engine_config(
-            self._prefix, self._slug, self._num_zones, self._zones, self._hw
+            self._prefix,
+            self._slug,
+            self._num_zones,
+            self._zones,
+            self._hw,
+            {**self._entry.data, **self._entry.options},
         )
 
 
@@ -542,7 +549,7 @@ class CropSteeringSensor(SensorEntity):
                 pass
         return 0.0
 
-    def _get_zone_weekly_water_usage(self, zone_num: int) -> float:
+    def _get_zone_weekly_water_usage(self, zone_num: int) -> float | None:
         """Get weekly water usage for zone."""
         # Check the engine sensor for weekly usage
         usage_sensor = self.hass.states.get(
@@ -550,10 +557,40 @@ class CropSteeringSensor(SensorEntity):
         )
         if usage_sensor and usage_sensor.state not in ["unknown", "unavailable"]:
             try:
-                return float(usage_sensor.state)
-            except ValueError:
+                value = float(usage_sensor.state)
+                return value if math.isfinite(value) and value >= 0 else None
+            except (TypeError, ValueError):
                 pass
-        return 0.0
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        """Expose the weekly producer's coverage so partial history stays visible."""
+        if self._zone_number and self.entity_description.key == (
+            f"zone_{self._zone_number}_weekly_water_usage"
+        ):
+            source = self.hass.states.get(
+                f"sensor.crop_steering_{self._prefix}zone_{self._zone_number}_weekly_water_app"
+            )
+            if (
+                source is None
+                or self._get_zone_weekly_water_usage(self._zone_number) is None
+            ):
+                return {"coverage": "unknown", "history_complete": False}
+            keys = (
+                "window_start_grow_day",
+                "window_end_grow_day",
+                "observed_grow_days",
+                "complete_grow_days",
+                "history_complete",
+                "coverage",
+                "legacy_volume_excluded_l",
+                "measurement",
+            )
+            return {
+                key: source.attributes[key] for key in keys if key in source.attributes
+            }
+        return None
 
     def _get_zone_irrigation_count_today(self, zone_num: int) -> int:
         """Get today's irrigation count for zone."""
@@ -584,7 +621,9 @@ class CropSteeringSensor(SensorEntity):
                     _LOGGER.warning(f"Sensor entity not found: {sensor_id}")
                     continue
                 if state.state not in ["unknown", "unavailable", "none", None]:
-                    values.append(float(state.state))
+                    value = float(state.state)
+                    if math.isfinite(value):
+                        values.append(value)
             except (ValueError, TypeError) as e:
                 _LOGGER.debug(f"Could not parse sensor value for {sensor_id}: {e}")
                 continue

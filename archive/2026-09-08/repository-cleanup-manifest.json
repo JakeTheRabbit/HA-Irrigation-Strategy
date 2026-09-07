@@ -1,0 +1,219 @@
+[
+  {
+    "original_path": "dashboards/co2_environment.yaml",
+    "sha256": "0e1b29caf16d9768f579d78fcb09435f2eef56f7dcb8f2265bef7ef2a866324f",
+    "original_working_copy_sha256": "36c6caa56afd0fff6928938f1cb075464f9f8ccc4d73f8741d0021f5369f5e99",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "dashboards/crop_steering_console_mobile.yaml",
+    "sha256": "6e918af5454d9280dfce8b711ba2b585a205388aefcbaaa7ae410223cba2b550",
+    "original_working_copy_sha256": "1e5dc98273bd590835be28478a70dc9ad9df456dd0767d0e29a05519d070696d",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "dashboards/crop_steering_console.yaml",
+    "sha256": "01fac45b2dce1db46f5beefbe86a2a61757d7a2aa509ee3dfe21908dbd838611",
+    "original_working_copy_sha256": "d20db54b47a738eee95ad99e5174b0a254730ceb8652becb3113c5dd1e574a9b",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "dashboards/crop_steering.yaml",
+    "sha256": "37699e2bc3df51da34bfe01910ff4633b2b9fe20e1bdcf9e491d9a4d7b755a22",
+    "original_working_copy_sha256": "cb8ef43fdf757397bdf2bb494206c574131d213e7707fa879a1caefc0b1d3904",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "dashboards/irrigation.yaml",
+    "sha256": "7fdeafb7f9513f9ae3b6de6ac1cc4918127314e6613970a0e8fa9661a947a9a2",
+    "original_working_copy_sha256": "b9e081a4748127359f5f6f1928f60ac817381adcd870996cc020999becdd84d7",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "dashboards/README.md",
+    "sha256": "366f717fb288f8e12362dafcfd50a02270f04fec1fc0be019429ff2376301d66",
+    "original_working_copy_sha256": "80f8106846a2e2052a742cae488d17c86413c64f50e0247a38607c1bfb612ae7",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "packages/f2_pump_modes.yaml",
+    "sha256": "dbbe3b4b19888c61c5a139c18eef2e3b997888d0d25a698fc705ca8ea48a99e2",
+    "original_working_copy_sha256": "2e0e272eb821ebf7bb1b1606886fa678cc2d2a79c0df73c1b1ad0c0e569d4054",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "packages/README.md",
+    "sha256": "502ef9a80da8523a7e9449c43d6c1d980b23f715d0799ce7898c9998aa807de5",
+    "original_working_copy_sha256": "b04517fcccfb7734a706eb9fede636d3a26adea41f46746b300fdfeac5df822d",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "packages/irrigation/00_core.yaml",
+    "sha256": "208c91c8d2f8b04aa17bf7d12432ed9530ac0067a7de78ca095dba4a3f20a413",
+    "original_working_copy_sha256": "d2e79d07cc8fcf2a325204c7277dea81df1f93b84cb0dd121ec69be74af95d9e",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "packages/irrigation/10_mapping.yaml",
+    "sha256": "b50b310e14f79e49a59c3c4194947eaa4025b360967dc130a23cd17693bf9533",
+    "original_working_copy_sha256": "bcde6da219c1417894fc7f4da47b6e9929d44074c7b267402eefbaead1eec6f9",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "packages/irrigation/20_model.yaml",
+    "sha256": "e642b7e23ce56c8ab4119172a1b68e29796581227a764dbb70b4cfcb329d341c",
+    "original_working_copy_sha256": "4783cec0bd26d2170715903eda68725f0af04b2bd736b66ba75551c43b6fce00",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "packages/irrigation/30_irrigation.yaml",
+    "sha256": "ac64c37341d03aa0596f286f1b619e6f02d43346d150dc34e6796ed4fa67e0e9",
+    "original_working_copy_sha256": "a2b29d40b78da471d0c1ce9b794491a135df6a2094ebbc7373d4ef6fa732b5ab",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "packages/irrigation/40_environment.yaml",
+    "sha256": "5458663c32e5321f9fe31b00e0a50f67268e8e736a83b3737e9ed7bcca724534",
+    "original_working_copy_sha256": "38915e28f2d4356b0c0cf62898908cdee98a99753f28d0440a72591de193a3d5",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "packages/irrigation/50_alerts_watchdogs.yaml",
+    "sha256": "15a3f4b519fd5f023dcbb2821db32a6f73ba8b07c41da819524878a70205d144",
+    "original_working_copy_sha256": "a95e63757718fa43793320b19782f4179c7988627b66e86564b9688a6bdc38f8",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "packages/irrigation/60_tank_level.yaml",
+    "sha256": "064d7345dfc1a9a6ffb70d8ca6fdab98a8aac00238c229a9d2b6d93c8181629f",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "deploy/f2_feed_alerts.yaml",
+    "sha256": "7b2c1ce306f74383d7b0f5cf8a7221c937b3fcfc833ac1b8a7c9915a91bda0fb",
+    "original_working_copy_sha256": "bd1c871d8f368766cb117cabf908bd6e8ad43e8f944644433b259b83e2947e6e",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "deploy/f2_zone_recipes.yaml",
+    "sha256": "0713acdb90a7fa2e3dabb24bf3eac5b80688a06d1cd9c1788ffabb5577d66ff1",
+    "original_working_copy_sha256": "4ef241c2ec2273459a9a1700ba614bd2eea5c4c0f5f1f7dc2b366061ece0cab8",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "templates/crop_steering.2zone.env",
+    "sha256": "21c57ef4a63991d66b5e6f5f0b6a9cd2bb0c49fbf376006d9fe64cc25152a22f",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "templates/crop_steering.4zone.env",
+    "sha256": "1228441e4c0d74990b6ee70769e420bd0fa6dfeca5badb23496b3b292d88a1b1",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "templates/crop_steering.6zone.env",
+    "sha256": "92b4318def83480d89be4e2bcc778eda9507919da27cbcbf398f092eb87e045f",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "templates/README.md",
+    "sha256": "a43d85153b8ae51cfc4e9ef43734ff3b1ae947ea914019a1a6af644b6f6ae1cd",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "crop_steering.env",
+    "sha256": "ae105d04d85edcdc21a6da3cf762b587e20d2cf5b333a040898c59475dd393f6",
+    "original_working_copy_sha256": "0ca576de077a93c24ca195bf3658dc6917ffa3a8a1a47c07e06ac70d931f4885",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "crop_steering.env.example",
+    "sha256": "640f6da9b85ab0366b873452c931f406afb0c2289f482f267f9b774434486a43",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "crop_steering_lovelace.yaml",
+    "sha256": "df073dd0cbaa0d8299391102fa4f5dd29842576b90b50d10b8e6ec1dcbb4f9fa",
+    "original_working_copy_sha256": "52b985a576800e492183d8f1f02c4ce9604f1649f7e789a6cdb09e0874ba9fcb",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "index.html",
+    "sha256": "eb4a1185a2ca027ca52029650f44aacf7fb1b3eab38f86a50d40b38f7c78c314",
+    "original_working_copy_sha256": "bb5016822017de2d9506974ac333079c08e1b7a4a0b316efde4d0050c559dbbe",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "addons/f2_control/f2_control_package.yaml",
+    "sha256": "7e55ce4bbc2d3a9ebfb7cb2577cb0abe9c338cbf2c94699fb21a6b954f6efd8b",
+    "original_working_copy_sha256": "13cd2541f2d36853fac0a6df6a7ac85898d90e0df7d850e5f7f56a97ff38d423",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "addons/f2_control/f2_ec_pid_package.yaml",
+    "sha256": "c7ba7ba43fda68cdb30d37c6ab8a6d49f8e0b3e844f3bf3365db8a8011a6e5be",
+    "original_working_copy_sha256": "c724a0d515c147666965714873f072ce0555ce416b707a77222b0de0cd263f2c",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "addons/f2_control/f2_min_daily_package.yaml",
+    "sha256": "45b15a8354a468b7ae5dd379a5517995156e36735825f77d74978c3cd43e61d2",
+    "original_working_copy_sha256": "c75c30386b1c2c964391de37b2d566e8fd9004ca70872de02a474937e70fc085",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": ".github/workflows/deploy.yml",
+    "sha256": "b4f6122a9e572e15371b445ab84955d391781c04267f88d32df81d3f475847fa",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": ".github/workflows/rollback.yml",
+    "sha256": "34beeb81b4ef27dcae701bbfcf9426be29e37573e2a11ba8506f3017ef35feef",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "crop-steering-engine/.github/workflows/ci.yml",
+    "sha256": "0db19848f139b84aebfc1d42826dfc93bfb5d442ff4b14e31c29f41a28fff9cc",
+    "original_working_copy_sha256": "033ed5afdd953a356eb802d1cb2e4ba746768595e3610c5276c9d18909e8fdc1",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "docs/OPERATOR_DASHBOARD.md",
+    "archive_path": "archive/2026-09-08/retired-links/docs/OPERATOR_DASHBOARD.md",
+    "sha256": "01979178f80f4233dae7ccc12bb308ac3035953e0f8cf30536bc601030efa6b2",
+    "original_working_copy_sha256": "ffb06250ba3e30deda567d96781e6b3cd7d78199eccff752002b3f3505789f40",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "docs/dynamic_zones_guide.md",
+    "archive_path": "archive/2026-09-08/retired-links/docs/dynamic_zones_guide.md",
+    "sha256": "8c2f56f3149902473ea3ee334168ab3c4404258f4a2790be7d5c8d6453b98c6e",
+    "original_working_copy_sha256": "3ec718533088e1e4db7c6ff0ae1adb0fba4e17a2b5c82a0690d4c0b3e09a0158",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "docs/installation_guide.md",
+    "archive_path": "archive/2026-09-08/retired-links/docs/installation_guide.md",
+    "sha256": "0e03750bb2c37751d12293d1eebd60990e5482f31a199a7a0eeed7a33273fcc9",
+    "original_working_copy_sha256": "013f2735a662ec910c0087d62ebb62f6644e8eaf7a91fe718ac6bf1ac496a724",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "docs/operation_guide.md",
+    "archive_path": "archive/2026-09-08/retired-links/docs/operation_guide.md",
+    "sha256": "3375d80a2b18f6a4d569b17467c488d4fc6c573ee5726606085bfa76d63fe679",
+    "original_working_copy_sha256": "6a3bb071e638f8a69482975edb11386e897401c425572bc1403a95ec7785df5e",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "docs/INSTALL_GUIDE.html",
+    "archive_path": "archive/2026-09-08/retired-links/docs/INSTALL_GUIDE.html",
+    "sha256": "8a02af2adec87bf3b37d349300f85cae25e3cbbe805028e812fa8c7a4d54946b",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  },
+  {
+    "original_path": "frontend/scripts/capture-baseline.mjs",
+    "sha256": "59809e839c024ca2bdc5e0c8eee164da7c8706e68d3f0440d0daddaf3e144ff8",
+    "source_commit": "b61d7a6999ecbc5029b9b2eca92272c02ba2bedc"
+  }
+]

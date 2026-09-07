@@ -1,3 +1,5 @@
+extend-exclude = ["archive", "output", "frontend/node_modules", "frontend/dist"]
+
 # Repo-wide ruff gate. scripts/ are terse local deploy/dev helpers — style
 # rules (one-line statements) are intentionally relaxed there; real error
 # classes (F, E9, undefined names) still apply everywhere.

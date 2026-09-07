@@ -1,23 +1,53 @@
-"""Regression tests for the standalone operator dashboard layout."""
+"""Contracts for all shipped dashboard entry points and install metadata."""
 
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
-DASHBOARD = ROOT / "www" / "f2.html"
+DASHBOARD = ROOT / "www/dashboard.html"
 
 
-def test_fixed_navigation_is_opaque_and_content_reserves_safe_area():
+def test_dashboard_is_accessible_self_contained_and_bundles_font_license():
     source = DASHBOARD.read_text(encoding="utf-8")
+    assert '<html lang="en"' in source
+    assert 'id="root"' in source
+    assert "Operator dashboard" in source
+    assert not re.search(r"<script[^>]+src=", source)
+    assert not re.search(r'<link[^>]+rel="stylesheet"', source)
+    assert not re.search(r"url\([\"\x27]?https?://", source)
+    assert "<noscript>" in source
+    assert "SIL OPEN FONT LICENSE" in source
 
-    assert source.count('class="sticky top-0 z-30 app-navbar') == 1
-    assert source.count("app-navbar border-t") == 1
-    assert "background:#0d1117" in source
-    assert "padding-bottom:calc(5rem + env(safe-area-inset-bottom))" in source
-    assert 'class="app-content flex-1 min-w-0 flex flex-col"' in source
+
+def test_all_install_paths_ship_identical_dashboard():
+    for relative in (
+        "addons/f2_control/www/public",
+        "custom_components/crop_steering/www",
+    ):
+        assert (
+            DASHBOARD.read_bytes() == (ROOT / relative / "dashboard.html").read_bytes()
+        )
 
 
-def test_tune_stage_sticks_below_header():
-    source = DASHBOARD.read_text(encoding="utf-8")
+def test_compatibility_entries_preserve_context_and_route_to_native_workspace():
+    for relative in (
+        "www/index.html",
+        "www/f2.html",
+        "www/f2-classic.html",
+        "addons/f2_control/web-index.html",
+    ):
+        source = (ROOT / relative).read_text(encoding="utf-8")
+        assert "dashboard.html" in source
+        assert "location.search" in source
+        assert "location.hash" in source
+        assert "legacyViews" in source
+    classic = (ROOT / "www/f2-classic.html").read_text(encoding="utf-8")
+    assert '"room:f1_":"room:"' in classic
+    assert '"grow-plan"' in classic
 
-    assert ":root{--app-header-h:64px}" in source
-    assert "#tuneRoot .tune-stage{position:sticky;top:var(--app-header-h)" in source
+
+def test_repository_metadata_does_not_expose_legacy_facility_config_as_an_app():
+    assert (ROOT / "repository.yaml").exists()
+    assert not (ROOT / "config.yaml").exists()
+    assert not list((ROOT / "archive").rglob("config.yaml"))
+    assert (ROOT / "addons/f2_control/config.yaml").exists()

@@ -357,7 +357,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         )
 
     async def async_set_manual_override(call: ServiceCall) -> None:
-        """Service to set manual override for a zone with optional timeout."""
+        """Set a timed manual override; omitted timeout defaults to one hour."""
         zone = call.data["zone"]
         timeout_minutes = call.data.get("timeout_minutes", 60)  # Default 1 hour
         enable = call.data.get("enable", True)
@@ -368,16 +368,24 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             f"Manual override requested: Zone {zone}, Enable: {enable}, Timeout: {timeout_minutes}min"
         )
 
-        # Set the manual override switch
-        override_entity = f"switch.{DOMAIN}_{prefix}zone_{zone}_manual_override"
-        await hass.services.async_call(
-            "switch",
-            "turn_on" if enable else "turn_off",
-            {"entity_id": override_entity},
-            blocking=True,
-        )
+        # The loaded RestoreEntity owns its deadline and scheduler. The controller
+        # currently reads canonical IDs, so reject a renamed switch before success.
+        key = f"{prefix}zone_{zone}_manual_override"
+        override = hass.data.get(DOMAIN, {}).get("_manual_overrides", {}).get(key)
+        if override is None or not override._override_loaded:
+            raise HomeAssistantError(
+                f"Manual override for room {room or 'default'} zone {zone} is not loaded"
+            )
+        expected_entity_id = f"switch.{DOMAIN}_{key}"
+        if override.entity_id != expected_entity_id:
+            raise HomeAssistantError(
+                f"Restore the manual override entity ID to {expected_entity_id} in "
+                "Home Assistant before using timed overrides; the controller cannot "
+                f"read its renamed ID {override.entity_id}"
+            )
+        await override.async_set_manual_override(enable, timeout_minutes)
 
-        # Fire event for the engine to handle timeout logic
+        # Preserve the public event for observers; expiry is handled by the switch.
         if enable and timeout_minutes:
             hass.bus.async_fire(
                 "crop_steering_manual_override",
@@ -385,6 +393,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     "zone": zone,
                     "action": "enable_with_timeout",
                     "timeout_minutes": timeout_minutes,
+                    "expires_at": override.extra_state_attributes[
+                        "manual_override_expires_at"
+                    ],
                     "room": room or "default",
                     "timestamp": dt_util.now().isoformat(),
                 },

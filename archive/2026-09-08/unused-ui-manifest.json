@@ -1,0 +1,50 @@
+[
+  {
+    "sha256": "394EF4CDA1ABCBB1F9C3E8B3C66587E8C1579DD5C5F4B2B850BFD8B43B172F2B",
+    "reason": "Unused generated UI component; absent from application import graph",
+    "source": "frontend/src/components/ui/alert.tsx",
+    "retained": "archive/2026-09-08/frontend/src/components/ui/alert.tsx"
+  },
+  {
+    "sha256": "F345AA1BED7FFC28FB15065D47A09F923BB95BD751007D34862E317422B73594",
+    "reason": "Unused generated UI component; absent from application import graph",
+    "source": "frontend/src/components/ui/card.tsx",
+    "retained": "archive/2026-09-08/frontend/src/components/ui/card.tsx"
+  },
+  {
+    "sha256": "D2902201EEA6CF9D8E38EFBA13D58816EBC11F35119F5946D72AC3BD528C8E5F",
+    "reason": "Unused generated UI component; absent from application import graph",
+    "source": "frontend/src/components/ui/select.tsx",
+    "retained": "archive/2026-09-08/frontend/src/components/ui/select.tsx"
+  },
+  {
+    "sha256": "342987B24F535CD27920F8F31F52DD193E918C48590C7E406E26F432BD1A747C",
+    "reason": "Unused generated UI component; absent from application import graph",
+    "source": "frontend/src/components/ui/separator.tsx",
+    "retained": "archive/2026-09-08/frontend/src/components/ui/separator.tsx"
+  },
+  {
+    "sha256": "E3BD46B60FEC62FBE72B7C9A22DA75206D507D70700E976FB45778BE250D0822",
+    "reason": "Unused generated UI component; absent from application import graph",
+    "source": "frontend/src/components/ui/skeleton.tsx",
+    "retained": "archive/2026-09-08/frontend/src/components/ui/skeleton.tsx"
+  },
+  {
+    "sha256": "F28CBA0BE08C0873D121F6F35107C9E0B209EF649B0D0625C32E46CF0B2ED9A2",
+    "reason": "Unused generated UI component; absent from application import graph",
+    "source": "frontend/src/components/ui/sonner.tsx",
+    "retained": "archive/2026-09-08/frontend/src/components/ui/sonner.tsx"
+  },
+  {
+    "sha256": "F10FD3ACCFD324F7282396BDD8C0092AE1EEA0FA731043FA2ACD22C6C9B2D159",
+    "reason": "Unused generated UI component; absent from application import graph",
+    "source": "frontend/src/components/ui/switch.tsx",
+    "retained": "archive/2026-09-08/frontend/src/components/ui/switch.tsx"
+  },
+  {
+    "sha256": "20818F265854972F1DF4C2830F541C08B26F1442B5AC4E424D76D7A5B900D7C8",
+    "reason": "Unused generated UI component; absent from application import graph",
+    "source": "frontend/src/components/ui/table.tsx",
+    "retained": "archive/2026-09-08/frontend/src/components/ui/table.tsx"
+  }
+]

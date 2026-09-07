@@ -1,0 +1,162 @@
+[
+  {
+    "source": "www\\f2-classic.html",
+    "sha256": "3526F8F6FE8E272DC740C1C76D132B8BC44B6E434F5C91734D2917F9EDBC5E83",
+    "bytes": 821802
+  },
+  {
+    "source": "www\\home.html",
+    "sha256": "B9CD50B6C000ED6471302F6FA4CF732E01C2DFD5EFF956C8167C15085D279CCB",
+    "bytes": 123112
+  },
+  {
+    "source": "www\\overview.html",
+    "sha256": "86C1EAF13A5A170E005DAF5D9EB1EF5E5DC050FFC8A50C580DFA12FB1B82DFDB",
+    "bytes": 24125
+  },
+  {
+    "source": "www\\setpoints.html",
+    "sha256": "426F08BC5991D06F7E1D5E288461F2C3605640C4DB7822B2D3680FF503548EE5",
+    "bytes": 81773
+  },
+  {
+    "source": "www\\crop_steering.html",
+    "sha256": "359DD8C50843EED1FFD00963C77C6594A23E90C8EB48AD3DC8979AC1D93E6759",
+    "bytes": 91015
+  },
+  {
+    "source": "www\\crop_steering_tune.html",
+    "sha256": "82BAF0B316F251C4C8E5ED4FCA9EF8E46953A24F130DE33C20673294F5C3E6E2",
+    "bytes": 134710
+  },
+  {
+    "source": "www\\crop_steering_rules.html",
+    "sha256": "87594D6C9430F4E88BCC030940452350A8AF22BE543B72D4770CB8E1D5330FC4",
+    "bytes": 21611
+  },
+  {
+    "source": "www\\office.html",
+    "sha256": "09F685C8B52AA719DEE419C69A1FE7BF382B0F28B0EF315606BDA6AF0006F36F",
+    "bytes": 49812
+  },
+  {
+    "source": "www\\system-map.html",
+    "sha256": "3A820A38506A77AE83DE7CC8D25521AADAFA0F00DADEB766EAFCE12520B84BB3",
+    "bytes": 56671
+  },
+  {
+    "source": "www\\irrigation-manual.html",
+    "sha256": "F438EF82829B0575DCC532B216861C457980977E7866CD62AA8725618DA74A17",
+    "bytes": 43620
+  },
+  {
+    "source": "www\\install.html",
+    "sha256": "52BFCF632E44BDF2B188FCB8E780B8B0D9AB5C651648420E5C81093EB99EADFC",
+    "bytes": 34361
+  },
+  {
+    "source": "www\\SYSTEM_GUIDE.html",
+    "sha256": "28EE6C5BBE4BC42CF1F119307AF00669F924CCD09AEFD0FC030CB77BE899AAF6",
+    "bytes": 32115
+  },
+  {
+    "source": "www\\dashboard-nav.js",
+    "sha256": "DDBA212156BE06A7446322E5548BE7A3FB49D2667D947A25DDC8918323B82775",
+    "bytes": 3233
+  },
+  {
+    "source": "www\\floorplan\\index.html",
+    "sha256": "87A68DC4CDA5278492410060A1F0F9D14C57A7A108207EC2EFE6C8FB9DDA54AB",
+    "bytes": 4168
+  },
+  {
+    "source": "www\\floorplan\\assets\\index-6rAxXTMW.js",
+    "sha256": "89D6A2FB67BAB241BF4F649DEE1D9299A25B7C7F3129B41C3262F870F86580B9",
+    "bytes": 794210
+  },
+  {
+    "source": "www\\floorplan\\assets\\index-COm-xLT1.js",
+    "sha256": "83D9C3B4F77782937F1432B3924532C48D7D3158098AFE92A1EB86CE14D47BA8",
+    "bytes": 794388
+  },
+  {
+    "source": "www\\floorplan\\assets\\index-CTMuWeAY.js",
+    "sha256": "ADA4AFBF023CEC80C6E070EEB6F6CC046EDF4B05A35845FD9E48AC8073787D3F",
+    "bytes": 794258
+  },
+  {
+    "source": "www\\floorplan\\assets\\index-DKfIYGEd.js",
+    "sha256": "DD8238CA2590E0A860323C69FC0C81E52BB196A50098650D6B0AD53F2D03FBED",
+    "bytes": 789374
+  },
+  {
+    "source": "SYSTEM_GUIDE.html",
+    "sha256": "E76C13D01B367BAC7DEFE6B11D5D0BF2CDADAD303EF25853E1A39AE49ED6270A",
+    "bytes": 32067
+  },
+  {
+    "source": "SYSTEM_GUIDE.md",
+    "sha256": "27D0BA5C9B512B8B89456E0B8F3491D50402FECA44695004CAC240AF413AF6B0",
+    "bytes": 10582
+  },
+  {
+    "source": "ENV_CONFIGURATION_GUIDE.md",
+    "sha256": "8FE758CB6DF25810DCB0ADA64A153B9EB081CE62BB1BA291E209C3362CF90792",
+    "bytes": 10455
+  },
+  {
+    "source": "scripts\\capture_demo_shots.js",
+    "sha256": "37A9F2E83677346666C4FD37D635D87EA7FBE5A62D991A5226ED72062515A3CA",
+    "bytes": 2420
+  },
+  {
+    "source": "scripts\\capture_shots.py",
+    "sha256": "F3E31DFCBBCA333C66973AE09840817BC79BE2CFAD28BA1123FECE589A89398C",
+    "bytes": 3837
+  },
+  {
+    "source": "scripts\\check_tips_coverage.js",
+    "sha256": "F5AB89FB55DE3CB42832B7025EF58C48FF5536183C01C4C43FFB3B7D159804F7",
+    "bytes": 2371
+  },
+  {
+    "source": "scripts\\verify_home.js",
+    "sha256": "2F33EDA47204E1AE91C6CF4F18AC377D72A664904BC503D0B407217946D8BA55",
+    "bytes": 2685
+  },
+  {
+    "source": "scripts\\verify_overlay.py",
+    "sha256": "AA8B6030A8FCB39473BED1AA60660F6F5F465C05C853AFB3191357C68D404146",
+    "bytes": 4554
+  },
+  {
+    "source": "scripts\\render_guide.py",
+    "sha256": "7F794FDCAB9A04DCBF1ED42124389C5B74FC26B4CF65672D0B958DE3DC862177",
+    "bytes": 6271
+  },
+  {
+    "source": "scripts\\tips_data.json",
+    "sha256": "87B9F9740C1B71BC90667EEEF1C858ACE18DA1825E4BD65430F548AA26EEAB93",
+    "bytes": 131003
+  },
+  {
+    "source": "docs\\HOME_ASSISTANT_FORUM_POST.md",
+    "sha256": "EED9871399812F0DA29D80E46D1BD290D16AF62ABFABE2DF7531EFF01586E1FC",
+    "bytes": 3824
+  },
+  {
+    "source": "docs\\FEATURES_AND_TODO.md",
+    "sha256": "CAF13C15615870BA2FC32BFFB68CCF5352DF7E8950D487E6999E3C70881812DA",
+    "bytes": 3790
+  },
+  {
+    "source": "docs\\DASHBOARDS.md",
+    "sha256": "F8CEECC6CE6369102C37623120C536B5D77F3CB17B237A30549D5C6B54D9A2F1",
+    "bytes": 8906
+  },
+  {
+    "source": "docs\\AUTONOMOUS_SETPOINTS.md",
+    "sha256": "F61902BDC85B524CE9E2E1326CDD17A395415E949F6ECD299DC96916C836F9BF",
+    "bytes": 12128
+  }
+]

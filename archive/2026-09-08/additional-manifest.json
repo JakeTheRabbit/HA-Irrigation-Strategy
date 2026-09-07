@@ -1,0 +1,34 @@
+[
+  {
+    "source": "addons\\f2_control\\www\\public\\floorplan\\index.html",
+    "sha256": "87A68DC4CDA5278492410060A1F0F9D14C57A7A108207EC2EFE6C8FB9DDA54AB"
+  },
+  {
+    "source": "addons\\f2_control\\www\\public\\floorplan\\assets\\index-6rAxXTMW.js",
+    "sha256": "89D6A2FB67BAB241BF4F649DEE1D9299A25B7C7F3129B41C3262F870F86580B9"
+  },
+  {
+    "source": "addons\\f2_control\\www\\public\\floorplan\\assets\\index-COm-xLT1.js",
+    "sha256": "83D9C3B4F77782937F1432B3924532C48D7D3158098AFE92A1EB86CE14D47BA8"
+  },
+  {
+    "source": "addons\\f2_control\\www\\public\\floorplan\\assets\\index-CTMuWeAY.js",
+    "sha256": "ADA4AFBF023CEC80C6E070EEB6F6CC046EDF4B05A35845FD9E48AC8073787D3F"
+  },
+  {
+    "source": "addons\\f2_control\\www\\public\\floorplan\\assets\\index-DKfIYGEd.js",
+    "sha256": "DD8238CA2590E0A860323C69FC0C81E52BB196A50098650D6B0AD53F2D03FBED"
+  },
+  {
+    "source": "addons\\f2_control\\www\\public\\dashboard-nav.js",
+    "sha256": "DDBA212156BE06A7446322E5548BE7A3FB49D2667D947A25DDC8918323B82775"
+  },
+  {
+    "source": "docs\\INSTALL_GUIDE.html",
+    "sha256": "FC1576FA74D70640242CB4CA2DF1A469F1544B763BA02871DE77447421820135"
+  },
+  {
+    "source": "docs\\AGENT_INSTALL.md",
+    "sha256": "C233B196C6AC40B47ACCA97C971FFEF35CFBA00CDE1B12E0A2002ECC68DCD175"
+  }
+]

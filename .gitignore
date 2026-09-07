@@ -44,3 +44,10 @@ node_modules/
 *.key
 *.pem
 *.crt
+
+# Local browser verification artifacts
+output/
+
+# User-generated configuration and optional Lovelace output
+/crop_steering.env
+/crop_steering_lovelace.yaml

@@ -26,30 +26,18 @@ DEFAULT_MAX_EC = 9.0
 # ---------------------------------------------------------------------------
 # P0 dryback configuration
 # ---------------------------------------------------------------------------
-# IMPORTANT: in this codebase "dryback" is always the *drop* from peak VWC,
-# expressed as percentage points. e.g. peak=70%, valley=58% ⇒ dryback = 12.
-# It is NOT the VWC value the substrate dries down *to*.
-#
-# The two endpoints below feed the cultivator-intent slider, which interpolates
-# between them (-100 = pure generative ⇒ DROP_PCT_GEN, +100 = pure vegetative
-# ⇒ DROP_PCT_VEG).
-#
-# Defaults reflect Athena cannabis guidance (10-15% veg, 20-25% gen). They are
-# *only* defaults; the values are surfaced as HA `number` entities so the
-# cultivator can override per cultivar at any time without touching code:
-#
-#   number.crop_steering_veg_p0_dryback_drop_pct   (range 5-40)
-#   number.crop_steering_gen_p0_dryback_drop_pct   (range 5-50)
-#
-# The legacy entities `number.crop_steering_veg_dryback_target` /
-# `number.crop_steering_gen_dryback_target` are kept as aliases for backward
-# compatibility (see number.py) but emit a deprecation warning in the log.
+# Controller dryback is relative to detected peak VWC:
+# (peak - current VWC) / peak * 100. A 20% dryback from 60% VWC ends at
+# 48% VWC (a 12 percentage-point drop). VWC targets are absolute percentages;
+# dryback rates are VWC percentage points/hour and need explicit conversion.
+# These constants are defaults for separate legacy numbers, not synchronized
+# entity aliases or the Grow Plan endpoint settings. Existing restored values
+# remain unchanged. The Grow Plan uses its explicit per-zone endpoint ranges.
 DEFAULT_VEG_P0_DRYBACK_DROP_PCT = 12.0
 DEFAULT_GEN_P0_DRYBACK_DROP_PCT = 22.0
 
-# Legacy aliases — kept so existing dashboards / env files continue to load.
-# Numerically these used to mean "% drop from peak"; the previous defaults of
-# 50 / 40 were too aggressive under that semantic and are corrected here.
+# Python constant aliases retained for source compatibility. The HA number
+# entities created from them are independent controls; writes do not fan out.
 DEFAULT_VEG_DRYBACK_TARGET = DEFAULT_VEG_P0_DRYBACK_DROP_PCT  # legacy alias
 DEFAULT_GEN_DRYBACK_TARGET = DEFAULT_GEN_P0_DRYBACK_DROP_PCT  # legacy alias
 DEFAULT_P1_TARGET_VWC = 65.0
@@ -67,7 +55,7 @@ VWC_DRY_THRESHOLD = 40
 VWC_SATURATED_THRESHOLD = 70
 
 # Software version - single source of truth
-SOFTWARE_VERSION = "2.3.1"
+SOFTWARE_VERSION = "2.13.0"
 
 # Crop steering phases (P0-P3 only, Manual removed)
 PHASES = ["P0", "P1", "P2", "P3"]
