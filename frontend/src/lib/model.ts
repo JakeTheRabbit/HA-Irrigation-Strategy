@@ -11,6 +11,7 @@ import type {
   States,
   Zone,
 } from "./types";
+import { parseAutoSetpoints } from "./auto-setpoints";
 
 const ROOT = "crop_steering_";
 const ZONE_PARAMETERS = new Set([
@@ -73,6 +74,12 @@ export function readable(entity?: EntityState): boolean {
 }
 function boolean(entity?: EntityState): boolean | null {
   return entity?.state === "on" ? true : entity?.state === "off" ? false : null;
+}
+const roomActiveId = (room: Room) => `switch.${ROOT}${room.prefix}room_active`;
+/** Off means nothing is growing: the engine neither irrigates nor alerts. A missing or
+ * unreadable switch is never treated as off, so an unknown state cannot hide warnings. */
+export function roomIsActive(states: States, room: Room): boolean {
+  return states[roomActiveId(room)]?.state !== "off";
 }
 function lastIrrigation(entity: EntityState | undefined, now: number): Zone["lastIrrigation"] {
   const result: Zone["lastIrrigation"] = {
@@ -427,6 +434,9 @@ export function buildRoom(states: States, room: Room): RoomView {
     : configuredIds;
   const names = config?.attributes.zone_names as Record<string, unknown> | undefined;
   const valves = config?.attributes.valves;
+  const activeSwitch = room.id ? states[roomActiveId(room)] : undefined;
+  const roomActive = !room.id || roomIsActive(states, room);
+  const autoSwitch = room.id ? resolve(states, room, "switch", "auto_setpoints") : undefined;
   const zones: Zone[] = activeIds.map((id) => {
     const z = `zone_${id}_`;
     const phase = resolve(states, room, "sensor", `${z}phase`);
@@ -541,13 +551,14 @@ export function buildRoom(states: States, room: Room): RoomView {
         "Shots today",
         "",
       ),
-      status: readable(status) ? status!.state : "Unavailable",
+      status: !roomActive ? "Room off" : readable(status) ? status!.state : "Unavailable",
       fields: settings.filter((s) => s.zoneId === id),
       sensors: entities.filter(
         (e) =>
           e.entity_id.startsWith("sensor.") &&
           (e.entity_id.includes(`_zone_${id}_`) || e.entity_id.endsWith(`_zone_${id}`)),
       ),
+      auto: parseAutoSetpoints(resolve(states, room, "sensor", `${z}auto_setpoints`)),
     };
   });
   const aggregate = (
@@ -661,7 +672,17 @@ export function buildRoom(states: States, room: Room): RoomView {
       engaged: strategyEngaged,
       valid: strategyValid,
     },
-    alerts,
+    // An off room is empty: probe, heartbeat and status warnings are noise there.
+    // Physically stuck hardware is the one notice that still matters.
+    alerts: roomActive
+      ? alerts
+      : alerts.filter((alert) => alert.id === `${room.id}-hardware-fault`),
+    roomActive,
+    roomActiveEntity: activeSwitch?.entity_id ?? null,
+    autoSetpoints: {
+      entityId: autoSwitch?.entity_id ?? null,
+      enabled: boolean(autoSwitch),
+    },
   };
 }
 
@@ -712,6 +733,8 @@ export function validateChange(room: RoomView, states: States, change: Change): 
   }
   const safeSwitches = new Set([
     room.engine.entityId,
+    room.roomActiveEntity,
+    room.autoSetpoints.entityId,
     ...room.zones.flatMap((z) => [
       z.enabledEntity,
       `switch.${ROOT}${room.room.prefix}zone_${z.id}_manual_override`,

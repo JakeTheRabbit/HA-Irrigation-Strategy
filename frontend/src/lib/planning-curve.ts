@@ -12,10 +12,19 @@ export interface PlanningPhase {
   end: number;
   color: string;
 }
+/** One P1 shot on the ramp: the VWC reference before and after it. */
+export interface PlanningStep {
+  hour: number;
+  from: number;
+  to: number;
+  /** Configured shot size, % of substrate volume; null when sizes were not supplied. */
+  size: number | null;
+}
 export interface PlanningModel {
   phases: PlanningPhase[];
   vwc: PlanningPoint[];
   ec: PlanningPoint[];
+  p1Steps: PlanningStep[];
   photoperiod: number;
   morningDrybackVwc: number | null;
   drybackReference: number | null;
@@ -141,6 +150,27 @@ export function buildPlanningCurve(
     warnings.push(
       "The overnight reference reaches or crosses the P3 emergency floor. Emergency protection would be relevant at that reading; the chart does not predict or schedule an emergency shot.",
     );
+  // The ramp is a staircase, one riser per eligible shot. Each shot takes the share of the climb
+  // that its configured size is of the ramp's total water; retained water is not predicted.
+  const p1Steps: PlanningStep[] = [];
+  if (p1 !== null && overnightEnd !== null && p1 > overnightEnd && p1Windows.length) {
+    const initial = value("p1_initial_shot_size");
+    const increment = value("p1_shot_size_increment") ?? 0;
+    const sizes = p1Windows.map((_, index) =>
+      initial === null ? null : initial + index * increment,
+    );
+    const total = sizes.reduce<number>((sum, size) => sum + (size ?? 1), 0);
+    let level = overnightEnd;
+    p1Windows.forEach((hour, index) => {
+      const last = index === p1Windows.length - 1;
+      const to = last ? p1 : level + ((p1 - overnightEnd) * (sizes[index] ?? 1)) / total;
+      p1Steps.push({ hour, from: level, to, size: sizes[index] });
+      level = to;
+    });
+    notes.push(
+      "P1 is drawn one step per eligible shot. Each step takes the share of the climb that its configured shot size is of the ramp's total; how much water the substrate actually retains is not predicted.",
+    );
+  }
   const vwc: PlanningPoint[] = [];
   if (overnightEnd !== null) {
     vwc.push({ hour: 0, value: overnightEnd, phase: "P0" });
@@ -235,6 +265,7 @@ export function buildPlanningCurve(
     phases,
     vwc,
     ec,
+    p1Steps,
     p1Windows,
     photoperiod,
     morningDrybackVwc: morningDryback,
@@ -275,4 +306,292 @@ export function changePlanningValue(
   const step = Math.min(maxStep, Math.max(0, Math.round((value - bound.min) / bound.step)));
   const quantized = Number((bound.min + step * bound.step).toFixed(10));
   onChange(key, quantized);
+}
+
+export interface RecordedReading {
+  time: number;
+  value: number;
+}
+export interface RecordedPoint extends RecordedReading {
+  /** Hours since that grow-day's lights-on, the plan graph's x-axis. */
+  hour: number;
+}
+export interface FoldedRecording {
+  today: RecordedPoint[];
+  /** Earlier grow-days, most recent first. */
+  previous: RecordedPoint[][];
+  /** Earlier grow-days with too few readings to draw. */
+  earlier: number;
+}
+/** Fold recorded readings onto the lights-on axis so they sit under the targets being edited.
+ * A grow-day runs from lights-on to the next lights-on, in the browser's time zone. */
+export function foldRecorded(
+  readings: readonly RecordedReading[],
+  lightsOn: number,
+  now: number,
+): FoldedRecording {
+  const folded: FoldedRecording = { today: [], previous: [], earlier: 0 };
+  if (!Number.isFinite(lightsOn) || lightsOn < 0 || lightsOn >= 24 || !Number.isFinite(now))
+    return folded;
+  const dayStart = (time: number) => {
+    const date = new Date(time);
+    const at = (offset: number) =>
+      new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate() + offset,
+        0,
+        Math.round(lightsOn * 60),
+      ).getTime();
+    return at(0) > time ? at(-1) : at(0);
+  };
+  const current = dayStart(now);
+  const days = new Map<number, RecordedPoint[]>();
+  for (const reading of readings) {
+    if (!Number.isFinite(reading.time) || !Number.isFinite(reading.value) || reading.time > now)
+      continue;
+    const start = dayStart(reading.time);
+    const hour = Math.min(24, Math.max(0, (reading.time - start) / 3_600_000));
+    const day = days.get(start) ?? [];
+    day.push({ hour, value: reading.value, time: reading.time });
+    days.set(start, day);
+  }
+  for (const [start, points] of [...days].sort((a, b) => b[0] - a[0])) {
+    points.sort((a, b) => a.time - b.time);
+    if (start === current) folded.today = points;
+    else if (points.length > 1) folded.previous.push(points);
+    else folded.earlier++;
+  }
+  return folded;
+}
+/** VWC axis for the plan graph: what is plotted plus headroom. The span is always 20, 40, 60, 80
+ * or 100 points, so its four grid intervals land on whole multiples of 5. */
+export function planningAxis(values: readonly number[]): { min: number; max: number } {
+  const finite = values.filter((value) => Number.isFinite(value));
+  if (!finite.length) return { min: 0, max: 100 };
+  let min = Math.max(0, Math.floor((Math.min(...finite) - 2) / 5) * 5);
+  let max = Math.min(100, Math.ceil((Math.max(...finite) + 2) / 5) * 5);
+  for (let lower = true; (max - min) % 20 !== 0 || max === min; lower = !lower) {
+    if (lower ? min > 0 : max >= 100) min -= 5;
+    else max += 5;
+  }
+  return { min, max };
+}
+
+export interface DryRates {
+  /** VWC points lost per hour with lights on / lights off; null until enough quiet hours exist. */
+  day: number | null;
+  night: number | null;
+}
+const median = (values: number[]) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+};
+/** How fast this zone actually dries, from its own recorded VWC: the median hour-to-hour fall of
+ * the hourly medians, separately for lights-on and lights-off. Hours that rose (a shot) are skipped. */
+export function dryRates(
+  days: readonly (readonly RecordedPoint[])[],
+  photoperiod: number,
+): DryRates {
+  const falls: { day: number[]; night: number[] } = { day: [], night: [] };
+  for (const points of days) {
+    const hourly: (number | null)[] = Array.from({ length: 24 }, (_, hour) => {
+      const values = points
+        .filter((point) => point.hour >= hour && point.hour < hour + 1)
+        .map((point) => point.value);
+      return values.length > 1 ? median(values) : null;
+    });
+    for (let hour = 0; hour < 23; hour++) {
+      const a = hourly[hour],
+        b = hourly[hour + 1];
+      if (a === null || b === null || a - b <= 0 || a - b > 3) continue;
+      if (hour + 2 <= photoperiod) falls.day.push(a - b);
+      else if (hour >= photoperiod) falls.night.push(a - b);
+    }
+  }
+  const rate = (values: number[]) => (values.length > 2 ? +median(values).toFixed(2) : null);
+  return { day: rate(falls.day), night: rate(falls.night) };
+}
+
+export interface ProjectedShot {
+  hour: number;
+  phase: PlanningPhaseId;
+  from: number;
+  to: number;
+  /** Configured size, % of substrate volume. */
+  size: number | null;
+  emergency?: boolean;
+}
+export interface PlanningProjection {
+  points: PlanningPoint[];
+  shots: ProjectedShot[];
+  /** Projected VWC at lights-on: where the night's dry-down ends and the next day starts. */
+  lightsOnVwc: number;
+  peak: number;
+  /** The dryback target as a VWC level: the projected peak less the relative dryback. */
+  drybackVwc: number | null;
+  rates: { day: number; night: number };
+  measured: { day: boolean; night: boolean };
+  retention: number;
+}
+/** Used until a zone has enough recorded history to measure its own dry-down. */
+export const NOMINAL_DRY_RATES = { day: 0.7, night: 0.35 };
+/** The whole day as the engine would run these setpoints: P0 dries on, P1 climbs shot by shot,
+ * P2 fires a shot each time VWC falls to its threshold, P3 dries down to the next lights-on.
+ * Timing comes from the zone's dry-down rate, so it is a projection, not a schedule. */
+export function projectDay(
+  plan: PlanningModel,
+  parameters: Record<string, number>,
+  options: { rates?: DryRates; retention?: number | null } = {},
+): PlanningProjection | null {
+  const target = parameters.p1_target_vwc,
+    threshold = parameters.p2_vwc_threshold;
+  if (
+    !plan.photoperiod ||
+    !plan.vwc.length ||
+    !Number.isFinite(target) ||
+    !Number.isFinite(threshold)
+  )
+    return null;
+  const usable = (value: number | null | undefined): value is number =>
+    typeof value === "number" && Number.isFinite(value) && value > 0;
+  const rates = {
+    day: usable(options.rates?.day) ? options.rates.day : NOMINAL_DRY_RATES.day,
+    night: usable(options.rates?.night) ? options.rates.night : NOMINAL_DRY_RATES.night,
+  };
+  const retention = usable(options.retention) ? Math.min(1.5, options.retention) : 1;
+  const lift = (size: number) => (usable(size) ? Math.max(0.1, size * retention) : 0);
+  const [p0, p1, p2, p3] = plan.phases;
+  const floor = plan.emergencyFloor;
+  let lightsOnVwc = Math.min(threshold, target);
+  let points: PlanningPoint[] = [],
+    shots: ProjectedShot[] = [];
+  for (let pass = 0; pass < 6; pass++) {
+    points = [];
+    shots = [];
+    let value = lightsOnVwc;
+    const mark = (hour: number, phase: PlanningPhaseId) => points.push({ hour, value, phase });
+    /** Dry down minute by minute from `from` to `to`, firing `fire` whenever `due` says so. */
+    const dry = (
+      from: number,
+      to: number,
+      phase: PlanningPhaseId,
+      due?: (value: number) => Omit<ProjectedShot, "hour" | "phase" | "from" | "to"> | null,
+      /** Without a shot size there is nothing to lift the zone: hold the line here instead. */
+      holdAt?: number,
+    ) => {
+      mark(from, phase);
+      const end = Math.round(to * 60);
+      for (let minute = Math.round(from * 60); minute < end; minute++) {
+        value -= (minute / 60 < plan.photoperiod ? rates.day : rates.night) / 60;
+        value = Math.max(holdAt ?? 0, value);
+        const hour = (minute + 1) / 60;
+        const shot = shots.length < 200 ? due?.(value) : null;
+        if (shot && usable(shot.size) && minute + 1 < end) {
+          mark(hour, phase);
+          const before = value;
+          value += lift(shot.size);
+          shots.push({ hour, phase, from: before, to: value, ...shot });
+          mark(hour, phase);
+        } else if (minute + 1 === Math.round(plan.photoperiod * 60)) mark(hour, phase);
+      }
+      mark(to, phase);
+    };
+    if (p0.end > p0.start) dry(p0.start, p0.end, "P0");
+    const start = value;
+    if (!plan.p1Windows.length && target > start) {
+      // shot count or spacing not supplied: the climb is known, its steps are not
+      mark(p1.start, "P1");
+      value = target;
+      mark(p1.end, "P1");
+    } else if (plan.p1Windows.length && target > start) {
+      // one riser per eligible shot; each takes its share of the climb, and the substrate dries between them
+      const initial = parameters.p1_initial_shot_size;
+      const increment = Number.isFinite(parameters.p1_shot_size_increment)
+        ? parameters.p1_shot_size_increment
+        : 0;
+      const sizes = plan.p1Windows.map((_, index) =>
+        usable(initial) ? initial + index * increment : null,
+      );
+      const total = sizes.reduce<number>((sum, size) => sum + (size ?? 1), 0);
+      let climbed = 0;
+      plan.p1Windows.forEach((hour, index) => {
+        if (index) dry(plan.p1Windows[index - 1], hour, "P1");
+        else mark(hour, "P1");
+        climbed += (sizes[index] ?? 1) / total;
+        const to =
+          index === plan.p1Windows.length - 1 ? target : start + (target - start) * climbed;
+        shots.push({ hour, phase: "P1", from: value, to, size: sizes[index] ?? null });
+        value = to;
+        mark(hour, "P1");
+      });
+      if (p1.end > plan.p1Windows.at(-1)!) dry(plan.p1Windows.at(-1)!, p1.end, "P1");
+    } else if (p1.end > p1.start) dry(p1.start, p1.end, "P1");
+    if (p2.end > p2.start)
+      dry(
+        p2.start,
+        p2.end,
+        "P2",
+        (now) => (now <= threshold ? { size: parameters.p2_shot_size ?? null } : null),
+        usable(parameters.p2_shot_size) ? undefined : threshold,
+      );
+    if (p3.end > p3.start)
+      dry(p3.start, p3.end, "P3", (now) =>
+        floor !== null && now <= floor
+          ? { size: parameters.p3_emergency_shot_size ?? null, emergency: true }
+          : null,
+      );
+    if (Math.abs(value - lightsOnVwc) < 0.005) break;
+    lightsOnVwc = value;
+  }
+  points.at(-1)!.value = lightsOnVwc; // the next day starts where this one ends
+  const peak = Math.max(...points.map((point) => point.value));
+  const dryback = parameters.dryback_target;
+  return {
+    points,
+    shots,
+    lightsOnVwc,
+    peak,
+    drybackVwc: Number.isFinite(dryback) ? peak * (1 - dryback / 100) : null,
+    rates,
+    measured: { day: usable(options.rates?.day), night: usable(options.rates?.night) },
+    retention,
+  };
+}
+
+/** Recorder rows thinned to one median per time bucket. Probe jitter (pore EC flickers every few
+ * seconds) goes; a shot, which moves the reading for many minutes, stays. The final reading is kept
+ * exactly, so "now" is the live value. */
+export function smoothRecorded(
+  readings: readonly RecordedReading[],
+  bucketMinutes = 10,
+): RecordedReading[] {
+  const size = bucketMinutes * 60_000;
+  const buckets = new Map<number, RecordedReading[]>();
+  for (const reading of readings) {
+    if (!Number.isFinite(reading.time) || !Number.isFinite(reading.value)) continue;
+    const key = Math.floor(reading.time / size);
+    const bucket = buckets.get(key) ?? [];
+    bucket.push(reading);
+    buckets.set(key, bucket);
+  }
+  const smoothed = [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, bucket]) => {
+      const byValue = [...bucket].sort((a, b) => a.value - b.value);
+      return { time: bucket[bucket.length >> 1].time, value: byValue[byValue.length >> 1].value };
+    });
+  const last = readings.reduce<RecordedReading | null>(
+    (latest, reading) =>
+      Number.isFinite(reading.time) &&
+      Number.isFinite(reading.value) &&
+      reading.time >= (latest?.time ?? -Infinity)
+        ? reading
+        : latest,
+    null,
+  );
+  if (last && smoothed.length)
+    smoothed[smoothed.length - 1] = { time: last.time, value: last.value };
+  return smoothed;
 }

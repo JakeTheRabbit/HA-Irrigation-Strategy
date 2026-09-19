@@ -74,6 +74,9 @@ export function createDemo(now = Date.now()): States {
     );
     put(`binary_sensor.demo_${prefix}tank_filling`, "off");
     put(enable, "on");
+    put(`switch.crop_steering_${prefix}room_active`, "on");
+    // Flower 2 demonstrates a running setpoint supervisor; Flower 1 keeps the default (off).
+    put(`switch.crop_steering_${prefix}auto_setpoints`, index ? "off" : "on");
     put(`sensor.crop_steering_${prefix}ai_heartbeat`, "online", {
       enable_flag: enable,
     });
@@ -140,6 +143,37 @@ export function createDemo(now = Date.now()): States {
       number(prefix, `${key}plant_count`, 36, 1, 200, 1);
       number(prefix, key + "drippers_per_plant", 1, 1, 20, 1);
       number(prefix, key + "p3_emergency_shot_size", 3, 0.5, 15, 0.5, "%");
+      number(prefix, key + "field_capacity", 70, 5, 100, 1, "%");
+      number(prefix, key + "maximum_ec", 9, 1, 20, 0.1, "mS/cm");
+      const supervisor = index ? "off" : (["tracking", "learning", "frozen"][id - 1] ?? "off");
+      put(`${base}${key}auto_setpoints`, supervisor, {
+        friendly_name: `${name} Zone ${id} auto setpoints`,
+        learned_peak: supervisor === "off" || supervisor === "learning" ? null : 58 + id * 2,
+        gain: supervisor === "off" ? null : 0.62,
+        day_rate: supervisor === "off" ? null : 0.7,
+        night_rate: supervisor === "off" ? null : 0.37,
+        p1_outcome:
+          supervisor === "tracking" ? "plateau" : supervisor === "frozen" ? "suspect" : "pending",
+        last_change:
+          supervisor === "tracking"
+            ? "P1 target 66.0 → 64.0 % (demo)"
+            : supervisor === "frozen"
+              ? "P2 threshold 56.0 → 54.0 % (demo)"
+              : "",
+        jev: index ? "disabled" : supervisor === "frozen" ? "unavailable" : "ok",
+        hold_days: supervisor === "tracking" ? 3 : 0,
+        frozen_reason:
+          supervisor === "frozen" ? "probe response looks suspect after a sensor dropout" : null,
+        managed: index
+          ? []
+          : [
+              "p1_target_vwc",
+              "field_capacity",
+              "p2_vwc_threshold",
+              "p3_emergency_vwc_threshold",
+            ].map((suffix) => `number.crop_steering_${prefix}${key}${suffix}`),
+        updated: new Date(now - 120_000).toISOString(),
+      });
       for (const family of ["veg", "gen"])
         for (const phase of ["p0", "p1", "p2"])
           number(
@@ -171,6 +205,75 @@ export function createDemo(now = Date.now()): States {
   }
   return states;
 }
+/** Demo-only side effects of a switch write that a real controller would publish itself. */
+export function demoReact(states: States, entityId: string, value: unknown): States {
+  const auto = entityId.match(/^switch\.crop_steering_(.*)auto_setpoints$/);
+  if (!auto || typeof value !== "boolean") return states;
+  const sensor = new RegExp(`^sensor\\.crop_steering_${auto[1]}zone_\\d+_auto_setpoints$`);
+  return Object.fromEntries(
+    Object.entries(states).map(([id, entity]) => [
+      id,
+      sensor.test(id) ? { ...entity, state: value ? "learning" : "off" } : entity,
+    ]),
+  );
+}
+/** One synthetic crop-steering day, 0 (morning trough) to 1 (daytime peak), by hours since
+ * lights-on: P0 dryback tail, P1 ramp-up shots, P2 maintenance sawtooth, overnight dryback. */
+function dayShape(hour: number, photoperiod: number, shots: boolean): number {
+  const p3 = Math.max(4, photoperiod - 2);
+  if (hour < 1.5) return 0.06 * (1 - hour / 1.5);
+  if (hour < 3.5) {
+    const shot = (hour - 1.5) / (2 / 6);
+    return shots ? Math.min(1, (Math.floor(shot) + 1) / 6 - 0.03 * (shot % 1)) : shot / 6;
+  }
+  if (hour < p3) {
+    if (shots) return 1 - 0.3 * (((hour - 3.5) / 1.25) % 1);
+    // Pore EC follows the moisture trend; it does not jump with every maintenance shot.
+    // Ease between the P1 peak, the P2 average (0.85) and the P3 starting point.
+    const edge = Math.min(1, (hour - 3.5) / 0.5, (p3 - hour) / 0.5);
+    return 1 - 0.15 * edge;
+  }
+  return 1 - 0.94 * ((hour - p3) / (24 - p3)) ** 0.75;
+}
+/** Plausible probe history: a daily irrigation and dryback cycle that ends at the live value. */
+function cycleHistory(
+  states: States,
+  match: RegExpMatchArray,
+  base: number,
+  hours: number,
+  now: number,
+) {
+  const [entityId, prefix, kind] = match;
+  const hourSetting = (key: string, fallback: number) =>
+    numeric(states[`number.crop_steering_${prefix}lights_${key}_hour`]) ?? fallback;
+  const on = hourSetting("on", 8),
+    off = hourSetting("off", 20);
+  const photoperiod = (off - on + 24) % 24 || 12;
+  const seed = [...entityId].reduce((total, char) => total + char.charCodeAt(0), 0) % 17;
+  const raw = (time: number) => {
+    const date = new Date(time - seed * 180_000);
+    const hour = (date.getHours() + date.getMinutes() / 60 - on + 24) % 24;
+    // Days differ a little, so typical daily peaks are a real median and not one repeated day.
+    const day = Math.floor((time - seed * 180_000 - on * 3_600_000) / 86_400_000);
+    const amplitude = 9 * (1 + 0.12 * Math.sin(day * 2.3 + seed));
+    const vwc =
+      amplitude * dayShape(hour, photoperiod, kind === "vwc") +
+      0.8 * Math.sin(day * 1.7 + seed) +
+      0.12 * Math.sin(time / 353_000 + seed);
+    // Pore EC concentrates as the substrate dries and dilutes with each irrigation.
+    return kind === "ec" ? -0.075 * vwc : vwc;
+  };
+  const step = (hours <= 24 ? 5 : hours <= 72 ? 10 : 15) * 60_000;
+  const count = Math.floor((hours * 3_600_000) / step);
+  const offset = base - raw(now);
+  return Array.from({ length: count + 1 }, (_, index) => {
+    const time = now - (count - index) * step;
+    return {
+      time: new Date(time).toISOString(),
+      value: Number((offset + raw(time)).toFixed(kind === "ec" ? 3 : 2)),
+    };
+  });
+}
 export function demoHistory(
   states: States,
   entityIds: string[],
@@ -184,6 +287,15 @@ export function demoHistory(
       const base = numeric(state);
       const isEC = /(?:_ec_|_ec$)/.test(entityId);
       const amplitude = isEC ? 0.3 : 3;
+      const probe =
+        entityId.match(/^sensor\.crop_steering_(.*?)(vwc|ec)_zone_\d+$/) ??
+        entityId.match(/^sensor\.crop_steering_(.*?)zone_\d+_(vwc|ec)$/);
+      if (probe && base !== null)
+        return {
+          entityId,
+          label: String(state.attributes.friendly_name || entityId),
+          points: cycleHistory(states, probe, base, hours, now),
+        };
       return {
         entityId,
         label: String(state.attributes.friendly_name || entityId),

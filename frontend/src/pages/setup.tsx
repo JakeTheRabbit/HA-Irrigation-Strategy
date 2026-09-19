@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Heading, Empty } from "@/components/dashboard";
 import type { Controller } from "@/lib/types";
+import { errorText } from "@/lib/utils";
 import type { SetupCandidate, SetupDocument, SetupRoom, SetupZone } from "@/lib/operator-types";
 
 function MappingPicker({
@@ -209,7 +210,7 @@ export function Setup({
         result.rooms[0];
       selectRoom(room);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -326,7 +327,7 @@ export function Setup({
           : "Configuration saved in Home Assistant. Controller discovery and acknowledgement may follow on its next refresh; keep the engine off until verified.",
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

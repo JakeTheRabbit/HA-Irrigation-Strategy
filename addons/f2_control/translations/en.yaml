@@ -73,3 +73,21 @@ configuration:
     description: >-
       How often the engine wakes to read sensors and decide. Default 60. Lower
       reacts faster but makes more Home Assistant API calls.
+  cf_account_id:
+    name: Cloudflare account ID (optional, Auto Setpoints judge)
+    description: >-
+      Only used by Auto Setpoints. When a P1 ramp stops rising, the controller asks the
+      Jev model (typesafe/jev on Cloudflare Workers AI) whether the probe reading can be
+      trusted before it lowers a zone's targets. LEAVE BLANK to run Auto Setpoints
+      without the judge - the learner still works, it just trusts its own checks.
+  cf_api_token:
+    name: Cloudflare API token (optional)
+    description: >-
+      A Cloudflare API token with the Workers AI Read + Edit permission on the account
+      above. Stored as a password. Irrigation never waits on this call: if Cloudflare is
+      unreachable the controller carries on without a verdict.
+  cf_gateway_id:
+    name: Cloudflare AI Gateway ID (optional)
+    description: >-
+      Route the Jev calls through an AI Gateway (for logs and rate limits), e.g. default.
+      Leave blank to call Workers AI directly.

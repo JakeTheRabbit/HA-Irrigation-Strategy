@@ -118,7 +118,7 @@ def test_phase_transitions_extended():
     # Design #2: P1->P2 "recovered" also requires pore EC back in band (ec <= ec_target_p1*1.15).
     assert ph(S(phase="P1", vwc=61, ec=5, ec_smooth=5), P()) == "P2"
     assert ph(S(phase="P1", vwc=50, shot_count=12), P()) == "P2"  # max-shots escape
-    assert ph(S(phase="P1", vwc=50, phase_minutes=121), P()) == "P2"  # 120min ceiling
+    assert ph(S(phase="P1", vwc=50, shot_count=1, phase_minutes=121), P()) == "P1"  # no clock exit: ramp runs in full
 
 
 def test_p2_predictive_p3():
@@ -717,3 +717,28 @@ def test_zone_status_label():
         )
         == "Blocked — EC/cap"
     )
+
+
+def test_p1_runs_its_full_configured_cycle_never_cut_short_by_a_clock():
+    """Fundamental principle: phases happen in order and P1 is the ramp AS CONFIGURED. It ends only when
+    the ramp is complete (target reached with the minimum shots in, or the maximum shots delivered) -
+    never because minutes elapsed, whether the zone sat gate-blocked before OR during the ramp."""
+    # no clock exit at any shot count while the ramp is still below target
+    for shots in (0, 1, 3, 11):
+        assert ph(S(phase="P1", vwc=30, shot_count=shots, phase_minutes=9999), P()) == "P1"
+    # it keeps wanting the next ramp shot the moment the gate opens
+    assert fire(S(phase="P1", vwc=30, shot_count=1, phase_minutes=9999), P()) is True
+    # complete = configured max shots delivered
+    assert ph(S(phase="P1", vwc=30, shot_count=12), P()) == "P2"
+    # complete = target reached + EC back in band, but only once the configured MINIMUM shots are in
+    assert ph(S(phase="P1", vwc=61, ec=5, shot_count=1), P(p1_min_shots=3)) == "P1"
+    assert ph(S(phase="P1", vwc=61, ec=5, shot_count=3), P(p1_min_shots=3)) == "P2"
+    assert ph(S(phase="P1", vwc=61, ec=None, shot_count=2), P(p1_min_shots=3)) == "P1"
+    assert ph(S(phase="P1", vwc=61, ec=None, shot_count=3), P(p1_min_shots=3)) == "P2"
+    # lights-off still outranks everything: no zone strands in P1 overnight
+    assert ph(S(phase="P1", vwc=30, shot_count=0, phase_minutes=9999, lights_on=False), P()) == "P3"
+
+
+def test_p1_min_shots_is_clamped_to_max_shots():
+    vp, warns = validate_params(P(p1_min_shots=20, p1_max_shots=10))
+    assert vp.p1_min_shots == 10 and any("p1_min_shots" in w for w in warns)

@@ -183,7 +183,10 @@ export class HaClient {
     if (!Number.isFinite(hours) || hours <= 0 || hours > 168)
       throw new Error("History range must be between 0 and 168 hours.");
     const start = new Date(Date.now() - hours * 3_600_000).toISOString();
+    // Without end_time Home Assistant stops at start + 24 h, so a longer window would come back
+    // as only its oldest day.
     const query = new URLSearchParams({
+      end_time: new Date().toISOString(),
       filter_entity_id: entityIds.join(","),
       minimal_response: "",
       no_attributes: "",

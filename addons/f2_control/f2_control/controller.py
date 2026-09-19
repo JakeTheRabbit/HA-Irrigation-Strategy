@@ -27,6 +27,9 @@ import time
 from datetime import date, datetime, timedelta, timezone
 
 import requests
+import auto_setpoints
+import jev_policy
+import setpoint_supervisor
 from strategy_runtime import parse_snapshot, parameter_override, strategy_block
 
 from crop_steering_engine import (
@@ -180,6 +183,8 @@ class Controller:
         self.hold_entities = [e for e in (o.get("hold_entities") or []) if e]
         self.feed_grace_min = float(o.get("feed_grace_min", 30))
         self.blind_fallback_min = float(o.get("blind_fallback_min", 90))
+        # Optional: Jev (TypeSafe, via Cloudflare AI) as a guard on auto setpoints. Unset = arithmetic only.
+        self._cf = tuple((o.get(k) or "").strip() for k in ("cf_account_id", "cf_api_token", "cf_gateway_id"))
         self.loop_seconds = float(o.get("loop_seconds", 60))
         self.flow_lps = float(
             o.get("flow_lps", 0.02)
@@ -423,6 +428,7 @@ class Controller:
             "last_daily_reset": None,
             "water_history": None,
             "water_history_legacy_excluded_l": 0.0,
+            "learn": auto_setpoints.fresh(),
         }
 
     def _apply_saved_zone(self, fresh, d):
@@ -431,6 +437,7 @@ class Controller:
         if not isinstance(d, dict):
             return fresh
         s = fresh
+        s["learn"] = auto_setpoints.restore(d.get("learn"))
         for k in (
             "phase",
             "peak",
@@ -687,6 +694,7 @@ class Controller:
             "daily_vol": s.get("daily_vol"),
             "water_history": s.get("water_history"),
             "water_history_legacy_excluded_l": s.get("water_history_legacy_excluded_l", 0.0),
+            "learn": s.get("learn"),
             "ec_smooth": s.get("ec_smooth"),
             "ec_offset": float(s.get("ec_offset") or 0.0),
             "ec_integral": float(s.get("ec_integral") or 0.0),
@@ -968,6 +976,7 @@ class Controller:
             p1_initial=self._zone_num(room, zone, "p1_initial_shot_size", 2),
             p1_incr=self._zone_num(room, zone, "p1_shot_size_increment", 0.5),
             p1_max_shots=int(self._zone_num(room, zone, "p1_maximum_shots", 12)),
+            p1_min_shots=int(self._zone_num(room, zone, "p1_minimum_shots", 0)),
             p1_time_between_min=self._zone_num(room, zone, "p1_time_between_shots", 15),
             dryback_target=self._zone_num(
                 room,
@@ -1087,12 +1096,161 @@ class Controller:
         )
         return snap, self._params(room, zone, ec_known=ec is not None)
 
+    # ---------- auto setpoints (the engine still fires every shot) ----------
+    def _auto_tick(self, room, zone, snap, p, lights_on, now):
+        """Learn this zone from its own shots every loop. Rewrite its targets only when the room's
+        opt-in switch is on, only on its own per-zone numbers, and never while a grow plan owns the room."""
+        st = room.state[zone]
+        if not isinstance(st.get("learn"), dict):
+            st["learn"] = auto_setpoints.fresh()
+        learn = st["learn"]
+        st["last_vwc"] = snap.vwc
+        auto_setpoints.new_day(learn, self._grow_day_start(room, now).isoformat(), snap.vwc)
+        auto_setpoints.tick(learn, snap.vwc, st["phase"], now.timestamp(), lights_on,
+                            snap.dryback_rate, self._minutes_since_shot(st, now))
+        enabled = self._on(f"switch.crop_steering_{room.prefix}auto_setpoints", False)
+        planned = bool(getattr(room, "strategy_required", False))
+        jev_state = room.__dict__.setdefault("_jev_state", {})
+        jev = jev_state.get(zone, "ok") if (self._cf[0] and self._cf[1]) else "disabled"
+        was = learn["outcome"]
+        outcome = auto_setpoints.ramp_outcome(learn, st["phase"])
+        if outcome != was:
+            if outcome == "plateau" and enabled and jev != "disabled":
+                verdict = jev_policy.verdicts(jev_policy.call(
+                    self._cf[0], self._cf[1],
+                    auto_setpoints.evidence(learn, st["phase"], snap.vwc, p.p1_target, snap.ec, p.ec_target_p2,
+                                            self._read_feed_ec(room), p.p2_shot_size, st["shots"]),
+                    gateway=self._cf[2] or None, timeout=5.0))
+                jev = jev_state[zone] = "ok" if verdict is not None else "unavailable"
+                if verdict and verdict.get("freeze"):  # a guard can only make it MORE careful
+                    auto_setpoints.distrust(learn, f"Jev: {verdict['freeze']}")
+                    outcome = learn["outcome"]
+            log(f"[{room.slug}] Z{zone} P1 ramp outcome: {outcome} (peak {learn['peak']})")
+            if outcome == "suspect":
+                self._alert(f"auto_{room.slug}_z{zone}", f"{room.slug} Z{zone} auto setpoints frozen",
+                            auto_setpoints.frozen_reason(learn))
+            self._save_state()
+        if enabled and not planned:
+            current = {
+                "p1_target_vwc": p.p1_target, "field_capacity": p.field_capacity,
+                "p2_vwc_threshold": self._zone_num(room, zone, "p2_vwc_threshold", 45, optional=True),
+                "p3_emergency_vwc_threshold": p.p3_emergency_floor, "p2_shot_size": p.p2_shot_size,
+            }
+            h = now.hour + now.minute / 60.0
+            ctx = dict(
+                lights_on_h=room.lights_on_hour, lights_off_h=room.lights_off_hour,
+                minutes_since_lights_on=((h - room.lights_on_hour) % 24) * 60.0 if lights_on else None,
+                shots_today=st["shots"], dryback_pct=p.dryback_target, p0_wait_min=p.p0_max_wait_min,
+                p1_shot_pct=p.p1_initial, p1_gap_min=p.p1_time_between_min,
+                start_vwc=learn["ramp_start"] if learn["ramp_start"] is not None else snap.vwc,
+            )
+            want = auto_setpoints.wanted(learn, current, snap.vwc, st["phase"], ctx)
+            for suffix, value, _why in setpoint_supervisor.writes(current, want):
+                self._auto_write(room, zone, suffix, current[suffix], value, learn, now)
+            if st["phase"] == "P1" and learn["outcome"] == "plateau":
+                gate = auto_setpoints.p1_ec_gate(snap.ec, p.ec_target_p1, p.ec_target_p2)
+                if gate is not None:  # let the hand-over through; see p1_ec_gate
+                    mode = "veg" if self._veg(room, zone) else "gen"
+                    self._auto_write(room, zone, f"ec_target_{mode}_p1", p.ec_target_p1, gate, learn, now)
+        state, attrs = auto_setpoints.status(learn, enabled)
+        if enabled and planned:
+            state, attrs["frozen_reason"] = "frozen", "an armed grow plan owns this room's targets"
+        attrs.update(
+            jev=jev, updated=now.isoformat(), engine="f2-control", friendly_name=f"Zone {zone} auto setpoints",
+            managed=[f"number.crop_steering_{room.prefix}zone_{zone}_{s}" for s in auto_setpoints.MANAGED],
+        )
+        ha_set(f"sensor.crop_steering_{room.prefix}zone_{zone}_auto_setpoints", state, attrs)
+
+    def _auto_write(self, room, zone, suffix, old, value, learn, now):
+        entity = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
+        if ha_get(entity)[0] in (None, "unknown", "unavailable", ""):
+            return  # no per-zone number on this install: room-level values are the operator's, never ours
+        written = room.__dict__.setdefault("_auto_written", {})
+        last = written.get((zone, suffix))
+        if last and last[0] == value and (now - last[1]).total_seconds() < 300:
+            return  # HA has not reflected the last write yet: do not spam it
+        written[(zone, suffix)] = (value, now)
+        ha_call("number", "set_value", entity_id=entity, value=value)
+        learn["last_change"] = f"{now.strftime('%H:%M')} {suffix} {old:g} -> {value:g}"
+        tag = "" if room.prefix == "" else f"{room.slug} "
+        self._activity.insert(0, f"{now.strftime('%H:%M')} {tag}Z{zone} auto {suffix} {old:g} -> {value:g}"[:120])
+        log(f"[{room.slug}] Z{zone} auto {suffix} {old:g} -> {value:g}")
+
+    # ---------- room status (On / Off) ----------
+    def _room_active(self, room):
+        """OFF = nothing growing: no irrigation and no alerts for this room. A missing switch
+        (an integration older than this add-on) means ON, so behaviour never changes silently."""
+        return self._on(f"switch.crop_steering_{room.prefix}room_active", True)
+
+    def _room_switched_off(self, room):
+        """Stand the room down: its standing alerts are about a room that is now deliberately idle."""
+        log(f"[{room.slug}] room switched OFF - irrigation and alerts stand down")
+        for key in [k for k in self._alerted if f"_{room.slug}_" in k or k.endswith(f"_{room.slug}")]:
+            ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
+            del self._alerted[key]
+
+    def _room_switched_on(self, room):
+        """A fresh run: yesterday's phase, counters and learned ceiling belong to the last crop.
+        Water history is a record, so it stays. Zones wait in P3 for the next lights-on boundary."""
+        log(f"[{room.slug}] room switched ON - starting a fresh run")
+        for zone in room.zones:
+            old = room.state[zone]
+            room.state[zone] = {
+                **self._fresh_zone(),
+                "phase": "P3",
+                "last_shot": datetime.now(),  # the blind-probe schedule counts from switch-on, not from "never"
+                "water_history": old.get("water_history"),
+                "water_history_legacy_excluded_l": old.get("water_history_legacy_excluded_l", 0.0),
+            }
+        room._vmax, room._vmax_wetup = {}, {}
+        self._save_state()
+
+    def _heartbeat(self, room, now, hardware_fault, room_active=True):
+        ha_set(
+            f"sensor.crop_steering_{room.prefix}ai_heartbeat",
+            "healthy",
+            {
+                "engine": "f2-control",
+                "last_beat": now.isoformat(),
+                # the kill switch this room ACTUALLY uses — the integration's health
+                # check reads this so a custom enable_flag isn't flagged as "missing"
+                "enable_flag": room.enable_flag,
+                "hardware_fault": hardware_fault,
+                "strategy_snapshot_version": 1,
+                "setup_lifecycle_version": 1,
+                "strategy_required": getattr(room, "strategy_required", False),
+                "strategy_error": (getattr(room, "strategy_snapshot", None) or {}).get("error"),
+                "setup_revision": getattr(room, "setup_revision", 0),
+                "setup_active": getattr(room, "setup_active", True),
+                "setup_pending": getattr(room, "_setup_pending", None),
+                "room_active": room_active,
+            },
+        )
+
+    def _publish_room_off(self, room, now):
+        """An OFF room still reports in, so the dashboard shows why it is idle and the integration
+        never mistakes a deliberately idle room for a dead engine."""
+        px = room.prefix
+        try:
+            for zone in room.zones:
+                ha_set(f"sensor.crop_steering_{px}zone_{zone}_status", "Room off",
+                       {"reason": "Room off (nothing growing)"})
+            ha_set(f"sensor.crop_steering_{px}app_status", "room_off",
+                   {"engine": "f2-control", "updated": now.isoformat()})
+            ha_set(f"sensor.crop_steering_{px}current_decision", "Room off - nothing growing",
+                   {"fired": [], "blocked": []})
+            self._heartbeat(room, now, self._hardware_fault_block(room), room_active=False)
+        except Exception as e:
+            log("publish failed", room.slug, e)
+
     # ---------- gates ----------
     def _blocked(self, room, zone):
         if getattr(room, "_setup_pending", None):
             return room._setup_pending
         if getattr(room, "setup_active", True) is False:
             return "Room archived in integration setup"
+        if not self._room_active(room):
+            return "Room off (nothing growing)"
         planned_hold = strategy_block(getattr(room, "strategy_snapshot", None), zone)
         if planned_hold:
             return planned_hold
@@ -1249,6 +1407,9 @@ class Controller:
             if item["grow_day"] == day:
                 item["litres"] += delivered_l
                 break
+        if not isinstance(st.get("learn"), dict):
+            st["learn"] = auto_setpoints.fresh()
+        auto_setpoints.shot(st["learn"], st.get("phase"), size_pct, st.get("last_vwc"), now.timestamp())
         st["shots"] += 1
         st["last_shot"] = now
         st["daily_vol"] += delivered_l
@@ -1373,6 +1534,7 @@ class Controller:
         while time.monotonic() < deadline:
             for entity, stop_state in (
                 (room.enable_flag, "off"),
+                (f"switch.crop_steering_{room.prefix}room_active", "off"),
                 (
                     f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override",
                     "on",
@@ -1391,6 +1553,19 @@ class Controller:
             if remaining > 0:
                 time.sleep(min(step, remaining))
         return time.monotonic() - started, False
+
+    @staticmethod
+    def _confirm_switches(entities, want):
+        """True only when every switch reads back `want`.
+
+        Zigbee/MQTT plugs accept a command at once but report the new state later
+        (veg_main_pump OFF report: usually <1 s, 1.6 s on 2026-09-14 18:52). A read-back
+        that gives up too early latches a false hardware hold; one that waits too long
+        stalls every room (this loop is synchronous) before a real stuck-open is caught.
+        """
+        # TODO: poll/retry policy. Placeholder = the old fixed 1 s single read.
+        time.sleep(1)
+        return all(ha_get(ent)[0] == want for ent in entities)
 
     def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None):
         if self._hardware_fault_block(room):
@@ -1454,11 +1629,8 @@ class Controller:
                 ha_call("switch", "turn_off", entity_id=hw["mainline"]) and close_ok
             )
             close_ok = ha_call("switch", "turn_off", entity_id=hw["pump"]) and close_ok
-            time.sleep(1)
             # Only a definitive OFF is safe, including pump/mainline read-back.
-            closed = all(
-                ha_get(ent)[0] == "off" for ent in (valve, hw["mainline"], hw["pump"])
-            )
+            closed = self._confirm_switches((valve, hw["mainline"], hw["pump"]), "off")
             if not close_ok or not closed:
                 ha_call("switch", "turn_off", entity_id=hw["pump"])
                 ha_call("switch", "turn_off", entity_id=hw["mainline"])
@@ -1770,6 +1942,15 @@ class Controller:
         Reads/writes only this room's prefixed entities + its own state."""
         if getattr(room, "setup_active", True) is False:
             return {}
+        active, was = self._room_active(room), getattr(room, "_was_room_active", None)
+        room._was_room_active = active
+        if not active:
+            if was is not False:
+                self._room_switched_off(room)
+            self._publish_room_off(room, now)
+            return {}  # no snapshot, no decision, no blind schedule, no alerts, no vitals line
+        if was is False:
+            self._room_switched_on(room)
         self._load_strategy_snapshot(room, now)
         # Only a newly computed batch can clear a prior preflight invalidation.
         room._strategy_batch_invalid = False
@@ -1855,6 +2036,10 @@ class Controller:
                 if v is not None:
                     room._vmax[zone] = (v, c)
             decisions[zone] = (fire, size, reason)
+            try:  # learning and setpoint upkeep must never be able to stop a zone being watered
+                self._auto_tick(room, zone, snap, p, lights_on, now)
+            except Exception as e:
+                log("auto setpoints error", room.slug, zone, e)
         for zone, p in blind:
             st = room.state[zone]
             # A dead probe must NOT freeze the daily cycle: still honour the time-based
@@ -2078,27 +2263,7 @@ class Controller:
                 ),
                 {"engine": "f2-control", "updated": now.isoformat()},
             )
-            ha_set(
-                f"sensor.crop_steering_{px}ai_heartbeat",
-                "healthy",
-                {
-                    "engine": "f2-control",
-                    "last_beat": now.isoformat(),
-                    # the kill switch this room ACTUALLY uses — the integration's health
-                    # check reads this so a custom enable_flag isn't flagged as "missing"
-                    "enable_flag": room.enable_flag,
-                    "hardware_fault": hardware_fault,
-                    "strategy_snapshot_version": 1,
-                    "setup_lifecycle_version": 1,
-                    "strategy_required": getattr(room, "strategy_required", False),
-                    "strategy_error": (
-                        getattr(room, "strategy_snapshot", None) or {}
-                    ).get("error"),
-                    "setup_revision": getattr(room, "setup_revision", 0),
-                    "setup_active": getattr(room, "setup_active", True),
-                    "setup_pending": getattr(room, "_setup_pending", None),
-                },
-            )
+            self._heartbeat(room, now, hardware_fault)
             fired = [
                 f"Z{z} {d['phase']} {d['reason']}"
                 for z, d in sorted(pub.items())

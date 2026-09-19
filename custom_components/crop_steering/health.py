@@ -96,6 +96,14 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
         slug = entry.data.get("room_slug", "default")
         zones = entry.data.get("zones", {}) or {}
 
+        # Room switched OFF (nothing growing): unplugged probes and an idle engine are expected,
+        # so clear this room's issues and stand down. A missing switch (older install) means ON.
+        room = hass.states.get(f"switch.{DOMAIN}_{prefix}room_active")
+        if room is not None and str(room.state).lower() == "off":
+            for base in ISSUE_IDS:
+                _issue(hass, False, _iid(base, slug), ir.IssueSeverity.WARNING)
+            return
+
         # Kill switch + engine heartbeat are per-room: the engine drives EVERY configured
         # room, each with its own kill switch and prefixed heartbeat. Resolve them per room
         # so a custom default kill switch and additional rooms are all monitored.

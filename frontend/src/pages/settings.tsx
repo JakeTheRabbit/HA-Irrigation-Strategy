@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Heading, ReviewDialog, Status } from "@/components/dashboard";
 import type { Controller } from "@/lib/types";
+import { errorText } from "@/lib/utils";
+import { RoomPower } from "@/components/room-controls";
 import type { ThemePreference, ThemeSource } from "@/lib/ha-theme";
 
 export function workspaceLink(view: string): string {
@@ -54,7 +56,7 @@ export function Settings({
       setToken("");
       setConnected(true);
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
+      setError(errorText(error));
     } finally {
       setBusy(false);
     }
@@ -159,6 +161,25 @@ export function Settings({
             </div>
           </form>
         </section>
+        {controller.room.roomActiveEntity && (
+          <section className="panel settings-section">
+            <div className="settings-label">
+              <h2>Room on / off</h2>
+              <p>
+                Switch {controller.room.room.name} off when nothing is growing in it, and on again
+                to start a fresh run.
+              </p>
+            </div>
+            <div>
+              <RoomPower controller={controller} />
+              <p className="small muted mt-3">
+                Off: the engine will not irrigate this room and raises no alerts for it. On: daily
+                counters and learned phase state reset for a fresh run. This is not an emergency
+                stop and may not interrupt a shot already running.
+              </p>
+            </div>
+          </section>
+        )}
         <section className="panel settings-section">
           <div className="settings-label">
             <h2>Room scheduling</h2>

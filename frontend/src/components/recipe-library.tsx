@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { GrowPlan } from "@/lib/operator-types";
+import { errorText } from "@/lib/utils";
 import {
   exportRecipe,
   importRecipePlan,
@@ -44,7 +45,6 @@ export interface RecipeLibraryProps {
   onLoad: (plan: GrowPlan) => void;
   onDirtyChange?: (dirty: boolean) => void;
 }
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 function download(text: string, name: string) {
   const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
   const link = document.createElement("a");

@@ -80,6 +80,36 @@
 .setpoint-controls .settings-group-heading {
   padding: 16px;
 }
+/* Probe context under an input: spans the whole field row so it reads as one line. */
+.setting-field > .setting-context {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+  margin-top: -6px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.setting-field > .setting-context > p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.setting-field > .setting-context > .setting-auto-hint {
+  color: var(--primary-strong);
+}
+.setting-field > .setting-context > .setting-advisory {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.setting-advisory > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
 .setpoint-mode-visibility {
   display: flex;
   gap: 8px;

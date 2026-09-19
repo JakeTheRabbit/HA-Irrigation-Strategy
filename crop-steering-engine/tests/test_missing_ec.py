@@ -20,7 +20,7 @@ def test_missing_ec_p1_exit_requires_watered_ceiling_or_existing_timeout_limit()
     result = decide(S(phase="P1", ec=None, vwc=60, shot_count=1), P())
     assert result[0] == "P2" and "flush unverified" in result[4]
     assert decide(S(phase="P1", ec=None, vwc=45, shot_count=12), P())[0] == "P2"
-    assert decide(S(phase="P1", ec=None, vwc=45, phase_minutes=120), P())[0] == "P2"
+    assert decide(S(phase="P1", ec=None, vwc=45, shot_count=1, phase_minutes=120), P())[0] == "P1"
 
 
 def test_missing_ec_preserves_budget_dry_rescue_and_safety_warning():

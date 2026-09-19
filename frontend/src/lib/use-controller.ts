@@ -6,7 +6,7 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Change, Controller, States, WriteResult } from "./types";
 import { applyChanges, findSession, HaClient, haSessionToken } from "./client";
 import { buildRoom, discoverRooms, emptyRoom, resolveRequestedRoom, validateChange } from "./model";
-import { createDemo, demoHistory, isDemoLocation } from "./demo";
+import { createDemo, demoHistory, demoReact, isDemoLocation } from "./demo";
 
 type Listener = () => void;
 const SESSION_KEY = "crop-steering-connection-tab";
@@ -228,7 +228,7 @@ export class ControllerStore {
     try {
       if (this.demo) {
         const result: WriteResult = { applied: [], failed: [] };
-        const next = { ...this.states };
+        let next = { ...this.states };
         for (const change of changes) {
           const reason = validateChange(this.snapshot.room, this.states, change);
           if (reason) result.failed.push({ entityId: change.entityId, reason });
@@ -243,6 +243,7 @@ export class ControllerStore {
                   : String(change.value),
               last_updated: new Date().toISOString(),
             };
+            next = demoReact(next, change.entityId, change.value);
             result.applied.push(change.entityId);
           }
         }

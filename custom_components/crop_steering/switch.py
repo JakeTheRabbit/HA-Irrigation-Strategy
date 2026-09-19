@@ -23,6 +23,20 @@ _LOGGER = logging.getLogger(__name__)
 
 # Base switch descriptions (non-zone specific)
 BASE_SWITCH_DESCRIPTIONS = [
+    # Room status. OFF = nothing growing: the engine neither irrigates nor alerts for this room and
+    # the Repairs health checks stand down. Switching back ON starts a fresh run.
+    SwitchEntityDescription(
+        key="room_active",
+        name="Room Active (off = empty room: no irrigation, no alerts)",
+        icon="mdi:sprout",
+    ),
+    # Opt-in. ON lets the engine's setpoint supervisor rewrite this room's zone targets so they stay
+    # attainable and follow the reference curve. The engine still fires every shot by its own rules.
+    SwitchEntityDescription(
+        key="auto_setpoints",
+        name="Auto Setpoints (supervisor rewrites zone targets)",
+        icon="mdi:auto-fix",
+    ),
     SwitchEntityDescription(
         key="ec_stacking_enabled",
         name="EC Stacking Enabled",
@@ -223,7 +237,11 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
         self._override_loaded = False
 
         # Set default states based on switch type
-        if description.key == "system_enabled":
+        if description.key == "room_active":
+            self._attr_is_on = (
+                True  # a room is growing until the operator says otherwise
+            )
+        elif description.key == "system_enabled":
             self._attr_is_on = True  # System enabled by default
         elif description.key == "auto_irrigation_enabled":
             self._attr_is_on = True  # Auto irrigation enabled by default

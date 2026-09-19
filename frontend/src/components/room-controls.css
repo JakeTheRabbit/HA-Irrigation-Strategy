@@ -1,0 +1,73 @@
+.room-power {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* Deliberately calm: an off room is a chosen state, not a fault. */
+.room-off-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--muted);
+  color: var(--foreground);
+}
+.room-off-banner > svg {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+.room-off-banner > div:first-of-type {
+  flex: 1;
+  min-width: 0;
+}
+.room-off-banner strong {
+  font-size: 13px;
+}
+.room-off-banner p {
+  margin-top: 2px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  max-width: 100%;
+  gap: 10px 16px;
+}
+.auto-chip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 10px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.auto-chip b {
+  color: var(--foreground);
+  font-weight: 550;
+}
+.auto-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-color: var(--border);
+  background: var(--secondary);
+  color: var(--primary-strong);
+  font-size: 10px;
+  vertical-align: 1px;
+}
+@media (max-width: 720px) {
+  .room-off-banner {
+    flex-wrap: wrap;
+  }
+  .heading-actions {
+    justify-content: flex-start;
+  }
+}

@@ -26,6 +26,7 @@ import { WaterDelivery } from "@/components/water-delivery";
 import { waterParameters } from "@/lib/water-delivery";
 import { calibrateDripper } from "@/lib/insights-math";
 import type { Controller, Metric, Zone } from "@/lib/types";
+import { errorText } from "@/lib/utils";
 import type { SetupDocument, SetupRoom } from "@/lib/operator-types";
 import "./insights.css";
 
@@ -82,7 +83,7 @@ export function Insights({
           );
       })
       .catch((error) => {
-        if (current) setMappingError(error instanceof Error ? error.message : String(error));
+        if (current) setMappingError(errorText(error));
       });
     return () => {
       current = false;

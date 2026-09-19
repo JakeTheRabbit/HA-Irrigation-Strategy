@@ -132,10 +132,11 @@ try {
       .getByRole("button", { name: "P1", exact: true })
       .click();
     const target = field("p1_target_vwc");
-    const before = await line("vwc").getAttribute("d");
+    // The VWC axis scales to what is plotted, so compare what each line plots, not its pixels.
+    const before = await line("vwc").getAttribute("data-planning-values");
     await target.fill("70");
-    assert.notEqual(await line("vwc").getAttribute("d"), before);
-    assert.equal(await line("baseline-vwc").getAttribute("d"), before);
+    assert.notEqual(await line("vwc").getAttribute("data-planning-values"), before);
+    assert.equal(await line("baseline-vwc").getAttribute("data-planning-values"), before);
     await target.fill("999");
     assert.equal(await target.getAttribute("aria-invalid"), "true");
     assert.equal(

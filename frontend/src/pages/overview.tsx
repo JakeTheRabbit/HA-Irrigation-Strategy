@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowRight, ArrowUpRight, CircleCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Controller, Zone } from "@/lib/types";
+import { RoomPower } from "@/components/room-controls";
 import {
   Empty,
   EventList,
@@ -31,9 +32,12 @@ export function Overview({
         title="Room overview"
         description={`A clear view of ${room.room.name.toLowerCase()}: moisture, scheduling and recent activity.`}
         action={
-          <Button variant="outline" onClick={() => navigate("grow-plan")}>
-            Irrigation plan <ArrowUpRight size={16} />
-          </Button>
+          <div className="heading-actions">
+            <RoomPower controller={controller} />
+            <Button variant="outline" onClick={() => navigate("grow-plan")}>
+              Irrigation plan <ArrowUpRight size={16} />
+            </Button>
+          </div>
         }
       />
       <div className="room-summary">
@@ -47,11 +51,13 @@ export function Overview({
           </div>
         </div>
         <p>
-          {room.engine.enabled === true
-            ? "Follow zone readings and recorded activity below."
-            : room.engine.enabled === false
-              ? "Scheduling is paused. An active shot may still be running."
-              : "Connect a controller to see scheduling state."}
+          {!room.roomActive
+            ? "This room is off. Nothing will irrigate and no alerts are raised until it is switched back on."
+            : room.engine.enabled === true
+              ? "Follow zone readings and recorded activity below."
+              : room.engine.enabled === false
+                ? "Scheduling is paused. An active shot may still be running."
+                : "Connect a controller to see scheduling state."}
         </p>
       </div>
       {!!room.alerts.length && (

@@ -35,6 +35,9 @@ import {
 import { useController } from "@/lib/use-controller";
 import { useHaTheme } from "@/lib/ha-theme";
 import { useHaShell } from "@/lib/ha-shell";
+import { errorText } from "@/lib/utils";
+import { roomIsActive } from "@/lib/model";
+import { RoomOffBanner } from "@/components/room-controls";
 import { time, type Page } from "@/components/dashboard";
 import { Overview } from "@/pages/overview";
 import { Zones } from "@/pages/zones";
@@ -162,7 +165,7 @@ export default function App() {
     try {
       await controller.refresh();
     } catch (error) {
-      setRefreshError(error instanceof Error ? error.message : String(error));
+      setRefreshError(errorText(error));
     } finally {
       setRefreshing(false);
     }
@@ -208,6 +211,7 @@ export default function App() {
           {controller.rooms.map((room) => (
             <option key={room.id} value={room.id}>
               {room.name}
+              {roomIsActive(controller.states, room) ? "" : " · off"}
             </option>
           ))}
         </select>
@@ -359,6 +363,7 @@ export default function App() {
                 )}
               </div>
             )}
+            <RoomOffBanner controller={controller} />
             {page === "overview" && (
               <Overview key={controller.roomId} controller={controller} navigate={navigate} />
             )}

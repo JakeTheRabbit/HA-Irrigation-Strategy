@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ArrowRight, Check, SlidersHorizontal } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, Check, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,11 @@ import type { Controller, Setting } from "@/lib/types";
 import { PlanningCurve } from "@/components/planning-curve";
 import { WaterDelivery } from "@/components/water-delivery";
 import { buildSetpointPreview, validateSetpoint } from "@/lib/setpoint-preview";
-import type { PlanningPhaseId } from "@/lib/planning-curve";
+import { smoothRecorded, type PlanningPhaseId } from "@/lib/planning-curve";
+import { SensorContextCard, useSensorContext } from "@/components/sensor-context";
+import { AutoBadge, AutoSetpointsControl, AutoZoneChip } from "@/components/room-controls";
+import { managedBy } from "@/lib/auto-setpoints";
+import { fieldHint, referenceLines, setpointMetric, setpointParam } from "@/lib/sensor-context";
 import "./setpoint-preview.css";
 
 const phaseGroups = ["P0 · Morning dryback", "P1 · Ramp-up", "P2 · Maintenance", "P3 · Overnight"];
@@ -91,6 +95,32 @@ export function Strategy({
   );
   const invalid = validateSetpoint;
   const canEdit = !planEngaged && ["live", "demo"].includes(controller.connection);
+  // Recorded probe behaviour for the zone being previewed. The chart lines and the hints
+  // under each input read the same draft state as the form, so they move as you type.
+  const sensorZone = controller.room.zones.find((z) => z.id === previewZoneId);
+  // Seeing the probe never depends on being allowed to edit: a schedule-owned day still plots.
+  const sensor = useSensorContext(
+    controller,
+    sensorZone,
+    ["live", "demo"].includes(controller.connection),
+  );
+  // The plan graph redraws on every drag step, so the recorder dump is thinned once per load.
+  // Medians, not extremes: drawn raw, pore EC is a wall of sensor flicker.
+  const recorded = useMemo(
+    () => ({
+      vwc: smoothRecorded(sensor.vwc.points, 10),
+      ec: smoothRecorded(sensor.ec.points, 20),
+      now: sensor.now,
+    }),
+    [sensor.vwc.points, sensor.ec.points, sensor.now],
+  );
+  const sensorLines = referenceLines({
+    draft: preview.draft.parameters,
+    saved: preview.saved.parameters,
+    typicalDailyPeak: sensor.vwc.stats?.typicalDailyPeak ?? null,
+    learnedPeak: sensorZone?.auto?.learnedPeak ?? null,
+  });
+  const supervisors = controller.room.zones.map((z) => z.auto);
   const errors = Object.entries(drafts)
     .map(([id, draft]) => {
       const setting = allSettings.find((s) => s.entityId === id);
@@ -153,18 +183,21 @@ export function Strategy({
         title="Today’s targets"
         description="Current zone targets and their daily curve. When a schedule is active, it owns these targets; use Schedule to change upcoming days."
         action={
-          <Button
-            disabled={
-              !items.length ||
-              Boolean(errors.length) ||
-              planEngaged ||
-              !["live", "demo"].includes(controller.connection)
-            }
-            onClick={() => setReview(true)}
-          >
-            Review {Object.keys(drafts).length || ""}{" "}
-            {Object.keys(drafts).length === 1 ? "change" : "changes"} <ArrowRight size={16} />
-          </Button>
+          <div className="heading-actions">
+            <AutoSetpointsControl controller={controller} />
+            <Button
+              disabled={
+                !items.length ||
+                Boolean(errors.length) ||
+                planEngaged ||
+                !["live", "demo"].includes(controller.connection)
+              }
+              onClick={() => setReview(true)}
+            >
+              Review {Object.keys(drafts).length || ""}{" "}
+              {Object.keys(drafts).length === 1 ? "change" : "changes"} <ArrowRight size={16} />
+            </Button>
+          </div>
         }
       />
       {planEngaged && (
@@ -227,6 +260,16 @@ export function Strategy({
                   ? "Phase targets, timing and limits for this zone."
                   : "Shared controller settings for this room."}
               </p>
+              {(zone ? [zone] : controller.room.zones).map(
+                (item) =>
+                  item.auto && (
+                    <AutoZoneChip
+                      key={item.id}
+                      status={item.auto}
+                      name={zone ? undefined : item.name}
+                    />
+                  ),
+              )}
             </div>
           </div>
           {saved && (
@@ -427,6 +470,21 @@ export function Strategy({
                               const draft = drafts[setting.entityId];
                               const error = draft ? invalid(setting, draft.value) : "";
                               const stale = draft && draft.original !== setting.value;
+                              const param = setpointParam(
+                                setting.entityId,
+                                controller.room.room.prefix,
+                              );
+                              const metric = param ? setpointMetric(param) : null;
+                              const typed = !draft
+                                ? setting.value
+                                : draft.value.trim() && Number.isFinite(Number(draft.value))
+                                  ? Number(draft.value)
+                                  : null;
+                              const hint =
+                                param && metric
+                                  ? fieldHint(param, typed, sensor[metric].stats, sensor.hours)
+                                  : null;
+                              const auto = managedBy(supervisors, setting.entityId);
                               return (
                                 <div
                                   className={`setting-field ${draft ? "is-draft" : ""}`}
@@ -438,6 +496,7 @@ export function Strategy({
                                       {draft && (
                                         <span className="draft-dot" title="Unsaved draft" />
                                       )}
+                                      {auto && <AutoBadge />}
                                     </Label>
                                     <p>
                                       {setting.description ||
@@ -461,7 +520,10 @@ export function Strategy({
                                           setting.value === null ? "Unavailable" : undefined
                                         }
                                         aria-invalid={Boolean(error)}
-                                        aria-describedby={`hint-${setting.entityId}`}
+                                        aria-describedby={
+                                          `hint-${setting.entityId}` +
+                                          (hint || auto ? ` context-${setting.entityId}` : "")
+                                        }
                                         disabled={
                                           planEngaged ||
                                           !["live", "demo"].includes(controller.connection)
@@ -482,6 +544,35 @@ export function Strategy({
                                             : "")}
                                     </p>
                                   </div>
+                                  {(hint || auto) && (
+                                    <div
+                                      className="setting-context"
+                                      id={`context-${setting.entityId}`}
+                                    >
+                                      {auto && (
+                                        <p className="setting-auto-hint">
+                                          Managed automatically – manual edits will be overwritten.
+                                        </p>
+                                      )}
+                                      {hint && (
+                                        <p className="setting-sensor-hint">
+                                          {setting.zoneId === undefined
+                                            ? `${sensor.zoneName} probe · `
+                                            : ""}
+                                          {hint.text}
+                                        </p>
+                                      )}
+                                      {hint?.warning && (
+                                        <p className="setting-advisory">
+                                          <TriangleAlert size={13} aria-hidden="true" />
+                                          <span>
+                                            {hint.warning[0].toUpperCase() + hint.warning.slice(1)}.
+                                            Advisory only; you can still save this value.
+                                          </span>
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
@@ -536,6 +627,8 @@ export function Strategy({
                 </div>
               )}
               <PlanningCurve
+                recorded={recorded}
+                retention={sensorZone?.auto?.gain}
                 parameters={preview.draft.parameters}
                 lightsOn={preview.draft.lightsOn}
                 lightsOff={preview.draft.lightsOff}
@@ -558,10 +651,20 @@ export function Strategy({
                 }
               />
               <p className="setpoint-preview-note">
-                Whole-day setpoint illustration, not measured or forecast sensor data. The P3
-                boundary is shown at lights-off; the engine may stop earlier based on measured
+                Blue and pink are your targets for the whole day; the dark lines are what this
+                zone’s probe actually recorded, today and on earlier days. Nothing is forecast. The
+                P3 boundary is shown at lights-off; the engine may stop earlier based on measured
                 dryback. P2 can also adjust for EC and safety limits.
               </p>
+              <SensorContextCard
+                context={sensor}
+                lines={sensorLines}
+                disabledNote={
+                  planEngaged
+                    ? "The active schedule owns today’s targets, so nothing can be typed here. Recorded sensor behaviour is shown while manual targets are editable."
+                    : undefined
+                }
+              />
               {preview.notes.map((note) => (
                 <p className="setpoint-preview-note" key={note}>
                   {note}

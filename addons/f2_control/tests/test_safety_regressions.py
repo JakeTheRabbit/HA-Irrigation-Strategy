@@ -156,6 +156,41 @@ def test_unconfirmed_close_prevents_next_zone_pumping(rig, monkeypatch, close_st
     assert "hardware" in c._blocked(c.rooms[0], 2).lower()
 
 
+def _slow_switch_report(monkeypatch, fake, clock, entity, service, lag_s):
+    """Zigbee/MQTT plug: the command is accepted at once, HA sees the new state later."""
+    due = {}
+    real_call, real_get = controller.ha_call, controller.ha_get
+
+    def call(domain, svc, **data):
+        if data.get("entity_id") == entity and svc == service:
+            fake.calls.append((domain, svc, data))
+            due["at"] = clock.seconds + lag_s
+            return True
+        return real_call(domain, svc, **data)
+
+    def get(eid, timeout=8):
+        if eid == entity and "at" in due and clock.seconds >= due["at"]:
+            fake.set_state(entity, "on" if service == "turn_on" else "off")
+        return real_get(eid, timeout=timeout)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller, "ha_get", get)
+
+
+@pytest.mark.xfail(
+    reason="controller._confirm_switches still does the old fixed 1 s single read; its poll/retry policy is an open TODO",
+    strict=False,
+)
+def test_slow_pump_off_report_does_not_latch_false_fault(rig, monkeypatch):
+    # Live 2026-09-14 18:52: veg_main_pump reported OFF 1.6 s after turn_off, past the
+    # fixed 1 s read-back — a false hold that stopped F2 irrigation for 16 h.
+    c, fake, clock = rig
+    _slow_switch_report(monkeypatch, fake, clock, "switch.p", "turn_off", 1.6)
+    c._execute_shot(c.rooms[0], 1, 6, 6)
+    assert c.rooms[0].hardware_fault is None
+    assert c._blocked(c.rooms[0], 2) is None
+
+
 def test_fault_survives_restart_and_requires_off_then_verified_recovery(rig, monkeypatch):
     c, fake, _clock = rig
     _fail_valve_close(monkeypatch, fake)

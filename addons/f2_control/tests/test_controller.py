@@ -302,7 +302,8 @@ def test_engine_only_knobs_never_flag_missing_setpoints():
             for k in (
                 "p2_vwc_threshold", "p1_target_vwc", "field_capacity",
                 "p3_emergency_vwc_threshold", "p2_shot_size", "p1_initial_shot_size",
-                "p1_shot_size_increment", "p1_maximum_shots", "p1_time_between_shots",
+                "p1_shot_size_increment", "p1_maximum_shots", "p1_minimum_shots",
+                "p1_time_between_shots",
                 "generative_dryback_target", "vegetative_dryback_target",
                 "p0_maximum_wait_time", "ec_target_gen_p0", "ec_target_gen_p1",
                 "ec_target_gen_p2", "p3_emergency_shot_size", "max_daily_volume",

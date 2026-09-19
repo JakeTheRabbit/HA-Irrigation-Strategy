@@ -1,0 +1,125 @@
+"""Room On/Off. An OFF room (nothing growing) must neither irrigate nor alert, must keep a heartbeat
+so the integration does not call the engine offline, and must start a fresh run when switched back on.
+
+The pain this fixes, as seen live on 2026-09-20: F1 was empty with unplugged probes, yet the engine
+ran its 90-minute blind schedule (31.5 L per zone per day) and re-raised "probe dead" every 30 minutes.
+"""
+from datetime import datetime, timedelta
+
+import pytest
+
+import controller
+from test_controller import _build, _desc
+
+ROOM_ACTIVE = "switch.crop_steering_room_active"
+FLAGS = {  # everything else says GO: only the room status differs between tests
+    "input_boolean.kill": ("on", {}),
+    "switch.crop_steering_system_enabled": ("on", {}),
+    "switch.crop_steering_auto_irrigation_enabled": ("on", {}),
+    "switch.crop_steering_zone_1_enabled": ("on", {}),
+}
+
+
+@pytest.fixture(autouse=True)
+def fake_clock(monkeypatch):
+    """Shots run synchronously against time.monotonic/sleep: fake both so a fired shot costs no real time."""
+    clock = {"seconds": 0.0}
+    monkeypatch.setattr(controller.time, "monotonic", lambda: clock["seconds"])
+    monkeypatch.setattr(controller.time, "sleep", lambda dt: clock.__setitem__("seconds", clock["seconds"] + dt))
+    return clock
+
+
+def _room(room_state, extra=None):
+    states = {"sensor.crop_steering_engine_config": ("ok", _desc(enable_flag="input_boolean.kill")), **FLAGS}
+    if room_state is not None:
+        states[ROOM_ACTIVE] = (room_state, {})
+    states.update(extra or {})  # no VWC sensor at all -> the zone is blind, exactly like empty F1
+    return _build({"num_zones": 1, "enable_flag": "input_boolean.kill", "notify_service": "notify/phone"}, states=states)
+
+
+def _notifications(fake):
+    return [d for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "create")]
+
+
+def _pushes(fake):
+    return [d for dom, svc, d in fake.calls if dom == "notify"]
+
+
+def _valve_opens(fake):
+    return [d for dom, svc, d in fake.calls if (dom, svc) == ("switch", "turn_on")]
+
+
+def test_an_on_room_with_dead_probes_alerts_and_waters_blind_this_is_the_nuisance():
+    c, fake = _room("on")
+    c.rooms[0].state[1]["last_shot"] = None  # never watered -> the blind schedule is due
+    c.loop_once(datetime.now())
+    assert any("blind" in str(n.get("notification_id")) for n in _notifications(fake))
+    assert _pushes(fake)
+
+
+def test_an_off_room_neither_waters_nor_alerts():
+    c, fake = _room("off")
+    c.rooms[0].state[1]["last_shot"] = None
+    c.loop_once(datetime.now())
+    assert _valve_opens(fake) == []
+    assert _notifications(fake) == [] and _pushes(fake) == []  # no alerts, no vitals digest either
+    assert "Room off" in c._blocked(c.rooms[0], 1)
+
+
+def test_an_off_room_still_reports_in_so_nothing_calls_the_engine_offline():
+    c, fake = _room("off")
+    c.loop_once(datetime.now())
+    state, attrs = fake.sets["sensor.crop_steering_ai_heartbeat"]
+    assert state == "healthy" and attrs["room_active"] is False
+    assert fake.sets["sensor.crop_steering_zone_1_status"][0] == "Room off"
+    assert "Room off" in fake.sets["sensor.crop_steering_current_decision"][0]
+
+
+def test_a_missing_switch_means_on_so_older_integrations_keep_watering():
+    c, fake = _room(None)
+    assert c._room_active(c.rooms[0]) is True
+    c.loop_once(datetime.now())
+    assert fake.sets["sensor.crop_steering_ai_heartbeat"][1]["room_active"] is True
+
+
+def test_switching_off_dismisses_that_rooms_standing_alerts():
+    c, fake = _room("on")
+    c.rooms[0].state[1]["last_shot"] = None
+    c.loop_once(datetime.now())
+    raised = {n["notification_id"] for n in _notifications(fake)}
+    assert raised
+    fake.set_state(ROOM_ACTIVE, "off")
+    c.loop_once(datetime.now())
+    dismissed = {d["notification_id"] for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "dismiss")}
+    assert {i for i in raised if "default" in i} <= dismissed
+
+
+def test_switching_back_on_starts_a_fresh_run_but_keeps_the_water_history():
+    c, fake = _room("off")
+    st = c.rooms[0].state[1]
+    yesterday = (datetime.now() - timedelta(days=1)).date().isoformat()  # inside the 7-grow-day window
+    record = {"grow_day": yesterday, "litres": 12.0, "complete": True}
+    st.update(phase="P2", shots=9, daily_vol=31.5, peak=44.0, water_history=[record])
+    c.loop_once(datetime.now())
+    fake.set_state(ROOM_ACTIVE, "on")
+    c.loop_once(datetime.now())
+    st = c.rooms[0].state[1]
+    assert (st["shots"], st["daily_vol"], st["peak"]) == (0, 0.0, 0.0)
+    assert st["phase"] == "P3"  # waits for the next lights-on boundary instead of resuming mid-phase
+    assert _valve_opens(fake) == []  # and the blind-probe clock starts NOW: time to plug probes in first
+    kept = [r for r in st["water_history"] if r["grow_day"] == yesterday]
+    assert kept and kept[0]["litres"] == 12.0  # delivered water is a site record, not part of the run
+
+
+def test_a_shot_in_flight_is_cut_when_the_room_is_switched_off(monkeypatch):
+    c, fake = _room("on")
+    clock = {"seconds": 0.0}
+    monkeypatch.setattr(controller.time, "monotonic", lambda: clock["seconds"])
+
+    def sleep(dt):
+        clock["seconds"] += dt
+        fake.set_state(ROOM_ACTIVE, "off")
+
+    monkeypatch.setattr(controller.time, "sleep", sleep)
+    elapsed, aborted = c._wait_shot(c.rooms[0], 1, 60)
+    assert aborted is True and elapsed < 60

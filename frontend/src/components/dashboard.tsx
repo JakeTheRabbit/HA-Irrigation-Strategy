@@ -27,6 +27,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { Change, Controller, Metric, Series, Zone } from "@/lib/types";
+import { errorText } from "@/lib/utils";
 import "./zone-state.css";
 
 export type Page =
@@ -165,7 +166,7 @@ export function HistoryChart({ controller, zones }: { controller: Controller; zo
         if (current) setData(result);
       })
       .catch((error) => {
-        if (current) setError(error instanceof Error ? error.message : String(error));
+        if (current) setError(errorText(error));
       })
       .finally(() => {
         if (current) setLoading(false);
@@ -614,7 +615,7 @@ export function ReviewDialog({
         );
       else onOpenChange(false);
     } catch (error) {
-      setErrors([error instanceof Error ? error.message : String(error)]);
+      setErrors([errorText(error)]);
     } finally {
       setBusy(false);
     }

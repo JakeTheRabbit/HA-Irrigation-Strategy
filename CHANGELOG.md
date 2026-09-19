@@ -9,6 +9,28 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+**🌱 In plain English**
+
+- **Room on/off.** Each room has a Room Active switch. Turn it off when nothing is growing: no irrigation (scheduled, emergency or blind-probe fallback), no alerts, no repair issues, and the room's open notifications are dismissed. Turn it back on and the room starts a clean cycle from the overnight phase; water history is kept.
+- **P1 always runs in full.** The ramp no longer ends on a clock. However late the first shot lands, P1 fires its shots in order until the target is recovered (after at least the new minimum shot count) or the maximum shot count is reached. Only then does P2 start.
+- **See the sensor where you set the target.** The Today graph you drag targets on now draws that zone's recorded VWC and pore EC underneath them (this grow-day and the previous one), with now, peak and trough above it, on an axis scaled to the readings instead of 0-100 %. A deeper 24 h / 72 h / 7 d history panel sits below, and setpoint fields warn when a target sits outside what the probe reads.
+- **The whole day is drawn the way it runs.** P0 keeps drying after lights-on, P1 climbs one step per shot (all of them), P2 fires a shot each time VWC falls to its threshold, and P3 dries down overnight to the next lights-on. Timing uses the zone's own measured dry-down rate, so it is a projection, not a schedule. Hover any riser for its time and size.
+- **Auto Setpoints (off by default).** The controller learns each zone's real ceiling, what a shot lifts it, and how fast it dries. When a P1 ramp stops rising for two shots it hands over to P2 and carries the achieved peak forward as the P1 target, then probes 1 point higher after 3 days. It only ever rewrites per-zone target numbers; the engine still decides every shot.
+
+**🔧 Technical notes**
+
+- `switch.crop_steering_<prefix>room_active` (default on) and `switch.crop_steering_<prefix>auto_setpoints` (default off). `health.py` clears the room's repair issues while the room is off; the controller publishes `app_status: room_off` and a `room_active` heartbeat attribute.
+- Engine core: P1 time exit removed; `ZoneParams.p1_min_shots` (from `number.…p1_minimum_shots`, clamped to `p1_max_shots`). Both vendored copies stay byte-identical.
+- New pure modules in the controller: `auto_setpoints` (learner), `setpoint_supervisor` (bounded, stepped, ladder-safe writes), `curve_tracker` (day planner), `engine_twin` (test twin around the real `decide()`), `jev_policy` (optional Cloudflare `typesafe/jev` judge, consulted only on a plateau; any failure returns no verdict and never blocks irrigation).
+- Gain is learned only from ramp shots fired at least 2 points under the ceiling; dryback rates fold in once per grow-day as that day's mean. Near-ceiling top-ups no longer shrink the P2 band.
+- Publishes `sensor.crop_steering_<prefix>zone_<N>_auto_setpoints` (off / learning / tracking / frozen) with learned_peak, gain, day_rate, night_rate, p1_outcome, hold_days, frozen_reason, last_change, jev, managed.
+- Add-on options `cf_account_id`, `cf_api_token`, `cf_gateway_id` (all optional). Auto Setpoints never writes while a dated plan owns the room.
+- Dashboard: `foldRecorded`, `smoothRecorded`, `dryRates`, `projectDay` and `planningAxis` in `frontend/src/lib/planning-curve.ts`; the dryback target is measured from the projected peak (as the engine measures it from the recorded one) rather than from field capacity. Lines carry a scale-free `data-planning-values` signature because the axis now follows the data.
+- Fix: the live history request had no `end_time`, so Home Assistant returned only the first 24 h of a 72 h or 7 d window.
+- Known open item: `controller._confirm_switches` still does a fixed 1 s single read-back; its regression test is marked expected-fail until the poll policy is chosen.
+
 ## [2.16.1] - 2026-09-08
 
 - Replace competing Manual setpoints and Grow plan navigation with Irrigation plan: Today and Schedule.

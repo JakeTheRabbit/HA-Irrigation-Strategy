@@ -2,7 +2,15 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PlanningCurve } from "../components/planning-curve";
 import { describe, expect, it } from "vitest";
-import { buildPlanningCurve, planningClock } from "./planning-curve";
+import {
+  buildPlanningCurve,
+  dryRates,
+  foldRecorded,
+  planningAxis,
+  planningClock,
+  projectDay,
+  smoothRecorded,
+} from "./planning-curve";
 const parameters = {
   field_capacity: 70,
   dryback_target: 20,
@@ -223,8 +231,14 @@ describe("rendered planning curve", () => {
       );
     const before = render(38),
       after = render(42.5);
-    expect(line(before, "p3-floor")).not.toEqual(line(after, "p3-floor"));
-    expect(line(before, "baseline-p3-floor")).toEqual(line(after, "baseline-p3-floor"));
+    // The VWC axis scales to what is plotted, so pixel positions may shift with the draft; what
+    // each line stands for must not.
+    expect(before).toContain("P3 emergency floor: 38% VWC");
+    expect(after).toContain("P3 emergency floor: 42.5% VWC");
+    for (const html of [before, after]) {
+      expect(line(html, "baseline-p3-floor")).toBeDefined();
+      expect(html).toContain("Saved P3 floor: 38% VWC");
+    }
     expect(after).toContain('data-planning-line="baseline-vwc"');
     expect(after).toContain('data-planning-line="ec"');
   });
@@ -249,5 +263,225 @@ describe("rendered planning curve", () => {
     expect(line(html, "baseline-p3-floor")).toBeDefined();
     expect(html).not.toContain('data-planning-line="vwc"');
     expect(html).not.toContain("NaN:NaN");
+  });
+});
+
+describe("P1 ramp drawn shot by shot", () => {
+  it("gives every eligible shot its own step, from the morning endpoint to the P1 target", () => {
+    const plan = buildPlanningCurve({ ...parameters, p1_shot_size_increment: 1 }, 6, 18);
+    expect(plan.p1Steps.map((step) => step.hour)).toEqual(plan.p1Windows);
+    expect(plan.p1Steps.map((step) => step.size)).toEqual([6, 7, 8, 9]);
+    expect(plan.p1Steps[0].from).toBe(56);
+    expect(plan.p1Steps.at(-1)!.to).toBeCloseTo(68);
+    // each step's share of the 12-point climb follows its share of the water
+    expect(plan.p1Steps.map((step) => +(step.to - step.from).toFixed(2))).toEqual([
+      2.4, 2.8, 3.2, 3.6,
+    ]);
+    plan.p1Steps.slice(1).forEach((step, index) => expect(step.from).toBe(plan.p1Steps[index].to));
+  });
+  it("splits the climb evenly when shot sizes are not supplied", () => {
+    const { p1_initial_shot_size, ...rest } = parameters;
+    const plan = buildPlanningCurve(rest, 6, 18);
+    expect(plan.p1Steps.map((step) => [step.size, step.to - step.from])).toEqual([
+      [null, 3],
+      [null, 3],
+      [null, 3],
+      [null, 3],
+    ]);
+  });
+  it("draws no steps without a climb or without shot windows", () => {
+    expect(buildPlanningCurve({ ...parameters, p1_target_vwc: 50 }, 6, 18).p1Steps).toEqual([]);
+    expect(buildPlanningCurve({ ...parameters, p1_time_between_shots: 0 }, 6, 18).p1Steps).toEqual(
+      [],
+    );
+    expect(buildPlanningCurve({}, 6, 18).p1Steps).toEqual([]);
+  });
+  it("renders one riser per shot in the graph", () => {
+    const html = renderToStaticMarkup(
+      createElement(PlanningCurve, { parameters, lightsOn: 6, lightsOff: 18 }),
+    );
+    expect(html.match(/data-planning-shot="P1"/g)).toHaveLength(4);
+  });
+});
+
+describe("recorded readings on the plan graph", () => {
+  const at = (day: number, hour: number, minute = 0) =>
+    new Date(2026, 8, day, hour, minute).getTime();
+  it("folds readings onto the lights-on axis and separates today from earlier days", () => {
+    const readings = [
+      { time: at(19, 9, 30), value: 30 }, // before lights-on on the 19th: the grow-day of the 18th
+      { time: at(19, 10, 0), value: 31 },
+      { time: at(19, 16, 0), value: 38 },
+      { time: at(20, 4, 0), value: 33 }, // still the grow-day that began on the 19th
+      { time: at(20, 10, 30), value: 32 },
+      { time: at(20, 12, 0), value: 36 },
+    ];
+    const folded = foldRecorded(readings, 10, at(20, 12, 5));
+    expect(folded.today).toEqual([
+      { hour: 0.5, value: 32, time: at(20, 10, 30) },
+      { hour: 2, value: 36, time: at(20, 12, 0) },
+    ]);
+    expect(folded.previous.map((day) => day.map((point) => point.hour))).toEqual([[0, 6, 18]]);
+    expect(folded.earlier).toBe(1); // the 18th's single reading is counted, not drawn as a line
+  });
+  it("returns nothing for bad input and never draws the future", () => {
+    expect(foldRecorded([], 10, at(20, 12))).toEqual({ today: [], previous: [], earlier: 0 });
+    expect(foldRecorded([{ time: at(20, 13), value: 40 }], 10, at(20, 12)).today).toEqual([]);
+    expect(foldRecorded([{ time: at(20, 11), value: 40 }], Number.NaN, at(20, 12)).today).toEqual(
+      [],
+    );
+  });
+  it("scales the VWC axis to what is plotted instead of a fixed 0-100", () => {
+    // the span is always 20/40/60/80/100, so the four grid intervals are whole multiples of 5
+    expect(planningAxis([34, 40, 22, 31.2, 23.4])).toEqual({ min: 10, max: 50 });
+    expect(planningAxis([56, 58])).toEqual({ min: 45, max: 65 });
+    expect(planningAxis([2, 99])).toEqual({ min: 0, max: 100 });
+    expect(planningAxis([])).toEqual({ min: 0, max: 100 });
+  });
+  it("plots recorded VWC on the same graph as the draggable targets", () => {
+    const now = at(20, 12, 5);
+    const html = renderToStaticMarkup(
+      createElement(PlanningCurve, {
+        parameters,
+        lightsOn: 10,
+        lightsOff: 22,
+        recorded: {
+          now,
+          vwc: [
+            { time: at(19, 11), value: 57 },
+            { time: at(19, 15), value: 66 },
+            { time: at(20, 11), value: 58 },
+            { time: at(20, 12), value: 61 },
+          ],
+          ec: [{ time: at(20, 12), value: 3.1 }],
+        },
+      }),
+    );
+    expect(html).toContain('data-planning-line="recorded-vwc"');
+    expect(html).toContain('data-planning-line="recorded-vwc-previous"');
+    expect(html).toContain("Now 61");
+    expect(html).not.toContain("not recorded or forecast sensor data");
+  });
+});
+
+describe("the projected day: every phase drawn the way the engine runs it", () => {
+  // live F2 zone 1, 2026-09-20
+  const live = {
+    field_capacity: 55,
+    dryback_target: 10,
+    p1_target_vwc: 40,
+    p2_vwc_threshold: 34,
+    p2_shot_size: 3,
+    p1_initial_shot_size: 2,
+    p1_shot_size_increment: 0.5,
+    p1_maximum_shots: 10,
+    p1_time_between_shots: 20,
+    p0_maximum_wait_time: 60,
+    p3_emergency_vwc_threshold: 22,
+    p3_emergency_shot_size: 2,
+  };
+  const project = (parameters: Record<string, number>, options = {}) =>
+    projectDay(buildPlanningCurve(parameters, 10, 22), parameters, {
+      rates: { day: 0.72, night: 0.37 },
+      ...options,
+    })!;
+  const valueAt = (day: ReturnType<typeof project>, hour: number) =>
+    day.points.filter((point) => point.hour <= hour).at(-1)!.value;
+  it("P0 keeps drying after lights-on until the first shot", () => {
+    const day = project(live);
+    const wait = day.points.filter((point) => point.phase === "P0");
+    expect(wait[0]).toMatchObject({ hour: 0, value: day.lightsOnVwc });
+    expect(wait.at(-1)!.hour).toBe(1);
+    expect(wait.at(-1)!.value - day.lightsOnVwc).toBeCloseTo(-0.72, 2);
+  });
+  it("P1 shows all ten shots, drying between them, and lands on the target", () => {
+    const day = project(live);
+    const ramp = day.shots.filter((shot) => shot.phase === "P1");
+    expect(ramp).toHaveLength(10);
+    expect(ramp.map((shot) => shot.size)).toEqual([2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5]);
+    expect(ramp.at(-1)!.to).toBe(40);
+    expect(ramp[1].from).toBeCloseTo(ramp[0].to - 0.72 / 3, 2); // 20 minutes of dry-down
+    ramp.forEach((shot) => expect(shot.to).toBeGreaterThan(shot.from));
+  });
+  it("P2 fires a shot every time VWC falls to the threshold and none after the last-irrigation cutoff", () => {
+    const tight = { ...live, p2_vwc_threshold: 39, p2_shot_size: 1, p3_last_irrigation: 120 };
+    const maintenance = project(tight).shots.filter((shot) => shot.phase === "P2");
+    expect(maintenance).toHaveLength(4); // 1 point at 0.72 points/h: one shot every ~83 minutes
+    for (const shot of maintenance) {
+      expect(shot.from).toBeLessThanOrEqual(39);
+      expect(shot.from).toBeGreaterThan(38.9);
+      expect(shot.to - shot.from).toBeCloseTo(1); // full retention unless a gain is known
+      expect(shot.hour).toBeLessThan(10); // P3 starts two hours before lights-off
+    }
+    const halved = project(tight, { retention: 0.5 }).shots.filter((shot) => shot.phase === "P2");
+    expect(halved[0].to - halved[0].from).toBeCloseTo(0.5);
+    expect(halved.length).toBeGreaterThan(maintenance.length);
+    // the live setpoints: 40 down to 34 at 0.72 points/h takes over eight hours, so P2 barely fires
+    expect(project(live).shots.filter((shot) => shot.phase === "P2")).toHaveLength(0);
+  });
+  it("P3 dries down through the night at the slower rate and the next day starts where it ends", () => {
+    const day = project(live);
+    expect(valueAt(day, 24)).toBe(day.lightsOnVwc);
+    expect(day.points.at(-1)!.hour).toBe(24);
+    expect(valueAt(day, 12) - valueAt(day, 24)).toBeCloseTo(0.37 * 12, 1);
+    expect(day.lightsOnVwc).toBeLessThan(34);
+    for (let index = 1; index < day.points.length; index++)
+      expect(day.points[index].hour).toBeGreaterThanOrEqual(day.points[index - 1].hour);
+  });
+  it("measures the dryback target from the projected peak, as the engine does from the measured one", () => {
+    const day = project(live);
+    expect(day.peak).toBe(40);
+    expect(day.drybackVwc).toBeCloseTo(36);
+  });
+  it("fires the emergency shot if the night would cross the P3 floor", () => {
+    const day = project({ ...live, p3_emergency_vwc_threshold: 31 });
+    const emergency = day.shots.filter((shot) => shot.emergency);
+    expect(emergency.length).toBeGreaterThan(0);
+    expect(emergency[0].phase).toBe("P3");
+    expect(emergency[0].to - emergency[0].from).toBeCloseTo(2);
+  });
+  it("stays sane when shot count, spacing or sizes are not supplied", () => {
+    const sparse = { p1_target_vwc: 65, p2_vwc_threshold: 55, dryback_target: 20 };
+    const day = projectDay(buildPlanningCurve(sparse, 10, 22), sparse)!;
+    expect(day.peak).toBe(65);
+    expect(day.shots).toEqual([]); // nothing to draw a riser from
+    expect(Math.min(...day.points.map((point) => point.value))).toBeGreaterThan(45); // held at the threshold, then one night's dry-down
+  });
+  it("falls back to nominal rates without history and draws nothing without targets", () => {
+    const plan = buildPlanningCurve(live, 10, 22);
+    const day = projectDay(plan, live)!;
+    expect(day.measured).toEqual({ day: false, night: false });
+    expect(day.rates).toEqual({ day: 0.7, night: 0.35 });
+    expect(projectDay(buildPlanningCurve({}, 10, 22), {})).toBeNull();
+  });
+  it("measures a zone's own dry-down from its recorded hours, ignoring the hours a shot landed", () => {
+    const day = Array.from({ length: 24 * 6 }, (_, index) => {
+      const hour = index / 6;
+      const shot = hour >= 4 && hour < 5 ? 4 : 0; // one wet hour mid-photoperiod
+      const value = hour < 12 ? 40 - 0.6 * hour + shot : 32.8 - 0.3 * (hour - 12);
+      return { hour, value, time: index };
+    });
+    expect(dryRates([day, day], 12)).toEqual({ day: 0.6, night: 0.3 });
+    expect(dryRates([day.slice(0, 8)], 12)).toEqual({ day: null, night: null });
+  });
+});
+
+describe("recorded lines are drawn smooth", () => {
+  it("drops probe jitter, keeps a shot, and ends on the live reading", () => {
+    const minute = 60_000;
+    const readings = Array.from({ length: 180 }, (_, index) => ({
+      time: index * minute,
+      // flickers +/-0.4 every reading; a shot lifts it 5 points at the 90th minute
+      value: (index < 90 ? 30 : 35) + (index % 2 ? 0.4 : -0.4),
+    }));
+    readings.push({ time: 180 * minute, value: 34.2 });
+    const smooth = smoothRecorded(readings, 10);
+    expect(smooth.length).toBeLessThanOrEqual(19);
+    const steps = smooth
+      .slice(1, -1)
+      .map((point, index) => Math.abs(point.value - smooth[index].value));
+    expect(steps.filter((step) => step > 1)).toHaveLength(1); // only the shot is a real move
+    expect(smooth.at(-1)).toEqual({ time: 180 * minute, value: 34.2 });
+    expect(smoothRecorded([])).toEqual([]);
   });
 });

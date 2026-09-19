@@ -1,5 +1,6 @@
 import { interpolate, parsePlanImport, planErrors, validDate } from "./grow-plan";
 import { createUuid } from "./uuid";
+import { errorText } from "./utils";
 import type { GrowPlan, ParameterLimit } from "./operator-types";
 
 export const MAX_RECIPES = 20;
@@ -69,7 +70,7 @@ export interface LibrarySnapshot {
 export type RecipeStorage = Pick<Storage, "getItem" | "setItem">;
 export type RecipeCatalog = Record<string, Record<string, ParameterLimit>>;
 const bytes = (text: string) => new TextEncoder().encode(text).length;
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const message = errorText;
 const text = (value: unknown, label: string, maximum: number, required = true): string => {
   if (typeof value !== "string" || value.length > maximum || (required && !value.trim()))
     throw new Error(`${label} must contain ${required ? "1" : "0"}–${maximum} characters.`);

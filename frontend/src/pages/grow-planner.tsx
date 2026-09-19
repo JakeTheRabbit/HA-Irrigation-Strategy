@@ -25,8 +25,10 @@ import { Heading, Empty, number } from "@/components/dashboard";
 import { WaterDelivery } from "@/components/water-delivery";
 import { PlanningCurve } from "@/components/planning-curve";
 import { RecipeLibrary } from "@/components/recipe-library";
+import { SensorContext } from "@/components/sensor-context";
 import { syncPlanZones } from "@/lib/sync-plan-zones";
 import type { Controller } from "@/lib/types";
+import { errorText } from "@/lib/utils";
 import type {
   GrowPlan,
   StrategyDocument,
@@ -88,7 +90,7 @@ export function GrowPlanner({
         setDay(Math.max(1, Math.min(366, growDay(first.start_date, localDate()))));
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -243,7 +245,7 @@ export function GrowPlanner({
       setPreview(result);
       setReview("save");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -276,7 +278,7 @@ export function GrowPlanner({
             : "Plan disarm requested; active targets remain until the next boundary.",
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -313,7 +315,7 @@ export function GrowPlanner({
         "Plan imported as a local draft. Check endpoints and zone assignments before saving.",
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
     if (importRef.current) importRef.current.value = "";
   }
@@ -815,6 +817,16 @@ export function GrowPlanner({
                 </div>
               </section>
             </>
+          )}
+          {tab === "profiles" && (
+            <SensorContext
+              controller={controller}
+              zone={selectedZone}
+              parameters={params}
+              enabled={connected}
+              subtitle={`targets blended for grow day ${day} (${currentBlock?.bias ?? 50}% generative) drawn over what the probes read`}
+              disabledNote="Recorded history loads while Home Assistant is connected."
+            />
           )}
           {tab === "profiles" && (
             <section className="panel workspace-card">

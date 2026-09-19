@@ -1,5 +1,6 @@
 import type { HistoryRequest, HistoryWindow } from "./comparison-types";
 import type { OperatorAction } from "./operator-types";
+import type { AutoSetpointStatus } from "./auto-setpoints";
 export interface EntityState {
   entity_id: string;
   state: string;
@@ -60,6 +61,8 @@ export interface Zone {
   status: string;
   fields: Setting[];
   sensors: EntityState[];
+  /** Setpoint supervisor status; null when this zone has no supervisor sensor. */
+  auto: AutoSetpointStatus | null;
 }
 export interface LogEvent {
   id: string;
@@ -86,6 +89,11 @@ export interface RoomView {
   choices: Choice[];
   strategy: { status: string; engaged: boolean; valid: boolean };
   alerts: Notice[];
+  /** False only when switch.crop_steering_<prefix>room_active reports "off". */
+  roomActive: boolean;
+  /** Null when the controller has no room switch: the room is on and the control is hidden. */
+  roomActiveEntity: string | null;
+  autoSetpoints: { entityId: string | null; enabled: boolean | null };
 }
 export interface Change {
   entityId: string;

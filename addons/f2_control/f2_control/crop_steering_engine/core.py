@@ -44,6 +44,8 @@ class ZoneParams:
     #                                 GUARANTEED + FRONT-STACKED + SENSOR-INDEPENDENT: every plant gets this much,
     #                                 delivered from lights-on as fast as spacing allows, regardless of the VWC
     #                                 threshold — a lying/dead probe cannot suppress it. Clamped < max_daily_volume.
+    p1_min_shots: int = 0           # P1 cannot graduate on "target reached" until this many ramp shots have
+    #                                 landed (0 = off). The ramp runs as configured; max shots still bounds it.
     drown_ceiling: float = 90.0     # the ONLY VWC gate on the min-daily floor: a hard anti-drown limit well above
     #                                 field capacity. Below it, the floor fires regardless of the probe; at/above it
     #                                 the floor holds (never flood). 90 ~= unreachable in coco -> truly probe-blind.
@@ -136,15 +138,18 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     elif phase == "P1":
         # Ramp to the ACHIEVABLE ceiling, graduate once pore EC is flushed back to band.
         p1_ceiling = min(p.p1_target, p.field_capacity)
-        if s.vwc >= p1_ceiling and ec_known and s.ec <= p.ec_target_p1 * 1.15:
+        # P1 is the ramp AS CONFIGURED and ends only when the ramp is complete: target reached (with the
+        # minimum shots in) or the maximum shots delivered. There is deliberately NO time-based exit - a
+        # zone gate-blocked before or during the ramp (feed pH/EC, dosing hold) waits in P1 and resumes;
+        # phases always run in order. Lights-off -> P3 (above) is the only other way out.
+        min_in = s.shot_count >= p.p1_min_shots
+        if s.vwc >= p1_ceiling and ec_known and s.ec <= p.ec_target_p1 * 1.15 and min_in:
             phase, treason = "P2", f"P1 recovered {s.vwc:.0f}>={p1_ceiling:.0f} EC ok {s.ec:.1f}"
-        elif not ec_known and s.vwc >= p1_ceiling and s.shot_count > 0:
+        elif not ec_known and s.vwc >= p1_ceiling and s.shot_count > 0 and min_in:
             # Do not claim EC recovery or keep watering an already-full slab blindly.
             phase, treason = "P2", "P1 VWC recovered after watering; EC unknown (flush unverified)"
         elif s.shot_count >= p.p1_max_shots:
             phase, treason = "P2", f"P1 max shots {s.shot_count}/{p.p1_max_shots}"
-        elif s.phase_minutes >= 120:
-            phase, treason = "P2", "P1 120min ceiling"
     elif phase == "P2":
         # predictive P3: only if starting dryback NOW would finish by lights-on.
         if s.uptime_min >= 10 and s.vwc >= p.p3_emergency_floor and s.hours_to_lights_off <= 3.0:
@@ -349,6 +354,11 @@ def validate_params(p):
                 nv = int(nv)
             fixes[name] = nv
             warns.append(f"{name}={v:g} out of [{lo:g},{hi:g}] -> clamped to {nv:g}")
+    # the ramp minimum can never exceed the ramp maximum (else P1 could only exit at max shots anyway)
+    eff_p1max = int(fixes.get("p1_max_shots", p.p1_max_shots))
+    if p.p1_min_shots > eff_p1max:
+        fixes["p1_min_shots"] = eff_p1max
+        warns.append(f"p1_min_shots={p.p1_min_shots:g} > p1_max_shots={eff_p1max:g} -> clamped to {eff_p1max:g}")
     # the floor can never exceed the cap (else it would fight the budget block)
     eff_min = fixes.get("min_daily_volume", p.min_daily_volume)
     eff_max = fixes.get("max_daily_volume", p.max_daily_volume)
