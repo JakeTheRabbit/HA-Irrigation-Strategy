@@ -53,5 +53,6 @@ import pytest  # noqa: E402  (after the stub registration above)
 @pytest.fixture(autouse=True)
 def _hermetic_controller_state(tmp_path, monkeypatch):
     """Tests that build a full add-on Controller() must never read or write the machine's
-    real /data/state.json (see addons/f2_control/tests/conftest.py for the full story)."""
+    real /data/state.json (see addons/f2_control/tests/conftest.py for the full story).
+    """
     monkeypatch.setenv("F2_STATE_PATH", str(tmp_path / "constructor-state.json"))

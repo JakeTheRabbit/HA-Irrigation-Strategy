@@ -45,6 +45,8 @@ class SetupError(ValueError):
         self.key = key
         self.path = tuple(path)
         self.placeholders = {k: str(v) for k, v in placeholders.items()}
+
+
 HARDWARE_DOMAINS = {
     "pump_switch": {"switch"},
     "main_line_switch": {"switch"},

@@ -6,3 +6,6 @@ extend-exclude = ["archive", "output", "frontend/node_modules", "frontend/dist"]
 
 [lint.per-file-ignores]
 "scripts/*" = ["E701", "E702"]
+# Imports the `flow_module` pytest fixture from test_setup_flows.py and then names it as a test
+# parameter, which is how pytest fixtures work and what F811 mistakes for a redefinition.
+"tests/test_setup_wizard_rules.py" = ["F811"]

@@ -15,7 +15,12 @@ from homeassistant.helpers import config_validation as cv
 
 from .conftest import DOMAIN, TENT_SWITCH, seed_tent
 
-SYSTEM = {"num_zones": 1, "plumbing": "valves_only", "volume_unit": "gal", "flow_unit": "gal/hr"}
+SYSTEM = {
+    "num_zones": 1,
+    "plumbing": "valves_only",
+    "volume_unit": "us_gallons",
+    "flow_unit": "gph",
+}
 ZONES = {
     "ec_unit": "auto",
     "zone_1_name": "Tent",
@@ -80,7 +85,9 @@ async def test_a_single_switch_tent_installs_from_nothing(hass):
         return float(hass.states.get(f"number.crop_steering_{key}").state)
 
     assert number("substrate_volume") == 11.4  # the 3 US gal preset, in litres
-    assert number("dripper_flow_rate") == pytest.approx(3.785, abs=1e-3)  # 1 GPH in L/hr
+    assert number("dripper_flow_rate") == pytest.approx(
+        3.785, abs=1e-3
+    )  # 1 GPH in L/hr
     assert number("drippers_per_plant") == 2
     assert number("zone_1_plant_count") == 4
     # The lights hours were asked for, stored, and then ignored: the entities seeded to 12/0.
@@ -117,7 +124,9 @@ async def test_the_switch_being_on_is_an_inline_error_not_the_end_of_the_wizard(
     assert f"{TENT_SWITCH} is ON" in result["description_placeholders"]["blockers"]
 
     hass.states.async_set(TENT_SWITCH, "off")
-    result = await _answer(hass, result, ZONES, "hardware")  # same flow, same answers, carries on
+    result = await _answer(
+        hass, result, ZONES, "hardware"
+    )  # same flow, same answers, carries on
 
 
 @pytest.mark.parametrize(
@@ -154,7 +163,9 @@ async def test_a_pumped_room_is_asked_for_its_pump_and_cannot_skip_it(hass):
     result = await _answer(hass, result, ZONES, "hardware")
     fields = {str(marker) for marker in result["data_schema"].schema}
     assert "pump_switch" in fields and "main_line_switch" not in fields
-    result = await _answer(hass, result, {**LIGHTS, "pump_switch": "switch.pump"}, "substrate")
+    result = await _answer(
+        hass, result, {**LIGHTS, "pump_switch": "switch.pump"}, "substrate"
+    )
 
 
 async def test_every_wizard_form_can_be_rendered_by_the_frontend(hass):
@@ -163,24 +174,46 @@ async def test_every_wizard_form_can_be_rendered_by_the_frontend(hass):
     seed_tent(hass)
     result = await _start(hass)
     seen = []
-    for answers in (SYSTEM, ZONES, LIGHTS, {**SUBSTRATE, "have_catch_test": True},
-                    {"catch_seconds": 60, "catch_ml": 200, "catch_drippers": 4}):
+    for answers in (
+        SYSTEM,
+        ZONES,
+        LIGHTS,
+        {**SUBSTRATE, "have_catch_test": True},
+        {"catch_seconds": 60, "catch_ml": 200, "catch_drippers": 4},
+    ):
         seen.append(result["step_id"])
         assert voluptuous_serialize.convert(
             result["data_schema"], custom_serializer=cv.custom_serializer
         )
-        result = await hass.config_entries.flow.async_configure(result["flow_id"], answers)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], answers
+        )
     seen.append(result["step_id"])
-    assert voluptuous_serialize.convert(result["data_schema"], custom_serializer=cv.custom_serializer)
-    assert seen == ["manual_zones", "zones", "hardware", "substrate", "catch_test", "extras"]
-    assert "3 L/hr" not in result["description_placeholders"]["measured"]  # shown in GPH, as chosen
+    assert voluptuous_serialize.convert(
+        result["data_schema"], custom_serializer=cv.custom_serializer
+    )
+    assert seen == [
+        "manual_zones",
+        "zones",
+        "hardware",
+        "substrate",
+        "catch_test",
+        "extras",
+    ]
+    assert (
+        "3 L/hr" not in result["description_placeholders"]["measured"]
+    )  # shown in GPH, as chosen
     assert "gal/hr" in result["description_placeholders"]["measured"]
 
 
-async def test_field_capacity_is_suggested_once_the_controller_has_seen_the_zone_top_out(hass):
+async def test_field_capacity_is_suggested_once_the_controller_has_seen_the_zone_top_out(
+    hass,
+):
     await _install_tent(hass)
     suggestion = "sensor.crop_steering_zone_1_suggested_field_capacity"
-    assert hass.states.get(suggestion).state == "unknown"  # nothing learned yet: no guess offered
+    assert (
+        hass.states.get(suggestion).state == "unknown"
+    )  # nothing learned yet: no guess offered
 
     # What the add-on publishes over REST once a morning ramp has plateaued.
     hass.states.async_set(

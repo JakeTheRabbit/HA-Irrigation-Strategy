@@ -8,7 +8,7 @@ The demo opens directly in your browser with sample rooms, sensor data and edita
 
 The demo includes clearly labelled synthetic recipes and current/previous runs for exploring comparisons. They demonstrate the software; they are not production recommendations.
 
-![Release](https://img.shields.io/badge/Release-2.17.2-green)
+![Release](https://img.shields.io/badge/Release-2.18.0-green)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3+-41BDF5)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -16,7 +16,9 @@ The demo includes clearly labelled synthetic recipes and current/previous runs f
 
 ![Crop Steering operator workspace](img/operator-dashboard.png)
 
-> **New in 2.17 / controller 0.14.0:** the recorded-sensor plan graph with the projected P0-P3 day, room on/off, the full P1 ramp, Auto Setpoints, restart-safe setup and a patient pump read-back, all described below. Install the matching pair; see the [changelog](CHANGELOG.md).
+> **New in 2.18 / controller 0.15.0:** a setup wizard a newcomer can finish without help. Problems show beside the field that caused them instead of ending the wizard, a single-switch tent is supported, EC probes in µS/cm / CF / ppm and pots in US gallons are converted for you, and a blank install now works (it previously could not). Install the matching pair; see the [changelog](CHANGELOG.md).
+>
+> **In 2.17 / controller 0.14.0:** the recorded-sensor plan graph with the projected P0-P3 day, room on/off, the full P1 ramp, Auto Setpoints, restart-safe setup and a patient pump read-back, all described below.
 
 ## Start here
 

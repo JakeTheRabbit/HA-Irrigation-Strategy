@@ -34,6 +34,54 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -q
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest addons/f2_control/tests -q
 ```
 
+## The real-Home-Assistant tier (`tests_ha/`)
+
+The three suites above are fast because they never load Home Assistant: `tests/` drives the
+integration against hand-written stubs in which voluptuous, the selectors and the config-flow
+base class are no-ops. That has a cost. With only those suites, all of the following shipped
+with a green build: a setup wizard that aborted on its last screen and discarded every answer;
+a sidebar panel that raised `AttributeError` on every Home Assistant older than 2026.5 (the
+unit test assigned the missing function onto its own stub); and a blank install whose entities
+were named `sensor.engine_config` and `number.substrate_volume`, which the controller never
+looks for, so a room that set up cleanly never irrigated.
+
+`tests_ha/` loads the integration in an actual Home Assistant core
+([pytest-homeassistant-custom-component](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component)):
+real config entries, entity registry, restore state, schema validation and serialisation.
+
+```bash
+# Python 3.13+. A separate virtualenv keeps the lean prerequisites above lean.
+pip install pytest-homeassistant-custom-component requests
+python -m pytest tests_ha -q          # NOT with PYTEST_DISABLE_PLUGIN_AUTOLOAD
+```
+
+`bash tests/run_ci.sh` runs it too when the package is installed (set `HA_PYTHON` to point at a
+separate virtualenv), and skips it with a message otherwise. CI always runs it.
+
+| File | Scenario |
+| --- | --- |
+| `test_fresh_install.py` | **Fresh install.** A newcomer with a single-switch tent drives the wizard through the real flow manager. Inline errors, unit conversion, every form serialisable for the frontend, the values typed reach the entities. |
+| `test_install_to_controller.py` | **Fresh install, both layers.** That install is handed to the *real add-on controller*, which must find the room from the descriptor alone, adopt it, and fire a single-switch shot sized from the wizard's answers. The only test that crosses the integration / controller seam. |
+| `test_upgrade_in_place.py` | **In-place upgrade with seeded data.** Starts the new code on top of a snapshot of an old install: its config entry, the entity registry it had built up, operator-tuned values in the restore cache, and the controller's saved state and setup fingerprint. Nothing tuned may move, no entity may change id, the controller must carry on without a disarm cycle, and no new feature may switch itself on. |
+| `test_configure.py` | **Configure.** Catch-test calibration, editing a parameter, removing a mapping, inline errors. |
+
+**Seeded fixtures** live in `tests_ha/fixtures/`. Each is a room *as an old version actually wrote
+it*, with a `_about` note saying which era it models. To cover a new kind of old install, add a
+snapshot there rather than building one by hand in a test: `entry_2_17_wizard.json` (a pumped
+two-zone room from the 2.17 wizard) and `entry_env_era.json` (env-file era: legacy front/back
+probe pairs, no setup revision, a probe with no unit, bookkeeping keys in `entry.options`).
+
+`tests_ha/` is a separate directory on purpose: `tests/conftest.py` registers fake
+`homeassistant` modules, which would shadow the real package. Its conftest also refuses to run
+if Python resolved some other `custom_components` package, because a green run against the
+wrong code is worse than no run.
+
+**Hermetic state.** The controller persists to `/data/state.json`. Its constructor reads (and may
+write) that file before a test can redirect it, so on any machine where `/data` exists and is
+writable - a devcontainer, the add-on container itself - the suites used to write a real file
+there and leak it into the next test. Both conftests now set `F2_STATE_PATH` per test. Unset, as
+on every live install, the path is `/data/state.json`.
+
 ## Dashboard checks
 
 From the repository root:

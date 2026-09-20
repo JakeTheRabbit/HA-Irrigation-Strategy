@@ -444,12 +444,12 @@
       "name_invalid": "Names must be 1-80 characters.",
       "entity_missing": "{entity} does not exist in Home Assistant any more. Pick another.",
       "entity_wrong_domain": "{entity} is the wrong kind of entity here. Expected: {expected}.",
-      "vwc_unit": "{entity} reports '{unit}', but a moisture (VWC) sensor must report percent (%), 0-100. If it reports a 0-1 fraction, make a template sensor that multiplies by 100.",
+      "vwc_unit": "{entity} reports \"{unit}\", but a moisture (VWC) sensor must report percent (%), 0-100. If it reports a 0-1 fraction, make a template sensor that multiplies by 100.",
       "ec_unit_ppm_scale": "{entity} reports 'ppm', which depends on the meter's scale. Set 'EC unit' at the top to ppm (500 scale) or ppm (700 scale); it is printed on the meter or in its manual.",
       "ec_unit_missing": "{entity} does not report a unit, so its readings cannot be interpreted. Set 'EC unit' at the top to what this probe measures in.",
-      "ec_unit_unknown": "{entity} reports '{unit}', which is not an EC unit. Expected mS/cm, dS/m, µS/cm, CF or ppm. Is this the right sensor?",
-      "ph_unit": "{entity} reports '{unit}', which is not pH. Is this the right sensor?",
-      "tank_temperature_unit": "{entity} reports '{unit}'. A tank temperature sensor must report °C, °F or K.",
+      "ec_unit_unknown": "{entity} reports \"{unit}\", which is not an EC unit. Expected mS/cm, dS/m, µS/cm, CF or ppm. Is this the right sensor?",
+      "ph_unit": "{entity} reports \"{unit}\", which is not pH. Is this the right sensor?",
+      "tank_temperature_unit": "{entity} reports \"{unit}\". A tank temperature sensor must report °C, °F or K.",
       "zone_valve_missing": "Zone {zone} needs an irrigation switch.",
       "valve_already_allocated": "{entity} already waters another active zone. One switch can belong to only one zone.",
       "valve_is_foreign_shared": "{entity} is another room's pump, main-line or waste switch, so it cannot be a zone switch here.",
@@ -918,12 +918,12 @@
       "name_invalid": "Names must be 1-80 characters.",
       "entity_missing": "{entity} does not exist in Home Assistant any more. Pick another.",
       "entity_wrong_domain": "{entity} is the wrong kind of entity here. Expected: {expected}.",
-      "vwc_unit": "{entity} reports '{unit}', but a moisture (VWC) sensor must report percent (%), 0-100. If it reports a 0-1 fraction, make a template sensor that multiplies by 100.",
+      "vwc_unit": "{entity} reports \"{unit}\", but a moisture (VWC) sensor must report percent (%), 0-100. If it reports a 0-1 fraction, make a template sensor that multiplies by 100.",
       "ec_unit_ppm_scale": "{entity} reports 'ppm', which depends on the meter's scale. Set 'EC unit' at the top to ppm (500 scale) or ppm (700 scale); it is printed on the meter or in its manual.",
       "ec_unit_missing": "{entity} does not report a unit, so its readings cannot be interpreted. Set 'EC unit' at the top to what this probe measures in.",
-      "ec_unit_unknown": "{entity} reports '{unit}', which is not an EC unit. Expected mS/cm, dS/m, µS/cm, CF or ppm. Is this the right sensor?",
-      "ph_unit": "{entity} reports '{unit}', which is not pH. Is this the right sensor?",
-      "tank_temperature_unit": "{entity} reports '{unit}'. A tank temperature sensor must report °C, °F or K.",
+      "ec_unit_unknown": "{entity} reports \"{unit}\", which is not an EC unit. Expected mS/cm, dS/m, µS/cm, CF or ppm. Is this the right sensor?",
+      "ph_unit": "{entity} reports \"{unit}\", which is not pH. Is this the right sensor?",
+      "tank_temperature_unit": "{entity} reports \"{unit}\". A tank temperature sensor must report °C, °F or K.",
       "zone_valve_missing": "Zone {zone} needs an irrigation switch.",
       "valve_already_allocated": "{entity} already waters another active zone. One switch can belong to only one zone.",
       "valve_is_foreign_shared": "{entity} is another room's pump, main-line or waste switch, so it cannot be a zone switch here.",
@@ -970,14 +970,14 @@
     },
     "volume_unit": {
       "options": {
-        "L": "Litres (L)",
-        "gal": "US gallons (gal)"
+        "litres": "Litres (L)",
+        "us_gallons": "US gallons (gal)"
       }
     },
     "flow_unit": {
       "options": {
-        "L/hr": "Litres per hour (L/hr)",
-        "gal/hr": "US gallons per hour (GPH)"
+        "lph": "Litres per hour (L/hr)",
+        "gph": "US gallons per hour (GPH)"
       }
     },
     "ec_unit": {

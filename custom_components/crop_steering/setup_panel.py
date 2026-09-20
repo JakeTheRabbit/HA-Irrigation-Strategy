@@ -21,7 +21,9 @@ def _panel_exists(hass, frontend) -> bool:
     exists = getattr(frontend, "async_panel_exists", None)
     if exists is not None:
         return exists(hass, PANEL)
-    return PANEL in hass.data.get(getattr(frontend, "DATA_PANELS", "frontend_panels"), {})
+    return PANEL in hass.data.get(
+        getattr(frontend, "DATA_PANELS", "frontend_panels"), {}
+    )
 
 
 async def async_setup_panel(hass):

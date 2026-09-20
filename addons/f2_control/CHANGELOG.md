@@ -1,3 +1,16 @@
+# 0.15.0
+
+Pair with integration 2.18.0. Existing options, engine flags, room IDs, counters and learned state are kept, and
+**no off-and-on is needed after this update**: a setup the previous build accepted is recognised and resumed as is.
+
+- Single-switch rooms: a room may declare how water reaches its valves (`plumbing` in its setup: zone switch only, pump + valves, mainline + valves, or all three). A tent whose one switch is the whole watering system now irrigates: the shot is valve on, wait, valve off, verify off, with no pump-prime or mainline-settle waits. Previously it set up cleanly and was then held forever as "no hardware mapped".
+- "No pump" is only ever declared, never assumed from an empty mapping. A room that has not declared a layout (every existing room) still needs its pump, mainline and valve, so a pump mapping cleared by accident keeps holding the room and says which switch is missing.
+- A mapped pump or mainline is always sequenced and always included in the OFF read-back, whatever the layout says.
+- If the only switch will not turn off it is asked again and a hardware hold is latched. With no pump to cut, software cannot stop the water: use a normally-closed valve or a plug that defaults off.
+- Feed-water EC probes are read in their own unit (µS/cm, ppm, CF) using the factor the integration publishes; the 0-20 mS/cm plausibility band is applied in the probe's unit. No factor published (older integration) reads as mS/cm, and an out-of-band reading still closes the source-water check.
+- The saved setup fingerprint only includes the new fields when a room declares them, so existing rooms hash exactly as before.
+- Test seam: `F2_STATE_PATH` overrides the state file location. Unset, it is `/data/state.json` as always.
+
 # 0.14.0
 
 Pair with integration 2.17.0. Existing options, engine flags, room IDs, counters and learned state are kept.

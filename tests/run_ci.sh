@@ -35,13 +35,28 @@ repo_hygiene() {
 }
 
 run "ruff (lint)"             ruff check .
-run "black (format check)"    black --check custom_components/ tests/
+run "black (format check)"    black --check custom_components/ tests/ tests_ha/
 run "yamllint"                yamllint .
 run "engine vendored-copy in sync" engine_in_sync
 run "repo hygiene (no ignored shipped paths / tracked caches)" repo_hygiene
 run "pytest — integration + health + services + state + version" env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -q
 run "pytest — add-on controller (real engine)" env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest addons/f2_control/tests -q
 run "pytest — pure engine core"  env PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
+
+# The real-Home-Assistant tier (fresh install + seeded in-place upgrade, see docs/TESTING.md).
+# It needs a full Home Assistant, so it is kept out of the lean prerequisites above:
+#   pip install pytest-homeassistant-custom-component      (Python 3.13+)
+# Set HA_PYTHON to run it from a separate virtualenv, e.g. HA_PYTHON=~/ha-venv/bin/python.
+real_home_assistant() {
+  local py="${HA_PYTHON:-python}"
+  if ! "$py" -c "import pytest_homeassistant_custom_component" 2>/dev/null; then
+    echo "SKIPPED: pytest-homeassistant-custom-component is not installed for '$py'."
+    echo "         CI runs this tier; install it (or set HA_PYTHON) to run it here."
+    return 0
+  fi
+  "$py" -m pytest tests_ha -q
+}
+run "pytest — integration inside a real Home Assistant" real_home_assistant
 
 echo
 if [ "${fail}" -eq 0 ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED — see above"; fi

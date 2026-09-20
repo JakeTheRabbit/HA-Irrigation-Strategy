@@ -16,7 +16,9 @@ INTEGRATION = ROOT / "custom_components" / "crop_steering"
 
 
 def _load(name):
-    spec = importlib.util.spec_from_file_location(f"cs_{name}", INTEGRATION / f"{name}.py")
+    spec = importlib.util.spec_from_file_location(
+        f"cs_{name}", INTEGRATION / f"{name}.py"
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -41,7 +43,9 @@ helpers = _load("setup_helpers")
         (2.3, "EC", 2.3),  # a bare "EC" conventionally means mS/cm
     ],
 )
-def test_a_probe_that_states_its_unit_is_converted_without_asking(reading, unit, expected):
+def test_a_probe_that_states_its_unit_is_converted_without_asking(
+    reading, unit, expected
+):
     assert units.ec_factor(unit) == (pytest.approx(expected / reading), None)
     assert units.ec_to_ms_cm(reading, unit) == pytest.approx(expected)
 
@@ -73,7 +77,8 @@ def test_a_unit_that_is_not_ec_is_refused_at_setup(unit):
 @pytest.mark.parametrize("unit", ["", None, "ppm", "%"])
 def test_an_unconvertible_live_reading_passes_through_unchanged(unit):
     """In-place upgrade: an install from before units were checked may have such a probe
-    mapped. Its readings were always averaged as-is; they must not move under the operator."""
+    mapped. Its readings were always averaged as-is; they must not move under the operator.
+    """
     assert units.ec_to_ms_cm(3.1, unit) == 3.1
 
 
@@ -83,20 +88,39 @@ def test_every_pickable_ec_unit_converts():
 
 # ------------------------------------------------------------------ volume and flow
 def test_us_gallons_and_gph_round_trip_to_litres():
-    assert units.to_litres(1, "gal") == pytest.approx(3.785, abs=1e-3)
-    assert units.to_lph(1, "gal/hr") == pytest.approx(3.785, abs=1e-3)
+    assert units.to_litres(1, "us_gallons") == pytest.approx(3.785, abs=1e-3)
+    assert units.to_lph(1, "gph") == pytest.approx(3.785, abs=1e-3)
     for litres in (0.65, 6.0, 18.9):
-        assert units.from_litres(units.to_litres(litres, "gal"), "gal") == pytest.approx(litres)
-    assert units.to_litres(6, "L") == 6 and units.to_lph(2, "L/hr") == 2
+        assert units.from_litres(
+            units.to_litres(litres, "us_gallons"), "us_gallons"
+        ) == pytest.approx(litres)
+    assert units.to_litres(6, "litres") == 6 and units.to_lph(2, "lph") == 2
 
 
 def test_units_start_from_home_assistants_own_unit_system():
-    assert units.default_units(True) == ("L", "L/hr")
-    assert units.default_units(False) == ("gal", "gal/hr")
+    assert units.default_units(True) == ("litres", "lph")
+    assert units.default_units(False) == ("us_gallons", "gph")
+
+
+def test_a_stored_unit_is_a_slug_and_what_a_person_sees_is_its_symbol():
+    """The stored key is also the dropdown's translation key, and hassfest rejects a key such
+    as "L/hr". So the key is a slug and the symbol shown beside the number is looked up.
+    """
+    import re
+
+    for key in (*units.VOLUME_UNITS, *units.FLOW_UNITS):
+        assert re.fullmatch(r"[a-z0-9_]+", key), key
+    assert [units.symbol(u) for u in ("litres", "us_gallons", "lph", "gph")] == [
+        "L",
+        "gal",
+        "L/hr",
+        "gal/hr",
+    ]
 
 
 def test_an_unknown_unit_is_treated_as_metric_rather_than_crashing_setup():
     assert units.to_litres(6, "bucket") == 6
+    assert units.symbol("bucket") == "L" and units.symbol("firkin/hr", "L/hr") == "L/hr"
 
 
 # ------------------------------------------------------------------ substrate presets
@@ -111,12 +135,16 @@ def test_gallon_presets_are_the_gallons_they_claim():
     for key, litres in helpers.SUBSTRATE_PRESETS.items():
         if key.startswith("pot_"):
             gallons = int(key.removeprefix("pot_").removesuffix("gal"))
-            assert litres == pytest.approx(units.to_litres(gallons, "gal"), abs=0.06)
+            assert litres == pytest.approx(
+                units.to_litres(gallons, "us_gallons"), abs=0.06
+            )
 
 
 def test_rockwool_presets_are_their_stated_dimensions():
     assert helpers.SUBSTRATE_PRESETS["cube_4in"] == pytest.approx(10 * 10 * 6.5 / 1000)
-    assert helpers.SUBSTRATE_PRESETS["block_6in"] == pytest.approx(15 * 15 * 15 / 1000, abs=0.03)
+    assert helpers.SUBSTRATE_PRESETS["block_6in"] == pytest.approx(
+        15 * 15 * 15 / 1000, abs=0.03
+    )
 
 
 def test_every_preset_is_a_volume_setup_accepts():
@@ -131,12 +159,26 @@ def test_a_catch_test_gives_litres_per_hour_per_dripper():
     assert helpers.catch_test_lph(33.3, 60, 1) == (2.0, None)
 
 
-@pytest.mark.parametrize("ml, seconds, drippers", [
-    (0, 60, 1), (200, 0, 1), (200, 60, 0), (-5, 60, 1),
-    (None, 60, 1), ("a jug", 60, 1), (float("nan"), 60, 1), (float("inf"), 60, 1),
-])
-def test_a_catch_test_with_a_missing_or_impossible_number_is_refused(ml, seconds, drippers):
-    assert helpers.catch_test_lph(ml, seconds, drippers) == (None, helpers.CATCH_PROBLEM_INPUT)
+@pytest.mark.parametrize(
+    "ml, seconds, drippers",
+    [
+        (0, 60, 1),
+        (200, 0, 1),
+        (200, 60, 0),
+        (-5, 60, 1),
+        (None, 60, 1),
+        ("a jug", 60, 1),
+        (float("nan"), 60, 1),
+        (float("inf"), 60, 1),
+    ],
+)
+def test_a_catch_test_with_a_missing_or_impossible_number_is_refused(
+    ml, seconds, drippers
+):
+    assert helpers.catch_test_lph(ml, seconds, drippers) == (
+        None,
+        helpers.CATCH_PROBLEM_INPUT,
+    )
 
 
 def test_a_catch_test_that_implies_an_implausible_dripper_is_refused_not_saved():
@@ -148,8 +190,12 @@ def test_a_catch_test_that_implies_an_implausible_dripper_is_refused_not_saved()
 # ------------------------------------------------------------------ suggested field capacity
 def test_field_capacity_is_suggested_from_where_the_zone_really_tops_out():
     assert helpers.suggested_field_capacity(61.4) == 63.4
-    assert helpers.suggested_field_capacity("58") == 60.0  # HA attributes arrive as strings too
-    assert helpers.suggested_field_capacity(30) == 40.0  # never under the engine's own floor
+    assert (
+        helpers.suggested_field_capacity("58") == 60.0
+    )  # HA attributes arrive as strings too
+    assert (
+        helpers.suggested_field_capacity(30) == 40.0
+    )  # never under the engine's own floor
     assert helpers.suggested_field_capacity(99.5) == 100.0
 
 

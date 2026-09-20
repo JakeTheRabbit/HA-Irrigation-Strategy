@@ -50,6 +50,7 @@ from .units import (
     default_units,
     from_litres,
     from_lph,
+    symbol,
     tidy,
     to_litres,
     to_lph,
@@ -330,15 +331,15 @@ def _plumbing_schema(plumbing: str | None, current: dict, params: dict) -> dict:
     for key, needed in zip(_PLUMBING_FIELDS, (needs_pump, needs_mainline)):
         if needed:
             value = current.get(key) or ""
-            out[
-                vol.Required(key, default=value) if value else vol.Required(key)
-            ] = _sw_sel()
-    out[
-        vol.Required("lights_on_hour", default=params.get("lights_on_hour", 12))
-    ] = _whole(0, 23, "h")
-    out[
-        vol.Required("lights_off_hour", default=params.get("lights_off_hour", 0))
-    ] = _whole(0, 23, "h")
+            out[vol.Required(key, default=value) if value else vol.Required(key)] = (
+                _sw_sel()
+            )
+    out[vol.Required("lights_on_hour", default=params.get("lights_on_hour", 12))] = (
+        _whole(0, 23, "h")
+    )
+    out[vol.Required("lights_off_hour", default=params.get("lights_off_hour", 0))] = (
+        _whole(0, 23, "h")
+    )
     return out
 
 
@@ -357,7 +358,7 @@ def _substrate_schema(params: dict, volume_unit: str, flow_unit: str) -> dict:
             tidy(from_litres(low_l, volume_unit), 3),
             tidy(from_litres(high_l, volume_unit), 1),
             0.01,
-            volume_unit,
+            symbol(volume_unit),
         ),
         vol.Required(
             "dripper_flow_rate",
@@ -366,7 +367,7 @@ def _substrate_schema(params: dict, volume_unit: str, flow_unit: str) -> dict:
             tidy(from_lph(low_f, flow_unit), 3),
             tidy(from_lph(high_f, flow_unit), 1),
             0.01,
-            flow_unit,
+            symbol(flow_unit, "L/hr"),
         ),
         vol.Required(
             "drippers_per_plant", default=params.get("drippers_per_plant", 1)
@@ -818,7 +819,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             schema = self._zones_form(num, zones)
             errors, placeholders = self._check(
                 {_field_name(m) for m in schema},
-                {f"zone_{z}_switch": cfg.get("zone_switch") for z, cfg in zones.items()},
+                {
+                    f"zone_{z}_switch": cfg.get("zone_switch")
+                    for z, cfg in zones.items()
+                },
                 declare_plumbing=False,  # its switches are asked for on the next step
             )
             if not errors:
@@ -929,8 +933,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """What the plants are in and what feeds them: sizes every shot."""
         params = self._data.setdefault("parameters", {})
-        volume_unit = self._data.get("volume_unit", "L")
-        flow_unit = self._data.get("flow_unit", "L/hr")
+        volume_unit = self._data.get("volume_unit", "litres")
+        flow_unit = self._data.get("flow_unit", "lph")
         errors: dict = {}
         placeholders: dict = {}
         if user_input is not None:
@@ -962,8 +966,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(_substrate_schema(params, volume_unit, flow_unit)),
             errors=errors,
             description_placeholders={
-                "volume_unit": volume_unit,
-                "flow_unit": flow_unit,
+                "volume_unit": symbol(volume_unit),
+                "flow_unit": symbol(flow_unit, "L/hr"),
                 **placeholders,
             },
             last_step=False,
@@ -979,8 +983,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             low, high, _ = SIZING[key]
             if not low <= params[key] <= high:
                 return {key: "sizing_range"}, {
-                    "low": f"{tidy(show(low, unit), 2):g} {unit}",
-                    "high": f"{tidy(show(high, unit), 1):g} {unit}",
+                    "low": f"{tidy(show(low, unit), 2):g} {symbol(unit)}",
+                    "high": f"{tidy(show(high, unit), 1):g} {symbol(unit)}",
                 }
         return {}, {}
 
@@ -1026,7 +1030,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data["setup_revision"] = 1
                 return self.async_create_entry(title=data["name"], data=data)
         measured = getattr(self, "_measured_flow", None)
-        flow_unit = self._data.get("flow_unit", "L/hr")
+        flow_unit = self._data.get("flow_unit", "lph")
         return self.async_show_form(
             step_id="extras",
             data_schema=vol.Schema(_extras_schema(hardware)),
@@ -1034,7 +1038,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "measured": (
                     f"Your catch test measured {tidy(from_lph(measured, flow_unit)):g} "
-                    f"{flow_unit} per dripper, and that is what will be used. "
+                    f"{symbol(flow_unit, 'L/hr')} per dripper, and that is what will be used. "
                     if measured
                     else ""
                 ),
@@ -1165,7 +1169,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """
         data = effective(self._entry)
         prefix = data.get("room_prefix", "")
-        flow_unit = data.get("parameters", {}).get("flow_unit", "L/hr")
+        flow_unit = data.get("parameters", {}).get("flow_unit", "lph")
         # A zone that has its own dripper-flow entity ignores the room value, so offer it.
         own = [
             str(z)
@@ -1184,8 +1188,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             if problem is None:
                 target = user_input.get("zone", "all")
                 keys = (
-                    ["dripper_flow_rate"]
-                    + [f"zone_{z}_dripper_flow_rate" for z in own]
+                    ["dripper_flow_rate"] + [f"zone_{z}_dripper_flow_rate" for z in own]
                     if target == "all"
                     else [f"zone_{target}_dripper_flow_rate"]
                 )
@@ -1194,7 +1197,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     return self.async_abort(
                         reason="calibration_applied",
                         description_placeholders={
-                            "flow": f"{tidy(from_lph(flow, flow_unit)):g} {flow_unit}",
+                            "flow": f"{tidy(from_lph(flow, flow_unit)):g} "
+                            f"{symbol(flow_unit, 'L/hr')}",
                             "metric": f"{flow:g} L/hr",
                             "entities": ", ".join(written),
                         },
@@ -1302,7 +1306,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 return self.async_create_entry(title="", data={})
 
         current = self._live_parameters(
-            data, ("substrate_volume", "dripper_flow_rate", "p1_target_vwc", "p2_vwc_threshold")
+            data,
+            (
+                "substrate_volume",
+                "dripper_flow_rate",
+                "p1_target_vwc",
+                "p2_vwc_threshold",
+            ),
         )
         shown = user_input or current
         return self.async_show_form(

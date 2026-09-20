@@ -34,9 +34,9 @@ for path in (ROOT, ADDON, ROOT / "addons" / "f2_control" / "tests"):
 # than no run.
 import custom_components  # noqa: E402
 
-assert str(ROOT / "custom_components") in list(custom_components.__path__), (
-    f"tests_ha would test {list(custom_components.__path__)}, not this repository"
-)
+assert str(ROOT / "custom_components") in list(
+    custom_components.__path__
+), f"tests_ha would test {list(custom_components.__path__)}, not this repository"
 
 DOMAIN = "crop_steering"
 
@@ -96,7 +96,9 @@ def controller_for(hass, monkeypatch):
                 state.state,
                 json.loads(json.dumps(dict(state.attributes), default=str)),
             )
-        if saved_state is not None:  # what the PREVIOUS controller version left in /data
+        if (
+            saved_state is not None
+        ):  # what the PREVIOUS controller version left in /data
             Path(__import__("os").environ["F2_STATE_PATH"]).write_text(
                 json.dumps(saved_state), encoding="utf-8"
             )

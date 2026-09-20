@@ -104,13 +104,22 @@ def ec_to_ms_cm(value: float, unit, hint=EC_UNIT_AUTO) -> float:
 # ---------------------------------------------------------------------------
 LITRES_PER_US_GALLON = 3.785411784
 
-VOLUME_UNITS = {"L": 1.0, "gal": LITRES_PER_US_GALLON}  # x factor = litres
-FLOW_UNITS = {"L/hr": 1.0, "gal/hr": LITRES_PER_US_GALLON}  # x factor = L/hr (gal/hr = GPH)
+# Keys are what is stored and what the dropdowns translate, so they are lowercase slugs
+# (hassfest rejects a translation key such as "L/hr"). The symbol a person sees is separate.
+VOLUME_UNITS = {"litres": 1.0, "us_gallons": LITRES_PER_US_GALLON}  # x factor = litres
+FLOW_UNITS = {"lph": 1.0, "gph": LITRES_PER_US_GALLON}  # x factor = L/hr
+_SYMBOLS = {"litres": "L", "us_gallons": "gal", "lph": "L/hr", "gph": "gal/hr"}
+
+
+def symbol(unit: str, fallback: str = "L") -> str:
+    """What to show beside a number: "gal/hr" for "gph". An unknown unit reads as metric,
+    matching to_litres/to_lph, which convert an unknown unit with a factor of 1."""
+    return _SYMBOLS.get(unit, fallback)
 
 
 def default_units(is_metric: bool) -> tuple[str, str]:
     """(volume unit, flow unit) for the unit system Home Assistant is already set to."""
-    return ("L", "L/hr") if is_metric else ("gal", "gal/hr")
+    return ("litres", "lph") if is_metric else ("us_gallons", "gph")
 
 
 def to_litres(value: float, unit: str) -> float:

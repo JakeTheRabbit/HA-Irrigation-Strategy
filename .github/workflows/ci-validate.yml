@@ -51,7 +51,7 @@ jobs:
         # Scoped to the integration + tests (the add-on is deployed file-for-file, exempt).
         run: |
           black --version
-          black --check custom_components/ tests/
+          black --check custom_components/ tests/ tests_ha/
 
       - name: Yamllint
         run: |
@@ -99,6 +99,40 @@ jobs:
           # brands requires a home-assistant/brands submission; custom repos
           # installed by URL don't need it (same ignore as install.yml)
           ignore: brands
+
+  real-home-assistant:
+    # The lint-and-validate suites drive the integration against hand-written stubs where
+    # voluptuous, the selectors and the config-flow base class are no-ops. They are fast, and
+    # they are why a wizard that could not be finished, a sidebar panel that raised on every
+    # Home Assistant before 2026.5, and entity ids the controller never looks for all shipped
+    # green. This job loads the integration in an actual Home Assistant core: a fresh install
+    # through the real flow manager, that install handed to the real add-on controller, and
+    # in-place upgrades from seeded snapshots of old installs (tests_ha/fixtures/).
+    name: Real Home Assistant (fresh install + seeded in-place upgrade)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Home Assistant test core
+        # Installs a pinned, matching Home Assistant. `requests` is for the add-on controller,
+        # which the cross-layer tests import.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest-homeassistant-custom-component requests
+          python -c "from homeassistant.const import __version__ as v; print('Home Assistant', v)"
+
+      - name: Pytest (integration inside a real Home Assistant)
+        # No PYTEST_DISABLE_PLUGIN_AUTOLOAD here: this tier needs the Home Assistant plugin.
+        run: python -m pytest tests_ha -q
 
   addon-build:
     name: Build f2-control add-on image (amd64)

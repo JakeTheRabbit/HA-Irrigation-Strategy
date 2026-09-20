@@ -25,10 +25,15 @@ The native UI source is frontend/src. Setup and strategy APIs persist revisioned
 ```bash
 # Lint / format / yaml (matches CI; black is scoped — the add-on is
 # deployed file-for-file to the live box and stays exempt from reformatting)
-ruff check . && black --check custom_components/ tests/ && yamllint .
+ruff check . && black --check custom_components/ tests/ tests_ha/ && yamllint .
 
-# Tests — integration calculation helpers
+# Tests — integration calculation helpers (lean: hand-written HA stubs, no Home Assistant)
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v
+
+# Tests — the integration inside a REAL Home Assistant: fresh install, the same install handed
+# to the real add-on controller, and in-place upgrades from seeded snapshots of old installs.
+# Needs `pip install pytest-homeassistant-custom-component` (Python 3.13+); see docs/TESTING.md.
+python -m pytest tests_ha -q
 
 # Tests — crop-steering-engine package
 PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
@@ -104,7 +109,10 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
 - **Dependencies:** integration = pure HA + voluptuous (no external deps). Engine
   (`crop-steering-engine`) = pure Python, no scipy/numpy; f2-control add-on container
   installs its own deps from `addons/f2_control/requirements.txt`.
-- **Testing:** see `docs/TESTING.md`; run `bash tests/run_ci.sh` (mirrors CI). Suites: the pure
+- **Testing:** see `docs/TESTING.md`; run `bash tests/run_ci.sh` (mirrors CI). Anything that touches the
+  config flow, entity ids/platforms or the integration-controller contract must be proven in `tests_ha/`
+  (a real Home Assistant), not only against the stubs in `tests/`: the stubs cannot see a schema HA
+  rejects, an HA API that does not exist in an older version, or an entity id HA assigns. Suites: the pure
   `decide()` core (`crop-steering-engine/tests`), the lean harness, integration calc helpers
   (`tests/test_calculations.py`), the add-on **state-migration / in-place-upgrade** contract
   (`tests/test_state_migration.py`), and **version consistency** (`tests/test_version_consistency.py`).
