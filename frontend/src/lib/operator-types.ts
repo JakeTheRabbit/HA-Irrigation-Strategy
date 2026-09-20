@@ -106,6 +106,10 @@ export interface SetupRoom {
   active_zone_ids: number[];
   zones: SetupZone[];
   hardware: Record<string, string | number>;
+  /** Declared plumbing layout; "" (or absent, from an older integration) when never declared. */
+  plumbing?: string;
+  /** What the SAVED switches imply: a prefill for a room that never declared, never stored. */
+  plumbing_inferred?: string;
   safety: { ready: boolean; blockers: string[] };
 }
 export interface SetupCandidate {
@@ -118,7 +122,14 @@ export interface SetupCandidate {
 }
 export interface SetupDocument {
   api_version: number;
-  capabilities: { create: boolean; save: boolean; remove: boolean; stable_zone_ids: boolean };
+  capabilities: {
+    create: boolean;
+    save: boolean;
+    remove: boolean;
+    stable_zone_ids: boolean;
+    /** The integration stores and checks a declared plumbing layout (absent before 2.19). */
+    plumbing?: boolean;
+  };
   rooms: SetupRoom[];
   candidates: SetupCandidate[];
   limits: { max_zones: number };
