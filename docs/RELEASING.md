@@ -81,6 +81,8 @@ gh release create v2.19.0 --prerelease --target testing \
 
 Staging rooms now see it: HACS offers the pre-release, Supervisor offers the new controller version from `#testing`. Production rooms see nothing, because `main` has not moved.
 
+**`testing` is now frozen.** From the moment the release pull request merges until the candidate is promoted or abandoned, nothing else merges into `testing`. The reason is mechanical, not tidy-minded: HACS installs the integration from the *tag*, but Supervisor builds the controller from the *tip of the branch at the moment the box updates*. A feature merged behind a candidate carries no version change, so no box is offered it, but a staging room that installs, rebuilds or is restored after that merge builds the newer code **under the candidate's version number**, and what soaks is no longer what was tagged. Pull requests can still be opened, reviewed and checked during a soak; they wait to merge. One staging room can only soak one candidate at a time anyway, so the freeze costs review latency and nothing else. Make it mechanical: switch on **Lock branch** for `testing` when you cut the candidate, and off when it is promoted or abandoned. The one thing that merges into a frozen `testing` is the fix for a failed candidate (step 6).
+
 ### 4. Soak on a staging room, on real plumbing
 
 A staging room is a real room you can afford to get wrong: real switch, real pump or valve, real probes, water going into a bucket or a sacrificial plant. Record what you did in `docs/audits/<date>-release-<version>.md` (the repository already keeps these; say what was exercised live and, just as plainly, what was not).
@@ -90,7 +92,8 @@ A staging room is a real room you can afford to get wrong: real switch, real pum
 - [ ] Take a Supervisor backup of the controller add-on (it holds `/data`) and a Home Assistant backup.
 - [ ] Snapshot every `number.`, `select.` and `switch.crop_steering_*` state before updating.
 - [ ] Update both halves **in place from the previous release**. Never a fresh install standing in for an upgrade.
-- [ ] Confirm the installed versions, the running module hashes and a current controller heartbeat. A copied file or a clean restart proves nothing.
+- [ ] Confirm the installed versions and a current controller heartbeat. A copied file or a clean restart proves nothing.
+- [ ] **Prove the box is running the tagged code**, not a later tip of the branch. On the box (host console, or the *Advanced SSH & Web Terminal* add-on with protection mode off): `docker exec $(docker ps -qf name=f2_control) sha256sum /app/controller.py`. On your machine: `git show v2.19.0:addons/f2_control/f2_control/controller.py | sha256sum`. They must match. Write both into the audit file. If they differ, the soak has not started.
 - [ ] Diff the snapshot: **nothing the operator set has moved**, no entity has changed id, no repair issue has appeared.
 - [ ] The controller log reads `setup revision N resumed after restart`, not `Setup changed; disarm…`. An update must never need the kill switch cycled unless the changelog says so in bold.
 
@@ -133,7 +136,7 @@ Promotion is a fast-forward from the command line on purpose. GitHub's merge but
 
 ### 6. If the candidate fails
 
-It stays a pre-release forever and `main` never sees it. Fix on a branch, through a pull request into `testing`, take the next version number, cut a new candidate, and **start the soak clock again**. A candidate that needed a fix has not soaked.
+It stays a pre-release forever (put "abandoned" in its title) and `main` never sees it. Fix on a branch, through a pull request into the still-frozen `testing`, take the next version number, cut a new candidate, and **start the soak clock again**. A candidate that needed a fix has not soaked.
 
 ## Hotfixes
 
@@ -182,7 +185,8 @@ Open it as a pull request into `testing` like any other change. You cannot split
 People skip checklists at 11 pm. Repository settings do not.
 
 - **Protect `testing`:** require a pull request, require an approval from someone other than the author, require every `Validate` job (they must include *Real Home Assistant*, *Build f2-control add-on image* and *Dashboard build and browser workflows*, not only lint), require the branch to be up to date before merging, block force-pushes and deletion.
-- **Protect `main`:** block force-pushes and deletion, and restrict who can push to the people allowed to promote. It takes no pull requests at all: the only thing that ever arrives is a fast-forward.
+- **Protect `main`:** block force-pushes and deletion. It takes no pull requests at all: the only thing that ever arrives is a fast-forward, pushed by whoever is allowed to promote. On an organisation's repository, restrict pushes to those people. On a personal repository classic branch protection cannot do that (the *Restrict who can push* option exists only for organisations): anyone with write access can push, so keep write access to yourself, or use a ruleset with *Restrict updates* and yourself as the only bypass. (Not checked against GitHub's current settings pages; confirm when you set it up.)
+- **Freeze `testing` during a soak** with *Lock branch* (step 3).
 - **Production boxes:** plain repository address, add-on auto-update OFF, HACS beta versions OFF.
 - **Worth building next, each as its own pull request:**
   - a check on every pull request that fails when a branch not named `release/…` changes a version number;
