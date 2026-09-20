@@ -143,6 +143,23 @@ jobs:
         with:
           fail-on-severity: high
 
+  real-home-assistant:
+    # Everything under tests/ runs against hand-written stubs of Home Assistant. These load the real
+    # config flow and entity registry, so they fail when Home Assistant itself would: 2.17.0 shipped
+    # switches whose entity ids HA generated from their labels while the stub tests passed.
+    name: Real Home Assistant (setup wizard and entity ids)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Home Assistant and its pytest plugin
+        run: pip install -r requirements-test-ha.txt
+      - name: Setup wizard and entity registry
+        run: python -m pytest tests_ha -q
+
   frontend:
     name: Dashboard build and browser workflows
     runs-on: ubuntu-latest

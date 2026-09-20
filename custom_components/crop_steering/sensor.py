@@ -36,6 +36,7 @@ from .const import (
 )
 from .room import room_prefix, build_engine_config
 from .calculations import ShotCalculator
+from .units import to_native
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -476,7 +477,7 @@ class CropSteeringSensor(SensorEntity):
             if zone_config.get("vwc_back"):
                 vwc_sensors.append(zone_config["vwc_back"])
 
-        return self._average_sensor_values(vwc_sensors)
+        return self._average_sensor_values(vwc_sensors, "vwc")
 
     def _get_zone_ec(self, zone_num: int) -> float | None:
         """Get EC value for specific zone from configured sensors.
@@ -497,7 +498,7 @@ class CropSteeringSensor(SensorEntity):
             if zone_config.get("ec_back"):
                 ec_sensors.append(zone_config["ec_back"])
 
-        return self._average_sensor_values(ec_sensors)
+        return self._average_sensor_values(ec_sensors, "ec")
 
     def _get_zone_status(self, zone_num: int) -> str:
         """Get status for specific zone."""
@@ -607,8 +608,13 @@ class CropSteeringSensor(SensorEntity):
                 pass
         return 0
 
-    def _average_sensor_values(self, sensor_ids: list[str]) -> float | None:
-        """Average values from multiple sensors."""
+    def _average_sensor_values(
+        self, sensor_ids: list[str], kind: str | None = None
+    ) -> float | None:
+        """Average values from multiple sensors, each first converted to the unit the room steers
+        in (`kind` "ec" -> mS/cm, "vwc" -> %). Mixed probes are common: one Atlas in uS/cm beside
+        one TEROS in mS/cm would otherwise average to nonsense far over any EC target.
+        """
         if not sensor_ids:
             _LOGGER.debug("No sensor IDs provided for averaging")
             return None
@@ -625,7 +631,10 @@ class CropSteeringSensor(SensorEntity):
                 if state.state not in ["unknown", "unavailable", "none", None]:
                     value = float(state.state)
                     if math.isfinite(value):
-                        values.append(value)
+                        unit = (getattr(state, "attributes", None) or {}).get(
+                            "unit_of_measurement"
+                        )
+                        values.append(to_native(kind, unit, value))
             except (ValueError, TypeError) as e:
                 _LOGGER.debug(f"Could not parse sensor value for {sensor_id}: {e}")
                 continue
@@ -649,7 +658,7 @@ class CropSteeringSensor(SensorEntity):
                 if zone_config.get("vwc_back"):
                     all_sensors.append(zone_config["vwc_back"])
 
-        return self._average_sensor_values(all_sensors)
+        return self._average_sensor_values(all_sensors, "vwc")
 
     def _calculate_avg_ec(self) -> float | None:
         """Calculate average EC from all configured zone sensors."""
@@ -664,7 +673,7 @@ class CropSteeringSensor(SensorEntity):
                 if zone_config.get("ec_back"):
                     all_sensors.append(zone_config["ec_back"])
 
-        return self._average_sensor_values(all_sensors)
+        return self._average_sensor_values(all_sensors, "ec")
 
     def _get_number_value(self, key: str) -> float:
         """Get value from integration number entity."""

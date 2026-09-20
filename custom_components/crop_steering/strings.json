@@ -346,7 +346,8 @@
       "entity_not_found": "Entity not found in Home Assistant.",
       "invalid_moisture_sensor": "Invalid moisture sensor — must report in %.",
       "env_file_not_found": "crop_steering.env file not found.",
-      "missing_entities": "Some entities in the file don't exist."
+      "missing_entities": "Some entities in the file don't exist.",
+      "setup_invalid": "Not saved yet: {error}"
     },
     "abort": {
       "already_configured": "Crop Steering is already configured.",
@@ -711,6 +712,9 @@
     "abort": {
       "setup_invalid": "Setup could not be saved: {error}",
       "reserved_room_name": "Default is reserved for the original room. Choose another room name."
+    },
+    "error": {
+      "setup_invalid": "Not saved yet: {error}"
     }
   },
   "issues": {

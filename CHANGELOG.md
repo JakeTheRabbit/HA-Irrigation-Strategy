@@ -9,6 +9,24 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.18.0] - 2026-09-21
+
+Pair with controller **0.15.0**.
+
+**🌱 In plain English**
+
+- **The setup wizard no longer throws your work away.** If something was wrong at the end (a valve that was on, a probe in the wrong unit, a mistyped entity), the wizard closed and every zone, sensor and size you had entered was gone. It now shows the same step again with everything still filled in and says what to fix. Problems are reported on the step where you entered them, not three screens later, and the message says whether the entity is on, unreachable or does not exist instead of always "must read OFF".
+- **A tent with one switch works.** A room whose only hardware is one smart plug or solenoid per zone saved fine and then never watered, because the controller insisted on a separate pump and main-line valve. A zone now needs only its valve; pump and main-line are used when you have them. Every safety check still applies to whatever hardware the room has.
+- **Probes in other units are converted, not rejected.** Pore EC in µS/cm and moisture reported as a 0-1 volume fraction are accepted and converted to mS/cm and percent, including mixed probes in one zone and the source-water EC probe. `ppm` is still refused, with the reason: the 500 or 700 scale is not something a sensor reports.
+- **Less typing, fewer wrong numbers in Rooms & setup.** Choose litres or US gallons and L/h or GPH (always saved as metric); pick a common block or pot with its litres shown; work out real dripper flow from a catch test; and see the zone's learned peak as a suggestion beside field capacity. Suggestions are never applied for you.
+
+**🔧 Technical notes**
+
+- `config_flow`: `_retry_form` re-shows a step through `add_suggested_values_to_schema` with `errors.base = setup_invalid`; the zones step validates with `prepare_setup` and `safety_blockers` before moving on; the reconfigure zone map does the same. `safety_blockers` messages keep "must read OFF" and append the cause.
+- Controller: pump and mainline are optional in discovery, late mapping, setup adoption, the per-zone gate and `_execute_shot`; lead times are skipped with the hardware they belong to, the close read-back and the hardware-fault latch cover the actuators that exist. The three-switch sequence and its timing are unchanged (tested).
+- New `units.py`: exact conversions only (`µS/cm`, Greek-mu `μS/cm`, `uS/cm` -> mS/cm; `m³/m³` -> %). Unknown or missing units pass through unchanged so older installs keep their readings. The controller converts the source-water EC probe the same way before its 0-20 sanity range.
+- CI: a `real-home-assistant` job runs `tests_ha/` in a real Home Assistant (`pytest-homeassistant-custom-component`, Python 3.13): the wizard end to end for a one-switch room, and the entity registry ids of the room switches. The stub suite could not see the 2.17.0 entity-id bug; this can.
+
 ## [2.17.2] - 2026-09-20
 
 Documentation only; no code change. Pair with controller **0.14.0** (unchanged).
