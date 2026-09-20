@@ -123,6 +123,61 @@ def load_options():
 # Switch read-back after a close: see Controller._confirm_switches.
 CONFIRM_FIRST_READ_S, CONFIRM_POLL_S, CONFIRM_TIMEOUT_S = 1.0, 0.5, 6.0
 
+# How a room is plumbed, as DECLARED in the integration's setup and published as the descriptor's
+# `plumbing`: layout -> (has a pump switch, has a main-line valve). The integration carries the same
+# table (custom_components/crop_steering/plumbing.py); tests/test_plumbing.py pins the two together.
+PLUMBING_LAYOUTS = {
+    "valves_only": (False, False),
+    "pump_valves": (True, False),
+    "mainline_valves": (False, True),
+    "pump_mainline_valves": (True, True),
+}
+
+
+def with_plumbing(hw, descriptor):
+    """Carry a declared layout into a room's hardware map. A room that never declared one keeps
+    exactly the map it always had, so an install from before declared plumbing behaves (and
+    fingerprints) as it did."""
+    if (descriptor or {}).get("plumbing"):
+        hw["plumbing"] = descriptor["plumbing"]
+    return hw
+
+
+def plumbing_hold(hw):
+    """Why a room must not be watered given the plumbing it DECLARED, or None.
+
+    Undeclared (every install set up before this existed): None - pump and main-line are used when
+    mapped and skipped when not, as before. Declared: the switches have to match the declaration.
+    Without this, a pumped room whose pump mapping was cleared (or lost) looked exactly like a
+    one-switch tent: the valve opened, no pump ran, and the shot was counted as delivered while
+    the plants got nothing. A declaration turns that silent dry run into a hold with a reason.
+    """
+    layout = (hw or {}).get("plumbing")
+    if not layout:
+        return None
+    needs = PLUMBING_LAYOUTS.get(layout)
+    if needs is None:
+        return (
+            f"setup declares a plumbing layout this controller does not know ({layout!r}) - not "
+            "watering on a guess; update the controller app to match the integration"
+        )
+    for key, needed, label in (
+        ("pump", needs[0], "pump"),
+        ("mainline", needs[1], "main-line valve"),
+    ):
+        mapped = bool(hw.get(key))
+        if needed and not mapped:
+            return (
+                f"setup says this room has a {label}, but no {label} switch is mapped - not watering "
+                f"without it; map the {label} in the Crop Steering setup, or change the room's plumbing"
+            )
+        if mapped and not needed:
+            return (
+                f"setup says this room has no {label}, but a {label} switch is mapped ({hw[key]}) - "
+                "not watering until they agree; clear it, or change the room's plumbing"
+            )
+    return None
+
 
 class Room:
     """One fully-isolated grow room the engine steers. `prefix` is "" for the default
@@ -251,11 +306,11 @@ class Controller:
             if valves:
                 # A zone needs its valve. Pump and mainline are used when mapped and skipped when
                 # not: a tent with one smart plug is a complete room (see _execute_shot).
-                hw = {
+                hw = with_plumbing({
                     "pump": desc.get("pump") or None,
                     "mainline": desc.get("mainline") or None,
                     "valves": valves,
-                }
+                }, desc)
             else:
                 # unmapped — _blocked() holds every zone and alerts until it's configured
                 hw = {"pump": None, "mainline": None, "valves": {}}
@@ -384,11 +439,11 @@ class Controller:
                     }
                     for z in a.get("active_zone_ids", range(1, num + 1))
                 }
-                hw = {
+                hw = with_plumbing({
                     "pump": a.get("pump"),
                     "mainline": a.get("mainline"),
                     "valves": valves,
-                }
+                }, a)
                 if not (valves and zones):
                     log(
                         f"room '{a.get('slug')}' engine_config incomplete — skipped (no zone valves or zones)"
@@ -552,11 +607,11 @@ class Controller:
             desc = self._default_descriptor()
             valves = {int(k): v for k, v in (desc.get("valves") or {}).items() if v}
             if valves:
-                default.hw = {
+                default.hw = with_plumbing({
                     "pump": desc.get("pump") or None,
                     "mainline": desc.get("mainline") or None,
                     "valves": valves,
-                }
+                }, desc)
                 if not default.zones:
                     n = self._detect_zones(
                         "", int(desc.get("num_zones") or len(valves))
@@ -591,19 +646,21 @@ class Controller:
         zone_ids = attrs.get(
             "active_zone_ids", list(range(1, int(attrs.get("num_zones", 0)) + 1))
         )
-        return json.dumps(
-            {
-                "active": attrs.get("active", True),
-                "zones": sorted(zone_ids),
-                "pump": attrs.get("pump"),
-                "mainline": attrs.get("mainline"),
-                "valves": {str(k): v for k, v in (attrs.get("valves") or {}).items()},
-                "enable_flag": attrs.get("enable_flag") or room.enable_flag,
-                "feed_ec_sensor": attrs.get("feed_ec_sensor") or "",
-                "feed_ph_sensor": attrs.get("feed_ph_sensor") or "",
-            },
-            sort_keys=True,
-        )
+        adopted = {
+            "active": attrs.get("active", True),
+            "zones": sorted(zone_ids),
+            "pump": attrs.get("pump"),
+            "mainline": attrs.get("mainline"),
+            "valves": {str(k): v for k, v in (attrs.get("valves") or {}).items()},
+            "enable_flag": attrs.get("enable_flag") or room.enable_flag,
+            "feed_ec_sensor": attrs.get("feed_ec_sensor") or "",
+            "feed_ph_sensor": attrs.get("feed_ph_sensor") or "",
+        }
+        # Only when declared: a room that never declared its plumbing must keep the fingerprint
+        # it saved before this field existed, or the update would strand it behind a disarm cycle.
+        if attrs.get("plumbing"):
+            adopted["plumbing"] = attrs["plumbing"]
+        return json.dumps(adopted, sort_keys=True)
 
     def _apply_setup_descriptors(self):
         """Adopt explicit versioned setup changes only after both maps are safe OFF.
@@ -658,11 +715,11 @@ class Controller:
                 ):
                     raise ValueError("Invalid setup active zone list")
                 valves = {int(k): v for k, v in (attrs.get("valves") or {}).items()}
-                desired_hw = {
+                desired_hw = with_plumbing({
                     "pump": attrs.get("pump"),
                     "mainline": attrs.get("mainline"),
                     "valves": valves,
-                }
+                }, attrs)
                 desired_flag = attrs.get("enable_flag") or room.enable_flag
                 hardware = set(self._hardware_entities(room)) | {
                     v
@@ -1358,6 +1415,14 @@ class Controller:
                 "no hardware mapped — set this zone's valve (and the pump and mainline, if the room "
                 "has them) in the Crop Steering integration (or the add-on `hardware` option)"
             )
+        plumbing = plumbing_hold(hw)
+        if plumbing:
+            self._alert(
+                f"plumbing_{room.slug}",
+                "Irrigation BLOCKED - plumbing and switches disagree",
+                f"{room.slug}: {plumbing}.",
+            )
+            return plumbing
         if not self._on(room.enable_flag, False):
             return "f2-control disabled (kill switch off)"
         if not self._on(f"switch.crop_steering_{room.prefix}system_enabled", False):
@@ -1673,6 +1738,10 @@ class Controller:
 
     def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None):
         if self._hardware_fault_block(room):
+            return
+        plumbing = plumbing_hold(room.hw)
+        if plumbing:  # never open a valve on a room whose declared pump is not there to run
+            log(f"[{room.slug}] Z{zone} shot held: {plumbing}")
             return
         strategy_hold = self._strategy_preflight(room, zone, datetime.now())
         if strategy_hold:
