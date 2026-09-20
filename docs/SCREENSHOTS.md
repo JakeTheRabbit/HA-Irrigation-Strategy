@@ -2,7 +2,7 @@
 
 [Open the interactive demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1).
 
-Captured on 8 September 2026 from the compiled application with isolated demo data and inherited Home Assistant dark-theme variables. These are current UI examples, not photographs or live facility readings.
+Captured on 20 September 2026 (tank panel: 8 September) from the compiled application with isolated demo data and inherited Home Assistant dark-theme variables. These are current UI examples, not photographs or live facility readings.
 
 ## Room overview
 
@@ -16,9 +16,21 @@ Captured on 8 September 2026 from the compiled application with isolated demo da
 
 ![Zone planning and steering controls](../img/grow-plan.png)
 
-## Irrigation plan: Today beside the planning curve
+## Irrigation plan: Today, with the recorded zone and the projected day
 
-![Saved and draft targets with P3 emergency floor editing](../img/manual-setpoints.png)
+![Targets, recorded VWC/EC and the projected P0-P3 day on one graph](../img/plan-graph.png)
+
+## Recorded sensor history beside the setpoints
+
+![24 h / 72 h / 7 d probe history with setpoint lines, peaks and troughs](../img/sensor-history.png)
+
+## Irrigation plan: Today beside the plan graph
+
+![Saved and draft targets with the review bar](../img/manual-setpoints.png)
+
+## Room switched off
+
+![Room off: readings shown, no irrigation and no alerts](../img/room-off.png)
 
 ## Recorded run comparisons
 

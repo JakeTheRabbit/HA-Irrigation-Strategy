@@ -27,14 +27,15 @@ const forbidden = [],
   errors = [],
   checks = [],
   accessibility = [];
-await context.route("**/*", (route) => {
+const isolate = (route) => {
   const u = new URL(route.request().url());
   if (u.origin !== origin || u.pathname.startsWith("/api/")) {
     forbidden.push(u.origin + u.pathname);
     return route.abort();
   }
   return route.continue();
-});
+};
+await context.route("**/*", isolate);
 const page = await context.newPage();
 page.setDefaultTimeout(10000);
 page.on("pageerror", (e) => errors.push(e.message));
@@ -108,7 +109,6 @@ try {
       });
       await page.screenshot({
         path: fileURLToPath(new URL("../../img/manual-setpoints.png", import.meta.url)),
-        fullPage: true,
       });
       await page
         .locator(".strategy-zone-picker")
@@ -125,6 +125,70 @@ try {
       assert.equal(await line("p3-floor").getAttribute("y1"), savedY);
     },
   );
+  await check("Today graph carries the recorded probe and the whole projected day", async () => {
+    // The demo's history always ends at its fixed live reading, so what the recorded day looks like
+    // depends on the hour. An hour before lights-on the grow-day is complete (P0 dip, ramp, top-ups,
+    // overnight dry-down) and lines up with the targets; a pinned clock also stops the README images
+    // changing on every run. The clock belongs to the browser context, so this gets its own and the
+    // other checks keep real time.
+    const pinned = await browser.newContext({
+      viewport: { width: 1600, height: 1100 },
+      colorScheme: "dark",
+    });
+    await pinned.route("**/*", isolate);
+    const shot = await pinned.newPage();
+    shot.on("pageerror", (e) => errors.push(e.message));
+    await shot.clock.setFixedTime(new Date(2026, 8, 20, 9, 0, 0));
+    await shot.goto(`${origin}/dashboard.html?demo=1#/strategy`, { waitUntil: "networkidle" });
+    const graph = shot.locator(".planning-curve");
+    await graph.locator('[data-planning-line="recorded-vwc"]').waitFor();
+    assert.ok(await graph.locator('[data-planning-line="recorded-vwc-previous"]').count());
+    assert.ok(await graph.locator('[data-planning-line="recorded-ec"]').count());
+    assert.match(
+      await graph.locator(".planning-recorded").innerText(),
+      /Now[\s\S]*Peak · this grow-day[\s\S]*Trough · this grow-day/,
+    );
+    // every phase is drawn the way it runs: all six demo ramp shots, and the P2 top-ups
+    assert.equal(await graph.locator('[data-planning-shot="P1"]').count(), 6);
+    assert.ok((await graph.locator('[data-planning-shot="P2"]').count()) > 1);
+    assert.match(
+      await graph.locator(".planning-projection").innerText(),
+      /Projected day[\s\S]*measured from this zone/,
+    );
+    assert.doesNotMatch(await graph.innerText(), /NaN|undefined/);
+    await graph.scrollIntoViewIfNeeded();
+    await graph.screenshot({
+      path: fileURLToPath(new URL("../../img/plan-graph.png", import.meta.url)),
+    });
+    const history = shot
+      .locator("section")
+      .filter({ has: shot.getByRole("heading", { name: "Recorded sensor behaviour" }) })
+      .first();
+    await history.locator(".sensor-chart").first().waitFor();
+    await history.scrollIntoViewIfNeeded();
+    await history.screenshot({
+      path: fileURLToPath(new URL("../../img/sensor-history.png", import.meta.url)),
+    });
+    await pinned.close();
+  });
+  await check("Room off stands the room down and says so", async () => {
+    await fresh("settings");
+    await page.getByRole("button", { name: "Switch room off…" }).click();
+    await page.getByRole("button", { name: /^Apply 1 change/ }).click();
+    await page.getByRole("button", { name: "Switch room on…" }).first().waitFor();
+    // Same document, so the demo keeps its in-memory state; a reload would switch the room back on.
+    await page.evaluate(() => {
+      location.hash = "#/overview";
+    });
+    const banner = page.locator(".room-off-banner");
+    await banner.waitFor();
+    assert.match(await banner.innerText(), /no irrigation, no alerts/i);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: fileURLToPath(new URL("../../img/room-off.png", import.meta.url)),
+      clip: { x: 0, y: 0, width: 1600, height: 760 },
+    });
+  });
   await check("P1 controls reshape preview; invalid drafts cannot apply", async () => {
     await fresh("strategy");
     await page

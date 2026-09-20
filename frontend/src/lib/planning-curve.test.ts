@@ -464,6 +464,16 @@ describe("the projected day: every phase drawn the way the engine runs it", () =
     expect(dryRates([day, day], 12)).toEqual({ day: 0.6, night: 0.3 });
     expect(dryRates([day.slice(0, 8)], 12)).toEqual({ day: null, night: null });
   });
+  it("is not flattened by frequent P2 top-ups", () => {
+    // teeth every 75 minutes losing 2.7 points each: 2.16 points/h. Hour-to-hour averages read 0.18.
+    const sawtooth = Array.from({ length: 24 * 6 }, (_, index) => {
+      const hour = index / 6;
+      const value =
+        hour < 10 ? 64 - 2.7 * ((hour / 1.25) % 1) : 64 - 8.5 * ((hour - 10) / 14) ** 0.75;
+      return { hour, value, time: index };
+    });
+    expect(dryRates([sawtooth, sawtooth], 12).day).toBeCloseTo(2.16, 2);
+  });
 });
 
 describe("recorded lines are drawn smooth", () => {

@@ -388,29 +388,29 @@ const median = (values: number[]) => {
   const middle = sorted.length >> 1;
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 };
-/** How fast this zone actually dries, from its own recorded VWC: the median hour-to-hour fall of
- * the hourly medians, separately for lights-on and lights-off. Hours that rose (a shot) are skipped. */
+/** How fast this zone actually dries, from its own recorded VWC: the median fall rate over quiet
+ * runs (four consecutive readings, under an hour, none of them rising), separately for lights-on and
+ * lights-off. A shot ends a run, so frequent P2 top-ups do not flatten the answer the way hour-to-hour
+ * averages do. Checked against three live zones and a synthetic sawtooth with a known rate. */
 export function dryRates(
   days: readonly (readonly RecordedPoint[])[],
   photoperiod: number,
 ): DryRates {
+  const SPAN = 3,
+    RISE_TOLERANCE = 0.15;
   const falls: { day: number[]; night: number[] } = { day: [], night: [] };
-  for (const points of days) {
-    const hourly: (number | null)[] = Array.from({ length: 24 }, (_, hour) => {
-      const values = points
-        .filter((point) => point.hour >= hour && point.hour < hour + 1)
-        .map((point) => point.value);
-      return values.length > 1 ? median(values) : null;
-    });
-    for (let hour = 0; hour < 23; hour++) {
-      const a = hourly[hour],
-        b = hourly[hour + 1];
-      if (a === null || b === null || a - b <= 0 || a - b > 3) continue;
-      if (hour + 2 <= photoperiod) falls.day.push(a - b);
-      else if (hour >= photoperiod) falls.night.push(a - b);
+  for (const points of days)
+    for (let index = 0; index + SPAN < points.length; index++) {
+      const run = points.slice(index, index + SPAN + 1);
+      const hours = run[SPAN].hour - run[0].hour;
+      if (hours <= 0 || hours > 1) continue;
+      if (run.some((point, k) => k > 0 && point.value > run[k - 1].value + RISE_TOLERANCE))
+        continue;
+      const rate = (run[0].value - run[SPAN].value) / hours;
+      if (rate <= 0 || rate > 6) continue;
+      ((run[0].hour + run[SPAN].hour) / 2 < photoperiod ? falls.day : falls.night).push(rate);
     }
-  }
-  const rate = (values: number[]) => (values.length > 2 ? +median(values).toFixed(2) : null);
+  const rate = (values: number[]) => (values.length > 5 ? +median(values).toFixed(2) : null);
   return { day: rate(falls.day), night: rate(falls.night) };
 }
 

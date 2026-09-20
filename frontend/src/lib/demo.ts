@@ -130,7 +130,7 @@ export function createDemo(now = Date.now()): States {
       number(prefix, `${key}p0_maximum_wait_time`, 60, 5, 240, 1, "min");
       number(prefix, `${key}generative_dryback_target`, 14, 2, 60, 0.5, "% of peak");
       number(prefix, `${key}p1_target_vwc`, 64 + index * 2, 20, 90, 0.5, "%");
-      number(prefix, `${key}p2_vwc_threshold`, 54 + index * 2, 10, 90, 0.5, "%");
+      number(prefix, `${key}p2_vwc_threshold`, 61 + index * 2, 10, 90, 0.5, "%");
       number(prefix, `${key}p1_initial_shot_size`, 6, 0.5, 20, 0.5, "%");
       number(prefix, `${key}p1_shot_size_increment`, 0.5, 0.05, 10, 0.05, "%");
       number(prefix, `${key}p1_maximum_shots`, 6, 1, 30, 1);
