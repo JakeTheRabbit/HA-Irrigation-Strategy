@@ -109,11 +109,19 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
   (`tests/test_calculations.py`), the add-on **state-migration / in-place-upgrade** contract
   (`tests/test_state_migration.py`), and **version consistency** (`tests/test_version_consistency.py`).
   Any change to persisted state, add-on options, or entities needs a test proving an OLD install still loads.
+- **Branches and pull requests:** follow `CONTRIBUTING.md`. **One change, one branch, one pull
+  request, into `testing`.** `main` is what production rooms run: never open a pull request into
+  it, never push to it, never push to `testing`, never merge a pull request, never promote a
+  release. Those are a person's decisions. Do not bundle unrelated fixes, do not reformat what
+  you did not change, and do not change a version number outside a `release/x.y.z` branch. A
+  feature that crosses layers is built as one commit per layer. Generated files (the dashboard
+  bundle, the vendored engine copy) change only together with their source; CI proves they match.
 - **Releasing:** follow `docs/RELEASING.md`. The controller is built on each box from the git
-  branch that box tracks, so for the part that drives the pump **a push that changes `version:`
-  IS a release**: never bump it on a branch production tracks. Candidates are cut as
-  pre-releases from `main`, soak on a staging room on real plumbing, and only then is `stable`
-  fast-forwarded to that exact commit. A version number is never reused for different code.
+  branch that box tracks, and a box installed from the plain repository address tracks `main`
+  for life, so for the part that drives the pump **a push that changes `version:` on `main` IS a
+  release to production**. Candidates are cut as pre-releases from `testing`, soak on a staging
+  room on real plumbing, and only then is `main` fast-forwarded to that exact commit. A version
+  number is never reused for different code.
 - **Deploying changes:** publish a versioned integration release and matching controller
   app release. Existing app installations must update in place from their current
   repository to preserve their Supervisor identity and `/data`. A plain restart
@@ -121,8 +129,9 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
   release (or Rebuild for local source), then verify the running image and modules.
   Restart HA after integration updates; see `docs/INSTALL.md` for the current path.
 - **Commit style:** conventional commits (`feat:`/`fix:`/`docs:`/`chore:`) with a
-  `Co-Authored-By: Claude` trailer when written via Claude Code. One active branch:
-  `main`. Retired branches are kept as `archive/*` tags.
+  `Co-Authored-By: Claude` trailer when written via Claude Code. Two long-lived branches:
+  `main` (production) and `testing` (staging); everything else is a short-lived proposal.
+  Retired branches are kept as `archive/*` tags.
 - **Changelog = dual view.** Every release in `CHANGELOG.md` leads with **🌱 In plain English** (anyone
   can follow it) then **🔧 Technical notes** (entity/code detail). Keep both when adding a release.
 
