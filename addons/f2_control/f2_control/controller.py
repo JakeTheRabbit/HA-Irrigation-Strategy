@@ -776,6 +776,8 @@ class Controller:
                 block["_hardware_fault"] = room.hardware_fault
             else:
                 block.pop("_hardware_fault", None)
+            if hasattr(room, "_room_active_known"):
+                block["_room_active"] = room._room_active_known
             if getattr(room, "_setup_fingerprint_adopted", None):  # else keep whatever was saved
                 block["_setup"] = {
                     "revision": room.setup_revision,
@@ -1260,9 +1262,17 @@ class Controller:
 
     # ---------- room status (On / Off) ----------
     def _room_active(self, room):
-        """OFF = nothing growing: no irrigation and no alerts for this room. A missing switch
-        (an integration older than this add-on) means ON, so behaviour never changes silently."""
-        return self._on(f"switch.crop_steering_{room.prefix}room_active", True)
+        """OFF = nothing growing: no irrigation and no alerts for this room. A switch that has never
+        been seen (an integration older than this add-on) means ON, so behaviour never changes
+        silently. One that has been seen and cannot be read right now (Home Assistant restarting)
+        keeps its last value: an idle room is not woken, reset and re-alerted by every restart."""
+        v, _, _ = ha_get(f"switch.crop_steering_{room.prefix}room_active")
+        if str(v).lower() in ("on", "off"):
+            room._room_active_known = str(v).lower() == "on"
+        elif not hasattr(room, "_room_active_known"):
+            saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_room_active")
+            room._room_active_known = True if saved is None else bool(saved)
+        return room._room_active_known
 
     def _room_switched_off(self, room):
         """Stand the room down: its standing alerts are about a room that is now deliberately idle."""

@@ -16,7 +16,7 @@ The demo includes clearly labelled synthetic recipes and current/previous runs f
 
 ![Crop Steering operator workspace](img/operator-dashboard.png)
 
-> **New in 2.18 / controller 0.15.0:** a setup wizard that keeps what you typed and says exactly what to fix, rooms with a single switch per zone, probes in µS/cm or m³/m³ converted instead of rejected, and setup helpers (unit pickers, substrate presets, catch test, learned-peak suggestion). **2.17** added the recorded-sensor plan graph with the projected P0-P3 day, room on/off, the full P1 ramp, Auto Setpoints, restart-safe setup and a patient pump read-back. Install the matching pair; see the [changelog](CHANGELOG.md).
+> **New in 2.18 / controller 0.15.1:** a setup wizard that keeps what you typed and says exactly what to fix, rooms with a single switch per zone, probes in µS/cm or m³/m³ converted instead of rejected, and setup helpers (unit pickers, substrate presets, catch test, learned-peak suggestion). **2.17** added the recorded-sensor plan graph with the projected P0-P3 day, room on/off, the full P1 ramp, Auto Setpoints, restart-safe setup and a patient pump read-back. Install the matching pair; see the [changelog](CHANGELOG.md).
 
 ## Start here
 

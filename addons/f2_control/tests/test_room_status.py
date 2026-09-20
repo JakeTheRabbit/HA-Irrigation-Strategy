@@ -94,6 +94,30 @@ def test_a_missing_switch_means_on_so_older_integrations_keep_watering():
     assert fake.sets["sensor.crop_steering_ai_heartbeat"][1]["room_active"] is True
 
 
+def test_an_off_room_stays_off_while_home_assistant_restarts():
+    """Seen live 2026-09-20 23:54: during a core restart the switch read unavailable, unavailable meant ON,
+    and empty F1 began a 'fresh run' and raised probe-dead alerts at midnight."""
+    c, fake = _room("off")
+    c.loop_once(_Clock.now())
+    for unreadable in ("unavailable", "unknown"):
+        fake.set_state(ROOM_ACTIVE, unreadable)
+        c.loop_once(_Clock.now())
+        assert c._room_active(c.rooms[0]) is False
+    assert not _notifications(fake) and not _pushes(fake) and not _valve_opens(fake)
+    assert fake.sets["sensor.crop_steering_ai_heartbeat"][1]["room_active"] is False
+
+
+def test_the_last_known_room_status_survives_a_controller_restart_while_home_assistant_is_away():
+    c, fake = _room("off")
+    c.loop_once(_Clock.now())
+    c._save_state()
+    fake.set_state(ROOM_ACTIVE, "unavailable")
+    again = controller.Controller()
+    again._state_path = c._state_path
+    again._load_state()
+    assert again._room_active(again.rooms[0]) is False
+
+
 def test_switching_off_dismisses_that_rooms_standing_alerts():
     c, fake = _room("on")
     c.rooms[0].state[1]["last_shot"] = None
