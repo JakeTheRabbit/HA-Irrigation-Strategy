@@ -9,6 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from custom_components.crop_steering import units
+
 SOURCE = (
     Path(__file__).resolve().parents[1] / "custom_components/crop_steering/sensor.py"
 )
@@ -40,6 +42,7 @@ def sensor(states, prefix=""):
     namespace = {
         "math": math,
         "_LOGGER": logging.getLogger(__name__),
+        "to_native": units.to_native,
         "dt_util": SimpleNamespace(
             parse_datetime=datetime.fromisoformat,
             as_local=lambda value: value.replace(tzinfo=timezone.utc),
@@ -221,3 +224,32 @@ def test_last_irrigation_wrapper_does_not_borrow_other_room_timestamp():
         "veg_",
     )
     assert entity._get_zone_last_irrigation(1) is None
+
+
+# --------------------------------------------------------------------------- probe units
+def _probe(value, unit):
+    return SimpleNamespace(state=str(value), attributes={"unit_of_measurement": unit})
+
+
+def test_pore_ec_in_microsiemens_is_fused_as_millisiemens():
+    # Unconverted, 3200 next to 3.0 averages 1601.5 "mS/cm": far over any EC target, and the
+    # engine enlarges shots when pore EC is over target.
+    entity = sensor(
+        {"sensor.a": _probe(3200, "µS/cm"), "sensor.b": _probe(3.0, "mS/cm")}
+    )
+    assert entity._average_sensor_values(["sensor.a", "sensor.b"], "ec") == 3.1
+    greek_mu = sensor({"sensor.a": _probe(2500, "μS/cm")})
+    assert greek_mu._average_sensor_values(["sensor.a"], "ec") == 2.5
+
+
+def test_vwc_reported_as_a_volume_fraction_is_fused_as_percent():
+    entity = sensor({"sensor.a": _probe(0.42, "m³/m³"), "sensor.b": _probe(44, "%")})
+    assert entity._average_sensor_values(["sensor.a", "sensor.b"], "vwc") == 43.0
+
+
+def test_a_probe_with_no_unit_or_an_unknown_one_reads_exactly_as_before():
+    entity = sensor(
+        {"sensor.a": _probe(50, ""), "sensor.b": SimpleNamespace(state="52")}
+    )
+    assert entity._average_sensor_values(["sensor.a", "sensor.b"], "vwc") == 51.0
+    assert entity._average_sensor_values(["sensor.a", "sensor.b"]) == 51.0

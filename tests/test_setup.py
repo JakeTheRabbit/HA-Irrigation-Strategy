@@ -309,3 +309,19 @@ def test_setup_response_shows_explicit_new_sizing_until_entity_reload():
         entity_id=eid, state="38", attributes={"setup_revision": 1, "setup_value": 36}
     )
     assert api.setup_room(hass, entry)["zones"][0]["plant_count"] == 38
+
+
+def test_setup_accepts_probe_units_it_can_convert_exactly_and_explains_the_ones_it_cannot():
+    hass, entry, states = rig()
+    data = payload()
+    states["sensor.ec"].attributes["unit_of_measurement"] = "µS/cm"
+    states["sensor.vwc"].attributes["unit_of_measurement"] = "m³/m³"
+    assert api.prepare_setup(hass, data, entry.data, "one")["zones"]["2"][
+        "ec_sensors"
+    ] == ["sensor.ec"]
+    states["sensor.ec"].attributes["unit_of_measurement"] = "ppm"
+    with pytest.raises(ValueError, match="500 or 700 scale"):
+        api.prepare_setup(hass, data, entry.data, "one")
+    states["sensor.ec"].attributes["unit_of_measurement"] = "bananas"
+    with pytest.raises(ValueError, match="accepted: .*ms/cm"):
+        api.prepare_setup(hass, data, entry.data, "one")

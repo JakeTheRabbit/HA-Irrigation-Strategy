@@ -7,6 +7,7 @@ from copy import deepcopy
 from datetime import datetime
 import math
 
+from . import units
 from .const import DOMAIN, MAX_ZONES
 from .sizing import prefer_setup_value
 
@@ -35,8 +36,8 @@ SIZING = {
     "dripper_flow_rate": (0.1, 50, False),
 }
 UNITS = {
-    "vwc": {"%"},
-    "ec": {"ms/cm", "ds/m"},
+    "vwc": units.accepted("vwc"),  # converted to % where the probe reports a fraction
+    "ec": units.accepted("ec"),  # converted to mS/cm where the probe reports uS/cm
     "ph": {"ph", ""},
     "tank_temperature": {"°c", "°f", "k"},
 }
@@ -103,10 +104,28 @@ def safety_blockers(hass, entry=None, proposed=None):
         ):
             controls.add("input_boolean.f2_control_enabled")
     return [
-        f"{eid} must read OFF before changing setup"
+        blocker
         for eid in sorted(controls | entities)
-        if not (state := hass.states.get(eid)) or state.state != "off"
+        if (blocker := _off_blocker(hass, eid))
     ]
+
+
+def _off_blocker(hass, eid):
+    """Why this entity stops a setup change, or None. "Must read OFF" used to be the whole message
+    for an entity that was on, unreachable, or did not exist at all: three different things to fix.
+    """
+    state = hass.states.get(eid)
+    if state is not None and state.state == "off":
+        return None
+    if state is None:
+        detail = (
+            "entity not found: check the id, or its device integration has not loaded"
+        )
+    elif state.state == "on":
+        detail = "it is ON: turn it off, then submit again"
+    else:
+        detail = f"it reads {state.state!r}: the device has to be reachable and OFF"
+    return f"{eid} must read OFF before changing setup ({detail})"
 
 
 def _entry(hass, entry_id):
@@ -141,7 +160,15 @@ def _entity(hass, eid, domains, kind=None):
             .replace(" ", "")
         )
         if unit not in UNITS[kind]:
-            raise ValueError(f"{eid}: incompatible {kind.upper()} unit {unit!r}")
+            why = units.refusal(kind, unit)
+            raise ValueError(
+                f"{eid}: incompatible {kind.upper()} unit {unit!r}"
+                + (
+                    f" ({why})"
+                    if why
+                    else f" (accepted: {', '.join(sorted(UNITS[kind]))})"
+                )
+            )
     return eid
 
 

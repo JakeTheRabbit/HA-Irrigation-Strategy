@@ -236,6 +236,24 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 
+def _retry_form(flow, step_id, schema, user_input, info, error):
+    """Show the same step again with everything typed still in it, and say what is wrong.
+
+    These steps used to abort: one entity that was ON, unreachable or mistyped threw away every
+    zone, sensor and sizing entry. Home Assistant prefills a schema from the last submission.
+    """
+    prefill = getattr(flow, "add_suggested_values_to_schema", None)
+    return flow.async_show_form(
+        step_id=step_id,
+        data_schema=prefill(schema, user_input) if prefill else schema,
+        errors={"base": "setup_invalid"},
+        description_placeholders={
+            "info": f"{info}\n\n**Not saved yet.** {error}",
+            "error": str(error),
+        },
+    )
+
+
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Crop Steering System."""
 
@@ -244,6 +262,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self):
         """Initialize config flow."""
         self._data = {}
+
+    def _retry(self, step_id, schema, user_input, info, error):
+        return _retry_form(self, step_id, schema, user_input, info, error)
+
+    def _check(self, data):
+        """Validate what has been entered so far, at the step it was entered on."""
+        from .setup_api import configuration_payload, prepare_setup, safety_blockers
+
+        prepared = prepare_setup(self.hass, configuration_payload(data), data)
+        blockers = safety_blockers(self.hass, proposed=prepared)
+        if blockers:
+            raise ValueError("; ".join(blockers))
+        return prepared
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -549,31 +580,48 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Map each zone's valve and sensors via entity pickers."""
         num = int(self._data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES))
+        info = (
+            f"Pick the valve and probe(s) for each of your {num} zones. "
+            "You can choose MORE THAN ONE moisture/EC sensor per zone — the engine "
+            "averages valid readings. Outliers are not automatically rejected."
+        )
         if user_input is None:
             return self.async_show_form(
                 step_id="zones",
                 data_schema=vol.Schema(_zone_schema(num)),
-                description_placeholders={
-                    "info": f"Pick the valve and probe(s) for each of your {num} zones. "
-                    "You can choose MORE THAN ONE moisture/EC sensor per zone — the engine "
-                    "averages valid readings. Outliers are not automatically rejected."
-                },
+                description_placeholders={"info": info},
             )
-        self._data["zones"] = _build_zones(num, user_input)
+        zones = _build_zones(num, user_input)
+        try:  # a valve that is ON or a probe in the wrong unit is reported here, not three screens later
+            self._check(
+                {
+                    "room_name": self._data.get("room_name", "Crop Steering"),
+                    "room_prefix": self._data.get("room_prefix", ""),
+                    "enable_flag": f"switch.crop_steering_{self._data.get('room_prefix', '')}engine_enabled",
+                    "zones": zones,
+                }
+            )
+        except ValueError as err:
+            return self._retry(
+                "zones", vol.Schema(_zone_schema(num)), user_input, info, err
+            )
+        self._data["zones"] = zones
         return await self.async_step_hardware()
 
     async def async_step_hardware(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Map shared hardware (pump/mainline/lights) and substrate properties."""
+        info = (
+            "Shared plumbing, lights and the substrate facts used to size shots. Pump and main-line "
+            "valve are optional: a room with one switch per zone, such as a tent on a single smart "
+            "plug, needs only the zone valves you have already picked."
+        )
         if user_input is None:
             return self.async_show_form(
                 step_id="hardware",
                 data_schema=vol.Schema(_hardware_schema()),
-                description_placeholders={
-                    "info": "Shared plumbing, lights and the substrate facts used to size shots. "
-                    "Map pump and mainline for automatic irrigation; unmapped rooms stay inhibited."
-                },
+                description_placeholders={"info": info},
             )
         data = {
             "installation_mode": "manual",
@@ -591,16 +639,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data["enable_flag"] = (
             f"switch.crop_steering_{data['room_prefix']}engine_enabled"
         )
-        from .setup_api import configuration_payload, prepare_setup, safety_blockers
-
         try:
-            data = prepare_setup(self.hass, configuration_payload(data), data)
-            blockers = safety_blockers(self.hass, proposed=data)
-            if blockers:
-                raise ValueError("; ".join(blockers))
+            data = self._check(data)
         except ValueError as err:
-            return self.async_abort(
-                reason="setup_invalid", description_placeholders={"error": str(err)}
+            return self._retry(
+                "hardware", vol.Schema(_hardware_schema()), user_input, info, err
             )
         data["setup_revision"] = 1
         return self.async_create_entry(title=data["name"], data=data)
@@ -845,20 +888,23 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         from .setup_api import effective
 
         data = effective(self._entry)
-        if user_input is None:
-            schema = {
+        schema = vol.Schema(
+            {
                 **_zone_schema(num, data.get("zones", {})),
                 **_hardware_schema(
                     data.get("hardware", {}), data.get("parameters", {})
                 ),
             }
+        )
+        info = (
+            "Add, remove or swap the sensors and switches for each zone. "
+            "Pick multiple moisture/EC probes per zone if you have them — they get fused."
+        )
+        if user_input is None:
             return self.async_show_form(
                 step_id="edit_zones_map",
-                data_schema=vol.Schema(schema),
-                description_placeholders={
-                    "info": "Add, remove or swap the sensors and switches for each zone. "
-                    "Pick multiple moisture/EC probes per zone if you have them — they get fused."
-                },
+                data_schema=schema,
+                description_placeholders={"info": info},
             )
         new_data = {
             **data,
@@ -888,9 +934,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             if blockers:
                 raise ValueError("; ".join(blockers))
         except ValueError as err:
-            return self.async_abort(
-                reason="setup_invalid", description_placeholders={"error": str(err)}
-            )
+            return _retry_form(self, "edit_zones_map", schema, user_input, info, err)
         _update(self.hass, self._entry, new_data)
         return self.async_create_entry(title="", data={})
 

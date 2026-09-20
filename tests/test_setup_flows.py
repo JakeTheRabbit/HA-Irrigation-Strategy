@@ -8,6 +8,8 @@ from types import ModuleType
 
 import pytest
 
+from custom_components.crop_steering import setup_api as api
+
 from .test_setup import rig, payload
 
 
@@ -167,3 +169,113 @@ def test_native_hardware_schema_retains_explicit_tank_telemetry(
     assert set(fields["tank_fill_entity"][1]["domain"]) == {"switch", "binary_sensor"}
     hardware = flow_module._build_hardware(mappings)
     assert all(hardware[key] == value for key, value in mappings.items())
+
+
+# --------------------------------------------------------------------------- the wizard keeps what you typed
+# Seen on a first tent install: the last step failed with "switch.gt1_irrigation_switch must read OFF
+# before changing setup", the flow ABORTED, and every zone, sensor and sizing entry was gone.
+def _wizard(flow_module, *, zones=1):
+    hass, _, states = rig()
+    hass.config_entries.entries = []
+    flow = flow_module.ConfigFlow()
+    flow.hass = hass
+    # what HA's real flow base class does: prefill the schema with the last submission
+    flow.add_suggested_values_to_schema = lambda schema, values: {
+        "schema": schema,
+        "kept": dict(values),
+    }
+    flow._data = {
+        "name": "Tent",
+        "room_name": "Tent",
+        "room_prefix": "",
+        "room_slug": "default",
+        "num_zones": zones,
+    }
+    return flow, states
+
+
+ZONE_INPUT = {
+    "zone_1_name": "Tent",
+    "zone_1_active": True,
+    "zone_1_switch": "switch.v1",
+    "zone_1_vwc": ["sensor.vwc"],
+    "zone_1_ec": ["sensor.ec"],
+    "zone_1_plant_count": 4,
+}
+
+
+def test_a_valve_that_is_on_is_reported_on_the_zones_step_with_the_input_kept(
+    flow_module,
+):
+    flow, states = _wizard(flow_module)
+    states["switch.v1"].state = "on"
+    result = asyncio.run(flow.async_step_zones(dict(ZONE_INPUT)))
+    assert result["type"] == "form" and result["step_id"] == "zones"
+    assert result["data_schema"]["kept"] == ZONE_INPUT  # nothing typed is lost
+    assert result["errors"] == {"base": "setup_invalid"}
+    assert "switch.v1" in result["description_placeholders"]["error"]
+    assert "it is ON" in result["description_placeholders"]["error"]
+    states["switch.v1"].state = (
+        "off"  # fix the cause, press Submit again: the wizard carries on
+    )
+    result = asyncio.run(flow.async_step_zones(dict(ZONE_INPUT)))
+    assert result["type"] == "form" and result["step_id"] == "hardware"
+
+
+def test_a_wrong_unit_is_reported_on_the_zones_step_not_three_screens_later(
+    flow_module,
+):
+    flow, states = _wizard(flow_module)
+    states["sensor.ec"].attributes["unit_of_measurement"] = "ppm"
+    result = asyncio.run(flow.async_step_zones(dict(ZONE_INPUT)))
+    assert result["type"] == "form" and result["step_id"] == "zones"
+    assert "sensor.ec" in result["description_placeholders"]["error"]
+
+
+def test_a_failure_on_the_last_step_shows_that_step_again_instead_of_aborting(
+    flow_module,
+):
+    flow, states = _wizard(flow_module)
+    asyncio.run(flow.async_step_zones(dict(ZONE_INPUT)))
+    hardware = {
+        "pump_switch": "switch.p",
+        "main_line_switch": "switch.m",
+        "substrate_volume": 3.2,
+    }
+    states["switch.p"].state = "unavailable"
+    result = asyncio.run(flow.async_step_hardware(dict(hardware)))
+    assert result["type"] == "form" and result["step_id"] == "hardware"
+    assert result["data_schema"]["kept"] == hardware
+    assert "switch.p" in result["description_placeholders"]["error"]
+    assert "unavailable" in result["description_placeholders"]["error"]
+    assert (
+        flow._data["zones"]["1"]["zone_switch"] == "switch.v1"
+    )  # earlier steps survive too
+    states["switch.p"].state = "off"
+    result = asyncio.run(flow.async_step_hardware(dict(hardware)))
+    assert result["type"] == "create_entry" and result["data"]["setup_revision"] == 1
+
+
+def test_a_single_switch_tent_is_a_complete_room(flow_module):
+    flow, _states = _wizard(flow_module)
+    asyncio.run(flow.async_step_zones(dict(ZONE_INPUT)))
+    result = asyncio.run(
+        flow.async_step_hardware({"substrate_volume": 3.2})
+    )  # no pump, no mainline
+    assert result["type"] == "create_entry"
+    assert (
+        result["data"]["hardware"]["pump_switch"] == ""
+        and result["data"]["zones"]["1"]["zone_switch"] == "switch.v1"
+    )
+
+
+def test_a_blocker_says_whether_the_entity_is_on_unreachable_or_missing():
+    hass, entry, states = rig()
+    states["switch.p"].state = "on"
+    states["switch.m"].state = "unavailable"
+    del states["switch.v1"]
+    found = {line.split(" ")[0]: line for line in api.safety_blockers(hass, entry)}
+    assert "it is ON" in found["switch.p"]
+    assert "unavailable" in found["switch.m"]
+    assert "not found" in found["switch.v1"]
+    assert all("must read OFF" in line for line in found.values())
