@@ -2,9 +2,13 @@ name: Validate
 
 on:
   push:
-    branches: [ main ]
+    # `main` is what production rooms install from; `testing` is what staging rooms install
+    # from (docs/RELEASING.md). Both are checked on every push.
+    branches: [ main, testing ]
+  # Every pull request, whatever branch it targets. This used to be limited to pull requests
+  # into `main`, so a feature branch proposed into `testing`, or stacked on another feature
+  # branch, was merged with no checks at all.
   pull_request:
-    branches: [ main ]
   workflow_dispatch: {}
 
 concurrency:
@@ -177,6 +181,22 @@ jobs:
         run: npm test --prefix frontend
       - name: Compile and package standalone dashboard
         run: npm run build --prefix frontend
+      - name: Committed dashboard is exactly what the source builds
+        # The dashboard ships as one ~1 MB minified file, committed in three places, that nobody
+        # can review by eye. The build is reproducible (locked dependencies, no timestamps), so
+        # this proves the file a box will serve is the reviewed frontend/src and nothing else:
+        # a stale bundle, a hand-edited bundle and a bundle carrying code that is not in the
+        # source all fail here.
+        run: |
+          paths="www custom_components/crop_steering/www addons/f2_control/www addons/f2_control/web-index.html"
+          if [ -n "$(git status --porcelain -- $paths)" ]; then
+            echo "::error::The committed dashboard differs from a fresh build of frontend/src."
+            echo "Run 'npm ci --prefix frontend && npm run build --prefix frontend' and commit the result."
+            git status --short -- $paths
+            git diff --stat -- $paths
+            exit 1
+          fi
+          echo "Committed dashboard matches a fresh build."
       - name: Install Chromium
         working-directory: frontend
         run: npx playwright install --with-deps chromium
