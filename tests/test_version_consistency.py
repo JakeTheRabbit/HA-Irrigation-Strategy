@@ -4,9 +4,11 @@ that advertises it, so a release can't ship with a stale number somewhere.
 Checks: custom_components/crop_steering/manifest.json  ==  the latest released
 heading in CHANGELOG.md  ==  the Release badge in README.md.
 
-(The f2-control add-on carries its own independent version line in
-addons/f2_control/config.yaml; that is synced to the dedicated add-on repo by
-scripts/publish_addon.sh and is not part of this integration-release check.)
+The f2-control add-on carries its own independent version line in
+addons/f2_control/config.yaml. It is checked against the add-on's own changelog, and
+against the pairing both changelogs advertise: Supervisor offers a controller update the
+moment `version:` changes on the branch a box tracks (docs/RELEASING.md), so a bumped
+number with no changelog entry is a release nobody wrote down.
 """
 
 import json
@@ -49,3 +51,47 @@ def test_integration_version_is_consistent():
     assert (
         manifest == changelog == readme
     ), f"version mismatch: manifest.json={manifest} CHANGELOG={changelog} README badge={readme}"
+
+
+ADDON = ROOT / "addons" / "f2_control"
+
+
+def _addon_version() -> str:
+    match = re.search(
+        r'^version:\s*"?(\d+\.\d+\.\d+)"?\s*$',
+        (ADDON / "config.yaml").read_text(encoding="utf-8"),
+        re.M,
+    )
+    assert match, "addons/f2_control/config.yaml has no `version: x.y.z`"
+    return match.group(1)
+
+
+def _addon_changelog_version() -> str | None:
+    for line in (ADDON / "CHANGELOG.md").read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^#{1,2}\s*(\d+\.\d+\.\d+)\s*$", line.strip())
+        if m:  # the newest entry is first
+            return m.group(1)
+    return None
+
+
+def test_controller_version_has_a_changelog_entry():
+    """The add-on is built on the box from the branch it tracks, so changing `version:` IS the
+    release of the part that drives the pump. It must never go out unexplained."""
+    assert _addon_version() == _addon_changelog_version(), (
+        f"config.yaml says {_addon_version()}, the newest entry in "
+        f"addons/f2_control/CHANGELOG.md is {_addon_changelog_version()}"
+    )
+
+
+def test_the_release_names_the_controller_it_pairs_with():
+    """The two halves ship as a pair. The integration's newest changelog entry has to name the
+    controller version actually in this tree, or an operator installs a mismatched pair.
+    """
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    start = text.index(f"## [{_manifest_version()}]")
+    following = re.search(r"^## \[", text[start + 4 :], re.M)
+    entry = text[start : start + 4 + following.start()] if following else text[start:]
+    assert _addon_version() in entry, (
+        f"the {_manifest_version()} changelog entry never mentions controller "
+        f"{_addon_version()}"
+    )

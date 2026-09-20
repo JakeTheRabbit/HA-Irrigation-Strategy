@@ -9,6 +9,34 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.18.1] - 2026-09-21
+
+Pair with controller **0.15.2** (0.15.1 plus a test-only seam; irrigation behaviour is unchanged). Bug fixes only. Nothing an operator has set moves: every fix below was checked against seeded snapshots of older installs. Each was reproduced on 2.18.0 inside a real Home Assistant before it was fixed; the write-up is [docs/audits/2026-09-21-first-run-review.md](docs/audits/2026-09-21-first-run-review.md).
+
+**🌱 In plain English**
+
+- **The integration starts on older Home Assistant.** On anything before Home Assistant 2026.5 the setup wizard finished and the integration then showed "Failed to set up": no entities, no dashboard. It lists 2024.3 as supported, and now it is.
+- **Your lights times are used.** The wizard asks when your lights turn on and off, stored the answer, and then always ran on 12 and 0. The grow-day, the morning dry-back and the overnight phase now follow the hours you typed. If you already set them on a dashboard, those are kept.
+- **"Edit parameters" does something.** Changing a value under Configure said "saved" and quietly put the old value back. It now changes what the controller reads, and the form opens on the current value rather than the one from the day you installed.
+- **A sensor or pump can be removed, not just swapped.** Under Configure you could replace a mapping but never clear it: it came straight back. That matters more now that a pump is optional.
+- **Boxes that did nothing say so.** The waste-valve box promised the valve is "forced closed during a shot". The controller has never operated it, so if your plumbing relies on that, arrange it yourself. The grow-light, notification, humidity and VPD boxes are likewise marked as recorded only.
+- **The pump box says what leaving it empty means.** Since 2.18.0 an empty pump is accepted and the controller then never runs one: it opens the zone switch and counts the shot as delivered. That is right for a one-switch tent and wrong for a room that has a pump, so the box now says so where you choose it.
+- **Every box is explained.** The feed EC and feed pH pickers showed their raw names (`feed_ec_sensor`) with no label at all, and each zone's name and "in use" box had no help text. Two Configure messages showed as raw keys.
+- **Small pots can be adjusted.** A 0.65 L rockwool cube was accepted by setup and then could not be edited, because the setting's minimum was 1 L.
+
+**🔧 Technical notes**
+
+- `setup_panel`: `frontend.async_panel_exists` was added in Home Assistant **2026.5.0** (absent from core tags 2024.3.0, 2025.1.0, 2026.2.3, 2026.3.0, 2026.4.0) and was called unconditionally inside `async_setup_entry`: `AttributeError`, entry state `SETUP_ERROR`. `_panel_exists()` uses the helper when it exists and otherwise `PANEL in hass.data[frontend.DATA_PANELS]`, which is what the helper does. Neither test tier could see it: `tests/test_setup_panel.py` assigns the function onto its own stub, and `tests_ha/conftest.py` replaced the whole panel registration with a no-op. `tests_ha` now stands in for the web server only and runs the registration against the real frontend module; with the fix reverted, that tier fails.
+- `number.PARAM_TO_ENTITY_KEY` gains `lights_on_hour` / `lights_off_hour`. A seed only applies to an entity being created for the first time (`RestoreEntity` wins afterwards); pinned by a seeded upgrade where setup recorded 10-22, the operator set 8-20, and 8-20 survives.
+- `OptionsFlowHandler.async_step_edit_parameters` calls `number.set_value` on the live entities before `_update`, so the reload restores the value just written; defaults come from the live entities. The OFF check and its abort are unchanged, and nothing is written when it refuses.
+- `_hardware_schema._ent` prefills with `description={"suggested_value": ...}` instead of `default=`. The frontend omits an emptied field and voluptuous re-applied the default. `test_native_hardware_schema_retains_explicit_tank_telemetry` now asserts the same intent (the form opens showing the mapping) and additionally that the field can be cleared.
+- Translations: `options.abort.not_env_config` / `reload_failed`; labels and tooltips for `feed_ec_sensor` / `feed_ph_sensor` on both mapping forms; tooltips for all 24 `zone_N_name` / `zone_N_active`; truthful text for `waste_switch`, `light_entity`, `notification_service`, `humidity_sensor`, `vpd_sensor` (no runtime consumer in the integration, the add-on or the engine) and for `pump_switch`.
+- Global `substrate_volume` minimum 1.0 -> 0.1 and `drippers_per_plant` maximum 6 -> 20, matching `setup_api.SIZING` and the per-zone entities.
+- Tests, lean: `tests/test_translations.py` (every abort reason, error key and menu entry has a message in the flow that raises it; every mapping-form field has a label and a tooltip; hassfest's own key, quoted-placeholder and orphan-tooltip patterns; a field with no runtime consumer may not promise behaviour, and fails the day one gains a consumer). An honest pre-2026.5 case in `tests/test_setup_panel.py`.
+- Tests, real Home Assistant (`tests_ha/`, 4 -> 30): `test_setup_entry.py`, `test_configure.py`, `test_upgrade_in_place.py` driven by seeded snapshots in `tests_ha/fixtures/` (a 2.17 wizard room and an env-file era room: tuned values, an operator-renamed entity, a unit-less probe, and controller 0.14's saved setup fingerprint resuming with the kill switch ON), and `test_install_to_controller.py`, which hands a freshly installed room to the **real add-on controller** and requires it to find, adopt and water it.
+- Controller test seam: `F2_STATE_PATH` (see the add-on changelog). Docs: `docs/TESTING.md` describes the real-Home-Assistant tier, the fixtures and running hassfest without Docker.
+- Not changed, raised for a decision: an unmapped pump is read as "this room has no pump" (2.18.0). See the audit for a demonstration and three options.
+
 ## [2.18.0] - 2026-09-21
 
 Pair with controller **0.15.1** (0.15.0 plus one fix: a room switched off stays off while Home Assistant restarts).
