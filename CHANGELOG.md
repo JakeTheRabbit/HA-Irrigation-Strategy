@@ -9,6 +9,57 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Not released. Nothing here reaches a box until a `release/x.y.z` pull request gives it a version
+(see [docs/RELEASING.md](docs/RELEASING.md)). Controller change included: **C3, soak 7 days**.
+
+### 🌱 In plain English
+
+- **Setup now asks how your room is plumbed, and holds you to the answer.** 2.18.0 worked it out
+  from what you left empty: no pump chosen meant "this room has no pump". That is right for a tent
+  on one smart plug. It is silently wrong for a room that *does* have a pump and whose pump was
+  never chosen, or was cleared by mistake: the controller opened the valve, ran no pump, and
+  counted the water as delivered while the plants got none. The wizard and **Rooms & setup** now
+  ask the question outright (zone valves only; a pump, then zone valves; a main-line valve, then
+  zone valves; or all three), and the switches you choose have to match your answer.
+- **If they ever stop matching, the room is held, with a reason.** A room that says it has a pump
+  and has none mapped is not watered, nothing is counted as delivered, and you get a notification
+  saying what to fix. It used to look healthy until the plants wilted.
+- **Nothing changes for a room that is already set up.** It carries on exactly as it does today,
+  and an update does not need the kill switch cycled. Open **Rooms & setup** (or *Configure*) when
+  it suits you: it shows what your current switches imply and asks you to confirm. From then on
+  the protection above applies to that room too.
+
+### 🔧 Technical notes
+
+- New optional `plumbing` in a room's setup and, **only when declared**, in the engine descriptor:
+  `valves_only`, `pump_valves`, `mainline_valves`, `pump_mainline_valves`
+  (`custom_components/crop_steering/plumbing.py`; the controller carries the same table and a test
+  reads both). `prepare_setup` refuses a save whose mapped switches contradict a declared layout,
+  both ways, for an active room. Once declared it can be changed, not withdrawn; a client that does
+  not send it keeps the stored value.
+- Controller: `plumbing_hold()` gates `_blocked` and, as a last line of defence, `_execute_shot`.
+  A contradiction or a layout the controller does not know holds the room, alerts
+  (`f2_plumbing_<room>`, at most every 30 minutes), opens nothing and counts nothing. A mapped
+  switch the declaration disowns is still safed on exit and still has to read OFF for adoption.
+- **Upgrade in place:** an undeclared room publishes byte-for-byte the descriptor it did (key set
+  pinned in `tests/test_plumbing.py`), and `plumbing` joins the setup fingerprint only when present,
+  so the fingerprint saved by controller 0.15.x still matches and the room resumes without a disarm
+  cycle. Proven in `tests_ha/` from seeded snapshots: a one-switch tent recorded by running upstream
+  2.18.0's own wizard (`fixtures/entry_2_18_one_switch_tent.json`, fingerprint computed by
+  controller 0.15.1's code) and the 2.17 pumped room. Declaring later is an ordinary setup change
+  (new revision, adopted with the kill switch and hardware OFF).
+- Wizard and Configure: a required list question at the top of the hardware step; no prefill for a
+  new room; Configure prefills the declared layout or what the saved switches imply. Clearing the
+  pump of a room declared with one is refused in the form. Rooms & setup asks only when
+  `setup_read` reports the `plumbing` capability, so a newer dashboard served by the add-on beside
+  an older integration neither asks nor sends it.
+- Not changed: the env-file path (rooms configured that way stay undeclared until saved through a
+  form), add-on options, the state file format, every entity id.
+- **Not run on hardware.** Everything above is proven against a real Home Assistant and the real
+  controller code with a fake switch layer. No physical pump or valve has been driven by this build.
+
 ## [2.18.1] - 2026-09-21
 
 Pair with controller **0.15.2** (0.15.1 plus a test-only seam; irrigation behaviour is unchanged). Bug fixes only. Nothing an operator has set moves: every fix below was checked against seeded snapshots of older installs. Each was reproduced on 2.18.0 inside a real Home Assistant before it was fixed; the write-up is [docs/audits/2026-09-21-first-run-review.md](docs/audits/2026-09-21-first-run-review.md).

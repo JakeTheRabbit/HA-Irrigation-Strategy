@@ -1,3 +1,12 @@
+# Unreleased
+
+Not released: no version until a `release/x.y.z` pull request. **C3: soak 7 days** (docs/RELEASING.md).
+
+- A room can DECLARE its plumbing (`plumbing` in the engine descriptor, set in the integration's setup). Declared: the mapped pump and main-line have to match it, or the room is held with a reason, nothing opens and nothing is counted. This closes the 2.18.0 case where a pumped room with no pump mapped was watered with the valve open and no pump, and the shot counted as delivered.
+- **Never declared (every existing install): no change**, and no disarm cycle after the update. The layout joins the saved setup fingerprint only when it is present, so the fingerprint 0.15.x saved still matches.
+- A layout this controller does not know (a newer integration) is held, not guessed.
+- No change to add-on options or to the state file.
+
 # 0.15.2
 
 Pair with integration 2.18.1. No change to irrigation behaviour, options or saved state.
