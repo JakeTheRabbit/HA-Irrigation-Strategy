@@ -77,7 +77,8 @@ NUMBER_DESCRIPTIONS = [
         key="substrate_volume",
         name="Substrate Volume",
         icon="mdi:cube-outline",
-        native_min_value=1.0,
+        # 0.1, like the per-zone entity and setup's own rule: a 4 in rockwool cube is 0.65 L.
+        native_min_value=0.1,
         native_max_value=200.0,
         native_step=0.1,
         native_unit_of_measurement=UnitOfVolume.LITERS,
@@ -98,7 +99,7 @@ NUMBER_DESCRIPTIONS = [
         name="Drippers Per Plant",
         icon="mdi:sprinkler",
         native_min_value=1,
-        native_max_value=6,
+        native_max_value=20,  # as the per-zone entity and setup's own rule allow
         native_step=1,
         mode="box",
     ),
@@ -642,6 +643,12 @@ PARAM_TO_ENTITY_KEY: dict[str, str] = {
     "ec_target_gen_p1": "ec_target_gen_p1",
     "ec_target_gen_p2": "ec_target_gen_p2",
     "ec_target_gen_p3": "ec_target_gen_p3",
+    # Photoperiod. The setup wizard has always asked for these and stored them, but they were
+    # missing here, so the entities seeded to 12/0 whatever the operator typed. A seed only
+    # applies to a NEWLY created entity (an existing one restores its own last value), so
+    # adding them cannot move the lights schedule of an install that is already running.
+    "lights_on_hour": "lights_on_hour",
+    "lights_off_hour": "lights_off_hour",
 }
 
 

@@ -4,7 +4,7 @@ import asyncio
 import importlib.util
 import sys
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -48,6 +48,12 @@ def flow_module(monkeypatch):
     selector = ModuleType("homeassistant.helpers.selector")
     selector.EntitySelector = lambda config: config
     selector.EntitySelectorConfig = lambda **data: data
+    for name in ("SelectSelector", "NumberSelector"):
+        setattr(selector, name, lambda config: config)
+    for name in ("SelectSelectorConfig", "NumberSelectorConfig", "SelectOptionDict"):
+        setattr(selector, name, lambda **data: data)
+    selector.SelectSelectorMode = SimpleNamespace(DROPDOWN="dropdown", LIST="list")
+    selector.NumberSelectorMode = SimpleNamespace(BOX="box", SLIDER="slider")
     monkeypatch.setitem(sys.modules, "homeassistant.helpers.selector", selector)
     spec = importlib.util.spec_from_file_location(
         "custom_components.crop_steering._setup_flow_test",
@@ -147,7 +153,13 @@ def test_native_hardware_schema_retains_explicit_tank_telemetry(
     original = flow_module.vol.Optional
 
     def optional(key, **kwargs):
-        defaults[key] = kwargs.get("default")
+        # Prefilled as a SUGGESTED value, not a default: the form still opens showing the
+        # existing mapping (so saving cannot wipe it), but the field can now be cleared.
+        # With `default=` the frontend dropped an emptied field and voluptuous restored it,
+        # so a tank or pump mapping could be swapped but never removed.
+        if key in mappings:
+            assert "default" not in kwargs, f"{key} can no longer be cleared"
+        defaults[key] = (kwargs.get("description") or {}).get("suggested_value")
         return original(key, **kwargs)
 
     monkeypatch.setattr(flow_module.vol, "Optional", optional)

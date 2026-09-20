@@ -25,6 +25,35 @@ from .const import (
 )
 from .env_parser import load_env_config
 from .room import slugify_room
+from .setup_api import (
+    PLUMBING_LAYOUTS,
+    SIZING,
+    SetupError,
+    _update,
+    configuration_payload,
+    effective,
+    prepare_setup,
+    safety_blockers,
+    safety_report,
+)
+from .setup_helpers import (
+    SUBSTRATE_CUSTOM,
+    SUBSTRATE_PRESETS,
+    catch_test_lph,
+    substrate_litres,
+)
+from .units import (
+    EC_UNIT_AUTO,
+    EC_UNIT_CHOICES,
+    FLOW_UNITS,
+    VOLUME_UNITS,
+    default_units,
+    from_litres,
+    from_lph,
+    tidy,
+    to_litres,
+    to_lph,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,6 +85,106 @@ def _as_list(v):
     if not v:
         return []
     return list(v) if isinstance(v, (list, tuple)) else [v]
+
+
+def _pick(options, translation_key: str):
+    """A dropdown whose labels live in strings.json under selector.<translation_key>."""
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=list(options),
+            translation_key=translation_key,
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
+    )
+
+
+def _number(low: float, high: float, step: float, unit: str | None = None):
+    """A number box that shows its unit IN the field, so nobody has to guess it."""
+    return selector.NumberSelector(
+        selector.NumberSelectorConfig(
+            min=low,
+            max=high,
+            step=step,
+            unit_of_measurement=unit,
+            mode=selector.NumberSelectorMode.BOX,
+        )
+    )
+
+
+def _whole(low: int, high: int, unit: str | None = None):
+    return vol.All(_number(low, high, 1, unit), vol.Coerce(int))
+
+
+def _prefilled(key: str, value):
+    """An optional field shown filled in with `value` that can still be CLEARED.
+
+    `default=` cannot be: the frontend drops an emptied field and voluptuous puts the default
+    straight back, so a mapping could be swapped but never removed.
+    """
+    if value in (None, "", []):
+        return vol.Optional(key)
+    return vol.Optional(key, description={"suggested_value": value})
+
+
+def _field_name(marker) -> str:
+    return getattr(marker, "schema", getattr(marker, "key", marker))
+
+
+def _is_metric(hass) -> bool:
+    """Home Assistant already knows this household's unit system; start from it."""
+    units = getattr(getattr(hass, "config", None), "units", None)
+    return getattr(units, "volume_unit", "L") != "gal"
+
+
+# Where a setup rule's subject lives on a form: SetupError.path -> field name.
+_ZONE_FIELDS = {
+    "valve": "switch",
+    "vwc_sensors": "vwc",
+    "ec_sensors": "ec",
+    "name": "name",
+    "plant_count": "plant_count",
+}
+
+
+def _field_for(path: tuple, fields) -> str:
+    """The form field a failed rule belongs beside, or "base" if it is not on this form."""
+    field = "base"
+    if len(path) == 3 and path[0] == "zone":
+        # Room-wide sizing is asked once on the substrate step, not per zone.
+        field = (
+            f"zone_{path[1]}_{_ZONE_FIELDS[path[2]]}"
+            if path[2] in _ZONE_FIELDS
+            else str(path[2])
+        )
+    elif len(path) == 2 and path[0] == "hardware":
+        field = str(path[1])
+    elif len(path) == 1:
+        field = str(path[0])
+    return field if field in fields else "base"
+
+
+def _form_errors(error: Exception, fields) -> tuple[dict, dict]:
+    """(errors, placeholders) for a form. A rule without structure still shows its sentence."""
+    if isinstance(error, SetupError):
+        return {_field_for(error.path, fields): error.key}, dict(error.placeholders)
+    return {"base": "setup_invalid_detail"}, {"error": str(error)}
+
+
+def _not_off_errors(report: list[dict], fields, mapped: dict) -> tuple[dict, dict]:
+    """Everything that must read OFF and does not, shown beside the picker that chose it."""
+    if not report:
+        return {}, {}
+    by_entity = {entity: field for field, entity in mapped.items() if entity}
+    field = next(
+        (
+            by_entity[item["entity_id"]]
+            for item in report
+            if by_entity.get(item["entity_id"]) in fields
+        ),
+        "base",
+    )
+    blockers = "; ".join(f"{item['entity_id']} {item['detail']}" for item in report)
+    return {field: "must_read_off"}, {"blockers": blockers}
 
 
 def _zone_schema(num_zones: int, zones: dict | None = None) -> dict:
@@ -96,8 +225,7 @@ def _hardware_schema(hardware: dict | None = None, params: dict | None = None) -
     params = params or {}
 
     def _ent(key, sel):
-        val = hardware.get(key) or ""
-        out[vol.Optional(key, default=val) if val else vol.Optional(key)] = sel
+        out[_prefilled(key, hardware.get(key) or "")] = sel
 
     out: dict = {}
     _ent("pump_switch", _sw_sel())
@@ -154,6 +282,145 @@ def _hardware_schema(hardware: dict | None = None, params: dict | None = None) -
             "notification_service", default=hardware.get("notification_service") or ""
         )
     ] = str
+    return out
+
+
+# --------------------------------------------------------------------------
+# First-run wizard steps. Short forms, one subject each, only the fields that apply.
+# --------------------------------------------------------------------------
+_PLUMBING_FIELDS = ("pump_switch", "main_line_switch")
+_EXTRA_SENSORS = (
+    "feed_ec_sensor",
+    "feed_ph_sensor",
+    "temperature_sensor",
+    "humidity_sensor",
+    "vpd_sensor",
+    "water_level_sensor",
+    "tank_temperature_sensor",
+    "tank_ec_sensor",
+    "tank_ph_sensor",
+)
+
+
+def _system_schema(current: dict, metric: bool) -> dict:
+    """How many zones, how water reaches them, and the units this grower thinks in."""
+    volume_unit, flow_unit = default_units(metric)
+    plumbing = current.get("plumbing")
+    return {
+        vol.Required(
+            CONF_NUM_ZONES, default=current.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES)
+        ): _whole(MIN_ZONES, MAX_ZONES),
+        # Deliberately NO default. Guessing "no pump" for a pumped room would open valves with
+        # nothing behind them; guessing "pump" for a tent asks for switches it does not have.
+        (
+            vol.Required("plumbing", default=plumbing)
+            if plumbing
+            else vol.Required("plumbing")
+        ): _pick(PLUMBING_LAYOUTS, "plumbing"),
+        vol.Required(
+            "volume_unit", default=current.get("volume_unit", volume_unit)
+        ): _pick(VOLUME_UNITS, "volume_unit"),
+        vol.Required("flow_unit", default=current.get("flow_unit", flow_unit)): _pick(
+            FLOW_UNITS, "flow_unit"
+        ),
+    }
+
+
+def _plumbing_schema(plumbing: str | None, current: dict, params: dict) -> dict:
+    """Only the switches this layout actually has, then the photoperiod."""
+    needs_pump, needs_mainline = PLUMBING_LAYOUTS.get(plumbing, (True, True))
+    out: dict = {}
+    for key, needed in zip(_PLUMBING_FIELDS, (needs_pump, needs_mainline)):
+        if needed:
+            value = current.get(key) or ""
+            out[
+                vol.Required(key, default=value) if value else vol.Required(key)
+            ] = _sw_sel()
+    out[
+        vol.Required("lights_on_hour", default=params.get("lights_on_hour", 12))
+    ] = _whole(0, 23, "h")
+    out[
+        vol.Required("lights_off_hour", default=params.get("lights_off_hour", 0))
+    ] = _whole(0, 23, "h")
+    return out
+
+
+def _substrate_schema(params: dict, volume_unit: str, flow_unit: str) -> dict:
+    """Shot sizing. Values are shown in the grower's units and stored as L and L/hr."""
+    low_l, high_l, _ = SIZING["substrate_volume"]
+    low_f, high_f, _ = SIZING["dripper_flow_rate"]
+    return {
+        vol.Required(
+            "substrate_preset", default=params.get("substrate_preset", SUBSTRATE_CUSTOM)
+        ): _pick(SUBSTRATE_PRESETS, "substrate_preset"),
+        vol.Required(
+            "substrate_volume",
+            default=tidy(from_litres(params.get("substrate_volume", 6.0), volume_unit)),
+        ): _number(
+            tidy(from_litres(low_l, volume_unit), 3),
+            tidy(from_litres(high_l, volume_unit), 1),
+            0.01,
+            volume_unit,
+        ),
+        vol.Required(
+            "dripper_flow_rate",
+            default=tidy(from_lph(params.get("dripper_flow_rate", 2.0), flow_unit)),
+        ): _number(
+            tidy(from_lph(low_f, flow_unit), 3),
+            tidy(from_lph(high_f, flow_unit), 1),
+            0.01,
+            flow_unit,
+        ),
+        vol.Required(
+            "drippers_per_plant", default=params.get("drippers_per_plant", 1)
+        ): _whole(*SIZING["drippers_per_plant"][:2]),
+        vol.Required(
+            "field_capacity", default=params.get("field_capacity", 70.0)
+        ): _number(30, 95, 0.5, "%"),
+        vol.Required("max_ec", default=params.get("max_ec", 9.0)): _number(
+            1, 15, 0.1, "mS/cm"
+        ),
+        vol.Required("have_catch_test", default=False): bool,
+    }
+
+
+def _catch_test_schema(current: dict | None = None) -> dict:
+    current = current or {}
+    return {
+        vol.Required(
+            "catch_seconds", default=current.get("catch_seconds", 60)
+        ): _number(5, 3600, 1, "s"),
+        (
+            vol.Required("catch_ml", default=current["catch_ml"])
+            if current.get("catch_ml")
+            else vol.Required("catch_ml")
+        ): _number(1, 100000, 1, "mL"),
+        vol.Required(
+            "catch_drippers", default=current.get("catch_drippers", 1)
+        ): _whole(1, 1000),
+    }
+
+
+def _extras_schema(current: dict | None = None) -> dict:
+    """Everything that is optional, last, so a first install can simply press Submit."""
+    current = current or {}
+    out: dict = {}
+    for key in _EXTRA_SENSORS:
+        out[_prefilled(key, current.get(key))] = _sensor_one()
+    out[_prefilled("tank_last_fill_sensor", current.get("tank_last_fill_sensor"))] = (
+        selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["sensor", "input_datetime"])
+        )
+    )
+    out[_prefilled("tank_fill_entity", current.get("tank_fill_entity"))] = (
+        selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["switch", "binary_sensor"])
+        )
+    )
+    # Recorded, shown on the dashboard and held to the OFF rule - but NOT operated by the
+    # controller. The labels say so: a grower must not assume a waste valve is driven.
+    out[_prefilled("waste_switch", current.get("waste_switch"))] = _sw_sel()
+    out[_prefilled("light_entity", current.get("light_entity"))] = _light_sel()
     return out
 
 
@@ -244,6 +511,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self):
         """Initialize config flow."""
         self._data = {}
+        self._validated: dict | None = None  # the last answers that passed every rule
+        self._measured_flow: float | None = None  # L/hr per dripper, from a catch test
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -253,8 +522,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         room (own zones/sensors/pump/setpoints), namespaced as crop_steering_<slug>_*.
         """
         if user_input is not None and "setup_payload" in user_input:
-            from .setup_api import prepare_setup, safety_blockers
-
             try:
                 data = prepare_setup(self.hass, user_input["setup_payload"])
                 named = bool(self._async_current_entries())
@@ -415,28 +682,23 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_manual_zones(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Manual configuration - ask how many zones."""
+        """Your system: how many zones, how water reaches them, and your units."""
         if user_input is None:
             return self.async_show_form(
                 step_id="manual_zones",
                 data_schema=vol.Schema(
-                    {
-                        vol.Required(
-                            CONF_NUM_ZONES, default=DEFAULT_NUM_ZONES
-                        ): vol.All(
-                            vol.Coerce(int), vol.Range(min=MIN_ZONES, max=MAX_ZONES)
-                        ),
-                    }
+                    _system_schema(self._data, _is_metric(self.hass))
                 ),
                 description_placeholders={
                     "info": f"Configure {MIN_ZONES}-{MAX_ZONES} irrigation zones. "
                     "Each zone can have independent sensors and controls."
                 },
+                last_step=False,
             )
 
-        # Store number of zones and proceed to basic configuration
-        self._data[CONF_NUM_ZONES] = user_input[CONF_NUM_ZONES]
-
+        self._data[CONF_NUM_ZONES] = int(user_input[CONF_NUM_ZONES])
+        for key in ("plumbing", "volume_unit", "flow_unit"):
+            self._data[key] = user_input[key]
         return await self.async_step_zones()
 
     async def async_step_load_yaml(
@@ -549,61 +811,240 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Map each zone's valve and sensors via entity pickers."""
         num = int(self._data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES))
-        if user_input is None:
-            return self.async_show_form(
-                step_id="zones",
-                data_schema=vol.Schema(_zone_schema(num)),
-                description_placeholders={
-                    "info": f"Pick the valve and probe(s) for each of your {num} zones. "
-                    "You can choose MORE THAN ONE moisture/EC sensor per zone — the engine "
-                    "averages valid readings. Outliers are not automatically rejected."
-                },
+        errors: dict = {}
+        placeholders: dict = {}
+        zones = self._data.get("zones")
+        if user_input is not None:
+            zones = _build_zones(num, user_input)
+            self._data["zones"] = zones
+            self._data["ec_unit"] = user_input.get("ec_unit", EC_UNIT_AUTO)
+            schema = self._zones_form(num, zones)
+            errors, placeholders = self._check(
+                {_field_name(m) for m in schema},
+                {f"zone_{z}_switch": cfg.get("zone_switch") for z, cfg in zones.items()},
+                declare_plumbing=False,  # its switches are asked for on the next step
             )
-        self._data["zones"] = _build_zones(num, user_input)
-        return await self.async_step_hardware()
+            if not errors:
+                return await self.async_step_hardware()
+        return self.async_show_form(
+            step_id="zones",
+            data_schema=vol.Schema(self._zones_form(num, zones)),
+            errors=errors,
+            description_placeholders={
+                "info": f"Pick the valve and probe(s) for each of your {num} zones. "
+                "You can choose MORE THAN ONE moisture/EC sensor per zone — the engine "
+                "averages valid readings. Outliers are not automatically rejected.",
+                **placeholders,
+            },
+            last_step=False,
+        )
 
-    async def async_step_hardware(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Map shared hardware (pump/mainline/lights) and substrate properties."""
-        if user_input is None:
-            return self.async_show_form(
-                step_id="hardware",
-                data_schema=vol.Schema(_hardware_schema()),
-                description_placeholders={
-                    "info": "Shared plumbing, lights and the substrate facts used to size shots. "
-                    "Map pump and mainline for automatic irrigation; unmapped rooms stay inhibited."
-                },
-            )
+    def _zones_form(self, num: int, zones: dict | None) -> dict:
+        return {
+            vol.Required(
+                "ec_unit", default=self._data.get("ec_unit", EC_UNIT_AUTO)
+            ): _pick(EC_UNIT_CHOICES, "ec_unit"),
+            **_zone_schema(num, zones),
+        }
+
+    def _candidate(self, *, declare_plumbing: bool = True) -> dict:
+        """The entry this wizard would create from the answers given so far."""
+        prefix = self._data.get("room_prefix", "")
         data = {
             "installation_mode": "manual",
             "config_method": "manual",
             "name": self._data.get("name", "Crop Steering System"),
             "room_name": self._data.get("room_name", "Crop Steering"),
-            "room_prefix": self._data.get("room_prefix", ""),
+            "room_prefix": prefix,
             "room_slug": self._data.get("room_slug", "default"),
             CONF_NUM_ZONES: int(self._data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES)),
             "zones": self._data.get("zones", {}),
-            "hardware": _build_hardware(user_input),
-            "parameters": _build_parameters(user_input),
+            "hardware": dict(self._data.get("hardware", {})),
+            "parameters": dict(self._data.get("parameters", {})),
             "features": {"ec_stacking": False, "analytics": True, "ml_features": False},
+            "enable_flag": f"switch.crop_steering_{prefix}engine_enabled",
+            "ec_unit": self._data.get("ec_unit", EC_UNIT_AUTO),
         }
-        data["enable_flag"] = (
-            f"switch.crop_steering_{data['room_prefix']}engine_enabled"
-        )
-        from .setup_api import configuration_payload, prepare_setup, safety_blockers
+        if declare_plumbing and self._data.get("plumbing"):
+            data["plumbing"] = self._data["plumbing"]
+        return data
 
+    def _check(
+        self, fields, mapped: dict, *, declare_plumbing: bool = True
+    ) -> tuple[dict, dict]:
+        """Run every setup rule against the answers so far; ({} , {}) when they all hold.
+
+        The same rules used to run once, after the last screen, and answered with an abort
+        that discarded everything typed. Run per step, a problem appears beside the field
+        that caused it while that field is still on screen.
+        """
+        data = self._candidate(declare_plumbing=declare_plumbing)
         try:
-            data = prepare_setup(self.hass, configuration_payload(data), data)
-            blockers = safety_blockers(self.hass, proposed=data)
-            if blockers:
-                raise ValueError("; ".join(blockers))
-        except ValueError as err:
-            return self.async_abort(
-                reason="setup_invalid", description_placeholders={"error": str(err)}
+            self._validated = prepare_setup(
+                self.hass, configuration_payload(data), data
             )
-        data["setup_revision"] = 1
-        return self.async_create_entry(title=data["name"], data=data)
+        except ValueError as error:
+            return _form_errors(error, fields)
+        return _not_off_errors(
+            safety_report(self.hass, proposed=self._validated), fields, mapped
+        )
+
+    async def async_step_hardware(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """The switches this plumbing layout has, and the photoperiod."""
+        plumbing = self._data.get("plumbing")
+        hardware = self._data.setdefault("hardware", {})
+        params = self._data.setdefault("parameters", {})
+        errors: dict = {}
+        placeholders: dict = {}
+        if user_input is not None:
+            for key in _PLUMBING_FIELDS:
+                hardware[key] = user_input.get(key, "")
+            for key in ("lights_on_hour", "lights_off_hour"):
+                params[key] = int(user_input[key])
+            schema = _plumbing_schema(plumbing, hardware, params)
+            errors, placeholders = self._check(
+                {_field_name(m) for m in schema},
+                {key: hardware.get(key) for key in _PLUMBING_FIELDS},
+            )
+            if not errors:
+                return await self.async_step_substrate()
+        return self.async_show_form(
+            step_id="hardware",
+            data_schema=vol.Schema(_plumbing_schema(plumbing, hardware, params)),
+            errors=errors,
+            description_placeholders={
+                "info": (
+                    "Your zone switch is the whole watering system, so there is no pump or "
+                    "main-line switch to pick here. Just set when your lights run."
+                    if plumbing == "valves_only"
+                    else "Pick the shared switches your plumbing has, then set when your "
+                    "lights run. Each one opens before the zone valve and closes after it."
+                ),
+                **placeholders,
+            },
+            last_step=False,
+        )
+
+    async def async_step_substrate(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """What the plants are in and what feeds them: sizes every shot."""
+        params = self._data.setdefault("parameters", {})
+        volume_unit = self._data.get("volume_unit", "L")
+        flow_unit = self._data.get("flow_unit", "L/hr")
+        errors: dict = {}
+        placeholders: dict = {}
+        if user_input is not None:
+            preset = user_input.get("substrate_preset", SUBSTRATE_CUSTOM)
+            params.update(
+                substrate_preset=preset,
+                substrate_volume=tidy(
+                    substrate_litres(
+                        preset, to_litres(user_input["substrate_volume"], volume_unit)
+                    ),
+                    3,
+                ),
+                dripper_flow_rate=tidy(
+                    to_lph(user_input["dripper_flow_rate"], flow_unit), 3
+                ),
+                drippers_per_plant=int(user_input["drippers_per_plant"]),
+                field_capacity=float(user_input["field_capacity"]),
+                max_ec=float(user_input["max_ec"]),
+                volume_unit=volume_unit,
+                flow_unit=flow_unit,
+            )
+            errors, placeholders = self._sizing_errors(params, volume_unit, flow_unit)
+            if not errors:
+                if user_input.get("have_catch_test"):
+                    return await self.async_step_catch_test()
+                return await self.async_step_extras()
+        return self.async_show_form(
+            step_id="substrate",
+            data_schema=vol.Schema(_substrate_schema(params, volume_unit, flow_unit)),
+            errors=errors,
+            description_placeholders={
+                "volume_unit": volume_unit,
+                "flow_unit": flow_unit,
+                **placeholders,
+            },
+            last_step=False,
+        )
+
+    @staticmethod
+    def _sizing_errors(params: dict, volume_unit: str, flow_unit: str):
+        """Bounds are checked in litres and L/hr, and explained in the grower's own units."""
+        for key, unit, show in (
+            ("substrate_volume", volume_unit, from_litres),
+            ("dripper_flow_rate", flow_unit, from_lph),
+        ):
+            low, high, _ = SIZING[key]
+            if not low <= params[key] <= high:
+                return {key: "sizing_range"}, {
+                    "low": f"{tidy(show(low, unit), 2):g} {unit}",
+                    "high": f"{tidy(show(high, unit), 1):g} {unit}",
+                }
+        return {}, {}
+
+    async def async_step_catch_test(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Measured dripper flow replaces the rating on the packet."""
+        errors: dict = {}
+        if user_input is not None:
+            flow, problem = catch_test_lph(
+                user_input.get("catch_ml"),
+                user_input.get("catch_seconds"),
+                user_input.get("catch_drippers", 1),
+            )
+            if problem is None:
+                self._data["parameters"]["dripper_flow_rate"] = flow
+                self._measured_flow = flow
+                return await self.async_step_extras()
+            errors["base"] = problem
+        return self.async_show_form(
+            step_id="catch_test",
+            data_schema=vol.Schema(_catch_test_schema(user_input)),
+            errors=errors,
+            last_step=False,
+        )
+
+    async def async_step_extras(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Optional probes and display mappings, then create the room."""
+        hardware = self._data.setdefault("hardware", {})
+        errors: dict = {}
+        placeholders: dict = {}
+        if user_input is not None:
+            shown = [_field_name(m) for m in _extras_schema()]
+            for key in shown:
+                hardware[key] = user_input.get(key, "")
+            errors, placeholders = self._check(
+                set(shown), {"waste_switch": hardware.get("waste_switch")}
+            )
+            if not errors:
+                data = self._validated
+                data["setup_revision"] = 1
+                return self.async_create_entry(title=data["name"], data=data)
+        measured = getattr(self, "_measured_flow", None)
+        flow_unit = self._data.get("flow_unit", "L/hr")
+        return self.async_show_form(
+            step_id="extras",
+            data_schema=vol.Schema(_extras_schema(hardware)),
+            errors=errors,
+            description_placeholders={
+                "measured": (
+                    f"Your catch test measured {tidy(from_lph(measured, flow_unit)):g} "
+                    f"{flow_unit} per dripper, and that is what will be used. "
+                    if measured
+                    else ""
+                ),
+                **placeholders,
+            },
+            last_step=True,
+        )
 
     async def _validate_entities(self, user_input: dict) -> dict:
         """Validate that entity IDs exist in Home Assistant."""
@@ -688,9 +1129,97 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             menu_options=[
                 "reload_env",
                 "edit_parameters",
+                "calibrate_flow",
                 "edit_zones",
                 "edit_features",
             ],
+        )
+
+    async def _set_numbers(self, values: dict[str, float]) -> list[str]:
+        """Write settings to this room's LIVE number entities; returns the ids written.
+
+        The entry's `parameters` only seed an entity the first time it is created. After
+        that the entity restores its own last value, so editing `parameters` alone changes
+        nothing the engine reads. Setting the entity is what makes an edit real - and it is
+        done BEFORE any entry update, so the reload that follows restores the new value.
+        """
+        prefix = effective(self._entry).get("room_prefix", "")
+        written = []
+        for key, value in values.items():
+            entity_id = f"number.crop_steering_{prefix}{key}"
+            if self.hass.states.get(entity_id) is None:
+                continue
+            await self.hass.services.async_call(
+                "number",
+                "set_value",
+                {"entity_id": entity_id, "value": value},
+                blocking=True,
+            )
+            written.append(entity_id)
+        return written
+
+    async def async_step_calibrate_flow(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Catch test: set dripper flow from what was measured, not what the packet says.
+
+        Changes number entities only - never the hardware map - so it needs no disarm, no
+        setup revision and no reload, exactly like editing the number on a dashboard.
+        """
+        data = effective(self._entry)
+        prefix = data.get("room_prefix", "")
+        flow_unit = data.get("parameters", {}).get("flow_unit", "L/hr")
+        # A zone that has its own dripper-flow entity ignores the room value, so offer it.
+        own = [
+            str(z)
+            for z in range(1, int(data.get("num_zones", 1)) + 1)
+            if self.hass.states.get(
+                f"number.crop_steering_{prefix}zone_{z}_dripper_flow_rate"
+            )
+        ]
+        errors: dict = {}
+        if user_input is not None:
+            flow, problem = catch_test_lph(
+                user_input.get("catch_ml"),
+                user_input.get("catch_seconds"),
+                user_input.get("catch_drippers", 1),
+            )
+            if problem is None:
+                target = user_input.get("zone", "all")
+                keys = (
+                    ["dripper_flow_rate"]
+                    + [f"zone_{z}_dripper_flow_rate" for z in own]
+                    if target == "all"
+                    else [f"zone_{target}_dripper_flow_rate"]
+                )
+                written = await self._set_numbers({key: flow for key in keys})
+                if written:
+                    return self.async_abort(
+                        reason="calibration_applied",
+                        description_placeholders={
+                            "flow": f"{tidy(from_lph(flow, flow_unit)):g} {flow_unit}",
+                            "metric": f"{flow:g} L/hr",
+                            "entities": ", ".join(written),
+                        },
+                    )
+                problem = "calibration_no_entity"
+            errors["base"] = problem
+        schema = _catch_test_schema(user_input)
+        if own:
+            schema[vol.Required("zone", default="all")] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[
+                        selector.SelectOptionDict(value="all", label="Whole room"),
+                        *[
+                            selector.SelectOptionDict(value=z, label=f"Zone {z} only")
+                            for z in own
+                        ],
+                    ],
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            )
+        return self.async_show_form(
+            step_id="calibrate_flow", data_schema=vol.Schema(schema), errors=errors
         )
 
     async def async_step_reload_env(
@@ -710,14 +1239,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             # Reload .env file off the event loop (file I/O must not block it)
             env_config = await self.hass.async_add_executor_job(
                 load_env_config, self.hass.config.config_dir
-            )
-
-            from .setup_api import (
-                effective,
-                configuration_payload,
-                prepare_setup,
-                safety_blockers,
-                _update,
             )
 
             prior = effective(self._entry)
@@ -764,58 +1285,78 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Edit irrigation parameters via UI."""
-        from .setup_api import effective, safety_blockers, _update
-
+        data = effective(self._entry)
+        errors: dict = {}
+        placeholders: dict = {}
         if user_input is not None:
-            blockers = safety_blockers(self.hass, self._entry)
-            if blockers:
-                return self.async_abort(
-                    reason="setup_invalid",
-                    description_placeholders={"error": "; ".join(blockers)},
-                )
-            new_data = effective(self._entry)
-            new_data["parameters"] = {**new_data.get("parameters", {}), **user_input}
-            _update(self.hass, self._entry, new_data)
+            report = safety_report(self.hass, self._entry)
+            if report:
+                errors, placeholders = _not_off_errors(report, set(), {})
+            else:
+                # The live entities first (that is what the engine reads), then the entry,
+                # whose reload then restores the values just written.
+                await self._set_numbers(user_input)
+                new_data = effective(self._entry)
+                new_data["parameters"] = {
+                    **new_data.get("parameters", {}),
+                    **user_input,
+                }
+                _update(self.hass, self._entry, new_data)
+                return self.async_create_entry(title="", data={})
 
-            return self.async_create_entry(title="", data={})
-
-        # Get current parameters
-        current_params = effective(self._entry).get("parameters", {})
-
+        current = self._live_parameters(
+            data, ("substrate_volume", "dripper_flow_rate", "p1_target_vwc", "p2_vwc_threshold")
+        )
+        shown = user_input or current
         return self.async_show_form(
             step_id="edit_parameters",
             data_schema=vol.Schema(
                 {
                     vol.Optional(
-                        "substrate_volume",
-                        default=current_params.get("substrate_volume", 10.0),
-                    ): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=200.0)),
+                        "substrate_volume", default=shown.get("substrate_volume", 10.0)
+                    ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=200.0)),
                     vol.Optional(
                         "dripper_flow_rate",
-                        default=current_params.get("dripper_flow_rate", 2.0),
+                        default=shown.get("dripper_flow_rate", 2.0),
                     ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=50.0)),
                     vol.Optional(
-                        "p1_target_vwc",
-                        default=current_params.get("p1_target_vwc", 65.0),
+                        "p1_target_vwc", default=shown.get("p1_target_vwc", 65.0)
                     ): vol.All(vol.Coerce(float), vol.Range(min=30.0, max=95.0)),
                     vol.Optional(
-                        "p2_vwc_threshold",
-                        default=current_params.get("p2_vwc_threshold", 60.0),
+                        "p2_vwc_threshold", default=shown.get("p2_vwc_threshold", 60.0)
                     ): vol.All(vol.Coerce(float), vol.Range(min=25.0, max=85.0)),
                 }
             ),
+            errors=errors,
             description_placeholders={
                 "info": "Edit irrigation parameters. Changes take effect immediately. "
-                "You can also edit these via number entities in Home Assistant."
+                "You can also edit these via number entities in Home Assistant.",
+                **placeholders,
             },
         )
+
+    def _live_parameters(self, data: dict, keys) -> dict:
+        """What the engine is reading NOW, falling back to what setup recorded.
+
+        The recorded `parameters` go stale the moment a number is changed on a dashboard, so
+        showing them here used to present an old value as the current one.
+        """
+        prefix = data.get("room_prefix", "")
+        recorded = data.get("parameters", {})
+        current = {}
+        for key in keys:
+            state = self.hass.states.get(f"number.crop_steering_{prefix}{key}")
+            try:
+                current[key] = float(state.state)
+            except (AttributeError, TypeError, ValueError):
+                if key in recorded:
+                    current[key] = recorded[key]
+        return current
 
     async def async_step_edit_zones(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Reconfigure zones — step 1: how many zones (add or remove)."""
-        from .setup_api import effective
-
         cur = int(effective(self._entry).get("num_zones", 1))
         if user_input is None:
             return self.async_show_form(
@@ -842,57 +1383,84 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         num = getattr(self, "_edit_num", None) or int(
             self._entry.data.get("num_zones", 1)
         )
-        from .setup_api import effective
-
         data = effective(self._entry)
-        if user_input is None:
-            schema = {
-                **_zone_schema(num, data.get("zones", {})),
-                **_hardware_schema(
-                    data.get("hardware", {}), data.get("parameters", {})
-                ),
-            }
-            return self.async_show_form(
-                step_id="edit_zones_map",
-                data_schema=vol.Schema(schema),
-                description_placeholders={
-                    "info": "Add, remove or swap the sensors and switches for each zone. "
-                    "Pick multiple moisture/EC probes per zone if you have them — they get fused."
+        errors: dict = {}
+        placeholders: dict = {}
+        shown = data
+        if user_input is not None:
+            new_data = {
+                **data,
+                "num_zones": max(num, int(data.get("num_zones", 1))),
+                "zones": _build_zones(num, user_input, data.get("zones", {})),
+                "hardware": {**data.get("hardware", {}), **_build_hardware(user_input)},
+                "parameters": {
+                    **data.get("parameters", {}),
+                    **_build_parameters(user_input),
                 },
-            )
-        new_data = {
-            **data,
-            "num_zones": max(num, int(data.get("num_zones", 1))),
-            "zones": _build_zones(num, user_input, data.get("zones", {})),
-            "hardware": {**data.get("hardware", {}), **_build_hardware(user_input)},
-            "parameters": {
-                **data.get("parameters", {}),
-                **_build_parameters(user_input),
+                "plumbing": user_input["plumbing"],
+                "ec_unit": user_input.get("ec_unit", EC_UNIT_AUTO),
+            }
+            shown = new_data
+            fields = {_field_name(m) for m in self._map_form(num, shown)}
+            try:
+                new_data = prepare_setup(
+                    self.hass,
+                    configuration_payload(new_data),
+                    new_data,
+                    self._entry.entry_id,
+                )
+            except ValueError as error:
+                errors, placeholders = _form_errors(error, fields)
+            else:
+                errors, placeholders = _not_off_errors(
+                    safety_report(self.hass, self._entry, new_data),
+                    fields,
+                    {
+                        **{
+                            f"zone_{z}_switch": cfg.get("zone_switch")
+                            for z, cfg in new_data["zones"].items()
+                        },
+                        **{
+                            key: new_data["hardware"].get(key)
+                            for key in (*_PLUMBING_FIELDS, "waste_switch")
+                        },
+                    },
+                )
+            if not errors:
+                _update(self.hass, self._entry, new_data)
+                return self.async_create_entry(title="", data={})
+        return self.async_show_form(
+            step_id="edit_zones_map",
+            data_schema=vol.Schema(self._map_form(num, shown)),
+            errors=errors,
+            description_placeholders={
+                "info": "Add, remove or swap the sensors and switches for each zone. "
+                "Pick multiple moisture/EC probes per zone if you have them — they get fused.",
+                **placeholders,
             },
-        }
-        from .setup_api import (
-            configuration_payload,
-            prepare_setup,
-            safety_blockers,
-            _update,
         )
 
-        try:
-            new_data = prepare_setup(
-                self.hass,
-                configuration_payload(new_data),
-                new_data,
-                self._entry.entry_id,
-            )
-            blockers = safety_blockers(self.hass, self._entry, new_data)
-            if blockers:
-                raise ValueError("; ".join(blockers))
-        except ValueError as err:
-            return self.async_abort(
-                reason="setup_invalid", description_placeholders={"error": str(err)}
-            )
-        _update(self.hass, self._entry, new_data)
-        return self.async_create_entry(title="", data={})
+    @staticmethod
+    def _map_form(num: int, data: dict) -> dict:
+        hardware = data.get("hardware", {})
+        # A room from before layouts existed never declared one. Offer the layout its mapped
+        # switches already imply, so confirming the form changes nothing about how it runs.
+        implied = {
+            (False, False): "valves_only",
+            (True, False): "pump_valves",
+            (False, True): "mainline_valves",
+            (True, True): "pump_mainline_valves",
+        }[(bool(hardware.get("pump_switch")), bool(hardware.get("main_line_switch")))]
+        return {
+            vol.Required("plumbing", default=data.get("plumbing") or implied): _pick(
+                PLUMBING_LAYOUTS, "plumbing"
+            ),
+            vol.Required("ec_unit", default=data.get("ec_unit", EC_UNIT_AUTO)): _pick(
+                EC_UNIT_CHOICES, "ec_unit"
+            ),
+            **_zone_schema(num, data.get("zones", {})),
+            **_hardware_schema(hardware, data.get("parameters", {})),
+        }
 
     async def async_step_edit_features(
         self, user_input: dict[str, Any] | None = None

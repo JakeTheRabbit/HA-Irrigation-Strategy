@@ -36,6 +36,8 @@ from .const import (
 )
 from .room import room_prefix, build_engine_config
 from .calculations import ShotCalculator
+from .setup_helpers import suggested_field_capacity
+from .units import EC_UNIT_AUTO, ec_to_ms_cm
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -199,6 +201,18 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
                 name=f"Zone {zone_num} Irrigations Today",
                 state_class=SensorStateClass.TOTAL_INCREASING,
                 icon="mdi:counter",
+            )
+        )
+
+        # Field capacity read off the plant instead of guessed: where this zone's own ramp
+        # tops out. A suggestion only; unknown until the controller has seen a plateau.
+        zone_sensors.append(
+            SensorEntityDescription(
+                key=f"zone_{zone_num}_suggested_field_capacity",
+                name=f"Zone {zone_num} Suggested Field Capacity",
+                state_class=SensorStateClass.MEASUREMENT,
+                native_unit_of_measurement=PERCENTAGE,
+                icon="mdi:water-percent-alert",
             )
         )
 
@@ -366,6 +380,11 @@ class CropSteeringSensor(SensorEntity):
                 == self.entity_description.key
             ):
                 return self._get_zone_irrigation_count_today(self._zone_number)
+            elif (
+                f"zone_{self._zone_number}_suggested_field_capacity"
+                == self.entity_description.key
+            ):
+                return self._get_zone_suggested_field_capacity(self._zone_number)
 
         # Implement critical calculations ported from template entities
         if self.entity_description.key == "p1_shot_duration_seconds":
@@ -497,7 +516,7 @@ class CropSteeringSensor(SensorEntity):
             if zone_config.get("ec_back"):
                 ec_sensors.append(zone_config["ec_back"])
 
-        return self._average_sensor_values(ec_sensors)
+        return self._average_sensor_values(ec_sensors, ec=True)
 
     def _get_zone_status(self, zone_num: int) -> str:
         """Get status for specific zone."""
@@ -592,7 +611,54 @@ class CropSteeringSensor(SensorEntity):
             return {
                 key: source.attributes[key] for key in keys if key in source.attributes
             }
+        if self._zone_number and self.entity_description.key == (
+            f"zone_{self._zone_number}_suggested_field_capacity"
+        ):
+            return self._suggested_field_capacity_detail(self._zone_number)
         return None
+
+    def _learned_peak(self, zone_num: int):
+        """The VWC this zone's morning ramp plateaus at, as learned by the controller.
+
+        It learns this whether or not Auto Setpoints is switched on, and publishes it on the
+        zone's auto_setpoints sensor. None until a believable plateau has been seen.
+        """
+        learned = self.hass.states.get(
+            f"sensor.crop_steering_{self._prefix}zone_{zone_num}_auto_setpoints"
+        )
+        return learned.attributes.get("learned_peak") if learned else None
+
+    def _get_zone_suggested_field_capacity(self, zone_num: int) -> float | None:
+        return suggested_field_capacity(self._learned_peak(zone_num))
+
+    def _suggested_field_capacity_detail(self, zone_num: int) -> dict:
+        """Why the suggestion is what it is, and how far the configured value is from it.
+
+        Read-only: nothing here changes a setting. Auto Setpoints (off by default) is the
+        feature that keeps field capacity on the learned value for you.
+        """
+        suggestion = self._get_zone_suggested_field_capacity(zone_num)
+        configured = None
+        for key in (f"zone_{zone_num}_field_capacity", "field_capacity"):
+            state = self.hass.states.get(f"number.crop_steering_{self._prefix}{key}")
+            try:
+                configured = float(state.state) if state else None
+            except (ValueError, TypeError):
+                configured = None
+            if configured is not None:
+                break
+        detail = {
+            "learned_peak": self._learned_peak(zone_num),
+            "configured_field_capacity": configured,
+            "basis": (
+                "VWC this zone's morning ramp stopped gaining at, plus a small margin"
+                if suggestion is not None
+                else "waiting for the controller to see this zone's ramp plateau"
+            ),
+        }
+        if suggestion is not None and configured is not None:
+            detail["difference"] = round(suggestion - configured, 1)
+        return detail
 
     def _get_zone_irrigation_count_today(self, zone_num: int) -> int:
         """Get today's irrigation count for zone."""
@@ -607,12 +673,28 @@ class CropSteeringSensor(SensorEntity):
                 pass
         return 0
 
-    def _average_sensor_values(self, sensor_ids: list[str]) -> float | None:
-        """Average values from multiple sensors."""
+    def _ec_unit_hint(self) -> str:
+        """The room's EC unit pick, for probes that report no unit (or a bare 'ppm')."""
+        config = {
+            **(getattr(self._entry, "data", None) or {}),
+            **(getattr(self._entry, "options", None) or {}),
+        }
+        return config.get("ec_unit", EC_UNIT_AUTO)
+
+    def _average_sensor_values(
+        self, sensor_ids: list[str], ec: bool = False
+    ) -> float | None:
+        """Average values from multiple sensors.
+
+        With ``ec=True`` every reading is first converted from the probe's OWN unit to mS/cm,
+        so a uS/cm probe and an mS/cm probe in the same zone average correctly and the engine
+        only ever sees mS/cm.
+        """
         if not sensor_ids:
             _LOGGER.debug("No sensor IDs provided for averaging")
             return None
 
+        hint = self._ec_unit_hint() if ec else None
         values = []
         for sensor_id in sensor_ids:
             if not sensor_id:
@@ -624,6 +706,10 @@ class CropSteeringSensor(SensorEntity):
                     continue
                 if state.state not in ["unknown", "unavailable", "none", None]:
                     value = float(state.state)
+                    if ec:
+                        value = ec_to_ms_cm(
+                            value, state.attributes.get("unit_of_measurement"), hint
+                        )
                     if math.isfinite(value):
                         values.append(value)
             except (ValueError, TypeError) as e:
@@ -664,7 +750,7 @@ class CropSteeringSensor(SensorEntity):
                 if zone_config.get("ec_back"):
                     all_sensors.append(zone_config["ec_back"])
 
-        return self._average_sensor_values(all_sensors)
+        return self._average_sensor_values(all_sensors, ec=True)
 
     def _get_number_value(self, key: str) -> float:
         """Get value from integration number entity."""

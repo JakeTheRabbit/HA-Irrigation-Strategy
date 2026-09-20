@@ -55,7 +55,16 @@ def build_engine_config(prefix, slug, num_zones, zones, hardware, setup=None):
     )
     hw = hardware or {}
     setup = setup or {}
+    # Newer fields are published ONLY once the room has them. A room that never declared a
+    # plumbing layout publishes the same descriptor it always did, so the controller keeps
+    # requiring pump + mainline + valves and its saved setup fingerprint still matches.
+    declared = {
+        key: setup[key]
+        for key in ("plumbing", "feed_ec_factor")
+        if setup.get(key) is not None
+    }
     return {
+        **declared,
         "setup_api_version": 1,
         "setup_revision": setup.get("setup_revision", 0),
         "active": setup.get("active", True),

@@ -9,8 +9,42 @@ import math
 
 from .const import DOMAIN, MAX_ZONES
 from .sizing import prefer_setup_value
+from .units import (
+    EC_PROBLEM_AMBIGUOUS_PPM,
+    EC_PROBLEM_MISSING,
+    EC_UNIT_AUTO,
+    EC_UNIT_CHOICES,
+    ec_factor,
+)
 
 API_VERSION = 1
+
+# How water reaches the zone valves: layout -> (needs a pump switch, needs a mainline switch).
+# Published to the controller as the descriptor's `plumbing`. A room that has never declared
+# one (every install from before layouts) is treated as the original three-stage system by
+# the controller, so nothing about it changes. Keep in step with the controller's
+# PLUMBING_LAYOUTS (tests/test_setup_wizard_rules.py pins them together).
+PLUMBING_LAYOUTS = {
+    "valves_only": (False, False),
+    "pump_valves": (True, False),
+    "mainline_valves": (False, True),
+    "pump_mainline_valves": (True, True),
+}
+
+
+class SetupError(ValueError):
+    """A setup rule that failed, with enough structure to show it next to the right field.
+
+    `str(error)` is the same sentence callers have always received. `key` names a
+    translatable message, `path` says what it is about - ("zone", 2, "ec_sensors"),
+    ("hardware", "pump_switch"), ("plumbing",) - and `placeholders` fill the message in.
+    """
+
+    def __init__(self, message, *, key, path=(), **placeholders):
+        super().__init__(message)
+        self.key = key
+        self.path = tuple(path)
+        self.placeholders = {k: str(v) for k, v in placeholders.items()}
 HARDWARE_DOMAINS = {
     "pump_switch": {"switch"},
     "main_line_switch": {"switch"},
@@ -34,9 +68,10 @@ SIZING = {
     "drippers_per_plant": (1, 20, True),
     "dripper_flow_rate": (0.1, 50, False),
 }
+# EC is absent on purpose: probes report it in many units, so it is CONVERTED (units.ec_factor)
+# rather than matched against a list.
 UNITS = {
     "vwc": {"%"},
-    "ec": {"ms/cm", "ds/m"},
     "ph": {"ph", ""},
     "tank_temperature": {"°c", "°f", "k"},
 }
@@ -74,8 +109,52 @@ def engine_flag(hass, data):
     )
 
 
+def _why_not_off(hass, eid):
+    """None when `eid` definitively reads OFF, else what it reads instead."""
+    state = hass.states.get(eid)
+    if state is None:
+        return "missing"
+    if state.state == "off":
+        return None
+    return state.state if state.state in ("on", "unavailable", "unknown") else "other"
+
+
+_NOT_OFF_DETAIL = {
+    "on": "is ON",
+    "unavailable": "is unavailable (its device is offline or still starting)",
+    "unknown": "has not reported a state yet",
+    "missing": "does not exist in Home Assistant",
+    "other": "is not reporting on/off",
+}
+
+
+def safety_report(hass, entry=None, proposed=None):
+    """[{entity_id, reason, detail}] for everything that must read OFF and does not.
+
+    `reason` is on | unavailable | unknown | missing | other. "Must read OFF" used to be the
+    whole message, which sent people hunting for a switch that was in fact offline.
+    """
+    return [
+        {"entity_id": eid, "reason": reason, "detail": _NOT_OFF_DETAIL[reason]}
+        for eid in _must_read_off(hass, entry, proposed)
+        if (reason := _why_not_off(hass, eid))
+    ]
+
+
 def safety_blockers(hass, entry=None, proposed=None):
     """Require affected engines and union of old/new plumbing definitively OFF."""
+    return [
+        (
+            f"{item['entity_id']} must read OFF before changing setup"
+            if item["reason"] == "on"
+            else f"{item['entity_id']} {item['detail']}; "
+            "it must read OFF before changing setup"
+        )
+        for item in safety_report(hass, entry, proposed)
+    ]
+
+
+def _must_read_off(hass, entry=None, proposed=None):
     old = effective(entry) if entry else {}
     entities = hardware_entities(old) | hardware_entities(proposed or {})
     affected = [entry] if entry else []
@@ -102,11 +181,7 @@ def safety_blockers(hass, entry=None, proposed=None):
             "input_boolean.f2_control_enabled"
         ):
             controls.add("input_boolean.f2_control_enabled")
-    return [
-        f"{eid} must read OFF before changing setup"
-        for eid in sorted(controls | entities)
-        if not (state := hass.states.get(eid)) or state.state != "off"
-    ]
+    return sorted(controls | entities)
 
 
 def _entry(hass, entry_id):
@@ -120,20 +195,53 @@ def _entry(hass, entry_id):
     )
 
 
-def _name(value):
+def _name(value, path=()):
     if not isinstance(value, str) or not value.strip() or len(value.strip()) > 80:
-        raise ValueError("Room and zone names must contain 1–80 characters")
+        raise SetupError(
+            "Room and zone names must contain 1–80 characters",
+            key="name_invalid",
+            path=path,
+        )
     return value.strip()
 
 
-def _entity(hass, eid, domains, kind=None):
+_EC_PROBLEM_TEXT = {
+    EC_PROBLEM_AMBIGUOUS_PPM: (
+        "{eid}: reports EC in ppm, which depends on the meter's scale; "
+        "choose ppm (500 scale) or ppm (700 scale) as the EC unit"
+    ),
+    EC_PROBLEM_MISSING: (
+        "{eid}: incompatible EC unit ''; it reports no unit, so choose the EC unit it uses"
+    ),
+}
+
+
+def _entity(hass, eid, domains, kind=None, path=(), ec_hint=EC_UNIT_AUTO):
+    """Validate one mapped entity. For an EC probe, returns its factor to mS/cm."""
     if not isinstance(eid, str) or eid.split(".")[0] not in domains:
-        raise ValueError(
-            f"Invalid entity domain for {eid!r}; expected {', '.join(sorted(domains))}"
+        raise SetupError(
+            f"Invalid entity domain for {eid!r}; expected {', '.join(sorted(domains))}",
+            key="entity_wrong_domain",
+            path=path,
+            entity=eid,
+            expected=", ".join(sorted(domains)),
         )
     state = hass.states.get(eid)
     if state is None:
-        raise ValueError(f"Entity {eid} does not exist")
+        raise SetupError(
+            f"Entity {eid} does not exist", key="entity_missing", path=path, entity=eid
+        )
+    if kind == "ec":
+        declared = state.attributes.get("unit_of_measurement", "")
+        factor, problem = ec_factor(declared, ec_hint)
+        if problem:
+            text = _EC_PROBLEM_TEXT.get(
+                problem, "{eid}: incompatible EC unit {unit!r}"
+            ).format(eid=eid, unit=str(declared or ""))
+            raise SetupError(
+                text, key=problem, path=path, entity=eid, unit=declared or ""
+            )
+        return factor
     if kind:
         unit = (
             str(state.attributes.get("unit_of_measurement", ""))
@@ -141,7 +249,13 @@ def _entity(hass, eid, domains, kind=None):
             .replace(" ", "")
         )
         if unit not in UNITS[kind]:
-            raise ValueError(f"{eid}: incompatible {kind.upper()} unit {unit!r}")
+            raise SetupError(
+                f"{eid}: incompatible {kind.upper()} unit {unit!r}",
+                key=f"{kind}_unit",
+                path=path,
+                entity=eid,
+                unit=unit,
+            )
     return eid
 
 
@@ -187,13 +301,34 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
     old = old or {}
     result = deepcopy(old)
     result["room_name"] = _name(
-        payload.get("room_name", old.get("room_name", old.get("name", "Crop Steering")))
+        payload.get(
+            "room_name", old.get("room_name", old.get("name", "Crop Steering"))
+        ),
+        ("room_name",),
     )
     result["name"] = result["room_name"]
     active = payload.get("active", old.get("active", True))
     if type(active) is not bool:
         raise ValueError("active must be a boolean")
     result["active"] = active
+    # Optional, additive fields. Absent from the payload = keep what the room already has;
+    # absent from the room too = never declared, which the controller reads as the original
+    # pump + mainline + valves system and the fused EC sensor reads as "believe the probe".
+    plumbing = payload.get("plumbing", old.get("plumbing"))
+    if plumbing is not None and plumbing not in PLUMBING_LAYOUTS:
+        raise SetupError(
+            f"Unknown plumbing layout {plumbing!r}; expected one of "
+            f"{', '.join(PLUMBING_LAYOUTS)}",
+            key="plumbing_unknown",
+            path=("plumbing",),
+        )
+    ec_unit = payload.get("ec_unit", old.get("ec_unit", EC_UNIT_AUTO))
+    if ec_unit not in EC_UNIT_CHOICES:
+        raise SetupError(
+            f"Unknown EC unit {ec_unit!r}; expected one of {', '.join(EC_UNIT_CHOICES)}",
+            key="ec_unit_choice",
+            path=("ec_unit",),
+        )
     rows = payload.get("zones")
     if not isinstance(rows, list) or not rows or len(rows) > MAX_ZONES:
         raise ValueError(f"Provide 1–{MAX_ZONES} zone slots (archive unused slots)")
@@ -235,22 +370,35 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
             raise ValueError("Zone active must be a boolean")
         prior.update(
             zone_number=z,
-            name=_name(row.get("name") or prior.get("name") or f"Zone {z}"),
+            name=_name(
+                row.get("name") or prior.get("name") or f"Zone {z}", ("zone", z, "name")
+            ),
             active=enabled,
         )
         valve = row.get("valve", prior.get("zone_switch", ""))
         if valve:
-            _entity(hass, valve, {"switch"})
+            _entity(hass, valve, {"switch"}, path=("zone", z, "valve"))
         elif enabled:
-            raise ValueError(f"Zone {z}: select a valve")
+            raise SetupError(
+                f"Zone {z}: select a valve",
+                key="zone_valve_missing",
+                path=("zone", z, "valve"),
+                zone=z,
+            )
         if enabled and active and valve:
             if valve in foreign_shared:
-                raise ValueError(
-                    f"Valve {valve} conflicts with another room's shared hardware role"
+                raise SetupError(
+                    f"Valve {valve} conflicts with another room's shared hardware role",
+                    key="valve_is_foreign_shared",
+                    path=("zone", z, "valve"),
+                    entity=valve,
                 )
             if valve in allocated:
-                raise ValueError(
-                    f"Valve {valve} is already allocated to an active zone"
+                raise SetupError(
+                    f"Valve {valve} is already allocated to an active zone",
+                    key="valve_already_allocated",
+                    path=("zone", z, "valve"),
+                    entity=valve,
                 )
             allocated[valve] = entry_id or "new room"
         prior["zone_switch"] = valve
@@ -272,9 +420,22 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
                 )
             for sensor in sensors:
                 if not isinstance(sensor, str) or not sensor.startswith("sensor."):
-                    raise ValueError("Sensor lists require sensor entity IDs")
+                    raise SetupError(
+                        "Sensor lists require sensor entity IDs",
+                        key="entity_wrong_domain",
+                        path=("zone", z, f"{kind}_sensors"),
+                        entity=sensor,
+                        expected="sensor",
+                    )
                 if enabled and active:
-                    _entity(hass, sensor, {"sensor"}, kind)
+                    _entity(
+                        hass,
+                        sensor,
+                        {"sensor"},
+                        kind,
+                        path=("zone", z, f"{kind}_sensors"),
+                        ec_hint=ec_unit,
+                    )
             prior[f"{kind}_sensors"] = sensors
             prior[f"{kind}_front"] = sensors[0] if sensors else ""
             prior[f"{kind}_back"] = sensors[1] if len(sensors) > 1 else ""
@@ -289,16 +450,24 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
                 or not low <= value <= high
                 or (integer and int(value) != value)
             ):
-                raise ValueError(f"{key} must be within {low}–{high}")
+                raise SetupError(
+                    f"{key} must be within {low}–{high}",
+                    key="sizing_range",
+                    path=("zone", z, key),
+                    field=key,
+                    low=low,
+                    high=high,
+                )
             prior[key] = int(value) if integer else float(value)
         zones[str(z)] = prior
     hw = deepcopy(old.get("hardware", {}))
     incoming = payload.get("hardware", {})
     if not isinstance(incoming, dict) or set(incoming) - set(HARDWARE_DOMAINS):
         raise ValueError("Unknown hardware mapping field")
+    feed_ec_factor = old.get("feed_ec_factor", 1.0)
     for key, value in incoming.items():
         if value:
-            _entity(
+            checked = _entity(
                 hass,
                 value,
                 HARDWARE_DOMAINS[key],
@@ -315,9 +484,15 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
                         )
                     )
                 ),
+                path=("hardware", key),
+                ec_hint=ec_unit,
             )
+            if key == "feed_ec_sensor":
+                feed_ec_factor = checked
             if key == "tank_last_fill_sensor":
                 _tank_timestamp(hass, value)
+        elif key == "feed_ec_sensor":
+            feed_ec_factor = 1.0
         hw[key] = value or ""
     shared = {
         hw.get("pump_switch"),
@@ -338,12 +513,58 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
             if hw.get(k)
         ]
     ):
-        raise ValueError("Pump, mainline and waste must use different switches")
-    if shared.intersection(
+        raise SetupError(
+            "Pump, mainline and waste must use different switches",
+            key="hardware_duplicate",
+            path=("hardware", "pump_switch"),
+        )
+    doubled = shared.intersection(
         z["zone_switch"] for z in zones.values() if z.get("active", True)
-    ):
-        raise ValueError("A valve cannot also be pump, mainline or waste")
+    )
+    if doubled:
+        role = next(
+            k
+            for k in ("pump_switch", "main_line_switch", "waste_switch")
+            if hw.get(k) in doubled
+        )
+        raise SetupError(
+            "A valve cannot also be pump, mainline or waste",
+            key="valve_is_shared",
+            path=("hardware", role),
+            entity=hw[role],
+        )
+    if plumbing is not None and active:
+        # A declared layout is a promise about which switches exist, checked both ways: a
+        # stage it needs must be mapped, and a stage it rules out must not be - otherwise the
+        # room would hold "incomplete" forever, or sequence a pump its operator said isn't there.
+        for key, needed, name in (
+            ("pump_switch", PLUMBING_LAYOUTS[plumbing][0], "pump"),
+            ("main_line_switch", PLUMBING_LAYOUTS[plumbing][1], "mainline"),
+        ):
+            if needed and not hw.get(key):
+                raise SetupError(
+                    f"The {plumbing} plumbing layout needs a {name} switch",
+                    key=f"plumbing_needs_{name}",
+                    path=("hardware", key),
+                )
+            if not needed and hw.get(key):
+                raise SetupError(
+                    f"The {plumbing} plumbing layout has no {name} switch, "
+                    f"but {hw[key]} is mapped as one",
+                    key=f"plumbing_unused_{name}",
+                    path=("hardware", key),
+                    entity=hw[key],
+                )
     result.update(zones=zones, num_zones=max(ids), hardware=hw)
+    # Only ever ADD the newer fields: a room that never declared them saves exactly as before.
+    if plumbing is not None:
+        result["plumbing"] = plumbing
+    if ec_unit != EC_UNIT_AUTO or "ec_unit" in old:
+        result["ec_unit"] = ec_unit
+    # Persisted at setup time, not re-derived live: an offline probe drops its unit attribute,
+    # and a factor that flapped with it would read to the controller as a changed setup.
+    if feed_ec_factor != 1.0 or "feed_ec_factor" in old:
+        result["feed_ec_factor"] = feed_ec_factor
     return result
 
 
@@ -376,6 +597,7 @@ def configuration_payload(data):
         "hardware": {
             k: v for k, v in data.get("hardware", {}).items() if k in HARDWARE_DOMAINS
         },
+        **{k: data[k] for k in ("plumbing", "ec_unit") if data.get(k) is not None},
     }
 
 
@@ -446,6 +668,9 @@ def setup_room(hass, entry):
         "prefix": data.get("room_prefix", ""),
         "slug": data.get("room_slug", "default"),
         "active": data.get("active", True),
+        # None = never declared (the controller then requires pump + mainline + valves).
+        "plumbing": data.get("plumbing"),
+        "ec_unit": data.get("ec_unit", EC_UNIT_AUTO),
         "num_zones": data.get("num_zones", 1),
         "active_zone_ids": [z["id"] for z in zones if z["active"]],
         "zones": zones,
@@ -516,6 +741,9 @@ def _update(hass, entry, data):
             "hardware",
             "parameters",
             "setup_revision",
+            "plumbing",
+            "ec_unit",
+            "feed_ec_factor",
         }
     }
     hass.config_entries.async_update_entry(
