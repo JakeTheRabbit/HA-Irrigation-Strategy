@@ -1,3 +1,16 @@
+# 0.14.0
+
+Pair with integration 2.17.0. Existing options, engine flags, room IDs, counters and learned state are kept.
+**After this update, turn the engine kill switch off and on once**: the previous build saved no record of the
+setup it had accepted, so this first start has nothing to resume from. Later restarts and reboots carry on by themselves.
+
+- Room on/off: `switch.crop_steering_<prefix>room_active` off means no irrigation of any kind and no alerts for that room.
+- P1 no longer ends on a clock. It runs until the target is recovered after `p1_minimum_shots`, or `p1_maximum_shots` is reached.
+- Auto Setpoints (off by default): learns each zone's ceiling, gain and dry-down; on a P1 plateau hands over to P2 and carries the achieved peak forward. Optional Cloudflare `typesafe/jev` check via the new `cf_*` options.
+- The accepted setup revision is saved with a fingerprint, so an unchanged setup resumes after a restart with the kill switch left on (hardware must read off). A pending setup raises a notification naming what must read off.
+- Switch read-back after a shot re-reads for up to 6 s instead of once at 1 s: a late Zigbee report no longer latches a false hardware hold.
+- Bundles the 2.17.0 dashboard (recorded sensor data and the projected P0-P3 day on the Today graph).
+
 # 0.13.3
 
 - Combine daily targets and dated plans under Irrigation plan, with Today and Schedule views.

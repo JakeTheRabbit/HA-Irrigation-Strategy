@@ -120,6 +120,10 @@ def load_options():
     return opts
 
 
+# Switch read-back after a close: see Controller._confirm_switches.
+CONFIRM_FIRST_READ_S, CONFIRM_POLL_S, CONFIRM_TIMEOUT_S = 1.0, 0.5, 6.0
+
+
 class Room:
     """One fully-isolated grow room the engine steers. `prefix` is "" for the default
     (un-prefixed) room or "<slug>_" for an additional room, applied to every
@@ -1619,9 +1623,18 @@ class Controller:
         that gives up too early latches a false hardware hold; one that waits too long
         stalls every room (this loop is synchronous) before a real stuck-open is caught.
         """
-        # TODO: poll/retry policy. Placeholder = the old fixed 1 s single read.
-        time.sleep(1)
-        return all(ha_get(ent)[0] == want for ent in entities)
+        # First read at 1 s, exactly as before, so a plug that reports promptly costs nothing extra.
+        # A late report is then re-read every 0.5 s up to 6 s in all: nearly four times the worst lag
+        # seen, and still short enough that a genuinely stuck-open valve latches the hold within the
+        # same minute's loop. The pump has already been commanded OFF by the time this runs.
+        deadline = time.monotonic() + CONFIRM_TIMEOUT_S
+        time.sleep(CONFIRM_FIRST_READ_S)
+        while True:
+            if all(ha_get(ent)[0] == want for ent in entities):
+                return True
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(CONFIRM_POLL_S)
 
     def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None):
         if self._hardware_fault_block(room):

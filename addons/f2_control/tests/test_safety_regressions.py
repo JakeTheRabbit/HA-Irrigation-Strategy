@@ -177,10 +177,6 @@ def _slow_switch_report(monkeypatch, fake, clock, entity, service, lag_s):
     monkeypatch.setattr(controller, "ha_get", get)
 
 
-@pytest.mark.xfail(
-    reason="controller._confirm_switches still does the old fixed 1 s single read; its poll/retry policy is an open TODO",
-    strict=False,
-)
 def test_slow_pump_off_report_does_not_latch_false_fault(rig, monkeypatch):
     # Live 2026-09-14 18:52: veg_main_pump reported OFF 1.6 s after turn_off, past the
     # fixed 1 s read-back — a false hold that stopped F2 irrigation for 16 h.
@@ -189,6 +185,17 @@ def test_slow_pump_off_report_does_not_latch_false_fault(rig, monkeypatch):
     c._execute_shot(c.rooms[0], 1, 6, 6)
     assert c.rooms[0].hardware_fault is None
     assert c._blocked(c.rooms[0], 2) is None
+
+
+def test_a_pump_that_never_reports_off_still_latches_and_within_seconds(rig, monkeypatch):
+    # Patience for a slow report must not become blindness to a stuck one.
+    c, fake, clock = rig
+    _slow_switch_report(monkeypatch, fake, clock, "switch.p", "turn_off", 3600)
+    before = clock.seconds
+    c._execute_shot(c.rooms[0], 1, 6, 6)
+    assert c.rooms[0].hardware_fault is not None
+    assert "hardware" in c._blocked(c.rooms[0], 2).lower()
+    assert clock.seconds - before < 6 + 6 + 10  # the shot, one bounded read-back, and sequencing
 
 
 def test_fault_survives_restart_and_requires_off_then_verified_recovery(rig, monkeypatch):

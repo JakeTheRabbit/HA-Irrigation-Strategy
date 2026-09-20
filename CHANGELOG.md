@@ -9,7 +9,9 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.17.0] - 2026-09-20
+
+Pair with controller **0.14.0**.
 
 **🌱 In plain English**
 
@@ -18,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **See the sensor where you set the target.** The Today graph you drag targets on now draws that zone's recorded VWC and pore EC underneath them (this grow-day and the previous one), with now, peak and trough above it, on an axis scaled to the readings instead of 0-100 %. A deeper 24 h / 72 h / 7 d history panel sits below, and setpoint fields warn when a target sits outside what the probe reads.
 - **The whole day is drawn the way it runs.** P0 keeps drying after lights-on, P1 climbs one step per shot (all of them), P2 fires a shot each time VWC falls to its threshold, and P3 dries down overnight to the next lights-on. Timing uses the zone's own measured dry-down rate, so it is a projection, not a schedule. Hover any riser for its time and size.
 - **A restart no longer strands irrigation.** The controller used to forget which setup it had accepted whenever it restarted, then refuse to water until the kill switch was turned off and on again, without saying so. On 2026-09-20 a host reboot cost F2 two hours of its morning ramp that way. It now remembers the setup it accepted and carries on after a restart if nothing changed (pump, mainline and valves must still read off). A genuinely changed setup still needs the off-and-on, and now says so with a notification naming exactly what has to read off. The first start after this upgrade still needs one off-and-on, because the old build saved nothing to remember.
+- **A slow pump report no longer stops the room.** After a shot the controller checks that pump, mainline and valve all read off. It used to look once, a second later, and a Zigbee plug that answered in 1.6 seconds latched a false hardware hold that stopped F2 for 16 hours. It now looks at 1 second as before and then keeps re-reading for up to 6, so a late report passes and a genuinely stuck valve still latches within the same minute.
+- **When P2 shows no sawtooth, the graph says why.** The engine fires a P2 shot only once VWC has dried down to the P2 threshold. A threshold far under the P1 target spends the whole window drying, so the graph now draws the threshold across P2, says how many points and hours away it is, and names the threshold that gives shots from the start of P2.
 - **Auto Setpoints (off by default).** The controller learns each zone's real ceiling, what a shot lifts it, and how fast it dries. When a P1 ramp stops rising for two shots it hands over to P2 and carries the achieved peak forward as the P1 target, then probes 1 point higher after 3 days. It only ever rewrites per-zone target numbers; the engine still decides every shot.
 
 **🔧 Technical notes**
@@ -31,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard: `foldRecorded`, `smoothRecorded`, `dryRates`, `projectDay` and `planningAxis` in `frontend/src/lib/planning-curve.ts`; the dryback target is measured from the projected peak (as the engine measures it from the recorded one) rather than from field capacity. Lines carry a scale-free `data-planning-values` signature because the axis now follows the data.
 - Fix: the live history request had no `end_time`, so Home Assistant returned only the first 24 h of a 72 h or 7 d window.
 - Controller: the adopted `setup_revision` is saved per room with a fingerprint of what was adopted (`_setup` in `/data/state.json`: pump, mainline, valves, enable flag, active zones, feed sensors). Same revision and fingerprint after a restart is resumed without the engine flag reading off; hardware must still read off. Malformed or missing records keep the full fail-safe. A pending setup raises `f2_setup_<room>` (debounced, dismissed on adoption, silent for archived rooms), and the per-zone hold line carries `[blocked: ...]` in every phase.
-- Known open item: `controller._confirm_switches` still does a fixed 1 s single read-back; its regression test is marked expected-fail until the poll policy is chosen.
+- Controller `_confirm_switches`: first read at 1 s, then every 0.5 s to a 6 s deadline (`CONFIRM_FIRST_READ_S`, `CONFIRM_POLL_S`, `CONFIRM_TIMEOUT_S`). Regression tests cover a 1.6 s report (no latch) and a pump that never reports off (latches, bounded).
+- Dashboard: `p2Advice` explains a missing or late P2 sawtooth; nominal dry-down is now 2 / 1 points per hour (lights on / off) until a zone has history, replacing 0.7 / 0.35 taken from one low-light week.
 
 ## [2.16.1] - 2026-09-08
 

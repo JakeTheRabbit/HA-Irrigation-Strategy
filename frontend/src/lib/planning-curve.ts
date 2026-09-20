@@ -435,8 +435,11 @@ export interface PlanningProjection {
   measured: { day: boolean; night: boolean };
   retention: number;
 }
-/** Used until a zone has enough recorded history to measure its own dry-down. */
-export const NOMINAL_DRY_RATES = { day: 0.7, night: 0.35 };
+/** Used until a zone has enough recorded history to measure its own dry-down: a flowering room
+ * transpiring well (about 2 points an hour under lights, 1 overnight). The first default, 0.7 / 0.35,
+ * was one low-light week on one zone; at that rate no ordinary plan ever reached its P2 threshold, so
+ * the maintenance sawtooth never drew. */
+export const NOMINAL_DRY_RATES = { day: 2, night: 1 };
 /** The whole day as the engine would run these setpoints: P0 dries on, P1 climbs shot by shot,
  * P2 fires a shot each time VWC falls to its threshold, P3 dries down to the next lights-on.
  * Timing comes from the zone's dry-down rate, so it is a projection, not a schedule. */
@@ -594,4 +597,44 @@ export function smoothRecorded(
   if (last && smoothed.length)
     smoothed[smoothed.length - 1] = { time: last.time, value: last.value };
   return smoothed;
+}
+
+export interface P2Advice {
+  shots: number;
+  firstShotHour: number | null;
+  /** VWC points from the start of P2 down to the threshold, and the hours that takes to dry. */
+  pointsToThreshold: number;
+  hoursToThreshold: number;
+  /** A threshold a point under where P2 starts: a sawtooth from the start of P2. */
+  suggestedThreshold: number;
+  /** Hours between shots once the zone sits at its threshold: one shot's lift at the dry-down rate. */
+  repeatHours: number;
+}
+/** Why P2 shows few or no shots, and the threshold that would give them. Null when maintenance is
+ * already under way by the middle of P2. The engine fires a P2 shot only once VWC has fallen to the
+ * threshold, so a threshold far under the P1 target spends the whole window just drying down. */
+export function p2Advice(
+  plan: PlanningModel,
+  parameters: Record<string, number>,
+  projection: PlanningProjection,
+): P2Advice | null {
+  const window = plan.phases[2];
+  const threshold = parameters.p2_vwc_threshold;
+  const start = projection.points.find((point) => point.phase === "P2");
+  if (!start || window.end <= window.start || !Number.isFinite(threshold)) return null;
+  const shots = projection.shots.filter((shot) => shot.phase === "P2");
+  const firstShotHour = shots[0]?.hour ?? null;
+  if (firstShotHour !== null && firstShotHour - window.start <= (window.end - window.start) / 2)
+    return null;
+  const size = parameters.p2_shot_size;
+  const lift = (Number.isFinite(size) && size > 0 ? size : 2) * projection.retention;
+  const pointsToThreshold = Math.max(0, start.value - threshold);
+  return {
+    shots: shots.length,
+    firstShotHour,
+    pointsToThreshold,
+    hoursToThreshold: pointsToThreshold / projection.rates.day,
+    suggestedThreshold: Math.max(threshold, Math.floor((start.value - 1) * 2) / 2),
+    repeatHours: lift / projection.rates.day,
+  };
 }

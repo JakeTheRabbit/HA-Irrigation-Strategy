@@ -7,6 +7,7 @@ import {
   dryRates,
   foldRecorded,
   planningAxis,
+  p2Advice,
   planningClock,
   projectDay,
   smoothRecorded,
@@ -445,13 +446,13 @@ describe("the projected day: every phase drawn the way the engine runs it", () =
     const day = projectDay(buildPlanningCurve(sparse, 10, 22), sparse)!;
     expect(day.peak).toBe(65);
     expect(day.shots).toEqual([]); // nothing to draw a riser from
-    expect(Math.min(...day.points.map((point) => point.value))).toBeGreaterThan(45); // held at the threshold, then one night's dry-down
+    expect(Math.min(...day.points.map((point) => point.value))).toBeGreaterThan(35); // held at the threshold, then one night's dry-down
   });
   it("falls back to nominal rates without history and draws nothing without targets", () => {
     const plan = buildPlanningCurve(live, 10, 22);
     const day = projectDay(plan, live)!;
     expect(day.measured).toEqual({ day: false, night: false });
-    expect(day.rates).toEqual({ day: 0.7, night: 0.35 });
+    expect(day.rates).toEqual({ day: 2, night: 1 });
     expect(projectDay(buildPlanningCurve({}, 10, 22), {})).toBeNull();
   });
   it("measures a zone's own dry-down from its recorded hours, ignoring the hours a shot landed", () => {
@@ -493,5 +494,50 @@ describe("recorded lines are drawn smooth", () => {
     expect(steps.filter((step) => step > 1)).toHaveLength(1); // only the shot is a real move
     expect(smooth.at(-1)).toEqual({ time: 180 * minute, value: 34.2 });
     expect(smoothRecorded([])).toEqual([]);
+  });
+});
+
+describe("when P2 shows no sawtooth, the graph says why and what would give one", () => {
+  const plan = {
+    dryback_target: 11,
+    p1_target_vwc: 61,
+    p2_vwc_threshold: 50,
+    p2_shot_size: 3.5,
+    p1_initial_shot_size: 2,
+    p1_maximum_shots: 8,
+    p1_time_between_shots: 15,
+    p0_maximum_wait_time: 120,
+    p3_emergency_vwc_threshold: 35,
+  };
+  const advise = (parameters: Record<string, number>, rates?: { day: number; night: number }) => {
+    const model = buildPlanningCurve(parameters, 10, 22);
+    const day = projectDay(model, parameters, { rates })!;
+    return { day, advice: p2Advice(model, parameters, day) };
+  };
+  it("a threshold 11 points under the target spends P2 drying down: no shots, and it says so", () => {
+    const { day, advice } = advise(plan, { day: 0.7, night: 0.35 });
+    expect(day.shots.filter((shot) => shot.phase === "P2")).toHaveLength(0);
+    expect(advice).toMatchObject({ shots: 0, firstShotHour: null, suggestedThreshold: 59.5 });
+    expect(advice!.repeatHours).toBeCloseTo(5); // a 3.5-point shot lasts five hours at 0.7 points/h
+    expect(advice!.pointsToThreshold).toBeCloseTo(10.8, 0);
+    expect(advice!.hoursToThreshold).toBeCloseTo(15.4, 0);
+  });
+  it("the suggested threshold gives maintenance shots from the start of P2", () => {
+    const { advice } = advise(plan, { day: 0.7, night: 0.35 });
+    const fixed = advise(
+      { ...plan, p2_vwc_threshold: advice!.suggestedThreshold },
+      {
+        day: 0.7,
+        night: 0.35,
+      },
+    );
+    expect(fixed.day.shots.filter((shot) => shot.phase === "P2").length).toBeGreaterThan(1);
+    expect(fixed.advice).toBeNull();
+  });
+  it("without zone history the nominal flowering-room rates still draw that plan's late sawtooth", () => {
+    const { day, advice } = advise(plan);
+    const maintenance = day.shots.filter((shot) => shot.phase === "P2");
+    expect(maintenance.length).toBeGreaterThan(0);
+    expect(advice!.firstShotHour).toBe(maintenance[0].hour); // late in the window: still worth saying
   });
 });

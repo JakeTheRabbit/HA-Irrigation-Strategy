@@ -7,6 +7,7 @@ import {
   buildPlanningCurve,
   dryRates,
   foldRecorded,
+  p2Advice,
   projectDay,
   planningAxis,
   planningClock,
@@ -124,6 +125,7 @@ export function PlanningCurve({
   const projection = projectDay(plan, parameters, { rates, retention });
   const savedProjection =
     saved && baseline ? projectDay(saved, baseline.parameters, { rates, retention }) : null;
+  const advice = projection ? p2Advice(plan, parameters, projection) : null;
   const drybackVwc = projection ? projection.drybackVwc : plan.morningDrybackVwc;
   const drybackPeak = projection ? projection.peak : plan.drybackReference;
   const previousDay = vwcRecorded.previous[0] ?? [];
@@ -545,6 +547,45 @@ export function PlanningCurve({
                   strokeWidth="2.5"
                 />
               )}
+              {projection && Number.isFinite(parameters.p2_vwc_threshold) && p2.end > p2.start && (
+                <g data-planning-line="p2-threshold">
+                  <line
+                    x1={x(p2.start)}
+                    x2={x(p2.end)}
+                    y1={y(parameters.p2_vwc_threshold)}
+                    y2={y(parameters.p2_vwc_threshold)}
+                    stroke="#42b995"
+                    strokeOpacity="0.8"
+                    strokeDasharray="5 4"
+                  >
+                    <title>{`P2 threshold ${trim(parameters.p2_vwc_threshold)}% VWC: a maintenance shot fires each time the zone dries to here`}</title>
+                  </line>
+                  <text
+                    x={x(p2.end) - 6}
+                    y={y(parameters.p2_vwc_threshold) + 13}
+                    textAnchor="end"
+                    fill="#42b995"
+                    fontSize="10.5"
+                  >
+                    P2 threshold {trim(parameters.p2_vwc_threshold)}%
+                  </text>
+                  {advice && x(p2.end) - x(p2.start) > 190 && (
+                    <text
+                      data-planning-advice="p2"
+                      x={(x(p2.start) + x(p2.end)) / 2}
+                      y={y(parameters.p2_vwc_threshold) - 8}
+                      textAnchor="middle"
+                      fill="var(--destructive)"
+                      fontSize="11"
+                      fontWeight="600"
+                    >
+                      {advice.shots
+                        ? `First P2 shot not until ${planningClock(lightsOn, advice.firstShotHour ?? 0)}`
+                        : `No P2 shot: ${trim(advice.pointsToThreshold)} points to dry, ${trim(advice.hoursToThreshold)} h at this rate`}
+                    </text>
+                  )}
+                </g>
+              )}
               {drybackVwc !== null &&
                 [
                   [p3.start, 24],
@@ -809,7 +850,7 @@ export function PlanningCurve({
             Dry-down: {projection.rates.day} points/h lights-on (
             {projection.measured.day
               ? "measured from this zone"
-              : "nominal, not enough history yet"}
+              : "a typical flowering-room rate, until this zone has history"}
             ), {projection.rates.night} points/h lights-off (
             {projection.measured.night ? "measured" : "nominal"}). Each shot is drawn retaining{" "}
             {retention && retention > 0
@@ -818,6 +859,26 @@ export function PlanningCurve({
             . Shot timing is a projection from those rates, not a schedule: the engine fires on the
             probe.
           </p>
+          {advice && (
+            <p className="planning-projection-warning" data-planning-advice="p2-text">
+              <strong>
+                {advice.shots
+                  ? "P2 maintenance starts late."
+                  : "No P2 sawtooth with these targets."}
+              </strong>{" "}
+              The engine fires a P2 shot only when VWC has dried down to the P2 threshold. From{" "}
+              {trim(advice.pointsToThreshold + parameters.p2_vwc_threshold)}% at the start of P2
+              that is {trim(advice.pointsToThreshold)} points, about {trim(advice.hoursToThreshold)}{" "}
+              hours at {projection.rates.day} points/h
+              {advice.shots
+                ? `, so the first shot is not until ${planningClock(lightsOn, advice.firstShotHour ?? 0)}.`
+                : ", longer than P2 lasts."}{" "}
+              For a sawtooth from the start of P2, drag the P2 threshold up to about{" "}
+              {trim(advice.suggestedThreshold)}%, just under the P1 target. Shots then repeat about
+              every {trim(advice.repeatHours)} hours at this dry-down; a smaller P2 shot gives a
+              finer sawtooth.
+            </p>
+          )}
           {drybackVwc !== null && projection.lightsOnVwc > drybackVwc + 0.5 && (
             <p className="planning-projection-warning">
               At this dry-down the zone reaches lights-on at {trim(projection.lightsOnVwc)}%, which
