@@ -9,6 +9,11 @@ import math
 
 from . import units
 from .const import DOMAIN, MAX_ZONES
+from .plumbing import (
+    PLUMBING_LAYOUTS,
+    infer as infer_plumbing,
+    problems as plumbing_problems,
+)
 from .sizing import prefer_setup_value
 
 API_VERSION = 1
@@ -370,6 +375,18 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
         z["zone_switch"] for z in zones.values() if z.get("active", True)
     ):
         raise ValueError("A valve cannot also be pump, mainline or waste")
+    # The plumbing layout is DECLARED, never inferred here. Absent from the payload (an older
+    # dashboard, the env file, a room from before this existed) keeps whatever the room already
+    # had, which may be nothing: that room is then driven as it always was. Once declared it can
+    # be changed but not withdrawn.
+    layout = payload.get("plumbing") or old.get("plumbing") or None
+    if layout is not None:
+        if not isinstance(layout, str) or layout not in PLUMBING_LAYOUTS:
+            raise ValueError(plumbing_problems(str(layout), hw)[0])
+        found = plumbing_problems(layout, hw) if active else []
+        if found:
+            raise ValueError(". ".join(found))
+        result["plumbing"] = layout
     result.update(zones=zones, num_zones=max(ids), hardware=hw)
     return result
 
@@ -403,6 +420,7 @@ def configuration_payload(data):
         "hardware": {
             k: v for k, v in data.get("hardware", {}).items() if k in HARDWARE_DOMAINS
         },
+        **({"plumbing": data["plumbing"]} if data.get("plumbing") else {}),
     }
 
 
@@ -479,6 +497,10 @@ def setup_room(hass, entry):
         "hardware": {
             key: data.get("hardware", {}).get(key, "") for key in HARDWARE_DOMAINS
         },
+        # "" = never declared. `plumbing_inferred` is what the mapped switches imply, for a form
+        # to PREFILL; it becomes a declaration only when the operator saves it.
+        "plumbing": data.get("plumbing") or "",
+        "plumbing_inferred": infer_plumbing(data.get("hardware", {})),
         "safety": {"ready": not blockers, "blockers": blockers},
     }
 
@@ -492,6 +514,7 @@ def read_setup(hass):
             "remove": True,
             "restore": True,
             "stable_zone_ids": True,
+            "plumbing": True,
         },
         "limits": {"max_zones": MAX_ZONES},
         "rooms": [
@@ -541,6 +564,7 @@ def _update(hass, entry, data):
             "num_zones",
             "zones",
             "hardware",
+            "plumbing",
             "parameters",
             "setup_revision",
         }
