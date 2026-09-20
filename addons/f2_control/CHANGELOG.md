@@ -1,3 +1,7 @@
+# 0.15.1
+
+- A room switched off stays off while Home Assistant restarts. The room's on/off switch reads unavailable for a moment during a core restart, and unavailable used to mean on: an empty room began a fresh run and raised its probe alerts again. The controller now keeps the last value it read (also across its own restart) and only treats a switch it has never seen as on, which is what keeps integrations older than the switch watering.
+
 # 0.15.0
 
 Pair with integration 2.18.0. Existing options, engine flags, room IDs, counters and learned state are kept.

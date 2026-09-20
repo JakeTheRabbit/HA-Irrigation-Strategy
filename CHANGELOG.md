@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.18.0] - 2026-09-21
 
-Pair with controller **0.15.0**.
+Pair with controller **0.15.1** (0.15.0 plus one fix: a room switched off stays off while Home Assistant restarts).
 
 **🌱 In plain English**
 
