@@ -574,11 +574,38 @@ class Controller:
             log(f"room '{room.slug}' discovered live — joined fail-safe OFF")
         self._apply_setup_descriptors()
 
+    @staticmethod
+    def _setup_fingerprint(attrs, room):
+        """What adopting this descriptor would put in force. Saved with the adopted revision so a
+        restarted controller can tell "the setup I already adopted" from "a changed setup that
+        happens to carry the same number"."""
+        zone_ids = attrs.get(
+            "active_zone_ids", list(range(1, int(attrs.get("num_zones", 0)) + 1))
+        )
+        return json.dumps(
+            {
+                "active": attrs.get("active", True),
+                "zones": sorted(zone_ids),
+                "pump": attrs.get("pump"),
+                "mainline": attrs.get("mainline"),
+                "valves": {str(k): v for k, v in (attrs.get("valves") or {}).items()},
+                "enable_flag": attrs.get("enable_flag") or room.enable_flag,
+                "feed_ec_sensor": attrs.get("feed_ec_sensor") or "",
+                "feed_ph_sensor": attrs.get("feed_ph_sensor") or "",
+            },
+            sort_keys=True,
+        )
+
     def _apply_setup_descriptors(self):
         """Adopt explicit versioned setup changes only after both maps are safe OFF.
 
         Missing legacy revision leaves add-on overrides untouched. Tombstones do
         not delete counters, and missing descriptors never imply room removal.
+
+        A restart forgets nothing: the adopted revision and its fingerprint are saved, and the
+        same pair after a restart is RESUMED with the kill switch left as it is (hardware must
+        still read OFF). On 2026-09-20 a host reboot otherwise left every F2 zone blocked behind
+        a disarm cycle nobody knew was needed, and two hours of the P1 ramp were lost.
         """
         descriptors = {}
         for entity in ha_get_all():
@@ -601,6 +628,15 @@ class Controller:
                 continue
             room._setup_pending = "Setup changed; disarm current and requested engine flags and verify hardware OFF"
             try:
+                fingerprint = self._setup_fingerprint(attrs, room)
+                saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_setup")
+                resuming = (
+                    getattr(room, "setup_revision", 0) == 0
+                    and isinstance(saved, dict)
+                    and type(saved.get("revision")) is int
+                    and saved["revision"] == revision
+                    and saved.get("fingerprint") == fingerprint
+                )
                 active = attrs.get("active", True)
                 zone_ids = attrs.get(
                     "active_zone_ids",
@@ -638,9 +674,19 @@ class Controller:
                     flags.discard(
                         room.enable_flag
                     )  # absent legacy helper on a fresh setup
-                if any(ha_get(flag)[0] != "off" for flag in flags) or any(
-                    ha_get(entity)[0] != "off" for entity in hardware
-                ):
+                armed = sorted(flag for flag in flags if ha_get(flag)[0] != "off")
+                running = sorted(e for e in hardware if ha_get(e)[0] != "off")
+                if running or (armed and not resuming):
+                    if active:  # an archived room is meant to stay dry: no noise about it
+                        self._alert(
+                            f"setup_{room.slug}",
+                            "Irrigation BLOCKED - setup needs re-arming",
+                            f"{room.slug}: setup revision {revision} is waiting to be adopted, and nothing "
+                            "in this room will be watered until it is. It is adopted only while these read "
+                            f"OFF: {', '.join(armed + running)}. Turn them OFF, wait for this notice to "
+                            f"clear (up to {int(getattr(self, 'rediscover_seconds', 300))} s), then turn "
+                            "the kill switch back ON.",
+                        )
                     continue
                 if active and (
                     not desired_hw["pump"]
@@ -667,7 +713,10 @@ class Controller:
                 room.feed_ec_sensor = attrs.get("feed_ec_sensor") or ""
                 room.feed_ph_sensor = attrs.get("feed_ph_sensor") or ""
                 room.setup_active, room.setup_revision = active, revision
+                room._setup_fingerprint_adopted = fingerprint
                 room._setup_pending = None
+                ha_call("persistent_notification", "dismiss", notification_id=f"f2_setup_{room.slug}")
+                self._alerted.pop(f"setup_{room.slug}", None)
                 self._fused_id_cache = {
                     key: value
                     for key, value in self._fused_id_cache.items()
@@ -675,7 +724,9 @@ class Controller:
                 }
                 self._save_state()
                 log(
-                    f"room '{room.slug}' setup revision {revision} adopted with verified OFF hardware"
+                    f"room '{room.slug}' setup revision {revision} "
+                    + ("resumed after restart (unchanged since it was adopted; hardware verified OFF)"
+                       if resuming and armed else "adopted with verified OFF hardware")
                 )
             except (TypeError, ValueError, KeyError) as error:
                 room._setup_pending = f"Invalid setup descriptor: {error}"
@@ -723,6 +774,11 @@ class Controller:
                 block["_hardware_fault"] = room.hardware_fault
             else:
                 block.pop("_hardware_fault", None)
+            if getattr(room, "_setup_fingerprint_adopted", None):  # else keep whatever was saved
+                block["_setup"] = {
+                    "revision": room.setup_revision,
+                    "fingerprint": room._setup_fingerprint_adopted,
+                }
             out[room.slug] = block
         try:
             tmp = self._state_path + ".tmp"
@@ -1813,7 +1869,10 @@ class Controller:
                     "Zone blocked — needs attention",
                     f"{room.slug} zone {zone} ({st['phase']}): {reason}",
                 )
-            log(f"[{room.slug}] Z{zone} {st['phase']} hold — {reason}")
+            # A gate that is closed is said out loud in every phase: overnight nothing is due, and a
+            # room blocked since a restart used to look exactly like a healthy one until lights-on.
+            log(f"[{room.slug}] Z{zone} {st['phase']} hold — {reason}"
+                + (f" [blocked: {block}]" if block else ""))
 
     def _check_defaulted_setpoints(self):
         """Turn the per-loop 'setpoint entity missing' set into a rate-limited alert once an

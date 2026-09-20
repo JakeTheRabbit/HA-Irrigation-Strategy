@@ -50,8 +50,10 @@ def rig(monkeypatch, tmp_path):
     c._state_path = str(tmp_path / "state.json")
     c._defaulted_this_loop = set()
     c._fused_id_cache = {}
+    c._alerted, c.notify_service = {}, ""  # a pending setup is now announced
     c._load_room_state(room, {})
     monkeypatch.setattr(controller, "ha_get", lambda entity, **kwargs: (None, {}, None))
+    monkeypatch.setattr(controller, "ha_call", lambda *args, **kwargs: True)  # never the real Supervisor
     return c, room
 
 
