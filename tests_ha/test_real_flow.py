@@ -110,3 +110,26 @@ async def test_a_fresh_install_registers_every_entity_under_the_id_its_code_asks
                 if entity.entity_id != f"{platform.domain}.{wanted}":
                     wrong.append(f"{entity.entity_id} should be {platform.domain}.{wanted}")
     assert checked > 100 and not wrong, wrong
+
+
+async def test_an_existing_install_keeps_the_entity_ids_its_registry_already_holds(hass):
+    """Older installs hold ids the code no longer asks for (F2's fused probe is
+    `sensor.crop_steering_zone_1_vwc`, the code asks for `..._vwc_zone_1`). Dashboards, automations and
+    recorder history hang off the registered id, so setting `entity_id` must never move one."""
+    _seed(hass)
+    flow_id = await _to_zones_step(hass)
+    await hass.config_entries.flow.async_configure(flow_id, dict(ZONES))
+    result = await hass.config_entries.flow.async_configure(flow_id, {})
+    await hass.async_block_till_done()
+    registry = er.async_get(hass)
+    asked, held = "sensor.crop_steering_vwc_zone_1", "sensor.crop_steering_zone_1_vwc"
+    unique_id = registry.async_get(asked).unique_id
+    registry.async_update_entity(asked, new_entity_id=held)
+    await hass.async_block_till_done()
+
+    assert await hass.config_entries.async_reload(result["result"].entry_id)
+    await hass.async_block_till_done()
+
+    assert registry.async_get(held).unique_id == unique_id
+    assert registry.async_get(asked) is None and hass.states.get(asked) is None
+    assert hass.states.get(held) is not None
