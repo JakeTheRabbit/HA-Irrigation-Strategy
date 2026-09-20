@@ -22,6 +22,7 @@ const context = await browser.newContext({
   viewport: { width: 1600, height: 1100 },
   acceptDownloads: true,
   colorScheme: "dark",
+  ...(process.env.VERIFY_TZ ? { timezoneId: process.env.VERIFY_TZ } : {}),
 });
 const forbidden = [],
   errors = [],
@@ -37,6 +38,9 @@ const isolate = (route) => {
 };
 await context.route("**/*", isolate);
 const page = await context.newPage();
+// The demo's readings depend on the hour. VERIFY_TZ=UTC VERIFY_AT=2026-09-20T11:41:00Z replays any
+// wall clock (CI runs in UTC, at whatever hour the push happened) without changing how timers run.
+if (process.env.VERIFY_AT) await page.clock.setFixedTime(new Date(process.env.VERIFY_AT));
 page.setDefaultTimeout(10000);
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("dialog", (d) => d.accept());
@@ -89,6 +93,18 @@ try {
         .getByRole("button", { name: "P3", exact: true })
         .click();
       const floor = field("p3_emergency_vwc_threshold");
+      // Each zone's axis scales to its own recorded data, so zones are compared by value and a
+      // zone's draft line only against that same zone's saved line, never by pixels across zones.
+      const zoneTab = (n) =>
+        page
+          .locator(".strategy-zone-picker")
+          .getByRole("button", { name: new RegExp("Zone " + n) });
+      const otherFloor = page.locator(
+        '[id="setting-number.crop_steering_zone_2_p3_emergency_vwc_threshold"]',
+      );
+      await zoneTab(2).click();
+      const other = await otherFloor.inputValue();
+      await zoneTab(1).click();
       const original = await floor.inputValue();
       const savedY = await line("baseline-p3-floor").getAttribute("y1");
       const curve = await line("vwc").getAttribute("d");
@@ -110,15 +126,14 @@ try {
       await page.screenshot({
         path: fileURLToPath(new URL("../../img/manual-setpoints.png", import.meta.url)),
       });
-      await page
-        .locator(".strategy-zone-picker")
-        .getByRole("button", { name: /Zone 2/ })
-        .click();
-      assert.equal(await line("p3-floor").getAttribute("y1"), savedY, "Zone 2 remains unchanged");
-      await page
-        .locator(".strategy-zone-picker")
-        .getByRole("button", { name: /Zone 1/ })
-        .click();
+      await zoneTab(2).click();
+      assert.equal(await otherFloor.inputValue(), other, "Zone 2 remains unchanged");
+      assert.equal(
+        await line("p3-floor").getAttribute("y1"),
+        await line("baseline-p3-floor").getAttribute("y1"),
+        "Zone 2 draws no draft floor",
+      );
+      await zoneTab(1).click();
       assert.equal(await floor.inputValue(), String(Number(original) + 5));
       await page.getByRole("button", { name: "Discard draft", exact: true }).click();
       assert.equal(await floor.inputValue(), original);
