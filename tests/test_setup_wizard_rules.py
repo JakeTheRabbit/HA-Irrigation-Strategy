@@ -253,9 +253,14 @@ def test_a_size_outside_the_limits_is_explained_in_the_growers_own_unit(flow_mod
 def test_both_layers_agree_on_what_each_layout_needs():
     addon = str(ROOT / "addons" / "f2_control" / "f2_control")
     sys.path.insert(0, addon)
-    sys.modules.setdefault(
-        "requests", SimpleNamespace(Session=lambda: SimpleNamespace(headers={}))
-    )
+    try:
+        import requests  # noqa: F401  (the controller's only third-party import)
+    except ImportError:
+        # Stand in ONLY when it is genuinely absent. A blanket stub would shadow the real
+        # package for every test that runs after this one.
+        sys.modules["requests"] = SimpleNamespace(
+            Session=lambda: SimpleNamespace(headers={})
+        )
     try:
         import controller
     finally:
