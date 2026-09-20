@@ -227,6 +227,11 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
         self._attr_name = description.name
         # Set object_id to include crop_steering prefix for entity_id generation
         self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}{description.key}"
+        # Home Assistant ignores _attr_object_id: a NEW switch was named from its friendly name
+        # (switch.crop_steering_room_active_off_empty_room_no_irrigation_no_alerts), which the
+        # controller and dashboard never look for. An explicit entity_id is the suggestion HA uses
+        # at first registration; an entity already in the registry keeps the id it has.
+        self.entity_id = f"switch.{self._attr_object_id}"
         self._is_manual_override = description.key.startswith(
             "zone_"
         ) and description.key.endswith("_manual_override")

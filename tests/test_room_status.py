@@ -75,14 +75,16 @@ def test_every_room_gets_a_room_active_switch_that_defaults_on(switch_module):
     default = _make(switch_module, "room_active")
     f1 = _make(switch_module, "room_active", prefix="f1_")
     assert default._attr_is_on and f1._attr_is_on  # a fresh install keeps watering
-    assert default._attr_object_id == "crop_steering_room_active"
-    assert f1._attr_object_id == "crop_steering_f1_room_active"
+    # The id the controller and dashboard look for. Home Assistant only honours entity_id;
+    # 2.17.0 set _attr_object_id alone and the live switches came up named after their labels.
+    assert default.entity_id == "switch.crop_steering_room_active"
+    assert f1.entity_id == "switch.crop_steering_f1_room_active"
 
 
 def test_auto_setpoints_is_opt_in(switch_module):
     entity = _make(switch_module, "auto_setpoints", prefix="f1_")
     assert entity._attr_is_on is False  # nothing rewrites setpoints until asked to
-    assert entity._attr_object_id == "crop_steering_f1_auto_setpoints"
+    assert entity.entity_id == "switch.crop_steering_f1_auto_setpoints"
 
 
 def _f1_entry():

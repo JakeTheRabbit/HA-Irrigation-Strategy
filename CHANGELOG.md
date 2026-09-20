@@ -9,6 +9,13 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.1] - 2026-09-20
+
+Pair with controller **0.14.0** (unchanged).
+
+- Fix: the new Room Active and Auto Setpoints switches registered under ids made from their labels (`switch.crop_steering_room_active_off_empty_room_no_irrigation_no_alerts`), which the controller and dashboard never look for, so the room on/off control did nothing on a fresh 2.17.0 install. Switches now suggest `switch.crop_steering_<prefix><key>` when first registered. Found on the first live install, where the four entities were renamed in the entity registry.
+- If you installed 2.17.0: rename the two switches per room to `switch.crop_steering_<prefix>room_active` and `switch.crop_steering_<prefix>auto_setpoints` in Settings > Entities (an entity already registered keeps its id), or remove them and restart on 2.17.1.
+
 ## [2.17.0] - 2026-09-20
 
 Pair with controller **0.14.0**.
