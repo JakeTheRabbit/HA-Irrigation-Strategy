@@ -9,6 +9,15 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.2] - 2026-09-20
+
+Documentation only; no code change. Pair with controller **0.14.0** (unchanged).
+
+- Feature matrix: rows for the 2.17 features with what is tested and what was exercised live on 20 September (room off, restart-safe setup, patient read-back), what was not (the full P1 ramp through a live lights-on, Auto Setpoints writing live), and an updated live deployment row.
+- Planning guide: "Read the combined graph" now describes the projected P0-P3 day, the overnight lines and the P2 threshold note, replacing text from before 2.16.1.
+- Entity reference: `room_active`, `auto_setpoints` and the per-zone `auto_setpoints` sensor.
+- User guide, sidebar guide and the controller's documentation tab no longer describe the Today / Schedule navigation as awaiting verification or use the old page names.
+
 ## [2.17.1] - 2026-09-20
 
 Pair with controller **0.14.0** (unchanged).

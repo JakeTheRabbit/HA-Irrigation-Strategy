@@ -113,6 +113,8 @@ match the globals above.
 ### Global (`switch.crop_steering_*`)
 | Entity | What it does |
 |---|---|
+| `room_active` | Room on/off (default on). Off = nothing is growing: no irrigation of any kind for this room, including emergency shots and the no-probe fallback schedule, no alerts, repair issues cleared. Per room: `switch.crop_steering_<prefix>room_active`. |
+| `auto_setpoints` | Auto Setpoints (default off). On = the controller may rewrite this room's per-zone VWC targets from what it has learned, in bounded steps, never while a dated plan owns the room. Off = it still learns and reports, and writes nothing. Per room: `switch.crop_steering_<prefix>auto_setpoints`. |
 | `system_enabled` | Master on/off. Off = no irrigation at all. |
 | `auto_irrigation_enabled` | Enables the autonomous decision loop (off = manual-only). |
 | `ec_stacking_enabled` | When on, the system builds EC when below target instead of diluting (push EC up intentionally). |
@@ -191,7 +193,8 @@ match the globals above.
 | `zone_N_vwc` | % | Fused substrate moisture. |
 | `zone_N_ec` | mS/cm | Fused pore-water EC. |
 | `zone_N_phase` | — | The zone's current phase (P0–P3). |
-| `zone_N_status` | — | `Optimal` / `Dry - Needs Water` / `Saturated` / `Disabled` / `Sensor Error`. |
+| `zone_N_auto_setpoints` | — | Published by the controller: `off` / `learning` / `tracking` / `frozen`. Attributes: `learned_peak`, `gain`, `day_rate`, `night_rate`, `p1_outcome` (`pending` / `reached` / `short` / `plateau` / `suspect`), `hold_days`, `frozen_reason`, `last_change`, `jev`, `managed` (the number entities it may rewrite). |
+| `zone_N_status` | — | `Optimal` / `Dry - Needs Water` / `Saturated` / `Disabled` / `Sensor Error`; `Room off` while the room is switched off. |
 | `zone_N_safety_status` | — | `safe` / fault. |
 | `zone_N_health_score` / `zone_N_efficiency` | — | Per-zone health/efficiency. |
 | `zone_N_daily_water_usage` / `_daily_water_app` | L | Water today (resets at lights-on). |

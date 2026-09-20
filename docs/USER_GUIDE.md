@@ -2,7 +2,7 @@
 
 Use **Overview** to check a room and **Irrigation plan** for **Today** and **Schedule**. Today shows the current zone targets; Schedule edits the dated plan. Select the room before editing; zone numbers belong to that room.
 
-The unified navigation and overnight-curve changes described here are follow-up UI source awaiting release verification. The recorded live checks in this guide refer to deployed **2.16.0**, which used the earlier Manual setpoints/Grow plan labels. Existing `#/strategy` and `#/grow-plan` bookmarks are preserved as Today and Schedule.
+The unified **Irrigation plan → Today / Schedule** navigation and overnight curves were verified live in **2.16.1 / controller 0.13.3**. The recorded live checks later in this guide were taken on deployed **2.16.0**, which used the earlier Manual setpoints/Grow plan labels. Existing `#/strategy` and `#/grow-plan` bookmarks are preserved as Today and Schedule.
 
 New installation? Start with [Install, upgrade and rollback](INSTALL.md). To try the interface without connecting equipment, open the [interactive demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1).
 
@@ -169,7 +169,7 @@ For an existing timed zone hold, Home Assistant exposes the `crop_steering.set_m
 
 On 8 September 2026, the deployed **2.16.0** installation completed reviewed MCP preview/apply/readback for tank mappings in both rooms. Each saved setup reached revision **1**, and healthy controller reports acknowledged revision **1**. The F2 panel showed **42%** tank level, **3.06 mS/cm EC**, **pH 5.66**, **17.9 °C**, the explicitly mapped recorded-fill time, and timezone-aware last-irrigation events. The HA sidebar was hidden while in the panel; the Home Assistant button revealed it.
 
-These are recorded checks, not current sensor values. They verify the deployed display and configuration path, not physical filling or water delivery. The follow-up Today/Schedule navigation and overnight-curve update require separate release verification.
+These are recorded checks, not current sensor values. They verify the deployed display and configuration path, not physical filling or water delivery. The Today/Schedule navigation and overnight-curve update were verified separately on 2.16.1; see the [feature matrix](FEATURE_MATRIX.md).
 
 ## Connect an LLM with MCP
 

@@ -23,15 +23,15 @@ The calendar supports grow days 1–366 per zone, distinct start dates and compl
 ## Read the combined graph
 
 - **VWC axis:** percent substrate water content. P1 target, P2 trigger and the P3 emergency floor come from the selected interpolated profile.
-- **EC axis:** root-zone conductivity in mS/cm. P0/P1/P2 references are distinct from the supply tank's feed EC. There is no independent scheduled P3 EC target; that segment is omitted.
+- **EC axis:** root-zone conductivity in mS/cm. P0/P1/P2 references are distinct from the supply tank's feed EC. There is no independent scheduled P3 EC target: overnight, the dashed EC line interpolates from the last daytime reference to the next morning's. It is not a predicted salt response.
 - **Morning dryback:** relative to the peak. Formula: (peak − current VWC) / peak × 100. A peak of 60% and a dryback target of 10% gives a 54% VWC reference, a drop of six percentage points.
 - **Phase windows:** show configured wait/shot timing where supplied. Approximate layout windows are explained beneath the chart when a parameter is missing. Actual phase transitions depend on sensor conditions.
-- **Overnight:** P3 shows only the conditional emergency floor; it does not invent an overnight VWC/EC trend or routine watering schedule.
-- **Shot band:** illustrates nominal retained shot volume; drainage and actual substrate response can differ.
+- **The day, phase by phase:** the VWC line is drawn the way the controller runs the day. P0 keeps drying after lights-on, P1 climbs one step per shot, P2 fires a shot each time VWC falls to its threshold, and P3 dries down overnight to the next lights-on. Shot timing comes from a dry-down rate: the zone's own measured rate on **Today**, a stated nominal rate (2 points an hour with lights on, 1 with lights off) where no zone history is available, as on **Schedule**. The P3 emergency floor stays a separate line. If a P2 threshold sits far under the P1 target, few or no P2 shots project, and the graph says why and names the threshold that would give them.
+- **Shot size on the graph:** each riser assumes the whole shot is retained unless the zone has a learned gain; drainage and actual substrate response can differ. Hover a riser for its time and size.
 
 Change a slider, profile value or supported graph handle and the preview updates immediately. Graph handles edit the selected profile's endpoints as explained in the UI; check shared profile references. Editing the graph does not directly write irrigation hardware.
 
-This is a setpoint planning schematic. It does not predict uptake, runoff, salt balance or the exact times of future shots. **Overview → history** separately plots recorded VWC and EC on one timeline using HA Recorder data, with independent units/axes and explicit missing-data states.
+This is a projection from setpoints and a dry-down rate. It does not predict uptake, runoff or salt balance, and the engine fires on the probe, not on these times. **Overview → history** separately plots recorded VWC and EC on one timeline using HA Recorder data, with independent units/axes and explicit missing-data states.
 
 ## See changes while editing manual setpoints
 
