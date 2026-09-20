@@ -1,3 +1,10 @@
+# 0.15.2
+
+Pair with integration 2.18.1. No change to irrigation behaviour, options or saved state.
+
+- Test seam: the state file location can be overridden with the `F2_STATE_PATH` environment variable. **Unset, as on every install, it is `/data/state.json` exactly as before.** The constructor reads that file, and on adopting a setup writes it, before a test can redirect it; GitHub runners have no `/data`, so CI never noticed, but on any machine where `/data` exists and is writable (a devcontainer, this add-on's own container) the test suite wrote a real file there and leaked it into the next test.
+- Bundles nothing new; the dashboard is the 2.18.0 build.
+
 # 0.15.1
 
 - A room switched off stays off while Home Assistant restarts. The room's on/off switch reads unavailable for a moment during a core restart, and unavailable used to mean on: an empty room began a fresh run and raised its probe alerts again. The controller now keeps the last value it read (also across its own restart) and only treats a switch it has never seen as on, which is what keeps integrations older than the switch watering.

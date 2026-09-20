@@ -198,7 +198,10 @@ class Controller:
         )  # generic last-resort fallback — real volume read live from the integration
         self._opt_lon = float(o.get("lights_on_hour", 10))
         self._opt_loff = float(o.get("lights_off_hour", 22))
-        self._state_path = "/data/state.json"
+        # Live installs always use /data/state.json (HA-managed, survives Rebuild). The env
+        # override exists so a test/dev rig can redirect the file BEFORE this constructor's
+        # own _load_state()/adoption pass reads and writes it.
+        self._state_path = os.environ.get("F2_STATE_PATH") or "/data/state.json"
         self._busy = False
         self._alerted = {}
         self._fused_id_cache = (

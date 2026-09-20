@@ -11,6 +11,8 @@ fingerprint after a restart = resume (hardware must still read OFF; the kill swi
 Anything else keeps the full fail-safe.
 """
 import json
+import os
+import tempfile
 
 import pytest
 
@@ -35,8 +37,12 @@ def _states(kill="on", revision=4, **descriptor):
 def _start(states, state_path=None):
     """A controller process starting up; pass the previous process's state file to model a restart.
 
-    The real constructor reads /data/state.json BEFORE its first setup pass. The test rig can only
-    redirect the state file afterwards, so that first pass is wiped and replayed against the file."""
+    The real constructor reads its state file BEFORE its first setup pass, so point it at the
+    previous process's file (or at a brand-new empty location: a first start with nothing saved)
+    before constructing. `_build` then re-seeds from a scratch file, so the pass is replayed
+    against the intended file below."""
+    os.environ["F2_STATE_PATH"] = state_path or os.path.join(
+        tempfile.mkdtemp(prefix="f2resume_"), "state.json")  # restored by the autouse fixture
     c, fake = _build({"num_zones": 1, "enable_flag": KILL, "notify_service": "notify/phone"}, states=states)
     if state_path:
         c._state_path = state_path

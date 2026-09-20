@@ -1,0 +1,37 @@
+{
+  "_about": "An install from the crop_steering.env era: config_method env, only the legacy front/back probe pair (no *_sensors lists), no setup_revision, no room_name/active, a probe with NO unit, and setup fields shadowed in entry.options the way old versions wrote them.",
+  "entry_id": "seededenvera00000000000000000001",
+  "unique_id": "default",
+  "title": "Crop Steering (1 zones from .env)",
+  "data": {
+    "name": "Crop Steering System",
+    "config_method": "env",
+    "room_prefix": "",
+    "room_slug": "default",
+    "num_zones": 1,
+    "zones": {
+      "1": {
+        "zone_number": 1, "zone_switch": "switch.veg_valve",
+        "vwc_front": "sensor.veg_vwc_front", "vwc_back": "sensor.veg_vwc_back",
+        "ec_front": "sensor.veg_ec_front", "ec_back": "sensor.veg_ec_template"
+      }
+    },
+    "hardware": {"pump_switch": "switch.veg_pump", "main_line_switch": "switch.veg_main"},
+    "parameters": {"substrate_volume": 10.0, "dripper_flow_rate": 2.0, "drippers_per_plant": 2},
+    "features": {"ec_stacking": false},
+    "env_file_path": "/config/crop_steering.env"
+  },
+  "options": {"reloaded": true, "zones_detected": 1},
+  "states": {
+    "switch.veg_valve": ["off", {}],
+    "switch.veg_pump": ["off", {}],
+    "switch.veg_main": ["off", {}],
+    "sensor.veg_vwc_front": ["58", {"unit_of_measurement": "%"}],
+    "sensor.veg_vwc_back": ["62", {"unit_of_measurement": "%"}],
+    "sensor.veg_ec_front": ["3.0", {"unit_of_measurement": "mS/cm"}],
+    "sensor.veg_ec_template": ["3.4", {}]
+  },
+  "operator_tuned_numbers": {
+    "number.crop_steering_substrate_volume": "8"
+  }
+}

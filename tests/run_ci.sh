@@ -43,6 +43,21 @@ run "pytest — integration + health + services + state + version" env PYTEST_DI
 run "pytest — add-on controller (real engine)" env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest addons/f2_control/tests -q
 run "pytest — pure engine core"  env PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
 
+# The real-Home-Assistant tier (fresh install, the controller hand-off, seeded in-place upgrades;
+# see docs/TESTING.md). It needs a full Home Assistant, so it is kept out of the lean
+# prerequisites above:   pip install -r requirements-test-ha.txt      (Python 3.13+)
+# Set HA_PYTHON to run it from a separate virtualenv, e.g. HA_PYTHON=~/ha-venv/bin/python.
+real_home_assistant() {
+  local py="${HA_PYTHON:-python}"
+  if ! "$py" -c "import pytest_homeassistant_custom_component" 2>/dev/null; then
+    echo "SKIPPED: pytest-homeassistant-custom-component is not installed for '$py'."
+    echo "         CI runs this tier; install it (or set HA_PYTHON) to run it here."
+    return 0
+  fi
+  "$py" -m pytest tests_ha -q
+}
+run "pytest — integration inside a real Home Assistant" real_home_assistant
+
 echo
 if [ "${fail}" -eq 0 ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED — see above"; fi
 exit "${fail}"

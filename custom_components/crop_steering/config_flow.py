@@ -96,8 +96,18 @@ def _hardware_schema(hardware: dict | None = None, params: dict | None = None) -
     params = params or {}
 
     def _ent(key, sel):
+        # Prefilled as a SUGGESTED value, not a default. With `default=` the frontend dropped an
+        # emptied field and voluptuous put the default straight back, so a mapping could be
+        # swapped but never removed - and the pump and main-line are optional now, so removing
+        # one has to work. The form still opens showing the mapping, so a save cannot wipe it.
         val = hardware.get(key) or ""
-        out[vol.Optional(key, default=val) if val else vol.Optional(key)] = sel
+        out[
+            (
+                vol.Optional(key, description={"suggested_value": val})
+                if val
+                else vol.Optional(key)
+            )
+        ] = sel
 
     out: dict = {}
     _ent("pump_switch", _sw_sel())
@@ -803,6 +813,34 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             _LOGGER.error(f"Error reloading .env: {e}")
             return self.async_abort(reason="reload_failed")
 
+    def _number_id(self, key: str) -> str:
+        from .setup_api import effective
+
+        prefix = effective(self._entry).get("room_prefix", "")
+        return f"number.crop_steering_{prefix}{key}"
+
+    def _live_numbers(self, keys) -> dict:
+        """{key: value} for each of this room's number entities that has a numeric state."""
+        live = {}
+        for key in keys:
+            state = self.hass.states.get(self._number_id(key))
+            try:
+                live[key] = float(state.state)
+            except (AttributeError, TypeError, ValueError):
+                continue  # absent or unavailable: the caller falls back to what setup recorded
+        return live
+
+    async def _set_live_numbers(self, values: dict) -> None:
+        for key, value in values.items():
+            if self.hass.states.get(self._number_id(key)) is None:
+                continue
+            await self.hass.services.async_call(
+                "number",
+                "set_value",
+                {"entity_id": self._number_id(key), "value": value},
+                blocking=True,
+            )
+
     async def async_step_edit_parameters(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -816,14 +854,31 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     reason="setup_invalid",
                     description_placeholders={"error": "; ".join(blockers)},
                 )
+            # The entry's `parameters` only SEED a number entity the first time it is created.
+            # After that the entity restores its own last value, so updating `parameters` alone
+            # saved the edit, reloaded, and each number restored the old value over the top:
+            # nothing the engine reads ever changed. Write the live entities first; the reload
+            # that follows then restores the value just written.
+            await self._set_live_numbers(user_input)
             new_data = effective(self._entry)
             new_data["parameters"] = {**new_data.get("parameters", {}), **user_input}
             _update(self.hass, self._entry, new_data)
 
             return self.async_create_entry(title="", data={})
 
-        # Get current parameters
-        current_params = effective(self._entry).get("parameters", {})
+        # What the engine is reading NOW. The recorded `parameters` go stale the moment a number
+        # is changed on a dashboard, so showing them here presented an old value as current.
+        current_params = {
+            **effective(self._entry).get("parameters", {}),
+            **self._live_numbers(
+                (
+                    "substrate_volume",
+                    "dripper_flow_rate",
+                    "p1_target_vwc",
+                    "p2_vwc_threshold",
+                )
+            ),
+        }
 
         return self.async_show_form(
             step_id="edit_parameters",
@@ -832,7 +887,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(
                         "substrate_volume",
                         default=current_params.get("substrate_volume", 10.0),
-                    ): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=200.0)),
+                    ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=200.0)),
                     vol.Optional(
                         "dripper_flow_rate",
                         default=current_params.get("dripper_flow_rate", 2.0),

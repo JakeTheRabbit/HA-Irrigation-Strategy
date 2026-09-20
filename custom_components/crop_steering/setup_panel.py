@@ -9,6 +9,23 @@ PANEL = "crop-steering"
 URL = "/crop_steering"
 
 
+def _panel_exists(hass, frontend) -> bool:
+    """Whether the sidebar path is already taken, on every supported Home Assistant.
+
+    `frontend.async_panel_exists` only arrived in Home Assistant 2026.5.0. Called
+    unconditionally it raised AttributeError inside async_setup_entry on anything older, so
+    the config entry failed to set up - no entities, no dashboard - on the 2024.3+ this
+    integration says it supports. The fallback is what that helper does: look in the
+    frontend's own panel table, whose key has been the same since before 2024.3.
+    """
+    exists = getattr(frontend, "async_panel_exists", None)
+    if exists is not None:
+        return exists(hass, PANEL)
+    return PANEL in hass.data.get(
+        getattr(frontend, "DATA_PANELS", "frontend_panels"), {}
+    )
+
+
 async def async_setup_panel(hass):
     from homeassistant.components import frontend
 
@@ -17,7 +34,7 @@ async def async_setup_panel(hass):
     # registration so another room cannot pass the panel guard during that await.
     lock = state.setdefault("panel_lock", asyncio.Lock())
     async with lock:
-        if state.get("panel_registered") or frontend.async_panel_exists(hass, PANEL):
+        if state.get("panel_registered") or _panel_exists(hass, frontend):
             return
         if not state.get("static_registered"):
             directory = str(Path(__file__).parent / "www")
@@ -34,7 +51,7 @@ async def async_setup_panel(hass):
             state["static_registered"] = True
         # Another integration can claim this route while HTTP registration yields.
         # Leave its panel unowned so our unload never removes it.
-        if frontend.async_panel_exists(hass, PANEL):
+        if _panel_exists(hass, frontend):
             return
         frontend.async_register_built_in_panel(
             hass,
