@@ -168,19 +168,17 @@ def test_upstreams_own_release_may_arrive_through_an_intake_branch():
     )
 
 
-def test_the_one_grandfathered_branch_is_the_only_one():
-    assert guards.GRANDFATHERED_HEADS == {"fix/2.18.1-post-44-follow-up"}
+def test_no_branch_is_exempt_by_name():
+    """2.18.1 was opened before these rules and was let through by name until it merged. That
+    exception is gone; a fix branch that carries a version in its name is still not a release.
+    """
+    assert not hasattr(guards, "GRANDFATHERED_HEADS")
     before = {"integration": "2.18.0", "controller": "0.15.1"}
-    assert (
-        _pr(
-            head_ref="fix/2.18.1-post-44-follow-up",
-            base_versions=before,
-            head_versions=OLD,
-            tags={"v2.18.0"},
+    for head in ("fix/2.18.1-post-44-follow-up", "fix/2.18.2-something"):
+        (problem,) = _pr(
+            head_ref=head, base_versions=before, head_versions=OLD, tags={"v2.18.0"}
         )
-        == []
-    )
-    assert _pr(head_ref="fix/2.18.2-something", base_versions=before, head_versions=OLD)
+        assert "release/<the new version>" in problem
 
 
 # --------------------------------------------------------------------------- reading versions

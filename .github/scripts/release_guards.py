@@ -31,9 +31,6 @@ CONST = "custom_components/crop_steering/const.py"
 VERSION_FILES = (MANIFEST, ADDON_CONFIG, CONST)
 
 PRODUCTION, STAGING = "main", "testing"
-# Opened before these rules existed, with its version change already reviewed. Delete this once
-# it has merged; nothing else belongs here.
-GRANDFATHERED_HEADS = frozenset({"fix/2.18.1-post-44-follow-up"})
 
 
 # --------------------------------------------------------------------------- pure rules
@@ -86,8 +83,8 @@ def check_pull_request(
     if changed:
         summary = ", ".join(f"{part} {old} -> {new}" for part, (old, new) in changed.items())
         new_versions = {new for _old, new in changed.values()}
-        if head_ref.startswith("intake/") or head_ref in GRANDFATHERED_HEADS:
-            pass  # upstream's own release arriving in a fork; or the one exception named above
+        if head_ref.startswith("intake/"):
+            pass  # upstream's own release arriving in a fork, carrying upstream's number
         elif not is_release or named_for not in new_versions:
             problems.append(
                 f"This pull request changes a version number ({summary}) from the branch "
