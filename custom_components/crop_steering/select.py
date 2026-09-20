@@ -212,6 +212,9 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         self._attr_name = description.name
         # Set object_id to include crop_steering prefix for entity_id generation
         self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}{description.key}"
+        # Home Assistant ignores _attr_object_id and would name a NEW entity from its friendly name
+        # (number.p1_target_vwc). Existing installs keep the id the registry already holds.
+        self.entity_id = f"select.{self._attr_object_id}"
         self._attr_options = description.options
 
         # Set default values based on entity type

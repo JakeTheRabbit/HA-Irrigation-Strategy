@@ -23,12 +23,12 @@ import {
   latestOnly,
   nearestReading,
   plotPoints,
-  referenceLines,
   sensorStats,
   spreadLabels,
   timeTicks,
   windowLabel,
   windowPoints,
+  type FieldSuggestion,
   type ReferenceLine,
   type SensorMetric,
   type SensorReading,
@@ -749,35 +749,45 @@ export function SensorContextCard({
   );
 }
 
-/** Self-contained card for pages that only have a set of target parameters to draw. */
-export function SensorContext({
-  controller,
-  zone,
-  parameters,
-  enabled,
-  subtitle,
-  disabledNote,
+/** A suggestion under a field. It is never applied for the operator: the button only fills the
+ * page's local draft, which still goes through that page's review. */
+export function FieldSuggestionLine({
+  suggestion,
+  zoneName,
+  draftValue,
+  unit,
+  action,
+  disabled,
+  onUse,
 }: {
-  controller: Controller;
-  zone: Zone | undefined;
-  parameters: Record<string, number>;
-  enabled: boolean;
-  subtitle?: string;
-  disabledNote?: string;
+  suggestion: FieldSuggestion;
+  /** Named when the field is not specific to the zone the suggestion came from. */
+  zoneName?: string;
+  /** The suggestion as a value this field accepts; null hides the button. */
+  draftValue: number | null;
+  unit: string;
+  /** Completes the button label: "Use 60% …". */
+  action: string;
+  disabled: boolean;
+  onUse: (value: number) => void;
 }) {
-  const context = useSensorContext(controller, zone, enabled);
-  const typicalDailyPeak = context.vwc.stats?.typicalDailyPeak ?? null;
-  const learnedPeak = zone?.auto?.learnedPeak ?? null;
-  const lines = useMemo(
-    () => referenceLines({ draft: parameters, typicalDailyPeak, learnedPeak }),
-    [parameters, typicalDailyPeak, learnedPeak],
-  );
   return (
-    <SensorContextCard
-      context={context}
-      lines={lines}
-      subtitle={subtitle}
-      disabledNote={disabledNote}
-    />
+    <p className="setting-suggestion">
+      <span>
+        Suggestion{zoneName ? ` from ${zoneName}` : ""} · {suggestion.text}.
+      </span>
+      {draftValue !== null && (
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          disabled={disabled}
+          onClick={() => onUse(draftValue)}
+        >
+          Use {draftValue}
+          {unit} {action}
+        </Button>
+      )}
+    </p>
   );
 }

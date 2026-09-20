@@ -215,10 +215,55 @@ export function formatReading(value: number, metric: SensorMetric, unit = true):
 }
 /** Advisory margins: VWC in percentage points, pore EC in mS/cm. */
 const MARGIN: Record<SensorMetric, number> = { vwc: 1.5, ec: 0.5 };
+/** A value that already exists elsewhere, offered for one field. Never applied automatically. */
+export interface FieldSuggestion {
+  value: number;
+  source: "learned" | "history";
+  /** Names the value and where it came from. */
+  text: string;
+}
+/** Field capacity is the zone's ceiling: the peak the controller has learned, else the typical
+ * daily peak from recorded history. Null when neither exists; nothing is estimated here. */
+export function fieldCapacitySuggestion(
+  learnedPeak: number | null | undefined,
+  stats: SensorStats | null,
+  hours: number,
+): FieldSuggestion | null {
+  if (typeof learnedPeak === "number" && Number.isFinite(learnedPeak))
+    return {
+      value: learnedPeak,
+      source: "learned",
+      text: `Learned peak ${formatReading(learnedPeak, "vwc")}, the ceiling the controller’s Auto Setpoints has learned for this zone`,
+    };
+  const typical = stats?.typicalDailyPeak;
+  if (typical === null || typical === undefined) return null;
+  return {
+    value: typical,
+    source: "history",
+    text: `Typical daily peak ${formatReading(typical, "vwc")}, the median daily high this probe recorded over ${stats!.days} ${stats!.days === 1 ? "day" : "days"} (${windowLabel(hours)} window)`,
+  };
+}
+/** Nearest value a number field accepts (same step rule as validateSetpoint); null when the
+ * suggestion lies outside the field's limits. */
+export function suggestedDraft(
+  value: number,
+  field: { min: number; max: number; step: number },
+): number | null {
+  if (!Number.isFinite(value)) return null;
+  const snapped =
+    field.step > 0
+      ? Number(
+          (field.min + Math.round((value - field.min) / field.step) * field.step).toPrecision(12),
+        )
+      : value;
+  return snapped >= field.min && snapped <= field.max ? snapped : null;
+}
 export interface FieldHint {
+  /** Empty when only a suggestion is available (no recorded history). */
   text: string;
   /** Gentle, advisory only. Saving is never blocked by it. */
   warning: string | null;
+  suggestion: FieldSuggestion | null;
 }
 /** `stats` must belong to the metric returned by setpointMetric(param). */
 export function fieldHint(
@@ -226,9 +271,13 @@ export function fieldHint(
   value: number | null,
   stats: SensorStats | null,
   hours: number,
+  learnedPeak: number | null = null,
 ): FieldHint | null {
   const metric = setpointMetric(param);
-  if (!metric || !stats) return null;
+  if (!metric) return null;
+  const suggestion =
+    param === "field_capacity" ? fieldCapacitySuggestion(learnedPeak, stats, hours) : null;
+  if (!stats) return suggestion && { text: "", warning: null, suggestion };
   const show = (reading: number) => formatReading(reading, metric);
   const span = windowLabel(hours);
   const typed = value !== null && Number.isFinite(value) ? value : null;
@@ -241,6 +290,7 @@ export function fieldHint(
         floor !== null && floor < stats.trough.value - MARGIN.vwc
           ? `dryback floor ${show(floor)} is below anything this probe has read in ${span} (trough ${show(stats.trough.value)})`
           : null,
+      suggestion,
     };
   }
   const range = `${formatReading(stats.trough.value, metric, false)}–${show(stats.peak.value)}`;
@@ -269,7 +319,7 @@ export function fieldHint(
         ? `this probe read above this limit in ${span} (peak ${show(stats.peak.value)})`
         : null;
   else warning = tooHigh ? above : tooLow ? below : null;
-  return { text, warning };
+  return { text, warning, suggestion };
 }
 
 /** Value axis over readings AND setpoints, so a distant target is visibly distant. */

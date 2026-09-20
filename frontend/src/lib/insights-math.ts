@@ -1,13 +1,3 @@
-export function calibrateDripper(collectedMl: number, minutes: number): number | null {
-  if (
-    !Number.isFinite(collectedMl) ||
-    !Number.isFinite(minutes) ||
-    collectedMl <= 0 ||
-    minutes <= 0
-  )
-    return null;
-  return ((collectedMl / 1000) * 60) / minutes;
-}
 export interface ShotInputs {
   substrateL: number;
   plants: number;

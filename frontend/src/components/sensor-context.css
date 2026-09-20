@@ -282,6 +282,17 @@
   font-size: 11px;
   line-height: 1.6;
 }
+/* A suggested value under a field, beside the button that copies it into the local draft. */
+.setting-suggestion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 6px 0 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.5;
+}
 @media (max-width: 1150px) {
   /* Stacked above the form: the collapsed preview drops prose, never the charts. */
   .setpoint-preview:not(.is-expanded) .sensor-context-caption {

@@ -9,10 +9,20 @@ import { PlanningCurve } from "@/components/planning-curve";
 import { WaterDelivery } from "@/components/water-delivery";
 import { buildSetpointPreview, validateSetpoint } from "@/lib/setpoint-preview";
 import { smoothRecorded, type PlanningPhaseId } from "@/lib/planning-curve";
-import { SensorContextCard, useSensorContext } from "@/components/sensor-context";
+import {
+  FieldSuggestionLine,
+  SensorContextCard,
+  useSensorContext,
+} from "@/components/sensor-context";
 import { AutoBadge, AutoSetpointsControl, AutoZoneChip } from "@/components/room-controls";
 import { managedBy } from "@/lib/auto-setpoints";
-import { fieldHint, referenceLines, setpointMetric, setpointParam } from "@/lib/sensor-context";
+import {
+  fieldHint,
+  referenceLines,
+  setpointMetric,
+  setpointParam,
+  suggestedDraft,
+} from "@/lib/sensor-context";
 import "./setpoint-preview.css";
 
 const phaseGroups = ["P0 · Morning dryback", "P1 · Ramp-up", "P2 · Maintenance", "P3 · Overnight"];
@@ -482,8 +492,17 @@ export function Strategy({
                                   : null;
                               const hint =
                                 param && metric
-                                  ? fieldHint(param, typed, sensor[metric].stats, sensor.hours)
+                                  ? fieldHint(
+                                      param,
+                                      typed,
+                                      sensor[metric].stats,
+                                      sensor.hours,
+                                      sensorZone?.auto?.learnedPeak,
+                                    )
                                   : null;
+                              const suggested = hint?.suggestion
+                                ? suggestedDraft(hint.suggestion.value, setting)
+                                : null;
                               const auto = managedBy(supervisors, setting.entityId);
                               return (
                                 <div
@@ -554,13 +573,28 @@ export function Strategy({
                                           Managed automatically – manual edits will be overwritten.
                                         </p>
                                       )}
-                                      {hint && (
+                                      {hint?.text && (
                                         <p className="setting-sensor-hint">
                                           {setting.zoneId === undefined
                                             ? `${sensor.zoneName} probe · `
                                             : ""}
                                           {hint.text}
                                         </p>
+                                      )}
+                                      {hint?.suggestion && (
+                                        <FieldSuggestionLine
+                                          suggestion={hint.suggestion}
+                                          zoneName={
+                                            setting.zoneId === undefined
+                                              ? sensor.zoneName
+                                              : undefined
+                                          }
+                                          draftValue={suggested}
+                                          unit={setting.unit}
+                                          action="in draft"
+                                          disabled={!canEdit || typed === suggested}
+                                          onUse={(value) => edit(setting, String(value))}
+                                        />
                                       )}
                                       {hint?.warning && (
                                         <p className="setting-advisory">

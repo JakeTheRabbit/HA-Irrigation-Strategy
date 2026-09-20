@@ -263,6 +263,8 @@ class CropSteeringEngineConfigSensor(SensorEntity):
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_engine_config"
         self._attr_name = "Engine config"
         self._attr_object_id = f"{DOMAIN}_{self._prefix}engine_config"
+        # Home Assistant ignores _attr_object_id; the controller finds a room by THIS id.
+        self.entity_id = f"sensor.{self._attr_object_id}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -312,6 +314,9 @@ class CropSteeringSensor(SensorEntity):
         self._attr_name = description.name
         # Set object_id to include crop_steering prefix for entity_id generation
         self._attr_object_id = f"{DOMAIN}_{self._prefix}{description.key}"
+        # Home Assistant ignores _attr_object_id and would name a NEW entity from its friendly name
+        # (number.p1_target_vwc). Existing installs keep the id the registry already holds.
+        self.entity_id = f"sensor.{self._attr_object_id}"
 
         # Extract zone number from key if this is a zone sensor.
         # Regex matches BOTH `vwc_zone_3` and `zone_3_status`-style keys; the prior
