@@ -21,7 +21,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Heading, Empty } from "@/components/dashboard";
+import {
+  CatchTestCalculator,
+  SizingField,
+  SizingUnitPickers,
+  SubstratePresetPicker,
+  useSizingUnits,
+} from "@/components/zone-sizing";
 import type { Controller } from "@/lib/types";
+import { SIZING_UNITS, reviewValue, sizingError } from "@/lib/units";
 import { errorText } from "@/lib/utils";
 import type { SetupCandidate, SetupDocument, SetupRoom, SetupZone } from "@/lib/operator-types";
 
@@ -182,6 +190,7 @@ export function Setup({
   const [review, setReview] = useState<"save" | "remove" | null>(null),
     [confirmName, setConfirmName] = useState("");
   const [tab, setTab] = useState<"rooms" | "install">("rooms");
+  const units = useSizingUnits();
   const dirty = !!draft && (isNew || JSON.stringify(draft) !== JSON.stringify(original));
   const connected = ["live", "demo"].includes(controller.connection);
   useLayoutEffect(() => {
@@ -286,12 +295,14 @@ export function Setup({
         (z) =>
           !Number.isInteger(z.plant_count) ||
           z.plant_count < 1 ||
-          !Number.isFinite(z.substrate_volume) ||
-          Number(z.substrate_volume) <= 0 ||
+          !!sizingError(
+            z.substrate_volume ?? NaN,
+            "substrate_volume",
+            SIZING_UNITS.volume.metric,
+          ) ||
           !Number.isFinite(z.drippers_per_plant) ||
           Number(z.drippers_per_plant) < 1 ||
-          !Number.isFinite(z.dripper_flow_rate) ||
-          Number(z.dripper_flow_rate) <= 0,
+          !!sizingError(z.dripper_flow_rate ?? NaN, "dripper_flow_rate", SIZING_UNITS.flow.metric),
       )
     )
       errors.push("Enter valid plant counts, pot volumes and dripper sizing.");
@@ -658,6 +669,7 @@ export function Setup({
                     Add zone
                   </Button>
                 </div>
+                <SizingUnitPickers units={units} disabled={busy} />
                 <div className="setup-zones">
                   {activeZones.map((zone) => (
                     <section className="setup-zone" key={zone.id}>
@@ -708,30 +720,60 @@ export function Setup({
                       <div className="workspace-form-grid sizing-grid">
                         {(
                           [
-                            ["plant_count", "Plants", 1, 1000, 1],
-                            ["substrate_volume", "Pot volume · L per plant", 0.1, 200, 0.1],
-                            ["drippers_per_plant", "Drippers per plant", 1, 20, 1],
-                            ["dripper_flow_rate", "Dripper flow · L/h each", 0.1, 50, 0.1],
+                            "plant_count",
+                            "substrate_volume",
+                            "drippers_per_plant",
+                            "dripper_flow_rate",
                           ] as const
-                        ).map(([key, label, min, max, step]) => (
-                          <div key={key}>
-                            <Label htmlFor={"zone-" + zone.id + "-" + key}>{label}</Label>
-                            <Input
+                        ).map((key) =>
+                          key === "substrate_volume" || key === "dripper_flow_rate" ? (
+                            <SizingField
+                              key={key}
                               id={"zone-" + zone.id + "-" + key}
-                              type="number"
-                              min={min}
-                              max={max}
-                              step={step}
+                              sizingKey={key}
+                              unit={key === "substrate_volume" ? units.volume : units.flow}
+                              value={zone[key] ?? NaN}
                               disabled={busy}
-                              value={Number.isFinite(zone[key]) ? zone[key] : ""}
-                              onChange={(e) =>
-                                editZone(zone.id, {
-                                  [key]: e.target.value === "" ? NaN : Number(e.target.value),
-                                })
-                              }
+                              onChange={(metric) => editZone(zone.id, { [key]: metric })}
                             />
-                          </div>
-                        ))}
+                          ) : (
+                            <div key={key}>
+                              <Label htmlFor={"zone-" + zone.id + "-" + key}>
+                                {key === "plant_count" ? "Plants" : "Drippers per plant"}
+                              </Label>
+                              <Input
+                                id={"zone-" + zone.id + "-" + key}
+                                type="number"
+                                min={1}
+                                max={key === "plant_count" ? 1000 : 20}
+                                step={1}
+                                disabled={busy}
+                                value={Number.isFinite(zone[key]) ? zone[key] : ""}
+                                onChange={(e) =>
+                                  editZone(zone.id, {
+                                    [key]: e.target.value === "" ? NaN : Number(e.target.value),
+                                  })
+                                }
+                              />
+                            </div>
+                          ),
+                        )}
+                      </div>
+                      <div className="workspace-form-grid sizing-helpers">
+                        <SubstratePresetPicker
+                          id={"zone-" + zone.id + "-substrate-preset"}
+                          volumeFieldId={"zone-" + zone.id + "-substrate_volume"}
+                          litres={zone.substrate_volume ?? NaN}
+                          disabled={busy}
+                          onPick={(litres) => editZone(zone.id, { substrate_volume: litres })}
+                        />
+                        <CatchTestCalculator
+                          id={"zone-" + zone.id + "-catch-test"}
+                          zoneName={zone.name}
+                          flowUnit={units.flow}
+                          disabled={busy}
+                          onUse={(flow) => editZone(zone.id, { dripper_flow_rate: flow })}
+                        />
                       </div>
                       {(!zone.vwc_sensors.length || !zone.ec_sensors.length) && (
                         <p className="small muted">
@@ -845,8 +887,10 @@ export function Setup({
                     {z.vwc_sensors.length} VWC probes · {z.ec_sensors.length} EC probes
                   </p>
                   <p>
-                    {z.plant_count} plants × {z.substrate_volume} L · {z.drippers_per_plant}{" "}
-                    drippers per plant × {z.dripper_flow_rate} L/h
+                    {z.plant_count} plants ×{" "}
+                    {reviewValue(z.substrate_volume ?? NaN, "substrate_volume", units.volume)} ·{" "}
+                    {z.drippers_per_plant} drippers per plant ×{" "}
+                    {reviewValue(z.dripper_flow_rate ?? NaN, "dripper_flow_rate", units.flow)}
                   </p>
                 </div>
               ))}

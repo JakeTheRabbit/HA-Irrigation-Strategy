@@ -20,6 +20,16 @@ The controller retains source-water/interlock gates, duration/daily-volume caps 
 
 Water cards distinguish total substrate capacity from all-plant zone litres and average mL per plant. The runtime calculator includes whole-second timing, the minimum shot and duration cap. Phase estimates also disclose engine parameter limits. New delivery counters use configured flow captured per shot and elapsed runtime, including partial aborts; historical totals are preserved.
 
+## Optional: the Cloudflare judge
+
+Auto Setpoints works without it. To let the `typesafe/jev` model on Cloudflare Workers AI veto suspect changes and look after P2, set three options and restart the controller:
+
+- `cf_account_id`: your Cloudflare account id.
+- `cf_api_token`: an API token with the **Workers AI** permission (read and edit is enough). Create it at dash.cloudflare.com, My Profile, API Tokens, Create Token, Workers AI template.
+- `cf_gateway_id`: optional, an AI Gateway name if you want the calls logged there.
+
+What it may do: on a P1 plateau, veto the hand-over when the evidence looks like a probe or delivery fault. Once an hour during P2, nudge the zone's P2 shot size within 1-4 % and hold the working peak within 2 points of the learned one, one step per lever per grow-day. It cannot fire, size or delay a shot. A tripped guard or no answer in 5 seconds changes nothing. Each zone's `auto_setpoints` sensor shows `jev`, `jev_last` and `jev_changed_today`.
+
 ## Updating
 
 Update the integration and this app together. Use **Update** or **Rebuild** to include new Python code; restarting an old image does not rebuild it. Preserve persistent data and export plans before upgrades. See the installation guide for rollback instructions.

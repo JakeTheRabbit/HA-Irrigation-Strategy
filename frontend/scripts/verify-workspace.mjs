@@ -131,12 +131,111 @@ async function pause() {
     await page.getByRole("dialog").waitFor({ state: "hidden" });
   }
 }
-async function saveSetup() {
-  await page.getByRole("button", { name: "Review configuration", exact: true }).click();
-  await visible(page.getByRole("heading", { name: "Review room configuration", exact: true }));
-  await page.getByRole("button", { name: "Save configuration", exact: true }).click();
-  await page.getByRole("dialog").waitFor({ state: "hidden", timeout: 10000 });
+async function saveSetup(target = page) {
+  await target.getByRole("button", { name: "Review configuration", exact: true }).click();
+  await visible(target.getByRole("heading", { name: "Review room configuration", exact: true }));
+  await target.getByRole("button", { name: "Save configuration", exact: true }).click();
+  await target.getByRole("dialog").waitFor({ state: "hidden", timeout: 10000 });
 }
+/** Mocked live Home Assistant with one room, so a check can read the exact setup_save payload.
+ * `calls` records every service the page reached, which is how "never actuates" is proven. */
+async function liveSetup(run) {
+  const live = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const calls = [];
+  const stamp = new Date().toISOString();
+  const entity = (entity_id, state, attributes = {}) => ({
+    entity_id,
+    state,
+    attributes,
+    last_updated: stamp,
+    last_changed: stamp,
+  });
+  const states = [
+    entity("sensor.crop_steering_f1_engine_config", "ready", {
+      prefix: "f1_",
+      slug: "f1",
+      num_zones: 1,
+      friendly_name: "Flower 1 engine config",
+      enable_flag: "switch.crop_steering_f1_engine_enabled",
+    }),
+    entity("switch.crop_steering_f1_engine_enabled", "off"),
+  ];
+  const room = {
+    entry_id: "sizing-fixture-entry",
+    revision: 1,
+    room_name: "Flower 1",
+    prefix: "f1_",
+    slug: "f1",
+    active: true,
+    num_zones: 1,
+    active_zone_ids: [1],
+    zones: [
+      {
+        id: 1,
+        name: "Zone 1",
+        active: true,
+        valve: "switch.fixture_valve",
+        vwc_sensors: [],
+        ec_sensors: [],
+        plant_count: 12,
+        substrate_volume: 6,
+        drippers_per_plant: 1,
+        dripper_flow_rate: 4,
+      },
+    ],
+    hardware: {},
+    safety: { ready: true, blockers: [] },
+  };
+  await live.addInitScript(() =>
+    localStorage.setItem("hassTokens", JSON.stringify({ access_token: "sizing-fixture-token" })),
+  );
+  await live.route("**/*", (route) => {
+    const req = route.request(),
+      u = new URL(req.url());
+    if (u.origin !== origin) {
+      forbidden.push(u.origin + u.pathname);
+      return route.abort();
+    }
+    if (!u.pathname.startsWith("/api/")) return route.continue();
+    const reply = (data, status = 200) =>
+      route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
+    if (u.pathname === "/api/states") return reply(states);
+    const action = u.pathname.split("/").at(-1),
+      data = req.postDataJSON();
+    calls.push({ action, data });
+    if (action === "setup_read")
+      return reply({
+        service_response: {
+          api_version: 1,
+          capabilities: { create: true, save: true, remove: true, stable_zone_ids: true },
+          rooms: [room],
+          candidates: [],
+          limits: { max_zones: 24 },
+        },
+      });
+    if (action === "setup_save") {
+      Object.assign(room, { zones: data.zones, revision: room.revision + 1 });
+      return reply({ changed_states: [], service_response: room });
+    }
+    return reply({ message: "The sizing fixture has no such service" }, 400);
+  });
+  const lp = await live.newPage();
+  lp.setDefaultTimeout(10000);
+  lp.on("pageerror", (e) => pageErrors.push(e.message));
+  try {
+    await lp.goto(origin + "/dashboard.html?room=f1#/setup");
+    await visible(lp.locator("#room-name"));
+    await run(lp, calls);
+    assert.deepEqual(
+      [...new Set(calls.map((call) => call.action))].sort(),
+      ["setup_read", "setup_save"],
+      "Sizing helpers must reach no service except reading and saving the setup",
+    );
+  } finally {
+    await live.close();
+  }
+}
+const savedZone = (calls) => calls.findLast((call) => call.action === "setup_save").data.zones[0];
 try {
   await check(
     "Planning slider changes both plotted VWC and EC; exact day and week edits preserve neighboring days and other zones",
@@ -355,6 +454,212 @@ try {
       await saveSetup();
       assert.equal(await page.locator("#setup-room").inputValue(), id);
       assert.equal(await page.locator("#room-name").inputValue(), "Verification room");
+    },
+  );
+  await check(
+    "Sizing units: gallons and GPH are typed and shown, litres and L/h are saved, and the choice is remembered",
+    async () => {
+      await fresh("setup");
+      await visible(page.locator("#room-name"));
+      const volume = page.locator("#zone-1-substrate_volume");
+      assert.equal(await page.locator("#sizing-unit-volume").inputValue(), "metric");
+      assert.equal(await page.locator("#sizing-unit-flow").inputValue(), "metric");
+      assert.equal(await volume.inputValue(), "6");
+      await page.locator("#sizing-unit-volume").selectOption("us");
+      await visible(page.getByLabel("Pot volume · US gal per plant").first());
+      assert.equal(await volume.inputValue(), "1.585", "6 L shown in US gallons");
+      assert.equal(
+        await page.locator("#zone-1-substrate_volume-note").innerText(),
+        "= 6 L per plant, saved in litres",
+      );
+      assert.equal(
+        await page.getByRole("button", { name: "Review configuration", exact: true }).isDisabled(),
+        true,
+        "Changing the unit alone must not change the draft",
+      );
+      await volume.fill("60");
+      assert.equal(await volume.getAttribute("aria-invalid"), "true");
+      assert.equal(
+        await page.locator("#zone-1-substrate_volume-note").innerText(),
+        "Pot volume must be 0.027–52.834 US gal (0.1–200 L).",
+      );
+      assert.equal(
+        await page.getByRole("button", { name: "Review configuration", exact: true }).isDisabled(),
+        true,
+      );
+      await volume.fill("5");
+      assert.equal(
+        await page.locator("#zone-1-substrate_volume-note").innerText(),
+        "= 18.927 L per plant, saved in litres",
+      );
+      await fresh("setup");
+      await visible(page.locator("#room-name"));
+      assert.equal(
+        await page.locator("#sizing-unit-volume").inputValue(),
+        "us",
+        "The unit choice is remembered in this browser",
+      );
+      await page.locator("#sizing-unit-volume").selectOption("metric");
+      await liveSetup(async (lp, calls) => {
+        await lp.locator("#sizing-unit-volume").selectOption("us");
+        await lp.locator("#sizing-unit-flow").selectOption("us");
+        await lp.locator("#zone-1-substrate_volume").fill("5");
+        await lp.locator("#zone-1-dripper_flow_rate").fill("2");
+        await lp.getByRole("button", { name: "Review configuration", exact: true }).click();
+        assert.match(
+          await lp.getByRole("dialog").innerText(),
+          /12 plants × 18\.927 L \(5 US gal\) · 1 drippers per plant × 7\.571 L\/h \(2 US GPH\)/,
+        );
+        await lp.getByRole("button", { name: "Back to editing", exact: true }).click();
+        await saveSetup(lp);
+        const zone = savedZone(calls);
+        assert.equal(zone.substrate_volume, 18.92705892, "5 US gal at exactly 3.785411784 L");
+        assert.equal(zone.dripper_flow_rate, 7.570823568, "2 US GPH at exactly 3.785411784 L");
+        assert.equal(zone.plant_count, 12);
+        assert.equal(await lp.locator("#zone-1-substrate_volume").inputValue(), "5");
+        await lp.locator("#sizing-unit-volume").selectOption("metric");
+        assert.equal(await lp.locator("#zone-1-substrate_volume").inputValue(), "18.927");
+      });
+    },
+  );
+  await check(
+    "Sizing units default from the unit system of the Home Assistant page embedding the dashboard",
+    async () => {
+      const embedded = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+      await embedded.route("**/*", (route) => {
+        const u = new URL(route.request().url());
+        if (u.origin !== origin || u.pathname.startsWith("/api/")) {
+          forbidden.push(u.origin + u.pathname);
+          return route.abort();
+        }
+        if (u.pathname === "/workspace-units-parent.html")
+          return route.fulfill({
+            contentType: "text/html",
+            body: `<!doctype html><html><body style="margin:0"><home-assistant></home-assistant><script>document.querySelector("home-assistant").hass={config:{unit_system:{volume:"gal",length:"mi"}}};</script><iframe title="Crop Steering" src="/dashboard.html?demo=1#/setup" style="border:0;width:100vw;height:100vh"></iframe></body></html>`,
+          });
+        return route.continue();
+      });
+      const ep = await embedded.newPage();
+      ep.on("pageerror", (e) => pageErrors.push(e.message));
+      try {
+        await ep.goto(origin + "/workspace-units-parent.html");
+        const frame = ep.frames().find((f) => f !== ep.mainFrame());
+        assert.ok(frame);
+        await visible(frame.locator("#room-name"));
+        assert.equal(await frame.locator("#sizing-unit-volume").inputValue(), "us");
+        assert.equal(await frame.locator("#sizing-unit-flow").inputValue(), "us");
+        assert.equal(await frame.locator("#zone-1-dripper_flow_rate").inputValue(), "1.057");
+      } finally {
+        await embedded.close();
+      }
+    },
+  );
+  await check(
+    "Substrate presets fill the pot volume in litres, show their litres, and leave custom typing alone",
+    async () => {
+      await fresh("setup");
+      await visible(page.locator("#room-name"));
+      const preset = page.locator("#zone-1-substrate-preset");
+      assert.equal(await preset.inputValue(), "custom", "6 L is not a preset");
+      const options = await preset.locator("option").allInnerTexts();
+      assert.deepEqual(options, [
+        "Custom · type the pot volume",
+        "Rockwool 4 in cube · 10 × 10 × 6.5 cm · 0.65 L",
+        "Rockwool Hugo · 15 × 15 × 14.2 cm · 3.2 L",
+        "1 gal pot (nominal) · 3.8 L",
+        "2 gal pot (nominal) · 7.6 L",
+        "3 gal pot (nominal) · 11.4 L",
+        "5 gal pot (nominal) · 18.9 L",
+        "7 gal pot (nominal) · 26.5 L",
+        "5 L pot · 5 L",
+        "10 L pot · 10 L",
+        "15 L pot · 15 L",
+        "20 L pot · 20 L",
+      ]);
+      await visible(
+        page
+          .getByText(
+            "Nursery “trade” pots often hold less than their nominal gallons, and shot sizes are a percentage of this volume, so measure it if unsure.",
+            { exact: true },
+          )
+          .first(),
+      );
+      await preset.selectOption("rockwool-4in");
+      assert.equal(await page.locator("#zone-1-substrate_volume").inputValue(), "0.65");
+      await page.locator("#zone-1-substrate_volume").fill("6.5");
+      assert.equal(await preset.inputValue(), "custom", "Typing a volume is a custom entry");
+      await page.locator("#zone-1-substrate_volume").fill("20");
+      assert.equal(await preset.inputValue(), "pot-20l", "A typed preset volume is recognised");
+      await liveSetup(async (lp, calls) => {
+        await lp.locator("#zone-1-substrate-preset").selectOption("pot-5gal");
+        assert.equal(await lp.locator("#zone-1-substrate_volume").inputValue(), "18.9");
+        await saveSetup(lp);
+        assert.equal(savedZone(calls).substrate_volume, 18.9, "Nominal 5 gal pot is 18.9 L");
+        await lp.locator("#zone-1-substrate-preset").selectOption("rockwool-hugo");
+        await saveSetup(lp);
+        assert.equal(savedZone(calls).substrate_volume, 3.2, "Hugo block is 3.2 L");
+        assert.equal(savedZone(calls).dripper_flow_rate, 4, "Other sizing is untouched");
+      });
+    },
+  );
+  await check(
+    "Catch test works out L/h, rejects nonsense, fills only the dripper-flow draft and actuates nothing",
+    async () => {
+      await fresh("setup");
+      await visible(page.locator("#room-name"));
+      const catchTest = page.locator("#zone-1-catch-test");
+      await catchTest.locator("summary").click();
+      assert.match(await catchTest.innerText(), /never opens a valve or runs a pump/);
+      const use = catchTest.getByRole("button");
+      assert.equal(await use.isDisabled(), true);
+      await catchTest.getByLabel("Run time · seconds").fill("0");
+      await catchTest.getByLabel("Water caught from one dripper · mL").fill("65");
+      assert.equal(
+        await page.locator("#zone-1-catch-test-result").innerText(),
+        "Run time must be more than 0 seconds.",
+      );
+      assert.equal(
+        await catchTest.getByLabel("Run time · seconds").getAttribute("aria-invalid"),
+        "true",
+      );
+      assert.equal(await use.isDisabled(), true);
+      await catchTest.getByLabel("Run time · seconds").fill("1");
+      await catchTest.getByLabel("Water caught from one dripper · mL").fill("5000");
+      assert.match(
+        await page.locator("#zone-1-catch-test-result").innerText(),
+        /^That works out to 18000 L\/h, above the 50 L\/h maximum for a dripper\./,
+      );
+      assert.equal(await use.isDisabled(), true);
+      await catchTest.getByLabel("Run time · seconds").fill("60");
+      await catchTest.getByLabel("Water caught from one dripper · mL").fill("65");
+      assert.equal(
+        await page.locator("#zone-1-catch-test-result").innerText(),
+        "Flow per dripper: 3.9 L/h",
+      );
+      assert.equal(
+        await page.locator("#zone-1-dripper_flow_rate").inputValue(),
+        "4",
+        "Computing a result must not touch the draft",
+      );
+      await axe("setup-sizing-helpers");
+      await page.getByRole("button", { name: "Use 3.9 L/h as Zone 1 dripper flow" }).click();
+      assert.equal(await page.locator("#zone-1-dripper_flow_rate").inputValue(), "3.9");
+      assert.equal(await page.locator("#zone-2-dripper_flow_rate").inputValue(), "4");
+      await liveSetup(async (lp, calls) => {
+        const live = lp.locator("#zone-1-catch-test");
+        await live.locator("summary").click();
+        await live.getByLabel("Run time · seconds").fill("47");
+        await live.getByLabel("Water caught from one dripper · mL").fill("100");
+        await lp.getByRole("button", { name: "Use 7.66 L/h as Zone 1 dripper flow" }).click();
+        assert.equal(
+          calls.some((call) => call.action === "setup_save"),
+          false,
+          "Using the result must not save anything by itself",
+        );
+        await saveSetup(lp);
+        assert.equal(savedZone(calls).dripper_flow_rate, 7.66);
+        assert.equal(savedZone(calls).substrate_volume, 6, "Other sizing is untouched");
+      });
     },
   );
   await check(

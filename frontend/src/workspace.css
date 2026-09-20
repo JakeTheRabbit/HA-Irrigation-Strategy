@@ -406,6 +406,47 @@
 .sizing-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+.sizing-units {
+  grid-template-columns: repeat(2, minmax(0, 260px));
+  margin-top: 0;
+}
+.sizing-units > p {
+  grid-column: 1 / -1;
+  margin-top: -10px;
+}
+.sizing-grid p,
+.sizing-helpers p {
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.sizing-helpers {
+  align-items: start;
+  margin-top: 0;
+}
+.catch-test summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+.catch-test summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.catch-test .workspace-form-grid {
+  margin: 12px 0 0;
+}
+.catch-test .catch-test-result,
+.catch-test .field-error {
+  margin: 12px 0;
+  font-size: 13px;
+}
+.sizing-action {
+  height: auto;
+  min-height: 36px;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
 .archived-zones {
   padding: 16px 0;
 }

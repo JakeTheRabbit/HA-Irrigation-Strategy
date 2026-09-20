@@ -24,7 +24,7 @@ import {
 } from "@/components/dashboard";
 import { WaterDelivery } from "@/components/water-delivery";
 import { waterParameters } from "@/lib/water-delivery";
-import { calibrateDripper } from "@/lib/insights-math";
+import { calibrateDripper } from "@/lib/catch-test";
 import type { Controller, Metric, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import type { SetupDocument, SetupRoom } from "@/lib/operator-types";

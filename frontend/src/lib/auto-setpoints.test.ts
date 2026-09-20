@@ -41,6 +41,8 @@ describe("auto setpoint status", () => {
       p1Outcome: "plateau",
       lastChange: "P1 target 38.0 → 36.5 %",
       jev: "ok",
+      jevLast: null,
+      jevChangedToday: null,
       managed: [
         "number.crop_steering_zone_1_p1_target_vwc",
         "number.crop_steering_zone_1_p2_vwc_threshold",
@@ -152,5 +154,29 @@ describe("auto setpoint status", () => {
     expect(managedBy([off], "number.crop_steering_zone_1_p1_target_vwc")).toBe(false);
     expect(managedBy([tracking], "number.crop_steering_zone_1_p2_vwc_threshold")).toBe(false);
     expect(managedBy([null, tracking], "number.crop_steering_zone_1_p1_target_vwc")).toBe(true);
+  });
+});
+
+describe("what the judge said in P2", () => {
+  const entity = (attributes: Record<string, unknown>): EntityState => ({
+    entity_id: "sensor.crop_steering_zone_1_auto_setpoints",
+    state: "tracking",
+    attributes,
+    last_changed: "",
+    last_updated: "",
+  });
+  it("is shown in its own words, and left out when it has said nothing", () => {
+    const spoke = parseAutoSetpoints(
+      entity({
+        jev: "ok",
+        jev_last: "14:00 no change (ec_steer level 2 (0.84))",
+        jev_changed_today: "12:00 p2_shot_size 3 -> 4",
+      }),
+    )!;
+    expect(autoStatusText(spoke)).toContain("Jev changed today: 12:00 p2_shot_size 3 -> 4");
+    expect(autoStatusText(spoke)).toContain("Jev last said: 14:00 no change");
+    const silent = parseAutoSetpoints(entity({ jev: "disabled", jev_last: 7 }))!;
+    expect(silent.jevLast).toBeNull();
+    expect(autoStatusText(silent)).not.toContain("Jev last said");
   });
 });

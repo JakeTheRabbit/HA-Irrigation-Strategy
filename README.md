@@ -85,7 +85,7 @@ Each room has a **Room on / off** control in Settings and on Overview. Off means
 
 The controller always learns each zone from its own shots: the ceiling the probe actually reaches, what a shot lifts it, and how fast it dries with lights on and off. With **Auto Setpoints** switched on for a room, it uses that to keep the zone's targets attainable. When two P1 shots in a row stop raising VWC, it hands over to P2 and carries the achieved peak forward as the P1 target, holds it for three days, then tries one point higher. It only rewrites that zone's own target numbers, in bounded steps, and never while a dated plan owns the room. The engine still decides every shot. Fields it manages carry an **Auto** badge, and each zone shows what it has learned and its last change.
 
-An optional check by the `typesafe/jev` model on Cloudflare Workers AI can veto a change when the evidence looks like a probe or delivery fault. It is consulted only when a ramp plateaus, and irrigation never waits on it.
+An optional check by the `typesafe/jev` model on Cloudflare Workers AI can veto a change when the evidence looks like a probe or delivery fault. It is consulted when a ramp plateaus and once an hour during P2, where it may nudge the zone's P2 shot size (pore EC up or down) and hold the working peak a little above or below the learned one: one small, bounded step per grow-day. Irrigation never waits on it, and no answer means no change.
 
 ## Set up rooms and sensors
 

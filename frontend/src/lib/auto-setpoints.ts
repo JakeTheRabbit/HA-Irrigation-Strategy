@@ -16,6 +16,9 @@ export interface AutoSetpointStatus {
   p1Outcome: (typeof OUTCOMES)[number] | null;
   lastChange: string | null;
   jev: (typeof JEV)[number] | null;
+  /** The judge's latest hourly P2 answer, and what it has changed this grow-day, in its own words. */
+  jevLast: string | null;
+  jevChangedToday: string | null;
   /** number.* entities the supervisor rewrites; manual edits to them do not last. */
   managed: string[];
   updated: string | null;
@@ -48,6 +51,8 @@ export function parseAutoSetpoints(entity: EntityState | undefined): AutoSetpoin
     p1Outcome: oneOf(OUTCOMES, attributes.p1_outcome),
     lastChange: text(attributes.last_change),
     jev: oneOf(JEV, attributes.jev),
+    jevLast: text(attributes.jev_last),
+    jevChangedToday: text(attributes.jev_changed_today),
     managed: Array.isArray(attributes.managed)
       ? attributes.managed.filter(
           (id): id is string => typeof id === "string" && /^number\.[a-z0-9_]+$/.test(id),
@@ -87,6 +92,8 @@ export function autoStatusText(status: AutoSetpointStatus): string {
       : `learned peak ${status.learnedPeak.toFixed(1)}%${hold ? `, ${hold}` : ""}`,
     status.lastChange ? `last change: ${status.lastChange}` : "no changes yet",
     `Jev: ${status.jev ?? "not reported"}`,
+    ...(status.jevChangedToday ? [`Jev changed today: ${status.jevChangedToday}`] : []),
+    ...(status.jevLast ? [`Jev last said: ${status.jevLast}`] : []),
   ].join(" · ");
 }
 /** A setpoint is "Auto" only while a supervisor that owns it is running. */

@@ -25,7 +25,12 @@ import { Heading, Empty, number } from "@/components/dashboard";
 import { WaterDelivery } from "@/components/water-delivery";
 import { PlanningCurve } from "@/components/planning-curve";
 import { RecipeLibrary } from "@/components/recipe-library";
-import { SensorContext } from "@/components/sensor-context";
+import {
+  FieldSuggestionLine,
+  SensorContextCard,
+  useSensorContext,
+} from "@/components/sensor-context";
+import { fieldCapacitySuggestion, referenceLines, suggestedDraft } from "@/lib/sensor-context";
 import { syncPlanZones } from "@/lib/sync-plan-zones";
 import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
@@ -174,6 +179,14 @@ export function GrowPlanner({
   const columns =
     granularity === "week" ? Math.ceil(lastScheduled / 7) : Math.min(lastScheduled, 366);
   const selectedZone = controller.room.zones.find((z) => z.id === zoneId);
+  // Recorded probe behaviour for the endpoints tab: the chart, and the field-capacity suggestion.
+  const sensor = useSensorContext(controller, selectedZone, connected && tab === "profiles");
+  const learnedPeak = selectedZone?.auto?.learnedPeak ?? null;
+  const capacitySuggestion = fieldCapacitySuggestion(learnedPeak, sensor.vwc.stats, sensor.hours);
+  const capacityDraft =
+    capacitySuggestion && limits.field_capacity
+      ? suggestedDraft(capacitySuggestion.value, limits.field_capacity)
+      : null;
   const configuredLightsOn = controller.room.settings.find((f) =>
     f.entityId.endsWith("_lights_on_hour"),
   )?.value;
@@ -819,11 +832,13 @@ export function GrowPlanner({
             </>
           )}
           {tab === "profiles" && (
-            <SensorContext
-              controller={controller}
-              zone={selectedZone}
-              parameters={params}
-              enabled={connected}
+            <SensorContextCard
+              context={sensor}
+              lines={referenceLines({
+                draft: params,
+                typicalDailyPeak: sensor.vwc.stats?.typicalDailyPeak ?? null,
+                learnedPeak,
+              })}
               subtitle={`targets blended for grow day ${day} (${currentBlock?.bias ?? 50}% generative) drawn over what the probes read`}
               disabledNote="Recorded history loads while Home Assistant is connected."
             />
@@ -916,6 +931,21 @@ export function GrowPlanner({
                     <small className="muted">
                       {limit.min}–{limit.max} {limit.unit}
                     </small>
+                    {key === "field_capacity" && capacitySuggestion && (
+                      <FieldSuggestionLine
+                        suggestion={capacitySuggestion}
+                        zoneName={selectedZone?.name}
+                        draftValue={capacityDraft}
+                        unit={limit.unit}
+                        action="for both endpoints"
+                        disabled={
+                          disabled ||
+                          (profile?.vegetative[key] === capacityDraft &&
+                            profile?.generative[key] === capacityDraft)
+                        }
+                        onUse={(value) => curveEdit(key, value)}
+                      />
+                    )}
                   </div>
                   {(["vegetative", "generative"] as const).map((side) => (
                     <div key={side}>

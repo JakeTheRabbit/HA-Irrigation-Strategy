@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   chartScale,
+  fieldCapacitySuggestion,
   fieldHint,
   formatReading,
   latestOnly,
@@ -11,13 +12,15 @@ import {
   setpointMetric,
   setpointParam,
   spreadLabels,
+  suggestedDraft,
   timeTicks,
   valueScale,
   windowLabel,
   windowPoints,
   type SensorStats,
 } from "./sensor-context";
-import type { Series } from "./types";
+import { validateSetpoint } from "./setpoint-preview";
+import type { Series, Setting } from "./types";
 
 // 13:00 NZST on 8 September 2026 (UTC+12, before daylight saving starts).
 const now = Date.parse("2026-09-08T01:00:00Z");
@@ -336,6 +339,76 @@ describe("field hints", () => {
     expect(formatReading(36, "vwc")).toBe("36.0%");
     expect(formatReading(3.842, "ec")).toBe("3.84 mS/cm");
     expect(formatReading(3.842, "ec", false)).toBe("3.84");
+  });
+  describe("field capacity suggestion", () => {
+    it("prefers the peak the controller has learned, and says where it came from", () => {
+      expect(fieldCapacitySuggestion(61.4, vwc, 72)).toEqual({
+        value: 61.4,
+        source: "learned",
+        text: "Learned peak 61.4%, the ceiling the controller’s Auto Setpoints has learned for this zone",
+      });
+    });
+    it("falls back to the typical daily peak from recorded history", () => {
+      expect(fieldCapacitySuggestion(null, vwc, 72)).toEqual({
+        value: 35.9,
+        source: "history",
+        text: "Typical daily peak 35.9%, the median daily high this probe recorded over 3 days (72 h window)",
+      });
+      expect(fieldCapacitySuggestion(undefined, { ...vwc, days: 1 }, 24)!.text).toBe(
+        "Typical daily peak 35.9%, the median daily high this probe recorded over 1 day (24 h window)",
+      );
+      expect(fieldCapacitySuggestion(NaN, vwc, 72)!.source).toBe("history");
+    });
+    it("suggests nothing rather than guess when neither value exists", () => {
+      expect(fieldCapacitySuggestion(null, null, 72)).toBeNull();
+      expect(fieldCapacitySuggestion(null, { ...vwc, typicalDailyPeak: null }, 72)).toBeNull();
+    });
+    it("rides on the field-capacity hint only", () => {
+      expect(fieldHint("field_capacity", 70, vwc, 72, 61.4)!.suggestion).toMatchObject({
+        value: 61.4,
+        source: "learned",
+      });
+      expect(fieldHint("field_capacity", 70, vwc, 72)!.suggestion).toMatchObject({
+        value: 35.9,
+        source: "history",
+      });
+      expect(fieldHint("p1_target_vwc", 64, vwc, 72, 61.4)!.suggestion).toBeNull();
+      expect(fieldHint("maximum_ec", 9, ec, 72, 61.4)!.suggestion).toBeNull();
+    });
+    it("still offers a learned peak while recorded history is unavailable", () => {
+      expect(fieldHint("field_capacity", 70, null, 72, 61.4)).toEqual({
+        text: "",
+        warning: null,
+        suggestion: fieldCapacitySuggestion(61.4, null, 72),
+      });
+      expect(fieldHint("field_capacity", 70, null, 72, null)).toBeNull();
+      expect(fieldHint("p1_target_vwc", 64, null, 72, 61.4)).toBeNull();
+    });
+    it("turns a suggestion into a value the field accepts", () => {
+      const field = { min: 5, max: 100, step: 1 };
+      expect(suggestedDraft(61.4, field)).toBe(61);
+      expect(suggestedDraft(61.5, field)).toBe(62);
+      expect(suggestedDraft(35.9, { min: 40, max: 90, step: 0.5 })).toBeNull();
+      expect(suggestedDraft(101, field)).toBeNull();
+      expect(suggestedDraft(58.34, { min: 0, max: 100, step: 0.1 })).toBe(58.3);
+      expect(suggestedDraft(58.34, { min: 0, max: 100, step: 0 })).toBe(58.34);
+      expect(suggestedDraft(NaN, field)).toBeNull();
+    });
+    it("only ever proposes a draft that passes the field's own validation", () => {
+      const setting: Setting = {
+        entityId: "number.crop_steering_zone_1_field_capacity",
+        label: "Field capacity",
+        description: "",
+        value: 70,
+        min: 5,
+        max: 100,
+        step: 0.1,
+        unit: "%",
+        group: "Other",
+      };
+      for (const value of [5, 5.04, 58.34, 61.45, 99.96, 100])
+        expect(validateSetpoint(setting, String(suggestedDraft(value, setting)))).toBe("");
+    });
   });
 });
 

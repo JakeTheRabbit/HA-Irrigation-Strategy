@@ -85,4 +85,28 @@ async def test_a_one_switch_tent_becomes_a_room_and_its_switches_get_the_ids_the
         "sensor.crop_steering_engine_config"
     )
     assert descriptor is not None
-    assert not descriptor.attributes.get("pump") and descriptor.attributes["valves"] == {"1": VALVE}
+    valves = {str(zone): valve for zone, valve in descriptor.attributes["valves"].items()}
+    assert not descriptor.attributes.get("pump") and valves == {"1": VALVE}
+
+
+async def test_a_fresh_install_registers_every_entity_under_the_id_its_code_asks_for(hass):
+    """Home Assistant ignores `_attr_object_id`. Until 2.18.0 a new room's numbers, selects, sensors and
+    buttons were named from their labels (`number.p1_target_vwc`, `sensor.engine_config`), so the
+    controller never found the room. Existing installs never showed it: the registry keeps old ids."""
+    from homeassistant.helpers import entity_platform
+
+    _seed(hass)
+    flow_id = await _to_zones_step(hass)
+    await hass.config_entries.flow.async_configure(flow_id, dict(ZONES))
+    await hass.config_entries.flow.async_configure(flow_id, {})
+    await hass.async_block_till_done()
+
+    checked, wrong = 0, []
+    for platform in entity_platform.async_get_platforms(hass, DOMAIN):
+        for entity in platform.entities.values():
+            wanted = getattr(entity, "_attr_object_id", None)
+            if wanted:
+                checked += 1
+                if entity.entity_id != f"{platform.domain}.{wanted}":
+                    wrong.append(f"{entity.entity_id} should be {platform.domain}.{wanted}")
+    assert checked > 100 and not wrong, wrong

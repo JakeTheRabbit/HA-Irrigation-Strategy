@@ -193,7 +193,7 @@ match the globals above.
 | `zone_N_vwc` | % | Fused substrate moisture. |
 | `zone_N_ec` | mS/cm | Fused pore-water EC. |
 | `zone_N_phase` | — | The zone's current phase (P0–P3). |
-| `zone_N_auto_setpoints` | — | Published by the controller: `off` / `learning` / `tracking` / `frozen`. Attributes: `learned_peak`, `gain`, `day_rate`, `night_rate`, `p1_outcome` (`pending` / `reached` / `short` / `plateau` / `suspect`), `hold_days`, `frozen_reason`, `last_change`, `jev`, `managed` (the number entities it may rewrite). |
+| `zone_N_auto_setpoints` | — | Published by the controller: `off` / `learning` / `tracking` / `frozen`. Attributes: `learned_peak`, `gain`, `day_rate`, `night_rate`, `p1_outcome` (`pending` / `reached` / `short` / `plateau` / `suspect`), `hold_days`, `frozen_reason`, `last_change`, `jev` (`disabled` / `ok` / `unavailable`), `jev_last` (the judge's latest hourly P2 answer), `jev_changed_today`, `working_peak_adjust`, `managed` (the number entities it may rewrite; includes `p2_shot_size` while the judge is configured). |
 | `zone_N_status` | — | `Optimal` / `Dry - Needs Water` / `Saturated` / `Disabled` / `Sensor Error`; `Room off` while the room is switched off. |
 | `zone_N_safety_status` | — | `safe` / fault. |
 | `zone_N_health_score` / `zone_N_efficiency` | — | Per-zone health/efficiency. |

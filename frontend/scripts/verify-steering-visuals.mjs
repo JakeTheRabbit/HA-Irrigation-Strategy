@@ -210,6 +210,58 @@ try {
     await page.getByRole("button", { name: "Discard draft", exact: true }).click();
   });
   await check(
+    "Field capacity suggestion names its source, fills only the local draft and is never applied by itself",
+    async () => {
+      await fresh("strategy");
+      const capacity = field("field_capacity");
+      const context = page.locator('[id="context-number.crop_steering_zone_1_field_capacity"]');
+      // Zone 1's supervisor is tracking, so the controller has a learned peak to offer.
+      const learned = context.locator(".setting-suggestion");
+      await learned.waitFor();
+      assert.match(
+        await learned.innerText(),
+        /^Suggestion · Learned peak 60\.0%, the ceiling the controller’s Auto Setpoints has learned for this zone\./,
+      );
+      assert.equal(await capacity.inputValue(), "70", "A suggestion must not change the field");
+      assert.equal(
+        await page.getByRole("button", { name: "Discard draft", exact: true }).count(),
+        0,
+        "A suggestion must not create a draft",
+      );
+      await context.getByRole("button", { name: "Use 60% in draft", exact: true }).click();
+      assert.equal(await capacity.inputValue(), "60", "The draft holds the suggested value");
+      // Draft only: the controller keeps its saved value until the change is reviewed and applied.
+      await page.getByText("Currently 70 %", { exact: true }).waitFor();
+      assert.equal(
+        await context.getByRole("button", { name: "Use 60% in draft", exact: true }).isDisabled(),
+        true,
+      );
+      await page.getByRole("button", { name: /^Review 1 change/ }).click();
+      assert.match(
+        await page.getByRole("dialog").locator(".review-row").innerText(),
+        /Zone 1 · Field Capacity[\s\S]*70 %[\s\S]*60 %/,
+      );
+      await page.getByRole("button", { name: "Back to editing", exact: true }).click();
+      await page.getByRole("dialog").waitFor({ state: "hidden" });
+      await page.getByRole("button", { name: "Discard draft", exact: true }).click();
+      assert.equal(await capacity.inputValue(), "70");
+      // Zone 2's supervisor is still learning: the suggestion falls back to recorded history.
+      await page
+        .locator(".strategy-zone-picker")
+        .getByRole("button", { name: /Zone 2/ })
+        .click();
+      const typical = page.locator(
+        '[id="context-number.crop_steering_zone_2_field_capacity"] .setting-suggestion',
+      );
+      await typical.waitFor();
+      assert.match(
+        await typical.innerText(),
+        /^Suggestion · Typical daily peak \d+\.\d%, the median daily high this probe recorded over \d+ days? \(72 h window\)\./,
+      );
+      await axe("field capacity suggestion");
+    },
+  );
+  await check(
     "Runtime estimates show all-plant zone litres and per-plant water separately",
     async () => {
       await fresh("strategy");

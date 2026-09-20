@@ -1,15 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { calibrateDripper, previewShot } from "./insights-math";
+import { previewShot } from "./insights-math";
 describe("local irrigation calculations", () => {
-  it("converts a measured per-dripper catch into L/hour", () => {
-    expect(calibrateDripper(200, 3)).toBe(4);
-    expect(calibrateDripper(100, 1)).toBe(6);
-  });
-  it("does not turn missing, non-positive or invalid measurements into a flow", () => {
-    expect(calibrateDripper(0, 3)).toBeNull();
-    expect(calibrateDripper(100, 0)).toBeNull();
-    expect(calibrateDripper(NaN, 2)).toBeNull();
-  });
   it("keeps substrate percentage, zone litres and emitter duration distinct", () => {
     const result = previewShot({
       substrateL: 6,
