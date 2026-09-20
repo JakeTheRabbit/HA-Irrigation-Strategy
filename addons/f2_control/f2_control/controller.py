@@ -123,6 +123,58 @@ def load_options():
 # Switch read-back after a close: see Controller._confirm_switches.
 CONFIRM_FIRST_READ_S, CONFIRM_POLL_S, CONFIRM_TIMEOUT_S = 1.0, 0.5, 6.0
 
+# How water reaches the zone valves, DECLARED by the operator in the integration's setup and
+# published as the descriptor's `plumbing`: layout -> (needs a pump switch, needs a mainline
+# switch). A tent whose one switch IS the pump, or a pressure-fed manifold, is "valves_only".
+PLUMBING_LAYOUTS = {
+    "valves_only": (False, False),
+    "pump_valves": (True, False),
+    "mainline_valves": (False, True),
+    "pump_mainline_valves": (True, True),
+}
+
+
+def plumbing_needs(layout):
+    """(needs_pump, needs_mainline) for a declared layout.
+
+    An absent or unknown layout is the original three-stage system. "No pump" is never
+    inferred from an empty mapping: on a pumped install a pump that was cleared by accident
+    must keep holding the room loudly, not quietly open valves with no water behind them."""
+    return PLUMBING_LAYOUTS.get(layout, (True, True))
+
+
+def hardware_from_descriptor(desc):
+    """The room's hardware map from an engine_config descriptor, or None while it is
+    incomplete for its declared layout. A mapped stage is always sequenced and always
+    included in OFF checks; the layout only decides which stages are REQUIRED."""
+    desc = desc or {}
+    valves = {int(k): v for k, v in (desc.get("valves") or {}).items() if v}
+    pump, mainline = desc.get("pump") or None, desc.get("mainline") or None
+    needs_pump, needs_mainline = plumbing_needs(desc.get("plumbing"))
+    if not valves or (needs_pump and not pump) or (needs_mainline and not mainline):
+        return None
+    hw = {"pump": pump, "mainline": mainline, "valves": valves}
+    if desc.get("plumbing") in PLUMBING_LAYOUTS:
+        hw["plumbing"] = desc["plumbing"]
+    return hw
+
+
+def descriptor_feed_ec_factor(desc, sensor_in_use):
+    """raw feed-probe reading x factor = mS/cm (uS/cm 0.001, ppm-500 0.002, ppm-700 1/700,
+    CF 0.1). The integration works it out from the mapped probe's unit and publishes it.
+
+    It describes the DESCRIPTOR's probe, so it only applies while that is the probe in use;
+    an add-on `feed_ec_sensor` option naming a different entity reads as mS/cm, as it always
+    has. Absent (older integration) or implausible = 1.0."""
+    desc = desc or {}
+    if not sensor_in_use or sensor_in_use != (desc.get("feed_ec_sensor") or ""):
+        return 1.0
+    try:
+        factor = float(desc.get("feed_ec_factor", 1.0))
+    except (TypeError, ValueError):
+        return 1.0
+    return factor if math.isfinite(factor) and 0 < factor <= 10 else 1.0
+
 
 class Room:
     """One fully-isolated grow room the engine steers. `prefix` is "" for the default
@@ -151,6 +203,8 @@ class Room:
         )
         self.feed_ec_sensor = (feed_ec_sensor or "").strip()
         self.feed_ph_sensor = (feed_ph_sensor or "").strip()
+        # raw feed-probe reading x this = mS/cm (see descriptor_feed_ec_factor); 1.0 = already mS/cm
+        self.feed_ec_factor = 1.0
         # lights: fall back to these option values until the integration entity is read
         self.opt_lon = opt_lon
         self.opt_loff = opt_loff
@@ -247,16 +301,13 @@ class Controller:
             }
         hw = o.get("hardware")
         if not hw:
-            valves = {int(k): v for k, v in (desc.get("valves") or {}).items()}
-            if desc.get("pump") and desc.get("mainline") and valves:
-                hw = {
-                    "pump": desc["pump"],
-                    "mainline": desc["mainline"],
-                    "valves": valves,
-                }
-            else:
-                # unmapped — _blocked() holds every zone and alerts until it's configured
-                hw = {"pump": None, "mainline": None, "valves": {}}
+            # unmapped (or incomplete for its declared plumbing layout) — _blocked() holds
+            # every zone and alerts until it's configured
+            hw = hardware_from_descriptor(desc) or {
+                "pump": None,
+                "mainline": None,
+                "valves": {},
+            }
         hw["valves"] = {int(k): v for k, v in hw["valves"].items()}
         # Source-water feed gate sensors are OPTIONAL and have NO facility default — an empty
         # (or unset) value disables that half of the source-water gate so the add-on works on
@@ -276,11 +327,14 @@ class Controller:
             opt_lon=self._opt_lon,
             opt_loff=self._opt_loff,
         )
-        if not default_room.hw.get("pump"):
+        default_room.feed_ec_factor = descriptor_feed_ec_factor(
+            desc, default_room.feed_ec_sensor
+        )
+        if not default_room.hw.get("valves"):
             log(
-                "config: default room has NO hardware mapped — holding safe. Set the pump, "
-                "mainline and per-zone valves in the Crop Steering integration (or the add-on "
-                "`hardware` option)."
+                "config: default room has NO hardware mapped — holding safe. Map each zone's "
+                "switch (and the pump / mainline if your plumbing has them) in the Crop "
+                "Steering integration (or the add-on `hardware` option)."
             )
         self.rooms = [default_room]
         # ---- additional rooms: discovered from the integration's published descriptors ----
@@ -382,30 +436,27 @@ class Controller:
                     }
                     for z in a.get("active_zone_ids", range(1, num + 1))
                 }
-                hw = {
-                    "pump": a.get("pump"),
-                    "mainline": a.get("mainline"),
-                    "valves": valves,
-                }
-                if not (hw["pump"] and hw["mainline"] and valves and zones):
+                hw = hardware_from_descriptor(a)
+                if not (hw and zones):
                     log(
-                        f"room '{a.get('slug')}' engine_config incomplete — skipped (pump/mainline/valves/zones missing)"
+                        f"room '{a.get('slug')}' engine_config incomplete — skipped "
+                        "(valves/zones missing, or the pump/mainline its plumbing layout needs)"
                     )
                     continue
-                rooms.append(
-                    Room(
-                        slug=a.get("slug") or prefix.rstrip("_"),
-                        prefix=prefix,
-                        zones=zones,
-                        hardware=hw,
-                        enable_flag=a.get("enable_flag")
-                        or f"switch.crop_steering_{prefix}engine_enabled",
-                        feed_ec_sensor=a.get("feed_ec_sensor", ""),
-                        feed_ph_sensor=a.get("feed_ph_sensor", ""),
-                        opt_lon=self._opt_lon,
-                        opt_loff=self._opt_loff,
-                    )
+                room = Room(
+                    slug=a.get("slug") or prefix.rstrip("_"),
+                    prefix=prefix,
+                    zones=zones,
+                    hardware=hw,
+                    enable_flag=a.get("enable_flag")
+                    or f"switch.crop_steering_{prefix}engine_enabled",
+                    feed_ec_sensor=a.get("feed_ec_sensor", ""),
+                    feed_ph_sensor=a.get("feed_ph_sensor", ""),
+                    opt_lon=self._opt_lon,
+                    opt_loff=self._opt_loff,
                 )
+                room.feed_ec_factor = descriptor_feed_ec_factor(a, room.feed_ec_sensor)
+                rooms.append(room)
             except Exception as e:
                 log("room discovery error for", eid, e)
         return rooms
@@ -546,15 +597,11 @@ class Controller:
         self._last_discovery = now
         # (1) resolve the default room's hardware/zones if it started unmapped (HA was down)
         default = self.rooms[0]
-        if default.slug == "default" and not default.hw.get("pump"):
+        if default.slug == "default" and not default.hw.get("valves"):
             desc = self._default_descriptor()
-            valves = {int(k): v for k, v in (desc.get("valves") or {}).items()}
-            if desc.get("pump") and desc.get("mainline") and valves:
-                default.hw = {
-                    "pump": desc["pump"],
-                    "mainline": desc["mainline"],
-                    "valves": valves,
-                }
+            mapped = hardware_from_descriptor(desc)
+            if mapped:
+                default.hw, valves = mapped, mapped["valves"]
                 if not default.zones:
                     n = self._detect_zones(
                         "", int(desc.get("num_zones") or len(valves))
@@ -568,7 +615,8 @@ class Controller:
                     }
                     self._load_room_state(default)
                 log(
-                    f"config: default room hardware now mapped ({desc['pump']}) — resuming"
+                    "config: default room hardware now mapped "
+                    f"({mapped['pump'] or 'no pump switch'}, {len(valves)} valve(s)) — resuming"
                 )
         # (2) add any newly-published additional rooms
         known = {r.slug for r in self.rooms}
@@ -589,19 +637,24 @@ class Controller:
         zone_ids = attrs.get(
             "active_zone_ids", list(range(1, int(attrs.get("num_zones", 0)) + 1))
         )
-        return json.dumps(
-            {
-                "active": attrs.get("active", True),
-                "zones": sorted(zone_ids),
-                "pump": attrs.get("pump"),
-                "mainline": attrs.get("mainline"),
-                "valves": {str(k): v for k, v in (attrs.get("valves") or {}).items()},
-                "enable_flag": attrs.get("enable_flag") or room.enable_flag,
-                "feed_ec_sensor": attrs.get("feed_ec_sensor") or "",
-                "feed_ph_sensor": attrs.get("feed_ph_sensor") or "",
-            },
-            sort_keys=True,
-        )
+        adopted = {
+            "active": attrs.get("active", True),
+            "zones": sorted(zone_ids),
+            "pump": attrs.get("pump"),
+            "mainline": attrs.get("mainline"),
+            "valves": {str(k): v for k, v in (attrs.get("valves") or {}).items()},
+            "enable_flag": attrs.get("enable_flag") or room.enable_flag,
+            "feed_ec_sensor": attrs.get("feed_ec_sensor") or "",
+            "feed_ph_sensor": attrs.get("feed_ph_sensor") or "",
+        }
+        # Newer descriptor fields join the fingerprint ONLY when present. A descriptor without
+        # them must hash exactly as it did when an older controller saved it, or every install
+        # would lose its restart-resume on upgrade and sit blocked behind a disarm cycle.
+        if attrs.get("plumbing") in PLUMBING_LAYOUTS:
+            adopted["plumbing"] = attrs["plumbing"]
+        if attrs.get("feed_ec_factor") not in (None, 1, 1.0):
+            adopted["feed_ec_factor"] = attrs["feed_ec_factor"]
+        return json.dumps(adopted, sort_keys=True)
 
     def _apply_setup_descriptors(self):
         """Adopt explicit versioned setup changes only after both maps are safe OFF.
@@ -657,10 +710,13 @@ class Controller:
                     raise ValueError("Invalid setup active zone list")
                 valves = {int(k): v for k, v in (attrs.get("valves") or {}).items()}
                 desired_hw = {
-                    "pump": attrs.get("pump"),
-                    "mainline": attrs.get("mainline"),
+                    "pump": attrs.get("pump") or None,
+                    "mainline": attrs.get("mainline") or None,
                     "valves": valves,
                 }
+                if attrs.get("plumbing") in PLUMBING_LAYOUTS:
+                    desired_hw["plumbing"] = attrs["plumbing"]
+                needs_pump, needs_mainline = plumbing_needs(attrs.get("plumbing"))
                 desired_flag = attrs.get("enable_flag") or room.enable_flag
                 hardware = set(self._hardware_entities(room)) | {
                     v
@@ -696,8 +752,8 @@ class Controller:
                         )
                     continue
                 if active and (
-                    not desired_hw["pump"]
-                    or not desired_hw["mainline"]
+                    (needs_pump and not desired_hw["pump"])
+                    or (needs_mainline and not desired_hw["mainline"])
                     or any(not valves.get(z) for z in zone_ids)
                 ):
                     raise ValueError("Active setup has incomplete hardware mapping")
@@ -719,6 +775,7 @@ class Controller:
                 room.zones, room.hw, room.enable_flag = zones, desired_hw, desired_flag
                 room.feed_ec_sensor = attrs.get("feed_ec_sensor") or ""
                 room.feed_ph_sensor = attrs.get("feed_ph_sensor") or ""
+                room.feed_ec_factor = descriptor_feed_ec_factor(attrs, room.feed_ec_sensor)
                 room.setup_active, room.setup_revision = active, revision
                 room._setup_fingerprint_adopted = fingerprint
                 room._setup_pending = None
@@ -937,7 +994,12 @@ class Controller:
     def _read_feed_ec(self, room):
         if not room.feed_ec_sensor:
             return None
-        feed = self._read_sensor(room.feed_ec_sensor, lo=0, hi=20)
+        # The plausibility band is 0-20 mS/cm, expressed in the probe's own unit before the
+        # reading is converted (a uS/cm probe legitimately reads 2300, not 2.3).
+        factor = getattr(room, "feed_ec_factor", 1.0) or 1.0
+        feed = self._read_sensor(room.feed_ec_sensor, lo=0, hi=20 / factor)
+        if feed is not None:
+            feed *= factor
         if feed is not None:
             lo = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_min", 0)
             hi = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_max", 0)
@@ -1321,10 +1383,21 @@ class Controller:
         if fault:
             return fault
         hw = room.hw
-        if not (hw.get("pump") and hw.get("mainline") and hw["valves"].get(zone)):
+        needs_pump, needs_mainline = plumbing_needs(hw.get("plumbing"))
+        missing = [
+            name
+            for name, absent in (
+                ("pump", needs_pump and not hw.get("pump")),
+                ("mainline", needs_mainline and not hw.get("mainline")),
+                ("this zone's valve", not hw["valves"].get(zone)),
+            )
+            if absent
+        ]
+        if missing:
             return (
-                "no hardware mapped — set the pump, mainline and this zone's valve in the "
-                "Crop Steering integration (or the add-on `hardware` option)"
+                f"no hardware mapped — set {', '.join(missing)} in the Crop Steering "
+                "integration (or the add-on `hardware` option). A system with no separate "
+                "pump or mainline switch declares that in setup; it is never assumed."
             )
         if not self._on(room.enable_flag, False):
             return "f2-control disabled (kill switch off)"
@@ -1653,35 +1726,47 @@ class Controller:
         self._busy = True
         hw = room.hw
         valve = hw["valves"].get(zone)
+        # Stages this room actually has. A tent whose one switch is the pump, or a pressure-fed
+        # manifold, has neither: the shot is then just valve on -> wait -> valve off -> verify.
+        # _blocked() has already held the zone if a stage its declared layout NEEDS is unmapped.
+        pump, mainline = hw.get("pump"), hw.get("mainline")
         shutdown_checked = False
         try:
             # OPEN sequence — FAIL CLOSED: if any service call errors, cut what's on, alert, and DO NOT count the shot
             # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
-            if not ha_call("switch", "turn_on", entity_id=hw["pump"]):
-                self._alert(
-                    f"hw_{room.slug}_z{zone}",
-                    "Shot aborted — pump command failed",
-                    f"{room.slug} zone {zone}: pump turn_on returned an error. No water delivered, shot NOT counted.",
-                )
-                return
-            time.sleep(2)
-            if not ha_call("switch", "turn_on", entity_id=hw["mainline"]):
-                ha_call("switch", "turn_off", entity_id=hw["pump"])
-                self._alert(
-                    f"hw_{room.slug}_z{zone}",
-                    "Shot aborted — mainline command failed",
-                    f"{room.slug} zone {zone}: mainline turn_on failed. Pump cut. No water, shot NOT counted.",
-                )
-                return
-            time.sleep(1)
+            if pump:
+                if not ha_call("switch", "turn_on", entity_id=pump):
+                    self._alert(
+                        f"hw_{room.slug}_z{zone}",
+                        "Shot aborted — pump command failed",
+                        f"{room.slug} zone {zone}: pump turn_on returned an error. No water delivered, shot NOT counted.",
+                    )
+                    return
+                time.sleep(2)
+            if mainline:
+                if not ha_call("switch", "turn_on", entity_id=mainline):
+                    if pump:
+                        ha_call("switch", "turn_off", entity_id=pump)
+                    self._alert(
+                        f"hw_{room.slug}_z{zone}",
+                        "Shot aborted — mainline command failed",
+                        f"{room.slug} zone {zone}: mainline turn_on failed. "
+                        f"{'Pump cut. ' if pump else ''}No water, shot NOT counted.",
+                    )
+                    return
+                time.sleep(1)
             valve_started = time.monotonic()
             if not ha_call("switch", "turn_on", entity_id=valve):
-                ha_call("switch", "turn_off", entity_id=hw["mainline"])
-                ha_call("switch", "turn_off", entity_id=hw["pump"])
+                if mainline:
+                    ha_call("switch", "turn_off", entity_id=mainline)
+                if pump:
+                    ha_call("switch", "turn_off", entity_id=pump)
+                upstream = " + ".join(n for n, e in (("Pump", pump), ("mainline", mainline)) if e)
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "Shot aborted — valve command failed",
-                    f"{room.slug} zone {zone}: valve {valve} turn_on failed. Pump + mainline cut. No water, shot NOT counted.",
+                    f"{room.slug} zone {zone}: valve {valve} turn_on failed. "
+                    f"{upstream + ' cut. ' if upstream else ''}No water, shot NOT counted.",
                 )
                 return
             elapsed, aborted = self._wait_shot(
@@ -1696,16 +1781,21 @@ class Controller:
             # Delivery is estimated, not flow-metered. Include the acknowledgement
             # interval conservatively because the exact physical close time is unknown.
             elapsed = max(elapsed, time.monotonic() - valve_started)
-            time.sleep(1)
-            close_ok = (
-                ha_call("switch", "turn_off", entity_id=hw["mainline"]) and close_ok
-            )
-            close_ok = ha_call("switch", "turn_off", entity_id=hw["pump"]) and close_ok
+            if mainline or pump:
+                time.sleep(1)
+            if mainline:
+                close_ok = ha_call("switch", "turn_off", entity_id=mainline) and close_ok
+            if pump:
+                close_ok = ha_call("switch", "turn_off", entity_id=pump) and close_ok
             # Only a definitive OFF is safe, including pump/mainline read-back.
-            closed = self._confirm_switches((valve, hw["mainline"], hw["pump"]), "off")
+            sequenced = tuple(e for e in (valve, mainline, pump) if e)
+            closed = self._confirm_switches(sequenced, "off")
             if not close_ok or not closed:
-                ha_call("switch", "turn_off", entity_id=hw["pump"])
-                ha_call("switch", "turn_off", entity_id=hw["mainline"])
+                # Cut upstream first. With no pump or mainline the valve IS the only shut-off,
+                # so ask it again: nothing else in software can stop the water.
+                for ent in (pump, mainline) if (pump or mainline) else (valve,):
+                    if ent:
+                        ha_call("switch", "turn_off", entity_id=ent)
                 self._latch_hardware_fault(
                     room, f"zone {zone} valve/pump/mainline close not confirmed"
                 )
