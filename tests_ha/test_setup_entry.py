@@ -10,6 +10,7 @@ from homeassistant.components import frontend
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.data_entry_flow import FlowResultType
 
+from custom_components.crop_steering.plumbing import infer
 from test_real_flow import ZONES, _seed, _to_zones_step
 
 PANEL = "crop-steering"
@@ -20,7 +21,11 @@ async def _install(hass, hardware=None):
     flow_id = await _to_zones_step(hass)
     result = await hass.config_entries.flow.async_configure(flow_id, dict(ZONES))
     assert result["step_id"] == "hardware", result.get("errors")
-    result = await hass.config_entries.flow.async_configure(flow_id, hardware or {})
+    answers = dict(hardware or {})
+    # The wizard asks how the room is plumbed. Unless a test says otherwise, answer truthfully for
+    # the switches it chose, as a person with a pump would.
+    answers.setdefault("plumbing", infer(answers))
+    result = await hass.config_entries.flow.async_configure(flow_id, answers)
     assert result["type"] is FlowResultType.CREATE_ENTRY, result
     await hass.async_block_till_done()
     return result["result"]

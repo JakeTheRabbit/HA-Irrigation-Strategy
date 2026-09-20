@@ -50,6 +50,9 @@ def flow_module(monkeypatch):
     selector = ModuleType("homeassistant.helpers.selector")
     selector.EntitySelector = lambda config: config
     selector.EntitySelectorConfig = lambda **data: data
+    selector.SelectSelector = lambda config: config
+    selector.SelectSelectorConfig = lambda **data: data
+    selector.SelectSelectorMode = type("SelectSelectorMode", (), {"LIST": "list"})
     monkeypatch.setitem(sys.modules, "homeassistant.helpers.selector", selector)
     spec = importlib.util.spec_from_file_location(
         "custom_components.crop_steering._setup_flow_test",
@@ -273,6 +276,78 @@ def test_a_single_switch_tent_is_a_complete_room(flow_module):
         result["data"]["hardware"]["pump_switch"] == ""
         and result["data"]["zones"]["1"]["zone_switch"] == "switch.v1"
     )
+
+
+def test_the_wizard_stores_the_plumbing_answer(flow_module):
+    flow, _states = _wizard(flow_module)
+    asyncio.run(flow.async_step_zones(dict(ZONE_INPUT)))
+    result = asyncio.run(
+        flow.async_step_hardware({"plumbing": "valves_only", "substrate_volume": 3.2})
+    )
+    assert result["type"] == "create_entry"
+    assert result["data"]["plumbing"] == "valves_only"
+
+
+def test_a_pump_layout_without_a_pump_is_caught_on_the_step_it_was_answered_on(
+    flow_module,
+):
+    """The mistake inference could not see: "my room has a pump" with the pump never chosen.
+    It used to save, and the controller then watered with the valve open and no pump."""
+    flow, _states = _wizard(flow_module)
+    asyncio.run(flow.async_step_zones(dict(ZONE_INPUT)))
+    answer = {"plumbing": "pump_valves", "substrate_volume": 3.2}
+    result = asyncio.run(flow.async_step_hardware(dict(answer)))
+    assert result["type"] == "form" and result["step_id"] == "hardware"
+    assert result["data_schema"]["kept"] == answer  # nothing typed is lost
+    assert "no pump switch is chosen" in result["description_placeholders"]["error"]
+    result = asyncio.run(
+        flow.async_step_hardware({**answer, "pump_switch": "switch.p"})
+    )
+    assert result["type"] == "create_entry"
+    assert result["data"]["plumbing"] == "pump_valves"
+
+
+def _required_markers(flow_module, monkeypatch):
+    """The stub voluptuous forgets whether a marker was required or had a default; record it.
+    (tests_ha/ checks the same thing against the real library.)"""
+    seen = {}
+    original = flow_module.vol.Required
+
+    def required(key, **kwargs):
+        seen[key] = kwargs
+        return original(key, **kwargs)
+
+    monkeypatch.setattr(flow_module.vol, "Required", required)
+    return seen
+
+
+def test_the_plumbing_question_is_asked_first_and_a_new_room_gets_no_guess(
+    flow_module, monkeypatch
+):
+    seen = _required_markers(flow_module, monkeypatch)
+    schema = flow_module._hardware_schema()
+    assert seen["plumbing"] == {}  # required, no default: a newcomer answers it
+    assert list(schema)[0] == "plumbing"  # asked before the switches it governs
+    assert schema["plumbing"]["options"] == [
+        "valves_only",
+        "pump_valves",
+        "mainline_valves",
+        "pump_mainline_valves",
+    ]
+
+
+def test_configure_prefills_what_the_room_declared_or_what_its_switches_imply(
+    flow_module, monkeypatch
+):
+    seen = _required_markers(flow_module, monkeypatch)
+    hass, entry, _states = rig()  # from before the question existed: pump and main-line
+    flow = flow_module.OptionsFlowHandler(entry)
+    flow.hass = hass
+    asyncio.run(flow.async_step_edit_zones_map())
+    assert seen["plumbing"] == {"default": "pump_mainline_valves"}
+    entry.data["plumbing"] = "pump_valves"  # a declaration always wins over the guess
+    asyncio.run(flow.async_step_edit_zones_map())
+    assert seen["plumbing"] == {"default": "pump_valves"}
 
 
 def test_a_blocker_says_whether_the_entity_is_on_unreachable_or_missing():
