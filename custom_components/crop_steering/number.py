@@ -845,6 +845,11 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         self._attr_name = description.name
         # Set object_id to include crop_steering prefix for entity_id generation
         self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}{description.key}"
+        # Home Assistant ignores _attr_object_id (see switch.py): without an explicit id a NEW
+        # install got number.substrate_volume / number.lights_on_hour, so the controller, which
+        # reads number.crop_steering_<room><key>, ran every shot on its built-in defaults and
+        # nothing the operator set took effect. An entity already registered keeps its id.
+        self.entity_id = f"number.{self._attr_object_id}"
 
         if default_value is not None:
             # Caller supplied an explicit value (e.g. zone tunables from .env zones dict).

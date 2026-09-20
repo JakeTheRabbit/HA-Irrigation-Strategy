@@ -45,6 +45,9 @@ class CropSteeringTriggerButton(ButtonEntity):
         self._attr_object_id = (
             f"{DOMAIN}_{room_prefix(entry)}zone_{zone_num}_trigger_shot"
         )
+        # Home Assistant ignores _attr_object_id (see switch.py): without an explicit id a NEW
+        # install got button.zone_1_trigger_shot. An entity already registered keeps its id.
+        self.entity_id = f"button.{self._attr_object_id}"
         self._attr_icon = "mdi:water-pump"
 
     @property

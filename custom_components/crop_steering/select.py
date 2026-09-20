@@ -212,6 +212,10 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         self._attr_name = description.name
         # Set object_id to include crop_steering prefix for entity_id generation
         self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}{description.key}"
+        # Home Assistant ignores _attr_object_id (see switch.py): without an explicit id a NEW
+        # install named selects from their labels, and the per-zone phase pin the controller
+        # reads was never found. An entity already registered keeps the id it has.
+        self.entity_id = f"select.{self._attr_object_id}"
         self._attr_options = description.options
 
         # Set default values based on entity type

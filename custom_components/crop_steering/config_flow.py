@@ -100,14 +100,11 @@ def _pick(options, translation_key: str):
 
 def _number(low: float, high: float, step: float, unit: str | None = None):
     """A number box that shows its unit IN the field, so nobody has to guess it."""
+    config = {"min": low, "max": high, "step": step}
+    if unit:  # Home Assistant rejects unit_of_measurement=None outright
+        config["unit_of_measurement"] = unit
     return selector.NumberSelector(
-        selector.NumberSelectorConfig(
-            min=low,
-            max=high,
-            step=step,
-            unit_of_measurement=unit,
-            mode=selector.NumberSelectorMode.BOX,
-        )
+        selector.NumberSelectorConfig(**config, mode=selector.NumberSelectorMode.BOX)
     )
 
 
