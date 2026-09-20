@@ -127,6 +127,13 @@ The automated suite can't drive real hardware. Before trusting a change on the g
 - [ ] **Feed-gate hold.** Out-of-range feed pH/EC (or a tank fill/dose) blocks watering and
       alerts — that is correct behavior, not a bug.
 
+## Tests are not a release
+
+A green build says the code does what its tests expect. It says nothing about a pump on a
+smart plug at 3 am. What has to happen between a green build and a production room - the
+staging soak, the fault drills, promotion to `stable`, rollback - is in
+[RELEASING.md](RELEASING.md).
+
 ## A change isn't done until
 
 The relevant automated tests pass **and** any change to persisted state, add-on options, or
