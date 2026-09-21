@@ -9,6 +9,24 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🌱 In plain English
+
+- **Crop Steering has its icon.** Adding the integration, the integrations page and HACS all showed
+  a grey "icon not available" box. The integration now carries its own icon and logo, with
+  versions that stay readable on a dark theme. Needs Home Assistant 2026.3 or newer; older
+  versions carry on showing the placeholder, and nothing else changes for them.
+
+### 🔧 Technical notes
+
+- New `custom_components/crop_steering/brand/` (`icon`, `logo`, `@2x`, and `dark_` variants), which
+  Home Assistant 2026.3+ serves for a custom integration with no manifest change. Built from
+  `img/crop-steering-logo.png` by `scripts/make_brand_images.py`: the icon is the emblem alone (it is
+  shown at about 40 px), the logo keeps the wordmark, dark variants sit on a white rounded tile,
+  all reduced to 256 colours with alpha (10-53 KB each). `tests/test_brand_images.py` pins names
+  and sizes from the PNG headers. Class **C1**: nothing the controller reads.
+
 ## [2.19.0] - 2026-09-21
 
 Pair: **controller 0.16.0**. It also carries 2.18.1 / controller 0.15.2, which was never published by
