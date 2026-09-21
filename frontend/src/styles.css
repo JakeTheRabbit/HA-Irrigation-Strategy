@@ -1915,6 +1915,18 @@ input:not([type="checkbox"]),
 select {
   background: var(--ha-native-input, var(--native-input-default));
 }
+/* The open list of a native select is painted by the browser from the OPTION's colours. Home
+   Assistant's input fill is translucent (rgba of the text colour), which the list cannot paint:
+   it fell back to white while the text stayed light, so the choices could not be read on a dark
+   theme. Compare runs gave its selects an opaque background and was the one screen that worked. */
+select option,
+select optgroup {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+select option:disabled {
+  color: var(--muted-foreground);
+}
 .theme-options {
   flex-wrap: wrap;
 }
