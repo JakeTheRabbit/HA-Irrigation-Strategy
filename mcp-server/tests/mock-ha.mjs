@@ -37,7 +37,34 @@ export const planFixture = () => ({
     },
   ],
 });
+// custom_components/crop_steering/plumbing.py: layout -> [pump, main line], `infer`, `problems`.
+const LAYOUTS = {
+  valves_only: [false, false],
+  pump_valves: [true, false],
+  mainline_valves: [false, true],
+  pump_mainline_valves: [true, true],
+};
+const inferPlumbing = (hardware) =>
+  Object.keys(LAYOUTS).find(
+    (layout) =>
+      LAYOUTS[layout][0] === Boolean(hardware.pump_switch) &&
+      LAYOUTS[layout][1] === Boolean(hardware.main_line_switch),
+  );
+const plumbingProblem = (layout, hardware) =>
+  [
+    ["pump_switch", 0, "pump"],
+    ["main_line_switch", 1, "main-line valve"],
+  ]
+    .filter(([key, index]) => Boolean(hardware[key]) !== LAYOUTS[layout][index])
+    .map(([, , label]) => `The plumbing for this room disagrees about its ${label}`)
+    .join(". ");
+// The default room has never declared its plumbing ("": every install from before 2.19.0); Veg
+// has, as a pump then zone valves, which is what its mapped switches are.
 function room(prefix, name) {
+  const hardware = {
+    pump_switch: "switch." + prefix + "pump",
+    tank_temperature_sensor: "sensor." + prefix + "tank_temp",
+  };
   return {
     entry_id: "entry-" + (prefix || "default"),
     prefix,
@@ -45,6 +72,8 @@ function room(prefix, name) {
     room_name: name,
     revision: 4,
     active: true,
+    plumbing: prefix ? "pump_valves" : "",
+    plumbing_inferred: inferPlumbing(hardware),
     zones: [
       {
         id: 1,
@@ -59,10 +88,7 @@ function room(prefix, name) {
         dripper_flow_rate: 4,
       },
     ],
-    hardware: {
-      pump_switch: "switch." + prefix + "pump",
-      tank_temperature_sensor: "sensor." + prefix + "tank_temp",
-    },
+    hardware,
     safety: { ready: true, blockers: [] },
   };
 }
@@ -79,6 +105,13 @@ export async function mockHa(t) {
     {
       entity_id: "switch." + r.prefix + "valve",
       name: r.room_name + " valve",
+      domain: "switch",
+      state: "off",
+      unit: "",
+    },
+    {
+      entity_id: "switch." + r.prefix + "main_line",
+      name: r.room_name + " main line",
       domain: "switch",
       state: "off",
       unit: "",
@@ -184,10 +217,19 @@ export async function mockHa(t) {
             return json({ message: "Room setup changed; refresh" }, 400);
           if (!r.safety.ready)
             return json({ message: "Pump must be OFF" }, 400);
+          // setup_api.prepare_setup: declared, never inferred; absent from the payload keeps
+          // what the room already declared; an active room's switches have to agree with it.
+          const layout = body.plumbing || r.plumbing || "";
+          if (layout && !LAYOUTS[layout])
+            return json({ message: "Unknown plumbing layout" }, 400);
+          if (layout && body.active && plumbingProblem(layout, body.hardware))
+            return json({ message: plumbingProblem(layout, body.hardware) }, 400);
           state.saveCount++;
           Object.assign(r, {
             room_name: body.room_name,
             active: body.active,
+            plumbing: layout,
+            plumbing_inferred: inferPlumbing(body.hardware),
             hardware: body.hardware,
             zones: body.zones,
             revision: r.revision + 1,

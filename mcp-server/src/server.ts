@@ -128,7 +128,7 @@ export function createServer(ha: HaClient) {
     "preview_setup",
     {
       description:
-        "Prepare exact changes to an existing room name, mapped hardware/probes, or existing zone names/sizing/sensors/valves. No enable flags, zone creation/removal, archive, or live setpoints. Returns complete diff, expected revision and expiring server-held token; no HA write. HA enforces final validation and equipment OFF during apply.",
+        "Prepare exact changes to an existing room name, declared plumbing layout, mapped hardware/probes, or existing zone names/sizing/sensors/valves. `plumbing` says whether the room has a pump and/or main-line valve; it must agree with hardware.pump_switch and hardware.main_line_switch, so change them together (get_room_configuration shows `plumbing`, \"\" when never declared, and `plumbing_inferred`). No enable flags, zone creation/removal, archive, or live setpoints. Returns complete diff, expected revision and expiring server-held token; no HA write. HA enforces final validation and equipment OFF during apply.",
       inputSchema: z.strictObject({ room_id: roomId, changes: setupChanges }),
       annotations: { ...read, idempotentHint: false },
     },

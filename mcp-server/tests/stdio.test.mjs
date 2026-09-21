@@ -353,3 +353,134 @@ test("legacy null mappings normalize only inbound, preserve setup, reject new nu
     /Invalid/,
   );
 });
+
+// Review finding on JakeTheRabbit/HA-Irrigation-Strategy#47. Since 2.19.0 the integration refuses
+// an active room whose mapped switches contradict its DECLARED plumbing. The strict input schema
+// rejected `plumbing`, the room schema stripped it and the payload omitted it, so a declared room
+// could never gain or lose its pump through these tools: the hardware-only change previewed
+// cleanly and failed on apply, and the only payload Home Assistant would accept failed the schema.
+const setup = (client, room_id, changes) =>
+  call(client, "preview_setup", { room_id, changes });
+const saved = (ha) =>
+  ha.calls.filter((row) => row.path.includes("/setup_save?")).at(-1).body;
+
+test("plumbing layout and the mapping it implies change together, and are read back", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const cfg = data(
+    await call(client, "get_room_configuration", { room_id: "room:veg_" }),
+  );
+  assert.equal(cfg.plumbing, "pump_valves");
+  assert.equal(cfg.plumbing_inferred, "pump_valves");
+
+  // The room loses its pump: layout and mapping in ONE reviewed proposal.
+  const p = data(
+    await setup(client, "room:veg_", {
+      plumbing: "valves_only",
+      hardware: { pump_switch: "" },
+    }),
+  );
+  assert.deepEqual(
+    p.diff.map((row) => [row.path, row.before, row.after]),
+    [
+      ["/hardware/pump_switch", "switch.veg_pump", ""],
+      ["/plumbing", "pump_valves", "valves_only"],
+    ],
+  );
+  const done = data(await apply(client, p));
+  assert.equal(done.verified, true);
+  assert.equal(done.configuration.plumbing, "valves_only");
+  assert.equal(saved(ha).plumbing, "valves_only");
+  assert.equal(saved(ha).hardware.pump_switch, "");
+  assert.equal(ha.rooms[1].plumbing, "valves_only");
+
+  // ...and gains a pump and a main line again, the other way round.
+  const q = data(
+    await setup(client, "room:veg_", {
+      plumbing: "pump_mainline_valves",
+      hardware: {
+        pump_switch: "switch.veg_pump",
+        main_line_switch: "switch.veg_main_line",
+      },
+    }),
+  );
+  assert.equal(data(await apply(client, q)).verified, true);
+  assert.equal(ha.rooms[1].plumbing, "pump_mainline_valves");
+  assert.equal(ha.rooms[1].plumbing_inferred, "pump_mainline_valves");
+  assert.equal(ha.saveCount, 2);
+});
+
+test("a mapping that contradicts the declared plumbing is refused at preview, before any token", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  for (const [changes, pattern] of [
+    // hardware only: what used to preview cleanly and then fail on apply
+    [{ hardware: { pump_switch: "" } }, /no pump switch is mapped/],
+    [
+      { hardware: { main_line_switch: "switch.veg_main_line" } },
+      /a main-line valve switch is mapped/,
+    ],
+    // layout only: the same contradiction from the other side
+    [{ plumbing: "valves_only" }, /a pump switch is mapped/],
+    [{ plumbing: "pump_mainline_valves" }, /no main-line valve switch/],
+    [{ plumbing: "gravity" }, /Invalid/],
+    [{ plumbing: "" }, /Invalid/], // a declaration cannot be withdrawn, only changed
+  ])
+    error(await setup(client, "room:veg_", changes), pattern);
+  assert.equal(ha.saveCount, 0);
+  assert.ok(!ha.calls.some((row) => row.path.includes("/setup_save?")));
+});
+
+test("a room that never declared its plumbing is not declared by an unrelated save", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const cfg = data(
+    await call(client, "get_room_configuration", { room_id: "room:" }),
+  );
+  assert.equal(cfg.plumbing, "");
+  assert.equal(cfg.plumbing_inferred, "pump_valves"); // what its switches imply, for a prompt
+  const p = data(await setup(client, "room:", { room_name: "Flower" }));
+  assert.ok(!("plumbing" in p.proposed_configuration));
+  assert.equal(data(await apply(client, p)).verified, true);
+  assert.ok(!("plumbing" in saved(ha)));
+  assert.equal(ha.rooms[0].plumbing, "");
+
+  // Undeclared also means unenforced, exactly as before: its pump can still be unmapped.
+  const q = data(await setup(client, "room:", { hardware: { pump_switch: "" } }));
+  assert.equal(data(await apply(client, q)).verified, true);
+  assert.equal(ha.rooms[0].plumbing, "");
+
+  // Declaring it is an explicit, reviewed change like any other.
+  const r = data(await setup(client, "room:", { plumbing: "valves_only" }));
+  assert.deepEqual(
+    r.diff.map((row) => [row.path, row.before, row.after]),
+    [["/plumbing", null, "valves_only"]],
+  );
+  assert.equal(data(await apply(client, r)).verified, true);
+  assert.equal(ha.rooms[0].plumbing, "valves_only");
+});
+
+test("a declaration made elsewhere after the preview invalidates the proposal", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const p = data(await setup(client, "room:", { room_name: "Flower" }));
+  ha.rooms[0].plumbing = "pump_valves"; // declared in Rooms & setup meanwhile, same revision
+  error(await apply(client, p), /changed after preview/);
+  assert.equal(ha.saveCount, 0);
+});
+
+test("an integration from before declared plumbing is still read and saved", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  for (const r of ha.rooms) {
+    delete r.plumbing;
+    delete r.plumbing_inferred;
+  }
+  const cfg = data(
+    await call(client, "get_room_configuration", { room_id: "room:veg_" }),
+  );
+  assert.ok(!("plumbing" in cfg));
+  const p = await preview(client);
+  assert.ok(!("plumbing" in p.proposed_configuration));
+  assert.equal(data(await apply(client, p)).verified, true);
+});
