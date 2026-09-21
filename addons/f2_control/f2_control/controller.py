@@ -501,6 +501,9 @@ class Controller:
             "peak": 0.0,
             "win": [],
             "last_shot": None,
+            # True while `last_shot` is only the moment the room was switched on (the timers count
+            # from it) and no water has been delivered since: it must never be shown as an irrigation.
+            "last_shot_is_anchor": False,
             "shots": 0,
             "daily_vol": 0.0,
             "ec_smooth": None,
@@ -540,6 +543,21 @@ class Controller:
                     s[k] = datetime.fromisoformat(d[k])
                 except (ValueError, TypeError):
                     pass
+        if isinstance(d.get("last_shot_is_anchor"), bool):
+            s["last_shot_is_anchor"] = d["last_shot_is_anchor"]
+        else:
+            # A file from before this field existed. `last_shot` is a real irrigation if the zone has
+            # ever recorded water; with none on record it can only be the switch-on stamp.
+            history = d.get("water_history") if isinstance(d.get("water_history"), list) else []
+            litres = sum(
+                float(i.get("litres") or 0) for i in history
+                if isinstance(i, dict) and isinstance(i.get("litres"), (int, float))
+            )
+            watered = (
+                (d.get("shots") or 0) > 0 or (d.get("daily_vol") or 0) > 0 or litres > 0
+                or (d.get("water_history_legacy_excluded_l") or 0) > 0
+            )
+            s["last_shot_is_anchor"] = bool(s.get("last_shot")) and not watered
         if d.get("last_daily_reset"):
             try:
                 s["last_daily_reset"] = date.fromisoformat(d["last_daily_reset"])
@@ -833,6 +851,7 @@ class Controller:
             "ec_integral": float(s.get("ec_integral") or 0.0),
             "ec_prev_err": float(s.get("ec_prev_err") or 0.0),
             "last_shot": ls.isoformat() if isinstance(ls, datetime) else None,
+            "last_shot_is_anchor": bool(s.get("last_shot_is_anchor")),
             "last_phase_change": lpc.isoformat() if isinstance(lpc, datetime) else None,
             "last_ec_steer": les.isoformat() if isinstance(les, datetime) else None,
             "last_daily_reset": ldr.isoformat() if isinstance(ldr, date) else None,
@@ -1371,6 +1390,7 @@ class Controller:
                 **self._fresh_zone(),
                 "phase": "P3",
                 "last_shot": datetime.now(),  # the blind-probe schedule counts from switch-on, not from "never"
+                "last_shot_is_anchor": True,  # ...but it is not an irrigation, and is never shown as one
                 "water_history": old.get("water_history"),
                 "water_history_legacy_excluded_l": old.get("water_history_legacy_excluded_l", 0.0),
             }
@@ -1409,6 +1429,11 @@ class Controller:
             for zone in room.zones:
                 ha_set(f"sensor.crop_steering_{px}zone_{zone}_status", "Room off",
                        {"reason": "Room off (nothing growing)"})
+                if room.state.get(zone, {}).get("last_shot_is_anchor"):
+                    # a room switched on and off again without watering: take back the false
+                    # "last irrigation" an earlier controller published for it
+                    ha_set(f"sensor.crop_steering_{px}zone_{zone}_last_irrigation_app", "unknown",
+                           {"device_class": "timestamp"})
             ha_set(f"sensor.crop_steering_{px}app_status", "room_off",
                    {"engine": "f2-control", "updated": now.isoformat()})
             ha_set(f"sensor.crop_steering_{px}current_decision", "Room off - nothing growing",
@@ -1594,6 +1619,7 @@ class Controller:
         auto_setpoints.shot(st["learn"], st.get("phase"), size_pct, st.get("last_vwc"), now.timestamp())
         st["shots"] += 1
         st["last_shot"] = now
+        st["last_shot_is_anchor"] = False  # water was delivered: this one is an irrigation
         st["daily_vol"] += delivered_l
         self._save_state()
 
@@ -2396,7 +2422,10 @@ class Controller:
                         f"sensor.crop_steering_{px}zone_{zone}_last_irrigation_app",
                         # Internal times stay local-naive; publish the event's local
                         # UTC offset, including historical daylight-saving changes.
-                        ls.astimezone().isoformat(),
+                        # The switch-on stamp is NOT an irrigation: say "unknown", which also
+                        # overwrites the false time an earlier controller left in Home Assistant.
+                        "unknown" if room.state[zone].get("last_shot_is_anchor")
+                        else ls.astimezone().isoformat(),
                         {"device_class": "timestamp"},
                     )
                 # Daily volume fed + shot count today — the dashboard's "Volume fed vs cap"

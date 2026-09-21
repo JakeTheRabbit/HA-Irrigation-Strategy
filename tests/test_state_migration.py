@@ -255,3 +255,63 @@ def test_default_room_is_unprefixed(monkeypatch):
     assert room.slug == "default" and room.prefix == ""
     assert c._cs(room, "sensor", "vwc_zone_1") == "sensor.crop_steering_vwc_zone_1"
     assert len(c.rooms) == 1  # no extra rooms discovered offline
+
+
+# ---------------------------------------------------------------------------
+# `last_shot_is_anchor` (added after 0.16.1): an OLD file has no such key and must still load.
+# ---------------------------------------------------------------------------
+def test_an_old_file_without_the_anchor_flag_loads_and_gets_a_sane_value(tmp_path):
+    """`last_shot` doubles as the moment a room was switched on. Files written before the flag
+    existed are read by one rule: with no water ever recorded, the time cannot be an irrigation.
+    """
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps(
+            {
+                "default": {
+                    # switched on, never watered: what a first install leaves behind
+                    "1": {"phase": "P3", "shots": 0, "daily_vol": 0.0,
+                          "last_shot": "2026-09-21T18:19:37.355321",
+                          "water_history": [{"grow_day": "2026-09-21", "litres": 0.0}]},
+                    # a zone with a real irrigation history
+                    "2": {"phase": "P2", "shots": 0, "daily_vol": 0.0,
+                          "last_shot": "2026-09-20T21:40:00",
+                          "water_history": [{"grow_day": "2026-09-20", "litres": 3.5}]},
+                    # nothing at all
+                    "3": {"phase": "P2"},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )  # fmt: skip
+    c = _make([1, 2, 3], p)
+    c._load_state()
+    st = c.rooms[0].state
+    assert st[1]["last_shot_is_anchor"] is True and st[1]["last_shot"] is not None
+    assert st[2]["last_shot_is_anchor"] is False and st[2]["last_shot"] is not None
+    assert st[3]["last_shot_is_anchor"] is False and st[3]["last_shot"] is None
+
+
+def test_the_anchor_flag_round_trips_and_junk_is_tolerated(tmp_path):
+    p = tmp_path / "state.json"
+    c = _make([1, 2], p)
+    c._load_state()
+    c.rooms[0].state[1].update(
+        last_shot=datetime(2026, 9, 21, 18, 19, 37), last_shot_is_anchor=True
+    )
+    c._save_state()
+    saved = json.loads(p.read_text(encoding="utf-8"))["default"]
+    assert (
+        saved["1"]["last_shot_is_anchor"] is True
+        and saved["2"]["last_shot_is_anchor"] is False
+    )
+    again = _make([1, 2], p)
+    again._load_state()
+    assert again.rooms[0].state[1]["last_shot_is_anchor"] is True
+    saved["1"]["last_shot_is_anchor"] = "yes please"  # hand-edited nonsense
+    p.write_text(json.dumps({"default": saved}), encoding="utf-8")
+    third = _make([1, 2], p)
+    third._load_state()
+    assert (
+        third.rooms[0].state[1]["last_shot_is_anchor"] is True
+    )  # falls back to the no-water rule
