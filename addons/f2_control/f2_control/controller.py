@@ -421,16 +421,20 @@ class Controller:
         first: a one-zone tent got zones 2 and 3 that do not exist, each reporting "no hardware
         mapped", until the new setup happened to be adopted. Nothing is invented now.
         """
-        n = self._detect_zones("", 0)
-        if n:  # the integration's fused sensors exist: every working install, unchanged
-            return list(range(1, n + 1)), False
-        if descriptor:  # set up, sensors not created yet: the descriptor knows
+        # The descriptor owns the zone list. Sensors can appear one at a time while HA starts,
+        # and retired sensors can outlive their zones; neither should redefine a configured room.
+        if descriptor:
             ids = descriptor.get("active_zone_ids")
             if isinstance(ids, list) and ids and all(type(z) is int and 1 <= z <= 64 for z in ids):
                 return sorted(ids), False
             count = int(descriptor.get("num_zones") or len(descriptor.get("valves") or {}) or 0)
             if count:
                 return list(range(1, count + 1)), False
+        n = self._detect_zones("", 0)
+        if n:
+            # Without a descriptor this may still be a partial startup inventory. Keep checking
+            # until the room definition arrives, unless the operator supplied the hardware map.
+            return list(range(1, n + 1)), not bool(options.get("hardware"))
         fallback = list(range(1, int(options.get("num_zones", 3)) + 1))
         if options.get("hardware"):  # hand-mapped in the app options: their zone count stands
             return fallback, False
@@ -584,18 +588,10 @@ class Controller:
         if isinstance(d.get("last_shot_is_anchor"), bool):
             s["last_shot_is_anchor"] = d["last_shot_is_anchor"]
         else:
-            # A file from before this field existed. `last_shot` is a real irrigation if the zone has
-            # ever recorded water; with none on record it can only be the switch-on stamp.
-            history = d.get("water_history") if isinstance(d.get("water_history"), list) else []
-            litres = sum(
-                float(i.get("litres") or 0) for i in history
-                if isinstance(i, dict) and isinstance(i.get("litres"), (int, float))
-            )
-            watered = (
-                (d.get("shots") or 0) > 0 or (d.get("daily_vol") or 0) > 0 or litres > 0
-                or (d.get("water_history_legacy_excluded_l") or 0) > 0
-            )
-            s["last_shot_is_anchor"] = bool(s.get("last_shot")) and not watered
+            # Old files do not distinguish an irrigation from a switch-on stamp. Daily counters
+            # reset and water history expires (or predates its introduction), so no recorded water
+            # cannot prove this was an anchor. Preserve the timestamp the prior version published.
+            s["last_shot_is_anchor"] = False
         if d.get("last_daily_reset"):
             try:
                 s["last_daily_reset"] = date.fromisoformat(d["last_daily_reset"])

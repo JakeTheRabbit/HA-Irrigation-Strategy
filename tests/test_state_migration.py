@@ -261,15 +261,15 @@ def test_default_room_is_unprefixed(monkeypatch):
 # `last_shot_is_anchor` (added after 0.16.1): an OLD file has no such key and must still load.
 # ---------------------------------------------------------------------------
 def test_an_old_file_without_the_anchor_flag_loads_and_gets_a_sane_value(tmp_path):
-    """`last_shot` doubles as the moment a room was switched on. Files written before the flag
-    existed are read by one rule: with no water ever recorded, the time cannot be an irrigation.
+    """Old timestamps keep their existing meaning: zero counters or missing/expired history
+    cannot prove whether an unmarked timestamp was a switch-on or an actual irrigation.
     """
     p = tmp_path / "state.json"
     p.write_text(
         json.dumps(
             {
                 "default": {
-                    # switched on, never watered: what a first install leaves behind
+                    # ambiguous old timestamp: could be switch-on or an older irrigation
                     "1": {"phase": "P3", "shots": 0, "daily_vol": 0.0,
                           "last_shot": "2026-09-21T18:19:37.355321",
                           "water_history": [{"grow_day": "2026-09-21", "litres": 0.0}]},
@@ -287,7 +287,7 @@ def test_an_old_file_without_the_anchor_flag_loads_and_gets_a_sane_value(tmp_pat
     c = _make([1, 2, 3], p)
     c._load_state()
     st = c.rooms[0].state
-    assert st[1]["last_shot_is_anchor"] is True and st[1]["last_shot"] is not None
+    assert st[1]["last_shot_is_anchor"] is False and st[1]["last_shot"] is not None
     assert st[2]["last_shot_is_anchor"] is False and st[2]["last_shot"] is not None
     assert st[3]["last_shot_is_anchor"] is False and st[3]["last_shot"] is None
 
@@ -313,5 +313,5 @@ def test_the_anchor_flag_round_trips_and_junk_is_tolerated(tmp_path):
     third = _make([1, 2], p)
     third._load_state()
     assert (
-        third.rooms[0].state[1]["last_shot_is_anchor"] is True
-    )  # falls back to the no-water rule
+        third.rooms[0].state[1]["last_shot_is_anchor"] is False
+    )  # invalid metadata cannot establish that an old timestamp was an anchor

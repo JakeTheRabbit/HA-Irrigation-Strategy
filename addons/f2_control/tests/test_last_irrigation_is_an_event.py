@@ -101,14 +101,47 @@ def _restart_on(zone_state, states):
     return controller.Controller(), fake
 
 
-def test_the_box_this_was_found_on_stops_claiming_an_irrigation_after_the_update():
-    """Its state file, as controller 0.16.1 wrote it: no flag, a switch-on stamp, no water ever."""
+def test_an_unmarked_legacy_time_is_not_reclassified_from_zero_water_counters():
+    """Old state cannot distinguish switch-on from irrigation after counters/history roll over.
+    Keep its timestamp unless the saved state explicitly records that it is an anchor."""
     old = {"phase": "P3", "shots": 0, "daily_vol": 0.0, "last_shot": "2026-09-21T18:19:37.355321",
            "water_history": [{"grow_day": "2026-09-21", "litres": 0.0}]}
     c, fake = _restart_on(old, _states())
+    assert c.rooms[0].state[1]["last_shot_is_anchor"] is False
+    c.loop_once(NOW)
+    assert datetime.fromisoformat(_published(fake)).replace(tzinfo=None) == datetime.fromisoformat(old["last_shot"])
+
+
+@pytest.mark.parametrize("history", [None, [{"grow_day": "2026-09-21", "litres": 0.0}]])
+def test_a_real_old_event_survives_daily_reset_and_missing_or_expired_history(history):
+    old = {"phase": "P0", "shots": 0, "daily_vol": 0.0, "last_daily_reset": "2026-09-21",
+           "last_shot": "2026-09-12T21:40:00"}
+    if history is not None:
+        old["water_history"] = history
+    c, fake = _restart_on(old, _states())
+    assert c.rooms[0].state[1]["last_shot_is_anchor"] is False
+    c.loop_once(NOW)
+    assert datetime.fromisoformat(_published(fake)).replace(tzinfo=None) == datetime(2026, 9, 12, 21, 40)
+
+
+@pytest.mark.parametrize("room_active", ["on", "off"])
+def test_an_explicit_saved_anchor_stays_unknown_after_restart(room_active):
+    old = {"phase": "P3", "shots": 0, "daily_vol": 0.0, "last_shot": "2026-09-21T18:19:37",
+           "last_shot_is_anchor": True,
+           "water_history": [{"grow_day": "2026-09-20", "litres": 3.5}]}
+    c, fake = _restart_on(old, _states(room_active))
     assert c.rooms[0].state[1]["last_shot_is_anchor"] is True
     c.loop_once(NOW)
     assert _published(fake) == "unknown"
+
+
+@pytest.mark.parametrize("excluded, expected", [("2.5", 2.5), ("bad", 0.0), ({"invalid": 1}, 0.0)])
+def test_legacy_excluded_volume_is_normalized_before_it_can_break_startup(excluded, expected):
+    old = {"phase": "P2", "shots": 0, "daily_vol": 0.0, "last_shot": "2026-09-20T21:40:00",
+           "water_history_legacy_excluded_l": excluded}
+    c, _fake = _restart_on(old, _states())
+    assert c.rooms[0].state[1]["water_history_legacy_excluded_l"] == expected
+    assert c.rooms[0].state[1]["last_shot_is_anchor"] is False
 
 
 def test_an_install_with_a_real_irrigation_history_keeps_showing_its_last_irrigation():

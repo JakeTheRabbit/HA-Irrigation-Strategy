@@ -102,8 +102,9 @@ def test_integration_set_up_first_gives_exactly_n_zones_at_once(n, fused):
     assert not c._default_provisional
 
 
-def test_an_archived_zone_is_not_driven_even_before_its_sensors_exist():
-    c, _fake = _build(dict(SHIPPED_OPTIONS), states=_room(3, fused=False, active=[1, 3]))
+@pytest.mark.parametrize("fused", [True, False])
+def test_an_archived_zone_is_not_driven_even_before_its_sensors_exist(fused):
+    c, _fake = _build(dict(SHIPPED_OPTIONS), states=_room(3, fused=fused, active=[1, 3], revision=0))
     assert sorted(c.rooms[0].zones) == [1, 3]
 
 
@@ -135,6 +136,37 @@ def test_a_working_three_zone_install_is_untouched_by_the_update():
     assert sorted(room.zones) == [1, 2, 3] and not c._default_provisional
     assert [room.state[z]["shots"] for z in (1, 2, 3)] == [5, 6, 7]
     assert room.state[2]["daily_vol"] == 2.5
+
+
+@pytest.mark.parametrize("descriptor_first", [True, False])
+def test_legacy_room_keeps_all_zones_when_ha_publishes_sensors_in_stages(descriptor_first):
+    """A reboot can expose Z1 before Z2/Z3 or even before the descriptor. Revision-zero
+    rooms cannot rely on setup adoption later to repair an incorrectly settled zone list."""
+    c, fake = _restart_on(_saved([1, 2, 3]), {})
+    room = c.rooms[0]
+    assert sorted(room.zones) == [1, 2, 3] and c._default_provisional
+    partial = _room(3, fused=False, revision=0)
+    descriptor = partial.pop(DESCRIPTOR)
+    for entity_id, (value, attrs) in partial.items():
+        fake.set_state(entity_id, value, attrs)
+    if descriptor_first:
+        fake.set_state(DESCRIPTOR, *descriptor)
+    fake.set_state("sensor.crop_steering_vwc_zone_1", "45", {"unit_of_measurement": "%"})
+    c._rediscover(NOW)
+    if descriptor_first:
+        assert sorted(room.zones) == [1, 2, 3]
+    else:
+        assert c._default_provisional  # a partial sensor inventory is not a final room definition
+
+    fake.set_state(DESCRIPTOR, *descriptor)
+    for zone in (2, 3):
+        fake.set_state(f"sensor.crop_steering_vwc_zone_{zone}", "45", {"unit_of_measurement": "%"})
+    c._rediscover(NOW)
+    assert sorted(room.zones) == [1, 2, 3] and not c._default_provisional
+    assert [room.state[z]["shots"] for z in (1, 2, 3)] == [5, 6, 7]
+    c.loop_once(NOW)
+    assert _zone_lines(fake) == {1, 2, 3}
+    assert not any(service == "turn_on" for _, service, _ in fake.calls)
 
 
 def test_a_box_that_already_saved_the_phantom_zones_stops_showing_them():

@@ -33,10 +33,10 @@ release. Update with the engine off, read the controller log, then watch the fir
   still "Zone 1" or "Crop Steering Zone 1", depending on which part of the integration got there
   first. It is now the name you typed, and renaming the zone in Configure renames the device. A
   device you renamed yourself in Home Assistant keeps your name. No entity id changes.
-- **"Last irrigation" only ever means water.** Switching a room on stamped a time that was then
-  shown as the last irrigation, beside "0 shots, 0.0 L". It now reads unknown until water has
-  really been delivered. The update also takes back a false time already on screen. One limit: a
-  zone whose last real shot was more than seven grow-days ago reads unknown until its next shot.
+- **Switching a room on no longer creates an irrigation event.** New switch-on timestamps are
+  marked explicitly and displayed as unknown until an irrigation is recorded. Older unmarked
+  timestamps are preserved: zero daily counters or missing history cannot establish whether an
+  old timestamp represented irrigation or switch-on. Electrical operation does not prove water delivery.
 - **The menu scrolls on a phone.** On a small screen the lower half of the side menu (including
   *Help & tools* and the version numbers) could not be reached.
 - **Configure > Edit parameters no longer locks out a room that steers dry.** The number entities
@@ -57,18 +57,20 @@ release. Update with the engine off, read the controller log, then watch the fir
 - **Zones are never invented** (#17, **C3**). The shipped add-on options carry `num_zones: 3`,
   documented as "only used if Home Assistant isn't reachable at startup" but also used when Home
   Assistant answered and the integration simply was not set up yet. New
-  `_default_zone_ids(options, descriptor) -> (ids, provisional)`: fused sensors if they exist (every
-  working install, unchanged), else the descriptor's `active_zone_ids` / `num_zones`, else a
+  `_default_zone_ids(options, descriptor) -> (ids, provisional)`: the descriptor's authoritative
+  `active_zone_ids` / `num_zones` first, then fused sensors (provisional without a descriptor), else a
   hand-mapped `hardware` option keeps `num_zones`, else no zones when Home Assistant answers, else
   the documented fallback. While provisional the controller rediscovers every loop and re-resolves
   zones, enable flag and feed sensors. A state file that already holds phantom zones still loads.
   It also stops the controller's pre-setup `zone_N_status` states pushing the integration's own
   status sensor onto `sensor.crop_steering_zone_1_status_2` on a first install.
 - **Last irrigation is an event** (#18, **C3**). New per-zone state field `last_shot_is_anchor`
-  (additive: `_fresh_zone` default `False`; an old file without it is inferred as "anchor if
-  `last_shot` is set and no water was ever recorded"). `_room_switched_on` still stamps `last_shot`
+  (additive: `_fresh_zone` default `False`; an old file without it retains its existing timestamp,
+  because daily counters reset and history expires). `_room_switched_on` still stamps `last_shot`
   so the blind-probe schedule counts from switch-on; `zone_N_last_irrigation_app` publishes
   `unknown` while the flag is set, including for a room that is off. No option or entity change.
+  Final review added regression coverage for partial sensor startup, legacy numeric strings and
+  malformed excluded-volume values, and genuine irrigation timestamps after daily rollover.
 - **The kill-switch repair judges the right switch** (#19, **C2**). `health._kill_switch()` trusted
   the heartbeat's `enable_flag` over the room's own descriptor. While the heartbeat reports an older
   `setup_revision` than the descriptor (both plain ints), the engine holds every zone anyway and
