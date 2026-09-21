@@ -10,6 +10,10 @@ RUN pip3 install --no-cache-dir requests
 
 # vendored: the pure engine package + the IO-shell controller
 COPY f2_control /app
+# The controller reports its own version (heartbeat -> the dashboard's sidebar). It reads it from
+# this copy of the config.yaml Supervisor built the image from: one source of truth, nothing
+# to bump anywhere else.
+COPY config.yaml /app/addon.yaml
 WORKDIR /app
 
 # web UI: nginx config + the static dashboards (www/public is assembled from the repo

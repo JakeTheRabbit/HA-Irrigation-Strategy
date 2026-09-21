@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a grey "icon not available" box. The integration now carries its own icon and logo, with
   versions that stay readable on a dark theme. Needs Home Assistant 2026.3 or newer; older
   versions carry on showing the placeholder, and nothing else changes for them.
+- **You can see what you are running without leaving the dashboard.** The sidebar, under *Help &
+  tools*, now shows the integration version and the controller version. Both come from the parts
+  that are actually running, not from the page, so it cannot show a version you have not got, and
+  a half that is too old to say (or a controller that is not running) reads "not reported".
+  After an update it is the quickest check that both halves really moved.
 
 ### 🔧 Technical notes
 
@@ -26,6 +31,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shown at about 40 px), the logo keeps the wordmark, dark variants sit on a white rounded tile,
   all reduced to 256 colours with alpha (10-53 KB each). `tests/test_brand_images.py` pins names
   and sizes from the PNG headers. Class **C1**: nothing the controller reads.
+- Versions in the sidebar. The integration publishes `integration_version` in each room's
+  `engine_config` descriptor (from `SOFTWARE_VERSION`, already tied to `manifest.json` by the version
+  tests). The controller publishes `controller_version` in each room's `ai_heartbeat` and logs it on
+  start; it reads the number from the `config.yaml` it was built from, which the Dockerfile now
+  copies into the image as `/app/addon.yaml`. **No number is duplicated anywhere**, so a release
+  has nothing extra to bump; the tests fail if the report and `config.yaml` disagree or the
+  Dockerfile stops shipping the file. The descriptor attribute is proven not to enter the
+  controller's setup fingerprint, so an integration update still resumes without a disarm cycle.
+  Class **C3** by the table (the controller and its Dockerfile are touched), though the change is
+  one new attribute on a sensor the controller already publishes: no state-file, option or
+  entity-id change.
 
 ## [2.19.0] - 2026-09-21
 

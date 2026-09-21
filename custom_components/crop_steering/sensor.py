@@ -289,6 +289,7 @@ class CropSteeringEngineConfigSensor(SensorEntity):
             self._zones,
             self._hw,
             {**self._entry.data, **self._entry.options},
+            integration_version=SOFTWARE_VERSION,
         )
 
 

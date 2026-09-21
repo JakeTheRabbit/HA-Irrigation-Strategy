@@ -159,8 +159,10 @@ def test_a_room_that_never_declared_is_saved_without_one():
 
 
 def test_a_room_that_never_declared_publishes_the_descriptor_it_always_did():
-    """The controller fingerprints the descriptor. One new key on an undeclared room and every
-    existing install would come back from the update blocked behind a disarm cycle."""
+    """A room that never declared its plumbing must not grow a `plumbing` key, or anything else
+    the controller's setup fingerprint reads: that would bring every existing install back from
+    an update blocked behind a disarm cycle. (`integration_version` is not one of the keys the
+    fingerprint reads; addons/f2_control/tests/test_versions.py pins that side.)"""
     legacy = {
         "setup_api_version", "setup_revision", "active", "room_name", "active_zone_ids", "zone_names",
         "slug", "prefix", "num_zones", "pump", "mainline", "valves", "enable_flag", "feed_ec_sensor",

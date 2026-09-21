@@ -21,6 +21,7 @@ auto-injected SUPERVISOR_TOKEN. Safe-offs the hardware on exit.
 import json
 import math
 import os
+import re
 import signal
 import sys
 import time
@@ -119,6 +120,25 @@ def load_options():
             pass
     return opts
 
+
+def read_controller_version(module_dir=None):
+    """This app's own version, from the config.yaml it was BUILT from: the very file Supervisor
+    reads, so there is no second number to keep in step. The Dockerfile copies it next to this
+    module as addon.yaml; in a source checkout it is one directory up. "unknown" rather than a
+    guess when neither is readable."""
+    here = module_dir or os.path.dirname(os.path.abspath(__file__))
+    for path in (os.path.join(here, "addon.yaml"), os.path.join(here, os.pardir, "config.yaml")):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                found = re.search(r"""^version:\s*["']?([^"'\s#]+)""", fh.read(), re.M)
+        except OSError:
+            continue
+        if found:
+            return found.group(1)
+    return "unknown"
+
+
+CONTROLLER_VERSION = read_controller_version()
 
 # Switch read-back after a close: see Controller._confirm_switches.
 CONFIRM_FIRST_READ_S, CONFIRM_POLL_S, CONFIRM_TIMEOUT_S = 1.0, 0.5, 6.0
@@ -1363,6 +1383,8 @@ class Controller:
             "healthy",
             {
                 "engine": "f2-control",
+                # which controller is actually RUNNING, for the dashboard's sidebar
+                "controller_version": CONTROLLER_VERSION,
                 "last_beat": now.isoformat(),
                 # the kill switch this room ACTUALLY uses — the integration's health
                 # check reads this so a custom enable_flag isn't flagged as "missing"
@@ -2576,7 +2598,7 @@ class Controller:
 
     def run(self):
         log(
-            "starting | rooms",
+            f"f2-control {CONTROLLER_VERSION} starting | rooms",
             ", ".join(r.slug for r in self.rooms),
             "| notify",
             self.notify_service or "(none)",

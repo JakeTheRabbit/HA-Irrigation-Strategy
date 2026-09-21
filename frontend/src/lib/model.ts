@@ -214,6 +214,23 @@ function resolve(
       return states[F1_ALIASES[suffix]];
   }
 }
+/** Which integration and which controller are actually RUNNING for this room, as they report
+ * themselves: the integration in its room descriptor, the controller in its heartbeat. Nothing
+ * here is a number baked into the dashboard, so a release has no third place to bump. `null`
+ * means that half is not reporting one (older than 2.19.1 / 0.16.1, or not running). */
+export function runningVersions(
+  states: States,
+  room: Room,
+): { integration: string | null; controller: string | null } {
+  const text = (value: unknown) =>
+    typeof value === "string" && value.trim() && value !== "unknown" ? value.trim() : null;
+  return {
+    integration: text(descriptor(states, room)?.attributes.integration_version),
+    controller: text(
+      resolve(states, room, "sensor", "ai_heartbeat")?.attributes.controller_version,
+    ),
+  };
+}
 export function roomEntities(states: States, room: Room): EntityState[] {
   if (!room.id) return [];
   const prefixes = [

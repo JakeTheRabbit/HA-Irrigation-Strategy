@@ -36,7 +36,7 @@ import { useController } from "@/lib/use-controller";
 import { useHaTheme } from "@/lib/ha-theme";
 import { useHaShell } from "@/lib/ha-shell";
 import { errorText } from "@/lib/utils";
-import { roomIsActive } from "@/lib/model";
+import { roomIsActive, runningVersions } from "@/lib/model";
 import { RoomOffBanner } from "@/components/room-controls";
 import { time, type Page } from "@/components/dashboard";
 import { Overview } from "@/pages/overview";
@@ -170,6 +170,7 @@ export default function App() {
       setRefreshing(false);
     }
   }
+  const versions = runningVersions(controller.states, controller.room.room);
   const sidebar = (variant: string) => (
     <>
       <a
@@ -251,6 +252,22 @@ export default function App() {
           </Button>
         )}
         <span className="small">Configuration changes require review.</span>
+        {!controller.demo && (
+          <dl
+            className="sidebar-versions"
+            aria-label="Running versions"
+            title="Reported by the running integration and controller, not by this page"
+          >
+            <div>
+              <dt>Integration</dt>
+              <dd>{versions.integration ?? "not reported"}</dd>
+            </div>
+            <div>
+              <dt>Controller</dt>
+              <dd>{versions.controller ?? "not reported"}</dd>
+            </div>
+          </dl>
+        )}
       </div>
     </>
   );

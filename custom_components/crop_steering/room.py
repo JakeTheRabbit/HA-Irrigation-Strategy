@@ -29,7 +29,9 @@ def room_prefix(entry) -> str:
         return ""
 
 
-def build_engine_config(prefix, slug, num_zones, zones, hardware, setup=None):
+def build_engine_config(
+    prefix, slug, num_zones, zones, hardware, setup=None, integration_version=None
+):
     """PURE. The room descriptor the f2-control add-on reads from
     ``sensor.crop_steering_<prefix>engine_config`` to DISCOVER and drive an additional room
     (the add-on can't read the config entry directly). Maps each zone's valve switch, the
@@ -59,8 +61,16 @@ def build_engine_config(prefix, slug, num_zones, zones, hardware, setup=None):
     # descriptor it always did, so the controller's saved setup fingerprint still matches and an
     # update does not strand the room behind a disarm cycle.
     declared = {"plumbing": setup["plumbing"]} if setup.get("plumbing") else {}
+    # Which integration Home Assistant actually loaded, for the dashboard's sidebar and for pairing
+    # diagnostics. Passed in (this module stays import-free so it can be loaded on its own). The
+    # controller's setup fingerprint reads named keys only, so this does not disturb a
+    # restart-resume (addons/f2_control/tests/test_versions.py pins that).
+    versions = (
+        {"integration_version": integration_version} if integration_version else {}
+    )
     return {
         **declared,
+        **versions,
         "setup_api_version": 1,
         "setup_revision": setup.get("setup_revision", 0),
         "active": setup.get("active", True),
