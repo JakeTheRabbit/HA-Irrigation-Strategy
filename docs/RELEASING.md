@@ -2,7 +2,9 @@
 
 This controller opens valves and runs pumps on unattended crops. A bug that reaches a production room is not an error report, it is a dry or flooded bench found the next morning. The rule this document exists to enforce:
 
-> **`main` is what production rooms run. Nothing lands on `main` that has not run, unchanged, on real hardware first.**
+> **`main` is what production rooms run. The normal gate is unchanged candidate code verified on staging hardware before promotion.**
+
+An explicitly owner-approved, bounded rehearsal exception is recorded as `approved-rehearsal` in step 5. It changes the accepted promotion scope for that candidate; it does not turn an isolated software rehearsal into a hardware soak or permission to operate unverified plumbing. Without that explicit decision, the normal staging requirements below apply.
 
 CI is necessary and nowhere near sufficient. On one day in September 2026 this repository published four releases in under ten hours. 2.17.1 shipped nineteen minutes after 2.17.0 because "the room on/off control did nothing on a fresh 2.17.0 install", which its changelog records as "Found on the first live install". 2.18.0 was published one minute after its pull request merged. Every one of those builds was green. Four defects that survived all of them, including one that stopped the integration loading at all on Home Assistant older than 2026.5, are written up in [audits/2026-09-21-first-run-review.md](audits/2026-09-21-first-run-review.md). Production was the test environment. This process moves that job to a staging room.
 
@@ -22,7 +24,7 @@ Four things follow, each checked against the Supervisor source (`supervisor/vali
 1. **For the controller, the tracked branch *is* the release channel.** `release.yml` runs *after* a release exists and cannot stop one. A push that changes `version:` on a branch boxes track is a release of the part that drives the pump, with no tag, no review and no soak.
 2. **A box added by the plain address follows `main`, for life.** With no `#branch` on the end, Supervisor clones the repository's default branch, and from then on keeps pulling *the branch it cloned*. Every box ever installed from `https://github.com/<owner>/HA-Irrigation-Strategy` is on `main` and will stay there. That is why `main` has to be the stable branch: it already is what production runs. Never rename or delete `main`, and never change the default branch expecting boxes to follow.
 3. **A box can track another branch.** A repository address may end in `#branch` (`https://github.com/<owner>/HA-Irrigation-Strategy#testing`). That is how a staging room gets code before production does.
-4. **The repository address is the add-on's identity.** Supervisor names an add-on `<hash>_f2_control`, where the hash is taken from the address *exactly as entered, `#branch` included*. The same add-on installed from a different owner, or from the same repository with a different `#branch`, is a **different add-on with its own empty `/data`**: phase, daily counters, water history, learned peaks and the adopted setup all start again. Choose what a box tracks **once, when it is installed**. Moving an existing box is a migration (below), never a casual edit.
+4. **The repository address is the add-on's identity.** Supervisor names an add-on `<hash>_f2_control`, hashing the **lowercased repository address, `#branch` included** ([Supervisor source](https://github.com/home-assistant/supervisor/blob/main/supervisor/store/utils.py)). The same add-on installed from a different owner, or from the same repository with a different `#branch`, is a **different add-on with its own empty `/data`**: phase, daily counters, water history, learned peaks and the adopted setup all start again. Choose what a box tracks **once, when it is installed**. Moving an existing box is a migration (below), never a casual edit.
 
 ## Branches
 
@@ -32,7 +34,7 @@ Four things follow, each checked against the Supervisor source (`supervisor/vali
 | `testing` | Staging rooms only. Address ending `#testing`, HACS *Show beta versions* **on**. | Pull requests, one change each, every required check green, merged by someone other than their author ([CONTRIBUTING.md](../CONTRIBUTING.md)). Never a direct push. |
 | `feat/…` `fix/…` `docs/…` `ci/…` `intake/…` `release/…` | Nobody. (A bench box may install from one to try it: a separate, empty controller. Stop every other controller on that box first.) | Anything. They are proposals, and they are deleted once merged. |
 
-A production room therefore cannot receive anything that was not first on `testing`, built and run on a staging room, and deliberately promoted.
+A production candidate therefore passes through `testing` and deliberate promotion, with hardware evidence under the normal gate or an explicit, bounded rehearsal exception recorded in its audit.
 
 If you deploy from a fork of someone else's repository, **your fork's `main` is your production channel** and upstream is a supplier. Upstream's `main` and upstream's releases are *candidates*: bring them into your `testing` on your schedule (see *Taking upstream changes*), never point a production room at them, and never press **Sync fork** on `main`: that fast-forwards `main` to whatever upstream pushed last, which is a release to every production room with no gate at all.
 
@@ -81,7 +83,7 @@ gh release create v2.19.0 --prerelease --target testing \
 
 Staging rooms now see it: HACS offers the pre-release, Supervisor offers the new controller version from `#testing`. Production rooms see nothing, because `main` has not moved.
 
-**`testing` is now frozen.** From the moment the release pull request merges until the candidate is promoted or abandoned, nothing else merges into `testing`. The reason is mechanical, not tidy-minded: HACS installs the integration from the *tag*, but Supervisor builds the controller from the *tip of the branch at the moment the box updates*. A feature merged behind a candidate carries no version change, so no box is offered it, but a staging room that installs, rebuilds or is restored after that merge builds the newer code **under the candidate's version number**, and what soaks is no longer what was tagged. Pull requests can still be opened, reviewed and checked during a soak; they wait to merge. One staging room can only soak one candidate at a time anyway, so the freeze costs review latency and nothing else. Make it mechanical: switch on **Lock branch** for `testing` when you cut the candidate, and off when it is promoted or abandoned. The one thing that merges into a frozen `testing` is the fix for a failed candidate (step 6).
+**`testing` is now frozen.** From the moment the release pull request merges until the candidate is promoted or abandoned, nothing else merges into `testing`. The reason is mechanical, not tidy-minded: HACS installs the integration from the *tag*, but Supervisor builds the controller from the *tip of the branch at the moment the box updates*. A feature merged behind a candidate carries no version change, so no box is offered it, but a staging room that installs or rebuilds after that merge builds the newer code **under the candidate's version number**, and what soaks is no longer what was tagged. A backup restore can import a saved image instead; it does not always rebuild the branch tip (see *Rolling back*). Pull requests can still be opened, reviewed and checked during a soak; they wait to merge. One staging room can only soak one candidate at a time anyway, so the freeze costs review latency and nothing else. Make it mechanical: switch on **Lock branch** for `testing` when you cut the candidate, and off when it is promoted or abandoned. The one thing that merges into a frozen `testing` is the fix for a failed candidate (step 6).
 
 ### 4. Soak on a staging room, on real plumbing
 
@@ -122,17 +124,48 @@ A staging room is a real room you can afford to get wrong: real switch, real pum
 
 ### 5. Promote
 
-Only when every box above is ticked and written down:
+Only when the applicable checks above are complete and recorded, publish two evidence assets on the candidate's existing pre-release:
 
-```bash
-git fetch origin
-git checkout main && git merge --ff-only v2.19.0 && git push origin main
-gh release edit v2.19.0 --prerelease=false --title "2.19.0"
+- `release-audit-v2.19.0.md`: the version-specific audit, including the candidate's full commit SHA, what ran, the results, and every remaining limitation. Keep the detailed report under `docs/audits/` as well where practical.
+- `promotion-audit-v2.19.0.json`: the explicit approval below, binding that exact commit and the SHA256 of the uploaded Markdown file. Generate this after the final candidate SHA is known; committing an audit containing its own commit SHA is impossible.
+
+```json
+{
+  "schema_version": 1,
+  "tag": "v2.19.0",
+  "candidate_sha": "<full 40-character candidate commit SHA>",
+  "verdict": "ready",
+  "approval": {
+    "approved_by": "<person who approved this candidate>",
+    "approved_at": "2026-09-21T10:00:00Z",
+    "basis": "staging-soak",
+    "evidence_asset": "release-audit-v2.19.0.md",
+    "evidence_sha256": "<SHA256 of the uploaded Markdown bytes>"
+  }
+}
 ```
 
-`main` now points at the exact commit that soaked, and because it only ever fast-forwards, `main` is always a point in `testing`'s own history. Production rooms are offered the pair. Update **one production room first**, watch it through a photoperiod, then the rest.
+Use `verdict: "not-ready"` while anything required remains unresolved. The normal approval basis is `staging-soak`. An owner may explicitly approve a bounded `approved-rehearsal` exception; the evidence must name that decision, the rehearsal environment, the exact tested code, the unresolved real-plumbing/soak checks, and the deployment limits accepted by the owner. Passing CI or a rehearsal alone is never authorization to set `ready`, and rehearsal evidence must never claim that water delivery or a hardware soak occurred.
 
-Promotion is a fast-forward from the command line on purpose. GitHub's merge button cannot fast-forward: every option it offers creates a new commit, so `main` would stop being the commit that soaked and the two branches would drift apart.
+Run **Actions → Promote → Run workflow**, using branch **main**, the exact candidate tag, and **dry_run = true** first. The same nonmutating preflight is available locally with an authenticated GitHub CLI:
+
+```bash
+python .github/scripts/promotion.py --repo <owner>/HA-Irrigation-Strategy --tag v2.19.0
+```
+
+The preflight rejects a tag that does not match the integration manifest, a candidate that cannot fast-forward current `main`, an unfrozen `testing` tip, a missing/failed/incomplete **Validate** run for that exact SHA, a noncandidate release, or missing/mismatched approval evidence. A green unrelated workflow or a PR's synthetic merge SHA does not count. It reads the exact `ci-validate.yml` workflow ID, path and name, checks the latest updated candidate run (including reruns of older run numbers), and requires each mandatory job to have succeeded on the same SHA. Any active candidate run blocks promotion. An already-stable release is accepted only when `main` already equals the candidate, making retries safe.
+
+After the dry run passes and the owner authorizes promotion, dispatch **Promote** again with **dry_run = false**. A read-only job checks all gates first; the writing job runs code from the same trusted `main` commit, repeats all checks, and refuses if the candidate, refs, CI attempt or evidence changed. Candidate files and assets are read as data; no candidate code executes with the write token. The GitHub ref update uses `force: false`, so GitHub also rejects a non-fast-forward. The release flips from pre-release only after `main` is confirmed at the exact candidate SHA. No tag is moved and nothing is rebuilt.
+
+`main` now points at that exact approved commit, and because it only ever fast-forwards, `main` remains a point in `testing`'s own history. Production rooms are offered the pair. Update **one production room first**, watch it through a photoperiod, then the rest.
+
+If `main` advances but the release flip fails, the workflow fails visibly with that partial result. **Do not rewind `main`.** Fix the reported issue and dispatch again from the new `main`; preflight accepts an already-promoted identical SHA and completes only the release flip. If GitHub completed the flip but its response was lost, the retry verifies the already-stable state and makes no changes. Keep `testing` frozen until it succeeds. Branch/ref protection is still required: no workflow can stop a separate writer changing refs after its final check.
+
+The workflow uses `GITHUB_TOKEN`; its ref/release writes do not start another push/release workflow. It relies on the completed candidate `Validate` run and its own pre/post-write checks. Release packaging must already have completed when the pre-release was created.
+
+**First installation of this workflow:** GitHub cannot dispatch it until it exists on the default branch. For that one bootstrap only, the owner reviews the workflow/script, runs the local read-only preflight against the final tagged candidate and its uploaded evidence, then explicitly authorizes a normal fast-forward of `main` to that same SHA and the matching release flip. Do not copy the workflow alone into `main`, create a merge commit on `main`, force an update, or bypass an unsuccessful preflight. All later promotions use **Promote**. This bootstrap changes no runtime requirement or evidence claim.
+
+GitHub's pull request merge button cannot fast-forward: every option it offers creates a new commit, so `main` would stop being the approved candidate and the two branches would drift apart.
 
 ### 6. If the candidate fails
 
@@ -153,7 +186,7 @@ A fix written in a hurry and pushed straight to the branch production tracks is 
 ## Rolling back
 
 - **Integration:** HACS → the repository → *Redownload* → choose the previous version → restart Home Assistant.
-- **Controller:** restore the add-on backup taken before the update. For an add-on that is built on the box, Supervisor's backup holds the **built image as well as `/data`** (`export_image` / `import_image` in its source), so the old code *and* its counters and phase come back together. That is the reason the backup in step 4 is not optional.
+- **Controller:** restore the add-on backup taken before the update. Supervisor can include the locally built image as **`image.tar` alongside `/data`** and import it on restore ([backup/restore source](https://github.com/home-assistant/supervisor/blob/main/supervisor/apps/app.py)). Confirm the actual backup contains a usable image and rehearse restoring it; a source-only backup or later rebuild must not be assumed to recover the original binary. Verify the restored code, counters and phase together. That is the reason the backup in step 4 is not optional.
 - `main` itself is never moved backwards. Production boxes that have not updated yet are protected by not pressing Update; the next promoted release carries the fix.
 - A release that changes the state file format must say in its changelog whether the previous controller can read the new file. `Controller._load_state` tolerates unknown keys precisely so that it can; keep it that way.
 
@@ -188,9 +221,6 @@ People skip checklists at 11 pm. Repository settings do not.
 - **Protect `main`:** block force-pushes and deletion. It takes no pull requests at all: the only thing that ever arrives is a fast-forward, pushed by whoever is allowed to promote. On an organisation's repository, restrict pushes to those people. On a personal repository classic branch protection cannot do that (the *Restrict who can push* option exists only for organisations): anyone with write access can push, so keep write access to yourself, or use a ruleset with *Restrict updates* and yourself as the only bypass. (Not checked against GitHub's current settings pages; confirm when you set it up.)
 - **Freeze `testing` during a soak** with *Lock branch* (step 3).
 - **Production boxes:** plain repository address, add-on auto-update OFF, HACS beta versions OFF.
-- **In place: the *Release guards* workflow** (`.github/scripts/release_guards.py`). On every pull request it fails a version change from a branch not named `release/<that version>` (an `intake/…` branch may carry upstream's), a release pull request that carries code (including anything but the version field inside a version file, compared against the fork point), a version that goes down or reuses a tag, and any pull request into `main`. On every push to `main` it fails loudly unless the new tip is a fast-forward to the commit tagged `v<version>` that is already on `testing`; that one cannot prevent the push, it makes sure you hear about it at once. GitHub reads this workflow from **`main`**, so a pull request cannot switch it off, and a change to the guard itself only takes effect after a promotion.
-- **Worth building next, each as its own pull request:**
-  - a `promote` workflow (manual trigger) that refuses unless the tag's commit has a green `Validate` run and an audit file for that version exists, then fast-forwards `main` and flips the pre-release;
-  - third-party GitHub Actions pinned to commit SHAs (`hassfest@master` and `hacs/action@main` float today, and a workflow runs with the repository's token).
-
-  Until the `promote` workflow exists, promotion is the three commands in step 5 and the discipline to run them last.
+- **In place: the *Promote* workflow** (`.github/workflows/promote.yml`, `.github/scripts/promotion.py`). It checks the tag, manifest, frozen staging tip, fast-forward ancestry, exact successful `Validate` run and approved evidence **before** moving production. Dispatch it from `main`; a dry run is the default. Its checkout action is pinned to a commit. Restrict production updates to the promotion identity and an explicit recovery administrator; if protection refuses its token, configure the permitted identity rather than disabling the gate.
+- **In place: the *Release guards* workflow** (`.github/scripts/release_guards.py`). On every pull request it fails a version change from a branch not named `release/<that version>` (an `intake/…` branch may carry upstream's), a release pull request that carries code (including anything but the version field inside a version file, compared against the fork point), a version that goes down or reuses a tag, and any pull request into `main`. On human/token pushes that trigger Actions it also fails loudly unless the new `main` tip is a fast-forward to the commit tagged `v<version>` already on `testing`. That after-push check cannot prevent a push and is defense in depth; **Promote** supplies the gate before its writes. Pull request guard code comes from **`main`**, so a pull request cannot switch it off, and guard changes take effect only after promotion.
+- **Worth building next, as its own pull request:** pin the remaining third-party GitHub Actions to commit SHAs (`hassfest@master` and `hacs/action@main` still float).

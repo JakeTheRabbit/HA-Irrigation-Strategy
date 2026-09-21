@@ -132,7 +132,14 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
   for life, so for the part that drives the pump **a push that changes `version:` on `main` IS a
   release to production**. Candidates are cut as pre-releases from `testing`, soak on a staging
   room on real plumbing, and only then is `main` fast-forwarded to that exact commit. A version
-  number is never reused for different code.
+  number is never reused for different code. The **Promote** workflow must be dispatched from
+  `main`; default to its read-only dry run. The local equivalent is
+  `python .github/scripts/promotion.py --repo <owner>/HA-Irrigation-Strategy --tag vX.Y.Z`.
+  It requires exact-candidate `Validate` success, `testing` still at the tag, fast-forward
+  ancestry and version-specific approved audit assets. Do not infer readiness or promotion
+  authorization from CI or a rehearsal. The writing job uses trusted `main` code and rechecks
+  all gates before advancing `main`, then flips the matching pre-release. If that flip fails,
+  report that `main` already advanced and retry through the workflow; never rewind production.
 - **Deploying changes:** publish a versioned integration release and matching controller
   app release. Existing app installations must update in place from their current
   repository to preserve their Supervisor identity and `/data`. A plain restart

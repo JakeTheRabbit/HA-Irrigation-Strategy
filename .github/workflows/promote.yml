@@ -1,0 +1,68 @@
+name: Promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_tag:
+        description: Exact integration candidate tag (vX.Y.Z)
+        required: true
+        type: string
+      dry_run:
+        description: Check every gate without moving main or publishing the release
+        default: true
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: production-promotion
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Read-only candidate checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      digest: ${{ steps.check.outputs.digest }}
+    steps:
+      - name: Require dispatch from main
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+        run: test "$DISPATCH_REF" = refs/heads/main
+      - name: Checkout trusted main workflow code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check exact candidate, CI and approved evidence
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+        run: python3 .github/scripts/promotion.py --tag "$CANDIDATE_TAG"
+
+  promote:
+    name: Fast-forward production then publish the matching release
+    needs: preflight
+    if: ${{ !inputs.dry_run && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Checkout the same trusted main workflow code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Recheck the plan before the first write
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+          PROMOTION_DIGEST: ${{ needs.preflight.outputs.digest }}
+        run: python3 .github/scripts/promotion.py --tag "$CANDIDATE_TAG" --apply
