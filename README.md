@@ -8,7 +8,7 @@ The demo opens directly in your browser with sample rooms, sensor data and edita
 
 The demo includes clearly labelled synthetic recipes and current/previous runs for exploring comparisons. They demonstrate the software; they are not production recommendations.
 
-![Release](https://img.shields.io/badge/Release-2.19.0-green)
+![Release](https://img.shields.io/badge/Release-2.19.1-green)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3+-41BDF5)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -16,7 +16,7 @@ The demo includes clearly labelled synthetic recipes and current/previous runs f
 
 ![Crop Steering operator workspace](img/operator-dashboard.png)
 
-> **New in 2.19 / controller 0.16.0:** setup asks how each room is plumbed, and a room that says it has a pump is never watered without it. **2.18** brought a setup wizard that keeps what you typed and says exactly what to fix, rooms with a single switch per zone, probes in µS/cm or m³/m³ converted instead of rejected, and setup helpers (unit pickers, substrate presets, catch test, learned-peak suggestion). **2.17** added the recorded-sensor plan graph with the projected P0-P3 day, room on/off, the full P1 ramp, Auto Setpoints, restart-safe setup and a patient pump read-back. Install the matching pair; see the [changelog](CHANGELOG.md).
+> **New in 2.19 / controller 0.16.1:** the dashboard sidebar shows which integration and controller are running, the integration has its icon, and setup asks how each room is plumbed, and a room that says it has a pump is never watered without it. **2.18** brought a setup wizard that keeps what you typed and says exactly what to fix, rooms with a single switch per zone, probes in µS/cm or m³/m³ converted instead of rejected, and setup helpers (unit pickers, substrate presets, catch test, learned-peak suggestion). **2.17** added the recorded-sensor plan graph with the projected P0-P3 day, room on/off, the full P1 ramp, Auto Setpoints, restart-safe setup and a patient pump read-back. Install the matching pair; see the [changelog](CHANGELOG.md).
 
 ## Start here
 

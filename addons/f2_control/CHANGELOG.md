@@ -1,6 +1,6 @@
-# Unreleased
+# 0.16.1
 
-Not released: no version until a `release/x.y.z` pull request.
+Pair with integration 2.19.1. Not run on hardware before release.
 
 - The controller reports its own version: `controller_version` in every room's `ai_heartbeat`, and in the first log line (`f2-control 0.16.x starting | rooms ...`). The dashboard's sidebar shows it next to the integration's. It is read from the `config.yaml` the image was built from (copied in as `/app/addon.yaml`), so there is no second number to keep in step.
 - No change to irrigation behaviour, options or the state file.
