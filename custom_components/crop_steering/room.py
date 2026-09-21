@@ -51,7 +51,14 @@ def zone_device_name(entry, zone_num) -> str:
 
 
 def build_engine_config(
-    prefix, slug, num_zones, zones, hardware, setup=None, integration_version=None
+    prefix,
+    slug,
+    num_zones,
+    zones,
+    hardware,
+    setup=None,
+    integration_version=None,
+    entry_id=None,
 ):
     """PURE. The room descriptor the f2-control add-on reads from
     ``sensor.crop_steering_<prefix>engine_config`` to DISCOVER and drive an additional room
@@ -89,9 +96,15 @@ def build_engine_config(
     versions = (
         {"integration_version": integration_version} if integration_version else {}
     )
+    # WHICH room this is. A room that is deleted and set up again publishes the same entity ids
+    # and starts its setup revision again at 1; without this the running controller cannot tell
+    # it from the room it already adopted, and goes on driving the old map. Like the version, it
+    # is not one of the keys the setup fingerprint reads.
+    which = {"entry_id": entry_id} if entry_id else {}
     return {
         **declared,
         **versions,
+        **which,
         "setup_api_version": 1,
         "setup_revision": setup.get("setup_revision", 0),
         "active": setup.get("active", True),
