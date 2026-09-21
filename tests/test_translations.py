@@ -166,9 +166,28 @@ def test_a_field_nothing_reads_does_not_promise_that_something_will():
     assert "does NOT operate" in waste
 
 
-def test_the_pump_tooltip_says_what_leaving_it_empty_means():
-    """An empty pump is accepted since 2.18.0 and means the controller never runs one. The person
-    choosing that has to be told, in the place they choose it."""
+def test_the_plumbing_question_says_what_it_commits_you_to_and_the_pump_tooltip_defers_to_it():
+    """Whether a room has a pump is no longer read off an empty field: it is asked. The person
+    answering has to be told, where they answer, that the switches must then match and that a
+    mismatch stops watering rather than running the valve with no pump."""
+    strings = _strings()
     for flow, step in (("config", "hardware"), ("options", "edit_zones_map")):
-        tooltip = _strings()[flow]["step"][step]["data_description"]["pump_switch"]
-        assert "NEVER run a pump" in tooltip and "counts the shot" in tooltip
+        text = strings[flow]["step"][step]
+        assert (
+            list(text["data"])[0] == "plumbing"
+        )  # asked before the switches it governs
+        question = text["data_description"]["plumbing"]
+        assert "refuses to save" in question and "refuses to water" in question
+        for key in ("pump_switch", "main_line_switch"):
+            tooltip = text["data_description"][key]
+            assert "plumbing above" in tooltip and "EMPTY when it does not" in tooltip
+        # 2.18.1 told the truth about inference; with a declared layout that text would now be false
+        assert "NEVER run a pump" not in text["data_description"]["pump_switch"]
+
+
+def test_every_plumbing_layout_has_a_plain_english_choice_and_nothing_else_does():
+    from custom_components.crop_steering.plumbing import LABELS, PLUMBING_LAYOUTS
+
+    options = _strings()["selector"]["plumbing"]["options"]
+    assert set(options) == set(PLUMBING_LAYOUTS) == set(LABELS)
+    assert list(options) == list(PLUMBING_LAYOUTS)  # offered simplest first

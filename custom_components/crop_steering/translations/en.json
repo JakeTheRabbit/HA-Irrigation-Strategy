@@ -333,6 +333,7 @@
         "title": "Hardware & substrate",
         "description": "{info}",
         "data": {
+          "plumbing": "How is this room plumbed?",
           "pump_switch": "Pump switch",
           "main_line_switch": "Main-line valve",
           "waste_switch": "Waste / recirculation valve (optional)",
@@ -358,8 +359,9 @@
           "feed_ph_sensor": "Feed / tank pH probe (source-water check)"
         },
         "data_description": {
-          "pump_switch": "The switch that runs your water pump. It is switched on 2 seconds before a zone opens and off after it closes. Leave EMPTY only if Home Assistant does not switch your pump: one switch per zone is the whole system (a tent on a smart plug), or the line is always under pressure. If it is empty the controller will NEVER run a pump: it opens the zone switch and counts the shot as delivered.",
-          "main_line_switch": "The solenoid on the shared supply line feeding every zone; it opens 1 second before the zone valve. Leave empty if you have none: it is then simply skipped.",
+          "plumbing": "What stands between the water and a zone valve. This is a statement about your plumbing, and the switches below have to match it. Setup refuses to save if they do not, and the controller refuses to water if they ever stop matching: a room that needs its pump is never run with the valve open and no pump. Not sure? If water only comes out while a pump is running, the room has a pump.",
+          "pump_switch": "The switch that runs your water pump. Needed when the plumbing above includes a pump; leave it EMPTY when it does not (one switch per zone is the whole system, as in a tent on a smart plug, or the line is always under pressure). It is switched on 2 seconds before a zone opens and off after it closes.",
+          "main_line_switch": "The solenoid on the shared supply line feeding every zone; it opens 1 second before the zone valve. Needed when the plumbing above includes a main-line valve; leave it EMPTY when it does not.",
           "waste_switch": "Recorded, and required to read OFF before setup can change. IMPORTANT: the controller does NOT operate this valve during a shot. If your plumbing needs it closed to send feed to the plants, arrange that yourself. Leave empty if you have none.",
           "light_entity": "Recorded for reference only. Day and night come from the lights-on and lights-off hours, not from this entity.",
           "lights_on_hour": "Hour (0-23) the lights turn ON. Starts the grow-day; daily water/shot counters reset here.",
@@ -444,6 +446,7 @@
         "title": "Zones — map entities",
         "description": "{info}",
         "data": {
+          "plumbing": "How is this room plumbed?",
           "zone_1_switch": "Zone 1 valve (switch)",
           "zone_1_vwc": "Zone 1 moisture sensor(s) — VWC",
           "zone_1_ec": "Zone 1 nutrient sensor(s) — EC",
@@ -613,6 +616,7 @@
           "feed_ph_sensor": "Feed / tank pH probe (source-water check)"
         },
         "data_description": {
+          "plumbing": "What stands between the water and a zone valve. This is a statement about your plumbing, and the switches below have to match it. Setup refuses to save if they do not, and the controller refuses to water if they ever stop matching: a room that needs its pump is never run with the valve open and no pump. Not sure? If water only comes out while a pump is running, the room has a pump.",
           "zone_1_switch": "The switch entity that opens zone 1's irrigation valve.",
           "zone_1_vwc": "One or more substrate moisture (VWC) probes in zone 1. Pick a representative block. Choose several to average valid readings. Outliers are not automatically rejected.",
           "zone_1_ec": "One or more substrate EC (pore-water) probes in zone 1. Several are averaged.",
@@ -709,8 +713,8 @@
           "zone_24_vwc": "One or more substrate moisture (VWC) probes in zone 24. Pick a representative block. Choose several to average valid readings. Outliers are not automatically rejected.",
           "zone_24_ec": "One or more substrate EC (pore-water) probes in zone 24. Several are averaged.",
           "zone_24_plant_count": "Number of plants in zone 24. Scales shot volume (per-plant substrate x plants).",
-          "pump_switch": "The switch that runs your water pump. It is switched on 2 seconds before a zone opens and off after it closes. Leave EMPTY only if Home Assistant does not switch your pump: one switch per zone is the whole system (a tent on a smart plug), or the line is always under pressure. If it is empty the controller will NEVER run a pump: it opens the zone switch and counts the shot as delivered.",
-          "main_line_switch": "The solenoid on the shared supply line feeding every zone; it opens 1 second before the zone valve. Leave empty if you have none: it is then simply skipped.",
+          "pump_switch": "The switch that runs your water pump. Needed when the plumbing above includes a pump; leave it EMPTY when it does not (one switch per zone is the whole system, as in a tent on a smart plug, or the line is always under pressure). It is switched on 2 seconds before a zone opens and off after it closes.",
+          "main_line_switch": "The solenoid on the shared supply line feeding every zone; it opens 1 second before the zone valve. Needed when the plumbing above includes a main-line valve; leave it EMPTY when it does not.",
           "waste_switch": "Recorded, and required to read OFF before setup can change. IMPORTANT: the controller does NOT operate this valve during a shot. If your plumbing needs it closed to send feed to the plants, arrange that yourself. Leave empty if you have none.",
           "light_entity": "Recorded for reference only. Day and night come from the lights-on and lights-off hours, not from this entity.",
           "lights_on_hour": "Hour (0-23) the lights turn ON. Starts the grow-day; daily water/shot counters reset here.",
@@ -839,6 +843,16 @@
     "fused_sensor_unavailable": {
       "title": "Crop Steering: zone sensor unavailable",
       "description": "The moisture sensor for zone(s) {zones} reads unavailable — the probe(s) may be offline or misnamed. Check it in Developer Tools → States and your zone mapping."
+    }
+  },
+  "selector": {
+    "plumbing": {
+      "options": {
+        "valves_only": "Zone valves only: each zone is one switch and nothing else (a tent on one smart plug or solenoid)",
+        "pump_valves": "A pump, then zone valves: the pump has to run whenever a zone waters",
+        "mainline_valves": "A main-line valve, then zone valves: mains or gravity pressure, no pump to switch",
+        "pump_mainline_valves": "A pump, a main-line valve, then zone valves"
+      }
     }
   }
 }

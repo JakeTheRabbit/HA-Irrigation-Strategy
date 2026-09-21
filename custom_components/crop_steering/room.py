@@ -55,7 +55,12 @@ def build_engine_config(prefix, slug, num_zones, zones, hardware, setup=None):
     )
     hw = hardware or {}
     setup = setup or {}
+    # Only when DECLARED. A room that never declared its plumbing publishes byte-for-byte the
+    # descriptor it always did, so the controller's saved setup fingerprint still matches and an
+    # update does not strand the room behind a disarm cycle.
+    declared = {"plumbing": setup["plumbing"]} if setup.get("plumbing") else {}
     return {
+        **declared,
         "setup_api_version": 1,
         "setup_revision": setup.get("setup_revision", 0),
         "active": setup.get("active", True),

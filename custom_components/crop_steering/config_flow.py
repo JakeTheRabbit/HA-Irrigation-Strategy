@@ -24,6 +24,7 @@ from .const import (
     CONF_MAIN_LINE_SWITCH,
 )
 from .env_parser import load_env_config
+from .plumbing import PLUMBING_LAYOUTS, infer as infer_plumbing
 from .room import slugify_room
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,6 +50,17 @@ def _sensor_one():
 def _light_sel():
     return selector.EntitySelector(
         selector.EntitySelectorConfig(domain=["light", "switch"])
+    )
+
+
+def _plumbing_sel():
+    # Shown as a list, not a dropdown: four choices, and a newcomer should see all of them.
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=list(PLUMBING_LAYOUTS),
+            translation_key="plumbing",
+            mode=selector.SelectSelectorMode.LIST,
+        )
     )
 
 
@@ -90,8 +102,17 @@ def _zone_schema(num_zones: int, zones: dict | None = None) -> dict:
     return out
 
 
-def _hardware_schema(hardware: dict | None = None, params: dict | None = None) -> dict:
-    """Build the {marker: selector} map for shared hardware + substrate properties."""
+def _hardware_schema(
+    hardware: dict | None = None,
+    params: dict | None = None,
+    plumbing: str | None = None,
+) -> dict:
+    """Build the {marker: selector} map for shared hardware + substrate properties.
+
+    `plumbing` prefills the layout question: what the room declared, or for a room from before
+    the question existed, what its mapped switches imply. A new room gets no prefill, so the
+    person setting it up answers it rather than accepting a guess.
+    """
     hardware = hardware or {}
     params = params or {}
 
@@ -110,6 +131,13 @@ def _hardware_schema(hardware: dict | None = None, params: dict | None = None) -
         ] = sel
 
     out: dict = {}
+    out[
+        (
+            vol.Required("plumbing", default=plumbing)
+            if plumbing
+            else vol.Required("plumbing")
+        )
+    ] = _plumbing_sel()
     _ent("pump_switch", _sw_sel())
     _ent("main_line_switch", _sw_sel())
     _ent("waste_switch", _sw_sel())
@@ -623,9 +651,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Map shared hardware (pump/mainline/lights) and substrate properties."""
         info = (
-            "Shared plumbing, lights and the substrate facts used to size shots. Pump and main-line "
-            "valve are optional: a room with one switch per zone, such as a tent on a single smart "
-            "plug, needs only the zone valves you have already picked."
+            "Shared plumbing, lights and the substrate facts used to size shots. Start by saying how "
+            "the room is plumbed: a room with one switch per zone, such as a tent on a single smart "
+            "plug, is zone valves only and needs nothing more than the valves you have already "
+            "picked. If water only flows while a pump runs, say so and choose the pump."
         )
         if user_input is None:
             return self.async_show_form(
@@ -649,6 +678,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data["enable_flag"] = (
             f"switch.crop_steering_{data['room_prefix']}engine_enabled"
         )
+        if user_input.get("plumbing"):
+            data["plumbing"] = user_input["plumbing"]
         try:
             data = self._check(data)
         except ValueError as err:
@@ -947,7 +978,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             {
                 **_zone_schema(num, data.get("zones", {})),
                 **_hardware_schema(
-                    data.get("hardware", {}), data.get("parameters", {})
+                    data.get("hardware", {}),
+                    data.get("parameters", {}),
+                    data.get("plumbing") or infer_plumbing(data.get("hardware", {})),
                 ),
             }
         )
@@ -971,6 +1004,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 **_build_parameters(user_input),
             },
         }
+        if user_input.get("plumbing"):
+            new_data["plumbing"] = user_input["plumbing"]
         from .setup_api import (
             configuration_payload,
             prepare_setup,

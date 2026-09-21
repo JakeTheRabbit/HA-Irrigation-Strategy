@@ -12,6 +12,7 @@ import type {
 import type { States } from "./types";
 import { discoverRooms, numeric } from "./model";
 import { blockForDay, dateForDay, growDay, interpolate, localDate, planErrors } from "./grow-plan";
+import { inferPlumbing, plumbingErrors } from "./plumbing";
 
 const clone = <T>(value: T): T => structuredClone(value);
 export class OperatorDemo {
@@ -66,9 +67,12 @@ export class OperatorDemo {
             ]),
           ),
         },
+        // The demo rooms are pumped rooms that have said so.
+        plumbing: "pump_mainline_valves",
         safety: { ready: false, blockers: [] },
       }));
     for (const room of this.rooms) {
+      room.plumbing_inferred = inferPlumbing(room.hardware);
       const descriptor = states["sensor.crop_steering_" + room.prefix + "engine_config"];
       const flag = String(descriptor?.attributes.enable_flag || "");
       room.safety = {
@@ -116,7 +120,13 @@ export class OperatorDemo {
       });
     return clone({
       api_version: 1,
-      capabilities: { create: true, save: true, remove: true, stable_zone_ids: true },
+      capabilities: {
+        create: true,
+        save: true,
+        remove: true,
+        stable_zone_ids: true,
+        plumbing: true,
+      },
       rooms: this.rooms,
       candidates,
       limits: { max_zones: 24 },
@@ -304,6 +314,13 @@ export class OperatorDemo {
           if (valves.some((v) => otherValves.has(v)))
             throw new Error("A valve is already mapped to another room.");
           if (!String(data.room_name || "").trim()) throw new Error("Enter a room name.");
+          // As the integration does: a declared layout has to match the switches, both ways.
+          const layout = String(data.plumbing || room?.plumbing || "");
+          const contradictions =
+            data.active === false
+              ? []
+              : plumbingErrors(layout, (data.hardware || {}) as Record<string, unknown>);
+          if (contradictions.length) throw new Error(contradictions.join(" "));
           const fresh: SetupRoom = room || {
             entry_id: "demo-entry-" + this.rooms!.length,
             revision: 0,
@@ -322,6 +339,7 @@ export class OperatorDemo {
             zones,
             hardware: clone(data.hardware as Record<string, string | number>),
             active: data.active !== false,
+            ...(layout ? { plumbing: layout } : {}),
           });
           fresh.revision++;
           fresh.num_zones = Math.max(...zones.map((z) => z.id));
@@ -350,6 +368,7 @@ export class OperatorDemo {
               friendly_name: target.room_name + " engine config",
               enable_flag: flag,
               ...target.hardware,
+              ...(target.plumbing ? { plumbing: target.plumbing } : {}),
               pump: target.hardware.pump_switch,
               valves: Object.fromEntries(target.zones.map((z) => [z.id, z.valve])),
               zone_names: Object.fromEntries(target.zones.map((z) => [z.id, z.name])),

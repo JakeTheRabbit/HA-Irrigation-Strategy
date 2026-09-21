@@ -225,6 +225,11 @@ async function liveSetup(run) {
   try {
     await lp.goto(origin + "/dashboard.html?room=f1#/setup");
     await visible(lp.locator("#room-name"));
+    assert.equal(
+      await lp.locator("#room-plumbing").count(),
+      0,
+      "An integration that does not report the plumbing capability must not be asked about it",
+    );
     await run(lp, calls);
     assert.deepEqual(
       [...new Set(calls.map((call) => call.action))].sort(),
@@ -437,7 +442,31 @@ try {
         .getByRole("textbox", { name: "Search Zone 1 valve entities" })
         .fill("switch.demo_spare_2");
       await page.locator(".mapping-result").filter({ hasText: "switch.demo_spare_2" }).click();
-      await saveSetup();
+      // A new room has to SAY how it is plumbed; nothing is guessed from empty fields.
+      const review = page.getByRole("button", { name: "Review configuration", exact: true });
+      await visible(page.getByText("Choose how this room is plumbed.", { exact: true }));
+      assert.ok(await review.isDisabled(), "A room with no plumbing answer must not be reviewable");
+      // "It has a pump" with no pump chosen is the mistake 2.18.0 saved and then ran dry.
+      await page.locator("#room-plumbing").selectOption("pump_valves");
+      await visible(page.getByText(/plumbed with a pump: choose the pump switch/));
+      assert.ok(await review.isDisabled(), "A pumped room with no pump must not be reviewable");
+      await visible(page.getByRole("button", { name: "Map Room pump", exact: true }));
+      assert.equal(
+        await page.getByRole("button", { name: "Map Mainline valve", exact: true }).count(),
+        0,
+        "A layout without a main-line valve must not offer one",
+      );
+      // A one-switch room says so, and is then complete with nothing but its valve.
+      await page.locator("#room-plumbing").selectOption("valves_only");
+      assert.equal(
+        await page.getByRole("button", { name: "Map Room pump", exact: true }).count(),
+        0,
+      );
+      await page.getByRole("button", { name: "Review configuration", exact: true }).click();
+      await visible(page.getByText("Plumbing: Zone valves only", { exact: true }));
+      await page.getByRole("button", { name: "Save configuration", exact: true }).click();
+      await page.getByRole("dialog").waitFor({ state: "hidden" });
+      assert.equal(await page.locator("#room-plumbing").inputValue(), "valves_only");
       const id = await page.locator("#setup-room").inputValue();
       assert.ok(id);
       await page.getByRole("button", { name: "Archive room", exact: true }).click();

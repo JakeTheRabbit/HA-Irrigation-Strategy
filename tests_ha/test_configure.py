@@ -123,12 +123,31 @@ async def test_an_untouched_save_keeps_every_mapping(hass):
     assert entry.data["hardware"] == before
 
 
-async def test_a_pump_that_was_mapped_can_be_unmapped_now_that_it_is_optional(hass):
+async def test_a_pump_can_be_removed_by_saying_the_room_no_longer_has_one(hass):
     hass.states.async_set("switch.pump", "off")
     entry = await _install(hass, {"pump_switch": "switch.pump"})
     assert entry.data["hardware"]["pump_switch"] == "switch.pump"
-    await _save_map(hass, entry, pump_switch=None)
+    assert entry.data["plumbing"] == "pump_valves"
+    await _save_map(hass, entry, pump_switch=None, plumbing="valves_only")
     assert entry.data["hardware"]["pump_switch"] == ""
+    assert entry.data["plumbing"] == "valves_only"
+
+
+async def test_clearing_the_pump_of_a_room_that_says_it_has_one_is_refused_in_the_form(hass):
+    """The defect this feature exists for. On 2.18.0 this save went through, and the controller
+    then opened the valve with no pump running and counted the water as delivered."""
+    hass.states.async_set("switch.pump", "off")
+    entry = await _install(hass, {"pump_switch": "switch.pump"})
+    revision = entry.data["setup_revision"]
+    flow = await _open(hass, entry, "edit_zones")
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"num_zones": 1})
+    answers = {**_shown(flow), **_suggested(flow)}
+    answers.pop("pump_switch")  # cleared in the form; the layout still says "a pump, then zone valves"
+    result = await hass.config_entries.options.async_configure(flow["flow_id"], answers)
+    assert result["type"] is FlowResultType.FORM and result["step_id"] == "edit_zones_map"
+    assert "no pump switch is chosen" in result["description_placeholders"]["error"]
+    assert entry.data["hardware"]["pump_switch"] == "switch.pump"  # nothing was written
+    assert entry.data["setup_revision"] == revision
 
 
 # ------------------------------------------------------------------ messages

@@ -101,6 +101,7 @@
   margin-bottom: 8px;
 }
 .workspace-form-grid select,
+.setup-plumbing select,
 .setup-room-select select {
   width: 100%;
   min-height: 40px;
@@ -297,6 +298,14 @@
 .setup-room-select label {
   display: block;
   margin-bottom: 8px;
+}
+.setup-plumbing {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.setup-plumbing select {
+  max-width: 440px;
 }
 .mapping-picker {
   min-width: 0;

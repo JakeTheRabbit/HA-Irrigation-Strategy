@@ -30,6 +30,16 @@ import {
 } from "@/components/zone-sizing";
 import type { Controller } from "@/lib/types";
 import { SIZING_UNITS, reviewValue, sizingError } from "@/lib/units";
+import {
+  PLUMBING_HINTS,
+  PLUMBING_LABELS,
+  PLUMBING_LAYOUTS,
+  hardwareForLayout,
+  isPlumbingLayout,
+  plumbingErrors,
+  plumbingUses,
+  type PlumbingLayout,
+} from "@/lib/plumbing";
 import { errorText } from "@/lib/utils";
 import type { SetupCandidate, SetupDocument, SetupRoom, SetupZone } from "@/lib/operator-types";
 
@@ -239,6 +249,7 @@ export function Setup({
       active_zone_ids: [1],
       zones: [newZone(1)],
       hardware: {},
+      plumbing: "",
       safety: { ready: true, blockers: [] },
     };
     setIsNew(true);
@@ -281,8 +292,21 @@ export function Setup({
   }
   const activeZones = draft?.zones.filter((z) => z.active) || [],
     archivedZones = draft?.zones.filter((z) => !z.active) || [];
+  // An integration from before declared plumbing neither stores nor checks it: ask nothing.
+  const asksPlumbing = !!data?.capabilities.plumbing;
+  // What the room declared; else, for a room from before the question existed, what its SAVED
+  // switches imply. Never the draft's switches: clearing the pump of a pumped room must raise
+  // an error, not quietly turn the room into a tent. A new room has no answer until one is given.
+  const plumbing = !asksPlumbing
+    ? ""
+    : draft?.plumbing || (isNew ? "" : original?.plumbing_inferred || "");
+  const plumbingConfirmed = !asksPlumbing || isNew || !!draft?.plumbing;
   const errors: string[] = [];
   if (draft) {
+    if (asksPlumbing && draft.active) {
+      if (!plumbing) errors.push("Choose how this room is plumbed.");
+      errors.push(...plumbingErrors(plumbing, draft.hardware));
+    }
     if (!draft.room_name.trim()) errors.push("Name the room.");
     if (!draft.zones.length) errors.push("Add a zone.");
     if (activeZones.some((z) => !z.name.trim() || !z.valve))
@@ -327,6 +351,7 @@ export function Setup({
               active: draft.active,
               zones: draft.zones,
               hardware: draft.hardware,
+              ...(asksPlumbing && plumbing ? { plumbing } : {}),
             },
       );
       setReview(null);
@@ -619,30 +644,84 @@ export function Setup({
                   <div>
                     <h2>Shared room hardware</h2>
                     <p className="muted">
-                      Pump, mainline and source-water probes. Empty feed mappings leave that
-                      source-water gate disabled. Tank display mappings show readings in Overview;
-                      they do not change feed-water gates or operate the fill valve.
+                      How the room is plumbed, then the switches and source-water probes that go
+                      with it. Empty feed mappings leave that source-water gate disabled. Tank
+                      display mappings show readings in Overview; they do not change feed-water
+                      gates or operate the fill valve.
                     </p>
                   </div>
                 </div>
-                <div className="workspace-form-grid">
-                  {hardwareFields.map(([key, label, kind]) => (
-                    <MappingPicker
-                      key={key}
-                      label={label}
-                      values={
-                        typeof draft.hardware[key] === "string" ? [String(draft.hardware[key])] : []
-                      }
-                      candidates={candidates(kind)}
+                {asksPlumbing && (
+                  <div className="setup-plumbing">
+                    <Label htmlFor="room-plumbing">How is this room plumbed?</Label>
+                    <select
+                      id="room-plumbing"
                       disabled={busy}
-                      onChange={(values) =>
+                      value={isPlumbingLayout(plumbing) ? plumbing : ""}
+                      onChange={(e) =>
                         setDraft({
                           ...draft,
-                          hardware: { ...draft.hardware, [key]: values[0] || "" },
+                          plumbing: e.target.value,
+                          hardware: hardwareForLayout(e.target.value, draft.hardware),
                         })
                       }
-                    />
-                  ))}
+                    >
+                      {!isPlumbingLayout(plumbing) && <option value="">Choose…</option>}
+                      {(Object.keys(PLUMBING_LAYOUTS) as PlumbingLayout[]).map((name) => (
+                        <option key={name} value={name}>
+                          {PLUMBING_LABELS[name]}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="muted">
+                      {isPlumbingLayout(plumbing)
+                        ? PLUMBING_HINTS[plumbing]
+                        : "If water only comes out while a pump is running, the room has a pump."}{" "}
+                      The switches below have to match this, and a room whose switches stop matching
+                      is held rather than watered with the valve open and no pump.
+                    </small>
+                    {!plumbingConfirmed && isPlumbingLayout(plumbing) && (
+                      <div className="workspace-message">
+                        <p>
+                          This room was set up before it could say how it is plumbed. Its saved
+                          switches imply <strong>{PLUMBING_LABELS[plumbing]}</strong>. Until that is
+                          confirmed, the controller goes on working it out from whichever switches
+                          are mapped.
+                        </p>
+                        <Button
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => setDraft({ ...draft, plumbing })}
+                        >
+                          <Check size={15} />
+                          Confirm this plumbing
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="workspace-form-grid">
+                  {hardwareFields
+                    .filter(([key]) => plumbingUses(plumbing, key))
+                    .map(([key, label, kind]) => (
+                      <MappingPicker
+                        key={key}
+                        label={label}
+                        values={
+                          typeof draft.hardware[key] === "string"
+                            ? [String(draft.hardware[key])]
+                            : []
+                        }
+                        candidates={candidates(kind)}
+                        disabled={busy}
+                        onChange={(values) =>
+                          setDraft({
+                            ...draft,
+                            hardware: { ...draft.hardware, [key]: values[0] || "" },
+                          })
+                        }
+                      />
+                    ))}
                 </div>
               </section>
               <section className="panel workspace-card">
@@ -877,6 +956,16 @@ export function Setup({
               <p>
                 {activeZones.length} active zones · {archivedZones.length} archived zones
               </p>
+              {asksPlumbing && isPlumbingLayout(plumbing) && (
+                <div className="workspace-message">
+                  <strong>Plumbing: {PLUMBING_LABELS[plumbing]}</strong>
+                  <p className="mapping-id">
+                    {[draft?.hardware.pump_switch, draft?.hardware.main_line_switch]
+                      .filter(Boolean)
+                      .join(" → ") || "No pump or main-line valve: each zone is its one switch."}
+                  </p>
+                </div>
+              )}
               {activeZones.map((z) => (
                 <div className="workspace-message" key={z.id}>
                   <strong>
