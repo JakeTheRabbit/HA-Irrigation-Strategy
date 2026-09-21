@@ -83,3 +83,90 @@ def test_named_room_kill_switch_present_not_flagged():
     _run(hass, entry)
     # switch exists (even though OFF) -> not "missing"
     assert "kill_switch_missing_veg" not in hass._issues
+
+
+# ---------------------------------------------------------------- an engine that is behind
+# The controller app is often started BEFORE the integration is set up (it is the first thing the
+# install guide has you add). With no room to read, it builds its default room around the add-on's
+# shipped `enable_flag` option, input_boolean.f2_control_enabled, and says so on its heartbeat. A
+# fresh install never creates that helper: the wizard gives the room its own
+# switch.crop_steering_engine_enabled. Until the controller adopts the new setup (up to
+# rediscover_seconds, and only while everything reads OFF) its heartbeat still names the helper, and
+# this check believed it: sixty seconds after a clean first setup, Repairs told a new operator to
+# create a second kill switch by hand, one the room would never use.
+LEGACY = "input_boolean.f2_control_enabled"
+OWN = "switch.crop_steering_engine_enabled"
+
+
+def _behind(*, heartbeat, descriptor, present):
+    states = {
+        "sensor.crop_steering_ai_heartbeat": ha_stubs.FakeState("healthy", heartbeat),
+        "sensor.crop_steering_engine_config": ha_stubs.FakeState(
+            "ok", {"prefix": "", **descriptor}
+        ),
+    }
+    states.update({entity: ha_stubs.FakeState("off") for entity in present})
+    hass = ha_stubs.FakeHass(states=states)
+    _run(hass, ha_stubs.FakeEntry(data={"room_slug": "default", "zones": {}}))
+    return hass._issues
+
+
+def test_a_controller_started_before_setup_does_not_send_the_operator_to_create_a_helper():
+    issues = _behind(
+        heartbeat={"enable_flag": LEGACY, "setup_revision": 0},
+        descriptor={"enable_flag": OWN, "setup_revision": 1},
+        present=[OWN],
+    )
+    assert "kill_switch_missing" not in issues
+
+
+def test_while_the_engine_is_behind_the_room_is_judged_on_the_kill_switch_it_is_moving_to():
+    issues = _behind(
+        heartbeat={"enable_flag": LEGACY, "setup_revision": 0},
+        descriptor={"enable_flag": OWN, "setup_revision": 1},
+        present=[
+            LEGACY
+        ],  # the flag being left behind exists; the one the room needs does not
+    )
+    assert "kill_switch_missing" in issues
+
+
+def test_an_engine_that_is_up_to_date_is_still_believed_about_its_own_kill_switch():
+    """Upgrade path: the heartbeat stays the authority whenever the engine is NOT behind, so a
+    custom add-on `enable_flag` that has gone missing is still reported, even though the
+    descriptor's documented default happens to exist."""
+    issues = _behind(
+        heartbeat={"enable_flag": "input_boolean.my_kill", "setup_revision": 3},
+        descriptor={"enable_flag": LEGACY, "setup_revision": 3},
+        present=[LEGACY],
+    )
+    assert "kill_switch_missing" in issues
+
+
+def test_a_legacy_room_whose_helper_was_deleted_is_still_reported():
+    issues = _behind(
+        heartbeat={"enable_flag": LEGACY, "setup_revision": 0},
+        descriptor={"enable_flag": LEGACY, "setup_revision": 0},
+        present=[],
+    )
+    assert "kill_switch_missing" in issues
+
+
+def test_a_controller_too_old_to_report_a_setup_revision_is_believed_as_before():
+    """It never adopts a descriptor's kill switch, so the flag it names is the one that gates it."""
+    issues = _behind(
+        heartbeat={"enable_flag": LEGACY},
+        descriptor={"enable_flag": OWN, "setup_revision": 1},
+        present=[OWN],
+    )
+    assert "kill_switch_missing" in issues
+
+
+def test_a_revision_that_is_not_a_plain_integer_never_counts_as_behind():
+    for junk in (True, "2", 1.0, None):
+        issues = _behind(
+            heartbeat={"enable_flag": LEGACY, "setup_revision": 0},
+            descriptor={"enable_flag": OWN, "setup_revision": junk},
+            present=[OWN],
+        )
+        assert "kill_switch_missing" in issues, junk

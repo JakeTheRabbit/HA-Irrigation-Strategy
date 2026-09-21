@@ -73,17 +73,25 @@ def _kill_switch(hass: HomeAssistant, prefix: str) -> str:
     on the room's heartbeat sensor, which covers a custom add-on ``enable_flag`` option.
     Fallbacks: the room's engine_config descriptor, then the per-room engine_enabled
     switch (named rooms) or the documented default (default room).
+
+    Except while the engine is BEHIND: its heartbeat reports an older ``setup_revision`` than the
+    room publishes. It then holds every zone until it adopts the new setup, and adopting moves it
+    to the descriptor's flag, so the flag it names is the one being left behind. That is every
+    first install where the controller app was started before the integration was set up: the
+    app's shipped option names input_boolean.f2_control_enabled, a fresh install never creates
+    it, and this check used to send a new operator off to create a second kill switch that the
+    room would never use.
     """
     hb = hass.states.get(f"sensor.{DOMAIN}_{prefix}ai_heartbeat")
-    if hb is not None:
-        ef = (getattr(hb, "attributes", {}) or {}).get("enable_flag")
-        if ef:
-            return ef
     desc = hass.states.get(f"sensor.{DOMAIN}_{prefix}engine_config")
-    if desc is not None:
-        ef = (getattr(desc, "attributes", {}) or {}).get("enable_flag")
-        if ef:
-            return ef
+    beat = (getattr(hb, "attributes", {}) or {}) if hb is not None else {}
+    room = (getattr(desc, "attributes", {}) or {}) if desc is not None else {}
+    have, want = beat.get("setup_revision"), room.get("setup_revision")
+    behind = type(have) is int and type(want) is int and want > have
+    if beat.get("enable_flag") and not (behind and room.get("enable_flag")):
+        return beat["enable_flag"]
+    if room.get("enable_flag"):
+        return room["enable_flag"]
     if prefix:
         return f"switch.{DOMAIN}_{prefix}engine_enabled"
     return _DEFAULT_KILL_SWITCH
