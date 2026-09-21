@@ -167,6 +167,14 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   z-index: 30;
+  /* A window shorter than the menu (a phone in landscape, Home Assistant's panel on a small
+     laptop) must still reach the footer, where the running versions are. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.desktop-sidebar > *,
+.mobile-sidebar > * {
+  flex-shrink: 0; /* scroll the menu; never squash its rows to make it fit */
 }
 .brand {
   display: flex;
@@ -1364,6 +1372,11 @@ nav button.nav-separated {
   padding: 28px 18px;
   width: 280px;
   max-width: 90vw;
+  /* Seen on a phone: the drawer is the height of the screen, the menu is taller, and it would not
+     scroll, so Settings, Help and the versions were out of reach. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .mobile-sidebar .sidebar-footer {
   margin-top: 28px;

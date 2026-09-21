@@ -179,6 +179,47 @@ try {
       await visible(versions.getByText("2.19.1"));
     },
   );
+  await check(
+    "the navigation scrolls on a phone and in a short window, down to the versions in its footer",
+    async () => {
+      // Seen on a real phone: the drawer was screen-high, the menu taller, and it would not scroll.
+      const phone = await context.newPage();
+      try {
+        await phone.setViewportSize({ width: 390, height: 640 });
+        await phone.goto(`${base}/dashboard.html?room=f1#/overview`, { waitUntil: "networkidle" });
+        await phone.getByRole("button", { name: "Open navigation", exact: true }).click();
+        const drawer = phone.locator(".mobile-sidebar");
+        await drawer.waitFor({ state: "visible" });
+        const fits = await drawer.evaluate((el) => ({
+          taller: el.scrollHeight > el.clientHeight,
+          overflowY: getComputedStyle(el).overflowY,
+        }));
+        assert.ok(fits.taller, "the fixture must make the menu taller than the drawer");
+        assert.ok(["auto", "scroll"].includes(fits.overflowY), "the drawer must scroll");
+        const versions = drawer.locator(".sidebar-versions");
+        await versions.scrollIntoViewIfNeeded();
+        const box = await versions.boundingBox();
+        assert.ok(box && box.y >= 0 && box.y + box.height <= 640, "versions must be reachable");
+        assert.match(await versions.innerText(), /Controller\s+0\.16\.1/);
+        assert.ok((await drawer.evaluate((el) => el.scrollTop)) > 0, "it really scrolled");
+        // and the first item is still reachable on the way back
+        await drawer.getByRole("button", { name: "Overview" }).scrollIntoViewIfNeeded();
+      } finally {
+        await phone.close();
+      }
+      const short = await context.newPage();
+      try {
+        await short.setViewportSize({ width: 1280, height: 480 });
+        await short.goto(`${base}/dashboard.html?room=f1#/overview`, { waitUntil: "networkidle" });
+        const versions = short.locator(".desktop-sidebar .sidebar-versions");
+        await versions.scrollIntoViewIfNeeded();
+        const box = await versions.boundingBox();
+        assert.ok(box && box.y + box.height <= 480, "versions must be reachable in a short window");
+      } finally {
+        await short.close();
+      }
+    },
+  );
   await check("partial failure keeps failed draft and writes only selected room", async () => {
     failWrite = "number.crop_steering_f1_zone_1_p2_vwc_threshold";
     await field("p1_target_vwc").fill("65");
