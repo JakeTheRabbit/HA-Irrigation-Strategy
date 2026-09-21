@@ -304,22 +304,14 @@ class Controller:
         # Sensors are owned by the INTEGRATION: it fuses every probe you map to a zone
         # into sensor.crop_steering_vwc_zone_N / _ec_zone_N; the engine reads those.
         desc = self._default_descriptor()
+        self._options = o
+        self._default_provisional = False
         zones_opt = o.get("zones")
         if zones_opt:
             zones = {int(k): v for k, v in zones_opt.items()}
         else:
-            # auto-detect zone count from the integration's fused sensors (configure once);
-            # fall back to the descriptor/option if HA isn't reachable yet at startup.
-            n = self._detect_zones(
-                "", int(o.get("num_zones", desc.get("num_zones") or 3))
-            )
-            zones = {
-                z: {
-                    "vwc": f"sensor.crop_steering_vwc_zone_{z}",
-                    "ec": f"sensor.crop_steering_ec_zone_{z}",
-                }
-                for z in range(1, n + 1)
-            }
+            zone_ids, self._default_provisional = self._default_zone_ids(o, desc)
+            zones = self._default_zone_map(zone_ids)
         hw = o.get("hardware")
         if not hw:
             valves = {int(k): v for k, v in (desc.get("valves") or {}).items() if v}
@@ -353,7 +345,14 @@ class Controller:
             opt_lon=self._opt_lon,
             opt_loff=self._opt_loff,
         )
-        if not default_room.hw.get("valves"):
+        if self._default_provisional and not default_room.zones:
+            log(
+                "config: the Crop Steering integration has not published a room yet, so there is "
+                "nothing to drive. Add it in Home Assistant (Settings > Devices & services > Add "
+                "integration > Crop Steering). This controller checks every loop and picks the room "
+                "up by itself: no restart needed."
+            )
+        elif not default_room.hw.get("valves"):
             log(
                 "config: default room has NO hardware mapped — holding safe. Map each zone's valve "
                 "(and the pump and mainline, if the room has them) in the Crop Steering integration "
@@ -399,6 +398,45 @@ class Controller:
             log(
                 f"config: {tag}feed gate EC={room.feed_ec_sensor} pH={room.feed_ph_sensor}"
             )
+
+    @staticmethod
+    def _default_zone_map(zone_ids):
+        return {
+            z: {
+                "vwc": f"sensor.crop_steering_vwc_zone_{z}",
+                "ec": f"sensor.crop_steering_ec_zone_{z}",
+            }
+            for z in zone_ids
+        }
+
+    def _default_zone_ids(self, options, descriptor):
+        """Which zones the default room has -> (zone ids, provisional).
+
+        `provisional` means the answer is only a stand-in because the integration could not be
+        asked yet; the room is then re-resolved every loop until it can (see _rediscover).
+
+        The `num_zones` option (default 3) is documented as "only used if Home Assistant isn't
+        reachable at startup". It was ALSO used when Home Assistant was up and the integration
+        simply had not been set up yet, which is every first install where the app is started
+        first: a one-zone tent got zones 2 and 3 that do not exist, each reporting "no hardware
+        mapped", until the new setup happened to be adopted. Nothing is invented now.
+        """
+        n = self._detect_zones("", 0)
+        if n:  # the integration's fused sensors exist: every working install, unchanged
+            return list(range(1, n + 1)), False
+        if descriptor:  # set up, sensors not created yet: the descriptor knows
+            ids = descriptor.get("active_zone_ids")
+            if isinstance(ids, list) and ids and all(type(z) is int and 1 <= z <= 64 for z in ids):
+                return sorted(ids), False
+            count = int(descriptor.get("num_zones") or len(descriptor.get("valves") or {}) or 0)
+            if count:
+                return list(range(1, count + 1)), False
+        fallback = list(range(1, int(options.get("num_zones", 3)) + 1))
+        if options.get("hardware"):  # hand-mapped in the app options: their zone count stands
+            return fallback, False
+        if ha_get_all():  # Home Assistant answers, and there is no room in it yet
+            return [], True
+        return fallback, True  # Home Assistant unreachable: the documented fallback, for now
 
     def _default_enable_flag(self, options, descriptor):
         legacy = "input_boolean.f2_control_enabled"
@@ -623,6 +661,22 @@ class Controller:
         self._last_discovery = now
         # (1) resolve the default room's hardware/zones if it started unmapped (HA was down)
         default = self.rooms[0]
+        if default.slug == "default" and getattr(self, "_default_provisional", False):
+            desc = self._default_descriptor()
+            zone_ids, self._default_provisional = self._default_zone_ids(self._options, desc)
+            if set(zone_ids) != set(default.zones):
+                was = sorted(default.zones)
+                default.zones = self._default_zone_map(zone_ids)
+                self._load_room_state(default)
+                log(f"config: default room zones resolved: {was or 'none'} -> {sorted(zone_ids) or 'none'}")
+            if desc:
+                default.enable_flag = self._default_enable_flag(self._options, desc)
+                default.feed_ec_sensor = (
+                    self._options.get("feed_ec_sensor") or desc.get("feed_ec_sensor") or ""
+                ).strip()
+                default.feed_ph_sensor = (
+                    self._options.get("feed_ph_sensor") or desc.get("feed_ph_sensor") or ""
+                ).strip()
         if default.slug == "default" and not default.hw.get("valves"):
             desc = self._default_descriptor()
             valves = {int(k): v for k, v in (desc.get("valves") or {}).items() if v}
@@ -2046,7 +2100,10 @@ class Controller:
             return
         self._recover_hardware_faults()
         self._defaulted_this_loop = set()
-        if (now - self._last_discovery).total_seconds() >= self.rediscover_seconds:
+        if (
+            getattr(self, "_default_provisional", False)
+            or (now - self._last_discovery).total_seconds() >= self.rediscover_seconds
+        ):
             try:
                 self._rediscover(now)
             except Exception as e:
