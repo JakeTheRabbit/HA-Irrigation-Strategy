@@ -205,10 +205,10 @@ The automated suite can't drive real hardware. Before trusting a change on the g
 ## Tests are not a release
 
 A green build says the code does what its tests expect. It says nothing about a pump on a
-smart plug at 3 am. What has to happen between a green build and a production room - the
-staging soak on the `testing` branch, the fault drills, promotion to `main`, rollback - is in
-[RELEASING.md](RELEASING.md). How a change gets in to begin with - one change, one branch, one
-pull request - is in [CONTRIBUTING.md](../CONTRIBUTING.md).
+smart plug at 3 am. Before a production room gets a release: rehearse the in-place upgrade on a
+copy of that room's configuration, compare mappings, setpoints, enabled states and saved
+controller state with a snapshot taken beforehand, and run a controlled hardware check with a
+backup and a rollback ready.
 
 ## A change isn't done until
 
