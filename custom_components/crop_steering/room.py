@@ -29,6 +29,27 @@ def room_prefix(entry) -> str:
         return ""
 
 
+def zone_device_name(entry, zone_num) -> str:
+    """The Home Assistant device name for a zone: what the operator called it in setup.
+
+    Three platforms used to name this device themselves, and differently ("Zone 1" in one,
+    "Crop Steering Zone 1" in two others), so the name Home Assistant showed depended on which
+    platform registered it last, and was never the name that had been typed. Seen on a first
+    install: the zone was set up as "GT1" and Home Assistant offered a device called "Zone 1".
+    Entity ids and entity names are not derived from this, so nothing else moves.
+    """
+    try:
+        data = {**(entry.data or {}), **(getattr(entry, "options", None) or {})}
+    except Exception:  # pragma: no cover - defensive, as room_prefix above
+        data = {}
+    zones = data.get("zones") or {}
+    zone = zones.get(str(zone_num)) or zones.get(zone_num) or {}
+    name = zone.get("name") if isinstance(zone, dict) else None
+    return (
+        name.strip() if isinstance(name, str) and name.strip() else f"Zone {zone_num}"
+    )
+
+
 def build_engine_config(
     prefix, slug, num_zones, zones, hardware, setup=None, integration_version=None
 ):

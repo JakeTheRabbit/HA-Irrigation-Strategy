@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
-from .room import room_prefix
+from .room import room_prefix, zone_device_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class CropSteeringTriggerButton(ButtonEntity):
         """Return device information."""
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self._entry.entry_id}_zone_{self._zone_num}")},
-            name=f"Zone {self._zone_num}",
+            name=zone_device_name(self._entry, self._zone_num),
             manufacturer="Home Assistant Community",
             model="Zone Controller",
             sw_version=SOFTWARE_VERSION,
