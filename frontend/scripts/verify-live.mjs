@@ -62,10 +62,13 @@ for (const prefix of ["", "f1_"]) {
     num_zones: 2,
     friendly_name: `${name} engine config`,
     enable_flag: flag,
+    // F1 runs a pair that reports its versions; the default room models an older pair that does not
+    ...(prefix ? { integration_version: "2.19.1" } : {}),
   });
   put(`sensor.crop_steering_${prefix}ai_heartbeat`, "online", {
     enable_flag: flag,
     last_beat: new Date().toISOString(),
+    ...(prefix ? { controller_version: "0.16.1" } : {}),
   });
   put(flag, "on");
   put(`sensor.crop_steering_${prefix}activity_log`, "active", {
@@ -161,6 +164,21 @@ try {
     assert.equal(await page.locator(".demo-banner").count(), 0);
     await visible(field("p1_target_vwc"));
   });
+  await check(
+    "sidebar shows the versions the running integration and controller report, per room",
+    async () => {
+      const versions = page.locator(".desktop-sidebar .sidebar-versions");
+      await visible(versions);
+      assert.match(await versions.innerText(), /Integration\s+2\.19\.1/);
+      assert.match(await versions.innerText(), /Controller\s+0\.16\.1/);
+      // An older pair reports nothing: say so, never show a number this page made up.
+      await page.locator("#desktop-room").selectOption("room:");
+      await visible(versions.getByText("not reported").first());
+      assert.equal((await versions.innerText()).match(/not reported/g).length, 2);
+      await page.locator("#desktop-room").selectOption("room:f1_");
+      await visible(versions.getByText("2.19.1"));
+    },
+  );
   await check("partial failure keeps failed draft and writes only selected room", async () => {
     failWrite = "number.crop_steering_f1_zone_1_p2_vwc_threshold";
     await field("p1_target_vwc").fill("65");

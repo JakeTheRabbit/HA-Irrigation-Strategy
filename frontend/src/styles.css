@@ -268,6 +268,27 @@ nav button.nav-separated {
 .sidebar-footer .small {
   font-size: 11px;
 }
+.sidebar-versions {
+  margin: 4px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 2px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.sidebar-versions div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sidebar-versions dt,
+.sidebar-versions dd {
+  margin: 0;
+}
+.sidebar-versions dd {
+  color: var(--foreground);
+}
 .app-main {
   margin-left: 232px;
   min-height: 100vh;
