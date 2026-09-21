@@ -170,7 +170,7 @@ match the globals above.
 | `system_safety_status` | — | `safe` / fault. |
 | `system_health_score` | — | 0–100 composite health. |
 | `system_uptime` | — | Engine uptime. |
-| `ai_heartbeat` | — | Self-correction loop status (`healthy` / anomaly). |
+| `ai_heartbeat` | — | Self-correction loop status (`healthy` / anomaly). Attribute `controller_version`: the controller app that is actually running (shown in the dashboard sidebar beside the descriptor's `integration_version`). |
 | `system_efficiency` / `water_efficiency` | — | Efficiency metrics. |
 | `average_vwc_all_zones` / `average_ec_all_zones` | % / mS/cm | Cross-zone means. |
 | `fused_vwc` / `fused_ec` | — | Sensor-fused VWC/EC. |
