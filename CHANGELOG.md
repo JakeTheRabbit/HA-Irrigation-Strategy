@@ -9,10 +9,12 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.19.0] - 2026-09-21
 
-Not released. Nothing here reaches a box until a `release/x.y.z` pull request gives it a version
-(see [docs/RELEASING.md](docs/RELEASING.md)). Controller change included: **C3, soak 7 days**.
+Pair: **controller 0.16.0**. It also carries 2.18.1 / controller 0.15.2, which was never published by
+itself. Class **C3**. Released without a staging soak by decision of the two people who run it; see
+[the record](docs/audits/2026-09-21-release-2.18.1.md). **Not run on hardware** before release: treat
+the first update of each box as the first run. Engine off, update, check the log, watch the first shot.
 
 ### 🌱 In plain English
 
