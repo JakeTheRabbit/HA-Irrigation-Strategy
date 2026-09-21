@@ -20,7 +20,7 @@ Install the integration and controller together. HACS, the HA integration config
 - An HA administrator account for Rooms & setup and its configuration services.
 - Existing HA entities for the actual pump and zone valves, fresh VWC/EC probes, feed-water probes and any configured interlocks. This integration maps entities; it does not provision sensor firmware or pair devices.
 
-This release documents integration 2.19.1 and controller 0.16.1. Use the matching published pair. The public demo uses isolated synthetic data; its sample plans and records are not installation settings.
+This release documents integration 2.19.2 and controller 0.16.2. Use the matching published pair. The public demo uses isolated synthetic data; its sample plans and records are not installation settings.
 
 ## Guided installation
 
@@ -31,6 +31,8 @@ This release documents integration 2.19.1 and controller 0.16.1. Use the matchin
 5. In **Rooms & setup**, select or add a room. Name its zones. Search HA entities by friendly name or ID and check their units/current states while mapping valves, VWC probes, EC probes and room equipment. Multiple probes can be selected per zone. Every zone needs its valve. Under **Shared room hardware**, say how the room is plumbed: a tent with one smart plug or solenoid is *Zone valves only* and maps that switch as the zone's valve and nothing else; a room where water only flows while a pump runs is *A pump, then zone valves* and must have the pump chosen. The switches have to match the answer, and the controller holds a room whose switches stop matching rather than watering it with no pump.
 6. Enter substrate litres **per plant**, plant count, drippers per plant and each dripper's L/hour. Catch-test actual output using **Insights → Calibration**. The calculator proposes a value; it does not write it automatically.
 7. Choose **Review configuration**, then **Save configuration**. Setup validates entity domains, moisture/EC units, duplicate valve assignments, revision conflicts and readable OFF states of the affected engine/equipment. A saved configuration and controller acknowledgement are shown separately; wait for **Mapping acknowledged** instead of assuming a save has already reached the controller.
+
+Steps 2 and 3 can be done in either order from integration 2.19.2 with controller 0.16.2. A controller started before any room exists waits, invents no zones, and picks the room up by itself within a minute of setup finishing; no restart is needed. On earlier versions that order produced errors for zones that did not exist and a Repairs card asking for a kill-switch helper: **do not create that helper**, update instead.
 
 See the [step-by-step mapping workflow](USER_GUIDE.md#set-up-rooms-zones-and-sensors) for field meanings, revision conflicts and controller adoption.
 
@@ -62,8 +64,8 @@ For an existing controller, update it in place from its current app repository. 
 
 1. Back up HA, the controller's persistent data and existing setpoints. Export grow plans if available. Record which engines are enabled.
 2. Turn the affected engines off and wait for the pump, mainline and valves to be OFF. Stop the existing controller while replacing software.
-3. Refresh your existing app repository and update that controller in place to **0.16.1**. After updating from 0.13.x, turn the engine kill switch off and on once so the controller can accept and save the current setup; later restarts resume by themselves. A restart alone does not rebuild an old image. Do not install a second copy or enable automatic startup during the upgrade.
-4. Download integration **2.19.1** through HACS and restart HA. Confirm every Crop Steering room finishes loading. Version 2.13.1 fixed the concurrent sidebar-registration error discovered with two rooms during the live upgrade.
+3. Refresh your existing app repository and update that controller in place to **0.16.2**. After updating from 0.13.x, turn the engine kill switch off and on once so the controller can accept and save the current setup; later restarts resume by themselves. A restart alone does not rebuild an old image. Do not install a second copy or enable automatic startup during the upgrade.
+4. Download integration **2.19.2** through HACS and restart HA. Confirm every Crop Steering room finishes loading. Version 2.13.1 fixed the concurrent sidebar-registration error discovered with two rooms during the live upgrade.
 5. Start the controller with engines still off. Verify its version, fresh heartbeat, both room descriptors, sensor readings, setup acknowledgement and grow-plan capability. Compare current setpoints and pot/dripper sizing with the backup.
 6. Restore the engines' previous enabled states after these checks. An upgrade does not require arming a recipe or replacing existing values with defaults.
 

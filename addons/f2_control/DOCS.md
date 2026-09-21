@@ -34,4 +34,4 @@ What it may do: on a P1 plateau, veto the hand-over when the evidence looks like
 
 Update the integration and this app together. Use **Update** or **Rebuild** to include new Python code; restarting an old image does not rebuild it. Preserve persistent data and export plans before upgrades. See the installation guide for rollback instructions.
 
-The display name is Crop Steering Controller. The existing f2_control slug remains stable for upgrade compatibility. Use controller 0.16.1 with integration 2.19.1. The dashboard sidebar shows both, as reported by the running parts. Local browser/unit checks do not constitute a live HA installation test.
+The display name is Crop Steering Controller. The existing f2_control slug remains stable for upgrade compatibility. Use controller 0.16.2 with integration 2.19.2. The dashboard sidebar shows both, as reported by the running parts. Local browser/unit checks do not constitute a live HA installation test.

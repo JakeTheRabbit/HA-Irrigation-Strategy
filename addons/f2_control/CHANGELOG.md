@@ -1,3 +1,12 @@
+# 0.16.2
+
+Pair with integration 2.19.2. **C3.** Found on the first real install (a one-zone tent); the fixes themselves were not run on hardware before release.
+
+- **Zones are never invented.** Started before the integration was set up, the controller fell back to the shipped `num_zones: 3` and reported zones 2 and 3 of a one-zone tent as "no hardware mapped". It now has no zones until a room exists, checks every loop, and picks the room up by itself: no restart needed. The log says so: *"the Crop Steering integration has not published a room yet..."*. `num_zones` is still the fallback when Home Assistant cannot be reached at start, and a hand-mapped `hardware` option still keeps its zone count. A state file that already holds the phantom zones loads as before.
+- **"Last irrigation" is only ever a real shot.** Switching a room on stamps a time so the blind-probe schedule counts from switch-on; that stamp was also published as the last irrigation, with 0 shots and 0.0 L. It is now published as `unknown` until water has been delivered, also for a room that is off. One new state-file field, `last_shot_is_anchor`; an old file without it is read by whether any water was ever recorded.
+- The dashboard served by the app is the 2.19.2 build (the side menu scrolls on small screens).
+- No change to add-on options. No change to what a working install waters, or when.
+
 # 0.16.1
 
 Pair with integration 2.19.1. Not run on hardware before release.

@@ -9,6 +9,102 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.2] - 2026-09-21
+
+Pair: **controller 0.16.2**. Class **C3**. Everything here comes from two reviews by use: the first
+real install on a one-zone tent, set up from a phone, and an independent review of 2.19.1 upstream.
+Nine small changes, each its own pull request with its own tests (#15 to #23). **This candidate
+carries more than one behaviour change** (two C3, four C2), which
+[docs/RELEASING.md](docs/RELEASING.md) says a candidate should not; they were bundled by decision
+of the person running the only staging room, and a failed soak would have to be bisected across
+them. The defects were seen on real hardware; **the fixes have not run on hardware** before
+release. Update with the engine off, read the controller log, then watch the first shot.
+
+### 🌱 In plain English
+
+- **Set things up in either order.** If the controller app was started before the integration was
+  set up (the order the app store invites), a one-zone tent was shown Zones 2 and 3 that do not
+  exist, each complaining "no hardware mapped", and a minute after setup Settings > Repairs told you
+  to create a kill-switch helper by hand. Both are gone. The controller now waits for a room,
+  invents nothing, and picks the room up by itself within a minute, with no restart. **If you saw
+  that Repairs card: do not create the helper.** A room made by the wizard has its own kill
+  switch, *Engine Enabled*; the helper would be a second one that does nothing.
+- **A zone is called what you called it.** Name a zone "GT1" and its device in Home Assistant was
+  still "Zone 1" or "Crop Steering Zone 1", depending on which part of the integration got there
+  first. It is now the name you typed, and renaming the zone in Configure renames the device. A
+  device you renamed yourself in Home Assistant keeps your name. No entity id changes.
+- **"Last irrigation" only ever means water.** Switching a room on stamped a time that was then
+  shown as the last irrigation, beside "0 shots, 0.0 L". It now reads unknown until water has
+  really been delivered. The update also takes back a false time already on screen. One limit: a
+  zone whose last real shot was more than seven grow-days ago reads unknown until its next shot.
+- **The menu scrolls on a phone.** On a small screen the lower half of the side menu (including
+  *Help & tools* and the version numbers) could not be reached.
+- **Configure > Edit parameters no longer locks out a room that steers dry.** The number entities
+  accept a P1 target and a P2 threshold as low as 5 %, the form insisted on 30 % and 25 %, and
+  since 2.18.1 it opens on your current values. A room at P1 20 % could not submit the form even
+  unchanged. The form now has exactly the limits of the entities it edits.
+- **Assistants using the MCP tools can change how a room is plumbed.** A room that had declared
+  its plumbing could never gain or lose its pump through them: the tools did not know the
+  question existed. The plumbing and the pump or main-line mapping now travel together in one
+  reviewed proposal, and a proposal that contradicts the declared plumbing is refused at preview.
+- **Two holes in the release checks are closed.** A release pull request could also change a
+  default, a dependency or an add-on permission inside the three files that hold the version
+  numbers; and a controller-only release was accepted that could then never be promoted. Every
+  release now raises the integration's number, a controller-only fix included.
+
+### 🔧 Technical notes
+
+- **Zones are never invented** (#17, **C3**). The shipped add-on options carry `num_zones: 3`,
+  documented as "only used if Home Assistant isn't reachable at startup" but also used when Home
+  Assistant answered and the integration simply was not set up yet. New
+  `_default_zone_ids(options, descriptor) -> (ids, provisional)`: fused sensors if they exist (every
+  working install, unchanged), else the descriptor's `active_zone_ids` / `num_zones`, else a
+  hand-mapped `hardware` option keeps `num_zones`, else no zones when Home Assistant answers, else
+  the documented fallback. While provisional the controller rediscovers every loop and re-resolves
+  zones, enable flag and feed sensors. A state file that already holds phantom zones still loads.
+  It also stops the controller's pre-setup `zone_N_status` states pushing the integration's own
+  status sensor onto `sensor.crop_steering_zone_1_status_2` on a first install.
+- **Last irrigation is an event** (#18, **C3**). New per-zone state field `last_shot_is_anchor`
+  (additive: `_fresh_zone` default `False`; an old file without it is inferred as "anchor if
+  `last_shot` is set and no water was ever recorded"). `_room_switched_on` still stamps `last_shot`
+  so the blind-probe schedule counts from switch-on; `zone_N_last_irrigation_app` publishes
+  `unknown` while the flag is set, including for a room that is off. No option or entity change.
+- **The kill-switch repair judges the right switch** (#19, **C2**). `health._kill_switch()` trusted
+  the heartbeat's `enable_flag` over the room's own descriptor. While the heartbeat reports an older
+  `setup_revision` than the descriptor (both plain ints), the engine holds every zone anyway and
+  adoption moves it to the descriptor's flag, so that flag is the one judged. An up-to-date engine
+  is believed as before (custom add-on `enable_flag`), a deleted legacy helper is still reported,
+  and a controller too old to report a revision is believed as before.
+- **Zone device name** (#16, **C2**). `room.zone_device_name(entry, zone_num)`, used by the button,
+  number and select platforms, which used to register the same device under two different names.
+  The room device is left alone.
+- **Edit parameters limits** (#20, **C2**). The four fields read `native_min_value` /
+  `native_max_value` from `NUMBER_DESCRIPTIONS`. Only the lower limits of `p1_target_vwc` (30 -> 5)
+  and `p2_vwc_threshold` (25 -> 5) actually move.
+- **MCP plumbing** (#21, **C2**, `mcp-server/` only). `plumbing` in the strict input schema; the
+  room carries `plumbing` ("" = never declared) and `plumbing_inferred`; `config()` includes the
+  layout only when declared, which puts it in the payload, the comparison snapshot and the readback
+  digest, and never declares one on the operator's behalf. New
+  `tests_ha/test_mcp_setup_contract.py` sends that payload to the real `setup_save`.
+- **Sidebar scroll** (#15, **C1**). `.desktop-sidebar` / `.mobile-sidebar` get `overflow-y: auto` and
+  `overscroll-behavior: contain`, their children `flex-shrink: 0`; checked in `verify-live.mjs` at
+  390x640 and 1280x480. The committed bundle is rebuilt from that source.
+- **Release guards** (#22, #23, **C0**). `without_version()` compares each version file with only its
+  version field blanked, and `check_pull_request` takes the files' text as a required argument; a
+  release that does not change the integration version is refused, and a release branch is named
+  for the integration version. Both take effect once promoted, because GitHub reads the workflow
+  from `main`.
+- **Upgrade in place.** No add-on option and no entity id changes. One additive state-file field
+  (`last_shot_is_anchor`). A room that never declared its plumbing still publishes byte-for-byte
+  the descriptor it did, and the controller's saved setup fingerprint still matches, so an update
+  resumes without a disarm cycle. Every change above is tested both on a fresh install and from the
+  seeded snapshots of old installs in `tests_ha/fixtures/`.
+- **Documented, not changed.** A probe whose reading has not changed for 20 minutes is treated as
+  dead and the zone goes onto the blind schedule. That is deliberate (a probe pulled out of its
+  cube leaves a plant that will need saving), and it also fires on a bench test with no plant in
+  the cube. [docs/troubleshooting.md](docs/troubleshooting.md) now says so, along with the three
+  first-install symptoms fixed above.
+
 ## [2.19.1] - 2026-09-21
 
 Pair: **controller 0.16.1**. Class **C3** by the table, because the controller is touched, though
