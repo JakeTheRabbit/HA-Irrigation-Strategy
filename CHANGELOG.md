@@ -13,13 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Pair: **controller 0.16.2**. Class **C3**. Everything here comes from two reviews by use: the first
 real install on a one-zone tent, set up from a phone, and an independent review of 2.19.1 upstream.
-Seven small changes, each its own pull request with its own tests on the fork this came from
-(ChillingSilence #15 to #21). **This release carries more than one behaviour change** (two C3,
-four C2), so if something misbehaves there is more than one suspect; each was merged separately
-so that each can be reverted alone. Classes, as used in these entries: **C0** documents, tests
-and CI; **C1** dashboard and wording; **C2** integration behaviour; **C3** the controller, its
-state file, setup adoption, the descriptor, entity ids or add-on options. The defects were seen
-on real hardware; **the fixes have not run on hardware** before release. Update with the engine off, read the controller log, then watch the first shot.
+Nine small changes, each its own pull request with its own tests (#15 to #23). **This candidate
+carries more than one behaviour change** (two C3, four C2), which
+[docs/RELEASING.md](docs/RELEASING.md) says a candidate should not; they were bundled by decision
+of the person running the only staging room, and a failed soak would have to be bisected across
+them. The defects were seen on real hardware; **the fixes have not run on hardware** before
+release. Update with the engine off, read the controller log, then watch the first shot.
 
 ### 🌱 In plain English
 
@@ -48,6 +47,10 @@ on real hardware; **the fixes have not run on hardware** before release. Update 
   its plumbing could never gain or lose its pump through them: the tools did not know the
   question existed. The plumbing and the pump or main-line mapping now travel together in one
   reviewed proposal, and a proposal that contradicts the declared plumbing is refused at preview.
+- **Two holes in the release checks are closed.** A release pull request could also change a
+  default, a dependency or an add-on permission inside the three files that hold the version
+  numbers; and a controller-only release was accepted that could then never be promoted. Every
+  release now raises the integration's number, a controller-only fix included.
 
 ### 🔧 Technical notes
 
@@ -86,6 +89,11 @@ on real hardware; **the fixes have not run on hardware** before release. Update 
 - **Sidebar scroll** (#15, **C1**). `.desktop-sidebar` / `.mobile-sidebar` get `overflow-y: auto` and
   `overscroll-behavior: contain`, their children `flex-shrink: 0`; checked in `verify-live.mjs` at
   390x640 and 1280x480. The committed bundle is rebuilt from that source.
+- **Release guards** (#22, #23, **C0**). `without_version()` compares each version file with only its
+  version field blanked, and `check_pull_request` takes the files' text as a required argument; a
+  release that does not change the integration version is refused, and a release branch is named
+  for the integration version. Both take effect once promoted, because GitHub reads the workflow
+  from `main`.
 - **Upgrade in place.** No add-on option and no entity id changes. One additive state-file field
   (`last_shot_is_anchor`). A room that never declared its plumbing still publishes byte-for-byte
   the descriptor it did, and the controller's saved setup fingerprint still matches, so an update
@@ -139,8 +147,8 @@ with the engine off, then check the sidebar reads 2.19.1 and 0.16.1.
 ## [2.19.0] - 2026-09-21
 
 Pair: **controller 0.16.0**. It also carries 2.18.1 / controller 0.15.2, which was never published by
-itself. Class **C3**. Released without a soak on real plumbing, by decision of the two people who
-run it. **Not run on hardware** before release: treat
+itself. Class **C3**. Released without a staging soak by decision of the two people who run it; see
+[the record](docs/audits/2026-09-21-release-2.18.1.md). **Not run on hardware** before release: treat
 the first update of each box as the first run. Engine off, update, check the log, watch the first shot.
 
 ### 🌱 In plain English

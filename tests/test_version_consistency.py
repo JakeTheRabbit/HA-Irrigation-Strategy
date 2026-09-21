@@ -7,7 +7,7 @@ heading in CHANGELOG.md  ==  the Release badge in README.md.
 The f2-control add-on carries its own independent version line in
 addons/f2_control/config.yaml. It is checked against the add-on's own changelog, and
 against the pairing both changelogs advertise: Supervisor offers a controller update the
-moment `version:` changes on the branch a box tracks, so a bumped
+moment `version:` changes on the branch a box tracks (docs/RELEASING.md), so a bumped
 number with no changelog entry is a release nobody wrote down.
 """
 

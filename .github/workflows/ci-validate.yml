@@ -2,9 +2,12 @@ name: Validate
 
 on:
   push:
-    branches: [ main ]
+    # `main` is what production rooms install from; `testing` is what staging rooms install
+    # from (docs/RELEASING.md). Both are checked on every push.
+    branches: [ main, testing ]
   # Every pull request, whatever branch it targets. This used to be limited to pull requests
-  # into `main`, so a branch stacked on another branch was merged with no checks at all.
+  # into `main`, so a feature branch proposed into `testing`, or stacked on another feature
+  # branch, was merged with no checks at all.
   pull_request:
   workflow_dispatch: {}
 

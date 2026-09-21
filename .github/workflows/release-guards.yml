@@ -1,0 +1,57 @@
+name: Release guards
+
+# The rules in docs/RELEASING.md and CONTRIBUTING.md that a machine can check. Boxes build the
+# controller from a git branch and are offered an update when a version number changes on it, so
+# a version change IS a release. See .github/scripts/release_guards.py for the rules themselves.
+
+on:
+  # pull_request_target, not pull_request: GitHub then takes this workflow and its script from
+  # the repository's DEFAULT branch (`main`), not from the pull request and not from the branch
+  # it targets. So a pull request cannot edit the guard that judges it, and a change to the guard
+  # itself takes effect only once it has been promoted to `main`. (Seen for real: while this file
+  # was on `testing` only, it never ran. It went live with the promotion that carried it to `main`.)
+  #
+  # SECURITY: that trigger carries the repository's own token, so this workflow must NEVER check
+  # out, install, import or run anything from the pull request. It checks out the default branch
+  # only, and the script reads the head commit's files as text through `git show`. Do not add a
+  # step that builds or tests the pull request here; that is what the Validate workflow (plain
+  # pull_request) is for.
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pull-request:
+    name: Version changes only in a release pull request
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout the default branch (never the pull request)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Release guard
+        run: python3 .github/scripts/release_guards.py pull-request
+
+  promotion:
+    name: main moved only by promotion
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Promotion guard
+        run: python3 .github/scripts/release_guards.py promotion
