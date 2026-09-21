@@ -755,6 +755,17 @@ class EntityNotFound(HomeAssistantError):
     """Error to indicate entity ID does not exist."""
 
 
+def _number_range(key: str) -> vol.Range:
+    """The limits of this integration's own number entity for `key`: one definition, in
+    number.py, so a form can never refuse a value the entity it edits accepts, nor write one the
+    entity then rejects. Imported here, not at module level: number.py is an entity platform.
+    """
+    from .number import NUMBER_DESCRIPTIONS
+
+    described = next(d for d in NUMBER_DESCRIPTIONS if d.key == key)
+    return vol.Range(min=described.native_min_value, max=described.native_max_value)
+
+
 class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for Crop Steering System."""
 
@@ -911,26 +922,22 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             ),
         }
 
+        # The form opens on the live entities, so it takes their limits too. It used to restate
+        # them, and demanded a P1 target of at least 30 and a P2 threshold of at least 25 where
+        # the entities accept 5: a room steering lower could not submit this form even unchanged.
         return self.async_show_form(
             step_id="edit_parameters",
             data_schema=vol.Schema(
                 {
                     vol.Optional(
-                        "substrate_volume",
-                        default=current_params.get("substrate_volume", 10.0),
-                    ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=200.0)),
-                    vol.Optional(
-                        "dripper_flow_rate",
-                        default=current_params.get("dripper_flow_rate", 2.0),
-                    ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=50.0)),
-                    vol.Optional(
-                        "p1_target_vwc",
-                        default=current_params.get("p1_target_vwc", 65.0),
-                    ): vol.All(vol.Coerce(float), vol.Range(min=30.0, max=95.0)),
-                    vol.Optional(
-                        "p2_vwc_threshold",
-                        default=current_params.get("p2_vwc_threshold", 60.0),
-                    ): vol.All(vol.Coerce(float), vol.Range(min=25.0, max=85.0)),
+                        key, default=current_params.get(key, fallback)
+                    ): vol.All(vol.Coerce(float), _number_range(key))
+                    for key, fallback in (
+                        ("substrate_volume", 10.0),
+                        ("dripper_flow_rate", 2.0),
+                        ("p1_target_vwc", 65.0),
+                        ("p2_vwc_threshold", 60.0),
+                    )
                 }
             ),
             description_placeholders={

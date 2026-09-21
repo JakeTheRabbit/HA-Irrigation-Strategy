@@ -5,10 +5,12 @@ parameter (saved, reloaded, and the entity restored its old value over the top) 
 mapping (the form put it straight back).
 """
 
-from homeassistant.data_entry_flow import FlowResultType
+import pytest
+from homeassistant.data_entry_flow import FlowResultType, InvalidData
 
 from test_real_flow import VALVE
 from test_setup_entry import _install
+from test_upgrade_in_place import _upgrade
 
 TARGET = "number.crop_steering_p1_target_vwc"
 
@@ -72,6 +74,106 @@ async def test_an_edit_made_while_a_switch_is_on_is_refused_and_nothing_is_writt
     done = await hass.config_entries.options.async_configure(flow["flow_id"], EDIT)
     assert done["type"] is FlowResultType.ABORT and done["reason"] == "setup_invalid"
     assert float(hass.states.get(TARGET).state) == 65.0  # the live entity was not touched either
+
+
+# ------------------------------------------------------------------ the form's limits
+# 2.18.1 made this form open on the LIVE number entities instead of the values recorded at setup.
+# Its own limits were never widened to match: the entities take a P1 target of 5-95 % and a P2
+# threshold of 5-85 %, the form still demanded at least 30 and 25. A room steering at P1 20 / P2 15
+# (dry-rooted crops, coarse substrates) could not submit the form at all, not even unchanged, and
+# not to edit the pot size either. (Review finding on JakeTheRabbit/HA-Irrigation-Strategy#47.)
+FIELDS = {
+    "substrate_volume": "number.crop_steering_substrate_volume",
+    "dripper_flow_rate": "number.crop_steering_dripper_flow_rate",
+    "p1_target_vwc": TARGET,
+    "p2_vwc_threshold": "number.crop_steering_p2_vwc_threshold",
+}
+
+
+async def _set(hass, values):
+    for key, value in values.items():
+        await hass.services.async_call(
+            "number", "set_value", {"entity_id": FIELDS[key], "value": value}, blocking=True
+        )
+
+
+def _numbers(hass):
+    return {s.entity_id: float(s.state) for s in hass.states.async_all("number")}
+
+
+def _limits(hass, which):
+    return {key: float(hass.states.get(eid).attributes[which]) for key, eid in FIELDS.items()}
+
+
+async def test_a_room_running_low_targets_can_submit_the_form_unchanged(hass):
+    entry = await _install(hass)
+    await _set(hass, {"p1_target_vwc": 20.0, "p2_vwc_threshold": 15.0})
+    flow = await _open(hass, entry, "edit_parameters")
+    shown = _shown(flow)
+    assert (shown["p1_target_vwc"], shown["p2_vwc_threshold"]) == (20.0, 15.0)
+    done = await hass.config_entries.options.async_configure(flow["flow_id"], shown)
+    assert done["type"] is FlowResultType.CREATE_ENTRY  # was: "value must be at least 30.0"
+    await hass.async_block_till_done()
+    assert float(hass.states.get(TARGET).state) == 20.0
+    assert float(hass.states.get(FIELDS["p2_vwc_threshold"]).state) == 15.0
+
+
+async def test_the_pot_size_can_be_edited_while_the_targets_stay_low(hass):
+    entry = await _install(hass)
+    await _set(hass, {"p1_target_vwc": 20.0, "p2_vwc_threshold": 15.0})
+    flow = await _open(hass, entry, "edit_parameters")
+    done = await hass.config_entries.options.async_configure(
+        flow["flow_id"], {**_shown(flow), "substrate_volume": 3.5}
+    )
+    assert done["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert float(hass.states.get(FIELDS["substrate_volume"]).state) == 3.5
+    assert float(hass.states.get(TARGET).state) == 20.0
+
+
+@pytest.mark.parametrize("which", ["min", "max"])
+async def test_every_value_the_entities_accept_the_form_accepts_up_to_both_limits(hass, which):
+    entry = await _install(hass)
+    limits = _limits(hass, which)  # read from the live entities, not restated here
+    await _set(hass, limits)
+    flow = await _open(hass, entry, "edit_parameters")
+    assert _shown(flow) == limits
+    done = await hass.config_entries.options.async_configure(flow["flow_id"], limits)
+    assert done["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    for key, entity_id in FIELDS.items():
+        assert float(hass.states.get(entity_id).state) == limits[key], key
+
+
+@pytest.mark.parametrize("key", sorted(FIELDS))
+@pytest.mark.parametrize("which, step", [("min", -0.5), ("max", 0.5)])
+async def test_a_value_the_entity_would_refuse_is_refused_by_the_form_too(hass, key, which, step):
+    """Aligned, not loosened: the form must never write a number its entity then rejects."""
+    entry = await _install(hass)
+    flow = await _open(hass, entry, "edit_parameters")
+    beyond = {**_shown(flow), key: _limits(hass, which)[key] + step}
+    with pytest.raises(InvalidData):
+        await hass.config_entries.options.async_configure(flow["flow_id"], beyond)
+    assert float(hass.states.get(FIELDS[key]).state) == _shown(flow)[key]  # nothing was written
+
+
+@pytest.mark.parametrize(
+    "name", ["entry_2_18_one_switch_tent.json", "entry_2_17_wizard.json", "entry_env_era.json"]
+)
+async def test_an_upgraded_room_tuned_low_can_use_the_form_and_nothing_else_moves(hass, name):
+    """In-place upgrade: the same form on rooms as OLD versions left them (tests_ha/fixtures)."""
+    hass.states.async_set("input_boolean.f2_control_enabled", "off")  # an env-era room's kill switch
+    entry, seed = await _upgrade(hass, name)
+    await _set(hass, {"p1_target_vwc": 20.0, "p2_vwc_threshold": 15.0})
+    before = _numbers(hass)
+    flow = await _open(hass, entry, "edit_parameters")
+    done = await hass.config_entries.options.async_configure(flow["flow_id"], _shown(flow))
+    assert done["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert _numbers(hass) == before  # every number this room has, not only the four on the form
+    for key in ("zones", "hardware", "num_zones", "room_prefix"):  # a save, but only of parameters
+        assert entry.data.get(key) == seed["data"].get(key), key
+    assert entry.data["parameters"]["p1_target_vwc"] == 20.0
 
 
 # ------------------------------------------------------------------ removing a mapping
