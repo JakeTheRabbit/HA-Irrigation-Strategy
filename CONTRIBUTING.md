@@ -23,7 +23,7 @@ This is not tidiness. Large mixed changes are how problems get in:
 | `testing` | Where every change lands first, and what staging rooms run. **Every pull request targets `testing`.** Nobody pushes to it directly. |
 | `feat/…` `fix/…` `docs/…` `ci/…` | Your change. Branch from `testing`, delete after merging. |
 | `intake/upstream-<date>` | Upstream's changes being brought into a fork. |
-| `release/x.y.z` | Version numbers and changelogs for a release candidate, and nothing else. |
+| `release/x.y.z` | Version numbers and changelogs for a release candidate, and nothing else. `x.y.z` is the **integration** version, which every release raises, a controller-only fix included. |
 
 ## What a pull request must be
 

@@ -110,15 +110,29 @@ def check_pull_request(
 
     if changed:
         summary = ", ".join(f"{part} {old} -> {new}" for part, (old, new) in changed.items())
-        new_versions = {new for _old, new in changed.values()}
+        released_as = head_versions.get("integration")
         if head_ref.startswith("intake/"):
             pass  # upstream's own release arriving in a fork, carrying upstream's number
-        elif not is_release or named_for not in new_versions:
+        elif is_release and "integration" not in changed:
+            # One number names a release. Promotion (below) demands the tag v<integration
+            # version> on the new tip; if that version has not changed, the tag already names
+            # the previous commit and is never moved, so this candidate could be merged, tagged
+            # and soaked, and then never promoted: found out only after `main` had advanced.
+            problems.append(
+                f"This release changes only the controller ({summary}). A release is named, "
+                f"tagged and promoted by the integration version, and v{released_as} already "
+                f"names an earlier commit, so this candidate could never be promoted. Release a "
+                f"controller fix as a pair: raise the integration's patch number too (its code "
+                f"may be unchanged), name the branch for it, and say so in both changelogs."
+            )
+        elif not is_release or named_for != released_as:
             problems.append(
                 f"This pull request changes a version number ({summary}) from the branch "
                 f"`{head_ref}`. On a branch boxes install from, that one line IS a release. Only a "
-                f"branch named `release/<the new version>` may do it. If this is a feature or a "
-                f"fix, take the version change out: it belongs in the release pull request."
+                f"branch named `release/<the new version>` may do it, meaning the integration's "
+                f"({released_as}): that is the number a release is tagged and promoted by. If this "
+                f"is a feature or a fix, take the version change out: it belongs in the release "
+                f"pull request."
             )
         for part, (old, new) in changed.items():
             was, now = as_tuple(old), as_tuple(new)
@@ -173,7 +187,11 @@ def check_pull_request(
 
 
 def check_promotion(*, forced, fast_forward, on_staging, tags_at_tip, integration_version):
-    """Every way a push to `main` was not a promotion. Empty = it was one."""
+    """Every way a push to `main` was not a promotion. Empty = it was one.
+
+    The tag asked for is v<integration version>. check_pull_request guarantees every release
+    changes that version, so the tag always names exactly one commit: the candidate that soaked.
+    """
     problems = []
     if forced or not fast_forward:
         problems.append(

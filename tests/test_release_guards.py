@@ -70,18 +70,93 @@ def test_a_release_pull_request_named_for_its_version_passes():
         _pr(head_ref="release/2.19.0", head_versions=NEW, changed_paths=RELEASE_PATHS)
         == []
     )
-    # a controller-only release is named for the controller version
+    # the integration alone (nothing the controller runs changed) is a release too
     assert (
         _pr(
-            head_ref="release/0.15.3",
-            head_versions={**OLD, "controller": "0.15.3"},
-            changed_paths=[
-                "addons/f2_control/config.yaml",
-                "addons/f2_control/CHANGELOG.md",
-            ],
+            head_ref="release/2.18.2",
+            head_versions={**OLD, "integration": "2.18.2"},
+            changed_paths=RELEASE_PATHS,
         )
         == []
     )
+
+
+CONTROLLER_ONLY = {
+    "head_ref": "release/0.15.3",
+    "head_versions": {**OLD, "controller": "0.15.3"},
+    "changed_paths": [
+        "addons/f2_control/config.yaml",
+        "addons/f2_control/CHANGELOG.md",
+    ],
+}
+
+
+def test_every_release_is_named_by_the_integration_version():
+    """One number names a release: the tag, the HACS release, the changelog entry and the
+    promotion check are all keyed by the integration version. This guard used to accept a
+    controller-only release named for the controller version, which promotion can never accept:
+    the integration version has not changed, so the tag promotion demands already names the
+    PREVIOUS commit, and a tag is never moved. It failed only after `main` had advanced.
+    (Review finding on JakeTheRabbit/HA-Irrigation-Strategy#47.)
+    """
+    (problem,) = _pr(**CONTROLLER_ONLY)
+    assert "controller 0.15.2 -> 0.15.3" in problem
+    assert "integration version" in problem and "v2.18.1" in problem
+    # ...and a pair is not named for its controller half either
+    (problem,) = _pr(
+        head_ref="release/0.16.0", head_versions=NEW, changed_paths=RELEASE_PATHS
+    )
+    assert "release/<the new version>" in problem and "2.19.0" in problem
+
+
+def test_whatever_the_pull_request_guard_accepts_the_promotion_guard_can_accept():
+    """The whole accepted sequence, release pull request to promotion, for every shape of
+    release. The tag the process creates on the merged release is v<integration version>; a
+    promotion is a fast-forward of `main` to that commit."""
+    tags = {"v2.18.0", "v2.18.1"}
+    for head_versions in (
+        NEW,  # the pair
+        {**OLD, "integration": "2.18.2"},  # the integration alone
+        {
+            "integration": "2.18.2",
+            "controller": "0.15.3",
+        },  # a controller fix, released properly
+    ):
+        named = f"release/{head_versions['integration']}"
+        accepted = _pr(
+            head_ref=named,
+            head_versions=head_versions,
+            changed_paths=RELEASE_PATHS,
+            tags=tags,
+        )
+        assert accepted == [], head_versions
+        tag = f"v{head_versions['integration']}"
+        assert (
+            tag not in tags
+        )  # so it can be created on the merged commit, and only there
+        assert (
+            guards.check_promotion(
+                forced=False,
+                fast_forward=True,
+                on_staging=True,
+                tags_at_tip={tag},
+                integration_version=head_versions["integration"],
+            )
+            == []
+        )
+
+    # The sequence the reviewer walked: the pull request guard now stops it at the start...
+    assert _pr(**CONTROLLER_ONLY, tags=tags) != []
+    # ...because this is where it would otherwise end: promotion wants v2.18.1, which already
+    # names the previous commit, whatever the candidate itself was tagged.
+    (problem,) = guards.check_promotion(
+        forced=False,
+        fast_forward=True,
+        on_staging=True,
+        tags_at_tip={"v0.15.3"},
+        integration_version=OLD["integration"],
+    )
+    assert "v2.18.1" in problem
 
 
 def test_a_release_branch_named_for_some_other_version_does_not():
