@@ -5,8 +5,9 @@ version number changes on it. So a version change is a release, and these guards
 sure one never happens by accident, or tucked inside something else:
 
   pull-request   a pull request may change a version only from a branch named for that version,
-                 a release pull request may change nothing but versions and documents, a version
-                 only ever goes up and is never reused, and `main` takes no pull requests at all.
+                 a release pull request may change nothing but versions and documents (in a
+                 version file: the version field, not the rest of the file), a version only
+                 ever goes up and is never reused, and `main` takes no pull requests at all.
   promotion      every push to `main` must be a fast-forward to a tagged commit that is already
                  on `testing`. This one cannot prevent the push; it fails loudly, at once.
 
@@ -59,12 +60,37 @@ def is_document(path: str) -> bool:
     return path.endswith(".md") or path.startswith("docs/")
 
 
+def without_version(path: str, text: str | None) -> str | None:
+    """A version-bearing file with its ONE version field blanked, so two copies can be compared
+    for everything else. None when the file is absent, or cannot be read as what it is.
+
+    The manifest is compared as parsed JSON (reformatting it is not a change); the other two as
+    text, where only the top-level `version:` line and the `SOFTWARE_VERSION = ` line count.
+    """
+    if text is None:
+        return None
+    if path == MANIFEST:
+        try:
+            data = json.loads(text)
+        except ValueError:
+            return None
+        if not isinstance(data, dict):
+            return None
+        data.pop("version", None)
+        return json.dumps(data, sort_keys=True)
+    field = r"^version:.*$" if path == ADDON_CONFIG else r"^SOFTWARE_VERSION\s*=.*$"
+    masked, found = re.subn(field, "<version>", text, count=1, flags=re.M)
+    return masked if found else None
+
+
 def check_pull_request(
-    *, base_ref, head_ref, base_versions, head_versions, changed_paths, tags
+    *, base_ref, head_ref, base_versions, head_versions, changed_paths, tags, version_files
 ):
     """Every rule the pull request breaks, in words that say what to do. Empty = fine.
 
     `*_versions` are {"integration": "2.18.1", "controller": "0.15.2"} (None where unreadable).
+    `version_files` is {path: (text at the fork point, text at the head)} for VERSION_FILES, None
+    where a file does not exist. Required, so that no caller can leave the content rule unfed.
     """
     problems = []
     if base_ref == PRODUCTION:
@@ -119,6 +145,25 @@ def check_pull_request(
                 "A release pull request holds version numbers, changelogs and documents, and "
                 "nothing else, so that what soaked is exactly what was reviewed. These belong in "
                 "their own pull request: " + ", ".join(strays)
+            )
+        # The PATH of a version file being allowed is not the FILE being allowed: these three
+        # also hold executable defaults, dependencies, and the add-on's permissions and options.
+        rewritten = sorted(
+            path
+            for path, (before, after) in version_files.items()
+            if before != after
+            and (
+                (masked := without_version(path, after)) is None
+                or masked != without_version(path, before)
+            )
+        )
+        if rewritten:
+            problems.append(
+                "A release pull request changes the version number in a version file and nothing "
+                "else in it. Something other than the version differs (a default, a dependency, "
+                "an add-on permission or option, or the file was added, removed or cannot be "
+                "read) in: " + ", ".join(rewritten) + ". That would reach production reviewed as "
+                "a version bump. Put it in its own pull request."
             )
         if not changed:
             problems.append(
@@ -212,6 +257,10 @@ def main(mode: str) -> int:
                 head_versions=_versions(head),
                 changed_paths=_git("diff", "--name-only", fork_point, head).split("\n"),
                 tags=tags,
+                version_files={
+                    path: (_show(fork_point, path), _show(head, path))
+                    for path in VERSION_FILES
+                },
             ),
         )
     if mode == "promotion":

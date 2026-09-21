@@ -39,6 +39,7 @@ def _pr(**changes):
         "head_versions": OLD,
         "changed_paths": ["custom_components/crop_steering/sensor.py"],
         "tags": {"v2.18.0", "v2.18.1"},
+        "version_files": {},  # their content rule: tests/test_release_guard_content.py
     }
     case.update(changes)
     return guards.check_pull_request(**case)
