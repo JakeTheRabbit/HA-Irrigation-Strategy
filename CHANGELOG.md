@@ -11,8 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.19.1] - 2026-09-21
 
-Pair: **controller 0.16.0, unchanged**: there is no controller update in this release, so no box is
-offered one. Integration only. Class **C1** (static images; nothing the controller reads).
+Pair: **controller 0.16.1**. Class **C3** by the table, because the controller is touched, though
+what changes there is one new attribute on a sensor it already publishes: no change to irrigation
+behaviour, options, the state file or any entity id. **Not run on hardware** before release: update
+with the engine off, then check the sidebar reads 2.19.1 and 0.16.1.
 
 ### 🌱 In plain English
 
