@@ -188,10 +188,9 @@ People skip checklists at 11 pm. Repository settings do not.
 - **Protect `main`:** block force-pushes and deletion. It takes no pull requests at all: the only thing that ever arrives is a fast-forward, pushed by whoever is allowed to promote. On an organisation's repository, restrict pushes to those people. On a personal repository classic branch protection cannot do that (the *Restrict who can push* option exists only for organisations): anyone with write access can push, so keep write access to yourself, or use a ruleset with *Restrict updates* and yourself as the only bypass. (Not checked against GitHub's current settings pages; confirm when you set it up.)
 - **Freeze `testing` during a soak** with *Lock branch* (step 3).
 - **Production boxes:** plain repository address, add-on auto-update OFF, HACS beta versions OFF.
+- **In place: the *Release guards* workflow** (`.github/scripts/release_guards.py`). On every pull request it fails a version change from a branch not named `release/<that version>` (an `intake/…` branch may carry upstream's), a release pull request that carries code, a version that goes down or reuses a tag, and any pull request into `main`. On every push to `main` it fails loudly unless the new tip is a fast-forward to the commit tagged `v<version>` that is already on `testing`; that one cannot prevent the push, it makes sure you hear about it at once. GitHub reads this workflow from **`main`**, so a pull request cannot switch it off, and a change to the guard itself only takes effect after a promotion.
 - **Worth building next, each as its own pull request:**
-  - a check on every pull request that fails when a branch not named `release/…` changes a version number;
-  - a check on every push to `main` that fails loudly unless the new tip is a tagged commit already on `testing`;
   - a `promote` workflow (manual trigger) that refuses unless the tag's commit has a green `Validate` run and an audit file for that version exists, then fast-forwards `main` and flips the pre-release;
   - third-party GitHub Actions pinned to commit SHAs (`hassfest@master` and `hacs/action@main` float today, and a workflow runs with the repository's token).
 
-  Until they exist, promotion is the three commands in step 5 and the discipline to run them last.
+  Until the `promote` workflow exists, promotion is the three commands in step 5 and the discipline to run them last.

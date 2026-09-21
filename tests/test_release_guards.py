@@ -239,7 +239,7 @@ def test_anything_else_that_reaches_main_fails_loudly(change, says):
 
 
 # --------------------------------------------------------------------------- the guard itself
-def test_the_guard_runs_from_the_base_branch_and_never_touches_pull_request_code():
+def test_the_guard_runs_from_the_default_branch_and_never_touches_pull_request_code():
     """pull_request_target runs with the repository's own token. It is safe only while this
     workflow never checks out or runs the pull request. If someone adds a build or test step
     here, or points the checkout at the head, that is a remote-code-execution hole: fail.

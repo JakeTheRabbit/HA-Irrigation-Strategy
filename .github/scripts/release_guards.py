@@ -11,10 +11,12 @@ sure one never happens by accident, or tucked inside something else:
                  on `testing`. This one cannot prevent the push; it fails loudly, at once.
 
 The decisions are pure functions (tests/test_release_guards.py); the git and GitHub plumbing is
-at the bottom. IMPORTANT: the pull-request guard runs on `pull_request_target`, from the BASE
-branch, so that a pull request cannot edit the guard that judges it. It therefore must never
-check out, import or execute anything from the pull request: it reads the head commit's files
-as text through `git show`, and nothing else.
+at the bottom. IMPORTANT: the pull-request guard runs on `pull_request_target`, which GitHub
+takes from the repository's DEFAULT branch (`main`): a pull request cannot edit the guard that
+judges it, and a change to this file takes effect only once it has been promoted to `main`.
+That trigger carries the repository's token, so the guard must never check out, import or
+execute anything from the pull request: it reads the head commit's files as text through
+`git show`, and nothing else.
 """
 
 from __future__ import annotations

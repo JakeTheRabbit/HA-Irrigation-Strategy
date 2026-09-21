@@ -5,13 +5,17 @@ name: Release guards
 # a version change IS a release. See .github/scripts/release_guards.py for the rules themselves.
 
 on:
-  # pull_request_target, not pull_request: this workflow and its script then come from the BASE
-  # branch, so a pull request cannot edit the guard that judges it.
+  # pull_request_target, not pull_request: GitHub then takes this workflow and its script from
+  # the repository's DEFAULT branch (`main`), not from the pull request and not from the branch
+  # it targets. So a pull request cannot edit the guard that judges it, and a change to the guard
+  # itself takes effect only once it has been promoted to `main`. (Seen for real: while this file
+  # was on `testing` only, it never ran. It went live with the promotion that carried it to `main`.)
   #
-  # SECURITY: because of that, this workflow must NEVER check out, install, import or run
-  # anything from the pull request. It checks out the base branch only, and the script reads the
-  # head commit's files as text through `git show`. Do not add a step that builds or tests the
-  # pull request here; that is what the Validate workflow (plain pull_request) is for.
+  # SECURITY: that trigger carries the repository's own token, so this workflow must NEVER check
+  # out, install, import or run anything from the pull request. It checks out the default branch
+  # only, and the script reads the head commit's files as text through `git show`. Do not add a
+  # step that builds or tests the pull request here; that is what the Validate workflow (plain
+  # pull_request) is for.
   pull_request_target:
     types: [opened, synchronize, reopened, edited]
   push:
@@ -31,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout the BASE branch (never the pull request)
+      - name: Checkout the default branch (never the pull request)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
