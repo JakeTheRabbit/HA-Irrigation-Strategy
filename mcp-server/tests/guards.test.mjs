@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { HaClient, configFromEnv } from "../dist/ha.js";
 import { Workspace } from "../dist/workspace.js";
+import { readFileSync } from "node:fs";
+import { plumbing, plumbingLayouts } from "../dist/schemas.js";
 import { mockHa, TOKEN } from "./mock-ha.mjs";
 
 const base = { HA_URL: "http://127.0.0.1:8123", HA_TOKEN: TOKEN };
@@ -99,4 +101,27 @@ test("HTTP client rejects unsupported services and oversized response without ex
     return true;
   };
   await assert.rejects(client.service("setup_read"), /exceeds 8 MiB/);
+});
+
+test("the plumbing layouts are the integration's, entry for entry", () => {
+  // This package cannot import the integration, so the table exists here too (as it does in the
+  // controller and the dashboard, each pinned the same way). A layout only one side knows is a
+  // save Home Assistant refuses, or one these tools refuse for no reason.
+  const source = readFileSync(
+    new URL(
+      "../../custom_components/crop_steering/plumbing.py",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const block = /^PLUMBING_LAYOUTS = \{([\s\S]*?)^\}/m.exec(source)[1];
+  const theirs = [
+    ...block.matchAll(/"(\w+)":\s*\((True|False),\s*(True|False)\)/g),
+  ].map(([, layout, pump, mainline]) => [
+    layout,
+    [pump === "True", mainline === "True"],
+  ]);
+  assert.equal(theirs.length, 4);
+  assert.deepEqual(theirs, Object.entries(plumbingLayouts));
+  assert.deepEqual(plumbing.options, Object.keys(plumbingLayouts));
 });

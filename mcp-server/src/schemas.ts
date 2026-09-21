@@ -53,8 +53,24 @@ export const zonePatch = z.strictObject({
   ec_sensors: z.array(entityId).max(32).optional(),
   ...sizing,
 });
+// How a room is plumbed: layout -> [has a pump switch, has a main-line valve]. The integration
+// DECLARES this (custom_components/crop_steering/plumbing.py, same table) and refuses a save
+// whose mapped switches contradict it, so a change to one has to travel with the other.
+export const plumbingLayouts = {
+  valves_only: [false, false],
+  pump_valves: [true, false],
+  mainline_valves: [false, true],
+  pump_mainline_valves: [true, true],
+} as const;
+export const plumbing = z.enum(
+  Object.keys(plumbingLayouts) as [
+    keyof typeof plumbingLayouts,
+    ...(keyof typeof plumbingLayouts)[],
+  ],
+);
 export const setupChanges = z.strictObject({
   room_name: name.optional(),
+  plumbing: plumbing.optional(),
   hardware: hardware.optional(),
   zones: z.array(zonePatch).max(64).optional(),
 });
@@ -77,6 +93,9 @@ export const room = z.object({
   slug: z.string().max(100),
   room_name: name,
   active: z.boolean(),
+  // "" = never declared; absent = an integration from before declared plumbing (2.19.0).
+  plumbing: z.union([plumbing, z.literal("")]).optional(),
+  plumbing_inferred: plumbing.optional(),
   zones: z.array(zone).min(1).max(64),
   hardware: storedHardware,
   safety: z.object({

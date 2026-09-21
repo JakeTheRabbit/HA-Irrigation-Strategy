@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { HaClient, SafeError } from "./ha.js";
 import {
   hardwareDomains,
+  plumbingLayouts,
   setupResponse,
   type Room,
   type SetupChanges,
@@ -53,13 +54,45 @@ function diff(before: unknown, after: unknown, path = ""): JsonObject[] {
   }
   return [{ path: path || "/", before: before ?? null, after: after ?? null }];
 }
-function config(room: Room) {
+function config(room: Room): {
+  room_name: string;
+  active: boolean;
+  plumbing?: keyof typeof plumbingLayouts;
+  hardware: Room["hardware"];
+  zones: Room["zones"];
+} {
   return {
     room_name: room.room_name,
     active: room.active,
+    // Only when DECLARED. A room that never declared its plumbing must not have one declared
+    // for it by an unrelated save: that is the operator's statement to make.
+    ...(room.plumbing ? { plumbing: room.plumbing } : {}),
     hardware: room.hardware,
     zones: room.zones,
   };
+}
+// Every way the mapped switches contradict the declared layout (plumbing.py `problems`).
+function plumbingProblems(
+  layout: keyof typeof plumbingLayouts,
+  hardware: Room["hardware"],
+) {
+  const stages = [
+    ["pump_switch", "pump"],
+    ["main_line_switch", "main-line valve"],
+  ] as const;
+  return stages.flatMap(([key, label], index) => {
+    const mapped = hardware[key] || "",
+      needed = plumbingLayouts[layout][index];
+    if (needed && !mapped)
+      return [
+        `plumbing is "${layout}" but no ${label} switch is mapped (hardware.${key})`,
+      ];
+    if (mapped && !needed)
+      return [
+        `plumbing is "${layout}" but a ${label} switch is mapped (hardware.${key} = ${mapped})`,
+      ];
+    return [];
+  });
 }
 function setupSnapshot(room: Room) {
   return {
@@ -322,6 +355,7 @@ export class Workspace {
       room = this.select(data.rooms, id);
     const proposed = structuredClone(config(room));
     if (changes.room_name !== undefined) proposed.room_name = changes.room_name;
+    if (changes.plumbing !== undefined) proposed.plumbing = changes.plumbing;
     if (changes.hardware) Object.assign(proposed.hardware, changes.hardware);
     const seen = new Set<number>();
     for (const patch of changes.zones ?? []) {
@@ -377,6 +411,17 @@ export class Workspace {
         for (const entity of sensors ?? []) validate(entity, ["sensor"], kind);
       }
     }
+    // HA refuses an ACTIVE room whose switches contradict its declared layout. Say so now,
+    // before a token exists: a proposal that can only fail on apply is not worth reviewing.
+    const contradictions =
+      proposed.active && proposed.plumbing
+        ? plumbingProblems(proposed.plumbing, proposed.hardware)
+        : [];
+    if (contradictions.length)
+      throw new SafeError(
+        `Home Assistant would refuse this save: ${contradictions.join("; ")}. ` +
+          "Change `plumbing` and the pump/main-line mapping together in one proposal.",
+      );
     const baseline = digest(setupSnapshot(room));
     return this.remember(
       {
@@ -394,7 +439,7 @@ export class Workspace {
       {
         current_setup_safety: room.safety,
         validation:
-          "Local schema, candidate domains and probe units checked. HA performs final timestamp, mapping-conflict, revision and affected-engine/plumbing-OFF validation during save. This preview cannot guarantee later readiness.",
+          "Local schema, candidate domains, probe units and declared-plumbing agreement checked. HA performs final timestamp, mapping-conflict, revision and affected-engine/plumbing-OFF validation during save. This preview cannot guarantee later readiness.",
       },
     );
   }
