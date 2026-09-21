@@ -70,7 +70,7 @@ A C2 or C3 change is not reviewable without:
 
 **One behaviour change per candidate.** Any number of C0 and C1 changes may ride along, but a candidate carries at most one C2 or C3 change. When a soak fails, the question "which change did that?" must already be answered. An upstream release taken into a fork counts as one C3 change and soaks alone.
 
-Open a `release/2.19.0` pull request into `testing` holding only the version numbers and both changelogs. When it is merged:
+Open a `release/2.19.0` pull request into `testing` holding only the version numbers and both changelogs. **The number is the integration's, and every release raises it**: the branch, the tag, the HACS release, the changelog entry and the promotion check are all keyed by it. There is no controller-only release. A fix that touches only the controller still goes out as a pair, with the integration's patch number raised (its code may be unchanged, and HACS will offer it), because a candidate tagged by anything else can be merged and soaked but never promoted: promotion asks for `v<integration version>` on the new tip, and a tag that already names the previous release is never moved. The *Release guards* workflow refuses such a pull request. When it is merged:
 
 ```bash
 git checkout testing && git pull --ff-only       # the commit CI just passed
