@@ -852,6 +852,10 @@
     "strategy_degraded": {
       "title": "Crop Steering: grow strategy plan has not moved on to today",
       "description": "The room's grow strategy plan could not apply the current day at lights-on: {reason}. It keeps its last valid targets (a plan waiting to start stays armed) and tries again every minute, and the controller keeps steering. This clears itself once the cause is fixed, usually a stale controller heartbeat or probe."
+    },
+    "entities_moved": {
+      "title": "Crop Steering: {count} setting(s) are not where the controller looks for them",
+      "description": "The controller finds each setting by its exact entity id, and these are somewhere else, so it is running on its built-in defaults for them (daily water cap and plant count included):\n\n{entities}\n\nKeep the engine off until this is fixed. If you changed an entity id yourself, change it back: Settings → Devices & services → Entities → the entity → the cog → Entity ID. If nearly every entity is listed, the room was created while Home Assistant was still running an older version of this integration: delete the Crop Steering entry, restart Home Assistant, and add it again. Nothing is renamed for you, because an id you chose on purpose is yours to keep."
     }
   },
   "selector": {
