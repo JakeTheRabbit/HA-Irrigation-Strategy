@@ -50,6 +50,30 @@ def zone_device_name(entry, zone_num) -> str:
     )
 
 
+def restored_state_is_ours(entry, last_state) -> bool:
+    """PURE. Whether a state Home Assistant offers to restore belongs to THIS room.
+
+    Home Assistant keeps the last state of a removed entity for seven days, keyed by entity id,
+    and this integration pins its entity ids. So a room that is deleted and set up again was
+    handed the deleted room's states: its setpoints over the answers just typed into the
+    wizard, its room on/off switch, and its kill switch. A room deleted while armed came back
+    armed.
+
+    A state written before this config entry existed cannot be this room's. Anything else is
+    restored exactly as before: an entry from before Home Assistant recorded `created_at`
+    carries the epoch, so everything is newer than it, and where either time is missing or
+    cannot be compared the answer is yes.
+    """
+    created = getattr(entry, "created_at", None)
+    written = getattr(last_state, "last_updated", None)
+    if created is None or written is None:
+        return True
+    try:
+        return written >= created
+    except TypeError:  # one of them is naive: no basis for throwing a room's state away
+        return True
+
+
 def build_engine_config(
     prefix,
     slug,

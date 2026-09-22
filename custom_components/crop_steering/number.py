@@ -13,7 +13,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
-from .room import room_prefix, zone_device_name
+from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .sizing import SIZING_KEYS, configured_sizing, prefer_setup_value
 
 _LOGGER = logging.getLogger(__name__)
@@ -874,7 +874,9 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
     async def async_added_to_hass(self) -> None:
         """Restore state when added to hass."""
         await super().async_added_to_hass()
-        if (last_state := await self.async_get_last_state()) is not None:
+        last_state = await self.async_get_last_state()
+        # A state left behind by a DELETED room is not this room's: keep the wizard's answer.
+        if last_state is not None and restored_state_is_ours(self._entry, last_state):
             if self._setup_value is not None and prefer_setup_value(
                 last_state.attributes, self._setup_revision, self._setup_value
             ):
