@@ -3,10 +3,18 @@ import { demoHistoryWindow } from "./comparison-demo";
 import type { OperatorAction } from "./operator-types";
 import { OperatorDemo } from "./operator-demo";
 import { useEffect, useRef, useSyncExternalStore } from "react";
-import type { Change, Controller, States, WriteResult } from "./types";
-import { applyChanges, findSession, HaClient, haSessionToken } from "./client";
+import type { Change, Controller, EntityState, States, WriteResult } from "./types";
+import { applyChanges, asStates, findSession, HaClient, haSessionToken } from "./client";
 import { buildRoom, discoverRooms, emptyRoom, resolveRequestedRoom, validateChange } from "./model";
 import { createDemo, demoBeat, demoHistory, demoReact, isDemoLocation } from "./demo";
+import {
+  applyEntityUpdate,
+  liveConnection,
+  watchedEntities,
+  whileVisible,
+  type EntityUpdate,
+  type LiveConnection,
+} from "./live";
 
 type Listener = () => void;
 const SESSION_KEY = "crop-steering-connection-tab";
@@ -15,7 +23,16 @@ export class ControllerStore {
   private client: HaClient | null = null;
   private generation = 0;
   private requestId = 0;
-  private interval?: ReturnType<typeof setInterval>;
+  private stopTimer?: () => void;
+  /** Home Assistant's own websocket, when this page runs inside Home Assistant. */
+  private live: LiveConnection | null = null;
+  private liveToken = 0;
+  /** Ends the current subscription; set while one is open or opening. */
+  private dropLive?: () => void;
+  /** Every entity id subscribed so far on this connection. */
+  private watched = new Set<string>();
+  private offlineTicks = 0;
+  private publishTimer?: ReturnType<typeof setTimeout>;
   private states: States;
   private roomId = "";
   private connection: Controller["connection"];
@@ -100,6 +117,7 @@ export class ControllerStore {
         typeof window !== "undefined" && base === window.location.origin ? haSessionToken() : "";
       try {
         this.client = new HaClient(base, saved.token || inheritedToken, session);
+        this.live = liveConnection(session);
         void this.refresh();
       } catch (error) {
         this.connection = "offline";
@@ -107,15 +125,17 @@ export class ControllerStore {
         this.publish();
       }
     }
-    if (!this.interval)
-      this.interval = setInterval(() => {
-        void this.refresh();
-      }, 30_000);
+    this.stopTimer ??= whileVisible(this.tick, 30_000);
+    if (typeof window !== "undefined") window.addEventListener?.("pagehide", this.unsubscribe);
     return this.stop;
   };
   stop = () => {
-    clearInterval(this.interval);
-    this.interval = undefined;
+    this.stopTimer?.();
+    this.stopTimer = undefined;
+    if (typeof window !== "undefined") window.removeEventListener?.("pagehide", this.unsubscribe);
+    this.unsubscribe();
+    clearTimeout(this.publishTimer);
+    this.publishTimer = undefined;
     this.historyAborters.forEach((abort) => abort.abort());
     this.historyAborters.clear();
     this.generation++;
@@ -134,25 +154,13 @@ export class ControllerStore {
     const generation = this.generation;
     const request = ++this.requestId;
     try {
+      // The full download: discovery, and the standalone poll. Inside Home Assistant it runs once
+      // (and after a reconnect); the subscription keeps it current from there.
       const states = await client.states();
       if (generation !== this.generation || request !== this.requestId) return;
       this.states = states;
-      const rooms = discoverRooms(states);
-      const requested = new URLSearchParams(window.location.search).get("room");
-      if (!rooms.some((r) => r.id === this.roomId)) {
-        this.roomId =
-          resolveRequestedRoom(rooms, requested)?.id ||
-          (requested === null ? rooms[0]?.id : "") ||
-          "";
-      }
-      this.connection = "live";
-      this.error =
-        requested !== null && !this.roomId
-          ? `Requested room "${requested}" is unavailable. Select an available room.`
-          : rooms.length
-            ? null
-            : "Connected, but no crop-steering room descriptors were discovered.";
-      this.updated = Date.now();
+      this.settle();
+      if (this.live) this.subscribeLive(this.live);
     } catch (error) {
       if (generation !== this.generation || request !== this.requestId) return;
       this.connection = "offline";
@@ -160,6 +168,114 @@ export class ControllerStore {
     }
     this.publish();
   };
+  /** New states arrived: keep the selected room (or pick the requested or first one). */
+  private settle() {
+    const rooms = discoverRooms(this.states);
+    const requested = new URLSearchParams(window.location.search).get("room");
+    if (!rooms.some((r) => r.id === this.roomId)) {
+      this.roomId =
+        resolveRequestedRoom(rooms, requested)?.id ||
+        (requested === null ? rooms[0]?.id : "") ||
+        "";
+    }
+    this.connection = "live";
+    this.error =
+      requested !== null && !this.roomId
+        ? `Requested room "${requested}" is unavailable. Select an available room.`
+        : rooms.length
+          ? null
+          : "Connected, but no crop-steering room descriptors were discovered.";
+    this.updated = Date.now();
+  }
+  /** Every 30 s while the page is visible. Standalone: poll. Live: nothing to download; re-derive
+   * what depends on the clock, and report a websocket that stays down. */
+  private tick = () => {
+    if (this.demo || !this.dropLive) return void this.refresh();
+    if (this.live?.connected === false) {
+      // Home Assistant drops its socket while a tab is hidden and reconnects when it is shown,
+      // so only a second disconnected tick in a row counts.
+      if (++this.offlineTicks > 1 && this.connection === "live") {
+        this.connection = "offline";
+        this.error =
+          "Live updates from Home Assistant stopped. Values shown are the last received.";
+      }
+    } else {
+      this.offlineTicks = 0;
+      if (this.connection === "offline") return void this.refresh();
+      this.updated = Date.now();
+    }
+    this.publish();
+  };
+  /** Subscribes to every entity this console reads. The first event restates all of them, so the
+   * snapshot just fetched is brought up to date with anything that changed meanwhile. */
+  private subscribeLive(live: LiveConnection) {
+    this.unsubscribe();
+    // Ids stay watched for the life of the connection: a fetch made while Home Assistant is still
+    // starting may lack them, and they come back as additions.
+    for (const id of watchedEntities(this.states)) this.watched.add(id);
+    // An empty list would subscribe to every entity in Home Assistant; keep polling instead.
+    if (!this.watched.size) return;
+    const token = ++this.liveToken;
+    const current = () => token === this.liveToken;
+    const reconnected = () => {
+      if (current()) void this.refresh();
+    };
+    let cancel: (() => unknown) | undefined;
+    const end = (stop: (() => unknown) | undefined) =>
+      Promise.resolve()
+        .then(stop)
+        .catch(() => {});
+    live.addEventListener?.("ready", reconnected);
+    this.dropLive = () => {
+      live.removeEventListener?.("ready", reconnected);
+      void end(cancel);
+    };
+    live
+      .subscribeMessage<EntityUpdate>(
+        (update) => {
+          if (!current()) return;
+          this.states = applyEntityUpdate(this.states, update);
+          this.publishSoon();
+        },
+        { type: "subscribe_entities", entity_ids: [...this.watched].sort() },
+      )
+      .then(
+        (unsubscribe) => (current() ? (cancel = unsubscribe) : void end(unsubscribe)),
+        () => {
+          // Refused (an older Home Assistant, or no permission): poll instead.
+          if (!current()) return;
+          this.unsubscribe();
+          this.live = null;
+        },
+      );
+  }
+  private unsubscribe = () => {
+    this.liveToken++;
+    this.dropLive?.();
+    this.dropLive = undefined;
+  };
+  /** Single-entity reads (write preflight and readback) go into the snapshot, never over a state
+   * that is newer (the subscription may already have delivered a later one). */
+  private merge(entities: EntityState[]) {
+    const read = Object.values(asStates(entities)).filter(
+      (entity) =>
+        !(
+          Date.parse(this.states[entity.entity_id]?.last_updated ?? "") >
+          Date.parse(entity.last_updated ?? "")
+        ),
+    );
+    if (read.length)
+      this.states = { ...this.states, ...Object.fromEntries(read.map((e) => [e.entity_id, e])) };
+  }
+  /** Entity updates come in bursts (the controller posts its whole room at once): publish once. */
+  private publishSoon() {
+    this.publishTimer ??= setTimeout(() => {
+      this.publishTimer = undefined;
+      if (!this.dropLive) return;
+      this.settle();
+      this.publish();
+    }, 250);
+  }
   changeRoom = (id: string) => {
     if (id === this.roomId || !discoverRooms(this.states).some((r) => r.id === id)) return;
     this.historyAborters.forEach((abort) => abort.abort());
@@ -173,16 +289,21 @@ export class ControllerStore {
       url.searchParams.set("room", id);
       window.history.replaceState({}, "", url);
     }
-    void this.refresh();
+    // A live subscription already covers every room.
+    if (!this.dropLive) void this.refresh();
   };
   connect = async (base: string, token: string) => {
     if (this.demo) return;
-    const client = new HaClient(base, token.trim(), token.trim() ? undefined : findSession(base));
+    const session = token.trim() ? undefined : findSession(base);
+    const client = new HaClient(base, token.trim(), session);
     this.historyAborters.forEach((abort) => abort.abort());
     this.historyAborters.clear();
     this.generation++;
     this.client?.dispose();
     this.client = client;
+    this.unsubscribe();
+    this.watched.clear();
+    this.live = liveConnection(session);
     this.states = {};
     this.roomId = "";
     this.updated = null;
@@ -206,6 +327,8 @@ export class ControllerStore {
     this.generation++;
     this.client?.dispose();
     this.client = null;
+    this.unsubscribe();
+    this.live = null;
     this.connection = "offline";
     this.error = "Disconnected. Displayed data is the last successful snapshot.";
     try {
@@ -255,19 +378,30 @@ export class ControllerStore {
       }
       if (!client || this.connection !== "live")
         return fail("Connect to Home Assistant before applying changes.");
-      // Fresh full-state preflight rechecks room membership, limits and availability.
-      const fresh = await client.states();
+      // Preflight re-reads only the entities being written (availability and limits); room
+      // membership comes from the current snapshot.
+      const read: EntityState[] = [];
+      for (const { entityId } of changes)
+        if (this.states[entityId]) read.push(await client.state(entityId));
       if (!isCurrent()) return fail("Room or connection changed; changes cancelled.");
-      const currentRoom = discoverRooms(fresh).find((r) => r.id === roomId);
+      this.merge(read);
+      const currentRoom = discoverRooms(this.states).find((r) => r.id === roomId);
       if (!currentRoom) return fail("The selected room is no longer available.");
       const result = await applyChanges(
-        client,
-        buildRoom(fresh, currentRoom),
-        fresh,
+        {
+          service: (domain, action, data) => client.service(domain, action, data),
+          state: async (entityId) => {
+            const entity = await client.state(entityId);
+            if (isCurrent()) this.merge([entity]);
+            return entity;
+          },
+        },
+        buildRoom(this.states, currentRoom),
+        this.states,
         changes,
         isCurrent,
       );
-      if (isCurrent()) await this.refresh();
+      if (isCurrent()) this.publish();
       return result;
     } catch (error) {
       if (isCurrent()) {

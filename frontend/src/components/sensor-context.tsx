@@ -20,7 +20,9 @@ import {
   SENSOR_WINDOWS,
   chartScale,
   formatReading,
+  historySpan,
   latestOnly,
+  mergeSeries,
   nearestReading,
   plotPoints,
   sensorStats,
@@ -62,7 +64,8 @@ const REFRESH_MS = 60_000;
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
 /** Recorded VWC and pore EC for one zone. Fetches only while `enabled` (connected and
- * editable), refetches on zone or window change and every minute, and drops stale responses. */
+ * editable): the whole window on zone or window change, then each minute only the readings
+ * recorded since. Drops stale responses. */
 export function useSensorContext(
   controller: Controller,
   zone: Zone | undefined,
@@ -91,14 +94,27 @@ export function useSensorContext(
       setLoading(false);
       return;
     }
+    let loadedAt: number | null = null;
     const load = () => {
       setLoading(true);
+      const since = loadedAt,
+        span = historySpan(hours, since, Date.now());
       guard.run(
-        () => history(probes.split("|"), hours),
+        () => history(probes.split("|"), span),
         (result) => {
           setLoading(false);
           if (result.ok) {
-            setData({ key, probes, series: result.value, at: Date.now() });
+            const at = Date.now();
+            loadedAt = at;
+            setData((held) =>
+              since === null || held?.key !== key
+                ? { key, probes, series: result.value, at }
+                : {
+                    ...held,
+                    series: mergeSeries(held.series, result.value, at - hours * 3_600_000),
+                    at,
+                  },
+            );
             setError("");
           } else setError(errorText(result.error));
         },
