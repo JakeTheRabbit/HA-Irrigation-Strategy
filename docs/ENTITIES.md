@@ -171,6 +171,7 @@ match the globals above.
 | `system_health_score` | — | 0–100 composite health. |
 | `system_uptime` | — | Engine uptime. |
 | `ai_heartbeat` | — | Self-correction loop status (`healthy` / anomaly). Attribute `controller_version`: the controller app that is actually running (shown in the dashboard sidebar beside the descriptor's `integration_version`). |
+| `engine_config` | — | The room's descriptor: what the controller reads to find and drive the room (valves, pump, main line, kill switch, zones, `setup_revision`). Attribute `integration_version`: the integration Home Assistant actually loaded. Attribute `entry_id`: WHICH room this is. A room that is deleted and set up again keeps its entity ids and starts its revision again at 1, so this is how a running controller tells it from the room it already adopted; it then adopts the new setup through the usual gate (kill switch and hardware OFF). Neither attribute enters the setup fingerprint. |
 | `system_efficiency` / `water_efficiency` | — | Efficiency metrics. |
 | `average_vwc_all_zones` / `average_ec_all_zones` | % / mS/cm | Cross-zone means. |
 | `fused_vwc` / `fused_ec` | — | Sensor-fused VWC/EC. |
