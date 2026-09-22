@@ -97,10 +97,10 @@ something else cannot pass.
 | Leg (check name) | Python | Plugin release | Home Assistant | What it proves |
 | --- | --- | --- | --- | --- |
 | Production: `Real Home Assistant (setup wizard and entity ids)` | 3.14 | 0.13.366, from `requirements-test-ha.txt` | 2026.9.3 | What production runs. Branch protection requires this check on `testing` and `main`. |
-| Oldest supported: the same name followed by ` - oldest supported Home Assistant` | 3.12 | 0.13.161, with `josepy==1.14.0` | 2024.9.0 | The minimum in `hacs.json`, the README badge and [INSTALL.md](INSTALL.md). |
+| Oldest supported: the same name followed by ` - oldest supported Home Assistant` | 3.12 | 0.13.171, with `josepy==1.14.0` | 2024.10.0 | The minimum in `hacs.json`, the README badge and [INSTALL.md](INSTALL.md). |
 
 The Python requirement follows Home Assistant: 2026.9 needs Python 3.14.2 or newer, and no plugin
-release for 2026.3 or later installs on an older Python; 2024.9 runs on 3.12. Before the matrix the
+release for 2026.3 or later installs on an older Python; 2024.10 runs on 3.12. Before the matrix the
 job ran Python 3.13 with the plugin unpinned, so pip settled, without a word, on the newest release
 that still installed there, and CI tested Home Assistant 2026.2.3 while production ran 2026.9.
 
@@ -112,12 +112,16 @@ Moving a leg:
   is: branch protection looks for it by name.
 - **Oldest supported.** That version is a promise to users, and HACS reads the one in `hacs.json`
   as the minimum. Change the leg, `hacs.json`, the README badge and `INSTALL.md` together. Nothing
-  older than 2024.9.0 passes today: the integration unloads a room through
-  `ConfigEntries.async_loaded_entries`, which Home Assistant added in 2024.9.0, so on anything
-  older unloading raises `AttributeError`, and every reload with it, including the one that
-  applies a saved Configure form. The `josepy` pin works around the test environment, not the
-  integration: josepy 2.0 (2025) removed an API that the `acme` release pinned by Home Assistant
-  2024.9 still imports, so the leg installs the josepy of that time.
+  older than 2024.10.0 passes today. Before 2024.9.0 the integration itself fails: it unloads a
+  room through `ConfigEntries.async_loaded_entries`, which Home Assistant added in 2024.9.0, so on
+  anything older unloading raises `AttributeError`, and every reload with it, including the one
+  that applies a saved Configure form. On 2024.9.x the integration passes, but
+  `test_non_admin_user.py` writes its automation as `triggers:` / `trigger: event` / `actions:`,
+  the syntax Home Assistant introduced in 2024.10.0; the older `trigger:` / `platform: event` /
+  `action:` form works on every version tested here, so rewriting that one automation would bring
+  2024.9.0 back. The `josepy` pin works around the test environment, not the integration: josepy
+  2.0 (2025) removed an API that the `acme` release pinned by Home Assistant 2024.10 still imports,
+  so the leg installs the josepy of that time.
 
 ### hassfest, without Docker
 

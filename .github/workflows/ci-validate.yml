@@ -171,13 +171,14 @@ jobs:
             install: '-r requirements-test-ha.txt'
             suffix: ''
           # The oldest Home Assistant this repository claims to support: hacs.json, the README
-          # badge and docs/INSTALL.md all say 2024.9.0, and move with this leg. Anything older
-          # lacks ConfigEntries.async_loaded_entries, which unloading a room calls. josepy 2.0
-          # (2025) removed an API that the acme release this Home Assistant pins still imports, so
-          # it is held at the josepy that was current when this Home Assistant shipped.
+          # badge and docs/INSTALL.md all say 2024.10.0, and move with this leg. Before 2024.9.0
+          # the integration itself fails (unloading a room calls ConfigEntries.async_loaded_entries);
+          # on 2024.9.x the suite's automation test is written in the syntax 2024.10.0 introduced.
+          # josepy 2.0 (2025) removed an API that the acme release this Home Assistant pins still
+          # imports, so it is held at the josepy that was current when this Home Assistant shipped.
           - python: '3.12'
-            homeassistant: '2024.9.0'
-            install: 'pytest-homeassistant-custom-component==0.13.161 josepy==1.14.0'
+            homeassistant: '2024.10.0'
+            install: 'pytest-homeassistant-custom-component==0.13.171 josepy==1.14.0'
             suffix: ' - oldest supported Home Assistant'
     steps:
       - uses: actions/checkout@v4
