@@ -5,8 +5,9 @@ also how 2.17.0 shipped two switches whose entity ids Home Assistant generated f
 the stub tests asserted an attribute the real entity platform ignores. These tests load the real
 config flow and the real entity registry, so they fail when Home Assistant would.
 
-Run: `python -m pytest tests_ha -q` on Python 3.13 with requirements-test-ha.txt installed. They are
-kept out of tests/ because that suite replaces the `homeassistant` package with stubs.
+Run: `python -m pytest tests_ha -q` on Python 3.14.2+ with requirements-test-ha.txt installed (the
+Home Assistant versions CI runs are in docs/TESTING.md). They are kept out of tests/ because that
+suite replaces the `homeassistant` package with stubs.
 """
 
 import json
