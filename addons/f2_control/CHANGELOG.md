@@ -1,3 +1,7 @@
+# Unreleased
+
+- **Zone status has one writer.** The controller publishes each zone's label, with its reason, on `sensor.crop_steering_<prefix>zone_N_status_app` (`Room off` included) and no longer writes `zone_N_status`, which the integration now mirrors from it. With an older integration, `zone_N_status` shows that integration's fixed-threshold label until it is updated. No change to options, the state file or irrigation.
+
 # 0.16.4
 
 Pair with integration 2.19.4. **C1.** No controller code change: the dashboard served by the app is the 2.19.4 build (controller-health status line, live updates instead of polling). No change to options, the state file or irrigation.

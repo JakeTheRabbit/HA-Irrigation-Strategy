@@ -9,6 +9,40 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🌱 In plain English
+
+- **The zone status sensor has one writer.** The zone status in Home Assistant had two authors
+  taking turns about twice a minute: the integration, with a fixed 40 % moisture threshold
+  (*Dry - Needs Water*), and the controller, with its phase-aware label (*Overnight dryback*). The
+  controller now publishes its label on a separate entity, and the zone status shows exactly that,
+  with its reason. When the controller has not reported for 10 minutes the zone status says
+  *Controller not reporting* instead of guessing from a threshold. Cards and automations keep the
+  same entity. Until the controller is updated too, the zone status shows the older controller's
+  own label, as before, and is no longer fought over.
+
+### 🔧 Technical notes
+
+- **Zone status, one writer** (class C3: controller and integration). The controller publishes
+  `sensor.crop_steering_<prefix>zone_N_status_app` (state: the `zone_status_label`; attributes
+  `reason`, `friendly_name`, `engine`), `Room off` included, and no longer writes `zone_N_status`.
+  The integration's `zone_N_status` (`CropSteeringZoneStatusSensor`, same unique id and entity id)
+  mirrors it through `zone_status.mirrored_status`: the label and its reason, or
+  `Controller not reporting` when the app entity is missing, `unknown`/`unavailable`, or its
+  `last_reported` (else `last_updated`) is more than 10 minutes old, the engine-offline repair's
+  limit. It is not polled: it updates on the app entity's `state_changed` and checks staleness
+  every minute, and writes only when what it shows changes, so a 0.16.x controller still writing
+  `zone_N_status` is left alone rather than overwritten every 30 s. With a controller from this
+  release and an older integration, `zone_N_status` shows that integration's threshold label.
+  `VWC_DRY_THRESHOLD` / `VWC_SATURATED_THRESHOLD` removed from `const.py`. The label and reason
+  are now recorded on both entities; exclude `sensor.crop_steering_*_status_app` from the
+  recorder to keep one copy. Tests: `tests/test_zone_status.py`,
+  `addons/f2_control/tests/test_zone_status_one_owner.py`,
+  `tests_ha/test_zone_status_one_owner.py` (an older controller's writes are not fought; with this
+  controller there is exactly one writer). The two add-on tests that asserted the controller
+  writing `zone_N_status` now assert `zone_N_status_app`.
+
 ## [2.19.4] - 2026-09-23
 
 Pair: **controller 0.16.4** (no controller code change: it serves the 2.19.4 dashboard). Class **C1**:

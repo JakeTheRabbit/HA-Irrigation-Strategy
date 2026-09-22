@@ -83,7 +83,7 @@ def test_an_off_room_still_reports_in_so_nothing_calls_the_engine_offline():
     c.loop_once(_Clock.now())
     state, attrs = fake.sets["sensor.crop_steering_ai_heartbeat"]
     assert state == "healthy" and attrs["room_active"] is False
-    assert fake.sets["sensor.crop_steering_zone_1_status"][0] == "Room off"
+    assert fake.sets["sensor.crop_steering_zone_1_status_app"][0] == "Room off"
     assert "Room off" in fake.sets["sensor.crop_steering_current_decision"][0]
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import math
 import re
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -19,8 +20,12 @@ from homeassistant.const import (
     UnitOfTime,
     UnitOfVolume,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.entity import DeviceInfo
 
@@ -30,13 +35,12 @@ from .const import (
     DEFAULT_EC_RATIO,
     DEFAULT_EC_FALLBACK,
     VWC_ADJUSTMENT_PERCENT,
-    VWC_DRY_THRESHOLD,
-    VWC_SATURATED_THRESHOLD,
     SOFTWARE_VERSION,
 )
 from .room import room_prefix, build_engine_config
 from .calculations import ShotCalculator
 from .units import to_native
+from .zone_status import mirrored_status, status_app_entity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -229,9 +233,12 @@ async def async_setup_entry(
 
     # Create sensor entities
     for description in sensor_descriptions:
-        sensors.append(
-            CropSteeringSensor(entry, description, zones_config, hardware_config)
+        cls = (
+            CropSteeringZoneStatusSensor
+            if re.fullmatch(r"zone_\d+_status", description.key)
+            else CropSteeringSensor
         )
+        sensors.append(cls(entry, description, zones_config, hardware_config))
 
     # Publish this room's engine config (hardware map + kill switch + zones) so the
     # f2-control add-on can discover and drive it — multi-room Stage 2.
@@ -352,8 +359,6 @@ class CropSteeringSensor(SensorEntity):
                 return self._get_zone_vwc(self._zone_number)
             elif f"ec_zone_{self._zone_number}" == self.entity_description.key:
                 return self._get_zone_ec(self._zone_number)
-            elif f"zone_{self._zone_number}_status" == self.entity_description.key:
-                return self._get_zone_status(self._zone_number)
             elif (
                 f"zone_{self._zone_number}_last_irrigation"
                 == self.entity_description.key
@@ -506,30 +511,6 @@ class CropSteeringSensor(SensorEntity):
                 ec_sensors.append(zone_config["ec_back"])
 
         return self._average_sensor_values(ec_sensors, "ec")
-
-    def _get_zone_status(self, zone_num: int) -> str:
-        """Get status for specific zone."""
-        # Check if zone is enabled
-        zone_enabled = self.hass.states.get(
-            f"switch.crop_steering_{self._prefix}zone_{zone_num}_enabled"
-        )
-        if not zone_enabled or zone_enabled.state != "on":
-            return "Disabled"
-
-        # Check VWC and EC values
-        vwc = self._get_zone_vwc(zone_num)
-        ec = self._get_zone_ec(zone_num)
-
-        if vwc is None or ec is None:
-            return "Sensor Error"
-
-        # Basic status based on VWC
-        if vwc < VWC_DRY_THRESHOLD:
-            return "Dry - Needs Water"
-        elif vwc > VWC_SATURATED_THRESHOLD:
-            return "Saturated"
-        else:
-            return "Optimal"
 
     def _get_zone_last_irrigation(self, zone_num: int):
         """Return zone last-irrigation as a tz-aware datetime (or None) — see
@@ -783,3 +764,58 @@ class CropSteeringSensor(SensorEntity):
     def available(self) -> bool:
         """Return if sensor is available."""
         return True
+
+
+class CropSteeringZoneStatusSensor(CropSteeringSensor):
+    """zone_N_status: what the CONTROLLER says about the zone, mirrored from its zone_N_status_app.
+
+    Not polled. It is updated when zone_N_status_app changes, and checked once a minute for a
+    controller that has stopped reporting, and it writes only when what it shows changes. A
+    controller from before this, which still writes zone_N_status itself, is therefore left alone
+    rather than fought every 30 seconds: the integration shows "Controller not reporting" once, and
+    that controller's own label stands until it is updated.
+    """
+
+    _attr_should_poll = False
+
+    def __init__(self, entry, description, zones_config, hardware_config) -> None:
+        super().__init__(entry, description, zones_config, hardware_config)
+        self._source = status_app_entity(self._prefix, self._zone_number)
+        self._shown: tuple[str, dict] | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass, [self._source], self._source_changed
+            )
+        )
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._refresh, timedelta(minutes=1))
+        )
+
+    @callback
+    def _source_changed(self, _event) -> None:
+        self._refresh(dt_util.utcnow())
+
+    @callback
+    def _refresh(self, now) -> None:
+        shown = mirrored_status(self.hass.states.get(self._source), now)
+        if shown != self._shown:
+            self._shown = shown
+            self.async_write_ha_state()
+
+    def _current(self) -> tuple[str, dict]:
+        if self._shown is None:
+            self._shown = mirrored_status(
+                self.hass.states.get(self._source), dt_util.utcnow()
+            )
+        return self._shown
+
+    @property
+    def native_value(self) -> Any:
+        return self._current()[0]
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        return dict(self._current()[1])
