@@ -52,7 +52,7 @@ VWC_ADJUSTMENT_PERCENT = 5.0
 
 
 # Software version - single source of truth
-SOFTWARE_VERSION = "2.19.4"
+SOFTWARE_VERSION = "2.19.5"
 
 # Crop steering phases (P0-P3 only, Manual removed)
 PHASES = ["P0", "P1", "P2", "P3"]

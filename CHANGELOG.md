@@ -9,7 +9,10 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.19.5] - 2026-09-23
+
+Pair: **controller 0.16.5**. Class **C3**: engine, controller and integration. **Owner-approved rehearsal
+release** (Ben Isdale, 23 September 2026), no staging soak; see the release audit.
 
 The irrigation changes (engine and controller) are class **C3**; the plan, setup and Repairs changes
 are class **C2**. The zone status change is class **C3** (controller and integration).
