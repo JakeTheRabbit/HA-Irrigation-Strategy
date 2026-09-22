@@ -17,7 +17,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
-from .room import room_prefix
+from .room import restored_state_is_ours, room_prefix
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -261,6 +261,12 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
         """Restore state when added to hass."""
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
+        # A state left behind by a DELETED room is not this room's. Without this a room deleted
+        # while armed and set up again was born with its kill switch ON.
+        if last_state is not None and not restored_state_is_ours(
+            self._entry, last_state
+        ):
+            last_state = None
         if last_state is not None:
             self._attr_is_on = last_state.state == "on"
         if not self._is_manual_override:

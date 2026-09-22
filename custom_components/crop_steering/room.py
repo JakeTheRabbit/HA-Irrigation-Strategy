@@ -50,8 +50,39 @@ def zone_device_name(entry, zone_num) -> str:
     )
 
 
+def restored_state_is_ours(entry, last_state) -> bool:
+    """PURE. Whether a state Home Assistant offers to restore belongs to THIS room.
+
+    Home Assistant keeps the last state of a removed entity for seven days, keyed by entity id,
+    and this integration pins its entity ids. So a room that is deleted and set up again was
+    handed the deleted room's states: its setpoints over the answers just typed into the
+    wizard, its room on/off switch, and its kill switch. A room deleted while armed came back
+    armed.
+
+    A state written before this config entry existed cannot be this room's. Anything else is
+    restored exactly as before: an entry from before Home Assistant recorded `created_at`
+    carries the epoch, so everything is newer than it, and where either time is missing or
+    cannot be compared the answer is yes.
+    """
+    created = getattr(entry, "created_at", None)
+    written = getattr(last_state, "last_updated", None)
+    if created is None or written is None:
+        return True
+    try:
+        return written >= created
+    except TypeError:  # one of them is naive: no basis for throwing a room's state away
+        return True
+
+
 def build_engine_config(
-    prefix, slug, num_zones, zones, hardware, setup=None, integration_version=None
+    prefix,
+    slug,
+    num_zones,
+    zones,
+    hardware,
+    setup=None,
+    integration_version=None,
+    entry_id=None,
 ):
     """PURE. The room descriptor the f2-control add-on reads from
     ``sensor.crop_steering_<prefix>engine_config`` to DISCOVER and drive an additional room
@@ -89,9 +120,15 @@ def build_engine_config(
     versions = (
         {"integration_version": integration_version} if integration_version else {}
     )
+    # WHICH room this is. A room that is deleted and set up again publishes the same entity ids
+    # and starts its setup revision again at 1; without this the running controller cannot tell
+    # it from the room it already adopted, and goes on driving the old map. Like the version, it
+    # is not one of the keys the setup fingerprint reads.
+    which = {"entry_id": entry_id} if entry_id else {}
     return {
         **declared,
         **versions,
+        **which,
         "setup_api_version": 1,
         "setup_revision": setup.get("setup_revision", 0),
         "active": setup.get("active", True),
