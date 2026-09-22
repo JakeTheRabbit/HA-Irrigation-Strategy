@@ -9,7 +9,12 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.19.3] - 2026-09-23
+
+Pair: **controller 0.16.3**. **Owner-approved rehearsal release, no staging soak**: Ben Isdale
+approved releasing on 23 September 2026 ("do all of it now") after the F2 dry tails of 21-22 September; the
+release audit on the GitHub release names what was and was not exercised. Update with the engine off, read
+the controller log, then watch the first shots.
 
 The irrigation changes (controller and engine) are class **C3**, from the F2 history of 21-22 September
 2026 and the review of it.
@@ -18,6 +23,19 @@ previous controller ignores, so it can still read the file after a rollback.
 
 ### 🌱 In plain English
 
+- **A room deleted and set up again starts fresh.** Home Assistant keeps the last state of a removed
+  entity for seven days, and a re-created room inherited the deleted one's settings, its room on/off
+  switch and its kill switch: a room deleted while armed came back armed. Now a room only takes back
+  values saved after it was created. An existing room restarts exactly as before.
+- **The controller adopts a re-created room afresh.** It used to go on driving the room that no longer
+  existed: with a different valve in the new room, arming it would have watered through the **old**
+  valve. The integration now says which room it is, and a new room is adopted through the usual gate
+  (kill switch and hardware OFF first).
+- **Setup shows the version that is running, and waits for a restart.** After a HACS download Home
+  Assistant keeps running the old code until it restarts; setup now says which version is running and
+  will not create a room on stale code. *Configure* is never blocked.
+- **Tested against the Home Assistant you run.** The real-Home-Assistant tests now run on HA 2026.9.3
+  (Python 3.14) and on the oldest version supported, now **2024.10.0** (2024.3 never passed).
 - **One repository.** The controller app is now installed only from this repository. The old
   `f2-control` mirror, which a release script pushed a copy to, is retired: it gets no more
   releases, and nothing in this repository writes to it. A controller installed from the mirror
@@ -75,6 +93,16 @@ previous controller ignores, so it can still read the file after a rollback.
 
 ### 🔧 Technical notes
 
+- #49 `room.restored_state_is_ours(entry, last_state)` (`last_state.last_updated >= entry.created_at`,
+  lenient when either is missing or naive) gates restore in the number, switch and select platforms.
+- #50 the descriptor gains `entry_id` (not a fingerprint key); `Controller._is_another_room` re-opens
+  adoption when it changes; first sight is remembered and changes nothing; `_setup` gains optional
+  `entry_id`.
+- #51 `config.step.user`/`room` and `options.step.init` show `SOFTWARE_VERSION`; `async_step_user` aborts
+  `restart_required` while the on-disk `manifest.json` differs (read in the executor).
+- #56 Validate: `Real Home Assistant` legs pinned (HA 2026.9.3 / plugin 0.13.366 / Python 3.14; HA
+  2024.10.0 / Python 3.12) with a version assertion; `tests/run_ci.sh` ends `PARTIAL` (exit 1 unless
+  `--allow-skip`) when that tier is skipped; minimum in `hacs.json`, README and INSTALL raised to 2024.10.0.
 - `addons/f2_control/config.yaml` `url` points at this repository (metadata only; version unchanged).
 - Removed `scripts/prepare_addon_release.py`, `scripts/publish_addon.sh` and
   `tests/test_addon_release.py`, the publisher for the mirror. The add-on's web root is already

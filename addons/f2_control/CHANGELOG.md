@@ -1,8 +1,9 @@
-# Unreleased
+# 0.16.3
 
+Pair with integration 2.19.3. **C3.** Owner-approved rehearsal release without a staging soak (23 Sep 2026); not run on hardware before release. No change to add-on options.
+
+- **A room deleted and set up again is adopted afresh** (#50): the descriptor's `entry_id` changing re-opens adoption through the usual gate (kill switch and hardware OFF); first sight changes nothing, so a running room resumes without a disarm cycle.
 - Installed only from `JakeTheRabbit/HA-Irrigation-Strategy`; the `f2-control` mirror is retired. `url` in `config.yaml` now points here. No change to options, the state file or irrigation.
-
-**C3.** From the F2 history of 21-22 September 2026. Not run on hardware. No change to add-on options.
 
 - **The daily limit is a budget with typed exemptions.** The watchdog, P3 emergency and high-EC flushes (anti-lockout, P2 rescue) pass it, and so does the P1 ramp, which always runs in full. Top-ups, P1/P2/P0 EC-correction shots and the min-daily floor stop at it. A shot that would cross it is cut to what is left (under 5 s: held, `BLOCK daily-cap (x L left)`). The "flush" in a reason's text no longer makes a shot exempt.
 - **A zone over budget and starving gets the watchdog shot** instead of nothing (22 Sep: Z1 dry 14:06-22:00). No watchdog in P0: the night no longer counts as "no water" at lights-on.

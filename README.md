@@ -8,7 +8,7 @@ The demo opens directly in your browser with sample rooms, sensor data and edita
 
 The demo includes clearly labelled synthetic recipes and current/previous runs for exploring comparisons. They demonstrate the software; they are not production recommendations.
 
-![Release](https://img.shields.io/badge/Release-2.19.2-green)
+![Release](https://img.shields.io/badge/Release-2.19.3-green)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.10+-41BDF5)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
