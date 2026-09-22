@@ -9,6 +9,90 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+The irrigation changes (engine and controller) are class **C3**; the plan, setup and Repairs changes
+are class **C2**.
+
+### 🌱 In plain English
+
+- **A grow plan never stops a starving zone from being watered.** While a room's grow plan is held
+  (in error, out of date, or missing after a restart) the controller held every shot on every zone
+  the plan runs, for as long as the hold lasted. Now the overnight emergency shot, the lights-on
+  watchdog and the minimum daily volume still water those zones; only the routine steering waits
+  for the plan. A zone with a dead probe keeps its timed safety schedule too. The kill switch,
+  a hardware fault, the zone switches, bad feed water and the daily budget still stop them, as
+  before.
+- **A missed minute at lights-on no longer holds a room all day.** A plan moved on to the new day
+  only in the two minutes after lights-on. If Home Assistant was restarting then, or the
+  controller or a probe was a few minutes late, the plan went into error and held every zone
+  until the next lights-on. Now it applies the new day at the first minute it can, and keeps the
+  previous day's targets until then. Changing the lights-on hour while a plan runs, or a lights-on
+  hour that falls in the daylight-saving jump, no longer puts it in error either.
+- **Zones cannot be changed under a running plan.** Setup now refuses to add or archive zones, or
+  to archive the room, while its plan is armed or running, instead of saving the change and
+  putting the plan in error. Disarm the plan first.
+- **Repairs says when a plan is holding.** A card appears for every hold (the plan in error, the
+  controller unable to use it, a zone the plan does not steer today), and a warning while a plan
+  has not moved on to today, each with the reason.
+
+### 🔧 Technical notes
+
+- **Engine** (`crop_steering_engine/core.py`, and the vendored copy): new
+  `ZoneSnapshot.steering_held` (default `False`, so every caller is unchanged). When it is set,
+  `decide()` skips the per-phase steering rules and the anti-lockout flush (it steers to
+  `max_ec`, a plan setpoint) and fires only the P3 emergency, the watchdog and the minimum-daily
+  floor; the high-EC blocks still apply and phases still move. Holding only the routine decision
+  in the controller was not enough: a zone drying in P2 is a top-up first, so the watchdog behind
+  it never came up.
+- **Controller** (`controller.py`): `_snapshot` sets `steering_held` from `strategy_block`.
+  `PLAN_HOLD_EXEMPT` = `p3_emergency`, `watchdog`, `min_daily`, `blind_fallback`,
+  `blind_copy_rescue`; `_blocked(room, zone, reason)` lets those kinds through the plan hold (and
+  logs it), and `_execute_shot(plan_exempt=True)` skips the plan preflight for them. The blind
+  decisions are typed: FALLBACK is `blind_fallback`; COPY is `blind_copy_rescue` when the
+  sibling's shot is one of the rescues, else `blind_copy`; none is exempt from the daily budget.
+  A held zone that is not firing publishes the hold as its `block`, so the zone status and
+  `current_decision` still show it.
+- **Integration, plan** (`strategy.py`): `tick` applies the latest lights-on on the first tick
+  that can (`_advance`), not only within 120 s of it. `activate` / `disarm` record
+  `armed_at` / `disarm_at`, which take effect at the first lights-on after them by the current
+  `lights_on_hour` (`_due`), so a changed hour re-anchors them; a day already applied is never
+  applied again (`grow_day >= day`), and a later hour never takes the plan back a day. Lights-on
+  is built per local date and compared in UTC (`_lights_on`, `_boundary`, `_next_boundary`): an
+  hour inside a daylight-saving gap is the instant the clocks jump to, and `now - boundary` no
+  longer compares wall clocks across a change. A recoverable fault (stale heartbeat, flag, zone
+  switch or probe at lights-on, a failing hydraulic preview, an unreadable `lights_on_hour`,
+  storage) keeps the last valid snapshot published and sets `degraded_reason` (a plan sensor
+  attribute and a `strategy_get` response field), retried every tick. Only zones that no longer
+  match the plan (or an archived room) are an error (`_Hold`), stored once instead of every
+  minute. `async_init` no longer turns a missed lights-on into an error. The response's
+  `armed_after` / `disarm_after` are computed from `armed_at` / `disarm_at` by the current hour.
+- **Integration, setup** (`setup_api.py`): `safety_blockers` adds `_plan_blocker`: with a
+  proposal, a change of the active zone set or archiving the room is refused while the plan is
+  armed, active, disarming or in error. A change back to the plan's own zones is allowed.
+  `remove_setup` passes its archive as the proposal. Covers `save_setup`, `remove_setup`, the
+  options flow's zone map and `.env` reload.
+- **Integration, Repairs** (`health.py`): `strategy_hold` (ERROR: plan status `error`, or a fresh
+  heartbeat's `strategy_error`; WARNING: a zone the active plan does not steer today) and
+  `strategy_degraded` (WARNING: `degraded_reason`), with `{reason}`; both cleared with the room's
+  other cards when it is switched off. Translations in `strings.json` and `translations/en.json`.
+- **Existing installs:** no state-file, option or entity-id change. A plan document stored by an
+  older version (no `armed_at` / `disarm_at`) keeps working from its `armed_after` /
+  `disarm_after`, and one stored in error with "Lights-on boundary was missed" applies its day on
+  the first tick. An older controller with this integration sees fewer holds; this controller
+  with an older integration still waters the rescues through its holds.
+- **Tests:** `crop-steering-engine/tests/test_steering_held.py`,
+  `addons/f2_control/tests/test_plan_hold_never_stops_rescues.py`,
+  `tests/test_plan_never_holds_a_room_all_day.py` (stale heartbeat or probe at lights-on, Home
+  Assistant down across it, the lights-on hour moved later and earlier, the Pacific/Auckland gap
+  on 27 September 2026, a zone change while armed), new cards in `tests/test_health.py`, and
+  `tests_ha/test_plan_holds.py` (the options flow refusing a zone change under an armed plan and
+  saving it under a draft; every hold, and a plan that could not apply its day, in the real
+  Repairs registry). `test_active_store_survives_reload_without_midday_reapplication` now asserts
+  the stored snapshot stays active with a `degraded_reason` where it asserted the error, and
+  `test_disarm_waits_for_next_boundary_and_survives_missed_boundary_restart` that the missed
+  release is made on the first tick.
+
 ## [2.19.4] - 2026-09-23
 
 Pair: **controller 0.16.4** (no controller code change: it serves the 2.19.4 dashboard). Class **C1**:

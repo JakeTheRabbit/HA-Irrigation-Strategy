@@ -1,3 +1,7 @@
+# Unreleased
+
+- **A held grow plan never stops an emergency, watchdog or minimum-daily shot.** Each zone the plan holds is decided with the engine's new `ZoneSnapshot.steering_held`, so `decide()` returns the rescue behind a routine shot; `_blocked` and the shot preflight let `PLAN_HOLD_EXEMPT` kinds (`p3_emergency`, `watchdog`, `min_daily`, and for a blind zone `blind_fallback` and `blind_copy_rescue`) through the plan hold, and every other gate still applies. A held zone that is not firing shows the hold as its block. No change to options or the state file. Pairs with the integration's plan fixes in the same release (a plan no longer holds a room all day over a missed lights-on).
+
 # 0.16.4
 
 Pair with integration 2.19.4. **C1.** No controller code change: the dashboard served by the app is the 2.19.4 build (controller-health status line, live updates instead of polling). No change to options, the state file or irrigation.
