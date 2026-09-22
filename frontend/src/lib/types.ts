@@ -1,4 +1,5 @@
 import type { HistoryRequest, HistoryWindow } from "./comparison-types";
+import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
 import type { AutoSetpointStatus } from "./auto-setpoints";
 export interface EntityState {
@@ -136,5 +137,7 @@ export interface Controller {
   write: (changes: Change[]) => Promise<WriteResult>;
   historyWindow: (request: HistoryRequest) => Promise<HistoryWindow>;
   history: (entityIds: string[], hours: number) => Promise<Series[]>;
+  /** One grow-day of recorder history for the selected room's day timeline. */
+  timeline: (request: TimelineRequest) => Promise<TimelineRows>;
   operator: <T>(action: OperatorAction, data?: Record<string, unknown>) => Promise<T>;
 }

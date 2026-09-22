@@ -1,3 +1,7 @@
+# Unreleased
+
+**C1.** No controller code change: the dashboard the app serves (`www/public/dashboard.html`) is rebuilt with the Overview's grow-day timeline. No change to options, the state file or irrigation.
+
 # 0.16.5
 
 Pair with integration 2.19.5. **C3.** Owner-approved rehearsal release without a staging soak (23 Sep 2026); not run on hardware before release. No change to add-on options or the state file.

@@ -1,4 +1,5 @@
 import { DailyWaterSummary } from "@/components/water-delivery";
+import { DayTimeline } from "@/components/day-timeline";
 import { TankStatus } from "@/components/tank-status";
 import { useState } from "react";
 import { ArrowRight, ArrowUpRight, CircleCheck, TriangleAlert } from "lucide-react";
@@ -10,7 +11,6 @@ import {
   Empty,
   EventList,
   Heading,
-  HistoryChart,
   Metrics,
   Status,
   ZoneDetails,
@@ -109,7 +109,7 @@ export function Overview({
         )}
       </section>
       <DailyWaterSummary controller={controller} />
-      <HistoryChart controller={controller} zones={room.zones} />
+      <DayTimeline controller={controller} />
       <div className="overview-bottom">
         <section className="panel">
           <div className="panel-heading">

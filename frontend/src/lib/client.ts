@@ -1,5 +1,6 @@
 import { loadHistoryWindow } from "./comparison-history";
 import type { HistoryRequest } from "./comparison-types";
+import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
 import type { Change, EntityState, RoomView, Series, States, WriteResult } from "./types";
 import { numeric, validateChange } from "./model";
@@ -47,6 +48,31 @@ export function asStates(payload: unknown): States {
       )
       .map((e) => [e.entity_id, e]),
   );
+}
+/** Rows of `GET history/period`: one array per entity, the first row naming it; a minimal
+ * response leaves later rows with only `state` and `last_changed`. */
+export function recordedRows(payload: unknown, attributes: boolean): TimelineRows {
+  if (!Array.isArray(payload)) throw new Error("Home Assistant returned invalid history.");
+  const rows: TimelineRows = {};
+  for (const group of payload) {
+    const id = Array.isArray(group) ? group[0]?.entity_id : undefined;
+    if (typeof id !== "string") continue;
+    rows[id] = (group as Partial<EntityState>[])
+      .flatMap((row) => {
+        const time = Date.parse(row?.last_updated ?? row?.last_changed ?? "");
+        return typeof row?.state === "string" && Number.isFinite(time)
+          ? [
+              {
+                state: row.state,
+                time,
+                ...(attributes ? { attributes: row.attributes ?? {} } : {}),
+              },
+            ]
+          : [];
+      })
+      .sort((a, b) => a.time - b.time);
+  }
+  return rows;
 }
 export class HaClient {
   private controller = new AbortController();
@@ -179,6 +205,29 @@ export class HaClient {
       (path, signal) => this.request("GET", path, undefined, undefined, signal),
       request,
     );
+  }
+  /** One grow-day of history for the day timeline, in requests short enough for any URL limit. */
+  async timeline(request: TimelineRequest): Promise<TimelineRows> {
+    const read = async (ids: string[], attributes: boolean) => {
+      const rows: TimelineRows = {};
+      for (let index = 0; index < ids.length; index += 40) {
+        const query = new URLSearchParams({
+          end_time: new Date(request.end).toISOString(),
+          filter_entity_id: ids.slice(index, index + 40).join(","),
+          ...(attributes
+            ? { significant_changes_only: "0" }
+            : { minimal_response: "", no_attributes: "" }),
+        });
+        const start = new Date(request.start).toISOString();
+        const payload = await this.request<unknown>("GET", `history/period/${start}?${query}`);
+        Object.assign(rows, recordedRows(payload, attributes));
+      }
+      return rows;
+    };
+    return {
+      ...(await read(request.entityIds, false)),
+      ...(await read(request.attributeIds, true)),
+    };
   }
   async history(entityIds: string[], hours: number, states: States): Promise<Series[]> {
     if (!entityIds.length) return [];

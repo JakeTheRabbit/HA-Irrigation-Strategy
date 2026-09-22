@@ -1,3 +1,4 @@
+import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { EntityState, States } from "./types";
 
 /** The part of Home Assistant's frontend websocket connection (`hass.connection`, from
@@ -8,6 +9,7 @@ export interface LiveConnection {
     callback: (message: T) => void,
     message: Record<string, unknown>,
   ): Promise<() => unknown>;
+  sendMessagePromise?<T>(message: Record<string, unknown>): Promise<T>;
   addEventListener?(event: "ready", callback: () => void): void;
   removeEventListener?(event: "ready", callback: () => void): void;
 }
@@ -34,6 +36,73 @@ export interface EntityUpdate {
 }
 const time = (seconds: number | undefined) =>
   typeof seconds === "number" ? new Date(seconds * 1000).toISOString() : undefined;
+
+/** Recorder rows in the compressed form the websocket sends: `lu` on every row, `lc` only where it
+ * differs, `a` only when attributes were asked for. */
+export function compressedRows(result: unknown, attributes: boolean): TimelineRows {
+  if (!result || typeof result !== "object")
+    throw new Error("Home Assistant returned invalid history.");
+  const rows: TimelineRows = {};
+  for (const [id, list] of Object.entries(result as Record<string, unknown>)) {
+    if (!Array.isArray(list)) continue;
+    rows[id] = list
+      .flatMap((row: CompressedState | null) => {
+        const seconds = row?.lu ?? row?.lc;
+        return typeof seconds === "number" && Number.isFinite(seconds)
+          ? [
+              {
+                state: String(row!.s ?? ""),
+                time: seconds * 1000,
+                ...(attributes && row!.a ? { attributes: row!.a } : {}),
+              },
+            ]
+          : [];
+      })
+      .sort((a, b) => a.time - b.time);
+  }
+  return rows;
+}
+/** One grow-day of history over Home Assistant's own websocket (`history/history_during_period`):
+ * state changes without attributes in one request, every change of the decision sensor with
+ * them in another. */
+export async function liveHistory(
+  connection: LiveConnection,
+  request: TimelineRequest,
+  timeoutMs = 30_000,
+): Promise<TimelineRows> {
+  const ask = async (ids: string[], attributes: boolean) =>
+    ids.length
+      ? compressedRows(
+          await connection.sendMessagePromise!({
+            type: "history/history_during_period",
+            start_time: new Date(request.start).toISOString(),
+            end_time: new Date(request.end).toISOString(),
+            entity_ids: ids,
+            include_start_time_state: true,
+            significant_changes_only: !attributes,
+            minimal_response: !attributes,
+            no_attributes: !attributes,
+          }),
+          attributes,
+        )
+      : {};
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error("Home Assistant did not return the day's history in time.")),
+      timeoutMs,
+    );
+  });
+  try {
+    const [plain, detailed] = await Promise.race([
+      Promise.all([ask(request.entityIds, false), ask(request.attributeIds, true)]),
+      deadline,
+    ]);
+    return { ...plain, ...detailed };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** One subscribe_entities event applied to a snapshot, as home-assistant-js-websocket applies it.
  * Returns the same object when nothing changed. */
