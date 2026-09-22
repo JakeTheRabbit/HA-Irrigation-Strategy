@@ -50,9 +50,6 @@ DEFAULT_EC_RATIO = 1.0
 DEFAULT_EC_FALLBACK = 3.0
 VWC_ADJUSTMENT_PERCENT = 5.0
 
-# Status thresholds
-VWC_DRY_THRESHOLD = 40
-VWC_SATURATED_THRESHOLD = 70
 
 # Software version - single source of truth
 SOFTWARE_VERSION = "2.19.3"
