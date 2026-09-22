@@ -79,7 +79,15 @@ export function createDemo(now = Date.now()): States {
     put(`switch.crop_steering_${prefix}auto_setpoints`, index ? "off" : "on");
     put(`sensor.crop_steering_${prefix}ai_heartbeat`, "online", {
       enable_flag: enable,
+      last_beat: new Date(now - 18_000).toISOString(),
     });
+    put(`sensor.crop_steering_${prefix}app_status`, "safe_idle");
+    const fired = index ? [] : ["Z1 P1 ramp shot 3/6 (demo)"];
+    put(
+      `sensor.crop_steering_${prefix}current_decision`,
+      fired[0] ?? "Holding — all zones in band",
+      { fired, blocked: [] },
+    );
     put(`select.crop_steering_${prefix}steering_mode`, index ? "Generative" : "Vegetative", {
       options: ["Vegetative", "Generative"],
     });
@@ -115,6 +123,8 @@ export function createDemo(now = Date.now()): States {
           : !index && id === 1
             ? "Demo irrigation pulse — valve on"
             : "Holding — within target band",
+        // The controller always posts its zone status with a reason.
+        { reason: "demo" },
       );
       put(`${base}${key}daily_water_app`, (4.4 + id * 0.9 + index).toFixed(1), {
         unit_of_measurement: "L",
@@ -204,6 +214,18 @@ export function createDemo(now = Date.now()): States {
     });
   }
   return states;
+}
+/** The demo controller reports in like a running one, so it never reads as stopped. */
+export function demoBeat(states: States, now = Date.now()): States {
+  const stamp = new Date(now).toISOString();
+  return Object.fromEntries(
+    Object.entries(states).map(([id, entity]) => [
+      id,
+      /^sensor\.crop_steering_.*ai_heartbeat$/.test(id)
+        ? { ...entity, last_updated: stamp, attributes: { ...entity.attributes, last_beat: stamp } }
+        : entity,
+    ]),
+  );
 }
 /** Demo-only side effects of a switch write that a real controller would publish itself. */
 export function demoReact(states: States, entityId: string, value: unknown): States {

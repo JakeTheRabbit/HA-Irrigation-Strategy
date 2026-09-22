@@ -388,7 +388,7 @@ export function ZoneOperatingState({
   showScheduling?: boolean;
 }) {
   return (
-    <div className="zone-operating-state">
+    <div className="zone-operating-state" data-stale={zone.stale || undefined}>
       <span className="zone-controller-status" data-zone-status={zone.id}>
         {zone.status === "Unavailable" ? "Controller status unavailable" : zone.status}
       </span>
@@ -407,6 +407,16 @@ export function ZoneOperatingState({
         <span>
           {zone.phase === "Unavailable" ? "Phase unavailable" : zone.phase || "Phase unavailable"}
         </span>
+        {zone.stale && (
+          <Badge
+            variant="outline"
+            className="status-paused"
+            title="The controller is not reporting: phase and status are its last report, not live."
+          >
+            <span className="status-dot" />
+            Stale
+          </Badge>
+        )}
         {showScheduling && <Status enabled={zone.enabled} />}
       </div>
     </div>
