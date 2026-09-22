@@ -11,6 +11,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🌱 In plain English
+
+- **The dashboard says when the controller is not running.** After a Home Assistant restart with
+  the controller app stopped, its heartbeat simply disappears, and the dashboard looked normal:
+  only a heartbeat that was present but old raised a yellow warning. A room that is switched on
+  now raises a red *Controller not running* notice whenever the heartbeat is missing, unreadable
+  or more than five minutes old, and its zone phases and statuses are marked *Stale*.
+- **A status line on every page, for every room.** It says whether the room is watering, holding
+  and why, or not watering and what to do about it (engine switched off, a setup change waiting to
+  be adopted, stuck hardware, a grow plan hold, the controller stopped), and how old the
+  controller's last report is: amber after two minutes, red after ten. Phones show it too.
+- **Red notices are never pushed off the Overview.** Notices are ordered red, then yellow, then
+  information. The Overview showed the first three in the order they were raised, so an
+  information notice could hide a red one; every red notice is shown now. Zones with the same
+  problem share one notice.
+- **Zone status follows the controller.** Two writers share the zone status sensor. While the
+  controller is running, the dashboard shows the controller's phase-aware status, and it never
+  shows the integration's fixed-threshold *Dry - Needs Water* during P3, where drying back
+  overnight is the plan.
+
+### 🔧 Technical notes
+
+- Dashboard (class C1, nothing the controller or integration reads): new
+  `frontend/src/lib/controller-health.ts`. `readHeartbeat` dates a beat by the heartbeat's
+  `last_updated` (UTC, the clock the integration's health check uses), falling back to the naive
+  local `last_beat`; missing, unreadable (no usable time, or `unknown`/`unavailable`) and older
+  than 5 min all count as not running. `controllerZoneLabel` mirrors `zone_status_label` in
+  `crop_steering_engine/core.py`, rebuilt from the zone phase and its `reason` and
+  `current_decision` `fired`/`blocked`; it is used while the heartbeat is fresh and the status
+  sensor holds the integration's value (no `reason` attribute).
+- `model.ts`: `buildRoom` raises `<room>-controller` (critical) in place of
+  `<room>-stale-heartbeat` (warning), sets `Zone.stale`, merges identical per-zone notices into
+  one (`zones-1-2-3-sensors`, no `zoneId`) and sorts alerts critical > warning > info. New
+  `roomStatus()` (the status line, rendered by `components/status-line.tsx` above
+  `RoomOffBanner`) and `leadingNotices()` (Overview: every critical, then up to three).
+- Demo: heartbeats carry `last_beat` and are restamped on each demo refresh; each demo room
+  publishes `app_status` and `current_decision`; demo zone statuses carry a `reason` like the
+  controller's.
+
+## [2.19.3] - 2026-09-23
+
+Pair: **controller 0.16.3**. **Owner-approved rehearsal release, no staging soak**: Ben Isdale
+approved releasing on 23 September 2026 ("do all of it now") after the F2 dry tails of 21-22 September; the
+release audit on the GitHub release names what was and was not exercised. Update with the engine off, read
+the controller log, then watch the first shots.
+
 The irrigation changes (controller and engine) are class **C3**, from the F2 history of 21-22 September
 2026 and the review of it.
 **Not run on hardware.** No add-on option changes. The state file gains three additive keys that the
@@ -18,6 +64,19 @@ previous controller ignores, so it can still read the file after a rollback.
 
 ### 🌱 In plain English
 
+- **A room deleted and set up again starts fresh.** Home Assistant keeps the last state of a removed
+  entity for seven days, and a re-created room inherited the deleted one's settings, its room on/off
+  switch and its kill switch: a room deleted while armed came back armed. Now a room only takes back
+  values saved after it was created. An existing room restarts exactly as before.
+- **The controller adopts a re-created room afresh.** It used to go on driving the room that no longer
+  existed: with a different valve in the new room, arming it would have watered through the **old**
+  valve. The integration now says which room it is, and a new room is adopted through the usual gate
+  (kill switch and hardware OFF first).
+- **Setup shows the version that is running, and waits for a restart.** After a HACS download Home
+  Assistant keeps running the old code until it restarts; setup now says which version is running and
+  will not create a room on stale code. *Configure* is never blocked.
+- **Tested against the Home Assistant you run.** The real-Home-Assistant tests now run on HA 2026.9.3
+  (Python 3.14) and on the oldest version supported, now **2024.10.0** (2024.3 never passed).
 - **One repository.** The controller app is now installed only from this repository. The old
   `f2-control` mirror, which a release script pushed a copy to, is retired: it gets no more
   releases, and nothing in this repository writes to it. A controller installed from the mirror
@@ -72,26 +131,19 @@ previous controller ignores, so it can still read the file after a rollback.
   15 September problem, on the one path the earlier fix missed).
 - **A critical alert raised while Home Assistant is unreachable is not lost.** It is raised again until
   Home Assistant has it; the 30-minute quiet period starts only then.
-- **The dashboard says when the controller is not running.** After a Home Assistant restart with
-  the controller app stopped, its heartbeat simply disappears, and the dashboard looked normal:
-  only a heartbeat that was present but old raised a yellow warning. A room that is switched on
-  now raises a red *Controller not running* notice whenever the heartbeat is missing, unreadable
-  or more than five minutes old, and its zone phases and statuses are marked *Stale*.
-- **A status line on every page, for every room.** It says whether the room is watering, holding
-  and why, or not watering and what to do about it (engine switched off, a setup change waiting to
-  be adopted, stuck hardware, a grow plan hold, the controller stopped), and how old the
-  controller's last report is: amber after two minutes, red after ten. Phones show it too.
-- **Red notices are never pushed off the Overview.** Notices are ordered red, then yellow, then
-  information. The Overview showed the first three in the order they were raised, so an
-  information notice could hide a red one; every red notice is shown now. Zones with the same
-  problem share one notice.
-- **Zone status follows the controller.** Two writers share the zone status sensor. While the
-  controller is running, the dashboard shows the controller's phase-aware status, and it never
-  shows the integration's fixed-threshold *Dry - Needs Water* during P3, where drying back
-  overnight is the plan.
 
 ### 🔧 Technical notes
 
+- #49 `room.restored_state_is_ours(entry, last_state)` (`last_state.last_updated >= entry.created_at`,
+  lenient when either is missing or naive) gates restore in the number, switch and select platforms.
+- #50 the descriptor gains `entry_id` (not a fingerprint key); `Controller._is_another_room` re-opens
+  adoption when it changes; first sight is remembered and changes nothing; `_setup` gains optional
+  `entry_id`.
+- #51 `config.step.user`/`room` and `options.step.init` show `SOFTWARE_VERSION`; `async_step_user` aborts
+  `restart_required` while the on-disk `manifest.json` differs (read in the executor).
+- #56 Validate: `Real Home Assistant` legs pinned (HA 2026.9.3 / plugin 0.13.366 / Python 3.14; HA
+  2024.10.0 / Python 3.12) with a version assertion; `tests/run_ci.sh` ends `PARTIAL` (exit 1 unless
+  `--allow-skip`) when that tier is skipped; minimum in `hacs.json`, README and INSTALL raised to 2024.10.0.
 - `addons/f2_control/config.yaml` `url` points at this repository (metadata only; version unchanged).
 - Removed `scripts/prepare_addon_release.py`, `scripts/publish_addon.sh` and
   `tests/test_addon_release.py`, the publisher for the mirror. The add-on's web root is already
@@ -187,22 +239,6 @@ previous controller ignores, so it can still read the file after a rollback.
   asserted the old blanket switch-off). `fake_ha.FakeHA` reports
   `last_changed`. The `tests_ha/` tier was not run locally, and no `tests_ha/` test or seeded fixture was
   added for this change yet.
-- Dashboard (class C1, nothing the controller or integration reads): new
-  `frontend/src/lib/controller-health.ts`. `readHeartbeat` dates a beat by the heartbeat's
-  `last_updated` (UTC, the clock the integration's health check uses), falling back to the naive
-  local `last_beat`; missing, unreadable (no usable time, or `unknown`/`unavailable`) and older
-  than 5 min all count as not running. `controllerZoneLabel` mirrors `zone_status_label` in
-  `crop_steering_engine/core.py`, rebuilt from the zone phase and its `reason` and
-  `current_decision` `fired`/`blocked`; it is used while the heartbeat is fresh and the status
-  sensor holds the integration's value (no `reason` attribute).
-- `model.ts`: `buildRoom` raises `<room>-controller` (critical) in place of
-  `<room>-stale-heartbeat` (warning), sets `Zone.stale`, merges identical per-zone notices into
-  one (`zones-1-2-3-sensors`, no `zoneId`) and sorts alerts critical > warning > info. New
-  `roomStatus()` (the status line, rendered by `components/status-line.tsx` above
-  `RoomOffBanner`) and `leadingNotices()` (Overview: every critical, then up to three).
-- Demo: heartbeats carry `last_beat` and are restamped on each demo refresh; each demo room
-  publishes `app_status` and `current_decision`; demo zone statuses carry a `reason` like the
-  controller's.
 
 ## [2.19.2] - 2026-09-21
 
