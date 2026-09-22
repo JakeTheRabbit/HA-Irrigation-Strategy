@@ -2458,7 +2458,7 @@ class Controller:
                 )
             # A shot that is not exempt from the daily budget gets only what is left of it (22 Sep: a
             # 607 s, ~28 L flush fired with ~2 L of an 80 L budget left). Copied / blind-schedule
-            # decisions carry plain text, so they are never exempt either.
+            # decisions are never exempt either (their Reason, or plain text, is not cap_exempt).
             if p is not None and not getattr(reason, "cap_exempt", False):
                 left_l = p.max_daily_volume - float(st.get("daily_vol") or 0.0)
                 allowed = int(left_l / flow) if left_l > 0 else 0
