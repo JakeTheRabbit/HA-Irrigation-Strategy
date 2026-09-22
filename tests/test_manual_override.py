@@ -99,9 +99,11 @@ def rig(monkeypatch):
     def request(zone=1, room=None, **kwargs):
         asyncio.run(services.async_setup_services(hass))
         handler = hass.services.registered[(DOMAIN, "set_manual_override")]
-        asyncio.run(
-            handler(SimpleNamespace(data={"zone": zone, "room": room, **kwargs}))
+        call = SimpleNamespace(
+            data={"zone": zone, "room": room, **kwargs},
+            context=SimpleNamespace(user_id=None),  # an automation's call: no user
         )
+        asyncio.run(handler(call))
 
     def advance(minutes):
         clock.now += timedelta(minutes=minutes)
