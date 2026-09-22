@@ -8,6 +8,7 @@ from datetime import datetime
 import math
 
 from . import units
+from .admin import async_require_admin
 from .const import DOMAIN, MAX_ZONES
 from .plumbing import (
     PLUMBING_LAYOUTS,
@@ -640,12 +641,7 @@ async def async_setup_setup_services(hass):
     for name, handler in handlers.items():
 
         async def call(service_call, fn=handler, action=name):
-            user_id = service_call.context.user_id
-            user = await hass.auth.async_get_user(user_id) if user_id else None
-            if user is None or not user.is_admin:
-                raise HomeAssistantError(
-                    "Setup requires an authenticated Home Assistant administrator"
-                )
+            await async_require_admin(hass, service_call, "Setup", allow_no_user=False)
             try:
                 async with lock:
                     result = (

@@ -5,6 +5,8 @@ apply_recipe:
     engine reads (VWC targets, dryback, EC targets, EC ceiling, P2 shot size).
     Operator-initiated; values are clamped by each number's min/max and the kill
     switch still gates actuation. Omit the stage to re-apply the active one.
+    Needs a Home Assistant administrator when a signed-in user calls it, directly
+    or through a script they start; automations are unaffected.
   fields:
     stage:
       name: Stage
@@ -24,7 +26,8 @@ save_recipe:
   description: >-
     Replace the stored recipe table (stage -> setpoints) for every room. Used by
     the dashboard recipe editor; does not change any live setpoint until a stage
-    is applied.
+    is applied. Needs a Home Assistant administrator when a signed-in user calls
+    it, directly or through a script they start; automations are unaffected.
   fields:
     recipe:
       name: Recipe
@@ -39,6 +42,8 @@ transition_phase:
     Transition the irrigation system to a target phase (P0 morning dryback,
     P1 ramp-up, P2 maintenance, P3 pre-lights-off). Fires the
     crop_steering_phase_transition event consumed by the f2-control add-on engine.
+    Needs a Home Assistant administrator when a signed-in user calls it, directly
+    or through a script they start; automations are unaffected.
   fields:
     target_phase:
       name: Target phase
@@ -78,7 +83,8 @@ execute_irrigation_shot:
     Request a timed irrigation shot for a zone. Fires the
     crop_steering_irrigation_shot event; the f2-control add-on engine performs the
     hardware sequence with its safety checks. The integration never touches
-    hardware directly.
+    hardware directly. Needs a Home Assistant administrator when a signed-in user
+    calls it, directly or through a script they start; automations are unaffected.
   fields:
     zone:
       name: Zone
@@ -135,6 +141,8 @@ set_manual_override:
     Pause automatic irrigation for one zone until the timeout expires, including
     across Home Assistant restarts. The default is 60 minutes. Disable clears the
     hold immediately; turning the switch on directly creates an indefinite hold.
+    Needs a Home Assistant administrator when a signed-in user calls it, directly
+    or through a script they start; automations are unaffected.
   fields:
     zone:
       name: Zone
@@ -244,7 +252,8 @@ custom_shot:
   description: >-
     Operator/orchestrator-facing volumetric shot request. Fires the
     crop_steering_custom_shot event; the engine applies safety gates and
-    routes to hardware.
+    routes to hardware. Needs a Home Assistant administrator when a signed-in user
+    calls it, directly or through a script they start; automations are unaffected.
   fields:
     target_zone:
       name: Target zone
@@ -314,7 +323,7 @@ strategy_get:
 
 strategy_save:
   name: Save grow strategy draft
-  description: Validate and save grower-defined endpoints and daily or weekly zone assignments. Does not activate watering.
+  description: Validate and save grower-defined endpoints and daily or weekly zone assignments. Does not activate watering. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
   fields:
     room_id:
       required: true
@@ -353,7 +362,7 @@ strategy_preview:
 
 strategy_activate:
   name: Arm grow strategy
-  description: Arm a saved draft for the next local lights-on boundary. Requires a compatible controller and readable configuration; never enables hardware.
+  description: Arm a saved draft for the next local lights-on boundary. Requires a compatible controller and readable configuration; never enables hardware. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
   fields:
     room_id:
       required: true
@@ -368,7 +377,7 @@ strategy_activate:
 
 strategy_disarm:
   name: Disarm grow strategy
-  description: Cancel an unstarted plan or return an active plan to legacy setpoints at the next lights-on boundary. Use the engine control to stop irrigation eligibility.
+  description: Cancel an unstarted plan or return an active plan to legacy setpoints at the next lights-on boundary. Use the engine control to stop irrigation eligibility. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
   fields:
     room_id:
       required: true
@@ -385,7 +394,7 @@ runs_get:
         text:
 runs_save:
   name: Save run record
-  description: Register a run with current reference metadata, or edit its dates and name while preserving the original reference.
+  description: Register a run with current reference metadata, or edit its dates and name while preserving the original reference. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
   fields:
     room_id:
       required: true
@@ -403,7 +412,7 @@ runs_save:
         object:
 runs_archive:
   name: Archive or restore run record
-  description: Change run visibility without deleting historical reference metadata.
+  description: Change run visibility without deleting historical reference metadata. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
   fields:
     room_id:
       required: true
@@ -425,7 +434,7 @@ runs_archive:
         boolean:
 runs_import:
   name: Import run records
-  description: Import at most 100 validated metadata records for the same room. Recorder history is not included.
+  description: Import at most 100 validated metadata records for the same room. Recorder history is not included. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
   fields:
     room_id:
       required: true

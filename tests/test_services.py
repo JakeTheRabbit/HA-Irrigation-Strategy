@@ -27,10 +27,11 @@ from homeassistant.exceptions import HomeAssistantError  # noqa: E402
 
 
 class Call:
-    """Minimal ServiceCall stand-in."""
+    """Minimal ServiceCall stand-in, made with no user: an automation's call."""
 
     def __init__(self, **data):
         self.data = data
+        self.context = SimpleNamespace(user_id=None)
 
 
 def _handlers(hass):
