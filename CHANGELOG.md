@@ -13,6 +13,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🌱 In plain English
 
+- **The zone status sensor has one writer.** The zone status in Home Assistant had two authors
+  taking turns about twice a minute: the integration, with a fixed 40 % moisture threshold
+  (*Dry - Needs Water*), and the controller, with its phase-aware label (*Overnight dryback*). The
+  controller now publishes its label on a separate entity, and the zone status shows exactly that,
+  with its reason. When the controller has not reported for 10 minutes the zone status says
+  *Controller not reporting* instead of guessing from a threshold. Cards and automations keep the
+  same entity. Until the controller is updated too, the zone status shows the older controller's
+  own label, as before, and is no longer fought over.
+
+### 🔧 Technical notes
+
+- **Zone status, one writer** (class C3: controller and integration). The controller publishes
+  `sensor.crop_steering_<prefix>zone_N_status_app` (state: the `zone_status_label`; attributes
+  `reason`, `friendly_name`, `engine`), `Room off` included, and no longer writes `zone_N_status`.
+  The integration's `zone_N_status` (`CropSteeringZoneStatusSensor`, same unique id and entity id)
+  mirrors it through `zone_status.mirrored_status`: the label and its reason, or
+  `Controller not reporting` when the app entity is missing, `unknown`/`unavailable`, or its
+  `last_reported` (else `last_updated`) is more than 10 minutes old, the engine-offline repair's
+  limit. It is not polled: it updates on the app entity's `state_changed` and checks staleness
+  every minute, and writes only when what it shows changes, so a 0.16.x controller still writing
+  `zone_N_status` is left alone rather than overwritten every 30 s. With a controller from this
+  release and an older integration, `zone_N_status` shows that integration's threshold label.
+  `VWC_DRY_THRESHOLD` / `VWC_SATURATED_THRESHOLD` removed from `const.py`. The label and reason
+  are now recorded on both entities; exclude `sensor.crop_steering_*_status_app` from the
+  recorder to keep one copy. Tests: `tests/test_zone_status.py`,
+  `addons/f2_control/tests/test_zone_status_one_owner.py`,
+  `tests_ha/test_zone_status_one_owner.py` (an older controller's writes are not fought; with this
+  controller there is exactly one writer). The two add-on tests that asserted the controller
+  writing `zone_N_status` now assert `zone_N_status_app`.
+
+## [2.19.4] - 2026-09-23
+
+Pair: **controller 0.16.4** (no controller code change: it serves the 2.19.4 dashboard). Class **C1**:
+dashboard only, nothing the controller or the integration reads. **Owner-approved rehearsal release** (Ben Isdale,
+23 September 2026), no staging photoperiod; see the release audit.
+
+### 🌱 In plain English
+
 - **The dashboard says when the controller is not running.** After a Home Assistant restart with
   the controller app stopped, its heartbeat simply disappears, and the dashboard looked normal:
   only a heartbeat that was present but old raised a yellow warning. A room that is switched on
@@ -30,14 +68,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   controller is running, the dashboard shows the controller's phase-aware status, and it never
   shows the integration's fixed-threshold *Dry - Needs Water* during P3, where drying back
   overnight is the plan.
-- **The zone status sensor has one writer.** The zone status in Home Assistant had two authors
-  taking turns about twice a minute: the integration, with a fixed 40 % moisture threshold
-  (*Dry - Needs Water*), and the controller, with its phase-aware label (*Overnight dryback*). The
-  controller now publishes its label on a separate entity, and the zone status shows exactly that,
-  with its reason. When the controller has not reported for 10 minutes the zone status says
-  *Controller not reporting* instead of guessing from a threshold. Cards and automations keep the
-  same entity. Until the controller is updated too, the zone status shows the older controller's
-  own label, as before, and is no longer fought over.
+- **The dashboard no longer downloads all of Home Assistant twice a minute.** Inside Home
+  Assistant it fetched every entity (3.3 MB on a large install) every 30 seconds for each open
+  tab, twice more for every change you applied, and kept going in a hidden tab. It now downloads
+  once when it opens, then receives only changes to the few hundred entities it shows, as they
+  happen, over Home Assistant's own connection. Opened on its own, outside Home Assistant, it
+  still checks every 30 seconds, but not while the tab is hidden, and at once when you come back.
+  Recorded sensor history loads its window once, then only the newest readings each minute.
 
 ### 🔧 Technical notes
 
@@ -57,24 +94,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Demo: heartbeats carry `last_beat` and are restamped on each demo refresh; each demo room
   publishes `app_status` and `current_decision`; demo zone statuses carry a `reason` like the
   controller's.
-- **Zone status, one writer** (class C3: controller and integration). The controller publishes
-  `sensor.crop_steering_<prefix>zone_N_status_app` (state: the `zone_status_label`; attributes
-  `reason`, `friendly_name`, `engine`), `Room off` included, and no longer writes `zone_N_status`.
-  The integration's `zone_N_status` (`CropSteeringZoneStatusSensor`, same unique id and entity id)
-  mirrors it through `zone_status.mirrored_status`: the label and its reason, or
-  `Controller not reporting` when the app entity is missing, `unknown`/`unavailable`, or its
-  `last_reported` (else `last_updated`) is more than 10 minutes old, the engine-offline repair's
-  limit. It is not polled: it updates on the app entity's `state_changed` and checks staleness
-  every minute, and writes only when what it shows changes, so a 0.16.x controller still writing
-  `zone_N_status` is left alone rather than overwritten every 30 s. With a controller from this
-  release and an older integration, `zone_N_status` shows that integration's threshold label.
-  `VWC_DRY_THRESHOLD` / `VWC_SATURATED_THRESHOLD` removed from `const.py`. The label and reason
-  are now recorded on both entities; exclude `sensor.crop_steering_*_status_app` from the
-  recorder to keep one copy. Tests: `tests/test_zone_status.py`,
-  `addons/f2_control/tests/test_zone_status_one_owner.py`,
-  `tests_ha/test_zone_status_one_owner.py` (an older controller's writes are not fought; with this
-  controller there is exactly one writer). The two add-on tests that asserted the controller
-  writing `zone_N_status` now assert `zone_N_status_app`.
+- Dashboard (class C1, nothing the controller or integration reads): new
+  `frontend/src/lib/live.ts`. Inside the Home Assistant iframe (parent `hass.connection`),
+  `/api/states` is fetched once for discovery (again only on Refresh, after a Setup or plan change,
+  and on a websocket reconnect), then `subscribe_entities` covers `watchedEntities()`: every
+  `*.crop_steering_*` entity, what room descriptors and heartbeats point at (kill switches, pumps,
+  valves, tank and feed sensors), and the controller's per-zone sensors even before it has posted
+  them. `applyEntityUpdate()` applies the compressed events; updates are published in 250 ms
+  batches. A socket down for two 30 s ticks shows the offline banner; a refused subscription
+  falls back to polling. Standalone: `whileVisible()` polls every 30 s only while the page is
+  visible and refreshes on `visibilitychange`/`focus` (at most once per 10 s).
+- Writes no longer fetch all states before and after: the preflight and the readback read only
+  the written entities (`GET /api/states/<id>`) and merge them, never over a newer state.
+- `sensor-context`: the 72–168 h window loads once; each minute `historySpan()` asks only for the
+  time since the last load plus two minutes, and `mergeSeries()` folds it in.
+- Known limit: a room or zone created from Home Assistant's own integration pages, not this
+  dashboard's Setup, appears after Refresh, a reload or a Home Assistant reconnect.
 
 ## [2.19.3] - 2026-09-23
 

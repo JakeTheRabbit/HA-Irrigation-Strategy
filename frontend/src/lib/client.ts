@@ -7,6 +7,8 @@ import { numeric, validateChange } from "./model";
 export interface HassSession {
   callApi: <T>(method: string, path: string, data?: unknown) => Promise<T>;
   callService: (domain: string, service: string, data: Record<string, unknown>) => Promise<unknown>;
+  /** Home Assistant's own websocket (`hass.connection`); see live.ts. */
+  connection?: unknown;
 }
 export function findSession(base?: string): HassSession | undefined {
   if (typeof window === "undefined") return;

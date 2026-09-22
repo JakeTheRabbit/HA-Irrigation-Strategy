@@ -55,6 +55,26 @@ export function windowPoints(
     points.push({ value: live, time: now });
   return points;
 }
+/** Hours of history the next load asks for: the whole window first, then only the time since the
+ * last load, plus two minutes for readings the recorder had not committed yet. */
+export function historySpan(hours: number, loadedAt: number | null, now: number): number {
+  return loadedAt === null ? hours : Math.min(hours, (now - loadedAt) / 3_600_000 + 2 / 60);
+}
+/** A recent slice of recorder history merged into a loaded window. Home Assistant starts a slice
+ * with the state held at its start time, so the slice replaces what the window had from there on,
+ * less that first reading when it only repeats the last one kept. Readings before `since` go. */
+export function mergeSeries(held: Series[], recent: Series[], since: number): Series[] {
+  return held.map((series) => {
+    const slice = recent.find((item) => item.entityId === series.entityId)?.points ?? [];
+    const from = slice.length ? Date.parse(slice[0].time) : Infinity;
+    const kept = series.points.filter((point) => {
+      const time = Date.parse(point.time);
+      return time >= since && time < from;
+    });
+    const repeat = !!slice.length && kept.at(-1)?.value === slice[0].value;
+    return { ...series, points: [...kept, ...(repeat ? slice.slice(1) : slice)] };
+  });
+}
 const median = (values: number[]): number | null => {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
