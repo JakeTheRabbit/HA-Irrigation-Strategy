@@ -151,16 +151,54 @@ jobs:
     # Everything under tests/ runs against hand-written stubs of Home Assistant. These load the real
     # config flow and entity registry, so they fail when Home Assistant itself would: 2.17.0 shipped
     # switches whose entity ids HA generated from their labels while the stub tests passed.
-    name: Real Home Assistant (setup wizard and entity ids)
+    #
+    # One leg per Home Assistant this repository vouches for, each pinned to the plugin release that
+    # brings exactly that Home Assistant, and each checking what it got. Unpinned, pip quietly fell
+    # back to an older plugin whenever the runner's Python was too old for the newest one, and this
+    # job tested 2026.2.3 while production ran 2026.9. The production leg keeps the exact check name
+    # that branch protection requires on `testing` and `main`: leave its suffix empty.
+    name: Real Home Assistant (setup wizard and entity ids)${{ matrix.suffix }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # What production runs. The pin lives in requirements-test-ha.txt, which local runs
+          # install too. Home Assistant 2026.9 needs Python 3.14.2 or newer.
+          - python: '3.14'
+            homeassistant: '2026.9.3'
+            install: '-r requirements-test-ha.txt'
+            suffix: ''
+          # The oldest Home Assistant this repository claims to support: hacs.json, the README
+          # badge and docs/INSTALL.md all say 2024.10.0, and move with this leg. Before 2024.9.0
+          # the integration itself fails (unloading a room calls ConfigEntries.async_loaded_entries);
+          # on 2024.9.x the suite's automation test is written in the syntax 2024.10.0 introduced.
+          # josepy 2.0 (2025) removed an API that the acme release this Home Assistant pins still
+          # imports, so it is held at the josepy that was current when this Home Assistant shipped.
+          - python: '3.12'
+            homeassistant: '2024.10.0'
+            install: 'pytest-homeassistant-custom-component==0.13.171 josepy==1.14.0'
+            suffix: ' - oldest supported Home Assistant'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
-      - name: Install Home Assistant and its pytest plugin
-        run: pip install -r requirements-test-ha.txt
+          python-version: ${{ matrix.python }}
+      - name: Install Home Assistant ${{ matrix.homeassistant }} and its pytest plugin
+        run: python -m pip install ${{ matrix.install }}
+      - name: Check the Home Assistant under test is ${{ matrix.homeassistant }}
+        # An exact pin that cannot be installed already fails the step above. This catches the
+        # quieter failure: an install that succeeds with some other Home Assistant.
+        env:
+          EXPECTED: ${{ matrix.homeassistant }}
+        run: |
+          actual="$(python -c 'from homeassistant.const import __version__; print(__version__)')"
+          echo "Python $(python -c 'import platform; print(platform.python_version())'), Home Assistant ${actual}"
+          if [ "${actual}" != "${EXPECTED}" ]; then
+            echo "::error::Expected Home Assistant ${EXPECTED}, but ${actual} is installed."
+            exit 1
+          fi
       - name: Setup wizard and entity registry
         run: python -m pytest tests_ha -q
 

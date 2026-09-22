@@ -1,5 +1,6 @@
 """Response-bearing strategy services, always addressed by canonical room ID."""
 
+from .admin import async_require_admin
 from .const import DOMAIN
 
 SERVICES = (
@@ -9,6 +10,9 @@ SERVICES = (
     "strategy_activate",
     "strategy_disarm",
 )
+# These only read. Every other strategy service changes the room's plan, and is refused to a
+# signed-in user who is not an administrator.
+READ_ONLY = ("strategy_get", "strategy_preview")
 
 
 def resolve_manager(hass, room_id):
@@ -30,6 +34,8 @@ async def async_setup_strategy_services(hass):
     from homeassistant.exceptions import HomeAssistantError
 
     async def handle(call):
+        if call.service not in READ_ONLY:
+            await async_require_admin(hass, call, f"{DOMAIN}.{call.service}")
         try:
             manager = resolve_manager(hass, call.data["room_id"])
             if call.service == "strategy_save":
