@@ -4,7 +4,7 @@ The [standalone MCP server](../mcp-server/README.md) lets an assistant inspect C
 
 ## Prerequisites and connection
 
-Install Crop Steering in Home Assistant and create the room in **Rooms & setup** first. The integration must expose response-bearing `crop_steering.setup_read`, `setup_save`, `strategy_get`, `strategy_preview`, `strategy_save`, and `runs_get` services. Setup services require an authenticated Home Assistant administrator. Run this package on a computer that can reach that HA instance.
+Install Crop Steering in Home Assistant and create the room in **Rooms & setup** first. The integration must expose response-bearing `crop_steering.setup_read`, `setup_save`, `strategy_get`, `strategy_preview`, `strategy_save`, and `runs_get` services. Setup services, and the services that save, arm or disarm a plan or change run records, require an authenticated Home Assistant administrator. Run this package on a computer that can reach that HA instance.
 
 Install Node.js 22 or newer, then build the server:
 

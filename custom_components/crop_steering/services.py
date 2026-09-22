@@ -11,6 +11,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 
+from .admin import async_require_admin
 from .const import (
     DOMAIN,
     MIN_ZONES,
@@ -161,6 +162,9 @@ SERVICES = {
     SERVICE_CHECK_TRANSITION_CONDITIONS: {
         "schema": vol.Schema({vol.Optional("room"): cv.string}),
         "method": "async_check_transition_conditions",
+        # Evaluates and publishes; changes nothing. Every service without this flag is refused
+        # to a signed-in user who is not an administrator (admin.py).
+        "read_only": True,
     },
     SERVICE_SET_MANUAL_OVERRIDE: {
         "schema": MANUAL_OVERRIDE_SCHEMA,
@@ -471,14 +475,22 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         if service_config.get("dynamic_schema"):
             schema = get_irrigation_shot_schema(hass)
 
-        hass.services.async_register(
-            DOMAIN,
-            service_name,
-            locals()[service_config["method"]],
-            schema=schema,
-        )
+        handler = locals()[service_config["method"]]
+        if not service_config.get("read_only"):
+            handler = _admin_only(hass, service_name, handler)
+        hass.services.async_register(DOMAIN, service_name, handler, schema=schema)
 
     _LOGGER.info("Crop steering services registered")
+
+
+def _admin_only(hass: HomeAssistant, service_name: str, handler):
+    """The handler, run only once the caller has passed the administrator check."""
+
+    async def guarded(call: ServiceCall) -> None:
+        await async_require_admin(hass, call, f"{DOMAIN}.{service_name}")
+        await handler(call)
+
+    return guarded
 
 
 async def async_unload_services(hass: HomeAssistant) -> None:
