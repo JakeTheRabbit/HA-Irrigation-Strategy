@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyEntityUpdate,
+  compressedRows,
+  liveHistory,
   watchedEntities,
   whileVisible,
   type EntityUpdate,
@@ -211,6 +213,9 @@ describe("inside Home Assistant", () => {
         push = callback;
         return vi.fn();
       }),
+      sendMessagePromise: vi.fn(
+        async (_message: Record<string, unknown>): Promise<unknown> => ({}),
+      ),
       addEventListener: (event: string, callback: () => void) => listeners.set(event, callback),
       removeEventListener: (event: string) => listeners.delete(event),
     };
@@ -219,6 +224,7 @@ describe("inside Home Assistant", () => {
       callApi: vi.fn(async (method: string, path: string) => {
         calls.push(`${method} ${path}`);
         if (path === "states") return Object.values(ha);
+        if (path.startsWith("history/period/")) return [];
         return ha[decodeURIComponent(path.slice("states/".length))];
       }),
       callService: vi.fn(
@@ -340,6 +346,124 @@ describe("inside Home Assistant", () => {
     await vi.advanceTimersByTimeAsync(30_000);
     expect(home.fullFetches()).toBe(2);
     store.stop();
+  });
+  const DECISION = "sensor.crop_steering_current_decision";
+  const VALVE = "switch.demo_valve_1";
+  it("loads a grow day once over the websocket, attributes only for the decision", async () => {
+    const { home, store } = await started();
+    const start = Date.now() - 3_600_000,
+      end = Date.now();
+    home.connection.sendMessagePromise.mockImplementation(async (message) =>
+      message.no_attributes
+        ? {
+            [VALVE]: [
+              { s: "off", lu: start / 1000 },
+              { s: "on", lu: start / 1000 + 60 },
+            ],
+          }
+        : { [DECISION]: [{ s: "Holding", a: { fired: [], blocked: [] }, lu: start / 1000 }] },
+    );
+    home.calls.length = 0;
+    const rows = await store
+      .getSnapshot()
+      .timeline({ entityIds: [VALVE, VWC], attributeIds: [DECISION], start, end });
+    expect(rows[VALVE]).toEqual([
+      { state: "off", time: start },
+      { state: "on", time: start + 60_000 },
+    ]);
+    expect(rows[DECISION]).toEqual([
+      { state: "Holding", time: start, attributes: { fired: [], blocked: [] } },
+    ]);
+    const common = {
+      type: "history/history_during_period",
+      start_time: new Date(start).toISOString(),
+      end_time: new Date(end).toISOString(),
+      include_start_time_state: true,
+    };
+    expect(home.connection.sendMessagePromise.mock.calls.map(([message]) => message)).toEqual([
+      {
+        ...common,
+        entity_ids: [VALVE, VWC],
+        significant_changes_only: true,
+        minimal_response: true,
+        no_attributes: true,
+      },
+      {
+        ...common,
+        entity_ids: [DECISION],
+        significant_changes_only: false,
+        minimal_response: false,
+        no_attributes: false,
+      },
+    ]);
+    // Nothing went over REST, and nothing polls afterwards.
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(home.calls).toEqual([]);
+    expect(home.connection.sendMessagePromise).toHaveBeenCalledTimes(2);
+    store.stop();
+  });
+  it("reads a grow day over REST when the connection cannot send commands", async () => {
+    const { home, store } = await started();
+    delete (home.connection as { sendMessagePromise?: unknown }).sendMessagePromise;
+    home.calls.length = 0;
+    const start = Date.now() - 3_600_000;
+    await store
+      .getSnapshot()
+      .timeline({ entityIds: [VALVE], attributeIds: [DECISION], start, end: Date.now() });
+    expect(home.calls).toHaveLength(2);
+    expect(home.calls[0]).toMatch(/^GET history\/period\/.*minimal_response=&no_attributes=$/);
+    expect(home.calls[1]).toMatch(/^GET history\/period\/.*significant_changes_only=0$/);
+    store.stop();
+  });
+  it("keeps a grow day to the selected room and one day", async () => {
+    const { store } = await started();
+    const start = Date.now() - 3_600_000,
+      end = Date.now();
+    const timeline = store.getSnapshot().timeline;
+    for (const id of ["light.kitchen", "number.crop_steering_f1_zone_1_p1_target_vwc"])
+      await expect(timeline({ entityIds: [id], attributeIds: [], start, end })).rejects.toThrow(
+        "History is limited to entities in the selected room.",
+      );
+    await expect(
+      timeline({ entityIds: [VALVE], attributeIds: [], start: end - 30 * 3_600_000, end }),
+    ).rejects.toThrow("at most one grow-day");
+    store.stop();
+  });
+});
+
+describe("recorder rows over the websocket", () => {
+  it("reads the compressed form: lu on every row, lc only where it differs, sorted", () => {
+    expect(
+      compressedRows(
+        {
+          "sensor.a": [
+            { s: "P1", lu: 1_790_000_060 },
+            { s: "P0", lu: 1_790_000_000, lc: 1_789_999_000 },
+            { s: "junk" },
+          ],
+          "sensor.b": "not rows",
+        },
+        false,
+      ),
+    ).toEqual({
+      "sensor.a": [
+        { state: "P0", time: 1_790_000_000_000 },
+        { state: "P1", time: 1_790_000_060_000 },
+      ],
+    });
+    expect(() => compressedRows(null, false)).toThrow("invalid history");
+  });
+  it("gives up on a history request Home Assistant never answers", async () => {
+    vi.useFakeTimers();
+    const connection = {
+      subscribeMessage: vi.fn(),
+      sendMessagePromise: () => new Promise<never>(() => {}),
+    };
+    const request = { entityIds: ["sensor.a"], attributeIds: [], start: 0, end: 1 };
+    const pending = liveHistory(connection, request, 30_000);
+    const failed = expect(pending).rejects.toThrow("did not return the day's history");
+    await vi.advanceTimersByTimeAsync(30_000);
+    await failed;
   });
 });
 

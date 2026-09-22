@@ -191,4 +191,44 @@ describe("controller lifecycle", () => {
     await vi.advanceTimersByTimeAsync(51);
     await pending;
   });
+  it("reads a standalone grow day in requests short enough for any URL limit", async () => {
+    const urls: URL[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      urls.push(url);
+      const [first] = (url.searchParams.get("filter_entity_id") ?? "").split(",");
+      // One entity per request answers; a minimal response leaves later rows without their id.
+      const rows = [
+        {
+          entity_id: first,
+          state: "on",
+          attributes: { a: 1 },
+          last_changed: "2026-09-23T00:01:00Z",
+        },
+        { state: "off", last_changed: "2026-09-23T00:00:00Z" },
+      ];
+      return new Response(JSON.stringify([rows]), { status: 200 });
+    });
+    const client = new HaClient("http://example.test", "test");
+    const ids = Array.from({ length: 45 }, (_, index) => `number.crop_steering_x_${index}`);
+    const rows = await client.timeline({
+      entityIds: ids,
+      attributeIds: ["sensor.crop_steering_current_decision"],
+      start: Date.parse("2026-09-22T22:00:00Z"),
+      end: Date.parse("2026-09-23T01:00:00Z"),
+    });
+    expect(urls.map((url) => url.searchParams.get("filter_entity_id")!.split(",").length)).toEqual([
+      40, 5, 1,
+    ]);
+    expect(
+      urls.every((url) => url.pathname === "/api/history/period/2026-09-22T22:00:00.000Z"),
+    ).toBe(true);
+    expect(urls[0].searchParams.has("no_attributes")).toBe(true);
+    expect(urls[2].searchParams.get("significant_changes_only")).toBe("0");
+    expect(rows["number.crop_steering_x_0"]).toEqual([
+      { state: "off", time: Date.parse("2026-09-23T00:00:00Z") },
+      { state: "on", time: Date.parse("2026-09-23T00:01:00Z") },
+    ]);
+    expect(rows["sensor.crop_steering_current_decision"][1].attributes).toEqual({ a: 1 });
+  });
 });

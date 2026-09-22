@@ -9,6 +9,62 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Class **C1**: dashboard only, nothing the controller or the integration reads. Not run on hardware;
+checked read-only against a live room's recorded history.
+
+### 🌱 In plain English
+
+- **The Overview shows the day.** Its moisture and EC chart is replaced by the room's grow-day,
+  from lights-on to the next lights-on, one row per zone on one time axis: lights-off shaded, the
+  phase each zone was in, every shot (the valve opening, as wide as it was open), what held a zone
+  back and for how long (a spent daily budget hatched red, *blocked 13:31–22:00*; a gate such as a
+  dosing hold or the kill switch outlined amber), and every setpoint change, from what to what.
+  Point at or tap any of it for the details; the same events are listed in words below.
+- **What comes next is marked as an estimate.** The rest of the day is drawn dashed: P2 until
+  lights-off and P3 from there. For a zone in P2 whose moisture has been falling steadily since
+  its last shot settled, the dry-down is drawn to its re-water threshold: *next shot ≈ 14:20*.
+  With too little recent data, a shot running or a hold open, it says why there is no estimate
+  instead of guessing. A zone in P1 shows its next shot from the ramp's interval, one in P0 the
+  latest time P1 can start; how long P0 and P1 last is not drawn, because nobody knows.
+- **One line per zone:** its phase and for how long, P1 shots so far against the ramp's maximum,
+  litres used against the daily budget, and the next expected shot. Moisture is scaled to the
+  day's own readings, not 0–100 %; zones are named, never told apart by colour alone; red, amber
+  and green only ever mean a state. The age of the newest reading is shown, and it fits a phone.
+- **No new polling.** The day's history is read once when the Overview opens (inside Home
+  Assistant over its own connection) and kept current from the updates the dashboard already
+  receives.
+- Insights keeps its moisture and EC chart.
+
+### 🔧 Technical notes
+
+- New `frontend/src/lib/day-timeline.ts` (pure, tested): `growDay()` (lights-on to the next
+  lights-on in the browser's time zone, as `foldRecorded` folds days), `phaseBands()`,
+  `valveShots()`, `alignBands()`, `zoneBlocks()`, `setpointChanges()`, `levels()`, `readings()`,
+  `dryDown()` (least squares over the last hour from 15 minutes after the last shot ended: at
+  least five readings over at least 15 minutes, falling at least 0.1 %/h), `nextShot()` and
+  `appendLive()`.
+- Shots are the zone valve's on→off intervals (valves from the room's `engine_config`). The
+  controller posts a loop's decision and phases after that loop's shots, so a shot is named by
+  the first `current_decision` row after its valve closed (its `fired` entry,
+  `Z<n> <phase> <reason>`), and a phase change posted by the same loop starts at the shot
+  (`alignBands`). Holds are the zone's `current_decision` `blocked` entries, one interval per
+  unbroken run of the same hold (numbers in the text may change): `daily-cap` is the budget,
+  `BLOCK` a refusal, anything else a gate.
+- Loading: `Controller.timeline(request)`. Inside Home Assistant, `history/history_during_period`
+  on `hass.connection` (`live.ts` `liveHistory`): states without attributes and
+  `minimal_response`, and the decision sensor with attributes and
+  `significant_changes_only: false`. Standalone, `GET history/period` in chunks of 40 entities
+  (`client.ts`). Limited to the selected room's entities and mapped valves, and to one grow-day.
+  Loaded once per room and grow-day; `appendLive()` then adds each subscribed (standalone: each
+  polled) change.
+- Demo: `demoDay()` generates a grow-day on the demo probes' own day shape (P0, six P1 shots, P2
+  top-ups, P3), shifted per probe, with a feed-EC hold on Flower 2 zone 2 ended by a feed-band
+  change and Flower 1 zone 3 held since it was disabled.
+- `pages/overview.tsx` renders `components/day-timeline.tsx` in place of `HistoryChart`, which
+  stays on Insights.
+
 ## [2.19.5] - 2026-09-23
 
 Pair: **controller 0.16.5**. Class **C3**: engine, controller and integration. **Owner-approved rehearsal

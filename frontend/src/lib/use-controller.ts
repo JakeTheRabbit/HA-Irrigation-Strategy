@@ -1,15 +1,17 @@
 import type { HistoryRequest, HistoryWindow, RunsDocument } from "./comparison-types";
 import { demoHistoryWindow } from "./comparison-demo";
+import type { TimelineRequest } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
 import { OperatorDemo } from "./operator-demo";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Change, Controller, EntityState, States, WriteResult } from "./types";
 import { applyChanges, asStates, findSession, HaClient, haSessionToken } from "./client";
 import { buildRoom, discoverRooms, emptyRoom, resolveRequestedRoom, validateChange } from "./model";
-import { createDemo, demoBeat, demoHistory, demoReact, isDemoLocation } from "./demo";
+import { createDemo, demoBeat, demoDay, demoHistory, demoReact, isDemoLocation } from "./demo";
 import {
   applyEntityUpdate,
   liveConnection,
+  liveHistory,
   watchedEntities,
   whileVisible,
   type EntityUpdate,
@@ -98,6 +100,7 @@ export class ControllerStore {
       write: this.write,
       history: this.history,
       historyWindow: this.historyWindow,
+      timeline: this.timeline,
       operator: this.operator,
     };
     this.listeners.forEach((listener) => listener());
@@ -498,6 +501,30 @@ export class ControllerStore {
       throw new Error("Connect to Home Assistant to load recorded history.");
     const generation = this.generation;
     const result = await this.client.history(entityIds, hours, this.states);
+    if (generation !== this.generation)
+      throw new Error("Room or connection changed; history request cancelled.");
+    return result;
+  };
+  /** The selected room's grow-day, once: over Home Assistant's websocket inside Home Assistant,
+   * over REST standalone. Live updates extend it from there (day-timeline.ts appendLive). */
+  timeline = async (request: TimelineRequest) => {
+    const room = this.snapshot.room;
+    const allowed = new Set([
+      ...room.entities.map((entity) => entity.entity_id),
+      ...room.zones.flatMap((zone) => (zone.valveEntity ? [zone.valveEntity] : [])),
+    ]);
+    const ids = [...request.entityIds, ...request.attributeIds];
+    if (!ids.length || ids.some((id) => !allowed.has(id)))
+      throw new Error("History is limited to entities in the selected room.");
+    if (!(request.end > request.start) || request.end - request.start > 26 * 3_600_000)
+      throw new Error("The day timeline covers at most one grow-day.");
+    if (this.demo) return demoDay(this.states, request);
+    if (!this.client || this.connection !== "live")
+      throw new Error("Connect to Home Assistant to load recorded history.");
+    const generation = this.generation;
+    const result = this.live?.sendMessagePromise
+      ? await liveHistory(this.live, request)
+      : await this.client.timeline(request);
     if (generation !== this.generation)
       throw new Error("Room or connection changed; history request cancelled.");
     return result;
