@@ -195,7 +195,7 @@ match the globals above.
 | `zone_N_ec` | mS/cm | Fused pore-water EC. |
 | `zone_N_phase` | — | The zone's current phase (P0–P3). |
 | `zone_N_auto_setpoints` | — | Published by the controller: `off` / `learning` / `tracking` / `frozen`. Attributes: `learned_peak`, `gain`, `day_rate`, `night_rate`, `p1_outcome` (`pending` / `reached` / `short` / `plateau` / `suspect`), `hold_days`, `frozen_reason`, `last_change`, `jev` (`disabled` / `ok` / `unavailable`), `jev_last` (the judge's latest hourly P2 answer), `jev_changed_today`, `working_peak_adjust`, `managed` (the number entities it may rewrite; includes `p2_shot_size` while the judge is configured). |
-| `zone_N_status` | — | `Optimal` / `Dry - Needs Water` / `Saturated` / `Disabled` / `Sensor Error`; `Room off` while the room is switched off. |
+| `zone_N_status` / `_status_app` | — | The controller's label for the zone, published on `zone_N_status_app` with a `reason` attribute and shown by `zone_N_status`, its only writer: `Drying back` / `Ramping` / `Optimal` / `Overnight dryback` (P0-P3, holding), `Flushing` / `Refilling` / `Topping up` / `Emergency` (watering), `Blocked: <why>`, `Blocked — EC/cap`, `Probe dead — copying`, `Room off`. `Controller not reporting` when the controller has not reported for 10 minutes. |
 | `zone_N_safety_status` | — | `safe` / fault. |
 | `zone_N_health_score` / `zone_N_efficiency` | — | Per-zone health/efficiency. |
 | `zone_N_daily_water_usage` / `_daily_water_app` | L | Water today (resets at lights-on). |

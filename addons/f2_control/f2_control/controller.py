@@ -1622,14 +1622,24 @@ class Controller:
             },
         )
 
+    @staticmethod
+    def _publish_zone_status(room, zone, label, reason):
+        """The zone's status label, for the integration's zone_N_status to show. The controller writes
+        only this _app entity: zone_N_status belongs to the integration, and two writers made it flip
+        between two vocabularies about twice a minute."""
+        ha_set(
+            f"sensor.crop_steering_{room.prefix}zone_{zone}_status_app",
+            label,
+            {"reason": reason, "friendly_name": f"Zone {zone} status (controller)", "engine": "f2-control"},
+        )
+
     def _publish_room_off(self, room, now):
         """An OFF room still reports in, so the dashboard shows why it is idle and the integration
         never mistakes a deliberately idle room for a dead engine."""
         px = room.prefix
         try:
             for zone in room.zones:
-                ha_set(f"sensor.crop_steering_{px}zone_{zone}_status", "Room off",
-                       {"reason": "Room off (nothing growing)"})
+                self._publish_zone_status(room, zone, "Room off", "Room off (nothing growing)")
                 if room.state.get(zone, {}).get("last_shot_is_anchor"):
                     # a room switched on and off again without watering: take back the false
                     # "last irrigation" an earlier controller published for it
@@ -2870,12 +2880,10 @@ class Controller:
                         "max_ec_limit": p.max_ec,
                     },
                 )
-                ha_set(
-                    f"sensor.crop_steering_{px}zone_{zone}_status",
-                    zone_status_label(
-                        d["phase"], d["fire"], d["block"], d["blind"], d["reason"]
-                    ),
-                    {"reason": d["reason"]},
+                self._publish_zone_status(
+                    room, zone,
+                    zone_status_label(d["phase"], d["fire"], d["block"], d["blind"], d["reason"]),
+                    d["reason"],
                 )
                 # Advisory Vmax (detected P1 wet-up ceiling); operator eyeballs it,
                 # nothing auto-tunes from it yet.
