@@ -1,3 +1,7 @@
+# 0.16.4
+
+Pair with integration 2.19.4. **C1.** No controller code change: the dashboard served by the app is the 2.19.4 build (controller-health status line, live updates instead of polling). No change to options, the state file or irrigation.
+
 # 0.16.3
 
 Pair with integration 2.19.3. **C3.** Owner-approved rehearsal release without a staging soak (23 Sep 2026); not run on hardware before release. No change to add-on options.

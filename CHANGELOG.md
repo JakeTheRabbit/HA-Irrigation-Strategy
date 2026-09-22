@@ -9,7 +9,11 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.19.4] - 2026-09-23
+
+Pair: **controller 0.16.4** (no controller code change: it serves the 2.19.4 dashboard). Class **C1**:
+dashboard only, nothing the controller or the integration reads. **Owner-approved rehearsal release** (Ben Isdale,
+23 September 2026), no staging photoperiod; see the release audit.
 
 ### 🌱 In plain English
 
