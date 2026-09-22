@@ -8,7 +8,6 @@ integration's sensor mirrors it, is not polled, and writes only when what it sho
 
 from datetime import datetime, timedelta
 
-from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from test_setup_entry import _install
@@ -18,8 +17,12 @@ APP = "sensor.crop_steering_zone_1_status_app"
 KILL = "switch.crop_steering_engine_enabled"
 
 
-async def _later(hass, minutes):
-    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=minutes))
+async def _later(hass, freezer, minutes):
+    """Move the wall clock on, then run every timer. An interval timer hands its callback
+    dt_util.utcnow(), which only the frozen clock moves: a timer fired at a future time alone
+    still sees the real now. Every timer rather than "those due", as test_kill_switch_repair does."""
+    freezer.tick(timedelta(minutes=minutes))
+    async_fire_time_changed(hass, fire_all=True)
     await hass.async_block_till_done()
 
 
@@ -38,21 +41,21 @@ async def test_the_zone_status_is_the_controllers_label_with_its_reason(hass):
     assert state.attributes["reason"] == "lights-off -> P3"
 
 
-async def test_a_controller_that_stops_reporting_is_shown_as_not_reporting(hass):
+async def test_a_controller_that_stops_reporting_is_shown_as_not_reporting(hass, freezer):
     await _install(hass)
     hass.states.async_set(APP, "Optimal", {"reason": "in band"})
     await hass.async_block_till_done()
-    await _later(hass, 5)
+    await _later(hass, freezer, 5)
     assert hass.states.get(STATUS).state == "Optimal"
-    await _later(hass, 11)
+    await _later(hass, freezer, 6)  # 11 minutes since the last report
     assert hass.states.get(STATUS).state == "Controller not reporting"
 
 
-async def test_a_controller_from_before_this_still_writing_the_zone_status_is_not_fought(hass):
+async def test_a_controller_from_before_this_still_writing_the_zone_status_is_not_fought(hass, freezer):
     await _install(hass)
-    for minute in range(1, 7):  # what 0.16.x does every loop, across several of the old poll intervals
+    for _minute in range(6):  # what 0.16.x does every loop, across several of the old poll intervals
         hass.states.async_set(STATUS, "Topping up", {"reason": "P2 top-up VWC 40<45"})
-        await _later(hass, minute)
+        await _later(hass, freezer, 1)
         assert hass.states.get(STATUS).state == "Topping up"
 
 
