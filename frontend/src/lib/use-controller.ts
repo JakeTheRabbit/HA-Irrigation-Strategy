@@ -6,7 +6,7 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Change, Controller, States, WriteResult } from "./types";
 import { applyChanges, findSession, HaClient, haSessionToken } from "./client";
 import { buildRoom, discoverRooms, emptyRoom, resolveRequestedRoom, validateChange } from "./model";
-import { createDemo, demoHistory, demoReact, isDemoLocation } from "./demo";
+import { createDemo, demoBeat, demoHistory, demoReact, isDemoLocation } from "./demo";
 
 type Listener = () => void;
 const SESSION_KEY = "crop-steering-connection-tab";
@@ -125,6 +125,7 @@ export class ControllerStore {
   refresh = async () => {
     if (this.demo) {
       this.updated = Date.now();
+      this.states = demoBeat(this.states, this.updated);
       this.publish();
       return;
     }

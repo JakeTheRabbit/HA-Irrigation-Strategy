@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowRight, ArrowUpRight, CircleCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Controller, Zone } from "@/lib/types";
+import { leadingNotices } from "@/lib/model";
 import { RoomPower } from "@/components/room-controls";
 import {
   Empty,
@@ -26,6 +27,7 @@ export function Overview({
 }) {
   const [selected, setSelected] = useState<number | null>(null);
   const room = controller.room;
+  const notices = leadingNotices(room.alerts);
   return (
     <>
       <Heading
@@ -62,7 +64,7 @@ export function Overview({
       </div>
       {!!room.alerts.length && (
         <div className="attention-list">
-          {room.alerts.slice(0, 3).map((notice) => (
+          {notices.map((notice) => (
             <div className={`attention attention-${notice.severity}`} key={notice.id}>
               <TriangleAlert size={20} />
               <div>
@@ -76,9 +78,10 @@ export function Overview({
               )}
             </div>
           ))}
-          {room.alerts.length > 3 && (
+          {room.alerts.length > notices.length && (
             <Button variant="ghost" onClick={() => navigate("sensors")}>
-              Review {room.alerts.length - 3} more notices in Sensors <ArrowRight size={15} />
+              Review {room.alerts.length - notices.length} more notices in Sensors{" "}
+              <ArrowRight size={15} />
             </Button>
           )}
         </div>

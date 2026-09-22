@@ -59,6 +59,8 @@ export interface Zone {
   water: Metric;
   shots: Metric;
   status: string;
+  /** The controller is not reporting: phase and status are its last word, not live. */
+  stale: boolean;
   fields: Setting[];
   sensors: EntityState[];
   /** Setpoint supervisor status; null when this zone has no supervisor sensor. */
@@ -94,6 +96,16 @@ export interface RoomView {
   /** Null when the controller has no room switch: the room is on and the control is hidden. */
   roomActiveEntity: string | null;
   autoSetpoints: { entityId: string | null; enabled: boolean | null };
+}
+/** One line per room: is it watering, and if not, why not and what to do. */
+export interface RoomStatus {
+  room: Room;
+  /** "stopped": not watering until someone acts. "stale": the controller stopped reporting. */
+  tone: "watering" | "holding" | "stopped" | "stale" | "off";
+  text: string;
+  detail: string;
+  /** When the controller last reported (epoch ms); null when it has not. */
+  reportedAt: number | null;
 }
 export interface Change {
   entityId: string;
