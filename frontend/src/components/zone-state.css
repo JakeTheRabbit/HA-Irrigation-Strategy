@@ -9,6 +9,9 @@
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
+.zone-operating-state[data-stale] .zone-controller-status {
+  color: var(--muted-foreground);
+}
 .zone-state-flags {
   display: flex;
   flex-wrap: wrap;

@@ -1,0 +1,72 @@
+/* One compact line per room at every width: the data age is never hidden. */
+.status-lines {
+  display: grid;
+  gap: 4px;
+  margin: 14px 0 0;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  font-size: 12px;
+}
+.status-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "room text age";
+  align-items: baseline;
+  gap: 2px 10px;
+  margin: 0;
+}
+.status-line-room {
+  grid-area: room;
+  white-space: nowrap;
+}
+.status-line-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: 1px;
+  background: var(--muted-foreground);
+}
+.status-line[data-tone="watering"] .status-line-dot {
+  background: var(--primary);
+}
+.status-line[data-tone="stopped"] .status-line-dot,
+.status-line[data-tone="stale"] .status-line-dot {
+  background: var(--destructive);
+}
+.status-line-text {
+  grid-area: text;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.status-line-text b {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.status-line[data-tone="stopped"] .status-line-text b {
+  color: var(--destructive);
+}
+.status-line-age {
+  grid-area: age;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.status-line [data-age="amber"] {
+  color: var(--warning);
+  font-weight: 600;
+}
+.status-line [data-age="red"] {
+  color: var(--destructive);
+  font-weight: 600;
+}
+@media (max-width: 720px) {
+  .status-line {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "room age"
+      "text text";
+  }
+}

@@ -6,7 +6,7 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Change, Controller, EntityState, States, WriteResult } from "./types";
 import { applyChanges, asStates, findSession, HaClient, haSessionToken } from "./client";
 import { buildRoom, discoverRooms, emptyRoom, resolveRequestedRoom, validateChange } from "./model";
-import { createDemo, demoHistory, demoReact, isDemoLocation } from "./demo";
+import { createDemo, demoBeat, demoHistory, demoReact, isDemoLocation } from "./demo";
 import {
   applyEntityUpdate,
   liveConnection,
@@ -145,6 +145,7 @@ export class ControllerStore {
   refresh = async () => {
     if (this.demo) {
       this.updated = Date.now();
+      this.states = demoBeat(this.states, this.updated);
       this.publish();
       return;
     }

@@ -38,6 +38,7 @@ import { useHaShell } from "@/lib/ha-shell";
 import { errorText } from "@/lib/utils";
 import { roomIsActive, runningVersions } from "@/lib/model";
 import { RoomOffBanner } from "@/components/room-controls";
+import { StatusLines } from "@/components/status-line";
 import { time, type Page } from "@/components/dashboard";
 import { Overview } from "@/pages/overview";
 import { Zones } from "@/pages/zones";
@@ -380,6 +381,7 @@ export default function App() {
                 )}
               </div>
             )}
+            <StatusLines controller={controller} />
             <RoomOffBanner controller={controller} />
             {page === "overview" && (
               <Overview key={controller.roomId} controller={controller} navigate={navigate} />

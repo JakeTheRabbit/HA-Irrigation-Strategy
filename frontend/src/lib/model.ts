@@ -6,12 +6,14 @@ import type {
   Metric,
   Notice,
   Room,
+  RoomStatus,
   RoomView,
   Setting,
   States,
   Zone,
 } from "./types";
 import { parseAutoSetpoints } from "./auto-setpoints";
+import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
 
 const ROOT = "crop_steering_";
 const ZONE_PARAMETERS = new Set([
@@ -384,6 +386,13 @@ export function eventsForRoom(states: States, room: Room): LogEvent[] {
   });
 }
 
+const SEVERITY_RANK: Record<Notice["severity"], number> = { critical: 0, warning: 1, info: 2 };
+/** A short notice list: every critical notice, then the next ones up to `limit`. Expects
+ * `buildRoom` order (most severe first). */
+export function leadingNotices(alerts: Notice[], limit = 3): Notice[] {
+  return alerts.filter((notice, index) => notice.severity === "critical" || index < limit);
+}
+
 export function buildRoom(states: States, room: Room): RoomView {
   const config = descriptor(states, room);
   const entities = roomEntities(states, room);
@@ -439,6 +448,9 @@ export function buildRoom(states: States, room: Room): RoomView {
     Number.isFinite(strategyValidUntil) &&
     strategyValidUntil > Date.now();
   const now = Date.now();
+  const beat = readHeartbeat(heartbeat, now);
+  const live = beat.health === "fresh";
+  const decision = resolve(states, room, "sensor", "current_decision");
   const flag = heartbeat?.attributes.enable_flag ?? config?.attributes.enable_flag;
   const engineEntity =
     typeof flag === "string" && /^(switch|input_boolean)\./.test(flag) ? states[flag] : undefined;
@@ -504,6 +516,13 @@ export function buildRoom(states: States, room: Room): RoomView {
         ? "veg"
         : null;
     const p = /^P[012]$/.test(phase?.state || "") ? phase!.state.toLowerCase() : null;
+    // The controller posts this status with a reason; the integration's fixed-threshold sensor
+    // writes the same entity without one. While the controller is live, show the controller's.
+    const label =
+      (live &&
+        !(status && "reason" in status.attributes) &&
+        controllerZoneLabel(id, phase, decision)) ||
+      (readable(status) ? status!.state : "Unavailable");
     return {
       id,
       name: typeof names?.[id] === "string" ? String(names[id]) : "Zone " + id,
@@ -568,7 +587,13 @@ export function buildRoom(states: States, room: Room): RoomView {
         "Shots today",
         "",
       ),
-      status: !roomActive ? "Room off" : readable(status) ? status!.state : "Unavailable",
+      // Overnight dryback is intended: the fixed threshold's "needs water" never applies in P3.
+      status: !roomActive
+        ? "Room off"
+        : phase?.state === "P3" && label === "Dry - Needs Water"
+          ? RESTING.P3
+          : label,
+      stale: roomActive && !live,
       fields: settings.filter((s) => s.zoneId === id),
       sensors: entities.filter(
         (e) =>
@@ -595,38 +620,49 @@ export function buildRoom(states: States, room: Room): RoomView {
           : null,
     };
   };
-  const alerts = zones.flatMap<Notice>((zone) => {
-    if (zone.vwc.value === null || zone.ec.value === null)
-      return [
-        {
-          id: `zone-${zone.id}-sensors`,
-          title: `${zone.name}: sensor data unavailable`,
-          detail:
-            [zone.vwc, zone.ec]
-              .flatMap((reading) => {
-                const issue = telemetryIssue(
-                  reading.entityId ? states[reading.entityId] : undefined,
-                  maxAgeS,
-                  now,
-                );
-                return issue ? [`${reading.label}: ${issue}.`] : [];
-              })
-              .join(" ") + " Check probes and update times before relying on automatic irrigation.",
-          severity: "warning" as const,
-          zoneId: zone.id,
-        },
-      ];
-    if (/fault|blocked|unsafe|error/i.test(zone.status))
-      return [
-        {
-          id: `zone-${zone.id}-status`,
-          title: `${zone.name} needs attention`,
-          detail: zone.status,
-          severity: "critical" as const,
-          zoneId: zone.id,
-        },
-      ];
-    return [];
+  // Zones with the identical problem share one notice instead of one each.
+  const problems = new Map<string, { kind: "sensors" | "status"; detail: string; zones: Zone[] }>();
+  for (const zone of zones) {
+    const problem =
+      zone.vwc.value === null || zone.ec.value === null
+        ? {
+            kind: "sensors" as const,
+            detail:
+              [zone.vwc, zone.ec]
+                .flatMap((reading) => {
+                  const issue = telemetryIssue(
+                    reading.entityId ? states[reading.entityId] : undefined,
+                    maxAgeS,
+                    now,
+                  );
+                  return issue ? [`${reading.label}: ${issue}.`] : [];
+                })
+                .join(" ") +
+              " Check probes and update times before relying on automatic irrigation.",
+          }
+        : /fault|blocked|unsafe|error/i.test(zone.status)
+          ? { kind: "status" as const, detail: zone.status }
+          : null;
+    if (!problem) continue;
+    const key = `${problem.kind}\n${problem.detail}`;
+    problems.set(key, { ...problem, zones: [...(problems.get(key)?.zones ?? []), zone] });
+  }
+  const alerts = [...problems.values()].map<Notice>(({ kind, detail, zones: group }) => {
+    const one = group.length === 1 ? group[0] : null;
+    const names = group.map((zone) => zone.name);
+    const list = one ? one.name : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+    return {
+      id: one
+        ? `zone-${one.id}-${kind}`
+        : `zones-${group.map((zone) => zone.id).join("-")}-${kind}`,
+      title:
+        kind === "sensors"
+          ? `${list}: sensor data unavailable`
+          : `${list} ${one ? "needs" : "need"} attention`,
+      detail,
+      severity: kind === "sensors" ? "warning" : "critical",
+      ...(one ? { zoneId: one.id } : {}),
+    };
   });
   if (
     typeof heartbeat?.attributes.hardware_fault === "string" &&
@@ -647,17 +683,18 @@ export function buildRoom(states: States, room: Room): RoomView {
         ? "Displayed VWC and EC references come from the active plan. Manual setpoints are retained for use after the plan is disarmed."
         : "The controller requires a valid plan snapshot. Targets are unavailable until plan status is restored; do not treat legacy number values as active targets.",
     });
-  const lastBeat =
-    typeof heartbeat?.attributes.last_beat === "string"
-      ? Date.parse(heartbeat.attributes.last_beat)
-      : NaN;
-  if (Number.isFinite(lastBeat) && Date.now() - lastBeat > 5 * 60_000)
+  if (config && !live)
     alerts.push({
-      id: `${room.id}-stale-heartbeat`,
-      severity: "warning",
-      title: "Controller heartbeat is stale",
+      id: `${room.id}-controller`,
+      severity: "critical",
+      title: "Controller not running",
       detail:
-        "The engine has not reported a heartbeat for over five minutes. Displayed controller status may be outdated.",
+        (beat.health === "stale"
+          ? `The controller last reported ${ageText(now - beat.at!)} ago`
+          : beat.health === "missing"
+            ? `There is no controller heartbeat (sensor.${ROOT}${room.prefix}ai_heartbeat is missing)`
+            : `The controller heartbeat has no readable time`) +
+        ", so nothing confirms this room is being watered. Start or restart the controller app and check its log. Zone phases and statuses are its last report, not live.",
     });
   if (config && boolean(engineEntity) === null)
     alerts.unshift({
@@ -691,9 +728,10 @@ export function buildRoom(states: States, room: Room): RoomView {
     },
     // An off room is empty: probe, heartbeat and status warnings are noise there.
     // Physically stuck hardware is the one notice that still matters.
-    alerts: roomActive
+    alerts: (roomActive
       ? alerts
-      : alerts.filter((alert) => alert.id === `${room.id}-hardware-fault`),
+      : alerts.filter((alert) => alert.id === `${room.id}-hardware-fault`)
+    ).sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]),
     roomActive,
     roomActiveEntity: activeSwitch?.entity_id ?? null,
     autoSetpoints: {
@@ -701,6 +739,100 @@ export function buildRoom(states: States, room: Room): RoomView {
       enabled: boolean(autoSwitch),
     },
   };
+}
+
+/** One line per room from what the controller publishes: watering, holding and why, not watering
+ * and what to do, or how old the data is once the controller has stopped reporting. */
+export function roomStatus(states: States, room: Room, now = Date.now()): RoomStatus {
+  const beat = readHeartbeat(resolve(states, room, "sensor", "ai_heartbeat"), now);
+  const say = (tone: RoomStatus["tone"], text: string, detail: string): RoomStatus => ({
+    room,
+    tone,
+    text,
+    detail,
+    reportedAt: beat.at,
+  });
+  const note = (key: string) => {
+    const value = beat.attributes[key];
+    return typeof value === "string" && value.trim() ? value.trim() : null;
+  };
+  const fault = note("hardware_fault");
+  if (fault)
+    return say(
+      "stopped",
+      "Not watering",
+      `Hardware fault: ${fault}. Disarm the engine, fix the stuck hardware and check it is off, then re-arm.`,
+    );
+  if (!roomIsActive(states, room))
+    return say("off", "Room off", "Nothing growing: no irrigation, no alerts.");
+  if (beat.health === "missing" || beat.health === "unreadable")
+    return say(
+      "stopped",
+      "Not watering",
+      "The controller is not running. Start the controller app and check its log.",
+    );
+  if (beat.health === "stale")
+    return say(
+      "stale",
+      `Data ${ageText(now - beat.at!)} old`,
+      "The controller stopped reporting. Check the controller app and its log.",
+    );
+  const pending = note("setup_pending");
+  if (pending)
+    return say(
+      "stopped",
+      "Not watering",
+      pending.startsWith("Setup changed")
+        ? `${pending}. Turn the engine off, wait up to 5 minutes for the controller to adopt the setup, then turn it back on.`
+        : `${pending}. Correct the room in Rooms & setup.`,
+    );
+  const flag = beat.attributes.enable_flag ?? descriptor(states, room)?.attributes.enable_flag;
+  const engine =
+    typeof flag === "string" && /^(switch|input_boolean)\./.test(flag)
+      ? states[flag]?.state
+      : undefined;
+  if (engine !== "on")
+    return say(
+      "stopped",
+      "Not watering",
+      engine === "off"
+        ? "The engine switch is off. Turn it on to resume automatic irrigation."
+        : "The engine switch is unavailable. Check this room's kill switch in Home Assistant.",
+    );
+  const plan = note("strategy_error");
+  if (plan)
+    return say(
+      "stopped",
+      "Not watering",
+      `Grow plan hold: ${plan}. Re-activate or disarm the plan in Irrigation plan.`,
+    );
+  const decision = resolve(states, room, "sensor", "current_decision");
+  const entries = (key: string) => {
+    const value = decision?.attributes[key];
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === "string")
+      : [];
+  };
+  const fired = entries("fired"),
+    blocked = entries("blocked");
+  const app = resolve(states, room, "sensor", "app_status")?.state;
+  if (fired.length) return say("watering", "Watering", fired.join(" · "));
+  if (app === "irrigating") return say("watering", "Watering", "A shot is running.");
+  // "error": a fail-closed hold; its block names what failed.
+  if (app === "error")
+    return say(
+      "stopped",
+      "Not watering",
+      blocked.join(" · ") || "The controller reports an error. Check its log.",
+    );
+  if (blocked.length) return say("holding", "Holding", blocked.join(" · "));
+  return say(
+    "holding",
+    "Holding",
+    readable(decision)
+      ? decision!.state.replace(/^Holding\s*[—-]\s*/, "")
+      : "No decision reported yet.",
+  );
 }
 
 export function validateChange(room: RoomView, states: States, change: Change): string | null {

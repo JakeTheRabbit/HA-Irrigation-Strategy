@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🌱 In plain English
 
+- **The dashboard says when the controller is not running.** After a Home Assistant restart with
+  the controller app stopped, its heartbeat simply disappears, and the dashboard looked normal:
+  only a heartbeat that was present but old raised a yellow warning. A room that is switched on
+  now raises a red *Controller not running* notice whenever the heartbeat is missing, unreadable
+  or more than five minutes old, and its zone phases and statuses are marked *Stale*.
+- **A status line on every page, for every room.** It says whether the room is watering, holding
+  and why, or not watering and what to do about it (engine switched off, a setup change waiting to
+  be adopted, stuck hardware, a grow plan hold, the controller stopped), and how old the
+  controller's last report is: amber after two minutes, red after ten. Phones show it too.
+- **Red notices are never pushed off the Overview.** Notices are ordered red, then yellow, then
+  information. The Overview showed the first three in the order they were raised, so an
+  information notice could hide a red one; every red notice is shown now. Zones with the same
+  problem share one notice.
+- **Zone status follows the controller.** Two writers share the zone status sensor. While the
+  controller is running, the dashboard shows the controller's phase-aware status, and it never
+  shows the integration's fixed-threshold *Dry - Needs Water* during P3, where drying back
+  overnight is the plan.
 - **The dashboard no longer downloads all of Home Assistant twice a minute.** Inside Home
   Assistant it fetched every entity (3.3 MB on a large install) every 30 seconds for each open
   tab, twice more for every change you applied, and kept going in a hidden tab. It now downloads
@@ -23,6 +40,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔧 Technical notes
 
+- Dashboard (class C1, nothing the controller or integration reads): new
+  `frontend/src/lib/controller-health.ts`. `readHeartbeat` dates a beat by the heartbeat's
+  `last_updated` (UTC, the clock the integration's health check uses), falling back to the naive
+  local `last_beat`; missing, unreadable (no usable time, or `unknown`/`unavailable`) and older
+  than 5 min all count as not running. `controllerZoneLabel` mirrors `zone_status_label` in
+  `crop_steering_engine/core.py`, rebuilt from the zone phase and its `reason` and
+  `current_decision` `fired`/`blocked`; it is used while the heartbeat is fresh and the status
+  sensor holds the integration's value (no `reason` attribute).
+- `model.ts`: `buildRoom` raises `<room>-controller` (critical) in place of
+  `<room>-stale-heartbeat` (warning), sets `Zone.stale`, merges identical per-zone notices into
+  one (`zones-1-2-3-sensors`, no `zoneId`) and sorts alerts critical > warning > info. New
+  `roomStatus()` (the status line, rendered by `components/status-line.tsx` above
+  `RoomOffBanner`) and `leadingNotices()` (Overview: every critical, then up to three).
+- Demo: heartbeats carry `last_beat` and are restamped on each demo refresh; each demo room
+  publishes `app_status` and `current_decision`; demo zone statuses carry a `reason` like the
+  controller's.
 - Dashboard (class C1, nothing the controller or integration reads): new
   `frontend/src/lib/live.ts`. Inside the Home Assistant iframe (parent `hass.connection`),
   `/api/states` is fetched once for discovery (again only on Refresh, after a Setup or plan change,
