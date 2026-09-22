@@ -112,3 +112,51 @@ def test_new_default_room_can_use_integration_engine_switch():
         "", "default", 1, {}, {}, {"enable_flag": "switch.crop_steering_engine_enabled"}
     )
     assert d["enable_flag"] == "switch.crop_steering_engine_enabled"
+
+
+# ---------------------------------------------------------------- whose restored state is it?
+def _at(hours_ago, aware=True):
+    from datetime import datetime, timedelta, timezone
+
+    when = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc) - timedelta(
+        hours=hours_ago
+    )
+    return when if aware else when.replace(tzinfo=None)
+
+
+def _ours(created, written):
+    entry = types.SimpleNamespace(created_at=created)
+    state = types.SimpleNamespace(last_updated=written)
+    return room.restored_state_is_ours(entry, state)
+
+
+def test_a_state_written_before_the_room_existed_is_not_the_rooms():
+    """Home Assistant keeps a REMOVED entity's last state for seven days, by entity id, and these
+    ids are pinned: a room deleted and set up again was handed the deleted room's kill switch.
+    """
+    assert _ours(created=_at(1), written=_at(3)) is False
+    assert _ours(created=_at(1), written=_at(24 * 6)) is False
+
+
+def test_everything_written_since_the_room_was_made_is_restored_as_before():
+    assert _ours(created=_at(24 * 400), written=_at(1)) is True
+    assert (
+        _ours(created=_at(2), written=_at(2)) is True
+    )  # the same instant counts as ours
+    from datetime import datetime, timezone
+
+    epoch = datetime.fromtimestamp(
+        0, timezone.utc
+    )  # an entry from before created_at existed
+    assert _ours(created=epoch, written=_at(24 * 6)) is True
+
+
+def test_with_nothing_to_compare_the_state_is_restored_never_thrown_away():
+    assert (
+        _ours(created=None, written=_at(1)) is True
+    )  # a Home Assistant without created_at
+    assert _ours(created=_at(1), written=None) is True
+    assert room.restored_state_is_ours(object(), object()) is True
+    assert (
+        _ours(created=_at(1), written=_at(3, aware=False)) is True
+    )  # naive against aware
