@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import yaml
+from pathlib import Path
 from typing import Any
 
 import voluptuous as vol
@@ -15,6 +17,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from .const import (
+    SOFTWARE_VERSION,
     DOMAIN,
     CONF_NUM_ZONES,
     MIN_ZONES,
@@ -321,6 +324,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         single-room installs are unchanged. Any further config adds another fully-isolated
         room (own zones/sensors/pump/setpoints), namespaced as crop_steering_<slug>_*.
         """
+        # Never set a room up on code that is waiting for a restart: whatever it creates is
+        # created by the OLD code, and entity ids are for life.
+        running, waiting = await _versions(self.hass)
+        if waiting:
+            return self.async_abort(
+                reason="restart_required",
+                description_placeholders={"running": running, "installed": waiting},
+            )
         if user_input is not None and "setup_payload" in user_input:
             from .setup_api import prepare_setup, safety_blockers
 
@@ -354,13 +365,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_room()
 
         if user_input is None:
+            running, _waiting = await _versions(self.hass)
             return self.async_show_form(
                 step_id="user",
                 data_schema=STEP_USER_DATA_SCHEMA,
                 description_placeholders={
                     "info": "Choose how to configure the Crop Steering System. "
                     "Select devices with searchable pickers (recommended). "
-                    "Advanced users can import an existing .env file."
+                    "Advanced users can import an existing .env file.",
+                    "version": running,
+                    "restart_notice": "",
                 },
             )
 
@@ -384,7 +398,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data_schema=vol.Schema({vol.Required("room_name"): str}),
                 description_placeholders={
                     "info": "Name this room (e.g. Veg, Flower B). It gets its own zones, "
-                    "sensors, pump and setpoints — completely isolated from your other rooms."
+                    "sensors, pump and setpoints — completely isolated from your other rooms.",
+                    "version": SOFTWARE_VERSION,
                 },
             )
         slug = slugify_room(user_input["room_name"])
@@ -755,6 +770,43 @@ class EntityNotFound(HomeAssistantError):
     """Error to indicate entity ID does not exist."""
 
 
+def _installed_version() -> str | None:
+    """The version in manifest.json ON DISK, which is what HACS last downloaded. Blocking: call
+    it in the executor. None when it cannot be read, which never stops anybody."""
+    try:
+        manifest = json.loads(
+            (Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
+        )
+        version = manifest.get("version")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return version if isinstance(version, str) and version else None
+
+
+async def _versions(hass) -> tuple[str, str | None]:
+    """(running, waiting). `running` is the code Home Assistant loaded when it started; HACS
+    replaces the files and Home Assistant goes on running the old ones until it restarts.
+    `waiting` is the version on disk when it differs, else None.
+
+    2026-09-21: 2.19.2 was on disk, code from before 2.18.0 was running, and nothing said so.
+    Setup was run twice on it, Home Assistant named every entity, and the controller could not
+    find one of them.
+    """
+    installed = await hass.async_add_executor_job(_installed_version)
+    return SOFTWARE_VERSION, (
+        installed if installed and installed != SOFTWARE_VERSION else None
+    )
+
+
+def _restart_notice(running: str, waiting: str | None) -> str:
+    if not waiting:
+        return ""
+    return (
+        f"⚠️ Home Assistant is still running {running}, but {waiting} is installed. Restart "
+        "Home Assistant to run it: an update downloaded by HACS does nothing until then."
+    )
+
+
 def _number_range(key: str) -> vol.Range:
     """The limits of this integration's own number entity for `key`: one definition, in
     number.py, so a form can never refuse a value the entity it edits accepts, nor write one the
@@ -778,6 +830,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Manage the options."""
+        running, waiting = await _versions(self.hass)
         return self.async_show_menu(
             step_id="init",
             menu_options=[
@@ -786,6 +839,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 "edit_zones",
                 "edit_features",
             ],
+            # Not blocked while an update waits for a restart: an operator with a growing room
+            # has to be able to get in here. It is told what is going on instead.
+            description_placeholders={
+                "version": running,
+                "restart_notice": _restart_notice(running, waiting),
+            },
         )
 
     async def async_step_reload_env(

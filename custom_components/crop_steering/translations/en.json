@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Crop Steering — setup method",
-        "description": "Choose how to configure the system. The UI wizard maps everything with dropdowns (no file). The .env file is for power users who prefer text.",
+        "description": "Choose how to configure the system. The UI wizard maps everything with dropdowns (no file). The .env file is for power users who prefer text.\n\nRunning: **Crop Steering {version}**. {restart_notice}",
         "data": {
           "name": "System name",
           "config_method": "Setup method"
@@ -15,7 +15,7 @@
       },
       "room": {
         "title": "Add a room",
-        "description": "{info}",
+        "description": "{info}\n\nRunning: **Crop Steering {version}**.",
         "data": {
           "room_name": "Room name"
         },
@@ -413,14 +413,15 @@
       "yaml_invalid_format": "config.yaml is not in the expected format.",
       "missing_entities": "Missing entities: {missing}",
       "setup_invalid": "Setup could not be saved: {error}",
-      "reserved_room_name": "Default is reserved for the original room. Choose another room name."
+      "reserved_room_name": "Default is reserved for the original room. Choose another room name.",
+      "restart_required": "Home Assistant is still running Crop Steering {running}, but {installed} is installed. HACS replaces the files; Home Assistant goes on running the old code until it restarts. Restart Home Assistant, then add Crop Steering again. Nothing was set up."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Crop Steering — options",
-        "description": "Reconfigure the system without reinstalling.",
+        "description": "Reconfigure the system without reinstalling.\n\nRunning: **Crop Steering {version}**. {restart_notice}",
         "menu_options": {
           "reload_env": "Reload from crop_steering.env file",
           "edit_zones": "Edit zones & hardware (add/remove sensors)",
