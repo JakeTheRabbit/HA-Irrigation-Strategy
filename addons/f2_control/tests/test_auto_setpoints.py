@@ -264,7 +264,9 @@ def test_against_the_real_engine_a_plateau_hands_p1_over_to_p2_and_the_peak_carr
 
     b1, a1, a2 = _days(base)[0], _days(auto)[0], _days(auto)[1]
     assert len(ramp(b1)) >= 7  # today: the engine chases a 40% target this probe cannot read, to max shots
-    assert len(ramp(a1)) < len(ramp(b1)) and p2_start(a1) < p2_start(b1) - 0.5  # handed over when it stopped rising
+    # handed over when it stopped rising, at least one 20-minute ramp interval sooner (the margin was 0.5 h
+    # while the engine also fired a WATCHDOG shot in P0 at lights-on, which delayed the base run's ramp)
+    assert len(ramp(a1)) < len(ramp(b1)) and p2_start(a1) <= p2_start(b1) - 20 / 60
     assert 35.0 <= learn["peak"] <= 37.5  # it found the real ceiling by itself
     assert any(s == "p1_target_vwc" and new < 38.0 for _h, s, _old, new, _w in changes)
     assert abs(a2[300]["p1_target"] - learn["peak"]) < 0.06  # and that peak IS the P1 target the next day

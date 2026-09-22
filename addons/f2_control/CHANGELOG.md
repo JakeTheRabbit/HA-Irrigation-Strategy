@@ -2,6 +2,17 @@
 
 - Installed only from `JakeTheRabbit/HA-Irrigation-Strategy`; the `f2-control` mirror is retired. `url` in `config.yaml` now points here. No change to options, the state file or irrigation.
 
+**C3.** From the F2 history of 21-22 September 2026. Not run on hardware. No change to add-on options.
+
+- **The daily limit is a budget with typed exemptions.** The watchdog, P3 emergency and high-EC flushes (anti-lockout, P2 rescue) pass it, and so does the P1 ramp, which always runs in full. Top-ups, P1/P2/P0 EC-correction shots and the min-daily floor stop at it. A shot that would cross it is cut to what is left (under 5 s: held, `BLOCK daily-cap (x L left)`). The "flush" in a reason's text no longer makes a shot exempt.
+- **A zone over budget and starving gets the watchdog shot** instead of nothing (22 Sep: Z1 dry 14:06-22:00). No watchdog in P0: the night no longer counts as "no water" at lights-on.
+- **P1 at its ceiling, held open only by pore EC, completes once the budget is spent.**
+- **Pore EC is settled EC.** Every EC rule uses the last reading taken 45 minutes after a shot, held in between; EC corrections wait for the next settled reading. Only settled readings feed the EC offset step / PID. Published as `ec_settled` on each zone's safety status.
+- **A new grow-day resets a zone found in P1/P2** (the controller was not running across lights-off), and yesterday's EC offset is cleared before the first tick of the day.
+- **Interrupted shots.** Each shot writes down what it will open before opening it; the next loop closes exactly that, only while the room's kill switch is ON and only switches ON continuously since the shot opened them. Anything a person has switched since (hand-watering, tank circulation), everything upstream of it, the main line and pump while another valve on the line is open, and the pump while a hold is on, are left alone. Nothing is switched off on a timer.
+- **Stopping the app closes only what is in flight.** SIGTERM (stop, update, restart) used to switch off every mapped pump and valve; it now closes only the shot running, by the same rules, and counts its water. With no shot running it switches nothing off, so tank circulation and hand-watering carry on through an update. The error-cleanup read-back is as patient as the normal one (no false hold from a late Zigbee OFF report); alerts are only silenced once Home Assistant has them, and a hardware hold latched while it was unreachable is announced once it is back.
+- State file: additive `_shot_inflight` (room block), `ec_settled` / `ec_settled_at` (zone). An old file loads; the 0.16.2 controller loads the new one.
+
 # 0.16.2
 
 Pair with integration 2.19.2. **C3.** Found on the first real install (a one-zone tent); the fixes themselves were not run on hardware before release.

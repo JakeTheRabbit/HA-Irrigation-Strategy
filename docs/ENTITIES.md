@@ -103,7 +103,7 @@ match the globals above.
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
 | `zone_N_plant_count` | 1–50 | — | — | Plants in the zone — scales total water volume. |
-| `zone_N_max_daily_volume` | 0–200 | 200 | L | Hard daily water cap for the zone (emergency rescue is exempt). |
+| `zone_N_max_daily_volume` | 0–200 | 200 | L | Daily water budget for the zone. Top-ups and EC-correction shots stop at it, and a shot that would cross it gets only what is left; rescues (watchdog, P3 emergency, high-EC flushes) and the P1 ramp are exempt. |
 | `zone_N_shot_size_multiplier` | 0.1–5 | 1.0 | × | Scales every shot for this zone (a weak/strong row trim). |
 
 ---

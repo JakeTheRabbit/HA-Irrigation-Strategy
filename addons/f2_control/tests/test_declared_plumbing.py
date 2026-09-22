@@ -130,10 +130,19 @@ def test_a_layout_from_a_newer_integration_is_held_not_guessed():
 
 
 def test_a_mapped_pump_is_still_safed_and_gated_even_when_the_declaration_disowns_it():
-    """The hold must never make hardware invisible: a pump that is mapped is a pump that gets turned
-    off on exit and that has to read OFF before a setup change is adopted."""
+    """The hold must never make hardware invisible: a pump that is mapped has to read OFF before a setup
+    change is adopted, and is closed on exit when a shot of this controller left it on. Exit closes
+    nothing else: with no shot in flight the pump may be circulating the tank, and is left alone."""
     c, fake = _room(plumbing="valves_only", pump="switch.p")
     assert "switch.p" in c._hardware_entities(c.rooms[0])
+    fake.set_state("switch.p", "on")
+    c._safe_off()
+    assert _switch_calls(fake) == []
+    from datetime import datetime, timezone
+    c.rooms[0].shot_inflight = {"zone": 1, "valve": VALVE, "mainline": None, "pump": "switch.p",
+                                "started": datetime.now(timezone.utc).isoformat()}
+    fake.set_state("switch.p", "off")
+    fake.set_state("switch.p", "on")  # switched on by that shot
     c._safe_off()
     assert ("turn_off", "switch.p") in _switch_calls(fake)
 
