@@ -27,6 +27,8 @@ ISSUE_IDS = (
     "engine_offline",
     "zone_no_sensor",
     "fused_sensor_unavailable",
+    "strategy_hold",
+    "strategy_degraded",
 )
 
 
@@ -97,6 +99,31 @@ def _kill_switch(hass: HomeAssistant, prefix: str) -> str:
     return _DEFAULT_KILL_SWITCH
 
 
+def _strategy_hold(plan, heartbeat):
+    """Why the room's grow-strategy plan is holding the steering of its zones -> (reason,
+    severity), or (None, None). The controller then waters those zones only with emergency,
+    watchdog and minimum-daily shots. `heartbeat` is None when the controller is offline (that
+    has its own issue)."""
+    attrs = (getattr(plan, "attributes", {}) or {}) if plan is not None else {}
+    if plan is not None and plan.state == "error":
+        return attrs.get("error") or "the plan is in error", ir.IssueSeverity.ERROR
+    beat = (getattr(heartbeat, "attributes", {}) or {}) if heartbeat is not None else {}
+    if beat.get("strategy_error"):
+        return beat["strategy_error"], ir.IssueSeverity.ERROR
+    if plan is not None and plan.state in ("active", "disarming"):
+        waiting = [
+            f"zone {row.get('zone_id')} ({row.get('status')})"
+            for row in attrs.get("zones") or []
+            if isinstance(row, dict) and row.get("status") != "active"
+        ]
+        if waiting:
+            return (
+                "not scheduled today: " + ", ".join(waiting),
+                ir.IssueSeverity.WARNING,
+            )
+    return None, None
+
+
 def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Evaluate one room's setup health and create/clear its Repairs issues."""
     try:
@@ -162,6 +189,25 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
             _iid("fused_sensor_unavailable", slug),
             ir.IssueSeverity.WARNING,
             {"zones": ", ".join(dead)},
+        )
+
+        # Every hold of the room's grow-strategy plan, and a plan running on its last snapshot.
+        plan = hass.states.get(f"sensor.{DOMAIN}_{prefix}strategy_plan")
+        reason, severity = _strategy_hold(plan, None if offline else hb)
+        _issue(
+            hass,
+            bool(reason),
+            _iid("strategy_hold", slug),
+            severity or ir.IssueSeverity.WARNING,
+            {"reason": str(reason or "")},
+        )
+        degraded = (getattr(plan, "attributes", {}) or {}).get("degraded_reason")
+        _issue(
+            hass,
+            bool(degraded),
+            _iid("strategy_degraded", slug),
+            ir.IssueSeverity.WARNING,
+            {"reason": str(degraded or "")},
         )
     except Exception as e:  # pragma: no cover - never let a health check break setup
         _LOGGER.debug("health check skipped: %s", e)

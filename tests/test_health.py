@@ -7,6 +7,8 @@ all monitored.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from . import ha_stubs
 
 ha_stubs.install()
@@ -170,3 +172,79 @@ def test_a_revision_that_is_not_a_plain_integer_never_counts_as_behind():
             present=[OWN],
         )
         assert "kill_switch_missing" in issues, junk
+
+
+# ---------------------------------------------------------------- the grow-strategy plan
+# Every hold of a room's plan is a Repairs card: while it lasts the controller waters the zones the plan
+# manages only with emergency, watchdog and minimum-daily shots. It used to be visible only on the
+# plan's own sensor.
+PLAN = "sensor.crop_steering_strategy_plan"
+BEAT = "sensor.crop_steering_ai_heartbeat"
+
+
+def _plan_issues(plan=None, heartbeat=None):
+    now = datetime.now(timezone.utc)
+    states = {"switch.crop_steering_engine_enabled": ha_stubs.FakeState("off")}
+    if plan is not None:
+        states[PLAN] = ha_stubs.FakeState(plan[0], plan[1], now)
+    states[BEAT] = ha_stubs.FakeState(
+        "healthy",
+        {"enable_flag": "switch.crop_steering_engine_enabled", **(heartbeat or {})},
+        now,
+    )
+    hass = ha_stubs.FakeHass(states=states)
+    _run(hass, ha_stubs.FakeEntry(data={"room_slug": "default", "zones": {}}))
+    return hass._issues
+
+
+def test_a_plan_in_error_is_an_error_card_that_says_why():
+    issues = _plan_issues(
+        ("error", {"error": "Strategy zones do not match room setup"})
+    )
+    card = issues["strategy_hold"]
+    assert card["severity"] == "error"
+    assert card["translation_placeholders"]["reason"].startswith("Strategy zones")
+
+
+def test_a_controller_holding_on_a_plan_it_cannot_use_is_an_error_card():
+    issues = _plan_issues(
+        ("active", {"zones": [{"zone_id": 1, "status": "active"}]}),
+        {"strategy_error": "Strategy snapshot is stale"},
+    )
+    assert issues["strategy_hold"]["severity"] == "error"
+    assert "stale" in issues["strategy_hold"]["translation_placeholders"]["reason"]
+
+
+def test_a_zone_the_plan_does_not_steer_today_is_a_warning_card():
+    zones = [{"zone_id": 1, "status": "active"}, {"zone_id": 2, "status": "complete"}]
+    issues = _plan_issues(("active", {"zones": zones}))
+    assert issues["strategy_hold"]["severity"] == "warning"
+    assert (
+        "zone 2 (complete)"
+        in issues["strategy_hold"]["translation_placeholders"]["reason"]
+    )
+
+
+def test_a_plan_behind_on_its_day_is_a_warning_and_a_healthy_plan_is_no_card():
+    degraded = {
+        "zones": [{"zone_id": 1, "status": "active"}],
+        "degraded_reason": "heartbeat",
+    }
+    issues = _plan_issues(("active", degraded))
+    assert issues["strategy_degraded"]["severity"] == "warning"
+    assert "strategy_hold" not in issues
+    healthy = _plan_issues(("active", {"zones": [{"zone_id": 1, "status": "active"}]}))
+    assert "strategy_hold" not in healthy and "strategy_degraded" not in healthy
+    assert not {"strategy_hold", "strategy_degraded"} & set(_plan_issues())
+
+
+def test_a_room_switched_off_clears_its_plan_cards():
+    hass = ha_stubs.FakeHass(
+        states={
+            "switch.crop_steering_room_active": ha_stubs.FakeState("off"),
+            PLAN: ha_stubs.FakeState("error", {"error": "x"}),
+        }
+    )
+    hass._issues["strategy_hold"] = {"severity": "error"}
+    _run(hass, ha_stubs.FakeEntry(data={"room_slug": "default", "zones": {}}))
+    assert "strategy_hold" not in hass._issues

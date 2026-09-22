@@ -55,6 +55,18 @@ def _age(state, now):
         return float("inf")
 
 
+def _utc(value):
+    """Compare instants in UTC: two times in the same zone compare by wall clock, which a
+    daylight-saving change makes lie."""
+    return value.astimezone(timezone.utc)
+
+
+class _Hold(ValueError):
+    """A fault only the operator can clear: the plan goes to error and the controller holds the
+    steering of the zones it manages (never their emergency, watchdog or minimum-daily shots).
+    """
+
+
 class StrategyManager:
     """Per-entry persistent document, coherent snapshots and guarded scheduler."""
 
@@ -67,6 +79,10 @@ class StrategyManager:
         self._lock = asyncio.Lock()
         self._unsubscribe = None
         self.document = self._fresh_document()
+        # Why the last tick could not move the plan on (a stale heartbeat or probe at lights-on,
+        # Home Assistant down across it, an unreadable lights_on_hour). The plan keeps publishing
+        # its last valid snapshot meanwhile and tries again every tick.
+        self.degraded_reason = None
 
     def _fresh_document(self):
         return {
@@ -76,7 +92,9 @@ class StrategyManager:
             "plan": None,
             "active": {"grow_day": None, "zones": []},
             "error": None,
+            "armed_at": None,
             "armed_after": None,
+            "disarm_at": None,
             "disarm_after": None,
             "release_legacy": False,
         }
@@ -213,33 +231,21 @@ class StrategyManager:
                     )
                 ):
                     raise ValueError("Malformed stored strategy document")
-                for field in ("armed_after", "disarm_after"):
+                for field in ("armed_at", "armed_after", "disarm_at", "disarm_after"):
                     if self.document.get(field):
                         datetime.fromisoformat(self.document[field])
-                if self.document["status"] == "disarming" and not self.document.get(
-                    "disarm_after"
+                if self.document["status"] == "disarming" and not (
+                    self.document.get("disarm_at") or self.document.get("disarm_after")
                 ):
-                    self.document["disarm_after"] = (
-                        self._boundary(_now()) + timedelta(days=1)
-                    ).isoformat()
+                    self.document["disarm_at"] = _now().isoformat()
         except Exception as error:
             self.document = self._fresh_document()
             self.document["status"] = "error"
             self.document["error"] = str(error)
         if self.document["plan"] is None:
             self.document["plan"] = self._seed_plan(_now())
-        if self.document["status"] in ("active", "disarming"):
-            try:
-                if (
-                    self.document["active"].get("grow_day")
-                    != self._boundary(_now()).date().isoformat()
-                ):
-                    raise ValueError(
-                        "Lights-on boundary was missed; schedule held until the next boundary"
-                    )
-            except ValueError as error:
-                self.document["status"] = "error"
-                self.document["error"] = str(error)
+        # A lights-on missed while Home Assistant was down is not an error: the stored snapshot
+        # stays published and the first tick applies the day it missed.
         self._publish(_now())
         return self
 
@@ -265,10 +271,24 @@ class StrategyManager:
                 "controller_supported": self.controller_supported(now),
             },
             "catalog": self.catalog(),
-            "armed_after": self.document.get("armed_after"),
-            "disarm_after": self.document.get("disarm_after"),
+            "armed_after": self._takes_effect("armed", now),
+            "disarm_after": self._takes_effect("disarm", now),
+            "degraded_reason": self.degraded_reason,
             "disarm_policy": "Return to legacy setpoints at the next lights-on boundary; no hardware flag is enabled.",
         }
+
+    def _takes_effect(self, key, now):
+        """When a pending arm or disarm takes effect: the first lights-on after it was asked for,
+        by the room's lights_on_hour now. A document stored before `*_at` existed says when.
+        """
+        asked = self.document.get(f"{key}_at")
+        if not asked:
+            return self.document.get(f"{key}_after")
+        try:
+            asked = datetime.fromisoformat(asked).astimezone(now.tzinfo)
+            return self._next_boundary(asked).isoformat()
+        except ValueError:
+            return None
 
     def _sizing(self, zone):
         fields = {
@@ -336,17 +356,39 @@ class StrategyManager:
             self._publish(_now())
             return self.response()
 
-    def _boundary(self, now):
+    def _lights_on(self, day, tz):
+        """Lights-on on the local date `day`, at the room's lights_on_hour. An hour inside a
+        daylight-saving gap is the instant the clocks jump to: 02:30, on a night that goes from
+        02:00 straight to 03:00, is 03:30."""
         hour = _number(self._state("lights_on_hour", "number"))
         if hour is None or not 0 <= hour < 24:
             raise ValueError("Readable room lights_on_hour is required")
-        seconds = int(hour * 3600)
-        boundary = datetime.combine(now.date(), time(), tzinfo=now.tzinfo) + timedelta(
-            seconds=seconds
-        )
-        if now < boundary:
-            boundary -= timedelta(days=1)
+        wall = datetime.combine(day, time()) + timedelta(seconds=int(hour * 3600))
+        return _utc(wall.replace(tzinfo=tz)).astimezone(tz)
+
+    def _boundary(self, now):
+        """The latest lights-on at or before `now`."""
+        boundary = self._lights_on(now.date(), now.tzinfo)
+        if _utc(now) < _utc(boundary):
+            boundary = self._lights_on(now.date() - timedelta(days=1), now.tzinfo)
         return boundary
+
+    def _next_boundary(self, now):
+        """The first lights-on after `now`."""
+        return self._lights_on(
+            self._boundary(now).date() + timedelta(days=1), now.tzinfo
+        )
+
+    def _due(self, key, boundary):
+        """Has the lights-on a pending arm or disarm waits for come, `boundary` being the latest?
+        It is the first lights-on after the request, by the room's lights_on_hour now, so a
+        changed hour moves it. A document stored before `*_at` existed says when (`*_after`).
+        """
+        asked = self.document.get(f"{key}_at")
+        if asked:
+            return _utc(boundary) > _utc(datetime.fromisoformat(asked))
+        due = self.document.get(f"{key}_after")
+        return bool(due) and _utc(boundary) >= _utc(datetime.fromisoformat(due))
 
     def _readiness(self, now, zone_ids):
         if not self.controller_supported(now):
@@ -384,12 +426,15 @@ class StrategyManager:
                 raise ValueError(
                     "Resolve hydraulic configuration errors before activation"
                 )
+            # An unreadable lights_on_hour refuses to arm.
+            first = self._next_boundary(now)
             prior = copy.deepcopy(self.document)
             self.document.update(
                 status="armed",
                 error=None,
                 release_legacy=False,
-                armed_after=(self._boundary(now) + timedelta(days=1)).isoformat(),
+                armed_at=now.isoformat(),
+                armed_after=first.isoformat(),  # what a version before armed_at reads
             )
             try:
                 await self._persist()
@@ -404,16 +449,17 @@ class StrategyManager:
         async with self._lock:
             prior = copy.deepcopy(self.document)
             if self.document["active"]["zones"] or self.document["status"] == "error":
-                self.document.update(
-                    status="disarming",
-                    error=None,
-                    disarm_after=self.document.get("disarm_after")
-                    or (self._boundary(now) + timedelta(days=1)).isoformat(),
-                )
+                self.document.update(status="disarming", error=None)
+                if not (
+                    self.document.get("disarm_at") or self.document.get("disarm_after")
+                ):
+                    self.document["disarm_at"] = now.isoformat()
             else:
                 self.document.update(
                     status="draft",
+                    armed_at=None,
                     armed_after=None,
+                    disarm_at=None,
                     disarm_after=None,
                     error=None,
                     release_legacy=True,
@@ -429,81 +475,76 @@ class StrategyManager:
     async def tick(self, now=None):
         now = now or _now()
         async with self._lock:
-            status = self.document["status"]
-            if status == "draft":
-                self._publish(now)
-                return
-            try:
-                boundary = self._boundary(now)
-                day = boundary.date().isoformat()
-                near_boundary = 0 <= (now - boundary).total_seconds() <= 120
-                if self.document.get("disarm_after"):
-                    target = datetime.fromisoformat(self.document["disarm_after"])
-                    if near_boundary and now >= target:
-                        self.document.update(
-                            status="draft",
-                            active={"grow_day": None, "zones": []},
-                            armed_after=None,
-                            disarm_after=None,
-                            error=None,
-                            release_legacy=True,
-                        )
-                        await self._persist()
-                    elif self.document["active"].get("grow_day") != day:
-                        self.document.update(
-                            status="error",
-                            error="Disarm boundary was missed; holding until the next boundary",
-                        )
-                        await self._persist()
-                elif status in ("armed", "active", "error"):
-                    assigned = {
-                        zone["zone_id"]
-                        for zone in self.document["plan"].get("zones", [])
-                    }
-                    if (
-                        assigned != set(self.zone_ids())
-                        or self._config().get("active", True) is False
-                    ):
-                        raise ValueError(
-                            "Strategy zones do not match room setup; disarm and reconcile the draft"
-                        )
-                    armed_after = self.document.get("armed_after")
-                    # An error/reload must never invent an activation that was
-                    # not explicitly armed and successfully stored by the user.
-                    eligible = bool(armed_after) and now >= datetime.fromisoformat(
-                        armed_after
-                    )
-                    if (
-                        near_boundary
-                        and eligible
-                        and self.document["active"]["grow_day"] != day
-                    ):
-                        preview = self.preview(grow_day=day)
-                        self._readiness(
-                            now, [row["zone_id"] for row in preview["zones"]]
-                        )
-                        if any(row["errors"] for row in preview["zones"]):
-                            raise ValueError(
-                                "Hydraulic preview failed; scheduled activation held"
-                            )
-                        self.document.update(
-                            status="active",
-                            active={"grow_day": day, "zones": preview["zones"]},
-                            error=None,
-                        )
-                        await self._persist()
-                    elif (
-                        status == "active"
-                        and self.document["active"]["grow_day"] != day
-                    ):
-                        raise ValueError(
-                            "Lights-on boundary was missed; schedule held until the next boundary"
-                        )
-            except Exception as error:
-                self.document["error"] = str(error)
-                self.document["status"] = "error"
-                await self._persist()
+            self.degraded_reason = None
+            if self.document["status"] != "draft":
+                prior = copy.deepcopy(self.document)
+                try:
+                    await self._advance(now)
+                except _Hold as error:
+                    changed = (prior["status"], prior["error"]) != ("error", str(error))
+                    self.document = prior
+                    self.document.update(status="error", error=str(error))
+                    if changed:
+                        try:
+                            await self._persist()
+                        except Exception:  # held and published either way
+                            _LOGGER.exception("Could not store the strategy hold")
+                except Exception as error:
+                    # Recoverable: the plan keeps its last valid snapshot and tries again next tick.
+                    self.document = prior
+                    self.degraded_reason = str(error)
             self._publish(now)
+
+    async def _advance(self, now):
+        """Move the plan on to the latest lights-on, on whichever tick first sees it: a lights-on
+        missed while Home Assistant was down, or held by a stale heartbeat, is applied late rather
+        than holding the room all day. Raises _Hold for what only the operator can clear.
+        """
+        boundary = self._boundary(now)
+        day = boundary.date().isoformat()
+        # An explicit disarm wins over everything else, a stored error included.
+        if self.document.get("disarm_at") or self.document.get("disarm_after"):
+            if self._due("disarm", boundary):
+                self.document.update(
+                    status="draft",
+                    active={"grow_day": None, "zones": []},
+                    armed_at=None,
+                    armed_after=None,
+                    disarm_at=None,
+                    disarm_after=None,
+                    error=None,
+                    release_legacy=True,
+                )
+                await self._persist()
+            return
+        assigned = {zone["zone_id"] for zone in self.document["plan"].get("zones", [])}
+        if (
+            assigned != set(self.zone_ids())
+            or self._config().get("active", True) is False
+        ):
+            raise _Hold(
+                "Strategy zones do not match room setup; disarm and reconcile the draft"
+            )
+        # An error/reload must never invent an activation that was not explicitly armed and
+        # successfully stored by the user. A day already applied is never applied again, and a
+        # lights_on_hour moved later never takes the plan back a day.
+        if (
+            not self._due("armed", boundary)
+            or (self.document["active"].get("grow_day") or "") >= day
+        ):
+            return
+        preview = self.preview(grow_day=day)
+        self._readiness(now, [row["zone_id"] for row in preview["zones"]])
+        if any(row["errors"] for row in preview["zones"]):
+            raise ValueError(
+                "Hydraulic preview failed; the day is applied once it passes"
+            )
+        self.document.update(
+            status="active",
+            active={"grow_day": day, "zones": preview["zones"]},
+            error=None,
+        )
+        await self._persist()
 
     def _publish(self, now):
         status = self.document["status"]
@@ -525,6 +566,7 @@ class StrategyManager:
                 for zone in (self.document.get("plan") or {}).get("zones", [])
             ],
             "error": self.document["error"],
+            "degraded_reason": self.degraded_reason,
             "status": status,
         }
         self.hass.states.async_set(self.entity_id, status, attributes)
