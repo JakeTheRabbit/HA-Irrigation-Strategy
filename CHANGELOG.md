@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   releases, and nothing in this repository writes to it. A controller installed from the mirror
   moves once; [docs/INSTALL.md](docs/INSTALL.md) has the steps, which carry its learned state and
   settings across. Never run the old and the new app at the same time.
+- **The dashboard no longer downloads all of Home Assistant twice a minute.** Inside Home
+  Assistant it fetched every entity (3.3 MB on a large install) every 30 seconds for each open
+  tab, twice more for every change you applied, and kept going in a hidden tab. It now downloads
+  once when it opens, then receives only changes to the few hundred entities it shows, as they
+  happen, over Home Assistant's own connection. Opened on its own, outside Home Assistant, it
+  still checks every 30 seconds, but not while the tab is hidden, and at once when you come back.
+  Recorded sensor history loads its window once, then only the newest readings each minute.
 
 ### 🔧 Technical notes
 
@@ -28,6 +35,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the Validate bundle check, so nothing it verified goes unchecked.
 - New section in `docs/INSTALL.md`: moving an app from `4d457e60_f2_control` (mirror) to
   `6db5faba_f2_control` (this repository), copying `/data/state.json` and the options.
+- Dashboard (class C1, nothing the controller or integration reads): new
+  `frontend/src/lib/live.ts`. Inside the Home Assistant iframe (parent `hass.connection`),
+  `/api/states` is fetched once for discovery (again only on Refresh, after a Setup or plan change,
+  and on a websocket reconnect), then `subscribe_entities` covers `watchedEntities()`: every
+  `*.crop_steering_*` entity, what room descriptors and heartbeats point at (kill switches, pumps,
+  valves, tank and feed sensors), and the controller's per-zone sensors even before it has posted
+  them. `applyEntityUpdate()` applies the compressed events; updates are published in 250 ms
+  batches. A socket down for two 30 s ticks shows the offline banner; a refused subscription
+  falls back to polling. Standalone: `whileVisible()` polls every 30 s only while the page is
+  visible and refreshes on `visibilitychange`/`focus` (at most once per 10 s).
+- Writes no longer fetch all states before and after: the preflight and the readback read only
+  the written entities (`GET /api/states/<id>`) and merge them, never over a newer state.
+- `sensor-context`: the 72–168 h window loads once; each minute `historySpan()` asks only for the
+  time since the last load plus two minutes, and `mergeSeries()` folds it in.
+- Known limit: a room or zone created from Home Assistant's own integration pages, not this
+  dashboard's Setup, appears after Refresh, a reload or a Home Assistant reconnect.
 
 ## [2.19.2] - 2026-09-21
 
