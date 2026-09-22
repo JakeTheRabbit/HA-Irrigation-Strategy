@@ -9,7 +9,7 @@ The demo opens directly in your browser with sample rooms, sensor data and edita
 The demo includes clearly labelled synthetic recipes and current/previous runs for exploring comparisons. They demonstrate the software; they are not production recommendations.
 
 ![Release](https://img.shields.io/badge/Release-2.19.2-green)
-![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.3+-41BDF5)
+![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.9+-41BDF5)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 > Read the [validated feature matrix](docs/FEATURE_MATRIX.md) for tested behavior and installation/commissioning limits. Install matching integration and controller versions; a demo is not proof of physical water delivery.

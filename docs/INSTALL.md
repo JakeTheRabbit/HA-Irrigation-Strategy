@@ -14,7 +14,7 @@ Install the integration and controller together. HACS, the HA integration config
 
 ## Requirements
 
-- Home Assistant 2024.3 or newer. Python requirements follow your HA version; HA 2024.3 requires Python 3.12.
+- Home Assistant 2024.9 or newer. Python requirements follow your HA version; HA 2024.9 requires Python 3.12.
 - HACS for the guided integration download, or access to copy a custom integration manually.
 - Home Assistant OS/Supervised with the app store for the guided controller install. Container/Core users must run the companion controller separately; a true one-click controller install is not available there.
 - An HA administrator account for Rooms & setup and its configuration services.
