@@ -349,19 +349,86 @@ def test_a_pump_that_never_reports_off_in_an_error_cleanup_still_latches(rig, mo
     assert c.rooms[0].hardware_fault is not None and c.rooms[0].shot_inflight is not None
 
 
-def test_stopping_the_app_mid_shot_counts_the_water_already_given(rig, monkeypatch):
+def counted_for_30_s(litres, flow=0.05):
+    """30 s of water went in before the stop. Like a normal close, the count runs to the end of the close
+    (valve, then the line, then the read-back), so it may be a little over, never under."""
+    return flow * 30 <= litres <= flow * (30 + 1 + controller.CONFIRM_TIMEOUT_S)
+
+
+def stopped_after(c, clock, seconds):
+    """A _wait_shot the app is stopped in: SIGTERM runs _safe_exit, which ends in SystemExit."""
+    def wait(room, zone, duration_s, started=None):
+        clock.sleep(seconds)
+        c._safe_exit()
+    return wait
+
+
+def test_stopping_the_app_mid_shot_closes_that_shot_and_counts_the_water_already_given(rig, monkeypatch):
     c, fake, clock = rig
     slow_report(monkeypatch, fake, clock, "switch.p", 1.6)
-
-    def stopped_after_thirty_seconds(room, zone, duration_s, started=None):
-        clock.sleep(30)
-        c._safe_exit()  # what SIGTERM runs: hardware OFF, state saved, SystemExit
-
-    monkeypatch.setattr(c, "_wait_shot", stopped_after_thirty_seconds)
+    monkeypatch.setattr(c, "_wait_shot", stopped_after(c, clock, 30))
     with pytest.raises(SystemExit):
         c._execute_shot(c.rooms[0], 1, 300, 5, flow_lps=0.05)
+    assert offs(fake) == ["switch.v1", "switch.m", "switch.p"]  # that shot's own, valve first, once each
+    assert {e: fake.states[e][0] for e in ("switch.v1", "switch.m", "switch.p")} == dict.fromkeys(
+        ("switch.v1", "switch.m", "switch.p"), "off")
     st = c.rooms[0].state[1]
-    assert st["daily_vol"] == pytest.approx(0.05 * 30) and st["shots"] == 1
+    assert counted_for_30_s(st["daily_vol"]) and st["shots"] == 1
     assert c.rooms[0].hardware_fault is None and c.rooms[0].shot_inflight is None
     on_disk = saved(c)["default"]
-    assert on_disk["1"]["daily_vol"] == pytest.approx(1.5) and "_shot_inflight" not in on_disk
+    assert counted_for_30_s(on_disk["1"]["daily_vol"]) and "_shot_inflight" not in on_disk
+
+
+def test_stopping_the_app_with_no_shot_in_flight_switches_nothing_off(rig):
+    # The tank circulating to heat: pump and manifold relay ON, and no shot of the controller's running.
+    c, fake, _ = rig
+    fake.set_state("switch.p", "on")
+    fake.set_state("switch.tank_manifold", "on")
+    c.rooms[0].state[1]["daily_vol"] = 7.5
+    with pytest.raises(SystemExit):
+        c._safe_exit()
+    assert offs(fake) == []
+    assert fake.states["switch.p"][0] == "on" and fake.states["switch.tank_manifold"][0] == "on"
+    assert saved(c)["default"]["1"]["daily_vol"] == 7.5  # state is still saved on the way out
+
+
+def test_stopping_the_app_mid_shot_leaves_the_pump_to_a_hold_that_came_on_meanwhile(rig, monkeypatch):
+    c, fake, clock = rig
+    c.hold_entities = ["input_boolean.tank_circulation"]
+
+    def circulation_starts_then_stop(room, zone, duration_s, started=None):
+        fake.set_state("input_boolean.tank_circulation", "on")  # somebody starts heating the tank
+        clock.sleep(30)
+        c._safe_exit()
+
+    monkeypatch.setattr(c, "_wait_shot", circulation_starts_then_stop)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 300, 5, flow_lps=0.05)
+    assert offs(fake) == ["switch.v1", "switch.m"] and fake.states["switch.p"][0] == "on"
+    assert counted_for_30_s(c.rooms[0].state[1]["daily_vol"])
+    assert "_shot_inflight" not in saved(c)["default"]  # settled: the pump is the circulation's now
+
+
+def test_stopping_the_app_right_after_the_kill_switch_went_off_still_closes_the_shot_running(rig, monkeypatch):
+    # The operator hits the kill switch and stops the app a moment later, before the shot saw the switch.
+    c, fake, clock = rig
+
+    def killed_then_stopped(room, zone, duration_s, started=None):
+        fake.set_state("input_boolean.kill", "off")
+        clock.sleep(10)
+        c._safe_exit()
+
+    monkeypatch.setattr(c, "_wait_shot", killed_then_stopped)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 300, 5, flow_lps=0.05)
+    assert offs(fake) == ["switch.v1", "switch.m", "switch.p"]  # this process's own shot: closed
+    assert "_shot_inflight" not in saved(c)["default"]
+
+
+def test_stopping_the_app_leaves_an_older_interrupted_shot_to_the_operator(rig):
+    c, fake, _ = rig
+    crashed(c, fake)
+    fake.set_state("input_boolean.kill", "off")  # the operator has taken over
+    with pytest.raises(SystemExit):
+        c._safe_exit()
+    assert offs(fake) == [] and saved(c)["default"]["_shot_inflight"]["valve"] == "switch.v1"

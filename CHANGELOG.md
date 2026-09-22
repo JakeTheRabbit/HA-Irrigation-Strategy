@@ -52,9 +52,12 @@ previous controller ignores, so it can still read the file after a rollback.
   switched since the shot started is theirs and is left alone, together with everything upstream of
   it; the pump is left alone while a hold (dosing, fill, flush, circulation) is on or another valve on
   the line is open; and nothing at all is touched while the room's kill switch is off.
-- **Stopping the app mid-shot counts the water.** The water already given when an update or restart
-  stopped a shot is counted, and a pump that reports OFF a second late no longer latches a false
-  hardware hold on that path (the 15 September problem, on the one path the earlier fix missed).
+- **Stopping or updating the app no longer switches everything off.** It used to switch off every pump
+  and valve it knew, which ended tank circulation and hand-watering whenever the app was stopped,
+  updated or restarted. Now it closes only the shot it has running, by the same rules as above, and
+  counts the water that shot gave. With no shot running it switches nothing off. A pump that reports
+  OFF a second late no longer latches a false hardware hold after a failed shot either (the
+  15 September problem, on the one path the earlier fix missed).
 - **A critical alert raised while Home Assistant is unreachable is not lost.** It is raised again until
   Home Assistant has it; the 30-minute quiet period starts only then.
 
@@ -107,20 +110,30 @@ previous controller ignores, so it can still read the file after a rollback.
   any `hold_entities` is on, and everything while the room's kill switch is not ON. A close that is not
   confirmed latches the hardware hold and alerts, and is retried each loop. A new shot in that room
   waits until the record is settled. `ha_get` returns `HAState`, a tuple that unpacks as before and
-  carries `last_changed`. Unchanged: stopping the app (SIGTERM) still switches every mapped switch off.
+  carries `last_changed`.
+- **Stopping the app.** `_safe_off` (SIGTERM / SIGINT: stop, update, restart) no longer switches off
+  every mapped switch. It closes only a room's `_shot_inflight`, by the same `_inflight_plan` rules, and
+  with no shot in flight it switches nothing off. The shot running in this process is closed whatever
+  its kill switch reads; an older interrupted shot is left to the operator while its kill switch is not
+  ON, as in the loop. What cannot be closed and read back OFF stays recorded for the next start. State
+  is still saved on the way out.
 - **Alerts.** `_alert` starts the 30-minute debounce, and sends the phone push, only once
   `persistent_notification.create` succeeds. A latched hardware hold this process has not announced is
   announced from `_recover_hardware_faults`.
 - **Shot cleanup and stop.** The error-cleanup read-back uses `_confirm_switches` (1 s, then every
-  0.5 s to 6 s). A `SystemExit` mid-shot counts `nominal_l * elapsed / duration` before re-raising.
+  0.5 s to 6 s). A `SystemExit` mid-shot counts `nominal_l * elapsed / duration` before re-raising
+  (up to the end of the stop's close, like the normal close counts to its acknowledgement), and skips
+  the error cleanup, which would otherwise switch the rest off.
 - **State file.** Additive: `_shot_inflight` in a room block, `ec_settled` and `ec_settled_at` per zone.
   The previous controller (0.16.2) loads the new file: it ignores the new keys, keeps the room-block one
   when it saves and drops the two zone keys. An old file loads with the new keys at their defaults; a
   damaged record is ignored and logged.
 - **Tests.** Engine: `crop-steering-engine/tests/test_day_structure.py` (32). Controller:
-  `test_grow_day_and_budget.py` (15) and `test_interrupted_shot.py` (18). In `test_auto_setpoints.py`
+  `test_grow_day_and_budget.py` (15) and `test_interrupted_shot.py` (22). In `test_auto_setpoints.py`
   the plateau hand-over margin is now one 20-minute ramp interval instead of 0.5 h: the base run no
-  longer includes the P0 lights-on watchdog shot that delayed it. `fake_ha.FakeHA` reports
+  longer includes the P0 lights-on watchdog shot that delayed it. `test_declared_plumbing.py`: a mapped
+  pump is closed on exit when a shot of this controller left it on, and left alone otherwise (it
+  asserted the old blanket switch-off). `fake_ha.FakeHA` reports
   `last_changed`. The `tests_ha/` tier was not run locally, and no `tests_ha/` test or seeded fixture was
   added for this change yet.
 

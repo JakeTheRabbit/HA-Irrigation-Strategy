@@ -309,6 +309,7 @@ class Controller:
         # own _load_state()/adoption pass reads and writes it.
         self._state_path = os.environ.get("F2_STATE_PATH") or "/data/state.json"
         self._busy = False
+        self._shot_room = None  # the room whose shot is in flight (see _execute_shot / _safe_off)
         self._alerted = {}
         self._fused_id_cache = (
             {}
@@ -1990,37 +1991,9 @@ class Controller:
                     f"leaving {still_on} alone")
                 room._inflight_waiting_logged = True
             return
-        started = _aware(rec.get("started"))
-        lo, hi = INFLIGHT_OPEN_WINDOW_S
-        close, left, unsure, why, line_in_use = [], [], [], "", None
-        for i, ent in enumerate(order):
-            read = reads[ent]
-            if read[0] == "off":
-                continue
-            changed = _aware(getattr(read, "last_changed", None))
-            if read[0] != "on" or changed is None or started is None:
-                unsure = order[i:]  # unreadable, or no change time: whose it is cannot be told
-                break
-            if not lo <= (changed - started).total_seconds() <= hi:
-                left, why = order[i:], f"{ent} changed at {changed.isoformat()}, not when the shot opened it"
-                break
-            if ent != rec.get("valve"):
-                if line_in_use is None:
-                    line_in_use = self._line_in_use(room, rec)
-                if line_in_use:
-                    left, why = order[i:], "another valve on this line is open"
-                    break
-            if ent == rec.get("pump") and any(self._on(f, False) for f in self.hold_entities):
-                left, why = order[i:], "a hold (dosing / fill / flush / circulation) is on"
-                break
-            close.append(ent)
+        close, left, unsure, why = self._inflight_plan(room, rec, reads)
         if close:
-            ok = ha_call("switch", "turn_off", entity_id=close[0])
-            if len(close) > 1:
-                time.sleep(1)  # the valve first, then back up the line, as after a normal shot
-            for ent in close[1:]:
-                ok = ha_call("switch", "turn_off", entity_id=ent) and ok
-            if not (ok and self._confirm_switches(close, "off")):
+            if not self._switch_off_confirmed(close):
                 if not room.hardware_fault:
                     self._latch_hardware_fault(room, f"zone {zone} interrupted shot: close not confirmed")
                 self._alert(
@@ -2044,6 +2017,48 @@ class Controller:
             self._clear_inflight(room, f"{tag}: left {', '.join(left)} alone ({why}) - record closed")
             return
         self._clear_inflight(room, f"{tag}: closed and read back OFF - record closed")
+
+    def _inflight_plan(self, room, rec, reads):
+        """Which of a recorded shot's switches are provably its own -> (close, left, unsure, why).
+
+        Walks valve -> main line -> pump. A switch is the shot's own while it has been ON since the shot
+        opened it (last_changed inside INFLIGHT_OPEN_WINDOW_S of the record's start). The walk stops at the
+        first switch that is not: one that changed since, or was on before, is a person's (`left`, with
+        everything upstream of it), and so are the main line and pump while another valve on the line is
+        open, and the pump while a hold is on. One that cannot be read, or has no change time, stops it
+        too (`unsure`): whose it is cannot be told."""
+        order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
+        started = _aware(rec.get("started"))
+        lo, hi = INFLIGHT_OPEN_WINDOW_S
+        close, line_in_use = [], None
+        for i, ent in enumerate(order):
+            read = reads[ent]
+            if read[0] == "off":
+                continue
+            changed = _aware(getattr(read, "last_changed", None))
+            if read[0] != "on" or changed is None or started is None:
+                return close, [], order[i:], ""
+            if not lo <= (changed - started).total_seconds() <= hi:
+                return close, order[i:], [], f"{ent} changed at {changed.isoformat()}, not when the shot opened it"
+            if ent != rec.get("valve"):
+                if line_in_use is None:
+                    line_in_use = self._line_in_use(room, rec)
+                if line_in_use:
+                    return close, order[i:], [], "another valve on this line is open"
+            if ent == rec.get("pump") and any(self._on(f, False) for f in self.hold_entities):
+                return close, order[i:], [], "a hold (dosing / fill / flush / circulation) is on"
+            close.append(ent)
+        return close, [], [], ""
+
+    def _switch_off_confirmed(self, entities):
+        """Switch these off, the valve first and then back up the line as after a normal shot, and
+        report whether every one reads back OFF."""
+        ok = ha_call("switch", "turn_off", entity_id=entities[0])
+        if len(entities) > 1:
+            time.sleep(1)
+        for ent in entities[1:]:
+            ok = ha_call("switch", "turn_off", entity_id=ent) and ok
+        return ok and self._confirm_switches(entities, "off")
 
     def _line_in_use(self, room, rec):
         """Another valve fed by this shot's main line or pump is open: someone is watering through it."""
@@ -2139,6 +2154,7 @@ class Controller:
         nominal_l = (flow_lps * duration_s if flow_lps is not None
                      else size_pct / 100.0 * self._substrate_l(room, zone))
         self._busy = True
+        self._shot_room = room  # the room whose shot is in flight right now (see _safe_off)
         hw = room.hw
         valve = hw["valves"].get(zone)
         pump, mainline = hw.get("pump"), hw.get("mainline")
@@ -2153,6 +2169,7 @@ class Controller:
         shutdown_checked = False
         valve_started = None
         counted = False
+        stopping = False
         try:
             # OPEN sequence — FAIL CLOSED: if any service call errors, cut what's on, alert, and DO NOT count the shot
             # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
@@ -2234,9 +2251,11 @@ class Controller:
                     "by the kill switch or manual override. Valve closed; partial volume counted.",
                 )
         except SystemExit:
-            # SIGTERM/SIGINT mid-shot (the app stopped or updated): _safe_exit has already commanded the
-            # hardware OFF. Count the water this shot delivered before the process goes, or the next start
-            # would water the zone as if it had had none.
+            # SIGTERM/SIGINT mid-shot (the app stopped or updated): _safe_exit has already closed what this
+            # shot has open, by the reconciler's rules, so the cleanup below must not switch the rest off.
+            # Count the water this shot delivered before the process goes, or the next start would water
+            # the zone as if it had had none.
+            stopping = True
             if valve_started is not None and not counted:
                 counted = True
                 run = (time.monotonic() - valve_started) / duration_s if duration_s > 0 else 1.0
@@ -2248,7 +2267,7 @@ class Controller:
             try:
                 # Early command failures and unexpected exceptions need the SAME hold
                 # guarantee as normal shutdown; no path may start the next row blindly.
-                if not shutdown_checked:
+                if not shutdown_checked and not stopping:
                     closing = [
                         e for e in (valve, hw.get("mainline"), hw.get("pump")) if e
                     ]
@@ -2269,19 +2288,41 @@ class Controller:
                         self._save_state()
             finally:
                 self._busy = False
+                self._shot_room = None
 
     def _safe_off(self):
+        """Stopping (SIGTERM: the app stopped, updated or restarted): close only what this controller has
+        in flight, by the reconciler's rules (_inflight_plan), and nothing else.
+
+        With no shot in flight nothing is switched off: the tank is circulated for well over 20 minutes to
+        heat it and zones are hand-watered with the valves and main line open, and stopping the app must
+        end neither. The shot running NOW is closed whatever its kill switch reads (it is this process's
+        own); an older interrupted shot is left to the operator while its kill switch is not ON, as in the
+        loop. Anything that cannot be closed and read back OFF stays recorded for the next start."""
         for room in self.rooms:
-            if room.hw.get("pump"):
-                ha_call("switch", "turn_off", entity_id=room.hw["pump"])
-            if room.hw.get("mainline"):
-                ha_call("switch", "turn_off", entity_id=room.hw["mainline"])
-            for v in room.hw["valves"].values():
-                if v:
-                    ha_call("switch", "turn_off", entity_id=v)
+            rec = getattr(room, "shot_inflight", None)
+            if not rec:
+                continue
+            order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
+            reads = {e: ha_get(e) for e in order}
+            if all(read[0] == "off" for read in reads.values()):
+                room.shot_inflight = None
+                continue
+            if room is not getattr(self, "_shot_room", None) and ha_get(room.enable_flag)[0] != "on":
+                continue
+            close, left, unsure, why = self._inflight_plan(room, rec, reads)
+            if close and not self._switch_off_confirmed(close):
+                log(f"[{room.slug}] stopping: {', '.join(close)} not confirmed OFF - left recorded for the next start")
+                continue
+            if close:
+                log(f"[{room.slug}] stopping: switched off {', '.join(close)} (the shot in flight)")
+            if left:
+                log(f"[{room.slug}] stopping: left {', '.join(left)} alone ({why})")
+            if not unsure:
+                room.shot_inflight = None
 
     def _safe_exit(self, *_):
-        log("SIGTERM — safing hardware + exiting")
+        log("SIGTERM — closing what is in flight, saving state, exiting")
         try:
             self._safe_off()
             self._save_state()
