@@ -15,10 +15,12 @@ A more vegetative irrigation approach generally keeps water more available; gene
 3. In **Schedule & curve**, select a zone row and week. Set its profile and steering slider. Switch to **Days** for exceptions. Editing a range splits existing blocks and preserves surrounding days.
 4. Review the combined planning curve and hydraulic estimates below. The same selected date, zone and interpolated parameters drive both the curve and preview.
 5. Choose **Review & save**. Resolve validation issues, inspect the per-zone preview and save the draft. Export JSON for a portable backup or another draft.
-6. After adding or archiving zones in setup, use **Update zones from setup** in the draft planner. This keeps existing active-zone schedules, removes archived assignments and seeds new zones from current settings. Export the old draft first if you need those assignments. Review and save the reconciled draft.
-7. **Arm plan** after the controller reports support. Activation happens at the next eligible local lights-on boundary. Active plans must be disarmed before editing. Disarm transfers control back to manual setpoints at a boundary.
+6. After adding or archiving zones in setup, use **Update zones from setup** in the draft planner. This keeps existing active-zone schedules, removes archived assignments and seeds new zones from current settings. Export the old draft first if you need those assignments. Review and save the reconciled draft. Setup refuses to add or archive zones, or to archive the room, while its plan is armed or running: disarm it first.
+7. **Arm plan** after the controller reports support. Activation happens at the next local lights-on after arming, by the room's lights-on hour at that time. Active plans must be disarmed before editing. Disarm transfers control back to manual setpoints at the next lights-on.
 
-The calendar supports grow days 1–366 per zone, distinct start dates and complete contiguous schedule ranges. Missing/finished/invalid schedules are visible and hold managed zones rather than inventing targets. Each room stores its plan in HA persistent storage with optimistic revision checks. Restart recovery uses the stored plan and controller latch.
+Each new day is applied at lights-on. If it cannot be applied then (Home Assistant restarting, the controller's heartbeat or a probe a few minutes late), the plan keeps the previous day's targets and applies the day at the first minute it can; Settings → Repairs shows *has not moved on to today* with the reason meanwhile.
+
+The calendar supports grow days 1–366 per zone, distinct start dates and complete contiguous schedule ranges. Missing/finished/invalid schedules are visible and hold managed zones rather than inventing targets. A hold stops the plan's steering, never the zone's water safety: the overnight emergency shot, the lights-on watchdog and the minimum daily volume still water a held zone, and Repairs shows *holding irrigation* with the reason. Each room stores its plan in HA persistent storage with optimistic revision checks. Restart recovery uses the stored plan and controller latch.
 
 ## Read the combined graph
 

@@ -1,5 +1,6 @@
 # Unreleased
 
+- **A held grow plan never stops an emergency, watchdog or minimum-daily shot.** Each zone the plan holds is decided with the engine's new `ZoneSnapshot.steering_held`, so `decide()` returns the rescue behind a routine shot; `_blocked` and the shot preflight let `PLAN_HOLD_EXEMPT` kinds (`p3_emergency`, `watchdog`, `min_daily`, and for a blind zone `blind_fallback` and `blind_copy_rescue`) through the plan hold, and every other gate still applies. A held zone that is not firing shows the hold as its block. No change to options or the state file. Pairs with the integration's plan fixes in the same release (a plan no longer holds a room all day over a missed lights-on).
 - **Zone status has one writer.** The controller publishes each zone's label, with its reason, on `sensor.crop_steering_<prefix>zone_N_status_app` (`Room off` included) and no longer writes `zone_N_status`, which the integration now mirrors from it. With an older integration, `zone_N_status` shows that integration's fixed-threshold label until it is updated. No change to options, the state file or irrigation.
 
 # 0.16.4

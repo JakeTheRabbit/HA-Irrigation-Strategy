@@ -36,6 +36,7 @@ from strategy_runtime import parse_snapshot, parameter_override, strategy_block
 
 from crop_steering_engine import (
     EC_SETTLE_MIN,
+    Reason,
     decide,
     ZoneParams,
     ZoneSnapshot,
@@ -171,6 +172,14 @@ MIN_SHOT_S = 5
 # the pump prime (2 s), the main-line lead (1 s) and, at worst, a slow Home Assistant acknowledging
 # each command. A switch that changed outside it was already on, or has been touched by a person since.
 INFLIGHT_OPEN_WINDOW_S = (-5.0, 60.0)
+
+# The shots a plan hold never stops, by decide()'s Reason.kind. A plan decides how a zone is steered, not
+# whether a starving zone gets water: while the plan is held, stale or missing, routine steering waits
+# (decide() is asked for the rescues alone: ZoneSnapshot.steering_held), but the P3 emergency, the
+# lights-on watchdog and the minimum-daily floor still fire, and so do a blind zone's safety schedule and
+# its copy of a sibling's rescue. Every other gate (kill switch, faults, zone switches, source water, the
+# daily budget) still applies to them.
+PLAN_HOLD_EXEMPT = frozenset({"p3_emergency", "watchdog", "min_daily", "blind_fallback", "blind_copy_rescue"})
 
 # How a room is plumbed, as DECLARED in the integration's setup and published as the descriptor's
 # `plumbing`: layout -> (has a pump switch, has a main-line valve). The integration carries the same
@@ -1400,6 +1409,8 @@ class Controller:
             feed_ec=(feed_ec if feed_ec is not None else 3.0),
             new_grow_day=new_grow_day,
             ec_settled=ec_settled,
+            # a held plan holds the steering; decide() then fires only the rescues (PLAN_HOLD_EXEMPT)
+            steering_held=bool(strategy_block(getattr(room, "strategy_snapshot", None), zone)),
         )
         return snap, self._params(room, zone, ec_known=ec is not None)
 
@@ -1643,7 +1654,7 @@ class Controller:
             log("publish failed", room.slug, e)
 
     # ---------- gates ----------
-    def _blocked(self, room, zone):
+    def _blocked(self, room, zone, reason=None):
         if getattr(room, "_setup_pending", None):
             return room._setup_pending
         if getattr(room, "setup_active", True) is False:
@@ -1652,7 +1663,9 @@ class Controller:
             return "Room off (nothing growing)"
         planned_hold = strategy_block(getattr(room, "strategy_snapshot", None), zone)
         if planned_hold:
-            return planned_hold
+            if getattr(reason, "kind", None) not in PLAN_HOLD_EXEMPT:
+                return planned_hold
+            log(f"[{room.slug}] Z{zone} {planned_hold}: not holding a {reason.kind} shot")
         fault = self._hardware_fault_block(room)
         if fault:
             return fault
@@ -2145,7 +2158,7 @@ class Controller:
                 return False
             time.sleep(CONFIRM_POLL_S)
 
-    def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None):
+    def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None, plan_exempt=False):
         if self._hardware_fault_block(room):
             return
         if getattr(room, "shot_inflight", None):
@@ -2155,7 +2168,8 @@ class Controller:
         if plumbing:  # never open a valve on a room whose declared pump is not there to run
             log(f"[{room.slug}] Z{zone} shot held: {plumbing}")
             return
-        strategy_hold = self._strategy_preflight(room, zone, datetime.now())
+        # A shot a plan hold never stops (PLAN_HOLD_EXEMPT) does not wait on the plan here either.
+        strategy_hold = None if plan_exempt else self._strategy_preflight(room, zone, datetime.now())
         if strategy_hold:
             log(f"[{room.slug}] Z{zone} shot held: {strategy_hold}")
             return
@@ -2454,7 +2468,7 @@ class Controller:
                 )
             # A shot that is not exempt from the daily budget gets only what is left of it (22 Sep: a
             # 607 s, ~28 L flush fired with ~2 L of an 80 L budget left). Copied / blind-schedule
-            # decisions carry plain text, so they are never exempt either.
+            # decisions are never exempt either (their Reason, or plain text, is not cap_exempt).
             if p is not None and not getattr(reason, "cap_exempt", False):
                 left_l = p.max_daily_volume - float(st.get("daily_vol") or 0.0)
                 allowed = int(left_l / flow) if left_l > 0 else 0
@@ -2474,7 +2488,8 @@ class Controller:
             # Count configured flow x actual runtime, including caps, truncation,
             # the minimum duration and partial aborts. Preserve this flow snapshot
             # so later sizing edits cannot change an already delivered volume.
-            self._execute_shot(room, zone, dur, size, flow_lps=flow)
+            self._execute_shot(room, zone, dur, size, flow_lps=flow,
+                               plan_exempt=getattr(reason, "kind", None) in PLAN_HOLD_EXEMPT)
         else:
             if "BLOCK" in reason:
                 self._alert(
@@ -2740,8 +2755,10 @@ class Controller:
             looking = f"sensor.crop_steering_{room.prefix}vwc_zone_{zone}"
             if healthy:
                 sib = pick_sibling(p.p1_target, healthy)
-                s_fire, s_size, _ = decisions[sib]
-                decisions[zone] = (s_fire, s_size, f"COPY Z{sib} (VWC probe dead)")
+                s_fire, s_size, s_reason = decisions[sib]
+                rescue = getattr(s_reason, "kind", None) in PLAN_HOLD_EXEMPT
+                decisions[zone] = (s_fire, s_size, Reason(f"COPY Z{sib} (VWC probe dead)",
+                                                          "blind_copy_rescue" if rescue else "blind_copy"))
                 # Re-alert each tick — _alert's 30-min debounce throttles it to a repeating
                 # reminder so a dead probe can't sit unnoticed (the silent-freeze lesson).
                 self._alert(
@@ -2754,7 +2771,7 @@ class Controller:
                 decisions[zone] = (
                     mss >= self.blind_fallback_min,
                     p.p2_shot_size,
-                    "FALLBACK schedule (no live probe)",
+                    Reason("FALLBACK schedule (no live probe)", "blind_fallback"),
                 )
                 self._alert(
                     f"blind_{room.slug}_z{zone}",
@@ -2783,7 +2800,10 @@ class Controller:
                     f"{params[zone].max_daily_volume:.0f}L (blind irrigation budget)"
                 )
                 decisions[zone] = (fire, size, reason)
-            block = self._blocked(room, zone) if fire else None
+            # A held plan is shown on every zone it holds: decide() no longer returns the steering shot it
+            # would have stopped (ZoneSnapshot.steering_held), so the hold is said here instead.
+            block = (self._blocked(room, zone, reason) if fire
+                     else strategy_block(getattr(room, "strategy_snapshot", None), zone))
             acted = self._act_zone(
                 room,
                 zone,

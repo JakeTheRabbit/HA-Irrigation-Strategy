@@ -318,9 +318,15 @@ def test_active_store_survives_reload_without_midday_reapplication(monkeypatch):
         restored, _, _ = manager_fixture(monkeypatch, store=store)
         await restored.async_init()
         assert restored.document["active"] == manager.document["active"]
+        await restored.tick(boundary + timedelta(hours=3))  # the same grow-day
+        assert restored.document["active"] == manager.document["active"]
+        assert restored.degraded_reason is None
+        # The next lights-on passed with no controller heartbeat. It used to be an error that
+        # held the room all day; the stored snapshot now stays published until it can apply.
         await restored.tick(boundary + timedelta(days=1, hours=3))
-        assert restored.document["status"] == "error"
-        assert "missed" in restored.document["error"]
+        assert restored.document["status"] == "active"
+        assert restored.document["active"] == manager.document["active"]
+        assert "heartbeat" in restored.degraded_reason
 
     asyncio.run(scenario())
 
@@ -381,6 +387,8 @@ def test_disarm_waits_for_next_boundary_and_survives_missed_boundary_restart(
         restored, new_states, _ = manager_fixture(monkeypatch, store=manager._store)
         await restored.async_init()
         await restored.tick(boundary + timedelta(days=1, hours=4))
+        # The missed release is made on the first tick after it, not turned into an error.
+        assert restored.document["status"] == "draft"
         for state in new_states.values():
             state.last_updated = boundary + timedelta(days=2)
         await restored.tick(boundary + timedelta(days=2))

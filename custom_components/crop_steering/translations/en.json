@@ -844,6 +844,14 @@
     "fused_sensor_unavailable": {
       "title": "Crop Steering: zone sensor unavailable",
       "description": "The moisture sensor for zone(s) {zones} reads unavailable — the probe(s) may be offline or misnamed. Check it in Developer Tools → States and your zone mapping."
+    },
+    "strategy_hold": {
+      "title": "Crop Steering: grow strategy plan is holding irrigation",
+      "description": "The room's grow strategy plan is holding the steering of the zones it manages: {reason}. Until it clears, the controller waters those zones only with emergency, watchdog and minimum-daily shots. See the plan in the Crop Steering panel under Irrigation plan → Schedule. If it stays in error, fix the cause, then disarm the plan and arm it again."
+    },
+    "strategy_degraded": {
+      "title": "Crop Steering: grow strategy plan has not moved on to today",
+      "description": "The room's grow strategy plan could not apply the current day at lights-on: {reason}. It keeps its last valid targets (a plan waiting to start stays armed) and tries again every minute, and the controller keeps steering. This clears itself once the cause is fixed, usually a stale controller heartbeat or probe."
     }
   },
   "selector": {

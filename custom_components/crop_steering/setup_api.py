@@ -109,11 +109,47 @@ def safety_blockers(hass, entry=None, proposed=None):
             "input_boolean.f2_control_enabled"
         ):
             controls.add("input_boolean.f2_control_enabled")
-    return [
+    blockers = [
         blocker
         for eid in sorted(controls | entities)
         if (blocker := _off_blocker(hass, eid))
     ]
+    plan = _plan_blocker(hass, entry, proposed)
+    return blockers + [plan] if plan else blockers
+
+
+def _zone_ids(data):
+    zones = data.get("zones") or {}
+    return {
+        z
+        for z in range(1, int(data.get("num_zones", 1)) + 1)
+        if (zones.get(str(z), zones.get(z, {})) or {}).get("active", True)
+    }
+
+
+def _plan_blocker(hass, entry, proposed):
+    """A grow-strategy plan that is armed or running manages a fixed set of zones. A change to
+    that set, or archiving the room, would hold the plan and the steering of every zone it
+    manages, so it waits until the plan is disarmed. A change back to the plan's own zones is
+    always allowed: it is how a room that got out of step is put right."""
+    if entry is None or proposed is None:
+        return None
+    manager = hass.data.get(DOMAIN, {}).get("_strategy", {}).get(entry.entry_id)
+    status = manager.document["status"] if manager else "draft"
+    if status == "draft":
+        return None
+    current, wanted = _zone_ids(effective(entry)), _zone_ids(proposed)
+    planned = {
+        zone["zone_id"]
+        for zone in (manager.document.get("plan") or {}).get("zones", [])
+    }
+    archiving = proposed.get("active", True) is False
+    if not archiving and wanted in (current, planned):
+        return None
+    return (
+        f"The grow strategy plan is {status}: disarm it (Irrigation plan > Schedule) and "
+        "wait for it to return to draft before changing this room's zones or archiving it"
+    )
 
 
 def _off_blocker(hass, eid):
@@ -592,7 +628,7 @@ async def remove_setup(hass, payload):
         "room_name", data.get("name", entry.title)
     ):
         raise ValueError("Confirm the exact selected room name")
-    blockers = safety_blockers(hass, entry)
+    blockers = safety_blockers(hass, entry, {**data, "active": False})
     if blockers:
         raise ValueError("; ".join(blockers))
     data["active"] = False
