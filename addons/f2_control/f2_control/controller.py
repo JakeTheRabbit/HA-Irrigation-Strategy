@@ -750,6 +750,48 @@ class Controller:
             adopted["plumbing"] = attrs["plumbing"]
         return json.dumps(adopted, sort_keys=True)
 
+    @staticmethod
+    def _entry_id(attrs):
+        """Which Home Assistant config entry published this descriptor, or None when it does not
+        say (every integration before 2.19.3) or says something that is not a plain string."""
+        value = (attrs or {}).get("entry_id")
+        return value if type(value) is str and value else None
+
+    def _is_another_room(self, room, attrs, saved):
+        """True when this descriptor comes from a DIFFERENT room than the one adopted: the
+        integration was deleted in Home Assistant and set up again behind the same entity ids.
+
+        A re-created room's setup revision starts again at 1, which is not higher than the one
+        held, so it used to be skipped: the controller went on driving the map of a room that no
+        longer existed, behind a kill-switch id the new room shares. Adoption is re-opened here
+        and nothing more; it still goes through the gate below (kill switch OFF, hardware OFF).
+
+        First sight of an `entry_id` (the integration was updated under a running room, or the
+        state file is from before this) is remembered and changes nothing.
+        """
+        entry_id = self._entry_id(attrs)
+        if entry_id is None:
+            return False
+        known = getattr(room, "_setup_entry_id", None)
+        if known is None and isinstance(saved, dict):
+            known = saved.get("entry_id") if type(saved.get("entry_id")) is str else None
+        if not known:
+            room._setup_entry_id = entry_id
+            if getattr(room, "_setup_fingerprint_adopted", None):
+                self._save_state()  # written down now, not at some later adoption
+            return False
+        if entry_id == known:
+            room._setup_entry_id = known
+            return False
+        if getattr(room, "setup_revision", 0):
+            log(
+                f"room '{room.slug}' was deleted in Home Assistant and set up again: its setup is "
+                "adopted afresh, once the kill switch and the hardware read OFF"
+            )
+        room.setup_revision = 0
+        room._setup_fingerprint_adopted = None  # the saved block keeps describing the OLD room
+        return True
+
     def _apply_setup_descriptors(self):
         """Adopt explicit versioned setup changes only after both maps are safe OFF.
 
@@ -775,6 +817,8 @@ class Controller:
             attrs = descriptors.get(room.prefix)
             if not attrs:
                 continue
+            saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_setup")
+            another_room = self._is_another_room(room, attrs, saved)
             revision = attrs.get("setup_revision", 0)
             if type(revision) is not int or revision <= getattr(
                 room, "setup_revision", 0
@@ -783,9 +827,9 @@ class Controller:
             room._setup_pending = "Setup changed; disarm current and requested engine flags and verify hardware OFF"
             try:
                 fingerprint = self._setup_fingerprint(attrs, room)
-                saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_setup")
                 resuming = (
                     getattr(room, "setup_revision", 0) == 0
+                    and not another_room  # a different room is gated, however alike it looks
                     and isinstance(saved, dict)
                     and type(saved.get("revision")) is int
                     and saved["revision"] == revision
@@ -864,6 +908,7 @@ class Controller:
                 room.feed_ph_sensor = attrs.get("feed_ph_sensor") or ""
                 room.setup_active, room.setup_revision = active, revision
                 room._setup_fingerprint_adopted = fingerprint
+                room._setup_entry_id = self._entry_id(attrs) or getattr(room, "_setup_entry_id", None)
                 room._setup_pending = None
                 ha_call("persistent_notification", "dismiss", notification_id=f"f2_setup_{room.slug}")
                 self._alerted.pop(f"setup_{room.slug}", None)
@@ -932,6 +977,8 @@ class Controller:
                     "revision": room.setup_revision,
                     "fingerprint": room._setup_fingerprint_adopted,
                 }
+                if getattr(room, "_setup_entry_id", None):  # which room it was (see _is_another_room)
+                    block["_setup"]["entry_id"] = room._setup_entry_id
             out[room.slug] = block
         try:
             tmp = self._state_path + ".tmp"
