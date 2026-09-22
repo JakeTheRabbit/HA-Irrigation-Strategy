@@ -58,10 +58,15 @@ def rig():
         states[eid] = SimpleNamespace(
             entity_id=eid, state="50", attributes={"unit_of_measurement": unit}
         )
+
+    async def in_executor(function, *args):  # what Home Assistant always has
+        return function(*args)
+
     hass = SimpleNamespace(
         config_entries=Entries([entry]),
         data={},
         states=SimpleNamespace(get=states.get, async_all=lambda: list(states.values())),
+        async_add_executor_job=in_executor,
     )
     return hass, entry, states
 

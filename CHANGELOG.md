@@ -11,12 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Controller and engine, class **C3**. From the F2 history of 21-22 September 2026 and the review of it.
+The irrigation changes (controller and engine) are class **C3**, from the F2 history of 21-22 September
+2026 and the review of it.
 **Not run on hardware.** No add-on option changes. The state file gains three additive keys that the
 previous controller ignores, so it can still read the file after a rollback.
 
 ### 🌱 In plain English
 
+- **One repository.** The controller app is now installed only from this repository. The old
+  `f2-control` mirror, which a release script pushed a copy to, is retired: it gets no more
+  releases, and nothing in this repository writes to it. A controller installed from the mirror
+  moves once; [docs/INSTALL.md](docs/INSTALL.md) has the steps, which carry its learned state and
+  settings across. Never run the old and the new app at the same time.
 - **A zone that has used its day's water can still be rescued.** On 22 September Zone 1 had no water
   from 14:06 until lights-off with its moisture under the re-water line: the daily limit was reached
   by midday, and the limit also stopped the "no water for 3 hours" safety shot. That safety shot, the
@@ -54,6 +60,13 @@ previous controller ignores, so it can still read the file after a rollback.
 
 ### 🔧 Technical notes
 
+- `addons/f2_control/config.yaml` `url` points at this repository (metadata only; version unchanged).
+- Removed `scripts/prepare_addon_release.py`, `scripts/publish_addon.sh` and
+  `tests/test_addon_release.py`, the publisher for the mirror. The add-on's web root is already
+  written by `frontend/scripts/package.mjs` and checked by `tests/test_dashboard_layout.py` and
+  the Validate bundle check, so nothing it verified goes unchecked.
+- New section in `docs/INSTALL.md`: moving an app from `4d457e60_f2_control` (mirror) to
+  `6db5faba_f2_control` (this repository), copying `/data/state.json` and the options.
 - **Typed decisions (engine).** `decide()` still returns `(phase, p2_threshold, fire, size, reason)`;
   `reason` is a `Reason(str)` with `.kind` and `.cap_exempt` (`CAP_EXEMPT`). Exempt: `flush_high_ec`,
   `p1_ramp`, `p2_rescue`, `p3_emergency`, `watchdog`. Not exempt: `p0_ec_flush`, `p1_flush`, `p2_dilute`,

@@ -16,8 +16,7 @@
 | archive/2026-09-08 | Superseded dashboards, documentation and tools with original paths/hashes |
 | docs/TESTING.md / docs/ENTITIES.md | Development checks and entity reference |
 | img | Current screenshots; superseded captures are archived |
-| repository.yaml | HA app repository discovery metadata |
-| scripts/prepare_addon_release.py | Reviewed tracked-file packaging for the existing dedicated controller repository |
+| repository.yaml | HA app repository discovery metadata; the controller app is installed from this repository only |
 
 Edit source in frontend/src and run the build; do not hand-edit generated dashboards. Small old-name HTML files are intentional compatibility redirects. Runtime entity IDs, room prefixes and the f2_control app slug remain stable; friendly names can change without breaking references.
 

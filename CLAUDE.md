@@ -141,8 +141,11 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
   all gates before advancing `main`, then flips the matching pre-release. If that flip fails,
   report that `main` already advanced and retry through the workflow; never rewind production.
 - **Deploying changes:** publish a versioned integration release and matching controller
-  app release. Existing app installations must update in place from their current
-  repository to preserve their Supervisor identity and `/data`. A plain restart
+  app release. The controller app is installed only from this repository
+  (`addons/f2_control`); the old `JakeTheRabbit/f2-control` mirror is retired and gets
+  nothing. Existing app installations update in place to preserve their Supervisor
+  identity and `/data`; one still installed from the mirror moves once, carrying
+  `/data/state.json` and its options (`docs/INSTALL.md`). A plain restart
   does not change a baked controller image. Use Supervisor Update for a published
   release (or Rebuild for local source), then verify the running image and modules.
   Restart HA after integration updates; see `docs/INSTALL.md` for the current path.

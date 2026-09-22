@@ -1,5 +1,7 @@
 # Unreleased
 
+- Installed only from `JakeTheRabbit/HA-Irrigation-Strategy`; the `f2-control` mirror is retired. `url` in `config.yaml` now points here. No change to options, the state file or irrigation.
+
 **C3.** From the F2 history of 21-22 September 2026. Not run on hardware. No change to add-on options.
 
 - **The daily limit is a budget with typed exemptions.** The watchdog, P3 emergency and high-EC flushes (anti-lockout, P2 rescue) pass it, and so does the P1 ramp, which always runs in full. Top-ups, P1/P2/P0 EC-correction shots and the min-daily floor stop at it. A shot that would cross it is cut to what is left (under 5 s: held, `BLOCK daily-cap (x L left)`). The "flush" in a reason's text no longer makes a shot exempt.

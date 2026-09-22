@@ -60,7 +60,7 @@ Developers build the dashboard using `npm ci --prefix frontend` then `npm run bu
 
 ## Upgrading an existing installation
 
-For an existing controller, update it in place from its current app repository. Do not install a second controller from a different repository: that creates a different app identity and separate runtime data. The dedicated [controller repository](https://github.com/JakeTheRabbit/f2-control) continues to receive matching releases.
+Update an existing controller in place from this repository. The old `JakeTheRabbit/f2-control` mirror no longer receives releases; a controller installed from it moves once, as described in [Moving a controller installed from f2-control](#moving-a-controller-installed-from-f2-control). Never run two controllers against one room: each app has its own identity and runtime data, and both would drive the same pump and valves.
 
 1. Back up HA, the controller's persistent data and existing setpoints. Export grow plans if available. Record which engines are enabled.
 2. Turn the affected engines off and wait for the pump, mainline and valves to be OFF. Stop the existing controller while replacing software.
@@ -70,6 +70,18 @@ For an existing controller, update it in place from its current app repository. 
 6. Restore the engines' previous enabled states after these checks. An upgrade does not require arming a recipe or replacing existing values with defaults.
 
 If an update is missing from the app store, refresh the repository information first. Use Update for published versions or Rebuild for a local source installation. HACS and the app store update separate components.
+
+### Moving a controller installed from f2-control
+
+The controller used to be mirrored to `JakeTheRabbit/f2-control`. That mirror is retired; this repository is the only source. Supervisor names an app after the repository it came from (`4d457e60_f2_control` from the mirror, `6db5faba_f2_control` from here), so the move is a one-time reinstall that carries the runtime state across:
+
+1. Add this repository to the app store and install **Crop Steering Controller** from it. Do not start it.
+2. Copy the old app's Configuration into the new app: every option, including the Cloudflare fields.
+3. Turn every engine kill switch off and wait until the pump, mainline and valves read OFF.
+4. Stop the old app and turn off its Start on boot and Watchdog.
+5. Copy `state.json` from the old app's data folder to the new one. It holds each zone's phase, today's counters, the accepted setup revision and what Auto Setpoints has learned; without it the controller starts learning again and waits for setup to be accepted. On HA OS, from an SSH terminal with Docker access: `docker run --rm -v /mnt/data/supervisor/apps/data:/d alpine cp -p /d/4d457e60_f2_control/state.json /d/6db5faba_f2_control/state.json` (older Supervisor versions use `addons/data`).
+6. Start the new app, turn on its Start on boot and Watchdog, and check its log, version, heartbeat and setup acceptance before turning the engines back on.
+7. After a day of normal running, uninstall the old app and remove the `f2-control` repository.
 
 The existing app slug `f2_control` and entity IDs are deliberately stable. Existing environment mapping remains supported. Older dashboard bookmarks retain room context and redirect to the new routes. After upgrade, verify the room descriptor and controller heartbeat, setup acknowledgement and plan capability before enabling control.
 

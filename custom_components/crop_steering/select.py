@@ -22,7 +22,7 @@ from .const import (
     RECIPE_PARAMS,
     SOFTWARE_VERSION,
 )
-from .room import room_prefix, zone_device_name
+from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .recipe import get_manager
 
 _LOGGER = logging.getLogger(__name__)
@@ -238,7 +238,9 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
     async def async_added_to_hass(self) -> None:
         """Restore state when added to hass."""
         await super().async_added_to_hass()
-        if (last_state := await self.async_get_last_state()) is not None:
+        last_state = await self.async_get_last_state()
+        # A state left behind by a DELETED room is not this room's.
+        if last_state is not None and restored_state_is_ours(self._entry, last_state):
             if last_state.state in self.options:
                 self._attr_current_option = last_state.state
         # The recipe stage's source of truth is the server-side recipe Store, not
