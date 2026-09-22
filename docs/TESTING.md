@@ -166,8 +166,8 @@ round-trip.
 ### 4. Version consistency — `tests/test_version_consistency.py`
 The integration version must match across `manifest.json`, the latest released `CHANGELOG.md`
 heading, and the README badge, so a release can't ship a stale number. (The f2-control
-add-on has its own version line in `addons/f2_control/config.yaml`, synced to the dedicated
-add-on repo by `scripts/publish_addon.sh`.)
+add-on has its own version line in `addons/f2_control/config.yaml`; boxes build the add-on
+from this repository, so there is no second copy to keep in step.)
 
 ### 5. Lint / format / YAML — ruff, black (scoped to `custom_components/` + `tests/`), yamllint
 Plus, on GitHub only: **hassfest** and **HACS validation** of the integration.
