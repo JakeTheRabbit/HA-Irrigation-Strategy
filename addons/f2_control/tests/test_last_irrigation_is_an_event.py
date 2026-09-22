@@ -84,7 +84,7 @@ def test_a_room_switched_on_and_off_again_has_the_false_time_taken_back():
     c._room_switched_on(room)
     fake.set_state("switch.crop_steering_room_active", "off")
     c.loop_once(NOW)
-    assert fake.sets["sensor.crop_steering_zone_1_status"][0] == "Room off"
+    assert fake.sets["sensor.crop_steering_zone_1_status_app"][0] == "Room off"
     assert _published(fake) == "unknown"
 
 
