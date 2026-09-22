@@ -112,6 +112,9 @@ class ZoneSnapshot:
     ec_settled: float | None = None  # pore EC read >= EC_SETTLE_MIN after the last shot (or the last such
     #                                  reading, held while shots come closer together). When given, EVERY
     #                                  EC rule uses it instead of `ec`; None = fall back to `ec` as before.
+    steering_held: bool = False   # the caller holds routine steering (a grow-strategy plan that is held,
+    #                               stale or missing): only the water-safety rules fire, the P3 emergency,
+    #                               the watchdog and the minimum-daily floor. Phases still move.
 
 
 def ec_adjust(size: float, ec: float | None, target: float) -> float:
@@ -238,23 +241,26 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     # an EC correction also needs water that can dilute: feed below pore EC, and room left in the slab
     flush_ok = ec_known and s.feed_ec < ec and s.vwc < p.field_capacity - 2.0
 
-    # PRIORITY 1 — ANTI-LOCKOUT: high pore EC FLUSHES in ANY phase, never locks out.
+    # PRIORITY 1 — ANTI-LOCKOUT: high pore EC FLUSHES in ANY phase, never locks out. While steering is held
+    # the flush waits too (it steers to max_ec, a setpoint the plan manages); the blocks below still apply.
     if ec_known and ec >= p.max_ec:
         if not flush_ok:
             why = "feed not dilutive" if s.feed_ec >= ec else "slab saturated"
             reason = treason + (" | " if treason else "") + f"BLOCK high EC {ec:.1f} — {why} (self-clears)"
             return phase, round(p2_thr, 1), False, 0.0, Reason(reason, "block_high_ec")
         if ec_gap_ok:
-            excess = max(ec - p.max_ec, 0.0)
-            size = p.p2_shot_size * (1.5 + min(excess, 3.0) * 0.3)
-            fire, ir, kind = True, f"FLUSH high EC {ec:.1f}>={p.max_ec:.1f} (anti-lockout)", "flush_high_ec"
+            if not s.steering_held:
+                excess = max(ec - p.max_ec, 0.0)
+                size = p.p2_shot_size * (1.5 + min(excess, 3.0) * 0.3)
+                fire, ir, kind = True, f"FLUSH high EC {ec:.1f}>={p.max_ec:.1f} (anti-lockout)", "flush_high_ec"
         else:
             # over the ceiling but a flush just fired — hold this tick so it can drain (no machine-gun, no normal shot)
             reason = treason + (" | " if treason else "") + f"HOLD high EC {ec:.1f} — flush draining ({s.minutes_since_shot:.0f}/{ec_gap:.0f}min)"
             return phase, round(p2_thr, 1), False, 0.0, Reason(reason, "hold_high_ec")
 
-    # PRIORITY 2 — normal per-phase rules
-    if not fire:
+    # PRIORITY 2 — normal per-phase rules. While steering is held only the P3 emergency runs: a held plan
+    # stops the steering, never the water-safety rules (the watchdog and the floor below run either way).
+    if not fire and not s.steering_held:
         if phase == "P0":
             # P0 is the morning dryback: it fires only a genuine EC flush, gated like every other flush.
             if (ec_known and p.ec_target_p0 > 0 and ec / p.ec_target_p0 > 2.5
@@ -282,9 +288,8 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
                 fire, size, ir, kind = True, p.p2_shot_size * 1.5, f"P2 dilute EC {ec:.1f}", "p2_dilute"
             elif s.vwc < p2_thr:
                 fire, size, ir, kind = True, ec_adjust(p.p2_shot_size, ec, p.ec_target_p2), f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}", "p2_topup"
-        elif phase == "P3":
-            if s.vwc < p.p3_emergency_floor:
-                fire, size, ir, kind = True, p.p3_emergency_shot, f"P3 emergency VWC {s.vwc:.0f}<{p.p3_emergency_floor:.0f}", "p3_emergency"
+    if not fire and phase == "P3" and s.vwc < p.p3_emergency_floor:
+        fire, size, ir, kind = True, p.p3_emergency_shot, f"P3 emergency VWC {s.vwc:.0f}<{p.p3_emergency_floor:.0f}", "p3_emergency"
 
     # PRIORITY 3 — LIGHTS-ON WATERING WATCHDOG: backstop so no enabled zone ever starves. Never in P0: at
     # lights-on the whole night counts as "no water", and P0 is the dryback the day is meant to start with.
