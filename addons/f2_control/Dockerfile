@@ -16,8 +16,8 @@ COPY f2_control /app
 COPY config.yaml /app/addon.yaml
 WORKDIR /app
 
-# web UI: nginx config + the static dashboards (www/public is assembled from the repo
-# www/ by scripts/publish_addon.sh, so the dashboards have a single source of truth)
+# web UI: nginx config + the static dashboards (www/public is written by the dashboard
+# build, frontend/scripts/package.mjs, so the dashboards have a single source of truth)
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY www/public /www/public
 

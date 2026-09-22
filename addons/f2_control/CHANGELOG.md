@@ -1,3 +1,7 @@
+# Unreleased
+
+- Installed only from `JakeTheRabbit/HA-Irrigation-Strategy`; the `f2-control` mirror is retired. `url` in `config.yaml` now points here. No change to options, the state file or irrigation.
+
 # 0.16.2
 
 Pair with integration 2.19.2. **C3.** Found on the first real install (a one-zone tent); the fixes themselves were not run on hardware before release.

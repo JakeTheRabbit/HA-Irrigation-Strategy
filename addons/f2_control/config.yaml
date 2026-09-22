@@ -7,7 +7,7 @@ description: >-
   sequences the pump and valves with valve-close read-back, and is gated by a hard
   kill switch. Configure once in the Crop Steering UI; the operator dashboards are
   served right in the sidebar.
-url: https://github.com/JakeTheRabbit/f2-control
+url: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy
 arch:
   - amd64
   - aarch64
