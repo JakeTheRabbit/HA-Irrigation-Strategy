@@ -11,10 +11,17 @@ from datetime import datetime, timezone
 _CURRENT_TIMESTAMP = object()
 
 
+class _Read(tuple):
+    """(state, attributes, last_updated), plus `last_changed` as Home Assistant reports it."""
+
+    last_changed = None
+
+
 class FakeHA:
     def __init__(self):
         # entity_id -> (state, attributes, last_updated_iso)
         self.states: dict[str, tuple] = {}
+        self.changed: dict[str, str] = {}  # entity_id -> last_changed_iso (when the VALUE last changed)
         self.calls: list[tuple] = []  # (domain, service, data)
         self.sets: dict[str, tuple] = {}  # entity_id -> (state, attributes)
 
@@ -22,11 +29,16 @@ class FakeHA:
     def set_state(self, entity_id, state, attributes=None, last_updated=_CURRENT_TIMESTAMP):
         if last_updated is _CURRENT_TIMESTAMP:
             last_updated = datetime.now(timezone.utc).isoformat()
+        previous = self.states.get(entity_id)
+        if previous is None or previous[0] != str(state):
+            self.changed[entity_id] = last_updated
         self.states[entity_id] = (str(state), attributes or {}, last_updated)
 
     # ---- controller shims ----
     def ha_get(self, entity, timeout=8):
-        return self.states.get(entity, (None, {}, None))
+        read = _Read(self.states.get(entity, (None, {}, None)))
+        read.last_changed = self.changed.get(entity) if entity in self.states else None
+        return read
 
     def ha_call(self, domain, service, **data):
         self.calls.append((domain, service, data))

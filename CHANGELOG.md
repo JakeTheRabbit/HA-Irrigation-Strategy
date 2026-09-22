@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The irrigation changes (controller and engine) are class **C3**, from the F2 history of 21-22 September
+2026 and the review of it.
+**Not run on hardware.** No add-on option changes. The state file gains three additive keys that the
+previous controller ignores, so it can still read the file after a rollback.
+
 ### 🌱 In plain English
 
 - **One repository.** The controller app is now installed only from this repository. The old
@@ -30,6 +35,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dashboard is refused, like that person. Not changed: the room's own switches, selectors and
   numbers (a zone's hold switch, the phase selector, a setpoint) are Home Assistant entities and
   still follow Home Assistant's own permissions, so an ordinary login can still change those.
+- **A zone that has used its day's water can still be rescued.** On 22 September Zone 1 had no water
+  from 14:06 until lights-off with its moisture under the re-water line: the daily limit was reached
+  by midday, and the limit also stopped the "no water for 3 hours" safety shot. That safety shot, the
+  overnight emergency shot and the high-EC flushes now always pass the daily limit. Routine top-ups and
+  EC-correction shots stop at it, and a shot that would cross it gets only what is left, not a ten
+  minute shot with two litres of budget remaining.
+- **The morning ramp always finishes, and never waits all day.** P1 runs in full whatever it is set
+  to: it stops at its target or its maximum number of shots, not at the daily limit. Once the zone is
+  full and only pore EC is keeping the ramp open, a spent budget ends the ramp instead of holding the
+  zone in P1 with nothing it is allowed to fire.
+- **Pore EC is read when it means something.** For the first 45 minutes after a shot the probe reads
+  the fresh water passing it (6 to 8 mS/cm during the 22 September ramps, on zones that read about 4.5
+  when left alone). Every EC decision now uses the last reading taken at least 45 minutes after a shot,
+  so a passing spike no longer keeps the ramp flushing, doubles a shot or fires a flush, and an EC
+  flush waits for the next such reading before it is repeated.
+- **No safety shot at lights-on.** The whole night counted as "3 hours without water", so every zone
+  got a safety shot the moment the lights came on, before its morning dry-back. The dry-back now comes
+  first, as intended.
+- **A restart after lights-on starts a proper day.** If the controller was not running when the lights
+  went off (a reboot left it stopped), it came back in yesterday's P2 with yesterday's water already
+  counted, and watered nothing all day. It now starts the day at P0 with its own budget.
+- **A shot interrupted by a crash is closed at the next start, and nothing else is.** Before opening
+  anything the controller writes down what a shot is about to open. If it dies mid-shot, or loses Home
+  Assistant during the close, its next loop closes exactly that valve, main line and pump. **It never
+  switches anything off on a timer or on suspicion.** The tank is circulated for well over 20 minutes to
+  heat it, and zones are hand-watered with the valves and main line open: anything a person has
+  switched since the shot started is theirs and is left alone, together with everything upstream of
+  it; the pump is left alone while a hold (dosing, fill, flush, circulation) is on or another valve on
+  the line is open; and nothing at all is touched while the room's kill switch is off.
+- **Stopping or updating the app no longer switches everything off.** It used to switch off every pump
+  and valve it knew, which ended tank circulation and hand-watering whenever the app was stopped,
+  updated or restarted. Now it closes only the shot it has running, by the same rules as above, and
+  counts the water that shot gave. With no shot running it switches nothing off. A pump that reports
+  OFF a second late no longer latches a false hardware hold after a failed shot either (the
+  15 September problem, on the one path the earlier fix missed).
+- **A critical alert raised while Home Assistant is unreachable is not lost.** It is raised again until
+  Home Assistant has it; the 30-minute quiet period starts only then.
 
 ### 🔧 Technical notes
 
@@ -62,6 +104,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests_ha/test_non_admin_user.py` (a real Users-group account, and a real automation it sets
   off). The `tests/` call stand-ins for `services.py` now carry a no-user context, as a real
   `ServiceCall` always has one.
+- **Typed decisions (engine).** `decide()` still returns `(phase, p2_threshold, fire, size, reason)`;
+  `reason` is a `Reason(str)` with `.kind` and `.cap_exempt` (`CAP_EXEMPT`). Exempt: `flush_high_ec`,
+  `p1_ramp`, `p2_rescue`, `p3_emergency`, `watchdog`. Not exempt: `p0_ec_flush`, `p1_flush`, `p2_dilute`,
+  `p2_topup`, `min_daily`. Non-firing: `idle`, `block_high_ec`, `hold_high_ec`, `block_daily_cap`. This
+  replaces the substring test (`"flush" in ir`) that made every "P1 flush/runoff" shot an emergency.
+- **Cap -> watchdog.** A non-exempt shot cancelled by the cap becomes the watchdog shot (`p2_shot_size`,
+  kind `watchdog`) when the watchdog is due: lights on, not P0, more than `watchdog_hours` since the last
+  shot, VWC under the P2 threshold. The watchdog no longer fires in P0.
+- **P1 completion over budget.** P1 at `min(p1_target, field_capacity)` with `p1_minimum_shots` in and
+  `daily_vol >= max_daily_volume` goes to P2: `P1 complete at ceiling; EC flush over daily budget`.
+- **P0 EC flush** gated like the other flushes (feed below pore EC, VWC < FC - 2, `p2_min_interval_min`);
+  not exempt.
+- **New grow-day in any phase.** P1/P2 with `lights_on and new_grow_day` goes to P0 (`new grow-day -> P0
+  (reset)`) and the existing P0 bookkeeping resets the counters. From P1/P2 this needs a dated
+  `last_daily_reset` older than the grow-day start, so a fresh zone is never restarted mid-day. Blind
+  zones follow the same rule in `_blind_time_transition`.
+- **Settled EC.** New last field `ZoneSnapshot.ec_settled` (default `None`); every EC rule uses it when
+  present. `EC_SETTLE_MIN = 45`. `_settled_ec` takes the fused reading as settled 45 min after the last
+  shot ended (a switch-on anchor is not a shot), holds the last settled value in between, and passes
+  `None` while the probe reads nothing valid. Only settled readings feed `ec_smooth`, so the EC step /
+  PID. An EC correction acting on a settled value (anti-lockout, P0/P1 flush, P2 rescue/dilute) also
+  waits 45 min after the last shot: a held value can never re-fire a cap-exempt flush every 10 minutes.
+  The P1 EC-gate helper and the Jev evidence in `_auto_tick` use the same value. Published as
+  `ec_settled` on `sensor.crop_steering_<room>zone_N_safety_status`.
+- **EC offset at lights-on.** `_loop_room` clears `ec_offset`, the integral and the previous error
+  before it builds the parameters for the tick that starts the zone's day.
+- **Budget clipping (controller).** `_act_zone` cuts a non-exempt shot to the remaining budget at the
+  zone's flow; under `MIN_SHOT_S` (5 s) it does not fire and publishes `BLOCK daily-cap (x L left)`.
+  When less than a minimum shot is left, `_loop_room` decides again with the budget spent, so the
+  watchdog rescue and P1 completion apply at the margin too. Copied and blind-schedule decisions are
+  plain text and never exempt.
+- **Write-ahead shot record.** `_execute_shot` saves `_shot_inflight` (zone, valve, mainline, pump,
+  `started` in UTC) in the room's state block before opening anything and clears it once the close
+  reads back OFF. `_reconcile_inflight` runs at the top of every loop, so at start-up: it closes a
+  recorded switch only if Home Assistant's `last_changed` is within `INFLIGHT_OPEN_WINDOW_S` (-5 s to
+  +60 s) of `started`, walking valve -> main line -> pump and stopping at the first switch that changed
+  outside it; it leaves the main line and pump while another valve on the line is on, the pump while
+  any `hold_entities` is on, and everything while the room's kill switch is not ON. A close that is not
+  confirmed latches the hardware hold and alerts, and is retried each loop. A new shot in that room
+  waits until the record is settled. `ha_get` returns `HAState`, a tuple that unpacks as before and
+  carries `last_changed`.
+- **Stopping the app.** `_safe_off` (SIGTERM / SIGINT: stop, update, restart) no longer switches off
+  every mapped switch. It closes only a room's `_shot_inflight`, by the same `_inflight_plan` rules, and
+  with no shot in flight it switches nothing off. The shot running in this process is closed whatever
+  its kill switch reads; an older interrupted shot is left to the operator while its kill switch is not
+  ON, as in the loop. What cannot be closed and read back OFF stays recorded for the next start. State
+  is still saved on the way out.
+- **Alerts.** `_alert` starts the 30-minute debounce, and sends the phone push, only once
+  `persistent_notification.create` succeeds. A latched hardware hold this process has not announced is
+  announced from `_recover_hardware_faults`.
+- **Shot cleanup and stop.** The error-cleanup read-back uses `_confirm_switches` (1 s, then every
+  0.5 s to 6 s). A `SystemExit` mid-shot counts `nominal_l * elapsed / duration` before re-raising
+  (up to the end of the stop's close, like the normal close counts to its acknowledgement), and skips
+  the error cleanup, which would otherwise switch the rest off.
+- **State file.** Additive: `_shot_inflight` in a room block, `ec_settled` and `ec_settled_at` per zone.
+  The previous controller (0.16.2) loads the new file: it ignores the new keys, keeps the room-block one
+  when it saves and drops the two zone keys. An old file loads with the new keys at their defaults; a
+  damaged record is ignored and logged.
+- **Tests.** Engine: `crop-steering-engine/tests/test_day_structure.py` (32). Controller:
+  `test_grow_day_and_budget.py` (15) and `test_interrupted_shot.py` (22). In `test_auto_setpoints.py`
+  the plateau hand-over margin is now one 20-minute ramp interval instead of 0.5 h: the base run no
+  longer includes the P0 lights-on watchdog shot that delayed it. `test_declared_plumbing.py`: a mapped
+  pump is closed on exit when a shot of this controller left it on, and left alone otherwise (it
+  asserted the old blanket switch-off). `fake_ha.FakeHA` reports
+  `last_changed`. The `tests_ha/` tier was not run locally, and no `tests_ha/` test or seeded fixture was
+  added for this change yet.
 
 ## [2.19.2] - 2026-09-21
 

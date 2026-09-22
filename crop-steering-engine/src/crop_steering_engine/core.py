@@ -11,6 +11,43 @@ from dataclasses import dataclass
 
 PHASES = ("P0", "P1", "P2", "P3")
 
+# Minutes after a shot ends before a pore-EC reading counts as SETTLED. For the first half hour or so
+# after a shot the probe reads the fresh feed front and the free water still draining, not the slab
+# (live F2 2026-09-22: 6-8 mS/cm during the morning ramp on zones whose quiet readings were ~4.5).
+# The controller takes a settled reading only this long after the last shot, and an EC correction that
+# acts on one waits the same time, so each correction is judged by a reading taken after the last drained.
+EC_SETTLE_MIN = 45.0
+
+
+class Reason(str):
+    """decide()'s reason: still exactly the text it always was (logged, published, compared as a
+    string), plus WHICH rule produced it (`kind`) and whether that shot may exceed the zone's daily
+    budget (`cap_exempt`). Anything that only ever used the text is unaffected."""
+
+    def __new__(cls, text="", kind="idle", cap_exempt=False):
+        obj = super().__new__(cls, text)
+        obj.kind = kind
+        obj.cap_exempt = bool(cap_exempt)
+        return obj
+
+
+# Which shots may take a zone over its daily budget. The budget is a BUDGET, not a wall: routine and
+# EC-correction shots stop at it, rescues do not. P1 ramp shots are exempt because the ramp runs in full
+# and in order, whatever it is set to: it is bounded by p1_maximum_shots and its shot size, not the budget.
+# Kinds that never fire: idle (nothing due), block_high_ec, hold_high_ec, block_daily_cap.
+CAP_EXEMPT = {
+    "flush_high_ec": True,  # anti-lockout: pore EC at max_ec
+    "p0_ec_flush": False,
+    "p1_ramp": True,
+    "p1_flush": False,  # the ramp is at its ceiling; only EC is keeping P1 open
+    "p2_rescue": True,  # pore EC within 1 of max_ec
+    "p2_dilute": False,
+    "p2_topup": False,
+    "p3_emergency": True,
+    "watchdog": True,
+    "min_daily": False,  # never over the budget by construction: min_daily_volume <= max_daily_volume
+}
+
 
 # ============================================================
 # PURE DECISION CORE  (no HA, no IO -> unit-testable)
@@ -72,6 +109,9 @@ class ZoneSnapshot:
     feed_ec: float = 3.0          # source-water (tank) EC — for the anti-lockout dilutive-flush test
     new_grow_day: bool = False    # wall-clock fallback: True when in the lights-on window AND the daily
     #                               budget has NOT yet been reset for THIS grow-day (photoperiod).
+    ec_settled: float | None = None  # pore EC read >= EC_SETTLE_MIN after the last shot (or the last such
+    #                                  reading, held while shots come closer together). When given, EVERY
+    #                                  EC rule uses it instead of `ec`; None = fall back to `ec` as before.
 
 
 def ec_adjust(size: float, ec: float | None, target: float) -> float:
@@ -116,11 +156,18 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     Mirrors the distilled algorithm: phase transition -> EC steering (P2) ->
     irrigation decision -> the cap/EC safety subset. Gate checks that need live HA
     (dosing interlock, source-water, zone-enable) are applied in the IO shell.
+
+    `reason` is a Reason: the same text as always, plus `.kind` (the rule that produced it) and
+    `.cap_exempt` (whether this shot may exceed the daily budget; see CAP_EXEMPT).
     """
     phase = s.phase
     p2_thr = p.p2_threshold
     treason = ""
-    ec_known = s.ec is not None and math.isfinite(s.ec)
+    # Every EC rule reads the SETTLED pore EC when the caller supplies one (see EC_SETTLE_MIN): a raw
+    # reading taken minutes after a shot is the feed front passing the probe, not the slab.
+    settled = s.ec_settled is not None and math.isfinite(s.ec_settled)
+    ec = s.ec_settled if settled else s.ec
+    ec_known = ec is not None and math.isfinite(ec)
 
     # ---- PHASE TRANSITIONS (checked before irrigation) ----
     if not s.lights_on and phase != "P3":
@@ -128,6 +175,11 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     elif phase == "P3" and (s.lights_just_on or (s.lights_on and s.new_grow_day)):
         why = "lights-on -> P0" if s.lights_just_on else "new grow-day -> P0 (missed light edge)"
         phase, treason = "P0", why
+    elif phase in ("P1", "P2") and s.lights_on and s.new_grow_day:
+        # Still in yesterday's daytime phases when a new photoperiod has begun (the controller was not
+        # running across lights-off, or the schedule moved): today starts at P0 with its own budget and
+        # counters, instead of carrying yesterday's spent budget through the whole day.
+        phase, treason = "P0", "new grow-day -> P0 (reset)"
     elif phase == "P0":
         if s.vwc <= p.p2_threshold:
             phase, treason = "P1", f"P0 bypass VWC {s.vwc:.0f}<=rewater {p.p2_threshold:.0f}"
@@ -143,13 +195,17 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
         # zone gate-blocked before or during the ramp (feed pH/EC, dosing hold) waits in P1 and resumes;
         # phases always run in order. Lights-off -> P3 (above) is the only other way out.
         min_in = s.shot_count >= p.p1_min_shots
-        if s.vwc >= p1_ceiling and ec_known and s.ec <= p.ec_target_p1 * 1.15 and min_in:
-            phase, treason = "P2", f"P1 recovered {s.vwc:.0f}>={p1_ceiling:.0f} EC ok {s.ec:.1f}"
+        if s.vwc >= p1_ceiling and ec_known and ec <= p.ec_target_p1 * 1.15 and min_in:
+            phase, treason = "P2", f"P1 recovered {s.vwc:.0f}>={p1_ceiling:.0f} EC ok {ec:.1f}"
         elif not ec_known and s.vwc >= p1_ceiling and s.shot_count > 0 and min_in:
             # Do not claim EC recovery or keep watering an already-full slab blindly.
             phase, treason = "P2", "P1 VWC recovered after watering; EC unknown (flush unverified)"
         elif s.shot_count >= p.p1_max_shots:
             phase, treason = "P2", f"P1 max shots {s.shot_count}/{p.p1_max_shots}"
+        elif s.vwc >= p1_ceiling and min_in and s.daily_vol >= p.max_daily_volume:
+            # The ramp is complete and only pore EC holds P1 open, but the flush it wants is not exempt
+            # from the daily budget, which is spent: staying would hold the zone here with nothing to fire.
+            phase, treason = "P2", "P1 complete at ceiling; EC flush over daily budget"
     elif phase == "P2":
         # predictive P3: only if starting dryback NOW would finish by lights-on.
         if s.uptime_min >= 10 and s.vwc >= p.p3_emergency_floor and s.hours_to_lights_off <= 3.0:
@@ -170,62 +226,73 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     # threshold. (clamped lo/hi inside the shell.)
 
     # ---- IRRIGATION DECISION (priority order) ----
-    fire, size, ir = False, 0.0, ""
+    fire, size, ir, kind = False, 0.0, "", "idle"
 
     # anti short-cycle: an EC-correction shot must drain + re-read before the next, else small no-runoff
     # shots STACK EC instead of diluting it (the pump-cycling-every-minute failure mode seen live).
-    interval_ok = s.minutes_since_shot >= p.p2_min_interval_min
+    # Judged on a SETTLED reading it also waits for the next settled one: a held value cannot see what the
+    # last correction did, and re-firing on it would flush every few minutes for ever.
+    ec_gap = max(p.p2_min_interval_min, EC_SETTLE_MIN) if settled else p.p2_min_interval_min
+    ec_gap_ok = s.minutes_since_shot >= ec_gap
+    settle_ok = not settled or s.minutes_since_shot >= EC_SETTLE_MIN
+    # an EC correction also needs water that can dilute: feed below pore EC, and room left in the slab
+    flush_ok = ec_known and s.feed_ec < ec and s.vwc < p.field_capacity - 2.0
 
     # PRIORITY 1 — ANTI-LOCKOUT: high pore EC FLUSHES in ANY phase, never locks out.
-    if ec_known and s.ec >= p.max_ec:
-        if not (s.feed_ec < s.ec and s.vwc < p.field_capacity - 2.0):
-            why = "feed not dilutive" if s.feed_ec >= s.ec else "slab saturated"
-            reason = treason + (" | " if treason else "") + f"BLOCK high EC {s.ec:.1f} — {why} (self-clears)"
-            return phase, round(p2_thr, 1), False, 0.0, reason
-        if interval_ok:
-            excess = max(s.ec - p.max_ec, 0.0)
+    if ec_known and ec >= p.max_ec:
+        if not flush_ok:
+            why = "feed not dilutive" if s.feed_ec >= ec else "slab saturated"
+            reason = treason + (" | " if treason else "") + f"BLOCK high EC {ec:.1f} — {why} (self-clears)"
+            return phase, round(p2_thr, 1), False, 0.0, Reason(reason, "block_high_ec")
+        if ec_gap_ok:
+            excess = max(ec - p.max_ec, 0.0)
             size = p.p2_shot_size * (1.5 + min(excess, 3.0) * 0.3)
-            fire, ir = True, f"FLUSH high EC {s.ec:.1f}>={p.max_ec:.1f} (anti-lockout)"
+            fire, ir, kind = True, f"FLUSH high EC {ec:.1f}>={p.max_ec:.1f} (anti-lockout)", "flush_high_ec"
         else:
             # over the ceiling but a flush just fired — hold this tick so it can drain (no machine-gun, no normal shot)
-            reason = treason + (" | " if treason else "") + f"HOLD high EC {s.ec:.1f} — flush draining ({s.minutes_since_shot:.0f}/{p.p2_min_interval_min:.0f}min)"
-            return phase, round(p2_thr, 1), False, 0.0, reason
+            reason = treason + (" | " if treason else "") + f"HOLD high EC {ec:.1f} — flush draining ({s.minutes_since_shot:.0f}/{ec_gap:.0f}min)"
+            return phase, round(p2_thr, 1), False, 0.0, Reason(reason, "hold_high_ec")
 
     # PRIORITY 2 — normal per-phase rules
     if not fire:
         if phase == "P0":
-            if ec_known and p.ec_target_p0 > 0 and s.ec / p.ec_target_p0 > 2.5:
-                fire, size, ir = True, 10.0, f"P0 EC flush {s.ec:.1f}"
+            # P0 is the morning dryback: it fires only a genuine EC flush, gated like every other flush.
+            if (ec_known and p.ec_target_p0 > 0 and ec / p.ec_target_p0 > 2.5
+                    and flush_ok and ec_gap_ok):
+                fire, size, ir, kind = True, 10.0, f"P0 EC flush {ec:.1f}", "p0_ec_flush"
         elif phase == "P1":
             p1_ceiling = min(p.p1_target, p.field_capacity)
-            ec_high = ec_known and s.ec > p.ec_target_p1 * 1.15 and s.feed_ec < s.ec and s.vwc < p.field_capacity - 2.0
-            if s.minutes_since_shot >= p.p1_time_between_min and (s.vwc < p1_ceiling or ec_high):
+            ec_high = ec_known and ec > p.ec_target_p1 * 1.15 and flush_ok
+            ramp = s.vwc < p1_ceiling
+            if s.minutes_since_shot >= p.p1_time_between_min and (ramp or (ec_high and settle_ok)):
                 raw = min(p.p1_initial + p.p1_incr * s.shot_count,
                           p.p1_initial + p.p1_incr * p.p1_max_shots)
-                if s.vwc < p1_ceiling:
-                    ir = f"P1 ramp VWC {s.vwc:.0f}<{p1_ceiling:.0f}"
+                if ramp:
+                    ir, kind = f"P1 ramp VWC {s.vwc:.0f}<{p1_ceiling:.0f}", "p1_ramp"
                 else:
-                    ir = f"P1 flush/runoff EC {s.ec:.1f} (at ceiling {p1_ceiling:.0f})"
-                fire, size = True, ec_adjust(raw, s.ec, p.ec_target_p1)
+                    ir, kind = f"P1 flush/runoff EC {ec:.1f} (at ceiling {p1_ceiling:.0f})", "p1_flush"
+                fire, size = True, ec_adjust(raw, ec, p.ec_target_p1)
         elif phase == "P2":
-            flush_ok = ec_known and s.feed_ec < s.ec and s.vwc < p.field_capacity - 2.0
-            if ec_known and s.ec >= p.max_ec - 1.0:
-                if flush_ok and interval_ok:
-                    fire, size, ir = True, p.p2_shot_size * 1.5, f"P2 rescue flush EC {s.ec:.1f}"
+            if ec_known and ec >= p.max_ec - 1.0:
+                if flush_ok and ec_gap_ok:
+                    fire, size, ir, kind = True, p.p2_shot_size * 1.5, f"P2 rescue flush EC {ec:.1f}", "p2_rescue"
                 elif s.vwc < p2_thr:
-                    fire, size, ir = True, ec_adjust(p.p2_shot_size, s.ec, p.ec_target_p2), f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}"
-            elif ec_known and p.ec_target_p2 > 0 and s.ec / p.ec_target_p2 > 1.2 and flush_ok and interval_ok:
-                fire, size, ir = True, p.p2_shot_size * 1.5, f"P2 dilute EC {s.ec:.1f}"
+                    fire, size, ir, kind = True, ec_adjust(p.p2_shot_size, ec, p.ec_target_p2), f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}", "p2_topup"
+            elif ec_known and p.ec_target_p2 > 0 and ec / p.ec_target_p2 > 1.2 and flush_ok and ec_gap_ok:
+                fire, size, ir, kind = True, p.p2_shot_size * 1.5, f"P2 dilute EC {ec:.1f}", "p2_dilute"
             elif s.vwc < p2_thr:
-                fire, size, ir = True, ec_adjust(p.p2_shot_size, s.ec, p.ec_target_p2), f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}"
+                fire, size, ir, kind = True, ec_adjust(p.p2_shot_size, ec, p.ec_target_p2), f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}", "p2_topup"
         elif phase == "P3":
             if s.vwc < p.p3_emergency_floor:
-                fire, size, ir = True, p.p3_emergency_shot, f"P3 emergency VWC {s.vwc:.0f}<{p.p3_emergency_floor:.0f}"
+                fire, size, ir, kind = True, p.p3_emergency_shot, f"P3 emergency VWC {s.vwc:.0f}<{p.p3_emergency_floor:.0f}", "p3_emergency"
 
-    # PRIORITY 3 — LIGHTS-ON WATERING WATCHDOG: backstop so no enabled zone ever starves.
-    if (not fire and p.watchdog_hours > 0 and s.lights_on
-            and s.minutes_since_shot > p.watchdog_hours * 60.0 and s.vwc < p2_thr):
-        fire, size, ir = True, p.p2_shot_size, f"WATCHDOG {s.minutes_since_shot / 60.0:.1f}h no water (VWC {s.vwc:.0f}<{p2_thr:.0f})"
+    # PRIORITY 3 — LIGHTS-ON WATERING WATCHDOG: backstop so no enabled zone ever starves. Never in P0: at
+    # lights-on the whole night counts as "no water", and P0 is the dryback the day is meant to start with.
+    watchdog_due = (p.watchdog_hours > 0 and s.lights_on and phase != "P0"
+                    and s.minutes_since_shot > p.watchdog_hours * 60.0 and s.vwc < p2_thr)
+    watchdog_ir = f"WATCHDOG {s.minutes_since_shot / 60.0:.1f}h no water (VWC {s.vwc:.0f}<{p2_thr:.0f})"
+    if not fire and watchdog_due:
+        fire, size, ir, kind = True, p.p2_shot_size, watchdog_ir, "watchdog"
 
     # PRIORITY 4 — MINIMUM DAILY VOLUME floor (per-plant water safety, GUARANTEED + FRONT-STACKED +
     # SENSOR-INDEPENDENT): every enabled zone MUST put through at least min_daily_volume L per photoperiod.
@@ -237,23 +304,26 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
             and s.daily_vol < p.min_daily_volume
             and s.vwc < p.drown_ceiling
             and s.minutes_since_shot >= p.p2_min_interval_min):
-        fire, size, ir = True, p.p2_shot_size, f"MIN-DAILY floor {s.daily_vol:.1f}<{p.min_daily_volume:.1f}L (guaranteed)"
+        fire, size, ir, kind = True, p.p2_shot_size, f"MIN-DAILY floor {s.daily_vol:.1f}<{p.min_daily_volume:.1f}L (guaranteed)", "min_daily"
 
-    # ---- SAFETY: daily cap is a BUDGET, not a wall — emergencies exempt ----
+    # ---- SAFETY: daily cap is a BUDGET, not a wall — exemptions are by kind (CAP_EXEMPT) ----
     # NOTE: the MIN-DAILY floor above can never be blocked by this cap — the floor only fires while
     # daily_vol < min_daily_volume, and validate_params() clamps min_daily_volume <= max_daily_volume,
     # so floor-fires => daily_vol < min <= max => the cap's (daily_vol >= max) test is always false.
     # The two are mutually exclusive by construction; the floor's "guaranteed" contract holds.
-    if fire:
-        emergency = (ir.startswith("FLUSH") or ir.startswith("WATCHDOG")
-                     or "rescue" in ir or "flush" in ir or "emergency" in ir)
-        if s.daily_vol >= p.max_daily_volume and not emergency:
-            fire, ir = False, f"BLOCK daily-cap {s.daily_vol:.0f}/{p.max_daily_volume:.0f}L (budget; emergencies exempt)"
+    if fire and not CAP_EXEMPT[kind] and s.daily_vol >= p.max_daily_volume:
+        if watchdog_due:
+            # The routine shot is over budget, but the zone has had no water for watchdog_hours in
+            # daylight and sits under its re-water threshold: it gets the watchdog's cap-exempt shot,
+            # not nothing (live F2 2026-09-22: Z1 dry 14:06-22:00 behind a spent budget).
+            fire, size, ir, kind = True, p.p2_shot_size, watchdog_ir + " — over the daily budget", "watchdog"
+        else:
+            fire, ir, kind = False, f"BLOCK daily-cap {s.daily_vol:.0f}/{p.max_daily_volume:.0f}L (budget; emergencies exempt)", "block_daily_cap"
 
     reason = treason + (" | " if (treason and ir) else "") + ir
     if not ec_known:
         reason += (" | " if reason else "") + "EC unknown: base VWC watering; salt protection unverified"
-    return phase, round(p2_thr, 1), fire, round(size, 1), reason
+    return phase, round(p2_thr, 1), fire, round(size, 1), Reason(reason, kind, fire and CAP_EXEMPT.get(kind, False))
 
 
 def pick_sibling(blind_p1_target, healthy):
