@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   releases, and nothing in this repository writes to it. A controller installed from the mirror
   moves once; [docs/INSTALL.md](docs/INSTALL.md) has the steps, which carry its learned state and
   settings across. Never run the old and the new app at the same time.
+- **Only an administrator can change plans, recipes and run records.** The Crop Steering sidebar
+  is open to every Home Assistant login, and until now so was everything it can change: any
+  login, a staff phone or the hallway kiosk, could arm a plan with a future start date (which
+  holds every zone), disarm the plan that is running, or replace every room's recipe. Through
+  the Crop Steering actions, which is what the sidebar uses, saving, arming and disarming plans,
+  changing run records and recipes, holding a zone, forcing a phase and requesting a shot now
+  need an administrator's login, as room setup already did. Everyone else can still open the
+  sidebar and look. **Automations are not affected**: they run with no login of their own, even
+  when a person set them off. A script that someone who is not an administrator starts from a
+  dashboard is refused, like that person. Not changed: the room's own switches, selectors and
+  numbers (a zone's hold switch, the phase selector, a setpoint) are Home Assistant entities and
+  still follow Home Assistant's own permissions, so an ordinary login can still change those.
 
 ### 🔧 Technical notes
 
@@ -28,6 +40,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the Validate bundle check, so nothing it verified goes unchecked.
 - New section in `docs/INSTALL.md`: moving an app from `4d457e60_f2_control` (mirror) to
   `6db5faba_f2_control` (this repository), copying `/data/state.json` and the options.
+- New `custom_components/crop_steering/admin.py` `async_require_admin`: the one administrator
+  check, extracted from `setup_api.py`. It now also runs before every state-changing service:
+  `strategy_save`, `strategy_activate`, `strategy_disarm`, `runs_save`, `runs_archive`,
+  `runs_import`, `save_recipe`, `apply_recipe`, `set_manual_override`, `transition_phase`,
+  `execute_irrigation_shot` and `custom_shot`. Read-only services stay open: `strategy_get`,
+  `strategy_preview`, `runs_get`, `check_transition_conditions`. New services are checked by
+  default (the read-only ones are listed, not the others). Entity services on the integration's
+  own entities (`switch.crop_steering_zone_N_manual_override`, `select.crop_steering_irrigation_phase`,
+  `select.crop_steering_recipe_stage`, the numbers, the engine switch) are not covered; Home
+  Assistant's entity permissions govern those, and its Users group may control every entity.
+- Semantics are those of Home Assistant's own admin services: `context.user_id` empty passes, an
+  unknown user id or a non-admin is refused. `setup_*` keep their stricter rule (no user is
+  refused too) and their message. The panel stays `require_admin=False`.
+- Refusals raise `HomeAssistantError("crop_steering.<service> requires an authenticated Home
+  Assistant administrator")`, the type setup already used, not `Unauthorized`: over the REST API
+  the console uses, `Unauthorized` is a bare 401 that the http ban middleware counts as a failed
+  login (notification, then an IP ban at `login_attempts_threshold`).
+- `services.yaml` says so on each checked service. Tests: `tests/test_admin_only.py` (every
+  service; administrator, non-administrator, unknown user and no user) and
+  `tests_ha/test_non_admin_user.py` (a real Users-group account, and a real automation it sets
+  off). The `tests/` call stand-ins for `services.py` now carry a no-user context, as a real
+  `ServiceCall` always has one.
 
 ## [2.19.2] - 2026-09-21
 

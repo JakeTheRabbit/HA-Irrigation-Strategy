@@ -99,6 +99,8 @@ The planner schedules user-defined profiles by zone and grow day. The balance sl
 
 An active/armed plan cannot be edited as a draft. **Disarm plan** requests the normal boundary handoff back to manual targets; wait for **draft** status before editing. The UI reports unsupported controllers, stale required snapshots and unfinished handoffs instead of claiming activation succeeded.
 
+Saving, arming and disarming a plan need a Home Assistant administrator login. Any other login can open the plan and its previews, and is refused when it tries to change them.
+
 After adding or archiving zones in setup, use **Update zones from setup** in a draft plan. It preserves existing active-zone schedules, removes archived assignments, and initializes new zones from their current settings. Export the previous plan first if you need those removed assignments.
 
 ### Recipe library
@@ -137,6 +139,8 @@ Use **Insights → Calibration** to enter an actual catch-test result and inspec
 5. Choose a **Target reference**: **Current configured daily plan**, **Saved run daily reference**, or **Current phase reference**. Read its capture/source note before comparing it with recorded measurements.
 6. Inspect coverage and missing-data notices. **Export metadata** backs up run definitions and reference snapshots, not Recorder readings. Archive/restore controls retain the registered run's identity.
 
+Saving, archiving and importing run records need a Home Assistant administrator login; any login can view them.
+
 Registering last month's run today captures today's reference configuration. It cannot recover last month's setpoints or expired Recorder data. Editing dates preserves the original capture. Current/saved daily target illustrations are references, not an audit of every historical target. Each room supports up to 100 run records; a completed run covers 1–366 inclusive calendar days.
 
 ## Set up rooms, zones and sensors
@@ -163,7 +167,7 @@ Choose **Settings → Appearance → Home Assistant / system** to inherit the HA
 
 **Sensors** shows values, units, availability and freshness. **Insights** shows coverage, equipment mappings and the local catch-test calculator. **Activity** lists available controller/state records and supports CSV export; it is not an immutable audit of every physical shot. **Help** explains the interface's metrics and limits.
 
-For an existing timed zone hold, Home Assistant exposes the `crop_steering.set_manual_override` action. Its timeout defaults to 60 minutes and accepts 1–1440 minutes; specify the intended zone and room slug (omit the room for the legacy default room). Clearing the hold is distinct from enabling zone/room scheduling. Turning its switch on directly creates an indefinite hold. See the action's fields in HA and the [entity reference](ENTITIES.md); the dashboard does not advertise legacy manual-shot or phase-event services as verified actuator commands.
+For an existing timed zone hold, Home Assistant exposes the `crop_steering.set_manual_override` action. The action refuses a signed-in user who is not an administrator (automations can still call it); the switch itself follows Home Assistant's own user permissions. Its timeout defaults to 60 minutes and accepts 1–1440 minutes; specify the intended zone and room slug (omit the room for the legacy default room). Clearing the hold is distinct from enabling zone/room scheduling. Turning its switch on directly creates an indefinite hold. See the action's fields in HA and the [entity reference](ENTITIES.md); the dashboard does not advertise legacy manual-shot or phase-event services as verified actuator commands.
 
 ## Recorded live verification
 

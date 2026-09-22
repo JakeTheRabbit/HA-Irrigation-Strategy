@@ -1,5 +1,6 @@
 """Response-only metadata services, isolated by canonical room identity."""
 
+from .admin import async_require_admin
 from .const import DOMAIN
 from .run_store import RunStore
 
@@ -29,6 +30,9 @@ async def async_setup_runs(hass, entry):
     hass.data.setdefault(DOMAIN, {}).setdefault("_runs", {})[entry.entry_id] = manager
 
     async def handle(call):
+        # runs_get only reads; saving, archiving and importing records needs an administrator.
+        if call.service != "runs_get":
+            await async_require_admin(hass, call, f"{DOMAIN}.{call.service}")
         try:
             target = resolve_runs(hass, call.data["room_id"])
             if call.service == "runs_get":
