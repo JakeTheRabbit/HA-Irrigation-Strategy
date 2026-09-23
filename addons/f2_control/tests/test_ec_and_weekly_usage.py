@@ -188,7 +188,7 @@ def test_aborted_shot_records_only_delivered_volume_in_weekly_total(rig, monkeyp
     c, fake, room, clock = rig
     def partial_wait(_room, _zone, _duration, started=None):
         clock["seconds"] += 2
-        return 2, True
+        return 2, ("abort", _room.enable_flag)
     monkeypatch.setattr(c, "_wait_shot", partial_wait)
     c._execute_shot(room, 1, 10, 10)
     assert room.state[1]["daily_vol"] == pytest.approx(2)

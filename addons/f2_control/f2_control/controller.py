@@ -168,6 +168,10 @@ CONFIRM_FIRST_READ_S, CONFIRM_POLL_S, CONFIRM_TIMEOUT_S = 1.0, 0.5, 6.0
 # The shortest shot the controller runs, in seconds (a shot sized shorter is lengthened to this).
 MIN_SHOT_S = 5
 
+# What Controller._on reads as ON. A hold (hold_entities) in one of these states stops a shot starting
+# (_blocked) and ends one in flight (_wait_shot): the same test, so the two can never disagree.
+ON_STATES = ("on", "true", "open", "1", "home")
+
 # A switch a shot opened changed state inside this window of the shot's recorded start, in seconds:
 # the pump prime (2 s), the main-line lead (1 s) and, at worst, a slow Home Assistant acknowledging
 # each command. A switch that changed outside it was already on, or has been touched by a person since.
@@ -1164,7 +1168,7 @@ class Controller:
         v, _, _ = ha_get(entity)
         if v in (None, "unknown", "unavailable", ""):
             return default
-        return str(v).lower() in ("on", "true", "open", "1", "home")
+        return str(v).lower() in ON_STATES
 
     def _read_sensor(self, entity, lo=0.0, hi=200.0, max_age_min=20, to_ms_cm=False):
         v, attrs, lu = ha_get(entity)
@@ -2105,14 +2109,21 @@ class Controller:
     def _wait_shot(self, room, zone, duration_s, started=None):
         """Wait to a monotonic deadline, including HA latency and valve-open command time.
 
-        Check kill/override between <=2 s sleeps using bounded reads. This remains
-        synchronous: other rooms wait and network/device delays can delay shutdown.
-        Returns actual seconds elapsed and whether a definitive kill OFF / override ON
-        interrupted it. An unreadable flag retains the existing in-flight policy.
+        Check kill/override, the holds and the shot's valve between <=2 s sleeps using bounded
+        reads. This remains synchronous: other rooms wait and network/device delays can delay
+        shutdown. Returns actual seconds elapsed and what ended the shot early, or None:
+          ("abort", entity): a definitive kill OFF / room OFF / override ON. The operator's own
+            switches are read first in every round, so they win.
+          ("external", entity): something else closed the feed path: a hold (hold_entities) reads
+            ON (the test _blocked applies before a shot), or the shot's own valve reads OFF. The
+            caller closes only what is still this shot's (_close_cut_short).
+        An unreadable entity retains the existing in-flight policy: it ends nothing.
         """
         started = time.monotonic() if started is None else started
         deadline = started + duration_s
         step = 2.0
+        valve = room.hw.get("valves", {}).get(zone)
+        valve_seen_on = False
         while time.monotonic() < deadline:
             for entity, stop_state in (
                 (room.enable_flag, "off"),
@@ -2130,11 +2141,69 @@ class Controller:
                 # return measured time rather than pretending sleep time was delivery.
                 state = ha_get(entity, timeout=min(step, remaining))[0]
                 if state == stop_state:
-                    return time.monotonic() - started, True
+                    return time.monotonic() - started, ("abort", entity)
+            for entity in [e for e in (*self.hold_entities, valve) if e]:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                state = ha_get(entity, timeout=min(step, remaining))[0]
+                if entity != valve:
+                    ended = str(state).lower() in ON_STATES
+                else:
+                    # Right after turn_on Home Assistant can still show the valve's old OFF (a Zigbee
+                    # plug reports its new state up to ~1.6 s late): only an OFF after it was seen ON
+                    # is somebody closing it.
+                    ended = state == "off" and valve_seen_on
+                    valve_seen_on = valve_seen_on or state == "on"
+                if ended:
+                    return time.monotonic() - started, ("external", entity)
             remaining = deadline - time.monotonic()
             if remaining > 0:
                 time.sleep(min(step, remaining))
-        return time.monotonic() - started, False
+        return time.monotonic() - started, None
+
+    def _close_cut_short(self, room, zone, by, elapsed, duration_s, valve_opened):
+        """Close a shot that something else cut short (see _wait_shot) -> seconds its valve was open.
+
+        The shot's valve and main line are its own: each is switched off unless it already reads OFF
+        (a guard automation closed it first; it is not touched again). So is its pump, but never while
+        a hold is ON: dosing, a fill, a flush or circulation owns the pump now, as in _inflight_plan.
+        Only what this switches off is read back, so a feed path somebody else closed never latches a
+        hardware hold. A switch of the shot's own that will not close still does, and the shot stays
+        recorded for the reconciler.
+
+        The seconds come from Home Assistant's last_changed for the valve when it reads OFF and that
+        change falls between this shot opening it and the interruption being seen: it closed before
+        the controller looked. Otherwise (still open, or no usable change time) they run to when the
+        interruption was seen.
+        """
+        valve, mainline, pump = room.hw["valves"].get(zone), room.hw.get("mainline"), room.hw.get("pump")
+        reads = {e: ha_get(e) for e in (valve, mainline, pump) if e}
+        close = [e for e in (valve, mainline) if e and reads[e][0] != "off"]
+        left = []
+        if pump and reads[pump][0] != "off":
+            (left if any(self._on(f, False) for f in self.hold_entities) else close).append(pump)
+        if close and not self._switch_off_confirmed(close):
+            self._latch_hardware_fault(room, f"zone {zone} shot cut short: {', '.join(close)} close not confirmed")
+        else:
+            room.shot_inflight = None  # as after a normal close: nothing of this shot's is left open
+        changed = _aware(getattr(reads[valve], "last_changed", None)) if reads[valve][0] == "off" else None
+        closed_after = (changed - valve_opened).total_seconds() if changed else None
+        open_s = closed_after if closed_after is not None and 0 <= closed_after <= elapsed else elapsed
+        what = (f"its valve {by} was switched OFF by something other than this controller" if by == valve
+                else f"the hold {by} turned ON")
+        outcome = " ".join(
+            ([f"Switched off {', '.join(close)}."] if close else [])
+            + ([f"Left {', '.join(left)} on: a hold owns it now."] if left else [])
+        ) or "Nothing it had opened was still on."
+        log(f"[{room.slug}] Z{zone} shot cut short after {open_s:.1f}/{duration_s:.0f}s: {what}. {outcome}")
+        self._alert(
+            f"cutshort_{room.slug}_z{zone}",
+            "Shot cut short — feed path closed externally",
+            f"{room.slug} zone {zone}: {what}, so the shot ended after {open_s:.0f} of {duration_s:.0f} s "
+            f"and only those {open_s:.0f} s are counted. {outcome}",
+        )
+        return open_s
 
     @staticmethod
     def _confirm_switches(entities, want):
@@ -2220,6 +2289,7 @@ class Controller:
             if mainline:
                 time.sleep(1)
             valve_started = time.monotonic()
+            valve_opened = datetime.now(timezone.utc)  # on Home Assistant's clock too: see _close_cut_short
             if not ha_call("switch", "turn_on", entity_id=valve):
                 for upstream in (mainline, pump):
                     if upstream:
@@ -2233,6 +2303,18 @@ class Controller:
             elapsed, aborted = self._wait_shot(
                 room, zone, duration_s, started=valve_started
             )
+            if aborted and aborted[0] == "external":
+                # Something else closed the feed path (dosing, a tank fill, a guard automation, a person).
+                # Only what is still this shot's is closed, so the error cleanup below, which switches off
+                # all three (a pump a hold now owns too), must never run for it: anything left recorded is
+                # settled by the reconciler at the next loop.
+                shutdown_checked = True
+                elapsed = self._close_cut_short(room, zone, aborted[1], elapsed, duration_s, valve_opened)
+                # Counted as a kill-switch abort is: the shot counts, with only the water it delivered.
+                run = elapsed / duration_s if duration_s > 0 else 1.0
+                counted = True
+                self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run)
+                return
             # CLOSE sequence. A failed close (e.g. HA went unreachable mid-shot) leaves the valve
             # OPEN and the SOFTWARE CANNOT fix it — only the hardware fail-safe (NC valve /
             # pump-relay-default-off / independent watchdog) can. So check EVERY turn_off + the
