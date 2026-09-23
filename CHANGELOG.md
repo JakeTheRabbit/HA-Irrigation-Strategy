@@ -11,8 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Class **C1**: dashboard only, nothing the controller or the integration reads. Not run on hardware;
-checked read-only against a live room's recorded history.
+The Overview timeline is class **C1**: dashboard only, nothing the controller or the integration
+reads. Not run on hardware; checked read-only against a live room's recorded history. A shot cut
+short by something else is class **C3** (irrigation behaviour, controller only). Not run on
+hardware; the 23 September event is replayed in the controller suite.
 
 ### 🌱 In plain English
 
@@ -36,6 +38,17 @@ checked read-only against a live room's recorded history.
   Assistant over its own connection) and kept current from the updates the dashboard already
   receives.
 - Insights keeps its moisture and EC chart.
+- **A shot that something else cuts short now ends there, and only the water it gave is counted.**
+  On 23 September at 11:25 the batch tank ran empty 4 seconds into a zone 1 shot. The dosing
+  automation took the tank and its pump, and the feed guard closed the valve and main line. The
+  controller did not notice: it waited out the full 170 seconds and counted about 7.9 litres for
+  about 0.2 litres delivered. It now checks during every shot, at least every 2 seconds: when one
+  of its holds (dosing, a tank fill, a flush) comes on, or the zone's valve is switched off by
+  something else, the shot ends there and only the seconds the valve was open are counted. It
+  closes its own valve and main line if they are still open, never touches a pump a hold is
+  using, and sends one alert saying what ended the shot. A feed path closed by somebody else is
+  not a hardware fault. Nothing is switched off on a timer, and the kill switch and manual
+  override work as before.
 
 ### 🔧 Technical notes
 
@@ -64,6 +77,24 @@ checked read-only against a live room's recorded history.
   change and Flower 1 zone 3 held since it was disabled.
 - `pages/overview.tsx` renders `components/day-timeline.tsx` in place of `HistoryChart`, which
   stays on Insights.
+- **Controller** (`controller.py`), a shot cut short from outside: in every round `_wait_shot` also
+  reads each `hold_entities` entity (ON as `_blocked` reads it, the shared `ON_STATES`) and the
+  shot's own valve, with the same bounded reads and at most 2 s between rounds, after the kill
+  switch, `room_active` and manual override, which therefore still win. It returns
+  `(elapsed, None | ("abort", entity) | ("external", entity))` instead of `(elapsed, bool)`. The
+  valve reading OFF counts only once it has been seen ON in that shot: right after `turn_on`, Home
+  Assistant can still show the old OFF (a Zigbee report can lag 1.6 s). `_execute_shot` hands an
+  external stop to the new `_close_cut_short`, which switches off the shot's valve and main line
+  unless they read OFF, and its pump unless it reads OFF or a hold is ON (the `_inflight_plan`
+  rule). It reads back only what it switched off: a switch of its own that will not close still
+  latches the hardware hold and keeps the record for the reconciler. Otherwise it clears
+  `shot_inflight` as the normal close does. The error cleanup, which switches off all three, never
+  runs for such a shot. Counted time: the valve's `last_changed` when it reads OFF and that falls
+  between the valve opening and the detection, else the detection. Counters as for a kill-switch
+  abort: the shot counts, with the volume delivered. One alert, `cutshort_<room>_z<n>` (*Shot cut
+  short — feed path closed externally*), debounced like the others, names the entity and the
+  seconds delivered against planned. No change to add-on options, the state file, entities or the
+  normal shot.
 
 ## [2.19.5] - 2026-09-23
 
