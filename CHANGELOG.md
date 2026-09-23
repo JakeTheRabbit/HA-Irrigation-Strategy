@@ -42,7 +42,7 @@ hardware; the 23 September event is replayed in the controller suite.
   On 23 September at 11:25 the batch tank ran empty 4 seconds into a zone 1 shot. The dosing
   automation took the tank and its pump, and the feed guard closed the valve and main line. The
   controller did not notice: it waited out the full 170 seconds and counted about 7.9 litres for
-  about 0.2 litres delivered. It now checks during every shot, at least every 2 seconds: when one
+  about 0.2 litres delivered. It now checks during every shot, about every 2 seconds: when one
   of its holds (dosing, a tank fill, a flush) comes on, or the zone's valve is switched off by
   something else, the shot ends there and only the seconds the valve was open are counted. It
   closes its own valve and main line if they are still open, never touches a pump a hold is
@@ -79,7 +79,7 @@ hardware; the 23 September event is replayed in the controller suite.
   stays on Insights.
 - **Controller** (`controller.py`), a shot cut short from outside: in every round `_wait_shot` also
   reads each `hold_entities` entity (ON as `_blocked` reads it, the shared `ON_STATES`) and the
-  shot's own valve, with the same bounded reads and at most 2 s between rounds, after the kill
+  shot's own valve, with the same bounded reads and sleeps of at most 2 s between rounds, after the kill
   switch, `room_active` and manual override, which therefore still win. It returns
   `(elapsed, None | ("abort", entity) | ("external", entity))` instead of `(elapsed, bool)`. The
   valve reading OFF counts only once it has been seen ON in that shot: right after `turn_on`, Home
