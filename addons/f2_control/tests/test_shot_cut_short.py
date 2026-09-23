@@ -7,7 +7,7 @@ his dose guard closed the valve and the main line. The controller did not notice
 170 s, ran its close sequence and counted about 7.9 L for about 0.2 L delivered. Had the next dosing
 step started the pump to mix inside that window, the end-of-shot close would have stopped it mid-dose.
 
-Now the shot ends at the next check (every 2 s at most) once a hold reads ON or the shot's own valve
+Now the shot ends at the next check (about every 2 s) once a hold reads ON or the shot's own valve
 reads OFF. Only the time the valve was open is counted. Only what is still the shot's is closed, never
 a pump a hold now owns, and nothing is re-toggled or read back that somebody else already closed, so
 there is no hardware hold for it. Nothing is ever switched off on a timer.
