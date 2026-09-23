@@ -109,7 +109,7 @@ def test_wait_shot_interrupts_on_kill_switch(monkeypatch):
 
     monkeypatch.setattr(controller.time, "sleep", fake_sleep)
     elapsed, aborted = c._wait_shot(room, 1, 10)
-    assert aborted is True
+    assert aborted == ("abort", "input_boolean.kill")  # the operator's switch, not something external
     assert 0 < elapsed < 10  # stopped partway, not the full duration
 
 
@@ -125,7 +125,7 @@ def test_wait_shot_runs_full_when_enabled(monkeypatch):
     monkeypatch.setattr(controller.time, "sleep",
                         lambda dt: clock.__setitem__("seconds", clock["seconds"] + dt))
     elapsed, aborted = c._wait_shot(c.rooms[0], 1, 6)
-    assert aborted is False
+    assert aborted is None
     assert elapsed == 6
 
 

@@ -163,4 +163,4 @@ def test_a_shot_in_flight_is_cut_when_the_room_is_switched_off(monkeypatch):
 
     monkeypatch.setattr(controller.time, "sleep", sleep)
     elapsed, aborted = c._wait_shot(c.rooms[0], 1, 60)
-    assert aborted is True and elapsed < 60
+    assert aborted == ("abort", ROOM_ACTIVE) and elapsed < 60
