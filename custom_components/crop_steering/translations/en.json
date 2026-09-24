@@ -856,6 +856,10 @@
     "entities_moved": {
       "title": "Crop Steering: {count} setting(s) are not where the controller looks for them (CS-605)",
       "description": "The controller finds each setting by its exact entity id, and these are somewhere else, so it is running on its built-in defaults for them (daily water cap and plant count included):\n\n{entities}\n\nKeep the engine off until this is fixed. If you changed an entity id yourself, change it back: Settings → Devices & services → Entities → the entity → the cog → Entity ID. If nearly every entity is listed, the room was created while Home Assistant was still running an older version of this integration: delete the Crop Steering entry, restart Home Assistant, and add it again. Nothing is renamed for you, because an id you chose on purpose is yours to keep.\n\nCode CS-605. What it means and what to do: Crop Steering → Help & tools → Error codes."
+    },
+    "stock_low": {
+      "title": "Crop Steering: {count} stock tank(s) running low (CS-608)",
+      "description": "These stock tanks are at or below their low mark:\n\n{tanks}\n\nRefill them, then open Crop Steering → Stock tanks and press Refilled, or set the level you read off the tank. Each batch tank the room makes takes its dose from every stock tank; this card clears itself once every tank is above its low mark.\n\nCode CS-608. What it means and what to do: Crop Steering → Help & tools → Error codes."
     }
   },
   "selector": {

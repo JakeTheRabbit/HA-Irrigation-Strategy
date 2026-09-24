@@ -63,6 +63,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-605](#cs-605) | Settings not where the controller looks for them | Warning | Repairs card |
 | [CS-606](#cs-606) | Grow strategy plan is holding irrigation | Critical | Repairs card |
 | [CS-607](#cs-607) | Grow strategy plan has not moved on to today | Warning | Repairs card |
+| [CS-608](#cs-608) | Stock tanks running low | Warning | Repairs card |
 
 ## Sensors (CS-1xx)
 
@@ -768,3 +769,23 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Usually nothing: it clears by itself once the cause is fixed.
 - If it stays, check the controller app is running and the probes are reporting.
+
+<a id="cs-608"></a>
+
+### CS-608: Stock tanks running low
+
+*Warning · Repairs card*
+
+**What it means.** One or more of the room's stock tanks is at or below its low mark. Each batch tank the room makes takes its dose from every stock tank.
+
+**Watering meanwhile.** Carries on. Batches made from an empty stock tank will be short of that nutrient.
+
+**Likely causes**
+
+- Batches have drawn the stock down to its low mark.
+- A tank was refilled but Refilled was not pressed, so its level is still the old one.
+
+**Suggested fixes**
+
+- Refill the tank, then press Refilled on Crop Steering → Stock tanks.
+- Or set the level you read off the tank. The card clears itself once every tank is above its low mark.
