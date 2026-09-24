@@ -11,10 +11,12 @@ try:
     from homeassistant.const import Platform
     from homeassistant.core import HomeAssistant, callback
     from homeassistant.exceptions import ConfigEntryNotReady
+    from homeassistant.helpers import config_validation as cv
 except ImportError:  # pragma: no cover - enables non-HA unit tests
     ConfigEntry = Any  # type: ignore
     HomeAssistant = Any  # type: ignore
     ConfigEntryNotReady = Exception  # type: ignore
+    cv = None  # type: ignore
 
     def callback(func):  # type: ignore
         return func
@@ -28,6 +30,11 @@ except ImportError:  # pragma: no cover - enables non-HA unit tests
 
 
 from .const import DOMAIN
+
+# Set up from the UI only: nothing is read from configuration.yaml. Saying so is what hassfest asks
+# of an integration with async_setup, and Home Assistant then tells anyone who writes a
+# `crop_steering:` block that it is ignored, instead of ignoring it without a word.
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN) if cv else None
 
 try:
     from .services import async_setup_services, async_unload_services

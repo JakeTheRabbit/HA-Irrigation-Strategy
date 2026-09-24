@@ -220,6 +220,60 @@ try {
       }
     },
   );
+  await check(
+    "an open dropdown can be read on a dark Home Assistant theme (steering mode, activity, sensors)",
+    async () => {
+      // Home Assistant's input fill is a translucent rgba of the text colour. The browser cannot
+      // paint an option list with it and fell back to white under light text.
+      const themed = await context.newPage();
+      try {
+        const alpha = (colour) => {
+          const parts = colour.match(/[\d.]+/g).map(Number);
+          return parts.length < 4 ? 1 : parts[3];
+        };
+        const luminance = (colour) => {
+          const [r, g, b] = colour.match(/[\d.]+/g).map(Number);
+          return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+        };
+        for (const route of ["strategy", "activity", "sensors", "comparison"]) {
+          await themed.goto(`${base}/dashboard.html?room=f1#/${route}`, {
+            waitUntil: "networkidle",
+          });
+          await themed.evaluate(() => {
+            document.documentElement.classList.add("dark");
+            document.documentElement.style.setProperty(
+              "--ha-native-input",
+              "rgba(225, 225, 225, 0.05)",
+            );
+          });
+          const options = await themed.locator("select option").evaluateAll((nodes) =>
+            nodes.map((node) => {
+              const style = getComputedStyle(node);
+              return {
+                text: node.textContent,
+                background: style.backgroundColor,
+                colour: style.color,
+              };
+            }),
+          );
+          assert.ok(options.length > 0, `${route}: expected at least one dropdown`);
+          for (const option of options) {
+            assert.equal(
+              alpha(option.background),
+              1,
+              `${route}: "${option.text}" has a see-through background`,
+            );
+            assert.ok(
+              Math.abs(luminance(option.background) - luminance(option.colour)) > 0.4,
+              `${route}: "${option.text}" is ${option.colour} on ${option.background}`,
+            );
+          }
+        }
+      } finally {
+        await themed.close();
+      }
+    },
+  );
   await check("partial failure keeps failed draft and writes only selected room", async () => {
     failWrite = "number.crop_steering_f1_zone_1_p2_vwc_threshold";
     await field("p1_target_vwc").fill("65");
