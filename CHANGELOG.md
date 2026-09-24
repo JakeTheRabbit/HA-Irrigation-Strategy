@@ -56,6 +56,10 @@ controller or the integration reads. Not run on hardware; checked by the browser
   table carries each zone's target under its moisture and fits without scrolling sideways. The
   sentences under panel titles and the captions under today's totals moved into tooltips. At
   1440 px wide the Overview is under two screens tall; it was more than three.
+- **A calmer look.** No text smaller than 12 px anywhere (118 places were 7–11 px), page and
+  panel titles in one semibold weight, no divider under every panel title, no shaded band behind
+  table headers, neutral status chips with a coloured dot, and a quieter menu. Colours still
+  follow your Home Assistant theme.
 - **A shot that something else cuts short now ends there, and only the water it gave is counted.**
   On 23 September at 11:25 the batch tank ran empty 4 seconds into a zone 1 shot. The dosing
   automation took the tank and its pump, and the feed guard closed the valve and main line. The
@@ -110,6 +114,16 @@ controller or the integration reads. Not run on hardware; checked by the browser
   and value strings are unchanged. `Metrics` shows only the *waiting for controller data*
   caption. `DayTimeline` loses its heading paragraph. `verify-tank-status.mjs` holds the tank's
   top inset to its left inset.
+- `styles.css` set its type and chrome twice: the original rules, then a later "Home
+  Assistant-native density" block overriding them (`h1` 26/400 over 28/650, `h2` 20/400 over
+  17/650, panel heading padding, table sizes, metric weight, nav weights). Each value now lives
+  once, in the original rules; the later block keeps only the theme mappings. New `:root` tokens
+  `--text-xs`…`--text-2xl` (12–24 px) and `--space-2`…`--space-6`. New `lib/type-scale.test.ts`
+  fails any stylesheet under `frontend/src` that sets text below 12 px. `.status-good` is a
+  neutral pill (it leaves the `--primary-strong` contrast list); `nav button.active` has a
+  neutral fill with a 2 px accent bar.
+  The Overview's `.overview-grid` becomes 7fr/3fr and its compact table keeps ages and units
+  on one line at the larger table text.
 - **Controller** (`controller.py`), a shot cut short from outside: in every round `_wait_shot` also
   reads each `hold_entities` entity (ON as `_blocked` reads it, the shared `ON_STATES`) and the
   shot's own valve, with the same bounded reads and sleeps of at most 2 s between rounds, after the kill

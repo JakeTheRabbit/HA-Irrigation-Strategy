@@ -117,7 +117,7 @@
 .wd-shots small {
   display: block;
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: var(--text-xs);
   margin-top: 4px;
 }
 .wd-budget {

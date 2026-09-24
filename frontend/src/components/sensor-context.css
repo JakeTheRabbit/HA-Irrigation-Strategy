@@ -72,7 +72,7 @@
   gap: 6px 16px;
   padding: 0 16px 4px;
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .sensor-key span {
   display: inline-flex;
@@ -111,7 +111,7 @@
 .sensor-chart-heading h3 span {
   color: var(--muted-foreground);
   font-weight: 400;
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .sensor-chart-empty {
   color: var(--muted-foreground);
@@ -134,7 +134,7 @@
 }
 .sensor-stats dt {
   color: var(--muted-foreground);
-  font-size: 10.5px;
+  font-size: var(--text-xs);
 }
 .sensor-stats dd {
   margin: 1px 0 0;
@@ -145,7 +145,7 @@
 .sensor-stats dd small {
   display: block;
   color: var(--muted-foreground);
-  font-size: 10.5px;
+  font-size: var(--text-xs);
   font-weight: 400;
 }
 .sensor-chart-plot {
@@ -164,7 +164,7 @@
 }
 .sensor-axis {
   fill: var(--muted-foreground);
-  font-size: 10.5px;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 .sensor-series {
@@ -199,7 +199,7 @@
 }
 .sensor-label text {
   fill: var(--foreground);
-  font-size: 10.5px;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 .sensor-label-saved polyline {
@@ -222,7 +222,7 @@
 }
 .sensor-marker-label {
   fill: var(--foreground);
-  font-size: 10.5px;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   paint-order: stroke;
   stroke: var(--surface);
@@ -245,7 +245,7 @@
   background: var(--surface);
   color: var(--foreground);
   box-shadow: 0 4px 16px rgb(0 0 0 / 14%);
-  font-size: 11px;
+  font-size: var(--text-xs);
   white-space: nowrap;
   pointer-events: none;
 }
@@ -279,7 +279,7 @@
 .sensor-context-caption {
   margin: 10px 16px 16px;
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 1.6;
 }
 /* A suggested value under a field, beside the button that copies it into the local draft. */
@@ -290,7 +290,7 @@
   gap: 6px 10px;
   margin: 6px 0 0;
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 1.5;
 }
 @media (max-width: 1150px) {

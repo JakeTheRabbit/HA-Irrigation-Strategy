@@ -60,7 +60,7 @@
   border-color: var(--border);
   background: var(--secondary);
   color: var(--primary-strong);
-  font-size: 10px;
+  font-size: var(--text-xs);
   vertical-align: 1px;
 }
 @media (max-width: 720px) {
