@@ -230,9 +230,22 @@ def test_a_switch_that_will_not_close_latches_the_hold_and_is_retried_every_loop
     c._reconcile_inflight()
     room = c.rooms[0]
     assert room.hardware_fault is not None and room.shot_inflight is not None
-    assert any("still ON" in n["title"] for n in notifications(fake))
+    assert "Zone 1: CRITICAL, an interrupted shot's hardware is still ON (CS-308)" in [
+        n["title"] for n in notifications(fake)
+    ]
     c._reconcile_inflight()
     assert offs(fake).count("switch.v1") == 2  # tried again on the next loop
+
+
+def test_a_switch_that_cannot_be_read_is_left_alone_and_said_so_with_its_code(rig):
+    c, fake, _ = rig
+    crashed(c, fake)
+    fake.set_state("switch.v1", "unavailable")  # whose it is now cannot be told
+    c._reconcile_inflight()
+    assert offs(fake) == []
+    (alert,) = [n for n in notifications(fake) if n["notification_id"] == "f2_inflight_default"]
+    assert alert["title"] == "Zone 1: an interrupted shot's hardware may still be ON (CS-309)"
+    assert "Can't be read: switch.v1" in alert["message"]
 
 
 def test_without_a_record_a_latched_hold_switches_nothing_off(rig):
@@ -267,12 +280,12 @@ def test_an_alert_home_assistant_did_not_take_is_raised_again_and_only_then_goes
     def pushes():
         return [d for dom, _svc, d in fake.calls if dom == "notify"]
 
-    c._alert("valve_stuck", "CRITICAL", "valve stuck")
+    c._alert("valve_stuck", "CS-301", "CRITICAL", "valve stuck")
     assert "valve_stuck" not in c._alerted and pushes() == []  # no push without the notification
     up["ok"] = True
-    c._alert("valve_stuck", "CRITICAL", "valve stuck")
+    c._alert("valve_stuck", "CS-301", "CRITICAL", "valve stuck")
     assert "valve_stuck" in c._alerted and len(pushes()) == 1
-    c._alert("valve_stuck", "CRITICAL", "valve stuck")
+    c._alert("valve_stuck", "CS-301", "CRITICAL", "valve stuck")
     assert len(notifications(fake)) == 2 and len(pushes()) == 1  # quiet only after it landed
 
 
@@ -294,7 +307,7 @@ def test_a_hold_latched_while_home_assistant_was_away_is_announced_once_it_is_ba
     fake.calls.clear()
     c.loop_once(datetime(2026, 9, 23, 12, 0))
     c.loop_once(datetime(2026, 9, 23, 12, 1))
-    latched = [n for n in notifications(fake) if n["title"] == "CRITICAL — hardware hold latched"]
+    latched = [n for n in notifications(fake) if n["title"].endswith("CRITICAL hardware fault, watering stopped (CS-301)")]
     assert len(latched) == 1  # said once it could be heard, and not again every loop
 
 
