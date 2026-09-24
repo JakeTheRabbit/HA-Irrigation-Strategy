@@ -136,7 +136,8 @@ export interface Controller {
   disconnect: () => void;
   write: (changes: Change[]) => Promise<WriteResult>;
   historyWindow: (request: HistoryRequest) => Promise<HistoryWindow>;
-  history: (entityIds: string[], hours: number) => Promise<Series[]>;
+  /** `signal` stops a long read between its day-sized requests. */
+  history: (entityIds: string[], hours: number, signal?: AbortSignal) => Promise<Series[]>;
   /** One grow-day of recorder history for the selected room's day timeline. */
   timeline: (request: TimelineRequest) => Promise<TimelineRows>;
   operator: <T>(action: OperatorAction, data?: Record<string, unknown>) => Promise<T>;

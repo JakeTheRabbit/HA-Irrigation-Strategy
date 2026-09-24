@@ -76,7 +76,7 @@ describe("controller lifecycle", () => {
     expect(service).toHaveBeenCalledWith("number", "set_value", { entity_id: numberId, value: 76 });
     expect(states["number.crop_steering_zone_1_p1_target_vwc"].state).toBe("64");
     await store.history([sensorId], 24);
-    expect(history).toHaveBeenCalledWith([sensorId], 24, states);
+    expect(history).toHaveBeenCalledWith([sensorId], 24, states, expect.any(AbortSignal));
     await expect(store.history(["sensor.crop_steering_vwc_zone_1"], 24)).rejects.toThrow(
       /selected room/,
     );
@@ -182,6 +182,93 @@ describe("controller lifecycle", () => {
     );
     await store.connect("http://never.test", "ignored");
     expect(fetch).not.toHaveBeenCalled();
+  });
+  it("reads the room's own tank probes for up to a month, and no other room's", async () => {
+    browser();
+    const store = new ControllerStore(true);
+    const [ec, ph] = await store.history(["sensor.demo_tank_ec", "sensor.demo_tank_ph"], 720);
+    expect(ec.points.length).toBeGreaterThan(700);
+    expect(ph.points.at(-1)!.value).toBeCloseTo(5.66, 2);
+    await expect(store.history(["sensor.demo_f1_tank_ec"], 24)).rejects.toThrow(/selected room/);
+    await expect(store.history(["sensor.demo_tank_ec"], 721)).rejects.toThrow(/720 hours/);
+    store.changeRoom("room:f1_");
+    expect((await store.history(["sensor.demo_f1_tank_ph"], 24))[0].points.length).toBeGreaterThan(
+      0,
+    );
+  });
+  it("reads a long history one day per request and joins the days in order", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.parse("2026-09-24T12:00:00Z"));
+    const urls: URL[] = [],
+      answered: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      urls.push(url);
+      const from = decodeURIComponent(url.pathname.split("/").pop()!);
+      // The oldest day answers last, so the days arrive out of order.
+      await new Promise((done) => setTimeout(done, (3 - urls.length) * 15));
+      answered.push(from);
+      // Each day starts with the state then in force; an unavailable row is no reading.
+      const rows = [
+        { entity_id: "sensor.tank_ec", state: "3.1", last_changed: from },
+        { state: "unavailable", last_changed: from },
+      ];
+      return new Response(JSON.stringify([rows]), { status: 200 });
+    });
+    const client = new HaClient("http://example.test", "test");
+    const [series] = await client.history(["sensor.tank_ec"], 72, {});
+    expect(urls).toHaveLength(3);
+    expect(answered).not.toEqual([...answered].sort());
+    const spans = urls.map((url) => [
+      Date.parse(decodeURIComponent(url.pathname.split("/").pop()!)),
+      Date.parse(url.searchParams.get("end_time")!),
+    ]);
+    expect(spans.every(([from, to]) => to - from === 86_400_000)).toBe(true);
+    expect(series.points.map((point) => Date.parse(point.time))).toEqual(
+      spans.map(([from]) => from).sort((a, b) => a - b),
+    );
+    await expect(client.history(["sensor.tank_ec"], 721, {})).rejects.toThrow(/720 hours/);
+  });
+  it("stops asking for more days once one request fails or the read is cancelled", async () => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => new Response("{}", { status: 500 }));
+    const client = new HaClient("http://example.test", "test");
+    await expect(client.history(["sensor.tank_ec"], 720, {})).rejects.toThrow(/\(500\)/);
+    expect(fetch.mock.calls.length).toBeLessThanOrEqual(2);
+    fetch.mockClear();
+    const abort = new AbortController();
+    fetch.mockImplementation(async () => {
+      abort.abort(); // cancelled while the first day is in flight
+      return new Response("[]", { status: 200 });
+    });
+    await expect(client.history(["sensor.tank_ec"], 720, {}, abort.signal)).rejects.toThrow(
+      /cancelled/,
+    );
+    expect(fetch.mock.calls.length).toBeLessThanOrEqual(2);
+  });
+  it("ends a long history read when its caller or the room lets go of it", async () => {
+    browser();
+    vi.spyOn(HaClient.prototype, "states").mockResolvedValue(createDemo());
+    const seen: AbortSignal[] = [];
+    vi.spyOn(HaClient.prototype, "history").mockImplementation(
+      (_ids, _hours, _states, signal) =>
+        new Promise((_, reject) => {
+          seen.push(signal!);
+          signal!.addEventListener("abort", () => reject(new Error("History request cancelled.")));
+        }),
+    );
+    const store = new ControllerStore(false);
+    await store.connect("http://example.test", "test");
+    const first = store.history(["sensor.demo_tank_ec"], 720);
+    store.changeRoom("room:f1_");
+    await expect(first).rejects.toThrow(/cancelled/);
+    const caller = new AbortController();
+    const second = store.history(["sensor.demo_f1_tank_ec"], 720, caller.signal);
+    caller.abort();
+    await expect(second).rejects.toThrow(/cancelled/);
+    expect(seen.map((signal) => signal.aborted)).toEqual([true, true]);
+    store.disconnect();
   });
   it("times out a pending HA request even if the implementation ignores abort", async () => {
     vi.useFakeTimers();

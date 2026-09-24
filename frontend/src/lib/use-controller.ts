@@ -6,7 +6,14 @@ import { OperatorDemo } from "./operator-demo";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Change, Controller, EntityState, States, WriteResult } from "./types";
 import { applyChanges, asStates, findSession, HaClient, haSessionToken } from "./client";
-import { buildRoom, discoverRooms, emptyRoom, resolveRequestedRoom, validateChange } from "./model";
+import {
+  buildRoom,
+  descriptor,
+  discoverRooms,
+  emptyRoom,
+  resolveRequestedRoom,
+  validateChange,
+} from "./model";
 import { createDemo, demoBeat, demoDay, demoHistory, demoReact, isDemoLocation } from "./demo";
 import {
   applyEntityUpdate,
@@ -490,20 +497,38 @@ export class ControllerStore {
       request.signal?.removeEventListener("abort", cancel);
     }
   };
-  history = async (entityIds: string[], hours: number) => {
-    if (!Number.isFinite(hours) || hours <= 0 || hours > 168)
-      throw new Error("History range must be between 0 and 168 hours.");
-    const allowed = new Set(this.snapshot.room.entities.map((e) => e.entity_id));
+  history = async (entityIds: string[], hours: number, signal?: AbortSignal) => {
+    if (!Number.isFinite(hours) || hours <= 0 || hours > 720)
+      throw new Error("History range must be between 0 and 720 hours.");
+    // The room's own entities, and the tank probes its descriptor maps for display.
+    const mapped = descriptor(this.states, this.snapshot.room.room)?.attributes;
+    const allowed = new Set([
+      ...this.snapshot.room.entities.map((e) => e.entity_id),
+      ...[mapped?.tank_ec_sensor, mapped?.tank_ph_sensor].filter(
+        (id): id is string => typeof id === "string" && !!id,
+      ),
+    ]);
     if (entityIds.some((id) => !allowed.has(id)))
       throw new Error("History is limited to entities in the selected room.");
     if (this.demo) return demoHistory(this.states, entityIds, hours);
     if (!this.client || this.connection !== "live")
       throw new Error("Connect to Home Assistant to load recorded history.");
     const generation = this.generation;
-    const result = await this.client.history(entityIds, hours, this.states);
-    if (generation !== this.generation)
-      throw new Error("Room or connection changed; history request cancelled.");
-    return result;
+    // A room change, reconnect or disconnect stops the rest of a long read, as does the caller.
+    const abort = new AbortController();
+    const cancel = () => abort.abort();
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) abort.abort();
+    this.historyAborters.add(abort);
+    try {
+      const result = await this.client.history(entityIds, hours, this.states, abort.signal);
+      if (generation !== this.generation)
+        throw new Error("Room or connection changed; history request cancelled.");
+      return result;
+    } finally {
+      this.historyAborters.delete(abort);
+      signal?.removeEventListener("abort", cancel);
+    }
   };
   /** The selected room's grow-day, once: over Home Assistant's websocket inside Home Assistant,
    * over REST standalone. Live updates extend it from there (day-timeline.ts appendLive). */
