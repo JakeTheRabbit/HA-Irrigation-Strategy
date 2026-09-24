@@ -129,6 +129,11 @@ def test_blind_fallback_and_sibling_copy_stop_at_own_daily_cap(rig, healthy_sibl
                    for dom, svc, data in fake.calls)
     if healthy_sibling:
         assert pub[2]["fire"] is True  # preserve the LIVE probe emergency exception
+    # CS-205 must not promise this zone the rescue shots a zone with a working probe keeps.
+    card = next(d for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "create")
+                and d["notification_id"] == "f2_block_default_z1")
+    assert "gets no more water until lights-on" in card["message"]
+    assert "still run" not in card["message"]
 
 
 def _fail_valve_close(monkeypatch, fake, mode="on"):
