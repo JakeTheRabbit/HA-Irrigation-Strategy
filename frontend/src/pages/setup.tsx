@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Heading, Empty } from "@/components/dashboard";
+import { Pill } from "@/components/mini-visuals";
 import {
   CatchTestCalculator,
   SizingField,
@@ -64,9 +65,26 @@ function MappingPicker({
     (c.name + " " + c.entity_id + " " + c.unit).toLowerCase().includes(search.toLowerCase()),
   );
   const selected = values.filter(Boolean);
+  // A mapped entity Home Assistant reports no state for is mapped, but not usable.
+  const silent = selected.filter((id) =>
+    ["unavailable", "unknown"].includes(
+      candidates.find((c) => c.entity_id === id)?.state.toLowerCase() ?? "",
+    ),
+  ).length;
   return (
     <div className="mapping-picker">
-      <span className="mapping-label">{label}</span>
+      <div className="mapping-head">
+        <span className="mapping-label">{label}</span>
+        {!selected.length ? (
+          <Pill tone="neutral">Not mapped</Pill>
+        ) : silent ? (
+          <Pill tone="warn">
+            {selected.length === 1 ? "Unavailable" : `${silent} of ${selected.length} unavailable`}
+          </Pill>
+        ) : (
+          <Pill tone="on">{selected.length === 1 ? "Mapped" : `${selected.length} mapped`}</Pill>
+        )}
+      </div>
       <Button
         type="button"
         variant="outline"
@@ -593,11 +611,11 @@ export function Setup({
                     </p>
                   </div>
                   {!isNew && (
-                    <span className={"status-pill " + (mappingConfirmed ? "enabled" : "unknown")}>
+                    <Pill dot tone={mappingConfirmed ? "on" : "warn"}>
                       {mappingConfirmed
                         ? "Mapping acknowledged"
                         : "Controller acknowledgement pending"}
-                    </span>
+                    </Pill>
                   )}
                 </div>
                 <div className="workspace-form-grid">
@@ -618,9 +636,9 @@ export function Setup({
                         ? "New namespace generated on creation"
                         : "Revision " + draft.revision + " · " + (draft.prefix || "Default room")}
                     </p>
-                    <small className="muted">
+                    <Pill dot tone={engineConfig ? "on" : "warn"}>
                       {engineConfig ? "Room descriptor discovered" : "Awaiting room descriptor"}
-                    </small>
+                    </Pill>
                   </div>
                 </div>
                 {!isNew && !draft.safety.ready && (

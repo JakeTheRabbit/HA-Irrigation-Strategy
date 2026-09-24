@@ -1,0 +1,156 @@
+.mini-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 6px;
+  flex: none;
+}
+.mini-bar {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+}
+.mini-bar-track {
+  display: flex;
+  align-items: flex-end;
+  width: 10px;
+  height: 34px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--foreground) 9%, var(--surface));
+  overflow: hidden;
+}
+.mini-bar-fill {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: var(--primary);
+}
+.mini-bar-label {
+  font-size: var(--text-xs);
+  line-height: 1;
+  color: var(--muted-foreground);
+}
+.mini-bar[data-selected] .mini-bar-label {
+  color: var(--foreground);
+  font-weight: 700;
+}
+.meter {
+  position: relative;
+  display: block;
+  height: 6px;
+  margin: 6px 0 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 9%, var(--surface));
+}
+.meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+/* A range as narrow as one reading still shows. */
+.meter-fill[data-range] {
+  min-width: 3px;
+}
+.meter-mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--foreground);
+}
+.mini-bar-fill[data-tone="high"],
+.meter-fill[data-tone="high"] {
+  background: var(--warning);
+}
+.mini-bar-fill[data-tone="over"],
+.meter-fill[data-tone="over"] {
+  background: var(--destructive);
+}
+.mini-bar-fill[data-tone="muted"],
+.meter-fill[data-tone="muted"] {
+  background: var(--muted-foreground);
+}
+.sparkline {
+  display: block;
+  overflow: visible;
+}
+.sparkline path {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+/* Rounded state pills: green when a valve is open, red when it is shut, a phase in its timeline
+   colour. The phase colours are the day timeline's light palette in both themes, dark enough
+   for white text. */
+.pill {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.pill-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+}
+/* A tinted tone mixes its colour into the text, the fill and the edge; the text keeps enough of
+   the foreground to pass AA in both themes. */
+.pill[data-tone="on"] {
+  --pill-tone: var(--success);
+}
+.pill[data-tone="off"] {
+  --pill-tone: var(--destructive);
+}
+.pill[data-tone="warn"] {
+  --pill-tone: var(--warning);
+}
+.pill[data-tone="water"] {
+  --pill-tone: var(--primary);
+}
+/* P2's timeline violet: a phase change. */
+.pill[data-tone="phase"] {
+  --pill-tone: #6450b0;
+}
+.pill[data-tone="on"],
+.pill[data-tone="off"],
+.pill[data-tone="warn"],
+.pill[data-tone="water"],
+.pill[data-tone="phase"] {
+  color: color-mix(in srgb, var(--pill-tone) 55%, var(--foreground));
+  background: color-mix(in srgb, var(--pill-tone) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--pill-tone) 40%, var(--surface));
+}
+.pill[data-tone="unknown"],
+.pill[data-tone="neutral"] {
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border-color: var(--border);
+}
+.pill[data-phase] {
+  color: #ffffff;
+}
+.pill[data-phase="P0"] {
+  background: #6b7580;
+}
+.pill[data-phase="P1"] {
+  background: #2f6fb5;
+}
+.pill[data-phase="P2"] {
+  background: #6450b0;
+}
+.pill[data-phase="P3"] {
+  background: #34405a;
+}

@@ -39,6 +39,8 @@ await context.addInitScript(() =>
 );
 const states = {};
 const calls = [];
+/** The entity ids of each history request, in order. */
+const history = [];
 const errors = [];
 const checks = [];
 let failStates = false,
@@ -130,7 +132,10 @@ await context.route("**/*", async (route) => {
     const id = decodeURIComponent(url.pathname.slice("/api/states/".length));
     return states[id] ? reply(states[id]) : reply({}, 404);
   }
-  if (url.pathname.startsWith("/api/history/")) return reply([]);
+  if (url.pathname.startsWith("/api/history/")) {
+    history.push(url.searchParams.get("filter_entity_id")?.split(",") ?? []);
+    return reply([]);
+  }
   if (url.pathname.startsWith("/api/services/crop_steering/"))
     return reply({ message: "Fixture has no workspace API" }, 404);
   if (url.pathname.startsWith("/api/services/")) {
@@ -349,10 +354,55 @@ try {
     const row = page.getByRole("row").filter({ hasText: probe });
     await visible(row.getByText("Stale or unverified", { exact: true }));
     await visible(row.getByText("Unavailable", { exact: true }));
+    // Stale is amber; a sensor that reports is green; the count of those that do not is red, as
+    // one of them (zone 1's EC) is down.
+    assert.equal(
+      await row.locator(".pill", { hasText: "Stale or unverified" }).getAttribute("data-tone"),
+      "warn",
+    );
+    assert.equal(
+      await page
+        .locator(".sensor-summary .pill", { hasText: "unavailable" })
+        .getAttribute("data-tone"),
+      "off",
+    );
+    assert.equal(
+      await page
+        .getByRole("row")
+        .filter({ hasText: "sensor.crop_steering_f1_ec_zone_2" })
+        .locator(".pill")
+        .getAttribute("data-tone"),
+      "on",
+    );
     await page
       .getByRole("combobox", { name: "Filter sensor availability" })
       .selectOption("unavailable");
     await visible(row);
+  });
+  await check("sensors: every numeric sensor's recent line comes from one request", async () => {
+    const nav = page.getByRole("navigation", { name: "Main navigation" });
+    // Settings reads no history: anything asked for after this is the Sensors page's.
+    await nav.getByRole("button", { name: "Settings", exact: true }).click();
+    await visible(page.getByRole("heading", { name: "Settings", exact: true }));
+    await page.waitForTimeout(1000);
+    history.length = 0;
+    await nav.getByRole("button", { name: "Sensors", exact: true }).click();
+    await visible(page.getByRole("heading", { name: "Sensors", exact: true }));
+    await page.waitForFunction(() => document.querySelectorAll(".sensors-table tr").length > 1);
+    await page.waitForTimeout(1000);
+    const numeric = Object.values(states)
+      .filter(
+        (e) =>
+          e.entity_id.startsWith("sensor.crop_steering_f1_") &&
+          e.state.trim() &&
+          Number.isFinite(Number(e.state)),
+      )
+      .map((e) => e.entity_id)
+      .sort();
+    assert.ok(numeric.length > 1, "the fixture has several numeric sensors");
+    assert.ok(history.length >= 1, "the Sensors page asks for its sensors' readings");
+    // A later re-read may repeat it; it is never one request per row.
+    for (const ids of history) assert.deepEqual([...ids].sort(), numeric);
   });
   await check(
     "authentication failure preserves explicit offline state and disables writes",

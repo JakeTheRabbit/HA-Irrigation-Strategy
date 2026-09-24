@@ -277,6 +277,101 @@ try {
     },
   );
   await check(
+    "Typing a balance into a grid cell updates that cell and the slider; preview, Esc, rejection, arrows and Mixed weeks",
+    async () => {
+      await fresh("grow-plan");
+      await visible(page.locator("#steering-balance"));
+      const initial = await exported();
+      const cell = (zone, unit) =>
+        page.getByRole("textbox", {
+          name: `Zone ${zone}, ${unit}, steering balance percent generative`,
+          exact: true,
+        });
+      const panel = page.locator(".plan-cell");
+      const message = page.locator("#plan-cell-message");
+      // Week 5 is days 29–35, inside the demo's 70% block for days 15–35.
+      await cell(1, "week 5").click();
+      await page.keyboard.type("55");
+      assert.match(await panel.innerText(), /Preview at 55%, now 70%/);
+      // The panel shows the page's own interpolation: P1 64 → 60 % VWC at 55% is 62, now 61.
+      const p1 = panel.locator("tr").filter({ hasText: "P1 moisture target" });
+      assert.equal((await p1.locator(".plan-cell-at").innerText()).trim(), "62");
+      assert.match(await p1.innerText(), /% VWC\s+64\s+61\s+62\s+60/);
+      assert.match(await panel.innerText(), /Morning dryback % of peak/);
+      assert.match(await panel.innerText(), /Week 4 → week 5: 70% → 55% \(−15 points\)/);
+      assert.match(
+        await panel.locator(".plan-cell-live").innerText(),
+        /VWC\s+[\d.]+%\s+EC\s+[\d.]+ mS\/cm\s+Water today\s+[\d.]+ L/,
+      );
+      // The whole-grow sparkline draws the typed week's seven days.
+      assert.equal(await panel.locator("rect.plan-cell-edit").count(), 7);
+      assert.equal(
+        await page.locator("#steering-balance").inputValue(),
+        "70",
+        "Typing applies nothing",
+      );
+      await page.keyboard.press("Escape");
+      assert.equal(await cell(1, "week 5").inputValue(), "70%");
+      await page.keyboard.type("150");
+      await page.keyboard.press("Enter");
+      assert.equal(await cell(1, "week 5").getAttribute("aria-invalid"), "true");
+      assert.equal(await message.innerText(), "150 is outside 0–100.");
+      await axe("grow-plan-cell-invalid");
+      await page.keyboard.press("Escape");
+      await page.keyboard.type("55");
+      await page.keyboard.press("Enter");
+      assert.equal(await cell(1, "week 5").inputValue(), "55%");
+      assert.equal(await page.locator("#steering-balance").inputValue(), "55");
+      let plan = await exported();
+      for (let d = 29; d <= 35; d++) assert.equal(block(plan, 1, d).bias, 55);
+      assert.equal(block(plan, 1, 28).bias, 70);
+      assert.equal(block(plan, 1, 36).bias, 40);
+      assert.deepEqual(plan.zones.slice(1), initial.zones.slice(1));
+      // Both controls edit the same block.
+      await setBalance(65);
+      assert.equal(await cell(1, "week 5").inputValue(), "65%");
+      // Arrows move between cells, and leaving a cell applies what was typed there.
+      await cell(1, "week 5").click();
+      await page.keyboard.press("ArrowRight");
+      await page.keyboard.type("45");
+      await page.keyboard.press("ArrowDown");
+      assert.equal(await cell(1, "week 6").inputValue(), "45%");
+      assert.equal(
+        await page.evaluate(() => document.activeElement?.getAttribute("aria-label")),
+        "Zone 2, week 6, steering balance percent generative",
+      );
+      await page.keyboard.type("4.5");
+      await page.keyboard.press("Tab");
+      assert.equal(
+        await page.evaluate(() => document.activeElement?.getAttribute("aria-label")),
+        "Zone 2, week 7, steering balance percent generative",
+      );
+      assert.match(await message.innerText(), /Zone 2, week 6: “4\.5” was not applied/);
+      assert.equal(await cell(2, "week 6").inputValue(), "40%");
+      // A day edit makes week 3 Mixed; one entry then sets exactly its seven days.
+      await page.getByRole("button", { name: "Days", exact: true }).click();
+      await cell(1, "day 16").click();
+      await page.keyboard.type("90");
+      await page.keyboard.press("Enter");
+      await page.getByRole("button", { name: "Weeks", exact: true }).click();
+      assert.equal(await cell(1, "week 3").inputValue(), "");
+      assert.equal(await cell(1, "week 3").getAttribute("placeholder"), "Mixed");
+      await cell(1, "week 3").click();
+      await page.keyboard.type("30");
+      await page.keyboard.press("Enter");
+      plan = await exported();
+      for (let d = 15; d <= 21; d++) assert.equal(block(plan, 1, d).bias, 30);
+      assert.equal(block(plan, 1, 14).bias, 20);
+      assert.equal(block(plan, 1, 22).bias, 70);
+      await page.emulateMedia({ colorScheme: "dark" });
+      await page.waitForFunction(() => document.documentElement.classList.contains("dark"));
+      await cell(1, "week 4").click();
+      await page.keyboard.type("5");
+      await axe("grow-plan-cell-dark");
+      await page.emulateMedia({ colorScheme: "light" });
+    },
+  );
+  await check(
     "Planner draft guards navigation, hash changes, browser back and selected room; keep editing preserves draft",
     async () => {
       await fresh("grow-plan");
@@ -347,10 +442,15 @@ try {
       await page.getByRole("button", { name: "Arm for next lights-on", exact: true }).click();
       await visible(page.getByRole("button", { name: "Disarm plan", exact: true }));
       assert.equal(await page.locator("#steering-balance").isDisabled(), true);
+      const gridCell = page.getByRole("textbox", {
+        name: "Zone 1, week 2, steering balance percent generative",
+      });
+      assert.equal(await gridCell.isEditable(), false, "An armed plan's grid is read only");
       await page.getByRole("button", { name: "Disarm plan", exact: true }).click();
       await page.getByRole("button", { name: "Confirm disarm", exact: true }).click();
       await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
       assert.equal(await page.locator("#steering-balance").isEnabled(), true);
+      assert.equal(await gridCell.isEditable(), true);
     },
   );
   await check(
@@ -1035,7 +1135,7 @@ try {
           .locator(".zone-table-desktop tbody tr")
           .first()
           .locator("td")
-          .filter({ hasText: "Plan · P2 base VWC threshold" });
+          .filter({ hasText: "Plan · threshold" });
         assert.match(await targetCell.innerText(), /77/);
         const mutations = () =>
           apiCalls.filter(

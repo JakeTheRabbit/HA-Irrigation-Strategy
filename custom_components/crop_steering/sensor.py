@@ -38,6 +38,7 @@ from .const import (
     SOFTWARE_VERSION,
 )
 from .room import room_prefix, build_engine_config
+from . import stock
 from .calculations import ShotCalculator
 from .units import to_native
 from .zone_status import mirrored_status, status_app_entity
@@ -245,6 +246,7 @@ async def async_setup_entry(
     sensors.append(
         CropSteeringEngineConfigSensor(entry, num_zones, zones_config, hardware_config)
     )
+    sensors.append(CropSteeringStockSensor(entry))
 
     async_add_entities(sensors)
 
@@ -298,6 +300,80 @@ class CropSteeringEngineConfigSensor(SensorEntity):
             {**self._entry.data, **self._entry.options},
             integration_version=SOFTWARE_VERSION,
             entry_id=self._entry.entry_id,
+        )
+
+
+class CropSteeringStockSensor(SensorEntity):
+    """How many of the room's stock tanks are at or below their low mark (0 when none), with every
+    tank's level as attributes, so an automation can push a phone alert. The tanks live in the
+    integration's store (stock_api.py); this is rewritten whenever they change."""
+
+    _attr_should_poll = False
+    _attr_icon = "mdi:flask-outline"
+
+    def __init__(self, entry):
+        self._entry = entry
+        self._prefix = room_prefix(entry)
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_stock_low"
+        self._attr_name = "Stock tanks low"
+        self._attr_object_id = f"{DOMAIN}_{self._prefix}stock_low"
+        self.entity_id = f"sensor.{self._attr_object_id}"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name="Crop Steering System",
+            manufacturer="Home Assistant Community",
+            model="Professional Irrigation Controller",
+            sw_version=SOFTWARE_VERSION,
+        )
+
+    def _manager(self):
+        return (
+            self.hass.data.get(DOMAIN, {}).get("_stock", {}).get(self._entry.entry_id)
+        )
+
+    @property
+    def native_value(self) -> Any:
+        manager = self._manager()
+        if manager is None or manager.error:
+            return None
+        return len(stock.low_tanks(manager.data))
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        manager = self._manager()
+        if manager is None:
+            return {}
+        doses = manager.doses()
+        return {
+            "tanks": [
+                {
+                    "name": tank["name"],
+                    "level_l": tank["level_l"],
+                    "capacity_l": tank["capacity_l"],
+                    "percent": round(tank["level_l"] / tank["capacity_l"] * 100, 1),
+                    "low_l": tank["low_l"],
+                    "dose_ml": doses.get(tank["id"]),
+                    "batches_left": stock.batches_left(tank, doses.get(tank["id"], 0)),
+                    "low": tank["level_l"] <= tank["low_l"],
+                }
+                for tank in manager.data["tanks"]
+            ],
+            "last_batch": manager.data["last_batch"],
+            "error": manager.error,
+        }
+
+    async def async_added_to_hass(self) -> None:
+        from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
+        from .stock_api import SIGNAL
+
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, f"{SIGNAL}_{self._entry.entry_id}", self.async_write_ha_state
+            )
         )
 
 

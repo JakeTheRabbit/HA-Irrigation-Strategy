@@ -614,6 +614,7 @@ export function buildRoom(states: States, room: Room): RoomView {
       entityId: null,
       label,
       unit,
+      key,
       value:
         values.length && values.every((v) => v !== null)
           ? values.reduce<number>((a, b) => a + b!, 0) / (average ? values.length : 1)
@@ -703,6 +704,28 @@ export function buildRoom(states: States, room: Room): RoomView {
       title: "Engine control unavailable",
       detail:
         "No readable configured engine control was found. Check the room descriptor and engine heartbeat.",
+    });
+  // The integration's stock sensor lists every stock tank; the low ones get one notice.
+  const stockTanks = resolve(states, room, "sensor", "stock_low")?.attributes.tanks;
+  const lowStock = (Array.isArray(stockTanks) ? stockTanks : []).filter(
+    (tank): tank is { name: string; level_l: number; batches_left: number | null } =>
+      !!tank && typeof tank === "object" && (tank as { low?: unknown }).low === true,
+  );
+  if (lowStock.length)
+    alerts.push({
+      id: `${room.id}-stock-low`,
+      severity: "warning",
+      title: `Stock ${lowStock.length === 1 ? "tank" : "tanks"} running low`,
+      detail:
+        lowStock
+          .map(
+            (tank) =>
+              `${tank.name}: ${tank.level_l} L` +
+              (typeof tank.batches_left === "number"
+                ? `, about ${tank.batches_left} batch${tank.batches_left === 1 ? "" : "es"} left`
+                : ""),
+          )
+          .join("; ") + ". Refill, then press Refilled on the Stock tanks page.",
     });
   return {
     room,
