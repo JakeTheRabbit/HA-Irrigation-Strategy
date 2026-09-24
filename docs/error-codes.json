@@ -1,5 +1,5 @@
 {
-  "about": "Every notification from the Crop Steering controller app, and every Crop Steering card in Settings → Repairs, ends with a code such as CS-101. This file is the one list of them. docs/ERROR_CODES.md and the dashboard's Help & tools page are both made from it; tests/test_error_codes.py keeps it in step with the code.",
+  "about": "Every alert from the Crop Steering controller app, and every Crop Steering card in Settings → Repairs, ends with a code such as CS-101 (the controller's regular status summary has none). This file is the one list of them. docs/ERROR_CODES.md and the dashboard's Help & tools page are both made from it; tests/test_error_codes.py keeps it in step with the code.",
   "groups": [
     {
       "prefix": "CS-1",

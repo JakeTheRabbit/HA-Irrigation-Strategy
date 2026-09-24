@@ -216,8 +216,9 @@ function ErrorCodes() {
         <div>
           <h2 id="error-codes-title">Error codes</h2>
           <p>
-            Every Crop Steering notification and Repairs card ends with a code such as CS-101. Look
-            it up here for what it means, what happens to watering meanwhile, and what to do.
+            Every Crop Steering alert and Repairs card ends with a code such as CS-101 (the
+            controller's regular status summary has none). Look it up here for what it means, what
+            happens to watering meanwhile, and what to do.
           </p>
         </div>
       </div>
