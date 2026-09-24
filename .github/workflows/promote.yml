@@ -53,7 +53,8 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: write
-      actions: read
+      # Only to start the Pages demo deploy below.
+      actions: write
     steps:
       - name: Checkout the same trusted main workflow code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -66,3 +67,10 @@ jobs:
           CANDIDATE_TAG: ${{ inputs.candidate_tag }}
           PROMOTION_DIGEST: ${{ needs.preflight.outputs.digest }}
         run: python3 .github/scripts/promotion.py --tag "$CANDIDATE_TAG" --apply
+      - name: Publish the promoted dashboard demo
+        # main was just moved with this workflow's token, and a push made with it starts no other
+        # workflow, so pages.yml never saw it and the demo kept the previous release. A dispatch
+        # is the one event the token may start.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
