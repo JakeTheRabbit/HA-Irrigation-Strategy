@@ -127,7 +127,7 @@ RUNTIME = [
     *(ROOT / "crop-steering-engine" / "src").rglob("*.py"),
 ]
 # Modules that collect, validate or parse the answer. Using it at runtime is something else.
-SETUP_ONLY = {"config_flow.py", "setup_api.py", "env_parser.py", "zone_config.py"}
+SETUP_ONLY = {"config_flow.py", "setup_api.py", "env_parser.py"}
 
 
 def _runtime_consumers(key):

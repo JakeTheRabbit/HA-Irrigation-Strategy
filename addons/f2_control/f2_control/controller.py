@@ -1300,13 +1300,22 @@ class Controller:
 
     def _refresh_lights(self, room):
         """Lights are configured once in the integration, per room. Read them live from
-        number.crop_steering_<prefix>lights_on_hour / _off_hour each loop, falling back to the
-        add-on option if the entities are missing. Log the source once per room, and alert once
-        if the integration value disagrees with the (now-legacy) add-on option."""
+        number.crop_steering_<prefix>lights_on_hour / _off_hour each loop, keeping the hours last
+        read through a loop that can't read them, and falling back to the add-on option only when
+        none have been read since start (an older integration without the entities). Log the
+        source once per room, and alert once if the integration value disagrees with the
+        (now-legacy) add-on option."""
         lon = self._num_or_none(f"number.crop_steering_{room.prefix}lights_on_hour")
         loff = self._num_or_none(f"number.crop_steering_{room.prefix}lights_off_hour")
         if lon is not None and loff is not None:
             src = "integration"
+            room._lights_last_read = (lon, loff)
+        elif getattr(room, "_lights_last_read", None):
+            # One unreadable loop (Home Assistant restarting, an integration reload, a timed-out
+            # read) must not swap in the option: with the integration on 7-20 and the option on
+            # 10-22, 08:30 read as lights-off, the zone was forced to P3, and the next loop's
+            # lights-on edge restarted its day, daily volume and shot count included.
+            (lon, loff), src = room._lights_last_read, "integration (last reading)"
         else:
             lon, loff, src = (
                 room.opt_lon,
@@ -1329,9 +1338,9 @@ class Controller:
                     f"The engine uses lights on at {int(lon)}:00 and off at {int(loff)}:00 from the "
                     "integration. The controller app's own option still says "
                     f"{int(room.opt_lon)}:00-{int(room.opt_loff)}:00, which is used only when the "
-                    "integration's hours can't be read (while Home Assistant restarts, for "
-                    "example): set it to the same hours so a missed reading can't move lights-on. If "
-                    "the integration's hours are wrong, change its Lights on hour and Lights off hour."
+                    "integration's hours can't be read and haven't been since the controller app "
+                    "started: set it to the same hours so that can't move lights-on. If the "
+                    "integration's hours are wrong, change its Lights on hour and Lights off hour."
                     "\n\nSettings: number.crop_steering_lights_on_hour, number.crop_steering_lights_off_hour",
                     room=room,
                 )
@@ -2141,6 +2150,8 @@ class Controller:
             log(
                 f"[{room.slug}] hardware hold cleared: engine OFF and hardware verified OFF; re-arm required"
             )
+            # The next hold is a new fault: announce it, don't take it for this one still quiet.
+            self._alerted.pop(f"hardware_fault_{room.slug}", None)
         for room in self.rooms:
             if room.hardware_fault and f"hardware_fault_{room.slug}" not in self._alerted:
                 # A hold latched while Home Assistant was unreachable (a failed close, typically) was never
