@@ -64,7 +64,7 @@ class FakeHA:
             out.append({"entity_id": eid, "state": state, "attributes": attrs})
         return out
 
-    def ha_set(self, entity, state, attributes=None):
+    def ha_set(self, entity, state, attributes=None, timeout=None):
         self.sets[entity] = (state, attributes or {})
 
 
