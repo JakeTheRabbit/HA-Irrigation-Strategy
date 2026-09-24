@@ -687,13 +687,23 @@ nav button.nav-separated {
   background: currentColor;
   border-radius: 50%;
 }
-.overview-bottom {
-  display: grid;
-  grid-template-columns: 1.75fr 1fr;
-  gap: 22px;
-}
 .event-list {
   padding: 0 24px;
+}
+.activity-sheet {
+  width: min(100vw, 420px);
+  max-width: 420px !important;
+}
+.activity-sheet > div:first-child {
+  padding: 28px 24px 8px;
+}
+.activity-sheet-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.activity-sheet [data-slot="sheet-footer"] {
+  padding: 8px 24px 24px;
 }
 .event-row {
   display: flex;
@@ -1528,9 +1538,6 @@ nav button.nav-separated {
   .metric-item strong {
     font-size: 26px;
   }
-  .overview-bottom {
-    grid-template-columns: 1.5fr 1fr;
-  }
   .settings-section {
     gap: 25px;
     grid-template-columns: 215px minmax(0, 1fr);
@@ -1570,7 +1577,6 @@ nav button.nav-separated {
     width: 33px;
     height: 33px;
   }
-  .overview-bottom,
   .help-columns {
     grid-template-columns: 1fr;
     gap: 0;
@@ -1882,7 +1888,6 @@ nav button.nav-separated {
 .app-main,
 #main-content,
 .main-inner,
-.overview-bottom > *,
 .help-columns > *,
 .strategy-content {
   min-width: 0;

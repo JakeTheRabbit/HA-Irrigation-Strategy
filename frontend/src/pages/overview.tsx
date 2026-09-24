@@ -9,7 +9,6 @@ import { leadingNotices } from "@/lib/model";
 import { RoomPower } from "@/components/room-controls";
 import {
   Empty,
-  EventList,
   Heading,
   Metrics,
   Status,
@@ -109,20 +108,6 @@ export function Overview({
       </section>
       <DailyWaterSummary controller={controller} />
       <DayTimeline controller={controller} />
-      <div className="overview-bottom">
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Recent activity</h2>
-              <p>Latest controller records</p>
-            </div>
-            <Button variant="ghost" onClick={() => navigate("activity")}>
-              View activity <ArrowRight size={16} />
-            </Button>
-          </div>
-          <EventList events={room.events.slice(0, 5)} />
-        </section>
-      </div>
       <ZoneDetails
         controller={controller}
         zone={room.zones.find((z) => z.id === selected) || null}
