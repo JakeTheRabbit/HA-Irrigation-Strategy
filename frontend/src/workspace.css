@@ -5,8 +5,8 @@
   min-width: 0;
 }
 .workspace-card h2 {
-  font-size: 20px;
-  font-weight: 500;
+  font-size: var(--text-lg);
+  font-weight: 600;
   margin: 0 0 6px;
 }
 .workspace-card h3 {

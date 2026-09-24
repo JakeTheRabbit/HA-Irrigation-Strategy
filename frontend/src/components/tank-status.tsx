@@ -79,7 +79,6 @@ export function TankStatus({
           <div
             className={connected && tank.pump.on ? "is-on" : undefined}
             data-pump-state={tank.pump.on === null ? "unknown" : tank.pump.on ? "on" : "off"}
-            title="The mapped pump switch's report. It does not prove water is flowing."
           >
             <dt>Pump{lastKnown}</dt>
             <dd>{pump}</dd>
@@ -94,7 +93,7 @@ export function TankStatus({
                   : "Not filling"}
             </dd>
           </div>
-          <div title="A recorded fill event. Sensor updates are not fills.">
+          <div>
             <dt>Last fill</dt>
             <dd>
               {tank.lastFill.timestamp ? (
@@ -110,6 +109,10 @@ export function TankStatus({
             </dd>
           </div>
         </dl>
+        <p className="tank-note">
+          Pump is the switch’s report, not measured flow. Last fill is a recorded fill, not a sensor
+          update.
+        </p>
       </div>
     </section>
   );

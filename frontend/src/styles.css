@@ -512,7 +512,7 @@ nav button.nav-separated {
 }
 .unit {
   font-weight: 400;
-  font-size: 0.52em;
+  font-size: max(0.52em, var(--text-xs));
   letter-spacing: 0;
   color: var(--muted-foreground);
 }
@@ -571,9 +571,6 @@ nav button.nav-separated {
   background: var(--secondary);
   color: var(--secondary-foreground);
   border-color: var(--border);
-}
-.chart-panel .panel-heading {
-  border-bottom: 0;
 }
 .chart-wrap {
   width: 100%;
@@ -1218,6 +1215,7 @@ nav button.nav-separated {
 }
 .connection-form label {
   margin-bottom: 9px;
+  font-size: 13px;
 }
 .connection-form input + p {
   margin-top: 7px;
@@ -1867,13 +1865,6 @@ nav button.nav-separated {
   }
 }
 
-.brand small {
-  letter-spacing: 0.8px;
-}
-.room-selector label {
-  letter-spacing: 0.3px;
-  font-size: var(--text-xs);
-}
 
 /* Keep offscreen accessibility labels within their scrolled table, and offer readable mobile zone summaries. */
 .table-scroll {
@@ -1959,10 +1950,6 @@ nav button.nav-separated {
 .mobile-sidebar {
   background: var(--ha-native-sidebar, var(--surface));
   color: var(--ha-native-sidebar-text, var(--foreground));
-}
-.page-heading p,
-.connection-form label {
-  font-size: 13px;
 }
 input:not([type="checkbox"]),
 select {
@@ -2093,9 +2080,6 @@ select option:disabled {
   .chart-panel .panel-heading {
     align-items: flex-start;
     gap: 10px;
-  }
-  .chart-panel .panel-heading h2 {
-    font-size: 18px;
   }
   .chart-panel .panel-heading p {
     font-size: var(--text-xs);
@@ -2297,9 +2281,6 @@ select option:disabled {
 @media (max-width: 720px) {
   .planning-curve .panel-heading {
     flex-wrap: wrap;
-  }
-  .planning-curve .panel-heading h2 {
-    font-size: 20px;
   }
   .planning-chart-key {
     font-size: var(--text-xs);

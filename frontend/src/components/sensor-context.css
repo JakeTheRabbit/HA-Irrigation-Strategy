@@ -14,7 +14,6 @@
 .sensor-context .panel-heading {
   flex-wrap: wrap;
   padding: 16px;
-  border-bottom: 0;
 }
 .sensor-context .panel-heading h2 {
   font-size: 14px;
