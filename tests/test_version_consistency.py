@@ -4,16 +4,19 @@ that advertises it, so a release can't ship with a stale number somewhere.
 Checks: custom_components/crop_steering/manifest.json  ==  the latest released
 heading in CHANGELOG.md  ==  the Release badge in README.md.
 
-The f2-control add-on carries its own independent version line in
-addons/f2_control/config.yaml. It is checked against the add-on's own changelog, and
-against the pairing both changelogs advertise: Supervisor offers a controller update the
-moment `version:` changes on the branch a box tracks (docs/RELEASING.md), so a bumped
-number with no changelog entry is a release nobody wrote down.
+The f2-control add-on carries its version line in addons/f2_control/config.yaml. From
+2.21.0 it is the integration's number (docs/RELEASING.md, Versions); before that the
+controller had its own. It is also checked against the add-on's own changelog, and against
+the pairing both changelogs advertise: Supervisor offers a controller update the moment
+`version:` changes on the branch a box tracks, so a bumped number with no changelog entry
+is a release nobody wrote down.
 """
 
 import json
 import re
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -94,4 +97,20 @@ def test_the_release_names_the_controller_it_pairs_with():
     assert _addon_version() in entry, (
         f"the {_manifest_version()} changelog entry never mentions controller "
         f"{_addon_version()}"
+    )
+
+
+ONE_NUMBER_FROM = (2, 21, 0)
+
+
+def test_from_2_21_the_controller_carries_the_integration_number():
+    """One number for the pair. Every release changes both halves anyway (the release guard
+    refuses a controller-only release), so a second number only hid a mismatched pair.
+    """
+    manifest = _manifest_version()
+    if tuple(int(part) for part in manifest.split(".")) < ONE_NUMBER_FROM:
+        pytest.skip(f"{manifest}: before 2.21.0 the controller had its own number")
+    assert _addon_version() == manifest, (
+        f"integration {manifest}, controller {_addon_version()}: from 2.21.0 both halves "
+        "carry one number (docs/RELEASING.md, Versions)"
     )

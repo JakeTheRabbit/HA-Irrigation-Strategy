@@ -303,6 +303,11 @@ def test_promotion_writes_only_after_every_gate_then_publishes(monkeypatch):
     plan = promotion.promote(api, TAG, apply=True, expected_digest=digest)
     assert plan["candidate_sha"] == api.main_sha == CANDIDATE
     assert [call[1] for call in api.writes] == ["git/refs/heads/main", "releases/56"]
+    assert api.writes[-1][2] == {
+        "prerelease": False,
+        "name": TAG.removeprefix("v"),
+        "make_latest": "true",  # the promoted release is GitHub's current one, in the same write
+    }
     first_write = next(i for i, call in enumerate(api.calls) if call[0] != "GET")
     assert sum(call[1] == "releases/assets/2" for call in api.calls[:first_write]) == 3
 

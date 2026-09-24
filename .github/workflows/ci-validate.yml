@@ -100,9 +100,10 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          # brands requires a home-assistant/brands submission; custom repos
-          # installed by URL don't need it (same ignore as install.yml)
-          ignore: brands
+          # Nothing is ignored: HACS lists a repository in its default store only when this passes
+          # without ignores (tests/test_hacs_ready.py keeps it that way). Brands pass on the
+          # integration's own images in custom_components/crop_steering/brand/, which HACS accepts
+          # since hacs/integration#5128 (February 2026).
 
   addon-build:
     name: Build f2-control add-on image (amd64)
