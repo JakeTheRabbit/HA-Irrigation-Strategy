@@ -193,7 +193,7 @@ def test_aborted_shot_records_only_delivered_volume_in_weekly_total(rig, monkeyp
     c._execute_shot(room, 1, 10, 10)
     assert room.state[1]["daily_vol"] == pytest.approx(2)
     assert c._water_usage(room, 1, FixedDateTime.now())[0] == 2
-    assert any("partial volume counted" in data.get("message", "") for _, _, data in fake.calls)
+    assert any("delivered so far is counted" in data.get("message", "") for _, _, data in fake.calls)
 
 
 @pytest.mark.parametrize("month", [1, 9])

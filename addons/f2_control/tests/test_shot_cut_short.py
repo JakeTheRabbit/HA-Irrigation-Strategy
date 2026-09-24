@@ -24,7 +24,7 @@ HOLD = "input_boolean.nutrient_dosing_active"
 KILL = "input_boolean.kill"
 PUMP, MAIN, VALVE = "switch.p", "switch.m", "switch.v1"
 FLOW = 7.9 / 170  # L/s: on the day, the full 170 s were counted as about 7.9 L
-CUT = "Shot cut short — feed path closed externally"
+CUT = "Zone 1: shot stopped early, something else closed the feed (CS-307)"
 
 
 class Clock:
@@ -150,7 +150,7 @@ def test_23_sep_the_tank_ran_empty_4_s_into_a_170_s_shot(rig, monkeypatch, mixin
     assert room.shot_inflight is None and "_shot_inflight" not in saved(c)["default"]
     alerts = notifications(fake)
     assert [n["title"] for n in alerts] == [CUT]
-    assert HOLD in alerts[0]["message"] and "after 4 of 170 s" in alerts[0]["message"]
+    assert HOLD in alerts[0]["message"] and "after 4 of 170 seconds" in alerts[0]["message"]
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ def test_a_valve_switched_off_by_something_else_counts_only_the_time_it_was_open
     assert room.hardware_fault is None and room.shot_inflight is None
     alerts = notifications(fake)
     assert [n["title"] for n in alerts] == [CUT]
-    assert VALVE in alerts[0]["message"] and f"after {counted:.0f} of 120 s" in alerts[0]["message"]
+    assert VALVE in alerts[0]["message"] and f"after {counted:.0f} of 120 seconds" in alerts[0]["message"]
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ def test_a_hold_that_comes_on_mid_shot_closes_valve_and_main_line_and_leaves_the
     assert st["daily_vol"] == pytest.approx(FLOW * 12) and st["shots"] == 1
     alerts = notifications(fake)
     assert [n["title"] for n in alerts] == [CUT]
-    assert HOLD in alerts[0]["message"] and "after 12 of 170 s" in alerts[0]["message"]
+    assert HOLD in alerts[0]["message"] and "after 12 of 170 seconds" in alerts[0]["message"]
     assert f"Left {PUMP} on" in alerts[0]["message"]
 
 
@@ -252,5 +252,5 @@ def test_the_kill_switch_still_wins_and_closes_as_before(rig, monkeypatch, valve
     room, st = c.rooms[0], c.rooms[0].state[1]
     assert offs(fake) == [VALVE, MAIN, PUMP]  # the shot's valve, main line and pump, as always
     assert st["daily_vol"] == pytest.approx(FLOW * 22) and st["shots"] == 1  # to the check that saw it
-    assert [n["title"] for n in notifications(fake)] == ["Shot cut short — kill switch / override"]
+    assert [n["title"] for n in notifications(fake)] == ["Zone 1: shot stopped early (CS-305)"]
     assert room.hardware_fault is None and room.shot_inflight is None

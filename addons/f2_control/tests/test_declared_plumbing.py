@@ -68,7 +68,7 @@ def test_a_pumped_room_that_lost_its_pump_mapping_is_held_not_run_dry():
     assert _switch_calls(fake) == []
     assert room.state[1]["shots"] == 0 and room.state[1]["daily_vol"] == 0  # and nothing is counted as delivered
     alert = _alerts(fake, "plumbing")
-    assert len(alert) == 1 and "BLOCKED" in alert[0]["title"]
+    assert len(alert) == 1 and "not watering (CS-202)" in alert[0]["title"]
     assert "map the pump" in alert[0]["message"]  # says what to do, not only what is wrong
 
 

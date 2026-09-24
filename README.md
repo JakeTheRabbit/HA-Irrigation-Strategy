@@ -151,6 +151,7 @@ To connect an LLM, install the optional [MCP connector](docs/MCP.md). It can ins
 - [Validated feature matrix and limitations](docs/FEATURE_MATRIX.md)
 - [Architecture and repository map](docs/REPOSITORY_MAP.md)
 - [Troubleshooting](docs/troubleshooting.md)
+- [Error codes (CS-101 and the rest): causes and fixes](docs/ERROR_CODES.md)
 - [Current screenshots](docs/SCREENSHOTS.md)
 - [Live upgrade verification](docs/audits/2026-09-08-live-upgrade.md)
 - [Branch consolidation and archived features](docs/audits/2026-09-08-branch-consolidation.md)

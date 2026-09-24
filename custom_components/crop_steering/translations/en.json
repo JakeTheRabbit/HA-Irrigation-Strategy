@@ -830,32 +830,32 @@
   },
   "issues": {
     "kill_switch_missing": {
-      "title": "Crop Steering: kill switch helper missing",
-      "description": "The engine is gated by the helper `input_boolean.f2_control_enabled`, but it doesn't exist — so the F2 Crop Steering add-on can't run. Create it: Settings → Devices & Services → Helpers → Create Helper → Toggle, named so the entity is input_boolean.f2_control_enabled. Leave it OFF until you're ready to irrigate."
+      "title": "Crop Steering: kill switch helper missing (CS-601)",
+      "description": "The engine is gated by the helper `input_boolean.f2_control_enabled`, but it doesn't exist — so the F2 Crop Steering add-on can't run. Create it: Settings → Devices & Services → Helpers → Create Helper → Toggle, named so the entity is input_boolean.f2_control_enabled. Leave it OFF until you're ready to irrigate.\n\nCode CS-601. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
     "engine_offline": {
-      "title": "Crop Steering: engine not running",
-      "description": "No fresh heartbeat from the add-on (sensor.crop_steering_ai_heartbeat is missing or stale). The integration creates the entities, but the F2 Crop Steering add-on is what actually steers. Install/start it and check its log. If you only use manual control, you can ignore this."
+      "title": "Crop Steering: engine not running (CS-602)",
+      "description": "No fresh heartbeat from the add-on (sensor.crop_steering_ai_heartbeat is missing or stale). The integration creates the entities, but the F2 Crop Steering add-on is what actually steers. Install/start it and check its log. If you only use manual control, you can ignore this.\n\nCode CS-602. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
     "zone_no_sensor": {
-      "title": "Crop Steering: zone with no moisture sensor",
-      "description": "Zone(s) {zones} have no VWC sensor mapped, so they can't be steered. Add a probe in Settings → Devices & Services → Crop Steering → Configure → Edit zones & hardware."
+      "title": "Crop Steering: zone with no moisture sensor (CS-603)",
+      "description": "Zone(s) {zones} have no VWC sensor mapped, so they can't be steered. Add a probe in Settings → Devices & Services → Crop Steering → Configure → Edit zones & hardware.\n\nCode CS-603. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
     "fused_sensor_unavailable": {
-      "title": "Crop Steering: zone sensor unavailable",
-      "description": "The moisture sensor for zone(s) {zones} reads unavailable — the probe(s) may be offline or misnamed. Check it in Developer Tools → States and your zone mapping."
+      "title": "Crop Steering: zone sensor unavailable (CS-604)",
+      "description": "The moisture sensor for zone(s) {zones} reads unavailable — the probe(s) may be offline or misnamed. Check it in Developer Tools → States and your zone mapping.\n\nCode CS-604. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
     "strategy_hold": {
-      "title": "Crop Steering: grow strategy plan is holding irrigation",
-      "description": "The room's grow strategy plan is holding the steering of the zones it manages: {reason}. Until it clears, the controller waters those zones only with emergency, watchdog and minimum-daily shots. See the plan in the Crop Steering panel under Irrigation plan → Schedule. If it stays in error, fix the cause, then disarm the plan and arm it again."
+      "title": "Crop Steering: grow strategy plan is holding irrigation (CS-606)",
+      "description": "The room's grow strategy plan is holding the steering of the zones it manages: {reason}. Until it clears, the controller waters those zones only with emergency, watchdog and minimum-daily shots. See the plan in the Crop Steering panel under Irrigation plan → Schedule. If it stays in error, fix the cause, then disarm the plan and arm it again.\n\nCode CS-606. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
     "strategy_degraded": {
-      "title": "Crop Steering: grow strategy plan has not moved on to today",
-      "description": "The room's grow strategy plan could not apply the current day at lights-on: {reason}. It keeps its last valid targets (a plan waiting to start stays armed) and tries again every minute, and the controller keeps steering. This clears itself once the cause is fixed, usually a stale controller heartbeat or probe."
+      "title": "Crop Steering: grow strategy plan has not moved on to today (CS-607)",
+      "description": "The room's grow strategy plan could not apply the current day at lights-on: {reason}. It keeps its last valid targets (a plan waiting to start stays armed) and tries again every minute, and the controller keeps steering. This clears itself once the cause is fixed, usually a stale controller heartbeat or probe.\n\nCode CS-607. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
     "entities_moved": {
-      "title": "Crop Steering: {count} setting(s) are not where the controller looks for them",
-      "description": "The controller finds each setting by its exact entity id, and these are somewhere else, so it is running on its built-in defaults for them (daily water cap and plant count included):\n\n{entities}\n\nKeep the engine off until this is fixed. If you changed an entity id yourself, change it back: Settings → Devices & services → Entities → the entity → the cog → Entity ID. If nearly every entity is listed, the room was created while Home Assistant was still running an older version of this integration: delete the Crop Steering entry, restart Home Assistant, and add it again. Nothing is renamed for you, because an id you chose on purpose is yours to keep."
+      "title": "Crop Steering: {count} setting(s) are not where the controller looks for them (CS-605)",
+      "description": "The controller finds each setting by its exact entity id, and these are somewhere else, so it is running on its built-in defaults for them (daily water cap and plant count included):\n\n{entities}\n\nKeep the engine off until this is fixed. If you changed an entity id yourself, change it back: Settings → Devices & services → Entities → the entity → the cog → Entity ID. If nearly every entity is listed, the room was created while Home Assistant was still running an older version of this integration: delete the Crop Steering entry, restart Home Assistant, and add it again. Nothing is renamed for you, because an id you chose on purpose is yours to keep.\n\nCode CS-605. What it means and what to do: Crop Steering → Help & tools → Error codes."
     }
   },
   "selector": {
