@@ -1,4 +1,5 @@
 import { RunDemo } from "./comparison-demo";
+import { StockDemo } from "./stock-demo";
 import type {
   OperatorAction,
   StrategyDocument,
@@ -17,6 +18,7 @@ import { inferPlumbing, plumbingErrors } from "./plumbing";
 const clone = <T>(value: T): T => structuredClone(value);
 export class OperatorDemo {
   private runDemo?: RunDemo;
+  private stockDemo?: StockDemo;
   private plans = new Map<string, StrategyDocument>();
   private rooms: SetupRoom[] | null = null;
   constructor(
@@ -249,6 +251,10 @@ export class OperatorDemo {
     if (action.startsWith("runs_")) {
       this.runDemo ||= new RunDemo(this.getStates);
       return this.runDemo.call(action, data) as T;
+    }
+    if (action.startsWith("stock_")) {
+      this.stockDemo ||= new StockDemo(this.getStates);
+      return this.stockDemo.call(action, data) as T;
     }
     let result: unknown;
     if (action.startsWith("strategy_")) {

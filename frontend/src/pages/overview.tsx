@@ -5,6 +5,9 @@ import { ArrowRight, ArrowUpRight, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Controller } from "@/lib/types";
 import { leadingNotices } from "@/lib/model";
+import { drybackTrend } from "@/lib/dryback";
+import { useRecentMoisture } from "@/lib/use-recent-moisture";
+import { coreWaterValue, waterParameters } from "@/lib/water-delivery";
 import { RoomPower } from "@/components/room-controls";
 import { Empty, Heading, Metrics, ZoneDetails, ZoneTable, type Page } from "@/components/dashboard";
 
@@ -18,6 +21,29 @@ export function Overview({
   const [selected, setSelected] = useState<number | null>(null);
   const room = controller.room;
   const notices = leadingNotices(room.alerts);
+  const moisture = useRecentMoisture(controller);
+  const now = Date.now();
+  const trends =
+    moisture &&
+    Object.fromEntries(
+      room.zones.map((zone) => [
+        zone.id,
+        drybackTrend(
+          moisture.find((series) => series.entityId === zone.vwc.entityId)?.points ?? [],
+          zone.lastIrrigation.timestamp,
+          zone.vwc.value,
+          now,
+        ),
+      ]),
+    );
+  // The limit the controller enforces: the configured value inside its safety bounds.
+  const limits = Object.fromEntries(
+    room.zones.map((zone) => [
+      zone.id,
+      coreWaterValue("max_daily_volume", waterParameters(controller, zone.id).max_daily_volume)
+        .value,
+    ]),
+  );
   return (
     <>
       <Heading
@@ -55,7 +81,7 @@ export function Overview({
           )}
         </div>
       )}
-      <Metrics metrics={room.metrics} />
+      <Metrics metrics={room.metrics} zones={room.zones} waterLimits={limits} />
       <DayTimeline controller={controller} />
       <div className="overview-grid">
         <section className="panel">
@@ -66,7 +92,13 @@ export function Overview({
             </Button>
           </div>
           {room.zones.length ? (
-            <ZoneTable compact zones={room.zones} onSelect={(zone) => setSelected(zone.id)} />
+            <ZoneTable
+              compact
+              zones={room.zones}
+              trends={trends}
+              limits={limits}
+              onSelect={(zone) => setSelected(zone.id)}
+            />
           ) : (
             <Empty
               title="No zones discovered"

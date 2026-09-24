@@ -3,6 +3,7 @@ import { Download, RefreshCw, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Heading } from "@/components/dashboard";
+import { Pill } from "@/components/mini-visuals";
 import type { Controller } from "@/lib/types";
 import type { HistoryWindow, RunRecord, RunsDocument, RunZone } from "@/lib/comparison-types";
 import { addDays, boundedRange, comparisonRange, dateInZone } from "@/lib/comparison";
@@ -683,7 +684,15 @@ export function Comparison({
               <div>
                 <h3>
                   {run.name}
-                  {run.archived ? " · archived" : ""}
+                  {run.archived ? (
+                    <Pill tone="neutral">Archived</Pill>
+                  ) : run.end_date ? (
+                    <Pill tone="neutral">Ended</Pill>
+                  ) : (
+                    <Pill dot tone="on">
+                      Ongoing
+                    </Pill>
+                  )}
                 </h3>
                 <p>
                   {run.start_date} → {run.end_date || "ongoing"} · {run.time_zone}

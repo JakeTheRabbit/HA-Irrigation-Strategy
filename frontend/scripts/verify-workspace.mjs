@@ -1135,7 +1135,7 @@ try {
           .locator(".zone-table-desktop tbody tr")
           .first()
           .locator("td")
-          .filter({ hasText: "Plan · P2 base VWC threshold" });
+          .filter({ hasText: "Plan · threshold" });
         assert.match(await targetCell.innerText(), /77/);
         const mutations = () =>
           apiCalls.filter(

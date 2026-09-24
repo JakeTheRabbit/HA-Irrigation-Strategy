@@ -33,6 +33,7 @@
   --native-input-default: #f2f2f2;
   --native-warning-default: #8a5700;
   --native-error-default: #b3261e;
+  --native-success-default: #2e7d32;
   --native-primary-default: #007eae;
   color-scheme: light;
   font-family: var(--ha-native-font, Roboto, "Noto Sans", Arial, sans-serif);
@@ -54,6 +55,7 @@
   --accent: var(--secondary);
   --accent-foreground: var(--foreground);
   --destructive: var(--ha-native-error, var(--native-error-default));
+  --success: var(--ha-native-success, var(--native-success-default));
   --border: var(--ha-native-border, var(--native-border-default));
   --input: var(--border);
   --ring: var(--primary);
@@ -86,6 +88,7 @@
   --native-input-default: #323232;
   --native-warning-default: #ffca5b;
   --native-error-default: #f28b82;
+  --native-success-default: #81c995;
   --native-primary-default: #03a9f4;
   --primary-foreground: var(--ha-native-primary-foreground, #111111);
 }
@@ -356,8 +359,7 @@ nav button.nav-separated {
 .connection-label.demo {
   color: var(--warning);
 }
-.connection-dot,
-.health-dot {
+.connection-dot {
   width: 6px;
   height: 6px;
   background: var(--muted-foreground);
@@ -365,12 +367,10 @@ nav button.nav-separated {
   display: inline-block;
   flex-shrink: 0;
 }
-.connection-dot.live,
-.health-dot {
+.connection-dot.live {
   background: var(--primary);
 }
-.connection-dot.demo,
-.warning-dot {
+.connection-dot.demo {
   background: var(--warning);
 }
 .connection-dot.offline {
@@ -521,6 +521,16 @@ nav button.nav-separated {
   font-size: var(--text-xs);
   display: block;
   margin-top: 6px;
+}
+/* The headline number, and the zones' mini bars beside it. */
+.metric-body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.metric-body > div:first-child {
+  min-width: 0;
 }
 .overview-grid {
   display: grid;
@@ -742,6 +752,11 @@ nav button.nav-separated {
   background: var(--warning-bg);
   color: var(--warning);
 }
+/* The phase pill's violet. */
+.event-phase {
+  background: color-mix(in srgb, #6450b0 14%, var(--surface));
+  color: color-mix(in srgb, #6450b0 55%, var(--foreground));
+}
 .event-row > div {
   flex: 1;
 }
@@ -749,7 +764,12 @@ nav button.nav-separated {
   font-size: 12px;
   line-height: 1.45;
 }
-.event-row span:not(.event-icon) {
+.event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 4px;
   font-size: var(--text-xs);
   color: var(--muted-foreground);
 }
@@ -814,7 +834,8 @@ nav button.nav-separated {
 .zone-card-pair {
   border-top: 1px solid var(--border);
   padding: 17px 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
 }
 .zone-card-pair > span {
@@ -872,16 +893,18 @@ nav button.nav-separated {
 }
 .detail-metrics {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
   margin-top: 24px;
 }
 .detail-metrics > div {
-  padding: 15px;
+  padding: 14px 15px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 10px;
+  background: var(--muted);
 }
-.detail-metrics span:not(.unit) {
+.detail-metrics > div > span:first-child,
+.detail-metrics small {
   display: block;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
@@ -890,6 +913,19 @@ nav button.nav-separated {
   display: block;
   font-size: 23px;
   margin-top: 5px;
+}
+/* The dryback: its rate beside a longer line. */
+.detail-metrics > .detail-wide {
+  grid-column: 1 / -1;
+}
+.detail-wide .dryback {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 600;
 }
 .sensor-mini-list > div {
   padding: 10px 0;
@@ -1161,16 +1197,12 @@ nav button.nav-separated {
 }
 .sensor-summary {
   display: flex;
-  gap: 28px;
+  align-items: center;
+  gap: 10px 12px;
   margin: 5px 0 26px;
   font-size: 12px;
   color: var(--muted-foreground);
   flex-wrap: wrap;
-}
-.sensor-summary > span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 .sensor-summary strong {
   color: var(--foreground);

@@ -450,3 +450,70 @@ runs_import:
       required: true
       selector:
         object:
+stock_get:
+  name: Read stock tanks
+  description: Read this room's stock tanks, their levels, what one batch takes from each, and the batches recorded. Does not change anything.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+stock_save:
+  name: Save stock tanks
+  description: Replace this room's list of stock tanks (name, capacity, level, dose per batch, dose entity, low mark). A tank left out is removed. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    tanks:
+      required: true
+      selector:
+        object:
+stock_refill:
+  name: Refill a stock tank
+  description: Record that a stock tank was refilled to capacity, or set the level read off its side. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    id:
+      required: true
+      selector:
+        text:
+    level_l:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 10000
+          step: 0.1
+          unit_of_measurement: L
+          mode: box
+stock_record_batch:
+  name: Record a batch
+  description: Take one batch's dose from every stock tank now. For rooms without a mapped tank last-fill entity; with one, batches are counted from it and recording one here as well counts it twice. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
