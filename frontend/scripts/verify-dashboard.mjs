@@ -104,6 +104,34 @@ async function planViewsShareRow() {
     schedule,
   });
 }
+/** Runs `open`, then axe, in the light theme and again in the dark one, each chosen as a person
+ * would (the saved preference, applied on load), and leaves the page light. */
+async function inBothThemes(label, open) {
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate((value) => localStorage.setItem("irrigation-theme", value), theme);
+    await page.reload({ waitUntil: "networkidle" });
+    await open();
+    assert.equal(
+      await page.evaluate(() => document.documentElement.classList.contains("dark")),
+      theme === "dark",
+    );
+    // Colours transition (even at reduced motion); measure after two frames, not mid-change.
+    await page.evaluate(
+      () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+    );
+    await axe(theme === "dark" ? `${label}, dark` : label);
+  }
+  await page.evaluate(() => localStorage.setItem("irrigation-theme", "light"));
+  await page.reload({ waitUntil: "networkidle" });
+}
+/** The words and the colour (tone, or phase) of every pill `scope` matches. */
+async function pillTones(scope) {
+  return page
+    .locator(scope)
+    .evaluateAll((pills) =>
+      pills.map((pill) => [pill.textContent.trim(), pill.dataset.tone ?? pill.dataset.phase]),
+    );
+}
 async function axe(label) {
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
@@ -287,6 +315,289 @@ try {
       facts.captions.some((c) => /^Avg [\d.]+ L per zone$/.test(c)),
       facts.captions.join(" | "),
     );
+  });
+  await check("zones: the full table and the cards carry the Overview's mini visuals", async () => {
+    const rows = ".zone-table-desktop tbody tr";
+    await inBothThemes("zones table", async () => {
+      await go("zones");
+      await page.waitForFunction(
+        (rows) =>
+          document.querySelectorAll(`${rows} [data-dryback]`).length ===
+          document.querySelectorAll(rows).length,
+        rows,
+      );
+    });
+    await go("zones");
+    await page.waitForFunction(
+      (rows) => document.querySelectorAll(`${rows} [data-dryback]`).length > 0,
+      rows,
+    );
+    const table = await page.evaluate((rows) => {
+      const all = [...document.querySelectorAll(rows)];
+      return {
+        rows: all.length,
+        headers: [...document.querySelectorAll(".zone-table-desktop th")].map((th) =>
+          th.textContent.trim(),
+        ),
+        marked: all.filter((row) => row.cells[3].querySelector(".meter .meter-mark")).length,
+        sparklines: all.filter((row) => row.querySelector("[data-dryback] .sparkline")).length,
+        water: all.map((row) => row.querySelector(".water-use .meter")?.getAttribute("aria-label")),
+      };
+    }, rows);
+    assert.ok(table.rows > 0);
+    // The full table keeps the columns the Overview drops, and gains the dryback.
+    for (const header of ["Last irrigation", "VWC reference", "Dryback", "Water today"])
+      assert.ok(table.headers.includes(header), `the zone table has ${header}`);
+    assert.equal(table.marked, table.rows, "every moisture reading has its bar and target mark");
+    assert.equal(table.sparklines, table.rows, "every zone draws its recent moisture");
+    for (const label of table.water) assert.match(label, /^\d+% of the [\d.]+ L daily limit$/);
+    const states = {
+      "Valve on": "on",
+      "Valve off": "off",
+      "Valve unknown": "unknown",
+      Enabled: "on",
+      Paused: "warn",
+      Unavailable: "unknown",
+      Stale: "warn",
+    };
+    for (const [text, tone] of await pillTones(`${rows} .pill:has(.pill-dot)`))
+      assert.equal(tone, states[text], text);
+    const cards = ".zone-grid .zone-card";
+    await inBothThemes("zones cards", async () => {
+      await go("zones");
+      await page.getByRole("button", { name: "Card view", exact: true }).click();
+      await page.waitForFunction(
+        (cards) =>
+          document.querySelectorAll(`${cards} [data-dryback]`).length ===
+          document.querySelectorAll(cards).length,
+        cards,
+      );
+    });
+    await go("zones");
+    await page.getByRole("button", { name: "Card view", exact: true }).click();
+    await page.locator(`${cards} [data-dryback]`).first().waitFor();
+    const card = await page.evaluate(
+      (cards) =>
+        [...document.querySelectorAll(cards)].map((card) => [
+          !!card.querySelector(".zone-card-moisture .meter-mark"),
+          !!card.querySelector(".water-use .meter"),
+          !!card.querySelector("[data-dryback] .sparkline"),
+        ]),
+      cards,
+    );
+    assert.equal(card.length, table.rows);
+    for (const visuals of card)
+      assert.deepEqual(visuals, [true, true, true], "moisture, water and dryback on every card");
+  });
+  await check(
+    "zone details: readings as meters, water against its limit, dryback, state pills",
+    async () => {
+      const open = async () => {
+        await go("zones");
+        await page.getByRole("button", { name: "View Zone 2", exact: true }).click();
+        await expectVisible(page.getByRole("dialog"));
+        await page.getByRole("dialog").locator("[data-dryback] .sparkline").waitFor();
+      };
+      await inBothThemes("zone details", open);
+      await open();
+      const sheet = page.getByRole("dialog");
+      const tiles = await sheet.locator(".detail-metrics > div").evaluateAll((tiles) =>
+        tiles.map((tile) => ({
+          name: tile.firstElementChild.textContent.trim(),
+          meter: tile.querySelector(".meter")?.getAttribute("aria-label") ?? null,
+          mark: !!tile.querySelector(".meter-mark"),
+        })),
+      );
+      const tile = (name) => tiles.find((item) => item.name.startsWith(name));
+      assert.match(tile("Moisture").meter, /^Moisture [\d.]+ %, .+ [\d.]+ % marked$/);
+      assert.ok(tile("Moisture").mark && tile("Root-zone EC").mark, "targets are marked");
+      assert.match(tile("Root-zone EC").meter, /^Root-zone EC [\d.]+ mS\/cm, .+ marked$/);
+      assert.match(tile("Water today").meter, /^\d+% of the [\d.]+ L daily limit$/);
+      assert.ok(tile("Dryback"), "the dryback has a tile");
+      const pills = await pillTones('[role="dialog"] .zone-state-flags .pill');
+      assert.deepEqual(
+        pills.map(([, tone]) => tone),
+        ["off", "P2", "on"],
+        `valve off, the phase, enabled: ${JSON.stringify(pills)}`,
+      );
+      await page.keyboard.press("Escape");
+    },
+  );
+  await check("sensors: coloured status pills and each numeric sensor's recent line", async () => {
+    const trends = "[data-sensor-trend] .sparkline";
+    await inBothThemes("sensors", async () => {
+      await go("sensors");
+      await page.locator(trends).first().waitFor();
+    });
+    await go("sensors");
+    await page.locator(trends).first().waitFor();
+    const rows = await page.locator(".sensors-table tbody tr").evaluateAll((rows) =>
+      rows.map((row) => ({
+        numeric: /^-?\d+(\.\d+)?(\s|$)/.test(row.cells[1].textContent.trim()),
+        line: !!row.cells[2].querySelector(".sparkline"),
+        pill: [row.cells[3].textContent.trim(), row.cells[3].querySelector(".pill")?.dataset.tone],
+      })),
+    );
+    assert.ok(rows.some((row) => row.numeric) && rows.some((row) => !row.numeric));
+    for (const row of rows) {
+      assert.equal(row.line, row.numeric, "a line for every numeric reading, and only for those");
+      const tones = { Reporting: "on", "Stale or unverified": "warn", Unavailable: "off" };
+      assert.equal(row.pill[1], tones[row.pill[0]], row.pill[0]);
+    }
+    assert.deepEqual(
+      (await pillTones(".sensor-summary .pill")).map(([text, tone]) => [text.split(" ")[1], tone]),
+      [
+        ["reporting", "on"],
+        ["unavailable", "neutral"],
+      ],
+    );
+  });
+  await check(
+    "activity: every record's type is a coloured pill, in the log and the panel",
+    async () => {
+      // Flower 1's demo log has all but one kind: water, phase changes and a warning.
+      const tones = { water: "water", phase: "phase", warning: "warn", info: "neutral" };
+      await inBothThemes("activity", async () => {
+        await go("activity", "f1");
+        await page.locator(".activity-table [data-event-type]").first().waitFor();
+      });
+      await go("activity", "f1");
+      const types = await page
+        .locator(".activity-table [data-event-type]")
+        .evaluateAll((pills) => pills.map((pill) => [pill.dataset.eventType, pill.dataset.tone]));
+      assert.equal(types.length, await page.locator(".activity-table tbody tr").count());
+      assert.deepEqual([...new Set(types.map(([type]) => type))].sort(), [
+        "phase",
+        "warning",
+        "water",
+      ]);
+      for (const [type, tone] of types) assert.equal(tone, tones[type], type);
+      const panel = async () => {
+        await page.getByRole("button", { name: "Recent activity", exact: true }).click();
+        await expectVisible(page.getByRole("dialog", { name: "Recent activity" }));
+      };
+      await inBothThemes("recent activity panel", async () => {
+        await go("activity", "f1");
+        await panel();
+      });
+      await go("activity", "f1");
+      await panel();
+      const rows = page.getByRole("dialog", { name: "Recent activity" }).locator(".event-row");
+      assert.equal(
+        await rows.locator(".event-meta [data-event-type]").count(),
+        await rows.count(),
+        "every record in the panel names its type in a pill",
+      );
+      await page.keyboard.press("Escape");
+    },
+  );
+  await check("insights: the summary numbers compare every zone in mini bars", async () => {
+    await inBothThemes("insights", async () => {
+      await go("insights");
+      await page.locator(".insight-summary .mini-bars").first().waitFor();
+    });
+    await go("insights");
+    const summary = await page.locator(".insight-summary > div").evaluateAll((tiles) =>
+      tiles.map((tile) => ({
+        bars: tile.querySelectorAll(".mini-bar").length,
+        selected: [...tile.querySelectorAll(".mini-bar[data-selected]")].map((bar) =>
+          bar.textContent.trim(),
+        ),
+      })),
+    );
+    const zones = await page.locator("#insights-zone option").count();
+    assert.deepEqual(
+      summary.map((tile) => tile.bars),
+      [zones, zones, zones],
+      "one bar per zone on each summary number",
+    );
+    // The water and shot numbers are the inspected zone's: its bar is picked out.
+    assert.deepEqual(
+      summary.map((tile) => tile.selected),
+      [[], ["1"], ["1"]],
+    );
+    await page.locator("#insights-zone").selectOption({ index: 1 });
+    assert.deepEqual(
+      await page
+        .locator(".insight-summary .mini-bar[data-selected]")
+        .evaluateAll((bars) => bars.map((bar) => bar.textContent.trim())),
+      ["2", "2"],
+    );
+    assert.equal(await page.locator(".insight-zone-picker .pill[data-phase]").count(), 1);
+    for (const [text, tone] of await pillTones(".insights-page .data-table .pill"))
+      assert.equal(tone, text === "Current" || text === "Enabled" ? "on" : "off", text);
+  });
+  await check(
+    "compare runs: each recorded range is a bar on one scale, the previous run grey",
+    async () => {
+      const table = ".comparison-table tbody";
+      await inBothThemes("compare runs", async () => {
+        await go("compare");
+        await page.locator(`${table} .meter`).first().waitFor();
+      });
+      await go("compare");
+      await page.locator(`${table} .meter`).first().waitFor();
+      const cells = await page.locator(`${table} tr`).evaluateAll((rows) =>
+        rows.flatMap((row) =>
+          [...row.cells].slice(1).map((cell) => {
+            const meter = cell.querySelector(".meter");
+            return meter
+              ? [
+                  meter.querySelector(".meter-fill").dataset.tone,
+                  meter.getBoundingClientRect().width,
+                ]
+              : null;
+          }),
+        ),
+      );
+      assert.ok(cells.length > 0 && cells.every(Boolean), "every recorded day has its range bars");
+      // Current VWC, current EC, previous VWC, previous EC: the previous run's ranges are grey.
+      assert.deepEqual(
+        [...new Set(cells.map(([tone], i) => `${i % 4 < 2 ? "current" : "previous"} ${tone}`))],
+        ["current normal", "previous muted"],
+      );
+      assert.equal(new Set(cells.map(([, width]) => width)).size, 1, "one scale width for all");
+      assert.deepEqual(await pillTones(".comparison-run-list h3 .pill"), [
+        ["Ongoing", "on"],
+        ["Ended", "neutral"],
+      ]);
+    },
+  );
+  await check("setup: every mapping says whether it is mapped; the checks are pills", async () => {
+    await inBothThemes("rooms & setup", async () => {
+      await go("setup");
+      await expectVisible(page.locator("#room-name"));
+    });
+    await go("setup");
+    await expectVisible(page.locator("#room-name"));
+    const mappings = await page.locator(".mapping-picker").evaluateAll((pickers) =>
+      pickers.map((picker) => ({
+        mapped: !!picker.querySelector(".mapping-id"),
+        pill: [
+          picker.querySelector(".mapping-head .pill")?.textContent.trim(),
+          picker.querySelector(".mapping-head .pill")?.dataset.tone,
+        ],
+      })),
+    );
+    assert.ok(mappings.some((m) => m.mapped) && mappings.some((m) => !m.mapped));
+    for (const { mapped, pill } of mappings)
+      assert.deepEqual(pill, mapped ? ["Mapped", "on"] : ["Not mapped", "neutral"]);
+    assert.deepEqual(await pillTones(".workspace-card .pill:has(.pill-dot)"), [
+      ["Controller acknowledgement pending", "warn"],
+      ["Room descriptor discovered", "on"],
+    ]);
+  });
+  await check("settings: the connection, the room and its scheduling are state pills", async () => {
+    await inBothThemes("settings", async () => {
+      await go("settings");
+      await expectVisible(page.locator("[data-connection]"));
+    });
+    await go("settings");
+    assert.deepEqual(await pillTones(".settings-section .pill"), [
+      ["Demo mode", "warn"],
+      ["Room on", "on"],
+      ["Enabled", "on"],
+    ]);
   });
   await check("overview: two screens at most, zones beside the tank", async () => {
     // 1440×800 ≈ the browser window of a 1440×900 laptop; the Overview was 3.2 screens tall.

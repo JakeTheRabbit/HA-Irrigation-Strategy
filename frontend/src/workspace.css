@@ -310,6 +310,21 @@
 .mapping-picker {
   min-width: 0;
 }
+/* The field's name, and a pill saying whether it is mapped. */
+.mapping-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.mapping-head .mapping-label {
+  min-width: 0;
+  margin-bottom: 0;
+}
+.workspace-form-grid > div > .pill {
+  margin-top: 6px;
+}
 .mapping-button {
   width: 100%;
   height: auto !important;

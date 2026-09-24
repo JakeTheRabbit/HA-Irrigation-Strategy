@@ -83,14 +83,14 @@
 .water-use .cell-subtext {
   font-weight: 400;
 }
-.zone-table-compact .meter {
+.zone-table-desktop .meter {
   min-width: 72px;
 }
 .zone-table-compact .cell-subtext.moisture-target {
   white-space: nowrap;
 }
-/* Phones: the Overview's four readings in two rows of two. */
-.zone-mobile-list.compact .zone-mobile-readings {
+/* Phones: the four readings in two rows of two. */
+.zone-mobile-list .zone-mobile-readings {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 /* Doubled class: styles.css loads after this file and sets .data-table cell padding. */
