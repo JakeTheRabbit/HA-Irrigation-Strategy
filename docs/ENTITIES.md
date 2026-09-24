@@ -213,9 +213,9 @@ match the globals above.
 
 The pump, mainline solenoid, per-zone valve switches, and the raw VWC/EC + source-water
 sensors are **your** existing HA entities. You map them to the engine via the f2-control
-add-on's `hardware` Configuration option (`pump` / `mainline` / per-zone `valves`), which
-defaults to the F2 entities (`switch.veg_main_pump`, `switch.espoe_irrigation_relay_2_3`,
-`switch.f2_row1`–`f2_row3`); the engine drives those switches and reads the sensors.
+add-on's `hardware` Configuration option (`pump` / `mainline` / per-zone `valves`). It is
+empty by default: the controller then drives what the room's setup maps in **Rooms & setup**,
+and with nothing mapped it holds every zone and says so.
 
 > **Inert legacy entities:** the integration may still create a steering-intent slider
 > and a few `…_intelligence_*_enabled` switches from a retired experimental layer. The

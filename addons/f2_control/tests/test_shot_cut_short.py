@@ -1,7 +1,7 @@
 """A shot that something else cuts short: a hold comes on, or the zone's valve is switched off.
 
 23 Sep 2026, 11:25:22 NZST: the controller fired a Z1 P1 ramp shot (2.8 %, ~170 s): pump, main line,
-then the valve at 11:25:25. At 11:25:29 the batch tank ran empty. Ben's dosing automation turned on
+then the valve at 11:25:25. At 11:25:29 the batch tank ran empty. the room's dosing automation turned on
 input_boolean.nutrient_dosing_active (one of the controller's holds) and switched the pump off, and
 his dose guard closed the valve and the main line. The controller did not notice. It waited out the
 170 s, ran its close sequence and counted about 7.9 L for about 0.2 L delivered. Had the next dosing
