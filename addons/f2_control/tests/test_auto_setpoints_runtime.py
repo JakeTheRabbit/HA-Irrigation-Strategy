@@ -196,7 +196,7 @@ def test_the_same_value_is_not_rewritten_every_tick(phase):
 
 
 # ------------------------------------------------------------------ Jev manages P2
-# Ben, 2026-09-20: "setup jev to manage the p2 using cloudflare". Until now Jev was asked once, at a P1
+# The owner, 2026-09-20: "setup jev to manage the p2 using cloudflare". Until now Jev was asked once, at a P1
 # plateau. In P2 it is now asked once an hour whether pore EC wants bigger or smaller maintenance shots
 # and whether the learned peak fits. It can only nudge, one step per lever per grow-day, inside fixed
 # bounds; a guard that trips means hands off; an unreachable Cloudflare never delays a shot.

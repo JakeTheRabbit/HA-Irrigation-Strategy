@@ -99,7 +99,7 @@ hardware; the 23 September event is replayed in the controller suite.
 ## [2.19.5] - 2026-09-23
 
 Pair: **controller 0.16.5**. Class **C3**: engine, controller and integration. **Owner-approved rehearsal
-release** (Ben Isdale, 23 September 2026), no staging soak; see the release audit.
+release** (the owner, 23 September 2026), no staging soak; see the release audit.
 
 The irrigation changes (engine and controller) are class **C3**; the plan, setup and Repairs changes
 are class **C2**. The zone status change is class **C3** (controller and integration).
@@ -212,7 +212,7 @@ are class **C2**. The zone status change is class **C3** (controller and integra
 ## [2.19.4] - 2026-09-23
 
 Pair: **controller 0.16.4** (no controller code change: it serves the 2.19.4 dashboard). Class **C1**:
-dashboard only, nothing the controller or the integration reads. **Owner-approved rehearsal release** (Ben Isdale,
+dashboard only, nothing the controller or the integration reads. **Owner-approved rehearsal release** (the owner,
 23 September 2026), no staging photoperiod; see the release audit.
 
 ### 🌱 In plain English
@@ -279,7 +279,7 @@ dashboard only, nothing the controller or the integration reads. **Owner-approve
 
 ## [2.19.3] - 2026-09-23
 
-Pair: **controller 0.16.3**. **Owner-approved rehearsal release, no staging soak**: Ben Isdale
+Pair: **controller 0.16.3**. **Owner-approved rehearsal release, no staging soak**: the owner
 approved releasing on 23 September 2026 ("do all of it now") after the F2 dry tails of 21-22 September; the
 release audit on the GitHub release names what was and was not exercised. Update with the engine off, read
 the controller log, then watch the first shots.
@@ -1044,8 +1044,8 @@ the only engine for a while, and keeping the dead code around made the docs clai
 system doesn't do. The README is corrected to match the actual code: the self-tuning "Vmax / adaptive
 steering" section is gone (it was never in the live engine), the dashboard tab names and the safety
 gate chain are fixed, and overstated claims (a `>4 h` self-healing watchdog, daily *shot-count* caps,
-`?room=` dashboard scoping) are reworded to what's real. New **[`SYSTEM_GUIDE.html`](archive/2026-09-08/SYSTEM_GUIDE.html)**
-(feature list + flowcharts) and **[`docs/DASHBOARDS.md`](archive/2026-09-08/docs/DASHBOARDS.md)** (what's wired, what's
+`?room=` dashboard scoping) are reworded to what's real. New **[`SYSTEM_GUIDE.html`](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/archive/2026-09-08/released-workspace/archive/2026-09-08/SYSTEM_GUIDE.html)**
+(feature list + flowcharts) and **[`docs/DASHBOARDS.md`](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/archive/2026-09-08/released-workspace/archive/2026-09-08/docs/DASHBOARDS.md)** (what's wired, what's
 hardcoded to F2, and how to populate the dashboards for your own facility).
 
 **🔧 Technical notes.**
@@ -1571,7 +1571,7 @@ integration. README, CLAUDE.md and docs/SYSTEM_OVERVIEW.md rewritten to match.
 ### Removed — undeployed experimental layers
 The `intelligence/` subsystem (RootSense substrate AI + ClimateSense climate
 control) was never deployed and has been removed from `main`, along with its tests,
-the F1/Green Wave `legacyag` dashboards, the `docs/upgrade/` planning docs, and the
+the facility-specific F1 dashboards, the `docs/upgrade/` planning docs, and the
 lean `crop_steering_v2` controller. All recoverable from the
 `archive/pre-doc-cleanup-2026-06` tag.
 
@@ -1634,7 +1634,7 @@ lean `crop_steering_v2` controller. All recoverable from the
   dataclass field didn't exist).
 
 ### Added (Dashboard wiring)
-- New "LLM Advisor" view in `dashboards/legacyag/30_intelligence.yaml`:
+- New "LLM Advisor" view in the facility's `30_intelligence.yaml` dashboard:
   pillar status, latest triage tag, full report payload as
   syntax-highlighted markdown, 7-day token-size + triage-history
   graphs.
@@ -1788,7 +1788,7 @@ intelligence/climate/
   -2.0` documented inline.
 
 ### Added (Dashboards)
-- New `Recipe` view in `dashboards/legacyag/40_setpoints.yaml` —
+- New `Recipe` view in the facility's `40_setpoints.yaml` dashboard —
   active phase + day-in-grow + DLI today/predicted + the 5
   ClimateSense module switches + measured-vs-recipe-target overlay.
 - Recorder package extended with all `sensor.climate_target_*`
@@ -1830,7 +1830,7 @@ intelligence/climate/
   step-by-step rollout sequence, rollback path, and troubleshooting.
 
 ### Added (Linked F1 dashboard suite)
-- Five linked Lovelace dashboards under `dashboards/legacyag/`,
+- Five linked Lovelace dashboards for the first facility,
   built on the existing `custom:agency-sensor-analytics-card` that
   the live F1 install already uses. Replaces the earlier
   history-graph-card prototype (`rootsense_history.yaml`) which

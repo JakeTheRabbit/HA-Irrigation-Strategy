@@ -550,7 +550,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 *Information · Notification*
 
-**What it means.** The controller app used to take the lights on and off hours from its own options. It now reads them from the integration, and the two disagree. The app's option is still used whenever the integration's hours can't be read (while Home Assistant restarts, for example).
+**What it means.** The controller app used to take the lights on and off hours from its own options. It now reads them from the integration, and the two disagree. The app's option is still used when the integration's hours can't be read and haven't been since the controller app started; a loop that can't read them keeps the hours read before.
 
 **Watering meanwhile.** Carries on, on the integration's hours.
 
@@ -560,7 +560,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 **Suggested fixes**
 
-- If the integration's hours are right, set the controller app's lights_on_hour and lights_off_hour options to the same hours, so a missed reading can't move lights-on or lights-off.
+- If the integration's hours are right, set the controller app's lights_on_hour and lights_off_hour options to the same hours, so that case can't move lights-on or lights-off.
 - If not, set the integration's Lights on hour and Lights off hour.
 
 <a id="cs-404"></a>
