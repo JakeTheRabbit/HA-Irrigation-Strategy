@@ -2,7 +2,7 @@ import { DailyWaterSummary } from "@/components/water-delivery";
 import { DayTimeline } from "@/components/day-timeline";
 import { TankStatus } from "@/components/tank-status";
 import { useState } from "react";
-import { ArrowRight, ArrowUpRight, CircleCheck, TriangleAlert } from "lucide-react";
+import { ArrowRight, ArrowUpRight, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Controller, Zone } from "@/lib/types";
 import { leadingNotices } from "@/lib/model";
@@ -121,23 +121,6 @@ export function Overview({
             </Button>
           </div>
           <EventList events={room.events.slice(0, 5)} />
-        </section>
-        <section className="panel next-panel">
-          <CircleCheck size={26} />
-          <h2>Your daily workflow</h2>
-          <p>
-            Check readings, inspect any zone that needs attention, then review strategy changes
-            before applying them.
-          </p>
-          <button onClick={() => navigate("zones")}>
-            Inspect individual zones <ArrowRight size={16} />
-          </button>
-          <button onClick={() => navigate("strategy")}>
-            Review irrigation settings <ArrowRight size={16} />
-          </button>
-          <button onClick={() => navigate("help")}>
-            Understand phases & metrics <ArrowRight size={16} />
-          </button>
         </section>
       </div>
       <ZoneDetails

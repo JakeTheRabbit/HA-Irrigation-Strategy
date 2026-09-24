@@ -739,31 +739,6 @@ nav button.nav-separated {
   font-size: 10px;
   white-space: nowrap;
 }
-.next-panel {
-  padding: 25px;
-}
-.next-panel > svg {
-  color: var(--primary-strong);
-  margin-bottom: 17px;
-}
-.next-panel p {
-  color: var(--muted-foreground);
-  font-size: 12px;
-  margin: 10px 0 19px;
-}
-.next-panel button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  padding: 12px 0;
-  font-size: 12px;
-  border: 0;
-  border-top: 1px solid var(--border);
-  background: transparent;
-  color: var(--primary-strong);
-}
 .toolbar {
   display: flex;
   align-items: center;
@@ -1282,6 +1257,21 @@ nav button.nav-separated {
   font-size: 12px;
   margin-top: 8px;
   max-width: 830px;
+}
+.help-intro h3 {
+  margin-top: 16px;
+}
+.daily-routine {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+}
+.daily-routine a {
+  color: var(--primary-strong);
+}
+.daily-routine a:hover {
+  text-decoration: underline;
 }
 .help-columns {
   display: grid;
@@ -1993,7 +1983,6 @@ h3 {
 }
 .page-heading p,
 .room-summary > p,
-.next-panel p,
 .connection-form label {
   font-size: 13px;
 }
@@ -2405,7 +2394,6 @@ nav button.active,
 .theme-options .chosen,
 .success-text,
 .success-banner,
-.next-panel button,
 .tool-link-list a,
 .review-row b,
 .text-primary {
