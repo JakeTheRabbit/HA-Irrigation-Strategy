@@ -40,7 +40,7 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          ignore: brands
+          # No ignores, as in ci-validate.yml.
 
       - name: Set up Python
         uses: actions/setup-python@v5
