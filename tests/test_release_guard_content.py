@@ -29,7 +29,7 @@ OLD = {
     "integration": guards.manifest_version(REAL[MANIFEST]),
     "controller": guards.addon_version(REAL[ADDON]),
 }
-NEW = {"integration": "9.0.0", "controller": "0.99.0"}
+NEW = {"integration": "9.0.0", "controller": "9.0.0"}  # one number for both halves (2.21.0 on)
 
 
 def _bumped(path):
