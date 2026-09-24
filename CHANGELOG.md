@@ -16,8 +16,8 @@ reads. Not run on hardware; checked read-only against a live room's recorded his
 short by something else is class **C3** (irrigation behaviour, controller only). Not run on
 hardware; the 23 September event is replayed in the controller suite.
 
-The dashboard's page headings, Overview and look are class **C1**: dashboard only, nothing the
-controller or the integration reads. Not run on hardware; checked by the browser contract scripts.
+The dashboard changes below are class **C1**: dashboard only, nothing the controller or the
+integration reads. Not run on hardware; checked by the browser contract scripts.
 
 ### 🌱 In plain English
 
@@ -52,7 +52,8 @@ controller or the integration reads. Not run on hardware; checked by the browser
 - **The Overview is shorter and balanced.** Under the grow day, the zones sit beside the tank
   instead of below it (on a phone they stack as before). The tank card has the same space above
   the tank and *Tank EC* as beside them, where before they sat flush under the heading, and shows
-  the level, EC, pH and temperature with the pump, filling and last fill in one row. The zones
+  the level, EC, pH and temperature with the pump, filling and last fill in one row, and one
+  short line on what the pump and fill readings do not prove. The zones
   table carries each zone's target under its moisture and fits without scrolling sideways. The
   sentences under panel titles and the captions under today's totals moved into tooltips. At
   1440 px wide the Overview is under two screens tall; it was more than three.
