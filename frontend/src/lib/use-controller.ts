@@ -14,16 +14,26 @@ import {
   resolveRequestedRoom,
   validateChange,
 } from "./model";
-import { createDemo, demoBeat, demoDay, demoHistory, demoReact, isDemoLocation } from "./demo";
+import {
+  createDemo,
+  demoBeat,
+  demoDay,
+  demoHistory,
+  demoReact,
+  demoWaterRecord,
+  isDemoLocation,
+} from "./demo";
 import {
   applyEntityUpdate,
   liveConnection,
   liveHistory,
+  liveStatistics,
   watchedEntities,
   whileVisible,
   type EntityUpdate,
   type LiveConnection,
 } from "./live";
+import { historySamples, type WaterRecord, type WaterRecordRequest } from "./water-use";
 
 type Listener = () => void;
 const SESSION_KEY = "crop-steering-connection-tab";
@@ -108,6 +118,7 @@ export class ControllerStore {
       history: this.history,
       historyWindow: this.historyWindow,
       timeline: this.timeline,
+      waterRecord: this.waterRecord,
       operator: this.operator,
     };
     this.listeners.forEach((listener) => listener());
@@ -427,12 +438,17 @@ export class ControllerStore {
   operator = async <T>(action: OperatorAction, data: Record<string, unknown> = {}): Promise<T> => {
     const generation = this.generation;
     const roomId = this.roomId;
-    const scoped = action.startsWith("strategy_") || action.startsWith("runs_");
+    const scoped =
+      action.startsWith("strategy_") || action.startsWith("runs_") || action.startsWith("stock_");
     const payload = scoped ? { ...data, room_id: roomId } : data;
     if (scoped && !roomId) throw new Error("Select an available room.");
-    const mutation = !["strategy_get", "strategy_preview", "setup_read", "runs_get"].includes(
-      action,
-    );
+    const mutation = ![
+      "strategy_get",
+      "strategy_preview",
+      "setup_read",
+      "runs_get",
+      "stock_get",
+    ].includes(action);
     if (mutation && this.writing) throw new Error("Another change is still being applied.");
     if (mutation) this.writing = true;
     try {
@@ -552,6 +568,29 @@ export class ControllerStore {
       : await this.client.timeline(request);
     if (generation !== this.generation)
       throw new Error("Room or connection changed; history request cancelled.");
+    return result;
+  };
+  /** The selected room's water-today counters: Home Assistant's hourly long-term statistics over
+   * its websocket inside Home Assistant; standalone, its recorded history over REST, which reaches
+   * back only as far as the recorder keeps it. */
+  waterRecord = async (request: WaterRecordRequest): Promise<WaterRecord> => {
+    const allowed = new Set(this.snapshot.room.entities.map((entity) => entity.entity_id));
+    if (!request.entityIds.length || request.entityIds.some((id) => !allowed.has(id)))
+      throw new Error("Water records are limited to the selected room's sensors.");
+    if (!(request.end > request.start))
+      throw new Error("Water records need a start before their end.");
+    if (this.demo) return { source: "demo", samples: demoWaterRecord(this.states, request) };
+    if (!this.client || this.connection !== "live")
+      throw new Error("Connect to Home Assistant to load recorded water.");
+    const generation = this.generation;
+    const result: WaterRecord = this.live?.sendMessagePromise
+      ? { source: "statistics", samples: await liveStatistics(this.live, request) }
+      : {
+          source: "history",
+          samples: historySamples(await this.client.timeline({ ...request, attributeIds: [] })),
+        };
+    if (generation !== this.generation)
+      throw new Error("Room or connection changed; water request cancelled.");
     return result;
   };
 }

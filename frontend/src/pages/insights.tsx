@@ -13,15 +13,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  dailyLimit,
   Empty,
   Heading,
   HistoryChart,
   MetricValue,
+  PhasePill,
   Status,
   number,
   time,
+  zoneBreakdown,
   type Page,
 } from "@/components/dashboard";
+import { MiniBars, Pill, type MiniBar } from "@/components/mini-visuals";
 import { WaterDelivery } from "@/components/water-delivery";
 import { waterParameters } from "@/lib/water-delivery";
 import { calibrateDripper } from "@/lib/catch-test";
@@ -32,6 +36,25 @@ import "./insights.css";
 
 const asId = (value: unknown) =>
   typeof value === "string" && /^[a-z_]+\.[a-z0-9_]+$/.test(value) ? value : "";
+/** The controller's water today over its shots today: the day's mean shot, in litres. */
+const perShot = (zone: Zone) =>
+  zone.water.value !== null && zone.shots.value !== null && zone.shots.value > 0
+    ? zone.water.value / zone.shots.value
+    : null;
+/** How many of the zone's two probes, VWC and EC, have a current reading. */
+function probeBar(zone: Zone): MiniBar {
+  const current = Number(zone.vwc.value !== null) + Number(zone.ec.value !== null);
+  const missing = [zone.vwc.value === null && "VWC", zone.ec.value === null && "EC"].filter(
+    Boolean,
+  );
+  return {
+    id: String(zone.id),
+    label: String(zone.id),
+    value: current,
+    tone: current === 2 ? "normal" : current === 1 ? "high" : "over",
+    title: `${zone.name}: ${missing.length ? `${missing.join(" and ")} unavailable or unverified` : "VWC and EC current"}`,
+  };
+}
 function Reference({ metric, controller }: { metric: Metric; controller: Controller }) {
   const entity = metric.entityId ? controller.states[metric.entityId] : undefined;
   return (
@@ -102,10 +125,26 @@ export function Insights({
   const readyProbes = controller.room.zones.filter(
     (item) => item.vwc.value !== null && item.ec.value !== null,
   ).length;
-  const meanShot =
-    zone && zone.water.value !== null && zone.shots.value !== null && zone.shots.value > 0
-      ? zone.water.value / zone.shots.value
-      : null;
+  const meanShot = zone ? perShot(zone) : null;
+  // The summary numbers are one zone's (or the room's); the bars beside them compare every zone.
+  const probeBars = controller.room.zones.map(probeBar);
+  const water = zoneBreakdown(
+    { entityId: null, label: "Water today", unit: "L", value: null, key: "water" },
+    controller.room.zones,
+    Object.fromEntries(
+      controller.room.zones.map((item) => [item.id, dailyLimit(controller, item.id)]),
+    ),
+  );
+  const shotBars = controller.room.zones.map((item): MiniBar => {
+    const value = perShot(item);
+    return {
+      id: String(item.id),
+      label: String(item.id),
+      value,
+      title: `${item.name}: ${number(value, 2)}${value === null ? "" : " L per shot"}`,
+      selected: item.id === zone?.id,
+    };
+  });
   const delta = (metric: Metric, target: Metric) =>
     metric.value !== null && target.value !== null ? metric.value - target.value : null;
   const vwcDelta = zone ? delta(zone.vwc, zone.target) : null,
@@ -171,6 +210,11 @@ export function Insights({
                 {readyProbes}/{controller.room.zones.length}
               </strong>
               <span>zones with current VWC + EC</span>
+              <MiniBars
+                bars={probeBars}
+                max={2}
+                label={`Current probe readings by zone. ${probeBars.map((bar) => bar.title).join("; ")}`}
+              />
             </div>
             <div>
               <Droplets size={19} />
@@ -178,6 +222,11 @@ export function Insights({
                 {number(zone.water.value)} <small>L</small>
               </strong>
               <span>{zone.name} · all plants, controller estimate today</span>
+              <MiniBars
+                bars={water.bars.map((bar) => ({ ...bar, selected: bar.id === String(zone.id) }))}
+                max={water.max}
+                label={water.label}
+              />
             </div>
             <div>
               <Waves size={19} />
@@ -185,6 +234,11 @@ export function Insights({
                 {number(meanShot, 2)} <small>{meanShot !== null ? "L/shot" : ""}</small>
               </strong>
               <span>recorded daily mean</span>
+              <MiniBars
+                bars={shotBars}
+                max={Math.max(0, ...shotBars.map((bar) => bar.value ?? 0))}
+                label={`Mean shot by zone. ${shotBars.map((bar) => bar.title).join("; ")}`}
+              />
             </div>
           </div>
           <div className="insight-zone-picker">
@@ -204,7 +258,7 @@ export function Insights({
               ))}
             </select>
             <Status enabled={zone.enabled} />
-            <span className="muted small">{zone.phase}</span>
+            <PhasePill phase={zone.phase} />
           </div>
           <Tabs defaultValue="diagnostics">
             <TabsList className="insight-tabs">
@@ -300,22 +354,13 @@ export function Insights({
                       {controller.room.zones.map((item) => (
                         <tr key={item.id}>
                           <td>{item.name}</td>
-                          <td>
-                            <Status
-                              enabled={item.vwc.value !== null ? true : null}
-                              label={
-                                item.vwc.value !== null ? "Current" : "Unavailable / unverified"
-                              }
-                            />
-                          </td>
-                          <td>
-                            <Status
-                              enabled={item.ec.value !== null ? true : null}
-                              label={
-                                item.ec.value !== null ? "Current" : "Unavailable / unverified"
-                              }
-                            />
-                          </td>
+                          {(["vwc", "ec"] as const).map((kind) => (
+                            <td key={kind}>
+                              <Pill dot tone={item[kind].value !== null ? "on" : "off"}>
+                                {item[kind].value !== null ? "Current" : "Unavailable / unverified"}
+                              </Pill>
+                            </td>
+                          ))}
                           <td>
                             <Status enabled={item.enabled} />
                           </td>

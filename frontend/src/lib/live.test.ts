@@ -3,6 +3,7 @@ import {
   applyEntityUpdate,
   compressedRows,
   liveHistory,
+  liveStatistics,
   watchedEntities,
   whileVisible,
   type EntityUpdate,
@@ -415,6 +416,50 @@ describe("inside Home Assistant", () => {
     expect(home.calls[1]).toMatch(/^GET history\/period\/.*significant_changes_only=0$/);
     store.stop();
   });
+  const WATER = "sensor.crop_steering_zone_1_daily_water_app";
+  it("reads the water counters' hourly long-term statistics over the websocket", async () => {
+    const { home, store } = await started();
+    const end = Date.now(),
+      start = end - 30 * 86_400_000;
+    home.connection.sendMessagePromise.mockImplementation(async () => ({
+      [WATER]: [{ start: end - 7_200_000, end: end - 3_600_000, state: 41.2 }],
+    }));
+    home.calls.length = 0;
+    const record = await store.getSnapshot().waterRecord({ entityIds: [WATER], start, end });
+    expect(record).toEqual({
+      source: "statistics",
+      samples: { [WATER]: [{ time: end - 3_600_001, value: 41.2 }] },
+    });
+    expect(home.connection.sendMessagePromise).toHaveBeenCalledWith({
+      type: "recorder/statistics_during_period",
+      start_time: new Date(start).toISOString(),
+      end_time: new Date(end).toISOString(),
+      statistic_ids: [WATER],
+      period: "hour",
+      types: ["state"],
+    });
+    expect(home.calls).toEqual([]);
+    store.stop();
+  });
+  it("reads the water counters' recorded history over REST without the websocket", async () => {
+    const { home, store } = await started();
+    delete (home.connection as { sendMessagePromise?: unknown }).sendMessagePromise;
+    home.calls.length = 0;
+    const record = await store
+      .getSnapshot()
+      .waterRecord({ entityIds: [WATER], start: Date.now() - 86_400_000, end: Date.now() });
+    expect(record).toEqual({ source: "history", samples: {} });
+    expect(home.calls).toHaveLength(1);
+    expect(home.calls[0]).toMatch(/^GET history\/period\/.*minimal_response=&no_attributes=$/);
+    await expect(
+      store.getSnapshot().waterRecord({
+        entityIds: ["sensor.crop_steering_f1_zone_1_daily_water_app"],
+        start: 0,
+        end: 1,
+      }),
+    ).rejects.toThrow("limited to the selected room");
+    store.stop();
+  });
   it("keeps a grow day to the selected room and one day", async () => {
     const { store } = await started();
     const start = Date.now() - 3_600_000,
@@ -452,6 +497,17 @@ describe("recorder rows over the websocket", () => {
       ],
     });
     expect(() => compressedRows(null, false)).toThrow("invalid history");
+  });
+  it("gives up on water statistics Home Assistant never answers", async () => {
+    vi.useFakeTimers();
+    const connection = {
+      subscribeMessage: vi.fn(),
+      sendMessagePromise: () => new Promise<never>(() => {}),
+    };
+    const pending = liveStatistics(connection, { entityIds: ["sensor.a"], start: 0, end: 1 });
+    const failed = expect(pending).rejects.toThrow("did not return the water statistics");
+    await vi.advanceTimersByTimeAsync(60_000);
+    await failed;
   });
   it("gives up on a history request Home Assistant never answers", async () => {
     vi.useFakeTimers();

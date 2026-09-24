@@ -30,6 +30,9 @@ CHANGES = {
     "runs_save": {"room_id": ROOM, "expected_revision": 0, "record": {}},
     "runs_archive": {"room_id": ROOM, "expected_revision": 0, "id": "r", "archived": True},
     "runs_import": {"room_id": ROOM, "expected_revision": 0, "runs": []},
+    "stock_save": {"room_id": ROOM, "expected_revision": 0, "tanks": []},
+    "stock_refill": {"room_id": ROOM, "expected_revision": 0, "id": "bloom"},
+    "stock_record_batch": {"room_id": ROOM, "expected_revision": 0},
     "save_recipe": {"recipe": {}},
     "apply_recipe": {},
     "set_manual_override": {"zone": 1},
@@ -45,6 +48,7 @@ READS = {
     "strategy_get": {"room_id": ROOM},
     "strategy_preview": {"room_id": ROOM},
     "runs_get": {"room_id": ROOM},
+    "stock_get": {"room_id": ROOM},
     "check_transition_conditions": {},
 }
 EVENTS = (

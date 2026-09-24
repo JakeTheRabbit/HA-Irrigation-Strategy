@@ -3,7 +3,7 @@
 import asyncio
 from pathlib import Path
 
-from .const import DOMAIN
+from .const import DOMAIN, SOFTWARE_VERSION
 
 PANEL = "crop-steering"
 URL = "/crop_steering"
@@ -59,7 +59,9 @@ async def async_setup_panel(hass):
             sidebar_title="Crop Steering",
             sidebar_icon="mdi:sprout",
             frontend_url_path=PANEL,
-            config={"url": f"{URL}/dashboard.html"},
+            # The page is served without cache headers, so a browser can keep showing the
+            # previous release's copy for hours after an update. A new version is a new URL.
+            config={"url": f"{URL}/dashboard.html?v={SOFTWARE_VERSION}"},
             require_admin=False,
         )
         state["panel_registered"] = True

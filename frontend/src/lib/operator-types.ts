@@ -11,7 +11,11 @@ export type OperatorAction =
   | "setup_read"
   | "setup_create"
   | "setup_save"
-  | "setup_remove";
+  | "setup_remove"
+  | "stock_get"
+  | "stock_save"
+  | "stock_refill"
+  | "stock_record_batch";
 
 export interface ParameterLimit {
   value: number | null;

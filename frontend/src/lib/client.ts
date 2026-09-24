@@ -175,6 +175,10 @@ export class HaClient {
       "setup_create",
       "setup_save",
       "setup_remove",
+      "stock_get",
+      "stock_save",
+      "stock_refill",
+      "stock_record_batch",
     ];
     if (!allowed.includes(action)) throw new Error("Unsupported workspace action.");
     const response = await this.request<{ service_response?: T }>(

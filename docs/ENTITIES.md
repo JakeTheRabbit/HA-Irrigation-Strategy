@@ -187,6 +187,7 @@ match the globals above.
 | `daily_water_usage` / `daily_water_usage_app` | L | Total water today. |
 | `prediction_estimated_daily_water_need` | L | Predicted daily demand. |
 | `irrigation_efficiency` | % | Water-to-uptake efficiency. |
+| `stock_low` | — | How many of the room's stock tanks are at or below their low mark (0 when none). Attribute `tanks`: each tank's `name`, `level_l`, `capacity_l`, `percent`, `low_l`, `dose_ml` (what one batch takes now), `batches_left` and `low`. Attribute `last_batch`: the newest batch counted. The tanks are kept by the integration (Crop Steering → Stock tanks, or the `stock_*` services); a room with a tank last-fill entity mapped loses one batch's dose from every tank at each newer fill time. Automate a phone alert on it going above 0. |
 
 ### Per-zone (`sensor.crop_steering_zone_N_*`)
 | Entity | Unit | What it reports |
