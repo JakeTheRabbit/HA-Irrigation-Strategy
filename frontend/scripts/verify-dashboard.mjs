@@ -158,6 +158,60 @@ try {
         fullPage: true,
       });
     });
+  await check("help: every error code is listed, searchable and linkable", async () => {
+    const catalog = JSON.parse(await readFile(path.join(root, "docs/error-codes.json"), "utf8"));
+    await go("help");
+    await expectVisible(page.getByRole("heading", { name: "Error codes", exact: true }));
+    const codes = page.locator("details.error-code");
+    assert.deepEqual(
+      await codes.evaluateAll((all) => all.map((d) => d.id)),
+      catalog.codes.map((entry) => entry.code.toLowerCase()),
+      "Help & tools must list exactly the codes in docs/error-codes.json",
+    );
+    const search = page.getByRole("textbox", { name: "Search error codes" });
+    await search.fill("101");
+    assert.equal(await codes.count(), 1);
+    const found = page.locator("details#cs-101");
+    assert.equal(await found.getAttribute("open"), "", "A code typed in full opens by itself");
+    await expectVisible(found.getByText("Likely causes", { exact: true }));
+    await expectVisible(found.getByText(/No plant in the cube/));
+    await search.fill("nothing like this");
+    await expectVisible(page.getByText(/No code matches/));
+    await page.goto(`${base}/dashboard.html?demo&room=f2#/help?code=CS-605`, {
+      waitUntil: "networkidle",
+    });
+    await expectVisible(page.locator("details#cs-605[open]"));
+    assert.equal(await search.inputValue(), "CS-605");
+    await search.fill("");
+    await codes.evaluateAll((all) => all.forEach((d) => (d.open = true)));
+    await noOverflow();
+    await axe("help error codes, all open");
+    // Dark: only the new section. Toggling the class alone is not the app's full dark theme, so
+    // the rest of the page is not judged on it here.
+    await page.evaluate(() => document.documentElement.classList.add("dark"));
+    // Colours transition (even at reduced motion); measure after two frames, not mid-change.
+    await page.evaluate(
+      () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+    );
+    const dark = await new AxeBuilder({ page })
+      .include(".error-codes")
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
+    accessibility.push({
+      page: "help error codes, all open, dark",
+      violations: dark.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })),
+    });
+    assert.deepEqual(
+      dark.violations.map((v) => v.id),
+      [],
+      "Error codes must be readable on a dark theme",
+    );
+    await page.screenshot({
+      path: path.join(out, "dashboard-help-error-codes.png"),
+      fullPage: true,
+    });
+    await page.evaluate(() => document.documentElement.classList.remove("dark"));
+  });
   await check(
     "one Irrigation plan entry exposes Today and Schedule with working history",
     async () => {

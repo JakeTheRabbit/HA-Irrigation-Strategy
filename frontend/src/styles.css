@@ -1355,6 +1355,117 @@ nav button.nav-separated {
   font-size: 11px;
   margin-top: 9px;
 }
+.error-codes {
+  margin-top: 24px;
+}
+.error-codes-body {
+  padding: 0 24px 20px;
+}
+.error-codes-body > .search-field {
+  margin-bottom: 8px;
+}
+.error-codes-empty {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  padding: 12px 0;
+}
+.error-code-group h3 {
+  font-size: 12px;
+  font-weight: 650;
+  margin: 18px 0 4px;
+}
+.error-code-group h3 span {
+  color: var(--muted-foreground);
+  font-weight: 500;
+  margin-left: 4px;
+}
+.error-code {
+  border-bottom: 1px solid var(--border);
+}
+.error-code summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  cursor: pointer;
+  font-size: 12px;
+}
+.error-code summary code {
+  font-weight: 650;
+  color: var(--primary-strong);
+  min-width: 52px;
+}
+.error-code summary::-webkit-details-marker {
+  display: none;
+}
+.error-code summary {
+  list-style: none;
+}
+.error-code-title {
+  flex: 1;
+}
+.error-code-chevron {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.error-code[open] .error-code-chevron {
+  transform: rotate(90deg);
+}
+.error-code .severity-critical {
+  background: color-mix(in srgb, var(--destructive) 10%, var(--surface));
+  color: var(--destructive);
+  border-color: transparent;
+}
+.error-code .severity-warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: transparent;
+}
+.error-code .severity-info {
+  color: var(--muted-foreground);
+}
+.error-code dl {
+  margin: 0;
+  padding: 0 0 4px 64px;
+}
+.error-code dl > div {
+  padding: 6px 0;
+}
+.error-code dt {
+  font-weight: 650;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.error-code dd {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.error-code ul {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+.error-code-source {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  padding: 0 0 14px 64px;
+}
+@media (max-width: 720px) {
+  .error-codes-body {
+    padding: 0 16px 16px;
+  }
+  .error-code summary {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  .error-code dl,
+  .error-code-source {
+    padding-left: 0;
+  }
+}
 .small {
   font-size: 12px;
 }
