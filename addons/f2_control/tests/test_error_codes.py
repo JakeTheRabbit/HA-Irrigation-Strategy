@@ -5,7 +5,7 @@ First real install, after 2.20.3: "default GT4 (Z2) probe dead — blind schedul
 sensor.crop_steering_vwc_zone_2 and no healthy sibling". The probe was fine; it sat in a cube with
 no plant, so its reading never moved. "default" is the controller's internal name for the first
 room, and the one sentence covered a missing sensor, an unavailable one, an impossible number and
-a reading that has not changed. docs/alert-codes.json holds what each code means and what to do;
+a reading that has not changed. docs/error-codes.json holds what each code means and what to do;
 tests/test_error_codes.py keeps this controller and that catalog in step.
 """
 import ast
@@ -83,6 +83,54 @@ def test_an_impossible_number_is_out_of_range():
     assert "reads 140" in alert["message"] and "calibration" in alert["message"]
 
 
+def test_a_reading_from_the_future_says_the_clocks_disagree():
+    """_read_sensor rejects a reading stamped more than a minute ahead; it is not a dead probe."""
+    ahead = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+    alert = _probe_alert("31.2", last_updated=ahead)
+    assert alert["title"] == "Zone 2: moisture sensor not reporting (CS-102)"
+    assert "stamped 5 minutes in the future" in alert["message"]
+    assert "clock" in alert["message"]
+
+
+def test_a_changed_cause_replaces_the_card_within_minutes_not_half_an_hour():
+    """One notification carries CS-101, CS-102 and CS-103. A probe that goes from "hasn't changed"
+    to "unavailable" must not go on saying it is normal for an empty cube for half an hour, and a
+    cause that flaps must not raise a card every loop."""
+    stale = (datetime.now(timezone.utc) - timedelta(minutes=47)).isoformat()
+    c, fake = _build(dict(OPTIONS), states=_room(2))
+    fake.set_state("sensor.crop_steering_vwc_zone_2", "31.2", {"unit_of_measurement": "%"},
+                   last_updated=stale)
+
+    def titles():
+        return [d["title"] for dom, svc, d in fake.calls
+                if (dom, svc) == ("persistent_notification", "create")
+                and d["notification_id"] == "f2_blind_default_z2"]
+
+    c.loop_once(NOW)
+    assert titles()[-1].endswith("(CS-101)")
+    fake.set_state("sensor.crop_steering_vwc_zone_2", "unavailable", {})
+    c._alerted["blind_default_z2"] -= timedelta(minutes=2)
+    c.loop_once(NOW)
+    assert len(titles()) == 1  # changed two minutes ago: it may still flap back
+    c._alerted["blind_default_z2"] -= timedelta(minutes=4)
+    c.loop_once(NOW)
+    assert len(titles()) == 2 and titles()[-1].endswith("(CS-102)")
+    c._alerted["blind_default_z2"] -= timedelta(minutes=10)
+    c.loop_once(NOW)
+    assert len(titles()) == 2  # the same cause keeps its 30-minute window
+
+
+def test_the_ec_notification_names_the_sensor_actually_read():
+    """UPGRADE IN PLACE: a box keeps the EC id it was first given (sensor.crop_steering_zone_1_ec)."""
+    states = _room(1)
+    for entity in ("sensor.crop_steering_ec_zone_1", "sensor.crop_steering_zone_1_ec"):
+        states.pop(entity, None)
+    states["sensor.crop_steering_vwc_zone_1"] = ("55", {"unit_of_measurement": "%"})
+    states["sensor.crop_steering_zone_1_ec"] = ("25", {"unit_of_measurement": "mS/cm"})  # too high to use
+    _c, alerts = _alerts(states)
+    assert "Sensor: sensor.crop_steering_zone_1_ec" in alerts["f2_ec_unknown_default_z1"]["message"]
+
+
 def test_a_zone_with_a_working_neighbour_says_which_one_it_copies():
     alert = _probe_alert("unavailable", names={"1": "GT1", "2": "GT4"})
     assert "gets the same shots as GT1 (Z1), whose probe is working" in alert["message"]
@@ -156,7 +204,7 @@ def test_every_alert_the_controller_raises_passes_a_code():
     """The catalog check (tests/test_error_codes.py) reads these; a call without one fails here."""
     tree = ast.parse(Path(controller.__file__).read_text(encoding="utf-8"))
     calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "_alert"]
-    assert len(calls) >= 25
+    assert len(calls) >= 24  # both daily-limit refusals raise CS-205 through _alert_daily_cap
     for call in calls:
         code = call.args[1]
         if isinstance(code, ast.Name):  # the moisture alert: one of _PROBE_ALERTS
