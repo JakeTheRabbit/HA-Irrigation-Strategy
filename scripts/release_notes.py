@@ -83,6 +83,8 @@ def main(argv: list[str]) -> None:
         )
     )
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    # The notes carry "🌱", which a Windows console or pipe (cp1252) cannot encode.
+    sys.stdout.reconfigure(encoding="utf-8")
     sys.stdout.write(notes(changelog, version, manifest["documentation"].rstrip("/")))
 
 
