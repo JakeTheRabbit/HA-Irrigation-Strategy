@@ -380,7 +380,13 @@ def promote(api, tag, *, apply=False, expected_digest=None):
         release = api.request(
             f"releases/{plan['release_id']}",
             method="PATCH",
-            payload={"prerelease": False, "name": tag.removeprefix("v")},
+            # A release born as a pre-release is not made Latest when it is flipped: GitHub keeps
+            # showing the previous one as the current release unless asked in the same request.
+            payload={
+                "prerelease": False,
+                "name": tag.removeprefix("v"),
+                "make_latest": "true",
+            },
         )
         require(
             release.get("tag_name") == tag and release.get("prerelease") is False,
