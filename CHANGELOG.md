@@ -16,8 +16,8 @@ reads. Not run on hardware; checked read-only against a live room's recorded his
 short by something else is class **C3** (irrigation behaviour, controller only). Not run on
 hardware; the 23 September event is replayed in the controller suite.
 
-The dashboard's page headings, Overview and look are class **C1**: dashboard only, nothing the
-controller or the integration reads. Not run on hardware; checked by the browser contract scripts.
+The dashboard changes below are class **C1**: dashboard only, nothing the controller or the
+integration reads. Not run on hardware; checked by the browser contract scripts.
 
 ### 🌱 In plain English
 
