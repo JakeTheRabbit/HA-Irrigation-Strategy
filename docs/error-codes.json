@@ -593,6 +593,22 @@
         "Usually nothing: it clears by itself once the cause is fixed.",
         "If it stays, check the controller app is running and the probes are reporting."
       ]
+    },
+    {
+      "code": "CS-608",
+      "title": "Stock tanks running low",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "One or more of the room's stock tanks is at or below its low mark. Each batch tank the room makes takes its dose from every stock tank.",
+      "watering": "Carries on. Batches made from an empty stock tank will be short of that nutrient.",
+      "causes": [
+        "Batches have drawn the stock down to its low mark.",
+        "A tank was refilled but Refilled was not pressed, so its level is still the old one."
+      ],
+      "fixes": [
+        "Refill the tank, then press Refilled on Crop Steering → Stock tanks.",
+        "Or set the level you read off the tank. The card clears itself once every tank is above its low mark."
+      ]
     }
   ]
 }
