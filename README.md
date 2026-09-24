@@ -1,6 +1,6 @@
 # Crop Steering for Home Assistant
 
-A Home Assistant irrigation controller for crop steering: it waters each zone of a room through the four daily phases (P0 dryback, P1 ramp-up, P2 maintenance, P3 overnight) by what the zone's own moisture and EC probes read, and gives you a native workspace to plan each zone, map your sensors and switches, and review every change before it is applied.
+A Home Assistant irrigation controller for crop steering: it waters each zone of a room through the four daily phases (P0 dryback, P1 ramp-up, P2 maintenance, P3 overnight) by what the zone's own moisture and EC probes read. A zone whose moisture probe stops giving a usable reading is still watered, with a working zone's shots or on a timed safety schedule, until the probe reads again. It also gives you a native workspace to plan each zone, map your sensors and switches, and review every change before it is applied.
 
 **[Open the interactive demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1)** · [Install](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md) · [Feature checklist](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/FEATURE_MATRIX.md)
 
@@ -38,7 +38,7 @@ Crop Steering is two parts, and autonomous watering needs both: the **integratio
    [![Open your Home Assistant instance and add this app repository.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FJakeTheRabbit%2FHA-Irrigation-Strategy)
 4. Open **Crop Steering** in the sidebar. Map your pumps, valves and probes in **Rooms & setup**, then check the readings in **Sensors**. Keep the engine switched off until the installation checks pass.
 
-The buttons only open the right screen: Home Assistant still asks you to confirm each download, install and restart. Updates arrive the same way, through HACS for the integration and the app store for the controller app; install the matching pair named in the [changelog](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md). The [installation and upgrade guide](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md) covers manual installs, upgrades and rollback.
+The buttons only open the right screen: Home Assistant still asks you to confirm each download, install and restart. Updates arrive the same way: HACS offers the integration, and on Home Assistant OS or Supervised the app store offers the controller app. With Container or Core you run the controller yourself, so update it to the matching version by hand. Always install the matching pair named in the [changelog](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md). The [installation and upgrade guide](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md) covers manual installs, upgrades and rollback.
 
 ## See the room at a glance
 
@@ -129,7 +129,7 @@ A grow plan steers each zone on a 0–100% scale between a vegetative and a gene
 
 Plans are saved as drafts, reviewed, and armed for the next lights-on. Arming never switches the engine or a pump on. [Planning guide →](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md)
 
-Every notification from the controller app, and every Crop Steering card in **Settings → Repairs**, ends with a code such as CS-101. **Help & tools → Error codes** explains each one: what it means, what happens to watering meanwhile, and what to do.
+Every alert from the controller app, and every Crop Steering card in **Settings → Repairs**, ends with a code such as CS-101 (the controller's regular status summary has none). **Help & tools → Error codes** explains each one: what it means, what happens to watering meanwhile, and what to do.
 
 ## Documentation
 
