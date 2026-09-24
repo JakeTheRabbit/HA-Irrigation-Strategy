@@ -1,4 +1,5 @@
 import { DailyWaterSummary } from "@/components/water-delivery";
+import { WaterUse } from "@/components/water-use";
 import { useState } from "react";
 import { ArrowUpRight, LayoutGrid, List, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -138,6 +139,7 @@ export function Zones({
         </div>
       )}
       <DailyWaterSummary controller={controller} zones={zones} />
+      <WaterUse controller={controller} zones={zones} />
       <ZoneDetails
         controller={controller}
         zone={controller.room.zones.find((zone) => zone.id === selected) || null}

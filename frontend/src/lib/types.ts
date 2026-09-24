@@ -2,6 +2,7 @@ import type { HistoryRequest, HistoryWindow } from "./comparison-types";
 import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
 import type { AutoSetpointStatus } from "./auto-setpoints";
+import type { WaterRecord, WaterRecordRequest } from "./water-use";
 export interface EntityState {
   entity_id: string;
   state: string;
@@ -139,5 +140,7 @@ export interface Controller {
   history: (entityIds: string[], hours: number) => Promise<Series[]>;
   /** One grow-day of recorder history for the selected room's day timeline. */
   timeline: (request: TimelineRequest) => Promise<TimelineRows>;
+  /** The selected room's water-today counters over a span of grow-days (the Water use panel). */
+  waterRecord: (request: WaterRecordRequest) => Promise<WaterRecord>;
   operator: <T>(action: OperatorAction, data?: Record<string, unknown>) => Promise<T>;
 }
