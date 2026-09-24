@@ -17,7 +17,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
 }
 .zone-valve-state {
@@ -50,6 +50,10 @@
 }
 .zone-table-compact .zone-last-irrigation {
   min-width: 0;
+  white-space: nowrap;
+}
+.zone-table-compact .unit {
+  white-space: nowrap;
 }
 /* The target's label wraps under the moisture reading instead of widening the table. */
 .zone-table-compact .cell-subtext {

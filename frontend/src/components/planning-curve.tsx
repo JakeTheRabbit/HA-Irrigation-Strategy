@@ -406,7 +406,7 @@ export function PlanningCurve({
                   y={20}
                   textAnchor="middle"
                   fill="var(--muted-foreground)"
-                  fontSize="11"
+                  fontSize="12"
                 >
                   {phase.id}
                 </text>
@@ -430,7 +430,7 @@ export function PlanningCurve({
                   y={line + 4}
                   textAnchor="end"
                   fill="var(--muted-foreground)"
-                  fontSize="11"
+                  fontSize="12"
                 >
                   {trim(axis.min + (span * tick) / 100)}%
                 </text>
@@ -438,7 +438,7 @@ export function PlanningCurve({
                   x={width - right + 7}
                   y={line + 4}
                   fill="var(--muted-foreground)"
-                  fontSize="11"
+                  fontSize="12"
                 >
                   {((ecMax * tick) / 100).toFixed(1)}
                 </text>
@@ -464,7 +464,7 @@ export function PlanningCurve({
               y={281}
               textAnchor="middle"
               fill="var(--muted-foreground)"
-              fontSize="11"
+              fontSize="12"
             >
               {planningClock(lightsOn, hour)}
             </text>
@@ -565,7 +565,7 @@ export function PlanningCurve({
                     y={y(parameters.p2_vwc_threshold) + 13}
                     textAnchor="end"
                     fill="#42b995"
-                    fontSize="10.5"
+                    fontSize="12"
                   >
                     P2 threshold {trim(parameters.p2_vwc_threshold)}%
                   </text>
@@ -576,7 +576,7 @@ export function PlanningCurve({
                       y={y(parameters.p2_vwc_threshold) - 8}
                       textAnchor="middle"
                       fill="var(--destructive)"
-                      fontSize="11"
+                      fontSize="12"
                       fontWeight="600"
                     >
                       {advice.shots
@@ -667,7 +667,7 @@ export function PlanningCurve({
                     x={Math.min(x(nowVwc.hour) + 7, width - right - 58)}
                     y={y(nowVwc.value) - 8}
                     fill="var(--foreground)"
-                    fontSize="11"
+                    fontSize="12"
                     fontWeight="600"
                   >
                     Now {trim(nowVwc.value)}%
@@ -812,7 +812,7 @@ export function PlanningCurve({
                     y={307}
                     textAnchor="middle"
                     fill="var(--muted-foreground)"
-                    fontSize="11"
+                    fontSize="12"
                   >
                     {projection ? "P2 · no shot projected" : "P2 · sensor-triggered"}
                   </text>

@@ -5,8 +5,8 @@
   min-width: 0;
 }
 .workspace-card h2 {
-  font-size: 20px;
-  font-weight: 500;
+  font-size: var(--text-lg);
+  font-weight: 600;
   margin: 0 0 6px;
 }
 .workspace-card h3 {
@@ -163,7 +163,7 @@
 .calendar-label small {
   display: block;
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: var(--text-xs);
   margin-top: 5px;
 }
 .calendar-cell {
@@ -180,7 +180,7 @@
   font-size: 14px;
 }
 .calendar-cell small {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
 }
 .calendar-cell.selected {
@@ -329,7 +329,7 @@
 .mapping-id {
   display: block;
   overflow-wrap: anywhere;
-  font-size: 11px;
+  font-size: var(--text-xs);
   margin-top: 7px;
 }
 .mapping-dialog {
@@ -365,7 +365,7 @@
   display: block;
 }
 .mapping-result small {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
   display: block;
   overflow-wrap: anywhere;

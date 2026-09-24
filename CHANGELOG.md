@@ -57,6 +57,10 @@ integration reads. Not run on hardware; checked by the browser contract scripts.
   table carries each zone's target under its moisture and fits without scrolling sideways. The
   sentences under panel titles and the captions under today's totals moved into tooltips. At
   1440 px wide the Overview is under two screens tall; it was more than three.
+- **A calmer look.** No text smaller than 12 px anywhere (118 places were 7–11 px, and the
+  plan graph's labels 10.5–11 px), page and panel titles and today's totals in one semibold weight, no divider under every panel title, no shaded band behind
+  table headers, neutral status chips with a coloured dot, and a quieter menu. Colours still
+  follow your Home Assistant theme.
 - **A shot that something else cuts short now ends there, and only the water it gave is counted.**
   On 23 September at 11:25 the batch tank ran empty 4 seconds into a zone 1 shot. The dosing
   automation took the tank and its pump, and the feed guard closed the valve and main line. The
@@ -104,13 +108,26 @@ integration reads. Not run on hardware; checked by the browser contract scripts.
   Recent activity panel, the daily workflow card (now `ol.daily-routine` in Help's intro), the
   `DailyWaterSummary` table (still on Zones) and the `room-summary` block; their CSS goes with
   them.
-- `.overview-grid` (zones `2fr`, tank `1fr`; one column under 1200 px). `ZoneTable({ compact })`:
+- `.overview-grid` (zones `7fr`, tank `3fr`; one column under 1200 px). `ZoneTable({ compact })`:
   no *VWC reference* or arrow column and no zone icon, the target under moisture (its label
   wraps), `LastIrrigation({ compact })` without the date line. `components/tank-status.tsx` rewritten compact: a 100×120 drawing whose
   shape touches its box, `dl.tank-quality` and `dl.tank-equipment`, one 20 px inset; the hooks
   and value strings are unchanged. `Metrics` shows only the *waiting for controller data*
   caption. `DayTimeline` loses its heading paragraph. `verify-tank-status.mjs` holds the tank's
   top inset to its left inset.
+- `styles.css` set its type and chrome twice: the original rules, then a later "Home
+  Assistant-native density" block overriding them (`h1` 26/400 over 28/650, `h2` 20/400 over
+  17/650, panel heading padding, table sizes, metric weight, nav weights). Each is now set once,
+  in the original rules, and several changed: `h1` 24px/600, `h2` 16px/600, table text 13px with
+  no header band, today's totals at weight 600; the later block keeps only the theme mappings. New `:root` tokens
+  `--text-xs`…`--text-2xl` (12–24 px) and `--space-2`…`--space-6`. New `lib/type-scale.test.ts`
+  fails any stylesheet under `frontend/src` that sets text below 12 px, a relative size without
+  a 12 px floor (`.unit` is now `max(0.52em, 12px)`), or chart text below 12 px (the plan graph's
+  `fontSize` 10.5/11 → 12). `.status-good` is a
+  neutral pill (it leaves the `--primary-strong` contrast list); `nav button.active` has a
+  neutral fill with a 2 px accent bar.
+  The Overview's compact zones table keeps ages and units on one line at the larger table
+  text; phone-only panel title sizes (18/20 px) are gone.
 - **Controller** (`controller.py`), a shot cut short from outside: in every round `_wait_shot` also
   reads each `hold_entities` entity (ON as `_blocked` reads it, the shared `ON_STATES`) and the
   shot's own valve, with the same bounded reads and sleeps of at most 2 s between rounds, after the kill
