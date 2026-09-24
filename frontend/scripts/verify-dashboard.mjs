@@ -185,6 +185,16 @@ try {
     assert.ok((await panel.locator(".event-row").count()) > 0, "the demo room has records");
     await axe("recent activity panel");
     await page.screenshot({ path: path.join(out, "dashboard-activity-panel.png") });
+    // Closing hands focus back to the button that opened it.
+    await page.keyboard.press("Escape");
+    await panel.waitFor({ state: "hidden" });
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.getAttribute("aria-label")),
+      "Recent activity",
+      "focus returns to the Recent activity button",
+    );
+    await page.getByRole("button", { name: "Recent activity", exact: true }).click();
+    await expectVisible(panel);
     await panel.getByRole("button", { name: "Open the activity log" }).click();
     await expectVisible(page.getByRole("heading", { name: "Activity", exact: true }));
     assert.equal(await page.getByRole("dialog").count(), 0, "the panel closes when the log opens");
