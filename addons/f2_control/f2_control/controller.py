@@ -985,9 +985,10 @@ class Controller:
                             + ", and nothing in this room is watered until the controller takes it "
                             "on. It only does that while these are "
                             f"OFF: {', '.join(running if resuming else armed + running)}. Turn them "
-                            "off, wait for this notice to "
-                            f"clear (up to {int(getattr(self, 'rediscover_seconds', 300))} seconds), then "
-                            "turn the engine switch back on.",
+                            "off and wait for this notice to "
+                            f"clear (up to {int(getattr(self, 'rediscover_seconds', 300))} seconds)"
+                            + (": it then carries on as before." if resuming
+                               else ", then turn the engine switch back on."),
                             room=room,
                         )
                     continue
