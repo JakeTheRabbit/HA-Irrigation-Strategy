@@ -9,6 +9,7 @@ def test_panel_registration_uses_async_paths_and_never_replaces_existing_panel(
     monkeypatch,
 ):
     from custom_components.crop_steering import setup_panel
+    from custom_components.crop_steering.const import SOFTWARE_VERSION
 
     calls = []
     frontend = ModuleType("homeassistant.components.frontend")
@@ -33,7 +34,11 @@ def test_panel_registration_uses_async_paths_and_never_replaces_existing_panel(
     asyncio.run(setup_panel.async_setup_panel(hass))
     asyncio.run(setup_panel.async_setup_panel(hass))
     assert len(paths) == len(calls) == 1
-    assert calls[0]["config"]["url"] == "/crop_steering/dashboard.html"
+    # A release is a new URL, so no browser keeps showing the last release's cached page.
+    assert (
+        calls[0]["config"]["url"]
+        == f"/crop_steering/dashboard.html?v={SOFTWARE_VERSION}"
+    )
     assert calls[0]["frontend_url_path"] == "crop-steering"
     assert paths[0][0] == "/crop_steering"
     assert paths[0][2] is False
