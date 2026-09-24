@@ -20,6 +20,8 @@ export interface Metric {
   label: string;
   value: number | null;
   unit: string;
+  /** A room metric: the zone reading it totals or averages. */
+  key?: "vwc" | "ec" | "water" | "shots";
 }
 export interface Setting {
   entityId: string;

@@ -62,6 +62,37 @@
 .zone-table-compact .zone-icon {
   display: none;
 }
+.dryback {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+.dryback-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.dryback-rate svg {
+  color: var(--muted-foreground);
+}
+.water-use {
+  display: grid;
+  min-width: 96px;
+}
+.water-use .cell-subtext {
+  font-weight: 400;
+}
+.zone-table-compact .meter {
+  min-width: 72px;
+}
+.zone-table-compact .cell-subtext.moisture-target {
+  white-space: nowrap;
+}
+/* Phones: the Overview's four readings in two rows of two. */
+.zone-mobile-list.compact .zone-mobile-readings {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 /* Doubled class: styles.css loads after this file and sets .data-table cell padding. */
 .data-table.zone-table-compact th,
 .data-table.zone-table-compact td {

@@ -219,6 +219,42 @@ try {
     assert.equal(await page.locator(".wd-daily").count(), 0, "no water table on the Overview");
     assert.equal(await page.getByText("Controller scheduling", { exact: true }).count(), 0);
   });
+  await check("overview: every zone and room metric has its mini visual", async () => {
+    await go("overview");
+    await expectVisible(page.locator(".zone-table-desktop th", { hasText: "Dryback" }));
+    // The dryback waits for the recorded readings; every row gets one once they arrive.
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll(".zone-table-desktop [data-dryback]").length ===
+        document.querySelectorAll(".zone-table-desktop tbody tr").length,
+    );
+    const facts = await page.evaluate(() => ({
+      rows: document.querySelectorAll(".zone-table-desktop tbody tr").length,
+      sparklines: document.querySelectorAll(".zone-table-desktop .dryback .sparkline").length,
+      water: [...document.querySelectorAll(".zone-table-desktop .water-use .meter")].map((m) =>
+        m.getAttribute("aria-label"),
+      ),
+      valves: [...document.querySelectorAll(".zone-table-desktop [data-zone-valve]")].map((v) => [
+        v.textContent.trim(),
+        v.dataset.tone,
+      ]),
+      bars: [...document.querySelectorAll(".metric-strip .mini-bars")].map(
+        (b) => b.querySelectorAll(".mini-bar").length,
+      ),
+      captions: [...document.querySelectorAll(".metric-caption")].map((c) => c.textContent.trim()),
+    }));
+    assert.ok(facts.rows > 0);
+    assert.equal(facts.sparklines, facts.rows, "every zone draws its recent moisture");
+    assert.equal(facts.water.length, facts.rows, "every zone shows water against its daily limit");
+    for (const label of facts.water) assert.match(label, /^\d+% of the [\d.]+ L daily limit$/);
+    for (const [text, tone] of facts.valves)
+      assert.equal(tone, /on$/.test(text) ? "on" : /off$/.test(text) ? "off" : "unknown", text);
+    assert.deepEqual(facts.bars, [facts.rows, facts.rows, facts.rows, facts.rows]);
+    assert.ok(
+      facts.captions.some((c) => /^Avg [\d.]+ L per zone$/.test(c)),
+      facts.captions.join(" | "),
+    );
+  });
   await check("overview: two screens at most, zones beside the tank", async () => {
     // 1440×800 ≈ the browser window of a 1440×900 laptop; the Overview was 3.2 screens tall.
     await page.setViewportSize({ width: 1440, height: 800 });

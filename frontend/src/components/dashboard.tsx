@@ -1,5 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, ArrowUpRight, Droplets, Info, LoaderCircle } from "lucide-react";
+import {
+  Activity,
+  ArrowUpRight,
+  Droplets,
+  Info,
+  LoaderCircle,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import {
   CartesianGrid,
   ComposedChart,
@@ -28,6 +36,8 @@ import {
 } from "@/components/ui/sheet";
 import type { Change, Controller, Metric, Series, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
+import { budgetShare, DRYBACK_WINDOW_H, type DrybackTrend } from "@/lib/dryback";
+import { Meter, MiniBars, Sparkline, type MiniBar, type Tone } from "./mini-visuals";
 import "./zone-state.css";
 
 export type Page =
@@ -114,24 +124,100 @@ export function Status({ enabled, label }: { enabled?: boolean | null; label?: s
     </Badge>
   );
 }
-export function Metrics({ metrics }: { metrics: Metric[] }) {
+/** Water used against the daily limit: amber from 80 %, red once it is spent. */
+export const budgetTone = (share: number | null): Tone =>
+  share === null ? "normal" : share >= 100 ? "over" : share >= 80 ? "high" : "normal";
+
+/** A room metric's zones as mini bars, and the line under the headline number. */
+function zoneBreakdown(
+  metric: Metric,
+  zones: Zone[],
+  limits: Record<number, number | null>,
+): { caption: string | null; bars: MiniBar[]; max: number; label: string } {
+  const key = metric.key!;
+  const known = zones.flatMap((zone) => (zone[key].value === null ? [] : [zone[key].value!]));
+  const average = known.length ? known.reduce((a, b) => a + b, 0) / known.length : null;
+  const unit = key === "shots" ? " shots" : ` ${metric.unit}`;
+  const limited = key === "water" && zones.some((zone) => (limits[zone.id] ?? null) !== null);
+  const bars = zones.map((zone): MiniBar => {
+    const value = zone[key].value;
+    const limit = limits[zone.id] ?? null;
+    const share = limited ? budgetShare(value, limit) : null;
+    return {
+      id: String(zone.id),
+      label: String(zone.id),
+      value: limited ? share : value,
+      tone: limited ? budgetTone(share) : "normal",
+      title:
+        `${zone.name}: ${number(value)}${value === null ? "" : unit}` +
+        (share === null ? "" : ` of ${number(limit)} L, ${number(share, 0)}% of its daily limit`),
+    };
+  });
+  const lo = Math.min(...known),
+    hi = Math.max(...known);
+  return {
+    caption:
+      average === null
+        ? null
+        : key === "water" || key === "shots"
+          ? `Avg ${number(average)}${unit} per zone`
+          : known.length > 1
+            ? `Range ${number(lo)}–${number(hi)}${unit}`
+            : null,
+    bars,
+    // Totals start from zero; averages leave headroom so the smallest zone still shows.
+    max: limited ? 100 : key === "shots" || key === "water" ? hi : hi * 1.1,
+    label:
+      (limited ? "Share of each zone's daily water limit. " : `${metric.label} by zone. `) +
+      bars.map((bar) => bar.title).join("; "),
+  };
+}
+
+export function Metrics({
+  metrics,
+  zones = [],
+  waterLimits = {},
+}: {
+  metrics: Metric[];
+  /** The zones behind the room metrics: each metric then gets one mini bar per zone. */
+  zones?: Zone[];
+  /** Each zone's daily water limit in litres, for the water bars. */
+  waterLimits?: Record<number, number | null>;
+}) {
   return (
     <div className="metric-strip">
-      {metrics.map((metric, i) => (
-        <div
-          className="metric-item"
-          key={metric.label}
-          title={i > 1 ? "Recorded by the controller" : "Across reporting zones"}
-        >
-          <span className="eyebrow">{metric.label}</span>
-          <strong>
-            <MetricValue metric={metric} />
-          </strong>
-          {metric.value === null && (
-            <span className="metric-caption">Waiting for controller data</span>
-          )}
-        </div>
-      ))}
+      {metrics.map((metric, i) => {
+        const breakdown =
+          metric.key && metric.value !== null && zones.length
+            ? zoneBreakdown(metric, zones, waterLimits)
+            : null;
+        return (
+          <div
+            className="metric-item"
+            key={metric.label}
+            title={i > 1 ? "Recorded by the controller" : "Across reporting zones"}
+          >
+            <span className="eyebrow">{metric.label}</span>
+            <div className="metric-body">
+              <div>
+                <strong>
+                  <MetricValue metric={metric} />
+                </strong>
+                {metric.value === null ? (
+                  <span className="metric-caption">Waiting for controller data</span>
+                ) : (
+                  breakdown?.caption && (
+                    <span className="metric-caption">{breakdown.caption}</span>
+                  )
+                )}
+              </div>
+              {breakdown && (
+                <MiniBars bars={breakdown.bars} max={breakdown.max} label={breakdown.label} />
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -395,7 +481,8 @@ export function ZoneOperatingState({
       </span>
       <div className="zone-state-flags">
         <span
-          className={`zone-valve-state${zone.valveOn === true ? " valve-on" : ""}`}
+          className={`pill zone-valve-state${zone.valveOn === true ? " valve-on" : ""}`}
+          data-tone={zone.valveOn === true ? "on" : zone.valveOn === false ? "off" : "unknown"}
           data-zone-valve={zone.id}
           title={
             zone.valveEntity
@@ -403,11 +490,18 @@ export function ZoneOperatingState({
               : "No valve mapped in this room's engine configuration"
           }
         >
+          <span className="pill-dot" />
           Valve {zone.valveOn === true ? "on" : zone.valveOn === false ? "off" : "unknown"}
         </span>
-        <span>
-          {zone.phase === "Unavailable" ? "Phase unavailable" : zone.phase || "Phase unavailable"}
-        </span>
+        {/^P[0-3]$/.test(zone.phase) ? (
+          <span className="pill" data-phase={zone.phase}>
+            {zone.phase}
+          </span>
+        ) : (
+          <span className="pill" data-tone="unknown">
+            {zone.phase === "Unavailable" || !zone.phase ? "Phase unavailable" : zone.phase}
+          </span>
+        )}
         {zone.stale && (
           <Badge
             variant="outline"
@@ -437,8 +531,13 @@ export function LastIrrigation({ zone, compact = false }: { zone: Zone; compact?
   const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60_000));
   const relative =
     minutes < 1
-      ? "Less than a minute ago"
-      : new Intl.RelativeTimeFormat(undefined, { numeric: "always" }).format(
+      ? compact
+        ? "Just now"
+        : "Less than a minute ago"
+      : new Intl.RelativeTimeFormat(undefined, {
+          numeric: "always",
+          style: compact ? "short" : "long",
+        }).format(
           -(minutes < 60
             ? minutes
             : minutes < 1440
@@ -469,15 +568,122 @@ export function LastIrrigation({ zone, compact = false }: { zone: Zone; compact?
   );
 }
 
+/** How fast the zone is drying, and the line it has drawn over the last two hours. */
+function DrybackRate({ zone, trend }: { zone: Zone; trend: DrybackTrend | undefined }) {
+  if (!trend)
+    return (
+      <span className="muted" title="Loading the recorded moisture readings">
+        —
+      </span>
+    );
+  const { rate } = trend;
+  const drying = rate !== null && rate >= 0;
+  // Below this the probe's own jitter decides the sign.
+  const steady = rate !== null && Math.abs(rate) < 0.05;
+  return (
+    <span
+      className="dryback"
+      data-dryback={zone.id}
+      title={
+        trend.reason ??
+        `Moisture lost per hour since the last shot settled, over up to the last ${DRYBACK_WINDOW_H} hours, in VWC percentage points.`
+      }
+    >
+      <span className="dryback-rate">
+        {rate === null ? (
+          "—"
+        ) : steady ? (
+          "Steady"
+        ) : (
+          <>
+            {drying ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
+            <span className="sr-only">{drying ? "Drying" : "Wetting"}</span>
+            {number(Math.abs(rate), Math.abs(rate) < 1 ? 2 : 1)}
+            <span className="unit"> %/h</span>
+          </>
+        )}
+      </span>
+      <Sparkline
+        points={trend.recent}
+        label={`${zone.name} moisture over the last ${DRYBACK_WINDOW_H} hours`}
+      />
+    </span>
+  );
+}
+
+/** Water today against the zone's daily limit. */
+function WaterUse({ zone, limit }: { zone: Zone; limit: number | null }) {
+  const share = budgetShare(zone.water.value, limit);
+  return (
+    <span className="water-use" data-water-share={share === null ? "" : Math.round(share)}>
+      <span>
+        {number(zone.water.value)}
+        {zone.water.value !== null && (
+          <span className="unit">{limit === null ? " L" : ` / ${number(limit)} L`}</span>
+        )}
+      </span>
+      {share !== null && (
+        <>
+          <Meter
+            value={share}
+            max={100}
+            tone={budgetTone(share)}
+            label={`${number(share, 0)}% of the ${number(limit)} L daily limit`}
+          />
+          <span className="cell-subtext">{number(share, 0)}% of limit</span>
+        </>
+      )}
+    </span>
+  );
+}
+
+/** "P2 base VWC threshold" → "Threshold", keeping a grow plan's "Plan · " prefix. */
+const shortTarget = (label: string) => {
+  const plan = label.startsWith("Plan · ");
+  const kind = /threshold/i.test(label) ? "threshold" : /floor/i.test(label) ? "floor" : "target";
+  return plan ? `Plan · ${kind}` : kind[0].toUpperCase() + kind.slice(1);
+};
+
+/** Moisture with a bar to 100 % and a marker at the phase's target. */
+function MoistureCell({ zone }: { zone: Zone }) {
+  return (
+    <>
+      <MetricValue metric={zone.vwc} />
+      {zone.vwc.value !== null && (
+        <Meter
+          value={zone.vwc.value}
+          max={100}
+          mark={zone.target.value}
+          label={`Moisture ${number(zone.vwc.value)} %${
+            zone.target.value === null
+              ? ""
+              : `, ${zone.target.label} ${number(zone.target.value)} % marked`
+          }`}
+        />
+      )}
+      <span className="cell-subtext moisture-target" title={zone.target.label}>
+        {shortTarget(zone.target.label)} <MetricValue metric={zone.target} />
+      </span>
+    </>
+  );
+}
+
 export function ZoneTable({
   zones,
   onSelect,
   compact = false,
+  trends,
+  limits = {},
 }: {
   zones: Zone[];
   onSelect: (zone: Zone) => void;
-  /** Overview: the target rides under the moisture reading; ages without dates; no arrow column. */
+  /** Overview: the target rides under the moisture reading; ages without dates; no arrow column;
+   * dryback and water against the daily limit as mini visuals. */
   compact?: boolean;
+  /** Each zone's dryback; null while the readings load. Shown when compact. */
+  trends?: Record<number, DrybackTrend> | null;
+  /** Each zone's daily water limit in litres. */
+  limits?: Record<number, number | null>;
 }) {
   return (
     <>
@@ -495,6 +701,7 @@ export function ZoneTable({
               <th>Moisture</th>
               {!compact && <th>VWC reference</th>}
               <th>Root-zone EC</th>
+              {compact && <th title="VWC percentage points lost per hour">Dryback</th>}
               <th>Water today</th>
               {!compact && (
                 <th>
@@ -515,18 +722,14 @@ export function ZoneTable({
                   </button>
                 </td>
                 <td>
-                  <ZoneOperatingState zone={zone} />
+                  {/* The Overview flags a zone that is not scheduled; enabled is the norm. */}
+                  <ZoneOperatingState zone={zone} showScheduling={!compact || zone.enabled !== true} />
                 </td>
                 <td>
                   <LastIrrigation zone={zone} compact={compact} />
                 </td>
                 <td className="numeric">
-                  <MetricValue metric={zone.vwc} />
-                  {compact && (
-                    <span className="cell-subtext">
-                      {zone.target.label} <MetricValue metric={zone.target} />
-                    </span>
-                  )}
+                  {compact ? <MoistureCell zone={zone} /> : <MetricValue metric={zone.vwc} />}
                 </td>
                 {!compact && (
                   <td className="numeric muted">
@@ -537,8 +740,17 @@ export function ZoneTable({
                 <td className="numeric">
                   <MetricValue metric={zone.ec} />
                 </td>
+                {compact && (
+                  <td className="numeric">
+                    <DrybackRate zone={zone} trend={trends?.[zone.id]} />
+                  </td>
+                )}
                 <td className="numeric">
-                  <MetricValue metric={zone.water} />
+                  {compact ? (
+                    <WaterUse zone={zone} limit={limits[zone.id] ?? null} />
+                  ) : (
+                    <MetricValue metric={zone.water} />
+                  )}
                 </td>
                 {!compact && (
                   <td>
@@ -557,7 +769,7 @@ export function ZoneTable({
           </tbody>
         </table>
       </div>
-      <div className="zone-mobile-list">
+      <div className={compact ? "zone-mobile-list compact" : "zone-mobile-list"}>
         {zones.map((zone) => (
           <div className="zone-mobile-row" key={zone.id}>
             <button className="zone-mobile-title" onClick={() => onSelect(zone)}>
@@ -589,9 +801,21 @@ export function ZoneTable({
               <div>
                 <span>Water today</span>
                 <strong>
-                  <MetricValue metric={zone.water} />
+                  {compact ? (
+                    <WaterUse zone={zone} limit={limits[zone.id] ?? null} />
+                  ) : (
+                    <MetricValue metric={zone.water} />
+                  )}
                 </strong>
               </div>
+              {compact && (
+                <div>
+                  <span>Dryback</span>
+                  <strong>
+                    <DrybackRate zone={zone} trend={trends?.[zone.id]} />
+                  </strong>
+                </div>
+              )}
             </div>
             <p className="zone-mobile-target">
               {zone.target.label}: <MetricValue metric={zone.target} />

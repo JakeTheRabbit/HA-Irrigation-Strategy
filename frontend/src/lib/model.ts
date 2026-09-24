@@ -614,6 +614,7 @@ export function buildRoom(states: States, room: Room): RoomView {
       entityId: null,
       label,
       unit,
+      key,
       value:
         values.length && values.every((v) => v !== null)
           ? values.reduce<number>((a, b) => a + b!, 0) / (average ? values.length : 1)

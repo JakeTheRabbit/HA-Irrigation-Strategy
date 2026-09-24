@@ -33,6 +33,7 @@
   --native-input-default: #f2f2f2;
   --native-warning-default: #8a5700;
   --native-error-default: #b3261e;
+  --native-success-default: #2e7d32;
   --native-primary-default: #007eae;
   color-scheme: light;
   font-family: var(--ha-native-font, Roboto, "Noto Sans", Arial, sans-serif);
@@ -54,6 +55,7 @@
   --accent: var(--secondary);
   --accent-foreground: var(--foreground);
   --destructive: var(--ha-native-error, var(--native-error-default));
+  --success: var(--ha-native-success, var(--native-success-default));
   --border: var(--ha-native-border, var(--native-border-default));
   --input: var(--border);
   --ring: var(--primary);
@@ -86,6 +88,7 @@
   --native-input-default: #323232;
   --native-warning-default: #ffca5b;
   --native-error-default: #f28b82;
+  --native-success-default: #81c995;
   --native-primary-default: #03a9f4;
   --primary-foreground: var(--ha-native-primary-foreground, #111111);
 }
@@ -521,6 +524,16 @@ nav button.nav-separated {
   font-size: var(--text-xs);
   display: block;
   margin-top: 6px;
+}
+/* The headline number, and the zones' mini bars beside it. */
+.metric-body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.metric-body > div:first-child {
+  min-width: 0;
 }
 .overview-grid {
   display: grid;
