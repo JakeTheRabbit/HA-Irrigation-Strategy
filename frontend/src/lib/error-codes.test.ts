@@ -34,6 +34,8 @@ describe("error codes", () => {
       ["Code CS-101. What it means and what to do", "CS-101"],
       ["Zone 2: moisture reading hasn't changed (CS-101)", "CS-101"],
       ["Crop Steering: grow strategy plan is holding irrigation (CS-606)", "CS-606"],
+      // A body names another code on the way; it ends with its own.
+      ["It latches a hardware hold (CS-301) … Code CS-302. What it means and what to do", "CS-302"],
     ]) {
       expect(findErrorCodes(pasted).map((entry) => entry.code)).toEqual([code]);
     }
