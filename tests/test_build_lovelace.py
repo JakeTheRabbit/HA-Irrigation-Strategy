@@ -49,7 +49,7 @@ def _ids(n, prefix=""):
     ids += [
         "sensor.f2_row_1_vwc",
         "switch.veg_main_pump",
-        "sensor.atlas_legacy_1_ec",
+        "sensor.tank_probe_1_ec",
         "input_select.growth_phase",
     ]
     return ids
@@ -85,7 +85,7 @@ def test_no_facility_specific_entities():
     for junk in (
         "f2_row",
         "veg_main_pump",
-        "atlas_legacy",
+        "tank_probe",
         "aquaponics_kit",
         "veg_scd41",
         "substrate_",

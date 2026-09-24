@@ -209,13 +209,14 @@ match the globals above.
 
 ---
 
-## 7. Hardware (your own switches/sensors — mapped via the add-on `hardware` option, not created here)
+## 7. Hardware (your own switches/sensors — mapped in Rooms & setup, not created here)
 
 The pump, mainline solenoid, per-zone valve switches, and the raw VWC/EC + source-water
-sensors are **your** existing HA entities. You map them to the engine via the f2-control
-add-on's `hardware` Configuration option (`pump` / `mainline` / per-zone `valves`), which
-defaults to the F2 entities (`switch.veg_main_pump`, `switch.espoe_irrigation_relay_2_3`,
-`switch.f2_row1`–`f2_row3`); the engine drives those switches and reads the sensors.
+sensors are **your** existing HA entities. Map them in the Crop Steering sidebar under
+**Rooms & setup**: the controller drives what the room's setup maps, and with nothing mapped
+it holds every zone and says so. (The controller also reads a `hardware` map from its options
+file, for tests and hand-built development setups only: the app's Configuration tab doesn't
+offer it, and Supervisor rejects it as an unknown option.)
 
 > **Inert legacy entities:** the integration may still create a steering-intent slider
 > and a few `…_intelligence_*_enabled` switches from a retired experimental layer. The
