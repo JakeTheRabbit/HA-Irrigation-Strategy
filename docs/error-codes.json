@@ -1,5 +1,5 @@
 {
-  "about": "Every notification from the Crop Steering controller app, and every Crop Steering card in Settings → Repairs, ends with a code such as CS-101. This file is the one list of them. docs/ERROR_CODES.md and the dashboard's Help & tools page are both made from it; tests/test_error_codes.py keeps it in step with the code.",
+  "about": "Every alert from the Crop Steering controller app, and every Crop Steering card in Settings → Repairs, ends with a code such as CS-101 (the controller's regular status summary has none). This file is the one list of them. docs/ERROR_CODES.md and the dashboard's Help & tools page are both made from it; tests/test_error_codes.py keeps it in step with the code.",
   "groups": [
     {
       "prefix": "CS-1",
@@ -422,13 +422,13 @@
       "title": "Lights hours now come from the integration",
       "source": "notification",
       "severity": "info",
-      "meaning": "The controller app used to take the lights on and off hours from its own options. It now reads them from the integration, and the two disagree. The app's option is still used whenever the integration's hours can't be read (while Home Assistant restarts, for example).",
+      "meaning": "The controller app used to take the lights on and off hours from its own options. It now reads them from the integration, and the two disagree. The app's option is still used when the integration's hours can't be read and haven't been since the controller app started; a loop that can't read them keeps the hours read before.",
       "watering": "Carries on, on the integration's hours.",
       "causes": [
         "An installation from before the integration had its own lights hours."
       ],
       "fixes": [
-        "If the integration's hours are right, set the controller app's lights_on_hour and lights_off_hour options to the same hours, so a missed reading can't move lights-on or lights-off.",
+        "If the integration's hours are right, set the controller app's lights_on_hour and lights_off_hour options to the same hours, so that case can't move lights-on or lights-off.",
         "If not, set the integration's Lights on hour and Lights off hour."
       ]
     },

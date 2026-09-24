@@ -233,11 +233,11 @@ def test_blank_or_whitespace_feed_sensor_is_disabled(monkeypatch):
 def test_feed_sensors_honored_when_explicitly_set(monkeypatch):
     # F2 (and any operator) keeps its behavior by setting these explicitly
     opts = {
-        "feed_ec_sensor": "sensor.atlas_legacy_1_ec",
+        "feed_ec_sensor": "sensor.tank_probe_1_ec",
         "feed_ph_sensor": "sensor.my_ph",
     }
     c, room = _init(opts, monkeypatch)
-    assert room.feed_ec_sensor == "sensor.atlas_legacy_1_ec"
+    assert room.feed_ec_sensor == "sensor.tank_probe_1_ec"
     assert room.feed_ph_sensor == "sensor.my_ph"
 
 
