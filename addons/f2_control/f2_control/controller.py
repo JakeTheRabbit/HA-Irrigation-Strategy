@@ -2141,6 +2141,8 @@ class Controller:
             log(
                 f"[{room.slug}] hardware hold cleared: engine OFF and hardware verified OFF; re-arm required"
             )
+            # The next hold is a new fault: announce it, don't take it for this one still quiet.
+            self._alerted.pop(f"hardware_fault_{room.slug}", None)
         for room in self.rooms:
             if room.hardware_fault and f"hardware_fault_{room.slug}" not in self._alerted:
                 # A hold latched while Home Assistant was unreachable (a failed close, typically) was never
