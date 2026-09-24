@@ -105,6 +105,30 @@ def ha_get_all():
         return []
 
 
+def ha_history(entity, since, timeout=12):
+    """Every state `entity` has had from `since` (an aware datetime) to now, oldest first, as
+    [(state, last_changed_iso), ...]; the first is the state it was already in at `since`.
+    None when Home Assistant can't say: unreachable, an error, or nothing recorded for it."""
+    try:
+        r = _S.get(
+            f"{BASE}/history/period/{since.isoformat()}",
+            headers=HDR,
+            params={
+                "filter_entity_id": entity,
+                "end_time": datetime.now(timezone.utc).isoformat(),
+                "minimal_response": "",
+                "no_attributes": "",
+            },
+            timeout=timeout,
+        )
+        if r.status_code != 200:
+            return None
+        rows = (r.json() or [[]])[0]
+        return [(row.get("state"), row.get("last_changed")) for row in rows] or None
+    except Exception:
+        return None
+
+
 def ha_call(domain, service, **data):
     try:
         r = _S.post(
@@ -211,8 +235,41 @@ ON_STATES = ("on", "true", "open", "1", "home")
 
 # A switch a shot opened changed state inside this window of the shot's recorded start, in seconds:
 # the pump prime (2 s), the main-line lead (1 s) and, at worst, a slow Home Assistant acknowledging
-# each command. A switch that changed outside it was already on, or has been touched by a person since.
+# each command. A switch that changed outside it was already on, or has been touched by a person since,
+# unless its recorded history shows only Home Assistant losing it and finding it again (_on_since_shot).
 INFLIGHT_OPEN_WINDOW_S = (-5.0, 60.0)
+
+
+def _on_since_shot(history, started):
+    """Has a switch been ON since the shot opened it? -> True / False, or None when its history can't tell.
+
+    `history` is ha_history's [(state, last_changed), ...] from the start of the opening window. The shot
+    opened the switch if it turned ON inside INFLIGHT_OPEN_WINDOW_S of `started`. It stays the shot's
+    while nothing but "unavailable" or "unknown" comes after: a Home Assistant restart or the switch
+    reconnecting moves last_changed to that moment without anyone touching the switch. ON before the
+    shot, first ON after the window, or an OFF after the shot opened it is a person's."""
+    if not history or started is None:
+        return None
+    lo, hi = INFLIGHT_OPEN_WINDOW_S
+    opened = False
+    for state, stamp in history:
+        when = _aware(stamp)
+        if when is None:
+            return None
+        offset = (when - started).total_seconds()
+        if state == "on":
+            if offset < lo:
+                return False  # already on before the shot
+            if offset <= hi:
+                opened = True
+            elif not opened:
+                return False  # first switched on after the shot
+        elif state == "off":
+            if opened:
+                return False  # switched off since the shot opened it
+        elif state not in ("unavailable", "unknown"):
+            return None
+    return True if opened else None
 
 # The shots a plan hold never stops, by decide()'s Reason.kind. A plan decides how a zone is steered, not
 # whether a starving zone gets water: while the plan is held, stale or missing, routine steering waits
@@ -2191,9 +2248,11 @@ class Controller:
         20 minutes to heat it, and zones are hand-watered with the valves and main line open. So:
           * nothing is touched while the room's kill switch is not ON: the operator has taken over;
           * a switch is closed only if it has been ON since this shot opened it (Home Assistant's
-            last_changed inside INFLIGHT_OPEN_WINDOW_S of the record's start). One that changed since, or
-            was already on, is a person's: it is left alone, and so is everything upstream of it
-            (valve -> main line -> pump), and the record is closed;
+            last_changed inside INFLIGHT_OPEN_WINDOW_S of the record's start, or, when a Home Assistant
+            restart or the switch reconnecting has moved last_changed, its recorded history ON since
+            then). One a person has switched since, or that was already on, is theirs: it is left
+            alone, and so is everything upstream of it (valve -> main line -> pump), and the record is
+            closed;
           * the main line and pump are left alone while another valve on the same line is open, and the
             pump while any hold (dosing, fill, flush, circulation) is on;
           * manifold, circulation and tank-fill relays are never touched: the record only names the
@@ -2241,8 +2300,8 @@ class Controller:
                 "CS-309",
                 "an interrupted shot's hardware may still be ON",
                 f"A shot that started {rec['started']} never finished, and what it opened can't be "
-                "read (or Home Assistant gives no time for its last change), so the controller "
-                "can't tell whether a person has switched it since. It leaves it alone and checks "
+                "read (or Home Assistant gives no time for its last change, or no history since the "
+                "shot began), so the controller can't tell whether a person has switched it since. It leaves it alone and checks "
                 "again every loop. Check it now and switch it off by hand if water is running: once "
                 "it can be read, the controller switches off only what it can prove this shot "
                 "opened, and leaves anything else on for you to deal with."
@@ -2260,11 +2319,13 @@ class Controller:
         """Which of a recorded shot's switches are provably its own -> (close, left, unsure, why).
 
         Walks valve -> main line -> pump. A switch is the shot's own while it has been ON since the shot
-        opened it (last_changed inside INFLIGHT_OPEN_WINDOW_S of the record's start). The walk stops at the
-        first switch that is not: one that changed since, or was on before, is a person's (`left`, with
-        everything upstream of it), and so are the main line and pump while another valve on the line is
-        open, and the pump while a hold is on. One that cannot be read, or has no change time, stops it
-        too (`unsure`): whose it is cannot be told."""
+        opened it (last_changed inside INFLIGHT_OPEN_WINDOW_S of the record's start; when last_changed is
+        outside it, the switch's recorded history decides, because a Home Assistant restart or a
+        reconnect moves last_changed too). The walk stops at the first switch that is not: one a person
+        switched since, or that was on before, is theirs (`left`, with everything upstream of it), and so
+        are the main line and pump while another valve on the line is open, and the pump while a hold is
+        on. One that cannot be read, has no change time, or has no readable history stops it too
+        (`unsure`): whose it is cannot be told."""
         order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
         started = _aware(rec.get("started"))
         lo, hi = INFLIGHT_OPEN_WINDOW_S
@@ -2277,7 +2338,13 @@ class Controller:
             if read[0] != "on" or changed is None or started is None:
                 return close, [], order[i:], ""
             if not lo <= (changed - started).total_seconds() <= hi:
-                return close, order[i:], [], f"{ent} changed at {changed.isoformat()}, not when the shot opened it"
+                # A Home Assistant restart or the switch reconnecting also moves last_changed: ask the
+                # recorder whether anyone switched it since the shot opened it.
+                own = _on_since_shot(ha_history(ent, started + timedelta(seconds=lo)), started)
+                if own is None:
+                    return close, [], order[i:], ""
+                if not own:
+                    return close, order[i:], [], f"{ent} changed at {changed.isoformat()}, not when the shot opened it"
             if ent != rec.get("valve"):
                 if line_in_use is None:
                     line_in_use = self._line_in_use(room, rec)

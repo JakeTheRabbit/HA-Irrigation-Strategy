@@ -26,3 +26,11 @@ def _hermetic_state_file(tmp_path, monkeypatch):
     test. Redirect the path up front, per test.
     """
     monkeypatch.setenv("F2_STATE_PATH", str(tmp_path / "constructor-state.json"))
+
+
+@pytest.fixture(autouse=True)
+def _no_real_history(monkeypatch):
+    """Never let a test ask a real Home Assistant for history: none is recorded unless a rig says so."""
+    import controller
+
+    monkeypatch.setattr(controller, "ha_history", lambda entity, since, timeout=12: None)

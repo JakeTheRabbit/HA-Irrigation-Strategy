@@ -39,7 +39,7 @@ def rig(monkeypatch, tmp_path):
         "enable_flag": "input_boolean.kill",
     }
     monkeypatch.setattr(controller, "load_options", lambda: options)
-    for name in ("ha_get", "ha_call", "ha_get_all", "ha_set"):
+    for name in ("ha_get", "ha_call", "ha_get_all", "ha_set", "ha_history"):
         monkeypatch.setattr(controller, name, getattr(fake, name))
     with monkeypatch.context() as setup:
         setup.setattr(controller.Controller, "_read_state_file", lambda self: {})
@@ -164,6 +164,69 @@ def test_a_valve_a_person_has_switched_since_is_theirs_with_everything_upstream(
     c._reconcile_inflight()
     assert offs(fake) == []
     assert c.rooms[0].shot_inflight is None  # handed over, and written down as settled
+
+
+def restarted(fake, back_at=900, gap=True):
+    """Home Assistant restarted `back_at` s into the shot. Every switch stayed ON and reads ON with that
+    change time; the recorder shows it ON since the shot opened it (with `unavailable` while it was down)."""
+    for eid, opened in (("switch.p", 0), ("switch.m", 2), ("switch.v1", 3)):
+        rows = [("off", at(-3600)), ("on", at(opened))]
+        if gap:
+            rows.append(("unavailable", at(back_at - 30)))
+        rows.append(("on", at(back_at)))
+        fake.history[eid] = rows
+        fake.changed[eid] = at(back_at)
+
+
+def test_a_home_assistant_restart_mid_shot_does_not_hand_the_shot_to_a_person(rig):
+    # The valve stayed open through the restart; only its change time moved. Before this it was taken
+    # for a person's and left running, and the record was closed without a word.
+    c, fake, _ = rig
+    crashed(c, fake)
+    restarted(fake)
+    c._reconcile_inflight()
+    assert offs(fake) == ["switch.v1", "switch.m", "switch.p"]
+    assert c.rooms[0].shot_inflight is None and notifications(fake) == []
+
+
+def test_a_switch_that_reconnected_without_reading_unavailable_is_still_the_shots(rig):
+    c, fake, _ = rig
+    crashed(c, fake)
+    restarted(fake, gap=False)
+    c._reconcile_inflight()
+    assert offs(fake) == ["switch.v1", "switch.m", "switch.p"]
+
+
+def test_after_a_restart_a_valve_a_person_turned_off_and_on_again_is_theirs(rig):
+    c, fake, _ = rig
+    crashed(c, fake)
+    restarted(fake)
+    fake.history["switch.v1"][2:2] = [("off", at(120)), ("on", at(400))]  # hand-watering since
+    c._reconcile_inflight()
+    assert offs(fake) == [] and c.rooms[0].shot_inflight is None
+
+
+def test_after_a_restart_with_no_history_nothing_is_switched_and_it_is_said_so(rig):
+    c, fake, _ = rig
+    crashed(c, fake)
+    restarted(fake)
+    fake.history["switch.v1"] = None  # the recorder excludes it, or has not started yet
+    c._reconcile_inflight()
+    assert offs(fake) == [] and c.rooms[0].shot_inflight is not None  # checked again next loop
+    (alert,) = [n for n in notifications(fake) if n["notification_id"] == "f2_inflight_default"]
+    assert alert["title"] == "Zone 1: an interrupted shot's hardware may still be ON (CS-309)"
+    assert "Can't be read: switch.v1" in alert["message"]
+
+
+def test_the_recorder_is_read_the_way_a_person_would():
+    on_since = controller._on_since_shot
+    assert on_since([("off", at(-60)), ("on", at(2)), ("unavailable", at(500)), ("on", at(520))], STARTED)
+    assert on_since([("on", at(-1800))], STARTED) is False  # already on before the shot
+    assert on_since([("off", at(-60)), ("on", at(700))], STARTED) is False  # first on after it
+    assert on_since([("off", at(-60)), ("on", at(2)), ("off", at(90)), ("on", at(95))], STARTED) is False
+    assert on_since(None, STARTED) is None
+    assert on_since([("off", at(-60))], STARTED) is None  # never seen on: can't tell
+    assert on_since([("on", "garbage")], STARTED) is None
 
 
 def test_a_pump_that_was_already_running_for_the_tank_is_left_running(rig):
