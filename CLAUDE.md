@@ -32,7 +32,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v
 
 # Tests — the integration inside a REAL Home Assistant: fresh install, that install handed to
 # the real add-on controller, and in-place upgrades from seeded snapshots of old installs.
-# Needs `pip install -r requirements-test-ha.txt` (Python 3.13+); see docs/TESTING.md.
+# Needs `pip install -r requirements-test-ha.txt` (Python 3.14.2+); see docs/TESTING.md.
 python -m pytest tests_ha -q
 
 # Tests — crop-steering-engine package
@@ -107,8 +107,8 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
 ## Notes
 
 - **Dependencies:** integration = pure HA + voluptuous (no external deps). Engine
-  (`crop-steering-engine`) = pure Python, no scipy/numpy; f2-control add-on container
-  installs its own deps from `addons/f2_control/requirements.txt`.
+  (`crop-steering-engine`) = pure Python, no scipy/numpy; the f2-control add-on image
+  installs its one dependency, `requests`, in `addons/f2_control/Dockerfile`.
 - **Testing:** see `docs/TESTING.md`; run `bash tests/run_ci.sh` (mirrors CI). Anything that touches the
   config flow, entity ids/platforms or the integration-controller contract must be proven in `tests_ha/`
   (a real Home Assistant), not only against the stubs in `tests/`: the stubs cannot see a schema HA
