@@ -1,4 +1,6 @@
-# Unreleased
+# 2.21.0
+
+Pair with integration 2.21.0, one number for both halves from this release on. **C3.** Owner-approved rehearsal release without a staging soak (25 Sep 2026); not run on hardware before release. No change to add-on options or the state file.
 
 - **C3. A shot interrupted by a Home Assistant restart is closed, not left running.** After a restart (or a switch reconnecting) Home Assistant reports every switch as changed at that moment, so `_inflight_plan` took the interrupted shot's own open valve for a person's and left it on without an alert. When `last_changed` falls outside `INFLIGHT_OPEN_WINDOW_S`, the new `ha_history()` + `_on_since_shot()` read the recorder: ON since the shot opened it, with only `unavailable`/`unknown` between, is the shot's and is closed; an OFF since, or ON before the shot, is a person's; no history is `unsure` (CS-309, retried every loop). Not run on hardware. No change to options or the state file.
 - **C1, dashboard only.** The dashboard the app serves (`www/public/dashboard.html`) is rebuilt with the Overview's grow-day timeline and the dashboard changes in the integration's changelog (the Overview's layout and a calmer look on every page). No change to options, the state file or irrigation.

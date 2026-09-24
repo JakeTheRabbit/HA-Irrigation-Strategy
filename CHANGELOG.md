@@ -9,7 +9,11 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.21.0] - 2026-09-25
+
+Pair: **controller 2.21.0**, one number for both halves from this release on. Class **C3**: the
+controller and the integration change; the engine does not. **Owner-approved rehearsal release** (the
+owner, 25 September 2026), no staging soak; see the release audit.
 
 The Overview timeline is class **C1**: dashboard only, nothing the controller or the integration
 reads. Not run on hardware; checked read-only against a live room's recorded history. A shot cut
