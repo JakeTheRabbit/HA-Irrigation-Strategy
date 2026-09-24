@@ -43,7 +43,7 @@ If you deploy from a fork of someone else's repository, **your fork's `main` is 
 - **A version number is never reused for different code.** If a candidate fails its soak, the fix gets the next patch number. Skipped numbers cost nothing; "which code is on this box?" having one answer is worth a great deal.
 - **Only a release pull request changes a version.** A feature or fix branch never touches `manifest.json`, `const.py` or the add-on's `config.yaml` version: on a tracked branch that one line is the release. A `release/x.y.z` pull request contains the version numbers, both changelogs and nothing else. In those three files that means the version *field*, not the file: `const.py` also holds defaults, `manifest.json` dependencies, and `config.yaml` the add-on's permissions and shipped options, and a change to any of them is a change of its own, reviewed as one.
 - A release is **born a pre-release and promoted by flipping it**, so the commit that ships is byte-for-byte the commit that soaked. Nothing is re-tagged or rebuilt at promotion.
-- The integration and controller are released as a **pair**, named together in both changelogs. `tests/test_version_consistency.py` keeps `manifest.json`, `CHANGELOG.md` and the README badge in step, and the controller's `config.yaml` in step with its own changelog.
+- The integration and controller are released as a **pair under one number**. From **2.21.0** the controller's `config.yaml` carries the integration's version: every release already changed both (there is no controller-only release, below), so a second number said nothing, and one number shows a mismatched pair at a glance. Before 2.21.0 the controller had its own numbers (0.16.5 paired with 2.19.5); a box on one of those is offered 2.21.0 as an ordinary update, because the number goes up, and the app's identity comes from the repository address, not its version. `tests/test_version_consistency.py` keeps `manifest.json`, `CHANGELOG.md`, the README badge and, from 2.21.0, the controller's `config.yaml` on that one number, and the controller in step with its own changelog.
 - Every release leads its changelog entry with **🌱 In plain English**, then **🔧 Technical notes**.
 
 ## The gate
@@ -78,7 +78,7 @@ Open a `release/2.19.0` pull request into `testing` holding only the version num
 git checkout testing && git pull --ff-only       # the commit CI just passed
 gh release create v2.19.0 --prerelease --target testing \
   --title "2.19.0 (candidate)" \
-  --notes "Candidate. Staging rooms only. Pair: controller 0.16.0."
+  --notes "Candidate. Staging rooms only. Integration and controller 2.19.0."
 ```
 
 Staging rooms now see it: HACS offers the pre-release, Supervisor offers the new controller version from `#testing`. Production rooms see nothing, because `main` has not moved.
