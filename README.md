@@ -42,7 +42,7 @@ The buttons only open the right screen: Home Assistant still asks you to confirm
 
 ## See the room at a glance
 
-Overview shows the controller's state, each zone's valve and last recorded irrigation, and the room's water use per zone and per plant. The graphical tank panel shows fill level, pump and filling status, the last recorded fill, EC, pH and temperature, from the tank sensors you map in **Rooms & setup**. Readings that aren't mapped, or are unavailable, are labelled as such.
+Overview shows today's grow-day timeline and, for every zone, the controller's state, its valve, the last recorded irrigation and today's water. Zones adds water per plant. The graphical tank panel shows fill level, pump and filling status, the last recorded fill, EC, pH and temperature, from the tank sensors you map in **Rooms & setup**. Readings that aren't mapped, or are unavailable, are labelled as such.
 
 ![Graphical tank and pump status](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/tank-status.png)
 
@@ -109,12 +109,12 @@ Add or archive rooms and zones, map the Home Assistant entities you already have
 
 | Page | Purpose |
 | --- | --- |
-| Overview | Room condition, controller status, recorded VWC/EC and daily water per zone and per plant |
-| Zones | Per-zone readings, active phase, targets and enable controls |
+| Overview | Today's totals, the grow-day timeline, each zone's state and readings, and the tank |
+| Zones | Per-zone readings, active phase, targets, enable controls and water per zone and per plant |
 | Irrigation plan → Today / Schedule | Today: the current targets on a graph with the zone's recorded VWC/EC and the projected day. Schedule: per-zone dated plans, profiles and curves |
 | Compare runs | Recorded day, week, month and run-to-date history, lined up with a previous run or a target reference |
 | Insights | Sensor coverage, equipment mapping and dripper catch-test calculations |
-| Activity | Controller and state activity, with what it can and can't show |
+| Activity | Controller and state activity, with what it can and can't show; the latest records also open from the top bar |
 | Sensors | Probe availability, values, units and freshness |
 | Rooms & setup | Add, configure, archive and restore rooms and zones; map existing Home Assistant entities |
 | Settings / Help & tools | Connection, room on/off, theme, how each workflow works, and every error code with its causes and fixes |

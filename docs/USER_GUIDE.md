@@ -22,7 +22,7 @@ New installation? Start with [Install, upgrade and rollback](INSTALL.md). To try
 
 The demo is an isolated software demonstration. Its readings, history, example plans and run records are synthetic; they are not a recommended configuration or evidence from a real grow. A demo tab cannot connect to live Home Assistant.
 
-1. Open **Overview** and switch rooms. Inspect the tank, zone states and combined VWC/EC history.
+1. Open **Overview** and switch rooms. Inspect today's grow-day timeline, the zone states and the tank.
 2. Open **Irrigation plan → Today**, select a zone and choose **P3**. Edit its emergency floor and compare the moving draft line with the saved reference. Use the review dialog to inspect changes.
 3. Open **Irrigation plan → Schedule**. Select a zone and day/week, inspect its endpoint profile and change the steering balance. Compare the schedule and curve.
 4. Expand **Recipe library** to inspect **Demo • steady schedule** or **Demo • week-by-week changes**, or save your own copy. Samples are added only when that demo room has no stored library yet. Loading affects a local draft; the normal review/save remains separate.
@@ -35,17 +35,17 @@ Use **Settings → Sample workspace → Reset demo session…** and review the c
 
 ## Read a room
 
-**Overview** brings together controller scheduling, alerts, tank equipment, zones, water estimates and Recorder history. A zone row opens its detail panel. **Zones** provides the same information in searchable table or card layouts.
+**Overview** is the room now: alerts, today's totals, the grow-day timeline, each zone's state and readings, and the tank. A zone row opens its detail panel. **Zones** adds search, a card layout and water delivered per zone and per plant. The latest controller records open beside any page from the top bar.
 
 | Indicator                     | Meaning                                                                                                                                                             |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Controller scheduling         | Whether future automatic scheduling is enabled for this room.                                                                                                       |
+| Room status line              | At the top of every page: watering, holding and why, or not watering and what to do, with the age of the controller's last report.                                  |
 | Zone scheduling               | Whether this zone is eligible for scheduling; it does not mean its valve is currently open.                                                                         |
 | Controller status and phase   | The controller's reported operating state and P0/P1/P2/P3 phase. Inspect any hold or unavailable status before making changes.                                      |
 | Valve on/off                  | The state of this zone's explicitly mapped switch. It does not establish physical flow.                                                                             |
 | Last irrigation               | A recorded controller event timestamp, with relative age and date/time. It is not inferred from sensor updates. Missing/invalid timestamps remain **Not reported**. |
 | VWC and root-zone EC          | The mapped substrate measurements. Their units and sensor availability matter independently.                                                                        |
-| Water delivered this grow-day | Controller-recorded delivery estimates since the room's lights-on boundary.                                                                                         |
+| Water delivered this grow-day | On **Zones**: controller-recorded delivery estimates since the room's lights-on boundary.                                                                           |
 
 **Settings → Room scheduling** and zone scheduling controls require a review. Pausing future scheduling is not an emergency stop: an active shot may continue. Use the installation's established physical shutdown procedure for an emergency.
 
@@ -120,7 +120,7 @@ Libraries are isolated by site, browser, room and demo/live mode. They are not a
 | View                          | What it shows                                                                                                            | What it does not establish                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | Today/Schedule VWC–EC curve   | Configured targets, phase references and supported timing, with local draft changes where applicable.                    | Exact future shot times, uptake, runoff or EC accumulation.                                 |
-| Overview history              | Retained HA Recorder measurements on separate VWC and EC axes.                                                           | Measurements from periods Recorder did not retain.                                          |
+| Insights history              | Retained HA Recorder measurements on separate VWC and EC axes.                                                           | Measurements from periods Recorder did not retain.                                          |
 | Water delivered this grow-day | The controller's recorded estimate from its configured flow and elapsed shot runtime, including accounted partial shots. | Independent meter readings, uniform distribution, plant uptake or external irrigation.      |
 | Average mL per plant          | Zone estimated water divided by configured plant count.                                                                  | A measurement from each emitter.                                                            |
 | Total substrate capacity      | Substrate volume per plant multiplied by plant count.                                                                    | Water delivered or water retained.                                                          |

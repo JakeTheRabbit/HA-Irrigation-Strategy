@@ -80,6 +80,18 @@ export function Help({ controller }: { controller: Controller }) {
             then review the daily or weekly grow plan. Live targets and manual fallback values are
             kept distinct.
           </p>
+          <h3 id="daily-routine">Daily routine</h3>
+          <ol className="daily-routine">
+            <li>
+              <a href="#/overview">Check the room’s readings and alerts on the Overview</a>
+            </li>
+            <li>
+              <a href="#/zones">Inspect any zone that needs attention</a>
+            </li>
+            <li>
+              <a href="#/strategy">Review irrigation changes before applying them</a>
+            </li>
+          </ol>
         </div>
       </div>
       <div className="help-columns">

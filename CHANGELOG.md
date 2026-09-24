@@ -21,8 +21,8 @@ integration reads. Not run on hardware; checked by the browser contract scripts.
 
 ### 🌱 In plain English
 
-- **The Overview shows the day.** Its moisture and EC chart is replaced by the room's grow-day,
-  from lights-on to the next lights-on, one row per zone on one time axis: lights-off shaded, the
+- **The Overview shows the day, first.** Its moisture and EC chart is replaced by the room's
+  grow-day, at the top of the page under today's totals, from lights-on to the next lights-on, one row per zone on one time axis: lights-off shaded, the
   phase each zone was in, every shot (the valve opening, as wide as it was open), what held a zone
   back and for how long (a spent daily budget hatched red, *blocked 13:31–22:00*; a gate such as a
   dosing hold or the kill switch outlined amber), and every setpoint change, from what to what.
@@ -44,6 +44,11 @@ integration reads. Not run on hardware; checked by the browser contract scripts.
 - **Headings say what the page is, once.** The Overview is titled after its room (*Flower 1
   overview*). The sentences under page headings that only repeated them are gone; Today's targets
   and Scheduled targets keep theirs, because they say how a schedule and a draft behave.
+- **The Overview is the room now.** Water per zone and per plant is on Zones, which already had
+  it; the zones table keeps each zone's water today. The scheduling summary is gone: the status
+  line at the top of every page already says whether the room is watering and why not. Recent
+  activity opens beside any page from the top bar, and the daily workflow is now a linked daily
+  routine at the top of Help & tools.
 - **A shot that something else cuts short now ends there, and only the water it gave is counted.**
   On 23 September at 11:25 the batch tank ran empty 4 seconds into a zone 1 shot. The dosing
   automation took the tank and its pump, and the feed guard closed the valve and main line. The
@@ -82,10 +87,15 @@ integration reads. Not run on hardware; checked by the browser contract scripts.
   top-ups, P3), shifted per probe, with a feed-EC hold on Flower 2 zone 2 ended by a feed-band
   change and Flower 1 zone 3 held since it was disabled.
 - `pages/overview.tsx` renders `components/day-timeline.tsx` in place of `HistoryChart`, which
-  stays on Insights.
+  stays on Insights, directly under the totals strip and above the tank and zones.
 - `Heading.description` is optional. `pages/overview.tsx` titles itself `${room.name} overview`
   (plain *Overview* when no room is discovered). `.page-heading` margin 30/25 → 20/20 px (16/16 on
   a phone).
+- New `components/activity-panel.tsx`: a top-bar button on every page opens a right-hand sheet
+  with the room's last ten events (`EventList`) and a link to Activity. The Overview loses its
+  Recent activity panel, the daily workflow card (now `ol.daily-routine` in Help's intro), the
+  `DailyWaterSummary` table (still on Zones) and the `room-summary` block; their CSS goes with
+  them.
 - **Controller** (`controller.py`), a shot cut short from outside: in every round `_wait_shot` also
   reads each `hold_entities` entity (ON as `_blocked` reads it, the shared `ON_STATES`) and the
   shot's own valve, with the same bounded reads and sleeps of at most 2 s between rounds, after the kill
