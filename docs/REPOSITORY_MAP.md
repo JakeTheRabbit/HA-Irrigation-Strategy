@@ -15,6 +15,7 @@
 | docs | Current install, operation, architecture and validation evidence |
 | archive/2026-09-08 | Superseded dashboards, documentation and tools with original paths/hashes |
 | docs/TESTING.md / docs/ENTITIES.md | Development checks and entity reference |
+| docs/error-codes.json | The one list of error codes (CS-101 …); docs/ERROR_CODES.md is written from it by scripts/render_error_codes.py, and the dashboard's Help & tools page imports it |
 | img | Current screenshots; superseded captures are archived |
 | repository.yaml | HA app repository discovery metadata; the controller app is installed from this repository only |
 
