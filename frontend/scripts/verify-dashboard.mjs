@@ -758,6 +758,64 @@ try {
     });
     await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
   });
+  await check("zones: Water use totals every zone and charts its grow weeks", async () => {
+    await go("zones");
+    const panel = page.locator(".wu-panel");
+    await expectVisible(panel.getByRole("heading", { name: "Water use", exact: true }));
+    const rows = panel.locator(".wu-table tbody tr");
+    await expectVisible(rows.first());
+    assert.equal(await rows.count(), 3, "one row per demo zone");
+    for (let index = 0; index < 3; index++) {
+      const [zone, today, week, since, estimate] = await rows
+        .nth(index)
+        .locator("td")
+        .allInnerTexts();
+      assert.match(zone, new RegExp(`Zone ${index + 1}`));
+      // Litres, and the grow-days each number covers.
+      assert.match(today, /[\d.]+ L\n.+ from 10:00/, `Zone ${index + 1} today: ${today}`);
+      assert.match(week, /[\d,.]+ L\nWeek \d+ · /, `Zone ${index + 1} this week: ${week}`);
+      assert.match(
+        since,
+        /[\d,.]+ L\n.+ · grow-day \d+/,
+        `Zone ${index + 1} since start: ${since}`,
+      );
+      assert.match(estimate, /≈ [\d,]+ L\n.*last 7 days’ average.*\n84-day plan/);
+    }
+    // Today is the live counter; the demo's saved draft plan dates the grow and says so.
+    assert.match((await rows.first().locator("td").allInnerTexts())[1], /^5\.3 L/);
+    await expectVisible(panel.getByText(/^Grow start: .+ saved grow plan \(a draft, not armed\)/));
+    const chart = panel.getByRole("img", {
+      name: /^Litres per grow week for Zone 1, Zone 2, Zone 3/,
+    });
+    await expectVisible(chart);
+    const bars = chart.locator(".recharts-bar-rectangle");
+    await bars.first().waitFor();
+    const count = await bars.count();
+    assert.ok(count >= 6 && count % 3 === 0, `one bar per zone and grow week, got ${count}`);
+    // The definition of "This week" is reachable from the keyboard.
+    await panel.getByRole("button", { name: "How this week is counted" }).focus();
+    await expectVisible(panel.getByRole("tooltip", { name: /grow week/ }));
+    await axe("zones water use");
+    await page.screenshot({ path: path.join(out, "dashboard-water-use.png"), fullPage: true });
+    await page.evaluate(() => document.documentElement.classList.add("dark"));
+    await page.evaluate(
+      () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+    );
+    const dark = await new AxeBuilder({ page })
+      .include(".wu-panel")
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
+    accessibility.push({
+      page: "zones water use, dark",
+      violations: dark.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })),
+    });
+    assert.deepEqual(
+      dark.violations.map((v) => v.id),
+      [],
+      "Water use must be readable on a dark theme",
+    );
+    await page.evaluate(() => document.documentElement.classList.remove("dark"));
+  });
   await check("strategy draft survives refresh, validates, reviews and applies", async () => {
     await go("strategy");
     const field = page.locator('input[id="setting-number.crop_steering_zone_1_p1_target_vwc"]');
