@@ -73,13 +73,14 @@ def test_a_long_shot_repeats_the_rooms_report_once_a_minute(rig):
     c._heartbeat(room, datetime(2026, 9, 25, 10, 1, 1), "valve stuck", room_active=True)
     c._publish_zone_status(room, 1, "Topping up", "P2 top-up VWC 40<45")
     first = writes[0][2]
-    started = clock.seconds
+    started, wall = clock.seconds, datetime.now()
     elapsed, ended = c._wait_shot(room, 1, 300)
     assert ended is None and 300 <= elapsed < 303  # the shot runs its full time, no longer
     beats = _to(writes, BEAT)[1:]
     assert [at - started for _e, _s, _a, at, _t in beats] == [60, 120, 180, 240]  # none in the last seconds
     for _entity, state, attributes, _at, timeout in beats:
-        assert state == "healthy" and attributes["last_beat"] > first["last_beat"]
+        # a fresh time: the controller's local clock at the write, whatever the machine's zone
+        assert state == "healthy" and datetime.fromisoformat(attributes["last_beat"]) >= wall
         # Everything but the time is what the room last reported.
         assert {k: v for k, v in attributes.items() if k != "last_beat"} == {
             k: v for k, v in first.items() if k != "last_beat"
