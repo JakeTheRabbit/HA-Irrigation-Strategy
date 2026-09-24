@@ -1379,6 +1379,11 @@ nav button.nav-separated {
   font-weight: 500;
   margin-left: 4px;
 }
+.error-code-group > p {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  margin: 0 0 4px;
+}
 .error-code {
   border-bottom: 1px solid var(--border);
 }
@@ -1389,6 +1394,7 @@ nav button.nav-separated {
   padding: 12px 0;
   cursor: pointer;
   font-size: 12px;
+  list-style: none;
 }
 .error-code summary code {
   font-weight: 650;
@@ -1397,9 +1403,6 @@ nav button.nav-separated {
 }
 .error-code summary::-webkit-details-marker {
   display: none;
-}
-.error-code summary {
-  list-style: none;
 }
 .error-code-title {
   flex: 1;

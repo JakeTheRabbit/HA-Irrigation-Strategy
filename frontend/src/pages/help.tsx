@@ -245,6 +245,7 @@ function ErrorCodes() {
               <h3>
                 {group.name} <span>{group.prefix}xx</span>
               </h3>
+              <p>{group.detail}</p>
               {codes.map((entry) => (
                 <details
                   className="error-code"

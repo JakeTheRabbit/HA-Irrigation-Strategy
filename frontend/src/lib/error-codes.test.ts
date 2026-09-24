@@ -26,6 +26,26 @@ describe("error codes", () => {
     expect(findErrorCodes("999")).toEqual([]);
   });
 
+  it("finds the code in a line pasted from a notification or a Repairs card", () => {
+    // Word search found other entries here: CS-207's text mentions CS-606, CS-103's CS-102.
+    for (const [pasted, code] of [
+      ["(CS-606)", "CS-606"],
+      ["CS-102.", "CS-102"],
+      ["Code CS-101. What it means and what to do", "CS-101"],
+      ["Zone 2: moisture reading hasn't changed (CS-101)", "CS-101"],
+      ["Crop Steering: grow strategy plan is holding irrigation (CS-606)", "CS-606"],
+    ]) {
+      expect(findErrorCodes(pasted).map((entry) => entry.code)).toEqual([code]);
+    }
+    expect(asCode("cs1010")).toBeNull();
+  });
+
+  it("finds a Repairs card by the words on the card", () => {
+    const codes = findErrorCodes("grow strategy plan").map((entry) => entry.code);
+    expect(codes).toContain("CS-606");
+    expect(codes).toContain("CS-607");
+  });
+
   it("finds codes by the words in them", () => {
     const moisture = findErrorCodes("moisture reading").map((entry) => entry.code);
     expect(moisture).toContain("CS-101");
