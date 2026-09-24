@@ -8,4 +8,4 @@ P0 waits for morning dryback, P1 ramps toward the moisture target, P2 maintains 
 
 The live loop applies source-water, sensor, enable/interlock, volume and duration gates before hardware sequencing. Readback failures latch shared equipment out. Local tests exercise these branches with fake HA; production hardware behavior still requires site verification.
 
-See [repository map](REPOSITORY_MAP.md), [installation](INSTALL.md), [grow plans](GROW_PLANS.md) and [validated feature matrix](FEATURE_MATRIX.md). The archived overview contains historical facility-specific state and is not current runtime evidence.
+See [repository map](REPOSITORY_MAP.md), [installation](INSTALL.md), [grow plans](GROW_PLANS.md) and [validated feature matrix](FEATURE_MATRIX.md). The archived overview (in the `archive/2026-09-08/released-workspace` tag) contains historical facility-specific state and is not current runtime evidence.

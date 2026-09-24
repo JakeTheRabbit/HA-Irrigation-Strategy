@@ -32,7 +32,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v
 
 # Tests — the integration inside a REAL Home Assistant: fresh install, that install handed to
 # the real add-on controller, and in-place upgrades from seeded snapshots of old installs.
-# Needs `pip install -r requirements-test-ha.txt` (Python 3.13+); see docs/TESTING.md.
+# Needs `pip install -r requirements-test-ha.txt` (Python 3.14.2+); see docs/TESTING.md.
 python -m pytest tests_ha -q
 
 # Tests — crop-steering-engine package
@@ -107,8 +107,8 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
 ## Notes
 
 - **Dependencies:** integration = pure HA + voluptuous (no external deps). Engine
-  (`crop-steering-engine`) = pure Python, no scipy/numpy; f2-control add-on container
-  installs its own deps from `addons/f2_control/requirements.txt`.
+  (`crop-steering-engine`) = pure Python, no scipy/numpy; the f2-control add-on image
+  installs its one dependency, `requests`, in `addons/f2_control/Dockerfile`.
 - **Testing:** see `docs/TESTING.md`; run `bash tests/run_ci.sh` (mirrors CI). Anything that touches the
   config flow, entity ids/platforms or the integration-controller contract must be proven in `tests_ha/`
   (a real Home Assistant), not only against the stubs in `tests/`: the stubs cannot see a schema HA
@@ -186,15 +186,15 @@ config entry. There is no schema to migrate by hand.
 required post-install migration. Defaults sane out of the box.
 
 **Stay generic.** F2-specific values are **defaults/overrides, never hardcoded assumptions**:
-entity ids (`switch.veg_main_pump`, `sensor.atlas_legacy_1_ec`, …), 36 plants, 6 L block,
+entity ids (`switch.veg_main_pump`, a named feed-EC probe, …), 36 plants, 6 L block,
 4 L/hr, lights 10–22, feed band EC 2.3–3.5 / pH 5.8–6.2. A change that only works because of
 F2's exact names or numbers is a bug. (**Resolved in add-on v0.8.0:** `feed_ec_sensor` /
 `feed_ph_sensor` are now optional add-on options with **empty** defaults — unset = that half
 of the source-water gate is disabled (dosing/fill holds still apply), never a fallback to an
 F2 entity id; `substrate_l` / `flow_lps` defaults are now generic last-resort placeholders
-(5 L / 0.02 L/s). **F2 must set `feed_ec_sensor: sensor.atlas_legacy_1_ec` and
-`feed_ph_sensor: sensor.aquaponics_kit_f4f618_ph` in its add-on Configuration** or its
-source-water gate goes dark after the v0.8.0 rebuild.)
+(5 L / 0.02 L/s). **A room that relied on the old F2 defaults must set `feed_ec_sensor` and
+`feed_ph_sensor` in its add-on Configuration** or its source-water gate goes dark after the
+v0.8.0 rebuild.)
 
 **Prove it.** `tests/test_state_migration.py` locks the backward-compatible load and
 `tests/test_version_consistency.py` keeps versions aligned. Run `bash tests/run_ci.sh`; detail

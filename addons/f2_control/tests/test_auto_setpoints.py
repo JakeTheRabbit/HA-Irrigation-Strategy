@@ -34,7 +34,7 @@ def _ramp(learn, rises, start=30.0, pct=3.0, phase="P1", t=T0, spike=0.0):
     return vwc
 
 
-# ------------------------------------------------------------------ the behaviour Ben asked for
+# ------------------------------------------------------------------ the behaviour the owner asked for
 def test_two_flat_shots_fail_p1_over_to_p2_and_the_peak_becomes_the_target():
     learn = au.fresh()
     _ramp(learn, [1.8, 1.8, 1.7, 0.2, 0.1])  # 30 -> 35.3, then the substrate stops taking water
