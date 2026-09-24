@@ -103,6 +103,11 @@
   background: color-mix(in srgb, var(--destructive) 12%, var(--surface));
   border-color: color-mix(in srgb, var(--destructive) 40%, var(--surface));
 }
+.pill[data-tone="warn"] {
+  color: color-mix(in srgb, var(--warning) 60%, var(--foreground));
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--surface));
+}
 .pill[data-tone="unknown"] {
   color: var(--muted-foreground);
   background: var(--muted);

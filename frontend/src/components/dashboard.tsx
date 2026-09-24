@@ -51,6 +51,7 @@ export type Page =
   | "activity"
   | "sensors"
   | "settings"
+  | "stock"
   | "help";
 export const number = (value: number | null, digits = 1) =>
   value === null || !Number.isFinite(value)

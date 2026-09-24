@@ -420,12 +420,17 @@ export class ControllerStore {
   operator = async <T>(action: OperatorAction, data: Record<string, unknown> = {}): Promise<T> => {
     const generation = this.generation;
     const roomId = this.roomId;
-    const scoped = action.startsWith("strategy_") || action.startsWith("runs_");
+    const scoped =
+      action.startsWith("strategy_") || action.startsWith("runs_") || action.startsWith("stock_");
     const payload = scoped ? { ...data, room_id: roomId } : data;
     if (scoped && !roomId) throw new Error("Select an available room.");
-    const mutation = !["strategy_get", "strategy_preview", "setup_read", "runs_get"].includes(
-      action,
-    );
+    const mutation = ![
+      "strategy_get",
+      "strategy_preview",
+      "setup_read",
+      "runs_get",
+      "stock_get",
+    ].includes(action);
     if (mutation && this.writing) throw new Error("Another change is still being applied.");
     if (mutation) this.writing = true;
     try {

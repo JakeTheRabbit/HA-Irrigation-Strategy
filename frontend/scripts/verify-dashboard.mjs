@@ -143,6 +143,7 @@ try {
     ["insights", "Insights"],
     ["activity", "Activity"],
     ["sensors", "Sensors"],
+    ["stock", "Stock tanks"],
     ["settings", "Settings"],
     ["help", "Help & tools"],
   ];
@@ -218,6 +219,38 @@ try {
     assert.ok(tops[0] < tops[1] && tops[0] < tops[2], `timeline ${tops[0]}, tank ${tops[1]}`);
     assert.equal(await page.locator(".wd-daily").count(), 0, "no water table on the Overview");
     assert.equal(await page.getByText("Controller scheduling", { exact: true }).count(), 0);
+  });
+  await check("stock tanks: refill, set a level, record a batch and add a tank", async () => {
+    await go("stock");
+    const card = (id) => page.locator(`[data-stock-tank="${id}"]`);
+    await expectVisible(card("cal_mag"));
+    assert.equal(await page.locator("[data-stock-tank]").count(), 4);
+    // Cal-Mag starts within half again of its low mark: amber, "Getting low".
+    assert.equal(await card("cal_mag").locator(".pill").textContent(), "Getting low");
+    await card("cal_mag").getByRole("button", { name: "Refilled" }).click();
+    await expectVisible(card("cal_mag").getByText("OK", { exact: true }));
+    assert.match(await card("cal_mag").locator("dd").first().textContent(), /^10 of 10 L$/);
+
+    await card("ph_down").getByRole("button", { name: "Set level" }).click();
+    await card("ph_down").getByLabel("Level read off the tank (L)").fill("0.8");
+    await card("ph_down").getByRole("button", { name: "Save level" }).click();
+    await expectVisible(card("ph_down").getByText("Low", { exact: true }));
+
+    await page.getByRole("button", { name: "Record a batch" }).click();
+    const confirm = page.getByRole("dialog");
+    if (await confirm.count()) await confirm.getByRole("button", { name: "Record the batch" }).click();
+    await expectVisible(page.getByRole("heading", { name: "Recent batches" }));
+    assert.match(await card("cal_mag").locator("dd").first().textContent(), /^9\.75 of 10 L$/);
+
+    await page.getByRole("button", { name: "Edit stock tanks" }).click();
+    const editor = page.getByRole("dialog");
+    await editor.getByRole("button", { name: "Add a stock tank" }).click();
+    const names = editor.getByLabel("Name");
+    await names.last().fill("Silica");
+    await editor.getByRole("button", { name: "Save stock tanks" }).click();
+    await expectVisible(card("silica"));
+    await axe("stock tanks after edits");
+    await noOverflow();
   });
   await check("overview: every zone and room metric has its mini visual", async () => {
     await go("overview");
