@@ -1044,8 +1044,8 @@ the only engine for a while, and keeping the dead code around made the docs clai
 system doesn't do. The README is corrected to match the actual code: the self-tuning "Vmax / adaptive
 steering" section is gone (it was never in the live engine), the dashboard tab names and the safety
 gate chain are fixed, and overstated claims (a `>4 h` self-healing watchdog, daily *shot-count* caps,
-`?room=` dashboard scoping) are reworded to what's real. New **[`SYSTEM_GUIDE.html`](archive/2026-09-08/SYSTEM_GUIDE.html)**
-(feature list + flowcharts) and **[`docs/DASHBOARDS.md`](archive/2026-09-08/docs/DASHBOARDS.md)** (what's wired, what's
+`?room=` dashboard scoping) are reworded to what's real. New **[`SYSTEM_GUIDE.html`](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/archive/2026-09-08/released-workspace/archive/2026-09-08/SYSTEM_GUIDE.html)**
+(feature list + flowcharts) and **[`docs/DASHBOARDS.md`](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/archive/2026-09-08/released-workspace/archive/2026-09-08/docs/DASHBOARDS.md)** (what's wired, what's
 hardcoded to F2, and how to populate the dashboards for your own facility).
 
 **🔧 Technical notes.**

@@ -13,7 +13,7 @@
 | addons/f2_control/www/public/dashboard.html | Identical generated application served through ingress |
 | tests | Integration and repository contract tests |
 | docs | Current install, operation, architecture and validation evidence |
-| archive/2026-09-08 | Superseded dashboards, documentation and tools with original paths/hashes |
+| `archive/2026-09-08/released-workspace` (tag) | Superseded dashboards, documentation and tools, at their original paths under archive/2026-09-08 |
 | docs/TESTING.md / docs/ENTITIES.md | Development checks and entity reference |
 | img | Current screenshots; superseded captures are archived |
 | repository.yaml | HA app repository discovery metadata; the controller app is installed from this repository only |
@@ -24,6 +24,6 @@ The integration owns plan/configuration storage and per-room run metadata. Run r
 
  The controller reads one atomic, versioned strategy snapshot, validates freshness and runs the pure decision core before its hardware IO sequence. Configuration revision and controller acknowledgement are distinct so the UI cannot mistake a saved mapping for a running configuration.
 
-Historical files in archive are not shipped as active dashboards or installation configuration. They can contain outdated claims and facility examples. The root formerly named config.yaml was archived as configuration.legacy.yaml to prevent Supervisor's recursive app scan from treating it as an app manifest.
+Historical files in the `archive/2026-09-08/released-workspace` tag are not shipped as active dashboards or installation configuration. They can contain outdated claims and facility examples. The root formerly named config.yaml was archived as configuration.legacy.yaml to prevent Supervisor's recursive app scan from treating it as an app manifest.
 
-Historical facility dashboards, packages, deploy YAML, environment templates, generated Lovelace sample and disabled workflows are in archive/2026-09-08. They are not needed for installation. The portable Lovelace generator remains in scripts/build_lovelace.py.
+Historical facility dashboards, packages, deploy YAML, environment templates, generated Lovelace sample and disabled workflows are kept in the `archive/2026-09-08/released-workspace` tag, under archive/2026-09-08. They are not needed for installation. The portable Lovelace generator remains in scripts/build_lovelace.py.
