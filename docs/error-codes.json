@@ -371,17 +371,18 @@
       "title": "An interrupted shot's hardware may still be ON",
       "source": "notification",
       "severity": "warning",
-      "meaning": "A shot never finished, and a switch it opened can't be read (or Home Assistant gives no time for its last change), so the controller can't tell whether a person has switched it since. It leaves it alone on purpose: people run this hardware by hand too, for hand-watering and tank circulation. Once the switch can be read again, the controller switches off only what it can prove this shot opened: a switch that reads ON with a change after the shot began (after a power cut or a Home Assistant restart, for example) is taken to be a person's and left on, and the notification is withdrawn.",
+      "meaning": "A shot never finished, and a switch it opened can't be read, or Home Assistant gives no time for its last change or no history since the shot began, so the controller can't tell whether a person has switched it since. It leaves it alone on purpose: people run this hardware by hand too, for hand-watering and tank circulation. Once it can tell, the controller switches off what it can prove this shot opened, including a switch whose change time moved only because Home Assistant restarted or the switch reconnected (its history shows it ON since the shot opened it). A switch a person turned off and on again since, or that was on before the shot, is left on, and the notification is withdrawn.",
       "watering": "No new shot starts in this room until the interrupted one is settled. The controller checks again every loop.",
       "causes": [
         "The switch's device is offline or reads 'unavailable'.",
         "Its integration reports no time for the switch's last change.",
-        "Home Assistant, or the switch's device, restarted while the controller was stopped."
+        "Home Assistant keeps no history for the switch: it is excluded from the recorder, or Home Assistant has only just started."
       ],
       "fixes": [
         "Check the switch the notification names, and the plumbing, now. Switch it off by hand if water is running.",
         "Bring its device back online.",
-        "Don't wait for the notification to go away: once the switch reads again the controller closes the record, and leaves a switch it can't prove was its own ON."
+        "If the switch is excluded from Home Assistant's recorder, include it: its history is how the controller tells a restart from a person.",
+        "Don't wait for the notification to go away: once the switch and its history read again, the controller closes what it can prove this shot opened and leaves anything else ON."
       ]
     },
     {

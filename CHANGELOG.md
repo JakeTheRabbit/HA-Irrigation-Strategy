@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 The Overview timeline is class **C1**: dashboard only, nothing the controller or the integration
 reads. Not run on hardware; checked read-only against a live room's recorded history. A shot cut
 short by something else is class **C3** (irrigation behaviour, controller only). Not run on
-hardware; the 23 September event is replayed in the controller suite.
+hardware; the 23 September event is replayed in the controller suite. A shot interrupted by a
+Home Assistant restart is class **C3** (controller only). Not run on hardware; the restart is
+replayed in the controller suite.
 
 The dashboard changes below are class **C1**: dashboard only, nothing the controller or the
 integration reads. Not run on hardware; checked by the browser contract scripts.
@@ -72,6 +74,16 @@ integration reads. Not run on hardware; checked by the browser contract scripts.
   using, and sends one alert saying what ended the shot. A feed path closed by somebody else is
   not a hardware fault. Nothing is switched off on a timer, and the kill switch and manual
   override work as before.
+
+- **A shot interrupted by a Home Assistant restart is closed, not left running.** If Home Assistant
+  restarted (an update, a power blip to the host, a crash) or a valve's device reconnected while a
+  shot was open, the valve kept running: after a restart Home Assistant says every switch changed
+  just then, so the controller took its own open valve for someone hand-watering and left it on,
+  with no alert. It now reads the valve's history: ON since the shot opened it, with only the
+  restart in between, is the shot's and is closed (valve first, then the main line and pump, as
+  always). A valve someone switched off and on again, or had on before the shot, is still left
+  alone. If Home Assistant has no history for it, nothing is switched and the *may still be ON*
+  notification (CS-309) says so, every loop until it can tell.
 
 ### 🔧 Technical notes
 
@@ -146,6 +158,17 @@ integration reads. Not run on hardware; checked by the browser contract scripts.
   stopped early, something else closed the feed*, CS-307), debounced like the others, names the
   entity and the seconds delivered against planned. No change to add-on options, the state file,
   entities or the normal shot.
+- **Controller** (`controller.py`), an interrupted shot after a Home Assistant restart: when a
+  switch the in-flight record names reads ON with `last_changed` outside `INFLIGHT_OPEN_WINDOW_S`,
+  `_inflight_plan` no longer hands it to a person on that alone. New `ha_history()` reads
+  `GET history/period/<start>` (`minimal_response`, `no_attributes`, `end_time` now) from the
+  window's start, and the pure `_on_since_shot()` decides: ON inside the window with only
+  `unavailable`/`unknown` after it is the shot's (closed as before, with the line-in-use and hold
+  rules unchanged); ON before the window, first ON after it, or an OFF after the shot opened it is a
+  person's (left, record closed); no readable history, or a row it can't read, is `unsure` (CS-309,
+  record kept, retried every loop). CS-309's catalog entry and alert text say so. The add-on test
+  rig gains `FakeHA.ha_history` and an autouse fixture so no test reaches a real history endpoint.
+
 
 ## [2.19.5] - 2026-09-23
 

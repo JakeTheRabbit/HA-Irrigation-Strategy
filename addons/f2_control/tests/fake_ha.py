@@ -24,6 +24,7 @@ class FakeHA:
         self.changed: dict[str, str] = {}  # entity_id -> last_changed_iso (when the VALUE last changed)
         self.calls: list[tuple] = []  # (domain, service, data)
         self.sets: dict[str, tuple] = {}  # entity_id -> (state, attributes)
+        self.history: dict[str, list] = {}  # entity_id -> what ha_history returns (a test's own)
 
     # ---- state helpers ----
     def set_state(self, entity_id, state, attributes=None, last_updated=_CURRENT_TIMESTAMP):
@@ -49,6 +50,14 @@ class FakeHA:
             )
         return True
 
+    def ha_history(self, entity, since, timeout=12):
+        """What the recorder holds from `since`: a test's own list, else the state the entity is in now."""
+        if entity in self.history:
+            return self.history[entity]
+        if entity not in self.states:
+            return None
+        return [(self.states[entity][0], self.changed.get(entity))]
+
     def ha_get_all(self):
         out = []
         for eid, (state, attrs, _lu) in self.states.items():
@@ -70,10 +79,12 @@ def install(controller, fake: FakeHA, options: dict):
         controller.ha_call,
         controller.ha_get_all,
         controller.ha_set,
+        controller.ha_history,
     )
     controller.load_options = lambda: dict(options)
     controller.ha_get = fake.ha_get
     controller.ha_call = fake.ha_call
     controller.ha_get_all = fake.ha_get_all
     controller.ha_set = fake.ha_set
+    controller.ha_history = fake.ha_history
     return orig
