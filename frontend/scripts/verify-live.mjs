@@ -373,6 +373,11 @@ try {
       .click();
     await visible(page.getByRole("heading", { name: "No zones discovered", exact: true }));
     assert.equal(await page.locator("#desktop-room").isDisabled(), true);
+    await page
+      .getByRole("navigation", { name: "Main navigation" })
+      .getByRole("button", { name: "Overview", exact: true })
+      .click();
+    await visible(page.getByRole("heading", { level: 1, name: "Overview", exact: true }));
   });
   await check(
     "named F2 stays distinct from default and unsupported tools cannot misroute",

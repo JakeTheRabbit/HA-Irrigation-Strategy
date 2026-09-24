@@ -353,7 +353,6 @@ export function Comparison({
     <div className="comparison-page">
       <Heading
         title="Compare runs"
-        description="Recorded VWC and EC, aligned by grow age with explicit planning references."
         action={
           <Button
             variant="outline"

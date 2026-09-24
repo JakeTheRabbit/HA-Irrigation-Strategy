@@ -16,6 +16,9 @@ reads. Not run on hardware; checked read-only against a live room's recorded his
 short by something else is class **C3** (irrigation behaviour, controller only). Not run on
 hardware; the 23 September event is replayed in the controller suite.
 
+The dashboard changes below are class **C1**: dashboard only, nothing the controller or the
+integration reads. Not run on hardware; checked by the browser contract scripts.
+
 ### 🌱 In plain English
 
 - **The Overview shows the day.** Its moisture and EC chart is replaced by the room's grow-day,
@@ -38,6 +41,9 @@ hardware; the 23 September event is replayed in the controller suite.
   Assistant over its own connection) and kept current from the updates the dashboard already
   receives.
 - Insights keeps its moisture and EC chart.
+- **Headings say what the page is, once.** The Overview is titled after its room (*Flower 1
+  overview*). The sentences under page headings that only repeated them are gone; Today's targets
+  and Scheduled targets keep theirs, because they say how a schedule and a draft behave.
 - **A shot that something else cuts short now ends there, and only the water it gave is counted.**
   On 23 September at 11:25 the batch tank ran empty 4 seconds into a zone 1 shot. The dosing
   automation took the tank and its pump, and the feed guard closed the valve and main line. The
@@ -77,6 +83,9 @@ hardware; the 23 September event is replayed in the controller suite.
   change and Flower 1 zone 3 held since it was disabled.
 - `pages/overview.tsx` renders `components/day-timeline.tsx` in place of `HistoryChart`, which
   stays on Insights.
+- `Heading.description` is optional. `pages/overview.tsx` titles itself `${room.name} overview`
+  (plain *Overview* when no room is discovered). `.page-heading` margin 30/25 → 20/20 px (16/16 on
+  a phone).
 - **Controller** (`controller.py`), a shot cut short from outside: in every round `_wait_shot` also
   reads each `hold_entities` entity (ON as `_blocked` reads it, the shared `ON_STATES`) and the
   shot's own valve, with the same bounded reads and sleeps of at most 2 s between rounds, after the kill

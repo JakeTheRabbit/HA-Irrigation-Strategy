@@ -46,7 +46,6 @@ export function ActivityPage({ controller }: { controller: Controller }) {
     <>
       <Heading
         title="Activity"
-        description="Search recorded controller events and export the current filtered view."
         action={
           <Button variant="outline" disabled={!events.length} onClick={exportCsv}>
             <Download size={16} />

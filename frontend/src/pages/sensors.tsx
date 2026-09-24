@@ -32,10 +32,7 @@ export function Sensors({ controller }: { controller: Controller }) {
   );
   return (
     <>
-      <Heading
-        title="Sensors"
-        description="Inspect measurements and availability reported by Home Assistant."
-      />
+      <Heading title="Sensors" />
       <div className="sensor-summary">
         <span>
           <strong>{sensors.length}</strong> sensor entities

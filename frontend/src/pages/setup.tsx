@@ -472,7 +472,6 @@ export function Setup({
     <>
       <Heading
         title="Rooms & setup"
-        description="Manage rooms, zones, sensor mapping and delivery sizing in one place."
         action={
           <Button
             disabled={!data?.capabilities.create || dirty || busy || !connected}

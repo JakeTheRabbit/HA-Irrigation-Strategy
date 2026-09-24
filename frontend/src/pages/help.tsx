@@ -70,10 +70,7 @@ const glossary = [
 export function Help({ controller }: { controller: Controller }) {
   return (
     <>
-      <Heading
-        title="Help & tools"
-        description="A practical guide to the complete Crop Steering workspace."
-      />
+      <Heading title="Help & tools" />
       <div className="help-intro">
         <BookOpen size={28} />
         <div>

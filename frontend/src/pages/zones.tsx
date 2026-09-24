@@ -35,7 +35,6 @@ export function Zones({
     <>
       <Heading
         title="Zones"
-        description="Inspect each zone’s readings, phase and scheduling state."
         action={
           <Button variant="outline" onClick={() => navigate("strategy")}>
             Edit strategy <ArrowUpRight size={16} />

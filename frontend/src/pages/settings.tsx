@@ -63,10 +63,7 @@ export function Settings({
   }
   return (
     <>
-      <Heading
-        title="Settings"
-        description="Manage this tab’s connection, appearance and room scheduling."
-      />
+      <Heading title="Settings" />
       <div className="settings-stack">
         {controller.demo && (
           <section className="panel settings-section">
