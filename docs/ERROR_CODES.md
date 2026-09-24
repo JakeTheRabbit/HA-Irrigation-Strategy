@@ -7,8 +7,12 @@ Every notification from the Crop Steering controller app, and every Crop Steerin
 means, what happens to watering meanwhile, the likely causes and what to do. The same list is
 in the Crop Steering sidebar under **Help & tools → Error codes**.
 
-A notification is raised again, at most every 30 minutes, for as long as its cause lasts.
-A room whose *Room Active* switch is off (nothing growing) raises none for that room.
+Most notifications are raised again, at most every 30 minutes, for as long as their cause lasts,
+and sooner when the cause changes. A few are said once: CS-301 once per fault (dismissing it does
+not clear the hold), CS-403 once each time the controller app starts and CS-405 at start-up. A
+notification stays in Home Assistant until you dismiss it, even after its cause has gone.
+A room whose *Room Active* switch is off (nothing growing) raises no watering notifications; a
+setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still reported.
 
 | Codes | About |
 | --- | --- |
@@ -53,9 +57,9 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 | [CS-602](#cs-602) | Engine not running | Warning | Repairs card |
 | [CS-603](#cs-603) | Zone with no moisture sensor | Warning | Repairs card |
 | [CS-604](#cs-604) | Zone sensor unavailable | Warning | Repairs card |
-| [CS-605](#cs-605) | Settings not where the controller looks for them | Critical | Repairs card |
-| [CS-606](#cs-606) | Grow plan is holding irrigation | Critical | Repairs card |
-| [CS-607](#cs-607) | Grow plan hasn't moved on to today | Warning | Repairs card |
+| [CS-605](#cs-605) | Settings not where the controller looks for them | Warning | Repairs card |
+| [CS-606](#cs-606) | Grow strategy plan is holding irrigation | Critical | Repairs card |
+| [CS-607](#cs-607) | Grow strategy plan has not moved on to today | Warning | Repairs card |
 
 ## Sensors (CS-1xx)
 
@@ -67,7 +71,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 **What it means.** The zone's moisture reading has stayed exactly the same for more than 20 minutes. A working probe in a cube with a plant drinking from it moves all the time, so the controller cannot tell this one from a probe that has stopped updating or been pulled out, and does not steer by it.
 
-**Watering meanwhile.** Carries on without the probe while the engine is on. If another zone in the room has a working probe, this zone gets the same shots as that zone; otherwise it gets one shot every 90 minutes, within its daily water limit. Phase changes that go by moisture wait until the reading moves.
+**Watering meanwhile.** Carries on without the probe while the engine is on. If another zone in the room has a working probe, this zone gets the same shots as that zone; otherwise it gets one shot every 90 minutes (the app's blind_fallback_min option), within its daily water limit. Phase changes that go by moisture wait until the reading moves.
 
 **Likely causes**
 
@@ -78,7 +82,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 **Suggested fixes**
 
-- With no plant in, or a plant not yet drinking: nothing to fix. The notification stops by itself once the reading changes.
+- With no plant in, or a plant not yet drinking: nothing to fix. Watering goes back to normal by itself once the reading changes; the notification stays until you dismiss it.
 - If the room is empty, switch its Room Active switch off: an empty room gets no watering and no notifications until it is switched back on.
 - Check the probe is pushed fully into the cube.
 - Open the sensor's history in Home Assistant. A flat line for hours while plants are drinking means the probe or its integration has stopped: reconnect or restart it.
@@ -89,21 +93,23 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Warning · Notification*
 
-**What it means.** The zone's moisture sensor reads 'unavailable' or 'unknown', isn't a number, or can't be found in Home Assistant at all. The notification says which.
+**What it means.** The zone's moisture sensor reads 'unavailable' or 'unknown', isn't a number, can't be found in Home Assistant at all, or carries a time in the future. The notification says which.
 
-**Watering meanwhile.** Carries on without the probe while the engine is on: the same shots as a zone whose probe is working, or one shot every 90 minutes within the daily water limit if there is none. Phase changes that go by moisture wait for the probe.
+**Watering meanwhile.** Carries on without the probe while the engine is on: the same shots as a zone whose probe is working, or one shot every 90 minutes (the app's blind_fallback_min option) within the daily water limit if there is none. Phase changes that go by moisture wait for the probe.
 
 **Likely causes**
 
 - The probe is offline: no power, a flat battery, or out of Wi-Fi or Zigbee range.
 - Home Assistant has just restarted and the probe's integration hasn't loaded yet.
 - The probe was renamed or removed, so the sensor mapped to the zone no longer exists.
+- Home Assistant's clock is ahead of the controller app's, so the reading looks as if it comes from the future (the notification says so).
 
 **Suggested fixes**
 
 - Find the sensor named in the notification under Settings → Developer tools → States and check what it reads.
 - Check the probe's device is powered and online.
 - In Crop Steering → Rooms & setup, check the zone's moisture sensor is the probe you expect.
+- If the notification says the reading is stamped in the future, set the clocks of the Home Assistant host and the controller app right.
 
 <a id="cs-103"></a>
 
@@ -153,7 +159,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Critical · Notification*
 
-**What it means.** A changed setup was saved for the room (in Rooms & setup or Configure), and the controller only takes on a new setup while the engine switch and every pump and valve it would drive are OFF. The notification lists the ones that are still on.
+**What it means.** A changed setup was saved for the room (in Rooms & setup or Configure), or the controller is taking the room's setup on again after a restart. It only takes a setup on while every pump and valve it would drive is OFF, and, for a changed setup, the engine switch too. The notification lists the ones that are still on.
 
 **Watering meanwhile.** Nothing in the room is watered until the controller has taken on the new setup.
 
@@ -161,6 +167,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 - The setup was saved while the engine switch was on.
 - A pump or valve was left on, or reads 'unavailable'.
+- The controller app restarted while a pump was running (tank circulation, for example) or a switch still read 'unavailable'.
 
 **Suggested fixes**
 
@@ -196,7 +203,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Critical · Notification*
 
-**What it means.** The room's maximum shot length must be a number of at least 5 seconds, and it isn't. It is never replaced by a default, because a default could flood a room.
+**What it means.** The room's maximum shot length must be a number of at least 5 seconds, and it isn't. A value set here is never replaced by a default, because a default could flood a room. Only when neither Maximum shot duration setting exists at all (an older install, or one whose ids have moved, CS-605) does the controller use 900 seconds, without this notification.
 
 **Watering meanwhile.** No shot is started in the room.
 
@@ -209,6 +216,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 - Check the Crop Steering integration is loaded (Settings → Devices & services).
 - Set Maximum shot duration to at least 5 seconds.
+- If Repairs shows CS-605, follow it: until the setting is back where the controller looks, shots are capped at 900 seconds.
 
 <a id="cs-204"></a>
 
@@ -216,19 +224,19 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Critical · Notification*
 
-**What it means.** The controller sizes every shot from the zone's pot size (litres per plant), plant count, drippers per plant and dripper flow. One of them is missing, zero or unreadable, so it can't tell how long to run.
+**What it means.** The controller sizes every shot from the zone's pot size (litres per plant), plant count, drippers per plant and dripper flow. One of them is set to zero or less, or to something that isn't a number, so it can't tell how long to run. A setting that is missing or reads 'unavailable' doesn't cause this: the controller uses its built-in values instead (CS-402).
 
 **Watering meanwhile.** The zone is not watered.
 
 **Likely causes**
 
-- Pot size, drippers per plant or dripper flow is 0 or empty.
-- A setting reads 'unavailable', because the integration hasn't loaded.
+- Pot size, drippers per plant or dripper flow is set to 0 or less.
+- The controller app's flow_lps or substrate_l option is 0 or less, and the zone's own setting is missing, so the option is used.
 
 **Suggested fixes**
 
 - Set the zone's pot size, plant count, drippers per plant and dripper flow in Crop Steering → Rooms & setup.
-- Check the Crop Steering integration is loaded.
+- Check the controller app's flow_lps and substrate_l options are above 0.
 
 <a id="cs-205"></a>
 
@@ -238,7 +246,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 **What it means.** The zone has had its daily water limit (max daily volume), counted from lights-on. A shot that would cross it gets only what is left; once too little is left for the shortest shot, routine shots stop.
 
-**Watering meanwhile.** Routine top-ups and EC-correction shots stop until lights-on starts the next day. The morning ramp, the overnight emergency shot, the no-water-for-hours safety shot and high-EC flushes still run.
+**Watering meanwhile.** Routine top-ups and EC-correction shots stop until lights-on starts the next day. The morning ramp, the overnight emergency shot, the no-water-for-hours safety shot and high-EC flushes still run. The exception is a zone with no usable moisture reading (CS-101, CS-102, CS-103): every shot it gets is copied or timed and none is exempt, so it gets no more water at all until lights-on, the overnight emergency shot included. Its notification says so.
 
 **Likely causes**
 
@@ -260,7 +268,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 **What it means.** Root-zone EC is above the zone's maximum, and a flush can't bring it down right now: the feed is no weaker than what is in the root zone, or the cube is already saturated.
 
-**Watering meanwhile.** The zone is held. It clears by itself once a flush could help (a weaker feed, or the cube drying back).
+**Watering meanwhile.** The zone is held: no shot runs, the overnight emergency shot, the no-water-for-hours safety shot and the minimum daily volume included, and the urgent CS-207 is not raised for it. The hold lifts by itself once a flush could help (a weaker feed, or the cube drying back).
 
 **Likely causes**
 
@@ -270,7 +278,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 **Suggested fixes**
 
-- Check the feed EC in the tank and bring it down if it is high.
+- Check the feed EC in the tank (the sensor in the controller app's feed_ec_sensor option) and bring it down if it is high; a feed probe that reads high has the same effect.
 - Check the EC probe against a hand-held meter.
 - Check the zone's maximum EC setting is what you intend.
 
@@ -304,7 +312,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Critical · Notification*
 
-**What it means.** A pump or valve did not confirm it had switched OFF: after a shot, after a shot something else cut short (CS-307), or while an interrupted shot was being closed (CS-308). It may still be running. The controller latches a hold on that hardware, remembered across restarts.
+**What it means.** A pump or valve did not confirm it had switched OFF: after a shot, after a shot was cancelled before its water started (CS-302, CS-303, CS-304), after a shot something else cut short (CS-307), or while an interrupted shot was being closed (CS-308). It may still be running. The controller latches a hold on that hardware, remembered across restarts.
 
 **Watering meanwhile.** Stopped on that hardware, in every room that shares it, until the hold is cleared.
 
@@ -320,6 +328,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 - Turn off the engine switch of this room and of every room sharing the hardware.
 - The hold clears once all of them read OFF; then turn the engine back on.
 - If the notification says the fault could not be saved, do not restart the controller until it is repaired.
+- The notification is said once per fault, not every 30 minutes, and dismissing it does not clear the hold: check the hardware even if the card is gone.
 
 <a id="cs-302"></a>
 
@@ -329,17 +338,18 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 **What it means.** Home Assistant returned an error when the controller switched the pump on.
 
-**Watering meanwhile.** That shot was cancelled and not counted. The next shot is tried as normal.
+**Watering meanwhile.** That shot was cancelled and not counted. The controller switches off the pump, main line and valve and checks they read OFF: if it can't confirm that (Home Assistant unreachable, or a switch offline), it latches a hardware hold (CS-301) and nothing on that hardware is watered until the hold is cleared. Otherwise the next shot is tried as normal.
 
 **Likely causes**
 
-- The pump's switch is offline or 'unavailable'.
-- The mapped entity no longer exists.
+- Home Assistant could not be reached (restarting, or a network fault), or returned an error for the command.
+- A switch that only reads 'unavailable' doesn't raise this: Home Assistant accepts the command and nothing switches, and the controller catches it when the switch doesn't read OFF after the shot (CS-301).
 
 **Suggested fixes**
 
 - Switch the pump on and off by hand in Home Assistant to check it responds.
 - Check the pump mapped in Crop Steering → Rooms & setup.
+- If CS-301 was raised too, follow it.
 
 <a id="cs-303"></a>
 
@@ -347,19 +357,20 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Warning · Notification*
 
-**What it means.** Home Assistant returned an error when the controller switched the main-line valve on. The pump was switched off again.
+**What it means.** Home Assistant returned an error when the controller switched the main-line valve on. The controller then switched off what the shot may have opened.
 
-**Watering meanwhile.** That shot was cancelled and not counted. The next shot is tried as normal.
+**Watering meanwhile.** That shot was cancelled and not counted. The controller switches off the pump, main line and valve and checks they read OFF: if it can't confirm that (Home Assistant unreachable, or a switch offline), it latches a hardware hold (CS-301) and nothing on that hardware is watered until the hold is cleared. Otherwise the next shot is tried as normal.
 
 **Likely causes**
 
-- The main-line valve's switch is offline or 'unavailable'.
-- The mapped entity no longer exists.
+- Home Assistant could not be reached (restarting, or a network fault), or returned an error for the command.
+- A switch that only reads 'unavailable' doesn't raise this: Home Assistant accepts the command and nothing switches, and the controller catches it when the switch doesn't read OFF after the shot (CS-301).
 
 **Suggested fixes**
 
 - Switch the valve on and off by hand in Home Assistant to check it responds.
 - Check the main-line valve mapped in Crop Steering → Rooms & setup.
+- If CS-301 was raised too, follow it.
 
 <a id="cs-304"></a>
 
@@ -367,19 +378,20 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Warning · Notification*
 
-**What it means.** Home Assistant returned an error when the controller switched the zone's valve on. Anything upstream was switched off again.
+**What it means.** Home Assistant returned an error when the controller switched the zone's valve on. The controller then switched off what the shot may have opened.
 
-**Watering meanwhile.** That shot was cancelled and not counted. The next shot is tried as normal.
+**Watering meanwhile.** That shot was cancelled and not counted. The controller switches off the pump, main line and valve and checks they read OFF: if it can't confirm that (Home Assistant unreachable, or a switch offline), it latches a hardware hold (CS-301) and nothing on that hardware is watered until the hold is cleared. Otherwise the next shot is tried as normal.
 
 **Likely causes**
 
-- The valve's switch is offline or 'unavailable'.
-- The mapped entity no longer exists.
+- Home Assistant could not be reached (restarting, or a network fault), or returned an error for the command.
+- A switch that only reads 'unavailable' doesn't raise this: Home Assistant accepts the command and nothing switches, and the controller catches it when the switch doesn't read OFF after the shot (CS-301).
 
 **Suggested fixes**
 
 - Switch the valve on and off by hand in Home Assistant to check it responds.
 - Check the zone's valve mapped in Crop Steering → Rooms & setup.
+- If CS-301 was raised too, follow it.
 
 <a id="cs-305"></a>
 
@@ -387,13 +399,13 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Information · Notification*
 
-**What it means.** A shot was stopped part-way because the engine switch was turned off or manual override was turned on while it ran. The valve is closed.
+**What it means.** A shot was stopped part-way because the engine switch was turned off, Room Active was switched off or manual override was turned on while it ran. The valve and anything upstream were switched off; if they don't all read OFF, CS-301 is raised as well.
 
 **Watering meanwhile.** The water delivered before the stop is counted. The next shot is decided as normal.
 
 **Likely causes**
 
-- Someone turned the engine switch off, or manual override on, during a shot.
+- Someone turned the engine switch or Room Active off, or manual override on, during a shot.
 - An automation did.
 
 **Suggested fixes**
@@ -450,7 +462,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Critical · Notification*
 
-**What it means.** A shot never finished: the controller stopped, crashed or lost Home Assistant part-way through it. On the next start it switched off what that shot had opened, and at least one of those switches still does not read OFF. It also latches a hardware hold (CS-301) and tries again every loop.
+**What it means.** A shot never finished cleanly: the controller stopped, crashed or lost Home Assistant part-way through it, or a switch did not confirm OFF at the end of it. The controller then switched off what that shot had opened, and at least one of those switches still does not read OFF. It also latches a hardware hold (CS-301) and tries again every loop.
 
 **Watering meanwhile.** Stopped on that hardware (CS-301). Water may still be running through the switch that reads ON.
 
@@ -470,7 +482,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Warning · Notification*
 
-**What it means.** A shot never finished, and a switch it opened can't be read (or Home Assistant gives no time for its last change), so the controller can't tell whether a person has switched it since. It leaves it alone on purpose: people run this hardware by hand too, for hand-watering and tank circulation.
+**What it means.** A shot never finished, and a switch it opened can't be read (or Home Assistant gives no time for its last change), so the controller can't tell whether a person has switched it since. It leaves it alone on purpose: people run this hardware by hand too, for hand-watering and tank circulation. Once the switch can be read again, the controller switches off only what it can prove this shot opened: a switch that reads ON with a change after the shot began (after a power cut or a Home Assistant restart, for example) is taken to be a person's and left on, and the notification is withdrawn.
 
 **Watering meanwhile.** No new shot starts in this room until the interrupted one is settled. The controller checks again every loop.
 
@@ -478,11 +490,13 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 - The switch's device is offline or reads 'unavailable'.
 - Its integration reports no time for the switch's last change.
+- Home Assistant, or the switch's device, restarted while the controller was stopped.
 
 **Suggested fixes**
 
-- Check the switch the notification names, and bring its device back online.
-- Once it reads ON or OFF again, the controller settles the old shot by itself.
+- Check the switch the notification names, and the plumbing, now. Switch it off by hand if water is running.
+- Bring its device back online.
+- Don't wait for the notification to go away: once the switch reads again the controller closes the record, and leaves a switch it can't prove was its own ON.
 
 ## Settings (CS-4xx)
 
@@ -492,7 +506,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Warning · Notification*
 
-**What it means.** A setting accepts a wider range than the engine will use, and it is set outside the engine's range. The notification names the setting, its value and the range.
+**What it means.** A setting accepts a wider range than the engine will use, and it is set outside the engine's range. The notification names the setting, its value and the range; a check that compares two settings (a minimum above its maximum) names both.
 
 **Watering meanwhile.** Carries on, using the nearest value inside the range.
 
@@ -503,6 +517,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 **Suggested fixes**
 
 - Set it inside the range shown. The notification then stops.
+- Where two settings are compared, change either one. The minimum daily volume is worked out from mL per plant and plant count.
 
 <a id="cs-402"></a>
 
@@ -510,9 +525,9 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Critical · Notification*
 
-**What it means.** Settings the controller reads by their exact entity ids don't exist in Home Assistant, so it uses its built-in values for them, the daily water limit and plant count included. The notification lists them.
+**What it means.** Settings the controller reads by their exact entity ids can't be read in Home Assistant (missing, or not a number for three loops running), so it uses its built-in values for them. The notification lists them, and says when the daily water limit or plant count is among them.
 
-**Watering meanwhile.** Carries on, on built-in values, which may not suit the room. Keep the engine off until they are back.
+**Watering meanwhile.** Carries on, on built-in values, which may not suit the room. If the daily water limit or plant count is among them, keep the engine off until they are back.
 
 **Likely causes**
 
@@ -532,7 +547,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Information · Notification*
 
-**What it means.** The controller app used to take the lights on and off hours from its own options. It now reads them from the integration, and the two disagree.
+**What it means.** The controller app used to take the lights on and off hours from its own options. It now reads them from the integration, and the two disagree. The app's option is still used whenever the integration's hours can't be read (while Home Assistant restarts, for example).
 
 **Watering meanwhile.** Carries on, on the integration's hours.
 
@@ -542,7 +557,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 **Suggested fixes**
 
-- If the integration's hours are right, nothing to do.
+- If the integration's hours are right, set the controller app's lights_on_hour and lights_off_hour options to the same hours, so a missed reading can't move lights-on or lights-off.
 - If not, set the integration's Lights on hour and Lights off hour.
 
 <a id="cs-404"></a>
@@ -628,7 +643,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 **Suggested fixes**
 
-- On a room made by the wizard, do NOT create the helper. The room's own switch is Engine Enabled. Update the integration; the card clears once the controller has picked the room up.
+- On a room made by the wizard, do NOT create the helper. The room's own switch is Engine Enabled. The card came from a controller app started before setup; integration 2.19.2 and newer don't raise it for such a room. Update the integration; the card clears once the controller has picked the room up.
 - Only on a room really gated by input_boolean.f2_control_enabled: create it under Settings → Devices & services → Helpers → Toggle, and leave it OFF until you are ready to water.
 
 <a id="cs-602"></a>
@@ -657,9 +672,9 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 *Warning · Repairs card*
 
-**What it means.** A zone has no moisture probe mapped, so it can't be steered.
+**What it means.** A zone has no moisture probe mapped, so it can't be steered by moisture.
 
-**Watering meanwhile.** The zone can't be watered by moisture.
+**Watering meanwhile.** As for CS-102: while the engine is on the zone is still watered, with the same shots as a zone whose probe is working, or one shot every 90 minutes within its daily water limit if there is none. Don't hand-water it on the assumption that the controller won't.
 
 **Likely causes**
 
@@ -691,7 +706,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 ### CS-605: Settings not where the controller looks for them
 
-*Critical · Repairs card*
+*Warning · Repairs card*
 
 **What it means.** The controller finds each setting by its exact entity id, and the settings listed on the card are registered under other ids. It runs on its built-in values for them (CS-402).
 
@@ -710,7 +725,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 <a id="cs-606"></a>
 
-### CS-606: Grow plan is holding irrigation
+### CS-606: Grow strategy plan is holding irrigation
 
 *Critical · Repairs card*
 
@@ -731,7 +746,7 @@ A room whose *Room Active* switch is off (nothing growing) raises none for that 
 
 <a id="cs-607"></a>
 
-### CS-607: Grow plan hasn't moved on to today
+### CS-607: Grow strategy plan has not moved on to today
 
 *Warning · Repairs card*
 

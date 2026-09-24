@@ -27,8 +27,12 @@ def render(catalog):
         "means, what happens to watering meanwhile, the likely causes and what to do. The same list is",
         "in the Crop Steering sidebar under **Help & tools → Error codes**.",
         "",
-        "A notification is raised again, at most every 30 minutes, for as long as its cause lasts.",
-        "A room whose *Room Active* switch is off (nothing growing) raises none for that room.",
+        "Most notifications are raised again, at most every 30 minutes, for as long as their cause lasts,",
+        "and sooner when the cause changes. A few are said once: CS-301 once per fault (dismissing it does",
+        "not clear the hold), CS-403 once each time the controller app starts and CS-405 at start-up. A",
+        "notification stays in Home Assistant until you dismiss it, even after its cause has gone.",
+        "A room whose *Room Active* switch is off (nothing growing) raises no watering notifications; a",
+        "setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still reported.",
         "",
         "| Codes | About |",
         "| --- | --- |",
@@ -70,7 +74,10 @@ def render(catalog):
 
 
 def main():
-    PAGE.write_text(render(json.loads(SOURCE.read_text(encoding="utf-8"))), encoding="utf-8")
+    # newline="\n": the committed page is LF, and on Windows write_text would otherwise write CRLF.
+    PAGE.write_text(
+        render(json.loads(SOURCE.read_text(encoding="utf-8"))), encoding="utf-8", newline="\n"
+    )
     print(f"wrote {PAGE.relative_to(ROOT)}")
 
 

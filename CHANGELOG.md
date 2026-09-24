@@ -91,10 +91,10 @@ hardware; the 23 September event is replayed in the controller suite.
   `shot_inflight` as the normal close does. The error cleanup, which switches off all three, never
   runs for such a shot. Counted time: the valve's `last_changed` when it reads OFF and that falls
   between the valve opening and the detection, else the detection. Counters as for a kill-switch
-  abort: the shot counts, with the volume delivered. One alert, `cutshort_<room>_z<n>` (*Shot cut
-  short — feed path closed externally*), debounced like the others, names the entity and the
-  seconds delivered against planned. No change to add-on options, the state file, entities or the
-  normal shot.
+  abort: the shot counts, with the volume delivered. One alert, `cutshort_<room>_z<n>` (*shot
+  stopped early, something else closed the feed*, CS-307), debounced like the others, names the
+  entity and the seconds delivered against planned. No change to add-on options, the state file,
+  entities or the normal shot.
 
 ## [2.19.5] - 2026-09-23
 
