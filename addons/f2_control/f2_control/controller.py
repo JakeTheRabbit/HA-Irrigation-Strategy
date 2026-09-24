@@ -162,6 +162,10 @@ def read_controller_version(module_dir=None):
 
 CONTROLLER_VERSION = read_controller_version()
 
+# config.yaml's shipped lights option. It matches the facility this was first written for, so a
+# legacy room may rely on it; on a wizard-made room it is a value nobody chose.
+SHIPPED_LIGHTS = (10.0, 22.0)
+
 # A zone with no usable moisture reading, by why: title and the advice that fits. The codes and
 # their full entries live in docs/error-codes.json with every other code.
 _PROBE_ALERTS = {
@@ -348,8 +352,8 @@ class Controller:
         self.substrate_l = float(
             o.get("substrate_l", 5)
         )  # generic last-resort fallback — real volume read live from the integration
-        self._opt_lon = float(o.get("lights_on_hour", 10))
-        self._opt_loff = float(o.get("lights_off_hour", 22))
+        self._opt_lon = float(o.get("lights_on_hour", SHIPPED_LIGHTS[0]))
+        self._opt_loff = float(o.get("lights_off_hour", SHIPPED_LIGHTS[1]))
         # Live installs always use /data/state.json (HA-managed, survives Rebuild). The env
         # override exists so a test/dev rig can redirect the file BEFORE this constructor's
         # own _load_state()/adoption pass reads and writes it.
@@ -1315,6 +1319,7 @@ class Controller:
                 src == "integration"
                 and room.prefix == ""
                 and (lon != room.opt_lon or loff != room.opt_loff)
+                and not self._lights_option_was_never_the_source(room)
             ):
                 self._alert(
                     "lights_source",
@@ -1331,6 +1336,19 @@ class Controller:
                 )
             room._lights_logged = True
         room.lights_on_hour, room.lights_off_hour = float(lon), float(loff)
+
+    def _lights_option_was_never_the_source(self, room):
+        """A room made by the setup wizard, on an app whose lights option nobody touched.
+
+        The wizard asks for the lights hours and the integration holds the answer; the option is
+        still the shipped 10-22, so "the add-on option still says 10:00-22:00" told every new
+        install about a setting they never made. A room on the legacy kill-switch helper may rely
+        on exactly that shipped value, and an option somebody changed is somebody's intent: both
+        still get the alert."""
+        if (room.opt_lon, room.opt_loff) != SHIPPED_LIGHTS:
+            return False
+        flag = str(self._default_descriptor().get("enable_flag") or "")
+        return flag.startswith("switch.crop_steering_")
 
     # ---------- params + snapshot ----------
     def _params(self, room, zone, ec_known=True):

@@ -91,6 +91,7 @@ def install() -> None:
     cv = _mod("homeassistant.helpers.config_validation")
     cv.string = str
     cv.boolean = bool
+    cv.config_entry_only_config_schema = lambda domain: lambda config: config
     helpers.config_validation = cv
 
     ir = _mod("homeassistant.helpers.issue_registry")
