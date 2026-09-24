@@ -134,7 +134,7 @@ try {
     assert.equal(await page.locator("#desktop-room").inputValue(), "room:f1_");
   });
   const routes = [
-    ["overview", "Room overview"],
+    ["overview", "Flower 2 overview"],
     ["zones", "Zones"],
     ["strategy", "Today’s targets"],
     ["grow-plan", "Scheduled targets"],
@@ -150,6 +150,13 @@ try {
     await check(`${route}: render, desktop layout and accessibility`, async () => {
       await go(route);
       await expectVisible(page.getByRole("heading", { name: heading, exact: true }));
+      // A heading carries a sentence only for a behaviour someone could get wrong.
+      if (!["strategy", "grow-plan"].includes(route))
+        assert.equal(
+          await page.locator(".page-heading > div > p").count(),
+          0,
+          `${route}: the heading repeats itself in a description`,
+        );
       if (["strategy", "grow-plan"].includes(route)) await planViewsShareRow();
       await noOverflow();
       await axe(route);

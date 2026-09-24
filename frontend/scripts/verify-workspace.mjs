@@ -304,7 +304,7 @@ try {
       assert.equal(await page.locator("#desktop-room").inputValue(), "room:");
       await navigate("Overview");
       await page.getByRole("button", { name: "Discard and continue" }).click();
-      await visible(page.getByRole("heading", { name: "Room overview", exact: true }));
+      await visible(page.getByRole("heading", { level: 1, name: / overview$/ }));
       await navigateSchedule();
       assert.notEqual(await page.locator("#steering-balance").inputValue(), "83");
       await setBalance(81);
@@ -1140,7 +1140,7 @@ try {
         await tp.goto(origin + "/workspace-theme-parent.html");
         const frame = tp.frames().find((f) => f !== tp.mainFrame());
         assert.ok(frame);
-        await visible(frame.getByRole("heading", { name: "Room overview", exact: true }));
+        await visible(frame.getByRole("heading", { level: 1, name: / overview$/ }));
         await frame.waitForFunction(
           () =>
             document.documentElement.dataset.themeSource === "home-assistant" &&
@@ -1195,7 +1195,7 @@ try {
           .locator(".desktop-sidebar")
           .getByRole("button", { name: "Overview", exact: true })
           .click();
-        await visible(frame.getByRole("heading", { name: "Room overview", exact: true }));
+        await visible(frame.getByRole("heading", { level: 1, name: / overview$/ }));
         await tp.setViewportSize({ width: 390, height: 844 });
         await tp.screenshot({
           path: fileURLToPath(new URL("../../img/mobile-overview.png", import.meta.url)),

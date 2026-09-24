@@ -148,7 +148,6 @@ export function Insights({
     <div className="insights-page">
       <Heading
         title="Insights"
-        description="Investigate root-zone readings, check water calculations and inspect the room’s mapped equipment."
         action={
           <Button variant="outline" onClick={() => open("setup")}>
             Room setup <ArrowUpRight size={16} />

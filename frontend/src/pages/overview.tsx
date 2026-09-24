@@ -31,8 +31,7 @@ export function Overview({
   return (
     <>
       <Heading
-        title="Room overview"
-        description={`A clear view of ${room.room.name.toLowerCase()}: moisture, scheduling and recent activity.`}
+        title={controller.roomId ? `${room.room.name} overview` : "Overview"}
         action={
           <div className="heading-actions">
             <RoomPower controller={controller} />

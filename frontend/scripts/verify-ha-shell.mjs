@@ -61,7 +61,7 @@ try {
     true,
   );
   await page.goto(origin + "/dashboard.html?demo=1");
-  await page.getByRole("heading", { name: "Room overview" }).waitFor();
+  await page.getByRole("heading", { name: "Flower 2 overview" }).waitFor();
   assert.equal(
     await page.getByRole("button", { name: "Open Home Assistant menu", exact: true }).count(),
     0,

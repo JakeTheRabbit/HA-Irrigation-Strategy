@@ -69,14 +69,15 @@ export function Heading({
   action,
 }: {
   title: string;
-  description: string;
+  /** Only a behaviour the operator could get wrong; never a restatement of the title. */
+  description?: string;
   action?: ReactNode;
 }) {
   return (
     <div className="page-heading">
       <div>
         <h1>{title}</h1>
-        <p>{description}</p>
+        {description && <p>{description}</p>}
       </div>
       {action}
     </div>
