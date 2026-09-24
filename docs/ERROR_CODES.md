@@ -2,8 +2,9 @@
 
 <!-- Generated from docs/error-codes.json by scripts/render_error_codes.py. Edit the JSON. -->
 
-Every notification from the Crop Steering controller app, and every Crop Steering card under
-**Settings → Repairs**, ends with a code such as **CS-101**. Find the code below for what it
+Every alert from the Crop Steering controller app, and every Crop Steering card under
+**Settings → Repairs**, ends with a code such as **CS-101** (the controller's regular status
+summary has none). Find the code below for what it
 means, what happens to watering meanwhile, the likely causes and what to do. The same list is
 in the Crop Steering sidebar under **Help & tools → Error codes**.
 
