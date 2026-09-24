@@ -1,21 +1,12 @@
-import { DailyWaterSummary } from "@/components/water-delivery";
 import { DayTimeline } from "@/components/day-timeline";
 import { TankStatus } from "@/components/tank-status";
 import { useState } from "react";
 import { ArrowRight, ArrowUpRight, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { Controller, Zone } from "@/lib/types";
+import type { Controller } from "@/lib/types";
 import { leadingNotices } from "@/lib/model";
 import { RoomPower } from "@/components/room-controls";
-import {
-  Empty,
-  Heading,
-  Metrics,
-  Status,
-  ZoneDetails,
-  ZoneTable,
-  type Page,
-} from "@/components/dashboard";
+import { Empty, Heading, Metrics, ZoneDetails, ZoneTable, type Page } from "@/components/dashboard";
 
 export function Overview({
   controller,
@@ -40,26 +31,6 @@ export function Overview({
           </div>
         }
       />
-      <div className="room-summary">
-        <div>
-          <span className="eyebrow">Controller scheduling</span>
-          <div className="split-row">
-            <Status enabled={room.engine.enabled} />
-            <span className="muted">
-              {room.zones.filter((z) => z.enabled).length} of {room.zones.length} zones enabled
-            </span>
-          </div>
-        </div>
-        <p>
-          {!room.roomActive
-            ? "This room is off. Nothing will irrigate and no alerts are raised until it is switched back on."
-            : room.engine.enabled === true
-              ? "Follow zone readings and recorded activity below."
-              : room.engine.enabled === false
-                ? "Scheduling is paused. An active shot may still be running."
-                : "Connect a controller to see scheduling state."}
-        </p>
-      </div>
       {!!room.alerts.length && (
         <div className="attention-list">
           {notices.map((notice) => (
@@ -85,6 +56,7 @@ export function Overview({
         </div>
       )}
       <Metrics metrics={room.metrics} />
+      <DayTimeline controller={controller} />
       <TankStatus controller={controller} onConfigure={() => navigate("setup")} />
       <section className="panel">
         <div className="panel-heading">
@@ -106,8 +78,6 @@ export function Overview({
           />
         )}
       </section>
-      <DailyWaterSummary controller={controller} />
-      <DayTimeline controller={controller} />
       <ZoneDetails
         controller={controller}
         zone={room.zones.find((z) => z.id === selected) || null}

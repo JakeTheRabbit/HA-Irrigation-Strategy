@@ -40,7 +40,7 @@ Home Assistant owns the install/restart confirmations; these links take you dire
 
 ## See the room at a glance
 
-Overview shows the controller state, mapped valve on/off report and last recorded irrigation for every zone. The graphical tank panel shows fill percentage, pump status, filling status, last recorded fill, EC, pH and temperature.
+Overview shows today's grow-day timeline and, for every zone, the controller state, mapped valve on/off report and last recorded irrigation. The graphical tank panel shows fill percentage, pump status, filling status, last recorded fill, EC, pH and temperature.
 
 Map tank sensors in **Rooms & setup**. Display-only tank quality mappings are separate from feed-water safety gates. Last fill uses a recorded fill timestamp (timestamp sensor or a date-and-time helper), never a sensor update time. Unmapped or unavailable readings are labelled explicitly.
 
@@ -115,12 +115,12 @@ Add or archive rooms and zones, map existing Home Assistant entities, and enter 
 
 | Page                               | Purpose                                                                                                                                                                                                               |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Overview                           | Room condition, controller status, recorded VWC/EC and daily water per zone/per plant                                                                                                                                 |
-| Zones                              | Per-zone readings, active phase, targets and enable controls                                                                                                                                                          |
+| Overview                           | Today's totals, the grow-day timeline, each zone's state and readings, and the tank                                                                                                                                   |
+| Zones                              | Per-zone readings, active phase, targets, enable controls and water per zone and per plant                                                                                                                            |
 | Irrigation plan → Today / Schedule | Today shows current editable targets on a graph with the zone’s recorded VWC/EC and the projected day, or the active schedule’s read-only effective targets; Schedule edits per-zone dated plans, profiles and curves |
 | Compare runs                       | Retained day/week/month/run-to-date history, previous-run alignment and captured target references                                                                                                                    |
 | Insights                           | Sensor coverage, equipment mapping and local dripper catch-test calculations                                                                                                                                          |
-| Activity                           | Available controller/state activity with explicit evidence limits                                                                                                                                                     |
+| Activity                           | Available controller/state activity with explicit evidence limits; the latest records also open from the top bar                                                                                                      |
 | Sensors                            | Probe availability, values, units and freshness                                                                                                                                                                       |
 | Rooms & setup                      | Add, configure, archive and restore rooms/zones; search and map existing HA entities                                                                                                                                  |
 | Settings / Help                    | Connection, room on/off, inherited HA theme, workflow explanations and limitations                                                                                                                                    |

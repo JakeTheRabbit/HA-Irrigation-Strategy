@@ -165,6 +165,45 @@ try {
         fullPage: true,
       });
     });
+  await check("help: the daily routine replaces the Overview's workflow card", async () => {
+    await go("help");
+    const routine = page.locator("ol.daily-routine");
+    await expectVisible(routine);
+    assert.deepEqual(
+      await routine.locator("a").evaluateAll((links) => links.map((a) => a.getAttribute("href"))),
+      ["#/overview", "#/zones", "#/strategy"],
+    );
+    await go("overview");
+    assert.equal(await page.getByRole("heading", { name: "Your daily workflow" }).count(), 0);
+  });
+  await check("recent activity opens beside any page and leads to the full log", async () => {
+    await go("zones");
+    assert.equal(await page.getByRole("dialog").count(), 0, "the panel starts closed");
+    await page.getByRole("button", { name: "Recent activity", exact: true }).click();
+    const panel = page.getByRole("dialog", { name: "Recent activity" });
+    await expectVisible(panel);
+    assert.ok((await panel.locator(".event-row").count()) > 0, "the demo room has records");
+    await axe("recent activity panel");
+    await page.screenshot({ path: path.join(out, "dashboard-activity-panel.png") });
+    await panel.getByRole("button", { name: "Open the activity log" }).click();
+    await expectVisible(page.getByRole("heading", { name: "Activity", exact: true }));
+    assert.equal(await page.getByRole("dialog").count(), 0, "the panel closes when the log opens");
+    await go("overview");
+    assert.equal(await page.getByRole("heading", { name: "Recent activity" }).count(), 0);
+  });
+  await check("overview: the grow day comes first, above the tank", async () => {
+    await go("overview");
+    const timeline = page.locator("[data-day-timeline]");
+    await expectVisible(timeline.locator(".timeline-zone").first());
+    const tops = await page.evaluate(() =>
+      ["[data-day-timeline]", "[data-tank-status]", ".zone-table-desktop"].map(
+        (selector) => document.querySelector(selector).getBoundingClientRect().top,
+      ),
+    );
+    assert.ok(tops[0] < tops[1] && tops[0] < tops[2], `timeline ${tops[0]}, tank ${tops[1]}`);
+    assert.equal(await page.locator(".wd-daily").count(), 0, "no water table on the Overview");
+    assert.equal(await page.getByText("Controller scheduling", { exact: true }).count(), 0);
+  });
   await check("help: every error code is listed, searchable and linkable", async () => {
     const catalog = JSON.parse(await readFile(path.join(root, "docs/error-codes.json"), "utf8"));
     await go("help");

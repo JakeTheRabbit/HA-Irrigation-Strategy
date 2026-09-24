@@ -290,7 +290,7 @@ try {
       assert.match(await water.locator(".wd-effective").innerText(), /2\.4(?:0)? L \/ zone/);
       assert.match(await water.innerText(), /Total substrate capacity/);
       assert.match(await water.innerText(), /216/);
-      await fresh("overview");
+      await fresh("zones");
       const summary = page.locator(".wd-daily");
       const row = summary.getByRole("row").filter({ hasText: "Zone 1" });
       assert.match(await row.innerText(), /5\.3(?:0)? L/);
