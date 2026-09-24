@@ -1,16 +1,25 @@
+.tank-panel .panel-heading {
+  gap: 12px;
+}
+.tank-stale {
+  margin-left: auto;
+  color: var(--warning);
+  font-size: 12px;
+  font-weight: 600;
+}
 .tank-layout {
   display: grid;
-  grid-template-columns: 180px minmax(220px, 1fr) minmax(200px, 1fr);
-  gap: 24px;
-  padding: 0 24px 16px;
-  align-items: center;
-}
-.tank-vessel {
-  text-align: center;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 20px;
+  /* One inset on every side: the tank and its first reading sit as far below the heading as the
+     tank sits from the panel's left edge. */
+  padding: 20px;
+  align-items: start;
 }
 .tank-vessel svg {
+  display: block;
   width: 100%;
-  max-height: 170px;
+  height: auto;
 }
 .tank-shell {
   fill: var(--muted);
@@ -30,111 +39,64 @@
 }
 .tank-percent {
   font:
-    600 30px Roboto,
+    600 22px Roboto,
     sans-serif;
   fill: var(--foreground);
 }
 .tank-caption {
   font:
-    13px Roboto,
+    12px Roboto,
     sans-serif;
   fill: var(--muted-foreground);
 }
-.tank-equipment,
-.tank-quality {
+.tank-quality,
+.tank-equipment {
   display: grid;
-  gap: 16px;
-}
-.tank-pump,
-.tank-fill-record,
-.tank-quality-item {
-  display: flex;
-  align-items: center;
   gap: 12px;
-}
-.tank-equipment strong,
-.tank-quality strong,
-.tank-equipment time {
-  display: block;
-  line-height: 1.6;
-}
-.tank-pump-icon {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--muted);
-  border: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.tank-pipe {
-  flex: 1;
-  height: 3px;
-  min-width: 20px;
-  background: var(--border);
-}
-.tank-pump.is-on .tank-pump-icon,
-.tank-pump.is-on > svg {
-  color: var(--primary);
-}
-.tank-pump.is-on .tank-pipe {
-  background: var(--primary);
-}
-.tank-fill-record > svg,
-.tank-quality-item > svg {
-  color: var(--primary);
-  flex-shrink: 0;
-}
-.tank-quality {
-  border-left: 1px solid var(--border);
-  padding-left: 24px;
-}
-.tank-note {
-  padding: 0 24px 20px;
   margin: 0;
 }
-.tank-quality strong {
-  font-size: 1.2rem;
+.tank-quality > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
 }
-@media (max-width: 850px) {
-  .tank-layout {
-    grid-template-columns: 140px 1fr;
-    gap: 16px;
-  }
-  .tank-quality {
-    grid-column: 1/-1;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    border-left: 0;
-    border-top: 1px solid var(--border);
-    padding: 18px 0 0;
-  }
-  .tank-quality-item {
-    align-items: flex-start;
-  }
-  .tank-quality strong {
-    font-size: 1rem;
-  }
+.tank-quality dt,
+.tank-equipment dt {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.tank-quality dd,
+.tank-equipment dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.tank-quality dd {
+  font-size: 16px;
+}
+.tank-equipment {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.tank-equipment .is-on dd {
+  color: var(--primary-strong);
+}
+.tank-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
 }
 @media (max-width: 480px) {
   .tank-layout {
-    padding: 0 16px 16px;
-    grid-template-columns: 110px minmax(0, 1fr);
-  }
-  .tank-quality {
-    grid-template-columns: 1fr;
-  }
-  .tank-note {
-    padding: 0 16px 16px;
-  }
-  .tank-pipe,
-  .tank-pump > svg {
-    display: none;
-  }
-  .tank-equipment time {
-    font-size: 0.85rem;
+    padding: 16px;
+    gap: 16px;
   }
   .tank-panel .panel-heading {
-    align-items: flex-start;
+    flex-wrap: wrap;
   }
 }

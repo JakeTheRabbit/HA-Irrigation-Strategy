@@ -46,6 +46,26 @@ try {
   assert.match(await tank.innerText(), /17.6 °C/);
   assert.ok(await tank.locator("time").getAttribute("datetime"));
   assert.ok(await page.locator('[data-last-irrigation="1"]:visible').getAttribute("datetime"));
+  // The tank and its first reading sit as far below the heading as the tank sits from the left.
+  const inset = await tank.evaluate((panel) => {
+    const box = panel.getBoundingClientRect();
+    const heading = panel.querySelector(".panel-heading").getBoundingClientRect();
+    const drawing = panel.querySelector(".tank-vessel svg").getBoundingClientRect();
+    const first = panel.querySelector(".tank-quality > div").getBoundingClientRect();
+    return {
+      left: Math.round(drawing.left - box.left),
+      top: Math.round(drawing.top - heading.bottom),
+      readingTop: Math.round(first.top - heading.bottom),
+    };
+  });
+  assert.ok(
+    Math.abs(inset.top - inset.left) <= 2,
+    `tank inset: top ${inset.top}, left ${inset.left}`,
+  );
+  assert.ok(
+    Math.abs(inset.readingTop - inset.left) <= 2,
+    `first reading inset: top ${inset.readingTop}, left ${inset.left}`,
+  );
   await tank.screenshot({
     path: new URL("tank-status.png", out).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
   });

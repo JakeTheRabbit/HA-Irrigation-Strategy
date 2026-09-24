@@ -479,8 +479,8 @@ nav button.nav-separated {
   border: 1px solid var(--border);
   background: var(--surface);
   border-radius: 8px;
-  margin-bottom: 23px;
-  padding: 22px 0;
+  margin-bottom: 20px;
+  padding: 16px 0;
 }
 .metric-item {
   padding: 0 25px;
@@ -492,7 +492,7 @@ nav button.nav-separated {
 }
 .metric-item strong {
   display: block;
-  font-size: 29px;
+  font-size: 26px;
   letter-spacing: -0.65px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -510,6 +510,20 @@ nav button.nav-separated {
   font-size: 10px;
   display: block;
   margin-top: 6px;
+}
+.overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.overview-grid > .panel {
+  margin-bottom: 0;
+}
+@media (max-width: 1200px) {
+  .overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .attention-list {
   display: flex;
@@ -1856,6 +1870,7 @@ nav button.nav-separated {
 .app-main,
 #main-content,
 .main-inner,
+.overview-grid > *,
 .help-columns > *,
 .strategy-content {
   min-width: 0;

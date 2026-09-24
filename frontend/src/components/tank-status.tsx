@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { Droplets, FlaskConical, Gauge, Settings2, Thermometer, Waves } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Controller } from "@/lib/types";
 import { tankTelemetry, type TankReading } from "@/lib/tank-telemetry";
@@ -20,118 +20,100 @@ export function TankStatus({
       ? r.issue
       : `${r.value.toLocaleString(undefined, { maximumFractionDigits: digits })} ${r.unit}`;
   const pump = tank.pump.on === null ? tank.pump.issue : tank.pump.on ? "On" : "Off";
+  const lastKnown = connected ? "" : " · last known";
+  const level = tank.level.value;
+  // The drawing's inside runs from y=119 (empty) to y=1 (full): 1.18 units per percent.
+  const surface = level === null ? null : 119 - level * 1.18;
   return (
     <section className="panel tank-panel" aria-label="Tank and pump status" data-tank-status>
       <div className="panel-heading">
-        <div>
-          <h2>Tank & pump</h2>
-          <p>
-            {connected
-              ? "Mapped equipment readings for this room"
-              : "Disconnected · readings below are last received"}
-          </p>
-        </div>
+        <h2>Tank & pump</h2>
+        {!connected && <span className="tank-stale">Disconnected · last received</span>}
         <Button variant="ghost" onClick={onConfigure}>
           <Settings2 size={16} /> Map sensors
         </Button>
       </div>
       <div className="tank-layout">
-        <div className="tank-vessel" data-tank-level={tank.level.value ?? "unknown"}>
-          <svg viewBox="0 0 180 170" role="img" aria-label={`Tank level: ${value(tank.level)}`}>
+        <div
+          className="tank-vessel"
+          data-tank-level={level ?? "unknown"}
+          title={tank.level.entityId || undefined}
+        >
+          <svg viewBox="0 0 100 120" role="img" aria-label={`Tank level: ${value(tank.level)}`}>
             <defs>
               <clipPath id={clipId}>
-                <rect x="27" y="15" width="126" height="140" rx="17" />
+                <rect x="1" y="1" width="98" height="118" rx="12" />
               </clipPath>
             </defs>
-            <rect x="27" y="15" width="126" height="140" rx="17" className="tank-shell" />
-            {tank.level.value !== null && (
+            <rect x="1" y="1" width="98" height="118" rx="12" className="tank-shell" />
+            {surface !== null && (
               <g clipPath={`url(#${clipId})`}>
-                <rect
-                  x="27"
-                  y={155 - tank.level.value * 1.4}
-                  width="126"
-                  height={tank.level.value * 1.4}
-                  className="tank-water"
-                />
-                <path d={`M27 ${155 - tank.level.value * 1.4} H153`} className="tank-waterline" />
+                <rect x="1" y={surface} width="98" height={119 - surface} className="tank-water" />
+                <path d={`M1 ${surface} H99`} className="tank-waterline" />
               </g>
             )}
             {[25, 50, 75].map((p) => (
-              <path key={p} d={`M139 ${155 - p * 1.4}h14`} className="tank-tick" />
+              <path key={p} d={`M86 ${119 - p * 1.18}h13`} className="tank-tick" />
             ))}
-            <text x="90" y="86" textAnchor="middle" className="tank-percent">
-              {tank.level.value === null ? "—" : `${Math.round(tank.level.value)}%`}
+            <text x="50" y="58" textAnchor="middle" className="tank-percent">
+              {level === null ? "—" : `${Math.round(level)}%`}
             </text>
-            <text x="90" y="108" textAnchor="middle" className="tank-caption">
+            <text x="50" y="76" textAnchor="middle" className="tank-caption">
               {tank.level.issue || "full"}
             </text>
           </svg>
-          <span className="muted small" title={tank.level.entityId || undefined}>
-            Tank fill level
-          </span>
         </div>
-        <div className="tank-equipment">
-          <div
-            className={`tank-pump ${connected && tank.pump.on ? "is-on" : ""}`}
-            data-pump-state={tank.pump.on === null ? "unknown" : tank.pump.on ? "on" : "off"}
-          >
-            <span className="tank-pump-icon">
-              <Gauge size={26} />
-            </span>
-            <div>
-              <span className="muted small">Room pump{!connected && " · last known"}</span>
-              <strong>{pump}</strong>
-            </div>
-            <span className="tank-pipe" aria-hidden="true" />
-            <Droplets size={23} aria-hidden="true" />
-          </div>
-          <div className="tank-fill-record">
-            <Waves size={19} />
-            <div>
-              <span className="muted small">Tank filling{!connected && " · last known"}</span>
-              <strong>
-                {tank.fill.on === null
-                  ? tank.fill.issue
-                  : tank.fill.on
-                    ? "Filling now"
-                    : "Not filling"}
-              </strong>
-            </div>
-          </div>
-          <div className="tank-fill-record">
-            <Droplets size={19} />
-            <div>
-              <span className="muted small">Last recorded fill</span>
-              {tank.lastFill.timestamp ? (
-                <time dateTime={tank.lastFill.timestamp}>
-                  {new Date(tank.lastFill.timestamp).toLocaleString()}
-                </time>
-              ) : (
-                <strong>{tank.lastFill.issue}</strong>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="tank-quality">
+        <dl className="tank-quality">
           {[
-            { label: "Tank EC", reading: tank.ec, Icon: Waves, digits: 2 },
-            { label: "Tank pH", reading: tank.ph, Icon: FlaskConical, digits: 2 },
-            { label: "Tank temperature", reading: tank.temperature, Icon: Thermometer, digits: 1 },
-          ].map(({ label, reading, Icon, digits }) => (
-            <div className="tank-quality-item" key={label} title={reading.entityId || undefined}>
-              <Icon size={21} />
-              <div>
-                <span className="muted small">{label}</span>
-                <strong>{value(reading, digits)}</strong>
-              </div>
+            { label: "EC", reading: tank.ec, digits: 2 },
+            { label: "pH", reading: tank.ph, digits: 2 },
+            { label: "Temperature", reading: tank.temperature, digits: 1 },
+          ].map(({ label, reading, digits }) => (
+            <div key={label} title={reading.entityId || undefined}>
+              <dt>{label}</dt>
+              <dd>{value(reading, digits)}</dd>
             </div>
           ))}
-        </div>
+        </dl>
+        <dl className="tank-equipment">
+          <div
+            className={connected && tank.pump.on ? "is-on" : undefined}
+            data-pump-state={tank.pump.on === null ? "unknown" : tank.pump.on ? "on" : "off"}
+          >
+            <dt>Pump{lastKnown}</dt>
+            <dd>{pump}</dd>
+          </div>
+          <div>
+            <dt>Filling{lastKnown}</dt>
+            <dd>
+              {tank.fill.on === null
+                ? tank.fill.issue
+                : tank.fill.on
+                  ? "Filling now"
+                  : "Not filling"}
+            </dd>
+          </div>
+          <div>
+            <dt>Last fill</dt>
+            <dd>
+              {tank.lastFill.timestamp ? (
+                <time dateTime={tank.lastFill.timestamp}>
+                  {new Date(tank.lastFill.timestamp).toLocaleString([], {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}
+                </time>
+              ) : (
+                tank.lastFill.issue
+              )}
+            </dd>
+          </div>
+        </dl>
+        <p className="tank-note">
+          Pump is the switch’s report, not measured flow. Last fill is a recorded fill, not a sensor
+          update.
+        </p>
       </div>
-      <p className="tank-note muted small">
-        Pump state is the mapped switch report. Last fill requires a recorded fill timestamp; sensor
-        updates are not fill events.
-      </p>
     </section>
   );
 }

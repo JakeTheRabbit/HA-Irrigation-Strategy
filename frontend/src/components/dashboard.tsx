@@ -118,18 +118,18 @@ export function Metrics({ metrics }: { metrics: Metric[] }) {
   return (
     <div className="metric-strip">
       {metrics.map((metric, i) => (
-        <div className="metric-item" key={metric.label}>
+        <div
+          className="metric-item"
+          key={metric.label}
+          title={i > 1 ? "Recorded by the controller" : "Across reporting zones"}
+        >
           <span className="eyebrow">{metric.label}</span>
           <strong>
             <MetricValue metric={metric} />
           </strong>
-          <span className="metric-caption">
-            {metric.value === null
-              ? "Waiting for controller data"
-              : i > 1
-                ? "Recorded by the controller"
-                : "Across reporting zones"}
-          </span>
+          {metric.value === null && (
+            <span className="metric-caption">Waiting for controller data</span>
+          )}
         </div>
       ))}
     </div>
@@ -424,7 +424,7 @@ export function ZoneOperatingState({
   );
 }
 
-export function LastIrrigation({ zone }: { zone: Zone }) {
+export function LastIrrigation({ zone, compact = false }: { zone: Zone; compact?: boolean }) {
   const { timestamp, issue } = zone.lastIrrigation;
   if (!timestamp)
     return (
@@ -464,12 +464,21 @@ export function LastIrrigation({ zone }: { zone: Zone }) {
       aria-label={`Last irrigation: ${full}. ${relative}.`}
     >
       <span>{relative}</span>
-      <span className="cell-subtext">{full}</span>
+      {!compact && <span className="cell-subtext">{full}</span>}
     </time>
   );
 }
 
-export function ZoneTable({ zones, onSelect }: { zones: Zone[]; onSelect: (zone: Zone) => void }) {
+export function ZoneTable({
+  zones,
+  onSelect,
+  compact = false,
+}: {
+  zones: Zone[];
+  onSelect: (zone: Zone) => void;
+  /** Overview: the target rides under the moisture reading; ages without dates; no arrow column. */
+  compact?: boolean;
+}) {
   return (
     <>
       <div
@@ -477,19 +486,21 @@ export function ZoneTable({ zones, onSelect }: { zones: Zone[]; onSelect: (zone:
         tabIndex={0}
         aria-label="Zone readings and irrigation events"
       >
-        <table className="data-table">
+        <table className={compact ? "data-table zone-table-compact" : "data-table"}>
           <thead>
             <tr>
               <th>Zone</th>
               <th>Current state</th>
               <th>Last irrigation</th>
               <th>Moisture</th>
-              <th>VWC reference</th>
+              {!compact && <th>VWC reference</th>}
               <th>Root-zone EC</th>
               <th>Water today</th>
-              <th>
-                <span className="sr-only">Details</span>
-              </th>
+              {!compact && (
+                <th>
+                  <span className="sr-only">Details</span>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -507,31 +518,40 @@ export function ZoneTable({ zones, onSelect }: { zones: Zone[]; onSelect: (zone:
                   <ZoneOperatingState zone={zone} />
                 </td>
                 <td>
-                  <LastIrrigation zone={zone} />
+                  <LastIrrigation zone={zone} compact={compact} />
                 </td>
                 <td className="numeric">
                   <MetricValue metric={zone.vwc} />
+                  {compact && (
+                    <span className="cell-subtext">
+                      {zone.target.label} <MetricValue metric={zone.target} />
+                    </span>
+                  )}
                 </td>
-                <td className="numeric muted">
-                  <MetricValue metric={zone.target} />
-                  <span className="cell-subtext">{zone.target.label}</span>
-                </td>
+                {!compact && (
+                  <td className="numeric muted">
+                    <MetricValue metric={zone.target} />
+                    <span className="cell-subtext">{zone.target.label}</span>
+                  </td>
+                )}
                 <td className="numeric">
                   <MetricValue metric={zone.ec} />
                 </td>
                 <td className="numeric">
                   <MetricValue metric={zone.water} />
                 </td>
-                <td>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label={`View ${zone.name}`}
-                    onClick={() => onSelect(zone)}
-                  >
-                    <ArrowUpRight size={17} />
-                  </Button>
-                </td>
+                {!compact && (
+                  <td>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={`View ${zone.name}`}
+                      onClick={() => onSelect(zone)}
+                    >
+                      <ArrowUpRight size={17} />
+                    </Button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
