@@ -253,7 +253,7 @@ def test_low_positive_flow_uses_real_hydraulics_without_hidden_denominator_floor
     c._substrate_l = lambda room, zone: 6
     c._zone_flow_lps = lambda room, zone: 2 / 3600
     c._num = lambda entity, default: 900
-    c._alert = lambda *args: None
+    c._alert = lambda *args, **kwargs: None
     recorded = []
     c._execute_shot = lambda room, zone, duration, size, **kwargs: recorded.append(duration)
     c._act_zone(room, 1, None, None, (True, 6, "test"), None, True, datetime.now())

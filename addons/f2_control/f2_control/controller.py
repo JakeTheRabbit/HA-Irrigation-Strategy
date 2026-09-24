@@ -162,6 +162,27 @@ def read_controller_version(module_dir=None):
 
 CONTROLLER_VERSION = read_controller_version()
 
+# A zone with no usable moisture reading, by why: title and the advice that fits. The codes and
+# their full entries live in docs/error-codes.json with every other code.
+_PROBE_ALERTS = {
+    "CS-101": (
+        "moisture reading hasn't changed",
+        "This is normal for a cube with no plant in it: nothing is drinking, so the number "
+        "doesn't move. It clears by itself once the reading changes; in an empty room, switching "
+        "Room Active off stops these notifications.",
+    ),
+    "CS-102": (
+        "moisture sensor not reporting",
+        "Check the probe is powered and online, and that the zone's moisture sensor is mapped "
+        "correctly in Rooms & setup.",
+    ),
+    "CS-103": (
+        "moisture reading out of range",
+        "Check the probe's calibration, and that the sensor mapped to this zone reports moisture "
+        "in %.",
+    ),
+}
+
 # Switch read-back after a close: see Controller._confirm_switches.
 CONFIRM_FIRST_READ_S, CONFIRM_POLL_S, CONFIRM_TIMEOUT_S = 1.0, 0.5, 6.0
 
@@ -876,6 +897,8 @@ class Controller:
             attrs = descriptors.get(room.prefix)
             if not attrs:
                 continue
+            room.zone_names = self._zone_names(attrs)  # display only; a rename needs no adoption
+            room.room_name = self._room_name(attrs)
             saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_setup")
             another_room = self._is_another_room(room, attrs, saved)
             revision = attrs.get("setup_revision", 0)
@@ -937,12 +960,14 @@ class Controller:
                     if active:  # an archived room is meant to stay dry: no noise about it
                         self._alert(
                             f"setup_{room.slug}",
-                            "Irrigation BLOCKED - setup needs re-arming",
-                            f"{room.slug}: setup revision {revision} is waiting to be adopted, and nothing "
-                            "in this room will be watered until it is. It is adopted only while these read "
-                            f"OFF: {', '.join(armed + running)}. Turn them OFF, wait for this notice to "
-                            f"clear (up to {int(getattr(self, 'rediscover_seconds', 300))} s), then turn "
-                            "the kill switch back ON.",
+                            "CS-201",
+                            "setup change waiting, not watering",
+                            f"A changed setup (revision {revision}) was saved, and nothing in this room is "
+                            "watered until the controller takes it on. It only does that while these are "
+                            f"OFF: {', '.join(armed + running)}. Turn them off, wait for this notice to "
+                            f"clear (up to {int(getattr(self, 'rediscover_seconds', 300))} seconds), then "
+                            "turn the engine switch back on.",
+                            room=room,
                         )
                     continue
                 if active and any(not valves.get(z) for z in zone_ids):
@@ -1107,9 +1132,12 @@ class Controller:
                 return value
             self._alert(
                 f"duration_config_{room.slug}",
-                "Irrigation held — invalid maximum shot duration",
-                f"{entity} must report a finite duration of at least 5 seconds. "
-                "The selected cap is not replaced by a legacy value or default.",
+                "CS-203",
+                "maximum shot length not valid, not watering",
+                "The room's maximum shot length must be a number of at least 5 seconds, and it "
+                "isn't, so no shot is started. It is never replaced by a default."
+                f"\n\nSetting: {entity}",
+                room=room,
             )
             return None
         # Keep the existing installation fallback only when neither room entity exists.
@@ -1273,10 +1301,14 @@ class Controller:
             ):
                 self._alert(
                     "lights_source",
-                    "Lights now read from the integration",
-                    f"Engine uses {int(lon)}:00-{int(loff)}:00 from the integration. The add-on "
-                    f"option still says {int(room.opt_lon)}:00-{int(room.opt_loff)}:00 — if the "
-                    "integration value is wrong, set number.crop_steering_lights_on_hour / _off_hour.",
+                    "CS-403",
+                    "lights hours now come from the integration",
+                    f"The engine uses lights on at {int(lon)}:00 and off at {int(loff)}:00 from the "
+                    "integration. The controller app's own option still says "
+                    f"{int(room.opt_lon)}:00-{int(room.opt_loff)}:00 and is no longer used. If the "
+                    "integration's hours are wrong, change its Lights on hour and Lights off hour."
+                    "\n\nSettings: number.crop_steering_lights_on_hour, number.crop_steering_lights_off_hour",
+                    room=room,
                 )
             room._lights_logged = True
         room.lights_on_hour, room.lights_off_hour = float(lon), float(loff)
@@ -1342,8 +1374,13 @@ class Controller:
         for w in warns:
             self._alert(
                 f"cfg_{room.slug}_z{zone}_{w.split('=')[0]}",
-                "F2 config clamp",
-                f"{room.slug} zone {zone}: {w}",
+                "CS-401",
+                "setting outside the engine's range",
+                "A setting is outside what the engine accepts, so the engine uses the nearest "
+                "allowed value instead. The setting itself accepts a wider range than the engine "
+                f"does. Set it inside the range shown to clear this.\n\nDetail: {w}",
+                room=room,
+                zone=zone,
             )
         return p
 
@@ -1495,8 +1532,12 @@ class Controller:
                     outcome = learn["outcome"]
             log(f"[{room.slug}] Z{zone} P1 ramp outcome: {outcome} (peak {learn['peak']})")
             if outcome == "suspect":
-                self._alert(f"auto_{room.slug}_z{zone}", f"{room.slug} Z{zone} auto setpoints frozen",
-                            auto_setpoints.frozen_reason(learn))
+                self._alert(f"auto_{room.slug}_z{zone}", "CS-404", "automatic targets paused",
+                            "Automatic adjustment of this zone's targets is paused, because this "
+                            f"morning's ramp didn't look right: {auto_setpoints.frozen_reason(learn)}. "
+                            "Watering carries on with the current targets, and the next morning's "
+                            "ramp is judged again.",
+                            room=room, zone=zone)
             self._save_state()
         # In P2 the judge manages the maintenance shot: asked once an hour, it may nudge the P2 shot
         # size (pore EC) and the working peak, one bounded step per lever per grow-day. It cannot fire,
@@ -1683,8 +1724,13 @@ class Controller:
         if plumbing:
             self._alert(
                 f"plumbing_{room.slug}",
-                "Irrigation BLOCKED - plumbing and switches disagree",
-                f"{room.slug}: {plumbing}.",
+                "CS-202",
+                "plumbing and switches disagree, not watering",
+                "The plumbing this room was set up with and the switches mapped to it don't "
+                "match, so nothing in this room is watered until they do. The detail below says "
+                "what to change, in Rooms & setup."
+                f"\n\nDetail: {plumbing}.",
+                room=room,
             )
             return plumbing
         if not self._on(room.enable_flag, False):
@@ -1754,12 +1800,67 @@ class Controller:
         return None
 
     # ---------- alerts / notify ----------
-    def _alert(self, key, title, message):
-        now = datetime.now()
+    @staticmethod
+    def _zone_names(attrs):
+        """The names the operator gave the zones ({2: "GT4"}), from the room's descriptor. A zone
+        still called "Zone N", or a descriptor without names, has none."""
+        names = (attrs or {}).get("zone_names")
+        found = {}
+        for key, name in (names.items() if isinstance(names, dict) else ()):
+            try:
+                zone = int(key)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(name, str) and name.strip() and name.strip() != f"Zone {zone}":
+                found[zone] = name.strip()[:40]
+        return found
+
+    @staticmethod
+    def _room_name(attrs):
+        """The name the operator gave the room, from its descriptor. "" when it has none: an older
+        integration publishes none, and the wizard's own default is not a name anyone chose."""
+        name = (attrs or {}).get("room_name")
+        if not isinstance(name, str):
+            return ""
+        name = name.strip()[:40]
+        return "" if name.lower() in ("default", "crop steering", "crop steering system") else name
+
+    def _where(self, room, zone=None):
+        """Where a notification is about, the way the operator named it: "Tent · GT4 (Z2)". An
+        install with one unnamed room says nothing about the room; the internal "default" is
+        never shown unless two rooms would otherwise read the same."""
+        name = getattr(room, "room_name", "")
+        if not name and len(self.rooms) > 1:
+            name = room.slug
+        if zone is None:
+            return name
+        return " · ".join(p for p in (name, self._zone_title(room, zone)) if p)
+
+    @staticmethod
+    def _zone_title(room, zone):
+        """A zone in a notification: "GT4 (Z2)" when the operator named it, else "Zone 2". The
+        number is always there, because the entity ids and the log say zone N."""
+        name = getattr(room, "zone_names", {}).get(zone)
+        return f"{name} (Z{zone})" if name else f"Zone {zone}"
+
+    def _alert_due(self, key):
+        """Whether `key` is out of its 30-minute repeat window (callers skip costly detail if not)."""
         last = self._alerted.get(key)
-        if last and (now - last).total_seconds() < 1800:
+        return not (last and (datetime.now() - last).total_seconds() < 1800)
+
+    def _alert(self, key, code, title, message, room=None, zone=None):
+        """Raise notification `f2_{key}` with its error code (docs/error-codes.json; the dashboard's
+        Help & tools lists the same catalog). The key, and so the notification id, never changes
+        with the wording: an update replaces an old notification instead of adding a second one."""
+        if not self._alert_due(key):
             return
-        log("ALERT", title, "-", message)
+        where = self._where(room, zone) if room is not None else ""
+        title = f"{where}: {title} ({code})" if where else f"{title[:1].upper()}{title[1:]} ({code})"
+        log("ALERT", title, "-", " ".join(message.split()))
+        message = (
+            f"{message}\n\nCode {code}. What it means and what to do: "
+            "Crop Steering → Help & tools → Error codes."
+        )
         # The 30-minute quiet period starts only once Home Assistant HAS the notification: an alert
         # raised while it is unreachable (the moment a close fails, typically) is raised again on the
         # next call, not silenced for half an hour. The phone push goes with it, never without it.
@@ -1771,10 +1872,39 @@ class Controller:
             notification_id=f"f2_{key}",
         ):
             return
-        self._alerted[key] = now
+        self._alerted[key] = datetime.now()
         dom, _, svc = self.notify_service.partition("/")
         if dom and svc:
             ha_call(dom, svc, title=title, message=message)
+
+    def _unreadable(self, entity, lo=0.0, hi=100.0, max_age_min=20):
+        """Why `_read_sensor` found no usable moisture reading at `entity`, as (code, sentence).
+        The same tests in the same order, read once more only when a notification is due."""
+        v, _attrs, lu = ha_get(entity)
+        if v is None:
+            return "CS-102", "This zone's moisture sensor can't be found in Home Assistant, so the controller has no reading to steer by."
+        if v in ("unknown", "unavailable", ""):
+            return "CS-102", f"This zone's moisture sensor reads '{v or 'empty'}', so the controller has no reading to steer by."
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return "CS-102", f"This zone's moisture sensor reads '{v}', which isn't a number, so the controller has no reading to steer by."
+        if not math.isfinite(f) or f < lo or f > hi:
+            return "CS-103", f"This zone's moisture sensor reads {v}, which can't be a moisture reading ({lo:g}–{hi:g}%), so the controller ignores it."
+        try:
+            ts = datetime.fromisoformat(str(lu).replace("Z", "+00:00"))
+            age_min = (datetime.now(timezone.utc) - ts).total_seconds() / 60.0
+        except (ValueError, TypeError, OverflowError):
+            ts = age_min = None
+        if age_min is not None and age_min > max_age_min:
+            age = f"{age_min:.0f} minutes" if age_min < 120 else f"{age_min / 60:.1f} hours"
+            return "CS-101", (
+                f"This zone's moisture reading has stayed at {f:g}% for {age}, so the controller "
+                "can't tell a working probe from one that has stopped or been pulled out."
+            )
+        if age_min is None:
+            return "CS-102", "This zone's moisture sensor has no valid time for its last reading, so the controller has no reading to steer by."
+        return "CS-102", "This zone's moisture sensor had no usable reading a moment ago, so the controller had nothing to steer by."
 
     def _water_usage(self, room, zone, now):
         """Recorded controller delivery over this grow-day and the previous six.
@@ -1914,17 +2044,20 @@ class Controller:
     def _alert_hardware_fault(self, room, saved=True):
         self._alert(
             f"hardware_fault_{room.slug}",
-            "CRITICAL — hardware hold latched",
-            f"{room.slug}: {room.hardware_fault['reason']}. Further pumping on shared hardware is blocked. "
-            f"Turn OFF {room.enable_flag} and every engine sharing this hardware. "
-            "Repair/check every pump and valve; the hold clears only when all affected "
-            "engines and hardware read OFF. "
-            "Then explicitly re-arm. "
+            "CS-301",
+            "CRITICAL hardware fault, watering stopped",
+            "A pump or valve did not confirm it had switched OFF, so watering is stopped on this "
+            "hardware and in every room that shares it. Turn OFF "
+            f"{room.enable_flag} and every engine sharing this hardware, then check every pump "
+            "and valve. The hold clears only once all of them read OFF; then turn the engine "
+            "back on."
             + (
                 ""
                 if saved
-                else "FAULT STATE COULD NOT BE SAVED — do not restart before repair."
-            ),
+                else " THE FAULT COULD NOT BE SAVED: do not restart the controller before it is repaired."
+            )
+            + f"\n\nDetail: {room.hardware_fault['reason']}.",
+            room=room,
         )
 
     def _recover_hardware_faults(self):
@@ -2025,19 +2158,28 @@ class Controller:
                     self._latch_hardware_fault(room, f"zone {zone} interrupted shot: close not confirmed")
                 self._alert(
                     f"inflight_{room.slug}",
-                    "CRITICAL — irrigation hardware still ON",
-                    f"{room.slug} zone {zone}: a shot started {rec['started']} never finished, and "
-                    f"{', '.join(close)} did not read OFF after being switched off. Retrying every loop.",
+                    "CS-308",
+                    "CRITICAL, an interrupted shot's hardware is still ON",
+                    f"A shot that started {rec['started']} never finished (the controller stopped or "
+                    "lost Home Assistant mid-shot). What it opened was switched off and still does "
+                    "not read OFF, so water may still be running. The controller tries again every "
+                    f"loop.\n\nStill ON: {', '.join(close)}",
+                    room=room,
+                    zone=zone,
                 )
                 return
             log(f"{tag}: switched off {', '.join(close)} (ON since the shot opened them)")
         if unsure:
             self._alert(
                 f"inflight_{room.slug}",
-                "Irrigation hardware may still be ON",
-                f"{room.slug} zone {zone}: a shot started {rec['started']} never finished and "
-                f"{', '.join(unsure)} cannot be read (or Home Assistant gives no change time), so it "
-                "cannot be told whether a person has it. Left alone; checking again every loop.",
+                "CS-309",
+                "an interrupted shot's hardware may still be ON",
+                f"A shot that started {rec['started']} never finished, and what it opened can't be "
+                "read (or Home Assistant gives no time for its last change), so the controller "
+                "can't tell whether a person has switched it since. It leaves it alone and checks "
+                f"again every loop.\n\nCan't be read: {', '.join(unsure)}",
+                room=room,
+                zone=zone,
             )
             return
         if left:
@@ -2199,9 +2341,12 @@ class Controller:
         log(f"[{room.slug}] Z{zone} shot cut short after {open_s:.1f}/{duration_s:.0f}s: {what}. {outcome}")
         self._alert(
             f"cutshort_{room.slug}_z{zone}",
-            "Shot cut short — feed path closed externally",
-            f"{room.slug} zone {zone}: {what}, so the shot ended after {open_s:.0f} of {duration_s:.0f} s "
-            f"and only those {open_s:.0f} s are counted. {outcome}",
+            "CS-307",
+            "shot stopped early, something else closed the feed",
+            f"The shot ended after {open_s:.0f} of {duration_s:.0f} seconds because {what}. Only "
+            f"those {open_s:.0f} seconds of water are counted. {outcome}",
+            room=room,
+            zone=zone,
         )
         return open_s
 
@@ -2271,8 +2416,13 @@ class Controller:
             if pump and not ha_call("switch", "turn_on", entity_id=pump):
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
-                    "Shot aborted — pump command failed",
-                    f"{room.slug} zone {zone}: pump turn_on returned an error. No water delivered, shot NOT counted.",
+                    "CS-302",
+                    "shot cancelled, the pump didn't switch on",
+                    "Home Assistant returned an error when the pump was switched on. No water was "
+                    "delivered and the shot was not counted; the next shot is tried as normal."
+                    f"\n\nPump: {pump}",
+                    room=room,
+                    zone=zone,
                 )
                 return
             if pump:
@@ -2282,8 +2432,13 @@ class Controller:
                     ha_call("switch", "turn_off", entity_id=pump)
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
-                    "Shot aborted — mainline command failed",
-                    f"{room.slug} zone {zone}: mainline turn_on failed. Pump cut. No water, shot NOT counted.",
+                    "CS-303",
+                    "shot cancelled, the main-line valve didn't switch on",
+                    "Home Assistant returned an error when the main-line valve was switched on. The "
+                    "pump was switched off again, no water was delivered and the shot was not "
+                    f"counted; the next shot is tried as normal.\n\nMain-line valve: {mainline}",
+                    room=room,
+                    zone=zone,
                 )
                 return
             if mainline:
@@ -2296,8 +2451,13 @@ class Controller:
                         ha_call("switch", "turn_off", entity_id=upstream)
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
-                    "Shot aborted — valve command failed",
-                    f"{room.slug} zone {zone}: valve {valve} turn_on failed. Anything upstream was cut. No water, shot NOT counted.",
+                    "CS-304",
+                    "shot cancelled, the zone valve didn't switch on",
+                    "Home Assistant returned an error when this zone's valve was switched on. "
+                    "Anything upstream was switched off again, no water was delivered and the shot "
+                    f"was not counted; the next shot is tried as normal.\n\nValve: {valve}",
+                    room=room,
+                    zone=zone,
                 )
                 return
             elapsed, aborted = self._wait_shot(
@@ -2352,9 +2512,13 @@ class Controller:
             if aborted:
                 self._alert(
                     f"killshot_{room.slug}_z{zone}",
-                    "Shot cut short — kill switch / override",
-                    f"{room.slug} zone {zone}: shot aborted after {elapsed:.0f}/{duration_s:.0f}s "
-                    "by the kill switch or manual override. Valve closed; partial volume counted.",
+                    "CS-305",
+                    "shot stopped early",
+                    f"The shot was stopped after {elapsed:.0f} of {duration_s:.0f} seconds, because the "
+                    "engine switch was turned off or manual override was turned on. The valve is "
+                    "closed, and the water delivered so far is counted.",
+                    room=room,
+                    zone=zone,
                 )
         except SystemExit:
             # SIGTERM/SIGINT mid-shot (the app stopped or updated): _safe_exit has already closed what this
@@ -2512,9 +2676,18 @@ class Controller:
         ):
             self._alert(
                 f"wd_{room.slug}_z{zone}",
-                "URGENT — zone starving",
-                f"{room.slug} zone {zone}: no water {snap.minutes_since_shot/60.0:.1f}h, "
-                f"VWC {snap.vwc:.0f}<{p.p2_threshold:.0f}, blocked by '{block}'.",
+                "CS-207",
+                "URGENT, drying out and not being watered",
+                f"This zone is dry (moisture {snap.vwc:.0f}%, below its {p.p2_threshold:.0f}% trigger) and "
+                + (
+                    "has never been watered by the controller"
+                    if snap.minutes_since_shot > 1e8
+                    else f"hasn't been watered for {snap.minutes_since_shot/60.0:.1f} hours"
+                )
+                + ", but watering is blocked. If you switched it off on purpose, this is a reminder "
+                f"that the plants are drying out.\n\nBlocked by: {block}",
+                room=room,
+                zone=zone,
             )
         if fire and block:
             log(
@@ -2531,8 +2704,13 @@ class Controller:
             ):
                 self._alert(
                     f"sizing_{room.slug}_z{zone}",
-                    "Invalid hydraulic sizing",
-                    "Positive readable substrate and zone flow are required",
+                    "CS-204",
+                    "shot size can't be worked out, not watering",
+                    "To size a shot the controller needs this zone's pot size (litres per plant), "
+                    "plant count, drippers per plant and dripper flow, and one of them is missing, "
+                    "zero or unreadable. Set them in Rooms & setup.",
+                    room=room,
+                    zone=zone,
                 )
                 return
             raw_dur = size / 100.0 * substrate / flow
@@ -2545,8 +2723,14 @@ class Controller:
             if raw_dur > max_dur:
                 self._alert(
                     f"durcap_{room.slug}_z{zone}",
-                    "Shot duration capped (flood guard)",
-                    f"{room.slug} zone {zone}: computed {int(raw_dur)}s > {int(max_dur)}s cap — clamped. Check substrate volume / flow config.",
+                    "CS-306",
+                    "shot shortened to the safety limit",
+                    f"The planned shot would run {int(raw_dur)} seconds, longer than the room's "
+                    f"{int(max_dur)}-second limit, so it runs for {int(max_dur)} seconds and delivers "
+                    "less than planned. Check this zone's pot size and dripper flow; if they are "
+                    "right, raise the maximum shot length.",
+                    room=room,
+                    zone=zone,
                 )
             # A shot that is not exempt from the daily budget gets only what is left of it (22 Sep: a
             # 607 s, ~28 L flush fired with ~2 L of an 80 L budget left). Copied / blind-schedule
@@ -2558,8 +2742,15 @@ class Controller:
                     held = f"BLOCK daily-cap ({max(left_l, 0.0):.2f} L left)"
                     self._alert(
                         f"block_{room.slug}_z{zone}",
-                        "Zone blocked — needs attention",
-                        f"{room.slug} zone {zone} ({st['phase']}): {held}",
+                        "CS-205",
+                        "daily water limit reached",
+                        "This zone has had its daily water limit, so routine top-ups and EC-correction "
+                        "shots stop until lights-on starts the next day. The morning ramp, the "
+                        "overnight emergency shot, the no-water-for-hours safety shot and high-EC "
+                        "flushes still run."
+                        f"\n\nDetail ({st['phase']}): {held}",
+                        room=room,
+                        zone=zone,
                     )
                     log(f"[{room.slug}] Z{zone} {st['phase']} hold — {held}: would {reason}")
                     return False, 0.0, held
@@ -2573,11 +2764,32 @@ class Controller:
             self._execute_shot(room, zone, dur, size, flow_lps=flow,
                                plan_exempt=getattr(reason, "kind", None) in PLAN_HOLD_EXEMPT)
         else:
-            if "BLOCK" in reason:
+            if "BLOCK" in reason and (
+                getattr(reason, "kind", None) == "block_daily_cap" or "daily-cap" in reason
+            ):
                 self._alert(
                     f"block_{room.slug}_z{zone}",
-                    "Zone blocked — needs attention",
-                    f"{room.slug} zone {zone} ({st['phase']}): {reason}",
+                    "CS-205",
+                    "daily water limit reached",
+                    "This zone has had its daily water limit, so routine top-ups and EC-correction "
+                    "shots stop until lights-on starts the next day. The morning ramp, the "
+                    "overnight emergency shot, the no-water-for-hours safety shot and high-EC "
+                    "flushes still run."
+                    f"\n\nDetail ({st['phase']}): {reason}",
+                    room=room,
+                    zone=zone,
+                )
+            elif "BLOCK" in reason:
+                self._alert(
+                    f"block_{room.slug}_z{zone}",
+                    "CS-206",
+                    "root-zone EC too high, not watering",
+                    "Root-zone EC is above this zone's maximum, and a flush can't bring it down "
+                    "right now (the feed is no weaker than the root zone, or the cube is already "
+                    "saturated), so the controller holds. It clears by itself once that changes."
+                    f"\n\nDetail ({st['phase']}): {reason}",
+                    room=room,
+                    zone=zone,
                 )
             # A gate that is closed is said out loud in every phase: overnight nothing is due, and a
             # room blocked since a restart used to look exactly like a healthy one until lights-on.
@@ -2599,9 +2811,12 @@ class Controller:
         if persistent:
             self._alert(
                 "defaulted_setpoints",
-                "Setpoint entities missing — using engine defaults",
-                "These setpoint entities don't exist in HA, so the engine is running its "
-                "built-in defaults (reload the integration / check for renamed entities):\n"
+                "CS-402",
+                "settings missing, running on built-in values",
+                "These settings don't exist in Home Assistant, so the engine uses its built-in "
+                "values for them, the daily water limit and plant count included. Keep the engine "
+                "off until they are back: reload the integration, and if Repairs lists settings "
+                "that are not where the controller looks, follow code CS-605.\n\n"
                 + "\n".join(persistent[:20]),
             )
 
@@ -2752,10 +2967,15 @@ class Controller:
             if snap.ec is None:
                 self._alert(
                     f"ec_unknown_{room.slug}_z{zone}",
-                    f"{room.slug} Z{zone} EC unavailable — base VWC watering",
-                    "No valid, fresh pore EC. EC shot scaling and PID/step learning are paused; "
-                    "salt protection and flushing cannot be verified. Base VWC watering and "
-                    "dry rescue remain active, subject to source-water and volume gates.",
+                    "CS-104",
+                    "root-zone EC not available",
+                    "There is no usable root-zone EC reading for this zone: it is missing, "
+                    "unavailable, out of range, or hasn't changed for 20 minutes. Watering carries on "
+                    "by moisture alone; EC-based shot sizing and EC learning are paused, and salt "
+                    "build-up can't be checked or flushed."
+                    f"\n\nSensor: sensor.crop_steering_{room.prefix}ec_zone_{zone}",
+                    room=room,
+                    zone=zone,
                 )
             healthy.append((zone, p.p1_target))
             new_phase, new_thr, fire, size, reason = decide(snap, p)
@@ -2834,19 +3054,15 @@ class Controller:
             # phase forces (lights-off -> P3, P3 -> P0 at the new photoperiod). Only the
             # VWC-driven transitions are paused while blind.
             self._blind_time_transition(room, zone, now, lights_on, lights_just_on)
-            looking = f"sensor.crop_steering_{room.prefix}vwc_zone_{zone}"
             if healthy:
                 sib = pick_sibling(p.p1_target, healthy)
                 s_fire, s_size, s_reason = decisions[sib]
                 rescue = getattr(s_reason, "kind", None) in PLAN_HOLD_EXEMPT
                 decisions[zone] = (s_fire, s_size, Reason(f"COPY Z{sib} (VWC probe dead)",
                                                           "blind_copy_rescue" if rescue else "blind_copy"))
-                # Re-alert each tick — _alert's 30-min debounce throttles it to a repeating
-                # reminder so a dead probe can't sit unnoticed (the silent-freeze lesson).
-                self._alert(
-                    f"blind_{room.slug}_z{zone}",
-                    f"⚠️ {room.slug} Z{zone} moisture probe dead — copying Z{sib}",
-                    f"No live VWC at {looking}. Mirroring Zone {sib} until it returns.",
+                plan = (
+                    "Until it reads normally again, this zone gets the same shots as "
+                    f"{self._zone_title(room, sib)}, whose probe is working."
                 )
             else:
                 mss = self._minutes_since_shot(st, now)
@@ -2855,12 +3071,25 @@ class Controller:
                     p.p2_shot_size,
                     Reason("FALLBACK schedule (no live probe)", "blind_fallback"),
                 )
+                plan = (
+                    "Until it reads normally again, this zone is watered on a timer while the engine "
+                    f"is on: one shot every {int(self.blind_fallback_min)} minutes, within its daily "
+                    "water limit. Phase changes that go by moisture wait for the probe."
+                )
+            # Re-alert each tick — _alert's 30-min debounce throttles it to a repeating
+            # reminder so a dead probe can't sit unnoticed (the silent-freeze lesson). Why it
+            # is unusable is read again only when a reminder is due.
+            key = f"blind_{room.slug}_z{zone}"
+            if self._alert_due(key):
+                looking = self._fused_id(room.prefix, "vwc", zone, room.zones[zone].get("vwc"))
+                code, what = self._unreadable(looking)
                 self._alert(
-                    f"blind_{room.slug}_z{zone}",
-                    f"⚠️ {room.slug} Z{zone} probe dead — blind schedule",
-                    f"No live VWC at {looking} and no healthy sibling. On a "
-                    f"{int(self.blind_fallback_min)}-min blind safety schedule; VWC-driven "
-                    "phase steering is paused until a probe returns.",
+                    key,
+                    code,
+                    _PROBE_ALERTS[code][0],
+                    f"{what} {plan} {_PROBE_ALERTS[code][1]}\n\nSensor: {looking}",
+                    room=room,
+                    zone=zone,
                 )
             room._blind_zones.add(zone)
         room._blind_zones = {z for z in room._blind_zones if z not in snaps}
@@ -2926,7 +3155,14 @@ class Controller:
             }
         for z, why in cross_zone_outliers(snaps):
             self._alert(
-                f"xzone_{room.slug}_{z}", "Zone under-drinking vs siblings", why
+                f"xzone_{room.slug}_{z}",
+                "CS-501",
+                "much less water than the other zones",
+                "This zone has been given far less water today than the room's other zones. "
+                "Plants that drink less, a probe sitting in a wetter spot, or a valve or dripper "
+                f"problem can all do this. Watering carries on as normal.\n\nDetail: {why}",
+                room=room,
+                zone=z,
             )
         room._was_lights_on = lights_on
         return pub
@@ -3181,11 +3417,13 @@ class Controller:
         if abs(ha_off - off_h) > 0.01:
             self._alert(
                 "tz_mismatch",
-                "Timezone mismatch — irrigation day may be shifted",
-                f"Add-on container is UTC{off_h:+.1f}h but Home Assistant is {ha_tz} "
-                f"(UTC{ha_off:+.1f}h). Lights / dryback / daily-reset all use container-local "
-                "time, so this shifts the whole photoperiod. Ensure the add-on image has tzdata "
-                "and the Supervisor is injecting TZ.",
+                "CS-405",
+                "timezone mismatch, the day may be shifted",
+                f"The controller app's clock is on UTC{off_h:+.1f}h, but Home Assistant is set to "
+                f"{ha_tz} (UTC{ha_off:+.1f}h). Lights on and off, dryback and the daily reset all go "
+                "by the app's clock, so the whole grow-day is shifted by the difference. Update or "
+                "rebuild the controller app; if it stays, check the time zone under Settings → "
+                "System → General.",
             )
         else:
             log(f"timezone: matches Home Assistant ({ha_tz})")
