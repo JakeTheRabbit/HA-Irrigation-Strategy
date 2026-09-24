@@ -20,10 +20,37 @@ export interface DrybackTrend {
   recent: Reading[];
 }
 
+const parse = (history: { time: string; value: number }[], now: number): Reading[] =>
+  history
+    .map((point) => ({ time: Date.parse(point.time), value: point.value }))
+    .filter((point) => Number.isFinite(point.time) && Number.isFinite(point.value))
+    .filter((point) => point.time <= now)
+    .sort((a, b) => a.time - b.time);
+
+/** The readings after `from`, oldest first. Recorder history only has changes, so the value held
+ * at `from` is carried in, and the live reading closes the window. */
+function since(all: Reading[], from: number, live: number | null, now: number): Reading[] {
+  const held = all.filter((point) => point.time <= from).at(-1);
+  const inside = all.filter((point) => point.time > from);
+  const points = held ? [{ time: from, value: held.value }, ...inside] : inside;
+  if (live !== null && Number.isFinite(live) && (points.at(-1)?.time ?? -Infinity) < now)
+    points.push({ time: now, value: live });
+  return points;
+}
+
+/** A sensor's readings over the last `hours`, for a sparkline. */
+export function recentReadings(
+  history: { time: string; value: number }[],
+  hours: number,
+  live: number | null,
+  now: number,
+): Reading[] {
+  return since(parse(history, now), now - hours * 3_600_000, live, now);
+}
+
 /**
  * Least-squares slope of the readings since the last shot settled, within the last
- * `DRYBACK_WINDOW_H` hours. Recorder history only has changes, so the value held at the window's
- * start is carried in, and the live reading closes the window.
+ * `DRYBACK_WINDOW_H` hours.
  */
 export function drybackTrend(
   history: { time: string; value: number }[],
@@ -32,19 +59,8 @@ export function drybackTrend(
   now: number,
 ): DrybackTrend {
   const start = now - DRYBACK_WINDOW_H * 3_600_000;
-  const all = history
-    .map((point) => ({ time: Date.parse(point.time), value: point.value }))
-    .filter((point) => Number.isFinite(point.time) && Number.isFinite(point.value))
-    .filter((point) => point.time <= now)
-    .sort((a, b) => a.time - b.time);
-  const window = (from: number) => {
-    const held = all.filter((point) => point.time <= from).at(-1);
-    const inside = all.filter((point) => point.time > from);
-    const points = held ? [{ time: from, value: held.value }, ...inside] : inside;
-    if (live !== null && Number.isFinite(live) && (points.at(-1)?.time ?? -Infinity) < now)
-      points.push({ time: now, value: live });
-    return points;
-  };
+  const all = parse(history, now);
+  const window = (from: number) => since(all, from, live, now);
   const recent = window(start);
   const shot = lastShot ? Date.parse(lastShot) : NaN;
   const from = Number.isFinite(shot) ? Math.max(start, shot + SETTLE_MS) : start;

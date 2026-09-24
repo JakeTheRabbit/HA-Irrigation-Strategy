@@ -10,9 +10,9 @@ import {
   type PointerEvent,
 } from "react";
 import { LoaderCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/dashboard";
+import { Pill } from "./mini-visuals";
 import { errorText } from "@/lib/utils";
 import type { Controller, Series, Zone } from "@/lib/types";
 import {
@@ -378,10 +378,9 @@ function SensorChart({
           {title} <span>{unit}</span>
         </h3>
         {!stats.current && (
-          <Badge variant="outline" className="status-paused">
-            <span className="status-dot" />
+          <Pill dot tone="warn">
             Live reading stale
-          </Badge>
+          </Pill>
         )}
       </div>
       <dl className="sensor-stats">
