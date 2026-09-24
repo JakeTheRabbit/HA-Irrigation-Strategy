@@ -83,13 +83,57 @@ describe("controller heartbeat", () => {
     expect(room.alerts[0]).toMatchObject({ severity: "critical", title: "Controller not running" });
     expect(room.zones[0].stale).toBe(true);
   });
-  it("raises the notice once the beat is older than five minutes", () => {
-    const fresh = view(fixture([entity(HEARTBEAT, "healthy", {}, ago(4 * 60_000))]));
+  it("raises the notice once the beat is older than ten minutes, the integration's own limit", () => {
+    // 25 Sep 2026: three shots in a row held a running controller's loop for 8.2 minutes.
+    const fresh = view(fixture([entity(HEARTBEAT, "healthy", {}, ago(9 * 60_000))]));
     expect(fresh.alerts).toEqual([]);
-    const stale = view(fixture([entity(HEARTBEAT, "healthy", {}, ago(6 * 60_000))]));
+    const stale = view(fixture([entity(HEARTBEAT, "healthy", {}, ago(11 * 60_000))]));
     expect(stale.alerts[0].severity).toBe("critical");
-    expect(stale.alerts[0].detail).toMatch(/last reported 6 min ago/);
+    expect(stale.alerts[0].detail).toMatch(/last reported 11 min ago/);
     expect(stale.zones.every((zone) => zone.stale)).toBe(true);
+  });
+  describe("while a quiet controller has a zone valve open", () => {
+    const VALVE = "switch.zone_1_valve";
+    const quiet = (opened: number, extra: EntityState[] = []) =>
+      fixture([
+        entity("sensor.crop_steering_engine_config", "ready", {
+          prefix: "",
+          slug: "",
+          num_zones: 2,
+          enable_flag: "input_boolean.f2_control_enabled",
+          valves: { "1": VALVE, "2": "switch.zone_2_valve" },
+        }),
+        entity(HEARTBEAT, "healthy", { enable_flag: "input_boolean.f2_control_enabled" }, ago(12 * 60_000)),
+        { ...entity(VALVE, "on", {}, ago(opened)), last_changed: ago(opened) },
+        entity("switch.zone_2_valve", "off"),
+        ...extra,
+      ]);
+    it("says a shot is running, not that the controller is not running", () => {
+      const states = quiet(3 * 60_000);
+      expect(view(states).alerts).toEqual([
+        expect.objectContaining({ severity: "info", title: "Watering" }),
+      ]);
+      expect(view(states).alerts[0].detail).toMatch(/^Zone 1's valve is open: .*12 min ago/);
+      expect(status(states)).toMatchObject({ tone: "watering", text: "Watering" });
+    });
+    it("calls a valve open longer than the room's maximum shot what it is: not a shot", () => {
+      // The controller's fallback cap is 900 s: a controller that stopped mid-shot left it open.
+      const states = quiet(16 * 60_000);
+      expect(view(states).alerts[0]).toMatchObject({
+        severity: "critical",
+        title: "Controller not running",
+      });
+      expect(status(states)).toMatchObject({ tone: "stale", text: "Data 12 min old" });
+      // The room's own cap decides, when it has one.
+      const longer = quiet(16 * 60_000, [entity("number.crop_steering_max_shot_duration", "1800")]);
+      expect(view(longer).alerts[0].title).toBe("Watering");
+    });
+    it("reads a valve that is closed, or a controller that is fresh, as nothing special", () => {
+      const closed = quiet(3 * 60_000, [entity(VALVE, "off")]);
+      expect(view(closed).alerts[0].title).toBe("Controller not running");
+      const fresh = quiet(3 * 60_000, [entity(HEARTBEAT, "healthy", {}, ago(60_000))]);
+      expect(view(fresh).alerts).toEqual([]);
+    });
   });
   it("falls back to the controller's naive local last_beat when Home Assistant gives no time", () => {
     const local = (ms: number) => {
@@ -103,7 +147,7 @@ describe("controller heartbeat", () => {
         NOW,
       );
     expect(beat(60_000)).toMatchObject({ health: "fresh", at: NOW - 60_000 + 123 });
-    expect(beat(6 * 60_000).health).toBe("stale");
+    expect(beat(11 * 60_000).health).toBe("stale");
     // Home Assistant's own update time wins: it is UTC, so a browser in another zone agrees.
     expect(
       readHeartbeat(entity(HEARTBEAT, "healthy", { last_beat: local(3_600_000) }), NOW).health,
