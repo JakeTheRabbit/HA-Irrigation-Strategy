@@ -18,6 +18,17 @@ The demo includes clearly labelled synthetic recipes and current/previous runs f
 
 > **New in 2.19.2 / controller 0.16.2:** fixes from the first real install on a one-zone tent. The controller app and the integration can now be set up in either order (no phantom zones, no false "create the kill switch helper" error), a zone's device carries the name you gave it, "last irrigation" only ever means water, and the menu scrolls on a phone. **New in 2.19:** the dashboard sidebar shows which integration and controller are running, the integration has its icon, and setup asks how each room is plumbed, and a room that says it has a pump is never watered without it. **2.18** brought a setup wizard that keeps what you typed and says exactly what to fix, rooms with a single switch per zone, probes in µS/cm or m³/m³ converted instead of rejected, and setup helpers (unit pickers, substrate presets, catch test, learned-peak suggestion). **2.17** added the recorded-sensor plan graph with the projected P0-P3 day, room on/off, the full P1 ramp, Auto Setpoints, restart-safe setup and a patient pump read-back. Install the matching pair; see the [changelog](CHANGELOG.md).
 
+## What you need
+
+| | |
+| --- | --- |
+| **Home Assistant** | **2024.10.0 or newer.** Every change is tested on 2024.10.0 and on 2026.9.3. Older versions are not supported. |
+| **Python** | Whatever your Home Assistant runs on: the integration adds no Python packages of its own. Home Assistant OS, Supervised and Container bring their own Python. Only a Core (virtual environment) install chooses it: 2024.10 needs Python 3.12, and 2026.9 needs Python 3.14.2 or newer. |
+| **Controller app** | Home Assistant OS or Supervised, where it installs from the app store (amd64, aarch64 or armv7) and brings its own Python 3.12. Container and Core have no app store: run the controller separately ([install guide](docs/INSTALL.md)). |
+| **HACS** | 1.6.0 or newer for the guided download, or copy `custom_components/crop_steering` in by hand. |
+| **MCP connector** (optional) | Node.js 22 or newer, on the machine that runs your LLM client. |
+| **Account** | A Home Assistant administrator for **Rooms & setup**, and to change plans, recipes and run records. |
+
 ## Start here
 
 1. [Add the integration repository to HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=JakeTheRabbit&repository=HA-Irrigation-Strategy&category=integration), download it, and restart Home Assistant.
