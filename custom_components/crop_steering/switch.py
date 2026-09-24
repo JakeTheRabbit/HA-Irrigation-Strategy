@@ -91,7 +91,7 @@ BASE_SWITCH_DESCRIPTIONS = [
     # Same pattern as RootSense — each pillar reads its own switch on
     # every iteration; OFF short-circuits all side effects. Default OFF
     # so existing GW pack remains the active climate controller until
-    # you opt in. See dashboards/legacyag/30_intelligence.yaml for a
+    # you opt in. See the retired intelligence dashboard for a
     # convenient toggle panel.
     SwitchEntityDescription(
         key="intelligence_climate_sensing_enabled",
