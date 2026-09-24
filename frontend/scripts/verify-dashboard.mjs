@@ -188,11 +188,16 @@ try {
     // Closing hands focus back to the button that opened it.
     await page.keyboard.press("Escape");
     await panel.waitFor({ state: "hidden" });
-    assert.equal(
-      await page.evaluate(() => document.activeElement?.getAttribute("aria-label")),
-      "Recent activity",
-      "focus returns to the Recent activity button",
-    );
+    // Radix restores focus as the panel unmounts, a moment after it is hidden: wait, don't sample.
+    await page
+      .waitForFunction(
+        () => document.activeElement?.getAttribute("aria-label") === "Recent activity",
+        null,
+        { timeout: 5_000 },
+      )
+      .catch(() => {
+        throw new Error("focus did not return to the Recent activity button");
+      });
     await page.getByRole("button", { name: "Recent activity", exact: true }).click();
     await expectVisible(panel);
     await panel.getByRole("button", { name: "Open the activity log" }).click();
