@@ -57,27 +57,28 @@ export function Overview({
       )}
       <Metrics metrics={room.metrics} />
       <DayTimeline controller={controller} />
-      <TankStatus controller={controller} onConfigure={() => navigate("setup")} />
-      <section className="panel">
-        <div className="panel-heading">
-          <div>
+      <div className="overview-grid">
+        <section className="panel">
+          <div className="panel-heading">
             <h2>Zones at a glance</h2>
-            <p>Controller state, valve activity and the last recorded irrigation</p>
+            <Button variant="ghost" onClick={() => navigate("zones")}>
+              All zones <ArrowRight size={16} />
+            </Button>
           </div>
-          <Button variant="ghost" onClick={() => navigate("zones")}>
-            All zones <ArrowRight size={16} />
-          </Button>
-        </div>
-        {room.zones.length ? (
-          <ZoneTable zones={room.zones} onSelect={(zone) => setSelected(zone.id)} />
-        ) : (
-          <Empty
-            title="No zones discovered"
-            detail="Connect Home Assistant in Settings. Zones are discovered from the controller entities available to your account."
-            action={<Button onClick={() => navigate("settings")}>Open connection settings</Button>}
-          />
-        )}
-      </section>
+          {room.zones.length ? (
+            <ZoneTable compact zones={room.zones} onSelect={(zone) => setSelected(zone.id)} />
+          ) : (
+            <Empty
+              title="No zones discovered"
+              detail="Connect Home Assistant in Settings. Zones are discovered from the controller entities available to your account."
+              action={
+                <Button onClick={() => navigate("settings")}>Open connection settings</Button>
+              }
+            />
+          )}
+        </section>
+        <TankStatus controller={controller} onConfigure={() => navigate("setup")} />
+      </div>
       <ZoneDetails
         controller={controller}
         zone={room.zones.find((z) => z.id === selected) || null}

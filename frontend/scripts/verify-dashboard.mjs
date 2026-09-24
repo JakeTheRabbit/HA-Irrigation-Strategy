@@ -204,6 +204,39 @@ try {
     assert.equal(await page.locator(".wd-daily").count(), 0, "no water table on the Overview");
     assert.equal(await page.getByText("Controller scheduling", { exact: true }).count(), 0);
   });
+  await check("overview: two screens at most, zones beside the tank", async () => {
+    // 1440×800 ≈ the browser window of a 1440×900 laptop; the Overview was 3.2 screens tall.
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await go("overview");
+    await expectVisible(page.getByRole("heading", { name: "Flower 2 overview", exact: true }));
+    const layout = await page.evaluate(() => {
+      const top = (selector) => document.querySelector(selector).getBoundingClientRect().top;
+      const table = document.querySelector(".zone-table-desktop");
+      return {
+        height: document.documentElement.scrollHeight,
+        window: innerHeight,
+        zonesTop: top(".overview-grid > .panel"),
+        tankTop: top("[data-tank-status]"),
+        tableScrolls: table.scrollWidth > table.clientWidth + 1,
+        subtitles: document.querySelectorAll("#main-content .panel-heading p").length,
+      };
+    });
+    assert.ok(
+      layout.height <= 2 * layout.window,
+      `Overview is ${layout.height}px tall in a ${layout.window}px window`,
+    );
+    assert.equal(layout.zonesTop, layout.tankTop, "zones and tank share a row");
+    assert.equal(layout.tableScrolls, false, "the zone table scrolls sideways");
+    assert.equal(layout.subtitles, 0, "a panel on the Overview repeats its title in a subtitle");
+    await page.screenshot({
+      path: path.join(out, "dashboard-overview-laptop.png"),
+      fullPage: true,
+    });
+    // A narrow desktop stacks the columns without sideways page scroll.
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await noOverflow();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  });
   await check("help: every error code is listed, searchable and linkable", async () => {
     const catalog = JSON.parse(await readFile(path.join(root, "docs/error-codes.json"), "utf8"));
     await go("help");

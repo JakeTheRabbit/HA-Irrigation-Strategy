@@ -49,6 +49,13 @@ controller or the integration reads. Not run on hardware; checked by the browser
   line at the top of every page already says whether the room is watering and why not. Recent
   activity opens beside any page from the top bar, and the daily workflow is now a linked daily
   routine at the top of Help & tools.
+- **The Overview is shorter and balanced.** Under the grow day, the zones sit beside the tank
+  instead of below it (on a phone they stack as before). The tank card has the same space above
+  the tank and *Tank EC* as beside them, where before they sat flush under the heading, and shows
+  the level, EC, pH and temperature with the pump, filling and last fill in one row. The zones
+  table carries each zone's target under its moisture and fits without scrolling sideways. The
+  sentences under panel titles and the captions under today's totals moved into tooltips. At
+  1440 px wide the Overview is under two screens tall; it was more than three.
 - **A shot that something else cuts short now ends there, and only the water it gave is counted.**
   On 23 September at 11:25 the batch tank ran empty 4 seconds into a zone 1 shot. The dosing
   automation took the tank and its pump, and the feed guard closed the valve and main line. The
@@ -96,6 +103,13 @@ controller or the integration reads. Not run on hardware; checked by the browser
   Recent activity panel, the daily workflow card (now `ol.daily-routine` in Help's intro), the
   `DailyWaterSummary` table (still on Zones) and the `room-summary` block; their CSS goes with
   them.
+- `.overview-grid` (zones `2fr`, tank `1fr`; one column under 1200 px). `ZoneTable({ compact })`:
+  no *VWC reference* or arrow column and no zone icon, the target under moisture (its label
+  wraps), `LastIrrigation({ compact })` without the date line. `components/tank-status.tsx` rewritten compact: a 100×120 drawing whose
+  shape touches its box, `dl.tank-quality` and `dl.tank-equipment`, one 20 px inset; the hooks
+  and value strings are unchanged. `Metrics` shows only the *waiting for controller data*
+  caption. `DayTimeline` loses its heading paragraph. `verify-tank-status.mjs` holds the tank's
+  top inset to its left inset.
 - **Controller** (`controller.py`), a shot cut short from outside: in every round `_wait_shot` also
   reads each `hold_entities` entity (ON as `_blocked` reads it, the shared `ON_STATES`) and the
   shot's own valve, with the same bounded reads and sleeps of at most 2 s between rounds, after the kill

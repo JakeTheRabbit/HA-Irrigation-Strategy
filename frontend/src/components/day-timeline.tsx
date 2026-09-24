@@ -162,14 +162,7 @@ export function DayTimeline({ controller }: { controller: Controller }) {
   return (
     <section className="panel day-timeline" data-day-timeline aria-labelledby="day-timeline-title">
       <div className="panel-heading">
-        <div>
-          <h2 id="day-timeline-title">Today’s grow day</h2>
-          <p>
-            {day
-              ? `Lights-on at ${clock(day.start)} to the next: phases, shots, holds and setpoint changes as recorded, then an estimate of the rest of the day.`
-              : "Phases, shots, holds and setpoint changes for each zone."}
-          </p>
-        </div>
+        <h2 id="day-timeline-title">Today’s grow day</h2>
         {rows && (
           <span className="timeline-age" data-age={ageTone(age)}>
             {controller.demo ? "Demo data · " : ""}

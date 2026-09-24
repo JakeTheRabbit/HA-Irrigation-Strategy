@@ -48,3 +48,19 @@
 .zone-mobile-row .zone-last-irrigation {
   max-width: none;
 }
+.zone-table-compact .zone-last-irrigation {
+  min-width: 0;
+}
+/* The target's label wraps under the moisture reading instead of widening the table. */
+.zone-table-compact .cell-subtext {
+  white-space: normal;
+}
+.zone-table-compact .zone-icon {
+  display: none;
+}
+/* Doubled class: styles.css loads after this file and sets .data-table cell padding. */
+.data-table.zone-table-compact th,
+.data-table.zone-table-compact td {
+  padding-left: 12px;
+  padding-right: 12px;
+}
