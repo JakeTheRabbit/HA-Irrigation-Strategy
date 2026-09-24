@@ -1,4 +1,5 @@
 import { useLayoutEffect, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   CalendarRange,
   Download,
@@ -24,6 +25,7 @@ import {
 import { Heading, Empty, number } from "@/components/dashboard";
 import { WaterDelivery } from "@/components/water-delivery";
 import { PlanningCurve } from "@/components/planning-curve";
+import { PlanCellContext } from "@/components/plan-cell-context";
 import { RecipeLibrary } from "@/components/recipe-library";
 import {
   FieldSuggestionLine,
@@ -42,16 +44,26 @@ import type {
 } from "@/lib/operator-types";
 import {
   blockForDay,
+  columnRange,
   dateForDay,
   growDay,
   interpolate,
   localDate,
   parameterHelp,
   parameterLabels,
+  parseBalance,
   parsePlanImport,
   planErrors,
+  rangeBlock,
   replaceRange,
 } from "@/lib/grow-plan";
+
+const moves: Record<string, [number, number]> = {
+  ArrowUp: [-1, 0],
+  ArrowDown: [1, 0],
+  ArrowLeft: [0, -1],
+  ArrowRight: [0, 1],
+};
 
 export function GrowPlanner({
   controller,
@@ -72,7 +84,11 @@ export function GrowPlanner({
   const [review, setReview] = useState<"save" | "activate" | "disarm" | null>(null);
   const [libraryDirty, setLibraryDirty] = useState(false);
   const [preview, setPreview] = useState<StrategyDocument | null>(null);
+  // A balance being typed into the grid, and the last entry that was refused.
+  const [cell, setCell] = useState<{ zone: number; col: number; text: string } | null>(null);
+  const [rejected, setRejected] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const dirty = !!plan && !!document && JSON.stringify(plan) !== JSON.stringify(document.plan);
   useLayoutEffect(() => {
     onDirtyChange(dirty || libraryDirty);
@@ -178,6 +194,10 @@ export function GrowPlanner({
   );
   const columns =
     granularity === "week" ? Math.ceil(lastScheduled / 7) : Math.min(lastScheduled, 366);
+  const selectedColumn = granularity === "week" ? Math.floor((day - 1) / 7) : day - 1;
+  const typedBalance = cell?.text.trim() ? parseBalance(cell.text) : null;
+  const typed = typedBalance && "value" in typedBalance ? typedBalance.value : null;
+  const cellError = typedBalance && "error" in typedBalance ? typedBalance.error : "";
   const selectedZone = controller.room.zones.find((z) => z.id === zoneId);
   // Recorded probe behaviour for the endpoints tab: the chart, and the field-capacity suggestion.
   const sensor = useSensorContext(controller, selectedZone, connected && tab === "profiles");
@@ -216,6 +236,43 @@ export function GrowPlanner({
     });
     setNotice("");
     setPreview(null);
+  }
+  // Focusing a grid cell selects it, so a typed balance edits the same block as the slider.
+  function applyBalance(bias: number) {
+    // The plan can turn read only while a value is typed (disconnected, busy or armed elsewhere).
+    if (disabled) setRejected(`${bias}% was not applied: the plan cannot be edited right now.`);
+    else if (
+      zonePlan &&
+      (rangeBlock(zonePlan, firstDay, lastDay).mixed || currentBlock?.bias !== bias)
+    )
+      updateBlock({ bias });
+  }
+  function leaveCell() {
+    if (!cell) return;
+    if (cellError)
+      setRejected(
+        `${selectedZone?.name || "Zone " + zoneId}, ${granularity === "week" ? "week " + (selectedColumn + 1) : "day " + day}: “${cell.text.trim()}” was not applied. ${cellError}`,
+      );
+    else if (typed !== null) applyBalance(typed);
+    setCell(null);
+  }
+  function cellKey(e: React.KeyboardEvent<HTMLInputElement>, row: number, col: number) {
+    const input = e.currentTarget,
+      move = moves[e.key];
+    if (move && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      e.preventDefault();
+      gridRef.current
+        ?.querySelector<HTMLInputElement>(`[data-cell="${row + move[0]}:${col + move[1]}"]`)
+        ?.focus();
+    } else if ((e.key === "Enter" && !cellError) || (e.key === "Escape" && cell)) {
+      e.preventDefault();
+      // Render the applied or restored value now, so it is selected ready to type over.
+      flushSync(() => {
+        if (e.key === "Enter" && typed !== null) applyBalance(typed);
+        setCell(null);
+      });
+      input.select();
+    }
   }
   function editProfile(side: "vegetative" | "generative", key: string, value: number) {
     if (!plan || !profile || disabled) return;
@@ -570,7 +627,8 @@ export function GrowPlanner({
                   <div>
                     <h2>Whole-grow overview</h2>
                     <p className="muted">
-                      Each row is a zone. Select a day or week to edit its steering balance.
+                      Each row is a zone. Type a balance (0–100% generative) into a week or day;
+                      Enter applies, Esc cancels, arrows move.
                     </p>
                   </div>
                   <div className="workspace-actions">
@@ -596,6 +654,7 @@ export function GrowPlanner({
                 >
                   <div
                     className="plan-calendar"
+                    ref={gridRef}
                     style={{
                       gridTemplateColumns:
                         "150px repeat(" +
@@ -611,55 +670,91 @@ export function GrowPlanner({
                         {granularity === "week" ? "Week " + (i + 1) : "D" + (i + 1)}
                       </div>
                     ))}
-                    {plan.zones.map((z) => (
-                      <div className="calendar-row" key={z.zone_id}>
-                        <button className="calendar-label" onClick={() => setZone(z.zone_id)}>
-                          {controller.room.zones.find((x) => x.id === z.zone_id)?.name ||
-                            "Zone " + z.zone_id}
-                          <small>{z.start_date}</small>
-                        </button>
-                        {Array.from({ length: columns }, (_, i) => {
-                          const d = granularity === "week" ? i * 7 + 1 : i + 1;
-                          const b = blockForDay(z, d);
-                          const selected =
-                            z.zone_id === zoneId &&
-                            day >= d &&
-                            day < d + (granularity === "week" ? 7 : 1);
-                          const end = granularity === "week" ? Math.min(d + 6, 366) : d;
-                          const mixed = z.schedule.some(
-                            (s) => s.start_day > d && s.start_day <= end,
-                          );
-                          return (
-                            <button
-                              key={i}
-                              className={"calendar-cell" + (selected ? " selected" : "")}
-                              onClick={() => {
-                                setZone(z.zone_id);
-                                setDay(d);
-                              }}
-                              aria-label={
-                                (controller.room.zones.find((x) => x.id === z.zone_id)?.name ||
-                                  "Zone " + z.zone_id) +
-                                ", " +
-                                (granularity === "week" ? "week " + (i + 1) : "day " + d) +
-                                ", " +
-                                (mixed
-                                  ? "mixed steering"
-                                  : b
-                                    ? b.bias + " percent generative"
-                                    : "unscheduled")
-                              }
-                              style={{ "--bias": String(b?.bias ?? 0) } as React.CSSProperties}
-                            >
-                              <span>{mixed ? "Mixed" : b ? b.bias + "%" : "—"}</span>
-                              <small>{b ? "G" : "No plan"}</small>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ))}
+                    {plan.zones.map((z, row) => {
+                      const name =
+                        controller.room.zones.find((x) => x.id === z.zone_id)?.name ||
+                        "Zone " + z.zone_id;
+                      return (
+                        <div className="calendar-row" key={z.zone_id}>
+                          <button className="calendar-label" onClick={() => setZone(z.zone_id)}>
+                            {name}
+                            <small>{z.start_date}</small>
+                          </button>
+                          {Array.from({ length: columns }, (_, i) => {
+                            const { start: d, end } = columnRange(granularity, i);
+                            const { block: b, mixed } = rangeBlock(z, d, end);
+                            const selected =
+                              z.zone_id === zoneId &&
+                              day >= d &&
+                              day < d + (granularity === "week" ? 7 : 1);
+                            const editing = cell?.zone === z.zone_id && cell.col === i;
+                            const invalid = editing && !!cellError;
+                            return (
+                              <label
+                                key={i}
+                                className={
+                                  "calendar-cell" +
+                                  (selected ? " selected" : "") +
+                                  (editing ? " editing" : "") +
+                                  (invalid ? " invalid" : "")
+                                }
+                                style={{ "--bias": String(b?.bias ?? 0) } as React.CSSProperties}
+                              >
+                                <input
+                                  data-cell={row + ":" + i}
+                                  aria-label={
+                                    name +
+                                    ", " +
+                                    (granularity === "week" ? "week " + (i + 1) : "day " + d) +
+                                    ", steering balance percent generative"
+                                  }
+                                  aria-invalid={invalid || undefined}
+                                  aria-describedby={invalid ? "plan-cell-message" : undefined}
+                                  inputMode="numeric"
+                                  autoComplete="off"
+                                  readOnly={disabled}
+                                  placeholder={mixed ? "Mixed" : "—"}
+                                  value={editing ? cell.text : mixed || !b ? "" : b.bias + "%"}
+                                  onFocus={(e) => {
+                                    setZone(z.zone_id);
+                                    setDay(d);
+                                    e.currentTarget.select();
+                                  }}
+                                  // A click after focus would drop the selection that lets typing replace the value.
+                                  onClick={(e) => !editing && e.currentTarget.select()}
+                                  onChange={(e) => {
+                                    setCell({ zone: z.zone_id, col: i, text: e.target.value });
+                                    setRejected("");
+                                  }}
+                                  onKeyDown={(e) => cellKey(e, row, i)}
+                                  onBlur={leaveCell}
+                                />
+                                <small>{b ? "G" : "No plan"}</small>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
+                <p id="plan-cell-message" className="plan-cell-message" aria-live="polite">
+                  {cellError || rejected}
+                </p>
+                {zonePlan && selectedColumn < columns && (
+                  <PlanCellContext
+                    zone={zonePlan}
+                    name={selectedZone?.name || "Zone " + zoneId}
+                    live={selectedZone}
+                    profile={profile}
+                    limits={limits}
+                    granularity={granularity}
+                    column={selectedColumn}
+                    columns={columns}
+                    typed={typed}
+                    readOnly={disabled}
+                  />
+                )}
               </section>
               <section className="panel workspace-card">
                 <div className="workspace-section-heading">

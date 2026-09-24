@@ -79,7 +79,103 @@ export function replaceRange(schedule: ScheduleBlock[], block: ScheduleBlock): S
       ...(old.end_day > block.end_day ? [{ ...old, start_day: block.end_day + 1 }] : []),
     ];
   });
-  return [...remaining, block].sort((a, b) => a.start_day - b.start_day);
+  const sorted = [...remaining, block].sort((a, b) => a.start_day - b.start_day);
+  // Rejoin a neighbour the new range now matches, so re-entering a balance never fragments a block.
+  const i = sorted.indexOf(block),
+    joins = (a?: ScheduleBlock, b?: ScheduleBlock) =>
+      !!a &&
+      !!b &&
+      a.end_day + 1 === b.start_day &&
+      a.profile_id === b.profile_id &&
+      a.bias === b.bias;
+  const from = joins(sorted[i - 1], block) ? i - 1 : i,
+    to = joins(block, sorted[i + 1]) ? i + 1 : i;
+  return [
+    ...sorted.slice(0, from),
+    { ...block, start_day: sorted[from].start_day, end_day: sorted[to].end_day },
+    ...sorted.slice(to + 1),
+  ];
+}
+/** Grow days covered by one column of the whole-grow grid. */
+export function columnRange(granularity: "week" | "day", column: number) {
+  const start = granularity === "week" ? column * 7 + 1 : column + 1;
+  return { start, end: granularity === "week" ? Math.min(start + 6, 366) : start };
+}
+/** What a grid cell shows for days start–end: the block on its first day, and whether another
+ * block starts inside the range (a "Mixed" week). */
+export function rangeBlock(zone: ZonePlan, start: number, end: number) {
+  return {
+    block: blockForDay(zone, start),
+    mixed: zone.schedule.some((s) => s.start_day > start && s.start_day <= end),
+  };
+}
+/** A steering balance typed into the grid: a whole number of percent generative, 0–100. */
+export function parseBalance(text: string): { value: number } | { error: string } {
+  const match = /^\s*(-?\d+(?:\.\d*)?)\s*%?\s*$/.exec(text);
+  if (!match) return { error: "Enter a whole number from 0 to 100." };
+  const value = Number(match[1]);
+  if (!Number.isInteger(value)) return { error: "Use a whole number from 0 to 100, no decimals." };
+  if (value < 0 || value > 100) return { error: `${value} is outside 0–100.` };
+  return { value };
+}
+const vwcKeys = [
+  "p1_target_vwc",
+  "p2_vwc_threshold",
+  "p3_emergency_vwc_threshold",
+  "field_capacity",
+];
+const shotKeys = [
+  "p1_initial_shot_size",
+  "p2_shot_size",
+  "p3_emergency_shot_size",
+  "p1_shot_size_increment",
+];
+/** VWC is absolute water content; dryback is a relative drop from the detected peak. */
+function setpointUnit(key: string, unit = ""): string {
+  if (key === "dryback_target") return "% of peak";
+  if (vwcKeys.includes(key)) return "% VWC";
+  if (shotKeys.includes(key)) return "% of substrate";
+  return key === "p1_maximum_shots" ? "shots" : unit;
+}
+export interface SetpointRow {
+  key: string;
+  label: string;
+  unit: string;
+  vegetative: number;
+  generative: number;
+  /** Interpolated at the balance being shown; absent when there is none. */
+  value?: number;
+  /** Interpolated at the saved balance, when a different one is being typed. */
+  now?: number;
+}
+/** Every setpoint a profile blends, in catalog order, beside both endpoints. */
+export function setpointRows(
+  profile: SteeringProfile | undefined,
+  bias: number | null,
+  catalog: Record<string, ParameterLimit> = {},
+  now: number | null = null,
+): SetpointRow[] {
+  if (!profile) return [];
+  const at = bias === null ? {} : interpolate(profile, bias, catalog),
+    before = now === null ? {} : interpolate(profile, now, catalog);
+  return [...new Set([...Object.keys(catalog), ...Object.keys(profile.vegetative)])].flatMap(
+    (key) => {
+      const vegetative = profile.vegetative[key],
+        generative = profile.generative[key];
+      if (!Number.isFinite(vegetative) || !Number.isFinite(generative)) return [];
+      return [
+        {
+          key,
+          label: parameterLabels[key] || key.replaceAll("_", " "),
+          unit: setpointUnit(key, catalog[key]?.unit),
+          vegetative,
+          generative,
+          value: at[key],
+          now: before[key],
+        },
+      ];
+    },
+  );
 }
 export function interpolate(
   profile: SteeringProfile | undefined,
