@@ -29,7 +29,13 @@ ISSUE_IDS = (
     "fused_sensor_unavailable",
     "strategy_hold",
     "strategy_degraded",
+    "entities_moved",
 )
+# The platforms whose entities the controller reads by exact id and has no other way to find.
+# Fused sensors are left out: the controller tolerates their legacy naming and an add-on option
+# can map them. The descriptor is found by scanning; the heartbeat is the controller's own.
+_READ_BY_ID = ("number", "switch", "select")
+_MOVED_SHOWN = 6
 
 
 def _iid(base: str, slug: str) -> str:
@@ -124,19 +130,79 @@ def _strategy_hold(plan, heartbeat):
     return None, None
 
 
+def moved_entities(hass: HomeAssistant, entry: ConfigEntry) -> list[tuple[str, str]]:
+    """This room's entities that are not where the controller reads them -> [(now, expected)].
+
+    The controller, the dashboard and the MCP tools find a setting by its exact entity id
+    (`number.crop_steering_<room>zone_1_plant_count`). Home Assistant keeps whatever id an entity
+    was first registered under, so a room created by stale code, an id edited in Settings, or a
+    collision that left `..._2` behind, leaves the setting somewhere nothing looks: the controller
+    runs on its built-in default and says only "setpoint entities missing".
+
+    Reported only when the expected id holds NOTHING (no state, no registry entry). An install
+    that works has its entities at these ids already, so this stays quiet there; and nothing is
+    renamed for the operator, because an id they chose on purpose is theirs to keep.
+    """
+    from homeassistant.helpers import entity_registry as er
+
+    registry = er.async_get(hass)
+    prefix = room_prefix(entry)
+    head = f"{DOMAIN}_{entry.entry_id}_"
+    moved = []
+    for item in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if item.domain not in _READ_BY_ID or not str(item.unique_id).startswith(head):
+            continue
+        expected = f"{item.domain}.{DOMAIN}_{prefix}{item.unique_id[len(head):]}"
+        if (
+            item.entity_id != expected
+            and registry.async_get(expected) is None
+            and hass.states.get(expected) is None
+        ):
+            moved.append((item.entity_id, expected))
+    return sorted(moved)
+
+
+def _check_moved(hass: HomeAssistant, entry: ConfigEntry, slug: str) -> None:
+    try:
+        moved = moved_entities(hass, entry)
+    except (
+        Exception
+    ) as e:  # a registry this cannot read is no reason to skip the other checks
+        _LOGGER.debug("moved-entity check skipped: %s", e)
+        return
+    shown = "\n".join(
+        f"- `{now}` should be `{expected}`" for now, expected in moved[:_MOVED_SHOWN]
+    )
+    more = len(moved) - _MOVED_SHOWN
+    _issue(
+        hass,
+        bool(moved),
+        _iid("entities_moved", slug),
+        ir.IssueSeverity.WARNING,
+        {
+            "count": str(len(moved)),
+            "entities": shown + (f"\n- and {more} more" if more > 0 else ""),
+        },
+    )
+
+
 def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Evaluate one room's setup health and create/clear its Repairs issues."""
     try:
         prefix = room_prefix(entry)
         slug = entry.data.get("room_slug", "default")
         zones = entry.data.get("zones", {}) or {}
+        # Before the room-off stand-down: this is a fault of the setup, not of a room that is
+        # resting, and it is best found before the room is switched on.
+        _check_moved(hass, entry, slug)
 
         # Room switched OFF (nothing growing): unplugged probes and an idle engine are expected,
         # so clear this room's issues and stand down. A missing switch (older install) means ON.
         room = hass.states.get(f"switch.{DOMAIN}_{prefix}room_active")
         if room is not None and str(room.state).lower() == "off":
             for base in ISSUE_IDS:
-                _issue(hass, False, _iid(base, slug), ir.IssueSeverity.WARNING)
+                if base != "entities_moved":
+                    _issue(hass, False, _iid(base, slug), ir.IssueSeverity.WARNING)
             return
 
         # Kill switch + engine heartbeat are per-room: the engine drives EVERY configured
