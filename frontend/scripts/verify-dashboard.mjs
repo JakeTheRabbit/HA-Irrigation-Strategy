@@ -288,6 +288,81 @@ try {
       facts.captions.join(" | "),
     );
   });
+  await check(
+    "overview: the grow day tracks today against yesterday, a typical day and its targets",
+    async () => {
+      await go("overview");
+      const timeline = page.locator("[data-day-timeline]");
+      const lane = timeline.locator(".timeline-zone").first();
+      const layer = (name) => lane.locator(`[data-layer="${name}"]`);
+      // The earlier days load after today's: yesterday's line is the last to arrive.
+      await expectVisible(layer("yesterday"));
+      for (const name of ["targets", "projected", "expected", "yesterday-shots"])
+        assert.equal(await layer(name).count(), 1, `the ${name} layer is drawn`);
+      const line = lane.locator(".timeline-zone-line");
+      assert.match(
+        await line.textContent(),
+        /% now · [+−±][\d.]+ pts vs yesterday at .+ · P1 target [\d.]+% /,
+      );
+      assert.match(await line.textContent(), /L so far \([+−±][\d.]+ L\)/);
+      const key = timeline.getByRole("list", { name: "Timeline key" });
+      for (const [name, layers] of [
+        ["Yesterday", ["yesterday", "yesterday-shots"]],
+        ["Projected (estimate)", ["projected", "expected"]],
+        ["Target for the phase", ["targets"]],
+      ]) {
+        const toggle = key.getByRole("button", { name, exact: true });
+        assert.equal(await toggle.getAttribute("aria-pressed"), "true");
+        await toggle.click();
+        assert.equal(await toggle.getAttribute("aria-pressed"), "false");
+        for (const hidden of layers) assert.equal(await layer(hidden).count(), 0, `${name} hides`);
+      }
+      // The choices are remembered in the browser.
+      await page.reload({ waitUntil: "networkidle" });
+      await expectVisible(lane);
+      assert.equal(
+        await key
+          .getByRole("button", { name: "Target for the phase" })
+          .getAttribute("aria-pressed"),
+        "false",
+      );
+      for (const name of ["Yesterday", "Projected (estimate)", "Target for the phase"])
+        await key.getByRole("button", { name, exact: true }).click();
+      await expectVisible(layer("yesterday"));
+      assert.equal(await layer("targets").count(), 1);
+      const compare = timeline.getByLabel("Compare with");
+      await compare.selectOption("typical");
+      await expectVisible(layer("typical"));
+      assert.ok(
+        (await layer("typical").locator(".typical-band").getAttribute("d")).length > 100,
+        "the typical day is a p25-p75 band",
+      );
+      assert.equal(await layer("yesterday").count(), 0);
+      await expectVisible(key.getByRole("button", { name: "Typical (7 days)", exact: true }));
+      assert.match(await line.textContent(), /pts vs typical at /);
+      await axe("overview grow day, typical");
+      await compare.selectOption("none");
+      assert.equal(await layer("typical").count(), 0);
+      assert.doesNotMatch(await line.textContent(), / vs (yesterday|typical)/);
+      await compare.selectOption("yesterday");
+      await expectVisible(layer("yesterday"));
+      // Dark: the timeline's own layers and controls, as the error codes are checked below.
+      await page.evaluate(() => document.documentElement.classList.add("dark"));
+      await page.evaluate(
+        () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+      );
+      const dark = await new AxeBuilder({ page })
+        .include("[data-day-timeline]")
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze();
+      await page.evaluate(() => document.documentElement.classList.remove("dark"));
+      assert.deepEqual(
+        dark.violations.map((v) => v.id),
+        [],
+        "The grow day must be readable on a dark theme",
+      );
+    },
+  );
   await check("overview: two screens at most, zones beside the tank", async () => {
     // 1440×800 ≈ the browser window of a 1440×900 laptop; the Overview was 3.2 screens tall.
     await page.setViewportSize({ width: 1440, height: 800 });

@@ -1,21 +1,40 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   alignBands,
   appendLive,
+  atHour,
+  compareDays,
+  dayTrace,
   dryDown,
   duration,
+  earlierDays,
+  earlierEntities,
+  earlierTraces,
   growDay,
+  joinRows,
   levels,
+  morningDryback,
   nextShot,
+  NOT_REPORTING,
+  openSeconds,
   phaseAt,
   phaseBands,
+  phaseTargets,
+  reachedHour,
   readings,
+  revisionAt,
   setpointChanges,
+  setpointSteps,
   timelineEntities,
+  typicalDay,
+  unprojected,
+  valueAt,
   valveShots,
   zoneBlocks,
   type Block,
+  type DayTrace,
   type GrowDay,
+  type PhaseBand,
   type Reading,
   type Shot,
   type TimelineRow,
@@ -603,6 +622,394 @@ describe("the demo's day", () => {
     expect(zoneBlocks(f1.decisions, 3, f1.day.start, now)).toEqual([
       expect.objectContaining({ kind: "hold", text: "zone disabled", open: true }),
     ]);
+  });
+});
+
+describe("earlier grow-days on today's axis", () => {
+  // NZ daylight saving starts 02:00 on 27 September 2026: the grow-day from 10:00 NZST on the 26th
+  // to 10:00 NZDT on the 27th is 23 hours long.
+  let zone: string | undefined;
+  beforeAll(() => {
+    zone = process.env.TZ;
+    process.env.TZ = "Pacific/Auckland";
+  });
+  afterAll(() => {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  });
+  const z = (iso: string) => Date.parse(iso);
+  const tenToTen = () => ({ on: 10, off: 22 });
+  it("a clock change makes a 23-hour grow-day, placed by hours since its own lights-on", () => {
+    const day = growDay(10, 22, z("2026-09-27T01:00:00Z"))!; // 14:00 NZDT on the 27th
+    const [yesterday, before] = earlierDays(day, 2, tenToTen);
+    expect(yesterday).toEqual({
+      start: z("2026-09-25T22:00:00Z"), // 10:00 NZST
+      lightsOff: z("2026-09-26T10:00:00Z"), // 22:00 NZST
+      end: z("2026-09-26T21:00:00Z"), // 10:00 NZDT
+    });
+    expect((yesterday.end - yesterday.start) / 3_600_000).toBe(23);
+    expect(before.end - before.start).toBe(24 * 3_600_000);
+    // A reading at 09:50 NZDT is 22 h 50 min after that day's lights-on, not 23 h 50 min.
+    const rows = {
+      vwc: [0, 5, 10, 22.8333].map((hour, index) =>
+        row(String(30 - index), yesterday.start + hour * 3_600_000),
+      ),
+    };
+    const trace = dayTrace(rows, { vwc: "vwc", valve: null, active: null }, 1, yesterday)!;
+    expect(trace.points.at(-1)!.hour).toBeCloseTo(22.8333, 3);
+    expect(atHour(trace.points, 22.8333)).toBe(27);
+  });
+  it("a changed schedule moves the day's lights-on, and its lights-off with it", () => {
+    const day = growDay(10, 22, z("2026-09-23T03:00:00Z"))!; // 15:00 NZST on the 23rd
+    const change = (at: string) => (time: number) =>
+      time < z(at) ? { on: 8, off: 20 } : { on: 10, off: 22 };
+    // Changed in the evening: the 22nd came on at 08:00 and ran 26 hours to today's 10:00.
+    const [evening] = earlierDays(day, 1, change("2026-09-22T09:00:00Z"));
+    expect(evening).toEqual({
+      start: z("2026-09-21T20:00:00Z"), // 08:00 on the 22nd
+      lightsOff: z("2026-09-22T08:00:00Z"), // 20:00
+      end: day.start,
+    });
+    // Changed before 08:00 on the 22nd: that day came on at 10:00, the one before ran 26 hours.
+    const [early, earlier] = earlierDays(day, 2, change("2026-09-21T19:00:00Z"));
+    expect(early.start).toBe(z("2026-09-21T22:00:00Z"));
+    expect(earlier.start).toBe(z("2026-09-20T20:00:00Z"));
+    expect((earlier.end - earlier.start) / 3_600_000).toBe(26);
+  });
+  it("reads the lights hours, the room switch and the setup revision from the recorded week", () => {
+    const states = createDemo(z("2026-09-23T03:00:00Z"));
+    const room = buildRoom(
+      states,
+      discoverRooms(states).find((item) => item.prefix === "")!,
+    );
+    const read = earlierEntities(room, states);
+    for (const id of [
+      "sensor.crop_steering_vwc_zone_1",
+      "switch.demo_valve_3",
+      "number.crop_steering_lights_on_hour",
+      "switch.crop_steering_room_active",
+    ])
+      expect(read.entityIds).toContain(id);
+    expect(read.entityIds.some((id) => /phase|threshold|decision/.test(id))).toBe(false);
+    expect(read.attributeIds).toEqual(["sensor.crop_steering_engine_config"]);
+    const day = growDay(10, 22, z("2026-09-23T03:00:00Z"))!;
+    const days = earlierDays(day, 7, tenToTen);
+    const config = read.attributeIds[0];
+    const vwc = days.flatMap((past) =>
+      [0, 6, 12].map((hour) => row("30", past.start + hour * 3_600_000)),
+    );
+    const week = {
+      "sensor.crop_steering_vwc_zone_1": vwc,
+      // Moved to 08:00 on the 20th: its grow-day came on then.
+      "number.crop_steering_lights_on_hour": [
+        row("10", days[6].start),
+        row("8", z("2026-09-19T21:00:00Z")),
+      ],
+      "switch.crop_steering_room_active": [
+        row("on", days[6].start),
+        row("off", days[1].start + 3_600_000),
+        row("on", days[1].start + 7_200_000),
+      ],
+      [config]: [
+        row("ready", days[6].start, { setup_revision: 4 }),
+        row("ready", days[3].start + 3_600_000),
+        row("ready", days[2].start + 3_600_000, { setup_revision: 5 }),
+      ],
+    };
+    const cut = earlierTraces(week, room, day, { on: 10, off: 22 }, config);
+    const zone1 = cut.traces.get(1)!;
+    // The day before yesterday the room was switched off for an hour: nothing to compare.
+    expect(zone1.map((trace) => trace !== null)).toEqual([
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(cut.setup).toEqual([5, 5, 4, 4, 4, 4, 4]);
+    expect(revisionAt(week[config], days[3].start + 3_600_000 + 1)).toBe(4);
+    expect(revisionAt(week[config], days[6].start - 1)).toBeNull();
+    expect(cut.traces.get(2)!.every((trace) => trace === null)).toBe(true); // nothing recorded
+  });
+});
+
+describe("how today is tracking", () => {
+  const START = at("22:00:00");
+  const hours = (list: [number, number][]) =>
+    list.map(([hour, value]) => ({ hour, value, time: START + hour * 3_600_000 }));
+  const day: GrowDay = {
+    start: START,
+    lightsOff: START + 12 * 3_600_000,
+    end: START + 24 * 3_600_000,
+  };
+  const shot = (from: number, seconds: number): Shot => ({
+    start: START + from * 3_600_000,
+    end: START + from * 3_600_000 + seconds * 1000,
+    open: false,
+    phase: null,
+    reason: null,
+  });
+  // Yesterday: a P1 ramp from 25 % that reached the 28.4 % target at 1.5 h, then P2.
+  const yesterday: DayTrace = {
+    day,
+    points: hours([
+      [0, 26],
+      [0.5, 25],
+      [1, 27],
+      [1.5, 28.6],
+      [3, 27.6],
+      [3.3, 27],
+      [3.5, 26.6],
+    ]),
+    shots: [shot(0.6, 120), shot(1, 150), shot(3.4, 90)],
+  };
+  it("VWC now, the P1 target and water so far against yesterday at the same hour", () => {
+    const now = compareDays([yesterday], 3.25, 28.1, 28.4)!;
+    expect(now.vwc).toBeCloseTo(28.1 - 27.1, 6); // yesterday read 27.1 % a quarter past three hours in
+    expect(now.reached).toBe(1.5);
+    expect(now.reachedBy).toBe(1);
+    expect(now.seconds).toBe(270); // the two shots before 3.25 h, not the one at 3.4 h
+    expect(openSeconds(yesterday.shots, START, 3.41)).toBeCloseTo(270 + 36, 6); // 36 s of the third
+    // Readings too far apart to read between, and none near: nothing.
+    expect(atHour(yesterday.points, 2.25)).toBeNull();
+    // Today reached 28.4 % ten minutes later than yesterday.
+    expect(
+      reachedHour(
+        hours([
+          [0, 25],
+          [1.5, 28],
+          [1.6667, 28.5],
+        ]),
+        28.4,
+      ),
+    ).toBeCloseTo(1.6667, 4);
+  });
+  it("a P1 target yesterday never reached, and a day that started above it", () => {
+    const short = {
+      ...yesterday,
+      points: hours([
+        [0, 26],
+        [2, 28],
+        [4, 27],
+      ]),
+    };
+    expect(compareDays([short], 3, 28, 28.4)).toMatchObject({ reached: null, reachedBy: 0 });
+    expect(
+      reachedHour(
+        hours([
+          [0, 29],
+          [1, 30],
+        ]),
+        28.4,
+      ),
+    ).toBe(0);
+    expect(reachedHour([], 28.4)).toBeNull();
+  });
+  it("a typical day reaches the P1 target only when its median day did", () => {
+    const at = (hour: number | null): DayTrace => ({
+      ...yesterday,
+      points: hours(
+        hour === null
+          ? [
+              [0, 26],
+              [3, 27],
+            ]
+          : [
+              [0, 26],
+              [hour, 29],
+              [3, 27],
+            ],
+      ),
+    });
+    // One of three days reached 28.4 %: the typical day did not.
+    expect(compareDays([at(1), at(null), at(null)], 3, 28, 28.4)).toMatchObject({
+      reached: null,
+      reachedBy: 1,
+    });
+    // Two of three did: the median day's time, the later of the two.
+    expect(compareDays([at(1), at(2), at(null)], 3, 28, 28.4)).toMatchObject({
+      reached: 2,
+      reachedBy: 2,
+    });
+    expect(compareDays([at(1), at(2), at(1.5)], 3, 28, 28.4)!.reached).toBe(1.5);
+  });
+  it("no recorded day: nothing to compare, and no line", () => {
+    expect(compareDays([], 3, 28, 28.4)).toBeNull();
+    const empty = dayTrace(
+      { vwc: [row("27", START)] },
+      { vwc: "vwc", valve: null, active: null },
+      1,
+      day,
+    );
+    expect(empty).toBeNull();
+    const off = dayTrace(
+      { vwc: [row("27", START), row("26", START + 3_600_000)], active: [row("off", START - 1)] },
+      { vwc: "vwc", valve: null, active: "active" },
+      1,
+      day,
+    );
+    expect(off).toBeNull();
+  });
+  it("the typical day: the median and middle half of the days recorded, where three or more were", () => {
+    const days = [0, 1, 2, 3, 4].map((offset) =>
+      hours(Array.from({ length: 13 }, (_, index) => [index / 2, 25 + offset] as [number, number])),
+    );
+    days[3] = days[3].filter((point) => point.hour <= 3); // one day stopped recording at 3 h
+    const typical = typicalDay(days);
+    expect(typical[0]).toEqual({ hour: 0, low: 26, median: 27, high: 28 });
+    expect(typical.find((point) => point.hour > 4)).toMatchObject({
+      low: 25.75,
+      median: 26.5,
+      high: 27.5,
+    });
+    expect(typical.at(-1)!.hour).toBeCloseTo(6, 9);
+    expect(typicalDay(days.slice(0, 2))).toEqual([]); // two days are not a typical one
+  });
+  it("targets: the P0 dryback level under the peak, a setpoint changed mid-day, a plan's snapshot", () => {
+    const threshold = "number.crop_steering_zone_2_p2_vwc_threshold";
+    const rows = {
+      [threshold]: [row("26.6", START - 3_600_000), row("27.2", START + 4 * 3_600_000)],
+    };
+    const parameters = {
+      dryback_target: 10,
+      p1_target_vwc: 28.4,
+      p2_vwc_threshold: 27.2,
+      p3_emergency_vwc_threshold: 20,
+    };
+    const bands: PhaseBand[] = [
+      { phase: "P0", start: START, end: START + 3_600_000 },
+      { phase: "P1", start: START + 3_600_000, end: START + 2 * 3_600_000 },
+      { phase: "P2", start: START + 2 * 3_600_000, end: START + 12 * 3_600_000 },
+      { phase: "P3", start: START + 12 * 3_600_000, end: day.end },
+    ];
+    const points = [
+      row("25", START),
+      row("26", START + 600_000),
+      row("25.2", START + 1_800_000),
+    ].map((item) => ({ time: item.time, value: Number(item.state) }));
+    const manual = setpointSteps(
+      rows,
+      parameters,
+      (key) => (key === "p2_vwc_threshold" ? threshold : null),
+      false,
+    );
+    expect(
+      phaseTargets(bands, manual, points).map(({ phase, value, start }) => [
+        phase,
+        value,
+        (start - START) / 3_600_000,
+      ]),
+    ).toEqual([
+      ["P0", 26 * 0.9, 0], // 10 % below the highest reading since P0 began
+      ["P1", 28.4, 1],
+      ["P2", 26.6, 2],
+      ["P2", 27.2, 4], // changed at 4 h
+      ["P3", 20, 12],
+    ]);
+    // A plan armed: its snapshot's values, whatever the numbers recorded.
+    const planned = setpointSteps(
+      rows,
+      { ...parameters, p2_vwc_threshold: 25 },
+      () => threshold,
+      true,
+    );
+    expect(phaseTargets(bands, planned, points).filter((step) => step.phase === "P2")).toEqual([
+      { phase: "P2", value: 25, start: bands[2].start, end: bands[2].end },
+    ]);
+    // In P0 now: the projected rest of P0 keeps the level from the peak since P0 began.
+    const now = START + 1_800_000;
+    const ongoing: PhaseBand[] = [
+      { phase: "P0", start: START, end: now },
+      { phase: "P0", start: now, end: START + 3_600_000 },
+    ];
+    expect(phaseTargets(ongoing, manual, points).map((step) => step.value)).toEqual([
+      26 * 0.9,
+      26 * 0.9,
+    ]);
+    // Without a dryback target (no steering mode) P0 has no target.
+    expect(
+      phaseTargets(
+        bands.slice(0, 1),
+        setpointSteps({}, {}, () => null, false),
+        points,
+      ),
+    ).toEqual([]);
+  });
+  it("how far P0 dried, as the engine measures it", () => {
+    const points = [
+      { time: START, value: 30 },
+      { time: START + 600_000, value: 30.5 },
+      { time: START + 1_800_000, value: 28.1 },
+      { time: START + 5_000_000, value: 20 },
+    ];
+    expect(morningDryback(points, { start: START, end: START + 3_600_000 })).toBeCloseTo(
+      ((30.5 - 28.1) / 30.5) * 100,
+      6,
+    );
+    expect(morningDryback(points, { start: 0, end: 1 })).toBeNull();
+  });
+  it("a controller not reporting gets no projection, only when it last reported", () => {
+    const now = at("03:00:00");
+    expect(unprojected(NOT_REPORTING, now - 12 * 60_000, now)).toBe(
+      "no projection: last report 12 min ago",
+    );
+    expect(unprojected(NOT_REPORTING, null, now)).toBe(
+      "no projection: no report from the controller",
+    );
+    expect(unprojected("the room is off", null, now)).toBe("not watering: the room is off");
+    expect(unprojected(null, now, now)).toBeNull();
+  });
+  it("joins a week of day-sized requests into one history per entity", () => {
+    const joined = joinRows([{ a: [row("2", 20)], b: [row("x", 5)] }, { a: [row("1", 10)] }]);
+    expect(joined).toEqual({ a: [row("1", 10), row("2", 20)], b: [row("x", 5)] });
+    expect(valueAt([row("8", 10), row("unavailable", 20), row("10", 30)], 25)).toBe(8);
+    expect(valueAt([row("8", 10)], 5)).toBeNull();
+  });
+});
+
+describe("the demo's earlier days", () => {
+  it("run on from today's curve, with shots of their own", () => {
+    const now = new Date(2026, 8, 23, 17, 0).getTime();
+    const states = createDemo(now);
+    const room = buildRoom(
+      states,
+      discoverRooms(states).find((item) => item.prefix === "")!,
+    );
+    const day = growDay(10, 22, now)!;
+    const [yesterday] = earlierDays(day, 1, () => ({ on: 10, off: 22 }));
+    const ids = earlierEntities(room, states);
+    const before = demoDay(states, { ...ids, start: yesterday.start, end: yesterday.end }, now);
+    const today = demoDay(states, { ...ids, start: day.start, end: now }, now);
+    const vwc = "sensor.crop_steering_vwc_zone_1";
+    // Yesterday ends where today begins, on the same curve.
+    const last = before[vwc].at(-1)!,
+      first = today[vwc][0];
+    expect(Math.abs(Number(last.state) - Number(first.state))).toBeLessThan(0.5);
+    // A room switched off now was on yesterday: that day still compares.
+    const active = "switch.crop_steering_room_active";
+    const off = demoDay(
+      { ...states, [active]: { ...states[active], state: "off" } },
+      { ...ids, start: yesterday.start, end: yesterday.end },
+      now,
+    );
+    expect(off[active]).toEqual([row("on", yesterday.start)]);
+    expect(dayTrace(off, { vwc, valve: null, active }, 1, yesterday)).not.toBeNull();
+    const trace = dayTrace(
+      before,
+      { vwc, valve: "switch.demo_valve_1", active: null },
+      1,
+      yesterday,
+    )!;
+    expect(trace.shots.length).toBeGreaterThan(6);
+    const seconds = (shots: Shot[]) => shots.map((item) => (item.end - item.start) / 1000);
+    expect(seconds(trace.shots)).not.toEqual(
+      seconds(valveShots(today["switch.demo_valve_1"], [], 1, day.start, now)).slice(
+        0,
+        trace.shots.length,
+      ),
+    );
   });
 });
 

@@ -303,7 +303,8 @@ function cycleHistory(
 /** A recorded grow-day for the day timeline, on the demo probes' own day shape (P0 dryback, a
  * six-shot P1 ramp, P2 top-ups every 75 minutes, P3 two hours before lights-off), each zone shifted
  * like its probe so its shots land where its readings jump. Flower 2's zone 2 waits out a feed-EC
- * hold that ends when the feed band is widened; Flower 1's zone 3 is held since it was disabled. */
+ * hold that ends when the feed band is widened; Flower 1's zone 3 is held since it was disabled.
+ * Earlier grow-days, to compare today with, come from the same curve. */
 export function demoDay(states: States, request: TimelineRequest, now = Date.now()): TimelineRows {
   const end = Math.min(now, request.end);
   const wanted = new Set([...request.entityIds, ...request.attributeIds]);
@@ -319,9 +320,17 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
         { state: states[id].state, time },
       ]);
   };
-  // Anything not drawn below held its current value all day.
+  // Anything not drawn below held its current value all day, but a room switched off now was on
+  // in the days before.
+  const past = request.end < now - 60_000;
   for (const id of wanted)
-    if (states[id]) put(id, [{ state: states[id].state, time: request.start }]);
+    if (states[id])
+      put(id, [
+        {
+          state: past && id.endsWith("room_active") ? "on" : states[id].state,
+          time: request.start,
+        },
+      ]);
   for (const config of Object.values(states)) {
     if (!/^sensor\.crop_steering_.*engine_config$/.test(config.entity_id)) continue;
     const prefix = String(config.attributes.prefix ?? "");
@@ -349,13 +358,19 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
       ]);
       const hold = !prefix && zone === 2 ? [2.5, 2.7] : null;
       const disabled = prefix && zone === 3 ? 6 : Infinity;
+      // Each grow-day's shots run a little longer or shorter than the day before's.
+      const drift = 1 + 0.12 * Math.sin(new Date(request.start).getDate() * 1.9 + zone);
       const shots: { hour: number; seconds: number; text: string }[] = [];
       for (let shot = 0, hour = 1.5; shot < 6; shot++, hour += 1 / 3) {
         if (hold && hour >= hold[0] && hour < hold[1]) hour = hold[1];
-        shots.push({ hour, seconds: 90 + 15 * shot, text: `P1 P1 ramp shot ${shot + 1}/6 (demo)` });
+        shots.push({
+          hour,
+          seconds: Math.round((90 + 15 * shot) * drift),
+          text: `P1 P1 ramp shot ${shot + 1}/6 (demo)`,
+        });
       }
       for (let hour = 4.75; hour < Math.min(p3, disabled); hour += 1.25)
-        shots.push({ hour, seconds: 150, text: "P2 P2 top-up (demo)" });
+        shots.push({ hour, seconds: Math.round(150 * drift), text: "P2 P2 top-up (demo)" });
       const valve: TimelineRow[] = [{ state: "off", time: request.start }];
       for (const shot of shots) {
         const start = at(shot.hour),
@@ -384,7 +399,8 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
           { time: at(disabled), zone, list: "blocked", text: "P2 zone disabled" },
           { time: at(p3), zone, list: "blocked", text: null },
         );
-      const recorded = demoHistory(states, [vwc], (end - request.start) / 3_600_000, end);
+      // Every day on one curve that ends at the live reading, so an earlier day joins up with today.
+      const recorded = demoHistory(states, [vwc], (now - request.start) / 3_600_000, now);
       put(
         vwc,
         (recorded[0]?.points ?? []).map((point) => ({

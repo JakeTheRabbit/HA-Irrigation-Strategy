@@ -2,32 +2,56 @@ import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, number, time as clock } from "@/components/dashboard";
-import { ageText, ageTone } from "@/lib/controller-health";
+import { ageText, ageTone, readHeartbeat } from "@/lib/controller-health";
 import {
   alignBands,
   appendLive,
+  atHour,
+  compareDays,
   duration,
+  earlierDays,
+  earlierEntities,
+  earlierTraces,
   growDay,
-  levels,
+  joinRows,
+  morningDryback,
   nextShot,
+  NOT_REPORTING,
+  openSeconds,
   phaseAt,
   phaseBands,
+  phaseTargets,
+  reachedHour,
   readings,
   setpointChanges,
+  setpointSteps,
   timelineEntities,
+  typicalDay,
+  unprojected,
   valveShots,
   zoneBlocks,
   type Block,
+  type Comparison,
+  type DayTrace,
   type GrowDay,
-  type Level,
   type NextShot,
   type PhaseBand,
   type Reading,
   type SetpointChange,
   type Shot,
+  type TargetStep,
   type TimelineRows,
+  type TypicalPoint,
 } from "@/lib/day-timeline";
-import { numeric } from "@/lib/model";
+import { descriptor, numeric } from "@/lib/model";
+import {
+  buildPlanningCurve,
+  dryRates,
+  projectFrom,
+  smoothRecorded,
+  type PlanningPhaseId,
+} from "@/lib/planning-curve";
+import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import type { Controller, Setting, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import { estimateRuntime, flowInputs, waterParameters } from "@/lib/water-delivery";
@@ -44,13 +68,18 @@ const HELD: Record<Block["kind"], string> = {
   block: "blocked",
   hold: "held",
 };
-const LEGEND = [
-  ...Object.entries(PHASES).map(([phase, name]) => [`key-phase phase-${phase}`, name]),
+const TARGETS: Record<string, string> = {
+  P0: "Dryback target",
+  P1: "P1 target",
+  P2: "P2 threshold",
+  P3: "Emergency floor",
+};
+const MARKS = [
   ["key-shot", "Shot (valve open)"],
+  ["key-expected", "Expected shot"],
   ["key-cap", "Blocked or budget spent"],
   ["key-hold", "Held by a gate"],
   ["key-change", "Setpoint change"],
-  ["key-estimate", "Estimate"],
   ["key-night", "Lights off"],
 ];
 const NO_ESTIMATE: Partial<Record<NextShot["basis"], string>> = {
@@ -61,10 +90,39 @@ const NO_ESTIMATE: Partial<Record<NextShot["basis"], string>> = {
   "no-reading": "no live VWC reading",
   "ramp-done": "the ramp is at its ceiling, P2 is next",
 };
+type Compare = "yesterday" | "typical" | "none";
+/** What the chart draws besides today, remembered in this browser. `compared` is the comparison's
+ * layer: yesterday's line, or the typical band. */
+interface Layers {
+  projected: boolean;
+  compared: boolean;
+  targets: boolean;
+  compare: Compare;
+}
+const LAYERS_KEY = "crop-steering-timeline-layers";
+function storedLayers(): Layers {
+  let saved: Partial<Layers> | null = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(LAYERS_KEY) ?? "null");
+  } catch {
+    /* no storage: the defaults */
+  }
+  return {
+    projected: saved?.projected !== false,
+    compared: saved?.compared !== false,
+    targets: saved?.targets !== false,
+    compare:
+      saved?.compare === "typical" || saved?.compare === "none" ? saved.compare : "yesterday",
+  };
+}
 interface Change extends SetpointChange {
   label: string;
   unit: string;
   zoneId?: number;
+}
+interface Projection {
+  points: (Reading & { phase: string })[];
+  shots: { time: number; phase: string; size: number | null; emergency: boolean }[];
 }
 interface Lane {
   zone: Zone;
@@ -72,7 +130,6 @@ interface Lane {
   shots: Shot[];
   blocks: Block[];
   points: Reading[];
-  threshold: Level[];
   changes: Change[];
   phase: string | null;
   since: number | null;
@@ -82,9 +139,27 @@ interface Lane {
   /** Why this zone is not being watered at all, if it is not. */
   stopped: string | null;
   p1Shots: number;
-  p1Max: number | null;
-  budget: number | null;
   litres: (seconds: number) => number | null;
+  /** What the controller aims at, phase by phase: as recorded, then along the projection. */
+  targets: TargetStep[];
+  projection: Projection | null;
+  /** The grow-day before today, and every earlier one there is to compare (latest first). */
+  yesterday: DayTrace | null;
+  past: DayTrace[];
+  typical: TypicalPoint[];
+  comparison: Comparison | null;
+  /** The P1 target, and when today first reached it (hours since lights-on). */
+  level: number | null;
+  reached: number | null;
+  /** Valve-open seconds today, until now. */
+  seconds: number;
+  dryback: number | null;
+  drybackTarget: number | null;
+  /** Rooms & setup was saved after the day compared with began. */
+  setupNote: string | null;
+  /** What the lane line ends with: why the zone is not watered, or held, or how old the last report
+   * is. */
+  status: string | null;
 }
 interface Mark {
   x0: number;
@@ -95,10 +170,99 @@ interface Mark {
   rank: number;
   text: (time: number) => string;
 }
+/** Earlier grow-days as loaded: per zone, each day's trace, yesterday first (null where there is
+ * nothing to compare), and the room's setup revision as each day began. */
+interface Earlier {
+  key: string;
+  traces: Map<number, (DayTrace | null)[]>;
+  setup: (number | null)[];
+  error: string;
+}
+/** Past grow-days do not change, so a room's week is loaded once per grow-day and kept while the
+ * page is open. */
+const earlierLoads = new Map<string, Promise<TimelineRows>>();
+/** Runs `tasks` two at a time; no more start once one has failed. */
+async function inPairs<T>(tasks: (() => Promise<T>)[]): Promise<T[]> {
+  const results: T[] = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < tasks.length) {
+      const index = next++;
+      try {
+        results[index] = await tasks[index]();
+      } catch (error) {
+        next = tasks.length;
+        throw error;
+      }
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  return results;
+}
+/** The seven grow-days before today: one request per day, over the transport and within the room
+ * that today's use, cut where each day's lights actually came on. Null while loading. */
+function useEarlierDays(controller: Controller, day: GrowDay | null, ready: boolean) {
+  const { room, states } = controller;
+  const ids = earlierEntities(room, states);
+  const hours = {
+    on: numeric(states[`number.crop_steering_${room.room.prefix}lights_on_hour`]),
+    off: numeric(states[`number.crop_steering_${room.room.prefix}lights_off_hour`]),
+  };
+  const key =
+    day && ids.entityIds.length
+      ? [controller.demo, room.room.id, day.start, hours.on, hours.off, ...ids.entityIds, "|"]
+          .concat(ids.attributeIds)
+          .join(" ")
+      : "";
+  const [earlier, setEarlier] = useState<Earlier | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const latest = useRef({ room, ids, day, hours });
+  latest.current = { room, ids, day, hours };
+  const load = controller.timeline;
+  useEffect(() => {
+    const { room, ids, day, hours } = latest.current;
+    if (!key || !ready || !day) return;
+    let current = true,
+      retry: number | undefined;
+    let pending = earlierLoads.get(key);
+    if (!pending) {
+      const windows = earlierDays(day, 7, () => hours);
+      pending = inPairs(
+        windows.map((window) => () => load({ ...ids, start: window.start, end: window.end })),
+      ).then(joinRows);
+      // A page left open for days keeps only its latest few weeks.
+      if (earlierLoads.size >= 4) earlierLoads.delete(earlierLoads.keys().next().value!);
+      earlierLoads.set(key, pending);
+      pending.catch(() => earlierLoads.delete(key));
+    }
+    pending.then(
+      (rows) => {
+        if (current)
+          setEarlier({
+            key,
+            ...earlierTraces(rows, room, day, hours, ids.attributeIds[0]),
+            error: "",
+          });
+      },
+      (reason) => {
+        if (!current) return;
+        setEarlier({ key, traces: new Map(), setup: [], error: errorText(reason) });
+        // A failed load is not kept: try again in a minute.
+        retry = window.setTimeout(() => setAttempt((value) => value + 1), 60_000);
+      },
+    );
+    return () => {
+      current = false;
+      window.clearTimeout(retry);
+    };
+  }, [key, ready, load, attempt]);
+  return earlier?.key === key ? earlier : null;
+}
 
 /** The selected room's grow-day on one time axis: lights, each zone's phases, every shot, what held
- * a zone back and every setpoint change, as recorded; then a dashed estimate of the rest of the day.
- * The day is downloaded once when the page opens; live updates extend it from there. */
+ * a zone back and every setpoint change, as recorded; then the rest of the day as projected, the
+ * target for each phase, and yesterday's day (or a typical one) to compare with. Today is downloaded
+ * once when the page opens and live updates extend it; the earlier days are downloaded once. */
 export function DayTimeline({ controller }: { controller: Controller }) {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -106,6 +270,16 @@ export function DayTimeline({ controller }: { controller: Controller }) {
     const timer = window.setInterval(() => tick((value) => value + 1), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+  const [layers, setLayers] = useState(storedLayers);
+  const change = (next: Partial<Layers>) => {
+    const merged = { ...layers, ...next };
+    setLayers(merged);
+    try {
+      localStorage.setItem(LAYERS_KEY, JSON.stringify(merged));
+    } catch {
+      /* The choice still applies on this page. */
+    }
+  };
   const { room, states } = controller;
   const now = Date.now();
   const prefix = room.room.prefix;
@@ -126,6 +300,7 @@ export function DayTimeline({ controller }: { controller: Controller }) {
   const latest = useRef({ states, entities, day });
   latest.current = { states, entities, day };
   const load = controller.timeline;
+  const earlier = useEarlierDays(controller, day, ready);
   useEffect(() => {
     const { entities: ids, day: today } = latest.current;
     if (!key || !ready || !today || !ids.entityIds.length) return;
@@ -164,10 +339,24 @@ export function DayTimeline({ controller }: { controller: Controller }) {
       <div className="panel-heading">
         <h2 id="day-timeline-title">Today’s grow day</h2>
         {rows && (
-          <span className="timeline-age" data-age={ageTone(age)}>
-            {controller.demo ? "Demo data · " : ""}
-            {age === null ? "Nothing recorded yet" : `Newest reading ${ageText(age)} old`}
-          </span>
+          <div className="timeline-heading-side">
+            <label htmlFor="day-timeline-compare" className="timeline-compare">
+              Compare with
+            </label>
+            <select
+              id="day-timeline-compare"
+              value={layers.compare}
+              onChange={(event) => change({ compare: event.target.value as Compare })}
+            >
+              <option value="yesterday">Yesterday</option>
+              <option value="typical">Typical (median of 7 days)</option>
+              <option value="none">None</option>
+            </select>
+            <span className="timeline-age" data-age={ageTone(age)}>
+              {controller.demo ? "Demo data · " : ""}
+              {age === null ? "Nothing recorded yet" : `Newest reading ${ageText(age)} old`}
+            </span>
+          </div>
         )}
       </div>
       {!ready && !rows ? (
@@ -201,7 +390,16 @@ export function DayTimeline({ controller }: { controller: Controller }) {
           Loading today’s recorded history…
         </div>
       ) : (
-        <Timeline controller={controller} entities={entities} day={day} rows={rows} now={now} />
+        <Timeline
+          controller={controller}
+          entities={entities}
+          day={day}
+          rows={rows}
+          now={now}
+          earlier={earlier}
+          layers={layers}
+          change={change}
+        />
       )}
     </section>
   );
@@ -213,12 +411,18 @@ function Timeline({
   day,
   rows,
   now,
+  earlier,
+  layers,
+  change,
 }: {
   controller: Controller;
   entities: ReturnType<typeof timelineEntities>;
   day: GrowDay;
   rows: TimelineRows;
   now: number;
+  earlier: Earlier | null;
+  layers: Layers;
+  change: (next: Partial<Layers>) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -240,21 +444,23 @@ function Timeline({
       return { ...change, label: setting.label, unit: setting.unit, zoneId: setting.zoneId };
     },
   );
-  const read = (zone: Zone, key: string) => {
+  const settingId = (zone: Zone, key: string) => {
     // Like the controller: the zone's own setpoint when it has one, else the room's.
-    const own = states[`number.crop_steering_${room.room.prefix}zone_${zone.id}_${key}`];
-    return numeric(own ?? states[`number.crop_steering_${room.room.prefix}${key}`]);
+    const own = `number.crop_steering_${room.room.prefix}zone_${zone.id}_${key}`;
+    return states[own] ? own : `number.crop_steering_${room.room.prefix}${key}`;
   };
+  const read = (zone: Zone, key: string) => numeric(states[settingId(zone, key)]);
+  const hourOf = (time: number) => (time - day.start) / 3_600_000;
+  const length = hourOf(day.end),
+    photoperiod = hourOf(day.lightsOff);
+  const beat = readHeartbeat(states[`sensor.crop_steering_${room.room.prefix}ai_heartbeat`], now);
+  const revision = descriptor(states, room.room)?.attributes.setup_revision;
   const lanes = room.zones.map((zone): Lane => {
     const ids = entities.zones.find((item) => item.id === zone.id);
     const shots = valveShots(ids?.valve ? rows[ids.valve] : [], decisions, zone.id, day.start, now);
     const bands = alignBands(phaseBands(ids && rows[ids.phase], day.start, now), shots);
     const blocks = zoneBlocks(decisions, zone.id, day.start, now);
     const points = ids?.vwc ? readings(rows[ids.vwc], day.start, now) : [];
-    const own = `number.crop_steering_${room.room.prefix}zone_${zone.id}_p2_vwc_threshold`;
-    const thresholdId = states[own]
-      ? own
-      : `number.crop_steering_${room.room.prefix}p2_vwc_threshold`;
     const water = waterParameters(controller, zone.id);
     // The phase now is the band that reaches now: none while the sensor is unreadable.
     const last = bands.at(-1);
@@ -269,7 +475,7 @@ function Timeline({
     const stopped = !room.roomActive
       ? "the room is off"
       : zone.stale
-        ? "the controller is not reporting"
+        ? NOT_REPORTING
         : room.engine.enabled === false
           ? "the engine is off"
           : zone.enabled === false
@@ -278,40 +484,157 @@ function Timeline({
     const ramp = phase === "P1" ? phaseTarget("p1_target_vwc") : null;
     const ceiling = ramp === null ? null : Math.min(ramp, read(zone, "field_capacity") ?? Infinity);
     const held = blocks.at(-1)?.open ? blocks.at(-1)! : null;
+    const p1Shots = shots.filter(
+      (shot) => (shot.phase ?? phaseAt(bands, shot.start)) === "P1",
+    ).length;
+    const next: NextShot = stopped
+      ? { at: null, basis: "unknown" }
+      : nextShot(
+          {
+            phase,
+            since,
+            held,
+            lastShot: shots.at(-1) ?? null,
+            points,
+            vwc: zone.vwc.value,
+            threshold: target,
+            ceiling,
+            interval: planned ? null : water.p1_time_between_shots,
+            maxWait: planned ? null : read(zone, "p0_maximum_wait_time"),
+          },
+          day,
+          now,
+        );
+    // Targets resolve as the controller's do: the zone's setpoint, else the room's, else the plan's
+    // snapshot while one is armed. The dryback target is the steering mode's.
+    const preview = buildSetpointPreview(room, states, zone.id, {}).saved;
+    const parameters = preview.parameters;
+    const setpoint = setpointSteps(
+      rows,
+      parameters,
+      (key) =>
+        key !== "dryback_target"
+          ? settingId(zone, key)
+          : preview.mode && settingId(zone, `${preview.mode.toLowerCase()}_dryback_target`),
+      planned,
+    );
+    const traces = earlier?.traces.get(zone.id) ?? [];
+    const yesterday = traces[0] ?? null;
+    const past = traces.filter((trace): trace is DayTrace => trace !== null);
+    const today = smoothRecorded(points).map((point) => ({ ...point, hour: hourOf(point.time) }));
+    // The rest of the day from the latest reading, on the zone's own dry-down (today and the three
+    // grow-days before), by the rules the plan graph's projected day runs. Nothing is claimed for
+    // a zone the controller is not watering.
+    const newest = points.at(-1);
+    const p0 = bands.find((band) => band.phase === "P0");
+    const peak = p0 && points.filter((point) => point.time >= p0.start).map((point) => point.value);
+    const projected =
+      stopped || !phase || !newest || zone.vwc.value === null
+        ? null
+        : projectFrom(
+            buildPlanningCurve(parameters, 0, photoperiod),
+            parameters,
+            {
+              hour: hourOf(newest.time),
+              phase: phase as PlanningPhaseId,
+              since: hourOf(since!),
+              value: newest.value,
+              p1Shots,
+              lastShot: shots.length ? hourOf(shots.at(-1)!.end) : null,
+              peak: phase === "P0" && peak?.length ? Math.max(...peak) : null,
+            },
+            {
+              rates: dryRates(
+                [today, ...past.slice(0, 3).map((trace) => trace.points)],
+                photoperiod,
+              ),
+              retention: zone.auto?.gain ?? null,
+              end: length,
+            },
+          );
+    const time = (hour: number) => day.start + hour * 3_600_000;
+    const projection = projected && {
+      points: projected.points.map((point) => ({ ...point, time: time(point.hour) })),
+      shots: projected.shots.map((shot) => ({
+        time: time(shot.hour),
+        phase: shot.phase,
+        size: shot.size,
+        emergency: !!shot.emergency,
+      })),
+    };
+    // Past targets follow the recorded phases, later ones the projected.
+    const ahead: PhaseBand[] = [];
+    for (const point of projection?.points ?? []) {
+      const at = Math.max(point.time, now),
+        band = ahead.at(-1);
+      if (band?.phase === point.phase) band.end = at;
+      else {
+        if (band) band.end = at;
+        ahead.push({ phase: point.phase, start: at, end: at });
+      }
+    }
+    const compared =
+      layers.compare === "typical"
+        ? past.length >= 3
+          ? past
+          : []
+        : layers.compare === "yesterday" && yesterday
+          ? [yesterday]
+          : [];
+    const level = Number.isFinite(parameters.p1_target_vwc) ? parameters.p1_target_vwc : null;
+    const hour = hourOf(now);
+    const moved = earlier?.setup.filter(
+      (value, index) =>
+        typeof revision === "number" &&
+        value !== null &&
+        value !== revision &&
+        traces[index] &&
+        compared.includes(traces[index]!),
+    ).length;
     return {
       zone,
       bands,
       shots,
       blocks,
       points,
-      threshold: planned ? [] : levels(rows[thresholdId], day.start, now),
       changes: changes.filter((change) => change.zoneId === zone.id),
       phase,
       since,
       target,
       stopped,
-      next: stopped
-        ? { at: null, basis: "unknown" }
-        : nextShot(
-            {
-              phase,
-              since,
-              held,
-              lastShot: shots.at(-1) ?? null,
-              points,
-              vwc: zone.vwc.value,
-              threshold: target,
-              ceiling,
-              interval: planned ? null : water.p1_time_between_shots,
-              maxWait: planned ? null : read(zone, "p0_maximum_wait_time"),
-            },
-            day,
-            now,
-          ),
-      p1Shots: shots.filter((shot) => (shot.phase ?? phaseAt(bands, shot.start)) === "P1").length,
-      p1Max: water.p1_maximum_shots,
-      budget: water.max_daily_volume,
+      next,
+      p1Shots,
       litres: (seconds) => estimateRuntime(flowInputs(water), seconds).requested?.zoneL ?? null,
+      targets: phaseTargets(
+        [...bands, ...ahead.filter((band) => band.end > band.start)],
+        setpoint,
+        [...points, ...(projection?.points ?? [])],
+      ),
+      projection,
+      yesterday,
+      past,
+      typical:
+        layers.compare === "typical" && past.length >= 3
+          ? typicalDay(past.map((trace) => trace.points))
+          : [],
+      comparison: compareDays(compared, hour, zone.vwc.value, level),
+      level,
+      reached: level === null ? null : reachedHour(today, level),
+      seconds: openSeconds(shots, day.start, hour),
+      dryback: p0 ? morningDryback(points, p0) : null,
+      drybackTarget: Number.isFinite(parameters.dryback_target) ? parameters.dryback_target : null,
+      setupNote: !moved
+        ? null
+        : layers.compare === "yesterday"
+          ? "Rooms & setup saved since yesterday: its probe may have differed"
+          : `${moved} of ${compared.length} days before the last Rooms & setup save`,
+      status:
+        unprojected(stopped, beat.at, now) ??
+        (next.basis === "held" && held
+          ? `${HELD[held.kind]}: ${held.text}`
+          : next.basis === "night"
+            ? `overnight: emergency shots only until ${clock(day.end)}`
+            : null),
     };
   });
   const roomChanges = changes.filter((change) => change.zoneId === undefined);
@@ -324,6 +647,20 @@ function Timeline({
     ...roomChanges.map((change) => ({ time: change.time, text: changeText(change) })),
   ].sort((a, b) => a.time - b.time);
   const strip = (marks: Mark[]) => pointer(marks, setHover, setPicked, timeAt);
+  const typicalDays = Math.max(0, ...lanes.map((lane) => lane.past.length));
+  const toggle = (key: "projected" | "compared" | "targets", icon: string, name: string) => (
+    <li>
+      <button
+        type="button"
+        className="timeline-toggle"
+        aria-pressed={layers[key]}
+        onClick={() => change({ [key]: !layers[key] })}
+      >
+        <i className={icon} aria-hidden="true" />
+        {name}
+      </button>
+    </li>
+  );
   return (
     <div className="timeline-body" ref={box}>
       {width > 0 && (
@@ -332,18 +669,48 @@ function Timeline({
           {lanes.map((lane) => (
             <div className="timeline-zone" key={lane.zone.id} data-zone={lane.zone.id}>
               <p className="timeline-zone-line">
-                <strong>{lane.zone.name}</strong> <span>{summary(lane, day, now)}</span>
+                <strong>{lane.zone.name}</strong>{" "}
+                <span>{tracking(lane, day, now, layers.compare, earlier)}</span>
               </p>
-              <LaneChart lane={lane} day={day} now={now} plot={plot} x={x} strip={strip} />
+              <LaneChart
+                lane={lane}
+                day={day}
+                now={now}
+                plot={plot}
+                x={x}
+                strip={strip}
+                layers={layers}
+              />
             </div>
           ))}
         </>
       )}
       <p className="timeline-detail" aria-live="polite">
-        {hover ?? picked ?? "Point at or tap a phase, shot, hold or setpoint mark for its details."}
+        {hover ??
+          picked ??
+          "Point at or tap the chart for details. A projection is an estimate: the controller waters by the probe."}
       </p>
       <ul className="timeline-legend" aria-label="Timeline key">
-        {LEGEND.map(([key, name]) => (
+        {Object.entries(PHASES).map(([phase, name]) => (
+          <li key={phase}>
+            <i className={`key-phase phase-${phase}`} aria-hidden="true" />
+            {name}
+          </li>
+        ))}
+        <li>
+          <i className="key-today" aria-hidden="true" />
+          Today
+        </li>
+        {toggle("projected", "key-projected", "Projected (estimate)")}
+        {layers.compare === "yesterday" && toggle("compared", "key-yesterday", "Yesterday")}
+        {layers.compare === "typical" &&
+          toggle(
+            "compared",
+            "key-typical",
+            typicalDays >= 3 ? `Typical (${typicalDays} days)` : "Typical (too few days)",
+          )}
+        {toggle("targets", "key-target", "Target for the phase")}
+        {MARKS.map(([key, name]) => (
           <li key={key}>
             <i className={key} aria-hidden="true" />
             {name}
@@ -543,6 +910,7 @@ function LaneChart({
   plot,
   x,
   strip,
+  layers,
 }: {
   lane: Lane;
   day: GrowDay;
@@ -550,32 +918,52 @@ function LaneChart({
   plot: number;
   x: (time: number) => number;
   strip: Strip;
+  layers: Layers;
 }) {
   const { zone, next, points, target } = lane;
   const name = zone.name;
-  const fit = next.fit;
-  const fitEnd = fit ? Math.min(fit.at, day.lightsOff) : null;
-  const edge =
-    fit && fitEnd !== null
-      ? fit.from.value - (fit.rate * (fitEnd - fit.from.time)) / 3_600_000
-      : null;
-  // VWC is drawn over the day's own range, never 0-100 %.
+  const hourOf = (time: number) => (time - day.start) / 3_600_000;
+  // Earlier days sit on today's axis by hours since their own lights-on.
+  const aligned = (trace: DayTrace, time: number) => day.start + time - trace.day.start;
+  const yesterday = layers.compared && layers.compare === "yesterday" ? lane.yesterday : null;
+  const typical =
+    layers.compared && layers.compare === "typical"
+      ? lane.typical.filter((point) => point.hour <= hourOf(day.end))
+      : [];
+  const projection = layers.projected ? lane.projection : null;
+  const targets = layers.targets ? lane.targets : [];
+  const before = (yesterday?.points ?? [])
+    .filter((point) => point.hour <= hourOf(day.end))
+    .map((point) => ({ time: day.start + point.hour * 3_600_000, value: point.value }));
+  const earlierShots = yesterday
+    ? yesterday.shots.filter((shot) => aligned(yesterday, shot.start) < day.end)
+    : [];
+  // VWC is drawn over the range of what is plotted, never 0-100 %. A target within one span of it
+  // widens the range; one further off is drawn at the edge it is beyond, and says so.
   const values = points.length
     ? [
         ...points.map((point) => point.value),
-        ...lane.threshold.map((level) => level.value),
-        ...(target === null ? [] : [target]),
-        ...(edge === null ? [] : [edge]),
+        ...before.map((point) => point.value),
+        ...typical.flatMap((point) => [point.low, point.high]),
+        ...(projection?.points.map((point) => point.value) ?? []),
+        ...(next.basis === "dry-down" && target !== null ? [target] : []),
       ]
     : [];
-  const low = Math.min(...values),
-    high = Math.max(...values);
+  const lowest = Math.min(...values),
+    highest = Math.max(...values),
+    spread = Math.max(1, highest - lowest);
+  const near = targets
+    .map((step) => step.value)
+    .filter((value) => value >= lowest - spread && value <= highest + spread);
+  const low = Math.min(lowest, ...near),
+    high = Math.max(highest, ...near);
   const pad = Math.max(0.3, (high - low) * 0.12);
   const min = low - pad,
     max = high + pad;
   const top = 24,
     area = 40;
-  const y = (value: number) => top + area - ((value - min) / (max - min)) * area;
+  const y = (value: number) =>
+    top + area - ((Math.min(max, Math.max(min, value)) - min) / (max - min)) * area;
   const start = Math.max(now, day.start);
   // What is known of the rest of the day: P2 lasts until lights-off and P3 from there. P0 and P1
   // end when their own conditions are met, at a time nobody knows, so they are drawn as open.
@@ -615,18 +1003,72 @@ function LaneChart({
         !best || Math.abs(point.time - time) < Math.abs(best.time - time) ? point : best,
       null,
     );
+  const projectedAt = (time: number) => {
+    const list = projection?.points ?? [];
+    const after = list.findIndex((point) => point.time >= time);
+    if (after < 0) return null;
+    const a = list[Math.max(0, after - 1)],
+      b = list[after];
+    return b.time === a.time
+      ? b.value
+      : a.value + ((b.value - a.value) * (time - a.time)) / (b.time - a.time);
+  };
+  const targetAt = (time: number) =>
+    targets.find((step) => step.start <= time && time < step.end) ?? null;
+  // What the other layers say at a moment: the text alternative for each of them.
+  const beside = (time: number) => {
+    const hour = hourOf(time);
+    const parts: string[] = [];
+    if (yesterday) {
+      const value = atHour(yesterday.points, hour);
+      parts.push(
+        `yesterday at ${clock(time)}: ${value === null ? "not recorded" : `${number(value)} %`}`,
+      );
+    }
+    if (layers.compared && layers.compare === "typical") {
+      const point = typical.find((item) => Math.abs(item.hour - hour) <= 1 / 12);
+      parts.push(
+        point
+          ? `typical at ${clock(time)}: ${number(point.median)} % (middle half ${number(point.low)}–${number(point.high)} %, ${lane.past.length} days)`
+          : `typical at ${clock(time)}: not enough recorded days`,
+      );
+    }
+    const step = targetAt(time);
+    if (step)
+      parts.push(`${TARGETS[step.phase]} ${number(step.value)} %, what the controller aims at`);
+    return parts.map((part) => ` · ${part}`).join("");
+  };
   const vwcAt = (time: number) => {
-    if (time > now)
-      return fit
-        ? `Estimate · ${name} · VWC ${number(fit.from.value)} % falling ${number(fit.rate, 2)} %/h since the last shot settled${target === null ? "" : `, toward the ${number(target)} % P2 threshold`}`
-        : `${name} · no VWC estimate: ${NO_ESTIMATE[next.basis] ?? "not enough to go on"}`;
+    if (time > now) {
+      const value = projectedAt(time);
+      return value !== null
+        ? `≈${clock(time)} · ${name} · projected VWC ≈${number(value)} %, an estimate: the controller waters by the probe${beside(time)}`
+        : `${name} · no projection: ${lane.status ?? NO_ESTIMATE[next.basis] ?? "not enough to go on"}${beside(time)}`;
+    }
     const point = nearest(time);
     const phase = point && phaseAt(lane.bands, point.time);
     return point
-      ? `${clock(point.time)} · ${name} · VWC ${number(point.value, 2)} %${phase ? ` in ${phase}` : ""}`
+      ? `${clock(point.time)} · ${name} · VWC ${number(point.value, 2)} %${phase ? ` in ${phase}` : ""}${beside(point.time)}`
       : `${name} · no VWC readings recorded today`;
   };
   const mark = markAt(x);
+  // Yesterday's own lights-off, and the end of a grow-day shorter than today's (a clock change or
+  // a moved schedule), where they fall on today's axis.
+  const edges: { time: number; text: string }[] = [];
+  if (yesterday) {
+    const { start: began, lightsOff, end } = yesterday.day;
+    if (Math.abs(lightsOff - began - (day.lightsOff - day.start)) >= 60_000)
+      edges.push({
+        time: aligned(yesterday, lightsOff),
+        text: `Yesterday’s lights went off here, ${duration(lightsOff - began)} after its lights-on`,
+      });
+    if (end - began < day.end - day.start - 60_000)
+      edges.push({
+        time: aligned(yesterday, end),
+        text: `Yesterday’s grow-day ended here: it was ${duration(end - began)} long`,
+      });
+  }
+  const labels = targetLabels(targets, x, plot);
   const marks = [
     ...lane.bands.map((band) =>
       mark(
@@ -650,6 +1092,7 @@ function LaneChart({
       ),
     ),
     mark(day.start, day.end, 20, 66, 4, vwcAt),
+    ...edges.map((edge) => mark(edge.time, edge.time, top, top + area, 0, () => edge.text)),
     ...lane.changes.map((change) =>
       mark(change.time, change.time, 18, 32, 0, () => changeText(change)),
     ),
@@ -657,18 +1100,54 @@ function LaneChart({
     ...lane.blocks.map((block) =>
       mark(block.start, block.end, 64, 88, 1, () => blockText(block, lane)),
     ),
+    ...(projection?.shots ?? []).map((shot) =>
+      mark(
+        shot.time,
+        shot.time,
+        64,
+        88,
+        0,
+        () =>
+          `≈${clock(shot.time)} · ${name} · expected ${shot.emergency ? "P3 emergency" : shot.phase} shot${shot.size === null ? "" : ` of ${number(shot.size, 2)} % of the substrate`}, an estimate`,
+      ),
+    ),
+    ...earlierShots.map((shot) =>
+      mark(aligned(yesterday!, shot.start), aligned(yesterday!, shot.end), 88, 96, 0, () =>
+        [
+          `Yesterday ${clock(shot.start)}–${clock(shot.end)}`,
+          name,
+          `shot ${duration(shot.end - shot.start)}`,
+          ...(lane.litres((shot.end - shot.start) / 1000) === null
+            ? []
+            : [`≈${number(lane.litres((shot.end - shot.start) / 1000))} L at the configured flow`]),
+        ].join(" · "),
+      ),
+    ),
+    ...(next.at === null
+      ? []
+      : [
+          mark(
+            next.at,
+            next.at,
+            20,
+            88,
+            0,
+            () => `≈${clock(next.at!)} · ${name} · ${nextText(lane, day)}`,
+          ),
+        ]),
   ];
   const at = next.at;
   const off = x(day.lightsOff);
+  const band = typicalBand(typical, (hour) => x(day.start + hour * 3_600_000), y);
   return (
     <svg
       className="timeline-lane"
       width={plot + 48}
-      height={88}
+      height={96}
       aria-hidden="true"
       {...strip(marks)}
     >
-      <rect x={off} y={0} width={plot - off} height={88} className="night" />
+      <rect x={off} y={0} width={plot - off} height={96} className="night" />
       {lane.bands.map((band, index) => (
         <Band
           key={index}
@@ -690,33 +1169,57 @@ function LaneChart({
       ))}
       {values.length ? (
         <>
-          {lane.threshold.map((level, index) => (
-            <line
-              key={index}
-              x1={x(level.start)}
-              x2={x(level.end)}
-              y1={y(level.value)}
-              y2={y(level.value)}
-              className="threshold"
-            />
-          ))}
-          {target !== null && now < day.lightsOff && (
-            <line
-              x1={x(now)}
-              x2={off}
-              y1={y(target)}
-              y2={y(target)}
-              className="threshold projected"
-            />
+          {!!typical.length && (
+            <g data-layer="typical">
+              <path d={band.area} className="typical-band" />
+              <path d={band.median} className="typical-line" />
+            </g>
+          )}
+          {!!before.length && (
+            <g data-layer="yesterday">
+              <path d={path(before, x, y)} className="yesterday-line" />
+              {edges.map((edge, index) => (
+                <line
+                  key={index}
+                  x1={x(edge.time)}
+                  x2={x(edge.time)}
+                  y1={top}
+                  y2={top + area}
+                  className="yesterday-edge"
+                />
+              ))}
+            </g>
+          )}
+          {!!targets.length && (
+            <g data-layer="targets">
+              <path d={steps(targets, x, y)} className="target-step" />
+              {labels.map((label, index) => (
+                <text
+                  key={index}
+                  x={label.x}
+                  y={y(label.value) - 4 < top + 8 ? y(label.value) + 13 : y(label.value) - 4}
+                  className="target-label"
+                >
+                  {label.value < min
+                    ? `${label.text} ↓`
+                    : label.value > max
+                      ? `${label.text} ↑`
+                      : label.text}
+                </text>
+              ))}
+            </g>
           )}
           <path d={path(points, x, y)} className="vwc-line" />
-          {fit && fitEnd !== null && edge !== null && (
-            <line
-              x1={x(fit.from.time)}
-              y1={y(fit.from.value)}
-              x2={x(fitEnd)}
-              y2={y(edge)}
-              className="estimate"
+          {projection && (
+            <path
+              data-layer="projected"
+              d={projection.points
+                .map(
+                  (point, index) =>
+                    `${index ? "L" : "M"}${x(point.time).toFixed(1)} ${y(point.value).toFixed(1)}`,
+                )
+                .join("")}
+              className="projection"
             />
           )}
           {next.basis === "dry-down" && at !== null && target !== null && (
@@ -767,6 +1270,37 @@ function LaneChart({
           className="shot"
         />
       ))}
+      {projection && (
+        <g data-layer="expected">
+          {projection.shots.map((shot, index) => (
+            <line
+              key={index}
+              x1={x(shot.time)}
+              x2={x(shot.time)}
+              y1={68}
+              y2={86}
+              className={shot.emergency ? "expected-shot emergency" : "expected-shot"}
+            />
+          ))}
+        </g>
+      )}
+      {yesterday && (
+        <g data-layer="yesterday-shots">
+          {earlierShots.map((shot, index) => (
+            <rect
+              key={index}
+              x={x(aligned(yesterday, shot.start))}
+              y={89}
+              width={Math.max(
+                2,
+                x(aligned(yesterday, shot.end)) - x(aligned(yesterday, shot.start)),
+              )}
+              height={6}
+              className="yesterday-shot"
+            />
+          ))}
+        </g>
+      )}
       {at !== null && next.basis !== "dry-down" && at <= day.end && (
         <>
           <line x1={x(at)} x2={x(at)} y1={66} y2={88} className="estimate" />
@@ -780,7 +1314,7 @@ function LaneChart({
           </text>
         </>
       )}
-      <line x1={x(now)} x2={x(now)} y1={0} y2={88} className="now-line" />
+      <line x1={x(now)} x2={x(now)} y1={0} y2={96} className="now-line" />
     </svg>
   );
 }
@@ -795,6 +1329,53 @@ function path(points: Reading[], x: (time: number) => number, y: (value: number)
       return `${gap ? "M" : "L"}${x(point.time).toFixed(1)} ${y(point.value).toFixed(1)}`;
     })
     .join("");
+}
+/** The targets as one stepped line, joined where one step starts as the last ends. */
+function steps(targets: TargetStep[], x: (time: number) => number, y: (value: number) => number) {
+  return targets
+    .map((step, index) => {
+      const joined = index > 0 && targets[index - 1].end === step.start;
+      return `${joined ? "L" : "M"}${x(step.start).toFixed(1)} ${y(step.value).toFixed(1)}H${x(step.end).toFixed(1)}`;
+    })
+    .join("");
+}
+/** A label at the start of each target step, where it fits without touching the one before. */
+function targetLabels(targets: TargetStep[], x: (time: number) => number, plot: number) {
+  const labels: { x: number; value: number; text: string }[] = [];
+  let free = 0;
+  for (const step of targets) {
+    const text = `${TARGETS[step.phase]} ${number(step.value)}%`;
+    const width = text.length * 6.6 + 12;
+    const left = Math.max(x(step.start) + 3, free);
+    // A label may run on past a short step, but P0's lower dryback level only where it fits.
+    const room = step.phase === "P0" ? width : 24;
+    if (x(step.end) - x(step.start) < room || left > x(step.end) - 12 || left + width > plot)
+      continue;
+    labels.push({ x: left, value: step.value, text });
+    free = left + width + 8;
+  }
+  return labels;
+}
+/** The typical day's middle half as a band and its median as a line, broken where too few days
+ * were recorded. */
+function typicalBand(
+  typical: TypicalPoint[],
+  x: (hour: number) => number,
+  y: (value: number) => number,
+) {
+  const runs: TypicalPoint[][] = [];
+  typical.forEach((point, index) => {
+    if (index && point.hour - typical[index - 1].hour < 0.2) runs.at(-1)!.push(point);
+    else runs.push([point]);
+  });
+  const line = (run: TypicalPoint[], key: "low" | "median" | "high") =>
+    run.map((point) => `${x(point.hour).toFixed(1)} ${y(point[key]).toFixed(1)}`);
+  return {
+    area: runs
+      .map((run) => `M${[...line(run, "high"), ...line([...run].reverse(), "low")].join("L")}Z`)
+      .join(""),
+    median: runs.map((run) => `M${line(run, "median").join("L")}`).join(""),
+  };
 }
 
 function nextText(lane: Lane, day: GrowDay): string {
@@ -816,26 +1397,74 @@ function nextText(lane: Lane, day: GrowDay): string {
     }
   return `no estimate: ${NO_ESTIMATE[next.basis] ?? "not enough to go on"}`;
 }
-function summary(lane: Lane, day: GrowDay, now: number): string {
-  const phase =
-    !lane.phase || lane.since === null
-      ? "phase unavailable"
-      : lane.since <= day.start
-        ? `${lane.phase} since before ${clock(day.start)}`
-        : `${lane.phase} for ${duration(now - lane.since)}`;
-  const used = lane.zone.water.value;
-  const water =
-    used === null
-      ? "water today unavailable"
-      : lane.budget === null
-        ? `${number(used)} L today`
-        : `${number(used)} of ${number(lane.budget)} L`;
-  return [
-    phase,
-    `P1 shots ${lane.p1Shots} / ${lane.p1Max ?? "?"}`,
-    water,
-    nextText(lane, day),
-  ].join(" · ");
+const signed = (value: number, digits = 1) => {
+  const shown = number(Math.abs(value), digits);
+  return Number(shown) === 0 ? "±0" : `${value > 0 ? "+" : "−"}${shown}`;
+};
+/** The lane's line: how today is tracking, in numbers, against yesterday or the typical day. */
+function tracking(
+  lane: Lane,
+  day: GrowDay,
+  now: number,
+  compare: Compare,
+  earlier: Earlier | null,
+): string {
+  const who = compare === "typical" ? "typical" : "yesterday";
+  const at = (hour: number) => clock(day.start + hour * 3_600_000);
+  const vwc = lane.zone.vwc.value;
+  const parts = [
+    lane.phase ?? "phase unavailable",
+    vwc === null ? "VWC now unavailable" : `${number(vwc)}% now`,
+  ];
+  const then = compare === "none" ? null : lane.comparison;
+  if (compare !== "none")
+    parts.push(
+      !earlier
+        ? "loading earlier days…"
+        : earlier.error
+          ? "earlier days did not load"
+          : !then
+            ? compare === "typical"
+              ? "too few recorded days for a typical one"
+              : "no recorded day to compare"
+            : then.vwc === null
+              ? `${who} at ${clock(now)} not recorded`
+              : `${signed(then.vwc)} pts vs ${who} at ${clock(now)}`,
+    );
+  // Against today's P1 target on both days: a supervisor can move it overnight.
+  if (lane.level !== null) {
+    const target = `P1 target ${number(lane.level)}%`;
+    const missed =
+      who === "yesterday" ? " (yesterday did not reach it)" : " (not reached on a typical day)";
+    if (lane.reached !== null) {
+      const gap = then?.reached == null ? null : Math.round((lane.reached - then.reached) * 60);
+      parts.push(
+        `${target} reached ${at(lane.reached)}${
+          !then
+            ? ""
+            : gap === null
+              ? missed
+              : gap === 0
+                ? ` (same time as ${who})`
+                : ` (${Math.abs(gap)} min ${gap > 0 ? "later" : "earlier"}${who === "typical" ? " than typical" : ""})`
+        }`,
+      );
+    } else
+      parts.push(
+        `${target} ${lane.phase === "P0" || lane.phase === "P1" ? "not reached yet" : "not reached today"}${!then ? "" : then.reached !== null ? ` (${who} ${at(then.reached)})` : missed}`,
+      );
+  }
+  const litres = (seconds: number) => (seconds > 0 ? lane.litres(seconds) : 0);
+  const used = litres(lane.seconds),
+    before = then && litres(then.seconds);
+  parts.push(
+    used !== null
+      ? `≈${number(used)} L so far${before != null ? ` (${signed(used - before)} L)` : ""}`
+      : `${duration(lane.seconds * 1000)} of watering so far${then ? ` (${signed((lane.seconds - then.seconds) / 60, 0)} min)` : ""}`,
+  );
+  if (lane.dryback !== null && lane.drybackTarget !== null)
+    parts.push(`P0 dryback ${number(lane.dryback)}% of ${number(lane.drybackTarget)}%`);
+  return [...parts, lane.setupNote, lane.status].filter(Boolean).join(" · ");
 }
 function changeText(change: Change): string {
   const unit = change.unit ? ` ${change.unit}` : "";
