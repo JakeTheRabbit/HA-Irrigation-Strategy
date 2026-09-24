@@ -88,7 +88,7 @@ function startText(start: GrowStart, today: string) {
         : `on or before ${day}, when the records begin`;
 }
 
-export function WaterUse({ controller, zones }: { controller: Controller; zones: Zone[] }) {
+export function WaterUsePanel({ controller, zones }: { controller: Controller; zones: Zone[] }) {
   const room = controller.room;
   const lightsOn = room.settings.find((field) => field.entityId.endsWith("_lights_on_hour"))?.value;
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
