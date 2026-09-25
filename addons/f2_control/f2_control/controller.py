@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""F2 Control — standalone crop-steering controller (Home Assistant add-on).
+"""Crop Steering Controller: the standalone crop-steering controller (a Home Assistant add-on).
 
 The synchronous I/O shell: ONE sync process, plain REST polling of HA, no asyncio, no
 coroutine trap. Imports the pure crop-steering-engine for decisions; this file is
@@ -155,7 +155,7 @@ def ha_set(entity, state, attributes=None):
         pass
 
 
-# ---------------------------------------------------------------- config (F2 defaults; override via /data/options.json)
+# ---------------------------------------------------------------- config (defaults; override via /data/options.json)
 def load_options():
     opts = {}
     for p in ("/data/options.json",):
@@ -954,7 +954,7 @@ class Controller:
 
         A restart forgets nothing: the adopted revision and its fingerprint are saved, and the
         same pair after a restart is RESUMED with the kill switch left as it is (hardware must
-        still read OFF). On 2026-09-20 a host reboot otherwise left every F2 zone blocked behind
+        still read OFF). Without this, a host reboot left every zone of a live room blocked behind
         a disarm cycle nobody knew was needed, and two hours of the P1 ramp were lost.
         """
         descriptors = {}
@@ -2491,7 +2491,7 @@ class Controller:
         """True only when every switch reads back `want`.
 
         Zigbee/MQTT plugs accept a command at once but report the new state later
-        (veg_main_pump OFF report: usually <1 s, 1.6 s on 2026-09-14 18:52). A read-back
+        (a pump's OFF report: usually under 1 s, 1.6 s seen on a live install). A read-back
         that gives up too early latches a false hardware hold; one that waits too long
         stalls every room (this loop is synchronous) before a real stuck-open is caught.
         """

@@ -10,6 +10,7 @@ import {
   p2Advice,
   planningClock,
   projectDay,
+  projectFrom,
   smoothRecorded,
 } from "./planning-curve";
 const parameters = {
@@ -474,6 +475,116 @@ describe("the projected day: every phase drawn the way the engine runs it", () =
       return { hour, value, time: index };
     });
     expect(dryRates([sawtooth, sawtooth], 12).day).toBeCloseTo(2.16, 2);
+  });
+});
+
+describe("the rest of today, projected from now on the same rules", () => {
+  // live F2 zone 1, 2026-09-20; lights 10:00-22:00, so hours count from lights-on
+  const live = {
+    dryback_target: 10,
+    p1_target_vwc: 40,
+    p2_vwc_threshold: 34,
+    p2_shot_size: 1,
+    p1_initial_shot_size: 2,
+    p1_shot_size_increment: 0.5,
+    p1_maximum_shots: 10,
+    p1_time_between_shots: 20,
+    p0_maximum_wait_time: 60,
+    p3_emergency_vwc_threshold: 22,
+    p3_emergency_shot_size: 2,
+  };
+  const rates = { day: 0.72, night: 0.37 };
+  const from = (
+    now: Partial<Parameters<typeof projectFrom>[2]>,
+    parameters: Record<string, number> = live,
+    end?: number,
+  ) =>
+    projectFrom(
+      buildPlanningCurve(parameters, 0, 12),
+      parameters,
+      { hour: 0, phase: "P0", since: 0, value: 30, p1Shots: 0, lastShot: null, peak: null, ...now },
+      { rates, end },
+    )!;
+  const at = (hour: number) => (point: { hour: number }) => Math.abs(point.hour - hour) < 1e-9;
+  it("mid-ramp: the shots P1 has left, spaced from the last one, sized on from it, up to the target", () => {
+    const day = from({ hour: 2, phase: "P1", since: 1, value: 33, p1Shots: 4, lastShot: 1.9 });
+    expect(day.points[0]).toEqual({ hour: 2, value: 33, phase: "P1" });
+    const ramp = day.shots.filter((shot) => shot.phase === "P1");
+    expect(ramp.map((shot) => shot.size)).toEqual([4, 4.5, 5, 5.5, 6, 6.5]);
+    expect(ramp[0].hour).toBeCloseTo(1.9 + 1 / 3, 9);
+    expect(ramp[1].hour - ramp[0].hour).toBeCloseTo(1 / 3, 9);
+    expect(ramp.at(-1)!.to).toBe(40);
+    // P2 takes over an interval after the last ramp shot; the day ends at the next lights-on.
+    expect(day.points.find((point) => point.phase === "P2")!.hour).toBeCloseTo(
+      ramp.at(-1)!.hour + 1 / 3,
+      9,
+    );
+    expect(day.points.at(-1)!.hour).toBe(24);
+    // A ramp at its target, or out of shots, is over: P2 from now.
+    expect(from({ hour: 2, phase: "P1", since: 1, value: 40.5 }).points[0].phase).toBe("P2");
+    expect(from({ hour: 2, phase: "P1", since: 1, p1Shots: 10 }).shots[0]?.phase).not.toBe("P1");
+  });
+  it("P2: a shot each time VWC dries to the threshold, none after lights-off", () => {
+    const day = from({ hour: 5, phase: "P2", since: 4, value: 34.5 });
+    const maintenance = day.shots.filter((shot) => shot.phase === "P2");
+    // 0.5 points at 0.72 points/h, then 1 point (a whole shot) at a time: every 83 minutes
+    expect(maintenance[0].hour).toBeCloseTo(5 + 0.5 / 0.72, 1);
+    expect(maintenance).toHaveLength(5);
+    for (const shot of maintenance) {
+      expect(shot.from).toBeLessThanOrEqual(34);
+      expect(shot.to - shot.from).toBeCloseTo(1);
+      expect(shot.hour).toBeLessThan(12);
+    }
+    expect(day.points.find((point) => point.phase === "P3")!.hour).toBe(12);
+    // Half of each shot retained: twice as many.
+    const halved = projectFrom(
+      buildPlanningCurve(live, 0, 12),
+      live,
+      { hour: 5, phase: "P2", since: 4, value: 34.5, p1Shots: 10, lastShot: 4, peak: null },
+      { rates, retention: 0.5 },
+    )!;
+    expect(halved.shots.filter((shot) => shot.phase === "P2").length).toBeGreaterThan(8);
+  });
+  it("from the start of P3: dries at the night rate to the next lights-on, the floor its only shot", () => {
+    const night = from({ hour: 12, phase: "P3", since: 12, value: 30 });
+    expect(night.shots).toEqual([]);
+    expect(night.lightsOnVwc).toBeCloseTo(30 - 0.37 * 12, 1);
+    const floor = from(
+      { hour: 12, phase: "P3", since: 12, value: 30 },
+      {
+        ...live,
+        p3_emergency_vwc_threshold: 27,
+      },
+    );
+    expect(floor.shots[0]).toMatchObject({ phase: "P3", emergency: true });
+    expect(floor.shots[0].hour).toBeCloseTo(12 + 3 / 0.37, 1);
+    // Past lights-off it is P3 whatever the recorded phase says.
+    expect(from({ hour: 13, phase: "P2", since: 4, value: 35 }).points[0].phase).toBe("P3");
+  });
+  it("P0: at once when already at the threshold, at the dryback target, or at its maximum wait", () => {
+    const bypass = from({ hour: 0.2, phase: "P0", since: 0, value: 33 });
+    expect(bypass.shots[0]).toMatchObject({ phase: "P1", size: 2 });
+    expect(bypass.shots[0].hour).toBeCloseTo(0.2, 9);
+    // 36 from a 36.5 peak dries to the 2 % dryback target (35.77) in 0.32 h
+    const drying = from(
+      { hour: 0.2, phase: "P0", since: 0, value: 36, peak: 36.5 },
+      { ...live, dryback_target: 2 },
+    );
+    expect(drying.shots[0].hour).toBeCloseTo(0.2 + (36 - 36.5 * 0.98) / 0.72, 1);
+    const waiting = from({ hour: 0.2, phase: "P0", since: 0, value: 36, peak: 38 });
+    expect(waiting.shots[0].hour).toBeCloseTo(1, 9);
+  });
+  it("ends at a 23- or 25-hour next lights-on, and says nothing without targets or a start", () => {
+    expect(
+      from({ hour: 12, phase: "P3", since: 12, value: 30 }, live, 23).points.at(-1)!.hour,
+    ).toBe(23);
+    expect(
+      from({ hour: 12, phase: "P3", since: 12, value: 30 }, live, 25).points.at(-1)!.hour,
+    ).toBe(25);
+    expect(from({ hour: 24, phase: "P3" })).toBeNull();
+    expect(from({ value: Number.NaN })).toBeNull();
+    expect(from({ hour: 5, phase: "P2" }, { p1_target_vwc: 40 })).toBeNull();
+    expect(from({ hour: 5, phase: "P2" }).points.some(at(5))).toBe(true);
   });
 });
 

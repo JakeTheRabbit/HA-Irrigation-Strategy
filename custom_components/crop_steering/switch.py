@@ -90,7 +90,7 @@ BASE_SWITCH_DESCRIPTIONS = [
     # ----- ClimateSense pillar enable switches -----
     # Same pattern as RootSense — each pillar reads its own switch on
     # every iteration; OFF short-circuits all side effects. Default OFF
-    # so existing GW pack remains the active climate controller until
+    # so an existing climate controller stays in charge until
     # you opt in. See the retired intelligence dashboard for a
     # convenient toggle panel.
     SwitchEntityDescription(
