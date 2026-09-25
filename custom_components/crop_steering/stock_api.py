@@ -15,7 +15,7 @@ import logging
 
 from . import stock
 from .admin import async_require_admin
-from .const import DOMAIN
+from .const import DOMAIN, REPAIRS_DOCS_URL
 from .room import room_prefix
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,7 +23,6 @@ _LOGGER = logging.getLogger(__name__)
 SERVICES = ("stock_get", "stock_save", "stock_refill", "stock_record_batch")
 SIGNAL = f"{DOMAIN}_stock_changed"
 ISSUE = "stock_low"
-DOCS = "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/wiki/Troubleshooting"
 
 
 def _now() -> str:
@@ -217,7 +216,7 @@ class StockStore:
                 "count": str(len(low)),
                 "tanks": "\n".join(lines),
             },
-            learn_more_url=DOCS,
+            learn_more_url=REPAIRS_DOCS_URL,
         )
 
 

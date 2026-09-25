@@ -13,13 +13,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 
-from .const import DOMAIN
+from .const import DOMAIN, REPAIRS_DOCS_URL
 from .room import room_prefix
 
 _LOGGER = logging.getLogger(__name__)
 
 _DEFAULT_KILL_SWITCH = "input_boolean.f2_control_enabled"
-DOCS = "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/wiki/Troubleshooting"
 _STALE_MIN = 10
 _DEAD = ("unavailable", "unknown", "none", "")
 ISSUE_IDS = (
@@ -63,7 +62,7 @@ def _issue(hass, present, issue_id, severity, placeholders=None):
             severity=severity,
             translation_key=_base_key(issue_id),
             translation_placeholders=placeholders or {},
-            learn_more_url=DOCS,
+            learn_more_url=REPAIRS_DOCS_URL,
         )
     else:
         ir.async_delete_issue(hass, DOMAIN, issue_id)

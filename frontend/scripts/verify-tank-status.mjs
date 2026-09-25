@@ -7,6 +7,9 @@ import AxeBuilder from "@axe-core/playwright";
 const html = await readFile(new URL("../../www/dashboard.html", import.meta.url));
 const out = new URL("../../output/playwright/", import.meta.url);
 const file = (name) => new URL(name, out).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+// The README's screenshots.
+const img = (name) =>
+  new URL(`../../img/${name}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 await mkdir(out, { recursive: true });
 const server = createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/html" });
@@ -104,6 +107,7 @@ try {
   }
   assert.equal(await page.locator("[data-tank-chart]").count(), 0, "a full graph on the Overview");
   await tank.screenshot({ path: file("tank-status.png") });
+  await tank.screenshot({ path: img("tank-status.png") });
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 1000 });
     assert.ok(
@@ -134,6 +138,7 @@ try {
     /EC latest 3\.06, lowest \d\.\d\d, highest \d\.\d\d mS\/cm\. pH latest 5\.66, lowest \d\.\d\d, highest \d\.\d\d/,
   );
   assert.equal(await sheet.locator("[data-tank-summary]").count(), 2, "latest, lowest, highest");
+  await sheet.screenshot({ path: img("tank-history.png") });
   // Flower 2 checks its feed water on these probes: its gate is drawn and named as such.
   assert.ok((await chart.locator(".recharts-reference-line").count()) >= 2, "gate lines drawn");
   assert.match(
