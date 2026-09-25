@@ -73,10 +73,20 @@ def test_set_manual_override_named_room_targets_prefixed_switch():
 def test_unknown_room_raises_instead_of_steering_default():
     # Silently acting on a different room than the caller named is the wrong-room
     # hazard the room parameter exists to prevent — a typo must error, not water room 1.
-    hass = ha_stubs.FakeHass()  # no entries → 'ghost' cannot resolve
+    override = SimpleNamespace(
+        entity_id=f"switch.{DOMAIN}_zone_1_manual_override",
+        _override_loaded=True,
+        async_set_manual_override=AsyncMock(),
+        extra_state_attributes={"manual_override_expires_at": None},
+    )
+    # The default room's override is loaded, so a fallback to it would succeed.
+    hass = ha_stubs.FakeHass(
+        data={DOMAIN: {"_manual_overrides": {"zone_1_manual_override": override}}}
+    )  # no entries → 'ghost' cannot resolve
     h = _handlers(hass)
-    with pytest.raises(HomeAssistantError):
+    with pytest.raises(HomeAssistantError, match="Unknown crop_steering room 'ghost'"):
         asyncio.run(h["set_manual_override"](Call(zone=1, room="ghost")))
+    override.async_set_manual_override.assert_not_awaited()
     assert hass.services.calls == [] and hass.bus.events == []  # nothing actuated
 
 
