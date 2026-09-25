@@ -48,6 +48,9 @@ export interface Zone {
   name: string;
   enabledEntity: string | null;
   enabled: boolean | null;
+  /** The zone's Set Phase select: the controller moves the zone to a phase picked there, once.
+   * Null when the integration has none. */
+  setPhaseEntity: string | null;
   valveEntity: string | null;
   valveOn: boolean | null;
   lastIrrigation: {

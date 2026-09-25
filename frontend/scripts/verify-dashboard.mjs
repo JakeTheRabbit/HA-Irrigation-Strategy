@@ -836,6 +836,26 @@ try {
     });
     await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
   });
+  await check("zones: a zone is moved to a phase by hand, through the review", async () => {
+    await go("zones");
+    await page.getByRole("button", { name: "View Zone 1", exact: true }).click();
+    const sheet = page.getByRole("dialog").filter({ hasText: "zone details" });
+    const picker = sheet.getByRole("group", { name: "Move Zone 1 to" });
+    await expectVisible(picker);
+    const move = async (from, to) => {
+      assert.equal(await picker.getByRole("button", { name: from, exact: true }).isDisabled(), true);
+      await picker.getByRole("button", { name: to, exact: true }).click();
+      const review = page.getByRole("dialog", { name: `Move Zone 1 to ${to.slice(0, 2)}?` });
+      await expectVisible(review);
+      await review.getByRole("button", { name: /^Apply 1 change/ }).click();
+      await review.waitFor({ state: "hidden" });
+      await expectVisible(sheet.locator(`.pill[data-phase="${to.slice(0, 2)}"]`));
+    };
+    await move("P1 · Ramp-up", "P2 · Maintenance");
+    await axe("zone phase picker");
+    await move("P2 · Maintenance", "P1 · Ramp-up"); // the demo as the other checks expect it
+    await sheet.getByRole("button", { name: "Close", exact: true }).click();
+  });
   await check("zones: Water use totals every zone and charts its grow weeks", async () => {
     await go("zones");
     const panel = page.locator(".wu-panel");
