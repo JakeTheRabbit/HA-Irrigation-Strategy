@@ -109,6 +109,15 @@
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
+/* One width, so a range sits at the same place in every column it is compared across. */
+.comparison-table .meter {
+  width: 120px;
+  margin-bottom: 0;
+}
+.comparison-run-list h3 .pill {
+  margin-left: 8px;
+  vertical-align: 1px;
+}
 .comparison-record-heading {
   display: flex;
   justify-content: space-between;

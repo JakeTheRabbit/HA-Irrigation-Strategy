@@ -1,7 +1,8 @@
+import type { ComponentProps } from "react";
 import type { Reading } from "@/lib/dryback";
 import "./mini-visuals.css";
 
-export type Tone = "normal" | "high" | "over";
+export type Tone = "normal" | "high" | "over" | "muted";
 
 const share = (value: number | null, max: number) =>
   value === null || !(max > 0) ? 0 : Math.max(0, Math.min(100, (value / max) * 100));
@@ -12,6 +13,8 @@ export interface MiniBar {
   value: number | null;
   title: string;
   tone?: Tone;
+  /** The zone the rest of the card is about: its label is emphasised. */
+  selected?: boolean;
 }
 
 /** One small vertical bar per zone, labelled with the zone's number. */
@@ -19,7 +22,12 @@ export function MiniBars({ bars, max, label }: { bars: MiniBar[]; max: number; l
   return (
     <div className="mini-bars" role="img" aria-label={label}>
       {bars.map((bar) => (
-        <span className="mini-bar" key={bar.id} title={bar.title}>
+        <span
+          className="mini-bar"
+          key={bar.id}
+          title={bar.title}
+          data-selected={bar.selected || undefined}
+        >
           <span className="mini-bar-track">
             <span
               className="mini-bar-fill"
@@ -34,23 +42,33 @@ export function MiniBars({ bars, max, label }: { bars: MiniBar[]; max: number; l
   );
 }
 
-/** A slim horizontal bar filled to `value` of `max`, with an optional marker line at `mark`. */
+/** A slim horizontal bar filled to `value` of `max`, with an optional marker line at `mark`.
+ * With `from` it is a range: filled from `from` to `value`. */
 export function Meter({
   value,
   max,
   mark,
+  from,
   tone = "normal",
   label,
 }: {
   value: number;
   max: number;
   mark?: number | null;
+  from?: number | null;
   tone?: Tone;
   label: string;
 }) {
+  const range = from !== null && from !== undefined;
+  const start = range ? share(from, max) : 0;
   return (
     <span className="meter" role="img" aria-label={label}>
-      <span className="meter-fill" data-tone={tone} style={{ width: `${share(value, max)}%` }} />
+      <span
+        className="meter-fill"
+        data-tone={tone}
+        data-range={range ? "" : undefined}
+        style={{ marginLeft: `${start}%`, width: `${Math.max(0, share(value, max) - start)}%` }}
+      />
       {mark !== null && mark !== undefined && Number.isFinite(mark) && (
         <span className="meter-mark" style={{ left: `${share(mark, max)}%` }} />
       )}
@@ -95,5 +113,24 @@ export function Sparkline({
     >
       <path d={path} />
     </svg>
+  );
+}
+
+/** Green is on or good, red off or failed, amber needs attention, blue is water, violet a phase
+ * change; neutral and unknown are grey. */
+export type PillTone = "on" | "off" | "warn" | "water" | "phase" | "neutral" | "unknown";
+
+/** A rounded state pill. The dot marks a state that can change on its own, like a valve. */
+export function Pill({
+  tone,
+  dot = false,
+  children,
+  ...rest
+}: ComponentProps<"span"> & { tone: PillTone; dot?: boolean }) {
+  return (
+    <span className="pill" data-tone={tone} {...rest}>
+      {dot && <span className="pill-dot" />}
+      {children}
+    </span>
   );
 }

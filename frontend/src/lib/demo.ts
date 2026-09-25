@@ -1,5 +1,8 @@
 import type { TimelineRequest, TimelineRow, TimelineRows } from "./day-timeline";
 import type { EntityState, LogEvent, Series, States } from "./types";
+import type { CounterSample, WaterRecordRequest } from "./water-use";
+import { addDays, daysBetween } from "./comparison";
+import { dateForDay, localDate } from "./grow-plan";
 import { numeric } from "./model";
 
 export function isDemoLocation(location: Pick<Location, "hostname" | "search">): boolean {
@@ -440,6 +443,63 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
     put(`sensor.crop_steering_${prefix}current_decision`, decision);
   }
   return rows;
+}
+/** Recorded water for the Water use panel, as the hourly statistics of each zone's water-today
+ * counter: a grow that began on the demo grow plan's start date after eight dry grow-days, drinking
+ * a little more each day. Complete grow-days only; the live counter supplies today. */
+export function demoWaterRecord(
+  states: States,
+  request: WaterRecordRequest,
+  now = Date.now(),
+): Record<string, CounterSample[]> {
+  const growStart = dateForDay(localDate(new Date(now)), -13); // as the demo plan (operator-demo)
+  const samples: Record<string, CounterSample[]> = {};
+  for (const entityId of request.entityIds) {
+    const match = entityId.match(
+      /^sensor\.crop_steering_(.*?)zone_(\d+)_daily_water_(?:app|usage)$/,
+    );
+    if (!match || !states[entityId]) continue;
+    const [, prefix, zone] = match;
+    const hour = (key: string, fallback: number) =>
+      numeric(states[`number.crop_steering_${prefix}lights_${key}_hour`]) ?? fallback;
+    const on = hour("on", 8);
+    const photoperiod = (hour("off", 20) - on + 24) % 24 || 12;
+    const lightsOn = (day: string) => {
+      const [year, month, date] = day.split("-").map(Number);
+      return new Date(year, month - 1, date, 0, Math.round(on * 60)).getTime();
+    };
+    const list: CounterSample[] = [];
+    for (
+      let day = addDays(growStart, -8);
+      lightsOn(addDays(day, 1)) <= now;
+      day = addDays(day, 1)
+    ) {
+      const age = daysBetween(growStart, day) + 1;
+      const total =
+        age < 1
+          ? 0
+          : Math.min(
+              38,
+              16 +
+                0.9 * age +
+                1.6 * Number(zone) +
+                (prefix ? 2 : 0) +
+                2.5 * Math.sin(1.7 * age + Number(zone)),
+            );
+      // One reading at the end of each hour; a daylight-saving grow-day has 23 or 25 of them.
+      const from = lightsOn(day);
+      for (let time = from + 3_600_000 - 1; time < lightsOn(addDays(day, 1)); time += 3_600_000) {
+        const share = Math.min(
+          1,
+          Math.max(0, ((time + 1 - from) / 3_600_000 - 1) / (photoperiod - 3)),
+        );
+        if (time >= request.start && time <= request.end)
+          list.push({ time, value: Math.round(total * share * 100) / 100 });
+      }
+    }
+    samples[entityId] = list;
+  }
+  return samples;
 }
 export function demoHistory(
   states: States,

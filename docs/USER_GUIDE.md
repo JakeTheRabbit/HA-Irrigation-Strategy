@@ -35,7 +35,7 @@ Use **Settings → Sample workspace → Reset demo session…** and review the c
 
 ## Read a room
 
-**Overview** is the room now: alerts, today's totals, the grow-day timeline, each zone's state and readings, and the tank. A zone row opens its detail panel. **Zones** adds search, a card layout and water delivered per zone and per plant. The latest controller records open beside any page from the top bar.
+**Overview** is the room now: alerts, today's totals, the grow-day timeline, each zone's state and readings, and the tank. A zone row opens its detail panel. **Zones** adds search, a card layout, water delivered per zone and per plant, and water use over the grow. The latest controller records open beside any page from the top bar.
 
 | Indicator                     | Meaning                                                                                                                                                             |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -46,6 +46,9 @@ Use **Settings → Sample workspace → Reset demo session…** and review the c
 | Last irrigation               | A recorded controller event timestamp, with relative age and date/time. It is not inferred from sensor updates. Missing/invalid timestamps remain **Not reported**. |
 | VWC and root-zone EC          | The mapped substrate measurements. Their units and sensor availability matter independently.                                                                        |
 | Water delivered this grow-day | On **Zones**: controller-recorded delivery estimates since the room's lights-on boundary.                                                                           |
+| Water use                     | On **Zones**: litres per zone today, this week, since the grow start and estimated for the whole grow, with a bar for each grow week.                               |
+
+**Water use** counts grow-days from lights-on to lights-on. It reads Home Assistant's long-term statistics, which Home Assistant keeps indefinitely; opened outside Home Assistant it can only read recorded history, as far back as the recorder keeps it. The grow start is the zone's grow plan start date when the plan is armed or has been saved. Without one it is inferred: the first day with water after at least five grow-days without any. The panel says which. A day Home Assistant did not record is flagged, never counted as zero.
 
 **Settings → Room scheduling** and zone scheduling controls require a review. Pausing future scheduling is not an emergency stop: an active shot may continue. Use the installation's established physical shutdown procedure for an emergency.
 
@@ -122,6 +125,7 @@ Libraries are isolated by site, browser, room and demo/live mode. They are not a
 | Today/Schedule VWC–EC curve   | Configured targets, phase references and supported timing, with local draft changes where applicable.                    | Exact future shot times, uptake, runoff or EC accumulation.                                 |
 | Insights history              | Retained HA Recorder measurements on separate VWC and EC axes.                                                           | Measurements from periods Recorder did not retain.                                          |
 | Water delivered this grow-day | The controller's recorded estimate from its configured flow and elapsed shot runtime, including accounted partial shots. | Independent meter readings, uniform distribution, plant uptake or external irrigation.      |
+| Water use estimate            | Water used so far plus the last 7 full grow-days' average for every grow-day left in the grow plan.                      | A forecast of plant uptake, or a total for a grow whose plan length is unknown.             |
 | Average mL per plant          | Zone estimated water divided by configured plant count.                                                                  | A measurement from each emitter.                                                            |
 | Total substrate capacity      | Substrate volume per plant multiplied by plant count.                                                                    | Water delivered or water retained.                                                          |
 | Runtime/phase water preview   | A conditional calculation from supplied settings, showing requested versus effective runtime and caps.                   | A guaranteed daily total; feedback-dependent maintenance/emergency shot counts are unknown. |

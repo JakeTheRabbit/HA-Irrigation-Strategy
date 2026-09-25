@@ -29,6 +29,10 @@
   line-height: 1;
   color: var(--muted-foreground);
 }
+.mini-bar[data-selected] .mini-bar-label {
+  color: var(--foreground);
+  font-weight: 700;
+}
 .meter {
   position: relative;
   display: block;
@@ -42,6 +46,10 @@
   height: 100%;
   border-radius: inherit;
   background: var(--primary);
+}
+/* A range as narrow as one reading still shows. */
+.meter-fill[data-range] {
+  min-width: 3px;
 }
 .meter-mark {
   position: absolute;
@@ -60,6 +68,10 @@
 .meter-fill[data-tone="over"] {
   background: var(--destructive);
 }
+.mini-bar-fill[data-tone="muted"],
+.meter-fill[data-tone="muted"] {
+  background: var(--muted-foreground);
+}
 .sparkline {
   display: block;
   overflow: visible;
@@ -76,6 +88,7 @@
    for white text. */
 .pill {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 6px;
   padding: 1px 9px;
@@ -93,22 +106,35 @@
   border-radius: 50%;
   background: currentColor;
 }
+/* A tinted tone mixes its colour into the text, the fill and the edge; the text keeps enough of
+   the foreground to pass AA in both themes. */
 .pill[data-tone="on"] {
-  color: color-mix(in srgb, var(--success) 55%, var(--foreground));
-  background: color-mix(in srgb, var(--success) 14%, var(--surface));
-  border-color: color-mix(in srgb, var(--success) 40%, var(--surface));
+  --pill-tone: var(--success);
 }
 .pill[data-tone="off"] {
-  color: color-mix(in srgb, var(--destructive) 55%, var(--foreground));
-  background: color-mix(in srgb, var(--destructive) 12%, var(--surface));
-  border-color: color-mix(in srgb, var(--destructive) 40%, var(--surface));
+  --pill-tone: var(--destructive);
 }
 .pill[data-tone="warn"] {
-  color: color-mix(in srgb, var(--warning) 60%, var(--foreground));
-  background: color-mix(in srgb, var(--warning) 14%, var(--surface));
-  border-color: color-mix(in srgb, var(--warning) 45%, var(--surface));
+  --pill-tone: var(--warning);
 }
-.pill[data-tone="unknown"] {
+.pill[data-tone="water"] {
+  --pill-tone: var(--primary);
+}
+/* P2's timeline violet: a phase change. */
+.pill[data-tone="phase"] {
+  --pill-tone: #6450b0;
+}
+.pill[data-tone="on"],
+.pill[data-tone="off"],
+.pill[data-tone="warn"],
+.pill[data-tone="water"],
+.pill[data-tone="phase"] {
+  color: color-mix(in srgb, var(--pill-tone) 55%, var(--foreground));
+  background: color-mix(in srgb, var(--pill-tone) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--pill-tone) 40%, var(--surface));
+}
+.pill[data-tone="unknown"],
+.pill[data-tone="neutral"] {
   color: var(--muted-foreground);
   background: var(--muted);
   border-color: var(--border);
