@@ -185,40 +185,40 @@ npm test --prefix mcp-server
 
 The MCP suite uses a local fake HA server and the official MCP client. It checks protocol initialization, tool discovery, scoped reads and reviewed proposals, write opt-in, stale revisions, replay/expiry, failed readback and transport errors. It does not require credentials or actuate equipment. Live read-only checks are recorded separately from any configuration writes.
 
-### 1. Pure decision core — `crop-steering-engine/tests/test_core.py`
+### 1. Pure decision core: `crop-steering-engine/tests/test_core.py`
 The `decide()` function with no HA and no I/O: phase transitions (P0→P1→P2→P3), the
 anti-lockout high-EC flush, the sensor-independent minimum-daily-water floor, EC steering,
 and `validate_params()` clamping. This is the bug class that has actually bitten the grow,
 testable offline.
 
-### 2. Integration calculation helpers — `tests/test_calculations.py`
+### 2. Integration calculation helpers: `tests/test_calculations.py`
 The pure helpers in `custom_components/crop_steering/calculations.py` (no hardware needed;
 input_boolean/number simulate pumps/sensors).
 
-### 3. In-place upgrade / state migration — `tests/test_state_migration.py`
+### 3. In-place upgrade / state migration: `tests/test_state_migration.py`
 **Why it matters:** the add-on persists per-zone runtime state to `/data/state.json` and is
 live-installed on many boxes. A version bump must load an **older** state file transparently.
 These tests lock that contract: a missing file, corrupt JSON, missing keys, an unknown
-legacy key, a bad timestamp, and a zone absent from the file must all be tolerated — new
+legacy key, a bad timestamp, and a zone absent from the file must all be tolerated: new
 fields fall back to fresh defaults, never an error, never a wipe. Plus a save→load
 round-trip.
 
-### 4. Version consistency — `tests/test_version_consistency.py`
+### 4. Version consistency: `tests/test_version_consistency.py`
 The integration version must match across `manifest.json`, the latest released `CHANGELOG.md`
 heading, and the README badge, so a release can't ship a stale number. (The f2-control
 add-on has its own version line in `addons/f2_control/config.yaml`; boxes build the add-on
 from this repository, so there is no second copy to keep in step.)
 
-### 5. Lint / format / YAML — ruff, black (scoped to `custom_components/` + `tests/`), yamllint
+### 5. Lint / format / YAML: ruff, black (scoped to `custom_components/` + `tests/`), yamllint
 Plus, on GitHub only: **hassfest** and **HACS validation** of the integration.
 
-### 6. Controller safety regressions — `addons/f2_control/tests/test_safety_regressions.py`
+### 6. Controller safety regressions: `addons/f2_control/tests/test_safety_regressions.py`
 
 Deterministic fake clocks and HA responses reproduce request-latency overruns, blind fallback/copy budget bypass, failed hardware closure and error cleanup, persisted shared-hardware holds, explicit recovery, and temporarily absent room descriptors. Tests verify preserved state/counters across restart and rediscovery.
 
 New flow accounting regressions cover runtime caps, integer truncation, minimum durations, partial aborts and sizing edits during delivery. Existing totals are retained.
 
-### 7. Frontend adapter and lifecycle — `frontend/src/lib/*.test.ts`
+### 7. Frontend adapter and lifecycle: `frontend/src/lib/*.test.ts`
 
 Room isolation and canonical identity, sensor freshness, supported entity/parameter validation, finite bounds and steps, write readback, partial batches, request deadlines, stale response cancellation, explicit demo isolation, and recorded history routing.
 
@@ -231,16 +231,16 @@ Run `node frontend/scripts/verify-recipe-library.mjs` after building to check na
 The automated suite can't drive real hardware. Before trusting a change on the grow:
 
 - [ ] **Dry run.** With the kill switch `input_boolean.f2_control_enabled` **OFF**, start the
-      add-on and watch a photoperiod in the log — it decides but **no valve opens**.
+      add-on and watch a photoperiod in the log: it decides but **no valve opens**.
 - [ ] **Shot length is real.** Verify a fired shot's duration from the live pump history
-      (`switch.<pump>` `/api/history/period`), not from "deployed" — a file copy proves
+      (`switch.<pump>` `/api/history/period`), not from "deployed": a file copy proves
       nothing about the running container.
 - [ ] **State persists.** Confirm `/data/state.json` survives an add-on **restart** (phase
       and daily counters carry over).
 - [ ] **Upgrade in place.** After a version **Update / Rebuild**, the engine resumes from the
       existing `state.json` with no re-setup and no wiped counters.
 - [ ] **Feed-gate hold.** Out-of-range feed pH/EC (or a tank fill/dose) blocks watering and
-      alerts — that is correct behavior, not a bug.
+      alerts: that is correct behavior, not a bug.
 
 ## Tests are not a release
 
