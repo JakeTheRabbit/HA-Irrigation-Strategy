@@ -9,6 +9,53 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.0] - 2026-09-25
+
+Pair: **controller 2.23.0**. Class **C1**: the dashboard, translations and documentation change; nothing
+the controller or the integration decides changes. The controller's code changes in comments only (its
+syntax tree is unchanged). **Owner-approved rehearsal release** (the owner, 25 September 2026), no staging
+soak; see the release audit. Not run on hardware; checked by the lean, controller, real-Home-Assistant and
+browser suites.
+
+### 🌱 In plain English
+
+- **The Overview shows how today is tracking.** Each zone's lane on the grow-day chart now draws the
+  target each phase is aiming for, yesterday's line and a dashed projection of the rest of the day. One
+  line per zone sums it up: moisture now against yesterday at the same time, when the P1 target was
+  reached, water so far against yesterday, and the morning dry-back. **Compare with** switches between
+  yesterday, a typical day (the middle of the last seven) or nothing, and each layer can be hidden. On a
+  laptop each zone's line stays on one row; point at it to read all of it.
+- **Repairs cards link to the answer.** "Learn more" on a Crop Steering Repairs card opened the project's
+  front page. It now opens the error-code guide, which explains the code every card carries.
+- **Clearer wording.** Two Repairs cards call the controller by its app-store name, and three controller
+  app settings that showed bare names now have a name and a description.
+- **The online demo uses your own time zone** for its sample grows.
+- **A new README.** The front page explains in plain words what the system does, with a current
+  screenshot of every feature. Dated internal logs, unused files and retired history are gone.
+
+### 🔧 Technical notes
+
+- **Timeline tracking (#101).** `day-timeline.tsx`: a target step line per lane (the phase target, a
+  setpoint changed mid-day, the plan's targets when one is armed), yesterday aligned by hours since its
+  own lights-on with its shot ticks, and `projectFrom()` beside `projectDay` (whose output is unchanged)
+  for the dashed projection and expected-shot ticks. Legend switches and "Compare with" (Yesterday,
+  Typical as a p25 to p75 band, None) are remembered in the browser. From 1024 px wide the tracking line
+  is one row with an ellipsis and a tooltip, so the Overview stays within two screens at any hour (1558
+  px by day and 1574 px at night, at 1440 by 800).
+- **Repairs link and unused code (#105).** `REPAIRS_DOCS_URL` (`docs/ERROR_CODES.md`) replaces a wiki
+  page that did not exist, in `health.py` and `stock_api.py`. Unused constants, `_validate_entities`,
+  three errors nothing raised and three translation strings nothing used are removed.
+- **Wording (#102, #108).** The CS-601 and CS-602 descriptions; the `notify_service` example; add-on
+  translations for `instance_name`, `hold_entities` and `rediscover_seconds`. Comments in the controller,
+  the engine and the integration describe events without naming one site's rooms or devices.
+- **Demo (#107).** `demoTimeZone()` dates the demo's runs in the browser's time zone.
+- **Tests and CI (#99, #103).** The disabled CodeQL and duplicate install workflows and the Lovelace
+  generator are removed. `axe()` in `verify-workspace.mjs` waits for colour transitions to finish, which
+  fixes a contrast check that failed at random.
+- **Docs (#104, #106, #110).** The README is rewritten with three new screenshots; `docs/audits` keeps
+  only the first-run review; entries before 2.13.0 move to this file's git history; em and en dashes
+  leave the docs' prose; references to the archive tags are removed.
+
 ## [2.22.0] - 2026-09-25
 
 Pair: **controller 2.22.0**. Its code is unchanged: the app serves the new dashboard. Class **C2**:
