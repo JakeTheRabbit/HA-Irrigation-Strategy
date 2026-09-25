@@ -764,7 +764,7 @@ with the engine off, then check the sidebar reads 2.19.1 and 0.16.1.
 
 Pair: **controller 0.16.0**. It also carries 2.18.1 / controller 0.15.2, which was never published by
 itself. Class **C3**. Released without a staging soak by decision of the two people who run it; see
-[the record](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/v2.18.1/docs/audits/2026-09-21-release-2.18.1.md). **Not run on hardware** before release: treat
+[the record](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/v2.22.0/docs/audits/2026-09-21-release-2.18.1.md). **Not run on hardware** before release: treat
 the first update of each box as the first run. Engine off, update, check the log, watch the first shot.
 
 ### 🌱 In plain English
