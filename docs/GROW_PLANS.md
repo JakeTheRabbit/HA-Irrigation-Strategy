@@ -20,7 +20,7 @@ A more vegetative irrigation approach generally keeps water more available; gene
 
 Each new day is applied at lights-on. If it cannot be applied then (Home Assistant restarting, the controller's heartbeat or a probe a few minutes late), the plan keeps the previous day's targets and applies the day at the first minute it can; Settings → Repairs shows *has not moved on to today* with the reason meanwhile.
 
-The calendar supports grow days 1–366 per zone, distinct start dates and complete contiguous schedule ranges. Missing/finished/invalid schedules are visible and hold managed zones rather than inventing targets. A hold stops the plan's steering, never the zone's water safety: the overnight emergency shot, the lights-on watchdog and the minimum daily volume still water a held zone, and Repairs shows *holding irrigation* with the reason. Each room stores its plan in HA persistent storage with optimistic revision checks. Restart recovery uses the stored plan and controller latch.
+The calendar supports grow days 1-366 per zone, distinct start dates and complete contiguous schedule ranges. Missing/finished/invalid schedules are visible and hold managed zones rather than inventing targets. A hold stops the plan's steering, never the zone's water safety: the overnight emergency shot, the lights-on watchdog and the minimum daily volume still water a held zone, and Repairs shows *holding irrigation* with the reason. Each room stores its plan in HA persistent storage with optimistic revision checks. Restart recovery uses the stored plan and controller latch.
 
 ## Read the combined graph
 

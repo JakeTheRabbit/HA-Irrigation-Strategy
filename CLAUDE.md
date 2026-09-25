@@ -24,7 +24,7 @@ The native UI source is frontend/src. Setup and strategy APIs persist revisioned
 
 ```bash
 # Lint / format / yaml (matches CI; black is scoped — the add-on is
-# deployed file-for-file to the live box and stays exempt from reformatting)
+# deployed file-for-file to installs and stays exempt from reformatting)
 ruff check . && black --check custom_components/ tests/ && yamllint .
 
 # Tests — integration calculation helpers (lean: hand-written HA stubs, no Home Assistant)
@@ -185,16 +185,11 @@ config entry. There is no schema to migrate by hand.
 **Fresh install (mandatory).** Works with no extra layers — no manual DB/schema step, no
 required post-install migration. Defaults sane out of the box.
 
-**Stay generic.** F2-specific values are **defaults/overrides, never hardcoded assumptions**:
-entity ids (`switch.veg_main_pump`, a named feed-EC probe, …), 36 plants, 6 L block,
-4 L/hr, lights 10–22, feed band EC 2.3–3.5 / pH 5.8–6.2. A change that only works because of
-F2's exact names or numbers is a bug. (**Resolved in add-on v0.8.0:** `feed_ec_sensor` /
-`feed_ph_sensor` are now optional add-on options with **empty** defaults — unset = that half
-of the source-water gate is disabled (dosing/fill holds still apply), never a fallback to an
-F2 entity id; `substrate_l` / `flow_lps` defaults are now generic last-resort placeholders
-(5 L / 0.02 L/s). **A room that relied on the old F2 defaults must set `feed_ec_sensor` and
-`feed_ph_sensor` in its add-on Configuration** or its source-water gate goes dark after the
-v0.8.0 rebuild.)
+**Stay generic.** Site values are **defaults or overrides, never hardcoded assumptions**: entity ids,
+plant counts, block sizes, dripper flow, lights hours, feed EC and pH bands. A change that only works
+because of one site's exact names or numbers is a bug. The add-on's `feed_ec_sensor` / `feed_ph_sensor`
+options default to empty (that half of the source-water gate is off, never a fallback to a site's
+entity id), and `substrate_l` / `flow_lps` default to generic placeholders (5 L / 0.02 L/s).
 
 **Prove it.** `tests/test_state_migration.py` locks the backward-compatible load and
 `tests/test_version_consistency.py` keeps versions aligned. Run `bash tests/run_ci.sh`; detail
@@ -213,9 +208,6 @@ install still loads.
 - Shot sizing uses both zone-total substrate and zone-total dripper flow, derived
   from per-plant pot size, plant count and drippers. Keep the units explicit.
 
-> **Historical note.** An earlier experimental "intelligence" layer (RootSense
-> substrate AI + ClimateSense climate control, under `intelligence/`) was never
-> deployed and was retired from `main` to keep the repo matched to what actually
-> runs. It is recoverable from the `archive/pre-doc-cleanup-2026-06` tag. A few inert
-> `…_intelligence_*_enabled` entities still exist in the integration; the engine
-> ignores them.
+> **Historical note.** An earlier experimental "intelligence" layer (RootSense substrate AI and
+> ClimateSense climate control) was never deployed and has been retired. A few inert
+> `…_intelligence_*_enabled` entities still exist in the integration; nothing reads them.
