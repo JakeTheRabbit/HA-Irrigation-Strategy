@@ -227,7 +227,7 @@ jobs:
         # a stale bundle, a hand-edited bundle and a bundle carrying code that is not in the
         # source all fail here.
         run: |
-          paths="www custom_components/crop_steering/www addons/f2_control/www addons/f2_control/web-index.html"
+          paths="www custom_components/crop_steering/www addons/f2_control/www"
           if [ -n "$(git status --porcelain -- $paths)" ]; then
             echo "::error::The committed dashboard differs from a fresh build of frontend/src."
             echo "Run 'npm ci --prefix frontend && npm run build --prefix frontend' and commit the result."

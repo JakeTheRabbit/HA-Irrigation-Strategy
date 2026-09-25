@@ -5,15 +5,12 @@
 # real breakage (syntax errors, duplicate keys) and demotes style to warnings.
 extends: relaxed
 
-# Untracked local-only paths: the obsolete nested checkout and the
-# gitignored secrets file. CI never sees them.
+# Untracked local-only paths: the gitignored secrets file and build output. CI never sees them.
 ignore: |
-  HA-Irrigation-Strategy/
   secrets.yaml
   frontend/node_modules/
   frontend/dist/
   output/
-  archive/
 
 rules:
   line-length: disable

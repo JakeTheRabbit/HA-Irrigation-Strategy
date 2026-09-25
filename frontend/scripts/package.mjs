@@ -54,7 +54,6 @@ for (const [filename, route] of Object.entries(routes)) {
   await writeFile(path.join(addon, filename), stub);
 }
 await writeFile(path.join(integration, "index.html"), redirect("index.html", "overview"));
-await copyFile(path.join(addon, "index.html"), path.join(root, "addons/f2_control/web-index.html"));
 console.log(
   "Packaged " +
     Math.round(Buffer.byteLength(html) / 1024) +

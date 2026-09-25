@@ -6,7 +6,7 @@ A Home Assistant irrigation controller for crop steering: it waters each zone of
 
 The demo runs in your browser with sample rooms, sensor data and editable plans. No login or Home Assistant is needed, and your changes stay in your browser. Its recipes and runs are clearly labelled synthetic examples, not growing recommendations.
 
-![Release](https://img.shields.io/badge/Release-2.21.0-green)
+![Release](https://img.shields.io/badge/Release-2.22.0-green)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.10+-41BDF5)
 ![License](https://img.shields.io/badge/License-MIT-green)
 

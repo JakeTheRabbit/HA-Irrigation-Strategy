@@ -245,7 +245,7 @@ export class HaClient {
     const end = Date.now(),
       start = end - hours * 3_600_000;
     // One day per request, two at a time. A busy probe records thousands of changes a day: a
-    // month of a room's two tank probes in one request took 19 s on a live box, past the request
+    // month of a room's two tank probes in one request took 19 s on a live install, past the request
     // timeout, and a day about 1 s. Each request needs its end_time; without one Home Assistant
     // stops at start + 24 h. Each day starts with the state then in force, the value held then.
     const days: number[] = [];
