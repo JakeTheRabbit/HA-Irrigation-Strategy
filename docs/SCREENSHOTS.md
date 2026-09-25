@@ -12,6 +12,18 @@ Captured on 25 September 2026 from the compiled application with isolated demo d
 
 ![Graphical tank level, pump/fill reports and water-quality readings](../img/tank-status.png)
 
+## Tank EC and pH history
+
+![The tank's EC and pH over 24 hours, 7 days or 30 days, with the feed-water limits](../img/tank-history.png)
+
+## Water use per zone
+
+![Today, this week, this grow and an estimate for the whole grow, with litres per grow week](../img/water-use.png)
+
+## Stock tanks
+
+![Nutrient stock tanks with their levels, low marks and batches left](../img/stock-tanks.png)
+
 ## Irrigation plan: Schedule and combined VWC/EC curve
 
 ![Zone planning and steering controls](../img/grow-plan.png)
@@ -48,4 +60,4 @@ Captured on 25 September 2026 from the compiled application with isolated demo d
 
 ![Mobile room overview](../img/mobile-overview.png)
 
-Reproduce these captures with `node frontend/scripts/verify-workspace.mjs` and `node frontend/scripts/verify-steering-visuals.mjs` after building the frontend. Historical screenshots are kept in the `archive/2026-09-08/released-workspace` tag, under archive/2026-09-08/img.
+Reproduce these captures by building the frontend and running the browser checks in `frontend/scripts/` (`verify-workspace.mjs`, `verify-steering-visuals.mjs`, `verify-dashboard.mjs`, `verify-tank-status.mjs` and `verify-recipe-library.mjs`); each writes its screenshots into `img/`.
