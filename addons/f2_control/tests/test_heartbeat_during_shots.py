@@ -1,6 +1,6 @@
 """What a room last reported keeps being reported while a shot holds the loop.
 
-25 Sep 2026, 10:00 NZST, the first lights-on after 2.21.0: the controller fired three minimum-daily floor
+25 Sep 2026, the first lights-on after 2.21.0: the controller fired three minimum-daily floor
 shots in a row (91 s, 182 s, 145 s). Its loop is synchronous, so no room reported anything from 10:01:01
 to 10:09:15, and the dashboard called the controller "not running" while it was watering. A single shot
 can be 900 s, longer than every "not reporting" limit (the dashboard's 5 min; the integration's engine
