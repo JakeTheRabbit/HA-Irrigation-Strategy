@@ -397,9 +397,6 @@
       }
     },
     "error": {
-      "entity_not_found": "Entity not found in Home Assistant.",
-      "invalid_moisture_sensor": "Invalid moisture sensor — must report in %.",
-      "env_file_not_found": "crop_steering.env file not found.",
       "missing_entities": "Some entities in the file don't exist.",
       "setup_invalid": "Not saved yet: {error}"
     },
