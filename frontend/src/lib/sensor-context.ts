@@ -206,8 +206,8 @@ export function referenceLines({
   if (draftFloor !== null || savedFloor !== null)
     lines.push({
       key: "dryback_floor",
-      label: "P3 dryback target",
-      short: "P3 dry",
+      label: "Dries back to",
+      short: "Dries to",
       metric: "vwc",
       value: draftFloor,
       saved: differs(draftFloor, savedFloor) ? savedFloor : null,

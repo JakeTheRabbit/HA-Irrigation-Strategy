@@ -214,11 +214,14 @@ try {
     await expectVisible(help());
     await page.keyboard.press("Escape");
     assert.equal(await help().count(), 0, "Escape closes the explainer");
-    assert.equal(
-      await trigger().evaluate((button) => button === document.activeElement),
-      true,
-      "focus returns to the ?",
-    );
+    // The popover hands focus back as it finishes closing, a moment after Escape: read it until it
+    // arrives (up to 2 s) rather than once, which failed at random on a slower machine.
+    let focused = false;
+    for (let tries = 0; tries < 20 && !focused; tries++) {
+      focused = await trigger().evaluate((button) => button === document.activeElement);
+      if (!focused) await page.waitForTimeout(100);
+    }
+    assert.equal(focused, true, "focus returns to the ?");
   });
   await check("help: the daily routine replaces the Overview's workflow card", async () => {
     await go("help");

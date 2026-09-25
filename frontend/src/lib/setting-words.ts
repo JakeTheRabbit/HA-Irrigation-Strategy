@@ -96,7 +96,7 @@ const WORDS: Record<string, SettingWords> = {
   p1_time_between_shots: {
     label: "Time between P1 shots",
     short: "Time between P1 shots",
-    help: "Lets each ramp shot soak in before the next. Athena: 15–30 minutes.",
+    help: "Lets each ramp shot soak in before the next. Athena: 15 to 30 minutes.",
   },
   p1_maximum_shots: {
     label: "Most P1 shots",
@@ -139,7 +139,7 @@ const WORDS: Record<string, SettingWords> = {
   maximum_ec: {
     label: "Maximum substrate EC",
     short: "Maximum EC",
-    help: "At this substrate EC a flush fires in any phase (in P2, from 1 mS/cm below it), when the feed is weaker than the substrate.",
+    help: "At this substrate EC a flush fires in any phase (in P2, from 1 mS/cm below it), when the feed is weaker than the substrate (with no feed EC sensor, the feed counts as 3.0 mS/cm). If the feed isn't weaker, or moisture is within 2 points of full saturation, the zone gets no shots at all, rescue and watchdog included, until its EC falls below this.",
   },
   watchdog_hours: {
     label: "Watchdog interval",
@@ -237,13 +237,13 @@ const DRYBACK_WORDS: SettingWords = {
 // engine does, from decide() and the controller's parameter reads.
 const AUTO = "The controller adjusts this zone’s value itself. Auto setpoints is off by default.";
 const EC_STAGES =
-  "Substrate EC targets by growth stage: veg 3–5, flower stretch 4–10, bulk 3.5–6, finish 3–4 (p. 40).";
+  "Substrate EC targets by growth stage: veg 3 to 5, flower stretch 4 to 10, bulk 3.5 to 6, finish 3 to 4 (p. 40).";
 const DETAILS: Record<string, SettingDetail> = {
   p0_maximum_wait_time: {
     what: "How long after lights-on the first shot can wait: Athena’s “transpiration before irrigation”.",
     when: "P0 ends and the ramp starts at the first of: this long after lights-on; moisture at or below the maintenance trigger; moisture down by the P3 dryback target from its highest reading since lights-on. The ramp’s first shot then fires straight away, unless moisture is still at the peak VWC target.",
     athena:
-      "Additional dryback is “the decrease in VWC% that occurs during P3, after the lights turn on and before the first irrigation event of the day” (p. 33): 1–5%, first shot 30 minutes to 2 hours after lights-on (p. 39). The P1 page says 1–2 hours (p. 36).",
+      "Additional dryback is “the decrease in VWC% that occurs during P3, after the lights turn on and before the first irrigation event of the day” (p. 33): 1 to 5%, first shot 30 minutes to 2 hours after lights-on (p. 39). The P1 page says 1 to 2 hours (p. 36).",
   },
   p1_target_vwc: {
     what: "The moisture the morning ramp brings the substrate up to: the top of the day’s range. Athena calls it the Peak VWC% Target.",
@@ -260,7 +260,7 @@ const DETAILS: Record<string, SettingDetail> = {
     affects:
       "Ramp shots are sized by substrate EC against the P1 target: up to twice this while EC is well above it, as little as half while it is well below.",
     athena:
-      "2–6% shots, 15–30 minutes apart, saturate slowly and avoid channelling (p. 36). A 1% shot of a 4 L pot is 40 mL (p. 40).",
+      "2 to 6% shots, 15 to 30 minutes apart, saturate slowly and avoid channelling (p. 36). A 1% shot of a 4 L pot is 40 mL (p. 40).",
   },
   p1_shot_size_increment: {
     what: `How much bigger each ramp shot is than the one before, ${OF_SUBSTRATE}.`,
@@ -292,7 +292,7 @@ const DETAILS: Record<string, SettingDetail> = {
     when: "Every maintenance shot. Watchdog and daily-minimum shots use it as it is; dilution and high-EC flushes are 1.5 times it or more.",
     affects:
       "Maintenance shots are sized by substrate EC against the P2 target, from half to twice this. Bigger shots make more runoff and lower substrate EC.",
-    auto: "With the optional judge set up, the controller nudges it at most one step a day, within 1–4%. Auto setpoints is off by default.",
+    auto: "With the optional judge set up, the controller nudges it at most one step a day, within 1 to 4%. Auto setpoints is off by default.",
     athena:
       "“Decrease Substrate EC: Increase shot size”; “Increase Substrate EC: Decrease shot size” (p. 38).",
   },
@@ -343,7 +343,7 @@ const DRYBACK_DETAIL: SettingDetail = {
   when: "Overnight nothing waters toward it: the substrate simply dries. It acts in two places. In the last 3 hours before lights-off, maintenance shots stop early if drying this far by lights-on needs the rest of the night (and no more than 12 hours). After lights-on, P0 also ends once moisture drops this much below its highest reading since lights-on; with P3-sized values that rarely comes first.",
   affects: "When P2 ends, and so substrate EC: a bigger dryback raises it.",
   athena:
-    "P3 dryback targets: vegetative 30–40% (less stress), generative 40–50% (more stress), “based on a relative change” (p. 39). By growth stage, the veg stage dries back 50% the first time, then 25% (p. 40). “The grower can control the amount of dryback by adding or subtracting P2 shots at the end of the day” (p. 37): stopping maintenance shots early is how the controller does that.",
+    "P3 dryback targets: vegetative 30 to 40% (less stress), generative 40 to 50% (more stress), “based on a relative change” (p. 39). By growth stage, the veg stage dries back 50% the first time, then 25% (p. 40). “The grower can control the amount of dryback by adding or subtracting P2 shots at the end of the day” (p. 37): stopping maintenance shots early is how the controller does that.",
 };
 
 const MODE: Record<string, string> = {

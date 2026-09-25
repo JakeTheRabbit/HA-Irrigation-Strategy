@@ -71,7 +71,7 @@ const HELD: Record<Block["kind"], string> = {
 };
 // Each phase's target line, named as its setting is (setting-words).
 const TARGETS: Record<string, string> = {
-  P0: settingWords("dryback_target")!.short,
+  P0: "Dries back to", // a level worked out from the dryback target, not the setting itself
   P1: settingWords("p1_target_vwc")!.short,
   P2: settingWords("p2_vwc_threshold")!.short,
   P3: settingWords("p3_emergency_vwc_threshold")!.short,
