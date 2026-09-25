@@ -333,7 +333,7 @@ try {
       const line = lane.locator(".timeline-zone-line");
       assert.match(
         await line.textContent(),
-        /% now · [+−±][\d.]+ pts vs yesterday at .+ · P1 target [\d.]+% /,
+        /% now · [+−±][\d.]+ pts vs yesterday at .+ · Peak target [\d.]+% /,
       );
       assert.match(await line.textContent(), /L so far \([+−±][\d.]+ L\)/);
       const key = timeline.getByRole("list", { name: "Timeline key" });

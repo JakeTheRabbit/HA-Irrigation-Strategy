@@ -309,10 +309,10 @@ try {
       await page.keyboard.type("55");
       assert.match(await panel.innerText(), /Preview at 55%, now 70%/);
       // The panel shows the page's own interpolation: P1 64 → 60 % VWC at 55% is 62, now 61.
-      const p1 = panel.locator("tr").filter({ hasText: "P1 moisture target" });
+      const p1 = panel.locator("tr").filter({ hasText: "Peak VWC target" });
       assert.equal((await p1.locator(".plan-cell-at").innerText()).trim(), "62");
       assert.match(await p1.innerText(), /% VWC\s+64\s+61\s+62\s+60/);
-      assert.match(await panel.innerText(), /Morning dryback % of peak/);
+      assert.match(await panel.innerText(), /P3 dryback target % of peak/);
       assert.match(await panel.innerText(), /Week 4 → week 5: 70% → 55% \(−15 points\)/);
       assert.match(
         await panel.locator(".plan-cell-live").innerText(),
@@ -435,7 +435,7 @@ try {
       await page.locator("#vegetative-p1_target_vwc").fill("66");
       await page.locator("#generative-p1_target_vwc").fill("62");
       await page.getByRole("tab", { name: "Schedule & curve" }).click();
-      const handle = page.getByRole("slider", { name: "P2 VWC threshold", exact: true });
+      const handle = page.getByRole("slider", { name: "Maintenance shot when below", exact: true });
       const before = Number(await handle.getAttribute("aria-valuenow"));
       await handle.focus();
       await handle.press("ArrowUp");
@@ -1169,10 +1169,10 @@ try {
         });
         const scheduledVwc = activeTargets
           .locator(".setting-field")
-          .filter({ hasText: /p2 vwc threshold/i });
+          .filter({ hasText: /maintenance shot when below/i });
         const scheduledEc = activeTargets
           .locator(".setting-field")
-          .filter({ hasText: /p2 ec target/i });
+          .filter({ hasText: /substrate ec target, p2/i });
         assert.equal((await scheduledVwc.locator("strong").innerText()).trim(), "77");
         assert.equal((await scheduledEc.locator("strong").innerText()).trim(), "4.2 mS/cm");
         assert.equal(await lp.locator('input[id^="setting-"], select[id^="choice-"]').count(), 0);
