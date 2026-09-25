@@ -154,7 +154,7 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
 - **Commit style:** conventional commits (`feat:`/`fix:`/`docs:`/`chore:`) with a
   `Co-Authored-By: Claude` trailer when written via Claude Code. Two long-lived branches:
   `main` (production) and `testing` (staging); everything else is a short-lived proposal.
-  Retired branches are kept as `archive/*` tags.
+  Short-lived branches are deleted once their pull request is merged or closed.
 - **Changelog = dual view.** Every release in `CHANGELOG.md` leads with **🌱 In plain English** (anyone
   can follow it) then **🔧 Technical notes** (entity/code detail). Keep both when adding a release.
 

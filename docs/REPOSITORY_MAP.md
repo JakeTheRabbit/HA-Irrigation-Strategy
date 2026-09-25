@@ -13,7 +13,6 @@
 | addons/f2_control/www/public/dashboard.html | Identical generated application served through ingress |
 | tests | Integration and repository contract tests |
 | docs | Install, operation, architecture and release process |
-| `archive/2026-09-08/released-workspace` (tag) | Superseded dashboards, documentation and tools, at their original paths under archive/2026-09-08 |
 | docs/TESTING.md / docs/ENTITIES.md | Development checks and entity reference |
 | docs/error-codes.json | The one list of error codes (CS-101 …); docs/ERROR_CODES.md is written from it by scripts/render_error_codes.py, and the dashboard's Help & tools page imports it |
 | img | Screenshots used by the README and docs |
