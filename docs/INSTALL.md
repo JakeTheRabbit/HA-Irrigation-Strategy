@@ -54,7 +54,7 @@ Start with a reviewed manual configuration, or create a draft in **Irrigation pl
 
 ## Manual integration install
 
-Copy the entire `custom_components/crop_steering` directory into HA's `/config/custom_components/crop_steering` and restart HA. Include its `www/dashboard.html` file. Then follow steps 2–7 above. Do not copy this repository wholesale into `/config`; historical facility examples are not your configuration.
+Copy the entire `custom_components/crop_steering` directory into HA's `/config/custom_components/crop_steering` and restart HA. Include its `www/dashboard.html` file. Then follow steps 2-7 above. Do not copy this repository wholesale into `/config`; historical facility examples are not your configuration.
 
 Developers build the dashboard using `npm ci --prefix frontend` then `npm run build --prefix frontend`. Packaging generates identical self-contained HTML in the integration, controller and web distribution folders. Compiled HTML is a deliverable, not the editing source.
 
