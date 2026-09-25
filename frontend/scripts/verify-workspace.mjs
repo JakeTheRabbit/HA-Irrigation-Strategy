@@ -97,7 +97,22 @@ async function noOverflow() {
     "Document overflow",
   );
 }
+// Colours animate when the theme changes (transition-colors). Contrast measured mid-transition
+// fails at random, so let the running finite animations and transitions finish (at most 2 s: a
+// paused one never does), then two frames.
+async function settle() {
+  await page.evaluate(async () => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const running = document
+      .getAnimations()
+      .filter((a) => a.playState === "running" && a.effect?.getTiming().iterations !== Infinity);
+    await Promise.race([Promise.all(running.map((a) => a.finished.catch(() => {}))), wait(2000)]);
+    for (let frame = 0; frame < 2; frame++)
+      await Promise.race([new Promise((resolve) => requestAnimationFrame(resolve)), wait(100)]);
+  });
+}
 async function axe(label) {
+  await settle();
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
     .analyze();
