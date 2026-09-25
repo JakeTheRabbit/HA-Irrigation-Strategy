@@ -25,6 +25,7 @@ def _build(options, states=None):
     fake = fake_ha.FakeHA()
     for eid, (state, attrs) in (states or {}).items():
         fake.set_state(eid, state, attrs)
+    _hardware_off(fake, options, states)
     fake_ha.install(controller, fake, options)
     c = controller.Controller()
     # The controller persists to /data/state.json; on a dev box that resolves to a real
@@ -33,6 +34,17 @@ def _build(options, states=None):
     c._state_path = os.path.join(tempfile.mkdtemp(prefix="f2test_"), "state.json")
     c._load_state()
     return c, fake
+
+
+def _hardware_off(fake, options, states):
+    """The pump, main line and valves a room is set up with exist in Home Assistant, switched off,
+    unless the test says otherwise: one that reads neither on nor off holds every shot (_blocked)."""
+    rooms = [attrs for eid, (_s, attrs) in (states or {}).items()
+             if eid.endswith("engine_config") and isinstance(attrs, dict)]
+    for hw in [*rooms, (options or {}).get("hardware") or {}]:
+        for entity in (hw.get("pump"), hw.get("mainline"), *(hw.get("valves") or {}).values()):
+            if entity and entity not in fake.states:
+                fake.set_state(entity, "off")
 
 
 def _desc(prefix="", pump="switch.p", mainline="switch.m", valves=None, num=1, **extra):

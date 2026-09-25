@@ -37,6 +37,8 @@ def rig(monkeypatch, tmp_path):
     for key in ("system_enabled", "auto_irrigation_enabled", "zone_1_enabled"):
         fake.set_state(f"switch.crop_steering_{key}", "on")
     fake.set_state(room.enable_flag, "on")
+    for switch in ("switch.p", "switch.m", "switch.v1"):  # the feed path exists, switched off
+        fake.set_state(switch, "off")
     # Keep all actuation local and deterministic.
     clock = {"seconds": 0.0}
     monkeypatch.setattr(controller.time, "monotonic", lambda: clock["seconds"])
