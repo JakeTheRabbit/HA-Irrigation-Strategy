@@ -164,5 +164,4 @@ async def test_an_upgraded_rooms_configure_menu_shows_the_version_and_still_open
         "reload_env",
         "edit_parameters",
         "edit_zones",
-        "edit_features",
     }

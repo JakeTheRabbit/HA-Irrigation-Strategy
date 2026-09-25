@@ -46,34 +46,6 @@ def _veg_entry():
     )
 
 
-def test_transition_phase_default_room_uses_dt_util_and_unprefixed_select():
-    hass = ha_stubs.FakeHass()
-    h = _handlers(hass)
-    asyncio.run(h["transition_phase"](Call(target_phase="P1", reason="test")))
-
-    # select.select_option targeted the DEFAULT room's (un-prefixed) phase select
-    assert hass.services.calls, "no service call made"
-    domain, service, data = hass.services.calls[-1]
-    assert (domain, service) == ("select", "select_option")
-    assert data["entity_id"] == f"select.{DOMAIN}_irrigation_phase"
-
-    # event fired with a real ISO timestamp (proves no hass.helpers.template crash)
-    assert hass.bus.events, "no event fired"
-    _etype, payload = hass.bus.events[-1]
-    assert payload["room"] == "default"
-    assert payload["timestamp"].startswith("2026-01-01")
-
-
-def test_transition_phase_named_room_targets_prefixed_select():
-    hass = ha_stubs.FakeHass(entries=[_veg_entry()])
-    h = _handlers(hass)
-    asyncio.run(h["transition_phase"](Call(target_phase="P2", room="veg")))
-
-    _domain, _service, data = hass.services.calls[-1]
-    assert data["entity_id"] == f"select.{DOMAIN}_veg_irrigation_phase"
-    assert hass.bus.events[-1][1]["room"] == "veg"
-
-
 def test_set_manual_override_named_room_targets_prefixed_switch():
     override = SimpleNamespace(
         entity_id="switch.crop_steering_veg_zone_2_manual_override",
@@ -94,6 +66,8 @@ def test_set_manual_override_named_room_targets_prefixed_switch():
     assert hass.services.calls == []
     assert hass.bus.events[-1][1]["room"] == "veg"
     assert hass.bus.events[-1][1]["expires_at"] == "2026-01-01T13:00:00+00:00"
+    # a real ISO timestamp (proves no hass.helpers.template crash)
+    assert hass.bus.events[-1][1]["timestamp"].startswith("2026-01-01")
 
 
 def test_unknown_room_raises_instead_of_steering_default():
@@ -102,8 +76,8 @@ def test_unknown_room_raises_instead_of_steering_default():
     hass = ha_stubs.FakeHass()  # no entries → 'ghost' cannot resolve
     h = _handlers(hass)
     with pytest.raises(HomeAssistantError):
-        asyncio.run(h["transition_phase"](Call(target_phase="P0", room="ghost")))
-    assert hass.services.calls == []  # nothing actuated
+        asyncio.run(h["set_manual_override"](Call(zone=1, room="ghost")))
+    assert hass.services.calls == [] and hass.bus.events == []  # nothing actuated
 
 
 def test_apply_recipe_without_store_raises():
@@ -118,19 +92,3 @@ def test_save_recipe_without_store_raises():
     h = _handlers(hass)
     with pytest.raises(HomeAssistantError):
         asyncio.run(h["save_recipe"](Call(recipe={"stages": {}})))
-
-
-def test_check_transition_conditions_missing_setpoints_no_crash():
-    # phase select + avg sensors present, but the number entities are missing:
-    # must warn and return, not raise AttributeError on a None state.
-    hass = ha_stubs.FakeHass(
-        states={
-            f"select.{DOMAIN}_irrigation_phase": "P1",
-            f"sensor.{DOMAIN}_configured_avg_vwc": "60",
-            f"sensor.{DOMAIN}_configured_avg_ec": "3.0",
-        }
-    )
-    h = _handlers(hass)
-    # should complete without raising and fire no transition_check event
-    asyncio.run(h["check_transition_conditions"](Call()))
-    assert not any(e[0] == "crop_steering_transition_check" for e in hass.bus.events)

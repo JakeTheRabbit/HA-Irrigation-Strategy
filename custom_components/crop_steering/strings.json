@@ -422,8 +422,7 @@
         "menu_options": {
           "reload_env": "Reload from crop_steering.env file",
           "edit_zones": "Edit zones & hardware (add/remove sensors)",
-          "edit_parameters": "Edit irrigation parameters",
-          "edit_features": "Edit feature flags"
+          "edit_parameters": "Edit irrigation parameters"
         }
       },
       "reload_env": {
@@ -798,20 +797,6 @@
           "dripper_flow_rate": "Litres/hour per dripper. Drives shot duration.",
           "p1_target_vwc": "Ramp-up target moisture; once reached the zone moves to maintenance (P2).",
           "p2_vwc_threshold": "During maintenance, water when VWC drops below this. Keep it below P1 target to avoid oscillation."
-        }
-      },
-      "edit_features": {
-        "title": "Feature flags",
-        "description": "Toggle optional behaviours.",
-        "data": {
-          "ec_stacking": "EC stacking",
-          "analytics": "Analytics",
-          "ml_features": "ML features (experimental)"
-        },
-        "data_description": {
-          "ec_stacking": "Progressively raise EC through P0->P3 instead of one flat target.",
-          "analytics": "Track dryback rates and trends. Minimal overhead.",
-          "ml_features": "Experimental ML predictions. Not deployed in the f2-control engine — leave off."
         }
       }
     },

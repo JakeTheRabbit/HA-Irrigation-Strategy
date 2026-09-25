@@ -16,7 +16,6 @@ from .const import (
     CONF_NUM_ZONES,
     PHASES,
     STEERING_MODES,
-    CROP_TYPES,
     GROWTH_STAGES,
     RECIPE_STAGES,
     RECIPE_PARAMS,
@@ -27,35 +26,7 @@ from .recipe import get_manager
 
 _LOGGER = logging.getLogger(__name__)
 
-# Zone grouping options
-ZONE_GROUP_OPTIONS = ["Ungrouped", "Group A", "Group B", "Group C", "Group D"]
-
-# Zone priority levels
-ZONE_PRIORITY_OPTIONS = ["Critical", "High", "Normal", "Low"]
-
-# Zone-specific crop profiles
-ZONE_CROP_PROFILES = [
-    "Follow Main",
-    "Cannabis_Athena",
-    "Cannabis_Indica_Dominant",
-    "Cannabis_Sativa_Dominant",
-    "Cannabis_Balanced_Hybrid",
-    "Tomato_Hydroponic",
-    "Lettuce_Leafy_Greens",
-    "Custom",
-]
-
-ZONE_PHASE_OVERRIDE_OPTIONS = ["Auto", "P0", "P1", "P2", "P3"]
-
-# Note: Light schedules are now system-wide, not per-zone
-
 SELECT_DESCRIPTIONS = [
-    SelectEntityDescription(
-        key="crop_type",
-        name="Crop Type",
-        icon="mdi:sprout",
-        options=CROP_TYPES,  # Use constant from const.py
-    ),
     SelectEntityDescription(
         key="growth_stage",
         name="Growth Stage",
@@ -81,24 +52,6 @@ SELECT_DESCRIPTIONS = [
         icon="mdi:format-list-bulleted-type",
         options=RECIPE_STAGES,
     ),
-    # RootSense v3 — derived view of `number.crop_steering_steering_intent`.
-    # Read-mostly: kept as a Select (not a Sensor) so dashboards can use it
-    # in glance/entity cards without extra templating. The IntentResolver in
-    # the engine updates this on every intent
-    # change. Operators who change it manually trigger a corresponding
-    # intent slider update via the existing automation path.
-    SelectEntityDescription(
-        key="steering_mode_derived",
-        name="Steering Mode (derived)",
-        icon="mdi:tune-vertical-variant",
-        options=[
-            "Generative",
-            "Mixed-generative",
-            "Balanced",
-            "Mixed-vegetative",
-            "Vegetative",
-        ],
-    ),
 ]
 
 
@@ -120,62 +73,6 @@ async def async_setup_entry(
 
     # Add zone-specific select entities
     for zone_num in range(1, num_zones + 1):
-        # Zone Group
-        selects.append(
-            CropSteeringSelect(
-                entry,
-                SelectEntityDescription(
-                    key=f"zone_{zone_num}_group",
-                    name=f"Crop Steering Zone {zone_num} Group",
-                    options=ZONE_GROUP_OPTIONS,
-                    icon="mdi:group",
-                ),
-                zone_num=zone_num,
-            )
-        )
-
-        # Zone Priority
-        selects.append(
-            CropSteeringSelect(
-                entry,
-                SelectEntityDescription(
-                    key=f"zone_{zone_num}_priority",
-                    name=f"Crop Steering Zone {zone_num} Priority",
-                    options=ZONE_PRIORITY_OPTIONS,
-                    icon="mdi:priority-high",
-                ),
-                zone_num=zone_num,
-            )
-        )
-
-        # Zone Crop Profile
-        selects.append(
-            CropSteeringSelect(
-                entry,
-                SelectEntityDescription(
-                    key=f"zone_{zone_num}_crop_profile",
-                    name=f"Crop Steering Zone {zone_num} Crop Profile",
-                    options=ZONE_CROP_PROFILES,
-                    icon="mdi:sprout",
-                ),
-                zone_num=zone_num,
-            )
-        )
-
-        # Zone Phase Override (native per-zone phase forcing: Auto/P0-P3) — RootSense v3.
-        selects.append(
-            CropSteeringSelect(
-                entry,
-                SelectEntityDescription(
-                    key=f"zone_{zone_num}_phase_override",
-                    name=f"Zone {zone_num} Phase Override",
-                    options=ZONE_PHASE_OVERRIDE_OPTIONS,
-                    icon="mdi:state-machine",
-                ),
-                zone_num=zone_num,
-            )
-        )
-
         # Zone Steering Mode (per-row Vegetative/Generative; the engine falls back to global).
         # Retained from the lean branch: the master app's _zone_is_vegetative() reads this
         # for per-zone veg/gen EC-target selection.
@@ -218,17 +115,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         self._attr_options = description.options
 
         # Set default values based on entity type
-        if "group" in description.key:
-            self._attr_current_option = "Ungrouped"
-        elif "priority" in description.key:
-            self._attr_current_option = "Normal"
-        elif "crop_profile" in description.key:
-            self._attr_current_option = "Follow Main"
-        elif "phase_override" in description.key:
-            self._attr_current_option = "Auto"
-        elif "schedule" in description.key:
-            self._attr_current_option = "Main Schedule"
-        elif description.key == "growth_stage":
+        if description.key == "growth_stage":
             self._attr_current_option = "Vegetative"
         else:
             self._attr_current_option = (
@@ -278,9 +165,8 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         if option in self.options:
             self._attr_current_option = option
             self.async_write_ha_state()
-            # The irrigation-phase select is a manual override: drive the engine by firing
-            # the same event the transition_phase service uses (forced => applies from any
-            # phase). Without this, changing the select did nothing to the controller.
+            # Announce a manual phase pick on the event bus for automations. The controller
+            # keeps each zone's phase itself and does not read this select.
             if getattr(self.entity_description, "key", None) == "irrigation_phase":
                 self.hass.bus.async_fire(
                     "crop_steering_phase_transition",

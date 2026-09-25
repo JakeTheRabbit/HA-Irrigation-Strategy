@@ -48,3 +48,45 @@ def test_dead_placeholder_sensor_descriptors_stay_removed():
 
     assert "irrigation_efficiency" not in descriptor_keys
     assert "dryback_percentage" not in descriptor_keys
+    assert "water_usage_daily" not in descriptor_keys
+    assert "next_irrigation_time" not in descriptor_keys
+
+
+def test_setup_removes_only_this_rooms_retired_entities(monkeypatch):
+    """_RETIRED is matched per platform, per room, and a zone key covers every zone's copy. The
+    global P2 EC thresholds stay: only their per-zone copies were retired."""
+    from homeassistant.helpers import entity_registry as er
+
+    integration = _load_integration_init()
+    head = "crop_steering_room-a_"
+    items = [
+        ("number", head + "zone_12_shot_size_multiplier", "number.multiplier"),
+        ("number", head + "zone_3_p2_ec_high_threshold", "number.zone_copy"),
+        ("number", head + "p2_ec_high_threshold", "number.global_kept"),
+        ("sensor", head + "zone_3_shot_size_multiplier", "sensor.other_platform"),
+        ("button", head + "zone_1_trigger_shot", "button.trigger"),
+        (
+            "switch",
+            "crop_steering_room-b_zone_1_dripper_protection",
+            "switch.other_room",
+        ),
+        ("switch", head + "zone_1_manual_override", "switch.kept"),
+    ]
+    removed = []
+    monkeypatch.setattr(
+        er,
+        "async_get",
+        lambda hass: types.SimpleNamespace(async_remove=removed.append),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        er,
+        "async_entries_for_config_entry",
+        lambda registry, entry_id: [
+            types.SimpleNamespace(domain=d, unique_id=u, entity_id=e)
+            for d, u, e in items
+        ],
+        raising=False,
+    )
+    integration._remove_retired_entities(None, types.SimpleNamespace(entry_id="room-a"))
+    assert removed == ["number.multiplier", "number.zone_copy", "button.trigger"]

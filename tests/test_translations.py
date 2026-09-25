@@ -59,7 +59,7 @@ def test_every_configure_menu_entry_has_a_label():
         1
     )
     entries = set(re.findall(r'"([a-z_]+)"', menu))
-    assert len(entries) >= 4  # the scan still works
+    assert len(entries) >= 3  # the scan still works
     assert entries == set(_strings()["options"]["step"]["init"]["menu_options"])
 
 

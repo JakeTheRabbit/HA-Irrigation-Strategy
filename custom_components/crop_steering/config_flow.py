@@ -221,9 +221,6 @@ def _build_zones(num_zones: int, data: dict, existing: dict | None = None) -> di
             "max_daily_volume": ((existing or {}).get(str(z)) or {}).get(
                 "max_daily_volume", 20.0
             ),
-            "shot_multiplier": ((existing or {}).get(str(z)) or {}).get(
-                "shot_multiplier", 1.0
-            ),
         }
     return zones
 
@@ -799,7 +796,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 "reload_env",
                 "edit_parameters",
                 "edit_zones",
-                "edit_features",
             ],
             # Not blocked while an update waits for a restart: an operator with a growing room
             # has to be able to get in here. It is told what is going on instead.
@@ -1055,38 +1051,3 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return _retry_form(self, "edit_zones_map", schema, user_input, info, err)
         _update(self.hass, self._entry, new_data)
         return self.async_create_entry(title="", data={})
-
-    async def async_step_edit_features(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Edit feature flags."""
-        if user_input is not None:
-            new_data = {**self._entry.data}
-            if "features" not in new_data:
-                new_data["features"] = {}
-            new_data["features"].update(user_input)
-
-            self.hass.config_entries.async_update_entry(self._entry, data=new_data)
-
-            return self.async_create_entry(title="", data={})
-
-        current_features = self._entry.data.get("features", {})
-
-        return self.async_show_form(
-            step_id="edit_features",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        "ec_stacking",
-                        default=current_features.get("ec_stacking", False),
-                    ): bool,
-                    vol.Optional(
-                        "analytics", default=current_features.get("analytics", True)
-                    ): bool,
-                    vol.Optional(
-                        "ml_features",
-                        default=current_features.get("ml_features", False),
-                    ): bool,
-                }
-            ),
-        )

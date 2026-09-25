@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from typing import Any
 
@@ -26,7 +27,6 @@ except ImportError:  # pragma: no cover - enables non-HA unit tests
         SWITCH = "switch"
         SELECT = "select"
         NUMBER = "number"
-        BUTTON = "button"
 
 
 from .const import DOMAIN
@@ -54,8 +54,66 @@ PLATFORMS: list[Platform] = [
     Platform.SWITCH,
     Platform.SELECT,
     Platform.NUMBER,
-    Platform.BUTTON,
 ]
+
+# Entities earlier versions created that nothing reads or sets any more, by platform and key. A key
+# starting "zone_" stands for every zone's copy (zone_3_group is "zone_group"). Setup removes them
+# from the entity registry; left there, each would sit in Settings as unavailable for good.
+_RETIRED = {
+    "button": {"zone_trigger_shot"},
+    "number": {
+        "steering_intent",
+        "climate_grow_day_offset",
+        "veg_p0_dryback_drop_pct",
+        "gen_p0_dryback_drop_pct",
+        "blocked_dripper_max_shots",
+        "p0_minimum_wait_time",
+        "p1_maximum_shot_size",
+        "p3_veg_last_irrigation",
+        "p3_gen_last_irrigation",
+        "ec_target_flush",
+        "zone_p0_minimum_wait_time",
+        "zone_p1_maximum_shot_size",
+        "zone_p3_veg_last_irrigation",
+        "zone_p3_gen_last_irrigation",
+        "zone_ec_target_flush",
+        "zone_p2_ec_high_threshold",
+        "zone_p2_ec_low_threshold",
+        "zone_ec_target_veg_p3",
+        "zone_ec_target_gen_p3",
+        "zone_shot_size_multiplier",
+    },
+    "select": {
+        "crop_type",
+        "steering_mode_derived",
+        "zone_group",
+        "zone_priority",
+        "zone_crop_profile",
+        "zone_phase_override",
+    },
+    "sensor": {"water_usage_daily", "next_irrigation_time"},
+    "switch": {
+        "analytics_enabled",
+        "zone_dripper_protection",
+        *(
+            f"intelligence_{name}_enabled"
+            for name in (
+                "root_zone",
+                "adaptive",
+                "agronomic",
+                "orchestrator",
+                "anomaly",
+                "climate_sensing",
+                "climate_timeline",
+                "climate_control",
+                "climate_lights",
+                "climate_anomaly",
+                "climate_drives_intent",
+                "llm_report",
+            )
+        ),
+    },
+}
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -92,6 +150,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await async_setup_stock(hass, entry)
     except Exception as err:  # pragma: no cover - never block setup on the stock store
         _LOGGER.warning("Stock tanks unavailable: %s", err)
+
+    _remove_retired_entities(hass, entry)
 
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -132,6 +192,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("Crop Steering System setup complete")
 
     return True
+
+
+def _remove_retired_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Drop this room's registry entries for the entities in _RETIRED."""
+    from homeassistant.helpers import entity_registry as er
+
+    registry = er.async_get(hass)
+    head = f"{DOMAIN}_{entry.entry_id}_"
+    removed = 0
+    for item in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if not str(item.unique_id).startswith(head):
+            continue
+        key = re.sub(r"^zone_\d+_", "zone_", item.unique_id[len(head) :])
+        if key in _RETIRED.get(item.domain, ()):
+            registry.async_remove(item.entity_id)
+            removed += 1
+    if removed:
+        _LOGGER.info("Removed %d retired entities from the registry", removed)
 
 
 def _entry_config(entry: ConfigEntry) -> dict[str, Any]:
