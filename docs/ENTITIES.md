@@ -142,6 +142,7 @@ match the globals above.
 ### Per-zone (`select.crop_steering_zone_N_*`)
 | Entity | Options | What it does |
 |---|---|---|
+| `zone_N_set_phase` | Keep · P0 · P1 · P2 · P3 | Moves the zone to a phase by hand. The controller applies a pick once, within a minute, and sets it back to Keep; its own rules carry on from that phase. Today's water and shot counts stay; P1 ramps from its first shot, and P0 measures its dry-back from the moisture at the move. |
 | `zone_N_steering_mode` | Vegetative · Generative | Per-zone veg/gen bias. |
 | `zone_N_crop_profile` | Follow Main · Cannabis_Athena · _Indica_Dominant · … · Custom | Per-zone crop preset (Follow Main = use system default). |
 | `zone_N_priority` | Critical · High · Normal · Low | Ordering when multiple zones want water at once. |

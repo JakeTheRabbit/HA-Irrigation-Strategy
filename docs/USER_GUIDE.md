@@ -50,6 +50,8 @@ Use **Settings → Sample workspace → Reset demo session…** and review the c
 
 **Water use** counts grow-days from lights-on to lights-on. It reads Home Assistant's long-term statistics, which Home Assistant keeps indefinitely; opened outside Home Assistant it can only read recorded history, as far back as the recorder keeps it. The grow start is the zone's grow plan start date when the plan is armed or has been saved. Without one it is inferred: the first day with water after at least five grow-days without any. The panel says which. A day Home Assistant did not record is flagged, never counted as zero.
 
+To move a zone to another phase, open it from **Zones** or **Overview** and pick one under **Phase**. After the review, the controller moves it within a minute and carries on from there: lights-off still moves it to P3 and lights-on to P0. Today's water and shot counts stay.
+
 **Settings → Room scheduling** and zone scheduling controls require a review. Pausing future scheduling is not an emergency stop: an active shot may continue. Use the installation's established physical shutdown procedure for an emergency.
 
 ### Tank and pump display
