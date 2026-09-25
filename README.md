@@ -1,155 +1,161 @@
 # Crop Steering for Home Assistant
 
-A Home Assistant irrigation controller for crop steering: it waters each zone of a room through the four daily phases (P0 dryback, P1 ramp-up, P2 maintenance, P3 overnight) by what the zone's own moisture and EC probes read. A zone whose moisture probe stops giving a usable reading is still watered, with a working zone's shots or on a timed safety schedule, until the probe reads again. It also gives you a native workspace to plan each zone, map your sensors and switches, and review every change before it is applied.
+Crop Steering waters the plants in a grow room automatically. It measures how wet each group of plants is, decides when they need water and how much, and switches your pump and valves to deliver it in small, measured shots. It follows the daily routine that professional growers call **crop steering**: let the roots dry a little each morning, bring them back up, hold them steady through the day, and let them dry again overnight. You choose how hard to push the plants, from lush vegetative growth to heavy flowering, and it does the watering.
 
-**[Open the interactive demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1)** · [Install](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md) · [Feature checklist](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/FEATURE_MATRIX.md)
+It runs inside [Home Assistant](https://www.home-assistant.io/) and works with the moisture probes, EC probes, pumps and valves you already have there. Everything happens on your own hardware: no cloud account, no subscription.
 
-The demo runs in your browser with sample rooms, sensor data and editable plans. No login or Home Assistant is needed, and your changes stay in your browser. Its recipes and runs are clearly labelled synthetic examples, not growing recommendations.
+**[Try the live demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1)** (runs in your browser with sample data, nothing to install) · [Install](#install) · [User guide](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md) · [What has been tested](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/FEATURE_MATRIX.md)
 
-![Release](https://img.shields.io/badge/Release-2.22.0-green)
+![Release](https://img.shields.io/badge/Release-2.22.0-blue)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.10+-41BDF5)
+![HACS](https://img.shields.io/badge/HACS-Custom-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-![Crop Steering operator workspace](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/operator-dashboard.png)
+![The Overview: today's grow day for every zone, the zones at a glance and the tank](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/operator-dashboard.png)
 
-> **Safety.** This software switches real pumps and valves on unattended crops. Commission each room with the engine switched off, check every mapped switch and probe, and run a catch test before you let it water. It does not replace hardware fail-safes: use normally-closed valves, and a float switch or timer that stops a pump on its own. The [feature checklist](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/FEATURE_MATRIX.md) says what has been tested and what has not.
+> **Safety first.** This software switches real pumps and valves, unattended, on living plants. Set up each room with watering switched off, check every probe and switch it uses, and do a catch test (measure what actually comes out of the drippers) before you let it water. It does not replace physical safety devices: use valves that close when power is lost, and a float switch or timer that can stop a pump on its own.
+
+## What it does
+
+**It waters by what the plants need, not by a timer.** Every zone (one valve and the plants it feeds) has its own moisture probe, and usually an EC probe that reads how salty the root zone is. The controller checks them every minute and waters in shots sized from your pot size, plant count and dripper flow.
+
+**It runs the same four-part day that crop steering growers use:**
+
+| Part of the day | What happens | Why |
+| --- | --- | --- |
+| **P0: morning dry-back** | After the lights come on, it waits until the roots have dried by the amount you chose. | Drying in the morning tells the plant to root and gives you control over its growth. |
+| **P1: ramp-up** | A series of small shots, a few minutes apart, until moisture reaches your target. | Brings the root zone back up gently instead of flooding it. |
+| **P2: maintenance** | A top-up shot whenever moisture falls to your threshold. | Holds the root zone steady through the main part of the day. |
+| **P3: overnight** | Routine watering stops before the lights go off; only an emergency shot if a zone gets too dry. | The overnight dry-back is where much of the steering happens. |
+
+**It steers the whole grow, not just one day.** A plan sets each zone somewhere between a vegetative profile (more water, gentler dry-backs) and a generative profile (harder dry-backs, pushing flowers), week by week or day by day, and changes the targets automatically at lights-on.
+
+**It looks after itself.** It stops and tells you when something is wrong instead of guessing:
+
+- **An off switch for every room**, and a **room off** setting for an empty room: no watering and no alerts.
+- **A daily water limit per zone** and a **maximum shot length**, so a stuck sensor can never keep a valve open all day.
+- **It checks every switch it turns off actually went off.** If a valve or pump does not, it holds that equipment, stops watering and alerts you.
+- **If a moisture probe dies**, the zone is still watered, by copying a working zone or on a cautious timed schedule, until the probe reads again.
+- **Optional feed-water checks:** it can refuse to water when the feed water's EC or pH is out of range.
+- **Clear alerts.** Every problem shows up as a Home Assistant Repairs card or notification with a code (such as CS-601) that the built-in Help page explains: what it means, what happens to watering meanwhile, and what to do.
+
+## See it in action
+
+### The whole day on one screen
+
+The **Overview** draws today's grow day for every zone, from lights-on to the next lights-on: the phase each zone was in, every shot, what held a zone back and for how long, and every setting change. On top of that it shows the **target** each phase was aiming for, **yesterday's line** for comparison, and a dashed **projection** of the rest of the day. One line per zone sums it up in numbers, for example "58% now, +0.4 points vs yesterday, P1 target reached 11:16".
+
+Under it, **Zones at a glance** shows each zone's moisture against its target, how fast it is drying, today's water against its daily limit, and whether its valve is open, all as small visual bars and coloured pills. The **tank card** shows the batch tank's level, EC, pH and temperature, with a 24-hour line for EC and pH and a History view going back 30 days.
+
+![The tank card with its EC and pH history](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/tank-history.png)
+
+### Set targets against what the zone actually does
+
+**Irrigation plan, Today** puts the targets you set on the same graph as the zone's recorded moisture and EC, for today and yesterday, with the rest of the day projected from how fast that zone really dries. If a target cannot be reached at that zone's drying rate, the graph shows it before you save.
+
+![Today's targets on the zone's recorded moisture and EC, with the projected day](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/plan-graph.png)
+
+Every change is a draft until you review it. The draft line moves on the graph straight away while the saved one stays visible, so you can see exactly what you are about to change.
+
+### Plan the whole grow
+
+**Irrigation plan, Schedule** lays out every zone's grow week by week. Type how generative you want each week or day (0 to 100 %) straight into the table, and it shows the moisture targets, dry-backs, EC targets and shot sizes that setting gives, next to the week before and after. Save plans you like in the **recipe library** and reuse them for the next run.
+
+![The whole-grow plan with its moisture and EC curve](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/grow-plan.png)
+
+### Know how much water each zone uses
+
+The **Zones** page shows every zone's water today, this week, since the grow started, litres per grow week, and an estimate for the whole grow. It reads Home Assistant's long-term statistics, so the history goes back as far as your system does.
+
+![Water use per zone: today, this week, this grow and an estimate for the whole grow](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/water-use.png)
+
+### Keep the nutrient stock topped up
+
+The **Stock tanks** page tracks the concentrates each batch tank is dosed from. Tell it each tank's size and how much goes into one batch; every batch you make takes its dose off each stock tank. When one runs low you get a Repairs card and an Overview notice saying roughly how many batches are left, and a sensor you can use for a phone alert. Press **Refilled** when you top it up.
+
+![Stock tanks with their levels, low marks and batches left](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/stock-tanks.png)
+
+### Compare runs
+
+**Compare runs** lines up recorded days, weeks or a whole run against an earlier run at the same age, or against a target reference, so you can see whether this grow is tracking the last good one.
+
+![Moisture and EC compared against a previous run](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/run-comparison.png)
+
+### Set up rooms without YAML
+
+**Rooms & setup** maps the Home Assistant entities you already have: valves, pump, main line, moisture and EC probes, tank sensors. You enter each zone's pot size, plant count and drippers. Every save is checked first (units, duplicate valves, everything off before a change) and the controller confirms it has picked the new setup up.
+
+![Rooms and zones with their sensor mapping](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/rooms-setup.png)
+
+<details>
+<summary>More: phones, room off, Auto Setpoints, AI assistants</summary>
+
+**On a phone.** Every page works on a phone, in the Home Assistant app or a browser.
+
+![The Overview on a phone](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/mobile-overview.png)
+
+**Room off.** Switch an empty room off: readings stay visible, but there is no watering of any kind and no alerts. Switching it back on starts a clean day at the right point.
+
+**Auto Setpoints (off by default).** The controller learns each zone from its own shots: the highest moisture the probe actually reaches, how much a shot raises it, and how fast it dries by day and night. With Auto Setpoints on, it keeps that zone's targets reachable in small, bounded steps, and never while a plan is in charge.
+
+**AI assistants (optional).** An optional connector lets an AI assistant such as Claude read your rooms, readings and plans and prepare changes for you to review. It can never switch equipment. See [MCP.md](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/MCP.md).
+
+</details>
+
+## How it fits together
+
+Crop Steering comes in two parts, and automatic watering needs both:
+
+| Part | Installed with | What it does |
+| --- | --- | --- |
+| **The integration** | HACS | Holds your rooms, zones, settings, plans and history, and adds the **Crop Steering** page to the Home Assistant sidebar. It never switches equipment itself. |
+| **The controller app** | The Home Assistant app store | Reads your probes every minute, decides every shot and switches the pump and valves, with every safety check above. |
+
+Both parts carry the same version number. Install and update them together.
 
 ## What you need
 
 | | |
 | --- | --- |
-| **Home Assistant** | **2024.10.0 or newer.** Every change is tested on 2024.10.0 and on 2026.9.3. Older versions are not supported. |
-| **Python** | Whatever your Home Assistant runs on: the integration adds no Python packages of its own. Home Assistant OS, Supervised and Container bring their own Python. Only a Core (virtual environment) install chooses it: 2024.10 needs Python 3.12, and 2026.9 needs Python 3.14.2 or newer. |
-| **Controller app** | Home Assistant OS or Supervised, where it installs from the app store (amd64, aarch64 or armv7) and brings its own Python 3.12. Container and Core have no app store: run the controller separately ([install guide](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md)). |
-| **HACS** | 1.6.0 or newer for the guided download, or copy `custom_components/crop_steering` in by hand. |
-| **MCP connector** (optional) | Node.js 22 or newer, on the machine that runs your LLM client. |
-| **Account** | A Home Assistant administrator for **Rooms & setup**, and to change plans, recipes and run records. |
+| **Home Assistant** | **2024.10.0 or newer.** Every change is tested on 2024.10.0 and on 2026.9.3. |
+| **The controller app** | Home Assistant OS or Supervised, where it installs from the app store (amd64, aarch64 or armv7) and brings its own Python 3.12. Home Assistant Container and Core have no app store: there you run the controller yourself (see the [install guide](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md)). |
+| **HACS** | 1.6.0 or newer for the guided download, or copy `custom_components/crop_steering` into Home Assistant by hand. |
+| **Hardware** | A switch Home Assistant can control for each zone's valve (and your pump and main line, if you have them), and a moisture probe per zone. EC probes and tank sensors are optional but recommended. |
+| **AI assistant connector** (optional) | Node.js 22 or newer, on the computer that runs your AI assistant. |
+| **Account** | A Home Assistant administrator, to set up rooms and change plans. |
 
 ## Install
 
-Crop Steering is two parts, and autonomous watering needs both: the **integration** (installed with HACS) holds your rooms, settings, entities and plans; the **controller app** (installed from the Home Assistant app store) decides every shot and drives the pumps and valves.
-
-1. **Download the integration with HACS.**
+1. **Download the integration with HACS**, then restart Home Assistant.
    [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=JakeTheRabbit&repository=HA-Irrigation-Strategy&category=integration)
-   Download **Crop Steering**, then restart Home Assistant.
 2. **Add Crop Steering** and name your first room.
    [![Open your Home Assistant instance and start setting up Crop Steering.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=crop_steering)
 3. **Add the controller app repository**, then install and start **Crop Steering Controller**.
    [![Open your Home Assistant instance and add this app repository.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FJakeTheRabbit%2FHA-Irrigation-Strategy)
-4. Open **Crop Steering** in the sidebar. Map your pumps, valves and probes in **Rooms & setup**, then check the readings in **Sensors**. Keep the engine switched off until the installation checks pass.
+4. **Open Crop Steering in the sidebar.** Map your valves, pump and probes in **Rooms & setup**, check the readings in **Sensors**, and keep watering switched off until everything reads correctly.
 
-The buttons only open the right screen: Home Assistant still asks you to confirm each download, install and restart. Updates arrive the same way: HACS offers the integration, and on Home Assistant OS or Supervised the app store offers the controller app. With Container or Core you run the controller yourself, so update it to the matching version by hand. Always install the matching pair named in the [changelog](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md). The [installation and upgrade guide](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md) covers manual installs, upgrades and rollback.
+The buttons open the right screen; Home Assistant still asks you to confirm each step. Updates arrive the same way: HACS offers the integration and the app store offers the controller. The [install guide](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md) covers manual installs, upgrades and rolling back.
 
-## See the room at a glance
+## Good to know
 
-Overview shows today's grow-day timeline and, for every zone, the controller's state, its valve, the last recorded irrigation and today's water. Zones adds water per plant. The graphical tank panel shows fill level, pump and filling status, the last recorded fill, EC, pH and temperature, from the tank sensors you map in **Rooms & setup**. Readings that aren't mapped, or are unavailable, are labelled as such.
-
-![Graphical tank and pump status](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/tank-status.png)
-
-## One irrigation plan: Today and Schedule
-
-**Irrigation plan → Today** shows the targets the controller is using now, and lets you edit them when no schedule owns the room. **Schedule** is a dated plan for each zone: choose a room, a zone and a day or week, and a steering slider moves the zone between your vegetative and generative profiles, redrawing the VWC and EC curve with the targets behind it.
-
-Save your own plans in the **Recipe library** and reuse them as drafts. Loading a recipe keeps each zone's start date; saving and arming still go through the normal review. [Recipe library →](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/RECIPE_LIBRARY.md)
-
-![Combined VWC and EC planning graph with per-zone day and week controls](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/grow-plan.png)
-
-![Reusable user-authored plans in the recipe library](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/recipe-library.png)
-
-## Set targets against what the zone actually does
-
-The graph you drag targets on draws the zone's own probe underneath them: recorded VWC for this grow-day and the one before, recorded pore EC, and the current reading with today's peak and trough. The VWC axis scales to the readings, so a zone sitting at 31% against a 40% target is obvious.
-
-The day is drawn the way the controller runs it. P0 keeps drying after lights-on, P1 climbs one step per shot, P2 fires a shot each time VWC falls to its threshold, and P3 dries down overnight. Shot timing comes from the zone's measured dry-down rate, so the line is a projection, not a schedule: the controller always waters by the probe. If the targets can't be reached at that zone's dry-down, the graph shows it.
-
-![Today's targets with the recorded zone and the projected day on one graph](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/plan-graph.png)
-
-A history panel below shows 24 hours, 72 hours or 7 days of the same probes, with each setpoint drawn as a line and a note beside any target that sits outside what the probe reads.
-
-![Recorded VWC and pore EC history with setpoint lines](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/sensor-history.png)
-
-## See each change before applying it
-
-Edits are drafts until you review them. A changed target moves its draft line on the graph straight away while the saved one stays visible; review and apply when you are ready.
-
-![Draft and saved targets beside the plan graph, with the review bar](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/manual-setpoints.png)
-
-**Compare runs** lines up recorded days, weeks, months or a whole run with an earlier run at the same grow age, or with a saved target reference. How far back it can go depends on your Home Assistant Recorder retention.
-
-![Recorded VWC and EC comparison against a previous run and target reference](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/run-comparison.png)
-
-Water cards show litres per zone, the average per plant today and the estimated water per runtime. For example, 42 plants with one 4 L/h dripper each get an estimated 133 mL per plant, 5.6 L per zone, in 120 seconds. These are estimates from your flow settings: they don't measure uptake or runoff.
-
-## Switch an empty room off
-
-Each room has a **Room on / off** control. Off means nothing is growing: no watering of any kind, emergency shots included, and no watering alerts. Readings stay visible. Switching it back on starts a clean day in order, never part-way through a phase, and keeps the recorded water history.
-
-![A room switched off: readings shown, no irrigation and no alerts](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/room-off.png)
-
-## Auto Setpoints (off by default)
-
-The controller learns each zone from its own shots: the ceiling the probe actually reaches, what a shot lifts it, and how fast it dries with the lights on and off. With **Auto Setpoints** switched on for a room, it uses that to keep the zone's targets reachable: when two P1 shots in a row stop raising VWC, it hands over to P2 and carries the reached peak forward as the P1 target, holds it for three days, then tries one point higher. It changes only that zone's own targets, in small bounded steps, and never while a dated plan owns the room. Fields it manages carry an **Auto** badge.
-
-An optional check by an AI model on Cloudflare Workers AI can veto a change when the evidence looks like a probe or delivery fault. Watering never waits on it, and no answer means no change.
-
-## Set up rooms and sensors
-
-Add or archive rooms and zones, map the Home Assistant entities you already have, and enter each zone's pot size, plants and drippers.
-
-![Room and zone setup with sensor mapping](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/rooms-setup.png)
-
-<details>
-<summary>The dashboard on a phone</summary>
-
-![Mobile room overview with responsive navigation](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/img/mobile-overview.png)
-
-</details>
-
-## One workspace
-
-| Page | Purpose |
-| --- | --- |
-| Overview | Today's totals, the grow-day timeline, each zone's state and readings, and the tank |
-| Zones | Per-zone readings, active phase, targets, enable controls and water per zone and per plant |
-| Irrigation plan → Today / Schedule | Today: the current targets on a graph with the zone's recorded VWC/EC and the projected day. Schedule: per-zone dated plans, profiles and curves |
-| Compare runs | Recorded day, week, month and run-to-date history, lined up with a previous run or a target reference |
-| Insights | Sensor coverage, equipment mapping and dripper catch-test calculations |
-| Activity | Controller and state activity, with what it can and can't show; the latest records also open from the top bar |
-| Sensors | Probe availability, values, units and freshness |
-| Rooms & setup | Add, configure, archive and restore rooms and zones; map existing Home Assistant entities |
-| Settings / Help & tools | Connection, room on/off, theme, how each workflow works, and every error code with its causes and fixes |
-
-The workspace opens in the Home Assistant sidebar and takes on your Home Assistant theme. Its scripts, styles and fonts are bundled, so it loads nothing from the internet.
-
-## How steering works
-
-Each zone runs P0 morning dryback, P1 ramp-up, P2 maintenance and P3 overnight, always in that order. P1 doesn't end on a clock: it runs until the target is reached after at least the minimum number of shots, or the maximum is reached. Dryback is relative to the detected peak: a 60% VWC peak with a 10% dryback target means 54% VWC.
-
-A grow plan steers each zone on a 0–100% scale between a vegetative and a generative profile that you define, scheduled per zone. Pot size and dripper flow set how much water a shot is and how long it runs; they don't decide what the crop needs.
-
-Plans are saved as drafts, reviewed, and armed for the next lights-on. Arming never switches the engine or a pump on. [Planning guide →](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md)
-
-Every alert from the controller app, and every Crop Steering card in **Settings → Repairs**, ends with a code such as CS-101 (the controller's regular status summary has none). **Help & tools → Error codes** explains each one: what it means, what happens to watering meanwhile, and what to do.
+- **Estimates are labelled as estimates.** Water per zone is worked out from your flow settings and the time each valve was open. It is not measured delivery; a catch test or a flow meter is the only proof of what actually reached the plants.
+- **Projections are projections.** The dashed "rest of the day" lines use how fast each zone has been drying. The controller always waters by the probe, not by the projection.
+- **It waters by moisture and EC.** It does not dose nutrients or control climate.
+- **Settings survive updates.** Updates install in place and keep your rooms, settings, counters and plans.
 
 ## Documentation
 
-- [Install, upgrade and rollback](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md)
-- [Step-by-step user guide](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md)
-- [Daily operation and whole-grow planning](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md)
+- [Install, upgrade and roll back](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md)
+- [User guide](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md) and [planning a grow](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md)
+- [Error codes: what each alert means and what to do](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/ERROR_CODES.md)
 - [Troubleshooting](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/troubleshooting.md)
-- [Error codes (CS-101 and the rest): causes and fixes](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/ERROR_CODES.md)
-- [Validated feature checklist and limitations](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/FEATURE_MATRIX.md)
-- [Entity reference](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/ENTITIES.md)
-- [Home Assistant sidebar and menu button](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/HA_SIDEBAR.md)
-- [Connect an LLM with the MCP server](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/MCP.md) (optional: it can read rooms, readings and plans and prepare changes for you to review; it never operates equipment)
-- [Current screenshots](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/SCREENSHOTS.md)
-- [Architecture and repository map](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/REPOSITORY_MAP.md) · [Development and testing](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/TESTING.md) · [Contributing](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CONTRIBUTING.md)
-
-This project waters by moisture and EC. It does not dose nutrients or control climate.
+- [What has been tested, and the known limits](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/FEATURE_MATRIX.md)
+- [Entity reference](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/ENTITIES.md) · [All screenshots](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/SCREENSHOTS.md) · [Sidebar and menu button](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/HA_SIDEBAR.md)
+- For developers: [architecture](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/REPOSITORY_MAP.md), [testing](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/TESTING.md), [how releases are made](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/RELEASING.md) and [contributing](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CONTRIBUTING.md)
 
 ## Support
 
-Report a problem or ask a question in [GitHub issues](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues). Include the error code if you have one, your integration and controller app versions (both shown in the Crop Steering sidebar), and what the controller app's log says.
+Report a problem or ask a question in [GitHub issues](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues). Include the error code if you have one, both version numbers (shown in the Crop Steering sidebar), and what the controller app's log says.
 
 ## License
 
