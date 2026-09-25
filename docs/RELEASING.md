@@ -89,7 +89,7 @@ Staging rooms now see it: HACS offers the pre-release, Supervisor offers the new
 
 ### 4. Soak on a staging room, on real plumbing
 
-A staging room is a real room you can afford to get wrong: real switch, real pump or valve, real probes, water going into a bucket or a sacrificial plant. Record what you did in `docs/audits/<date>-release-<version>.md` (the repository already keeps these; say what was exercised live and, just as plainly, what was not).
+A staging room is a real room you can afford to get wrong: real switch, real pump or valve, real probes, water going into a bucket or a sacrificial plant. Record what you did in the release audit, `release-audit-v<version>.md`, which step 5 attaches to the pre-release: say what was exercised live and, just as plainly, what was not.
 
 **Upgrade, engine off**
 
@@ -128,7 +128,7 @@ A staging room is a real room you can afford to get wrong: real switch, real pum
 
 Only when the applicable checks above are complete and recorded, publish two evidence assets on the candidate's existing pre-release:
 
-- `release-audit-v2.19.0.md`: the version-specific audit, including the candidate's full commit SHA, what ran, the results, and every remaining limitation. Keep the detailed report under `docs/audits/` as well where practical.
+- `release-audit-v2.19.0.md`: the version-specific audit, including the candidate's full commit SHA, what ran, the results, and every remaining limitation.
 - `promotion-audit-v2.19.0.json`: the explicit approval below, binding that exact commit and the SHA256 of the uploaded Markdown file. Generate this after the final candidate SHA is known; committing an audit containing its own commit SHA is impossible.
 
 ```json

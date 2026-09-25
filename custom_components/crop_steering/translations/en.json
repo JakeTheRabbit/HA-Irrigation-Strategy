@@ -828,11 +828,11 @@
   "issues": {
     "kill_switch_missing": {
       "title": "Crop Steering: kill switch helper missing (CS-601)",
-      "description": "The engine is gated by the helper `input_boolean.f2_control_enabled`, but it doesn't exist — so the F2 Crop Steering add-on can't run. Create it: Settings → Devices & Services → Helpers → Create Helper → Toggle, named so the entity is input_boolean.f2_control_enabled. Leave it OFF until you're ready to irrigate.\n\nCode CS-601. What it means and what to do: Crop Steering → Help & tools → Error codes."
+      "description": "The engine is gated by the helper `input_boolean.f2_control_enabled`, but it doesn't exist, so the Crop Steering Controller app can't run. Create it: Settings → Devices & Services → Helpers → Create Helper → Toggle, named so the entity is input_boolean.f2_control_enabled. Leave it OFF until you're ready to irrigate.\n\nCode CS-601. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
     "engine_offline": {
       "title": "Crop Steering: engine not running (CS-602)",
-      "description": "No fresh heartbeat from the add-on (sensor.crop_steering_ai_heartbeat is missing or stale). The integration creates the entities, but the F2 Crop Steering add-on is what actually steers. Install/start it and check its log. If you only use manual control, you can ignore this.\n\nCode CS-602. What it means and what to do: Crop Steering → Help & tools → Error codes."
+      "description": "No fresh heartbeat from the add-on (sensor.crop_steering_ai_heartbeat is missing or stale). The integration creates the entities, but the Crop Steering Controller app is what actually steers. Install/start it and check its log. If you only use manual control, you can ignore this.\n\nCode CS-602. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
     "zone_no_sensor": {
       "title": "Crop Steering: zone with no moisture sensor (CS-603)",

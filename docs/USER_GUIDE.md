@@ -2,7 +2,7 @@
 
 Use **Overview** to check a room and **Irrigation plan** for **Today** and **Schedule**. Today shows the current zone targets; Schedule edits the dated plan. Select the room before editing; zone numbers belong to that room.
 
-The unified **Irrigation plan → Today / Schedule** navigation and overnight curves were verified live in **2.16.1 / controller 0.13.3**. The recorded live checks later in this guide were taken on deployed **2.16.0**, which used the earlier Manual setpoints/Grow plan labels. Existing `#/strategy` and `#/grow-plan` bookmarks are preserved as Today and Schedule.
+Existing `#/strategy` and `#/grow-plan` bookmarks open **Irrigation plan → Today** and **Schedule**.
 
 New installation? Start with [Install, upgrade and rollback](INSTALL.md). To try the interface without connecting equipment, open the [interactive demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1).
 
@@ -59,7 +59,7 @@ Choose **Map sensors** on the tank panel, or open **Rooms & setup → Shared roo
 | Setup label             | Configuration key         | Select                                                                                                                |
 | ----------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Room pump               | `pump_switch`             | The room pump's actual HA switch. The controller descriptor publishes this as `pump`.                                 |
-| Tank fill level (%)     | `water_level_sensor`      | A percentage sensor, 0–100. A litres value is not a percentage.                                                       |
+| Tank fill level (%)     | `water_level_sensor`      | A percentage sensor, 0-100. A litres value is not a percentage.                                                       |
 | Tank EC (display)       | `tank_ec_sensor`          | A tank conductivity sensor in mS/cm or dS/m accepted by setup.                                                        |
 | Tank pH (display)       | `tank_ph_sensor`          | A pH sensor.                                                                                                          |
 | Tank temperature        | `tank_temperature_sensor` | A tank-water temperature sensor in °C, °F or K; its unit is retained.                                                 |
@@ -94,7 +94,7 @@ The planner schedules user-defined profiles by zone and grow day. The balance sl
 
 1. Open **Irrigation plan → Schedule → Endpoint profiles**. Inspect both endpoints and select the correct **Zone limits**. Duplicate a profile when you need an independent copy. A shared profile affects all schedule blocks referring to it.
 2. Open **Schedule & curve**. Select a zone and set **Zone grow start date**. Each zone can have its own start date.
-3. Select a day or week in the overview. Assign its **Endpoint profile** and **Steering balance**. Days 1–366 are supported. Range edits preserve surrounding assignments by splitting existing blocks.
+3. Select a day or week in the overview. Assign its **Endpoint profile** and **Steering balance**. Days 1-366 are supported. Range edits preserve surrounding assignments by splitting existing blocks.
 4. Inspect **Zone schedule blocks** for coverage. Fill missing days and resolve overlap, parameter or zone-assignment errors.
 5. Inspect the selected day's curve and water preview. Graph handles edit the selected profile as described on screen, which can affect its other schedule references.
 6. Choose **Review & save** to validate and persist the draft in HA. **Validate preview** checks an unchanged stored draft. **Export** downloads a portable plan; **Reload stored plan** retrieves the stored revision once local edits are saved or discarded.
@@ -122,7 +122,7 @@ Libraries are isolated by site, browser, room and demo/live mode. They are not a
 
 | View                          | What it shows                                                                                                            | What it does not establish                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Today/Schedule VWC–EC curve   | Configured targets, phase references and supported timing, with local draft changes where applicable.                    | Exact future shot times, uptake, runoff or EC accumulation.                                 |
+| Today/Schedule VWC-EC curve   | Configured targets, phase references and supported timing, with local draft changes where applicable.                    | Exact future shot times, uptake, runoff or EC accumulation.                                 |
 | Insights history              | Retained HA Recorder measurements on separate VWC and EC axes.                                                           | Measurements from periods Recorder did not retain.                                          |
 | Water delivered this grow-day | The controller's recorded estimate from its configured flow and elapsed shot runtime, including accounted partial shots. | Independent meter readings, uniform distribution, plant uptake or external irrigation.      |
 | Water use estimate            | Water used so far plus the last 7 full grow-days' average for every grow-day left in the grow plan.                      | A forecast of plant uptake, or a total for a grow whose plan length is unknown.             |
@@ -145,7 +145,7 @@ Use **Insights → Calibration** to enter an actual catch-test result and inspec
 
 Saving, archiving and importing run records need a Home Assistant administrator login; any login can view them.
 
-Registering last month's run today captures today's reference configuration. It cannot recover last month's setpoints or expired Recorder data. Editing dates preserves the original capture. Current/saved daily target illustrations are references, not an audit of every historical target. Each room supports up to 100 run records; a completed run covers 1–366 inclusive calendar days.
+Registering last month's run today captures today's reference configuration. It cannot recover last month's setpoints or expired Recorder data. Editing dates preserves the original capture. Current/saved daily target illustrations are references, not an audit of every historical target. Each room supports up to 100 run records; a completed run covers 1-366 inclusive calendar days.
 
 ## Set up rooms, zones and sensors
 
@@ -171,13 +171,7 @@ Choose **Settings → Appearance → Home Assistant / system** to inherit the HA
 
 **Sensors** shows values, units, availability and freshness. **Insights** shows coverage, equipment mappings and the local catch-test calculator. **Activity** lists available controller/state records and supports CSV export; it is not an immutable audit of every physical shot. **Help** explains the interface's metrics and limits.
 
-For an existing timed zone hold, Home Assistant exposes the `crop_steering.set_manual_override` action. The action refuses a signed-in user who is not an administrator (automations can still call it); the switch itself follows Home Assistant's own user permissions. Its timeout defaults to 60 minutes and accepts 1–1440 minutes; specify the intended zone and room slug (omit the room for the legacy default room). Clearing the hold is distinct from enabling zone/room scheduling. Turning its switch on directly creates an indefinite hold. See the action's fields in HA and the [entity reference](ENTITIES.md); the dashboard does not advertise legacy manual-shot or phase-event services as verified actuator commands.
-
-## Recorded live verification
-
-On 8 September 2026, the deployed **2.16.0** installation completed reviewed MCP preview/apply/readback for tank mappings in both rooms. Each saved setup reached revision **1**, and healthy controller reports acknowledged revision **1**. The F2 panel showed **42%** tank level, **3.06 mS/cm EC**, **pH 5.66**, **17.9 °C**, the explicitly mapped recorded-fill time, and timezone-aware last-irrigation events. The HA sidebar was hidden while in the panel; the Home Assistant button revealed it.
-
-These are recorded checks, not current sensor values. They verify the deployed display and configuration path, not physical filling or water delivery. The Today/Schedule navigation and overnight-curve update were verified separately on 2.16.1; see the [feature matrix](FEATURE_MATRIX.md).
+For an existing timed zone hold, Home Assistant exposes the `crop_steering.set_manual_override` action. The action refuses a signed-in user who is not an administrator (automations can still call it); the switch itself follows Home Assistant's own user permissions. Its timeout defaults to 60 minutes and accepts 1-1440 minutes; specify the intended zone and room slug (omit the room for the legacy default room). Clearing the hold is distinct from enabling zone/room scheduling. Turning its switch on directly creates an indefinite hold. See the action's fields in HA and the [entity reference](ENTITIES.md); the dashboard does not advertise legacy manual-shot or phase-event services as verified actuator commands.
 
 ## Connect an LLM with MCP
 

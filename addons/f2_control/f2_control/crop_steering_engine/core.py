@@ -13,7 +13,7 @@ PHASES = ("P0", "P1", "P2", "P3")
 
 # Minutes after a shot ends before a pore-EC reading counts as SETTLED. For the first half hour or so
 # after a shot the probe reads the fresh feed front and the free water still draining, not the slab
-# (live F2 2026-09-22: 6-8 mS/cm during the morning ramp on zones whose quiet readings were ~4.5).
+# (seen live: 6-8 mS/cm during the morning ramp on zones whose quiet readings were ~4.5).
 # The controller takes a settled reading only this long after the last shot, and an EC correction that
 # acts on one waits the same time, so each correction is judged by a reading taken after the last drained.
 EC_SETTLE_MIN = 45.0
@@ -320,7 +320,7 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
         if watchdog_due:
             # The routine shot is over budget, but the zone has had no water for watchdog_hours in
             # daylight and sits under its re-water threshold: it gets the watchdog's cap-exempt shot,
-            # not nothing (live F2 2026-09-22: Z1 dry 14:06-22:00 behind a spent budget).
+            # not nothing (seen live: a zone left dry from 14:06 to lights-off behind a spent budget).
             fire, size, ir, kind = True, p.p2_shot_size, watchdog_ir + " — over the daily budget", "watchdog"
         else:
             fire, ir, kind = False, f"BLOCK daily-cap {s.daily_vol:.0f}/{p.max_daily_volume:.0f}L (budget; emergencies exempt)", "block_daily_cap"
