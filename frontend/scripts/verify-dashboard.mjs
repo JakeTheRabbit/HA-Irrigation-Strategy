@@ -196,6 +196,30 @@ try {
         fullPage: true,
       });
     });
+  await check("irrigation plan: a setting's ? explains it, in both themes, and closes on Escape", async () => {
+    const trigger = () =>
+      page.getByRole("button", { name: "About Maintenance shot when below", exact: true });
+    const help = () => page.getByRole("dialog", { name: "Maintenance shot when below" });
+    await inBothThemes("setting explainer", async () => {
+      await go("strategy");
+      await trigger().click();
+      await expectVisible(help());
+      const text = await help().innerText();
+      for (const part of ["What it is", "When it acts", "What it affects", "Athena Handbook"])
+        assert.match(text, new RegExp(part, "i"), `the explainer has "${part}"`);
+      assert.match(text, /a level, not a crossing/);
+    });
+    await go("strategy");
+    await trigger().click();
+    await expectVisible(help());
+    await page.keyboard.press("Escape");
+    assert.equal(await help().count(), 0, "Escape closes the explainer");
+    assert.equal(
+      await trigger().evaluate((button) => button === document.activeElement),
+      true,
+      "focus returns to the ?",
+    );
+  });
   await check("help: the daily routine replaces the Overview's workflow card", async () => {
     await go("help");
     const routine = page.locator("ol.daily-routine");

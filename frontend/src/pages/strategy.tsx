@@ -15,6 +15,7 @@ import {
   useSensorContext,
 } from "@/components/sensor-context";
 import { AutoBadge, AutoSetpointsControl, AutoZoneChip } from "@/components/room-controls";
+import { SettingHelp } from "@/components/setting-help";
 import { managedBy } from "@/lib/auto-setpoints";
 import {
   fieldHint,
@@ -492,7 +493,8 @@ export function Strategy({
                                 ? suggestedDraft(hint.suggestion.value, setting)
                                 : null;
                               const auto = managedBy(supervisors, setting.entityId);
-                              const tag = param ? settingWords(param)?.tag : undefined;
+                              const words = param ? settingWords(param) : undefined;
+                              const tag = words?.tag;
                               return (
                                 <div
                                   className={`setting-field ${draft ? "is-draft" : ""}`}
@@ -512,6 +514,13 @@ export function Strategy({
                                         )}
                                         {auto && <AutoBadge />}
                                       </Label>
+                                      {param && words?.detail && (
+                                        <SettingHelp
+                                          label={setting.label}
+                                          param={param}
+                                          detail={words.detail}
+                                        />
+                                      )}
                                     </div>
                                     <p>
                                       {setting.description ||

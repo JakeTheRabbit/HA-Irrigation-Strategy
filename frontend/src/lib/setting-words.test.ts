@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildRoom, discoverRooms, ROOM_PARAMETERS, ZONE_PARAMETERS } from "./model";
 import { createDemo } from "./demo";
 import { parameterHelp, parameterLabels } from "./grow-plan";
-import { GROUP_HELP, PHASE_GROUPS, settingWords } from "./setting-words";
+import { DETAIL_HEADINGS, GROUP_HELP, PHASE_GROUPS, settingWords } from "./setting-words";
 
 /** Every parameter the Irrigation plan can show (model.ts `setting()` accepts exactly these). */
 const shown = [
@@ -42,6 +42,31 @@ describe("setting words", () => {
       expect(label, key).toBe(settingWords(key)!.label);
     for (const [key, help] of Object.entries(parameterHelp))
       expect(help, key).toBe(settingWords(key)!.help);
+  });
+  it("explains every irrigation setting: what it is and when it acts", () => {
+    const irrigation = shown.filter((param) =>
+      /^(p[0-3]_|ec_target_|vegetative_|generative_)|^field_capacity$/.test(param),
+    );
+    expect(irrigation.length).toBeGreaterThan(15);
+    for (const param of irrigation) {
+      const detail = settingWords(param)!.detail;
+      expect(detail?.what, param).toMatch(/\.$/);
+      expect(detail?.when, param).toMatch(/\.$/);
+    }
+    // The schedule's resolved keys explain the same way.
+    expect(settingWords("dryback_target")!.detail).toBe(
+      settingWords("vegetative_dryback_target")!.detail,
+    );
+    expect(settingWords("max_daily_volume")!.detail).toBeUndefined();
+  });
+  it("cites the handbook's printed page for every Athena line, and shows every part", () => {
+    const shownParts = new Set(DETAIL_HEADINGS.map(([key]) => key));
+    for (const param of [...shown, "dryback_target", "ec_target_p1"]) {
+      const detail = settingWords(param)!.detail;
+      if (!detail) continue;
+      for (const key of Object.keys(detail)) expect(shownParts.has(key as never), key).toBe(true);
+      if (detail.athena) expect(detail.athena, param).toMatch(/\(p\. (3[3-9]|4[01])\)/);
+    }
   });
   it("files the dryback targets under P3 and full saturation under Substrate", () => {
     const states = createDemo(Date.UTC(2026, 8, 25, 12));
