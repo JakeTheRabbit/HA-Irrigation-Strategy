@@ -20,7 +20,7 @@ Install the integration and controller together. HACS, the HA integration config
 - An HA administrator account for Rooms & setup and its configuration services.
 - Existing HA entities for the actual pump and zone valves, fresh VWC/EC probes, feed-water probes and any configured interlocks. This integration maps entities; it does not provision sensor firmware or pair devices.
 
-This release documents integration 2.19.2 and controller 0.16.2. Use the matching published pair. The public demo uses isolated synthetic data; its sample plans and records are not installation settings.
+Install the integration and the controller app at the same version: from 2.21.0 both carry one version number, and each release names the pair in the [changelog](../CHANGELOG.md). The public demo uses isolated synthetic data; its sample plans and records are not installation settings.
 
 ## Guided installation
 
