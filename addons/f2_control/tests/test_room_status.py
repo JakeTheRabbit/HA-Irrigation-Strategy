@@ -152,6 +152,56 @@ def test_switching_back_on_starts_a_fresh_run_but_keeps_the_water_history(hour, 
     assert kept and kept[0]["litres"] == 12.0  # delivered water is a site record, not part of the run
 
 
+def _mid_p2_room():
+    """An ON room at 14:00, its zone in P2 with today's counters, then switched off and seen off."""
+    _Clock.current = _Clock(2026, 9, 19, 14, 0)  # a _Clock, so its times pass the state file's type check
+    c, fake = _room("on")
+    c.rooms[0].state[1].update(phase="P2", shots=9, daily_vol=31.5, peak=44.0,
+                               last_shot=_Clock.now() - timedelta(minutes=20),
+                               last_daily_reset=_Clock.now().date())
+    c.loop_once(_Clock.now())
+    fake.set_state(ROOM_ACTIVE, "off")
+    c.loop_once(_Clock.now())
+    return c, fake
+
+
+def test_switching_a_room_off_and_on_again_within_a_day_carries_on_where_it_was():
+    """25 Sep 2026: the operator switched F2 off and on again at 20:53 to clear a fault, and all three
+    zones, in P2 an hour before lights-off, went back to P0 and a P1 ramp with today's counters at 0."""
+    c, fake = _mid_p2_room()
+    _Clock.current += timedelta(minutes=3)
+    fake.set_state(ROOM_ACTIVE, "on")
+    c.loop_once(_Clock.now())
+    st = c.rooms[0].state[1]
+    assert st["phase"] == "P2"
+    assert (st["shots"], st["daily_vol"], st["peak"]) == (9, 31.5, 44.0)
+    assert st["last_shot_is_anchor"] is False  # its last shot is still its last shot
+    assert c.rooms[0]._off_since is None  # and a later switch-off is timed afresh
+
+
+def test_a_room_off_for_more_than_a_day_starts_a_fresh_run():
+    c, fake = _mid_p2_room()
+    _Clock.current += timedelta(hours=25)
+    fake.set_state(ROOM_ACTIVE, "on")
+    c.loop_once(_Clock.now())
+    st = c.rooms[0].state[1]
+    assert (st["shots"], st["daily_vol"], st["peak"]) == (0, 0.0, 0.0)
+    assert st["phase"] == "P0"  # 15:00, lights on: the new crop's grow-day starts from the top
+
+
+def test_when_a_room_went_off_survives_a_controller_restart():
+    c, fake = _mid_p2_room()
+    again = controller.Controller()
+    again._state_path = c._state_path
+    again._load_state()
+    again.loop_once(_Clock.now())  # restarted while the room is off: it has not been switched off again
+    _Clock.current += timedelta(minutes=5)
+    fake.set_state(ROOM_ACTIVE, "on")
+    again.loop_once(_Clock.now())
+    assert again.rooms[0].state[1]["phase"] == "P2"
+    assert again.rooms[0].state[1]["shots"] == 9
+
+
 def test_a_shot_in_flight_is_cut_when_the_room_is_switched_off(monkeypatch):
     c, fake = _room("on")
     clock = {"seconds": 0.0}
