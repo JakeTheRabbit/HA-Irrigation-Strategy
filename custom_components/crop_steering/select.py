@@ -21,6 +21,7 @@ from .const import (
     RECIPE_STAGES,
     RECIPE_PARAMS,
     SOFTWARE_VERSION,
+    SET_PHASE_OPTIONS,
 )
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .recipe import get_manager
@@ -187,6 +188,21 @@ async def async_setup_entry(
                     name=f"Crop Steering Zone {zone_num} Steering Mode",
                     options=["Vegetative", "Generative"],
                     icon="mdi:steering",
+                ),
+                zone_num=zone_num,
+            )
+        )
+
+        # Move the zone to a phase by hand. The controller applies a choice once, within a
+        # minute, and sets this back to Keep; its own rules carry on from that phase.
+        selects.append(
+            CropSteeringSelect(
+                entry,
+                SelectEntityDescription(
+                    key=f"zone_{zone_num}_set_phase",
+                    name=f"Zone {zone_num} Set Phase",
+                    options=SET_PHASE_OPTIONS,
+                    icon="mdi:state-machine",
                 ),
                 zone_num=zone_num,
             )
