@@ -10,6 +10,8 @@ import AxeBuilder from "@axe-core/playwright";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const publicRoot = path.join(root, "www");
 const out = path.join(root, "output/playwright");
+// The README's screenshots, from the same demo the checks drive.
+const img = (name) => path.join(root, "img", name);
 await mkdir(out, { recursive: true });
 const server = createServer(async (req, res) => {
   try {
@@ -253,6 +255,7 @@ try {
     const card = (id) => page.locator(`[data-stock-tank="${id}"]`);
     await expectVisible(card("cal_mag"));
     assert.equal(await page.locator("[data-stock-tank]").count(), 4);
+    await page.screenshot({ path: img("stock-tanks.png") });
     // Cal-Mag starts within half again of its low mark: amber, "Getting low".
     assert.equal(await card("cal_mag").locator(".pill").textContent(), "Getting low");
     await card("cal_mag").getByRole("button", { name: "Refilled" }).click();
@@ -867,6 +870,7 @@ try {
     await bars.first().waitFor();
     const count = await bars.count();
     assert.ok(count >= 6 && count % 3 === 0, `one bar per zone and grow week, got ${count}`);
+    await panel.screenshot({ path: img("water-use.png") });
     // The definition of "This week" is reachable from the keyboard.
     await panel.getByRole("button", { name: "How this week is counted" }).focus();
     await expectVisible(panel.getByRole("tooltip", { name: /grow week/ }));
