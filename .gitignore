@@ -48,6 +48,11 @@ node_modules/
 # Local browser verification artifacts
 output/
 
-# User-generated configuration and optional Lovelace output
+# Local environment files, virtual environments and coverage output
+.env
+.env.*
 /crop_steering.env
-/crop_steering_lovelace.yaml
+.venv/
+venv/
+.coverage
+htmlcov/
