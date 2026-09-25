@@ -34,7 +34,7 @@ def test_compatibility_entries_preserve_context_and_route_to_native_workspace():
         "www/index.html",
         "www/f2.html",
         "www/f2-classic.html",
-        "addons/f2_control/web-index.html",
+        "addons/f2_control/www/public/index.html",
     ):
         source = (ROOT / relative).read_text(encoding="utf-8")
         assert "dashboard.html" in source
