@@ -1,7 +1,10 @@
 import type { EntityState } from "./types";
 
-/** A controller that has not reported for this long is not running. */
-export const HEARTBEAT_STALE_MS = 5 * 60_000;
+/** A controller that has not reported for this long is not running: the integration's own limit
+ * (the engine-offline repair and a zone's "Controller not reporting"). A shot holds the
+ * controller's loop, and a batch of them held it 8.2 minutes at the 25 Sep 2026 lights-on while it
+ * watered. */
+export const HEARTBEAT_STALE_MS = 10 * 60_000;
 /** Data age turns amber, then red. */
 export const AGE_AMBER_MS = 2 * 60_000;
 export const AGE_RED_MS = 10 * 60_000;
