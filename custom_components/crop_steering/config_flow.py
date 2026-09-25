@@ -13,7 +13,6 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from .const import (
@@ -23,8 +22,6 @@ from .const import (
     MIN_ZONES,
     MAX_ZONES,
     DEFAULT_NUM_ZONES,
-    CONF_PUMP_SWITCH,
-    CONF_MAIN_LINE_SWITCH,
 )
 from .env_parser import load_env_config
 from .plumbing import PLUMBING_LAYOUTS, infer as infer_plumbing
@@ -704,29 +701,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data["setup_revision"] = 1
         return self.async_create_entry(title=data["name"], data=data)
 
-    async def _validate_entities(self, user_input: dict) -> dict:
-        """Validate that entity IDs exist in Home Assistant."""
-        errors = {}
-
-        # List of entity keys to validate
-        entity_keys = [
-            "zone_switch",
-            "vwc_front",
-            "vwc_back",
-            "ec_front",
-            "ec_back",
-            CONF_PUMP_SWITCH,
-            CONF_MAIN_LINE_SWITCH,
-        ]
-
-        for key in entity_keys:
-            entity_id = user_input.get(key, "").strip()
-            if entity_id and not self.hass.states.get(entity_id):
-                _LOGGER.warning(f"Entity ID not found: {entity_id}")
-                errors[key] = "entity_not_found"
-
-        return errors
-
     async def _validate_env_entities(self, env_config: dict) -> list[str]:
         """Validate entity IDs from .env configuration."""
         missing = []
@@ -756,18 +730,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(config_entry):
         """Get the options flow for this handler."""
         return OptionsFlowHandler(config_entry)
-
-
-class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
-
-
-class InvalidAuth(HomeAssistantError):
-    """Error to indicate there is invalid auth."""
-
-
-class EntityNotFound(HomeAssistantError):
-    """Error to indicate entity ID does not exist."""
 
 
 def _installed_version() -> str | None:

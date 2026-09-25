@@ -5,6 +5,9 @@ import { buildRoom, discoverRooms } from "./model";
 import { addDays, dateInZone, daysBetween, validDate } from "./comparison";
 import { buildSetpointPreview } from "./setpoint-preview";
 import { loadHistoryWindow } from "./comparison-history";
+
+/** The demo's runs are dated in the visitor's own time zone, so "today" is their today. */
+export const demoTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 // Keep the demo's exported metadata compatible with RunStore's strategy-only schema.
 const runParameterKeys = new Set([
   "dryback_target",
@@ -83,7 +86,7 @@ export class RunDemo {
       name,
       start_date,
       end_date,
-      time_zone: "Pacific/Auckland",
+      time_zone: demoTimeZone(),
       archived: false,
       captured_at: new Date(this.now()).toISOString(),
       reference_source: "Synthetic demo configuration captured for this interface example",
@@ -108,7 +111,7 @@ export class RunDemo {
     };
   }
   private seed(room: Room): RunsDocument {
-    const today = dateInZone(this.now(), "Pacific/Auckland");
+    const today = dateInZone(this.now(), demoTimeZone());
     const current = this.capture(
       room,
       `Demo • current run — ${room.name.slice(0, 35)}`,
@@ -132,7 +135,7 @@ export class RunDemo {
       schema_version: 1,
       room_id: room.id,
       revision: 0,
-      time_zone: "Pacific/Auckland",
+      time_zone: demoTimeZone(),
       runs: [current, previous, archived],
       error: null,
       max_runs: 100,

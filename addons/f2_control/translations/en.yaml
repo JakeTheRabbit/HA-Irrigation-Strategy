@@ -29,13 +29,18 @@ configuration:
     name: Notification service
     description: >-
       Where to send vitals and alerts. Use the path form notify/<your_service>,
-      for example notify/mobile_app_pixel_8. Find yours in
+      for example notify/mobile_app_my_phone. Find yours in
       Developer Tools > Actions by typing "notify".
   notify_min:
     name: Minutes between routine notifications
     description: >-
       Minimum minutes between routine "vitals" messages so you are not spammed.
       Urgent alerts ignore this throttle. Default 30.
+  instance_name:
+    name: Name in notifications
+    description: >-
+      The title of the controller's vitals notifications, for example
+      "Crop Steering vitals". Change it to tell two installations apart.
   feed_ec_sensor:
     name: Source-water EC sensor (optional)
     description: >-
@@ -53,6 +58,13 @@ configuration:
       pH being inside number.crop_steering_irrigation_ph_min / _max (fail-closed
       if the probe dies). LEAVE BLANK if you have no feed-pH probe - the
       source-water pH gate is then disabled.
+  hold_entities:
+    name: Hold entities (optional)
+    description: >-
+      Entities that pause watering while they are on, such as the input_boolean
+      a dosing or tank-fill automation turns on while it works. While any of them
+      is on, no shot starts, and a shot already running ends and counts only the
+      water it gave. Empty by default: nothing holds.
   substrate_l:
     name: Fallback substrate volume (L per plant)
     description: >-
@@ -73,6 +85,11 @@ configuration:
     description: >-
       How often the engine wakes to read sensors and decide. Default 60. Lower
       reacts faster but makes more Home Assistant API calls.
+  rediscover_seconds:
+    name: Seconds between setup checks
+    description: >-
+      How often the controller looks for new rooms and for setup changes saved
+      in the Crop Steering page. Default 300 (five minutes).
   cf_account_id:
     name: Cloudflare account ID (optional, Auto Setpoints judge)
     description: >-

@@ -393,6 +393,26 @@ export function leadingNotices(alerts: Notice[], limit = 3): Notice[] {
   return alerts.filter((notice, index) => notice.severity === "critical" || index < limit);
 }
 
+/** The zone whose valve a running shot holds open, or null. A shot holds the controller's loop, so
+ * a controller that does not report during one goes quiet until it ends. Only a valve that opened
+ * no longer ago than the room's maximum shot length counts: a valve open longer is not a shot, and
+ * a controller that stopped mid-shot must never read as watering. */
+export function shotRunning(states: States, room: Room, now: number): string | null {
+  const valves = descriptor(states, room)?.attributes.valves;
+  const cap = Number(
+    resolve(states, room, "number", "max_shot_duration", "maximum_shot_duration")?.state,
+  );
+  // The controller's own fallback when the room has no cap entity.
+  const longest = (Number.isFinite(cap) && cap >= 5 ? cap : 900) * 1000;
+  if (!valves || typeof valves !== "object" || Array.isArray(valves)) return null;
+  for (const [zone, id] of Object.entries(valves as Record<string, unknown>)) {
+    const valve = typeof id === "string" ? states[id] : undefined;
+    if (valve?.state !== "on") continue;
+    if (now - Date.parse(valve.last_changed ?? valve.last_updated ?? "") <= longest) return zone;
+  }
+  return null;
+}
+
 export function buildRoom(states: States, room: Room): RoomView {
   const config = descriptor(states, room);
   const entities = roomEntities(states, room);
@@ -614,6 +634,7 @@ export function buildRoom(states: States, room: Room): RoomView {
       entityId: null,
       label,
       unit,
+      key,
       value:
         values.length && values.every((v) => v !== null)
           ? values.reduce<number>((a, b) => a + b!, 0) / (average ? values.length : 1)
@@ -683,7 +704,15 @@ export function buildRoom(states: States, room: Room): RoomView {
         ? "Displayed VWC and EC references come from the active plan. Manual setpoints are retained for use after the plan is disarmed."
         : "The controller requires a valid plan snapshot. Targets are unavailable until plan status is restored; do not treat legacy number values as active targets.",
     });
-  if (config && !live)
+  const shot = config && beat.health === "stale" ? shotRunning(states, room, now) : null;
+  if (shot)
+    alerts.push({
+      id: `${room.id}-controller`,
+      severity: "info",
+      title: "Watering",
+      detail: `Zone ${shot}'s valve is open: a shot is running, and the controller reports again when it ends (last report ${ageText(now - beat.at!)} ago). Zone phases and statuses are its last report, not live.`,
+    });
+  else if (config && !live)
     alerts.push({
       id: `${room.id}-controller`,
       severity: "critical",
@@ -703,6 +732,28 @@ export function buildRoom(states: States, room: Room): RoomView {
       title: "Engine control unavailable",
       detail:
         "No readable configured engine control was found. Check the room descriptor and engine heartbeat.",
+    });
+  // The integration's stock sensor lists every stock tank; the low ones get one notice.
+  const stockTanks = resolve(states, room, "sensor", "stock_low")?.attributes.tanks;
+  const lowStock = (Array.isArray(stockTanks) ? stockTanks : []).filter(
+    (tank): tank is { name: string; level_l: number; batches_left: number | null } =>
+      !!tank && typeof tank === "object" && (tank as { low?: unknown }).low === true,
+  );
+  if (lowStock.length)
+    alerts.push({
+      id: `${room.id}-stock-low`,
+      severity: "warning",
+      title: `Stock ${lowStock.length === 1 ? "tank" : "tanks"} running low`,
+      detail:
+        lowStock
+          .map(
+            (tank) =>
+              `${tank.name}: ${tank.level_l} L` +
+              (typeof tank.batches_left === "number"
+                ? `, about ${tank.batches_left} batch${tank.batches_left === 1 ? "" : "es"} left`
+                : ""),
+          )
+          .join("; ") + ". Refill, then press Refilled on the Stock tanks page.",
     });
   return {
     room,
@@ -770,6 +821,13 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
       "stopped",
       "Not watering",
       "The controller is not running. Start the controller app and check its log.",
+    );
+  const shot = beat.health === "stale" ? shotRunning(states, room, now) : null;
+  if (shot)
+    return say(
+      "watering",
+      "Watering",
+      `Zone ${shot}'s valve is open. The controller reports again when the shot ends.`,
     );
   if (beat.health === "stale")
     return say(

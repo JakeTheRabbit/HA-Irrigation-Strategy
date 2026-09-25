@@ -13,13 +13,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 
-from .const import DOMAIN
+from .const import DOMAIN, REPAIRS_DOCS_URL
 from .room import room_prefix
 
 _LOGGER = logging.getLogger(__name__)
 
 _DEFAULT_KILL_SWITCH = "input_boolean.f2_control_enabled"
-DOCS = "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/wiki/Troubleshooting"
 _STALE_MIN = 10
 _DEAD = ("unavailable", "unknown", "none", "")
 ISSUE_IDS = (
@@ -30,6 +29,9 @@ ISSUE_IDS = (
     "strategy_hold",
     "strategy_degraded",
     "entities_moved",
+    # Raised and cleared by stock_api.py, not by the checks here; listed so every card this
+    # integration can show is in one place.
+    "stock_low",
 )
 # The platforms whose entities the controller reads by exact id and has no other way to find.
 # Fused sensors are left out: the controller tolerates their legacy naming and an add-on option
@@ -60,7 +62,7 @@ def _issue(hass, present, issue_id, severity, placeholders=None):
             severity=severity,
             translation_key=_base_key(issue_id),
             translation_placeholders=placeholders or {},
-            learn_more_url=DOCS,
+            learn_more_url=REPAIRS_DOCS_URL,
         )
     else:
         ir.async_delete_issue(hass, DOMAIN, issue_id)
@@ -201,7 +203,9 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
         room = hass.states.get(f"switch.{DOMAIN}_{prefix}room_active")
         if room is not None and str(room.state).lower() == "off":
             for base in ISSUE_IDS:
-                if base != "entities_moved":
+                # Stock runs low whether or not anything grows, and only its own store
+                # raises that card again.
+                if base not in ("entities_moved", "stock_low"):
                     _issue(hass, False, _iid(base, slug), ir.IssueSeverity.WARNING)
             return
 

@@ -1,20 +1,26 @@
 import { DailyWaterSummary } from "@/components/water-delivery";
+import { WaterUsePanel } from "@/components/water-use";
 import { useState } from "react";
 import { ArrowUpRight, LayoutGrid, List, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  dailyLimit,
+  DrybackRate,
   Empty,
   Heading,
   LastIrrigation,
   MetricValue,
+  MoistureCell,
   Status,
+  WaterUse,
   ZoneDetails,
   ZoneOperatingState,
   ZoneTable,
   type Page,
 } from "@/components/dashboard";
 import type { Controller } from "@/lib/types";
+import { useDrybackTrends } from "@/lib/use-recent-moisture";
 
 export function Zones({
   controller,
@@ -30,6 +36,10 @@ export function Zones({
   const [selected, setSelected] = useState<number | null>(null);
   const zones = controller.room.zones.filter((zone) =>
     `${zone.name} ${zone.phase} ${zone.status}`.toLowerCase().includes(query.toLowerCase()),
+  );
+  const trends = useDrybackTrends(controller);
+  const limits = Object.fromEntries(
+    controller.room.zones.map((zone) => [zone.id, dailyLimit(controller, zone.id)]),
   );
   return (
     <>
@@ -97,7 +107,12 @@ export function Zones({
         </section>
       ) : layout === "table" ? (
         <section className="panel">
-          <ZoneTable zones={zones} onSelect={(zone) => setSelected(zone.id)} />
+          <ZoneTable
+            zones={zones}
+            trends={trends}
+            limits={limits}
+            onSelect={(zone) => setSelected(zone.id)}
+          />
         </section>
       ) : (
         <div className="zone-grid">
@@ -113,7 +128,7 @@ export function Zones({
                 <LastIrrigation zone={zone} />
               </div>
               <div className="zone-card-moisture">
-                <MetricValue metric={zone.vwc} />
+                <MoistureCell zone={zone} target={false} />
                 <span>Moisture · VWC</span>
               </div>
               <div className="zone-card-pair">
@@ -130,6 +145,20 @@ export function Zones({
                   </strong>
                 </span>
               </div>
+              <div className="zone-card-pair">
+                <span>
+                  Water today
+                  <strong>
+                    <WaterUse zone={zone} limit={limits[zone.id] ?? null} />
+                  </strong>
+                </span>
+                <span>
+                  Dryback
+                  <strong>
+                    <DrybackRate zone={zone} trend={trends?.[zone.id]} />
+                  </strong>
+                </span>
+              </div>
               <Button variant="outline" className="full-width" onClick={() => setSelected(zone.id)}>
                 View zone <ArrowUpRight size={16} />
               </Button>
@@ -138,6 +167,7 @@ export function Zones({
         </div>
       )}
       <DailyWaterSummary controller={controller} zones={zones} />
+      <WaterUsePanel controller={controller} zones={zones} />
       <ZoneDetails
         controller={controller}
         zone={controller.room.zones.find((zone) => zone.id === selected) || null}

@@ -85,6 +85,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the recipe store
         _LOGGER.warning("Recipe store unavailable: %s", err)
 
+    # Stock tanks: stored per room and drawn down per batch; the stock sensor reads them.
+    try:
+        from .stock_api import async_setup_stock
+
+        await async_setup_stock(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the stock store
+        _LOGGER.warning("Stock tanks unavailable: %s", err)
+
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -166,6 +174,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .run_api import async_unload_runs
 
     await async_unload_runs(hass, entry)
+    from .stock_api import async_unload_stock
+
+    await async_unload_stock(hass, entry)
     hass.data[DOMAIN].pop(entry.entry_id, None)
 
     # Unload services only when the last loaded room goes away â€” other loaded

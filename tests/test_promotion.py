@@ -439,3 +439,14 @@ def test_workflow_uses_main_code_and_does_not_execute_candidate():
         "run: ${{",
     ):
         assert forbidden not in workflow
+
+
+def test_a_promotion_republishes_the_demo():
+    """main moves with the workflow's own token, and a push made with it starts no other
+    workflow: without a dispatch the Pages demo keeps the previous release (it did for 2.21.0).
+    """
+    workflow = (ROOT / ".github/workflows/promote.yml").read_text(encoding="utf-8")
+    before, promote = workflow.split("  promote:")
+    assert "gh workflow run pages.yml" in promote and "--ref main" in promote
+    assert promote.index("--apply") < promote.index("gh workflow run pages.yml")
+    assert "actions: write" in promote and "actions: write" not in before

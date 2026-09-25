@@ -397,9 +397,6 @@
       }
     },
     "error": {
-      "entity_not_found": "Entity not found in Home Assistant.",
-      "invalid_moisture_sensor": "Invalid moisture sensor — must report in %.",
-      "env_file_not_found": "crop_steering.env file not found.",
       "missing_entities": "Some entities in the file don't exist.",
       "setup_invalid": "Not saved yet: {error}"
     },
@@ -831,11 +828,11 @@
   "issues": {
     "kill_switch_missing": {
       "title": "Crop Steering: kill switch helper missing (CS-601)",
-      "description": "The engine is gated by the helper `input_boolean.f2_control_enabled`, but it doesn't exist — so the F2 Crop Steering add-on can't run. Create it: Settings → Devices & Services → Helpers → Create Helper → Toggle, named so the entity is input_boolean.f2_control_enabled. Leave it OFF until you're ready to irrigate.\n\nCode CS-601. What it means and what to do: Crop Steering → Help & tools → Error codes."
+      "description": "The engine is gated by the helper `input_boolean.f2_control_enabled`, but it doesn't exist, so the Crop Steering Controller app can't run. Create it: Settings → Devices & Services → Helpers → Create Helper → Toggle, named so the entity is input_boolean.f2_control_enabled. Leave it OFF until you're ready to irrigate.\n\nCode CS-601. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
     "engine_offline": {
       "title": "Crop Steering: engine not running (CS-602)",
-      "description": "No fresh heartbeat from the add-on (sensor.crop_steering_ai_heartbeat is missing or stale). The integration creates the entities, but the F2 Crop Steering add-on is what actually steers. Install/start it and check its log. If you only use manual control, you can ignore this.\n\nCode CS-602. What it means and what to do: Crop Steering → Help & tools → Error codes."
+      "description": "No fresh heartbeat from the add-on (sensor.crop_steering_ai_heartbeat is missing or stale). The integration creates the entities, but the Crop Steering Controller app is what actually steers. Install/start it and check its log. If you only use manual control, you can ignore this.\n\nCode CS-602. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
     "zone_no_sensor": {
       "title": "Crop Steering: zone with no moisture sensor (CS-603)",
@@ -856,6 +853,10 @@
     "entities_moved": {
       "title": "Crop Steering: {count} setting(s) are not where the controller looks for them (CS-605)",
       "description": "The controller finds each setting by its exact entity id, and these are somewhere else, so it is running on its built-in defaults for them (daily water cap and plant count included):\n\n{entities}\n\nKeep the engine off until this is fixed. If you changed an entity id yourself, change it back: Settings → Devices & services → Entities → the entity → the cog → Entity ID. If nearly every entity is listed, the room was created while Home Assistant was still running an older version of this integration: delete the Crop Steering entry, restart Home Assistant, and add it again. Nothing is renamed for you, because an id you chose on purpose is yours to keep.\n\nCode CS-605. What it means and what to do: Crop Steering → Help & tools → Error codes."
+    },
+    "stock_low": {
+      "title": "Crop Steering: {count} stock tank(s) running low (CS-608)",
+      "description": "These stock tanks are at or below their low mark:\n\n{tanks}\n\nRefill them, then open Crop Steering → Stock tanks and press Refilled, or set the level you read off the tank. Each batch tank the room makes takes its dose from every stock tank; this card clears itself once every tank is above its low mark.\n\nCode CS-608. What it means and what to do: Crop Steering → Help & tools → Error codes."
     }
   },
   "selector": {

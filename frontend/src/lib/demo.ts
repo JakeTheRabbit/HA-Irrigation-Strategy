@@ -1,5 +1,8 @@
 import type { TimelineRequest, TimelineRow, TimelineRows } from "./day-timeline";
 import type { EntityState, LogEvent, Series, States } from "./types";
+import type { CounterSample, WaterRecordRequest } from "./water-use";
+import { addDays, daysBetween } from "./comparison";
+import { dateForDay, localDate } from "./grow-plan";
 import { numeric } from "./model";
 
 export function isDemoLocation(location: Pick<Location, "hostname" | "search">): boolean {
@@ -60,6 +63,12 @@ export function createDemo(now = Date.now()): States {
       tank_temperature_sensor: `sensor.demo_${prefix}tank_temperature`,
       tank_last_fill_sensor: `sensor.demo_${prefix}tank_last_fill`,
       tank_fill_entity: `binary_sensor.demo_${prefix}tank_filling`,
+      // Flower 2 checks its feed water on the tank probes (the source-water gate); Flower 1 maps
+      // no feed-water probe, so its gate is off. Both have been saved in Rooms & setup.
+      ...(index
+        ? {}
+        : { feed_ec_sensor: "sensor.demo_tank_ec", feed_ph_sensor: "sensor.demo_tank_ph" }),
+      setup_revision: 1,
     });
     put(`switch.demo_${prefix}pump`, index ? "off" : "on");
     put(`sensor.demo_${prefix}tank_level`, index ? 72 : 42, { unit_of_measurement: "%" });
@@ -99,6 +108,8 @@ export function createDemo(now = Date.now()): States {
     number(prefix, "lights_off_hour", index ? 20 : 22, 0, 23, 1, "h");
     number(prefix, "irrigation_ec_min", 2.3, 0, 6, 0.1, "mS/cm");
     number(prefix, "irrigation_ec_max", 3.5, 0, 8, 0.1, "mS/cm");
+    number(prefix, "irrigation_ph_min", 5.5, 3, 9, 0.05, "pH");
+    number(prefix, "irrigation_ph_max", 6.5, 3, 9, 0.05, "pH");
     for (let id = 1; id <= 3; id++) {
       put(`switch.demo_${prefix}valve_${id}`, !index && id === 1 ? "on" : "off");
       put(
@@ -300,10 +311,50 @@ function cycleHistory(
     };
   });
 }
+/** Plausible batch-tank chemistry: each refill (the recorded last fill, and every three days
+ * before it) starts a fresh mix, a step down. Then EC creeps up steadily as water evaporates, and
+ * pH climbs, fastest in the first day. Each batch mixes a little differently; EC follows the
+ * day's temperature a little. Ends at the live reading. */
+function tankHistory(
+  states: States,
+  match: RegExpMatchArray,
+  base: number,
+  hours: number,
+  now: number,
+) {
+  const [entityId, prefix, kind] = match;
+  const filled = Date.parse(states[`sensor.demo_${prefix}tank_last_fill`]?.state ?? "");
+  const last = Number.isFinite(filled) ? filled : now;
+  const batch = 72 * 3_600_000;
+  const seed = seedOf(entityId);
+  const raw = (time: number) => {
+    const index = Math.floor((time - last) / batch);
+    const hoursIn = (time - last - index * batch) / 3_600_000;
+    return kind === "ec"
+      ? 0.004 * hoursIn +
+          0.05 * Math.sin(index * 2.1 + seed) +
+          0.012 * Math.sin((time / 86_400_000) * 2 * Math.PI)
+      : 0.3 * (1 - Math.exp(-hoursIn / 18)) +
+          0.003 * hoursIn +
+          0.04 * Math.sin(index * 1.7 + seed) +
+          0.008 * Math.sin(time / 2.5e7);
+  };
+  const step = (hours <= 24 ? 5 : hours <= 168 ? 15 : 60) * 60_000;
+  const count = Math.floor((hours * 3_600_000) / step);
+  const offset = base - raw(now);
+  return Array.from({ length: count + 1 }, (_, index) => {
+    const time = now - (count - index) * step;
+    return {
+      time: new Date(time).toISOString(),
+      value: Number((offset + raw(time)).toFixed(kind === "ec" ? 3 : 2)),
+    };
+  });
+}
 /** A recorded grow-day for the day timeline, on the demo probes' own day shape (P0 dryback, a
  * six-shot P1 ramp, P2 top-ups every 75 minutes, P3 two hours before lights-off), each zone shifted
  * like its probe so its shots land where its readings jump. Flower 2's zone 2 waits out a feed-EC
- * hold that ends when the feed band is widened; Flower 1's zone 3 is held since it was disabled. */
+ * hold that ends when the feed band is widened; Flower 1's zone 3 is held since it was disabled.
+ * Earlier grow-days, to compare today with, come from the same curve. */
 export function demoDay(states: States, request: TimelineRequest, now = Date.now()): TimelineRows {
   const end = Math.min(now, request.end);
   const wanted = new Set([...request.entityIds, ...request.attributeIds]);
@@ -319,9 +370,17 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
         { state: states[id].state, time },
       ]);
   };
-  // Anything not drawn below held its current value all day.
+  // Anything not drawn below held its current value all day, but a room switched off now was on
+  // in the days before.
+  const past = request.end < now - 60_000;
   for (const id of wanted)
-    if (states[id]) put(id, [{ state: states[id].state, time: request.start }]);
+    if (states[id])
+      put(id, [
+        {
+          state: past && id.endsWith("room_active") ? "on" : states[id].state,
+          time: request.start,
+        },
+      ]);
   for (const config of Object.values(states)) {
     if (!/^sensor\.crop_steering_.*engine_config$/.test(config.entity_id)) continue;
     const prefix = String(config.attributes.prefix ?? "");
@@ -349,13 +408,19 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
       ]);
       const hold = !prefix && zone === 2 ? [2.5, 2.7] : null;
       const disabled = prefix && zone === 3 ? 6 : Infinity;
+      // Each grow-day's shots run a little longer or shorter than the day before's.
+      const drift = 1 + 0.12 * Math.sin(new Date(request.start).getDate() * 1.9 + zone);
       const shots: { hour: number; seconds: number; text: string }[] = [];
       for (let shot = 0, hour = 1.5; shot < 6; shot++, hour += 1 / 3) {
         if (hold && hour >= hold[0] && hour < hold[1]) hour = hold[1];
-        shots.push({ hour, seconds: 90 + 15 * shot, text: `P1 P1 ramp shot ${shot + 1}/6 (demo)` });
+        shots.push({
+          hour,
+          seconds: Math.round((90 + 15 * shot) * drift),
+          text: `P1 P1 ramp shot ${shot + 1}/6 (demo)`,
+        });
       }
       for (let hour = 4.75; hour < Math.min(p3, disabled); hour += 1.25)
-        shots.push({ hour, seconds: 150, text: "P2 P2 top-up (demo)" });
+        shots.push({ hour, seconds: Math.round(150 * drift), text: "P2 P2 top-up (demo)" });
       const valve: TimelineRow[] = [{ state: "off", time: request.start }];
       for (const shot of shots) {
         const start = at(shot.hour),
@@ -384,7 +449,8 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
           { time: at(disabled), zone, list: "blocked", text: "P2 zone disabled" },
           { time: at(p3), zone, list: "blocked", text: null },
         );
-      const recorded = demoHistory(states, [vwc], (end - request.start) / 3_600_000, end);
+      // Every day on one curve that ends at the live reading, so an earlier day joins up with today.
+      const recorded = demoHistory(states, [vwc], (now - request.start) / 3_600_000, now);
       put(
         vwc,
         (recorded[0]?.points ?? []).map((point) => ({
@@ -425,6 +491,63 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
   }
   return rows;
 }
+/** Recorded water for the Water use panel, as the hourly statistics of each zone's water-today
+ * counter: a grow that began on the demo grow plan's start date after eight dry grow-days, drinking
+ * a little more each day. Complete grow-days only; the live counter supplies today. */
+export function demoWaterRecord(
+  states: States,
+  request: WaterRecordRequest,
+  now = Date.now(),
+): Record<string, CounterSample[]> {
+  const growStart = dateForDay(localDate(new Date(now)), -13); // as the demo plan (operator-demo)
+  const samples: Record<string, CounterSample[]> = {};
+  for (const entityId of request.entityIds) {
+    const match = entityId.match(
+      /^sensor\.crop_steering_(.*?)zone_(\d+)_daily_water_(?:app|usage)$/,
+    );
+    if (!match || !states[entityId]) continue;
+    const [, prefix, zone] = match;
+    const hour = (key: string, fallback: number) =>
+      numeric(states[`number.crop_steering_${prefix}lights_${key}_hour`]) ?? fallback;
+    const on = hour("on", 8);
+    const photoperiod = (hour("off", 20) - on + 24) % 24 || 12;
+    const lightsOn = (day: string) => {
+      const [year, month, date] = day.split("-").map(Number);
+      return new Date(year, month - 1, date, 0, Math.round(on * 60)).getTime();
+    };
+    const list: CounterSample[] = [];
+    for (
+      let day = addDays(growStart, -8);
+      lightsOn(addDays(day, 1)) <= now;
+      day = addDays(day, 1)
+    ) {
+      const age = daysBetween(growStart, day) + 1;
+      const total =
+        age < 1
+          ? 0
+          : Math.min(
+              38,
+              16 +
+                0.9 * age +
+                1.6 * Number(zone) +
+                (prefix ? 2 : 0) +
+                2.5 * Math.sin(1.7 * age + Number(zone)),
+            );
+      // One reading at the end of each hour; a daylight-saving grow-day has 23 or 25 of them.
+      const from = lightsOn(day);
+      for (let time = from + 3_600_000 - 1; time < lightsOn(addDays(day, 1)); time += 3_600_000) {
+        const share = Math.min(
+          1,
+          Math.max(0, ((time + 1 - from) / 3_600_000 - 1) / (photoperiod - 3)),
+        );
+        if (time >= request.start && time <= request.end)
+          list.push({ time, value: Math.round(total * share * 100) / 100 });
+      }
+    }
+    samples[entityId] = list;
+  }
+  return samples;
+}
 export function demoHistory(
   states: States,
   entityIds: string[],
@@ -446,6 +569,13 @@ export function demoHistory(
           entityId,
           label: String(state.attributes.friendly_name || entityId),
           points: cycleHistory(states, probe, base, hours, now),
+        };
+      const tank = entityId.match(/^sensor\.demo_(.*?)tank_(ec|ph)$/);
+      if (tank && base !== null)
+        return {
+          entityId,
+          label: String(state.attributes.friendly_name || entityId),
+          points: tankHistory(states, tank, base, hours, now),
         };
       return {
         entityId,

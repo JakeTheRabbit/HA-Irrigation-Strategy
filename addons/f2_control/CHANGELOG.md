@@ -1,3 +1,16 @@
+# 2.23.0
+
+Pair with integration 2.23.0. **C1** for the controller app: no behaviour change; its code changes in comments only (the syntax tree is unchanged). Owner-approved rehearsal release without a staging soak (25 Sep 2026). No change to add-on options, the state file or irrigation.
+
+- **The dashboard the app serves** is the 2.23.0 build: each zone's lane on the Overview's grow-day chart shows its target, yesterday and the projected rest of the day.
+- **Configuration tab:** `instance_name`, `hold_entities` and `rediscover_seconds` now have a name and a description, and the `notify_service` example is neutral.
+
+# 2.22.0
+
+Pair with integration 2.22.0. **C1** for the controller app: no controller code change. Owner-approved rehearsal release without a staging soak (25 Sep 2026). No change to add-on options, the state file or irrigation.
+
+- **The dashboard the app serves** (`www/public/dashboard.html`) is the 2.22.0 build: the Stock tanks page, mini visuals on every page, water use per zone, typing the balance into the whole-grow table, the tank's EC and pH history, and "Watering" instead of "Controller not running" while a shot holds the controller.
+
 # 2.21.0
 
 Pair with integration 2.21.0, one number for both halves from this release on. **C3.** Owner-approved rehearsal release without a staging soak (25 Sep 2026); not run on hardware before release. No change to add-on options or the state file.

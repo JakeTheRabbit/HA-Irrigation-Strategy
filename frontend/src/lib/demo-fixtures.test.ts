@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDemo } from "./demo";
 import { OperatorDemo } from "./operator-demo";
-import { RunDemo, demoHistoryWindow } from "./comparison-demo";
+import { RunDemo, demoHistoryWindow, demoTimeZone } from "./comparison-demo";
 import { buildComparisonTarget } from "./comparison-target";
 import {
   addDays,
@@ -23,7 +23,7 @@ import {
 import type { GrowPlan, StrategyDocument } from "./operator-types";
 
 const now = Date.parse("2026-09-08T01:00:00Z");
-const timeZone = "Pacific/Auckland";
+const timeZone = demoTimeZone();
 beforeEach(() => vi.spyOn(Date, "now").mockReturnValue(now));
 afterEach(() => vi.restoreAllMocks());
 class MemoryStorage {

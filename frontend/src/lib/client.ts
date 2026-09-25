@@ -175,6 +175,10 @@ export class HaClient {
       "setup_create",
       "setup_save",
       "setup_remove",
+      "stock_get",
+      "stock_save",
+      "stock_refill",
+      "stock_record_batch",
     ];
     if (!allowed.includes(action)) throw new Error("Unsupported workspace action.");
     const response = await this.request<{ service_response?: T }>(
@@ -229,37 +233,68 @@ export class HaClient {
       ...(await read(request.attributeIds, true)),
     };
   }
-  async history(entityIds: string[], hours: number, states: States): Promise<Series[]> {
+  async history(
+    entityIds: string[],
+    hours: number,
+    states: States,
+    signal?: AbortSignal,
+  ): Promise<Series[]> {
     if (!entityIds.length) return [];
-    if (!Number.isFinite(hours) || hours <= 0 || hours > 168)
-      throw new Error("History range must be between 0 and 168 hours.");
-    const start = new Date(Date.now() - hours * 3_600_000).toISOString();
-    // Without end_time Home Assistant stops at start + 24 h, so a longer window would come back
-    // as only its oldest day.
-    const query = new URLSearchParams({
-      end_time: new Date().toISOString(),
-      filter_entity_id: entityIds.join(","),
-      minimal_response: "",
-      no_attributes: "",
-    });
-    const payload = await this.request<unknown>("GET", `history/period/${start}?${query}`);
-    if (!Array.isArray(payload)) throw new Error("Home Assistant returned invalid history.");
-    return entityIds.map((entityId) => {
-      const rows = payload.find(
-        (group: unknown) => Array.isArray(group) && group[0]?.entity_id === entityId,
-      ) as EntityState[] | undefined;
-      return {
-        entityId,
-        label: String(states[entityId]?.attributes.friendly_name || entityId),
-        points: (rows || []).flatMap((row) => {
+    if (!Number.isFinite(hours) || hours <= 0 || hours > 720)
+      throw new Error("History range must be between 0 and 720 hours.");
+    const end = Date.now(),
+      start = end - hours * 3_600_000;
+    // One day per request, two at a time. A busy probe records thousands of changes a day: a
+    // month of a room's two tank probes in one request took 19 s on a live install, past the request
+    // timeout, and a day about 1 s. Each request needs its end_time; without one Home Assistant
+    // stops at start + 24 h. Each day starts with the state then in force, the value held then.
+    const days: number[] = [];
+    for (let from = start; from < end; from += 86_400_000) days.push(from);
+    const payloads: unknown[][] = [];
+    let next = 0;
+    const worker = async () => {
+      while (next < days.length) {
+        const index = next++,
+          from = days[index];
+        const query = new URLSearchParams({
+          end_time: new Date(Math.min(end, from + 86_400_000)).toISOString(),
+          filter_entity_id: entityIds.join(","),
+          minimal_response: "",
+          no_attributes: "",
+        });
+        try {
+          const payload = await this.request<unknown>(
+            "GET",
+            `history/period/${new Date(from).toISOString()}?${query}`,
+            undefined,
+            undefined,
+            signal,
+          );
+          if (!Array.isArray(payload)) throw new Error("Home Assistant returned invalid history.");
+          payloads[index] = payload;
+        } catch (error) {
+          next = days.length; // no more requests once one has failed or been cancelled
+          throw error;
+        }
+      }
+    };
+    await Promise.all([worker(), worker()]);
+    return entityIds.map((entityId) => ({
+      entityId,
+      label: String(states[entityId]?.attributes.friendly_name || entityId),
+      points: payloads.flatMap((payload) => {
+        const rows = payload.find(
+          (group: unknown) => Array.isArray(group) && group[0]?.entity_id === entityId,
+        ) as EntityState[] | undefined;
+        return (rows || []).flatMap((row) => {
           const value = numeric(row);
           const time = row.last_changed || row.last_updated;
           return value !== null && time && Number.isFinite(Date.parse(time))
             ? [{ value, time }]
             : [];
-        }),
-      };
-    });
+        });
+      }),
+    }));
   }
 }
 

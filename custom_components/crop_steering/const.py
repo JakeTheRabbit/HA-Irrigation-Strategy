@@ -2,46 +2,16 @@
 
 DOMAIN = "crop_steering"
 
+# Where a Repairs card's "Learn more" link goes: every card carries a CS code, explained there.
+REPAIRS_DOCS_URL = "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/ERROR_CODES.md"
+
 # Configuration keys
-CONF_PUMP_SWITCH = "pump_switch"
-CONF_MAIN_LINE_SWITCH = "main_line_switch"
-CONF_ZONE_SWITCHES = "zone_switches"
-CONF_VWC_SENSORS = "vwc_sensors"
-CONF_EC_SENSORS = "ec_sensors"
 CONF_NUM_ZONES = "num_zones"
-CONF_ENV_FILE_PATH = "env_file_path"
 
 # Zone configuration
 MIN_ZONES = 1
 MAX_ZONES = 24  # No practical limit — env parser auto-detects zones
 DEFAULT_NUM_ZONES = 1
-
-# Default values (Athena method)
-DEFAULT_SCAN_INTERVAL = 30
-DEFAULT_SUBSTRATE_VOLUME = 10.0
-DEFAULT_DRIPPER_FLOW_RATE = 2.0
-DEFAULT_FIELD_CAPACITY = 70.0
-DEFAULT_MAX_EC = 9.0
-
-# ---------------------------------------------------------------------------
-# P0 dryback configuration
-# ---------------------------------------------------------------------------
-# Controller dryback is relative to detected peak VWC:
-# (peak - current VWC) / peak * 100. A 20% dryback from 60% VWC ends at
-# 48% VWC (a 12 percentage-point drop). VWC targets are absolute percentages;
-# dryback rates are VWC percentage points/hour and need explicit conversion.
-# These constants are defaults for separate legacy numbers, not synchronized
-# entity aliases or the Grow Plan endpoint settings. Existing restored values
-# remain unchanged. The Grow Plan uses its explicit per-zone endpoint ranges.
-DEFAULT_VEG_P0_DRYBACK_DROP_PCT = 12.0
-DEFAULT_GEN_P0_DRYBACK_DROP_PCT = 22.0
-
-# Python constant aliases retained for source compatibility. The HA number
-# entities created from them are independent controls; writes do not fan out.
-DEFAULT_VEG_DRYBACK_TARGET = DEFAULT_VEG_P0_DRYBACK_DROP_PCT  # legacy alias
-DEFAULT_GEN_DRYBACK_TARGET = DEFAULT_GEN_P0_DRYBACK_DROP_PCT  # legacy alias
-DEFAULT_P1_TARGET_VWC = 65.0
-DEFAULT_P2_VWC_THRESHOLD = 60.0
 
 # Calculation constants
 SECONDS_PER_HOUR = 3600
@@ -52,7 +22,7 @@ VWC_ADJUSTMENT_PERCENT = 5.0
 
 
 # Software version - single source of truth
-SOFTWARE_VERSION = "2.21.0"
+SOFTWARE_VERSION = "2.23.0"
 
 # Crop steering phases (P0-P3 only, Manual removed)
 PHASES = ["P0", "P1", "P2", "P3"]
@@ -158,9 +128,6 @@ DEFAULT_RECIPE = {
         },
     },
 }
-
-# Entity prefixes
-ENTITY_PREFIX = "crop_steering"
 
 # Service names — the single source of truth for the domain's registered services.
 # These MUST match the keys of the SERVICES dict in services.py.

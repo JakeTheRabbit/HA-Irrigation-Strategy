@@ -81,7 +81,6 @@
   color: var(--primary-strong);
 }
 .workspace-tabs button:focus-visible,
-.calendar-cell:focus-visible,
 .schedule-blocks button:focus-visible,
 .mapping-result:focus-visible {
   outline: 2px solid var(--primary);
@@ -168,16 +167,31 @@
 }
 .calendar-cell {
   min-height: 70px;
-  padding: 9px 5px;
+  /* A day column is 45px: its input needs the width for "100%". */
+  padding: 9px 2px;
   background: color-mix(in srgb, var(--primary) calc(10% + var(--bias) * 0.2%), var(--card));
   border: 2px solid transparent;
   text-align: center;
   cursor: pointer;
 }
-.calendar-cell span {
+.calendar-cell input {
   display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
   font-weight: 600;
   font-size: 14px;
+  text-align: center;
+}
+/* The cell draws the focus ring for its input. */
+.calendar-cell input:focus-visible {
+  outline: none;
+}
+.calendar-cell input::placeholder {
+  color: var(--muted-foreground);
+  opacity: 1;
 }
 .calendar-cell small {
   font-size: var(--text-xs);
@@ -186,6 +200,137 @@
 .calendar-cell.selected {
   border-color: var(--primary-strong);
   background: color-mix(in srgb, var(--primary) 28%, var(--card));
+}
+.calendar-cell:focus-within {
+  outline: 2px solid var(--primary-strong);
+  outline-offset: -2px;
+}
+/* A typed balance not applied yet. */
+.calendar-cell.editing {
+  background: var(--card);
+}
+.calendar-cell.invalid {
+  border-color: var(--destructive);
+  outline-color: var(--destructive);
+}
+.plan-cell-message {
+  margin: 10px 0 0;
+  color: var(--destructive);
+  font-size: var(--text-sm);
+}
+.plan-cell-message:empty {
+  margin: 0;
+}
+.plan-cell {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.plan-cell h3 {
+  font-size: var(--text-md);
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+/* Captions, units, axis labels and notes. */
+.plan-cell h4,
+.plan-cell-table caption,
+.plan-cell-table thead th,
+.plan-cell-table small,
+.plan-cell-note,
+.plan-cell-axis,
+.plan-cell-live dt {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.plan-cell h4,
+.plan-cell-table caption {
+  font-weight: 500;
+  text-align: left;
+  margin: 0 0 6px;
+}
+.plan-cell-body {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 16px 32px;
+  margin-top: 12px;
+}
+.plan-cell-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.plan-cell-table th,
+.plan-cell-table td {
+  padding: 6px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+.plan-cell-table th:first-child {
+  text-align: left;
+  padding-left: 0;
+}
+.plan-cell-table tbody th {
+  font-weight: 500;
+}
+.plan-cell-table .plan-cell-at {
+  font-weight: 600;
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+}
+.plan-cell-note {
+  margin: 8px 0 0;
+}
+.plan-cell-side {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+.plan-cell-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.plan-cell-shape {
+  margin: 0;
+}
+.plan-cell-shape svg {
+  display: block;
+  width: 100%;
+  height: 56px;
+  background: var(--muted);
+  border-radius: 4px;
+}
+.plan-cell-shape rect {
+  fill: color-mix(in srgb, var(--primary) 55%, var(--card));
+}
+.plan-cell-shape .plan-cell-window {
+  fill: color-mix(in srgb, var(--primary) 16%, transparent);
+}
+.plan-cell-shape .plan-cell-edit {
+  fill: var(--primary-strong);
+}
+.plan-cell-was {
+  stroke: var(--foreground);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+.plan-cell-axis,
+.plan-cell-live {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 24px;
+  margin: 4px 0 0;
+}
+.plan-cell-live {
+  justify-content: flex-start;
+}
+.plan-cell-live dd {
+  margin: 0;
+  font-weight: 600;
 }
 .steering-control {
   padding: 22px 0;
@@ -309,6 +454,21 @@
 }
 .mapping-picker {
   min-width: 0;
+}
+/* The field's name, and a pill saying whether it is mapped. */
+.mapping-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.mapping-head .mapping-label {
+  min-width: 0;
+  margin-bottom: 0;
+}
+.workspace-form-grid > div > .pill {
+  margin-top: 6px;
 }
 .mapping-button {
   width: 100%;
@@ -495,6 +655,9 @@
   .sizing-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .plan-cell-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 @media (max-width: 720px) {
   .workspace-card {
@@ -561,5 +724,8 @@
   }
   .install-steps li {
     gap: 12px;
+  }
+  .plan-cell-table small {
+    display: block;
   }
 }
