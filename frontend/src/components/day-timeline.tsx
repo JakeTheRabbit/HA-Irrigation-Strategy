@@ -666,23 +666,25 @@ function Timeline({
       {width > 0 && (
         <>
           <Axis day={day} now={now} plot={plot} x={x} changes={roomChanges} strip={strip} />
-          {lanes.map((lane) => (
-            <div className="timeline-zone" key={lane.zone.id} data-zone={lane.zone.id}>
-              <p className="timeline-zone-line">
-                <strong>{lane.zone.name}</strong>{" "}
-                <span>{tracking(lane, day, now, layers.compare, earlier)}</span>
-              </p>
-              <LaneChart
-                lane={lane}
-                day={day}
-                now={now}
-                plot={plot}
-                x={x}
-                strip={strip}
-                layers={layers}
-              />
-            </div>
-          ))}
+          {lanes.map((lane) => {
+            const line = tracking(lane, day, now, layers.compare, earlier);
+            return (
+              <div className="timeline-zone" key={lane.zone.id} data-zone={lane.zone.id}>
+                <p className="timeline-zone-line" title={`${lane.zone.name} ${line}`}>
+                  <strong>{lane.zone.name}</strong> <span>{line}</span>
+                </p>
+                <LaneChart
+                  lane={lane}
+                  day={day}
+                  now={now}
+                  plot={plot}
+                  x={x}
+                  strip={strip}
+                  layers={layers}
+                />
+              </div>
+            );
+          })}
         </>
       )}
       <p className="timeline-detail" aria-live="polite">
