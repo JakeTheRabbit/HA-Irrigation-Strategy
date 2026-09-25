@@ -440,6 +440,127 @@ export interface PlanningProjection {
  * was one low-light week on one zone; at that rate no ordinary plan ever reached its P2 threshold, so
  * the maintenance sawtooth never drew. */
 export const NOMINAL_DRY_RATES = { day: 2, night: 1 };
+const usable = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+/** The zone's own dry-down where it was measured, else the nominal rates; a learned retention up to
+ * 1.5 points per 1% shot, else every shot kept whole. */
+function projectionInputs(options: { rates?: DryRates; retention?: number | null }) {
+  return {
+    rates: {
+      day: usable(options.rates?.day) ? options.rates.day : NOMINAL_DRY_RATES.day,
+      night: usable(options.rates?.night) ? options.rates.night : NOMINAL_DRY_RATES.night,
+    },
+    measured: { day: usable(options.rates?.day), night: usable(options.rates?.night) },
+    retention: usable(options.retention) ? Math.min(1.5, options.retention) : 1,
+  };
+}
+interface PhaseRun {
+  /** The phase the run starts in and the VWC it starts at. */
+  phase: PlanningPhaseId;
+  value: number;
+  /** P0–P3 from there on, in hours since lights-on. */
+  phases: readonly { start: number; end: number }[];
+  /** The ramp shots still to come, and how many the ramp fired before them. */
+  p1Windows: readonly number[];
+  p1Done: number;
+  /** The ramp's shot count or spacing is not known: P1 climbs to its target as one line. */
+  jump: boolean;
+}
+/** The engine's rules from `run.phase` to the end of P3: P0 dries on; P1 climbs one riser per
+ * window, each taking its share of the rest of the climb, drying between them; P2 fires a shot each
+ * time VWC falls to its threshold; P3 dries on, with an emergency shot at the floor. */
+function runPhases(
+  plan: PlanningModel,
+  parameters: Record<string, number>,
+  rates: { day: number; night: number },
+  retention: number,
+  run: PhaseRun,
+) {
+  const target = parameters.p1_target_vwc,
+    threshold = parameters.p2_vwc_threshold;
+  const lift = (size: number) => (usable(size) ? Math.max(0.1, size * retention) : 0);
+  const [p0, p1, p2, p3] = run.phases;
+  const floor = plan.emergencyFloor;
+  const order = ["P0", "P1", "P2", "P3"].indexOf(run.phase);
+  const points: PlanningPoint[] = [],
+    shots: ProjectedShot[] = [];
+  let value = run.value;
+  const mark = (hour: number, phase: PlanningPhaseId) => points.push({ hour, value, phase });
+  /** Dry down minute by minute from `from` to `to`, firing `fire` whenever `due` says so. */
+  const dry = (
+    from: number,
+    to: number,
+    phase: PlanningPhaseId,
+    due?: (value: number) => Omit<ProjectedShot, "hour" | "phase" | "from" | "to"> | null,
+    /** Without a shot size there is nothing to lift the zone: hold the line here instead. */
+    holdAt?: number,
+  ) => {
+    mark(from, phase);
+    const end = Math.round(to * 60);
+    for (let minute = Math.round(from * 60); minute < end; minute++) {
+      value -= (minute / 60 < plan.photoperiod ? rates.day : rates.night) / 60;
+      value = Math.max(holdAt ?? 0, value);
+      const hour = (minute + 1) / 60;
+      const shot = shots.length < 200 ? due?.(value) : null;
+      if (shot && usable(shot.size) && minute + 1 < end) {
+        mark(hour, phase);
+        const before = value;
+        value += lift(shot.size);
+        shots.push({ hour, phase, from: before, to: value, ...shot });
+        mark(hour, phase);
+      } else if (minute + 1 === Math.round(plan.photoperiod * 60)) mark(hour, phase);
+    }
+    mark(to, phase);
+  };
+  if (order === 0 && p0.end > p0.start) dry(p0.start, p0.end, "P0");
+  if (order <= 1) {
+    const start = value,
+      windows = run.p1Windows;
+    if (run.jump && target > start) {
+      // shot count or spacing not supplied: the climb is known, its steps are not
+      mark(p1.start, "P1");
+      value = target;
+      mark(p1.end, "P1");
+    } else if (windows.length && target > start) {
+      // one riser per eligible shot; each takes its share of the climb, and the substrate dries between them
+      const initial = parameters.p1_initial_shot_size;
+      const increment = Number.isFinite(parameters.p1_shot_size_increment)
+        ? parameters.p1_shot_size_increment
+        : 0;
+      const sizes = windows.map((_, index) =>
+        usable(initial) ? initial + (run.p1Done + index) * increment : null,
+      );
+      const total = sizes.reduce<number>((sum, size) => sum + (size ?? 1), 0);
+      let climbed = 0;
+      windows.forEach((hour, index) => {
+        if (index) dry(windows[index - 1], hour, "P1");
+        else if (hour > p1.start) dry(p1.start, hour, "P1");
+        else mark(hour, "P1");
+        climbed += (sizes[index] ?? 1) / total;
+        const to = index === windows.length - 1 ? target : start + (target - start) * climbed;
+        shots.push({ hour, phase: "P1", from: value, to, size: sizes[index] ?? null });
+        value = to;
+        mark(hour, "P1");
+      });
+      if (p1.end > windows.at(-1)!) dry(windows.at(-1)!, p1.end, "P1");
+    } else if (p1.end > p1.start) dry(p1.start, p1.end, "P1");
+  }
+  if (order <= 2 && p2.end > p2.start)
+    dry(
+      p2.start,
+      p2.end,
+      "P2",
+      (now) => (now <= threshold ? { size: parameters.p2_shot_size ?? null } : null),
+      usable(parameters.p2_shot_size) ? undefined : threshold,
+    );
+  if (p3.end > p3.start)
+    dry(p3.start, p3.end, "P3", (now) =>
+      floor !== null && now <= floor
+        ? { size: parameters.p3_emergency_shot_size ?? null, emergency: true }
+        : null,
+    );
+  return { points, shots, value };
+}
 /** The whole day as the engine would run these setpoints: P0 dries on, P1 climbs shot by shot,
  * P2 fires a shot each time VWC falls to its threshold, P3 dries down to the next lights-on.
  * Timing comes from the zone's dry-down rate, so it is a projection, not a schedule. */
@@ -457,97 +578,22 @@ export function projectDay(
     !Number.isFinite(threshold)
   )
     return null;
-  const usable = (value: number | null | undefined): value is number =>
-    typeof value === "number" && Number.isFinite(value) && value > 0;
-  const rates = {
-    day: usable(options.rates?.day) ? options.rates.day : NOMINAL_DRY_RATES.day,
-    night: usable(options.rates?.night) ? options.rates.night : NOMINAL_DRY_RATES.night,
-  };
-  const retention = usable(options.retention) ? Math.min(1.5, options.retention) : 1;
-  const lift = (size: number) => (usable(size) ? Math.max(0.1, size * retention) : 0);
-  const [p0, p1, p2, p3] = plan.phases;
-  const floor = plan.emergencyFloor;
+  const { rates, measured, retention } = projectionInputs(options);
   let lightsOnVwc = Math.min(threshold, target);
-  let points: PlanningPoint[] = [],
-    shots: ProjectedShot[] = [];
+  let run!: ReturnType<typeof runPhases>;
   for (let pass = 0; pass < 6; pass++) {
-    points = [];
-    shots = [];
-    let value = lightsOnVwc;
-    const mark = (hour: number, phase: PlanningPhaseId) => points.push({ hour, value, phase });
-    /** Dry down minute by minute from `from` to `to`, firing `fire` whenever `due` says so. */
-    const dry = (
-      from: number,
-      to: number,
-      phase: PlanningPhaseId,
-      due?: (value: number) => Omit<ProjectedShot, "hour" | "phase" | "from" | "to"> | null,
-      /** Without a shot size there is nothing to lift the zone: hold the line here instead. */
-      holdAt?: number,
-    ) => {
-      mark(from, phase);
-      const end = Math.round(to * 60);
-      for (let minute = Math.round(from * 60); minute < end; minute++) {
-        value -= (minute / 60 < plan.photoperiod ? rates.day : rates.night) / 60;
-        value = Math.max(holdAt ?? 0, value);
-        const hour = (minute + 1) / 60;
-        const shot = shots.length < 200 ? due?.(value) : null;
-        if (shot && usable(shot.size) && minute + 1 < end) {
-          mark(hour, phase);
-          const before = value;
-          value += lift(shot.size);
-          shots.push({ hour, phase, from: before, to: value, ...shot });
-          mark(hour, phase);
-        } else if (minute + 1 === Math.round(plan.photoperiod * 60)) mark(hour, phase);
-      }
-      mark(to, phase);
-    };
-    if (p0.end > p0.start) dry(p0.start, p0.end, "P0");
-    const start = value;
-    if (!plan.p1Windows.length && target > start) {
-      // shot count or spacing not supplied: the climb is known, its steps are not
-      mark(p1.start, "P1");
-      value = target;
-      mark(p1.end, "P1");
-    } else if (plan.p1Windows.length && target > start) {
-      // one riser per eligible shot; each takes its share of the climb, and the substrate dries between them
-      const initial = parameters.p1_initial_shot_size;
-      const increment = Number.isFinite(parameters.p1_shot_size_increment)
-        ? parameters.p1_shot_size_increment
-        : 0;
-      const sizes = plan.p1Windows.map((_, index) =>
-        usable(initial) ? initial + index * increment : null,
-      );
-      const total = sizes.reduce<number>((sum, size) => sum + (size ?? 1), 0);
-      let climbed = 0;
-      plan.p1Windows.forEach((hour, index) => {
-        if (index) dry(plan.p1Windows[index - 1], hour, "P1");
-        else mark(hour, "P1");
-        climbed += (sizes[index] ?? 1) / total;
-        const to =
-          index === plan.p1Windows.length - 1 ? target : start + (target - start) * climbed;
-        shots.push({ hour, phase: "P1", from: value, to, size: sizes[index] ?? null });
-        value = to;
-        mark(hour, "P1");
-      });
-      if (p1.end > plan.p1Windows.at(-1)!) dry(plan.p1Windows.at(-1)!, p1.end, "P1");
-    } else if (p1.end > p1.start) dry(p1.start, p1.end, "P1");
-    if (p2.end > p2.start)
-      dry(
-        p2.start,
-        p2.end,
-        "P2",
-        (now) => (now <= threshold ? { size: parameters.p2_shot_size ?? null } : null),
-        usable(parameters.p2_shot_size) ? undefined : threshold,
-      );
-    if (p3.end > p3.start)
-      dry(p3.start, p3.end, "P3", (now) =>
-        floor !== null && now <= floor
-          ? { size: parameters.p3_emergency_shot_size ?? null, emergency: true }
-          : null,
-      );
-    if (Math.abs(value - lightsOnVwc) < 0.005) break;
-    lightsOnVwc = value;
+    run = runPhases(plan, parameters, rates, retention, {
+      phase: "P0",
+      value: lightsOnVwc,
+      phases: plan.phases,
+      p1Windows: plan.p1Windows,
+      p1Done: 0,
+      jump: !plan.p1Windows.length,
+    });
+    if (Math.abs(run.value - lightsOnVwc) < 0.005) break;
+    lightsOnVwc = run.value;
   }
+  const { points, shots } = run;
   points.at(-1)!.value = lightsOnVwc; // the next day starts where this one ends
   const peak = Math.max(...points.map((point) => point.value));
   const dryback = parameters.dryback_target;
@@ -558,7 +604,106 @@ export function projectDay(
     peak,
     drybackVwc: Number.isFinite(dryback) ? peak * (1 - dryback / 100) : null,
     rates,
-    measured: { day: usable(options.rates?.day), night: usable(options.rates?.night) },
+    measured,
+    retention,
+  };
+}
+/** The rest of today on the same rules, from now instead of lights-on: `hour` hours after lights-on,
+ * in the zone's current phase and at its current VWC. P0 ends at its maximum wait from `since`,
+ * sooner once VWC dries to the dryback target below `peak`, at once when VWC is already at the P2
+ * threshold (the engine's bypass). P1 fires the shots it has left `p1_time_between_shots` apart,
+ * from the last one. The day ends `end` hours after lights-on, the next lights-on: 23 or 25 hours
+ * across a clock change. Null without the targets or a reading to start from. */
+export function projectFrom(
+  plan: PlanningModel,
+  parameters: Record<string, number>,
+  now: {
+    hour: number;
+    phase: PlanningPhaseId;
+    since: number;
+    value: number;
+    p1Shots: number;
+    lastShot: number | null;
+    peak: number | null;
+  },
+  options: { rates?: DryRates; retention?: number | null; end?: number } = {},
+): PlanningProjection | null {
+  const target = parameters.p1_target_vwc,
+    threshold = parameters.p2_vwc_threshold,
+    end = options.end ?? 24;
+  if (
+    !plan.photoperiod ||
+    !Number.isFinite(target) ||
+    !Number.isFinite(threshold) ||
+    ![now.hour, now.since, now.value].every(Number.isFinite) ||
+    now.hour >= end
+  )
+    return null;
+  const { rates, measured, retention } = projectionInputs(options);
+  const hours = (key: string) => (usable(parameters[key]) ? parameters[key] / 60 : null);
+  const interval = hours("p1_time_between_shots"),
+    maxShots = usable(parameters.p1_maximum_shots) ? Math.floor(parameters.p1_maximum_shots) : null;
+  // Routine watering stops where P3 starts: lights-off, less any last-irrigation offset.
+  const cutoff = Math.max(now.hour, plan.phases[3].start);
+  const at = (hour: number) => Math.min(Math.max(hour, now.hour), cutoff);
+  let phase: PlanningPhaseId = now.hour >= plan.phases[3].start ? "P3" : now.phase;
+  let p1Start = now.hour;
+  if (phase === "P0") {
+    const dryback = parameters.dryback_target;
+    const level =
+      now.peak !== null && Number.isFinite(dryback) ? now.peak * (1 - dryback / 100) : null;
+    p1Start = at(
+      now.value <= threshold
+        ? now.hour
+        : Math.min(
+            now.since + (hours("p0_maximum_wait_time") ?? 1),
+            level === null ? Infinity : now.hour + Math.max(0, now.value - level) / rates.day,
+          ),
+    );
+  }
+  // A ramp already at its target, or out of shots, hands over to P2.
+  const rampFrom = phase === "P0" ? now.value - rates.day * (p1Start - now.hour) : now.value;
+  const rampDone =
+    rampFrom >= target || (phase === "P1" && maxShots !== null && now.p1Shots >= maxShots);
+  const done = phase === "P1" ? now.p1Shots : 0,
+    windows: number[] = [];
+  let p1End = p1Start;
+  if ((phase === "P0" || phase === "P1") && !rampDone) {
+    if (interval !== null && maxShots !== null) {
+      const first =
+        phase === "P1" && now.lastShot !== null
+          ? Math.max(now.hour, now.lastShot + interval)
+          : p1Start;
+      for (let index = 0; index < maxShots - done && first + index * interval < cutoff; index++)
+        windows.push(first + index * interval);
+      p1End = at(windows.length ? windows.at(-1)! + interval : first);
+    } else p1End = at(p1Start + 2); // buildPlanningCurve's layout window without count or spacing
+  }
+  if (phase === "P1" && rampDone) phase = "P2";
+  const p2Start = phase === "P2" ? now.hour : p1End;
+  const run = runPhases(plan, parameters, rates, retention, {
+    phase,
+    value: now.value,
+    phases: [
+      { start: now.hour, end: p1Start },
+      { start: phase === "P1" ? now.hour : p1Start, end: p1End },
+      { start: p2Start, end: Math.max(p2Start, cutoff) },
+      { start: phase === "P3" ? now.hour : cutoff, end },
+    ],
+    p1Windows: windows,
+    p1Done: done,
+    jump: interval === null || maxShots === null,
+  });
+  const peak = Math.max(...run.points.map((point) => point.value));
+  const dryback = parameters.dryback_target;
+  return {
+    points: run.points,
+    shots: run.shots,
+    lightsOnVwc: run.value,
+    peak,
+    drybackVwc: Number.isFinite(dryback) ? peak * (1 - dryback / 100) : null,
+    rates,
+    measured,
     retention,
   };
 }

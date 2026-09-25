@@ -1,3 +1,6 @@
+import { ageText } from "./controller-health";
+import { descriptor } from "./model";
+import { smoothRecorded, type RecordedPoint } from "./planning-curve";
 import type { RoomView, States } from "./types";
 
 /** One recorded state of an entity: epoch ms, and attributes only where they were asked for. */
@@ -305,6 +308,345 @@ export function levels(rows: TimelineRow[] = [], from: number, to: number): Leve
     else steps.push({ value, start, end });
   });
   return steps;
+}
+
+/** A numeric entity's value in force at `time`: the last number recorded at or before it. A
+ * restart's unavailable reading in between changes nothing. */
+export function valueAt(rows: TimelineRow[] = [], time: number): number | null {
+  let value: number | null = null;
+  for (const row of rows) {
+    if (row.time > time) break;
+    value = numberOf(row.state) ?? value;
+  }
+  return value;
+}
+
+/** What the earlier grow-days are read from: each zone's VWC probe and valve, the lights hours
+ * (a changed schedule moves a day's lights-on), the room switch (a room that was off has nothing to
+ * compare) and, with its attributes, the room descriptor (its setup revision). */
+export function earlierEntities(room: RoomView, states: States) {
+  const root = `crop_steering_${room.room.prefix}`;
+  const exists = (id: string | null | undefined): id is string => !!id && !!states[id];
+  const ids = [
+    ...room.zones.flatMap((zone) => [zone.vwc.entityId, zone.valveEntity]),
+    `number.${root}lights_on_hour`,
+    `number.${root}lights_off_hour`,
+    `switch.${root}room_active`,
+  ];
+  const config = descriptor(states, room.room)?.entity_id;
+  return {
+    entityIds: [...new Set(ids.filter(exists))].sort(),
+    attributeIds: exists(config) ? [config] : [],
+  };
+}
+
+/** The `count` grow-days before `day`, latest first, each from its lights-on to the next day's.
+ * `hours(time)` gives the lights hours in force at a time. A day starts at the last lights-on at
+ * least half a day before the next one, at the hour in force as it came on: a changed schedule
+ * or a clock change makes a day longer or shorter than 24 hours. */
+export function earlierDays(
+  day: GrowDay,
+  count: number,
+  hours: (time: number) => { on: number | null; off: number | null },
+): GrowDay[] {
+  const days: GrowDay[] = [];
+  for (let end = day.start; days.length < count;) {
+    const middle = end - 12 * 3_600_000;
+    const { on, off } = hours(middle);
+    let earlier = growDay(on, off, middle);
+    // The schedule changed after this day's lights-on: it came on at the hour in force then.
+    const then = earlier && hours(earlier.start);
+    const moved = then && then.on !== on && growDay(then.on, then.off, middle);
+    if (moved && hours(moved.start).on === then.on) earlier = moved;
+    if (!earlier) break;
+    days.push({ start: earlier.start, lightsOff: Math.min(earlier.lightsOff, end), end });
+    end = earlier.start;
+  }
+  return days;
+}
+
+/** Recorder rows from consecutive requests joined into one history per entity, in time order. */
+export function joinRows(parts: readonly TimelineRows[]): TimelineRows {
+  const rows: TimelineRows = {};
+  for (const part of parts)
+    for (const [id, list] of Object.entries(part)) (rows[id] ??= []).push(...list);
+  for (const list of Object.values(rows)) list.sort((a, b) => a.time - b.time);
+  return rows;
+}
+
+export interface DayTrace {
+  day: GrowDay;
+  /** The zone's VWC in ten-minute medians, by hours since that day's own lights-on. */
+  points: RecordedPoint[];
+  shots: Shot[];
+}
+/** One earlier grow-day of a zone, to compare today with. Null when there is nothing to compare:
+ * under two readings, or the room was switched off during it. */
+export function dayTrace(
+  rows: TimelineRows,
+  ids: { vwc: string | null; valve: string | null; active: string | null },
+  zoneId: number,
+  day: GrowDay,
+): DayTrace | null {
+  const active = (ids.active && rows[ids.active]) || [];
+  const off = active.some(
+    (row, index) =>
+      row.state === "off" &&
+      row.time < day.end &&
+      (active[index + 1]?.time ?? Infinity) > day.start,
+  );
+  const points = smoothRecorded(readings(ids.vwc ? rows[ids.vwc] : [], day.start, day.end)).map(
+    (point) => ({ ...point, hour: (point.time - day.start) / 3_600_000 }),
+  );
+  if (off || points.length < 2) return null;
+  const shots = ids.valve ? valveShots(rows[ids.valve], [], zoneId, day.start, day.end) : [];
+  return { day, points, shots };
+}
+
+/** The room's setup revision in force at `time`, from its descriptor's recorded attributes. A
+ * restart can record the descriptor without them, which changes nothing. */
+export function revisionAt(rows: TimelineRow[] = [], time: number): number | null {
+  let revision: number | null = null;
+  for (const row of rows) {
+    if (row.time > time) break;
+    const value = row.attributes?.setup_revision;
+    if (typeof value === "number") revision = value;
+  }
+  return revision;
+}
+
+/** The week before `day` as the room lived it, from the rows of `earlierEntities`: each grow-day
+ * cut at the lights-on recorded in force then (`hours` where none was recorded), every zone's
+ * trace of each day (null where there is nothing to compare), and the setup revision as each day
+ * began. */
+export function earlierTraces(
+  rows: TimelineRows,
+  room: RoomView,
+  day: GrowDay,
+  hours: { on: number | null; off: number | null },
+  config?: string,
+) {
+  const root = `crop_steering_${room.room.prefix}`;
+  const recorded = (key: "on" | "off", time: number) =>
+    valueAt(rows[`number.${root}lights_${key}_hour`], time) ?? hours[key];
+  const days = earlierDays(day, 7, (time) => ({
+    on: recorded("on", time),
+    off: recorded("off", time),
+  }));
+  const active = `switch.${root}room_active`;
+  return {
+    traces: new Map(
+      room.zones.map((zone) => [
+        zone.id,
+        days.map((past) =>
+          dayTrace(
+            rows,
+            { vwc: zone.vwc.entityId, valve: zone.valveEntity, active },
+            zone.id,
+            past,
+          ),
+        ),
+      ]),
+    ),
+    setup: days.map((past) => revisionAt(config ? rows[config] : [], past.start)),
+  };
+}
+
+/** VWC `hour` hours after lights-on: read between the readings either side when they are no more
+ * than `within` hours apart, else the nearest one if it is within half of that. */
+export function atHour(
+  points: readonly RecordedPoint[],
+  hour: number,
+  within = 1 / 3,
+): number | null {
+  let low = 0,
+    high = points.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (points[middle].hour < hour) low = middle + 1;
+    else high = middle;
+  }
+  const [a, b] = [points[low - 1], points[low]];
+  if (a && b && b.hour - a.hour <= within)
+    return a.value + ((b.value - a.value) * (hour - a.hour)) / (b.hour - a.hour);
+  const near = [a, b].find((point) => point && Math.abs(point.hour - hour) <= within / 2);
+  return near ? near.value : null;
+}
+
+/** When VWC first rose to `level`, in hours since lights-on: the first reading at or above it after
+ * one below it. A day that never went below it was there from its first reading; one that never
+ * came up to it never reached it (null). */
+export function reachedHour(points: readonly RecordedPoint[], level: number): number | null {
+  let below = false;
+  for (const point of points) {
+    if (point.value < level) below = true;
+    else if (below) return point.hour;
+  }
+  return below || !points.length ? null : points[0].hour;
+}
+
+/** Seconds the valve was open from lights-on (`start`) until `hour` hours later. */
+export function openSeconds(shots: readonly Shot[], start: number, hour: number): number {
+  const until = start + hour * 3_600_000;
+  return (
+    shots.reduce((sum, shot) => sum + Math.max(0, Math.min(shot.end, until) - shot.start), 0) / 1000
+  );
+}
+
+/** How far P0 dried the zone, as the engine measures dryback: (peak − VWC) / peak × 100, the peak
+ * being the highest reading since P0 began, at its furthest over the band. */
+export function morningDryback(points: readonly Reading[], band: Span): number | null {
+  let peak = -Infinity,
+    dryback: number | null = null;
+  for (const point of points) {
+    if (point.time < band.start || point.time > band.end) continue;
+    peak = Math.max(peak, point.value);
+    if (peak > 0) dryback = Math.max(dryback ?? 0, ((peak - point.value) / peak) * 100);
+  }
+  return dryback;
+}
+
+const quantile = (sorted: readonly number[], q: number) => {
+  const at = (sorted.length - 1) * q,
+    below = Math.floor(at);
+  return at === below
+    ? sorted[below]
+    : sorted[below] + (sorted[below + 1] - sorted[below]) * (at - below);
+};
+const middle = (values: number[]) =>
+  values.length
+    ? quantile(
+        [...values].sort((a, b) => a - b),
+        0.5,
+      )
+    : null;
+export interface TypicalPoint {
+  hour: number;
+  low: number;
+  median: number;
+  high: number;
+}
+/** The typical day: every ten minutes after lights-on, the median VWC of the recorded days and
+ * their middle half (25th to 75th percentile), wherever three or more of them were recorded. */
+export function typicalDay(days: readonly (readonly RecordedPoint[])[]): TypicalPoint[] {
+  const step = 1 / 6,
+    last = Math.max(0, ...days.map((points) => points.at(-1)?.hour ?? 0));
+  const typical: TypicalPoint[] = [];
+  for (let index = 0; index * step <= last; index++) {
+    const hour = index * step;
+    const values = days.flatMap((points) => atHour(points, hour) ?? []).sort((a, b) => a - b);
+    if (values.length >= 3)
+      typical.push({
+        hour,
+        low: quantile(values, 0.25),
+        median: quantile(values, 0.5),
+        high: quantile(values, 0.75),
+      });
+  }
+  return typical;
+}
+
+export interface Comparison {
+  /** VWC now less theirs at the same hour since lights-on; null when they have no reading then. */
+  vwc: number | null;
+  /** When they reached the P1 target: the median day's time, null when the median day did not
+   * reach it; and how many of them did. */
+  reached: number | null;
+  reachedBy: number;
+  /** Valve-open seconds from lights-on to this hour since lights-on. */
+  seconds: number;
+}
+/** Today against earlier grow-days at `hour` hours since lights-on: one day (yesterday) or the
+ * median of several (the typical day). Null without a day to compare with. */
+export function compareDays(
+  days: readonly DayTrace[],
+  hour: number,
+  vwc: number | null,
+  target: number | null,
+): Comparison | null {
+  if (!days.length) return null;
+  const then = middle(days.flatMap((trace) => atHour(trace.points, hour) ?? []));
+  // A day that never reached the target counts as the latest of all.
+  const reached =
+    target === null ? [] : days.map((trace) => reachedHour(trace.points, target) ?? Infinity);
+  const median = middle(reached);
+  return {
+    vwc: vwc === null || then === null ? null : vwc - then,
+    reached: median !== null && Number.isFinite(median) ? median : null,
+    reachedBy: reached.filter(Number.isFinite).length,
+    seconds: middle(days.map((trace) => openSeconds(trace.shots, trace.day.start, hour)))!,
+  };
+}
+
+export type TargetKey =
+  "dryback_target" | "p1_target_vwc" | "p2_vwc_threshold" | "p3_emergency_vwc_threshold";
+const PHASE_TARGET: Record<string, TargetKey> = {
+  P0: "dryback_target",
+  P1: "p1_target_vwc",
+  P2: "p2_vwc_threshold",
+  P3: "p3_emergency_vwc_threshold",
+};
+export interface TargetStep extends Level {
+  phase: string;
+}
+/** What the controller aims at in each phase, as steps along `bands` (the recorded phases, then the
+ * projected ones): in P0 the dryback target as a VWC level below the highest reading since P0
+ * began, in P1 the P1 target, in P2 the P2 threshold, in P3 the emergency floor. `setpoint` gives
+ * one setpoint over a span as steps: where it was changed, or a plan's value. */
+export function phaseTargets(
+  bands: readonly PhaseBand[],
+  setpoint: (key: TargetKey, span: Span) => Level[],
+  points: readonly Reading[],
+): TargetStep[] {
+  let since = -Infinity;
+  return bands.flatMap((band, index) => {
+    // P0's peak counts from when the phase began, through a recorded band and its projected rest.
+    const before = bands[index - 1];
+    if (band.phase === "P0" && !(before?.phase === "P0" && before.end === band.start))
+      since = band.start;
+    return setpoint(PHASE_TARGET[band.phase], band).flatMap((level) => {
+      if (band.phase !== "P0") return [{ ...level, phase: band.phase }];
+      const peak = Math.max(
+        ...points
+          .filter((point) => point.time >= since && point.time <= level.end)
+          .map((point) => point.value),
+      );
+      return Number.isFinite(peak)
+        ? [{ ...level, value: peak * (1 - level.value / 100), phase: "P0" }]
+        : [];
+    });
+  });
+}
+
+/** A target setpoint over a span as steps, resolved as the controller resolves it: while a plan is
+ * armed, its snapshot's value (in `parameters`, from buildSetpointPreview); otherwise the number
+ * `entity` names (the zone's own, else the room's) as recorded, so a value changed today steps
+ * where it changed. The value in force now where nothing was recorded. */
+export function setpointSteps(
+  rows: TimelineRows,
+  parameters: Record<string, number>,
+  entity: (key: TargetKey) => string | null,
+  planned: boolean,
+) {
+  return (key: TargetKey, span: Span): Level[] => {
+    const value = parameters[key];
+    if (!Number.isFinite(value)) return [];
+    const id = planned ? null : entity(key);
+    const steps = id ? levels(rows[id], span.start, span.end) : [];
+    return steps.length ? steps : [{ value, start: span.start, end: span.end }];
+  };
+}
+
+export const NOT_REPORTING = "the controller is not reporting";
+/** Why the rest of a zone's day is not projected, or null when it is. A zone the controller is not
+ * watering has no future to claim; one it has stopped reporting on says only when it last did. */
+export function unprojected(
+  stopped: string | null,
+  reportedAt: number | null,
+  now: number,
+): string | null {
+  if (stopped !== NOT_REPORTING) return stopped && `not watering: ${stopped}`;
+  return `no projection: ${reportedAt === null ? "no report from the controller" : `last report ${ageText(now - reportedAt)} ago`}`;
 }
 
 /** A least-squares line through the readings taken since `since`: when does VWC reach `threshold`?
