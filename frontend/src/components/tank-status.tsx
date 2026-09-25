@@ -3,6 +3,7 @@ import { Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Controller } from "@/lib/types";
 import { tankTelemetry, type TankReading } from "@/lib/tank-telemetry";
+import { TankHistory, TankSparkline, useTankHistory, useTankLines } from "./tank-history";
 import "./tank-status.css";
 
 export function TankStatus({
@@ -15,6 +16,14 @@ export function TankStatus({
   const tank = tankTelemetry(controller.states, controller.room.room);
   const clipId = useId();
   const connected = ["live", "demo"].includes(controller.connection);
+  // The last day of EC and pH: the sparklines, and the History panel's first range.
+  const recent = useTankHistory(
+    controller,
+    [tank.ec.entityId, tank.ph.entityId].filter((id): id is string => !!id),
+    24,
+    true,
+  );
+  const spark = useTankLines(controller, tank, recent, 24, 96);
   const value = (r: TankReading, digits = 1) =>
     r.value === null
       ? r.issue
@@ -29,9 +38,18 @@ export function TankStatus({
       <div className="panel-heading">
         <h2>Tank & pump</h2>
         {!connected && <span className="tank-stale">Disconnected · last received</span>}
-        <Button variant="ghost" onClick={onConfigure}>
-          <Settings2 size={16} /> Map sensors
-        </Button>
+        <div className="tank-actions">
+          <TankHistory
+            controller={controller}
+            ec={tank.ec}
+            ph={tank.ph}
+            recent={recent}
+            onConfigure={onConfigure}
+          />
+          <Button variant="ghost" onClick={onConfigure}>
+            <Settings2 size={16} /> Map sensors
+          </Button>
+        </div>
       </div>
       <div className="tank-layout">
         <div
@@ -64,14 +82,19 @@ export function TankStatus({
           </svg>
         </div>
         <dl className="tank-quality">
-          {[
-            { label: "EC", reading: tank.ec, digits: 2 },
-            { label: "pH", reading: tank.ph, digits: 2 },
-            { label: "Temperature", reading: tank.temperature, digits: 1 },
-          ].map(({ label, reading, digits }) => (
+          {(
+            [
+              { key: "ec", label: "EC", reading: tank.ec, digits: 2 },
+              { key: "ph", label: "pH", reading: tank.ph, digits: 2 },
+              { key: null, label: "Temperature", reading: tank.temperature, digits: 1 },
+            ] as const
+          ).map(({ key, label, reading, digits }) => (
             <div key={label} title={reading.entityId || undefined}>
               <dt>{label}</dt>
-              <dd>{value(reading, digits)}</dd>
+              <dd>
+                {key && <TankSparkline which={key} line={spark[key]} end={recent.at} />}
+                <span className="tank-value">{value(reading, digits)}</span>
+              </dd>
             </div>
           ))}
         </dl>

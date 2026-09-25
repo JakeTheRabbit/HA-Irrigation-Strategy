@@ -1,5 +1,6 @@
 import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { EntityState, States } from "./types";
+import { statisticSamples, type CounterSample, type WaterRecordRequest } from "./water-use";
 
 /** The part of Home Assistant's frontend websocket connection (`hass.connection`, from
  * home-assistant-js-websocket) this console uses when it runs inside Home Assistant. */
@@ -99,6 +100,40 @@ export async function liveHistory(
       deadline,
     ]);
     return { ...plain, ...detailed };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Water-today counters as hourly long-term statistics over Home Assistant's own websocket
+ * (`recorder/statistics_during_period`). Home Assistant keeps these indefinitely; its recorded
+ * history only for the recorder's purge window. */
+export async function liveStatistics(
+  connection: LiveConnection,
+  request: WaterRecordRequest,
+  timeoutMs = 60_000,
+): Promise<Record<string, CounterSample[]>> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error("Home Assistant did not return the water statistics in time.")),
+      timeoutMs,
+    );
+  });
+  try {
+    return statisticSamples(
+      await Promise.race([
+        connection.sendMessagePromise!({
+          type: "recorder/statistics_during_period",
+          start_time: new Date(request.start).toISOString(),
+          end_time: new Date(request.end).toISOString(),
+          statistic_ids: request.entityIds,
+          period: "hour",
+          types: ["state"],
+        }),
+        deadline,
+      ]),
+    );
   } finally {
     clearTimeout(timer);
   }

@@ -12,10 +12,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Heading, ReviewDialog, Status } from "@/components/dashboard";
+import { Pill, type PillTone } from "@/components/mini-visuals";
 import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import { RoomPower } from "@/components/room-controls";
 import type { ThemePreference, ThemeSource } from "@/lib/ha-theme";
+
+/** The connection in the top bar's words, with the colour of its state. */
+const CONNECTION: Record<Controller["connection"], { label: string; tone: PillTone }> = {
+  live: { label: "Connected", tone: "on" },
+  demo: { label: "Demo mode", tone: "warn" },
+  connecting: { label: "Connecting…", tone: "warn" },
+  offline: { label: "Offline", tone: "off" },
+};
 
 export function workspaceLink(view: string): string {
   const routes: Record<string, string> = {
@@ -88,10 +97,13 @@ export function Settings({
           <div className="settings-label">
             <h2>Home Assistant connection</h2>
             <p>Use the current Home Assistant session or connect with a long-lived access token.</p>
-            <Status
-              enabled={controller.connection === "live" || controller.connection === "demo"}
-              label={controller.connection === "demo" ? "Demo mode" : controller.connection}
-            />
+            <Pill
+              dot
+              tone={CONNECTION[controller.connection].tone}
+              data-connection={controller.connection}
+            >
+              {CONNECTION[controller.connection].label}
+            </Pill>
           </div>
           <form onSubmit={connect} className="connection-form">
             <div>

@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Download, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Empty, Heading, time } from "@/components/dashboard";
-import { Badge } from "@/components/ui/badge";
+import { Empty, EventType, Heading, time } from "@/components/dashboard";
 import type { Controller } from "@/lib/types";
 
 export function ActivityPage({ controller }: { controller: Controller }) {
@@ -141,12 +140,7 @@ export function ActivityPage({ controller }: { controller: Controller }) {
                       {controller.room.zones.find((z) => z.id === event.zoneId)?.name || "Room"}
                     </td>
                     <td>
-                      <Badge
-                        variant="outline"
-                        className={event.type === "warning" ? "status-paused" : ""}
-                      >
-                        {event.type}
-                      </Badge>
+                      <EventType type={event.type} />
                     </td>
                   </tr>
                 ))}

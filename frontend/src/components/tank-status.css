@@ -1,8 +1,36 @@
+/* EC and pH hues, the card's sparklines and the History panel's lines alike: the pore-EC and VWC
+   hues of sensor-context.css, validated there as a pair for colour-vision separation and 3:1
+   against the card, per theme. Text never wears them. */
+.tank-panel,
+.tank-history-sheet {
+  --tank-ec: #b0307a;
+  --tank-ph: #0288d1;
+}
+.dark .tank-panel,
+.dark .tank-history-sheet {
+  --tank-ec: #d160c4;
+  --tank-ph: #039be5;
+}
 .tank-panel .panel-heading {
-  gap: 12px;
+  gap: 12px 8px;
+  /* The actions wrap under the title on a narrow card, or beside the disconnected note, and stay
+     at the right. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.tank-panel .panel-heading h2 {
+  margin-right: auto;
+}
+.tank-actions {
+  display: flex;
+}
+/* Two actions share the heading with the title on a 1440 px screen: ghost buttons, so the
+   narrower padding shows only on hover. */
+.tank-actions button {
+  gap: 6px;
+  padding-inline: 7px;
 }
 .tank-stale {
-  margin-left: auto;
   color: var(--warning);
   font-size: 12px;
   font-weight: 600;
@@ -55,11 +83,15 @@
   gap: 12px;
   margin: 0;
 }
+.tank-quality {
+  container-type: inline-size;
+}
 .tank-quality > div {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
+  min-width: 0;
 }
 .tank-quality dt,
 .tank-equipment dt {
@@ -74,6 +106,45 @@
 }
 .tank-quality dd {
   font-size: 16px;
+  /* The value keeps the right edge; a sparkline takes what room is left beside it. */
+  display: flex;
+  flex: 1;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+/* One value column, so the sparklines beside it line up. */
+.tank-value {
+  min-width: 6em;
+  text-align: right;
+}
+.tank-spark {
+  align-self: center;
+  flex: 0 1 64px;
+  min-width: 24px;
+  height: 18px;
+  overflow: visible;
+}
+/* A card too narrow for a readable line (about 32 px) keeps the numbers. */
+@container (max-width: 162px) {
+  .tank-spark {
+    display: none;
+  }
+}
+.tank-spark path {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.tank-spark[data-tank-spark="ec"] path {
+  stroke: var(--tank-ec);
+}
+.tank-spark[data-tank-spark="ph"] path {
+  stroke: var(--tank-ph);
 }
 .tank-equipment {
   grid-column: 1 / -1;
@@ -95,8 +166,5 @@
   .tank-layout {
     padding: 16px;
     gap: 16px;
-  }
-  .tank-panel .panel-heading {
-    flex-wrap: wrap;
   }
 }

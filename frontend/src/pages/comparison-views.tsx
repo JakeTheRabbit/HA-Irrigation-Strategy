@@ -1,5 +1,6 @@
 import type { ComparisonTarget } from "@/lib/comparison-target";
 import { Empty } from "@/components/dashboard";
+import { Meter } from "@/components/mini-visuals";
 import type { HistoryPoint, HistoryWindow, RunRecord, RunZone } from "@/lib/comparison-types";
 import { addDays, ageAt, dateInZone, daysBetween, mergeDaily } from "@/lib/comparison";
 export type Loaded = {
@@ -305,8 +306,23 @@ export function ComparisonSummary({ loaded, monthly }: { loaded: Loaded; monthly
     currentE = values(loaded.current, loaded.zone, "ec"),
     previousV = values(loaded.previous, loaded.previousZone, "vwc", true),
     previousE = values(loaded.previous, loaded.previousZone, "ec", true);
-  const cell = (row: ReturnType<typeof currentV.get>) =>
-    row ? `${format(row.min)}–${format(row.max)} (${row.records})` : "—";
+  // Every range on one scale per measurement, as the chart's axes: VWC to 100 %, EC to 6 or more.
+  const ecMax = Math.max(6, ...[...currentE.values(), ...previousE.values()].map((row) => row.max));
+  const cell = (row: ReturnType<typeof currentV.get>, metric: "vwc" | "ec", previous = false) =>
+    row ? (
+      <>
+        {`${format(row.min)}–${format(row.max)} (${row.records})`}
+        <Meter
+          from={row.min}
+          value={row.max}
+          max={metric === "vwc" ? 100 : ecMax}
+          tone={previous ? "muted" : "normal"}
+          label={`${previous ? "Previous run " : ""}${metric === "vwc" ? "VWC" : "EC"} from ${format(row.min)} to ${format(row.max)}`}
+        />
+      </>
+    ) : (
+      "—"
+    );
   return (
     <section className="panel">
       <h2>{monthly ? "Monthly" : "Daily"} recorded ranges</h2>
@@ -340,12 +356,12 @@ export function ComparisonSummary({ loaded, monthly }: { loaded: Loaded; monthly
             {[...dates].sort().map((date) => (
               <tr key={date}>
                 <td>{date}</td>
-                <td>{cell(currentV.get(date))}</td>
-                <td>{cell(currentE.get(date))}</td>
+                <td>{cell(currentV.get(date), "vwc")}</td>
+                <td>{cell(currentE.get(date), "ec")}</td>
                 {loaded.previous && (
                   <>
-                    <td>{cell(previousV.get(date))}</td>
-                    <td>{cell(previousE.get(date))}</td>
+                    <td>{cell(previousV.get(date), "vwc", true)}</td>
+                    <td>{cell(previousE.get(date), "ec", true)}</td>
                   </>
                 )}
               </tr>
