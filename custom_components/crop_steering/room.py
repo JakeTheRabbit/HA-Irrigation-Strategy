@@ -1,7 +1,7 @@
 """Multi-room helpers.
 
 Each config entry is a *room*. The first/default room uses **no** entity prefix, so existing
-single-room installs (e.g. F2) are completely unchanged. Additional rooms namespace their
+single-room installs are completely unchanged. Additional rooms namespace their
 entities as ``crop_steering_<slug>_*`` so rooms are fully isolated — own zones, sensors,
 hardware and setpoints, nothing shared.
 """

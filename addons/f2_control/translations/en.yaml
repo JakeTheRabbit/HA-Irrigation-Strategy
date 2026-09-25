@@ -29,7 +29,7 @@ configuration:
     name: Notification service
     description: >-
       Where to send vitals and alerts. Use the path form notify/<your_service>,
-      for example notify/mobile_app_pixel_8. Find yours in
+      for example notify/mobile_app_my_phone. Find yours in
       Developer Tools > Actions by typing "notify".
   notify_min:
     name: Minutes between routine notifications
