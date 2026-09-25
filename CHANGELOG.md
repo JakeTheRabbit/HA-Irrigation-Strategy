@@ -9,6 +9,84 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.22.0] - 2026-09-25
+
+Pair: **controller 2.22.0**. Its code is unchanged: the app serves the new dashboard. Class **C2**:
+stock tanks add integration entities, services and a Repairs card. Every other change is class
+**C1** (dashboard only, nothing the controller or the integration reads) or **C0** (CI).
+**Owner-approved rehearsal release** (the owner, 25 September 2026), no staging soak; see the
+release audit. Not run on hardware; checked by the lean, controller, real-Home-Assistant and
+browser suites.
+
+### 🌱 In plain English
+
+- **Stock tanks.** A new Stock tanks page keeps track of the nutrient concentrates each batch tank
+  is dosed from. Give each one its size, how much goes into one batch and a low mark. Every batch
+  tank made takes its dose from every stock tank: it is counted when the tank's last-fill time
+  moves on, or with **Record a batch** in a room without that sensor. The dose can follow a
+  doser's own dose setting. At the low mark a Repairs card (CS-608) and an Overview notice say
+  about how many batches are left, and `sensor.crop_steering_<room>stock_low` rises above 0 for a
+  phone alert. **Refilled** or **Set level** clears it.
+- **The Overview reads at a glance.** Each zone shows how fast it is drying, in VWC points per
+  hour with a line of its last two hours; water today against its daily limit (amber from 80 %,
+  red once spent); moisture against the current phase's target; and green or red valve pills.
+  The four room numbers get one small bar per zone and an average per zone.
+- **The same visuals on every page:** Zones, the zone sheet, Sensors (with a six-hour line for
+  every numeric sensor), Activity, Insights, Compare runs, Rooms & setup and Settings. Colour only
+  ever means a state.
+- **Water use per zone** on the Zones page: today, this week, since the grow started and an
+  estimate for the whole grow, with a bar of litres per grow week. It reads Home Assistant's
+  long-term statistics, which it keeps for good.
+- **Type the balance into the whole-grow table.** On the Schedule page, click a week or a day,
+  type 0 to 100 (% generative) and press Enter. Under the table: the setpoints that balance gives,
+  how far it moves from the week before and to the week after, the zone's readings today and the
+  balance across the grow. Nothing is saved until Review & save.
+- **The tank card graphs its EC and pH.** A 24-hour line beside each value, and a History panel
+  over 24 hours, 7 days or 30 days. Where the controller checks feed water on a probe, its limits
+  are drawn too.
+- **No false "Controller not running" while it waters.** The dashboard now waits 10 minutes, the
+  integration's own limit, before calling the controller silent. While a zone valve has been open
+  no longer than the room's maximum shot, it says **Watering** instead.
+- **The sidebar page updates itself.** Its address carries the version, so a browser fetches the
+  new dashboard after an update instead of showing the old one for hours.
+- **The online demo follows each release** (CI).
+
+### 🔧 Technical notes
+
+- **Stock tanks (#91, C2).** `stock.py` holds the pure rules (`clean_tanks`, `dose_ml`, `draw`,
+  `refill`, `parse_fill`, `new_batch`, `batches_left`). `stock_api.py`'s `StockStore` keeps each
+  room's tanks in `Store(hass, 1, "crop_steering.stock.<entry_id>")`, revisioned behind a lock;
+  a change becomes the room's data only after the save succeeds, and corrupt stored data is
+  reported, never overwritten. Batches are counted from `async_track_state_change_event` on the
+  room's `tank_last_fill_sensor`: the first time seen is a baseline and only a strictly newer one
+  counts. Services `stock_get` (read-only) and `stock_save`, `stock_refill`, `stock_record_batch`
+  (admin, `expected_revision`). `sensor.crop_steering_<prefix>stock_low` (count of low tanks,
+  tanks as attributes, not polled). Repairs `stock_low` is in `health.ISSUE_IDS` and survives a
+  room switched off. Error code CS-608.
+- **Panel cache (#89).** `setup_panel.py` registers `dashboard.html?v=<SOFTWARE_VERSION>`.
+- **Mini visuals (#90, #95).** `lib/dryback.ts` (`drybackTrend`: a least-squares slope after a
+  5-minute settle, at least a 10-minute span, a 2-hour window) and
+  `components/mini-visuals.tsx` (`MiniBars`, `Meter`, `Sparkline`, `.pill`), used on every page.
+  Sensors asks Home Assistant for all its lines in one history request.
+- **Water use (#94).** `lib/water-use.ts` and `components/water-use.tsx`:
+  `recorder/statistics_during_period` (hourly) inside Home Assistant, REST history when opened
+  standalone. Grow-days start at lights-on; a grow-day's total is its counter's peak after the
+  reset. The start comes from the plan when it is armed or saved, else the first day with water
+  after at least five dry grow-days.
+- **Whole-grow table (#93).** Each cell is an input: a whole number 0 to 100, applied on Enter or
+  blur, Esc cancels, arrows and Tab move. `grow-plan.ts` gains `columnRange`, `rangeBlock`,
+  `parseBalance` and `setpointRows`; `replaceRange` rejoins matching neighbours. Read-only while a
+  plan is armed or active.
+- **Tank history (#96).** `lib/tank-history.ts` and `components/tank-history.tsx`. The dashboard's
+  history reads also allow the room descriptor's `tank_ec_sensor` and `tank_ph_sensor`, up to
+  720 hours, one day per request with two in flight. Gate lines only while `feed_ec_sensor` /
+  `feed_ph_sensor` are mapped, as `controller.py` applies them.
+- **Watering, not silent (#98).** `HEARTBEAT_STALE_MS` goes from 5 to 10 minutes. `shotRunning()`
+  (a mapped zone valve ON for no longer than the room's `max_shot_duration`, else 900 s) turns
+  the stale `-controller` notice into an info "Watering" and the status line into Watering.
+- **Demo (#92, C0).** `promote.yml` dispatches `pages.yml` on `main` after its apply step.
+- The three dashboard bundles are rebuilt from the merged source.
+
 ## [2.21.0] - 2026-09-25
 
 Pair: **controller 2.21.0**, one number for both halves from this release on. Class **C3**: the
