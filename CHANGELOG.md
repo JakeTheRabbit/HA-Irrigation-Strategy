@@ -9,6 +9,90 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.24.0] - 2026-09-26
+
+Pair: **controller 2.24.0**. Class **C3**. The controller changes in five ways (an offline switch
+holds a shot, a dead probe gets 15 minutes' grace, a room switched back on within a day carries on, a zone
+can be moved to a phase by hand, and the controller keeps reporting through a long shot). The integration
+adds one select per zone and retires the entities and services nothing used (C2). The dashboard's wording
+changes (C1). **Owner-approved rehearsal release** (the owner, 26 September 2026, asked for every open pull
+request to be merged and released together, so this release carries several C2 and C3 changes at once), no
+staging soak; see the release audit. Not run on hardware; the seven pull requests were merged together and
+checked by the lean, controller, engine, real-Home-Assistant (2026.9.3 and 2024.10.0) and browser suites.
+
+### 🌱 In plain English
+
+- **No shot starts while the pump, main line or a zone's valve is offline.** On 25 Sep F2's pump, main line
+  and valves dropped out of Home Assistant for 45 minutes. The controller watered into them anyway, could
+  not confirm anything had closed, and locked the room with a hardware hold for seven hours. Now the zone
+  waits, its status names the offline switch, and it waters as soon as the switch reads again. Nothing
+  opens, so nothing locks.
+- **A moisture probe has to be out for 15 minutes before it counts as dead.** A Home Assistant restart or a
+  sensor reconnecting no longer fires backup-timer shots or "moisture sensor not reporting" notifications.
+  A probe that is really dead is handled as before, 15 minutes later.
+- **A room switched back on within a day carries on where it was.** Switching F2 off and on to clear that
+  hold sent every zone from P2 back to a fresh P1 ramp and reset today's counts. Now the phases, today's
+  water and shot counts and the learned values are kept. A room that was off for longer than a day (an
+  empty room between crops) still starts afresh.
+- **Move a zone to a phase by hand.** Open the zone from Zones or Overview and pick P0, P1, P2 or P3 under
+  **Phase**. After the review the controller moves it within a minute and carries on from there:
+  lights-off still takes it to P3 and lights-on to P0. Today's counts stay. Home Assistant has a
+  **Zone N Set Phase** select for the same thing, for automations.
+- **The controller keeps reporting while it waters.** A long shot no longer makes the dashboard say
+  "Controller not running", or every zone "Controller not reporting". Once a minute during a shot the
+  controller repeats its last report. A controller that really stops is still flagged as before.
+- **Each irrigation setting says what it does.** The Irrigation plan uses one name per setting everywhere,
+  taken from the Athena Handbook where it has a term ("Peak VWC target", "Maintenance shot when below",
+  "P3 dryback target"), with a line of help, a tag saying which way it acts and a **?** with the detail.
+  Only the words change: no value, entity or decision.
+- **A room that isn't watering says which switch stopped it.** The dashboard calls the room's engine switch
+  **Watering** (Settings → Watering). The status line names the switch that stops a room (watering, System
+  Enabled or Auto Irrigation Enabled) and links to Settings when the switch is there.
+- **4 unused services and 43 unused entities are gone** (43 on a one-zone room, more on bigger rooms): a
+  button that did nothing, switches for a layer that never shipped, settings nothing read and two sensors
+  that were always "unknown". An existing room loses them the first time it starts; every setting in use
+  keeps its entity id and value. The removed services only fired an event nothing listened for.
+
+### 🔧 Technical notes
+
+- **Offline feed path (#116).** `_blocked` checks last of all whether the zone's pump, main line or valve
+  reads anything but `on`/`off` (`unavailable`, `unknown`, missing, or Home Assistant unreachable), and
+  returns `<switches> offline (reads neither on nor off)`: nothing is opened and no hardware hold latches.
+  Before, `ha_call` counted HTTP 200 as success and Home Assistant accepts `turn_on` for an unavailable
+  switch, so the shot ran blind and failed its close read-back. A switch that goes offline during a shot
+  still latches CS-301. The pH gate's in-grace `return None` became a fall-through so the check runs there.
+- **Dead-probe grace (#116).** `Room._blind_since[z]` records when a zone's probe was first seen unreadable
+  in this run; a readable probe clears it. Until `BLIND_GRACE_MIN` (15) has passed, a blind zone decides
+  `(False, 0, Reason(..., "blind_wait"))`: no timer shot, no sibling copy, no CS-102. The time rules still
+  apply. `docs/error-codes.json` (CS-102, CS-302 to CS-304) and `ERROR_CODES.md` are updated.
+- **Room resume (#114).** `_loop_room` records `room._off_since` when Room Active goes from on to off and
+  saves it as `_room_off_since` in the room's state block; `_room_switched_on` changes nothing when that is
+  under `ROOM_RESUME_H` (24 h) ago. A room already off when the controller started has no known switch-off
+  time and still starts a fresh run. An old state file has no such key and loads as before.
+- **Phase by hand (#115).** `select.crop_steering_zone_N_set_phase` (`SET_PHASE_OPTIONS`: Keep, P0 to P3), a
+  RestoreEntity. `_apply_phase_request` runs first in each zone's turn: it resets the select to Keep and
+  only if that call succeeds moves the zone (P1 zeroes `shots`, P0 zeroes `peak`, daily counts are kept),
+  logs `Z1 phase P1 -> P2, set by hand` and saves. It actuates nothing, so it does not need the kill
+  switch. The dashboard's zone details get a Phase section with a review.
+- **Keep-alive during a shot (#97).** `_wait_shot` calls `_keep_alive(remaining)` once per round: a room's
+  heartbeat and its zones' status labels are repeated once they are 60 s old, at most two writes per
+  round with short timeouts, so the kill switch is still read about every 2 s. `_report_before_acting`
+  reports a room before its first shot after a restart or a switch-on. The new `Room` fields are runtime
+  only. `ha_set` gains an optional `timeout`.
+- **Setting words (#113).** `frontend/src/lib/setting-words.ts` holds each setting's label, short form,
+  help, direction tag and explainer, read by the Irrigation plan, the Schedule, the charts, the Overview's
+  timeline, water delivery and Help. The explainer is a Radix Popover (no new dependency).
+- **Watering switch (#117).** `roomStatus()` checks the controller's `_blocked()` order: the engine switch,
+  then `system_enabled`, then `auto_irrigation_enabled`, off or unreadable. `RoomStatus.action` renders as
+  a link that selects the line's room first. Settings' "Room scheduling" is now "Watering".
+- **Retired surface (#112).** Services `transition_phase`, `execute_irrigation_shot`,
+  `check_transition_conditions` and `custom_shot`; the button platform; the `analytics_enabled`,
+  `intelligence_*_enabled` and `zone_N_dripper_protection` switches; unused numbers, selects and two
+  sensors (the full list is in #112). `_RETIRED` in `__init__.py` and `_remove_retired_entities`, run in
+  `async_setup_entry` before the platforms load, remove this entry's registry entries for them, proven by
+  an in-place upgrade test in `tests_ha`.
+- **Combined tree.** `settings.tsx` and `USER_GUIDE.md` keep both #114's and #117's wording; #97's
+  first-pass test uses `no_blind_grace`, since under #116 a blind zone no longer waters on the first pass.
 ## [2.23.0] - 2026-09-25
 
 Pair: **controller 2.23.0**. Class **C1**: the dashboard, translations and documentation change; nothing
