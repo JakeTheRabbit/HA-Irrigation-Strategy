@@ -139,7 +139,7 @@ async function check(name, run) {
 }
 async function pause() {
   await navigate("Settings");
-  const pause = page.getByRole("button", { name: "Pause scheduling…", exact: true });
+  const pause = page.getByRole("button", { name: "Switch watering off…", exact: true });
   if (await pause.count()) {
     await pause.click();
     await page.getByRole("button", { name: /Apply \d+ change/ }).click();

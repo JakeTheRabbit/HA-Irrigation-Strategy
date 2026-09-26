@@ -49,6 +49,11 @@
 .status-line[data-tone="stopped"] .status-line-text b {
   color: var(--destructive);
 }
+.status-line-action {
+  color: var(--primary-strong);
+  font-weight: 600;
+  white-space: nowrap;
+}
 .status-line-age {
   grid-area: age;
   color: var(--muted-foreground);

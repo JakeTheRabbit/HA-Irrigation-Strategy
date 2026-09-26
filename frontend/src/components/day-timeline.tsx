@@ -479,7 +479,7 @@ function Timeline({
       : zone.stale
         ? NOT_REPORTING
         : room.engine.enabled === false
-          ? "the engine is off"
+          ? "watering is switched off"
           : zone.enabled === false
             ? "zone scheduling is paused"
             : null;

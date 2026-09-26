@@ -378,7 +378,7 @@ export function Setup({
       setNotice(
         review === "remove"
           ? "Room archived. Its identifiers and stored configuration are retained."
-          : "Configuration saved in Home Assistant. Controller discovery and acknowledgement may follow on its next refresh; keep the engine off until verified.",
+          : "Configuration saved in Home Assistant. Controller discovery and acknowledgement may follow on its next refresh; keep watering off until verified.",
       );
     } catch (e) {
       setError(errorText(e));
@@ -444,7 +444,7 @@ export function Setup({
             <h3>Install the controller app</h3>
             <p>
               For Home Assistant OS/Supervised, add the repository and install Crop Steering. Keep
-              every engine disabled while mapping hardware.
+              watering off in every room while mapping hardware.
             </p>
             <Button asChild variant="outline">
               <a
@@ -463,8 +463,8 @@ export function Setup({
             <h3>Map, verify and start</h3>
             <p>
               Use Rooms & setup to select valves and probes, enter pot/dripper measurements, confirm
-              the controller acknowledges the mapping, then review your grow plan. Enable the engine
-              deliberately in Settings.
+              the controller acknowledges the mapping, then review your grow plan. Switch watering
+              on deliberately in Settings.
             </p>
             <Button
               variant="outline"
@@ -647,11 +647,11 @@ export function Setup({
                       <p key={b}>{b}</p>
                     ))}
                     <p>
-                      Mapping writes are checked again on the server. Turn the engine off and verify
+                      Mapping writes are checked again on the server. Switch watering off and verify
                       the mapped hardware is off before saving.
                     </p>
                     <Button asChild variant="outline">
-                      <a href="#/settings">Engine settings</a>
+                      <a href="#/settings">Watering settings</a>
                     </Button>
                   </div>
                 )}
@@ -918,8 +918,8 @@ export function Setup({
                   <div>
                     <h2>Remove this room</h2>
                     <p className="muted">
-                      Archive the room while retaining its identifiers and configuration. The engine
-                      and hardware must be off.
+                      Archive the room while retaining its identifiers and configuration. Watering
+                      and the hardware must be off.
                     </p>
                   </div>
                   <Button
@@ -955,7 +955,7 @@ export function Setup({
             <DialogDescription>
               {review === "remove"
                 ? "This removes the room from active control while preserving its identifiers and stored configuration."
-                : "Only the selected room configuration is changed. No engine is enabled and no valve is actuated."}
+                : "Only the selected room configuration is changed. Watering is not switched on and no valve is actuated."}
             </DialogDescription>
           </DialogHeader>
           {review === "remove" ? (

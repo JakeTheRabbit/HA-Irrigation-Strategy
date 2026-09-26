@@ -223,6 +223,26 @@ try {
     }
     assert.equal(focused, true, "focus returns to the ?");
   });
+  await check("status line: watering switched off says why and opens that room's Settings", async () => {
+    await go("settings", "f1");
+    await page.getByRole("button", { name: "Switch watering off…", exact: true }).click();
+    await page.getByRole("button", { name: /Apply \d+ change/ }).click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    // Another room selected, on another page: the link must still open Flower 1's Settings.
+    await page.locator("#desktop-room").selectOption("room:");
+    await page.evaluate(() => (location.hash = "#/overview"));
+    const line = page.locator('.status-line[data-room="room:f1_"]');
+    assert.match(
+      await line.innerText(),
+      /Not watering — Watering is switched off for this room \(its engine switch\)/,
+    );
+    await line.getByRole("link", { name: "Switch it on in Settings", exact: true }).click();
+    await expectVisible(page.getByRole("heading", { name: "Settings", exact: true }));
+    assert.match(page.url(), /room=room(%3A|:)f1_/);
+    assert.equal(await page.locator("#desktop-room").inputValue(), "room:f1_");
+    await expectVisible(page.getByText("Watering off", { exact: true }));
+    await expectVisible(page.getByRole("button", { name: "Switch watering on…", exact: true }));
+  });
   await check("help: the daily routine replaces the Overview's workflow card", async () => {
     await go("help");
     const routine = page.locator("ol.daily-routine");
@@ -692,7 +712,7 @@ try {
       ["Room descriptor discovered", "on"],
     ]);
   });
-  await check("settings: the connection, the room and its scheduling are state pills", async () => {
+  await check("settings: the connection, the room and its watering are state pills", async () => {
     await inBothThemes("settings", async () => {
       await go("settings");
       await expectVisible(page.locator("[data-connection]"));
@@ -701,7 +721,7 @@ try {
     assert.deepEqual(await pillTones(".settings-section .pill"), [
       ["Demo mode", "warn"],
       ["Room on", "on"],
-      ["Enabled", "on"],
+      ["Watering on", "on"],
     ]);
   });
   await check("overview: two screens at most, zones beside the tank", async () => {
