@@ -43,15 +43,21 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="EC Stacking Enabled",
         icon="mdi:chemistry-bottle",
     ),
+    # Retired: the room's engine switch ("Watering" on the dashboard) is the one switch that stops
+    # watering. A controller from 2.24.0 or before still stops every shot while one of these reads
+    # off, and treats a missing one as off, so they stay, hidden, until no such controller is left;
+    # a newer one switches the engine switch off while one of them is off (CS-208).
     SwitchEntityDescription(
         key="system_enabled",
-        name="System Enabled",
+        name="System Enabled (retired)",
         icon="mdi:power",
+        entity_registry_visible_default=False,
     ),
     SwitchEntityDescription(
         key="auto_irrigation_enabled",
-        name="Auto Irrigation Enabled",
+        name="Auto Irrigation Enabled (retired)",
         icon="mdi:auto-mode",
+        entity_registry_visible_default=False,
     ),
 ]
 
