@@ -62,7 +62,7 @@ describe("setpoint planning curve", () => {
     const plan = buildPlanningCurve({}, 6, 18);
     expect(plan.vwc).toEqual([]);
     expect(plan.ec).toEqual([]);
-    expect(plan.missing).toContain("P1 VWC target");
+    expect(plan.missing).toContain("Peak VWC target");
   });
   it("handles a lights-on window crossing midnight", () => {
     const plan = buildPlanningCurve(parameters, 20, 8);
@@ -74,8 +74,8 @@ describe("setpoint planning curve", () => {
     const { field_capacity, ...rest } = parameters;
     const plan = buildPlanningCurve({ ...rest, p2_vwc_threshold: 75 }, 6, 18);
     expect(plan.morningDrybackVwc).toBeCloseTo(54.4);
-    expect(plan.notes.join(" ")).toMatch(/P1 target.*reference/);
-    expect(plan.warnings.join(" ")).toMatch(/threshold.*above.*target/i);
+    expect(plan.notes.join(" ")).toMatch(/peak VWC target.*reference/);
+    expect(plan.warnings.join(" ")).toMatch(/trigger.*above.*target/i);
   });
   it("draws only supplied eligible ramp-up windows before the P3 cutoff", () => {
     const plan = buildPlanningCurve(parameters, 6, 18);
@@ -119,7 +119,7 @@ describe("setpoint planning curve", () => {
     expect(draft.ec).toEqual(baseline.ec);
     expect(draft.emergencyReferenceActive).toBe(true);
     expect(baseline.emergencyReferenceActive).toBe(false);
-    expect(draft.warnings.join(" ")).toMatch(/does not predict or schedule an emergency shot/);
+    expect(draft.warnings.join(" ")).toMatch(/rescue level.*does not predict or schedule one/);
   });
   it("does not invent a night rise when the relative endpoint exceeds the daytime reference", () => {
     const plan = buildPlanningCurve({ ...parameters, dryback_target: 5 }, 6, 18);
@@ -235,11 +235,11 @@ describe("rendered planning curve", () => {
       after = render(42.5);
     // The VWC axis scales to what is plotted, so pixel positions may shift with the draft; what
     // each line stands for must not.
-    expect(before).toContain("P3 emergency floor: 38% VWC");
-    expect(after).toContain("P3 emergency floor: 42.5% VWC");
+    expect(before).toContain("Rescue shot when below 38% VWC");
+    expect(after).toContain("Rescue shot when below 42.5% VWC");
     for (const html of [before, after]) {
       expect(line(html, "baseline-p3-floor")).toBeDefined();
-      expect(html).toContain("Saved P3 floor: 38% VWC");
+      expect(html).toContain("Saved rescue level: 38% VWC");
     }
     expect(after).toContain('data-planning-line="baseline-vwc"');
     expect(after).toContain('data-planning-line="ec"');
@@ -253,7 +253,9 @@ describe("rendered planning curve", () => {
         showEditors: false,
       }),
     );
-    expect(html).toContain('aria-label="P3 emergency floor" aria-valuemin="10" aria-valuemax="60"');
+    expect(html).toContain(
+      'aria-label="Rescue shot when below" aria-valuemin="10" aria-valuemax="60"',
+    );
     expect(html.match(/role="slider"/g)).toHaveLength(1);
     expect(html).not.toContain("Precise target controls");
   });

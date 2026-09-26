@@ -52,6 +52,7 @@ import {
   type PlanningPhaseId,
 } from "@/lib/planning-curve";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
+import { settingWords } from "@/lib/setting-words";
 import type { Controller, Setting, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import { estimateRuntime, flowInputs, waterParameters } from "@/lib/water-delivery";
@@ -68,11 +69,12 @@ const HELD: Record<Block["kind"], string> = {
   block: "blocked",
   hold: "held",
 };
+// Each phase's target line, named as its setting is (setting-words).
 const TARGETS: Record<string, string> = {
-  P0: "Dryback target",
-  P1: "P1 target",
-  P2: "P2 threshold",
-  P3: "Emergency floor",
+  P0: "Dries back to", // a level worked out from the dryback target, not the setting itself
+  P1: settingWords("p1_target_vwc")!.short,
+  P2: settingWords("p2_vwc_threshold")!.short,
+  P3: settingWords("p3_emergency_vwc_threshold")!.short,
 };
 const MARKS = [
   ["key-shot", "Shot (valve open)"],
@@ -477,7 +479,7 @@ function Timeline({
       : zone.stale
         ? NOT_REPORTING
         : room.engine.enabled === false
-          ? "the engine is off"
+          ? "watering is switched off"
           : zone.enabled === false
             ? "zone scheduling is paused"
             : null;
@@ -1435,7 +1437,7 @@ function tracking(
     );
   // Against today's P1 target on both days: a supervisor can move it overnight.
   if (lane.level !== null) {
-    const target = `P1 target ${number(lane.level)}%`;
+    const target = `${TARGETS.P1} ${number(lane.level)}%`;
     const missed =
       who === "yesterday" ? " (yesterday did not reach it)" : " (not reached on a typical day)";
     if (lane.reached !== null) {

@@ -182,21 +182,34 @@ export function Settings({
             <div>
               <RoomPower controller={controller} />
               <p className="small muted mt-3">
-                Off: the engine will not irrigate this room and raises no alerts for it. On: daily
-                counters and learned phase state reset for a fresh run. This is not an emergency
-                stop and may not interrupt a shot already running.
+                Off: the controller will not water this room and raises no alerts for it, and a shot
+                already running stops within a few seconds. On: daily counters and learned phase
+                state reset for a fresh run. This is not an emergency stop.
               </p>
             </div>
           </section>
         )}
         <section className="panel settings-section">
           <div className="settings-label">
-            <h2>Room scheduling</h2>
-            <p>Applies only to {controller.room.room.name}.</p>
+            <h2>Watering</h2>
+            <p>
+              Lets the controller water {controller.room.room.name}. This is the room’s engine
+              switch
+              {controller.room.engine.entityId ? ` (${controller.room.engine.entityId})` : ""}.
+            </p>
           </div>
           <div>
             <div className="split-row">
-              <Status enabled={controller.room.engine.enabled} />
+              <Status
+                enabled={controller.room.engine.enabled}
+                label={
+                  controller.room.engine.enabled === true
+                    ? "Watering on"
+                    : controller.room.engine.enabled === false
+                      ? "Watering off"
+                      : undefined
+                }
+              />
               <Button
                 variant="outline"
                 disabled={
@@ -206,12 +219,14 @@ export function Settings({
                 }
                 onClick={() => setReview(true)}
               >
-                {controller.room.engine.enabled ? "Pause scheduling…" : "Enable scheduling…"}
+                {controller.room.engine.enabled ? "Switch watering off…" : "Switch watering on…"}
               </Button>
             </div>
             <p className="small muted mt-3">
-              Pausing may prevent future cycles. An active shot may continue; this control is not an
-              emergency stop.
+              Off: the controller opens no valve in this room, and a shot already running stops
+              within a few seconds. It keeps reading the probes and following the phases. A new room
+              starts with watering off, so nothing is watered before its hardware has been checked.
+              This is not an emergency stop.
             </p>
           </div>
         </section>
@@ -300,7 +315,7 @@ export function Settings({
         open={review}
         onOpenChange={setReview}
         controller={controller}
-        title="Review room scheduling"
+        title="Review watering"
         items={
           controller.room.engine.entityId
             ? [
@@ -309,14 +324,14 @@ export function Settings({
                     entityId: controller.room.engine.entityId,
                     value: !controller.room.engine.enabled,
                   },
-                  label: `${controller.room.room.name} scheduling`,
-                  before: controller.room.engine.enabled ? "Enabled" : "Paused",
-                  after: controller.room.engine.enabled ? "Paused" : "Enabled",
+                  label: `${controller.room.room.name} watering`,
+                  before: controller.room.engine.enabled ? "On" : "Off",
+                  after: controller.room.engine.enabled ? "Off" : "On",
                 },
               ]
             : []
         }
-        note="An active irrigation shot may continue. Use the appropriate physical or controller safety procedure for an emergency."
+        note="Switching watering off also stops a running shot within a few seconds. It is not an emergency stop: use the installation's physical shut-off for that."
       />
     </>
   );

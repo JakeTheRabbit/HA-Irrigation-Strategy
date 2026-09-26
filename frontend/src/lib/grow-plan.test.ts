@@ -194,7 +194,7 @@ describe("grow planner", () => {
       expect(row.now).toBe(saved[row.key]);
     }
     expect(rows[0]).toMatchObject({
-      label: "P1 moisture target",
+      label: "Peak VWC target",
       vegetative: 64,
       generative: 60,
       value: 62,

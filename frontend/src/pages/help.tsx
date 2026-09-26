@@ -43,20 +43,20 @@ const glossary = [
     "The controller uses relative loss from peak: (peak VWC − current VWC) ÷ peak VWC × 100. A 60% peak and 10% dryback target means 54% VWC, not 50%.",
   ],
   [
-    "P0 · Morning wait",
-    "After lights-on, the controller waits for dryback or its maximum-wait condition. Existing low-VWC and emergency safeguards can take precedence.",
+    "P0 · Additional dryback",
+    "After lights-on, the controller waits for dryback, a fall to the maintenance trigger, or the latest first shot. Existing low-VWC and emergency safeguards can take precedence.",
   ],
   [
     "P1 · Ramp-up",
-    "Progressive shots bring substrate moisture to the P1 target, subject to maximum shots, timing and safety limits.",
+    "Progressive shots bring substrate moisture to the peak VWC target, subject to the most P1 shots, timing and safety limits.",
   ],
   [
     "P2 · Maintenance",
-    "Maintenance shots respond to the VWC trigger. EC feedback may adjust the base threshold; the planning curve shows the base setpoints, not a measured prediction.",
+    "A maintenance shot fires whenever VWC reads below the maintenance trigger. EC feedback may adjust the trigger; the planning curve shows the base setpoints, not a measured prediction.",
   ],
   [
-    "P3 · Overnight",
-    "Routine irrigation stops. The configured emergency floor can permit a rescue shot. There is no independent scheduled P3 EC target.",
+    "P3 · Overnight dryback",
+    "Routine irrigation stops. A rescue shot fires if VWC reads below the rescue level. There is no independent scheduled P3 EC target.",
   ],
   [
     "Steering balance",
