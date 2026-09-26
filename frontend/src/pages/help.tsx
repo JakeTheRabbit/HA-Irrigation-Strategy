@@ -10,6 +10,7 @@ import {
   Search,
 } from "lucide-react";
 import { Heading } from "@/components/dashboard";
+import { WhatsNewButton } from "@/components/whats-new";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -70,7 +71,7 @@ const glossary = [
 export function Help({ controller }: { controller: Controller }) {
   return (
     <>
-      <Heading title="Help & tools" />
+      <Heading title="Help & tools" action={<WhatsNewButton controller={controller} />} />
       <div className="help-intro">
         <BookOpen size={28} />
         <div>
