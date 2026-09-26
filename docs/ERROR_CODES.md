@@ -41,6 +41,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-205](#cs-205) | Daily water limit reached | Information | Notification |
 | [CS-206](#cs-206) | Root-zone EC too high, not watering | Warning | Notification |
 | [CS-207](#cs-207) | URGENT, drying out and not being watered | Critical | Notification |
+| [CS-208](#cs-208) | A retired switch is off, so watering was switched off | Warning | Notification |
 | [CS-301](#cs-301) | CRITICAL hardware fault, watering stopped | Critical | Notification |
 | [CS-302](#cs-302) | Shot cancelled, the pump didn't switch on | Warning | Notification |
 | [CS-303](#cs-303) | Shot cancelled, the main-line valve didn't switch on | Warning | Notification |
@@ -307,6 +308,26 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 - Read 'Blocked by' in the notification and deal with that.
 - If the room is off on purpose, water by hand or turn the engine on.
 - If nothing is growing, switch the room's Room Active switch off: an empty room gets no watering and no notifications.
+
+<a id="cs-208"></a>
+
+### CS-208: A retired switch is off, so watering was switched off
+
+*Warning · Notification*
+
+**What it means.** System Enabled and Auto Irrigation Enabled are retired: the room's Watering switch (its engine switch) is the one switch that stops watering. One of the two is still off, so the controller switched watering off in its place. It does so again, within a minute, while that switch stays off.
+
+**Watering meanwhile.** Stopped in the room, as if watering had been switched off in Settings: no shot starts, and a shot that was running stops within a few seconds. The controller keeps reading the probes and following the phases.
+
+**Likely causes**
+
+- System Enabled or Auto Irrigation Enabled was switched off, by a person or an automation, before these switches were retired.
+- An automation still switches one of them off to stop watering.
+
+**Suggested fixes**
+
+- Switch the named switch back on in Home Assistant (it is hidden: Settings → Entities, with hidden entities shown), then switch watering on in Crop Steering → Settings → Watering.
+- Change an automation that switches System Enabled or Auto Irrigation Enabled off to switch the room's Watering switch (its engine switch) off instead.
 
 ## Pumps and valves (CS-3xx)
 

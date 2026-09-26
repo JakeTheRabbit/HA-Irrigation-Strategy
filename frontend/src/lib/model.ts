@@ -854,9 +854,25 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
         ? `${pending}. Switch watering off, wait up to 5 minutes for the controller to adopt the setup, then switch it back on.`
         : `${pending}. Correct the room in Rooms & setup.`,
     );
-  // The switches the controller checks before every shot, in its order (_blocked): the room's
-  // engine switch (the "watering" switch here), then Home Assistant's System Enabled and Auto
-  // Irrigation Enabled. Off, or unreadable, stops every shot in the room.
+  // System Enabled and Auto Irrigation Enabled are retired: while one reads off, the controller
+  // keeps the engine switch off (CS-208), and an older controller holds every shot itself. Named
+  // first, because switching watering on would not last while one of them is off.
+  for (const [key, fallback] of [
+    ["system_enabled", "System Enabled"],
+    ["auto_irrigation_enabled", "Auto Irrigation Enabled"],
+  ]) {
+    const id = `switch.${ROOT}${room.prefix}${key}`;
+    const entity = states[id];
+    if (entity?.state !== "off") continue;
+    const name = String(entity.attributes.friendly_name || fallback);
+    return say(
+      "stopped",
+      "Not watering",
+      `Home Assistant's “${name}” switch (${id}) is off, and nothing is watered in this room while it is. Switch it back on in Home Assistant, then switch watering on in Settings if it is off.`,
+      { label: "Open Settings", route: "settings" },
+    );
+  }
+  // The room's engine switch (the "watering" switch here): off, or unreadable, stops every shot.
   const flag = beat.attributes.enable_flag ?? descriptor(states, room)?.attributes.enable_flag;
   const flagId = typeof flag === "string" && /^(switch|input_boolean)\./.test(flag) ? flag : null;
   const engine = flagId ? states[flagId]?.state : undefined;
@@ -873,22 +889,6 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
       "Not watering",
       `This room's engine switch${flagId ? `, ${flagId},` : ""} is missing or unavailable in Home Assistant. The controller treats that as off, so nothing is watered until it reads on.`,
     );
-  for (const [key, fallback] of [
-    ["system_enabled", "System Enabled"],
-    ["auto_irrigation_enabled", "Auto Irrigation Enabled"],
-  ]) {
-    const id = `switch.${ROOT}${room.prefix}${key}`;
-    const entity = states[id];
-    // Only a switch Home Assistant has: the integration always makes both, and a controller that
-    // is blocked by a missing one still says so in its decision below.
-    if (!entity || entity.state === "on") continue;
-    const name = String(entity.attributes.friendly_name || fallback);
-    return say(
-      "stopped",
-      "Not watering",
-      `Home Assistant's “${name}” switch (${id}) is ${entity.state === "off" ? "off" : "unavailable"}, and the controller waters nothing in this room until it is on. Switch it on in Home Assistant; this dashboard has no control for it.`,
-    );
-  }
   const plan = note("strategy_error");
   if (plan)
     return say(
