@@ -143,13 +143,13 @@ def ha_call(domain, service, **data):
         return False
 
 
-def ha_set(entity, state, attributes=None):
+def ha_set(entity, state, attributes=None, timeout=8):
     try:
         _S.post(
             f"{BASE}/states/{entity}",
             headers=HDR,
             json={"state": state, "attributes": attributes or {}},
-            timeout=8,
+            timeout=timeout,
         )
     except Exception:
         pass
@@ -390,6 +390,11 @@ class Room:
         self._feed_ph_last_good_time = None
         # when this room was seen switched off (see _room_switched_on); durable, None when not known
         self._off_since = None
+        # what the room last reported, repeated while a shot holds the loop (Controller._keep_alive)
+        self._beat = None  # (hardware_fault, room_active) of its last heartbeat
+        self._beat_at = None  # and when, by time.monotonic()
+        self._statuses = {}  # z -> (label, reason) of its zones' last status
+        self._status_at = {}  # z -> when, by time.monotonic()
 
 
 class Controller:
@@ -1780,7 +1785,18 @@ class Controller:
         room._vmax, room._vmax_wetup = {}, {}
         self._save_state()
 
-    def _heartbeat(self, room, now, hardware_fault, room_active=True):
+    # A shot holds the loop, which is synchronous, and a batch of them can hold it past every "not
+    # reporting" limit: at the 25 Sep 2026 lights-on, three floor shots in a row kept every room
+    # quiet for 8.2 minutes while the controller was busy watering. _wait_shot repeats what each
+    # room last reported meanwhile.
+    KEEP_ALIVE_S = 60
+    # ...at most this many repeats in one round of _wait_shot's checks. A 24-zone room has 25
+    # reports, each allowed a second to connect and a second to read: a stalled Home Assistant could
+    # hold one round for 50 s, the kill switch unread and the valve open.
+    KEEP_ALIVE_WRITES = 2
+
+    def _heartbeat(self, room, now, hardware_fault, room_active=True, timeout=None):
+        room._beat, room._beat_at = (hardware_fault, room_active), time.monotonic()
         ha_set(
             f"sensor.crop_steering_{room.prefix}ai_heartbeat",
             "healthy",
@@ -1802,17 +1818,71 @@ class Controller:
                 "setup_pending": getattr(room, "_setup_pending", None),
                 "room_active": room_active,
             },
+            **({"timeout": timeout} if timeout else {}),
         )
 
+    def _keep_alive(self, remaining):
+        """While a shot holds the loop, repeat each part of a room's last report once it is a minute
+        old: its heartbeat with a fresh time, and its zones' status labels as they were. A round
+        repeats at most KEEP_ALIVE_WRITES of them, heartbeats first, then the oldest labels, so the
+        shot reads its kill switch again within about one of its 2 s rounds however many zones there
+        are; the rest follow in the next rounds. The writes are optional, so they are kept short and
+        fit in the time the shot has left with a second to spare. requests applies a timeout to the
+        connect and to the read separately, so each write gets half its share; as with the shot's
+        reads, a slow network can still overshoot."""
+        timeout = min(0.5, (remaining - 1) / (2 * self.KEEP_ALIVE_WRITES))
+        if timeout < 0.25:
+            return
+        now = time.monotonic()
+        beats = [
+            (room._beat_at, room, None)
+            for room in self.rooms
+            if room._beat is not None and now - room._beat_at >= self.KEEP_ALIVE_S
+        ]
+        labels = [
+            (room._status_at[zone], room, zone)
+            for room in self.rooms
+            # a zone the room no longer has (its zone count changed in place) is not brought back
+            for zone in room.zones
+            if zone in room._statuses and now - room._status_at[zone] >= self.KEEP_ALIVE_S
+        ]
+        due = sorted(beats, key=lambda d: d[0]) + sorted(labels, key=lambda d: d[0])
+        for _at, room, zone in due[: self.KEEP_ALIVE_WRITES]:
+            if zone is None:
+                self._heartbeat(room, datetime.now(), *room._beat, timeout=timeout)
+            else:
+                self._publish_zone_status(room, zone, *room._statuses[zone], timeout=timeout)
+
+    def _report_before_acting(self, room, decisions, snaps, now):
+        """What _keep_alive repeats is a room's last report, and a room has none that holds when
+        this process has not reported it yet, or when its last report said "Room off" and it has
+        just been switched on. Before this pass's shots, report it afresh: the heartbeat, and the
+        label of each zone that is not watered this pass, as the pass will give it. A zone that is
+        to be watered gets no label here (whether its shot is blocked is known only as its turn
+        comes), so a stale "Room off" is never repeated for it while it waters."""
+        room._statuses, room._status_at = {}, {}
+        snapshot = getattr(room, "strategy_snapshot", None)
+        for zone, (fire, _size, reason) in decisions.items():
+            if not fire:
+                self._publish_zone_status(
+                    room, zone,
+                    zone_status_label(room.state[zone]["phase"], False, strategy_block(snapshot, zone),
+                                      zone not in snaps, reason),
+                    reason,
+                )
+        self._heartbeat(room, now, self._hardware_fault_block(room))
+
     @staticmethod
-    def _publish_zone_status(room, zone, label, reason):
+    def _publish_zone_status(room, zone, label, reason, timeout=None):
         """The zone's status label, for the integration's zone_N_status to show. The controller writes
         only this _app entity: zone_N_status belongs to the integration, and two writers made it flip
         between two vocabularies about twice a minute."""
+        room._statuses[zone], room._status_at[zone] = (label, reason), time.monotonic()
         ha_set(
             f"sensor.crop_steering_{room.prefix}zone_{zone}_status_app",
             label,
             {"reason": reason, "friendly_name": f"Zone {zone} status (controller)", "engine": "f2-control"},
+            **({"timeout": timeout} if timeout else {}),
         )
 
     def _publish_room_off(self, room, now):
@@ -2474,6 +2544,7 @@ class Controller:
                     valve_seen_on = valve_seen_on or state == "on"
                 if ended:
                     return time.monotonic() - started, ("external", entity)
+            self._keep_alive(deadline - time.monotonic())
             remaining = deadline - time.monotonic()
             if remaining > 0:
                 time.sleep(min(step, remaining))
@@ -3317,6 +3388,8 @@ class Controller:
             )
             room._blind_zones.add(zone)
         room._blind_zones = {z for z in room._blind_zones if z not in snaps}
+        if room._beat is None or not room._beat[1]:
+            self._report_before_acting(room, decisions, snaps, now)
         pub = {}
         for zone in room.zones:
             if zone not in decisions:
