@@ -314,9 +314,28 @@ describe("room status line", () => {
   });
   it.each([
     [
-      "the engine switch is off",
+      "watering is switched off",
       [entity("input_boolean.f2_control_enabled", "off")],
-      /engine switch is off\. Turn it on/,
+      /^Watering is switched off for this room \(its engine switch\), so the controller opens no valve\./,
+    ],
+    [
+      "the engine switch is unavailable",
+      [entity("input_boolean.f2_control_enabled", "unavailable")],
+      /^This room's engine switch, input_boolean\.f2_control_enabled, is missing or unavailable in Home Assistant\. The controller treats that as off/,
+    ],
+    [
+      "Home Assistant's System Enabled is off",
+      [
+        entity("switch.crop_steering_system_enabled", "off", {
+          friendly_name: "Crop Steering System Enabled",
+        }),
+      ],
+      /^Home Assistant's “Crop Steering System Enabled” switch \(switch\.crop_steering_system_enabled\) is off, and the controller waters nothing in this room until it is on\./,
+    ],
+    [
+      "Home Assistant's Auto Irrigation Enabled is unavailable",
+      [entity("switch.crop_steering_auto_irrigation_enabled", "unavailable")],
+      /^Home Assistant's “Auto Irrigation Enabled” switch \(switch\.crop_steering_auto_irrigation_enabled\) is unavailable/,
     ],
     [
       "setup is waiting to be adopted",
@@ -326,7 +345,7 @@ describe("room status line", () => {
             "Setup changed; disarm current and requested engine flags and verify hardware OFF",
         }),
       ],
-      /^Setup changed; disarm .* verify hardware OFF\. Turn the engine off, wait up to 5 minutes .* then turn it back on\.$/,
+      /^Setup changed; disarm .* verify hardware OFF\. Switch watering off, wait up to 5 minutes .* then switch it back on\.$/,
     ],
     [
       "the setup is invalid",
@@ -336,7 +355,7 @@ describe("room status line", () => {
     [
       "hardware is stuck",
       [entity(HEARTBEAT, "healthy", { hardware_fault: "Valve 2 did not close" })],
-      /^Hardware fault: Valve 2 did not close\. Disarm the engine/,
+      /^Hardware fault: Valve 2 did not close\. Switch watering off, fix the stuck hardware/,
     ],
     [
       "the grow plan is held",
@@ -358,6 +377,21 @@ describe("room status line", () => {
     const line = status(fixture(extra));
     expect(line).toMatchObject({ tone: "stopped", text: "Not watering" });
     expect(line.detail).toMatch(detail);
+  });
+  it("links to Settings only when watering is switched off, and names the first switch the controller checks", () => {
+    const off = status(fixture([entity("input_boolean.f2_control_enabled", "off")]));
+    expect(off.action).toEqual({ label: "Switch it on in Settings", route: "settings" });
+    const systemOff = [entity("switch.crop_steering_system_enabled", "off")];
+    expect(status(fixture(systemOff)).action).toBeUndefined();
+    // The controller checks the engine switch before System Enabled: so does the line.
+    const both = status(fixture([entity("input_boolean.f2_control_enabled", "off"), ...systemOff]));
+    expect(both.detail).toMatch(/^Watering is switched off/);
+    // Both switches on, as the integration makes them: no change to the usual line.
+    const on = [
+      entity("switch.crop_steering_system_enabled", "on"),
+      entity("switch.crop_steering_auto_irrigation_enabled", "on"),
+    ];
+    expect(status(fixture(on))).toMatchObject({ tone: "holding", detail: "all zones in band" });
   });
   it("says the controller is not running when its heartbeat is missing", () => {
     const states = fixture();

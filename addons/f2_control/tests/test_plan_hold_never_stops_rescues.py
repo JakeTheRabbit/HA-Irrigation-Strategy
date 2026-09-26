@@ -15,6 +15,9 @@ import controller
 import fake_ha
 from crop_steering_engine import Reason
 
+# What happens once a probe is dead; how long it must be out first is test_blind_grace.py.
+pytestmark = pytest.mark.usefixtures("no_blind_grace")
+
 PLAN = "sensor.crop_steering_strategy_plan"
 HOLD = "Lights-on boundary was missed; schedule held until the next boundary"
 

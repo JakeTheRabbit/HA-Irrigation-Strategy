@@ -16,6 +16,10 @@ from pathlib import Path
 import controller
 from test_controller import _build, _desc
 from test_zone_count import DESCRIPTOR, _room
+import pytest
+
+# What happens once a probe is dead; how long it must be out first is test_blind_grace.py.
+pytestmark = pytest.mark.usefixtures("no_blind_grace")
 
 NOW = datetime(2026, 9, 21, 14, 0, 0)
 OPTIONS = {"num_zones": 3, "enable_flag": "input_boolean.f2_control_enabled"}

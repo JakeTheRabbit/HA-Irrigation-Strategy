@@ -59,10 +59,10 @@
       "source": "notification",
       "severity": "warning",
       "meaning": "The zone's moisture sensor reads 'unavailable' or 'unknown', isn't a number, can't be found in Home Assistant at all, or carries a time in the future. The notification says which.",
-      "watering": "Carries on without the probe while the engine is on: the same shots as a zone whose probe is working, or one shot every 90 minutes (the app's blind_fallback_min option) within the daily water limit if there is none. Phase changes that go by moisture wait for the probe.",
+      "watering": "For its first 15 minutes out the zone waits: a probe back within that is a blip (Home Assistant restarting, a sensor reconnecting), so nothing is watered or notified. Then it carries on without the probe while the engine is on: the same shots as a zone whose probe is working, or one shot every 90 minutes (the app's blind_fallback_min option) within the daily water limit if there is none. Phase changes that go by moisture wait for the probe.",
       "causes": [
         "The probe is offline: no power, a flat battery, or out of Wi-Fi or Zigbee range.",
-        "Home Assistant has just restarted and the probe's integration hasn't loaded yet.",
+        "Home Assistant restarted and the probe's integration took more than 15 minutes to load.",
         "The probe was renamed or removed, so the sensor mapped to the zone no longer exists.",
         "Home Assistant's clock is ahead of the controller app's, so the reading looks as if it comes from the future (the notification says so)."
       ],
@@ -257,7 +257,7 @@
       "watering": "That shot was cancelled and not counted. The controller switches off the pump, main line and valve and checks they read OFF: if it can't confirm that (Home Assistant unreachable, or a switch offline), it latches a hardware hold (CS-301) and nothing on that hardware is watered until the hold is cleared. Otherwise the next shot is tried as normal.",
       "causes": [
         "Home Assistant could not be reached (restarting, or a network fault), or returned an error for the command.",
-        "A switch that only reads 'unavailable' doesn't raise this: Home Assistant accepts the command and nothing switches, and the controller catches it when the switch doesn't read OFF after the shot (CS-301)."
+        "A switch that reads 'unavailable' doesn't raise this: no shot starts while any switch on its feed path reads neither on nor off. The zone's status names the offline switch, and the zone is watered once it reads again."
       ],
       "fixes": [
         "Switch the pump on and off by hand in Home Assistant to check it responds.",
@@ -274,7 +274,7 @@
       "watering": "That shot was cancelled and not counted. The controller switches off the pump, main line and valve and checks they read OFF: if it can't confirm that (Home Assistant unreachable, or a switch offline), it latches a hardware hold (CS-301) and nothing on that hardware is watered until the hold is cleared. Otherwise the next shot is tried as normal.",
       "causes": [
         "Home Assistant could not be reached (restarting, or a network fault), or returned an error for the command.",
-        "A switch that only reads 'unavailable' doesn't raise this: Home Assistant accepts the command and nothing switches, and the controller catches it when the switch doesn't read OFF after the shot (CS-301)."
+        "A switch that reads 'unavailable' doesn't raise this: no shot starts while any switch on its feed path reads neither on nor off. The zone's status names the offline switch, and the zone is watered once it reads again."
       ],
       "fixes": [
         "Switch the valve on and off by hand in Home Assistant to check it responds.",
@@ -291,7 +291,7 @@
       "watering": "That shot was cancelled and not counted. The controller switches off the pump, main line and valve and checks they read OFF: if it can't confirm that (Home Assistant unreachable, or a switch offline), it latches a hardware hold (CS-301) and nothing on that hardware is watered until the hold is cleared. Otherwise the next shot is tried as normal.",
       "causes": [
         "Home Assistant could not be reached (restarting, or a network fault), or returned an error for the command.",
-        "A switch that only reads 'unavailable' doesn't raise this: Home Assistant accepts the command and nothing switches, and the controller catches it when the switch doesn't read OFF after the shot (CS-301)."
+        "A switch that reads 'unavailable' doesn't raise this: no shot starts while any switch on its feed path reads neither on nor off. The zone's status names the offline switch, and the zone is watered once it reads again."
       ],
       "fixes": [
         "Switch the valve on and off by hand in Home Assistant to check it responds.",

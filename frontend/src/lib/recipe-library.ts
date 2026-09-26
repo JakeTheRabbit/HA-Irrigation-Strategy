@@ -37,16 +37,16 @@ function profileId(value: unknown): string {
 }
 function validateRelationships(values: Record<string, number>) {
   if (values.p2_vwc_threshold >= values.p1_target_vwc)
-    throw new Error("P2 VWC threshold must be below the P1 target.");
+    throw new Error("The maintenance trigger must be below the peak VWC target.");
   if (values.p3_emergency_vwc_threshold + 3 > values.p2_vwc_threshold)
-    throw new Error("P2 threshold must be at least 3 points above the emergency floor.");
+    throw new Error("The maintenance trigger must be at least 3 points above the rescue level.");
   if ("field_capacity" in values && values.p1_target_vwc > values.field_capacity)
-    throw new Error("P1 target exceeds field capacity.");
+    throw new Error("The peak VWC target exceeds full saturation.");
   if (
     "maximum_ec" in values &&
     Math.max(values.ec_target_p0, values.ec_target_p1, values.ec_target_p2) > values.maximum_ec
   )
-    throw new Error("Phase EC target exceeds maximum EC.");
+    throw new Error("A substrate EC target exceeds the maximum substrate EC.");
 }
 export interface RecipeScope {
   roomId: string;

@@ -113,6 +113,8 @@ export interface RoomStatus {
   detail: string;
   /** When the controller last reported (epoch ms); null when it has not. */
   reportedAt: number | null;
+  /** Where to fix it, when that is a page of this dashboard: a link after the detail. */
+  action?: { label: string; route: string };
 }
 export interface Change {
   entityId: string;
