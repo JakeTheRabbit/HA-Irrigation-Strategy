@@ -61,6 +61,7 @@ def _valve_opens(fake):
     return [d for dom, svc, d in fake.calls if (dom, svc) == ("switch", "turn_on")]
 
 
+@pytest.mark.usefixtures("no_blind_grace")
 def test_an_on_room_with_dead_probes_alerts_and_waters_blind_this_is_the_nuisance():
     c, fake = _room("on")
     c.rooms[0].state[1]["last_shot"] = None  # never watered -> the blind schedule is due

@@ -5,42 +5,35 @@ import type {
   SteeringProfile,
   ZonePlan,
 } from "./operator-types";
+import { settingWords } from "./setting-words";
 
-export const parameterLabels: Record<string, string> = {
-  dryback_target: "Morning dryback",
-  ec_target_p0: "P0 EC target",
-  ec_target_p1: "P1 EC target",
-  ec_target_p2: "P2 EC target",
-  p1_target_vwc: "P1 moisture target",
-  p2_vwc_threshold: "P2 moisture trigger",
-  p1_initial_shot_size: "First shot size",
-  p2_shot_size: "Maintenance shot size",
-  p3_emergency_vwc_threshold: "Overnight emergency floor",
-  p3_emergency_shot_size: "Emergency shot size",
-  p0_maximum_wait_time: "Latest first irrigation",
-  p1_time_between_shots: "Ramp-up interval",
-  p1_maximum_shots: "Maximum ramp-up shots",
-  p1_shot_size_increment: "Ramp-up shot increase",
-  max_daily_volume: "Daily water limit",
-  maximum_ec: "Maximum substrate EC",
-  field_capacity: "Substrate field capacity",
-  watchdog_hours: "Watchdog interval",
-};
-export const parameterHelp: Record<string, string> = {
-  dryback_target:
-    "Relative drop from the detected peak before ramp-up can start. At 60% peak VWC, a 10% dryback target is 54% VWC.",
-  ec_target_p0: "Root-zone EC reference for morning dryback. It does not set tank dosing.",
-  ec_target_p1: "Root-zone EC reference during ramp-up. Keep feed-water EC and pore EC distinct.",
-  ec_target_p2: "Root-zone EC reference used for maintenance steering.",
-  p1_target_vwc: "Moisture level at which morning ramp-up finishes.",
-  p2_vwc_threshold: "Base trigger for maintenance watering; the engine may adjust it for EC.",
-  p1_initial_shot_size:
-    "First shot as a percentage of substrate volume. Hydraulic preview uses pot size and dripper flow.",
-  p2_shot_size: "Each maintenance shot as a percentage of substrate volume.",
-  p3_emergency_vwc_threshold:
-    "Emergency-only floor during the overnight phase, not a routine daytime target.",
-  p3_emergency_shot_size: "Rescue shot size when the overnight floor is crossed.",
-};
+// The Schedule names and explains each target in the same words as the Irrigation plan.
+const planKeys = [
+  "dryback_target",
+  "ec_target_p0",
+  "ec_target_p1",
+  "ec_target_p2",
+  "p1_target_vwc",
+  "p2_vwc_threshold",
+  "p1_initial_shot_size",
+  "p2_shot_size",
+  "p3_emergency_vwc_threshold",
+  "p3_emergency_shot_size",
+  "p0_maximum_wait_time",
+  "p1_time_between_shots",
+  "p1_maximum_shots",
+  "p1_shot_size_increment",
+  "max_daily_volume",
+  "maximum_ec",
+  "field_capacity",
+  "watchdog_hours",
+];
+export const parameterLabels: Record<string, string> = Object.fromEntries(
+  planKeys.map((key) => [key, settingWords(key)?.label ?? key]),
+);
+export const parameterHelp: Record<string, string> = Object.fromEntries(
+  planKeys.map((key) => [key, settingWords(key)?.help ?? ""]),
+);
 export function localDate(date = new Date()): string {
   return (
     String(date.getFullYear()) +

@@ -229,6 +229,10 @@ CONFIRM_FIRST_READ_S, CONFIRM_POLL_S, CONFIRM_TIMEOUT_S = 1.0, 0.5, 6.0
 # The shortest shot the controller runs, in seconds (a shot sized shorter is lengthened to this).
 MIN_SHOT_S = 5
 
+# A probe unreadable for less than this many minutes is a blip (Home Assistant restarting, a sensor
+# reconnecting): its zone gets no timer shot and no probe alert until it has been out this long.
+BLIND_GRACE_MIN = 15
+
 # What Controller._on reads as ON. A hold (hold_entities) in one of these states stops a shot starting
 # (_blocked) and ends one in flight (_wait_shot): the same test, so the two can never disagree.
 ON_STATES = ("on", "true", "open", "1", "home")
@@ -378,6 +382,7 @@ class Room:
         self._vmax_wetup = {}  # z -> P1 wet-up VWC series (resets each P0)
         self._vmax = {}  # z -> (vmax, confidence) advisory
         self._blind_zones = set()
+        self._blind_since = {}  # z -> when its probe was first seen unreadable in this run of it
         self._was_lights_on = None
         self._feed_last_good_value = None
         self._feed_last_good_time = None
@@ -1916,7 +1921,7 @@ class Controller:
             if ph_lo > 0 or ph_hi > 0:
                 ph = self._read_feed_ph(room)
                 if ph is None:
-                    if feed_grace_ok(
+                    if not feed_grace_ok(
                         datetime.now().timestamp(),
                         (
                             room._feed_ph_last_good_time.timestamp()
@@ -1925,10 +1930,18 @@ class Controller:
                         ),
                         self.feed_grace_min,
                     ):
-                        return None
-                    return f"source-water pH probe dead >{self.feed_grace_min:.0f}min — holding (fail-closed)"
-                if (ph_lo > 0 and ph < ph_lo) or (ph_hi > 0 and ph > ph_hi):
+                        return f"source-water pH probe dead >{self.feed_grace_min:.0f}min — holding (fail-closed)"
+                elif (ph_lo > 0 and ph < ph_lo) or (ph_hi > 0 and ph > ph_hi):
                     return f"source-water pH {ph:.2f} out of [{ph_lo:g},{ph_hi:g}]"
+        # Last, once nothing else holds the zone: a switch that reads neither on nor off (its device
+        # offline, Home Assistant still starting) accepts a command without switching and cannot be read
+        # back after the shot. On 25 Sep 2026 a shot opened onto an offline pump, could not be confirmed
+        # closed, and latched a hold that stopped the room for 7 hours. Nothing is opened until the
+        # whole feed path reads again, and nothing latches.
+        offline = [e for e in (hw.get("pump"), hw.get("mainline"), hw["valves"].get(zone))
+                   if e and str(ha_get(e)[0]).lower() not in ("on", "off")]
+        if offline:
+            return f"{', '.join(offline)} offline (reads neither on nor off)"
         return None
 
     # ---------- alerts / notify ----------
@@ -3137,8 +3150,10 @@ class Controller:
             snap, p = self._snapshot(room, zone, now, lights_on, lights_just_on)
             params[zone] = p
             if snap is None:
+                room._blind_since.setdefault(zone, now)
                 blind.append((zone, p))
                 continue
+            room._blind_since.pop(zone, None)
             snaps[zone] = snap
             if snap.ec is None:
                 self._alert(
@@ -3230,6 +3245,13 @@ class Controller:
             # phase forces (lights-off -> P3, P3 -> P0 at the new photoperiod). Only the
             # VWC-driven transitions are paused while blind.
             self._blind_time_transition(room, zone, now, lights_on, lights_just_on)
+            out_min = (now - room._blind_since[zone]).total_seconds() / 60.0
+            if out_min < BLIND_GRACE_MIN:
+                # 25 Sep 2026: the probes read unknown for a minute, and a timer shot fired at once.
+                decisions[zone] = (False, 0.0, Reason(
+                    f"probe unreadable {out_min:.0f} min: waiting {BLIND_GRACE_MIN} min before watering "
+                    "without it", "blind_wait"))
+                continue
             if healthy:
                 sib = pick_sibling(p.p1_target, healthy)
                 s_fire, s_size, s_reason = decisions[sib]
