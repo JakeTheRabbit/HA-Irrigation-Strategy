@@ -62,7 +62,7 @@ export function RoomPower({
         note={
           on
             ? `Nothing growing in ${name}? Irrigation and alerts stop until you switch it back on.`
-            : "Start a fresh run: daily counters and learned phase state reset."
+            : "Back on within a day, it carries on where it was. After longer, it starts a fresh run: daily counters and learned phase state reset."
         }
       />
     </>

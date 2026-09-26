@@ -149,6 +149,9 @@ export function createDemo(now = Date.now()): States {
         index ? "Generative" : "Vegetative",
         { options: ["Vegetative", "Generative"] },
       );
+      put(`select.crop_steering_${prefix}${key}set_phase`, "Keep", {
+        options: ["Keep", "P0", "P1", "P2", "P3"],
+      });
       number(prefix, `${key}p0_maximum_wait_time`, 60, 5, 240, 1, "min");
       number(prefix, `${key}generative_dryback_target`, 14, 2, 60, 0.5, "% of peak");
       number(prefix, `${key}p1_target_vwc`, 64 + index * 2, 20, 90, 0.5, "%");
@@ -241,6 +244,17 @@ export function demoBeat(states: States, now = Date.now()): States {
 }
 /** Demo-only side effects of a switch write that a real controller would publish itself. */
 export function demoReact(states: States, entityId: string, value: unknown): States {
+  // What the controller does with a phase picked on a zone's Set Phase select: it moves the zone,
+  // then sets the select back to Keep.
+  const pick = entityId.match(/^select\.crop_steering_(.*zone_\d+_)set_phase$/);
+  if (pick && typeof value === "string" && /^P[0-3]$/.test(value)) {
+    const phase = `sensor.crop_steering_${pick[1]}phase`;
+    return {
+      ...states,
+      [entityId]: { ...states[entityId], state: "Keep" },
+      ...(states[phase] ? { [phase]: { ...states[phase], state: value } } : {}),
+    };
+  }
   const auto = entityId.match(/^switch\.crop_steering_(.*)auto_setpoints$/);
   if (!auto || typeof value !== "boolean") return states;
   const sensor = new RegExp(`^sensor\\.crop_steering_${auto[1]}zone_\\d+_auto_setpoints$`);

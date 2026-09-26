@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { number } from "@/components/dashboard";
+import { settingWords } from "@/lib/setting-words";
 import type { Controller, Zone } from "@/lib/types";
 import {
   dailyWater,
@@ -16,6 +17,8 @@ import {
   type Delivery,
 } from "@/lib/water-delivery";
 import "./water-delivery.css";
+
+const PHASE_SHOTS = ["p1_initial_shot_size", "p2_shot_size", "p3_emergency_shot_size"] as const;
 
 export interface WaterDeliveryProps {
   controller: Controller;
@@ -237,13 +240,8 @@ export function WaterDelivery({
               </tr>
             </thead>
             <tbody>
-              {(
-                [
-                  ["P1 first shot", "p1_initial_shot_size"],
-                  ["P2 maintenance shot", "p2_shot_size"],
-                  ["P3 emergency shot", "p3_emergency_shot_size"],
-                ] as const
-              ).map(([label, key]) => {
+              {PHASE_SHOTS.map((key) => {
+                const label = settingWords(key)!.short;
                 const phase = estimatePhaseShot(config, key);
                 const shot = phase.controlled;
                 return (

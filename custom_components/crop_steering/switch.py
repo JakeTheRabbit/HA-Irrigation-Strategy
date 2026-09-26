@@ -24,7 +24,8 @@ _LOGGER = logging.getLogger(__name__)
 # Base switch descriptions (non-zone specific)
 BASE_SWITCH_DESCRIPTIONS = [
     # Room status. OFF = nothing growing: the engine neither irrigates nor alerts for this room and
-    # the Repairs health checks stand down. Switching back ON starts a fresh run.
+    # the Repairs health checks stand down. Switched back ON within a day it carries on where it was;
+    # after longer it starts a fresh run.
     SwitchEntityDescription(
         key="room_active",
         name="Room Active (off = empty room: no irrigation, no alerts)",

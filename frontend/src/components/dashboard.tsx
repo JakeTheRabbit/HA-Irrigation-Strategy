@@ -490,6 +490,14 @@ export function HistoryChart({ controller, zones }: { controller: Controller; zo
   );
 }
 
+/** The phases a zone can be moved to by hand, with the names the zone views use. */
+const PHASE_NAMES: Record<string, string> = {
+  P0: "Dry-back",
+  P1: "Ramp-up",
+  P2: "Maintenance",
+  P3: "Overnight",
+};
+
 /** A phase in its timeline colour; anything else in grey. */
 export function PhasePill({ phase }: { phase: string }) {
   return /^P[0-3]$/.test(phase) ? (
@@ -973,7 +981,11 @@ export function ZoneDetails({
   navigate: (page: Page, zoneId?: number) => void;
 }) {
   const [review, setReview] = useState(false);
-  useEffect(() => setReview(false), [zone?.id]);
+  const [phaseChoice, setPhaseChoice] = useState<string | null>(null);
+  useEffect(() => {
+    setReview(false);
+    setPhaseChoice(null);
+  }, [zone?.id]);
   // Only an open sheet reads its zone's moisture: one small request, for the dryback line.
   const moisture = useRecentHistory(
     controller,
@@ -1081,6 +1093,31 @@ export function ZoneDetails({
                 Pausing scheduling may prevent future cycles. It is not an emergency stop and may
                 not interrupt a shot already running.
               </p>
+              {zone.setPhaseEntity && (
+                <>
+                  <h3>Phase</h3>
+                  <p className="muted">
+                    Move {zone.name} to another phase. The controller moves it within a minute and
+                    carries on from there: lights-off still moves it to P3, and lights-on to P0.
+                  </p>
+                  <div className="phase-picker" role="group" aria-label={`Move ${zone.name} to`}>
+                    {Object.entries(PHASE_NAMES).map(([phase, name]) => (
+                      <Button
+                        key={phase}
+                        size="sm"
+                        variant="outline"
+                        aria-pressed={phase === zone.phase}
+                        disabled={
+                          phase === zone.phase || !["live", "demo"].includes(controller.connection)
+                        }
+                        onClick={() => setPhaseChoice(phase)}
+                      >
+                        {phase} · {name}
+                      </Button>
+                    ))}
+                  </div>
+                </>
+              )}
               <h3>Reporting sensors</h3>
               {zone.sensors.length ? (
                 <div className="sensor-mini-list">
@@ -1122,6 +1159,29 @@ export function ZoneDetails({
               : []
           }
           note="This changes future scheduling. An active irrigation shot may continue."
+        />
+      )}
+      {zone?.setPhaseEntity && (
+        <ReviewDialog
+          open={phaseChoice !== null}
+          onOpenChange={(open) => {
+            if (!open) setPhaseChoice(null);
+          }}
+          controller={controller}
+          title={`Move ${zone.name} to ${phaseChoice}?`}
+          items={
+            phaseChoice
+              ? [
+                  {
+                    change: { entityId: zone.setPhaseEntity, value: phaseChoice },
+                    label: `${zone.name} phase`,
+                    before: zone.phase,
+                    after: phaseChoice,
+                  },
+                ]
+              : []
+          }
+          note="The controller moves the zone at its next check, within a minute. Today's water and shot counts stay; a zone moved to P1 ramps from its first shot again."
         />
       )}
     </>

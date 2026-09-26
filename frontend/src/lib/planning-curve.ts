@@ -84,20 +84,20 @@ export function buildPlanningCurve(
   const reference = fc ?? p1;
   if (fc === null && p1 !== null && dryback !== null)
     notes.push(
-      "P1 target is used as the dryback reference because field capacity was not supplied.",
+      "The peak VWC target is used as the dryback reference because full saturation was not supplied.",
     );
   const morningDryback =
     reference !== null && dryback !== null ? reference * (1 - dryback / 100) : null;
-  if (p1 === null) missing.push("P1 VWC target");
-  if (p2 === null) missing.push("P2 VWC threshold");
-  if (morningDryback === null) missing.push("Dryback target/reference");
+  if (p1 === null) missing.push("Peak VWC target");
+  if (p2 === null) missing.push("Maintenance shot when below");
+  if (morningDryback === null) missing.push("P3 dryback target/reference");
   if (p1 !== null && p2 !== null && p2 > p1)
-    warnings.push("P2 maintenance threshold is above the P1 ramp-up target.");
+    warnings.push("The maintenance trigger is above the peak VWC target.");
   const wait = value("p0_maximum_wait_time", 0, 1440);
   const interval = value("p1_time_between_shots", 0, 1440);
   const maxShots = value("p1_maximum_shots", 0, 200);
   if (wait === null)
-    notes.push("P0 is drawn as a 1-hour layout window; a maximum wait was not supplied.");
+    notes.push("P0 is drawn as a 1-hour layout window; the latest first shot was not supplied.");
   if (interval === null || maxShots === null)
     notes.push("P1 is drawn as a 2-hour layout window; shot count/interval were not supplied.");
   else
@@ -120,10 +120,10 @@ export function buildPlanningCurve(
   const p0End = Math.min(rawP0End, p3Start);
   const p1End = Math.min(rawP1End, p3Start);
   const phases: PlanningPhase[] = [
-    { id: "P0", label: "Morning wait", start: 0, end: p0End, color: "#8f9aa6" },
+    { id: "P0", label: "Additional dryback", start: 0, end: p0End, color: "#8f9aa6" },
     { id: "P1", label: "Ramp-up", start: p0End, end: p1End, color: "#03a9f4" },
     { id: "P2", label: "Maintenance", start: p1End, end: p3Start, color: "#42b995" },
-    { id: "P3", label: "Overnight", start: p3Start, end: 24, color: "#e5a43b" },
+    { id: "P3", label: "Overnight dryback", start: p3Start, end: 24, color: "#e5a43b" },
   ];
   const p1Windows =
     interval !== null && interval > 0 && maxShots !== null
@@ -148,7 +148,7 @@ export function buildPlanningCurve(
   const emergencyReferenceActive = floor !== null && overnightEnd !== null && overnightEnd <= floor;
   if (emergencyReferenceActive)
     warnings.push(
-      "The overnight reference reaches or crosses the P3 emergency floor. Emergency protection would be relevant at that reading; the chart does not predict or schedule an emergency shot.",
+      "The overnight reference reaches or crosses the rescue level. A rescue shot would be relevant at that reading; the chart does not predict or schedule one.",
     );
   // The ramp is a staircase, one riser per eligible shot. Each shot takes the share of the climb
   // that its configured size is of the ramp's total water; retained water is not predicted.
@@ -194,7 +194,7 @@ export function buildPlanningCurve(
     vwc.push({ hour: 24, value: overnightEnd, phase: "P3" });
   }
   notes.push(
-    "Overnight VWC is a straight planning connection from the last daytime reference to the relative dryback endpoint, then the same value at next lights-on. P0's maximum-wait window is shown at that endpoint. Neither timing nor measured moisture is forecast. The emergency floor is separate, not a desired overnight target.",
+    "Overnight VWC is a straight planning connection from the last daytime reference to the relative dryback endpoint, then the same value at next lights-on. P0's latest-first-shot window is shown at that endpoint. Neither timing nor measured moisture is forecast. The rescue level is separate, not a desired overnight target.",
   );
   const ec: PlanningPoint[] = [];
   const ecTargets = phases
@@ -259,7 +259,7 @@ export function buildPlanningCurve(
     );
   if (p2 !== null && shot !== null && p2 + shot > 100)
     warnings.push(
-      "P2 threshold plus nominal shot exceeds 100% VWC; the illustrated band is clipped at 100%.",
+      "The maintenance trigger plus a maintenance shot exceeds 100% VWC; the illustrated band is clipped at 100%.",
     );
   return {
     phases,

@@ -48,6 +48,9 @@ export interface Zone {
   name: string;
   enabledEntity: string | null;
   enabled: boolean | null;
+  /** The zone's Set Phase select: the controller moves the zone to a phase picked there, once.
+   * Null when the integration has none. */
+  setPhaseEntity: string | null;
   valveEntity: string | null;
   valveOn: boolean | null;
   lastIrrigation: {
@@ -110,6 +113,8 @@ export interface RoomStatus {
   detail: string;
   /** When the controller last reported (epoch ms); null when it has not. */
   reportedAt: number | null;
+  /** Where to fix it, when that is a page of this dashboard: a link after the detail. */
+  action?: { label: string; route: string };
 }
 export interface Change {
   entityId: string;
