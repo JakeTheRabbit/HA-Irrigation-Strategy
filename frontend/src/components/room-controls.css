@@ -71,3 +71,61 @@
     justify-content: flex-start;
   }
 }
+/* The room's switch over every zone, beside the zones' heading. */
+.all-zones {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.all-zones-count {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+/* A switch as Home Assistant draws one: the track fills with the primary colour when on. 44 × 24,
+   so a finger can hit it. */
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 18%, var(--surface));
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.switch[aria-checked="true"] {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 35%, transparent);
+  transition: transform 0.15s ease;
+}
+.switch[aria-checked="true"] .switch-thumb {
+  transform: translateX(20px);
+}
+.switch:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+/* The Overview's zones heading: the switch, then the link to every zone. */
+.zones-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

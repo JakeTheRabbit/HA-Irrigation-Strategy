@@ -903,6 +903,40 @@ try {
     await move("P2 · Maintenance", "P1 · Ramp-up"); // the demo as the other checks expect it
     await sheet.getByRole("button", { name: "Close", exact: true }).click();
   });
+  await check("zones: one switch flips every zone, through the review", async () => {
+    // Flower 1's zone 3 is paused for inspection: the switch is on while any zone is on, as the
+    // entities card's header toggle is, and switching it on again switches zone 3 on too.
+    await go("zones", "f1");
+    const all = page.getByRole("switch", { name: "Every zone in Flower 1", exact: true });
+    const count = page.locator(".toolbar .all-zones-count");
+    const flip = async (title, rows, after) => {
+      await all.click();
+      const review = page.getByRole("dialog", { name: title, exact: true });
+      await expectVisible(review);
+      assert.deepEqual(
+        await review.locator(".review-row strong").allInnerTexts(),
+        rows.map((zone) => `Zone ${zone} scheduling`),
+      );
+      await axe(`every zone: ${title}`);
+      await review.getByRole("button", { name: `Apply ${rows.length} changes` }).click();
+      await review.waitFor({ state: "hidden" });
+      assert.equal(await count.innerText(), after);
+    };
+    assert.equal(await all.getAttribute("aria-checked"), "true");
+    assert.equal(await count.innerText(), "2 of 3 zones on");
+    await flip("Pause every zone", [1, 2], "0 of 3 zones on");
+    assert.equal(await all.getAttribute("aria-checked"), "false");
+    await flip("Switch every zone on", [1, 2, 3], "3 of 3 zones on");
+    assert.equal(await all.getAttribute("aria-checked"), "true");
+    // The Overview carries the same switch in its zones heading, at a phone's width too.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await go("overview");
+    await expectVisible(page.getByRole("switch", { name: "Every zone in Flower 2", exact: true }));
+    await noOverflow();
+    await go("zones");
+    await noOverflow();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  });
   await check("zones: Water use totals every zone and charts its grow weeks", async () => {
     await go("zones");
     const panel = page.locator(".wu-panel");

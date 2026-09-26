@@ -3,6 +3,7 @@ import { Power, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ReviewDialog, Status } from "@/components/dashboard";
+import { allZones, allZonesChanges } from "@/lib/all-zones";
 import {
   autoFrozenReason,
   autoHoldText,
@@ -66,6 +67,53 @@ export function RoomPower({
         }
       />
     </>
+  );
+}
+
+/** Every zone of the room at once, in the zones' heading, as Home Assistant's entities card has
+ * its header toggle: on while any zone is on. Switching it reviews switching every zone the same
+ * way, a zone paused on purpose included; each zone keeps its own switch in its details. */
+export function AllZonesSwitch({ controller }: { controller: Controller }) {
+  const { zones } = controller.room;
+  const state = allZones(zones);
+  const enable = state.checked === false;
+  const items = allZonesChanges(zones, enable);
+  const connected = ["live", "demo"].includes(controller.connection);
+  // The review keeps what it was opened with: its own writes move the zones under it.
+  const [review, setReview] = useState(false);
+  const [opened, setOpened] = useState({ enable, items });
+  return (
+    <span className="all-zones" data-all-zones={state.checked ?? "unknown"}>
+      <span className="all-zones-count">
+        {state.checked === null ? "Zones unavailable" : `${state.on} of ${state.known} zones on`}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        className="switch"
+        aria-checked={state.checked === true}
+        aria-label={`Every zone in ${controller.room.room.name}`}
+        disabled={!connected || !items.length}
+        onClick={() => {
+          setOpened({ enable, items });
+          setReview(true);
+        }}
+      >
+        <span className="switch-thumb" aria-hidden="true" />
+      </button>
+      <ReviewDialog
+        open={review}
+        onOpenChange={setReview}
+        controller={controller}
+        title={opened.enable ? "Switch every zone on" : "Pause every zone"}
+        items={opened.items}
+        note={
+          opened.enable
+            ? "Every zone is switched on, including any you had paused. The controller waters them from its next check."
+            : "Paused, a zone gets no water, not even a rescue shot. Switch them back on here, or one at a time from each zone."
+        }
+      />
+    </span>
   );
 }
 

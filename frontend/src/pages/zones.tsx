@@ -1,5 +1,6 @@
 import { DailyWaterSummary } from "@/components/water-delivery";
 import { WaterUsePanel } from "@/components/water-use";
+import { AllZonesSwitch } from "@/components/room-controls";
 import { useState } from "react";
 import { ArrowUpRight, LayoutGrid, List, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ export function Zones({
         <span className="muted small">
           {zones.length} {zones.length === 1 ? "zone" : "zones"}
         </span>
+        {controller.room.zones.length > 0 && <AllZonesSwitch controller={controller} />}
         <div className="segmented">
           <Button
             size="icon"
