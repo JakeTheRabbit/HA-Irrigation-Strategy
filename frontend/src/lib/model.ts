@@ -13,10 +13,11 @@ import type {
   Zone,
 } from "./types";
 import { parseAutoSetpoints } from "./auto-setpoints";
+import { PHASE_GROUPS, settingWords } from "./setting-words";
 import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
 
 const ROOT = "crop_steering_";
-const ZONE_PARAMETERS = new Set([
+export const ZONE_PARAMETERS = new Set([
   "p1_target_vwc",
   "p2_vwc_threshold",
   "p2_shot_size",
@@ -39,7 +40,7 @@ const ZONE_PARAMETERS = new Set([
   "dripper_flow_rate",
   "min_floor_drown_ceiling",
 ]);
-const ROOM_PARAMETERS = new Set([
+export const ROOM_PARAMETERS = new Set([
   "dripper_flow_rate",
   "lights_on_hour",
   "lights_off_hour",
@@ -287,14 +288,16 @@ function readingMetric(
   return telemetryIssue(entity, maxAgeS, now) ? { ...result, value: null } : result;
 }
 function group(key: string) {
-  if (/^p0_|dryback/.test(key)) return "P0 · Morning dryback";
-  if (/^p1_/.test(key)) return "P1 · Ramp-up";
-  if (/^p2_/.test(key)) return "P2 · Maintenance";
-  if (/^p3_/.test(key)) return "P3 · Overnight";
+  if (/^p0_/.test(key)) return PHASE_GROUPS[0];
+  if (/^p1_/.test(key)) return PHASE_GROUPS[1];
+  if (/^p2_/.test(key)) return PHASE_GROUPS[2];
+  // The dryback targets are where Athena puts them: what the substrate dries by overnight.
+  if (/^p3_|dryback/.test(key)) return PHASE_GROUPS[3];
   if (/^ec_target/.test(key)) return "EC targets";
+  if (key === "field_capacity") return "Substrate";
   if (/substrate|plant_count|dripper/.test(key)) return "Hardware sizing";
   if (/light.*hour/.test(key)) return "Schedule";
-  if (/max_|maximum_shot_duration|maximum_ec|watchdog|irrigation_(ec|ph)/.test(key))
+  if (/max_|maximum_shot_duration|maximum_ec|watchdog|irrigation_(ec|ph)|drown/.test(key))
     return "Safety";
   return "General";
 }
@@ -315,18 +318,15 @@ function setting(entity: EntityState, room: Room): Setting | null {
     Number(step) <= 0
   )
     return null;
+  const words = settingWords(param);
   return {
     entityId: entity.entity_id,
-    label: title(param),
-    description: ["max_shot_duration", "maximum_shot_duration"].includes(param)
-      ? "Maximum valve-open runtime for every zone in this room."
-      : /dryback/.test(param)
-        ? "Relative drop as a percentage of peak VWC. Example: 60% peak with a 10% target means 54% VWC."
-        : param === "substrate_volume"
-          ? "Substrate volume per plant; the engine scales by plant count."
-          : match
-            ? `Zone ${match[1]} configuration.`
-            : "Room default; an available zone-specific value takes precedence.",
+    label: words?.label ?? title(param),
+    description:
+      words?.help ??
+      (match
+        ? `Zone ${match[1]} configuration.`
+        : "Room default; an available zone-specific value takes precedence."),
     value: numeric(entity),
     min: Number(min),
     max: Number(max),

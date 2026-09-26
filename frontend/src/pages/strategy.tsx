@@ -15,6 +15,7 @@ import {
   useSensorContext,
 } from "@/components/sensor-context";
 import { AutoBadge, AutoSetpointsControl, AutoZoneChip } from "@/components/room-controls";
+import { SettingHelp } from "@/components/setting-help";
 import { managedBy } from "@/lib/auto-setpoints";
 import {
   fieldHint,
@@ -23,12 +24,12 @@ import {
   setpointParam,
   suggestedDraft,
 } from "@/lib/sensor-context";
+import { GROUP_HELP, PHASE_GROUPS, TAG_TEXT, settingWords } from "@/lib/setting-words";
 import "./setpoint-preview.css";
 
-const phaseGroups = ["P0 · Morning dryback", "P1 · Ramp-up", "P2 · Maintenance", "P3 · Overnight"];
 function fieldGroup(setting: Setting) {
   const ecPhase = setting.entityId.match(/_ec_target_(?:veg|gen)_p([012])$/);
-  return ecPhase ? phaseGroups[Number(ecPhase[1])] : setting.group;
+  return ecPhase ? PHASE_GROUPS[Number(ecPhase[1])] : setting.group;
 }
 
 export type Drafts = Record<
@@ -268,7 +269,7 @@ export function Strategy({
               <p>
                 {zone
                   ? "Phase targets, timing and limits for this zone."
-                  : "Shared controller settings for this room."}
+                  : "Shared controller settings for this room. A zone’s own value, where it has one, takes precedence."}
               </p>
               {(zone ? [zone] : controller.room.zones).map(
                 (item) =>
@@ -307,11 +308,7 @@ export function Strategy({
                         );
                       const ecPhase = key.match(/^ec_target_p([012])$/);
                       const label =
-                        key === "dryback_target"
-                          ? "Daily dryback target"
-                          : ecPhase
-                            ? `P${ecPhase[1]} EC target`
-                            : (field?.label ?? key.replaceAll("_", " "));
+                        settingWords(key)?.label ?? field?.label ?? key.replaceAll("_", " ");
                       const unit =
                         key === "dryback_target"
                           ? "% of peak"
@@ -370,7 +367,7 @@ export function Strategy({
                           <h3>Steering mode</h3>
                           <p>
                             {zone
-                              ? "The selected mode supplies the EC and morning dryback targets below."
+                              ? "The selected mode picks which EC and P3 dryback targets below the controller uses."
                               : "The current engine uses each zone's mode, with legacy growth stage as fallback."}
                           </p>
                         </div>
@@ -461,15 +458,7 @@ export function Strategy({
                           <div>
                             <h3>{group}</h3>
                             <p>
-                              {group.startsWith("P0")
-                                ? "Morning preparation before ramp-up."
-                                : group.startsWith("P1")
-                                  ? "Bring the substrate toward its daily target."
-                                  : group.startsWith("P2")
-                                    ? "Maintain moisture through the active window."
-                                    : group.startsWith("P3")
-                                      ? "Emergency watering only. The controller determines the cutoff from live dryback."
-                                      : "Configuration reported by the controller."}
+                              {GROUP_HELP[group] ?? "Configuration reported by the controller."}
                             </p>
                           </div>
                         </div>
@@ -504,19 +493,35 @@ export function Strategy({
                                 ? suggestedDraft(hint.suggestion.value, setting)
                                 : null;
                               const auto = managedBy(supervisors, setting.entityId);
+                              const words = param ? settingWords(param) : undefined;
+                              const tag = words?.tag;
                               return (
                                 <div
                                   className={`setting-field ${draft ? "is-draft" : ""}`}
                                   key={setting.entityId}
                                 >
                                   <div>
-                                    <Label htmlFor={`setting-${setting.entityId}`}>
-                                      {setting.label}
-                                      {draft && (
-                                        <span className="draft-dot" title="Unsaved draft" />
+                                    <div className="setting-name">
+                                      {tag && (
+                                        <span className="setting-tag" data-tag={tag}>
+                                          {TAG_TEXT[tag]}
+                                        </span>
                                       )}
-                                      {auto && <AutoBadge />}
-                                    </Label>
+                                      <Label htmlFor={`setting-${setting.entityId}`}>
+                                        {setting.label}
+                                        {draft && (
+                                          <span className="draft-dot" title="Unsaved draft" />
+                                        )}
+                                        {auto && <AutoBadge />}
+                                      </Label>
+                                      {param && words?.detail && (
+                                        <SettingHelp
+                                          label={setting.label}
+                                          param={param}
+                                          detail={words.detail}
+                                        />
+                                      )}
+                                    </div>
                                     <p>
                                       {setting.description ||
                                         `Allowed range: ${setting.min}–${setting.max}${setting.unit ? ` ${setting.unit}` : ""}.`}
@@ -524,6 +529,12 @@ export function Strategy({
                                     <span className="setting-limit">
                                       {setting.min}–{setting.max} {setting.unit} · step{" "}
                                       {setting.step}
+                                      {param && (
+                                        <>
+                                          {" "}
+                                          · <code>{param}</code>
+                                        </>
+                                      )}
                                     </span>
                                   </div>
                                   <div className="setting-input">

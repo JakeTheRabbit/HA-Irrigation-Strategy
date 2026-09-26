@@ -196,6 +196,33 @@ try {
         fullPage: true,
       });
     });
+  await check("irrigation plan: a setting's ? explains it, in both themes, and closes on Escape", async () => {
+    const trigger = () =>
+      page.getByRole("button", { name: "About Maintenance shot when below", exact: true });
+    const help = () => page.getByRole("dialog", { name: "Maintenance shot when below" });
+    await inBothThemes("setting explainer", async () => {
+      await go("strategy");
+      await trigger().click();
+      await expectVisible(help());
+      const text = await help().innerText();
+      for (const part of ["What it is", "When it acts", "What it affects", "Athena Handbook"])
+        assert.match(text, new RegExp(part, "i"), `the explainer has "${part}"`);
+      assert.match(text, /a level, not a crossing/);
+    });
+    await go("strategy");
+    await trigger().click();
+    await expectVisible(help());
+    await page.keyboard.press("Escape");
+    assert.equal(await help().count(), 0, "Escape closes the explainer");
+    // The popover hands focus back as it finishes closing, a moment after Escape: read it until it
+    // arrives (up to 2 s) rather than once, which failed at random on a slower machine.
+    let focused = false;
+    for (let tries = 0; tries < 20 && !focused; tries++) {
+      focused = await trigger().evaluate((button) => button === document.activeElement);
+      if (!focused) await page.waitForTimeout(100);
+    }
+    assert.equal(focused, true, "focus returns to the ?");
+  });
   await check("status line: watering switched off says why and opens that room's Settings", async () => {
     await go("settings", "f1");
     await page.getByRole("button", { name: "Switch watering off…", exact: true }).click();
@@ -353,7 +380,7 @@ try {
       const line = lane.locator(".timeline-zone-line");
       assert.match(
         await line.textContent(),
-        /% now · [+−±][\d.]+ pts vs yesterday at .+ · P1 target [\d.]+% /,
+        /% now · [+−±][\d.]+ pts vs yesterday at .+ · Peak target [\d.]+% /,
       );
       assert.match(await line.textContent(), /L so far \([+−±][\d.]+ L\)/);
       const key = timeline.getByRole("list", { name: "Timeline key" });
