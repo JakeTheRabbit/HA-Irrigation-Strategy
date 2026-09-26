@@ -1,3 +1,13 @@
+# 2.24.0
+
+Pair with integration 2.24.0. **C3.** Owner-approved rehearsal release without a staging soak (26 Sep 2026); not run on hardware before release. No change to add-on options. One new key in the state file, `_room_off_since` in a room's block, which an old state file does not have and does not need.
+
+- **No shot while a switch is offline.** `_blocked` returns `<switches> offline (reads neither on nor off)` when the zone's pump, main line or valve reads anything but `on`/`off`, checked last so every other reason keeps priority. Nothing is opened and no hardware hold latches; the zone waters once the switch reads again. A switch that goes offline during a shot still latches CS-301.
+- **A dead probe waits 15 minutes.** `BLIND_GRACE_MIN` = 15: a zone whose probe has been unreadable for less than that in this run gets no timer shot, sibling copy or CS-102 alert (`blind_wait`); the time rules still apply.
+- **A room switched back on within a day carries on.** The switch-off time is saved as `_room_off_since`; switched on less than `ROOM_RESUME_H` = 24 h later, the room keeps its phases, today's counters and learned state. Longer, or unknown, starts the fresh run as before.
+- **A zone can be moved to a phase by hand** with the integration's new `select.crop_steering_zone_N_set_phase`. `_apply_phase_request` resets the select to Keep and only then moves the zone, once; it actuates nothing and does not need the kill switch.
+- **Keeps reporting during a shot.** `_wait_shot` repeats the room's heartbeat and zone labels once they are a minute old (at most two short writes per round, so the kill switch is still read about every 2 s), and a room is reported before its first shot after a restart or a switch-on.
+- **The dashboard the app serves** is the 2.24.0 build: the setting names and explainers, the Watering switch in the status line and Settings, and the zone's Phase section.
 # 2.23.0
 
 Pair with integration 2.23.0. **C1** for the controller app: no behaviour change; its code changes in comments only (the syntax tree is unchanged). Owner-approved rehearsal release without a staging soak (25 Sep 2026). No change to add-on options, the state file or irrigation.

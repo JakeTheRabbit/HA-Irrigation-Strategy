@@ -6,7 +6,7 @@ It runs inside [Home Assistant](https://www.home-assistant.io/) and works with t
 
 **[Try the live demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1)** (runs in your browser with sample data, nothing to install) · [Install](#install) · [User guide](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md) · [What has been tested](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/FEATURE_MATRIX.md)
 
-![Release](https://img.shields.io/badge/Release-2.23.0-blue)
+![Release](https://img.shields.io/badge/Release-2.24.0-blue)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.10+-41BDF5)
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
