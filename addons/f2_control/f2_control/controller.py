@@ -2499,8 +2499,8 @@ class Controller:
         Check kill/override, the holds and the shot's valve between <=2 s sleeps using bounded
         reads. This remains synchronous: other rooms wait and network/device delays can delay
         shutdown. Returns actual seconds elapsed and what ended the shot early, or None:
-          ("abort", entity): a definitive kill OFF / room OFF / override ON. The operator's own
-            switches are read first in every round, so they win.
+          ("abort", entity): a definitive kill OFF / room OFF / zone OFF / override ON. The
+            operator's own switches are read first in every round, so they win.
           ("external", entity): something else closed the feed path: a hold (hold_entities) reads
             ON (the test _blocked applies before a shot), or the shot's own valve reads OFF. The
             caller closes only what is still this shot's (_close_cut_short).
@@ -2515,6 +2515,7 @@ class Controller:
             for entity, stop_state in (
                 (room.enable_flag, "off"),
                 (f"switch.crop_steering_{room.prefix}room_active", "off"),
+                (f"switch.crop_steering_{room.prefix}zone_{zone}_enabled", "off"),
                 (
                     f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override",
                     "on",
@@ -2756,13 +2757,18 @@ class Controller:
                 delivered_l=nominal_l * (elapsed / duration_s if duration_s > 0 else 1.0),
             )
             if aborted:
+                by = aborted[1]
+                why = {
+                    room.enable_flag: "the engine switch was turned off",
+                    f"switch.crop_steering_{room.prefix}room_active": "Room Active was switched off",
+                    f"switch.crop_steering_{room.prefix}zone_{zone}_enabled": "this zone was switched off",
+                }.get(by, "manual override was turned on")
                 self._alert(
                     f"killshot_{room.slug}_z{zone}",
                     "CS-305",
                     "shot stopped early",
-                    f"The shot was stopped after {elapsed:.0f} of {duration_s:.0f} seconds, because the "
-                    "engine switch was turned off, Room Active was switched off or manual override "
-                    "was turned on. The valve and anything upstream were switched off, and the water "
+                    f"The shot was stopped after {elapsed:.0f} of {duration_s:.0f} seconds, because "
+                    f"{why} ({by}). The valve and anything upstream were switched off, and the water "
                     "delivered so far is counted.",
                     room=room,
                     zone=zone,
