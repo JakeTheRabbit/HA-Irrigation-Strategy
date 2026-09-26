@@ -13,6 +13,7 @@ import {
   MetricValue,
   MoistureCell,
   Status,
+  WaitingFor,
   WaterUse,
   ZoneDetails,
   ZoneOperatingState,
@@ -159,6 +160,11 @@ export function Zones({
                   </strong>
                 </span>
               </div>
+              {zone.waiting && (
+                <p className="zone-waiting">
+                  <WaitingFor zone={zone} />
+                </p>
+              )}
               <Button variant="outline" className="full-width" onClick={() => setSelected(zone.id)}>
                 View zone <ArrowUpRight size={16} />
               </Button>

@@ -186,6 +186,7 @@ const ZONE_SENSORS = [
   "weekly_water_app",
   "irrigation_count_app",
   "auto_setpoints",
+  "waiting_for_app",
 ];
 const ENTITY_ID = /^(?!.+__)(?!_)[\da-z_]+(?<!_)\.(?!_)[\da-z_]+(?<!_)$/;
 /** Every entity this console reads: all crop_steering entities, whatever the room descriptors and

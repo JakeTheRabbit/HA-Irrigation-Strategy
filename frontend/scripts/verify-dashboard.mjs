@@ -548,6 +548,46 @@ try {
       await page.keyboard.press("Escape");
     },
   );
+  await check("zones: each zone says what the controller waits for next", async () => {
+    // The controller's own thresholds against the readings now, as the demo's controller publishes
+    // them: on the Zones cards, in a zone's details and on the phone's zone list.
+    const P2 =
+      /^Next: shot when VWC < [\d.]+% \(now [\d.]+%[^)]*\) · dilution if pwEC > [\d.]+ \(now [\d.]+\) · P3 by /;
+    await go("zones");
+    await page.getByRole("button", { name: "Card view", exact: true }).click();
+    const cards = await page.locator(".zone-grid .zone-card .zone-waiting").allInnerTexts();
+    assert.equal(cards.length, await page.locator(".zone-grid .zone-card").count());
+    assert.match(
+      cards[0],
+      /^Next: ramp shot (due|at .+) \(VWC [\d.]+% under [\d.]+%\) · P2 at VWC ≥ /,
+    );
+    assert.match(cards[1], P2);
+    await page.getByRole("button", { name: "View zone", exact: true }).nth(1).click();
+    assert.match(await page.getByRole("dialog").locator(".zone-waiting").innerText(), P2);
+    await page.keyboard.press("Escape");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await go("overview");
+    assert.match((await page.locator(".zone-mobile-target").allInnerTexts())[1], P2);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    // The grow-day line says it too, for a lane in the phase the controller worked it out for: at
+    // 4 PM the demo's recorded day has zone 2 in P2 as its controller does, and zone 1 in P2 where
+    // its controller has it in P1.
+    const pinned = await context.newPage();
+    pinned.on("pageerror", (error) => pageErrors.push(error.message));
+    await pinned.clock.setFixedTime(new Date(2026, 8, 20, 16, 0, 0));
+    await pinned.goto(`${base}/dashboard.html?demo&room=f2#/overview`, {
+      waitUntil: "networkidle",
+    });
+    const lanes = pinned.locator(".timeline-zone-line");
+    await lanes.first().waitFor();
+    const [zone1, zone2] = await lanes.allInnerTexts();
+    assert.match(
+      zone2,
+      / · next: shot when VWC < [\d.]+% \(now [\d.]+%[^)]*\) · dilution if pwEC > /,
+    );
+    assert.doesNotMatch(zone1, /next:/, "no P1 conditions beside a P2 lane");
+    await pinned.close();
+  });
   await check("sensors: coloured status pills and each numeric sensor's recent line", async () => {
     const trends = "[data-sensor-trend] .sparkline";
     await inBothThemes("sensors", async () => {
