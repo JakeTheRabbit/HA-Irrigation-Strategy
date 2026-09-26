@@ -403,13 +403,13 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 *Information · Notification*
 
-**What it means.** A shot was stopped part-way because the engine switch was turned off, Room Active was switched off or manual override was turned on while it ran. The valve and anything upstream were switched off; if they don't all read OFF, CS-301 is raised as well.
+**What it means.** A shot was stopped part-way because the engine switch was turned off, Room Active or the zone itself was switched off, or manual override was turned on while it ran. The notification names the switch. The valve and anything upstream were switched off; if they don't all read OFF, CS-301 is raised as well.
 
 **Watering meanwhile.** The water delivered before the stop is counted. The next shot is decided as normal.
 
 **Likely causes**
 
-- Someone turned the engine switch or Room Active off, or manual override on, during a shot.
+- Someone turned the engine switch, Room Active or the zone off, or manual override on, during a shot.
 - An automation did.
 
 **Suggested fixes**

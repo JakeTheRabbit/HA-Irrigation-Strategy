@@ -1090,8 +1090,9 @@ export function ZoneDetails({
                 {zone.enabled ? "Pause zone scheduling" : "Enable zone scheduling"}
               </Button>
               <p className="small muted">
-                Pausing scheduling may prevent future cycles. It is not an emergency stop and may
-                not interrupt a shot already running.
+                Paused, the zone gets no water at all, not even a rescue shot, and a shot already
+                running in it stops within a few seconds. It is not an emergency stop: use the
+                installation's physical shut-off for that.
               </p>
               {zone.setPhaseEntity && (
                 <>
@@ -1158,7 +1159,11 @@ export function ZoneDetails({
                 ]
               : []
           }
-          note="This changes future scheduling. An active irrigation shot may continue."
+          note={
+            zone.enabled
+              ? "Paused, the zone gets no water, not even a rescue shot, and a shot already running in it stops within a few seconds."
+              : "The controller waters the zone again from its next check."
+          }
         />
       )}
       {zone?.setPhaseEntity && (
