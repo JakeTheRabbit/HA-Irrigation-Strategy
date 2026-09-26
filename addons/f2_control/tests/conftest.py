@@ -28,6 +28,15 @@ def _hermetic_state_file(tmp_path, monkeypatch):
     monkeypatch.setenv("F2_STATE_PATH", str(tmp_path / "constructor-state.json"))
 
 
+@pytest.fixture
+def no_blind_grace(monkeypatch):
+    """For tests of what happens once a probe is dead: it counts as dead at once. How long a probe
+    must be out first (controller.BLIND_GRACE_MIN) is tested in test_blind_grace.py."""
+    import controller
+
+    monkeypatch.setattr(controller, "BLIND_GRACE_MIN", 0)
+
+
 @pytest.fixture(autouse=True)
 def _no_real_history(monkeypatch):
     """Never let a test ask a real Home Assistant for history: none is recorded unless a rig says so."""
