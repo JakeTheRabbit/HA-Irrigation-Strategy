@@ -117,7 +117,7 @@ for that zone. (3 zones × 23 = 69 entities on a 3-zone system.)
 ### Per-zone (`switch.crop_steering_zone_N_*`)
 | Entity | What it does |
 |---|---|
-| `zone_N_enabled` | Include/exclude the zone from automation. |
+| `zone_N_enabled` | The zone's own switch ("zone scheduling" on the dashboard). Off = the controller waters nothing in this zone, not even a rescue shot, and a shot already running in it stops within a few seconds. |
 | `zone_N_manual_override` | Absolute lockout: **nothing** opens that valve (auto, emergency, manual). For maintenance. |
 
 ---
