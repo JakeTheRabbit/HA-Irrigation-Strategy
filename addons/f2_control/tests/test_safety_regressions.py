@@ -111,6 +111,7 @@ def test_accounting_does_not_hide_request_overrun(rig, monkeypatch):
     assert c.rooms[0].state[1]["daily_vol"] == pytest.approx(.5)
 
 
+@pytest.mark.usefixtures("no_blind_grace")
 @pytest.mark.parametrize("healthy_sibling", [False, True])
 def test_blind_fallback_and_sibling_copy_stop_at_own_daily_cap(rig, healthy_sibling):
     c, fake, _clock = rig
@@ -241,6 +242,9 @@ def test_fault_blocks_other_room_sharing_pump_but_not_independent_room(rig, monk
         for eid in (room.enable_flag, "switch.crop_steering_" + slug + "_system_enabled",
                     "switch.crop_steering_" + slug + "_auto_irrigation_enabled"):
             fake.set_state(eid, "on")
+        for switch in (pump, "switch." + slug + "_main", "switch." + slug + "_valve"):
+            if switch not in fake.states:  # its own feed path exists, switched off
+                fake.set_state(switch, "off")
     blocked = c._blocked(c.rooms[1], 1)
     assert blocked and "hardware" in blocked.lower()
     assert c._blocked(c.rooms[2], 1) is None

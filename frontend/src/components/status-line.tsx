@@ -30,6 +30,19 @@ export function StatusLines({ controller }: { controller: Controller }) {
               <b data-age={status.tone === "stale" ? ageTone(age) : undefined}>{status.text}</b>
               {" — "}
               {status.detail}
+              {status.action && (
+                <>
+                  {" "}
+                  {/* Opens the page for THIS line's room, which need not be the selected one. */}
+                  <a
+                    className="status-line-action"
+                    href={`#/${status.action.route}`}
+                    onClick={() => controller.changeRoom(room.id)}
+                  >
+                    {status.action.label}
+                  </a>
+                </>
+              )}
             </span>
             {status.tone !== "stale" && (
               <span className="status-line-age" data-age={ageTone(age)}>

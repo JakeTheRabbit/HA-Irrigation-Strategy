@@ -99,3 +99,10 @@
   padding-left: 12px;
   padding-right: 12px;
 }
+
+/* A zone moved to a phase by hand: one button per phase, wrapping on a narrow sheet. */
+.phase-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

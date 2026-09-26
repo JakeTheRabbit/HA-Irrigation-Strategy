@@ -20,6 +20,7 @@ import {
   type RecordedPoint,
   type RecordedReading,
 } from "@/lib/planning-curve";
+import { settingWords } from "@/lib/setting-words";
 
 export interface PlanningCurveProps {
   parameters: Record<string, number>;
@@ -46,35 +47,17 @@ const extremes = (points: readonly RecordedPoint[]) =>
       }
     : null;
 const editors = [
-  { key: "p1_target_vwc", label: "P1 VWC target", unit: "% VWC", max: 100, step: 1 },
-  { key: "p2_vwc_threshold", label: "P2 VWC threshold", unit: "% VWC", max: 100, step: 1 },
-  { key: "dryback_target", label: "Dryback drop", unit: "% of peak drop", max: 100, step: 1 },
-  { key: "ec_target_p0", label: "P0 EC target", unit: "mS/cm", max: 20, step: 0.1 },
-  { key: "ec_target_p1", label: "P1 EC target", unit: "mS/cm", max: 20, step: 0.1 },
-  { key: "ec_target_p2", label: "P2 EC target", unit: "mS/cm", max: 20, step: 0.1 },
-  {
-    key: "p1_initial_shot_size",
-    label: "P1 initial shot",
-    unit: "% substrate volume",
-    max: 100,
-    step: 1,
-  },
-  { key: "p2_shot_size", label: "P2 nominal shot", unit: "% substrate volume", max: 100, step: 1 },
-  {
-    key: "p3_emergency_vwc_threshold",
-    label: "P3 emergency floor",
-    unit: "% VWC",
-    max: 100,
-    step: 1,
-  },
-  {
-    key: "p3_emergency_shot_size",
-    label: "P3 emergency shot",
-    unit: "% substrate volume",
-    max: 100,
-    step: 1,
-  },
-];
+  { key: "p1_target_vwc", unit: "% VWC", max: 100, step: 1 },
+  { key: "p2_vwc_threshold", unit: "% VWC", max: 100, step: 1 },
+  { key: "dryback_target", unit: "% of peak drop", max: 100, step: 1 },
+  { key: "ec_target_p0", unit: "mS/cm", max: 20, step: 0.1 },
+  { key: "ec_target_p1", unit: "mS/cm", max: 20, step: 0.1 },
+  { key: "ec_target_p2", unit: "mS/cm", max: 20, step: 0.1 },
+  { key: "p1_initial_shot_size", unit: "% substrate volume", max: 100, step: 1 },
+  { key: "p2_shot_size", unit: "% substrate volume", max: 100, step: 1 },
+  { key: "p3_emergency_vwc_threshold", unit: "% VWC", max: 100, step: 1 },
+  { key: "p3_emergency_shot_size", unit: "% substrate volume", max: 100, step: 1 },
+].map((editor) => ({ ...editor, label: settingWords(editor.key)?.label ?? editor.key }));
 export function PlanningCurve({
   parameters,
   lightsOn,
@@ -502,7 +485,7 @@ export function PlanningCurve({
                   stroke="var(--muted-foreground)"
                   strokeDasharray="4 5"
                 >
-                  <title>{`Saved P3 floor: ${saved.emergencyFloor}% VWC`}</title>
+                  <title>{`Saved rescue level: ${saved.emergencyFloor}% VWC`}</title>
                 </line>
               )}
             </g>
@@ -534,7 +517,7 @@ export function PlanningCurve({
                   stroke="var(--destructive)"
                   strokeDasharray="3 4"
                 >
-                  <title>{`P3 emergency floor: ${plan.emergencyFloor}% VWC`}</title>
+                  <title>{`Rescue shot when below ${plan.emergencyFloor}% VWC`}</title>
                 </line>
               )}
               {targetPath && (
@@ -558,7 +541,7 @@ export function PlanningCurve({
                     strokeOpacity="0.8"
                     strokeDasharray="5 4"
                   >
-                    <title>{`P2 threshold ${trim(parameters.p2_vwc_threshold)}% VWC: a maintenance shot fires each time the zone dries to here`}</title>
+                    <title>{`Maintenance shot when below ${trim(parameters.p2_vwc_threshold)}% VWC: one fires whenever the zone reads below here`}</title>
                   </line>
                   <text
                     x={x(p2.end) - 6}
@@ -567,7 +550,7 @@ export function PlanningCurve({
                     fill="#42b995"
                     fontSize="12"
                   >
-                    P2 threshold {trim(parameters.p2_vwc_threshold)}%
+                    Maintenance trigger {trim(parameters.p2_vwc_threshold)}%
                   </text>
                   {advice && x(p2.end) - x(p2.start) > 190 && (
                     <text
@@ -623,7 +606,7 @@ export function PlanningCurve({
                     strokeOpacity={shot.emergency ? 0.35 : 0}
                   >
                     <title>
-                      {shot.emergency ? "P3 emergency shot" : `${shot.phase} shot`}{" "}
+                      {shot.emergency ? "Rescue shot" : `${shot.phase} shot`}{" "}
                       {inPhase.indexOf(shots[index]) + 1} of {inPhase.length} ·{" "}
                       {planningClock(lightsOn, shot.hour)}
                       {shot.size === null ? "" : ` · ${trim(shot.size, 2)}% of substrate`} ·{" "}
@@ -840,10 +823,10 @@ export function PlanningCurve({
             {shotCount("P1")
               ? `P1 fires ${shotCount("P1")} shots, ${parameters.p1_time_between_shots} minutes apart, to ${trim(parameters.p1_target_vwc)}%.`
               : `P1 climbs to ${trim(parameters.p1_target_vwc)}% (shot count or spacing not set, so no steps are drawn).`}{" "}
-            P2 fires a {trim(parameters.p2_shot_size)}% shot each time VWC falls to{" "}
+            P2 fires a {trim(parameters.p2_shot_size)}% shot each time VWC falls below{" "}
             {trim(parameters.p2_vwc_threshold)}%: {shotCount("P2") || "none"} projected. P3 dries
             down overnight to {trim(projection.lightsOnVwc)}%
-            {shotCount("P3") ? `, with ${shotCount("P3")} emergency shot(s) at the floor` : ""}.
+            {shotCount("P3") ? `, with ${shotCount("P3")} rescue shot(s) at the rescue level` : ""}.
             Hover any riser for its time and size.
           </p>
           <p>
@@ -866,17 +849,17 @@ export function PlanningCurve({
                   ? "P2 maintenance starts late."
                   : "No P2 sawtooth with these targets."}
               </strong>{" "}
-              The engine fires a P2 shot only when VWC has dried down to the P2 threshold. From{" "}
-              {trim(advice.pointsToThreshold + parameters.p2_vwc_threshold)}% at the start of P2
-              that is {trim(advice.pointsToThreshold)} points, about {trim(advice.hoursToThreshold)}{" "}
-              hours at {projection.rates.day} points/h
+              The engine fires a maintenance shot only once VWC reads below the maintenance trigger.
+              From {trim(advice.pointsToThreshold + parameters.p2_vwc_threshold)}% at the start of
+              P2 that is {trim(advice.pointsToThreshold)} points, about{" "}
+              {trim(advice.hoursToThreshold)} hours at {projection.rates.day} points/h
               {advice.shots
                 ? `, so the first shot is not until ${planningClock(lightsOn, advice.firstShotHour ?? 0)}.`
                 : ", longer than P2 lasts."}{" "}
-              For a sawtooth from the start of P2, drag the P2 threshold up to about{" "}
-              {trim(advice.suggestedThreshold)}%, just under the P1 target. Shots then repeat about
-              every {trim(advice.repeatHours)} hours at this dry-down; a smaller P2 shot gives a
-              finer sawtooth.
+              For a sawtooth from the start of P2, drag the maintenance trigger up to about{" "}
+              {trim(advice.suggestedThreshold)}%, just under the peak VWC target. Shots then repeat
+              about every {trim(advice.repeatHours)} hours at this dry-down; a smaller P2 shot gives
+              a finer sawtooth.
             </p>
           )}
           {drybackVwc !== null && projection.lightsOnVwc > drybackVwc + 0.5 && (
@@ -896,10 +879,10 @@ export function PlanningCurve({
         )
       )}
       <p className="muted small" style={{ padding: "0 16px 12px", margin: 0 }}>
-        The P3 emergency floor stays separate from the dry-down; routine watering stops at the P3
+        The rescue level stays separate from the dry-down; routine watering stops at the P3
         boundary.
         {Number.isFinite(parameters.p3_emergency_shot_size)
-          ? ` Its ${parameters.p3_emergency_shot_size}% emergency shot is conditional on controller safety checks.`
+          ? ` Its ${parameters.p3_emergency_shot_size}% rescue shot is conditional on controller safety checks.`
           : ""}
       </p>
       <div className="planning-phase-legend">

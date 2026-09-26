@@ -1,5 +1,6 @@
 import { addDays, downsample, midnight, summarize } from "./comparison";
 import type { HistoryPoint } from "./comparison-types";
+import { settingWords } from "./setting-words";
 import type { Series } from "./types";
 
 /** Recorded probe behaviour beside the setpoints an operator types.
@@ -148,15 +149,16 @@ export interface ReferenceLine {
   saved: number | null;
   kind: "setpoint" | "derived" | "learned";
 }
-const LINE_LABELS: Record<string, [string, string]> = {
-  field_capacity: ["Field capacity", "FC"],
-  p1_target_vwc: ["P1 target", "P1"],
-  p2_vwc_threshold: ["P2 threshold", "P2"],
-  p3_emergency_vwc_threshold: ["P3 floor", "P3"],
-  maximum_ec: ["Max EC", "Max"],
-  ec_target_p0: ["P0 target", "P0"],
-  ec_target_p1: ["P1 target", "P1"],
-  ec_target_p2: ["P2 target", "P2"],
+/** A line is named as its setting is (setting-words); this is the compact form for phone widths. */
+const LINE_COMPACT: Record<string, string> = {
+  field_capacity: "Sat.",
+  p1_target_vwc: "Peak",
+  p2_vwc_threshold: "Maint.",
+  p3_emergency_vwc_threshold: "Rescue",
+  maximum_ec: "Max",
+  ec_target_p0: "P0",
+  ec_target_p1: "P1",
+  ec_target_p2: "P2",
 };
 const usable = (value: number | undefined): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -185,8 +187,8 @@ export function referenceLines({
       if (value === null && before === null) continue;
       lines.push({
         key,
-        label: LINE_LABELS[key][0],
-        short: LINE_LABELS[key][1],
+        label: settingWords(key)?.short ?? key,
+        short: LINE_COMPACT[key],
         metric,
         value,
         saved: differs(value, before) ? before : null,
@@ -204,8 +206,8 @@ export function referenceLines({
   if (draftFloor !== null || savedFloor !== null)
     lines.push({
       key: "dryback_floor",
-      label: "Dryback floor",
-      short: "Dryback",
+      label: "Dries back to",
+      short: "Dries to",
       metric: "vwc",
       value: draftFloor,
       saved: differs(draftFloor, savedFloor) ? savedFloor : null,
@@ -305,10 +307,10 @@ export function fieldHint(
     if (stats.typicalDailyPeak === null) return null;
     const floor = typed === null ? null : stats.typicalDailyPeak * (1 - typed / 100);
     return {
-      text: `Typical peak ${show(stats.typicalDailyPeak)} → dryback floor ${floor === null ? "—" : show(floor)} · ${span} trough ${show(stats.trough.value)}`,
+      text: `Typical peak ${show(stats.typicalDailyPeak)} → dries back to ${floor === null ? "—" : show(floor)} · ${span} trough ${show(stats.trough.value)}`,
       warning:
         floor !== null && floor < stats.trough.value - MARGIN.vwc
-          ? `dryback floor ${show(floor)} is below anything this probe has read in ${span} (trough ${show(stats.trough.value)})`
+          ? `drying back to ${show(floor)} is below anything this probe has read in ${span} (trough ${show(stats.trough.value)})`
           : null,
       suggestion,
     };
@@ -331,7 +333,7 @@ export function fieldHint(
     warning = tooHigh
       ? above
       : typed !== null && typed > stats.trough.value
-        ? `this probe read below this floor in ${span} (trough ${show(stats.trough.value)}), so emergency shots would have fired`
+        ? `this probe read below this level in ${span} (trough ${show(stats.trough.value)}), so rescue shots would have fired`
         : null;
   else if (param === "maximum_ec")
     warning =

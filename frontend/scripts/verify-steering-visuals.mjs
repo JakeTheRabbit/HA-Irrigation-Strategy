@@ -254,7 +254,7 @@ try {
       await page.getByRole("button", { name: /^Review 1 change/ }).click();
       assert.match(
         await page.getByRole("dialog").locator(".review-row").innerText(),
-        /Zone 1 · Field Capacity[\s\S]*70 %[\s\S]*60 %/,
+        /Zone 1 · Full saturation \(most it holds\)[\s\S]*70 %[\s\S]*60 %/,
       );
       await page.getByRole("button", { name: "Back to editing", exact: true }).click();
       await page.getByRole("dialog").waitFor({ state: "hidden" });

@@ -196,6 +196,53 @@ try {
         fullPage: true,
       });
     });
+  await check("irrigation plan: a setting's ? explains it, in both themes, and closes on Escape", async () => {
+    const trigger = () =>
+      page.getByRole("button", { name: "About Maintenance shot when below", exact: true });
+    const help = () => page.getByRole("dialog", { name: "Maintenance shot when below" });
+    await inBothThemes("setting explainer", async () => {
+      await go("strategy");
+      await trigger().click();
+      await expectVisible(help());
+      const text = await help().innerText();
+      for (const part of ["What it is", "When it acts", "What it affects", "Athena Handbook"])
+        assert.match(text, new RegExp(part, "i"), `the explainer has "${part}"`);
+      assert.match(text, /a level, not a crossing/);
+    });
+    await go("strategy");
+    await trigger().click();
+    await expectVisible(help());
+    await page.keyboard.press("Escape");
+    assert.equal(await help().count(), 0, "Escape closes the explainer");
+    // The popover hands focus back as it finishes closing, a moment after Escape: read it until it
+    // arrives (up to 2 s) rather than once, which failed at random on a slower machine.
+    let focused = false;
+    for (let tries = 0; tries < 20 && !focused; tries++) {
+      focused = await trigger().evaluate((button) => button === document.activeElement);
+      if (!focused) await page.waitForTimeout(100);
+    }
+    assert.equal(focused, true, "focus returns to the ?");
+  });
+  await check("status line: watering switched off says why and opens that room's Settings", async () => {
+    await go("settings", "f1");
+    await page.getByRole("button", { name: "Switch watering off…", exact: true }).click();
+    await page.getByRole("button", { name: /Apply \d+ change/ }).click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    // Another room selected, on another page: the link must still open Flower 1's Settings.
+    await page.locator("#desktop-room").selectOption("room:");
+    await page.evaluate(() => (location.hash = "#/overview"));
+    const line = page.locator('.status-line[data-room="room:f1_"]');
+    assert.match(
+      await line.innerText(),
+      /Not watering — Watering is switched off for this room \(its engine switch\)/,
+    );
+    await line.getByRole("link", { name: "Switch it on in Settings", exact: true }).click();
+    await expectVisible(page.getByRole("heading", { name: "Settings", exact: true }));
+    assert.match(page.url(), /room=room(%3A|:)f1_/);
+    assert.equal(await page.locator("#desktop-room").inputValue(), "room:f1_");
+    await expectVisible(page.getByText("Watering off", { exact: true }));
+    await expectVisible(page.getByRole("button", { name: "Switch watering on…", exact: true }));
+  });
   await check("help: the daily routine replaces the Overview's workflow card", async () => {
     await go("help");
     const routine = page.locator("ol.daily-routine");
@@ -333,7 +380,7 @@ try {
       const line = lane.locator(".timeline-zone-line");
       assert.match(
         await line.textContent(),
-        /% now · [+−±][\d.]+ pts vs yesterday at .+ · P1 target [\d.]+% /,
+        /% now · [+−±][\d.]+ pts vs yesterday at .+ · Peak target [\d.]+% /,
       );
       assert.match(await line.textContent(), /L so far \([+−±][\d.]+ L\)/);
       const key = timeline.getByRole("list", { name: "Timeline key" });
@@ -665,7 +712,7 @@ try {
       ["Room descriptor discovered", "on"],
     ]);
   });
-  await check("settings: the connection, the room and its scheduling are state pills", async () => {
+  await check("settings: the connection, the room and its watering are state pills", async () => {
     await inBothThemes("settings", async () => {
       await go("settings");
       await expectVisible(page.locator("[data-connection]"));
@@ -674,7 +721,7 @@ try {
     assert.deepEqual(await pillTones(".settings-section .pill"), [
       ["Demo mode", "warn"],
       ["Room on", "on"],
-      ["Enabled", "on"],
+      ["Watering on", "on"],
     ]);
   });
   await check("overview: two screens at most, zones beside the tank", async () => {
@@ -835,6 +882,26 @@ try {
       path: path.join(out, "dashboard-zone-detail.png"),
     });
     await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
+  });
+  await check("zones: a zone is moved to a phase by hand, through the review", async () => {
+    await go("zones");
+    await page.getByRole("button", { name: "View Zone 1", exact: true }).click();
+    const sheet = page.getByRole("dialog").filter({ hasText: "zone details" });
+    const picker = sheet.getByRole("group", { name: "Move Zone 1 to" });
+    await expectVisible(picker);
+    const move = async (from, to) => {
+      assert.equal(await picker.getByRole("button", { name: from, exact: true }).isDisabled(), true);
+      await picker.getByRole("button", { name: to, exact: true }).click();
+      const review = page.getByRole("dialog", { name: `Move Zone 1 to ${to.slice(0, 2)}?` });
+      await expectVisible(review);
+      await review.getByRole("button", { name: /^Apply 1 change/ }).click();
+      await review.waitFor({ state: "hidden" });
+      await expectVisible(sheet.locator(`.pill[data-phase="${to.slice(0, 2)}"]`));
+    };
+    await move("P1 · Ramp-up", "P2 · Maintenance");
+    await axe("zone phase picker");
+    await move("P2 · Maintenance", "P1 · Ramp-up"); // the demo as the other checks expect it
+    await sheet.getByRole("button", { name: "Close", exact: true }).click();
   });
   await check("zones: Water use totals every zone and charts its grow weeks", async () => {
     await go("zones");

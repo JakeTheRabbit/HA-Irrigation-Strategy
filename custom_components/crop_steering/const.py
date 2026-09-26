@@ -26,6 +26,8 @@ SOFTWARE_VERSION = "2.23.0"
 
 # Crop steering phases (P0-P3 only, Manual removed)
 PHASES = ["P0", "P1", "P2", "P3"]
+# A zone's Set Phase select: Keep (no request), or the phase the controller moves the zone to once
+SET_PHASE_OPTIONS = ["Keep", *PHASES]
 STEERING_MODES = ["Vegetative", "Generative"]
 
 # Growth stages (for growth_stage select entity)

@@ -297,16 +297,16 @@ describe("field hints", () => {
   });
   it("notes an emergency floor that the probe already dropped below", () => {
     expect(fieldHint("p3_emergency_vwc_threshold", 30, vwc, 72)!.warning).toBe(
-      "this probe read below this floor in 72 h (trough 26.8%), so emergency shots would have fired",
+      "this probe read below this level in 72 h (trough 26.8%), so rescue shots would have fired",
     );
     expect(fieldHint("p3_emergency_vwc_threshold", 20, vwc, 72)!.warning).toBeNull();
   });
   it("explains a dryback target through its derived floor", () => {
     const hint = fieldHint("vegetative_dryback_target", 10, vwc, 72)!;
-    expect(hint.text).toBe("Typical peak 35.9% → dryback floor 32.3% · 72 h trough 26.8%");
+    expect(hint.text).toBe("Typical peak 35.9% → dries back to 32.3% · 72 h trough 26.8%");
     expect(hint.warning).toBeNull();
     expect(fieldHint("generative_dryback_target", 40, vwc, 72)!.warning).toBe(
-      "dryback floor 21.5% is below anything this probe has read in 72 h (trough 26.8%)",
+      "drying back to 21.5% is below anything this probe has read in 72 h (trough 26.8%)",
     );
   });
   it("uses pore EC readings and units for EC setpoints", () => {
