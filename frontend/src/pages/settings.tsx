@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { ArrowUpRight, Check, LoaderCircle, Moon, Sun, Monitor } from "lucide-react";
+import {
+  ArrowUpRight,
+  Check,
+  Droplets,
+  LoaderCircle,
+  Moon,
+  Sprout,
+  Sun,
+  Monitor,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +26,7 @@ import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import { RoomPower } from "@/components/room-controls";
 import type { ThemePreference, ThemeSource } from "@/lib/ha-theme";
+import { useWaterView } from "@/lib/water-view";
 
 /** The connection in the top bar's words, with the colour of its state. */
 const CONNECTION: Record<Controller["connection"], { label: string; tone: PillTone }> = {
@@ -48,6 +58,7 @@ export function Settings({
   setTheme: (value: ThemePreference) => void;
   themeSource: ThemeSource;
 }) {
+  const water = useWaterView();
   const [base, setBase] = useState("");
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
@@ -242,23 +253,56 @@ export function Settings({
                   : "Using your saved appearance override."}
             </p>
           </div>
-          <div className="theme-options" aria-label="Appearance preference">
-            {[
-              { value: "auto", label: "Home Assistant / system", icon: Monitor },
-              { value: "light", label: "Light", icon: Sun },
-              { value: "dark", label: "Dark", icon: Moon },
-            ].map((option) => (
-              <button
-                key={option.value}
-                className={theme === option.value ? "chosen" : ""}
-                aria-pressed={theme === option.value}
-                onClick={() => setTheme(option.value as ThemePreference)}
+          <div className="appearance-options">
+            <div className="theme-options" aria-label="Appearance preference">
+              {[
+                { value: "auto", label: "Home Assistant / system", icon: Monitor },
+                { value: "light", label: "Light", icon: Sun },
+                { value: "dark", label: "Dark", icon: Moon },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  className={theme === option.value ? "chosen" : ""}
+                  aria-pressed={theme === option.value}
+                  onClick={() => setTheme(option.value as ThemePreference)}
+                >
+                  <option.icon size={20} />
+                  <span>{option.label}</span>
+                  {theme === option.value && <Check size={16} />}
+                </button>
+              ))}
+            </div>
+            <div>
+              <h3 id="water-view-label">Water today, shown as</h3>
+              <div
+                className="theme-options water-view-options"
+                role="group"
+                aria-labelledby="water-view-label"
               >
-                <option.icon size={20} />
-                <span>{option.label}</span>
-                {theme === option.value && <Check size={16} />}
-              </button>
-            ))}
+                {(
+                  [
+                    { value: "zone", label: "Zone total", icon: Droplets },
+                    { value: "plant", label: "Per plant", icon: Sprout },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.value}
+                    className={water.view === option.value ? "chosen" : ""}
+                    aria-pressed={water.view === option.value}
+                    onClick={() => water.setView(option.value)}
+                  >
+                    <option.icon size={20} />
+                    <span>{option.label}</span>
+                    {water.view === option.value && <Check size={16} />}
+                  </button>
+                ))}
+              </div>
+              <p className="small muted mt-3">
+                Per plant is each zone’s water today, and its daily limit, divided by its plant
+                count from Rooms &amp; setup, as if every plant got the same. Water use over the
+                grow stays in litres per zone. For this browser only, like the theme.
+              </p>
+            </div>
           </div>
         </section>
         <section className="panel settings-section">

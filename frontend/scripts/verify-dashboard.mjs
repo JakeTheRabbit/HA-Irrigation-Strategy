@@ -548,6 +548,54 @@ try {
       await page.keyboard.press("Escape");
     },
   );
+  await check("water today: per plant is one person's choice, made in Settings", async () => {
+    const cells = () => page.locator(".zone-table-desktop .water-use").allInnerTexts();
+    const choose = async (name) => {
+      await go("settings");
+      const choice = page.getByRole("group", { name: "Water today, shown as", exact: true });
+      await choice.getByRole("button", { name, exact: true }).click();
+      assert.equal(
+        await choice.getByRole("button", { name, exact: true }).getAttribute("aria-pressed"),
+        "true",
+      );
+    };
+    // Each zone's total, as always, until someone chooses otherwise.
+    await go("overview");
+    assert.match((await cells())[0], /^[\d.]+ \/ [\d.]+ L\n\d+% of limit$/);
+    await choose("Per plant");
+    await axe("settings: water per plant");
+    // The demo's zone 1: 5.3 L for 36 plants, a 40 L limit.
+    await go("overview"); // a reload: the choice is kept in this browser
+    assert.equal((await cells())[0], "147 mL / 1.1 L\n13% of limit");
+    const water = page.locator(".zone-table-desktop th", { hasText: "Water today" });
+    assert.equal((await water.innerText()).replace(/\s+/g, " "), "Water today per plant");
+    assert.match(
+      await page.locator(".metric-item", { hasText: "Water today" }).innerText(),
+      /^Water today\n\d+ mL\nPer plant, across 108 plants/,
+    );
+    const table = await page.evaluate(() => {
+      const box = document.querySelector(".zone-table-desktop");
+      return box.scrollWidth > box.clientWidth + 1;
+    });
+    assert.equal(table, false, "per plant, the Overview's zone table scrolls sideways");
+    await page.locator(".zone-table-desktop .zone-name", { hasText: "Zone 1" }).click();
+    const tile = page.getByRole("dialog").locator(".detail-metrics > div", {
+      hasText: "Water today per plant",
+    });
+    assert.match(await tile.innerText(), /147 mL \/ 1\.1 L/);
+    await page.keyboard.press("Escape");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await go("zones");
+    assert.match(
+      await page.locator(".zone-grid .zone-card").first().innerText(),
+      /Water today per plant\n147 mL \/ 1\.1 L/,
+    );
+    await noOverflow();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await choose("Zone total"); // and back, for the checks after this one
+    await go("overview");
+    assert.match((await cells())[0], /^[\d.]+ \/ [\d.]+ L\n\d+% of limit$/);
+  });
   await check("sensors: coloured status pills and each numeric sensor's recent line", async () => {
     const trends = "[data-sensor-trend] .sparkline";
     await inBothThemes("sensors", async () => {

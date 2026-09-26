@@ -2,6 +2,7 @@ import { StrictMode, Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
+import { WaterViewProvider } from "@/lib/water-view";
 import App from "./App";
 import "./styles.css";
 import "./workspace.css";
@@ -38,7 +39,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
       <TooltipProvider>
-        <App />
+        <WaterViewProvider>
+          <App />
+        </WaterViewProvider>
         <Toaster richColors position="bottom-right" />
       </TooltipProvider>
     </ErrorBoundary>
