@@ -388,6 +388,8 @@ class Room:
         self._feed_last_good_time = None
         self._feed_ph_last_good = None
         self._feed_ph_last_good_time = None
+        # when this room was seen switched off (see _room_switched_on); durable, None when not known
+        self._off_since = None
 
 
 class Controller:
@@ -799,9 +801,14 @@ class Controller:
         room.shot_inflight = None
         room.strategy_required = False
         room._strategy_persisted = True
+        room._off_since = None
         block = per_room.get(room.slug)
         if isinstance(block, dict):
             room.strategy_required = bool(block.get("_strategy_required", False))
+            try:
+                room._off_since = datetime.fromisoformat(block["_room_off_since"])
+            except (KeyError, TypeError, ValueError):
+                pass
             fault = block.get("_hardware_fault")
             if "_hardware_fault" in block:
                 # Old files have no metadata. Malformed new metadata must not clear a hold.
@@ -1147,6 +1154,10 @@ class Controller:
                 block.pop("_shot_inflight", None)
             if hasattr(room, "_room_active_known"):
                 block["_room_active"] = room._room_active_known
+            if getattr(room, "_off_since", None):
+                block["_room_off_since"] = room._off_since.isoformat()
+            else:
+                block.pop("_room_off_since", None)
             if getattr(room, "_setup_fingerprint_adopted", None):  # else keep whatever was saved
                 block["_setup"] = {
                     "revision": room.setup_revision,
@@ -1737,9 +1748,24 @@ class Controller:
             ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
             del self._alerted[key]
 
+    # A room switched back on within this many hours of being seen going off carries on where it was.
+    ROOM_RESUME_H = 24
+
     def _room_switched_on(self, room):
-        """A fresh run: yesterday's phase, counters and learned ceiling belong to the last crop.
-        Water history is a record, so it stays. Zones wait in P3 for the next lights-on boundary."""
+        """Switched back on within ROOM_RESUME_H of being seen going off, a room carries on where it
+        was: its phases, today's counters and what it has learned. Turning a room off and on to clear a
+        fault must not restart its day: on 25 Sep 2026 three zones in P2 went back to a P1 ramp at
+        20:53, an hour before lights-off. A room off for longer, or since before the controller last
+        started, is a new crop: yesterday's phase, counters and learned ceiling belong to the last one,
+        so it starts a fresh run, and its grow-day begins at once when the lights are on, else at
+        lights-on. Water history is a record, so it always stays."""
+        off_since, room._off_since = getattr(room, "_off_since", None), None
+        now = datetime.now()
+        if off_since is not None and timedelta(0) <= now - off_since < timedelta(hours=self.ROOM_RESUME_H):
+            minutes = (now - off_since).total_seconds() / 60.0
+            log(f"[{room.slug}] room switched ON after {minutes:.0f} min off - carrying on where it was")
+            self._save_state()
+            return
         log(f"[{room.slug}] room switched ON - starting a fresh run")
         for zone in room.zones:
             old = room.state[zone]
@@ -3094,6 +3120,9 @@ class Controller:
         active, was = self._room_active(room), getattr(room, "_was_room_active", None)
         room._was_room_active = active
         if not active:
+            if was is True:  # seen going off: how long it stays off decides what switching it on does
+                room._off_since = datetime.now()
+                self._save_state()
             if was is not False:
                 self._room_switched_off(room)
             self._publish_room_off(room, now)

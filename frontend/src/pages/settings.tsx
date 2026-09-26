@@ -176,15 +176,16 @@ export function Settings({
               <h2>Room on / off</h2>
               <p>
                 Switch {controller.room.room.name} off when nothing is growing in it, and on again
-                to start a fresh run.
+                when the next crop goes in.
               </p>
             </div>
             <div>
               <RoomPower controller={controller} />
               <p className="small muted mt-3">
                 Off: the controller will not water this room and raises no alerts for it, and a shot
-                already running stops within a few seconds. On: daily counters and learned phase
-                state reset for a fresh run. This is not an emergency stop.
+                already running stops within a few seconds. On within a day: it carries on where it
+                was. On after longer: daily counters and learned phase state reset for a fresh run.
+                This is not an emergency stop.
               </p>
             </div>
           </section>
