@@ -33,18 +33,6 @@ STEERING_MODES = ["Vegetative", "Generative"]
 # Growth stages (for growth_stage select entity)
 GROWTH_STAGES = ["Vegetative", "Generative", "Transition"]
 
-# Crop types (updated with Athena)
-CROP_TYPES = [
-    "Cannabis_Athena",
-    "Cannabis_Hybrid",
-    "Cannabis_Indica",
-    "Cannabis_Sativa",
-    "Tomato",
-    "Lettuce",
-    "Basil",
-    "Custom",
-]
-
 # ---------------------------------------------------------------------------
 # Named-stage recipes
 # ---------------------------------------------------------------------------
@@ -133,10 +121,6 @@ DEFAULT_RECIPE = {
 
 # Service names — the single source of truth for the domain's registered services.
 # These MUST match the keys of the SERVICES dict in services.py.
-SERVICE_TRANSITION_PHASE = "transition_phase"
-SERVICE_EXECUTE_IRRIGATION_SHOT = "execute_irrigation_shot"
-SERVICE_CHECK_TRANSITION_CONDITIONS = "check_transition_conditions"
 SERVICE_SET_MANUAL_OVERRIDE = "set_manual_override"
-SERVICE_CUSTOM_SHOT = "custom_shot"
 SERVICE_APPLY_RECIPE = "apply_recipe"
 SERVICE_SAVE_RECIPE = "save_recipe"

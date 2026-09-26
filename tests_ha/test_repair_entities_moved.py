@@ -87,11 +87,10 @@ async def test_a_long_list_is_cut_short_and_counted(hass):
     assert placeholders["count"] == "9" and "and 3 more" in placeholders["entities"]
 
 
-async def test_sensors_and_buttons_are_not_judged(hass):
-    """The controller tolerates the fused sensors' legacy naming and never reads a button."""
+async def test_sensors_are_not_judged(hass):
+    """The controller tolerates the fused sensors' legacy naming."""
     entry = await _install(hass)
     _move(hass, "sensor.crop_steering_vwc_zone_1", "sensor.crop_steering_zone_1_vwc")
-    _move(hass, "button.crop_steering_zone_1_trigger_shot", "button.gt1_trigger_shot")
     await hass.async_block_till_done()
     assert health.moved_entities(hass, entry) == []
 

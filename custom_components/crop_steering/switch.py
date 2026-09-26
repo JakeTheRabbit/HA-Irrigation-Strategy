@@ -53,85 +53,6 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="Auto Irrigation Enabled",
         icon="mdi:auto-mode",
     ),
-    SwitchEntityDescription(
-        key="analytics_enabled",
-        name="Analytics Enabled",
-        icon="mdi:chart-line",
-    ),
-    # ----- RootSense intelligence module enable switches -----
-    # Each pillar reads its corresponding switch on every iteration. When OFF,
-    # the module logs "skipped" and short-circuits without touching state or
-    # publishing sensors. Defaults: all OFF so existing v2.x installs are
-    # unaffected on first upgrade. Operators opt in pillar-by-pillar.
-    SwitchEntityDescription(
-        key="intelligence_root_zone_enabled",
-        name="RootSense — Root Zone Intelligence",
-        icon="mdi:water-percent-alert",
-    ),
-    SwitchEntityDescription(
-        key="intelligence_adaptive_enabled",
-        name="RootSense — Adaptive Irrigation",
-        icon="mdi:tune-vertical-variant",
-    ),
-    SwitchEntityDescription(
-        key="intelligence_agronomic_enabled",
-        name="RootSense — Agronomic Intelligence",
-        icon="mdi:sprout",
-    ),
-    SwitchEntityDescription(
-        key="intelligence_orchestrator_enabled",
-        name="RootSense — Orchestrator",
-        icon="mdi:hub-outline",
-    ),
-    SwitchEntityDescription(
-        key="intelligence_anomaly_enabled",
-        name="RootSense — Anomaly Scanner",
-        icon="mdi:alert-decagram-outline",
-    ),
-    # ----- ClimateSense pillar enable switches -----
-    # Same pattern as RootSense — each pillar reads its own switch on
-    # every iteration; OFF short-circuits all side effects. Default OFF
-    # so an existing climate controller stays in charge until
-    # you opt in. See the retired intelligence dashboard for a
-    # convenient toggle panel.
-    SwitchEntityDescription(
-        key="intelligence_climate_sensing_enabled",
-        name="ClimateSense — Sensing",
-        icon="mdi:thermometer-lines",
-    ),
-    SwitchEntityDescription(
-        key="intelligence_climate_timeline_enabled",
-        name="ClimateSense — Timeline",
-        icon="mdi:calendar-clock",
-    ),
-    SwitchEntityDescription(
-        key="intelligence_climate_control_enabled",
-        name="ClimateSense — Control loops",
-        icon="mdi:tune",
-    ),
-    SwitchEntityDescription(
-        key="intelligence_climate_lights_enabled",
-        name="ClimateSense — Lights manager",
-        icon="mdi:lightbulb-on-outline",
-    ),
-    SwitchEntityDescription(
-        key="intelligence_climate_anomaly_enabled",
-        name="ClimateSense — Anomaly scanner",
-        icon="mdi:alert-octagon-outline",
-    ),
-    # Optional — if ON, the timeline pillar drives
-    # number.crop_steering_steering_intent based on the active recipe phase.
-    SwitchEntityDescription(
-        key="intelligence_climate_drives_intent_enabled",
-        name="ClimateSense — Recipe drives cultivator intent",
-        icon="mdi:link-variant",
-    ),
-    # ----- LLM advisor (Phase L0 — report only, no LLM calls) -----
-    SwitchEntityDescription(
-        key="intelligence_llm_report_enabled",
-        name="LLM Advisor — Report builder (L0)",
-        icon="mdi:file-document-outline",
-    ),
 ]
 
 
@@ -154,17 +75,6 @@ def create_zone_switch_descriptions(num_zones: int) -> list[SwitchEntityDescript
                 key=f"zone_{zone_num}_manual_override",
                 name=f"Zone {zone_num} Manual Override",
                 icon="mdi:hand-water",
-            )
-        )
-
-        # Per-zone blocked-dripper protection toggle. ON (default) = abandon emergency
-        # irrigation for this row after the threshold of failed shots (blocked-dripper guard).
-        # OFF = never abandon; the row keeps retrying emergency shots.
-        zone_switches.append(
-            SwitchEntityDescription(
-                key=f"zone_{zone_num}_dripper_protection",
-                name=f"Zone {zone_num} Dripper Protection",
-                icon="mdi:water-alert",
             )
         )
 
@@ -253,8 +163,6 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
             self._attr_is_on = True  # Auto irrigation enabled by default
         elif "zone_" in description.key and "_enabled" in description.key:
             self._attr_is_on = True  # Zones enabled by default
-        elif "dripper_protection" in description.key:
-            self._attr_is_on = True  # Blocked-dripper protection on by default
         else:
             self._attr_is_on = False
 

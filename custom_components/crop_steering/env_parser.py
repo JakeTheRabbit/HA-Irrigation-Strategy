@@ -145,7 +145,6 @@ def _parse_zones(raw: Dict[str, str]) -> Dict[int, Dict[str, Any]]:
             # Per-zone tunables
             "plant_count": int(raw.get(f"ZONE_{n}_PLANT_COUNT", "4")),
             "max_daily_volume": float(raw.get(f"ZONE_{n}_MAX_DAILY_VOLUME", "20.0")),
-            "shot_multiplier": float(raw.get(f"ZONE_{n}_SHOT_MULTIPLIER", "1.0")),
         }
 
         _LOGGER.info(
@@ -193,17 +192,14 @@ def _parse_parameters(raw: Dict[str, str]) -> Dict[str, Any]:
         "field_capacity": _f("SUBSTRATE_FIELD_CAPACITY", 70.0),
         "max_ec": _f("SUBSTRATE_MAX_EC", 9.0),
         # Crop
-        "default_crop_type": raw.get("DEFAULT_CROP_TYPE", "Cannabis_Athena"),
         "default_steering_mode": raw.get("DEFAULT_STEERING_MODE", "Vegetative"),
         # P0
         "p0_veg_dryback": _f("P0_VEG_DRYBACK_TARGET", 50),
         "p0_gen_dryback": _f("P0_GEN_DRYBACK_TARGET", 40),
-        "p0_min_wait": _i("P0_MIN_WAIT_TIME", 30),
         "p0_max_wait": _i("P0_MAX_WAIT_TIME", 120),
         # P1
         "p1_initial_shot_size": _f("P1_INITIAL_SHOT_SIZE_PERCENT", 2.0),
         "p1_shot_increment": _f("P1_SHOT_SIZE_INCREMENT", 0.5),
-        "p1_max_shot_size": _f("P1_MAX_SHOT_SIZE_PERCENT", 10.0),
         "p1_time_between_shots": _i("P1_TIME_BETWEEN_SHOTS", 15),
         "p1_target_vwc": _f("P1_TARGET_VWC", 65),
         "p1_max_shots": _i("P1_MAX_SHOTS", 10),
@@ -214,8 +210,6 @@ def _parse_parameters(raw: Dict[str, str]) -> Dict[str, Any]:
         "p2_ec_high_threshold": _f("P2_EC_HIGH_THRESHOLD", 1.2),
         "p2_ec_low_threshold": _f("P2_EC_LOW_THRESHOLD", 0.8),
         # P3
-        "p3_veg_last_irrigation": _i("P3_VEG_LAST_IRRIGATION", 120),
-        "p3_gen_last_irrigation": _i("P3_GEN_LAST_IRRIGATION", 180),
         "p3_emergency_vwc": _f("P3_EMERGENCY_VWC_THRESHOLD", 40),
         "p3_emergency_shot_size": _f("P3_EMERGENCY_SHOT_SIZE_PERCENT", 2.0),
         # EC targets

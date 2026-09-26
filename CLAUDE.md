@@ -48,8 +48,9 @@ local Python installs. CI is unaffected.
 ## Architecture
 
 ### 1. HA integration — `custom_components/crop_steering/`
-- ~100 entities (numbers, switches, selects, sensors) via a config-flow UI; no YAML.
-- Services: `transition_phase`, `execute_irrigation_shot`, `check_transition_conditions`, `set_manual_override`.
+- About 90 entities for a one-zone room (numbers, switches, selects, sensors) via a config-flow UI; no YAML.
+- Services: `set_manual_override`, `apply_recipe`, `save_recipe`, and the `setup_*`, `strategy_*`,
+  `runs_*` and `stock_*` families the dashboard calls.
 - Pure, testable helpers in `calculations.py`.
 
 ### 2. f2-control add-on — `addons/f2_control/` (live engine)
@@ -100,7 +101,6 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
 - Global: `crop_steering_<param>` (e.g. `number.crop_steering_p2_shot_size`).
 - Per-zone: `crop_steering_zone_X_<param>`.
 - Sensors: `sensor.crop_steering_<metric>`; services: `crop_steering.<action>`.
-- Per-zone manual phase pin: `input_select.crop_steering_zone_X_phase_control` (Auto / P0–P3).
 - The engine reads switches/numbers by `entity_id` — renaming a friendly-name in HA
   or the dashboard does not affect it.
 
@@ -207,7 +207,3 @@ install still loads.
   state; only independent flow measurement or a catch test proves delivered water.
 - Shot sizing uses both zone-total substrate and zone-total dripper flow, derived
   from per-plant pot size, plant count and drippers. Keep the units explicit.
-
-> **Historical note.** An earlier experimental "intelligence" layer (RootSense substrate AI and
-> ClimateSense climate control) was never deployed and has been retired. A few inert
-> `…_intelligence_*_enabled` entities still exist in the integration; nothing reads them.

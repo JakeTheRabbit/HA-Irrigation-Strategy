@@ -85,6 +85,7 @@ def test_no_platform_names_the_zone_device_by_itself_any_more():
     users = [
         path.name
         for path in sorted(INTEGRATION.glob("*.py"))
-        if "name=zone_device_name(self._entry, self._zone_num)" in path.read_text()
+        if "name=zone_device_name(self._entry, self._zone_num)"
+        in path.read_text(encoding="utf-8")
     ]
-    assert users == ["button.py", "number.py", "select.py"]
+    assert users == ["number.py", "select.py"]

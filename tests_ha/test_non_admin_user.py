@@ -36,9 +36,6 @@ CHANGES = {
     "save_recipe": {"recipe": {}},
     "apply_recipe": {},
     "set_manual_override": {"zone": 1},
-    "transition_phase": {"target_phase": "P3"},
-    "execute_irrigation_shot": {"zone": 1, "duration_seconds": 5},
-    "custom_shot": {"target_zone": 1, "volume_ml": 100},
     "setup_read": {},
     "setup_create": {},
     "setup_save": {},
@@ -49,14 +46,8 @@ READS = {
     "strategy_preview": {"room_id": ROOM},
     "runs_get": {"room_id": ROOM},
     "stock_get": {"room_id": ROOM},
-    "check_transition_conditions": {},
 }
-EVENTS = (
-    "crop_steering_phase_transition",
-    "crop_steering_irrigation_shot",
-    "crop_steering_custom_shot",
-    "crop_steering_manual_override",
-)
+EVENTS = ("crop_steering_manual_override",)
 
 
 async def _staff(hass):

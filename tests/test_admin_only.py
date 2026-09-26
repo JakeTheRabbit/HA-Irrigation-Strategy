@@ -33,7 +33,6 @@ from homeassistant.exceptions import HomeAssistantError  # noqa: E402
 ADMIN, STAFF, GHOST = "admin-user", "staff-user", "deleted-user"
 ROOM = "room:"
 READ_ONLY = {
-    "check_transition_conditions",
     "strategy_get",
     "strategy_preview",
     "runs_get",
@@ -42,9 +41,6 @@ READ_ONLY = {
 SETUP = {"setup_read", "setup_create", "setup_save", "setup_remove"}
 # Every other service changes something. What each is called with:
 CHANGES = {
-    "transition_phase": {"target_phase": "P1"},
-    "execute_irrigation_shot": {"zone": 1, "duration_seconds": 5},
-    "custom_shot": {"target_zone": 1, "volume_ml": 100},
     "set_manual_override": {"zone": 1},
     "apply_recipe": {"stage": "Bulk"},
     "save_recipe": {"recipe": {"stages": {}}},

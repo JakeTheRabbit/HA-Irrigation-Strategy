@@ -83,6 +83,43 @@ async def test_everything_the_operator_tuned_survives_the_upgrade(hass):
         assert float(hass.states.get(entity_id).state) == float(tuned), entity_id
 
 
+async def test_the_upgrade_removes_the_entities_nothing_uses_and_keeps_the_rest(hass):
+    """An old install still holds entities that nothing read or set: the trigger button, the
+    retired intelligence switches, a zone's group and so on. Setup removes those from the
+    registry, and only those: the global P2 EC threshold stays although its per-zone copy goes."""
+    seed = fixture("entry_2_17_wizard.json")
+    retired = {
+        "button.crop_steering_zone_1_trigger_shot": "zone_1_trigger_shot",
+        "number.crop_steering_steering_intent": "steering_intent",
+        "number.crop_steering_zone_2_shot_size_multiplier": "zone_2_shot_size_multiplier",
+        "number.crop_steering_zone_1_p2_ec_high_threshold": "zone_1_p2_ec_high_threshold",
+        "select.crop_steering_crop_type": "crop_type",
+        "select.crop_steering_zone_2_phase_override": "zone_2_phase_override",
+        "sensor.crop_steering_next_irrigation_time": "next_irrigation_time",
+        "switch.crop_steering_intelligence_llm_report_enabled": "intelligence_llm_report_enabled",
+        "switch.crop_steering_zone_1_dripper_protection": "zone_1_dripper_protection",
+    }
+    kept = {
+        **_known_numbers(seed),
+        "number.crop_steering_p2_ec_high_threshold": "p2_ec_high_threshold",
+    }
+    entry, _seed = await _upgrade(
+        hass, "entry_2_17_wizard.json", registry_ids={**retired, **kept}
+    )
+    registry = er.async_get(hass)
+    assert [e for e in retired if registry.async_get(e)] == []
+    assert [e for e in kept if registry.async_get(e) is None] == []
+    for entity_id, saved in seed["operator_tuned_numbers"].items():
+        tuned = saved[0] if isinstance(saved, list) else saved
+        assert float(hass.states.get(entity_id).state) == float(tuned), entity_id
+    # No platform creates a retired entity again: a second pass finds nothing to remove.
+    from custom_components.crop_steering import _remove_retired_entities
+
+    count = len(er.async_entries_for_config_entry(registry, entry.entry_id))
+    _remove_retired_entities(hass, entry)
+    assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == count
+
+
 async def test_lights_hours_set_by_the_operator_beat_the_ones_recorded_at_setup(hass):
     """2.18.1 starts SEEDING the lights hours from the wizard's answers. On this room the wizard
     said 10-22 and the operator later set 8-20 on a dashboard. A seed must only ever apply to an

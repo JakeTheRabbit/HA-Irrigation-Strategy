@@ -111,7 +111,7 @@ async def test_a_fresh_install_registers_every_entity_under_the_id_its_code_asks
                 checked += 1
                 if entity.entity_id != f"{platform.domain}.{wanted}":
                     wrong.append(f"{entity.entity_id} should be {platform.domain}.{wanted}")
-    assert checked > 100 and not wrong, wrong
+    assert checked > 80 and not wrong, wrong
 
 
 async def test_an_existing_install_keeps_the_entity_ids_its_registry_already_holds(hass):
