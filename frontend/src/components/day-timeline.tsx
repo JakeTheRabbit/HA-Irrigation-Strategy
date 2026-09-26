@@ -53,6 +53,7 @@ import {
 } from "@/lib/planning-curve";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { settingWords } from "@/lib/setting-words";
+import { waitingText } from "@/lib/waiting-for";
 import type { Controller, Setting, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import { estimateRuntime, flowInputs, waterParameters } from "@/lib/water-delivery";
@@ -634,9 +635,10 @@ function Timeline({
         unprojected(stopped, beat.at, now) ??
         (next.basis === "held" && held
           ? `${HELD[held.kind]}: ${held.text}`
-          : next.basis === "night"
-            ? `overnight: emergency shots only until ${clock(day.end)}`
-            : null),
+          : waitingLine(zone, phase, next.basis === "dry-down" ? next.at : null) ||
+            (next.basis === "night"
+              ? `overnight: emergency shots only until ${clock(day.end)}`
+              : null)),
     };
   });
   const roomChanges = changes.filter((change) => change.zoneId === undefined);
@@ -1382,11 +1384,22 @@ function typicalBand(
   };
 }
 
+/** What the controller waits for, by its own thresholds against the readings now, with this chart's
+ * estimate of the next maintenance shot beside them: only for the phase this lane is in. */
+function waitingLine(zone: Zone, phase: string | null, shotEstimate: number | null): string {
+  const text =
+    zone.waiting && zone.phase === phase
+      ? waitingText(zone.waiting, { number: (value) => number(value), clock, shotEstimate })
+      : "";
+  return text && `next: ${text}`;
+}
 function nextText(lane: Lane, day: GrowDay): string {
   const { next } = lane;
   if (lane.stopped) return `not watering: ${lane.stopped}`;
   const held = lane.blocks.at(-1);
   if (next.basis === "held" && held) return `${HELD[held.kind]}: ${held.text}`;
+  const waiting = waitingLine(lane.zone, lane.phase, null);
+  if (waiting) return waiting;
   if (next.basis === "night") return `overnight: emergency shots only until ${clock(day.end)}`;
   if (next.at !== null)
     switch (next.basis) {

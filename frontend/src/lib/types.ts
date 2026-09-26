@@ -2,6 +2,7 @@ import type { HistoryRequest, HistoryWindow } from "./comparison-types";
 import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
 import type { AutoSetpointStatus } from "./auto-setpoints";
+import type { Waiting } from "./waiting-for";
 import type { WaterRecord, WaterRecordRequest } from "./water-use";
 export interface EntityState {
   entity_id: string;
@@ -72,6 +73,8 @@ export interface Zone {
   sensors: EntityState[];
   /** Setpoint supervisor status; null when this zone has no supervisor sensor. */
   auto: AutoSetpointStatus | null;
+  /** What would move the zone next, as the controller worked it out; null when it is not fresh. */
+  waiting: Waiting | null;
 }
 export interface LogEvent {
   id: string;

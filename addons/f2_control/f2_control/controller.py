@@ -38,6 +38,7 @@ from crop_steering_engine import (
     EC_SETTLE_MIN,
     Reason,
     decide,
+    waiting_for,
     ZoneParams,
     ZoneSnapshot,
     validate_params,
@@ -1885,6 +1886,23 @@ class Controller:
             **({"timeout": timeout} if timeout else {}),
         )
 
+    @staticmethod
+    def _publish_waiting_for(room, zone, snap, p, now):
+        """What would move the zone next (crop_steering_engine.waiting_for), for the dashboard's zone
+        card and grow-day line. No snapshot (no probe, or the room is off): an empty list, so an old
+        one never lingers. A wait's clock time is `at` plus its in_min."""
+        conditions = waiting_for(snap, p) if snap is not None else []
+        ha_set(
+            f"sensor.crop_steering_{room.prefix}zone_{zone}_waiting_for_app",
+            snap.phase if snap is not None else "none",
+            {
+                "conditions": conditions,
+                "at": now.astimezone().isoformat(timespec="seconds"),
+                "friendly_name": f"Zone {zone} waiting for (controller)",
+                "engine": "f2-control",
+            },
+        )
+
     def _publish_room_off(self, room, now):
         """An OFF room still reports in, so the dashboard shows why it is idle and the integration
         never mistakes a deliberately idle room for a dead engine."""
@@ -1892,6 +1910,7 @@ class Controller:
         try:
             for zone in room.zones:
                 self._publish_zone_status(room, zone, "Room off", "Room off (nothing growing)")
+                self._publish_waiting_for(room, zone, None, None, now)
                 if room.state.get(zone, {}).get("last_shot_is_anchor"):
                     # a room switched on and off again without watering: take back the false
                     # "last irrigation" an earlier controller published for it
@@ -3275,6 +3294,7 @@ class Controller:
                 # of firing a shot _act_zone could only refuse.
                 snap = snaps[zone] = dataclasses.replace(snap, daily_vol=max(snap.daily_vol, p.max_daily_volume))
                 new_phase, new_thr, fire, size, reason = decide(snap, p)
+            shown = snap  # what waiting_for reads: the snapshot, in the phase the zone is now in
             if new_phase != st["phase"]:
                 if new_phase == "P0":
                     st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, snap.vwc
@@ -3290,6 +3310,13 @@ class Controller:
                 st["phase"] = new_phase
                 st["last_phase_change"] = now
                 self._save_state()
+                # The snapshot was taken in the old phase: what the new one starts from.
+                shown = dataclasses.replace(
+                    snap, phase=new_phase, phase_minutes=0.0,
+                    **({"peak_vwc": snap.vwc} if new_phase == "P0" else {}),
+                    **({"shot_count": 0} if new_phase == "P1" else {}),
+                )
+            self._publish_waiting_for(room, zone, shown, p, now)
             # The EC steer runs on ec_smooth, which only settled readings feed (see _settled_ec).
             if (snap.ec is not None and snap.ec_smooth is not None and p.stacking_on
                     and st["phase"] == "P2" and p.ec_target_p2 > 0):
@@ -3340,6 +3367,7 @@ class Controller:
                 log("auto setpoints error", room.slug, zone, e)
         for zone, p in blind:
             st = room.state[zone]
+            self._publish_waiting_for(room, zone, None, p, now)  # no probe: nothing to compare
             # A dead probe must NOT freeze the daily cycle: still honour the time-based
             # phase forces (lights-off -> P3, P3 -> P0 at the new photoperiod). Only the
             # VWC-driven transitions are paused while blind.

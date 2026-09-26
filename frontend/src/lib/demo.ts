@@ -138,6 +138,18 @@ export function createDemo(now = Date.now()): States {
         // The controller always posts its zone status with a reason.
         { reason: "demo" },
       );
+      // What the controller publishes from crop_steering_engine.waiting_for, for the zone's phase.
+      put(`${base}${key}waiting_for_app`, id === 1 ? "P1" : "P2", {
+        at: new Date(now).toISOString(),
+        conditions: demoWaiting(id === 1 ? "P1" : "P2", {
+          vwc: 54 + id * 2 + index * 3,
+          ec: Number((2.6 + id * 0.2 + index * 0.3).toFixed(1)),
+          peak: 64 + index * 2,
+          trigger: 61 + index * 2,
+          ecTarget: index ? 3.5 : 3,
+          toLightsOff: minutesUntil(now, index ? 20 : 22),
+        }),
+      });
       put(`${base}${key}daily_water_app`, (4.4 + id * 0.9 + index).toFixed(1), {
         unit_of_measurement: "L",
       });
@@ -238,9 +250,89 @@ export function demoBeat(states: States, now = Date.now()): States {
       id,
       /^sensor\.crop_steering_.*ai_heartbeat$/.test(id)
         ? { ...entity, last_updated: stamp, attributes: { ...entity.attributes, last_beat: stamp } }
-        : entity,
+        : /^sensor\.crop_steering_.*waiting_for_app$/.test(id)
+          ? { ...entity, last_updated: stamp, attributes: rebased(entity.attributes, now) }
+          : entity,
     ]),
   );
+}
+/** A demo zone's waiting_for conditions, from its own numbers, as the engine would give them. */
+function demoWaiting(
+  phase: string,
+  zone: {
+    vwc: number;
+    ec: number;
+    peak: number;
+    trigger: number;
+    ecTarget: number;
+    toLightsOff: number;
+  },
+) {
+  const round = (value: number) => Math.round(value * 100) / 100;
+  if (phase === "P1")
+    return [
+      {
+        rule: "p1_ramp",
+        shot: true,
+        to: null,
+        metric: "vwc",
+        op: "<",
+        value: zone.peak,
+        now: zone.vwc,
+        in_min: 4,
+      },
+      {
+        rule: "p1_done",
+        shot: false,
+        to: "P2",
+        metric: "vwc",
+        op: ">=",
+        value: zone.peak,
+        now: zone.vwc,
+        shots_left: 0,
+        ec_max: round(zone.ecTarget * 1.15),
+        ec_now: zone.ec,
+      },
+      { rule: "p1_max_shots", shot: false, to: "P2", shots_left: 3 },
+    ];
+  return [
+    {
+      rule: "p2_topup",
+      shot: true,
+      to: null,
+      metric: "vwc",
+      op: "<",
+      value: zone.trigger,
+      now: zone.vwc,
+    },
+    {
+      rule: "p2_dilute",
+      shot: true,
+      to: null,
+      metric: "ec",
+      op: ">",
+      value: round(zone.ecTarget * 1.2),
+      now: zone.ec,
+    },
+    { rule: "lights_off", shot: false, to: "P3", in_min: zone.toLightsOff },
+  ];
+}
+const minutesUntil = (now: number, hour: number) => {
+  const date = new Date(now);
+  return (hour * 60 - (date.getHours() * 60 + date.getMinutes()) + 1440) % 1440;
+};
+/** The demo's waits keep their clock times as its clock moves: `at` becomes now, each wait shortens. */
+function rebased(attributes: Record<string, unknown>, now: number) {
+  const at = Date.parse(String(attributes.at));
+  const gone = Number.isFinite(at) ? (now - at) / 60_000 : 0;
+  const conditions = Array.isArray(attributes.conditions)
+    ? attributes.conditions.map((item: Record<string, unknown>) =>
+        typeof item.in_min === "number"
+          ? { ...item, in_min: Math.max(0, Math.round((item.in_min - gone) * 10) / 10) }
+          : item,
+      )
+    : attributes.conditions;
+  return { ...attributes, at: new Date(now).toISOString(), conditions };
 }
 /** Demo-only side effects of a switch write that a real controller would publish itself. */
 export function demoReact(states: States, entityId: string, value: unknown): States {

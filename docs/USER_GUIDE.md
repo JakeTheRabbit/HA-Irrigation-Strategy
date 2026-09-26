@@ -42,6 +42,7 @@ Use **Settings → Sample workspace → Reset demo session…** and review the c
 | Room status line              | At the top of every page: watering, holding and why, or not watering and what to do, with the age of the controller's last report.                                  |
 | Zone scheduling               | Whether this zone is eligible for scheduling; it does not mean its valve is currently open.                                                                         |
 | Controller status and phase   | The controller's reported operating state and P0/P1/P2/P3 phase. Inspect any hold or unavailable status before making changes.                                      |
+| Next                          | What the controller waits for next, by its own numbers: e.g. shot when VWC < 61% (now 58%). Shown while it waters the zone and reports; not a forecast.             |
 | Valve on/off                  | The state of this zone's explicitly mapped switch. It does not establish physical flow.                                                                             |
 | Last irrigation               | A recorded controller event timestamp, with relative age and date/time. It is not inferred from sensor updates. Missing/invalid timestamps remain **Not reported**. |
 | VWC and root-zone EC          | The mapped substrate measurements. Their units and sensor availability matter independently.                                                                        |
