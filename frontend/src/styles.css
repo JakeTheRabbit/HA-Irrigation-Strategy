@@ -1072,6 +1072,45 @@ nav button.nav-separated {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
 }
+.setting-limit code {
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.setting-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+/* Which way a level acts (fills up to, waters below, ...): a word, not only a colour. */
+.setting-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.setting-tag[data-tag="fills"] {
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  color: var(--primary-strong);
+}
+.setting-tag[data-tag="waters"] {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.setting-tag[data-tag="dries"] {
+  background: color-mix(in srgb, var(--success) 8%, var(--surface));
+  color: var(--success);
+}
+.setting-tag[data-tag="rescues"] {
+  background: color-mix(in srgb, var(--destructive) 8%, var(--surface));
+  color: var(--destructive);
+}
 .setting-input > div {
   position: relative;
 }
