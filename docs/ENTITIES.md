@@ -109,10 +109,9 @@ for that zone. (3 zones × 23 = 69 entities on a 3-zone system.)
 |---|---|
 | `room_active` | Room on/off (default on). Off = nothing is growing: no irrigation of any kind for this room, including emergency shots and the no-probe fallback schedule, no alerts, repair issues cleared. Per room: `switch.crop_steering_<prefix>room_active`. |
 | `auto_setpoints` | Auto Setpoints (default off). On = the controller may rewrite this room's per-zone VWC targets from what it has learned, in bounded steps, never while a dated plan owns the room. Off = it still learns and reports, and writes nothing. Per room: `switch.crop_steering_<prefix>auto_setpoints`. |
-| `system_enabled` | Master on/off. Off = no irrigation at all. |
-| `auto_irrigation_enabled` | Enables the autonomous decision loop (off = manual-only). |
+| `system_enabled` / `auto_irrigation_enabled` | **Retired**, hidden, named "(retired)". `engine_enabled` is the one switch that stops watering. They stay for controllers from 2.24.0 or before, which hold every shot while one reads off and treat a missing one as off. A newer controller switches the room's kill switch off while one of them reads off, and says so (CS-208). |
 | `ec_stacking_enabled` | When on, the system builds EC when below target instead of diluting (push EC up intentionally). |
-| `engine_enabled` | The room's kill switch, created off. Off = the controller waters nothing in this room. Created for named rooms and new default rooms; an older default room keeps the helper its setup names. |
+| `engine_enabled` | The room's kill switch ("Watering" in the dashboard's Settings), created off. Off = the controller waters nothing in this room, and a shot already running stops within a few seconds. Created for named rooms and new default rooms; an older default room keeps the helper its setup names. |
 
 ### Per-zone (`switch.crop_steering_zone_N_*`)
 | Entity | What it does |
