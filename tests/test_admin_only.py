@@ -26,6 +26,7 @@ from custom_components.crop_steering import (  # noqa: E402
     setup_api,
     stock_api,
     strategy_api,
+    whats_new,
 )
 from custom_components.crop_steering.const import DOMAIN  # noqa: E402
 from homeassistant.exceptions import HomeAssistantError  # noqa: E402
@@ -37,7 +38,11 @@ READ_ONLY = {
     "strategy_preview",
     "runs_get",
     "stock_get",
+    "whats_new_get",
 }
+# Changes nothing but whether the dashboard's What's new window shows again: whoever opens the
+# dashboard first after an update may dismiss it, administrator or not.
+NOTICES = {"whats_new_seen": {"version": "2.0.0"}}
 SETUP = {"setup_read", "setup_create", "setup_save", "setup_remove"}
 # Every other service changes something. What each is called with:
 CHANGES = {
@@ -115,6 +120,12 @@ def rig(monkeypatch):
         mutate=AsyncMock(return_value={"tanks": []}),
     )
     monkeypatch.setattr(stock_api, "StockStore", lambda hass, entry: tanks)
+    notice = SimpleNamespace(
+        async_init=AsyncMock(),
+        response=AsyncMock(return_value={"seen": None}),
+        mark_seen=AsyncMock(return_value={"seen": "2.0.0"}),
+    )
+    monkeypatch.setattr(whats_new, "WhatsNew", lambda hass: notice)
     setup = {
         "read_setup": MagicMock(return_value={}),
         "create_setup": AsyncMock(return_value={}),
@@ -144,6 +155,7 @@ def rig(monkeypatch):
     asyncio.run(run_api.async_setup_runs(hass, ha_stubs.FakeEntry()))
     asyncio.run(stock_api.async_setup_stock(hass, ha_stubs.FakeEntry()))
     asyncio.run(setup_api.async_setup_setup_services(hass))
+    asyncio.run(whats_new.async_setup_whats_new(hass, ha_stubs.FakeEntry(), False))
 
     def effects():
         """Everything a handler could have done: events, service calls, writes."""
@@ -171,19 +183,27 @@ def rig(monkeypatch):
         handler = hass.services.registered[(DOMAIN, name)]
         request = SimpleNamespace(
             service=name,
-            data=dict(CHANGES.get(name, {}) if data is None else data),
+            data=dict({**CHANGES, **NOTICES}.get(name, {}) if data is None else data),
             context=SimpleNamespace(user_id=user),
             return_response=True,
         )
         return asyncio.run(handler(request))
 
-    return SimpleNamespace(hass=hass, call=call, effects=effects)
+    return SimpleNamespace(hass=hass, call=call, effects=effects, notice=notice)
 
 
 def test_every_service_is_either_read_only_or_checked(rig):
     """A new service has to be put in one list or the other here, on purpose."""
     registered = {name for _domain, name in rig.hass.services.registered}
-    assert registered == READ_ONLY | SETUP | set(CHANGES)
+    assert registered == READ_ONLY | SETUP | set(CHANGES) | set(NOTICES)
+
+
+@pytest.mark.parametrize("user", [STAFF, ADMIN, None])
+def test_anyone_may_dismiss_the_whats_new_window_and_it_changes_nothing_else(rig, user):
+    before = rig.effects()
+    assert rig.call("whats_new_seen", user) == {"seen": "2.0.0"}
+    rig.notice.mark_seen.assert_awaited_once_with("2.0.0")
+    assert rig.effects() == before
 
 
 @pytest.mark.parametrize("user", [STAFF, GHOST])
