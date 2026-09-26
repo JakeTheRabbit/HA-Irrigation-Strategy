@@ -198,6 +198,7 @@ def looping(monkeypatch):
     return build, _Clock
 
 
+@pytest.mark.usefixtures("no_blind_grace")
 def test_a_fresh_controllers_first_pass_reports_before_its_shot_and_through_it(looping):
     """Codex review of #97: a controller that has just started has reported nothing, so a long shot on
     its first pass had nothing to repeat and the room still went quiet. The pass reports the room
