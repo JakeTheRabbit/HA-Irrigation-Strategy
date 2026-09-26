@@ -489,6 +489,7 @@ export function buildRoom(states: States, room: Room): RoomView {
   const zones: Zone[] = activeIds.map((id) => {
     const z = `zone_${id}_`;
     const phase = resolve(states, room, "sensor", `${z}phase`);
+    const setPhase = resolve(states, room, "select", `${z}set_phase`);
     const enabled = resolve(states, room, "switch", `${z}enabled`);
     const status = resolve(states, room, "sensor", `${z}status`, `${z}safety_status`);
     const mappedValve =
@@ -548,6 +549,7 @@ export function buildRoom(states: States, room: Room): RoomView {
       name: typeof names?.[id] === "string" ? String(names[id]) : "Zone " + id,
       enabledEntity: enabled?.entity_id || null,
       enabled: boolean(enabled),
+      setPhaseEntity: setPhase?.entity_id || null,
       valveEntity,
       valveOn: valveEntity ? boolean(states[valveEntity]) : null,
       lastIrrigation: lastIrrigation(
@@ -953,6 +955,10 @@ export function validateChange(room: RoomView, states: States, change: Change): 
     return "This watering switch is shared with another room: switching it here would switch that room too.";
   const entity = states[change.entityId];
   if (!entity || !readable(entity)) return "Entity is missing or unavailable.";
+  if (room.zones.some((z) => z.setPhaseEntity === change.entityId))
+    return typeof change.value === "string" && /^P[0-3]$/.test(change.value)
+      ? null
+      : "Choose a phase from P0 to P3.";
   const choice = room.choices.find((c) => c.entityId === change.entityId);
   if (choice)
     return typeof change.value === "string" && choice.options.includes(change.value)

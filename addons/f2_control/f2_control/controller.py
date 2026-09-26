@@ -3056,6 +3056,33 @@ class Controller:
             st["last_phase_change"] = now
             self._save_state()
 
+    def _apply_phase_request(self, room, zone, st, now):
+        """Move a zone to the phase the operator picked on its Set Phase select, once. The select is
+        set back to Keep first; if that write fails the request waits for the next loop, so a phase
+        the engine has since moved on from is never applied twice. The move is made as the engine's
+        own would be: P1 ramps from its first shot again, and P0 measures its dry-back from the
+        moisture now (_snapshot takes the peak from the next reading). Nothing else is reset, today's
+        water included, and the engine's rules carry on from the new phase: lights-off still moves
+        a zone to P3 and lights-on to P0."""
+        entity = f"select.crop_steering_{room.prefix}zone_{zone}_set_phase"
+        wanted = ha_get(entity)[0]
+        if wanted not in ("P0", "P1", "P2", "P3"):
+            return
+        if not ha_call("select", "select_option", entity_id=entity, option="Keep"):
+            return
+        was = st["phase"]
+        if wanted == was:
+            return
+        if wanted == "P0":
+            st["peak"] = 0.0
+        if wanted == "P1":
+            st["shots"] = 0
+        st["phase"], st["last_phase_change"] = wanted, now
+        tag = "" if room.prefix == "" else f"{room.slug} "
+        self._activity.insert(0, f"{now.strftime('%H:%M')} {tag}Z{zone} phase {was} -> {wanted}, set by hand"[:120])
+        log(f"[{room.slug}] Z{zone} phase {was} -> {wanted}: set by hand")
+        self._save_state()
+
     def _strategy_preflight(self, room, zone, now):
         if getattr(room, "_strategy_batch_invalid", False):
             return "Strategy changed or held; recompute the irrigation batch on the next loop"
@@ -3140,6 +3167,7 @@ class Controller:
         snaps, decisions, healthy, blind, params = {}, {}, [], [], {}
         for zone in room.zones:
             st = room.state[zone]
+            self._apply_phase_request(room, zone, st, now)
             self._water_usage(room, zone, now)
             if self._starts_day(room, st, now, lights_on, lights_just_on):
                 # This tick starts the zone's day: yesterday's EC steer must not shape it. The P0 reset
