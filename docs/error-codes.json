@@ -229,6 +229,22 @@
       ]
     },
     {
+      "code": "CS-208",
+      "title": "A retired switch is off, so watering was switched off",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "System Enabled and Auto Irrigation Enabled are retired: the room's Watering switch (its engine switch) is the one switch that stops watering. One of the two is still off, so the controller switched watering off in its place. It does so again, within a minute, while that switch stays off.",
+      "watering": "Stopped in the room, as if watering had been switched off in Settings: no shot starts, and a shot that was running stops within a few seconds. The controller keeps reading the probes and following the phases.",
+      "causes": [
+        "System Enabled or Auto Irrigation Enabled was switched off, by a person or an automation, before these switches were retired.",
+        "An automation still switches one of them off to stop watering."
+      ],
+      "fixes": [
+        "Switch the named switch back on in Home Assistant (it is hidden: Settings → Entities, with hidden entities shown), then switch watering on in Crop Steering → Settings → Watering.",
+        "Change an automation that switches System Enabled or Auto Irrigation Enabled off to switch the room's Watering switch (its engine switch) off instead."
+      ]
+    },
+    {
       "code": "CS-301",
       "title": "CRITICAL hardware fault, watering stopped",
       "source": "notification",
