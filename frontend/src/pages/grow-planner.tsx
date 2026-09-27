@@ -36,6 +36,7 @@ import { fieldCapacitySuggestion, referenceLines, suggestedDraft } from "@/lib/s
 import { syncPlanZones } from "@/lib/sync-plan-zones";
 import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
+import { zonePlants } from "@/lib/water-view";
 import type {
   GrowPlan,
   StrategyDocument,
@@ -746,6 +747,7 @@ export function GrowPlanner({
                     zone={zonePlan}
                     name={selectedZone?.name || "Zone " + zoneId}
                     live={selectedZone}
+                    livePlants={selectedZone ? zonePlants(controller, selectedZone.id) : null}
                     profile={profile}
                     limits={limits}
                     granularity={granularity}

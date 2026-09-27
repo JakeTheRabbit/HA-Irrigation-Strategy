@@ -487,6 +487,7 @@ export function buildRoom(states: States, room: Room): RoomView {
   const activeSwitch = room.id ? states[roomActiveId(room)] : undefined;
   const roomActive = !room.id || roomIsActive(states, room);
   const autoSwitch = room.id ? resolve(states, room, "switch", "auto_setpoints") : undefined;
+  const waterSelect = room.id ? resolve(states, room, "select", "water_today_view") : undefined;
   const zones: Zone[] = activeIds.map((id) => {
     const z = `zone_${id}_`;
     const phase = resolve(states, room, "sensor", `${z}phase`);
@@ -799,6 +800,10 @@ export function buildRoom(states: States, room: Room): RoomView {
       entityId: autoSwitch?.entity_id ?? null,
       enabled: boolean(autoSwitch),
     },
+    waterView: {
+      entityId: waterSelect?.entity_id ?? null,
+      view: waterSelect?.state === "Per plant" ? "plant" : "zone",
+    },
   };
 }
 
@@ -934,6 +939,13 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
 export function validateChange(room: RoomView, states: States, change: Change): string | null {
   if (!room.room.id || !readable(descriptor(states, room.room)))
     return "No current readable room descriptor.";
+  if (change.entityId === room.waterView.entityId) {
+    // How Water today reads is a choice of display for the room, not a target: a plan does not own it.
+    const options = states[change.entityId]?.attributes.options;
+    return Array.isArray(options) && options.includes(change.value)
+      ? null
+      : "Choose Zone total or Per plant.";
+  }
   if (room.strategy.engaged && /^(number|select)[.]/.test(change.entityId))
     return "An active grow plan owns these targets. Disarm the plan before editing manual setpoints.";
   const hardware = discoverRooms(states).flatMap((r) => {

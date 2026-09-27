@@ -588,6 +588,70 @@ try {
     assert.doesNotMatch(zone1, /next:/, "no P1 conditions beside a P2 lane");
     await pinned.close();
   });
+  await check("water today: per plant is the room's choice, made in Settings", async () => {
+    const cells = () => page.locator(".zone-table-desktop .water-use").allInnerTexts();
+    // Within the visit, not a reload: the demo keeps each room's choice as Home Assistant would.
+    const visit = async (route) => {
+      await page.evaluate((hash) => (location.hash = hash), `#/${route}`);
+      await page.waitForTimeout(300);
+    };
+    const choose = async (name) => {
+      await visit("settings");
+      const choice = page.getByRole("group", { name: "Water today, shown as", exact: true });
+      await choice.getByRole("button", { name, exact: true }).click();
+      await page.waitForFunction(
+        (name) =>
+          [...document.querySelectorAll(".water-view-options button")].some(
+            (button) =>
+              button.textContent.trim() === name && button.getAttribute("aria-pressed") === "true",
+          ),
+        name,
+      );
+    };
+    const litres = /^[\d.]+ \/ [\d.]+ L\n\d+% of limit$/;
+    // Each zone's total, as always, until someone chooses otherwise.
+    await go("overview");
+    assert.match((await cells())[0], litres);
+    await choose("Per plant");
+    await axe("settings: water per plant");
+    // The demo's zone 1: 5.3 L for 36 plants, a 40 L limit.
+    await visit("overview");
+    assert.equal((await cells())[0], "147 mL / 1.1 L\n13% of limit");
+    const water = page.locator(".zone-table-desktop th", { hasText: "Water today" });
+    assert.equal((await water.innerText()).replace(/\s+/g, " "), "Water today per plant");
+    assert.match(
+      await page.locator(".metric-item", { hasText: "Water today" }).innerText(),
+      /^Water today\n\d+ mL\nPer plant, across 108 plants/,
+    );
+    const table = await page.evaluate(() => {
+      const box = document.querySelector(".zone-table-desktop");
+      return box.scrollWidth > box.clientWidth + 1;
+    });
+    assert.equal(table, false, "per plant, the Overview's zone table scrolls sideways");
+    await page.locator(".zone-table-desktop .zone-name", { hasText: "Zone 1" }).click();
+    const tile = page.getByRole("dialog").locator(".detail-metrics > div", {
+      hasText: "Water today per plant",
+    });
+    assert.match(await tile.innerText(), /147 mL \/ 1\.1 L/);
+    await page.keyboard.press("Escape");
+    // The choice is Flower 2's: Flower 1 still shows each zone's total.
+    await page.locator("#desktop-room").selectOption("room:f1_");
+    await page.waitForTimeout(300);
+    assert.match((await cells())[0], litres);
+    await page.locator("#desktop-room").selectOption("room:");
+    await page.waitForTimeout(300);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await visit("zones");
+    assert.match(
+      await page.locator(".zone-grid .zone-card").first().innerText(),
+      /Water today per plant\n147 mL \/ 1\.1 L/,
+    );
+    await noOverflow();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await choose("Zone total");
+    await visit("overview");
+    assert.match((await cells())[0], litres);
+  });
   await check("sensors: coloured status pills and each numeric sensor's recent line", async () => {
     const trends = "[data-sensor-trend] .sparkline";
     await inBothThemes("sensors", async () => {
@@ -942,6 +1006,40 @@ try {
     await axe("zone phase picker");
     await move("P2 · Maintenance", "P1 · Ramp-up"); // the demo as the other checks expect it
     await sheet.getByRole("button", { name: "Close", exact: true }).click();
+  });
+  await check("zones: one switch flips every zone, through the review", async () => {
+    // Flower 1's zone 3 is paused for inspection: the switch is on while any zone is on, as the
+    // entities card's header toggle is, and switching it on again switches zone 3 on too.
+    await go("zones", "f1");
+    const all = page.getByRole("switch", { name: "Every zone in Flower 1", exact: true });
+    const count = page.locator(".toolbar .all-zones-count");
+    const flip = async (title, rows, after) => {
+      await all.click();
+      const review = page.getByRole("dialog", { name: title, exact: true });
+      await expectVisible(review);
+      assert.deepEqual(
+        await review.locator(".review-row strong").allInnerTexts(),
+        rows.map((zone) => `Zone ${zone} scheduling`),
+      );
+      await axe(`every zone: ${title}`);
+      await review.getByRole("button", { name: `Apply ${rows.length} changes` }).click();
+      await review.waitFor({ state: "hidden" });
+      assert.equal(await count.innerText(), after);
+    };
+    assert.equal(await all.getAttribute("aria-checked"), "true");
+    assert.equal(await count.innerText(), "2 of 3 zones on");
+    await flip("Pause every zone", [1, 2], "0 of 3 zones on");
+    assert.equal(await all.getAttribute("aria-checked"), "false");
+    await flip("Switch every zone on", [1, 2, 3], "3 of 3 zones on");
+    assert.equal(await all.getAttribute("aria-checked"), "true");
+    // The Overview carries the same switch in its zones heading, at a phone's width too.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await go("overview");
+    await expectVisible(page.getByRole("switch", { name: "Every zone in Flower 2", exact: true }));
+    await noOverflow();
+    await go("zones");
+    await noOverflow();
+    await page.setViewportSize({ width: 1440, height: 1000 });
   });
   await check("zones: Water use totals every zone and charts its grow weeks", async () => {
     await go("zones");

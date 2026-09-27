@@ -21,6 +21,7 @@ from .const import (
     RECIPE_PARAMS,
     SOFTWARE_VERSION,
     SET_PHASE_OPTIONS,
+    WATER_TODAY_VIEWS,
 )
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .recipe import get_manager
@@ -52,6 +53,14 @@ SELECT_DESCRIPTIONS = [
         name="Recipe Stage",
         icon="mdi:format-list-bulleted-type",
         options=RECIPE_STAGES,
+    ),
+    # The room's one choice of how Water today reads: the dashboard shows it for everyone, and
+    # the controller's vitals notification follows it. Zone total until someone chooses.
+    SelectEntityDescription(
+        key="water_today_view",
+        name="Water Today Shown As",
+        icon="mdi:water-outline",
+        options=WATER_TODAY_VIEWS,
     ),
 ]
 
