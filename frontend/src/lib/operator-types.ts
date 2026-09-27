@@ -15,7 +15,9 @@ export type OperatorAction =
   | "stock_get"
   | "stock_save"
   | "stock_refill"
-  | "stock_record_batch";
+  | "stock_record_batch"
+  | "whats_new_get"
+  | "whats_new_seen";
 
 export interface ParameterLimit {
   value: number | null;

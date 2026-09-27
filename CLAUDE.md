@@ -50,7 +50,7 @@ local Python installs. CI is unaffected.
 ### 1. HA integration — `custom_components/crop_steering/`
 - About 90 entities for a one-zone room (numbers, switches, selects, sensors) via a config-flow UI; no YAML.
 - Services: `set_manual_override`, `apply_recipe`, `save_recipe`, and the `setup_*`, `strategy_*`,
-  `runs_*` and `stock_*` families the dashboard calls.
+  `runs_*`, `stock_*` and `whats_new_*` families the dashboard calls.
 - Pure, testable helpers in `calculations.py`.
 
 ### 2. f2-control add-on — `addons/f2_control/` (live engine)
@@ -157,6 +157,12 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
   Short-lived branches are deleted once their pull request is merged or closed.
 - **Changelog = dual view.** Every release in `CHANGELOG.md` leads with **🌱 In plain English** (anyone
   can follow it) then **🔧 Technical notes** (entity/code detail). Keep both when adding a release.
+- **What's new = for growers.** Every release also adds its section at the top of
+  `custom_components/crop_steering/WHATS_NEW.md`, which the dashboard shows once after an update: two
+  to five short lines a grower would notice, in plain words (what they can now do or see, not how),
+  with no entity ids, error codes, file names or pull request numbers, and the small things as one
+  last line, "Bug fixes and improvements." The release notes keep the detail; the window links to
+  them. `tests/test_whats_new.py` fails until the release's section is there.
 
 ## Compatibility & data — never break a live install
 

@@ -42,6 +42,7 @@ import { RoomOffBanner } from "@/components/room-controls";
 import { ActivityPanel } from "@/components/activity-panel";
 import { StatusLines } from "@/components/status-line";
 import { WaterViewProvider } from "@/lib/water-view";
+import { WhatsNewOnUpdate } from "@/components/whats-new";
 import { time, type Page } from "@/components/dashboard";
 import { Overview } from "@/pages/overview";
 import { Zones } from "@/pages/zones";
@@ -472,6 +473,7 @@ export default function App() {
           <span>{controller.room.room.name} · Controller-reported data</span>
         </footer>
       </div>
+      <WhatsNewOnUpdate controller={controller} />
       <Dialog
         open={Boolean(pending)}
         onOpenChange={(open) => {

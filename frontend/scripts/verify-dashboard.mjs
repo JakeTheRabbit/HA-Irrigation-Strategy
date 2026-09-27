@@ -652,6 +652,76 @@ try {
     await visit("overview");
     assert.match((await cells())[0], litres);
   });
+  await check("what's new: once after an update, on a desktop and a phone, and from Help", async () => {
+    const dialog = page.getByRole("dialog", { name: "What’s new in Crop Steering", exact: true });
+    const versions = () => dialog.locator("section h3").allInnerTexts();
+    // Every other check opens the demo as a new installation: nothing to catch up on.
+    await go("overview");
+    await page.waitForTimeout(300);
+    assert.equal(await dialog.count(), 0, "a new installation shows no What's new");
+    // Updated from 2.22.0: the releases since, newest first, in both themes.
+    const updated = async () => {
+      await page.goto(`${base}/dashboard.html?demo&whats-new=2.22.0#/overview`, {
+        waitUntil: "networkidle",
+      });
+      await expectVisible(dialog);
+    };
+    await inBothThemes("what's new", updated);
+    await updated();
+    assert.deepEqual(
+      (await versions()).map((text) => text.split("\n")[0]),
+      ["Version 2.24.0", "Version 2.23.0"],
+    );
+    assert.equal(
+      await dialog.getByRole("link", { name: /Full release notes/ }).getAttribute("href"),
+      "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/releases/tag/v2.24.0",
+    );
+    await page.screenshot({ path: path.join(out, "whats-new-desktop.png") });
+    await dialog.getByRole("button", { name: "Got it", exact: true }).click();
+    await dialog.waitFor({ state: "hidden" });
+    await page.evaluate(() => (location.hash = "#/zones")); // another page, same visit
+    await page.waitForTimeout(300);
+    assert.equal(await dialog.count(), 0, "shown once, not on every page");
+    // A phone, where it cannot know what was shown: the last 30 days, inside the screen with a
+    // margin, the list scrolling and both buttons in reach.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${base}/dashboard.html?demo&whats-new=unknown#/overview`, {
+      waitUntil: "networkidle",
+    });
+    await expectVisible(dialog);
+    assert.equal((await versions()).length, 4, "2.21.0 to 2.24.0, all within 30 days");
+    const fit = await dialog.evaluate((box) => {
+      const outer = box.getBoundingClientRect();
+      const list = box.querySelector(".whats-new-releases");
+      const reach = [...box.querySelectorAll(".whats-new-actions > *")].map((item) => {
+        const rect = item.getBoundingClientRect();
+        return rect.top >= 0 && rect.bottom <= innerHeight;
+      });
+      return {
+        margins: Math.min(outer.left, innerWidth - outer.right),
+        inside: outer.top >= 0 && outer.bottom <= innerHeight,
+        scrolls: list.scrollHeight > list.clientHeight,
+        reach,
+      };
+    });
+    assert.ok(fit.margins >= 16, `${fit.margins}px from the screen's edge`);
+    assert.ok(fit.inside, "the window fits the screen");
+    assert.ok(fit.scrolls, "the releases scroll inside the window");
+    assert.deepEqual(fit.reach, [true, true], "Got it and the release notes stay in reach");
+    await axe("what's new on a phone");
+    await noOverflow();
+    await page.screenshot({ path: path.join(out, "whats-new-phone.png") });
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "hidden" });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    // Help & tools opens it again at any time, whatever the window has shown.
+    await go("help");
+    await page.getByRole("button", { name: "What’s new", exact: true }).click();
+    await expectVisible(dialog);
+    assert.equal((await versions()).length, 4);
+    await dialog.getByRole("button", { name: "Got it", exact: true }).click();
+    await dialog.waitFor({ state: "hidden" });
+  });
   await check("sensors: coloured status pills and each numeric sensor's recent line", async () => {
     const trends = "[data-sensor-trend] .sparkline";
     await inBothThemes("sensors", async () => {
