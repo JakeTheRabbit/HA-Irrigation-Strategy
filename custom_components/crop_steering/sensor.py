@@ -36,10 +36,12 @@ from .const import (
     DEFAULT_EC_FALLBACK,
     VWC_ADJUSTMENT_PERCENT,
     SOFTWARE_VERSION,
+    PROBE_RANGE,
+    PROBE_STALE_SECONDS,
 )
 from .room import room_prefix, build_engine_config
 from . import stock
-from .calculations import ShotCalculator
+from .calculations import ShotCalculator, fuse_probes
 from .units import to_native
 from .zone_status import mirrored_status, status_app_entity
 
@@ -385,6 +387,10 @@ class CropSteeringSensor(SensorEntity):
         # Home Assistant ignores _attr_object_id and would name a NEW entity from its friendly name
         # (number.p1_target_vwc). Existing installs keep the id the registry already holds.
         self.entity_id = f"sensor.{self._attr_object_id}"
+        # A zone VWC/EC sensor's memory of how its probes read against each other (fuse_probes),
+        # and what the last reading was made from.
+        self._probe_offsets: dict[str, float] = {}
+        self._fusion: dict | None = None
 
         # Extract zone number from key if this is a zone sensor.
         # Regex matches BOTH `vwc_zone_3` and `zone_3_status`-style keys; the prior
@@ -546,7 +552,7 @@ class CropSteeringSensor(SensorEntity):
             if zone_config.get("vwc_back"):
                 vwc_sensors.append(zone_config["vwc_back"])
 
-        return self._average_sensor_values(vwc_sensors, "vwc")
+        return self._fuse_zone(vwc_sensors, "vwc")
 
     def _get_zone_ec(self, zone_num: int) -> float | None:
         """Get EC value for specific zone from configured sensors.
@@ -567,7 +573,7 @@ class CropSteeringSensor(SensorEntity):
             if zone_config.get("ec_back"):
                 ec_sensors.append(zone_config["ec_back"])
 
-        return self._average_sensor_values(ec_sensors, "ec")
+        return self._fuse_zone(ec_sensors, "ec")
 
     def _get_zone_last_irrigation(self, zone_num: int):
         """Return zone last-irrigation as a tz-aware datetime (or None).
@@ -616,7 +622,13 @@ class CropSteeringSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict | None:
-        """Expose the weekly producer's coverage so partial history stays visible."""
+        """Expose the weekly producer's coverage so partial history stays visible, and which
+        probes a zone's VWC/EC reading was made from."""
+        if self._zone_number and self.entity_description.key in (
+            f"vwc_zone_{self._zone_number}",
+            f"ec_zone_{self._zone_number}",
+        ):
+            return self._fusion
         if self._zone_number and self.entity_description.key == (
             f"zone_{self._zone_number}_weekly_water_usage"
         ):
@@ -656,36 +668,66 @@ class CropSteeringSensor(SensorEntity):
                 pass
         return 0
 
-    def _average_sensor_values(
+    def _probe_readings(
         self, sensor_ids: list[str], kind: str | None = None
-    ) -> float | None:
-        """Average values from multiple sensors, each first converted to the unit the room steers
-        in (`kind` "ec" -> mS/cm, "vwc" -> %). Mixed probes are common: one Atlas in uS/cm beside
-        one TEROS in mS/cm would otherwise average to nonsense far over any EC target.
+    ) -> list[tuple[str, float | None, float | None]]:
+        """(entity_id, value, age in seconds) for every probe, each value first converted to the
+        unit the room steers in (`kind` "ec" -> mS/cm, "vwc" -> %). Mixed probes are common: one
+        Atlas in uS/cm beside one TEROS in mS/cm would otherwise average to nonsense far over any
+        EC target. Value None = no usable number; age None = the state carries no time.
         """
-        if not sensor_ids:
-            _LOGGER.debug("No sensor IDs provided for averaging")
-            return None
-
-        values = []
+        readings = []
         for sensor_id in sensor_ids:
             if not sensor_id:
                 continue
+            value = age = None
             try:
                 state = self.hass.states.get(sensor_id)
                 if state is None:
                     _LOGGER.warning(f"Sensor entity not found: {sensor_id}")
-                    continue
-                if state.state not in ["unknown", "unavailable", "none", None]:
+                elif state.state not in ["unknown", "unavailable", "none", None]:
                     value = float(state.state)
                     if math.isfinite(value):
                         unit = (getattr(state, "attributes", None) or {}).get(
                             "unit_of_measurement"
                         )
-                        values.append(to_native(kind, unit, value))
+                        value = to_native(kind, unit, value)
+                    # last_reported moves on every report, last_updated only on a change.
+                    stamp = getattr(state, "last_reported", None) or getattr(
+                        state, "last_updated", None
+                    )
+                    if stamp is not None:
+                        age = (dt_util.utcnow() - stamp).total_seconds()
             except (ValueError, TypeError) as e:
                 _LOGGER.debug(f"Could not parse sensor value for {sensor_id}: {e}")
-                continue
+            readings.append((sensor_id, value, age))
+        return readings
+
+    def _fuse_zone(self, sensor_ids: list[str], kind: str) -> float | None:
+        """One zone's reading from its probes (calculations.fuse_probes)."""
+        lo, hi = PROBE_RANGE[kind]
+        value, self._fusion = fuse_probes(
+            self._probe_readings(sensor_ids, kind),
+            self._probe_offsets,
+            lo,
+            hi,
+            PROBE_STALE_SECONDS,
+        )
+        return value
+
+    def _average_sensor_values(
+        self, sensor_ids: list[str], kind: str | None = None
+    ) -> float | None:
+        """Plain average of every finite probe reading (the room-wide figures)."""
+        if not sensor_ids:
+            _LOGGER.debug("No sensor IDs provided for averaging")
+            return None
+
+        values = [
+            value
+            for _sensor_id, value, _age in self._probe_readings(sensor_ids, kind)
+            if value is not None and math.isfinite(value)
+        ]
 
         if values:
             return round(sum(values) / len(values), 2)
