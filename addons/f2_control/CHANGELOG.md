@@ -1,3 +1,7 @@
+# 2.25.1
+
+Pair with integration 2.25.1. **No controller change:** the version moves with the pair (the integration's zone sensors now combine a zone's probes, #130). No change to add-on options or the state file.
+
 # 2.25.0
 
 Pair with integration 2.25.0. **C3.** Like 2.24.0, a bundled release of several changes, for the owner to approve; not run on hardware before release. No change to add-on options or the state file.
