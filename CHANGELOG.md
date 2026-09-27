@@ -9,6 +9,35 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.25.1] - 2026-09-27
+
+Pair: **controller 2.25.1**. Class **C2**. One pull request (#130): each zone's VWC and EC sensor combines
+the zone's probes so that one bad probe cannot move the reading the controller steers by. The controller's
+code is unchanged; its version moves with the pair. Not run on hardware; checked by the lean, controller,
+engine, real-Home-Assistant (2026.9.3 and 2024.10.0) and browser suites.
+
+### 🌱 In plain English
+
+- **A zone with several probes can't be thrown off by one of them.** The zone reads its middle probe (the
+  average of two), so one wild probe among three is outvoted. A probe dropping out no longer makes the
+  zone's reading jump, which the controller used to take for a dryback that never happened. A probe that
+  stops reporting is set aside while another in the zone still reports.
+- **Each zone's moisture and EC sensor says which probes it used**, which it left out and why, and how far
+  apart they read.
+- **A zone with one probe reads exactly as before.** Two probes that disagree still can't outvote each other;
+  the sensor shows how far apart they are.
+
+### 🔧 Technical notes
+
+- **Probe fusion (#130).** `calculations.fuse_probes` takes every mapped probe as (entity, value, age):
+  values outside `PROBE_RANGE` (VWC 0–100, EC 0–20 mS/cm, the controller's own bounds) are dropped; a probe
+  older than `PROBE_STALE_SECONDS` (1200, from `last_reported`) is used only when no fresh one is left. With
+  every probe usable the zone reads the median and each probe's offset from it is remembered; with one
+  missing, the median of the others after subtracting their offsets. `vwc_zone_N` / `ec_zone_N` gain the
+  attributes `probes`, `used`, `excluded` and `spread`. The room-wide averages stay arithmetic means.
+  Offsets are kept in memory: a Home Assistant restart while a probe is already dead gives one step.
+- **Upgrade.** No change to entities, the state file or the add-on options.
+
 ## [2.25.0] - 2026-09-27
 
 Pair: **controller 2.25.0**. Class **C3**. Ten pull requests (#119 to #125, #127 to #129). The controller

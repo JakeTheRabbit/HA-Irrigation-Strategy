@@ -19,6 +19,11 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 2.25.1 - 2026-09-27
+
+- A zone with more than one moisture probe reads the middle one, and no longer jumps when a probe drops out or stops reporting.
+- Bug fixes and improvements.
+
 ## 2.25.0 - 2026-09-27
 
 - Each zone shows what it is waiting for next: the moisture or EC level that starts its next shot or phase.
