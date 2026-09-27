@@ -247,7 +247,8 @@ async function liveSetup(run) {
     );
     await run(lp, calls);
     assert.deepEqual(
-      [...new Set(calls.map((call) => call.action))].sort(),
+      // The dashboard asks once per visit whether there is anything new to show: not the helpers.
+      [...new Set(calls.map((call) => call.action))].filter((a) => a !== "whats_new_get").sort(),
       ["setup_read", "setup_save"],
       "Sizing helpers must reach no service except reading and saving the setup",
     );

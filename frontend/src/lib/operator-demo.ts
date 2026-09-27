@@ -14,6 +14,8 @@ import type { States } from "./types";
 import { discoverRooms, numeric } from "./model";
 import { blockForDay, dateForDay, growDay, interpolate, localDate, planErrors } from "./grow-plan";
 import { inferPlumbing, plumbingErrors } from "./plumbing";
+import { DEMO_WHATS_NEW } from "./whats-new-demo";
+import { compareVersions } from "./whats-new";
 
 const clone = <T>(value: T): T => structuredClone(value);
 export class OperatorDemo {
@@ -21,10 +23,20 @@ export class OperatorDemo {
   private stockDemo?: StockDemo;
   private plans = new Map<string, StrategyDocument>();
   private rooms: SetupRoom[] | null = null;
+  /** The last release What's new showed: the demo's own unless the page asks otherwise. */
+  private whatsNewSeen: string | null;
   constructor(
     private getStates: () => States,
     private updateStates: (states: States) => void,
-  ) {}
+    whatsNew: string | null = null,
+  ) {
+    this.whatsNewSeen =
+      whatsNew === "unknown"
+        ? null
+        : whatsNew && /^\d+\.\d+\.\d+$/.test(whatsNew)
+          ? whatsNew
+          : DEMO_WHATS_NEW.version;
+  }
   private setup(): SetupDocument {
     const states = this.getStates();
     if (!this.rooms)
@@ -248,6 +260,17 @@ export class OperatorDemo {
     return { ...clone(doc), plan: clone(plan), preview: { date, zones } };
   }
   async call<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
+    if (action === "whats_new_get")
+      return clone({ ...DEMO_WHATS_NEW, seen: this.whatsNewSeen }) as T;
+    if (action === "whats_new_seen") {
+      const version = String(data.version);
+      if (
+        compareVersions(version, DEMO_WHATS_NEW.version) <= 0 &&
+        (this.whatsNewSeen === null || compareVersions(version, this.whatsNewSeen) > 0)
+      )
+        this.whatsNewSeen = version;
+      return { seen: this.whatsNewSeen } as T;
+    }
     if (action.startsWith("runs_")) {
       this.runDemo ||= new RunDemo(this.getStates);
       return this.runDemo.call(action, data) as T;

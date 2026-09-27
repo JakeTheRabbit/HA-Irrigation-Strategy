@@ -2,6 +2,7 @@ import type { HistoryRequest, HistoryWindow } from "./comparison-types";
 import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
 import type { AutoSetpointStatus } from "./auto-setpoints";
+import type { Waiting } from "./waiting-for";
 import type { WaterRecord, WaterRecordRequest } from "./water-use";
 export interface EntityState {
   entity_id: string;
@@ -72,6 +73,8 @@ export interface Zone {
   sensors: EntityState[];
   /** Setpoint supervisor status; null when this zone has no supervisor sensor. */
   auto: AutoSetpointStatus | null;
+  /** What would move the zone next, as the controller worked it out; null when it is not fresh. */
+  waiting: Waiting | null;
 }
 export interface LogEvent {
   id: string;
@@ -103,6 +106,9 @@ export interface RoomView {
   /** Null when the controller has no room switch: the room is on and the control is hidden. */
   roomActiveEntity: string | null;
   autoSetpoints: { entityId: string | null; enabled: boolean | null };
+  /** How Water today reads in this room, from its select (entityId null: an integration without it,
+   * the zone total). */
+  waterView: { entityId: string | null; view: "zone" | "plant" };
 }
 /** One line per room: is it watering, and if not, why not and what to do. */
 export interface RoomStatus {

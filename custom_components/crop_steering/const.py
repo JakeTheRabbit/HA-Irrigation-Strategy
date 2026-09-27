@@ -28,12 +28,15 @@ PROBE_STALE_SECONDS = 20 * 60
 
 
 # Software version - single source of truth
-SOFTWARE_VERSION = "2.24.0"
+SOFTWARE_VERSION = "2.25.0"
 
 # Crop steering phases (P0-P3 only, Manual removed)
 PHASES = ["P0", "P1", "P2", "P3"]
 # A zone's Set Phase select: Keep (no request), or the phase the controller moves the zone to once
 SET_PHASE_OPTIONS = ["Keep", *PHASES]
+# How Water today reads, in the dashboard and the controller's vitals notification: each zone's
+# total, or what each of its plants got. The controller matches "Per plant" by these words.
+WATER_TODAY_VIEWS = ["Zone total", "Per plant"]
 STEERING_MODES = ["Vegetative", "Generative"]
 
 # Growth stages (for growth_stage select entity)

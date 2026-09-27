@@ -13,6 +13,7 @@ import type {
   Zone,
 } from "./types";
 import { parseAutoSetpoints } from "./auto-setpoints";
+import { readWaiting } from "./waiting-for";
 import { PHASE_GROUPS, settingWords } from "./setting-words";
 import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
 
@@ -486,6 +487,7 @@ export function buildRoom(states: States, room: Room): RoomView {
   const activeSwitch = room.id ? states[roomActiveId(room)] : undefined;
   const roomActive = !room.id || roomIsActive(states, room);
   const autoSwitch = room.id ? resolve(states, room, "switch", "auto_setpoints") : undefined;
+  const waterSelect = room.id ? resolve(states, room, "select", "water_today_view") : undefined;
   const zones: Zone[] = activeIds.map((id) => {
     const z = `zone_${id}_`;
     const phase = resolve(states, room, "sensor", `${z}phase`);
@@ -623,6 +625,11 @@ export function buildRoom(states: States, room: Room): RoomView {
           (e.entity_id.includes(`_zone_${id}_`) || e.entity_id.endsWith(`_zone_${id}`)),
       ),
       auto: parseAutoSetpoints(resolve(states, room, "sensor", `${z}auto_setpoints`)),
+      // What would move the zone next, for the phase shown: only while the controller waters it.
+      waiting:
+        roomActive && live && boolean(engineEntity) !== false && boolean(enabled) !== false
+          ? readWaiting(resolve(states, room, "sensor", `${z}waiting_for_app`), now, phase?.state)
+          : null,
     };
   });
   const aggregate = (
@@ -793,6 +800,10 @@ export function buildRoom(states: States, room: Room): RoomView {
       entityId: autoSwitch?.entity_id ?? null,
       enabled: boolean(autoSwitch),
     },
+    waterView: {
+      entityId: waterSelect?.entity_id ?? null,
+      view: waterSelect?.state === "Per plant" ? "plant" : "zone",
+    },
   };
 }
 
@@ -854,9 +865,25 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
         ? `${pending}. Switch watering off, wait up to 5 minutes for the controller to adopt the setup, then switch it back on.`
         : `${pending}. Correct the room in Rooms & setup.`,
     );
-  // The switches the controller checks before every shot, in its order (_blocked): the room's
-  // engine switch (the "watering" switch here), then Home Assistant's System Enabled and Auto
-  // Irrigation Enabled. Off, or unreadable, stops every shot in the room.
+  // System Enabled and Auto Irrigation Enabled are retired: while one reads off, the controller
+  // keeps the engine switch off (CS-208), and an older controller holds every shot itself. Named
+  // first, because switching watering on would not last while one of them is off.
+  for (const [key, fallback] of [
+    ["system_enabled", "System Enabled"],
+    ["auto_irrigation_enabled", "Auto Irrigation Enabled"],
+  ]) {
+    const id = `switch.${ROOT}${room.prefix}${key}`;
+    const entity = states[id];
+    if (entity?.state !== "off") continue;
+    const name = String(entity.attributes.friendly_name || fallback);
+    return say(
+      "stopped",
+      "Not watering",
+      `Home Assistant's “${name}” switch (${id}) is off, and nothing is watered in this room while it is. Switch it back on in Home Assistant, then switch watering on in Settings if it is off.`,
+      { label: "Open Settings", route: "settings" },
+    );
+  }
+  // The room's engine switch (the "watering" switch here): off, or unreadable, stops every shot.
   const flag = beat.attributes.enable_flag ?? descriptor(states, room)?.attributes.enable_flag;
   const flagId = typeof flag === "string" && /^(switch|input_boolean)\./.test(flag) ? flag : null;
   const engine = flagId ? states[flagId]?.state : undefined;
@@ -873,22 +900,6 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
       "Not watering",
       `This room's engine switch${flagId ? `, ${flagId},` : ""} is missing or unavailable in Home Assistant. The controller treats that as off, so nothing is watered until it reads on.`,
     );
-  for (const [key, fallback] of [
-    ["system_enabled", "System Enabled"],
-    ["auto_irrigation_enabled", "Auto Irrigation Enabled"],
-  ]) {
-    const id = `switch.${ROOT}${room.prefix}${key}`;
-    const entity = states[id];
-    // Only a switch Home Assistant has: the integration always makes both, and a controller that
-    // is blocked by a missing one still says so in its decision below.
-    if (!entity || entity.state === "on") continue;
-    const name = String(entity.attributes.friendly_name || fallback);
-    return say(
-      "stopped",
-      "Not watering",
-      `Home Assistant's “${name}” switch (${id}) is ${entity.state === "off" ? "off" : "unavailable"}, and the controller waters nothing in this room until it is on. Switch it on in Home Assistant; this dashboard has no control for it.`,
-    );
-  }
   const plan = note("strategy_error");
   if (plan)
     return say(
@@ -928,6 +939,13 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
 export function validateChange(room: RoomView, states: States, change: Change): string | null {
   if (!room.room.id || !readable(descriptor(states, room.room)))
     return "No current readable room descriptor.";
+  if (change.entityId === room.waterView.entityId) {
+    // How Water today reads is a choice of display for the room, not a target: a plan does not own it.
+    const options = states[change.entityId]?.attributes.options;
+    return Array.isArray(options) && options.includes(change.value)
+      ? null
+      : "Choose Zone total or Per plant.";
+  }
   if (room.strategy.engaged && /^(number|select)[.]/.test(change.entityId))
     return "An active grow plan owns these targets. Disarm the plan before editing manual setpoints.";
   const hardware = discoverRooms(states).flatMap((r) => {

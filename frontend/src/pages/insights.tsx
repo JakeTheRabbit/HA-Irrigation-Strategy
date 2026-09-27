@@ -32,6 +32,7 @@ import { calibrateDripper } from "@/lib/catch-test";
 import type { Controller, Metric, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import type { SetupDocument, SetupRoom } from "@/lib/operator-types";
+import { roomPlants, useWaterView } from "@/lib/water-view";
 import "./insights.css";
 
 const asId = (value: unknown) =>
@@ -76,6 +77,7 @@ export function Insights({
   navigate?: (page: Page, zoneId?: number) => void;
 }) {
   const [zoneId, setZoneId] = useState<number | null>(controller.room.zones[0]?.id ?? null);
+  const { view: waterView } = useWaterView();
   const [setup, setSetup] = useState<SetupRoom | null>(null),
     [mappingError, setMappingError] = useState("");
   const [catchMl, setCatchMl] = useState(""),
@@ -134,6 +136,7 @@ export function Insights({
     Object.fromEntries(
       controller.room.zones.map((item) => [item.id, dailyLimit(controller, item.id)]),
     ),
+    { view: waterView, plants: roomPlants(controller) },
   );
   const shotBars = controller.room.zones.map((item): MiniBar => {
     const value = perShot(item);

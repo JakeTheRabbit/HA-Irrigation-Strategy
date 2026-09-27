@@ -37,7 +37,17 @@ import type { Change, Controller, LogEvent, Metric, Series, Zone } from "@/lib/t
 import { errorText } from "@/lib/utils";
 import { budgetShare, DRYBACK_WINDOW_H, drybackTrend, type DrybackTrend } from "@/lib/dryback";
 import { useRecentHistory } from "@/lib/use-recent-moisture";
-import { coreWaterValue, waterParameters } from "@/lib/water-delivery";
+import { coreWaterValue, dailyWater, waterParameters } from "@/lib/water-delivery";
+import { waitingText } from "@/lib/waiting-for";
+import {
+  mlPerPlant,
+  plantAmount,
+  roomPerPlant,
+  useWaterView,
+  waterTodayLabel,
+  zonePlants,
+  type WaterView,
+} from "@/lib/water-view";
 import {
   Meter,
   MiniBars,
@@ -156,24 +166,37 @@ export function zoneBreakdown(
   metric: Metric,
   zones: Zone[],
   limits: Record<number, number | null>,
+  /** Water per plant (Settings → Appearance): each zone's configured plant count. */
+  perPlant?: { view: WaterView; plants: Record<number, number | null> },
 ): { caption: string | null; bars: MiniBar[]; max: number; label: string } {
   const key = metric.key!;
   const known = zones.flatMap((zone) => (zone[key].value === null ? [] : [zone[key].value!]));
   const average = known.length ? known.reduce((a, b) => a + b, 0) / known.length : null;
   const unit = key === "shots" ? " shots" : ` ${metric.unit}`;
   const limited = key === "water" && zones.some((zone) => (limits[zone.id] ?? null) !== null);
+  const plants = key === "water" && perPlant?.view === "plant" ? perPlant.plants : null;
+  const room = plants && roomPerPlant(zones, plants);
   const bars = zones.map((zone): MiniBar => {
     const value = zone[key].value;
     const limit = limits[zone.id] ?? null;
     const share = limited ? budgetShare(value, limit) : null;
+    const each = plants && dailyWater(zone, plants[zone.id] ?? null).mlPerPlant;
+    const limitEach = plants && mlPerPlant(limit, plants[zone.id] ?? null);
     return {
       id: String(zone.id),
       label: String(zone.id),
-      value: limited ? share : value,
+      value: limited ? share : (each ?? value),
       tone: limited ? budgetTone(share) : "normal",
       title:
-        `${zone.name}: ${number(value)}${value === null ? "" : unit}` +
-        (share === null ? "" : ` of ${number(limit)} L, ${number(share, 0)}% of its daily limit`),
+        each !== null && each !== undefined
+          ? `${zone.name}: ${plantText(each)} per plant` +
+            (share === null || limitEach === null
+              ? ""
+              : ` of ${plantText(limitEach)}, ${number(share, 0)}% of its daily limit`)
+          : `${zone.name}: ${number(value)}${value === null ? "" : unit}` +
+            (share === null
+              ? ""
+              : ` of ${number(limit)} L, ${number(share, 0)}% of its daily limit`),
     };
   });
   const lo = Math.min(...known),
@@ -182,14 +205,22 @@ export function zoneBreakdown(
     caption:
       average === null
         ? null
-        : key === "water" || key === "shots"
-          ? `Avg ${number(average)}${unit} per zone`
-          : known.length > 1
-            ? `Range ${number(lo)}–${number(hi)}${unit}`
-            : null,
+        : room
+          ? `Per plant, across ${number(room.plants, 0)} plants`
+          : key === "water" || key === "shots"
+            ? `Avg ${number(average)}${unit} per zone`
+            : known.length > 1
+              ? `Range ${number(lo)}–${number(hi)}${unit}`
+              : null,
     bars,
     // Totals start from zero; averages leave headroom so the smallest zone still shows.
-    max: limited ? 100 : key === "shots" || key === "water" ? hi : hi * 1.1,
+    max: limited
+      ? 100
+      : plants
+        ? Math.max(0, ...bars.map((bar) => bar.value ?? 0))
+        : key === "shots" || key === "water"
+          ? hi
+          : hi * 1.1,
     label:
       (limited ? "Share of each zone's daily water limit. " : `${metric.label} by zone. `) +
       bars.map((bar) => bar.title).join("; "),
@@ -200,20 +231,26 @@ export function Metrics({
   metrics,
   zones = [],
   waterLimits = {},
+  waterPlants = {},
 }: {
   metrics: Metric[];
   /** The zones behind the room metrics: each metric then gets one mini bar per zone. */
   zones?: Zone[];
   /** Each zone's daily water limit in litres, for the water bars. */
   waterLimits?: Record<number, number | null>;
+  /** Each zone's configured plant count, for water per plant (Settings → Appearance). */
+  waterPlants?: Record<number, number | null>;
 }) {
+  const { view } = useWaterView();
+  const room = view === "plant" ? roomPerPlant(zones, waterPlants) : null;
   return (
     <div className="metric-strip">
       {metrics.map((metric, i) => {
         const breakdown =
           metric.key && metric.value !== null && zones.length
-            ? zoneBreakdown(metric, zones, waterLimits)
+            ? zoneBreakdown(metric, zones, waterLimits, { view, plants: waterPlants })
             : null;
+        const each = metric.key === "water" && metric.value !== null ? room : null;
         return (
           <div
             className="metric-item"
@@ -224,7 +261,7 @@ export function Metrics({
             <div className="metric-body">
               <div>
                 <strong>
-                  <MetricValue metric={metric} />
+                  {each ? <PlantAmount ml={each.ml} /> : <MetricValue metric={metric} />}
                 </strong>
                 {metric.value === null ? (
                   <span className="metric-caption">Waiting for controller data</span>
@@ -656,26 +693,78 @@ export function DrybackRate({
   );
 }
 
-/** Water today against the zone's daily limit. */
-export function WaterUse({ zone, limit }: { zone: Zone; limit: number | null }) {
-  const share = budgetShare(zone.water.value, limit);
+/** Water for one plant: mL below a litre, litres from one up. */
+const plantText = (ml: number) => {
+  const { value, unit, digits } = plantAmount(ml);
+  return `${number(value, digits)} ${unit}`;
+};
+export function PlantAmount({ ml }: { ml: number }) {
+  const { value, unit, digits } = plantAmount(ml);
   return (
-    <span className="water-use" data-water-share={share === null ? "" : Math.round(share)}>
-      <span>
-        {number(zone.water.value)}
-        {zone.water.value !== null && (
-          <span className="unit">{limit === null ? " L" : ` / ${number(limit)} L`}</span>
-        )}
-      </span>
+    <>
+      {number(value, digits)}
+      <span className="unit"> {unit}</span>
+    </>
+  );
+}
+
+/** Water today against the zone's daily limit: the zone's total, or each plant's share of it
+ * when that is this person's choice (Settings → Appearance) and the zone's plant count is known. */
+export function WaterUse({
+  zone,
+  limit,
+  plants = null,
+}: {
+  zone: Zone;
+  limit: number | null;
+  /** The zone's configured plant count. */
+  plants?: number | null;
+}) {
+  const { view } = useWaterView();
+  const share = budgetShare(zone.water.value, limit);
+  const each = view === "plant" ? dailyWater(zone, plants).mlPerPlant : null;
+  const limitEach = each === null ? null : mlPerPlant(limit, plants);
+  return (
+    <span
+      className="water-use"
+      data-water-share={share === null ? "" : Math.round(share)}
+      data-water-view={each === null ? "zone" : "plant"}
+    >
+      {each === null ? (
+        <span
+          title={
+            view === "plant" && zone.water.value !== null
+              ? "Water per plant needs this zone's plant count, in Rooms & setup"
+              : undefined
+          }
+        >
+          {number(zone.water.value)}
+          {zone.water.value !== null && (
+            <span className="unit">{limit === null ? " L" : ` / ${number(limit)} L`}</span>
+          )}
+        </span>
+      ) : (
+        <span title={`${number(zone.water.value)} L for the zone's ${number(plants, 0)} plants`}>
+          <PlantAmount ml={each} />
+          {limitEach !== null && <span className="unit"> / {plantText(limitEach)}</span>}
+        </span>
+      )}
       {share !== null && (
         <>
           <Meter
             value={share}
             max={100}
             tone={budgetTone(share)}
-            label={`${number(share, 0)}% of the ${number(limit)} L daily limit`}
+            label={
+              limitEach === null
+                ? `${number(share, 0)}% of the ${number(limit)} L daily limit`
+                : `${number(share, 0)}% of the ${plantText(limitEach)} daily limit per plant`
+            }
           />
-          <span className="cell-subtext">{number(share, 0)}% of limit</span>
+          <span className="cell-subtext">
+            {number(share, 0)}% of limit
+            {view === "plant" && each === null ? " · zone total" : ""}
+          </span>
         </>
       )}
     </span>
@@ -721,6 +810,7 @@ export function ZoneTable({
   compact = false,
   trends,
   limits = {},
+  plants = {},
 }: {
   zones: Zone[];
   onSelect: (zone: Zone) => void;
@@ -730,7 +820,10 @@ export function ZoneTable({
   trends?: Record<number, DrybackTrend> | null;
   /** Each zone's daily water limit in litres. */
   limits?: Record<number, number | null>;
+  /** Each zone's configured plant count, for water per plant. */
+  plants?: Record<number, number | null>;
 }) {
+  const { view } = useWaterView();
   return (
     <>
       <div
@@ -748,7 +841,10 @@ export function ZoneTable({
               {!compact && <th>VWC reference</th>}
               <th>Root-zone EC</th>
               <th title="VWC percentage points lost per hour">Dryback</th>
-              <th>Water today</th>
+              <th>
+                Water today
+                {view === "plant" && <span className="cell-subtext">per plant</span>}
+              </th>
               {!compact && (
                 <th>
                   <span className="sr-only">Details</span>
@@ -791,7 +887,11 @@ export function ZoneTable({
                   <DrybackRate zone={zone} trend={trends?.[zone.id]} />
                 </td>
                 <td className="numeric">
-                  <WaterUse zone={zone} limit={limits[zone.id] ?? null} />
+                  <WaterUse
+                    zone={zone}
+                    limit={limits[zone.id] ?? null}
+                    plants={plants[zone.id] ?? null}
+                  />
                 </td>
                 {!compact && (
                   <td>
@@ -840,9 +940,13 @@ export function ZoneTable({
                 </strong>
               </div>
               <div>
-                <span>Water today</span>
+                <span>{waterTodayLabel(view)}</span>
                 <strong>
-                  <WaterUse zone={zone} limit={limits[zone.id] ?? null} />
+                  <WaterUse
+                    zone={zone}
+                    limit={limits[zone.id] ?? null}
+                    plants={plants[zone.id] ?? null}
+                  />
                 </strong>
               </div>
               <div>
@@ -853,13 +957,27 @@ export function ZoneTable({
               </div>
             </div>
             <p className="zone-mobile-target">
-              {zone.target.label}: <MetricValue metric={zone.target} />
+              {zone.waiting ? (
+                <WaitingFor zone={zone} />
+              ) : (
+                <>
+                  {zone.target.label}: <MetricValue metric={zone.target} />
+                </>
+              )}
             </p>
           </div>
         ))}
       </div>
     </>
   );
+}
+
+/** What would move the zone next, as the controller worked it out: its thresholds and the reading
+ * now (crop_steering_engine.waiting_for). Nothing when that is not fresh. */
+export function WaitingFor({ zone }: { zone: Zone }) {
+  if (!zone.waiting) return null;
+  const text = waitingText(zone.waiting, { number: (value) => number(value), clock: time });
+  return text ? <>Next: {text}</> : null;
 }
 
 export interface ReviewItem {
@@ -980,6 +1098,7 @@ export function ZoneDetails({
   close: () => void;
   navigate: (page: Page, zoneId?: number) => void;
 }) {
+  const { view } = useWaterView();
   const [review, setReview] = useState(false);
   const [phaseChoice, setPhaseChoice] = useState<string | null>(null);
   useEffect(() => {
@@ -1021,6 +1140,11 @@ export function ZoneDetails({
                 <span className="small muted">Last irrigation</span>
                 <LastIrrigation zone={zone} />
               </div>
+              {zone.waiting && (
+                <p className="zone-waiting">
+                  <WaitingFor zone={zone} />
+                </p>
+              )}
               <div className="detail-metrics">
                 <div>
                   <span>Moisture</span>
@@ -1050,9 +1174,13 @@ export function ZoneDetails({
                   </small>
                 </div>
                 <div>
-                  <span>Water today</span>
+                  <span>{waterTodayLabel(view)}</span>
                   <strong>
-                    <WaterUse zone={zone} limit={dailyLimit(controller, zone.id)} />
+                    <WaterUse
+                      zone={zone}
+                      limit={dailyLimit(controller, zone.id)}
+                      plants={zonePlants(controller, zone.id)}
+                    />
                   </strong>
                 </div>
                 <div>
@@ -1090,8 +1218,9 @@ export function ZoneDetails({
                 {zone.enabled ? "Pause zone scheduling" : "Enable zone scheduling"}
               </Button>
               <p className="small muted">
-                Pausing scheduling may prevent future cycles. It is not an emergency stop and may
-                not interrupt a shot already running.
+                Paused, the zone gets no water at all, not even a rescue shot, and a shot already
+                running in it stops within a few seconds. It is not an emergency stop: use the
+                installation's physical shut-off for that.
               </p>
               {zone.setPhaseEntity && (
                 <>
@@ -1158,7 +1287,11 @@ export function ZoneDetails({
                 ]
               : []
           }
-          note="This changes future scheduling. An active irrigation shot may continue."
+          note={
+            zone.enabled
+              ? "Paused, the zone gets no water, not even a rescue shot, and a shot already running in it stops within a few seconds."
+              : "The controller waters the zone again from its next check."
+          }
         />
       )}
       {zone?.setPhaseEntity && (
