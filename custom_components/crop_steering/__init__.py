@@ -131,6 +131,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up the integration data
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = _entry_config(entry)
+    # Before the platforms register this room's entities: a room with none was set up just now.
+    fresh = _is_new_room(hass, entry)
 
     # Load this room's named-stage recipe (server-side Store) before the platforms
     # come up, so the recipe select + sensor can read it on setup.
@@ -152,6 +154,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.warning("Stock tanks unavailable: %s", err)
 
     _remove_retired_entities(hass, entry)
+    _hide_retired_switches(hass, entry)
 
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -168,6 +171,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await async_setup_runs(hass, entry)
     await async_setup_panel(hass)
+    # What's new: the release highlights the dashboard shows once after an update.
+    try:
+        from .whats_new import async_setup_whats_new
+
+        await async_setup_whats_new(hass, entry, fresh)
+    except Exception as err:  # pragma: no cover - never block setup on the highlights
+        _LOGGER.warning("What's new unavailable: %s", err)
 
     # Setup health checks -> Home Assistant Repairs (read-only diagnostics)
     from datetime import timedelta
@@ -194,6 +204,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
+def _is_new_room(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """No registered entity yet: the room was set up just now, not on an earlier start."""
+    from homeassistant.helpers import entity_registry as er
+
+    return not er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+
+
 def _remove_retired_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Drop this room's registry entries for the entities in _RETIRED."""
     from homeassistant.helpers import entity_registry as er
@@ -210,6 +227,29 @@ def _remove_retired_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
             removed += 1
     if removed:
         _LOGGER.info("Removed %d retired entities from the registry", removed)
+
+
+# Switches kept only for controllers from 2.24.0 or before (see switch.py): hidden, not removed.
+_HIDDEN_RETIRED = {"system_enabled", "auto_irrigation_enabled"}
+
+
+def _hide_retired_switches(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Hide this room's existing registry entries for _HIDDEN_RETIRED. A new install creates them
+    hidden (entity_registry_visible_default); an older one registered them visible."""
+    from homeassistant.helpers import entity_registry as er
+
+    registry = er.async_get(hass)
+    head = f"{DOMAIN}_{entry.entry_id}_"
+    for item in er.async_entries_for_config_entry(registry, entry.entry_id):
+        key = str(item.unique_id).removeprefix(head)
+        if (
+            item.domain == "switch"
+            and key in _HIDDEN_RETIRED
+            and item.hidden_by is None
+        ):
+            registry.async_update_entity(
+                item.entity_id, hidden_by=er.RegistryEntryHider.INTEGRATION
+            )
 
 
 def _entry_config(entry: ConfigEntry) -> dict[str, Any]:
@@ -255,6 +295,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .stock_api import async_unload_stock
 
     await async_unload_stock(hass, entry)
+    from .whats_new import async_unload_whats_new
+
+    await async_unload_whats_new(hass, entry)
     hass.data[DOMAIN].pop(entry.entry_id, None)
 
     # Unload services only when the last loaded room goes away â€” other loaded
