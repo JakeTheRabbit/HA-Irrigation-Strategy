@@ -20,6 +20,12 @@ DEFAULT_EC_RATIO = 1.0
 DEFAULT_EC_FALLBACK = 3.0
 VWC_ADJUSTMENT_PERCENT = 5.0
 
+# Combining a zone's probes. The ranges are the ones the controller refuses a zone reading outside
+# of, and the age is the controller's own: a probe that has not reported for longer is set aside
+# while another probe in the zone is still reporting.
+PROBE_RANGE = {"vwc": (0.0, 100.0), "ec": (0.0, 20.0)}
+PROBE_STALE_SECONDS = 20 * 60
+
 
 # Software version - single source of truth
 SOFTWARE_VERSION = "2.24.0"

@@ -3,14 +3,17 @@
 import ast
 import logging
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from custom_components.crop_steering import units
+from custom_components.crop_steering.calculations import fuse_probes
+from custom_components.crop_steering.const import PROBE_RANGE, PROBE_STALE_SECONDS
 
+NOW = datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc)
 SOURCE = (
     Path(__file__).resolve().parents[1] / "custom_components/crop_steering/sensor.py"
 )
@@ -29,6 +32,10 @@ def sensor(states, prefix=""):
         "_get_zone_last_irrigation",
         "extra_state_attributes",
         "_average_sensor_values",
+        "_probe_readings",
+        "_fuse_zone",
+        "_get_zone_vwc",
+        "_get_zone_ec",
     }
     methods = [
         node
@@ -43,9 +50,13 @@ def sensor(states, prefix=""):
         "math": math,
         "_LOGGER": logging.getLogger(__name__),
         "to_native": units.to_native,
+        "fuse_probes": fuse_probes,
+        "PROBE_RANGE": PROBE_RANGE,
+        "PROBE_STALE_SECONDS": PROBE_STALE_SECONDS,
         "dt_util": SimpleNamespace(
             parse_datetime=datetime.fromisoformat,
             as_local=lambda value: value.replace(tzinfo=timezone.utc),
+            utcnow=lambda: NOW,
         ),
     }
     exec(compile(module, str(SOURCE), "exec"), namespace)
@@ -53,6 +64,9 @@ def sensor(states, prefix=""):
     instance.hass = SimpleNamespace(states=SimpleNamespace(get=states.get))
     instance._prefix = prefix
     instance._zone_number = 1
+    instance._zones_config = {}
+    instance._probe_offsets = {}
+    instance._fusion = None
     instance.entity_description = SimpleNamespace(key="zone_1_weekly_water_usage")
     return instance
 
@@ -253,3 +267,64 @@ def test_a_probe_with_no_unit_or_an_unknown_one_reads_exactly_as_before():
     )
     assert entity._average_sensor_values(["sensor.a", "sensor.b"], "vwc") == 51.0
     assert entity._average_sensor_values(["sensor.a", "sensor.b"]) == 51.0
+
+
+# --------------------------------------------------------------------------- a zone's probes
+def _reported(value, unit, minutes_ago):
+    return SimpleNamespace(
+        state=str(value),
+        attributes={"unit_of_measurement": unit},
+        last_reported=NOW - timedelta(minutes=minutes_ago),
+    )
+
+
+def _zone(states, **zone):
+    entity = sensor(states)
+    entity._zones_config = {
+        "1": zone
+    }  # string keys: what a reloaded config entry holds
+    entity.entity_description = SimpleNamespace(key="vwc_zone_1")
+    return entity
+
+
+def test_a_zone_converts_each_probe_before_combining_them():
+    entity = _zone(
+        {"sensor.a": _probe(3200, "µS/cm"), "sensor.b": _probe(3.0, "mS/cm")},
+        ec_sensors=["sensor.a", "sensor.b"],
+    )
+    assert entity._get_zone_ec(1) == 3.1
+
+
+def test_a_zones_reading_names_the_probes_it_was_made_from():
+    states = {
+        "sensor.a": _reported(40, "%", 1),
+        "sensor.b": _reported(42, "%", 1),
+        "sensor.c": _reported(90, "%", 1),
+    }
+    entity = _zone(states, vwc_sensors=["sensor.a", "sensor.b", "sensor.c"])
+    assert entity._get_zone_vwc(1) == 42.0
+    assert entity.extra_state_attributes == {
+        "probes": 3,
+        "used": ["sensor.a", "sensor.b", "sensor.c"],
+        "excluded": {},
+        "spread": 50.0,
+    }
+
+
+def test_a_probe_that_stops_reporting_is_set_aside_without_stepping_the_zone():
+    states = {"sensor.a": _reported(40, "%", 1), "sensor.b": _reported(46, "%", 1)}
+    entity = _zone(states, vwc_sensors=["sensor.a", "sensor.b"])
+    assert entity._get_zone_vwc(1) == 43.0
+    states["sensor.a"] = _reported(39, "%", 0)
+    states["sensor.b"] = _reported(46, "%", 30)  # last heard from half an hour ago
+    assert entity._get_zone_vwc(1) == 42.0
+    assert entity.extra_state_attributes["excluded"] == {"sensor.b": "not reporting"}
+
+
+def test_the_legacy_front_and_back_pair_is_still_a_zones_probes():
+    entity = _zone(
+        {"sensor.front": _probe(40, "%"), "sensor.back": _probe(46, "%")},
+        vwc_front="sensor.front",
+        vwc_back="sensor.back",
+    )
+    assert entity._get_zone_vwc(1) == 43.0
