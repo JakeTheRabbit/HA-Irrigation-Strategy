@@ -42,6 +42,7 @@ Use **Settings → Sample workspace → Reset demo session…** and review the c
 | Room status line              | At the top of every page: watering, holding and why, or not watering and what to do, with the age of the controller's last report.                                  |
 | Zone scheduling               | Whether this zone is eligible for scheduling; it does not mean its valve is currently open.                                                                         |
 | Controller status and phase   | The controller's reported operating state and P0/P1/P2/P3 phase. Inspect any hold or unavailable status before making changes.                                      |
+| Next                          | What the controller waits for next, by its own numbers: e.g. shot when VWC < 61% (now 58%). Shown while it waters the zone and reports; not a forecast.             |
 | Valve on/off                  | The state of this zone's explicitly mapped switch. It does not establish physical flow.                                                                             |
 | Last irrigation               | A recorded controller event timestamp, with relative age and date/time. It is not inferred from sensor updates. Missing/invalid timestamps remain **Not reported**. |
 | VWC and root-zone EC          | The mapped substrate measurements. Their units and sensor availability matter independently.                                                                        |
@@ -54,7 +55,7 @@ The switch beside the zones' heading, on **Overview** and **Zones**, switches ev
 
 To move a zone to another phase, open it from **Zones** or **Overview** and pick one under **Phase**. After the review, the controller moves it within a minute and carries on from there: lights-off still moves it to P3 and lights-on to P0. Today's water and shot counts stay.
 
-**Settings → Watering** switches the room's engine switch ("Engine Enabled" in Home Assistant on a room made by the setup wizard), and like zone scheduling it asks for a review first. With watering off the controller opens no valve in the room and a shot already running stops within a few seconds; it keeps reading the probes and following the phases. A new room starts with watering off. When a room is not watering, the status line at the top of every page says which switch stopped it and links here when this is the one. Pausing a zone lets a shot already running finish. Neither is an emergency stop: use the installation's established physical shutdown procedure for an emergency.
+**Settings → Watering** switches the room's engine switch ("Engine Enabled" in Home Assistant on a room made by the setup wizard), and like zone scheduling it asks for a review first. With watering off the controller opens no valve in the room and a shot already running stops within a few seconds; it keeps reading the probes and following the phases. A new room starts with watering off. When a room is not watering, the status line at the top of every page says which switch stopped it and links here when this is the one. Pausing a zone stops a shot already running in it within a few seconds too, and a paused zone gets no water at all, not even a rescue shot. Neither is an emergency stop: use the installation's established physical shutdown procedure for an emergency.
 
 ### Tank and pump display
 

@@ -109,15 +109,14 @@ for that zone. (3 zones × 23 = 69 entities on a 3-zone system.)
 |---|---|
 | `room_active` | Room on/off (default on). Off = nothing is growing: no irrigation of any kind for this room, including emergency shots and the no-probe fallback schedule, no alerts, repair issues cleared. Per room: `switch.crop_steering_<prefix>room_active`. |
 | `auto_setpoints` | Auto Setpoints (default off). On = the controller may rewrite this room's per-zone VWC targets from what it has learned, in bounded steps, never while a dated plan owns the room. Off = it still learns and reports, and writes nothing. Per room: `switch.crop_steering_<prefix>auto_setpoints`. |
-| `system_enabled` | Master on/off. Off = no irrigation at all. |
-| `auto_irrigation_enabled` | Enables the autonomous decision loop (off = manual-only). |
+| `system_enabled` / `auto_irrigation_enabled` | **Retired**, hidden, named "(retired)". `engine_enabled` is the one switch that stops watering. They stay for controllers from 2.24.0 or before, which hold every shot while one reads off and treat a missing one as off. A newer controller switches the room's kill switch off while one of them reads off, and says so (CS-208). |
 | `ec_stacking_enabled` | When on, the system builds EC when below target instead of diluting (push EC up intentionally). |
-| `engine_enabled` | The room's kill switch, created off. Off = the controller waters nothing in this room. Created for named rooms and new default rooms; an older default room keeps the helper its setup names. |
+| `engine_enabled` | The room's kill switch ("Watering" in the dashboard's Settings), created off. Off = the controller waters nothing in this room, and a shot already running stops within a few seconds. Created for named rooms and new default rooms; an older default room keeps the helper its setup names. |
 
 ### Per-zone (`switch.crop_steering_zone_N_*`)
 | Entity | What it does |
 |---|---|
-| `zone_N_enabled` | Include/exclude the zone from automation. |
+| `zone_N_enabled` | The zone's own switch ("zone scheduling" on the dashboard). Off = the controller waters nothing in this zone, not even a rescue shot, and a shot already running in it stops within a few seconds. |
 | `zone_N_manual_override` | Absolute lockout: **nothing** opens that valve (auto, emergency, manual). For maintenance. |
 
 ---
@@ -169,6 +168,7 @@ The controller also publishes `sensor.f2_control_vitals`: the time of its last v
 | `zone_N_phase` | - | The zone's current phase (P0-P3). |
 | `zone_N_auto_setpoints` | - | Published by the controller: `off` / `learning` / `tracking` / `frozen`. Attributes: `learned_peak`, `gain`, `day_rate`, `night_rate`, `p1_outcome` (`pending` / `reached` / `short` / `plateau` / `suspect`), `hold_days`, `frozen_reason`, `last_change`, `jev` (`disabled` / `ok` / `unavailable`), `jev_last` (the judge's latest hourly P2 answer), `jev_changed_today`, `working_peak_adjust`, `managed` (the number entities it may rewrite; includes `p2_shot_size` while the judge is configured). |
 | `zone_N_status` / `_status_app` | - | The controller's label for the zone, published on `zone_N_status_app` with a `reason` attribute and shown by `zone_N_status`, its only writer: `Drying back` / `Ramping` / `Optimal` / `Overnight dryback` (P0-P3, holding), `Flushing` / `Refilling` / `Topping up` / `Emergency` (watering), `Blocked: <why>`, `Blocked — EC/cap`, `Probe dead — copying`, `Room off`. `Controller not reporting` when the controller has not reported for 10 minutes. |
+| `zone_N_waiting_for_app` | - | Published by the controller each minute: what would move the zone next, by the engine's own rules and numbers (`crop_steering_engine.waiting_for`), shown as the zone's "Next:" on the dashboard. State: the phase the list is for (`none`, with an empty list, while the zone has no usable probe or the room is off). Attribute `conditions`, one item per rule: `rule` (`p0_timeout` / `p0_bypass` / `p0_dryback`, `p1_ramp` / `p1_done` / `p1_max_shots`, `p2_topup` / `p2_dilute` / `lights_off`, `p3_emergency` / `lights_on`), `shot` (it fires a shot), `to` (the phase it moves to), then a reading test (`metric` `vwc` or `ec`, `op`, `value`, `now`) or a wait (`in_min`, minutes after `at`); `p1_done` adds `shots_left`, `ec_max`, `ec_now`. Attribute `at`: when it was worked out. It lists the engine's routine rules, not a forecast: a held plan leaves out the shots it stops; the EC flushes, the watchdog, the daily minimum and P2's early move to P3 in the last three hours before lights-off are not listed; a gate or switch that holds watering is in `zone_N_status`. |
 | `zone_N_safety_status` | - | `safe` / fault. |
 | `zone_N_daily_water_usage` / `_daily_water_app` | L | Water today (resets at lights-on). |
 | `zone_N_weekly_water_usage` / `_weekly_water_app` | L | Rolling 7-day water. |
