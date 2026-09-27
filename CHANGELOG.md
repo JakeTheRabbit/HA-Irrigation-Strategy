@@ -11,16 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.25.0] - 2026-09-27
 
-Pair: **controller 2.25.0**. Class **C3**. Seven pull requests (#119 to #125). The controller changes in
-three ways: a retired System Enabled or Auto Irrigation Enabled switch that is off now switches the room's
-watering off in its place (#120), switching a zone off stops a shot already running in it (#122), and it
-publishes what each zone waits for next, from the engine's new `waiting_for` (#121). The integration shows
-and saves the lights hours the controller uses in Configure (#119), hides the two retired switches (#120)
-and serves the What's new highlights (#124) (C2). The dashboard gains one switch over every zone (#123),
-Water today per plant (#125), each zone's "Next:" line and the What's new window (C1). Like 2.24.0, this
-candidate carries several C2 and C3 changes at once, which needs the owner's approval as a bundled
-release (docs/RELEASING.md). Not run on hardware; the seven pull requests were merged together and checked
-by the lean, controller, engine, real-Home-Assistant (2026.9.3 and 2024.10.0) and browser suites.
+Pair: **controller 2.25.0**. Class **C3**. Eight pull requests (#119 to #125, #127). The controller
+changes in five ways: a retired System Enabled or Auto Irrigation Enabled switch that is off now switches
+the room's watering off in its place (#120), switching a zone off stops a shot already running in it (#122),
+it publishes what each zone waits for next, from the engine's new `waiting_for` (#121), and its vitals
+notification leaves out feed EC where there is no feed EC probe (#127) and shows water today as the room has
+chosen (#125). The integration shows and saves the lights hours the controller uses in Configure (#119),
+hides the two retired switches (#120), adds each room's Water today choice (#125) and serves the What's new
+highlights (#124) (C2). The dashboard gains one switch over every zone (#123), Water today per plant (#125),
+each zone's "Next:" line and the What's new window (C1). Like 2.24.0, this candidate carries several C2 and
+C3 changes at once, which needs the owner's approval as a bundled release (docs/RELEASING.md). Not run on
+hardware; the eight pull requests were merged together and checked by the lean, controller, engine,
+real-Home-Assistant (2026.9.3 and 2024.10.0) and browser suites.
 
 ### 🌱 In plain English
 
@@ -39,7 +41,9 @@ by the lean, controller, engine, real-Home-Assistant (2026.9.3 and 2024.10.0) an
   recorded at setup, and saving there changed nothing the controller read. One room ran its morning ramp
   at 3 AM with its lights off because of it.
 - **Water today can show per plant** (Settings → Appearance), each zone's water and daily limit divided by
-  its plant count. The zone total stays the default.
+  its plant count. It is the room's choice, so everyone sees the same, and the vitals notification follows
+  it: "344 mL/plant day" instead of "12.4L day". The zone total stays the default.
+- **The vitals notification no longer says "feed EC —"** in a room with no feed EC probe.
 - **What's new.** After an update, the first person to open the dashboard sees the main changes, once;
   Help & tools shows them again.
 
@@ -63,14 +67,20 @@ by the lean, controller, engine, real-Home-Assistant (2026.9.3 and 2024.10.0) an
   zone, from a list at most five minutes old.
 - **Every zone at once (#123).** `AllZonesSwitch` (`components/room-controls.tsx`) and
   `lib/all-zones.ts`; it writes the zones' own switches through the review.
-- **Water today per plant (#125).** `lib/water-view.ts`, kept per browser (`irrigation-water-view`);
-  `WaterUse`, `Metrics`, `zoneBreakdown` and `PlanCellContext` take each zone's plant count.
+- **Water today per plant (#125).** `select.crop_steering_<prefix>water_today_view` ("Zone total" or "Per
+  plant", `WATER_TODAY_VIEWS`), restored like the other selects. The dashboard reads and writes it
+  (`lib/water-view.ts`; a plan does not own it), and `WaterUse`, `Metrics`, `zoneBreakdown` and
+  `PlanCellContext` take each zone's plant count. The controller's vitals divide `daily_vol` by the plant
+  count it sizes shots with when the room says `PER_PLANT`, pinned to the integration's words by a test.
+- **Vitals and feed EC (#127).** `_maybe_notify` adds `| feed EC …` only for a room with `feed_ec_sensor`,
+  and says "unreadable" for one that reads nothing usable, since the source-water gate then holds it.
 - **What's new (#124).** `custom_components/crop_steering/WHATS_NEW.md`, a document every release adds its
   section to, served by `whats_new_get`; `whats_new_seen` moves one installation-wide record
   (`.storage/crop_steering.whats_new`) forward, for any signed-in user. A new installation starts at its
   own version. `tests/test_whats_new.py` requires the release's section.
-- **Upgrade.** No change to the state file or the add-on options. The first start creates the What's new
-  record as unknown, so the first dashboard visit shows the last 30 days of releases once.
+- **Upgrade.** No change to the state file or the add-on options. Each room gains its Water today select
+  at "Zone total". The first start creates the What's new record as unknown, so the first dashboard visit
+  shows the last 30 days of releases once.
 
 ## [2.24.0] - 2026-09-26
 
