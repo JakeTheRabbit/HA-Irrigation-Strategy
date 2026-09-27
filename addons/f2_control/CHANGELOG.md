@@ -1,3 +1,14 @@
+# 2.25.0
+
+Pair with integration 2.25.0. **C3.** Like 2.24.0, a bundled release of several changes, for the owner to approve; not run on hardware before release. No change to add-on options or the state file.
+
+- **Retired switches.** `_carry_retired_switches` switches the room's engine switch off while System Enabled or Auto Irrigation Enabled reads off (CS-208), and `_blocked` no longer gates on them; a missing or unreadable one changes nothing.
+- **A zone switched off stops its running shot.** `_wait_shot` reads the zone's `switch.crop_steering_<prefix>zone_N_enabled` every round with the engine switch, Room Active and manual override; CS-305 names the switch that stopped the shot.
+- **An unreadable zone switch holds the zone.** `_blocked` returns `<entity> unreadable (reads neither on nor off)` when `switch.crop_steering_<prefix>zone_N_enabled` is missing, `unknown` or `unavailable`, so a room whose integration is not running is not watered on the backup timer. A running shot still ends only on a definite OFF.
+- **Publishes what each zone waits for.** `sensor.crop_steering_<prefix>zone_N_waiting_for_app` every pass, from the engine's `waiting_for`: for the phase the zone is in after this pass, and an empty list for a zone with no usable probe or a room that is off.
+- **The vitals follow the room.** A room with no feed EC probe leaves feed EC out of its line, and one whose probe reads nothing usable says "unreadable". When the room's `select.crop_steering_<prefix>water_today_view` says `PER_PLANT`, each zone's water today is divided by its plant count: "344 mL/plant day".
+- **The dashboard the app serves** is the 2.25.0 build: each zone's "Next:", the switch over every zone, Water today per plant and What's new.
+
 # 2.24.0
 
 Pair with integration 2.24.0. **C3.** Owner-approved rehearsal release without a staging soak (26 Sep 2026); not run on hardware before release. No change to add-on options. One new key in the state file, `_room_off_since` in a room's block, which an old state file does not have and does not need.

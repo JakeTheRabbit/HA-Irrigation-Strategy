@@ -19,6 +19,14 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 2.25.0 - 2026-09-27
+
+- Each zone shows what it is waiting for next: the moisture or EC level that starts its next shot or phase.
+- One switch in the zones heading turns every zone on or off, and switching a zone off now stops a shot already running.
+- Water today can show per plant instead of per zone, on the dashboard and in the vitals notification: choose it in Settings.
+- One watering switch per room: two older switches that did the same job are retired.
+- Bug fixes and improvements.
+
 ## 2.24.0 - 2026-09-26
 
 - Nothing is watered while the pump, main line or a zone's valve is offline: the zone waits, and says which switch is missing.
