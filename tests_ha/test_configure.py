@@ -177,10 +177,10 @@ async def test_an_upgraded_room_tuned_low_can_use_the_form_and_nothing_else_move
 
 
 # ------------------------------------------------------------------ removing a mapping
-async def _save_map(hass, entry, **hardware):
+async def _save_map(hass, entry, zones=1, **hardware):
     flow = await _open(hass, entry, "edit_zones")
     flow = await hass.config_entries.options.async_configure(
-        flow["flow_id"], {"num_zones": 1}
+        flow["flow_id"], {"num_zones": zones}
     )
     assert flow["step_id"] == "edit_zones_map"
     # What the frontend sends: every field at the value it is showing, plus the change.
@@ -250,6 +250,61 @@ async def test_clearing_the_pump_of_a_room_that_says_it_has_one_is_refused_in_th
     assert "no pump switch is chosen" in result["description_placeholders"]["error"]
     assert entry.data["hardware"]["pump_switch"] == "switch.pump"  # nothing was written
     assert entry.data["setup_revision"] == revision
+
+
+# ------------------------------------------------------------------ the lights hours
+# The controller reads the lights hours from these two numbers every loop. The zones-and-hardware
+# form showed, and saved, the hours recorded at setup, which only seed them once: a room ran its
+# lights 20-7 while this form said 7-20, and saving 7-20 here changed nothing the controller read.
+LIGHTS = ("number.crop_steering_lights_on_hour", "number.crop_steering_lights_off_hour")
+
+
+async def _set_lights(hass, on, off):
+    for entity_id, hour in zip(LIGHTS, (on, off)):
+        await hass.services.async_call(
+            "number", "set_value", {"entity_id": entity_id, "value": hour}, blocking=True
+        )
+
+
+def _lights(hass):
+    return tuple(float(hass.states.get(entity_id).state) for entity_id in LIGHTS)
+
+
+async def test_the_lights_hours_open_on_the_live_ones_and_a_save_reaches_the_controller(hass):
+    entry = await _install(hass)
+    await _set_lights(hass, 20, 7)  # what the controller runs on, whatever setup recorded
+    flow = await _save_map(hass, entry, lights_on_hour=7, lights_off_hour=20)
+    shown = _shown(flow)
+    assert (shown["lights_on_hour"], shown["lights_off_hour"]) == (20, 7)
+    assert _lights(hass) == (7.0, 20.0)
+    params = entry.data["parameters"]
+    assert (params["lights_on_hour"], params["lights_off_hour"]) == (7, 20)
+
+
+async def test_an_untouched_save_keeps_the_lights_hours_changed_since_setup(hass):
+    entry = await _install(hass)
+    await _set_lights(hass, 18, 6)  # changed on a dashboard since setup
+    await _save_map(hass, entry)
+    assert _lights(hass) == (18.0, 6.0)
+
+
+@pytest.mark.parametrize(
+    "name", ["entry_2_18_one_switch_tent.json", "entry_2_17_wizard.json", "entry_env_era.json"]
+)
+async def test_an_upgraded_room_keeps_its_lights_hours_until_configure_changes_them(hass, name):
+    """In-place upgrade: the update itself moves no hours; the form shows them and saves them."""
+    hass.states.async_set("input_boolean.f2_control_enabled", "off")  # an env-era room's kill switch
+    entry, _ = await _upgrade(hass, name)
+    ec = hass.states.get("sensor.veg_ec_template")
+    if ec is not None:  # the env-era room's EC template reports no unit, which the form refuses
+        hass.states.async_set(ec.entity_id, ec.state, {**ec.attributes, "unit_of_measurement": "mS/cm"})
+    await _set_lights(hass, 20, 7)
+    zones = int(entry.data["num_zones"])
+    flow = await _save_map(hass, entry, zones=zones)
+    assert (_shown(flow)["lights_on_hour"], _shown(flow)["lights_off_hour"]) == (20, 7)
+    assert _lights(hass) == (20.0, 7.0)  # an untouched save leaves them where they are
+    await _save_map(hass, entry, zones=zones, lights_on_hour=7, lights_off_hour=20)
+    assert _lights(hass) == (7.0, 20.0)
 
 
 # ------------------------------------------------------------------ messages

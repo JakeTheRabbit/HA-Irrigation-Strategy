@@ -232,6 +232,14 @@ MIN_SHOT_S = 5
 # A probe unreadable for less than this many minutes is a blip (Home Assistant restarting, a sensor
 # reconnecting): its zone gets no timer shot and no probe alert until it has been out this long.
 BLIND_GRACE_MIN = 15
+# System Enabled and Auto Irrigation Enabled each stopped every shot, as the room's engine switch
+# does, but less well: a shot already running carried on. The engine switch is the one switch now.
+# While either still exists and reads off, the controller switches the engine switch off in its
+# place, so a room someone stopped with one of them stays stopped (_carry_retired_switches).
+RETIRED_SWITCHES = (
+    ("system_enabled", "System Enabled"),
+    ("auto_irrigation_enabled", "Auto Irrigation Enabled"),
+)
 
 # What Controller._on reads as ON. A hold (hold_entities) in one of these states stops a shot starting
 # (_blocked) and ends one in flight (_wait_shot): the same test, so the two can never disagree.
@@ -1942,12 +1950,9 @@ class Controller:
             return plumbing
         if not self._on(room.enable_flag, False):
             return "f2-control disabled (kill switch off)"
-        if not self._on(f"switch.crop_steering_{room.prefix}system_enabled", False):
-            return "system disabled"
-        if not self._on(
-            f"switch.crop_steering_{room.prefix}auto_irrigation_enabled", False
-        ):
-            return "auto-irrigation disabled"
+        retired = getattr(room, "_retired_off", None)
+        if retired:  # switched off in their place this pass; the switch may not read OFF yet
+            return f"{' and '.join(retired)} off: engine switch switched off in its place"
         if not self._on(f"switch.crop_steering_{room.prefix}zone_{zone}_enabled", True):
             return "zone disabled"
         if self._on(
@@ -2070,6 +2075,34 @@ class Controller:
         if code is not None and self._alert_codes.get(key, code) != code:
             return age >= 300
         return age >= 1800
+
+    def _carry_retired_switches(self, room):
+        """Switch the engine switch off for each RETIRED_SWITCHES entry that reads off, and return
+        their names. Only ever OFF: an off one never switches watering back on. A retired switch
+        that is on, missing or unreadable changes nothing (the integration will remove them)."""
+        off = []
+        for key, name in RETIRED_SWITCHES:
+            entity = f"switch.crop_steering_{room.prefix}{key}"
+            state, _, _ = ha_get(entity)
+            if str(state).lower() != "off":
+                continue
+            off.append(name)
+            if not self._on(room.enable_flag, False):
+                continue  # watering is off already: nothing was switched
+            ha_call(room.enable_flag.split(".", 1)[0], "turn_off", entity_id=room.enable_flag)
+            log(f"[{room.slug}] {name} ({entity}) is off: engine switch {room.enable_flag} switched off")
+            self._alert(
+                f"retired_switch_{room.slug}_{key}",
+                "CS-208",
+                f"{name} is off, so watering was switched off",
+                f"{name} no longer stops watering by itself: the room's Watering switch does that, "
+                f"its engine switch ({room.enable_flag}). Because {name} ({entity}) is off, the "
+                "controller switched watering off in its place, and does so again while it stays "
+                f"off. Switch {name} back on in Home Assistant, then switch watering on in Crop "
+                "Steering → Settings → Watering.",
+                room=room,
+            )
+        return off
 
     def _alert(self, key, code, title, message, room=None, zone=None):
         """Raise notification `f2_{key}` with its error code (docs/error-codes.json; the dashboard's
@@ -2499,8 +2532,8 @@ class Controller:
         Check kill/override, the holds and the shot's valve between <=2 s sleeps using bounded
         reads. This remains synchronous: other rooms wait and network/device delays can delay
         shutdown. Returns actual seconds elapsed and what ended the shot early, or None:
-          ("abort", entity): a definitive kill OFF / room OFF / override ON. The operator's own
-            switches are read first in every round, so they win.
+          ("abort", entity): a definitive kill OFF / room OFF / zone OFF / override ON. The
+            operator's own switches are read first in every round, so they win.
           ("external", entity): something else closed the feed path: a hold (hold_entities) reads
             ON (the test _blocked applies before a shot), or the shot's own valve reads OFF. The
             caller closes only what is still this shot's (_close_cut_short).
@@ -2515,6 +2548,7 @@ class Controller:
             for entity, stop_state in (
                 (room.enable_flag, "off"),
                 (f"switch.crop_steering_{room.prefix}room_active", "off"),
+                (f"switch.crop_steering_{room.prefix}zone_{zone}_enabled", "off"),
                 (
                     f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override",
                     "on",
@@ -2756,13 +2790,18 @@ class Controller:
                 delivered_l=nominal_l * (elapsed / duration_s if duration_s > 0 else 1.0),
             )
             if aborted:
+                by = aborted[1]
+                why = {
+                    room.enable_flag: "the engine switch was turned off",
+                    f"switch.crop_steering_{room.prefix}room_active": "Room Active was switched off",
+                    f"switch.crop_steering_{room.prefix}zone_{zone}_enabled": "this zone was switched off",
+                }.get(by, "manual override was turned on")
                 self._alert(
                     f"killshot_{room.slug}_z{zone}",
                     "CS-305",
                     "shot stopped early",
-                    f"The shot was stopped after {elapsed:.0f} of {duration_s:.0f} seconds, because the "
-                    "engine switch was turned off, Room Active was switched off or manual override "
-                    "was turned on. The valve and anything upstream were switched off, and the water "
+                    f"The shot was stopped after {elapsed:.0f} of {duration_s:.0f} seconds, because "
+                    f"{why} ({by}). The valve and anything upstream were switched off, and the water "
                     "delivered so far is counted.",
                     room=room,
                     zone=zone,
@@ -3227,6 +3266,7 @@ class Controller:
             return {}  # no snapshot, no decision, no blind schedule, no alerts, no vitals line
         if was is False:
             self._room_switched_on(room)
+        room._retired_off = self._carry_retired_switches(room)
         self._load_strategy_snapshot(room, now)
         # Only a newly computed batch can clear a prior preflight invalidation.
         room._strategy_batch_invalid = False
