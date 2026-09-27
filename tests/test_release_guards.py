@@ -91,6 +91,26 @@ CONTROLLER_ONLY = {
 }
 
 
+def test_a_release_pull_request_carries_its_whats_new_section():
+    """What's new ships inside the integration as a document, so the release that writes its
+    section needs no rebuilt dashboard, which a release pull request could not carry."""
+    notes = "custom_components/crop_steering/WHATS_NEW.md"
+    assert (
+        _pr(
+            head_ref="release/2.19.0",
+            head_versions=NEW,
+            changed_paths=[*RELEASE_PATHS, notes],
+        )
+        == []
+    )
+    (problem,) = _pr(
+        head_ref="release/2.19.0",
+        head_versions=NEW,
+        changed_paths=[*RELEASE_PATHS, notes, "www/dashboard.html"],
+    )
+    assert "www/dashboard.html" in problem
+
+
 def test_every_release_is_named_by_the_integration_version():
     """One number names a release: the tag, the HACS release, the changelog entry and the
     promotion check are all keyed by the integration version. This guard used to accept a

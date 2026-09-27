@@ -355,3 +355,15 @@ stock_record_batch:
         number:
           min: 0
           mode: box
+whats_new_get:
+  name: Read what's new
+  description: The release highlights shipped with this integration, the installed version and the last release the dashboard's What's new window showed. Changes nothing.
+whats_new_seen:
+  name: Mark what's new as shown
+  description: Record that the dashboard's What's new window has shown the highlights up to this version, for the whole installation, so it does not show them again. Changes nothing else.
+  fields:
+    version:
+      required: true
+      example: "2.25.0"
+      selector:
+        text:

@@ -46,7 +46,9 @@ const checks = [];
 let failStates = false,
   failWrite = "",
   ignoreWrite = "",
-  noEntities = false;
+  noEntities = false,
+  /** What crop_steering.whats_new_get answers; null: an integration without What's new. */
+  whatsNew = null;
 const put = (entity_id, state, attributes = {}) =>
   (states[entity_id] = {
     entity_id,
@@ -135,6 +137,16 @@ await context.route("**/*", async (route) => {
   if (url.pathname.startsWith("/api/history/")) {
     history.push(url.searchParams.get("filter_entity_id")?.split(",") ?? []);
     return reply([]);
+  }
+  if (whatsNew && url.pathname.startsWith("/api/services/crop_steering/whats_new_")) {
+    const action = url.pathname.split("/").pop(),
+      body = req.postDataJSON() ?? {};
+    calls.push({ path: url.pathname + url.search, ...body });
+    if (action === "whats_new_seen") whatsNew.seen = body.version;
+    return reply({
+      changed_states: [],
+      service_response: action === "whats_new_get" ? whatsNew : { seen: whatsNew.seen },
+    });
   }
   if (url.pathname.startsWith("/api/services/crop_steering/"))
     return reply({ message: "Fixture has no workspace API" }, 404);
@@ -512,6 +524,37 @@ try {
       assert.equal(await page.locator("#desktop-room").inputValue(), expected);
       assert.equal(new URL(page.url()).searchParams.get("room"), expected);
     }
+  });
+  await check("what's new: an update shows it once, and the integration is told", async () => {
+    // Every check above ran against an integration without What's new: no window, no error.
+    const dialog = page.getByRole("dialog", { name: "What’s new in Crop Steering", exact: true });
+    assert.equal(await dialog.count(), 0);
+    whatsNew = {
+      version: "2.25.0",
+      seen: "2.24.0",
+      releases: [
+        { version: "2.25.0", date: "2026-10-05", items: ["Each zone says what it waits for."] },
+        { version: "2.24.0", date: "2026-09-26", items: ["Bug fixes and improvements."] },
+      ],
+    };
+    const told = () =>
+      calls.filter((call) => call.path.startsWith("/api/services/crop_steering/whats_new_seen"));
+    await page.goto(`${base}/dashboard.html?room=f1#/overview`, { waitUntil: "networkidle" });
+    await visible(dialog);
+    assert.deepEqual(
+      (await dialog.locator("section h3").allInnerTexts()).map((text) => text.split("\n")[0]),
+      ["Version 2.25.0"],
+    );
+    // Told as it opens, with the installed version, over the REST call the integration answers.
+    assert.deepEqual(told(), [
+      { path: "/api/services/crop_steering/whats_new_seen?return_response", version: "2.25.0" },
+    ]);
+    await dialog.getByRole("button", { name: "Got it", exact: true }).click();
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForTimeout(300);
+    assert.equal(await dialog.count(), 0, "the next visit, by anyone, does not show it again");
+    assert.equal(told().length, 1);
+    whatsNew = null;
   });
   await check("explicit missing room never falls through to default controls", async () => {
     await page.goto(`${base}/dashboard.html?room=missing-room#/strategy`, {
