@@ -1,5 +1,6 @@
 import { DailyWaterSummary } from "@/components/water-delivery";
 import { WaterUsePanel } from "@/components/water-use";
+import { AllZonesSwitch } from "@/components/room-controls";
 import { useState } from "react";
 import { ArrowUpRight, LayoutGrid, List, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import {
   MetricValue,
   MoistureCell,
   Status,
+  WaitingFor,
   WaterUse,
   ZoneDetails,
   ZoneOperatingState,
@@ -67,6 +69,7 @@ export function Zones({
         <span className="muted small">
           {zones.length} {zones.length === 1 ? "zone" : "zones"}
         </span>
+        {controller.room.zones.length > 0 && <AllZonesSwitch controller={controller} />}
         <div className="segmented">
           <Button
             size="icon"
@@ -167,6 +170,11 @@ export function Zones({
                   </strong>
                 </span>
               </div>
+              {zone.waiting && (
+                <p className="zone-waiting">
+                  <WaitingFor zone={zone} />
+                </p>
+              )}
               <Button variant="outline" className="full-width" onClick={() => setSelected(zone.id)}>
                 View zone <ArrowUpRight size={16} />
               </Button>

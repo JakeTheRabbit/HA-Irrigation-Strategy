@@ -38,6 +38,7 @@ import { errorText } from "@/lib/utils";
 import { budgetShare, DRYBACK_WINDOW_H, drybackTrend, type DrybackTrend } from "@/lib/dryback";
 import { useRecentHistory } from "@/lib/use-recent-moisture";
 import { coreWaterValue, dailyWater, waterParameters } from "@/lib/water-delivery";
+import { waitingText } from "@/lib/waiting-for";
 import {
   mlPerPlant,
   plantAmount,
@@ -956,13 +957,27 @@ export function ZoneTable({
               </div>
             </div>
             <p className="zone-mobile-target">
-              {zone.target.label}: <MetricValue metric={zone.target} />
+              {zone.waiting ? (
+                <WaitingFor zone={zone} />
+              ) : (
+                <>
+                  {zone.target.label}: <MetricValue metric={zone.target} />
+                </>
+              )}
             </p>
           </div>
         ))}
       </div>
     </>
   );
+}
+
+/** What would move the zone next, as the controller worked it out: its thresholds and the reading
+ * now (crop_steering_engine.waiting_for). Nothing when that is not fresh. */
+export function WaitingFor({ zone }: { zone: Zone }) {
+  if (!zone.waiting) return null;
+  const text = waitingText(zone.waiting, { number: (value) => number(value), clock: time });
+  return text ? <>Next: {text}</> : null;
 }
 
 export interface ReviewItem {
@@ -1125,6 +1140,11 @@ export function ZoneDetails({
                 <span className="small muted">Last irrigation</span>
                 <LastIrrigation zone={zone} />
               </div>
+              {zone.waiting && (
+                <p className="zone-waiting">
+                  <WaitingFor zone={zone} />
+                </p>
+              )}
               <div className="detail-metrics">
                 <div>
                   <span>Moisture</span>
@@ -1198,8 +1218,9 @@ export function ZoneDetails({
                 {zone.enabled ? "Pause zone scheduling" : "Enable zone scheduling"}
               </Button>
               <p className="small muted">
-                Pausing scheduling may prevent future cycles. It is not an emergency stop and may
-                not interrupt a shot already running.
+                Paused, the zone gets no water at all, not even a rescue shot, and a shot already
+                running in it stops within a few seconds. It is not an emergency stop: use the
+                installation's physical shut-off for that.
               </p>
               {zone.setPhaseEntity && (
                 <>
@@ -1266,7 +1287,11 @@ export function ZoneDetails({
                 ]
               : []
           }
-          note="This changes future scheduling. An active irrigation shot may continue."
+          note={
+            zone.enabled
+              ? "Paused, the zone gets no water, not even a rescue shot, and a shot already running in it stops within a few seconds."
+              : "The controller waters the zone again from its next check."
+          }
         />
       )}
       {zone?.setPhaseEntity && (

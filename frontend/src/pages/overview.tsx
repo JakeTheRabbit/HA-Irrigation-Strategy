@@ -9,7 +9,7 @@ import { drybackTrend } from "@/lib/dryback";
 import { useRecentMoisture } from "@/lib/use-recent-moisture";
 import { coreWaterValue, waterParameters } from "@/lib/water-delivery";
 import { roomPlants } from "@/lib/water-view";
-import { RoomPower } from "@/components/room-controls";
+import { AllZonesSwitch, RoomPower } from "@/components/room-controls";
 import { Empty, Heading, Metrics, ZoneDetails, ZoneTable, type Page } from "@/components/dashboard";
 
 export function Overview({
@@ -94,9 +94,12 @@ export function Overview({
         <section className="panel">
           <div className="panel-heading">
             <h2>Zones at a glance</h2>
-            <Button variant="ghost" onClick={() => navigate("zones")}>
-              All zones <ArrowRight size={16} />
-            </Button>
+            <div className="zones-heading-actions">
+              {room.zones.length > 0 && <AllZonesSwitch controller={controller} />}
+              <Button variant="ghost" onClick={() => navigate("zones")}>
+                All zones <ArrowRight size={16} />
+              </Button>
+            </div>
           </div>
           {room.zones.length ? (
             <ZoneTable
