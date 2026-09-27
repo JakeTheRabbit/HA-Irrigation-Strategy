@@ -240,7 +240,8 @@ def test_fault_blocks_other_room_sharing_pump_but_not_independent_room(rig, monk
         c.rooms.append(room)
         c._load_room_state(room, {})
         for eid in (room.enable_flag, "switch.crop_steering_" + slug + "_system_enabled",
-                    "switch.crop_steering_" + slug + "_auto_irrigation_enabled"):
+                    "switch.crop_steering_" + slug + "_auto_irrigation_enabled",
+                    "switch.crop_steering_" + slug + "_zone_1_enabled"):
             fake.set_state(eid, "on")
         for switch in (pump, "switch." + slug + "_main", "switch." + slug + "_valve"):
             if switch not in fake.states:  # its own feed path exists, switched off
