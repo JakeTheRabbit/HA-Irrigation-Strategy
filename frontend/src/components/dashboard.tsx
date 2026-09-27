@@ -38,6 +38,7 @@ import { errorText } from "@/lib/utils";
 import { budgetShare, DRYBACK_WINDOW_H, drybackTrend, type DrybackTrend } from "@/lib/dryback";
 import { useRecentHistory } from "@/lib/use-recent-moisture";
 import { coreWaterValue, waterParameters } from "@/lib/water-delivery";
+import { waitingText } from "@/lib/waiting-for";
 import {
   Meter,
   MiniBars,
@@ -853,13 +854,27 @@ export function ZoneTable({
               </div>
             </div>
             <p className="zone-mobile-target">
-              {zone.target.label}: <MetricValue metric={zone.target} />
+              {zone.waiting ? (
+                <WaitingFor zone={zone} />
+              ) : (
+                <>
+                  {zone.target.label}: <MetricValue metric={zone.target} />
+                </>
+              )}
             </p>
           </div>
         ))}
       </div>
     </>
   );
+}
+
+/** What would move the zone next, as the controller worked it out: its thresholds and the reading
+ * now (crop_steering_engine.waiting_for). Nothing when that is not fresh. */
+export function WaitingFor({ zone }: { zone: Zone }) {
+  if (!zone.waiting) return null;
+  const text = waitingText(zone.waiting, { number: (value) => number(value), clock: time });
+  return text ? <>Next: {text}</> : null;
 }
 
 export interface ReviewItem {
@@ -1021,6 +1036,11 @@ export function ZoneDetails({
                 <span className="small muted">Last irrigation</span>
                 <LastIrrigation zone={zone} />
               </div>
+              {zone.waiting && (
+                <p className="zone-waiting">
+                  <WaitingFor zone={zone} />
+                </p>
+              )}
               <div className="detail-metrics">
                 <div>
                   <span>Moisture</span>

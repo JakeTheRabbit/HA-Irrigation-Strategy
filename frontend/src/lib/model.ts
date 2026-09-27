@@ -13,6 +13,7 @@ import type {
   Zone,
 } from "./types";
 import { parseAutoSetpoints } from "./auto-setpoints";
+import { readWaiting } from "./waiting-for";
 import { PHASE_GROUPS, settingWords } from "./setting-words";
 import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
 
@@ -623,6 +624,11 @@ export function buildRoom(states: States, room: Room): RoomView {
           (e.entity_id.includes(`_zone_${id}_`) || e.entity_id.endsWith(`_zone_${id}`)),
       ),
       auto: parseAutoSetpoints(resolve(states, room, "sensor", `${z}auto_setpoints`)),
+      // What would move the zone next, for the phase shown: only while the controller waters it.
+      waiting:
+        roomActive && live && boolean(engineEntity) !== false && boolean(enabled) !== false
+          ? readWaiting(resolve(states, room, "sensor", `${z}waiting_for_app`), now, phase?.state)
+          : null,
     };
   });
   const aggregate = (

@@ -176,6 +176,35 @@ describe("room model", () => {
     expect(first.events[0].timestamp).toBe("10:30");
     expect(buildRoom(states, rooms[1]).events[0].timestamp).toBe("10:29");
   });
+  it("shows what a zone waits for only while the controller waters it, in the phase shown", () => {
+    const now = new Date().toISOString();
+    const states = fixture();
+    const put = (id: string, state: string, attributes: Record<string, unknown> = {}) => {
+      states[id] = { ...entity(id, state, attributes), last_updated: now };
+    };
+    put("sensor.crop_steering_ai_heartbeat", "online");
+    put("sensor.crop_steering_zone_1_phase", "P2");
+    put("sensor.crop_steering_zone_1_waiting_for_app", "P2", {
+      at: now,
+      conditions: [{ rule: "p2_topup", shot: true, to: null, op: "<", value: 55, now: 60 }],
+    });
+    const waiting = () => buildRoom(states, discoverRooms(states)[0]).zones[0].waiting;
+    expect(waiting()?.conditions.map((item) => item.rule)).toEqual(["p2_topup"]);
+    put("sensor.crop_steering_zone_1_phase", "P3"); // the zone moved on since
+    expect(waiting()).toBeNull();
+    put("sensor.crop_steering_zone_1_phase", "P2");
+    put("input_boolean.f2_control_enabled", "off"); // watering is switched off
+    expect(waiting()).toBeNull();
+    put("input_boolean.f2_control_enabled", "on");
+    put("switch.crop_steering_zone_1_enabled", "off"); // the zone is paused
+    expect(waiting()).toBeNull();
+    put("switch.crop_steering_zone_1_enabled", "on");
+    expect(waiting()).not.toBeNull();
+    states["sensor.crop_steering_ai_heartbeat"].last_updated = new Date(
+      Date.now() - 3_600_000,
+    ).toISOString(); // the controller stopped reporting
+    expect(waiting()).toBeNull();
+  });
   it("handles unavailable and blank numbers without fabricating zero", () => {
     for (const state of ["", "unavailable", "unknown", "NaN", "Infinity"])
       expect(numeric(entity("sensor.x", state))).toBeNull();
