@@ -3685,11 +3685,14 @@ class Controller:
                 continue
             on = self._on(room.enable_flag, False)
             any_live = any_live or on
-            feed = self._read_feed_ec(room)
             head = (room.slug if room.prefix else self.instance_name) + (
                 " LIVE" if on else " HELD"
             )
-            head += f" | feed EC {feed if feed is not None else '—'}"
+            # Only a room with a feed EC probe says anything about feed EC. One that reads nothing
+            # usable holds watering (the source-water gate), so it is named, not dropped.
+            if room.feed_ec_sensor:
+                feed = self._read_feed_ec(room)
+                head += f" | feed EC {feed if feed is not None else 'unreadable'}"
             lines = [head]
             for z in sorted(pub):
                 d = pub[z]
