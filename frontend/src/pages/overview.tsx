@@ -8,6 +8,7 @@ import { leadingNotices } from "@/lib/model";
 import { drybackTrend } from "@/lib/dryback";
 import { useRecentMoisture } from "@/lib/use-recent-moisture";
 import { coreWaterValue, waterParameters } from "@/lib/water-delivery";
+import { roomPlants } from "@/lib/water-view";
 import { AllZonesSwitch, RoomPower } from "@/components/room-controls";
 import { Empty, Heading, Metrics, ZoneDetails, ZoneTable, type Page } from "@/components/dashboard";
 
@@ -37,6 +38,7 @@ export function Overview({
       ]),
     );
   // The limit the controller enforces: the configured value inside its safety bounds.
+  const plants = roomPlants(controller);
   const limits = Object.fromEntries(
     room.zones.map((zone) => [
       zone.id,
@@ -81,7 +83,12 @@ export function Overview({
           )}
         </div>
       )}
-      <Metrics metrics={room.metrics} zones={room.zones} waterLimits={limits} />
+      <Metrics
+        metrics={room.metrics}
+        zones={room.zones}
+        waterLimits={limits}
+        waterPlants={plants}
+      />
       <DayTimeline controller={controller} />
       <div className="overview-grid">
         <section className="panel">
@@ -100,6 +107,7 @@ export function Overview({
               zones={room.zones}
               trends={trends}
               limits={limits}
+              plants={plants}
               onSelect={(zone) => setSelected(zone.id)}
             />
           ) : (

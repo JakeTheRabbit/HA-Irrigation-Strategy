@@ -1,4 +1,6 @@
-import { number } from "@/components/dashboard";
+import { number, PlantAmount } from "@/components/dashboard";
+import { dailyWater } from "@/lib/water-delivery";
+import { useWaterView } from "@/lib/water-view";
 import type { Metric, Zone } from "@/lib/types";
 import type { ParameterLimit, SteeringProfile, ZonePlan } from "@/lib/operator-types";
 import {
@@ -29,6 +31,7 @@ export function PlanCellContext({
   zone,
   name,
   live,
+  livePlants = null,
   profile,
   limits,
   granularity,
@@ -40,6 +43,8 @@ export function PlanCellContext({
   zone: ZonePlan;
   name: string;
   live?: Zone;
+  /** The live zone's configured plant count, for water per plant (Settings → Appearance). */
+  livePlants?: number | null;
   profile?: SteeringProfile;
   limits: Record<string, ParameterLimit>;
   granularity: "week" | "day";
@@ -49,6 +54,8 @@ export function PlanCellContext({
   typed: number | null;
   readOnly: boolean;
 }) {
+  const { view } = useWaterView();
+  const each = live && view === "plant" ? dailyWater(live, livePlants).mlPerPlant : null;
   const { start, end } = columnRange(granularity, column);
   const { block, mixed } = rangeBlock(zone, start, end);
   const saved = mixed ? null : (block?.bias ?? null);
@@ -230,7 +237,10 @@ export function PlanCellContext({
                 </div>
                 <div>
                   <dt>Water today</dt>
-                  <dd>{reading(live.water)}</dd>
+                  <dd>
+                    {each === null ? reading(live.water) : <PlantAmount ml={each} />}
+                    {each !== null && " per plant"}
+                  </dd>
                 </div>
               </dl>
             ) : (

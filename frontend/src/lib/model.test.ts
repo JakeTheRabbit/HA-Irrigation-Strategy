@@ -239,6 +239,19 @@ describe("room model", () => {
       }),
     ).toBeTruthy();
   });
+  it("reads how Water today shows from the room's select, which a running plan does not own", () => {
+    const states = fixture();
+    const view = "select.crop_steering_water_today_view";
+    const room = () => buildRoom(states, discoverRooms(states)[0]);
+    expect(room().waterView).toEqual({ entityId: null, view: "zone" }); // an older integration
+    states[view] = entity(view, "Per plant", { options: ["Zone total", "Per plant"] });
+    expect(room().waterView).toEqual({ entityId: view, view: "plant" });
+    const planned = { ...room(), strategy: { ...room().strategy, engaged: true } };
+    expect(validateChange(planned, states, { entityId: view, value: "Zone total" })).toBeNull();
+    expect(validateChange(planned, states, { entityId: view, value: "Litres" })).toBeTruthy();
+    const target = { entityId: "number.crop_steering_p1_target_vwc", value: 64.5 };
+    expect(validateChange(planned, states, target)).toBeTruthy(); // targets stay the plan's
+  });
   it("rejects a misconfigured engine flag that points directly at mapped hardware", () => {
     const states = fixture();
     states["sensor.crop_steering_engine_config"].attributes.pump =

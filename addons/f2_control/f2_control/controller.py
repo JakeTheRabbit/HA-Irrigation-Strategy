@@ -292,6 +292,10 @@ def _on_since_shot(history, started):
 # daily budget) still applies to them.
 PLAN_HOLD_EXEMPT = frozenset({"p3_emergency", "watchdog", "min_daily", "blind_fallback", "blind_copy_rescue"})
 
+# A room's choice of how Water today reads, select.crop_steering_<prefix>water_today_view. The integration
+# offers ["Zone total", PER_PLANT] (WATER_TODAY_VIEWS in its const.py); the vitals follow it.
+PER_PLANT = "Per plant"
+
 # How a room is plumbed, as DECLARED in the integration's setup and published as the descriptor's
 # `plumbing`: layout -> (has a pump switch, has a main-line valve). The integration carries the same
 # table (custom_components/crop_steering/plumbing.py); tests/test_plumbing.py pins the two together.
@@ -3722,6 +3726,7 @@ class Controller:
                 feed = self._read_feed_ec(room)
                 head += f" | feed EC {feed if feed is not None else 'unreadable'}"
             lines = [head]
+            per_plant = ha_get(f"select.crop_steering_{room.prefix}water_today_view")[0] == PER_PLANT
             for z in sorted(pub):
                 d = pub[z]
                 st = room.state[z]
@@ -3730,8 +3735,14 @@ class Controller:
                 vwc = f"{d['vwc']:.0f}%" if d["vwc"] is not None else "—"
                 ec = f"{d['ec']:.1f}" if d["ec"] is not None else "—"
                 fc = f"{st['peak']:.0f}" if st.get("peak") else "—"
+                water = f"{st['daily_vol']:.1f}L day"
+                if per_plant:  # each plant's share; a zone without a plant count stays in litres
+                    plants = self._zone_num(room, z, "plant_count", 0)
+                    if plants >= 1 and float(plants).is_integer():
+                        ml = st["daily_vol"] * 1000 / plants
+                        water = f"{ml:.0f} mL/plant day" if ml < 1000 else f"{ml / 1000:.1f} L/plant day"
                 lines.append(
-                    f"  Z{z} {d['phase']}: VWC {vwc} EC {ec} (FC~{fc}) | {st['daily_vol']:.1f}L day | last {ago}"
+                    f"  Z{z} {d['phase']}: VWC {vwc} EC {ec} (FC~{fc}) | {water} | last {ago}"
                 )
             blocks.append("\n".join(lines))
         if not blocks:

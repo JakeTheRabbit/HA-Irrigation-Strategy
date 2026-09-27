@@ -22,6 +22,7 @@ import {
   type Page,
 } from "@/components/dashboard";
 import type { Controller } from "@/lib/types";
+import { roomPlants, useWaterView, waterTodayLabel } from "@/lib/water-view";
 import { useDrybackTrends } from "@/lib/use-recent-moisture";
 
 export function Zones({
@@ -43,6 +44,8 @@ export function Zones({
   const limits = Object.fromEntries(
     controller.room.zones.map((zone) => [zone.id, dailyLimit(controller, zone.id)]),
   );
+  const plants = roomPlants(controller);
+  const { view: water } = useWaterView();
   return (
     <>
       <Heading
@@ -114,6 +117,7 @@ export function Zones({
             zones={zones}
             trends={trends}
             limits={limits}
+            plants={plants}
             onSelect={(zone) => setSelected(zone.id)}
           />
         </section>
@@ -150,9 +154,13 @@ export function Zones({
               </div>
               <div className="zone-card-pair">
                 <span>
-                  Water today
+                  {waterTodayLabel(water)}
                   <strong>
-                    <WaterUse zone={zone} limit={limits[zone.id] ?? null} />
+                    <WaterUse
+                      zone={zone}
+                      limit={limits[zone.id] ?? null}
+                      plants={plants[zone.id] ?? null}
+                    />
                   </strong>
                 </span>
                 <span>
