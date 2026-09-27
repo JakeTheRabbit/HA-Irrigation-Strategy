@@ -2,7 +2,7 @@
 
 Pair with integration 2.25.0. **C3.** Like 2.24.0, a bundled release of several changes, for the owner to approve; not run on hardware before release. No change to add-on options or the state file.
 
-- **Retired switches.** `_carry_retired_switches` switches the room's engine switch off while System Enabled or Auto Irrigation Enabled reads off (CS-208), and `_blocked` no longer gates on them; a missing or unreadable one changes nothing.
+- **Retired switches.** `_carry_retired_switches` switches the room's engine switch off while System Enabled or Auto Irrigation Enabled reads off (CS-208), and `_blocked` no longer gates on them; a missing or unreadable one changes nothing. While an interrupted shot is still being settled it leaves the engine switch alone, so the cleanup that closes that shot's valve is not taken for a person taking over.
 - **A zone switched off stops its running shot.** `_wait_shot` reads the zone's `switch.crop_steering_<prefix>zone_N_enabled` every round with the engine switch, Room Active and manual override; CS-305 names the switch that stopped the shot.
 - **An unreadable zone switch holds the zone.** `_blocked` returns `<entity> unreadable (reads neither on nor off)` when `switch.crop_steering_<prefix>zone_N_enabled` is missing, `unknown` or `unavailable`, so a room whose integration is not running is not watered on the backup timer. A running shot still ends only on a definite OFF.
 - **Publishes what each zone waits for.** `sensor.crop_steering_<prefix>zone_N_waiting_for_app` every pass, from the engine's `waiting_for`: for the phase the zone is in after this pass, and an empty list for a zone with no usable probe or a room that is off.

@@ -2110,7 +2110,10 @@ class Controller:
     def _carry_retired_switches(self, room):
         """Switch the engine switch off for each RETIRED_SWITCHES entry that reads off, and return
         their names. Only ever OFF: an off one never switches watering back on. A retired switch
-        that is on, missing or unreadable changes nothing (the integration will remove them)."""
+        that is on, missing or unreadable changes nothing (the integration will remove them).
+        Not while an interrupted shot is unsettled: _reconcile_room_inflight reads an engine switch
+        that is off as a person taking over, and would leave what the shot opened running. The
+        names still hold the room (_blocked) until the switch goes off after the shot is settled."""
         off = []
         for key, name in RETIRED_SWITCHES:
             entity = f"switch.crop_steering_{room.prefix}{key}"
@@ -2118,8 +2121,8 @@ class Controller:
             if str(state).lower() != "off":
                 continue
             off.append(name)
-            if not self._on(room.enable_flag, False):
-                continue  # watering is off already: nothing was switched
+            if getattr(room, "shot_inflight", None) or not self._on(room.enable_flag, False):
+                continue  # a shot still to settle, or watering is off already: nothing is switched
             ha_call(room.enable_flag.split(".", 1)[0], "turn_off", entity_id=room.enable_flag)
             log(f"[{room.slug}] {name} ({entity}) is off: engine switch {room.enable_flag} switched off")
             self._alert(

@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.25.0] - 2026-09-27
 
-Pair: **controller 2.25.0**. Class **C3**. Nine pull requests (#119 to #125, #127, #128). The controller
+Pair: **controller 2.25.0**. Class **C3**. Ten pull requests (#119 to #125, #127 to #129). The controller
 changes in six ways: a retired System Enabled or Auto Irrigation Enabled switch that is off now switches
 the room's watering off in its place (#120), switching a zone off stops a shot already running in it (#122),
 it publishes what each zone waits for next, from the engine's new `waiting_for` (#121), its vitals
@@ -21,7 +21,7 @@ hides the two retired switches (#120), adds each room's Water today choice (#125
 highlights (#124) (C2). The dashboard gains one switch over every zone (#123), Water today per plant (#125),
 each zone's "Next:" line and the What's new window (C1). Like 2.24.0, this candidate carries several C2 and
 C3 changes at once, which needs the owner's approval as a bundled release (docs/RELEASING.md). Not run on
-hardware; the nine pull requests were merged together and checked by the lean, controller, engine,
+hardware; the ten pull requests were merged together and checked by the lean, controller, engine,
 real-Home-Assistant (2026.9.3 and 2024.10.0) and browser suites.
 
 ### 🌱 In plain English
@@ -61,6 +61,9 @@ real-Home-Assistant (2026.9.3 and 2024.10.0) and browser suites.
   `hidden_by=integration` at setup). The controller no longer gates on them: `_carry_retired_switches`
   switches the engine switch off while either reads off, raises CS-208, and `_blocked` says so. Deleting
   them waits until no older controller is left: one before this reads a missing switch as off.
+  While an interrupted shot is still being settled, the carry leaves the engine switch alone:
+  `_reconcile_room_inflight` reads an engine switch that is off as a person taking over, and a
+  cleanup that had to wait a loop (CS-308, CS-309) would otherwise leave the shot's valve running (#129).
 - **A zone switched off stops its running shot (#122).** `_wait_shot` reads
   `switch.crop_steering_<prefix>zone_N_enabled` with the engine switch, Room Active and manual override
   every round (at most 2 s apart); CS-305 names the switch that stopped the shot. Catalog updated.
