@@ -41,6 +41,7 @@ import { roomIsActive, runningVersions } from "@/lib/model";
 import { RoomOffBanner } from "@/components/room-controls";
 import { ActivityPanel } from "@/components/activity-panel";
 import { StatusLines } from "@/components/status-line";
+import { WaterViewProvider } from "@/lib/water-view";
 import { time, type Page } from "@/components/dashboard";
 import { Overview } from "@/pages/overview";
 import { Zones } from "@/pages/zones";
@@ -276,7 +277,7 @@ export default function App() {
       </div>
     </>
   );
-  return (
+  const shell = (
     <div className="app-shell">
       <a
         href="#main-content"
@@ -507,4 +508,5 @@ export default function App() {
       </Dialog>
     </div>
   );
+  return <WaterViewProvider controller={controller}>{shell}</WaterViewProvider>;
 }

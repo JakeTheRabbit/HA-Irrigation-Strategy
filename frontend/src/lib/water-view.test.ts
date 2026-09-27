@@ -1,43 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mlPerPlant, plantAmount, readWaterView, roomPerPlant, saveWaterView } from "./water-view";
+import { mlPerPlant, plantAmount, roomPerPlant } from "./water-view";
 import type { Zone } from "./types";
 
 const zone = (id: number, value: number | null, unit = "L") =>
   ({ id, name: `Zone ${id}`, water: { value, unit } }) as unknown as Zone;
-const memory = () => {
-  const saved = new Map<string, string>();
-  return {
-    getItem: (key: string) => saved.get(key) ?? null,
-    setItem: (key: string, value: string) => void saved.set(key, value),
-  };
-};
-const refusing = {
-  getItem: () => {
-    throw new Error("storage refused");
-  },
-  setItem: () => {
-    throw new Error("storage refused");
-  },
-};
-
-describe("the choice between zone total and per plant", () => {
-  it("is the zone total until someone chooses per plant, in this browser", () => {
-    const storage = memory();
-    expect(readWaterView(storage)).toBe("zone");
-    saveWaterView("plant", storage);
-    expect(readWaterView(storage)).toBe("plant");
-    saveWaterView("zone", storage);
-    expect(readWaterView(storage)).toBe("zone");
-  });
-  it("falls back to the zone total when storage is refused or holds anything else", () => {
-    expect(readWaterView(refusing)).toBe("zone");
-    expect(() => saveWaterView("plant", refusing)).not.toThrow();
-    const storage = memory();
-    storage.setItem("irrigation-water-view", "per-plant");
-    expect(readWaterView(storage)).toBe("zone");
-  });
-});
-
 describe("water per plant", () => {
   it("divides a zone's litres by its plants, in mL", () => {
     expect(mlPerPlant(5.3, 36)).toBeCloseTo(147.22, 2);

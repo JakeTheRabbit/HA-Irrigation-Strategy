@@ -26,7 +26,7 @@ import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import { RoomPower } from "@/components/room-controls";
 import type { ThemePreference, ThemeSource } from "@/lib/ha-theme";
-import { useWaterView } from "@/lib/water-view";
+import { useWaterView, type WaterView } from "@/lib/water-view";
 
 /** The connection in the top bar's words, with the colour of its state. */
 const CONNECTION: Record<Controller["connection"], { label: string; tone: PillTone }> = {
@@ -59,6 +59,19 @@ export function Settings({
   themeSource: ThemeSource;
 }) {
   const water = useWaterView();
+  const [waterBusy, setWaterBusy] = useState(false);
+  const [waterError, setWaterError] = useState("");
+  async function chooseWater(view: WaterView) {
+    setWaterBusy(true);
+    setWaterError("");
+    try {
+      await water.setView(view);
+    } catch (error) {
+      setWaterError(errorText(error));
+    } finally {
+      setWaterBusy(false);
+    }
+  }
   const [base, setBase] = useState("");
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
@@ -289,7 +302,12 @@ export function Settings({
                     key={option.value}
                     className={water.view === option.value ? "chosen" : ""}
                     aria-pressed={water.view === option.value}
-                    onClick={() => water.setView(option.value)}
+                    disabled={
+                      !water.available ||
+                      waterBusy ||
+                      !["live", "demo"].includes(controller.connection)
+                    }
+                    onClick={() => void chooseWater(option.value)}
                   >
                     <option.icon size={20} />
                     <span>{option.label}</span>
@@ -297,10 +315,18 @@ export function Settings({
                   </button>
                 ))}
               </div>
+              {waterError && (
+                <p className="small error-text" role="alert">
+                  {waterError}
+                </p>
+              )}
               <p className="small muted mt-3">
+                {water.available
+                  ? `For ${controller.room.room.name}: everyone who opens it sees water today this way, and the controller’s vitals notification follows it. `
+                  : "This needs the updated Crop Steering integration. "}
                 Per plant is each zone’s water today, and its daily limit, divided by its plant
                 count from Rooms &amp; setup, as if every plant got the same. Water use over the
-                grow stays in litres per zone. For this browser only, like the theme.
+                grow stays in litres per zone.
               </p>
             </div>
           </div>

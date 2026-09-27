@@ -1,48 +1,49 @@
-import { createContext, createElement, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, createElement, useContext, useMemo, type ReactNode } from "react";
 import { dailyWater, positiveCount, waterParameters } from "./water-delivery";
 import type { Controller, Zone } from "./types";
 
-/** How Water today reads: each zone's total, as it always has, or what each of its plants got.
- * One person's choice (Settings → Appearance), kept in this browser like the theme. */
+/** How Water today reads: each zone's total, as it always has, or what each of its plants got. One
+ * choice per room, kept in Home Assistant (select.crop_steering_<prefix>water_today_view), so everyone
+ * who opens the room sees it the same way and the controller's vitals notification follows it. */
 export type WaterView = "zone" | "plant";
-const KEY = "irrigation-water-view";
-
-export function readWaterView(storage?: Pick<Storage, "getItem">): WaterView {
-  try {
-    return (storage ?? globalThis.localStorage)?.getItem(KEY) === "plant" ? "plant" : "zone";
-  } catch {
-    return "zone"; // storage refused (a private window): the default
-  }
-}
-export function saveWaterView(view: WaterView, storage?: Pick<Storage, "setItem">) {
-  try {
-    (storage ?? globalThis.localStorage)?.setItem(KEY, view);
-  } catch {
-    // storage refused: the choice lasts this visit only
-  }
-}
+/** The select's words for each view (the integration's WATER_TODAY_VIEWS). */
+export const WATER_VIEW_OPTIONS: Record<WaterView, string> = {
+  zone: "Zone total",
+  plant: "Per plant",
+};
 
 export const WaterViewContext = createContext<{
   view: WaterView;
-  setView: (view: WaterView) => void;
-}>({ view: "zone", setView: () => {} });
+  /** False when the room has no select to keep the choice in (an older integration). */
+  available: boolean;
+  setView: (view: WaterView) => Promise<void>;
+}>({ view: "zone", available: false, setView: async () => {} });
 export const useWaterView = () => useContext(WaterViewContext);
 /** What a Water today column or tile is called: the cells then say mL or L, not "per plant". */
 export const waterTodayLabel = (view: WaterView) =>
   view === "plant" ? "Water today per plant" : "Water today";
 
-/** The whole dashboard reads the one choice, and a change shows everywhere at once. */
-export function WaterViewProvider({ children }: { children: ReactNode }) {
-  const [view, setView] = useState<WaterView>(() => readWaterView());
+/** The selected room's choice, for the whole dashboard; changing it writes the room's select. */
+export function WaterViewProvider({
+  controller,
+  children,
+}: {
+  controller: Controller;
+  children: ReactNode;
+}) {
+  const { entityId, view } = controller.room.waterView;
+  const { write } = controller;
   const value = useMemo(
     () => ({
       view,
-      setView: (next: WaterView) => {
-        saveWaterView(next);
-        setView(next);
+      available: entityId !== null,
+      setView: async (next: WaterView) => {
+        if (!entityId) throw new Error("This needs the updated Crop Steering integration.");
+        const result = await write([{ entityId, value: WATER_VIEW_OPTIONS[next] }]);
+        if (result.failed.length) throw new Error(result.failed[0].reason);
       },
     }),
-    [view],
+    [entityId, view, write],
   );
   return createElement(WaterViewContext.Provider, { value }, children);
 }

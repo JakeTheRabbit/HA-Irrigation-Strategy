@@ -87,6 +87,10 @@ export function createDemo(now = Date.now()): States {
     put(`switch.crop_steering_${prefix}room_active`, "on");
     // Flower 2 demonstrates a running setpoint supervisor; Flower 1 keeps the default (off).
     put(`switch.crop_steering_${prefix}auto_setpoints`, index ? "off" : "on");
+    // How Water today reads in the room (Settings → Appearance): each zone's total until chosen.
+    put(`select.crop_steering_${prefix}water_today_view`, "Zone total", {
+      options: ["Zone total", "Per plant"],
+    });
     put(`sensor.crop_steering_${prefix}ai_heartbeat`, "online", {
       enable_flag: enable,
       last_beat: new Date(now - 18_000).toISOString(),
