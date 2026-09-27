@@ -271,6 +271,10 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 
+# The room's photoperiod, as the two number entities the controller reads every loop.
+LIGHTS_HOURS = ("lights_on_hour", "lights_off_hour")
+
+
 def _retry_form(flow, step_id, schema, user_input, info, error):
     """Show the same step again with everything typed still in it, and say what is wrong.
 
@@ -998,12 +1002,20 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         from .setup_api import effective
 
         data = effective(self._entry)
+        # The lights hours are the controller's: it reads them from the room's two number entities.
+        # The recorded `parameters` only seed those entities the first time they are created, so
+        # this form used to open on, and save, hours the controller never read (a room ran lights
+        # 20-7 while Configure said 7-20). It opens on the live hours, like edit_parameters.
+        live_lights = {
+            key: int(round(value))
+            for key, value in self._live_numbers(LIGHTS_HOURS).items()
+        }
         schema = vol.Schema(
             {
                 **_zone_schema(num, data.get("zones", {})),
                 **_hardware_schema(
                     data.get("hardware", {}),
-                    data.get("parameters", {}),
+                    {**data.get("parameters", {}), **live_lights},
                     data.get("plumbing") or infer_plumbing(data.get("hardware", {})),
                 ),
             }
@@ -1049,5 +1061,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 raise ValueError("; ".join(blockers))
         except ValueError as err:
             return _retry_form(self, "edit_zones_map", schema, user_input, info, err)
+        # Write the live lights hours first, as edit_parameters does: the reload that follows
+        # then restores the hours just written instead of the old ones.
+        await self._set_live_numbers(
+            {key: user_input[key] for key in LIGHTS_HOURS if key in user_input}
+        )
         _update(self.hass, self._entry, new_data)
         return self.async_create_entry(title="", data={})

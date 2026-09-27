@@ -1311,6 +1311,15 @@ nav button.nav-separated {
   border-radius: 7px;
   font-size: 12px;
 }
+.appearance-options {
+  display: grid;
+  gap: 24px;
+}
+.appearance-options h3 {
+  margin-bottom: 10px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
 .theme-options .chosen {
   border-color: var(--primary-strong);
   color: var(--primary-strong);
@@ -2406,4 +2415,9 @@ nav button.active > svg {
 /* Preserve readable filled-button contrast when hovering on a light surface. */
 [data-slot="button"][data-variant="default"]:hover {
   background: var(--primary);
+}
+/* Water today's two choices sit side by side: only the theme's first spans the row. */
+.water-view-options button:first-child {
+  flex-basis: auto;
+  grid-column: auto;
 }

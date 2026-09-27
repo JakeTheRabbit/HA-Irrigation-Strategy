@@ -1,5 +1,6 @@
 import { DailyWaterSummary } from "@/components/water-delivery";
 import { WaterUsePanel } from "@/components/water-use";
+import { AllZonesSwitch } from "@/components/room-controls";
 import { useState } from "react";
 import { ArrowUpRight, LayoutGrid, List, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import {
   MetricValue,
   MoistureCell,
   Status,
+  WaitingFor,
   WaterUse,
   ZoneDetails,
   ZoneOperatingState,
@@ -20,6 +22,7 @@ import {
   type Page,
 } from "@/components/dashboard";
 import type { Controller } from "@/lib/types";
+import { roomPlants, useWaterView, waterTodayLabel } from "@/lib/water-view";
 import { useDrybackTrends } from "@/lib/use-recent-moisture";
 
 export function Zones({
@@ -41,6 +44,8 @@ export function Zones({
   const limits = Object.fromEntries(
     controller.room.zones.map((zone) => [zone.id, dailyLimit(controller, zone.id)]),
   );
+  const plants = roomPlants(controller);
+  const { view: water } = useWaterView();
   return (
     <>
       <Heading
@@ -64,6 +69,7 @@ export function Zones({
         <span className="muted small">
           {zones.length} {zones.length === 1 ? "zone" : "zones"}
         </span>
+        {controller.room.zones.length > 0 && <AllZonesSwitch controller={controller} />}
         <div className="segmented">
           <Button
             size="icon"
@@ -111,6 +117,7 @@ export function Zones({
             zones={zones}
             trends={trends}
             limits={limits}
+            plants={plants}
             onSelect={(zone) => setSelected(zone.id)}
           />
         </section>
@@ -147,9 +154,13 @@ export function Zones({
               </div>
               <div className="zone-card-pair">
                 <span>
-                  Water today
+                  {waterTodayLabel(water)}
                   <strong>
-                    <WaterUse zone={zone} limit={limits[zone.id] ?? null} />
+                    <WaterUse
+                      zone={zone}
+                      limit={limits[zone.id] ?? null}
+                      plants={plants[zone.id] ?? null}
+                    />
                   </strong>
                 </span>
                 <span>
@@ -159,6 +170,11 @@ export function Zones({
                   </strong>
                 </span>
               </div>
+              {zone.waiting && (
+                <p className="zone-waiting">
+                  <WaitingFor zone={zone} />
+                </p>
+              )}
               <Button variant="outline" className="full-width" onClick={() => setSelected(zone.id)}>
                 View zone <ArrowUpRight size={16} />
               </Button>

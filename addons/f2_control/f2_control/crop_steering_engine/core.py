@@ -331,6 +331,62 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     return phase, round(p2_thr, 1), fire, round(size, 1), Reason(reason, kind, fire and CAP_EXEMPT.get(kind, False))
 
 
+def waiting_for(s: ZoneSnapshot, p: ZoneParams) -> list:
+    """PURE. What would move this zone next, by the rules decide() applies, and what they compare.
+
+    A list of conditions; whichever comes first acts. Each is {"rule", "shot", "to"} (a shot, or the
+    phase it leads to) with a reading test {"metric": "vwc"|"ec", "op", "value", "now"}, a wait
+    {"in_min"}, or both when a shot needs both. The EC reading is the settled one when there is one,
+    as decide() uses. A held plan (steering_held) leaves out the routine shots it stops. It says what
+    the engine checks, not what will happen: the controller's gates (switches, feed water, the daily
+    water limit), the EC flush and rescue rules, the watchdog, the daily minimum and P2's early move
+    to P3 in the last three hours before lights-off are not in it, and nothing is forecast.
+    """
+    settled = s.ec_settled is not None and math.isfinite(s.ec_settled)
+    ec = s.ec_settled if settled else s.ec
+    ec_known = ec is not None and math.isfinite(ec)
+    items = []
+
+    def add(rule, shot=False, to=None, metric=None, op=None, value=None, now=None, in_min=None, **extra):
+        item = {"rule": rule, "shot": shot, "to": to}
+        if metric is not None:
+            item.update(metric=metric, op=op, value=round(value, 2),
+                        now=None if now is None else round(now, 2))
+        if in_min is not None:
+            item["in_min"] = round(max(0.0, in_min), 1)
+        item.update(extra)
+        items.append(item)
+
+    if s.phase == "P0":
+        add("p0_timeout", to="P1", in_min=p.p0_max_wait_min - s.phase_minutes)
+        add("p0_bypass", to="P1", metric="vwc", op="<=", value=p.p2_threshold, now=s.vwc)
+        if s.peak_vwc > 0:
+            add("p0_dryback", to="P1", metric="vwc", op="<=",
+                value=s.peak_vwc * (1.0 - p.dryback_target / 100.0), now=s.vwc)
+    elif s.phase == "P1":
+        ceiling = min(p.p1_target, p.field_capacity)
+        if s.shot_count < p.p1_max_shots and not s.steering_held:
+            add("p1_ramp", shot=True, metric="vwc", op="<", value=ceiling, now=s.vwc,
+                in_min=p.p1_time_between_min - s.minutes_since_shot)
+        # With no EC reading the ramp ends only after a shot has gone in.
+        shots = p.p1_min_shots if ec_known else max(p.p1_min_shots, 1)
+        add("p1_done", to="P2", metric="vwc", op=">=", value=ceiling, now=s.vwc,
+            shots_left=max(0, shots - s.shot_count),
+            ec_max=round(p.ec_target_p1 * 1.15, 2) if ec_known else None,
+            ec_now=round(ec, 2) if ec_known else None)
+        add("p1_max_shots", to="P2", shots_left=max(0, p.p1_max_shots - s.shot_count))
+    elif s.phase == "P2":
+        if not s.steering_held:
+            add("p2_topup", shot=True, metric="vwc", op="<", value=p.p2_threshold, now=s.vwc)
+            if ec_known and p.ec_target_p2 > 0:
+                add("p2_dilute", shot=True, metric="ec", op=">", value=p.ec_target_p2 * 1.2, now=ec)
+        add("lights_off", to="P3", in_min=s.hours_to_lights_off * 60.0)
+    elif s.phase == "P3":
+        add("p3_emergency", shot=True, metric="vwc", op="<", value=p.p3_emergency_floor, now=s.vwc)
+        add("lights_on", to="P0", in_min=s.hours_to_lights_on * 60.0)
+    return items
+
+
 def pick_sibling(blind_p1_target, healthy):
     """PURE. A blind-probe zone copies the recipe-closest healthy sibling (nearest p1_target;
     tie -> lowest zone). `healthy` = list of (zone, p1_target); returns the zone or None."""

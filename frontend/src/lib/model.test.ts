@@ -176,6 +176,35 @@ describe("room model", () => {
     expect(first.events[0].timestamp).toBe("10:30");
     expect(buildRoom(states, rooms[1]).events[0].timestamp).toBe("10:29");
   });
+  it("shows what a zone waits for only while the controller waters it, in the phase shown", () => {
+    const now = new Date().toISOString();
+    const states = fixture();
+    const put = (id: string, state: string, attributes: Record<string, unknown> = {}) => {
+      states[id] = { ...entity(id, state, attributes), last_updated: now };
+    };
+    put("sensor.crop_steering_ai_heartbeat", "online");
+    put("sensor.crop_steering_zone_1_phase", "P2");
+    put("sensor.crop_steering_zone_1_waiting_for_app", "P2", {
+      at: now,
+      conditions: [{ rule: "p2_topup", shot: true, to: null, op: "<", value: 55, now: 60 }],
+    });
+    const waiting = () => buildRoom(states, discoverRooms(states)[0]).zones[0].waiting;
+    expect(waiting()?.conditions.map((item) => item.rule)).toEqual(["p2_topup"]);
+    put("sensor.crop_steering_zone_1_phase", "P3"); // the zone moved on since
+    expect(waiting()).toBeNull();
+    put("sensor.crop_steering_zone_1_phase", "P2");
+    put("input_boolean.f2_control_enabled", "off"); // watering is switched off
+    expect(waiting()).toBeNull();
+    put("input_boolean.f2_control_enabled", "on");
+    put("switch.crop_steering_zone_1_enabled", "off"); // the zone is paused
+    expect(waiting()).toBeNull();
+    put("switch.crop_steering_zone_1_enabled", "on");
+    expect(waiting()).not.toBeNull();
+    states["sensor.crop_steering_ai_heartbeat"].last_updated = new Date(
+      Date.now() - 3_600_000,
+    ).toISOString(); // the controller stopped reporting
+    expect(waiting()).toBeNull();
+  });
   it("handles unavailable and blank numbers without fabricating zero", () => {
     for (const state of ["", "unavailable", "unknown", "NaN", "Infinity"])
       expect(numeric(entity("sensor.x", state))).toBeNull();
@@ -209,6 +238,19 @@ describe("room model", () => {
         value: true,
       }),
     ).toBeTruthy();
+  });
+  it("reads how Water today shows from the room's select, which a running plan does not own", () => {
+    const states = fixture();
+    const view = "select.crop_steering_water_today_view";
+    const room = () => buildRoom(states, discoverRooms(states)[0]);
+    expect(room().waterView).toEqual({ entityId: null, view: "zone" }); // an older integration
+    states[view] = entity(view, "Per plant", { options: ["Zone total", "Per plant"] });
+    expect(room().waterView).toEqual({ entityId: view, view: "plant" });
+    const planned = { ...room(), strategy: { ...room().strategy, engaged: true } };
+    expect(validateChange(planned, states, { entityId: view, value: "Zone total" })).toBeNull();
+    expect(validateChange(planned, states, { entityId: view, value: "Litres" })).toBeTruthy();
+    const target = { entityId: "number.crop_steering_p1_target_vwc", value: 64.5 };
+    expect(validateChange(planned, states, target)).toBeTruthy(); // targets stay the plan's
   });
   it("rejects a misconfigured engine flag that points directly at mapped hardware", () => {
     const states = fixture();
