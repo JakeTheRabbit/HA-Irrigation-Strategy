@@ -218,6 +218,35 @@ def test_after_a_restart_with_no_history_nothing_is_switched_and_it_is_said_so(r
     assert "Can't be read: switch.v1" in alert["message"]
 
 
+def test_a_retired_switch_that_is_off_never_hands_an_unsettled_shot_to_a_person(rig):
+    # While System Enabled or Auto Irrigation Enabled reads off, the controller switches the room's
+    # engine switch off in its place. This check leaves everything alone while that switch is off (a
+    # person has taken over), so a check that had to wait a loop was never finished: the valve ran on.
+    c, fake, _ = rig
+    crashed(c, fake)
+    restarted(fake)
+    fake.history["switch.v1"] = None  # this loop, whose the valve is can't be told
+    fake.set_state("switch.crop_steering_system_enabled", "off")
+
+    def home_assistant_applies_engine_writes():
+        for dom, svc, d in fake.calls:
+            if dom == "input_boolean":
+                fake.set_state(d["entity_id"], "off" if svc == "turn_off" else "on")
+
+    c.loop_once(datetime(2026, 9, 23, 12, 0))
+    home_assistant_applies_engine_writes()
+    assert offs(fake) == [] and c.rooms[0].shot_inflight is not None
+    assert fake.states["input_boolean.kill"][0] == "on"  # the controller did not hand the shot over
+    restarted(fake)  # the recorder has it now
+    fake.calls.clear()
+    c.loop_once(datetime(2026, 9, 23, 12, 1))
+    assert offs(fake) == ["switch.v1", "switch.m", "switch.p"]
+    assert c.rooms[0].shot_inflight is None
+    # Settled, the room's watering goes off in the retired switch's place, as it would have at once.
+    home_assistant_applies_engine_writes()
+    assert fake.states["input_boolean.kill"][0] == "off"
+
+
 def test_the_recorder_is_read_the_way_a_person_would():
     on_since = controller._on_since_shot
     assert on_since([("off", at(-60)), ("on", at(2)), ("unavailable", at(500)), ("on", at(520))], STARTED)
