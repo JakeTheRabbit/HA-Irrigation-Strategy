@@ -1976,7 +1976,15 @@ class Controller:
         retired = getattr(room, "_retired_off", None)
         if retired:  # switched off in their place this pass; the switch may not read OFF yet
             return f"{' and '.join(retired)} off: engine switch switched off in its place"
-        if not self._on(f"switch.crop_steering_{room.prefix}zone_{zone}_enabled", True):
+        # A zone switch that can't be read holds the zone, as the kill switch does: whether the zone
+        # is paused can't be known, and when every one reads unavailable the integration itself is
+        # not running (not loaded, disabled, Home Assistant in safe mode), so its overrides can't be
+        # read either. A shot already running still ends only on a definite OFF (_wait_shot).
+        zone_switch = f"switch.crop_steering_{room.prefix}zone_{zone}_enabled"
+        state = ha_get(zone_switch)[0]
+        if state in (None, "unknown", "unavailable", ""):
+            return f"{zone_switch} unreadable (reads neither on nor off)"
+        if str(state).lower() not in ON_STATES:
             return "zone disabled"
         if self._on(
             f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override", False
