@@ -19,7 +19,8 @@ from test_setup_entry import _install
 from test_upgrade_in_place import _upgrade
 
 DOMAIN = "crop_steering"
-DESCRIPTOR = "sensor.crop_steering_engine_config"
+DESCRIPTOR = "sensor.crop_steering_tent_engine_config"  # every new room has a slug
+UPGRADED_DESCRIPTOR = "sensor.crop_steering_engine_config"  # a room from before that keeps its ids
 
 
 async def _service(hass, admin, name, data=None):
@@ -117,11 +118,11 @@ async def test_an_upgraded_room_that_never_declared_is_not_declared_by_an_mcp_sa
     await hass.async_block_till_done()
     after = await _room(hass, hass_admin_user)
     assert (after["room_name"], after["plumbing"]) == ("GT1", "")
-    assert "plumbing" not in hass.states.get(DESCRIPTOR).attributes
+    assert "plumbing" not in hass.states.get(UPGRADED_DESCRIPTOR).attributes
 
     # Declaring it is an explicit change, and from then on it is enforced.
     await _service(hass, hass_admin_user, "setup_save", _payload(after, plumbing="valves_only"))
     await hass.async_block_till_done()
     declared = await _room(hass, hass_admin_user)
     assert declared["plumbing"] == "valves_only"
-    assert hass.states.get(DESCRIPTOR).attributes["plumbing"] == "valves_only"
+    assert hass.states.get(UPGRADED_DESCRIPTOR).attributes["plumbing"] == "valves_only"

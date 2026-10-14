@@ -72,9 +72,17 @@ def test_native_creation_retains_supported_flow_and_validates_off(flow_module):
     data["room_name"] = "First room"
     result = asyncio.run(flow.async_step_user({"setup_payload": data}))
     assert result["type"] == "create_entry"
-    assert flow.unique == "default" and result["data"]["room_prefix"] == ""
+    # The first room has a slug like every other: un-prefixed ids are for upgraded installs only.
+    assert flow.unique == "room_first_room"
+    assert (result["data"]["room_slug"], result["data"]["room_prefix"]) == (
+        "first_room",
+        "first_room_",
+    )
     assert result["data"]["setup_revision"] == 1
-    assert result["data"]["enable_flag"] == "switch.crop_steering_engine_enabled"
+    assert (
+        result["data"]["enable_flag"]
+        == "switch.crop_steering_first_room_engine_enabled"
+    )
     assert result["data"]["zones"]["2"]["vwc_sensors"] == ["sensor.vwc"]
     states["switch.p"].state = "on"
     result = asyncio.run(flow.async_step_user({"setup_payload": data}))
@@ -89,6 +97,17 @@ def test_new_named_default_is_rejected_to_protect_controller_state(flow_module):
     flow = flow_module.ConfigFlow()
     flow.hass = hass
     result = asyncio.run(flow.async_step_room({"room_name": "Default"}))
+    assert result["type"] == "abort" and result["reason"] == "reserved_room_name"
+
+
+def test_a_first_room_named_default_is_rejected_on_every_path(flow_module):
+    hass, _, _ = rig()
+    hass.config_entries.entries = []
+    data = payload()
+    data["room_name"] = "Default"
+    flow = flow_module.ConfigFlow()
+    flow.hass = hass
+    result = asyncio.run(flow.async_step_user({"setup_payload": data}))
     assert result["type"] == "abort" and result["reason"] == "reserved_room_name"
 
 

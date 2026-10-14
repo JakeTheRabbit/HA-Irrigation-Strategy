@@ -111,6 +111,13 @@ def controller_for(hass, monkeypatch):
     return build
 
 
+def room_of(controller, prefix="tent_"):
+    """The controller's room with this entity-id prefix. Every new room has a slug, so the wizard's
+    "Tent" is `tent_`; an upgraded room from before that keeps the un-prefixed ids (prefix "")."""
+    (room,) = [room for room in controller.rooms if room.prefix == prefix]
+    return room
+
+
 def switch_calls(fake):
     return [
         (service, data["entity_id"])

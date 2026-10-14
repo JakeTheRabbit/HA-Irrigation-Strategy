@@ -13,11 +13,12 @@ from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.crop_steering import health
+from conftest import room_of
 from test_setup_entry import _install
 
 DOMAIN = "crop_steering"
-KILL = "switch.crop_steering_engine_enabled"
-STATUS = "sensor.crop_steering_zone_1_status"
+KILL = "switch.crop_steering_tent_engine_enabled"
+STATUS = "sensor.crop_steering_tent_zone_1_status"
 NOT_REPORTING = "Controller not reporting"
 
 
@@ -37,10 +38,10 @@ async def test_a_fifteen_minute_shot_leaves_the_room_reporting(hass, freezer, co
     label = hass.states.get(STATUS).state
     assert label != NOT_REPORTING  # the premise: the room has reported
 
-    for entity_id in (KILL, "switch.crop_steering_room_active"):
+    for entity_id in (KILL, "switch.crop_steering_tent_room_active"):
         fake.set_state(entity_id, "on")  # nobody stops the shot
     freezer.tick(timedelta(minutes=15))  # Home Assistant's clock, while the shot holds the loop
-    elapsed, ended = c._wait_shot(c.rooms[0], 1, 900)
+    elapsed, ended = c._wait_shot(room_of(c), 1, 900)
     assert ended is None and elapsed >= 900
     _written(hass, fake)
     async_fire_time_changed(hass, fire_all=True)

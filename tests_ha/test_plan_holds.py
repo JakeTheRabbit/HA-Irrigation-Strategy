@@ -17,7 +17,7 @@ from test_configure import _open, _shown, _suggested
 from test_setup_entry import _install
 
 DOMAIN = "crop_steering"
-HEARTBEAT = "sensor.crop_steering_ai_heartbeat"
+HEARTBEAT = "sensor.crop_steering_tent_ai_heartbeat"
 ZONE_2 = {
     "zone_2_name": "Second tent",
     "zone_2_active": True,
@@ -77,7 +77,7 @@ async def test_every_hold_of_the_plan_is_a_repairs_card(hass):
     await plan.tick()
     assert plan.document["status"] == "error"
     health.run_health_check(hass, entry)
-    card = registry.async_get_issue(DOMAIN, "strategy_hold")
+    card = registry.async_get_issue(DOMAIN, "strategy_hold_tent")
     assert card is not None and card.severity is ir.IssueSeverity.ERROR
     assert card.translation_key == "strategy_hold"
     assert "do not match" in card.translation_placeholders["reason"]
@@ -89,19 +89,19 @@ async def test_every_hold_of_the_plan_is_a_repairs_card(hass):
         HEARTBEAT,
         "healthy",
         {
-            "enable_flag": "switch.crop_steering_engine_enabled",
+            "enable_flag": "switch.crop_steering_tent_engine_enabled",
             "strategy_error": "Strategy snapshot is stale",
         },
     )
     health.run_health_check(hass, entry)
-    card = registry.async_get_issue(DOMAIN, "strategy_hold")
+    card = registry.async_get_issue(DOMAIN, "strategy_hold_tent")
     assert card is not None and "stale" in card.translation_placeholders["reason"]
 
     hass.states.async_set(
-        HEARTBEAT, "healthy", {"enable_flag": "switch.crop_steering_engine_enabled"}
+        HEARTBEAT, "healthy", {"enable_flag": "switch.crop_steering_tent_engine_enabled"}
     )
     health.run_health_check(hass, entry)
-    assert registry.async_get_issue(DOMAIN, "strategy_hold") is None
+    assert registry.async_get_issue(DOMAIN, "strategy_hold_tent") is None
 
 
 async def test_a_plan_that_could_not_apply_its_day_is_a_warning_card(hass):
@@ -113,14 +113,14 @@ async def test_a_plan_that_could_not_apply_its_day_is_a_warning_card(hass):
     plan.document.update(status="armed", armed_at=armed.isoformat())
     await plan.tick()
     assert plan.document["status"] == "armed" and plan.degraded_reason
-    published = hass.states.get("sensor.crop_steering_strategy_plan")
+    published = hass.states.get("sensor.crop_steering_tent_strategy_plan")
     assert published.attributes["degraded_reason"] == plan.degraded_reason
     health.run_health_check(hass, entry)
-    card = registry.async_get_issue(DOMAIN, "strategy_degraded")
+    card = registry.async_get_issue(DOMAIN, "strategy_degraded_tent")
     assert card is not None and card.severity is ir.IssueSeverity.WARNING
     assert card.translation_placeholders["reason"] == plan.degraded_reason
 
     plan.document.update(status="draft", armed_at=None)
     await plan.tick()
     health.run_health_check(hass, entry)
-    assert registry.async_get_issue(DOMAIN, "strategy_degraded") is None
+    assert registry.async_get_issue(DOMAIN, "strategy_degraded_tent") is None

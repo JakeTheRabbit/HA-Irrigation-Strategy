@@ -51,7 +51,7 @@ async def test_the_card_a_fresh_install_raises_shows_its_code(hass):
     """No controller app yet, so no heartbeat: the one card every new install sees first."""
     entry = await _install(hass)
     health.run_health_check(hass, entry)
-    issue = ir.async_get(hass).async_get_issue(DOMAIN, "engine_offline")
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, "engine_offline_tent")
     assert issue is not None
     cards = await _issue_strings(hass)
     assert cards[issue.translation_key]["title"] == "Crop Steering: engine not running (CS-602)"

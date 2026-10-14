@@ -7,10 +7,11 @@ its write is replayed into Home Assistant here, so the real entity has to accept
 
 from datetime import datetime
 
+from conftest import room_of
 from test_recreated_room_controller import _see
 from test_setup_entry import _install
 
-SET = "select.crop_steering_zone_1_set_phase"
+SET = "select.crop_steering_tent_zone_1_set_phase"
 
 
 class _Clock(datetime):
@@ -36,7 +37,7 @@ async def test_a_phase_picked_on_the_zone_select_moves_the_zone_once(
 
     monkeypatch.setattr(controller, "datetime", _Clock)
     _Clock.current = _Clock(2026, 9, 25, 20, 50)  # the lights are on (the new room's 12:00 to 00:00)
-    zone = c.rooms[0].state[1]
+    zone = room_of(c).state[1]
     zone.update(phase="P1", shots=2, last_daily_reset=_Clock.current.date())
 
     await hass.services.async_call(

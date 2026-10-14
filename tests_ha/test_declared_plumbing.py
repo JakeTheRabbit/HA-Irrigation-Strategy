@@ -7,20 +7,24 @@ installs (tests_ha/fixtures/): a room that never declared a layout must come thr
 """
 
 import pytest
-from conftest import fixture, switch_calls
+from conftest import fixture, switch_calls, room_of
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from test_configure import _open, _save_map, _shown
 from test_real_flow import VALVE, ZONES, _kept, _seed, _to_zones_step
 from test_setup_entry import _install
 from test_upgrade_in_place import DESCRIPTOR, _upgrade
 
-KILL = "switch.crop_steering_engine_enabled"
+KILL = "switch.crop_steering_tent_engine_enabled"
 ARMED = (
     KILL,
-    "switch.crop_steering_system_enabled",
-    "switch.crop_steering_auto_irrigation_enabled",
-    "switch.crop_steering_zone_1_enabled",
+    "switch.crop_steering_tent_system_enabled",
+    "switch.crop_steering_tent_auto_irrigation_enabled",
+    "switch.crop_steering_tent_zone_1_enabled",
 )
+NEW_DESCRIPTOR = "sensor.crop_steering_tent_engine_config"  # every new room has a slug
+# A room installed before every new room got a slug keeps its un-prefixed ids (DESCRIPTOR).
+UPGRADED_KILL = "switch.crop_steering_engine_enabled"
+UPGRADED_ARMED = tuple(s.replace("crop_steering_tent_", "crop_steering_") for s in ARMED)
 PUMP = "switch.tent_pump"
 
 
@@ -33,8 +37,8 @@ async def _at_hardware_step(hass):
     return flow_id, result
 
 
-def _arm(fake):
-    for switch in ARMED:
+def _arm(fake, armed=ARMED):
+    for switch in armed:
         fake.set_state(switch, "on")
 
 
@@ -65,11 +69,11 @@ async def test_saying_the_room_has_a_pump_without_choosing_one_is_caught_on_that
 async def test_a_declared_pump_room_is_watered_pump_first_by_the_real_controller(hass, controller_for):
     hass.states.async_set(PUMP, "off")
     await _install(hass, {"plumbing": "pump_valves", "pump_switch": PUMP})
-    descriptor = hass.states.get(DESCRIPTOR).attributes
+    descriptor = hass.states.get(NEW_DESCRIPTOR).attributes
     assert (descriptor["plumbing"], descriptor["pump"]) == ("pump_valves", PUMP)
 
     c, fake, _clock = controller_for({"enable_flag": KILL})
-    room = c.rooms[0]
+    room = room_of(c)
     assert room.hw["plumbing"] == "pump_valves"
     _arm(fake)
     assert "setup says" not in (c._blocked(room, 1) or "")
@@ -91,11 +95,11 @@ async def test_a_pumped_room_that_loses_its_pump_mapping_is_held_by_the_real_con
     hass.config_entries.async_update_entry(entry, data=data)
     await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
-    descriptor = hass.states.get(DESCRIPTOR).attributes
+    descriptor = hass.states.get(NEW_DESCRIPTOR).attributes
     assert descriptor["plumbing"] == "pump_valves" and not descriptor["pump"]
 
     c, fake, _clock = controller_for({"enable_flag": KILL})
-    room = c.rooms[0]
+    room = room_of(c)
     _arm(fake)
     assert "no pump switch is mapped" in c._blocked(room, 1)
     fake.calls.clear()
@@ -118,13 +122,15 @@ async def test_the_controller_carries_a_2_18_tent_straight_on_after_the_update(h
     the snapshot, computed by that version's own code) must still match, or the tent sits dry
     behind 'Setup changed; disarm...' until somebody notices."""
     _entry, seed = await _upgrade(hass, "entry_2_18_one_switch_tent.json")
-    hass.states.async_set(KILL, "on")
-    c, fake, _clock = controller_for({"enable_flag": KILL}, saved_state=seed["controller_saved"])
-    room = c.rooms[0]
+    hass.states.async_set(UPGRADED_KILL, "on")
+    c, fake, _clock = controller_for(
+        {"enable_flag": UPGRADED_KILL}, saved_state=seed["controller_saved"]
+    )
+    room = room_of(c, "")
     assert room._setup_pending is None, room._setup_pending
     assert room.setup_revision == 1 and room.state[1]["shots"] == 5
     assert "plumbing" not in room.hw
-    _arm(fake)
+    _arm(fake, UPGRADED_ARMED)
     fake.calls.clear()
     c._execute_shot(room, 1, 30, 5, flow_lps=c._zone_flow_lps(room, 1))
     assert switch_calls(fake) == [("turn_on", VALVE), ("turn_off", VALVE)]  # as 2.18.0 watered it
@@ -133,8 +139,8 @@ async def test_the_controller_carries_a_2_18_tent_straight_on_after_the_update(h
 async def test_a_2_17_pumped_room_is_still_driven_pump_mainline_valve(hass, controller_for):
     await _upgrade(hass, "entry_2_17_wizard.json")
     assert "plumbing" not in hass.states.get(DESCRIPTOR).attributes
-    c, _fake, _clock = controller_for({"enable_flag": KILL})
-    assert "plumbing" not in c.rooms[0].hw and c.rooms[0].hw["pump"] == "switch.main_pump"
+    c, _fake, _clock = controller_for({"enable_flag": UPGRADED_KILL})
+    assert "plumbing" not in room_of(c, "").hw and room_of(c, "").hw["pump"] == "switch.main_pump"
 
 
 # ------------------------------------------------------------------ upgrade in place: declaring later

@@ -73,7 +73,7 @@ set_manual_override:
         boolean:
     room:
       name: Room
-      description: Room slug for multi-room installs. Omit for the default room.
+      description: Room slug. Omit when only one room is set up, or for the un-prefixed room of an older install.
       required: false
       selector:
         text:
