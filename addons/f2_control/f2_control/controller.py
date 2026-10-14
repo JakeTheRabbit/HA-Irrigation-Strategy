@@ -625,8 +625,9 @@ class Controller:
         )
         if self._default_provisional and not default_room.zones:
             log(
-                "config: the Crop Steering integration has not published a room yet, so there is "
-                "nothing to drive. Add it in Home Assistant (Settings > Devices & services > Add "
+                "config: Home Assistant is not answering yet, or the Crop Steering integration has "
+                "not published a room yet, so there is nothing to drive. If it is not set up, add "
+                "it in Home Assistant (Settings > Devices & services > Add "
                 "integration > Crop Steering). This controller checks every loop and picks the room "
                 "up by itself: no restart needed."
             )
@@ -693,11 +694,13 @@ class Controller:
         `provisional` means the answer is only a stand-in because the integration could not be
         asked yet; the room is then re-resolved every loop until it can (see _rediscover).
 
-        The `num_zones` option (default 3) is documented as "only used if Home Assistant isn't
-        reachable at startup". It was ALSO used when Home Assistant was up and the integration
-        simply had not been set up yet, which is every first install where the app is started
-        first: a one-zone tent got zones 2 and 3 that do not exist, each reporting "no hardware
-        mapped", until the new setup happened to be adopted. Nothing is invented now.
+        The `num_zones` option (default 3) now counts zones only for a room hand-mapped in the
+        `hardware` option. It used to stand in whenever the integration could not be asked, which
+        is every first install where the app is started first: a one-zone tent got zones 2 and 3
+        that do not exist, each reporting "no hardware mapped", until the new setup happened to be
+        adopted. With Home Assistant unreachable at start it invented the same zones for a room
+        that might have one. Nothing is invented now: such a room has no zones until Home
+        Assistant answers with its own.
         """
         # The descriptor owns the zone list. Sensors can appear one at a time while HA starts,
         # and retired sensors can outlive their zones; neither should redefine a configured room.
@@ -713,12 +716,11 @@ class Controller:
             # Without a descriptor this may still be a partial startup inventory. Keep checking
             # until the room definition arrives, unless the operator supplied the hardware map.
             return list(range(1, n + 1)), not bool(options.get("hardware"))
-        fallback = list(range(1, int(options.get("num_zones", 3)) + 1))
         if options.get("hardware"):  # hand-mapped in the app options: their zone count stands
-            return fallback, False
-        if ha_get_all():  # Home Assistant answers, and there is no room in it yet
-            return [], True
-        return fallback, True  # Home Assistant unreachable: the documented fallback, for now
+            return list(range(1, int(options.get("num_zones", 3)) + 1)), False
+        # No hardware map, and either Home Assistant answers with no room in it yet, or it does not
+        # answer at all (nothing can be actuated then anyway): no zones, re-resolved every loop.
+        return [], True
 
     def _default_enable_flag(self, options, descriptor):
         legacy = "input_boolean.f2_control_enabled"
