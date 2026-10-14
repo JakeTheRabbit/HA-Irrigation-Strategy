@@ -108,7 +108,7 @@ On a phone, Today takes about two screens. The first:
 
 ### A zone's page: what happened today, and why
 
-Tap a zone's card to open its page. Its chart draws the day the way Athena's Grow Guide draws an irrigation day:
+Tap a zone's card to open its page. Its chart draws the day as a phase reference chart:
 
 ![A zone's day chart: moisture, pore EC, every shot and Jev's decisions, from lights-on to the next lights-on](https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/jev-zone-day.png)
 

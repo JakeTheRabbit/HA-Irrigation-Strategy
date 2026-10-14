@@ -60,7 +60,7 @@ docs/error-codes.json is in no kind at all.
   "recipients": [
     {
       "service": "notify.mobile_app_pixel_7",   // any notify.* service; the page offers the site's phones first
-      "name": "Callum's phone",                   // shown on the page; defaults to the device name
+      "name": "Grower's phone",                   // shown on the page; defaults to the device name
       "user_id": "7f21…",                         // the Home Assistant user the phone belongs to, when known
       "kinds": ["stock", "dosing"],               // ids from the table above
       "rooms": [],                                // room prefixes ("" = the default room, "f1_"); empty = every room
