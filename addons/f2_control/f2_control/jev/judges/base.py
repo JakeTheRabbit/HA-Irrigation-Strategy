@@ -19,14 +19,14 @@ def score(instructions, criteria):
 
 
 def with_doctrine(questions, text):
-    """Every phrasing of every question, with the owner's doctrine (jev.doctrine) appended: Jev knows
+    """Every phrasing of every question, with the doctrine (jev.doctrine) appended: Jev knows
     none of its own, so each question carries the rules it is to judge by."""
     return {name: [dict(v, instructions=f"{v['instructions']} {text}") for v in variants]
             for name, variants in questions.items()}
 
 
 def stage_words(ctx):
-    """The day's place on the owner's stage arc, in one sentence, or None."""
+    """The day's place on the stage arc, in one sentence, or None."""
     st = ctx.stage
     if not st:
         return None

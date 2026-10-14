@@ -1,20 +1,20 @@
-"""Crop-steering doctrine for Jev: the owner's GrowLabs wiki and Athena's handbook, restated as rules a judge can quote.
+"""Crop-steering doctrine for Jev: the GrowLabs wiki and Athena's handbook, restated as rules a judge can quote.
 
 Jev answers typed questions about the facts it is given, but it knows no crop-steering doctrine and does no
 arithmetic, so every judge writes the doctrine into its question. This module keeps that doctrine in one
-place: Ben Isdale's GrowLabs wiki pages, then Athena's Grow Guide Handbook (SOURCES), each point restated as one
+place: the GrowLabs wiki pages, then Athena's Grow Guide Handbook (SOURCES), each point restated as one
 plain sentence tagged with where it comes from. A judge appends doctrine("ramp", "probe") to a question's
 instructions.
 
-True water content vs probe readings: the wiki's moisture numbers (a ~92 % full mark, a 55-92 % working band,
-a 25-30 % recovery floor, drybacks of 5-30 points) are TRUE water content. A probe can read far from that: the
-F2 probes read about 33-41 % at saturation. So no rule sets an absolute moisture band against a raw reading.
-The rules judge a zone against its own saturation, its own peak and its own trends, and they say "true water
-content" wherever they keep a wiki number.
+True water content vs probe readings: the wiki's moisture numbers (a ~92 % full mark, a 55-92 % working band, a
+25-30 % recovery floor, drybacks of 5-30 points) are TRUE water content. A probe can read far from that: probes
+observed on a production room read about 33-41 % at saturation. So no rule sets an absolute moisture band against a
+raw reading. The rules judge a zone against its own saturation, its own peak and its own trends, and they say "true
+water content" wherever they keep a wiki number.
 
 Stage arc: the rockwool and one-steering-law pages put the deepest drybacks and the highest EC in flower
 weeks 4-6. The slab-irrigation page (Athena and CCI) makes flower days 22-42 a vegetative bulk. On 26 Sep 2026
-the owner chose the slab page's arc, so STAGE_ARC and the "stage" rules follow it. ALT_STAGE_ARC keeps the
+the slab page's arc was chosen, so STAGE_ARC and the "stage" rules follow it. ALT_STAGE_ARC keeps the
 other arc for reference only.
 
 Within each topic the rules are listed most important first, so doctrine(..., limit=n) keeps the core.
@@ -282,9 +282,9 @@ RULES = {
 }
 
 
-# Athena's Grow Guide Handbook (metric), Precision Irrigation Strategy, pages 33-41: sent by the owner on 28 Sep
-# 2026 as more doctrine for Jev. Its rules follow the owner's in each topic (the owner's pages lead, so
-# doctrine(..., limit=n) keeps them first), and where they differ the owner's stage arc wins (the last dryback rule).
+# Athena's Grow Guide Handbook (metric), Precision Irrigation Strategy, pages 33-41: added on 28 Sep
+# 2026 as more doctrine for Jev. Its rules follow the wiki's in each topic (the wiki's pages lead, so
+# doctrine(..., limit=n) keeps them first), and where they differ the chosen stage arc wins (the last dryback rule).
 ATHENA = "Athena Grow Guide Handbook (metric), Precision Irrigation Strategy, pp. 33-41"
 SOURCES.append(ATHENA)
 
@@ -366,7 +366,7 @@ def doctrine(*topics, limit=None):
     return "Doctrine: " + " ".join(texts) if texts else ""
 
 
-# The owner's chosen stage arc (slab guide, chosen 26 Sep 2026). Day 1 is the first day of 12/12. Dryback is in
+# The chosen stage arc (slab guide, chosen 26 Sep 2026). Day 1 is the first day of 12/12. Dryback is in
 # points of TRUE water content; root-zone EC is in mS/cm and compares only with EC read the same way; runoff is
 # a share of the water fed. The veg row has no flower days: code picks it by room, not by day.
 STAGE_ARC = [
@@ -398,7 +398,7 @@ STAGE_ARC = [
      "move_on_when": "cultivar-specific maturity (trichomes on mid-cola calyxes)", "source": SLAB},
 ]
 
-# The arc the rockwool and one-law pages give instead. Recorded, not followed: the owner chose STAGE_ARC.
+# The arc the rockwool and one-law pages give instead. Recorded, not followed: STAGE_ARC was chosen.
 ALT_STAGE_ARC = [
     {"stage": "flower weeks 1-3", "days": (1, 21), "peak": "high (wet, bulking)",
      "dryback": "10-18 points of true water content", "pore_ec": "stepping up", "runoff": "10-15 % of the water fed",

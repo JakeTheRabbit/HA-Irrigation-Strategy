@@ -1,10 +1,10 @@
 """Why is one zone getting different water from its siblings?
 
 The base engine flags a zone only below 40 % of the room's median litres, comparing zone totals rather
-than water per plant, and only on the low side. Seen live (19-26 Sep 2026): zone 1 got 65 L a day against
-126 and 106 on the same 42 plants, 61 % of the median, so it was never flagged; its learned settings had
-drifted. This judge is asked whenever a zone's water per plant is under 70 % or over 140 % of the room's
-median zone (the other zone, in a room of two), and says why.
+than water per plant, and only on the low side. Observed on a production room (19-26 Sep 2026): zone 1 got
+65 L a day against 126 and 106 on the same 42 plants, 61 % of the median, so it was never flagged; its
+learned settings had drifted. This judge is asked whenever a zone's water per plant is under 70 % or over
+140 % of the room's median zone (the other zone, in a room of two), and says why.
 """
 import statistics
 
@@ -47,10 +47,10 @@ def _lpp(v):
 def water_vs_room(ctx):
     """-> (this zone's litres a plant today, what it is compared with, their ratio, that in words).
 
-    The comparison is the median of every zone in the room, this one included, so one thirsty zone
-    does not make its siblings look short (27 Sep 2026, the first live day: zone 1 had 2477 mL a plant
-    and zones 2 and 3 about 1000, and zones 2 and 3 were flagged against zone 1's 2477). In a room of
-    two zones neither is the odd one out, so each is compared with the other."""
+    The comparison is the median of every zone in the room, this one included, so one thirsty zone does
+    not make its siblings look short (observed on a production room, 27 Sep 2026, its first live day:
+    zone 1 had 2477 mL a plant and zones 2 and 3 about 1000, and zones 2 and 3 were flagged against zone
+    1's 2477). In a room of two zones neither is the odd one out, so each is compared with the other."""
     mine = ctx.snap.daily_vol / ctx.plants if ctx.plants and ctx.snap is not None else None
     others = [x for x in (_lpp(v) for v in ctx.siblings.values()) if x is not None]
     if mine is None or not others:

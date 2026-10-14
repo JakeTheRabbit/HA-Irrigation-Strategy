@@ -1,9 +1,9 @@
-"""Once a grow-day: is this zone steered the way the owner's stage arc says for today's day of flower?
+"""Once a grow-day: is this zone steered the way the stage arc says for today's day of flower?
 
 The base engine has no idea what week of flower it is: the operator's steering mode and setpoints are all
 it knows, and nothing notices when they belong to another stage, or when the overnight dryback and the
-pore EC drift out of the stage's bands. This judge reads the zone against the owner's stage arc (the slab
-guide he chose on 26 Sep 2026, jev.doctrine.STAGE_ARC) and says what is off, as advice (CS-705). It never
+pore EC drift out of the stage's bands. This judge reads the zone against the stage arc (the slab
+guide chosen on 26 Sep 2026, jev.doctrine.STAGE_ARC) and says what is off, as advice (CS-705). It never
 changes a setting: moving to a new stage is the grower's call.
 """
 from datetime import timedelta

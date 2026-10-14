@@ -2,12 +2,12 @@
 
 Every 30 minutes in P2 the base engine moves the re-water threshold on pore EC against its target: above
 the band it waters sooner (wetter, more runoff, dilutes), below it lets the slab dry deeper (stacks). It
-cannot tell WHY pore EC is off. Two live cases it got wrong:
+cannot tell WHY pore EC is off. Two cases it got wrong, observed on a production room:
 
-- 26 Sep 2026, F2 zone 2: pore EC rose 4.4 -> 7.1 across three hand flushes. An assistant blamed the
-  probe and said stop flushing; the owner's rule is the opposite: EC going up after flush water went in is
+- 26 Sep 2026, one zone: pore EC rose 4.4 -> 7.1 across three hand flushes. An assistant blamed the
+  probe and said stop flushing; the doctrine says the opposite: EC going up after flush water went in is
   the salt front still passing the probe, and the slab needs MORE flushing.
-- The same day, F2 zone 1: a target of 6.0 against a pore EC of 2.55 that never moved. Three mechanisms
+- The same day, another zone: a target of 6.0 against a pore EC of 2.55 that never moved. Three mechanisms
   each shrank the shots on that low reading, and the zone got 30-second shots every 96 s.
 
 This judge asks what is driving pore EC and picks the steer's mode: steer (the base steer carries on),

@@ -150,7 +150,7 @@ class ZoneContext:
     probe_entity: str = ""
     flower_day: int | None = None  # day of flower (day 1 = the first day of 12/12), when the room says
     flower_days: int = 56  # the cultivar's flowering length
-    stage: dict | None = None  # doctrine.stage_intent(flower_day): the owner's stage arc row for today
+    stage: dict | None = None  # doctrine.stage_intent(flower_day): the stage arc's row for today
     steering: str | None = None  # the operator's steering mode for the zone: "vegetative" or "generative"
     # What the Setpoints judge may move tonight (jev_bridge.setpoint_view): {"enabled", "current", "home", "bands",
     # "changed_today", "frozen", "day", "last_words"}; None when the room has no setpoint memory.

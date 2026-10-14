@@ -1,8 +1,9 @@
 """Asking each question twice, in two independent phrasings, and acting only when both agree.
 
-Jev's confidence moves with how a question is worded (seen on the first F2 calls: the same state gave
-0.84 and 0.72). A judge therefore writes every question as a list of variants; `expand()` sends them all
-in one call, and `combine()` averages their calibrated probabilities and says whether they agreed.
+Jev's confidence moves with how a question is worded (observed on a production room's first calls: the
+same state gave 0.84 and 0.72). A judge therefore writes every question as a list of variants; `expand()`
+sends them all in one call, and `combine()` averages their calibrated probabilities and says whether they
+agreed.
 """
 from __future__ import annotations
 
