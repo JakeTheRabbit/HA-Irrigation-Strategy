@@ -220,7 +220,7 @@ Open it as a pull request into `testing` like any other change. You cannot split
 
 People skip checklists at 11 pm. Repository settings do not.
 
-- **Protect `testing`:** require a pull request, require an approval from someone other than the author, require every `Validate` job (they must include *Real Home Assistant*, *Build f2-control add-on image* and *Dashboard build and browser workflows*, not only lint), require the branch to be up to date before merging, block force-pushes and deletion.
+- **Protect `testing`:** require a pull request, require an approval from someone other than the author, require every `Validate` job (they must include *Real Home Assistant*, *Build controller add-on image* and *Dashboard build and browser workflows*, not only lint), require the branch to be up to date before merging, block force-pushes and deletion.
 - **Protect `main`:** block force-pushes and deletion. It takes no pull requests at all: the only thing that ever arrives is a fast-forward, pushed by whoever is allowed to promote. On an organisation's repository, restrict pushes to those people. On a personal repository classic branch protection cannot do that (the *Restrict who can push* option exists only for organisations): anyone with write access can push, so keep write access to yourself, or use a ruleset with *Restrict updates* and yourself as the only bypass. (Not checked against GitHub's current settings pages; confirm when you set it up.)
 - **Freeze `testing` during a soak** with *Lock branch* (step 3).
 - **Production boxes:** plain repository address, add-on auto-update OFF, HACS beta versions OFF.
