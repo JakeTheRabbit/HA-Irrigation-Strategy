@@ -12,8 +12,9 @@ runtime layers plus the React/shadcn operator workspace:
 2. **f2-control add-on** (`addons/f2_control/`) — the live autonomous coordinator.
    A single synchronous Python process that polls HA over REST every 60 s, imports
    the pure `crop-steering-engine` package, runs the per-zone P0→P1→P2→P3 logic,
-   and drives the hardware. Gated by kill switch
-   `input_boolean.f2_control_enabled` (OFF = safe, no actuation).
+   and drives the hardware. Gated per room by one kill switch (OFF = safe, no
+   actuation): the room's Engine Enabled switch, or `input_boolean.f2_control_enabled`
+   on a room from before the setup wizard (docs/INSTALL.md, "Moving a room's kill switch").
 
 The native UI source is frontend/src. Setup and strategy APIs persist revisioned data; active plans override canonical targets atomically at a local lights-on boundary. See docs/REPOSITORY_MAP.md and docs/GROW_PLANS.md.
 

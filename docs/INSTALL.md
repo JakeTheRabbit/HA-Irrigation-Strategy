@@ -71,6 +71,20 @@ Update an existing controller in place from this repository. The old `JakeTheRab
 
 If an update is missing from the app store, refresh the repository information first. Use Update for published versions or Rebuild for a local source installation. HACS and the app store update separate components.
 
+### Moving a room's kill switch
+
+Each room has one kill switch: the switch that must be ON before anything in it is watered. The controller names it on the room's heartbeat, and the sidebar and Settings → Repairs name the same switch. An update never moves it; moving it is your decision.
+
+- A room made by the setup wizard stops on its own **Engine Enabled** switch (`switch.crop_steering_engine_enabled`, or `switch.crop_steering_<room>_engine_enabled` for a named room). A fresh installation needs no helper.
+- A room from before the setup wizard stops on the entity the controller app's `enable_flag` option names, `input_boolean.f2_control_enabled` unless that option was changed.
+
+To move a room, first turn its current kill switch OFF and wait until the pump, main line and valves read OFF. Then:
+
+- On a room with **no saved setup** (an installation from before the wizard), set the app's `enable_flag` option to the new switch and restart the app.
+- On a room **whose setup has been saved** (every room made by the wizard), the setup names the kill switch. Once the controller has taken that setup on, the app's `enable_flag` option no longer decides it, so setting the option alone changes nothing. A new kill switch has to come with a new setup revision, which the controller takes on only while the old and the new switch both read OFF.
+
+If Repairs reports the kill switch missing (CS-601), the card names the switch the room really stops on. Whenever the running controller reports a kill switch other than the room's Engine Enabled switch, Repairs shows a card of its own (CS-610) saying that turning Engine Enabled OFF does not stop water in that room, and naming the switch that does.
+
 ### Moving a controller installed from f2-control
 
 The controller used to be mirrored to `JakeTheRabbit/f2-control`. That mirror is retired; this repository is the only source. Supervisor names an app after the repository it came from (`4d457e60_f2_control` from the mirror, `6db5faba_f2_control` from here), so the move is a one-time reinstall that carries the runtime state across:
