@@ -95,9 +95,11 @@ configuration:
   cf_account_id:
     name: Cloudflare account ID (Jev)
     description: >-
-      The Jev edition's judge: with this and the token below, Jev (typesafe/jev on
-      Cloudflare Workers AI) judges the engine's decisions in every phase, inside the
-      controller's safety envelope (docs/JEV.md). LEAVE BLANK to run the plain engine.
+      A second route to Jev (typesafe/jev on Cloudflare Workers AI), which judges the
+      engine's decisions in every phase inside the controller's safety envelope
+      (docs/JEV.md). With this and the token below but no TypeSafe key, Jev starts only
+      on an install that has already run it; a new install needs the TypeSafe key
+      below. LEAVE BLANK to run the plain engine.
   cf_api_token:
     name: Cloudflare API token (optional)
     description: >-

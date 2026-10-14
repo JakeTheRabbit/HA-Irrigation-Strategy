@@ -109,7 +109,7 @@ Add-on options (the controller app):
 | Option | Default | What it does |
 |---|---|---|
 | `typesafe_api_key` | empty | A TypeSafe API key (`apikey_...`): Jev straight from TypeSafe (`api.typesafe.ai/v1/systemone`, model `jev-latest`). Tried first when set; Cloudflare, when set too, is the second route. |
-| `cf_account_id`, `cf_api_token`, `cf_gateway_id` | empty | Or Jev through Cloudflare Workers AI: the account, a token with Workers AI access, and the AI Gateway (optional). With neither a TypeSafe key nor these, Jev is off. |
+| `cf_account_id`, `cf_api_token`, `cf_gateway_id` | empty | Or Jev through Cloudflare Workers AI: the account, a token with Workers AI access, and the AI Gateway (optional). With neither a TypeSafe key nor these, Jev is off. These alone start Jev only on an install that has run it before (one of the `/data/jev_*` files below is there), because an install updated from a line without Jev may have set them just for the Auto Setpoints check. |
 | `jev_enabled` | on | Off runs the plain engine even with Cloudflare set. |
 | `jev_judges` | all | The judges that may act, e.g. `dawn,ramp,salt,dusk,probe,shot,night,zones,stage,setpoints,alerts`. Setpoints also needs the room's **Auto setpoints** switch on; while it runs, it owns the P2 shot size and re-water threshold, and the base engine's own Auto Setpoints learner the P1 target and field capacity. |
 | `jev_daily_calls` | 5000 | The day's call budget across rooms. |

@@ -196,7 +196,7 @@ Crop Steering comes in two parts, and automatic watering needs both. They carry 
 | **The controller app** | Home Assistant OS or Supervised, where it installs from the app store (amd64, aarch64 or armv7) and brings its own Python 3.12. Home Assistant Container and Core have no app store: there you run the controller yourself (see the [install guide](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/INSTALL.md)). |
 | **HACS** | 1.6.0 or newer for the guided download, or copy `custom_components/crop_steering` into Home Assistant by hand. |
 | **Hardware** | A switch Home Assistant can control for each zone's valve (and your pump and main line, if you have them), and a moisture probe per zone. EC probes and tank sensors are optional but recommended. |
-| **A Jev key** (optional) | A TypeSafe API key, or a Cloudflare account with Workers AI. Without one, this is the original engine. |
+| **A Jev key** (optional) | A TypeSafe API key. A Cloudflare account with Workers AI starts Jev only on an install that has already run it; a new install needs the TypeSafe key. Without one, this is the original engine. |
 | **AI assistant connector** (optional) | Node.js 22 or newer, on the computer that runs your AI assistant. |
 | **Account** | A Home Assistant administrator, to set up rooms and change plans. |
 
@@ -210,14 +210,14 @@ Crop Steering comes in two parts, and automatic watering needs both. They carry 
    [![Open your Home Assistant instance and start setting up Crop Steering.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=crop_steering)
 3. **Add the app repository**, then install **Crop Steering Controller (Jev)**. Do not start it yet.
    [![Open your Home Assistant instance and add this app repository.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FJakeTheRabbit%2FHA-Crop-Steering-Jev)
-4. **Give Jev a key.** In Settings → Apps → Crop Steering Controller (Jev) → Configuration, set either:
-   - `typesafe_api_key`: a TypeSafe API key (it starts with `apikey_`), or
-   - `cf_account_id` and `cf_api_token`: your Cloudflare account ID and an API token with the **Workers AI** permission (dash.cloudflare.com → My Profile → API Tokens → Create Token → the Workers AI template).
+4. **Give Jev a key.** In Settings → Apps → Crop Steering Controller (Jev) → Configuration, set `typesafe_api_key`: a TypeSafe API key (it starts with `apikey_`). A new install needs this key to start Jev.
 
-   Without either, the controller runs as the original engine and everything else still works.
+   You can also set `cf_account_id` and `cf_api_token`: your Cloudflare account ID and an API token with the **Workers AI** permission (dash.cloudflare.com → My Profile → API Tokens → Create Token → the Workers AI template). Beside a TypeSafe key, Cloudflare is the second route. On its own it starts Jev only on an install that has already run Jev; on a new install it does not, and the app log says `jev: off`.
+
+   Without a key, the controller runs as the original engine and everything else still works.
 5. **Tell Jev when flowering started.** `jev_flower_start` is the room's first day of 12/12: a date such as `2026-08-22`, or an `input_datetime` helper. `jev_flower_days` is the cultivar's flowering length (56 unless you change it). This is how Jev knows today's stage.
 6. **Start the app**, then open **Crop Steering** in the sidebar. Map your valves, pump and probes in **Equipment › Setup**, check the readings in **Equipment › Probes**, and keep watering switched off until every probe reads correctly. Do a catch test.
-7. **Switch watering on** in the top bar. Jev joins in as each decision comes up. To let it tune setpoints as well, use **Turn auto on…** in **Plan › Targets**.
+7. **Switch watering on** in the top bar. With a key from step 4, Jev joins in as each decision comes up. To let it tune setpoints as well, use **Turn auto on…** in **Plan › Targets**.
 
 The buttons open the right screen; Home Assistant still asks you to confirm each step. Updates arrive the same way: HACS offers the integration and the app store offers the controller. The [install guide](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/INSTALL.md) covers manual installs, upgrades and rolling back.
 
