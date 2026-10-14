@@ -746,7 +746,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 *Warning · Notification*
 
-**What it means.** The zone's moisture sensor reports in a unit the controller can't take as a moisture percentage, and its number is outside 0 to 100, so the controller sets the probe aside. Moisture is read in %, and m³/m³ is converted; a sensor whose unit is unknown, or that has none, is still read as % while its number is between 0 and 100. The notification names the sensor, its reading and its unit.
+**What it means.** The zone's moisture probe reports in a unit that can't be taken as a moisture percentage, and its number is outside 0 to 100, so the probe is set aside and the zone has no moisture reading. Moisture is read in %, and m³/m³ is converted; a probe whose unit is unknown, or that has none, is still read as % while its number is between 0 and 100. The notification names the probe and its unit, and Home Assistant's log says once which probe was set aside.
 
 **Watering meanwhile.** The same as for CS-102: for its first 15 minutes out the zone waits, then it carries on without the probe while the engine is on: the same shots as a zone whose probe is working, or one shot every 90 minutes (the app's blind_fallback_min option) within the daily water limit if there is none. Phase changes that go by moisture wait for the probe. Nothing is held.
 
