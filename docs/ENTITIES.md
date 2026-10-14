@@ -60,8 +60,8 @@ The active EC target = the row for the current phase **and** the zone's steering
 |---|---|---|---|---|
 | `irrigation_ec_min` | 0-20 | 2.3 | mS/cm | Source-water EC gate (low bound). Irrigation blocked below it. `0` disables. |
 | `irrigation_ec_max` | 0-20 | 3.5 | mS/cm | Source-water EC gate (high bound). |
-| `irrigation_ph_min` | 3.0-9.0 | 5.8 | pH | Source-water pH gate (low bound). |
-| `irrigation_ph_max` | 3.0-9.0 | 6.2 | pH | Source-water pH gate (high bound). |
+| `irrigation_ph_min` | 3.0-9.0 | 5.5 | pH | Source-water pH gate (low bound), used only when a feed pH probe is mapped. A room set up before 5.5-6.5 became the default keeps its own band. |
+| `irrigation_ph_max` | 3.0-9.0 | 6.5 | pH | Source-water pH gate (high bound). |
 | `maximum_ec` | 1-20 | 9.0 | mS/cm | Hard substrate-EC cutoff: no shot above it (salt-burn guard). |
 | `max_shot_duration` | 5-3600 | 900 | s | Longest a single shot may run. The controller refuses to water a room whose cap is missing or below 5 s (CS-203). |
 | `watchdog_hours` | 0-12 | 3 | h | Lights-on backstop: a zone below its P2 trigger that has had no water for this long gets a watchdog shot, or an urgent alert (CS-207) when watering is blocked. `0` turns it off. |
