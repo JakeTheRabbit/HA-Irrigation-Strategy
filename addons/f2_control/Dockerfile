@@ -6,7 +6,11 @@ FROM ${BUILD_FROM}
 # dryback / daily-reset windows run on real local time, not UTC.
 RUN apk add --no-cache nginx tzdata && rm -rf /var/cache/apk/* /etc/nginx/http.d/*
 
-RUN pip3 install --no-cache-dir requests
+# requests and its whole dependency closure, exact versions with hashes (requirements.txt), so
+# every box's Rebuild installs the same library code. PIP_CONFIG_FILE=/dev/null skips the base
+# image's /etc/pip.conf (a second, extra index) so pip reads only PyPI, where the hashes came from.
+COPY requirements.txt /tmp/requirements.txt
+RUN PIP_CONFIG_FILE=/dev/null pip3 install --no-cache-dir --require-hashes -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
 # vendored: the pure engine package + the IO-shell controller
 COPY f2_control /app
