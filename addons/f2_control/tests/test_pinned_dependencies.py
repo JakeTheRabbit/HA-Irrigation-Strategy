@@ -39,9 +39,11 @@ def test_the_dockerfile_installs_it_in_hash_mode_and_nothing_else():
     dockerfile = (ADDON / "Dockerfile").read_text()
     assert "COPY requirements.txt /tmp/requirements.txt" in dockerfile
     installs = [line for line in dockerfile.splitlines() if re.search(r"\bpip3? install\b", line)]
-    assert installs == [
+    assert installs[0] == (
         "RUN PIP_CONFIG_FILE=/dev/null pip3 install --no-cache-dir --require-hashes"
         " -r /tmp/requirements.txt && rm /tmp/requirements.txt"
-    ]
+    )
+    # the one other install is the AI assistant's SDK, from requirements-brain.txt
+    assert len(installs) == 2 and "-r /tmp/requirements-brain.txt;" in installs[1]
     assert dockerfile.index("COPY requirements.txt") < dockerfile.index("--require-hashes")
     assert "requirements" not in (ADDON / ".dockerignore").read_text()  # or the COPY has nothing to copy
