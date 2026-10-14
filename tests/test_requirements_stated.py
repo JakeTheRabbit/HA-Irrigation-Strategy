@@ -91,3 +91,12 @@ def test_hacs_and_node_are_the_versions_their_files_ask_for():
     )["engines"]["node"]
     assert node.startswith(">="), node
     assert f"Node.js {node[2:]} or newer" in table
+
+
+def test_the_tests_ha_image_is_the_production_leg():
+    dockerfile = (ROOT / "tests_ha" / "Dockerfile").read_text(encoding="utf-8")
+    python = re.search(r"^FROM python:(\d+\.\d+)\.\d+-", dockerfile, re.M).group(1)
+    (production,) = [leg for leg in _legs() if not leg["suffix"]]
+    assert python == production["python"], "tests_ha/Dockerfile Python"
+    assert production["install"] == "-r requirements-test-ha.txt"
+    assert "-r /tmp/requirements-test-ha.txt" in dockerfile
