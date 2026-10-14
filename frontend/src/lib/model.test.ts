@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { discoverRooms, buildRoom, numeric, validateChange } from "./model";
+import {
+  discoverRooms,
+  buildRoom,
+  numeric,
+  roomSlug,
+  runningVersions,
+  validateChange,
+} from "./model";
 import { applyChanges, HaClient } from "./client";
 import { createDemo, demoHistory } from "./demo";
 import type { States, EntityState } from "./types";
@@ -493,4 +500,37 @@ it("does not offer a shadowed legacy cap as an effective room setting", () => {
   );
   expect(room.settings.find((s) => s.entityId === canonical)?.value).toBeNull();
   expect(room.settings.some((s) => s.entityId === legacy)).toBe(false);
+});
+describe("every new room has a slug", () => {
+  it("makes the slug the integration makes from the room's name", () => {
+    expect(roomSlug("Flower B")).toBe("flower_b");
+    expect(roomSlug("  Veg -- tent! ")).toBe("veg_tent");
+    expect(roomSlug("Room 2")).toBe("room_2");
+    expect(roomSlug("!!!")).toBe("room");
+    expect(roomSlug("Default")).toBe("default"); // reserved: the setup page refuses it
+  });
+  it("finds a new install whose only room has a slug, and an older install's un-prefixed room", () => {
+    const tent = entity("sensor.crop_steering_tent_engine_config", "ready", {
+      prefix: "tent_",
+      slug: "tent",
+      room_name: "Tent",
+      num_zones: 1,
+    });
+    const beat = entity("sensor.crop_steering_tent_ai_heartbeat", "healthy", {
+      controller_version: "9.9.9",
+    });
+    const fresh: States = { [tent.entity_id]: tent, [beat.entity_id]: beat };
+    const [room] = discoverRooms(fresh);
+    expect(discoverRooms(fresh)).toHaveLength(1);
+    expect(room).toMatchObject({ id: "room:tent_", prefix: "tent_", name: "Tent" });
+    expect(runningVersions(fresh, room).controller).toBe("9.9.9");
+    const upgraded = entity("sensor.crop_steering_engine_config", "ready", {
+      prefix: "",
+      slug: "default",
+      room_name: "Bench",
+      num_zones: 1,
+    });
+    const both = discoverRooms({ ...fresh, [upgraded.entity_id]: upgraded });
+    expect(both.map((r) => r.id)).toEqual(["room:", "room:tent_"]);
+  });
 });

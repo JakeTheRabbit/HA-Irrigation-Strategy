@@ -359,3 +359,39 @@ describe("synthetic current and previous run examples", () => {
     ).toBe(true);
   });
 });
+describe("a room created in the demo", () => {
+  function create(demo: OperatorDemo, room_name: string) {
+    return demo.call<{ entry_id: string }>("setup_create", {
+      entry_id: "",
+      expected_revision: 0,
+      room_name,
+      active: true,
+      zones: [
+        {
+          id: 1,
+          name: "Bench",
+          active: true,
+          valve: "switch.new_bench_valve",
+          vwc_sensors: [],
+          ec_sensors: [],
+          plant_count: 4,
+        },
+      ],
+      hardware: {},
+      plumbing: "valves_only",
+    });
+  }
+  it("gets its slug from its name, as the integration gives it", async () => {
+    let states = createDemo(now);
+    const demo = new OperatorDemo(
+      () => states,
+      (next) => (states = next),
+    );
+    await expect(create(demo, "Default")).rejects.toThrow(/reserved/);
+    await create(demo, "Veg Tent");
+    expect(states["sensor.crop_steering_veg_tent_engine_config"].attributes).toMatchObject({
+      prefix: "veg_tent_",
+      slug: "veg_tent",
+    });
+  });
+});
