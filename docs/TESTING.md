@@ -221,6 +221,14 @@ from this repository, so there is no second copy to keep in step.)
 ### 5. Lint / format / YAML: ruff, black (scoped to `custom_components/` + `tests/`), yamllint
 Plus, on GitHub only: **hassfest** and **HACS validation** of the integration.
 
+### 5a. Doctrine pack: `tests/test_doctrine_build.py`
+Runs `doctrine/tools/build_doctrine.py --check`: the pack's rules are valid, every rule of the brain's
+old doctrine is accounted for, its statements about the engine, controller and brain guard are still
+true of the code, the generated files are current, and the strip lint is clean. The private word list
+runs only when `DOCTRINE_PRIVATE_DENYLIST` names a file; otherwise the test skips that layer and says
+so. On a throwaway copy of the pack it also proves that each lint layer fails the build on a planted
+value made up at run time. See [doctrine/README.md](../doctrine/README.md).
+
 ### 6. Controller safety regressions: `addons/f2_control/tests/test_safety_regressions.py`
 
 Deterministic fake clocks and HA responses reproduce request-latency overruns, blind fallback/copy budget bypass, failed hardware closure and error cleanup, persisted shared-hardware holds, explicit recovery, and temporarily absent room descriptors. Tests verify preserved state/counters across restart and rediscovery.
