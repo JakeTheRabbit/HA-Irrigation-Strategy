@@ -1,6 +1,6 @@
 """CS-310: a zone's moisture rising while no water goes in is a table that isn't draining.
 
-On 29 Sep 2026 F2 Zone 2 climbed from 37 % to 71 % in a day with one shot: its slabs were sitting in runoff from
+On 29 Sep 2026 zone 2 of a production room climbed from 37 % to 71 % in a day with one shot: its slabs were sitting in runoff from
 a sump that had stopped. Nothing said so. The controller now watches every zone's reading against its valve: a
 rise of BACKUP_RISE_PTS within BACKUP_WINDOW_MIN, with the valve shut for that time and the BACKUP_GRACE_MIN
 before it, raises CS-310 (critical) and holds the zone's daily minimum, which waters whatever the probe reads and
@@ -106,7 +106,7 @@ def test_a_backed_up_zone_gets_no_daily_minimum(rig):  # noqa: F811
 
 
 def test_a_backed_up_zone_gets_no_ec_flush(rig):  # noqa: F811
-    # Flushes no longer wait for the reading to drop under field capacity - 2 (5 Oct 2026, F2 Zone 2 read 70 against
+    # Flushes no longer wait for the reading to drop under field capacity - 2 (5 Oct 2026, that zone read 70 against
     # 54 and got none); what stops one is this hold: a flush poured into a table that isn't draining floods it.
     c, fake, room = rig
     now = Clock.instant = Clock(2026, 9, 23, 14, 0)
@@ -120,7 +120,7 @@ def test_a_backed_up_zone_gets_no_ec_flush(rig):  # noqa: F811
 
 
 # ------------------------------------------------------------------ CS-311, the sump pump standing still
-SUMP = "sensor.f2_sump_pump_power"
+SUMP = "sensor.sump_pump_power"
 
 
 def sump_cards(fake):
@@ -168,7 +168,7 @@ def test_no_evidence_says_nothing_and_an_unset_sensor_is_never_read(rig, monkeyp
     now = Clock.instant = Clock(2026, 9, 23, 14, 0)
     c._watch_sump(room, now)
     assert asked == []  # no sump_power_sensor option
-    c.sump_sensors = {"f1": SUMP}  # another room's
+    c.sump_sensors = {"room_b": SUMP}  # another room's
     c._watch_sump(room, now)
     assert asked == []
     c.sump_sensors = {"default": SUMP}
@@ -191,5 +191,5 @@ def test_the_loop_watches_the_sump(rig, monkeypatch):  # noqa: F811
 def test_the_option_takes_one_sensor_or_room_pairs():
     assert controller.room_option("") == {}
     assert controller.room_option(SUMP) == {"*": SUMP}
-    assert controller.room_option(f"default={SUMP}, f1=sensor.f1_sump_power") == {
-        "default": SUMP, "f1": "sensor.f1_sump_power"}
+    assert controller.room_option(f"default={SUMP}, room_b=sensor.room_b_sump_power") == {
+        "default": SUMP, "room_b": "sensor.room_b_sump_power"}

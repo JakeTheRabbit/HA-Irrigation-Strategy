@@ -117,16 +117,16 @@ def test_a_stop_switches_off_the_running_jobs_pumps_and_the_current_setups(rig):
 def test_a_restart_holds_until_every_recorded_part_reads_off_and_says_so_every_30_min(rig, tmp_path):
     """A host boot: the fill valve's device is not back yet (unavailable), and Home Assistant answers
     turning it off all the same. It is never counted as off, and the rooms the batch held stay held."""
-    _interrupted(tmp_path, held=["default", "f1"])
-    f1 = _desc(prefix="f1_", slug="f1", pump=None, mainline="switch.f1_feed", valves={"1": "switch.f1_row1"})
-    r = rig({"sensor.crop_steering_f1_engine_config": ("ok", f1), "switch.f1_row1": ("off", {}),
+    _interrupted(tmp_path, held=["default", "room_b"])
+    room_b = _desc(prefix="room_b_", slug="room_b", pump=None, mainline="switch.room_b_feed", valves={"1": "switch.room_b_row1"})
+    r = rig({"sensor.crop_steering_room_b_engine_config": ("ok", room_b), "switch.room_b_row1": ("off", {}),
              "switch.tank_fill": ("unavailable", {}), "input_boolean.tank_hold": ("on", {})})
     rooms = {room.slug: room for room in r.c.rooms}
     assert r.runner.recover() is True
     assert r.runner.holds(rooms["default"]).startswith("dosing hardware still on")
-    assert r.runner.holds(rooms["f1"]).startswith("dosing hardware still on")
+    assert r.runner.holds(rooms["room_b"]).startswith("dosing hardware still on")
     r.runner.poll()
-    assert r.runner.holds(rooms["f1"]) == "dosing hardware still on: switch.tank_fill"
+    assert r.runner.holds(rooms["room_b"]) == "dosing hardware still on: switch.tank_fill"
     assert r.codes() == ["CS-803"]
     assert "switch.tank_fill still does not read off" in r.alert("CS-803")["message"]
     assert r.fake.states["input_boolean.tank_hold"][0] == "on"  # kept on while anything is on
@@ -143,7 +143,7 @@ def test_a_restart_holds_until_every_recorded_part_reads_off_and_says_so_every_3
     assert r.fake.states["switch.tank_fill"][0] == "off"
     _pass(r)
     _pass(r)
-    assert r.runner.holds(rooms["default"]) is None and r.runner.holds(rooms["f1"]) is None
+    assert r.runner.holds(rooms["default"]) is None and r.runner.holds(rooms["room_b"]) is None
     assert r.fake.states["input_boolean.tank_hold"][0] == "off" and r.saved()["inflight"] is None
     assert "Everything now reads off" in r.alert("CS-803")["message"]
 
@@ -449,7 +449,7 @@ def test_a_stop_is_read_at_every_step_not_only_on_the_next_pass(rig, monkeypatch
     r.ask("batch")
     r.runner.poll()
     assert ("turn_on", "switch.tank_fill") not in r.actions()  # the fill valve never opened
-    assert r.status()[1]["history"][0]["result"] == "stopped: fill: stop requested by Ben"
+    assert r.status()[1]["history"][0]["result"] == "stopped: fill: stop requested by Alex"
 
 
 def test_while_a_batch_runs_the_chores_wait_30_s_between_runs(rig):

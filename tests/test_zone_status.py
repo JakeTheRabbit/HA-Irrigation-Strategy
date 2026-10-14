@@ -71,4 +71,7 @@ def test_no_threshold_is_applied_and_a_reason_that_is_not_text_is_dropped():
 
 def test_each_room_reads_its_own_entity():
     assert status_app_entity("", 1) == "sensor.crop_steering_zone_1_status_app"
-    assert status_app_entity("f1_", 3) == "sensor.crop_steering_f1_zone_3_status_app"
+    assert (
+        status_app_entity("room_b_", 3)
+        == "sensor.crop_steering_room_b_zone_3_status_app"
+    )

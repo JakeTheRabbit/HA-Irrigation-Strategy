@@ -1,8 +1,8 @@
 """The "setting outside the engine's range" alert is for anybody's room, and says what to do.
 
 First real install: a tent set its field capacity to 95 %, which the number entity accepts and the
-engine limits to 90. The notification was titled "F2 config clamp": F2 is one facility's room
-name, and nothing in the text said the value had been limited, or how to clear it.
+engine limits to 90. The notification's title was one facility's room name and "config clamp", and
+nothing in the text said the value had been limited, or how to clear it.
 """
 from datetime import datetime
 
@@ -26,7 +26,7 @@ def test_a_value_the_engine_limits_is_reported_in_words_anyone_can_act_on():
     states = _room(1)
     states["number.crop_steering_zone_1_field_capacity"] = ("95", {})
     (alert,) = _loop(states)
-    assert "F2" not in alert["title"] and "range" in alert["title"]
+    assert "config clamp" not in alert["title"] and "range" in alert["title"]
     assert "field_capacity=95" in alert["message"] and "90" in alert["message"]
     assert "nearest allowed value" in alert["message"] and alert["title"].endswith("(CS-401)")
     assert alert["notification_id"] == "f2_cfg_default_z1_field_capacity"  # same id: it replaces the old card

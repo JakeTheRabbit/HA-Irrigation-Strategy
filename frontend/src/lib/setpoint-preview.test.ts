@@ -6,7 +6,7 @@ import { buildSetpointPreview, validateSetpoint } from "./setpoint-preview";
 import { buildPlanningCurve } from "./planning-curve";
 import type { EntityState, States } from "./types";
 
-function fixture(prefix = "f1_") {
+function fixture(prefix = "room_b_") {
   const states: States = {};
   const put = (id: string, state: string, attributes: Record<string, unknown> = {}) => {
     states[id] = { entity_id: id, state, attributes } as EntityState;
@@ -81,7 +81,7 @@ describe("manual setpoint preview", () => {
   it("switches the selected legacy mode locally, keeping saved mode and EC references", () => {
     const f = fixture();
     const p = buildSetpointPreview(f.room(), f.states, 1, {
-      "select.crop_steering_f1_zone_1_steering_mode": { value: "Vegetative" },
+      "select.crop_steering_room_b_zone_1_steering_mode": { value: "Vegetative" },
       [f.id("zone_1_ec_target_veg_p2")]: { value: "3.7" },
     });
     expect(p.saved.parameters.ec_target_p2).toBe(6);
@@ -129,7 +129,7 @@ describe("manual setpoint preview", () => {
   });
   it("does not invent a missing schedule, mode or missing zone target", () => {
     const f = fixture();
-    delete f.states["select.crop_steering_f1_zone_1_steering_mode"];
+    delete f.states["select.crop_steering_room_b_zone_1_steering_mode"];
     delete f.states[f.id("lights_on_hour")];
     delete f.states[f.id("zone_1_p1_target_vwc")];
     const p = buildSetpointPreview(f.room(), f.states, 1, {});
@@ -140,15 +140,15 @@ describe("manual setpoint preview", () => {
   });
   it("uses the controller's legacy growth_stage fallback, never room steering_mode", () => {
     const f = fixture();
-    delete f.states["select.crop_steering_f1_zone_1_steering_mode"];
-    f.put("select.crop_steering_f1_growth_stage", "Vegetative");
-    f.put("select.crop_steering_f1_steering_mode", "Generative");
+    delete f.states["select.crop_steering_room_b_zone_1_steering_mode"];
+    f.put("select.crop_steering_room_b_growth_stage", "Vegetative");
+    f.put("select.crop_steering_room_b_steering_mode", "Generative");
     expect(buildSetpointPreview(f.room(), f.states, 1, {}).draft.parameters.ec_target_p0).toBe(3);
   });
   it("does not mask an invalid local steering-mode choice with saved mode", () => {
     const f = fixture();
     const p = buildSetpointPreview(f.room(), f.states, 1, {
-      "select.crop_steering_f1_zone_1_steering_mode": { value: "" },
+      "select.crop_steering_room_b_zone_1_steering_mode": { value: "" },
     });
     expect(p.draft.mode).toBeNull();
     expect(p.draft.parameters.dryback_target).toBeUndefined();
@@ -156,10 +156,10 @@ describe("manual setpoint preview", () => {
   });
   it("shows valid active-plan targets read-only, ignoring all manual drafts", () => {
     const f = fixture();
-    f.put("sensor.crop_steering_f1_strategy_plan", "active", {
+    f.put("sensor.crop_steering_room_b_strategy_plan", "active", {
       enabled: true,
       snapshot_version: 1,
-      room_id: "room:f1_",
+      room_id: "room:room_b_",
       updated_at: new Date().toISOString(),
       valid_until: new Date(Date.now() + 60000).toISOString(),
       zones: [
@@ -196,9 +196,9 @@ describe("manual setpoint preview", () => {
   });
   it("never displays manual fallback targets as active when the plan snapshot is invalid", () => {
     const f = fixture();
-    f.put("sensor.crop_steering_f1_strategy_plan", "active", {
+    f.put("sensor.crop_steering_room_b_strategy_plan", "active", {
       enabled: true,
-      room_id: "room:f1_",
+      room_id: "room:room_b_",
     });
     const p = buildSetpointPreview(f.room(), f.states, 1, {});
     expect(p.readOnly).toBe(true);
@@ -226,8 +226,8 @@ it("keeps room flow drafts below existing zone flow, using entity-specific overr
 });
 it("uses a legacy Transition growth stage as generative, matching the controller", () => {
   const f = fixture();
-  delete f.states["select.crop_steering_f1_zone_1_steering_mode"];
-  f.put("select.crop_steering_f1_growth_stage", "Transition");
+  delete f.states["select.crop_steering_room_b_zone_1_steering_mode"];
+  f.put("select.crop_steering_room_b_growth_stage", "Transition");
   expect(buildSetpointPreview(f.room(), f.states, 1, {}).draft.parameters.ec_target_p2).toBe(6);
 });
 it("overlays room light-hour drafts independently from the saved whole-day schedule", () => {
@@ -244,10 +244,10 @@ it("overlays room light-hour drafts independently from the saved whole-day sched
 
 it("rejects incomplete active targets despite a fresh snapshot timestamp", () => {
   const f = fixture();
-  f.put("sensor.crop_steering_f1_strategy_plan", "active", {
+  f.put("sensor.crop_steering_room_b_strategy_plan", "active", {
     enabled: true,
     snapshot_version: 1,
-    room_id: "room:f1_",
+    room_id: "room:room_b_",
     updated_at: new Date().toISOString(),
     valid_until: new Date(Date.now() + 60000).toISOString(),
     zones: [{ zone_id: 1, status: "active", parameters: { p1_target_vwc: 62 } }],

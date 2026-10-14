@@ -18,7 +18,7 @@ KILL = "input_boolean.kill"
 PUMP, MAIN, VALVE = "switch.p", "switch.m", "switch.v1"
 BEAT = "sensor.crop_steering_ai_heartbeat"
 STATUS = "sensor.crop_steering_zone_1_status_app"
-F1_BEAT = "sensor.crop_steering_f1_ai_heartbeat"
+ROOM_B_BEAT = "sensor.crop_steering_room_b_ai_heartbeat"
 
 
 class Clock:
@@ -117,16 +117,16 @@ def test_nothing_is_repeated_before_a_first_report_or_in_a_shots_last_seconds(ri
 def test_every_room_is_repeated_the_quietest_first(rig):
     c, clock, writes = rig
     default = c.rooms[0]
-    f1 = controller.Room("f1", "f1_", {1: {}}, {"pump": None, "mainline": None, "valves": {1: "switch.f1_v1"}},
-                         "switch.crop_steering_f1_engine_enabled", "", "", 10, 22)
-    c.rooms.append(f1)
-    c._heartbeat(f1, datetime(2026, 9, 25, 10, 1, 1), None, room_active=False)  # an OFF room reports too
+    room_b = controller.Room("room_b", "room_b_", {1: {}}, {"pump": None, "mainline": None, "valves": {1: "switch.room_b_v1"}},
+                         "switch.crop_steering_room_b_engine_enabled", "", "", 10, 22)
+    c.rooms.append(room_b)
+    c._heartbeat(room_b, datetime(2026, 9, 25, 10, 1, 1), None, room_active=False)  # an OFF room reports too
     clock.seconds += 5
     c._heartbeat(default, datetime(2026, 9, 25, 10, 1, 6), None)
     clock.seconds += 61
     for _round in range(3):
         c._keep_alive(30)
-    assert [entity for entity, *_rest in writes[2:]] == [F1_BEAT, BEAT]  # then both are fresh
+    assert [entity for entity, *_rest in writes[2:]] == [ROOM_B_BEAT, BEAT]  # then both are fresh
     assert writes[2][2]["room_active"] is False
 
 

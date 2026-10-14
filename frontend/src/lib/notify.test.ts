@@ -39,8 +39,8 @@ import type { Room, States } from "./types";
 import { ControllerStore } from "./use-controller";
 
 const ROOMS: Room[] = [
-  { id: "room:", prefix: "", name: "Flower 2" },
-  { id: "room:f1_", prefix: "f1_", name: "Flower 1" },
+  { id: "room:", prefix: "", name: "Room A" },
+  { id: "room:room_b_", prefix: "room_b_", name: "Room B" },
 ];
 const recipient = (
   service: string,
@@ -85,10 +85,10 @@ describe("reading what notify_get returns", () => {
         recipients: [
           {
             service: "notify.mobile_app_pixel_7",
-            name: "Callum's phone",
+            name: "Alex's phone",
             user_id: "7f21",
             kinds: ["stock", "dosing"],
-            rooms: ["f1_"],
+            rooms: ["room_b_"],
             urgent_high_priority: true,
           },
         ],
@@ -116,10 +116,10 @@ describe("reading what notify_get returns", () => {
         recipients: [
           {
             service: "notify.mobile_app_pixel_7",
-            name: "Callum's phone",
+            name: "Alex's phone",
             user_id: "7f21",
             kinds: ["stock", "dosing"],
-            rooms: ["f1_"],
+            rooms: ["room_b_"],
             urgent_high_priority: true,
           },
         ],
@@ -147,7 +147,11 @@ describe("reading what notify_get returns", () => {
         revision: "5",
         idle_hours: "40",
         recipients: [
-          { service: "notify.a", kinds: ["emergency", "emergency", 3], rooms: ["", "f1_", "F 2"] },
+          {
+            service: "notify.a",
+            kinds: ["emergency", "emergency", 3],
+            rooms: ["", "room_b_", "F 2"],
+          },
           { service: "notify.a", kinds: ["stock"] },
           { service: "light.kitchen", kinds: ["stock"] },
           { service: "notify.b c" },
@@ -172,7 +176,7 @@ describe("reading what notify_get returns", () => {
           name: "notify.a",
           user_id: null,
           kinds: ["emergency"],
-          rooms: ["", "f1_"],
+          rooms: ["", "room_b_"],
           urgent_high_priority: false,
         },
       ],
@@ -218,8 +222,8 @@ describe("reading what notify_get returns", () => {
   });
   it("says the integration's refusals in words", () => {
     expect(notifyError("revision")).toMatch(/^Someone else saved .* your changes kept on top/);
-    expect(notifyError("not allowed: that phone is Ben's")).toBe(
-      "Home Assistant did not allow this: that phone is Ben's. An administrator can change every phone; anyone else, only their own phone's ticks.",
+    expect(notifyError("not allowed: that phone is Alex's")).toBe(
+      "Home Assistant did not allow this: that phone is Alex's. An administrator can change every phone; anyone else, only their own phone's ticks.",
     );
     expect(notifyError("not allowed")).toMatch(/^Home Assistant did not allow this\. /);
     expect(notifyError("notify.x is not a notify service")).toBe(
@@ -288,8 +292,8 @@ describe("who may change a row, and what it is called", () => {
 
 describe("the draft", () => {
   it("is the same setup whatever order the ticks were made and the rows listed in", () => {
-    const a = toDraft(config([recipient(BEN, ["stock", "dosing"], { rooms: ["f1_", ""] })]));
-    const b = toDraft(config([recipient(BEN, ["dosing", "stock"], { rooms: ["", "f1_"] })]));
+    const a = toDraft(config([recipient(BEN, ["stock", "dosing"], { rooms: ["room_b_", ""] })]));
+    const b = toDraft(config([recipient(BEN, ["dosing", "stock"], { rooms: ["", "room_b_"] })]));
     expect(sameDraft(a, b)).toBe(true);
     expect(sameDraft(a, { ...a, idle_hours: 4 })).toBe(false);
     expect(sameDraft(a, updateRow(a, BEN, { urgent_high_priority: false }))).toBe(false);
@@ -307,10 +311,10 @@ describe("the draft", () => {
     expect(toggleKind(["stock", "dosing"], "dosing", true)).toEqual(["stock", "dosing"]);
     expect(toggleKind(["stock", "dosing"], "stock", false)).toEqual(["dosing"]);
     // All covers every room; a room chip from All covers that room only.
-    expect(toggleRoom(["f1_"], null)).toEqual([]);
-    expect(toggleRoom([], "f1_")).toEqual(["f1_"]);
-    expect(toggleRoom(["f1_"], "")).toEqual(["f1_", ""]);
-    expect(toggleRoom(["f1_", ""], "f1_")).toEqual([""]);
+    expect(toggleRoom(["room_b_"], null)).toEqual([]);
+    expect(toggleRoom([], "room_b_")).toEqual(["room_b_"]);
+    expect(toggleRoom(["room_b_"], "")).toEqual(["room_b_", ""]);
+    expect(toggleRoom(["room_b_", ""], "room_b_")).toEqual([""]);
     // The last room taken out covers every room again: a row covers at least one.
     expect(toggleRoom([""], "")).toEqual([]);
   });
@@ -349,7 +353,7 @@ describe("the draft", () => {
       roomsWithoutEmergencies(
         draft([
           recipient(BEN, ["stock"]),
-          recipient(CALLUM, ["emergency"], { rooms: ["f1_"] }),
+          recipient(CALLUM, ["emergency"], { rooms: ["room_b_"] }),
           recipient(STEWART, ["emergency"], { rooms: [""] }),
         ]),
         ROOMS,
@@ -373,7 +377,7 @@ describe("saving", () => {
       config([
         recipient(CALLUM, ["dosing", "phases", "stock", "unknown"], {
           user_id: "demo-user-callum",
-          rooms: ["f1_"],
+          rooms: ["room_b_"],
         }),
         recipient("notify.family", ["emergency"]),
       ]),
@@ -387,7 +391,7 @@ describe("saving", () => {
           name: "callum_phone",
           user_id: "demo-user-callum",
           kinds: ["phases", "stock", "dosing", "unknown"],
-          rooms: ["f1_"],
+          rooms: ["room_b_"],
           urgent_high_priority: true,
         },
         // No owner: sent without one.
@@ -423,7 +427,7 @@ describe("saving", () => {
     // Elsewhere: Ben's rooms and high priority, Callum's rooms, a new family group; "gone" removed.
     const after = config(
       [
-        recipient(BEN, ["emergency", "stock"], { rooms: ["f1_"], urgent_high_priority: false }),
+        recipient(BEN, ["emergency", "stock"], { rooms: ["room_b_"], urgent_high_priority: false }),
         recipient(CALLUM, ["hardware"], { rooms: [""] }),
         recipient(STEWART, ["emergency"]),
         recipient("notify.family", ["emergency"]),
@@ -434,7 +438,7 @@ describe("saving", () => {
     const rebased = rebaseDraft(before, draft, after);
     expect(rebased.idle_hours).toBe(5);
     expect(rebased.recipients).toEqual([
-      recipient(BEN, ["emergency", "stock"], { rooms: ["f1_"], urgent_high_priority: false }),
+      recipient(BEN, ["emergency", "stock"], { rooms: ["room_b_"], urgent_high_priority: false }),
       recipient(CALLUM, ["hardware", "phases"], { rooms: [""] }),
       recipient("notify.family", ["emergency"]),
       // Changed here, removed elsewhere: kept, so the review shows it as added.
@@ -495,7 +499,7 @@ describe("saving", () => {
     let draft = toDraft(base);
     draft = updateRow(draft, CALLUM, {
       kinds: ["hardware", "stock", "phases"],
-      rooms: ["f1_"],
+      rooms: ["room_b_"],
       urgent_high_priority: true,
     });
     draft = { ...draft, recipients: draft.recipients.filter((row) => row.service !== STEWART) };
@@ -516,7 +520,7 @@ describe("saving", () => {
         lines: [
           { label: "Starts getting", before: null, after: "Phase changes" },
           { label: "Stops getting", before: null, after: "Dosing" },
-          { label: "Rooms", before: "All rooms", after: "Flower 1" },
+          { label: "Rooms", before: "All rooms", after: "Room B" },
           { label: "High priority for emergencies", before: "Off", after: "On" },
         ],
       },
@@ -551,9 +555,9 @@ describe("saving", () => {
       rooms: ROOMS,
     });
     expect(defaultRoom.phones[0].lines).toEqual([
-      { label: "Rooms", before: "All rooms", after: "Flower 2" },
+      { label: "Rooms", before: "All rooms", after: "Room A" },
     ]);
-    expect(roomWords(["f1_", "", "f9_"], ROOMS)).toBe("Flower 1, Flower 2, f9_");
+    expect(roomWords(["room_b_", "", "f9_"], ROOMS)).toBe("Room B, Room A, f9_");
   });
 });
 

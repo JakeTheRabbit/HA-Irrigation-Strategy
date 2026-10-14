@@ -19,17 +19,17 @@ function fixture(extra: EntityState[] = []): States {
       num_zones: 1,
       enable_flag: "input_boolean.f2_control_enabled",
     }),
-    entity("sensor.crop_steering_f1_engine_config", "ready", {
-      prefix: "f1_",
-      slug: "f1",
+    entity("sensor.crop_steering_room_b_engine_config", "ready", {
+      prefix: "room_b_",
+      slug: "room_b",
       num_zones: 1,
-      enable_flag: "switch.crop_steering_f1_engine_enabled",
+      enable_flag: "switch.crop_steering_room_b_engine_enabled",
     }),
     entity("input_boolean.f2_control_enabled", "on"),
-    entity("switch.crop_steering_f1_engine_enabled", "on"),
+    entity("switch.crop_steering_room_b_engine_enabled", "on"),
     // No probe readings: an active room raises a "sensor data unavailable" warning.
     entity("sensor.crop_steering_zone_1_status", "Holding"),
-    entity("sensor.crop_steering_f1_zone_1_status", "Fault: valve blocked"),
+    entity("sensor.crop_steering_room_b_zone_1_status", "Fault: valve blocked"),
     ...extra,
   ];
   return Object.fromEntries(entries.map((item) => [item.entity_id, item]));
@@ -56,35 +56,35 @@ describe("room on/off status", () => {
   it("reads the room switch for the default and named rooms independently", () => {
     const states = fixture([
       entity("switch.crop_steering_room_active", "on"),
-      entity("switch.crop_steering_f1_room_active", "off"),
+      entity("switch.crop_steering_room_b_room_active", "off"),
     ]);
     expect(room(states).roomActive).toBe(true);
     expect(room(states).roomActiveEntity).toBe("switch.crop_steering_room_active");
-    expect(room(states, "room:f1_").roomActive).toBe(false);
-    expect(room(states, "room:f1_").roomActiveEntity).toBe("switch.crop_steering_f1_room_active");
+    expect(room(states, "room:room_b_").roomActive).toBe(false);
+    expect(room(states, "room:room_b_").roomActiveEntity).toBe("switch.crop_steering_room_b_room_active");
     const [first, second] = discoverRooms(states);
     expect(roomIsActive(states, first)).toBe(true);
     expect(roomIsActive(states, second)).toBe(false);
   });
   it("keeps an off room in the room picker, unlike an archived room", () => {
-    const states = fixture([entity("switch.crop_steering_f1_room_active", "off")]);
-    expect(discoverRooms(states).map((item) => item.id)).toEqual(["room:", "room:f1_"]);
-    states["sensor.crop_steering_f1_engine_config"].attributes.active = false;
+    const states = fixture([entity("switch.crop_steering_room_b_room_active", "off")]);
+    expect(discoverRooms(states).map((item) => item.id)).toEqual(["room:", "room:room_b_"]);
+    states["sensor.crop_steering_room_b_engine_config"].attributes.active = false;
     expect(discoverRooms(states).map((item) => item.id)).toEqual(["room:"]);
   });
   it("shows zones as Room off and suppresses derived alerts for an off room", () => {
     const states = fixture([
-      entity("switch.crop_steering_f1_room_active", "off"),
-      entity("sensor.crop_steering_f1_ai_heartbeat", "online", {
+      entity("switch.crop_steering_room_b_room_active", "off"),
+      entity("sensor.crop_steering_room_b_ai_heartbeat", "online", {
         last_beat: "2020-01-01T00:00:00Z",
       }),
     ]);
-    const view = room(states, "room:f1_");
+    const view = room(states, "room:room_b_");
     expect(view.zones.map((zone) => zone.status)).toEqual(["Room off"]);
     expect(view.alerts).toEqual([]);
     // The same room raises its warnings again as soon as it is switched on.
-    states["switch.crop_steering_f1_room_active"].state = "on";
-    const active = room(states, "room:f1_");
+    states["switch.crop_steering_room_b_room_active"].state = "on";
+    const active = room(states, "room:room_b_");
     expect(active.zones[0].status).toBe("Fault: valve blocked");
     expect(active.alerts.length).toBeGreaterThan(0);
   });
@@ -108,8 +108,8 @@ describe("room on/off status", () => {
     const states = fixture([
       entity("switch.crop_steering_room_active", "on"),
       entity("switch.crop_steering_auto_setpoints", "off"),
-      entity("switch.crop_steering_f1_room_active", "on"),
-      entity("switch.crop_steering_f1_auto_setpoints", "off"),
+      entity("switch.crop_steering_room_b_room_active", "on"),
+      entity("switch.crop_steering_room_b_auto_setpoints", "off"),
     ]);
     const view = room(states);
     expect(
@@ -122,8 +122,8 @@ describe("room on/off status", () => {
       }),
     ).toBeNull();
     for (const entityId of [
-      "switch.crop_steering_f1_room_active",
-      "switch.crop_steering_f1_auto_setpoints",
+      "switch.crop_steering_room_b_room_active",
+      "switch.crop_steering_room_b_auto_setpoints",
     ])
       expect(validateChange(view, states, { entityId, value: false })).toMatch(/not an editable/);
     expect(
@@ -174,7 +174,7 @@ describe("auto setpoints in the room model", () => {
       learnedPeak: 35.9,
       managed: ["number.crop_steering_zone_1_p1_target_vwc"],
     });
-    expect(room(states, "room:f1_").autoSetpoints.entityId).toBeNull();
+    expect(room(states, "room:room_b_").autoSetpoints.entityId).toBeNull();
   });
 });
 

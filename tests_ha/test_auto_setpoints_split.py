@@ -73,7 +73,7 @@ async def test_the_p1_target_and_field_capacity_follow_the_highest_reading_and_t
     assert before == {"p1_target_vwc": 29.5, "field_capacity": 50.0, "p2_vwc_threshold": 27.5,
                       "p3_emergency_vwc_threshold": 20.0, "p2_shot_size": 6.0}
 
-    st["peak"] = 71.48  # F2 zone 2's highest reading of 5 Oct
+    st["peak"] = 71.48  # a production zone's highest reading of 5 Oct
     _Clock.current = now = datetime(2026, 10, 6, 5, 0)
     st["phase"] = "P3"
     fake.calls.clear()

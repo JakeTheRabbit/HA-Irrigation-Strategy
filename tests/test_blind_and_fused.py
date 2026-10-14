@@ -68,10 +68,10 @@ def test_fused_id_prefers_current_convention(monkeypatch):
 
 def test_fused_id_prefix_and_ec(monkeypatch):
     monkeypatch.setattr(
-        C, "ha_get", _fake_ha_get({"sensor.crop_steering_f1_zone_2_ec"})
+        C, "ha_get", _fake_ha_get({"sensor.crop_steering_room_b_zone_2_ec"})
     )
     c = _ctrl()
-    assert c._fused_id("f1_", "ec", 2) == "sensor.crop_steering_f1_zone_2_ec"
+    assert c._fused_id("room_b_", "ec", 2) == "sensor.crop_steering_room_b_zone_2_ec"
 
 
 def test_fused_id_override_wins_when_present(monkeypatch):

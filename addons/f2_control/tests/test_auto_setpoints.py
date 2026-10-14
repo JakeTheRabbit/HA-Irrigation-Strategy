@@ -1,7 +1,7 @@
 """Auto setpoints: learn a zone from its own shots, fail P1 over to P2 when the substrate stops taking
 water, carry the achieved peak forward as the P1 target, and keep probing upward for a higher one.
 
-Numbers mirror F2 Zone 1 as measured 2026-09-19: the probe saturates near 36 %, a 3 % shot lifts about
+Numbers mirror zone 1 of a production room as measured 2026-09-19: the probe saturates near 36 %, a 3 % shot lifts about
 1.8 points, and the live P1 target of 40 % is something that probe has never read.
 """
 import json
@@ -97,7 +97,7 @@ def test_the_spike_right_after_a_shot_is_not_the_peak():
 
 
 def test_a_shot_is_judged_by_what_it_retained_right_before_the_next_one():
-    # Seen on the twin of F2 Zone 1: eight minutes after a big shot the probe still rides the spike and
+    # Seen on the twin of that zone: eight minutes after a big shot the probe still rides the spike and
     # reads +1.3..+1.8 even at saturation. Shot-to-shot the same ramp reads 1.6, 1.3, 1.5, then 0.5, 0.2.
     learn = au.fresh()
     au.new_day(learn, "d", 31.5)

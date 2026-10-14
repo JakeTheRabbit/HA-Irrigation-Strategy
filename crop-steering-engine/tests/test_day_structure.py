@@ -1,5 +1,5 @@
 """The shape of a grow-day: typed decisions, what the daily budget may and may not stop, and which
-pore-EC reading the EC rules act on. The live cases are F2, 21-22 Sep 2026."""
+pore-EC reading the EC rules act on. The live cases were observed on a production room, 21-22 Sep 2026."""
 
 import pytest
 

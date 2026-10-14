@@ -11,7 +11,7 @@ which would otherwise put it in error.
 
 import asyncio
 import copy
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
@@ -185,31 +185,43 @@ def test_a_lights_on_hour_moved_earlier_is_followed_from_its_next_lights_on(
 
 
 # ---------------------------------------------------------------- a daylight-saving gap
+@pytest.mark.parametrize(
+    "zone, gap",
+    [
+        ("Pacific/Auckland", date(2026, 9, 27)),
+        ("America/New_York", date(2026, 3, 8)),
+    ],
+)
 def test_a_lights_on_hour_inside_the_daylight_saving_gap_still_starts_the_day(
-    monkeypatch,
+    monkeypatch, zone, gap
 ):
-    """Pacific/Auckland on 27 September 2026 goes from 02:00 straight to 03:00."""
+    """Each zone goes from 02:00 straight to 03:00 on its gap day, in either hemisphere."""
     manager, states, _ = manager_fixture(monkeypatch)
-    nz = ZoneInfo("Pacific/Auckland")
+    tz = ZoneInfo(zone)
     states[HOUR].state = "2"
+
+    def at(days, hour, minute, second=0):
+        return datetime.combine(
+            gap + timedelta(days=days), time(hour, minute, second), tzinfo=tz
+        )
 
     async def scenario():
         await manager.async_init()
         await manager.save(plan(), 0)
-        armed = datetime(2026, 9, 25, 12, 0, tzinfo=nz)
+        armed = at(-2, 12, 0)
         fresh(states, armed)
         await manager.activate(1, armed)
-        for at, day in (
-            (datetime(2026, 9, 26, 2, 0, 30, tzinfo=nz), "2026-09-26"),
-            (datetime(2026, 9, 27, 1, 59, tzinfo=nz), "2026-09-26"),
-            (datetime(2026, 9, 27, 3, 0, 30, tzinfo=nz), "2026-09-27"),
-            (datetime(2026, 9, 28, 2, 0, 30, tzinfo=nz), "2026-09-28"),
+        for when, day in (
+            (at(-1, 2, 0, 30), gap - timedelta(days=1)),
+            (at(0, 1, 59), gap - timedelta(days=1)),
+            (at(0, 3, 0, 30), gap),
+            (at(1, 2, 0, 30), gap + timedelta(days=1)),
         ):
-            fresh(states, at)
-            await manager.tick(at)
-            assert manager.document["status"] == "active", at
-            assert manager.document["active"]["grow_day"] == day, at
-            assert manager.degraded_reason is None, at
+            fresh(states, when)
+            await manager.tick(when)
+            assert manager.document["status"] == "active", when
+            assert manager.document["active"]["grow_day"] == day.isoformat(), when
+            assert manager.degraded_reason is None, when
 
     asyncio.run(scenario())
 

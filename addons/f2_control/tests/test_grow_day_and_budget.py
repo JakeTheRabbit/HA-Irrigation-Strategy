@@ -1,6 +1,6 @@
 """The controller's side of the grow-day: a day started late still gets its own budget, the EC rules act
 on settled pore EC, yesterday's EC steer stays in yesterday, and a routine shot only gets what is left of
-the budget. The live cases are F2, 21-22 Sep 2026."""
+the budget. The live cases were observed on a production room, 21-22 Sep 2026."""
 import json
 from datetime import date, datetime, timedelta, timezone
 
@@ -58,7 +58,7 @@ def rig(monkeypatch, tmp_path):
         fake.set_state(eid, "on")
     for eid in ("switch.p", "switch.m", "switch.v1", "switch.v2"):
         fake.set_state(eid, "off")
-    # F2's hydraulics: 42 plants in 6.75 L blocks, one 4 L/h dripper each
+    # a production room's hydraulics: 42 plants in 6.75 L blocks, one 4 L/h dripper each
     for key, value in {"plant_count": 42, "substrate_volume": 6.75,
                        "drippers_per_plant": 1, "dripper_flow_rate": 4}.items():
         fake.set_state(f"number.crop_steering_{key}", str(value))

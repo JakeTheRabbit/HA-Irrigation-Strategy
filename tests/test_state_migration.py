@@ -199,7 +199,7 @@ def test_nested_file_loads_per_room(tmp_path):
 # --------------------------------------------------------------------------- options compat
 # An old /data/options.json predates the feed_ec_sensor / feed_ph_sensor keys and may carry
 # the old facility-specific substrate_l / flow_lps numbers. Loading it must still work, must
-# NOT resurrect any F2-specific default entity id, and an unset feed sensor must DISABLE that
+# NOT resurrect any site-specific default entity id, and an unset feed sensor must DISABLE that
 # half of the source-water gate (generic, zero-config-safe) rather than poll a dead entity.
 
 
@@ -215,7 +215,7 @@ def _init(opts, monkeypatch):
 def test_old_options_without_feed_keys_disables_gate(monkeypatch):
     # an "old" file: no feed_* keys at all
     c, room = _init({"num_zones": 2, "substrate_l": 6, "flow_lps": 0.067}, monkeypatch)
-    assert room.feed_ec_sensor == ""  # no F2 atlas/aquaponics fallback
+    assert room.feed_ec_sensor == ""  # no fallback to one site's feed probe
     assert room.feed_ph_sensor == ""
     assert (
         c._read_feed_ec(room) is None
@@ -231,7 +231,7 @@ def test_blank_or_whitespace_feed_sensor_is_disabled(monkeypatch):
 
 
 def test_feed_sensors_honored_when_explicitly_set(monkeypatch):
-    # F2 (and any operator) keeps its behavior by setting these explicitly
+    # any operator keeps its behavior by setting these explicitly
     opts = {
         "feed_ec_sensor": "sensor.tank_probe_1_ec",
         "feed_ph_sensor": "sensor.my_ph",
@@ -241,12 +241,12 @@ def test_feed_sensors_honored_when_explicitly_set(monkeypatch):
     assert room.feed_ph_sensor == "sensor.my_ph"
 
 
-def test_substrate_flow_defaults_are_generic_not_f2(monkeypatch):
-    # empty options -> code fallbacks; must be generic placeholders, not F2's real numbers
+def test_substrate_flow_defaults_are_generic_not_one_sites(monkeypatch):
+    # empty options -> code fallbacks; must be generic placeholders, not one site's real numbers
     c, room = _init({}, monkeypatch)
     assert room.feed_ec_sensor == "" and room.feed_ph_sensor == ""
     assert c.substrate_l == 5.0
-    assert c.flow_lps == 0.02  # NOT F2's real 0.04
+    assert c.flow_lps == 0.02  # NOT one site's real 0.04
 
 
 def test_default_room_is_unprefixed(monkeypatch):

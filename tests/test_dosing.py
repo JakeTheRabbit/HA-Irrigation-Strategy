@@ -29,7 +29,7 @@ BATCH = {
     "mix_valves": ["switch.mix_return"],
     "mix_power_sensor": "sensor.tank_mixer_power",
     "mix_min_w": 200,
-    "close_entities": ["switch.f1_feed"],
+    "close_entities": ["switch.room_b_feed"],
     "hold_entity": "input_boolean.tank_dosing",
     "filled_at_entity": "input_datetime.tank_filled_at",
     "recipe": [{"pump": "balance", "ml": 300, "ml_entity": "number.recipe_balance"}],
@@ -41,7 +41,7 @@ KNOWN = {
     "switch.tank_mixer",
     "switch.mix_return",
     "sensor.tank_mixer_power",
-    "switch.f1_feed",
+    "switch.room_b_feed",
     "input_boolean.tank_dosing",
     "input_datetime.tank_filled_at",
     "number.recipe_balance",
@@ -158,7 +158,7 @@ def test_every_batch_entity_is_in_its_allowed_domain(field, entity):
 def test_lists_of_switches_and_the_recipe_entity_are_checked_too():
     for changes in (
         {"mix_valves": ["input_boolean.mix_return"]},
-        {"close_entities": ["number.f1_feed"]},
+        {"close_entities": ["number.room_b_feed"]},
         {"recipe": [{"pump": "balance", "ml": 300, "ml_entity": "switch.x"}]},
     ):
         with pytest.raises(dosing.DosingError, match="must be a"):
@@ -171,7 +171,7 @@ def test_every_entity_must_exist_in_home_assistant():
     with pytest.raises(dosing.DosingError, match="does not exist"):
         clean(exists=(KNOWN - {"button.doser_balance_start"}).__contains__)
     with pytest.raises(dosing.DosingError, match="does not exist"):
-        clean(exists=(KNOWN - {"switch.f1_feed"}).__contains__)
+        clean(exists=(KNOWN - {"switch.room_b_feed"}).__contains__)
     # A stored setup read back before its devices return is not thrown away.
     assert clean(exists=None)[0][0]["id"] == "balance"
 

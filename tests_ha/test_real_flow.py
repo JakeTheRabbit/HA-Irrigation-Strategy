@@ -115,7 +115,7 @@ async def test_a_fresh_install_registers_every_entity_under_the_id_its_code_asks
 
 
 async def test_an_existing_install_keeps_the_entity_ids_its_registry_already_holds(hass):
-    """Older installs hold ids the code no longer asks for (F2's fused probe is
+    """Older installs hold ids the code no longer asks for (one production room's fused probe is
     `sensor.crop_steering_zone_1_vwc`, the code asks for `..._vwc_zone_1`). Dashboards, automations and
     recorder history hang off the registered id, so setting `entity_id` must never move one."""
     _seed(hass)

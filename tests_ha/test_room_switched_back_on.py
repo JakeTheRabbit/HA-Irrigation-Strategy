@@ -1,6 +1,6 @@
 """A room switched off and on again, in a real Home Assistant, with the real controller.
 
-25 Sep 2026, F2: to clear a hardware hold the operator switched the room off and on again at 20:53.
+Observed on a production room (25 Sep 2026): to clear a hardware hold the operator switched the room off and on again at 20:53.
 All three zones were in P2, an hour before lights-off, and the controller took the switch-on for a new
 crop: it started their day again from P0, then a P1 ramp, with today's counters at 0. The room switch
 here is the integration's own entity; only the controller's REST reads stand in for HTTP.

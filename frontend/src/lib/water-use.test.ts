@@ -51,6 +51,16 @@ describe("grow-days", () => {
     expect(growDayOf(Date.parse("2026-09-25T21:59:00Z"), 10, zone)).toBe("2026-09-25");
     expect(growDayOf(Date.parse("2026-09-25T22:00:00Z"), 10, zone)).toBe("2026-09-26");
   });
+
+  it("keep lights-on at 10:00 local across the start of daylight saving in the north", () => {
+    // 8 March 2026: 02:00 EST becomes 03:00 EDT in New York. Lights-on 10:00 EDT is 14:00 UTC, an
+    // hour earlier in UTC than the day before, so the grow-day of 7 March lasts 23 hours.
+    const ny = "America/New_York";
+    expect(growDayOf(Date.parse("2026-03-08T13:59:00Z"), 10, ny)).toBe("2026-03-07");
+    expect(growDayOf(Date.parse("2026-03-08T14:00:00Z"), 10, ny)).toBe("2026-03-08");
+    expect(growDayOf(Date.parse("2026-03-07T14:59:00Z"), 10, ny)).toBe("2026-03-06");
+    expect(growDayOf(Date.parse("2026-03-07T15:00:00Z"), 10, ny)).toBe("2026-03-07");
+  });
 });
 
 describe("grow-day totals from the water-today counter", () => {
@@ -266,7 +276,7 @@ describe("merging the controller sensor with the integration's mirror", () => {
 });
 
 describe("grow start", () => {
-  // The live box, F2 zone 1, 21 August to 25 September 2026: a commissioning run, nine dry
+  // Zone 1 of a production room, 21 August to 25 September 2026: a commissioning run, nine dry
   // grow-days, then the grow from 1 September with one dry day on the 2nd.
   const live = days({
     "2026-08-21": 104.9,

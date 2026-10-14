@@ -73,60 +73,60 @@ def _make(switch_module, key, prefix=""):
 
 def test_every_room_gets_a_room_active_switch_that_defaults_on(switch_module):
     default = _make(switch_module, "room_active")
-    f1 = _make(switch_module, "room_active", prefix="f1_")
-    assert default._attr_is_on and f1._attr_is_on  # a fresh install keeps watering
+    room_b = _make(switch_module, "room_active", prefix="room_b_")
+    assert default._attr_is_on and room_b._attr_is_on  # a fresh install keeps watering
     # The id the controller and dashboard look for. Home Assistant only honours entity_id;
     # 2.17.0 set _attr_object_id alone and the live switches came up named after their labels.
     assert default.entity_id == "switch.crop_steering_room_active"
-    assert f1.entity_id == "switch.crop_steering_f1_room_active"
+    assert room_b.entity_id == "switch.crop_steering_room_b_room_active"
 
 
 def test_auto_setpoints_is_opt_in(switch_module):
-    entity = _make(switch_module, "auto_setpoints", prefix="f1_")
+    entity = _make(switch_module, "auto_setpoints", prefix="room_b_")
     assert entity._attr_is_on is False  # nothing rewrites setpoints until asked to
-    assert entity.entity_id == "switch.crop_steering_f1_auto_setpoints"
+    assert entity.entity_id == "switch.crop_steering_room_b_auto_setpoints"
 
 
-def _f1_entry():
+def _room_b_entry():
     return ha_stubs.FakeEntry(
         data={
-            "room_slug": "f1",
-            "room_prefix": "f1_",
+            "room_slug": "room_b",
+            "room_prefix": "room_b_",
             "zones": {"1": {"vwc_sensors": []}, "2": {"vwc_front": "sensor.dead"}},
         },
-        entry_id="f1",
+        entry_id="room_b",
     )
 
 
 def test_an_empty_room_with_unplugged_probes_nags_while_it_is_on():
     hass = ha_stubs.FakeHass(
         states={
-            "switch.crop_steering_f1_room_active": ha_stubs.FakeState("on"),
-            "sensor.crop_steering_f1_vwc_zone_2": ha_stubs.FakeState("unavailable"),
+            "switch.crop_steering_room_b_room_active": ha_stubs.FakeState("on"),
+            "sensor.crop_steering_room_b_vwc_zone_2": ha_stubs.FakeState("unavailable"),
         }
     )
-    health.run_health_check(hass, _f1_entry())
-    assert "zone_no_sensor_f1" in hass._issues
-    assert "fused_sensor_unavailable_f1" in hass._issues
-    assert "engine_offline_f1" in hass._issues
+    health.run_health_check(hass, _room_b_entry())
+    assert "zone_no_sensor_room_b" in hass._issues
+    assert "fused_sensor_unavailable_room_b" in hass._issues
+    assert "engine_offline_room_b" in hass._issues
 
 
 def test_switching_the_room_off_clears_and_silences_its_repairs():
     hass = ha_stubs.FakeHass(
         states={
-            "switch.crop_steering_f1_room_active": ha_stubs.FakeState("on"),
-            "sensor.crop_steering_f1_vwc_zone_2": ha_stubs.FakeState("unavailable"),
+            "switch.crop_steering_room_b_room_active": ha_stubs.FakeState("on"),
+            "sensor.crop_steering_room_b_vwc_zone_2": ha_stubs.FakeState("unavailable"),
         }
     )
-    health.run_health_check(hass, _f1_entry())
+    health.run_health_check(hass, _room_b_entry())
     assert hass._issues  # nagging
-    hass.states.set("switch.crop_steering_f1_room_active", "off")
-    health.run_health_check(hass, _f1_entry())
-    assert not [i for i in hass._issues if i.endswith("_f1")]
+    hass.states.set("switch.crop_steering_room_b_room_active", "off")
+    health.run_health_check(hass, _room_b_entry())
+    assert not [i for i in hass._issues if i.endswith("_room_b")]
 
 
 def test_a_missing_room_active_switch_means_on():
     # older installs have no switch yet: behaviour must not change
     hass = ha_stubs.FakeHass(states={})
-    health.run_health_check(hass, _f1_entry())
-    assert "zone_no_sensor_f1" in hass._issues
+    health.run_health_check(hass, _room_b_entry())
+    assert "zone_no_sensor_room_b" in hass._issues

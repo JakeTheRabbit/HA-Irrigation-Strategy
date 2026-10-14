@@ -13,7 +13,7 @@ more, do another shot until it stops rising". So:
     lights-on has kept a day before;
   - the learner writes neither; the P1 rule (core.decide) is fed the latch, the peak before each P1 shot and the
     count of shots after the target.
-Numbers: F2 zone 2 and zone 3 on 6 Oct 2026 (their 5 Oct peaks 71.48 and 73.4).
+Numbers: zones 2 and 3 of a production room on 6 Oct 2026 (their 5 Oct peaks 71.48 and 73.4).
 """
 import json
 from datetime import date, timedelta

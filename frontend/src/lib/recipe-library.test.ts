@@ -21,7 +21,7 @@ class MemoryStorage {
     this.data.set(key, value);
   }
 }
-const scope = { roomId: "room:f1_", demo: false };
+const scope = { roomId: "room:room_b_", demo: false };
 // Synthetic parser fixture, not a recommended growing profile.
 const endpoint = {
   dryback_target: 10,

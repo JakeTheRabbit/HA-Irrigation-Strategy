@@ -1,9 +1,9 @@
 """A restart must not strand irrigation behind a disarm cycle when the setup has not changed.
 
 Seen live on 2026-09-20: the host rebooted, the controller came back with no memory of the setup
-revision it had adopted (4), saw "4 > 0", and blocked every F2 zone with "Setup changed; disarm
+revision it had adopted (4), saw "4 > 0", and blocked every zone of a production room with "Setup changed; disarm
 current and requested engine flags and verify hardware OFF" because the kill switch was, correctly,
-still ON. Overnight the hold line showed no reason, so it looked healthy; F2 then lost two hours of
+still ON. Overnight the hold line showed no reason, so it looked healthy; the room then lost two hours of
 its P1 ramp before anyone saw it.
 
 The adopted revision is now saved with a fingerprint of what was adopted. Same revision and same
