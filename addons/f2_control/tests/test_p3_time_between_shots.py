@@ -123,5 +123,5 @@ def test_zero_turns_the_gap_off(rig):
 def test_an_integration_without_the_setting_leaves_the_controller_at_ten_minutes(rig):
     c, fake, room = rig
     assert ROOM not in fake.states and ZONE not in fake.states
-    assert c._params(room, 1).p3_time_between_min == controller.P3_TIME_BETWEEN_SHOTS_MIN == 10
+    assert c._params(room, 1).p3_time_between_min == controller.FALLBACK["p3_time_between_shots"] == 10
     assert ROOM not in c._defaulted_this_loop
