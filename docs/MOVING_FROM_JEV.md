@@ -41,11 +41,13 @@ These are for Home Assistant OS and Supervised installs, and follow the same sha
    switch, or the `input_boolean` helper on older rooms). Wait until the pump, main line and valves read
    OFF. Stop the Jev app and turn off its Start on boot and Watchdog.
 5. **Copy the data folder.** From an SSH terminal with Docker access, set `NEW` to the app id the room is
-   moving to (the table above), then run:
+   moving to (the table above) and `SUP` to the Supervisor's data folder on the host (`/mnt/data/supervisor`
+   on Home Assistant OS, `/usr/share/hassio` on a Supervised install), then run:
 
    ```sh
    NEW=6db5faba_f2_control   # 1d36ddd9_f2_control for a staging room on #testing
-   docker run --rm -e NEW="$NEW" -v /mnt/data/supervisor:/s alpine sh -c '
+   SUP=/mnt/data/supervisor  # /usr/share/hassio on a Supervised install
+   docker run --rm -e NEW="$NEW" -v "$SUP":/s alpine sh -c '
      for d in /s/apps/data /s/addons/data; do [ -d "$d/e031e6d4_f2_control" ] && break; done
      [ -d "$d/e031e6d4_f2_control" ] || { echo "no data folder for e031e6d4_f2_control"; exit 1; }
      [ -d "$d/$NEW" ] || { echo "no $d/$NEW: install the new app first"; exit 1; }
@@ -65,13 +67,13 @@ These are for Home Assistant OS and Supervised installs, and follow the same sha
    where a file the brain writes shows it has run before, and any one of them is enough. A TypeSafe key
    in the copied options keeps that route on by itself. Without them, a room on Cloudflare runs on the
    rules, which is safe but changes who decides.
-6. **Switch the integration's HACS source.** In HACS, add `https://github.com/JakeTheRabbit/HA-Irrigation-Strategy`
-   as a custom repository (type Integration) and **Download** the same version the new app runs. That
-   writes over `custom_components/crop_steering`. Then take the `HA-Crop-Steering-Jev` entry out of
-   HACS's list. If HACS removes it by deleting `custom_components/crop_steering`, download the
-   integration from `HA-Irrigation-Strategy` again before going on. Restart Home Assistant once. The
-   config entry and entities are untouched (same domain); check that Settings, Devices & services shows
-   the integration loaded at the new version.
+6. **Switch the integration's HACS source.** In HACS, first remove the `HA-Crop-Steering-Jev` repository
+   (HACS may delete `custom_components/crop_steering` as it does; Home Assistant keeps running the loaded
+   integration until it restarts). Then add `https://github.com/JakeTheRabbit/HA-Irrigation-Strategy` as a
+   custom repository (type Integration) and **Download** the same version the new app runs, which writes
+   `custom_components/crop_steering` afresh. Removing first means only one HACS repository ever provides
+   the integration. Restart Home Assistant once. The config entry and entities are untouched (same
+   domain); check that Settings, Devices & services shows the integration loaded at the new version.
 7. **Start the new app.** In its log check: the version on the `f2-control <version> starting` line;
    `room '<room>' setup revision N adopted with verified OFF hardware` for each room, and no "setup change
    waiting, not watering" notice; and the brain line, `jev: on via ...` where the old app had a brain, or
@@ -80,13 +82,16 @@ These are for Home Assistant OS and Supervised installs, and follow the same sha
    counters are the ones the old app left. Compare every state against step 1: nothing the operator set
    may have moved.
 8. Turn the kill switches back on, turn on the new app's Start on boot and Watchdog, and run a **catch
-   test** (Insights, Calibration) to prove water is delivered.
+   test**: run a shot, catch what one dripper delivers and compare it with the zone's dripper flow
+   (the calculator is in Equipment › Setup › Water & calibration). Only that proves water is delivered.
 9. After a full photoperiod, uninstall the Jev app. Two controllers on one room are two things opening
    the same valves, which is why step 4 stops the old app before the new one starts.
 
 ## Going back
 
 Until step 9 the old app and its data folder are untouched. To go back: turn the kill switches off, stop
-the new app and turn off its Start on boot, add `HA-Crop-Steering-Jev` back to HACS and download 3.11.1
-from it, restart Home Assistant, then start the Jev app. Its data folder is as it was at step 4, so its
-counters carry on from there.
+the new app and turn off its Start on boot, remove `HA-Irrigation-Strategy` from HACS, add
+`HA-Crop-Steering-Jev` back and download 3.11.1 from it, restart Home Assistant, then start the Jev app.
+Its data folder is as it was at step 4, so its counters carry on from there. If the integration does not
+load on 3.11.1 (a newer release can save its settings in a form 3.11.1 cannot read), restore the full Home
+Assistant backup from step 1 instead.

@@ -65,8 +65,8 @@ def _old_app(root, names, folder="apps"):
 
 
 def _move(root, new=NEW):
-    """The doc's copy command, as printed, with the host's /mnt/data/supervisor at `root`."""
-    (script,) = re.findall(r"-v /mnt/data/supervisor:/s alpine sh -c '(.*?)'\n *```", _doc(), re.S)
+    """The doc's copy command, as printed, with the host's Supervisor data folder ($SUP) at `root`."""
+    (script,) = re.findall(r"-v \"\$SUP\":/s alpine sh -c '(.*?)'\n *```", _doc(), re.S)
     return subprocess.run(
         ["sh", "-c", script.replace("/s/", f"{root}/")],
         env={**os.environ, "NEW": new},
