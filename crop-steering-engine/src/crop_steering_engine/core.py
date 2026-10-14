@@ -17,8 +17,8 @@ PHASES = ("P0", "P1", "P2", "P3")
 # The controller takes a settled reading only this long after the last shot, and an EC correction that
 # acts on one waits the same time, so each correction is judged by a reading taken after the last drained.
 EC_SETTLE_MIN = 45.0
-# P1 ends when a shot at or over the P1 target no longer raises the zone's highest reading by this much (the
-# owner's rule, 6 Oct 2026): reach the target, give one more shot, and if the peak did not rise, the slab is full.
+# P1 ends when a shot at or over the P1 target no longer raises the zone's highest reading by this much (a rule
+# adopted on 6 Oct 2026): reach the target, give one more shot, and if the peak did not rise, the slab is full.
 P1_RISE_PTS = 0.5
 
 
@@ -215,7 +215,7 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
         elif s.phase_minutes >= p.p0_max_wait_min:
             phase, treason = "P1", f"P0 timeout {s.phase_minutes:.0f}min"
     elif phase == "P1":
-        # The owner's rule (6 Oct 2026): ramp to the P1 target, then give one more shot. If that shot did not raise
+        # The P1 rule (adopted 6 Oct 2026): ramp to the P1 target, then give one more shot. If that shot did not raise
         # the zone's highest reading by P1_RISE_PTS, the slab is full: P2. If it did, another shot, until one does
         # not. The maximum shots still end P1. There is deliberately NO time-based exit: a zone gate-blocked before or
         # during the ramp (feed pH/EC, dosing hold) waits in P1 and resumes; lights-off -> P3 (above) is the only
@@ -260,8 +260,8 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     # the runoff carries the salt out, so a full slab is where a flush works. The capped corrections (P0 flush,
     # P2 dilute) need nothing more: the daily budget and the settle gap bound them. The cap-exempt
     # flushes (anti-lockout, P2 rescue) also need the reading under field capacity - 2, so that a probe reading
-    # above that setpoint cannot run them outside the budget for ever (5 Oct 2026: F2 zone 2 read 70 against a
-    # field capacity of 54, and that test had stopped every flush while its pore EC sat at 7).
+    # above that setpoint cannot run them outside the budget for ever (observed on a production room, 5 Oct 2026: a
+    # zone read 70 against a field capacity of 54, and that test had stopped every flush while its pore EC sat at 7).
     dilutive = ec_known and s.feed_ec < ec and not s.backed_up
     flush_ok = dilutive and s.vwc < p.field_capacity - 2.0
 
