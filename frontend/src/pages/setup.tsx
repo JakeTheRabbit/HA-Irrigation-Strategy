@@ -293,7 +293,8 @@ export function Setup({
     return (data?.candidates || [])
       .filter((c) =>
         kind === "switch"
-          ? c.domain === "switch"
+          ? // a zone valve, main line or pump: what the controller can open and close
+            ["switch", "input_boolean", "valve"].includes(c.domain)
           : kind === "timestamp"
             ? ["sensor", "input_datetime"].includes(c.domain)
             : kind === "binary"

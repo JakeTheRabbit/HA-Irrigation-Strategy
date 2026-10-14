@@ -194,3 +194,10 @@ sensors are **your** existing HA entities. Map them in the Crop Steering sidebar
 it holds every zone and says so. (The controller also reads a `hardware` map from its options
 file, for tests and hand-built development setups only: the app's Configuration tab doesn't
 offer it, and Supervisor rejects it as an unknown option.)
+
+The pump, main line and each zone valve can be a `switch` or an `input_boolean` (switched with
+`turn_on` / `turn_off`, read back `on` / `off`) or a `valve` (`valve.open_valve` /
+`valve.close_valve`, read back `open` / `closed`). Every open, close and read-back goes through one
+table in the controller (`ACTUATORS`), so a valve that does not read `closed` after a shot latches
+the same hardware hold (CS-301) a switch that does not read `off` does. Setup refuses any other
+domain; one mapped by hand holds its zone with CS-313 and is never sent a command.
