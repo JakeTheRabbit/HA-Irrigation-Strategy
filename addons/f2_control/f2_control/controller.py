@@ -33,7 +33,6 @@ import requests
 import auto_setpoints
 import dosing_runner
 import jev_bridge
-import jev_policy
 import setpoint_supervisor
 import zone_history
 from strategy_runtime import parse_snapshot, parameter_override, strategy_block
@@ -1795,38 +1794,19 @@ class Controller:
             st["learn"] = auto_setpoints.fresh()
         learn = st["learn"]
         st["last_vwc"] = snap.vwc
-        # the pore EC the engine's own rules act on (settled when there is one), so the P1 EC gate helper
-        # and the judge reason about the same number the engine does
-        ec_rules = getattr(snap, "ec_settled", None)
-        ec_rules = snap.ec if ec_rules is None else ec_rules
         auto_setpoints.new_day(learn, self._grow_day_start(room, now).isoformat(), snap.vwc)
         auto_setpoints.tick(learn, snap.vwc, st["phase"], now.timestamp(), lights_on,
                             snap.dryback_rate, self._minutes_since_shot(st, now))
         enabled = self._on(f"switch.crop_steering_{room.prefix}auto_setpoints", False)
         planned = bool(getattr(room, "strategy_required", False))
-        jev_state = room.__dict__.setdefault("_jev_state", {})
-        jev = jev_state.get(zone, "ok") if (self._cf[0] and self._cf[1]) else "disabled"
         # Each lever has one writer. With Jev's Setpoints judge running, the P2 shot size and re-water threshold
-        # are its own (jev_bridge) and this learner writes the rest, never consulting the old per-hour judge
-        # (26 Sep 2026: that judge walked zone 1's shot to 1 %). Writing nothing at all under the judge left
+        # are its own (jev_bridge) and this learner writes the rest. Writing nothing at all under the judge left
         # nobody on the P1 target: zone 2 sat at 29.5 under a probe reading 44 % and never ramped (4 Oct 2026).
         judged = jev_bridge.judge_levers(self)
-        if judged:
-            jev = "disabled"
         writes = enabled and not planned
         was = learn["outcome"]
         outcome = auto_setpoints.ramp_outcome(learn, st["phase"])
         if outcome != was:
-            if outcome == "plateau" and enabled and jev != "disabled":
-                verdict = jev_policy.verdicts(jev_policy.call(
-                    self._cf[0], self._cf[1],
-                    auto_setpoints.evidence(learn, st["phase"], snap.vwc, p.p1_target, ec_rules, p.ec_target_p2,
-                                            self._read_feed_ec(room), p.p2_shot_size, st["shots"]),
-                    gateway=self._cf[2] or None, timeout=5.0))
-                jev = jev_state[zone] = "ok" if verdict is not None else "unavailable"
-                if verdict and verdict.get("freeze"):  # a guard can only make it MORE careful
-                    auto_setpoints.distrust(learn, f"Jev: {verdict['freeze']}")
-                    outcome = learn["outcome"]
             log(f"[{room.slug}] Z{zone} P1 ramp outcome: {outcome} (peak {learn['peak']})")
             if outcome == "suspect":
                 self._alert(f"auto_{room.slug}_z{zone}", "CS-404", "automatic targets paused",
@@ -1835,23 +1815,6 @@ class Controller:
                             "Watering carries on with the current targets, and the next morning's "
                             "ramp is judged again.",
                             room=room, zone=zone)
-            self._save_state()
-        # In P2 the judge manages the maintenance shot: asked once an hour, it may nudge the P2 shot
-        # size (pore EC) and the working peak, one bounded step per lever per grow-day. It cannot fire,
-        # size or delay a shot, and a call that fails or takes too long changes nothing.
-        stamp = now.strftime("%Y-%m-%dT%H")
-        if (writes and jev != "disabled" and lights_on and st["phase"] == "P2"
-                and auto_setpoints.jev_due(learn, stamp)):
-            verdict = jev_policy.verdicts(jev_policy.call(
-                self._cf[0], self._cf[1],
-                auto_setpoints.evidence(learn, "P2", snap.vwc, p.p1_target, ec_rules, p.ec_target_p2,
-                                        self._read_feed_ec(room), p.p2_shot_size, st["shots"]),
-                gateway=self._cf[2] or None, timeout=5.0))
-            jev = jev_state[zone] = "ok" if verdict is not None else "unavailable"
-            asked = auto_setpoints.jev_verdict(learn, stamp, verdict, p.p2_shot_size, now.strftime("%H:%M"))
-            for suffix, value in asked.items():
-                self._auto_write(room, zone, suffix, p.p2_shot_size, value, learn, now, by="Jev")
-            log(f"[{room.slug}] Z{zone} Jev P2: {learn['jev']['last']}")
             self._save_state()
         if writes:
             current = {
@@ -1884,11 +1847,11 @@ class Controller:
         who["p3_emergency_vwc_threshold"] += (", only to keep it 3 points under the re-water threshold; "
                                               "moves with field capacity")
         who.update(dict.fromkeys(judged, "Jev's Setpoints judge, one notch a night"))
-        if jev != "disabled":  # the old per-hour judge, which only ever runs without the Setpoints judge
-            who.update(dict.fromkeys(auto_setpoints.JEV_MANAGED, "Jev's hourly P2 check"))
         number = f"number.crop_steering_{room.prefix}zone_{zone}_"
         attrs.update(
-            jev=jev, jev_last=learn["jev"]["last"], jev_changed_today=learn["jev"]["changed"],
+            # the hourly P2 check is retired: its keys stay for one release, for dashboards that read them; its saved
+            # last answer and change are not shown, as nothing clears them at lights-on any more
+            jev="disabled", jev_last=None, jev_changed_today=None,
             working_peak_adjust=learn["peak_adj"],
             updated=now.isoformat(), engine="f2-control", friendly_name=f"Zone {zone} auto setpoints",
             managed=[number + s for s in who], managed_by={number + s: w for s, w in who.items()},
