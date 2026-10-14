@@ -12,7 +12,7 @@ import { createDemo } from "./demo";
 import { StockDemo } from "./stock-demo";
 
 const draft = (change: Partial<StockTankDraft> = {}): StockTankDraft => ({
-  name: "Bloom",
+  name: "Part B",
   capacity_l: 50,
   level_l: 50,
   dose_ml: 1800,
@@ -42,8 +42,8 @@ describe("stock helpers", () => {
     expect(draftErrors([draft({ name: " " })])).toContain(
       "Each tank needs a name of 1 to 40 characters.",
     );
-    expect(draftErrors([draft(), draft({ name: "bloom" })])).toContain(
-      "Two tanks are called bloom.",
+    expect(draftErrors([draft(), draft({ name: "part b" })])).toContain(
+      "Two tanks are called part b.",
     );
     expect(draftErrors([draft({ level_l: 60 })]).join()).toMatch(/level must be between/);
     expect(draftErrors([draft({ dose_entity: "switch.pump" })]).join()).toMatch(/dose entity/);
@@ -83,14 +83,14 @@ describe("demo stock services", () => {
   it("starts with a tank per dosing pump, named after its nutrient, and refuses a stale revision", () => {
     const stock = demo();
     const doc = stock.call("stock_get", { room_id: room });
-    expect(doc.tanks.map((t) => t.name)).toEqual(["Balance", "Bloom", "Core", "Cleanse"]);
-    expect(stock.call("stock_get", { room_id: "room:f1_" }).tanks.map((t) => t.id)).toEqual([
-      "grow",
-      "cleanse",
-      "balance",
-      "fade",
-      "core",
-      "bloom",
+    expect(doc.tanks.map((t) => t.name)).toEqual(["Silica", "Part B", "Part A", "Line cleaner"]);
+    expect(stock.call("stock_get", { room_id: "room:room_b_" }).tanks.map((t) => t.id)).toEqual([
+      "veg_base",
+      "cleaner",
+      "silica",
+      "finisher",
+      "part_a",
+      "part_b",
     ]);
     expect(() =>
       stock.call("stock_refill", { room_id: room, expected_revision: 99, id: doc.tanks[0].id }),
@@ -106,30 +106,30 @@ describe("demo stock services", () => {
     const draw = (key: string, draws: Record<string, unknown>, source = "dose") =>
       stock.call("stock_draw", { room_id: room, key, draws, source });
     const before = stock.call("stock_get", { room_id: room });
-    // The draws the demo's dosing history made before it began: Balance's hand dose the newest.
-    expect(before.history[0]).toMatchObject({ source: "dose", draw_ml: { balance: 25 } });
+    // The draws the demo's dosing history made before it began: Silica's hand dose the newest.
+    expect(before.history[0]).toMatchObject({ source: "dose", draw_ml: { silica: 25 } });
     expect(before.history.filter((entry) => entry.source === "batch")).toHaveLength(8);
     // No revision needed: the key makes a repeat harmless, and an unknown tank is skipped.
-    let doc = draw("r1", { bloom: 60, nope: 5 });
+    let doc = draw("r1", { part_b: 60, nope: 5 });
     expect(doc.revision).toBe(before.revision + 1);
-    expect(doc.tanks.find((t) => t.id === "bloom")!.level_l).toBe(5.34);
-    expect(doc.history[0]).toMatchObject({ source: "dose", key: "r1", draw_ml: { bloom: 60 } });
-    expect(draw("r1", { bloom: 60 }).revision).toBe(doc.revision);
+    expect(doc.tanks.find((t) => t.id === "part_b")!.level_l).toBe(5.34);
+    expect(doc.history[0]).toMatchObject({ source: "dose", key: "r1", draw_ml: { part_b: 60 } });
+    expect(draw("r1", { part_b: 60 }).revision).toBe(doc.revision);
     expect(stock.call("stock_get", { room_id: room }).tanks[1].level_l).toBe(5.34);
     // A batch's dose; never below empty, and the draw says what was really taken.
-    doc = draw("r2:bloom", { bloom: 9000 }, "batch");
+    doc = draw("r2:part_b", { part_b: 9000 }, "batch");
     expect(doc.tanks[1].level_l).toBe(0);
-    expect(doc.history[0]).toMatchObject({ source: "batch", draw_ml: { bloom: 5340 } });
+    expect(doc.history[0]).toMatchObject({ source: "batch", draw_ml: { part_b: 5340 } });
     // Nothing the room has: nothing counted, so the key stays free.
     expect(draw("r3", { nope: 5 }).revision).toBe(doc.revision);
-    expect(() => draw("r4", { bloom: -1 })).toThrow(/0 or more/);
-    expect(() => draw("r4", { bloom: 1 }, "fill")).toThrow(/dose or batch/);
-    // The integration's stock sensor follows: Bloom empty and low, each tank with its pump.
+    expect(() => draw("r4", { part_b: -1 })).toThrow(/0 or more/);
+    expect(() => draw("r4", { part_b: 1 }, "fill")).toThrow(/dose or batch/);
+    // The integration's stock sensor follows: Part B empty and low, each tank with its pump.
     const sensor = states["sensor.crop_steering_stock_low"];
     expect(sensor.state).toBe("1");
     expect((sensor.attributes.tanks as Record<string, unknown>[])[1]).toMatchObject({
-      id: "bloom",
-      pump: "bloom",
+      id: "part_b",
+      pump: "part_b",
       level_l: 0,
       percent: 0,
       low: true,
@@ -145,19 +145,19 @@ describe("demo stock services", () => {
       expected_revision: doc.revision,
       tanks: [draft({ level_l: 8 }), draft({ name: "Part A!", dose_ml: 400 })],
     });
-    expect(doc.tanks.map((t) => t.id)).toEqual(["bloom", "part_a"]);
-    expect(doc.low).toEqual(["bloom"]);
+    expect(doc.tanks.map((t) => t.id)).toEqual(["part_b", "part_a"]);
+    expect(doc.low).toEqual(["part_b"]);
     doc = stock.call("stock_refill", {
       room_id: room,
       expected_revision: doc.revision,
-      id: "bloom",
+      id: "part_b",
     });
     expect(doc.tanks[0].level_l).toBe(50);
     expect(doc.low).toEqual([]);
     doc = stock.call("stock_refill", {
       room_id: room,
       expected_revision: doc.revision,
-      id: "bloom",
+      id: "part_b",
       level_l: 21.5,
     });
     expect(doc.tanks[0].level_l).toBe(21.5);
@@ -165,7 +165,7 @@ describe("demo stock services", () => {
     expect(doc.tanks.map((t) => t.level_l)).toEqual([19.7, 49.6]);
     expect(doc.history[0]).toMatchObject({
       source: "manual",
-      draw_ml: { bloom: 1800, part_a: 400 },
+      draw_ml: { part_b: 1800, part_a: 400 },
     });
   });
 });

@@ -87,7 +87,7 @@ describe("grow day", () => {
   });
 });
 
-// Flower 2 on 23 September 2026 (UTC; lights-on 10:00 NZST is 22:00Z), as the recorder returned it.
+// Room A on 23 September 2026 (UTC; lights-on 10:00 NZST is 22:00Z), as the recorder returned it.
 const START = at("22:00:00");
 const decisions = [
   decision(START),
@@ -218,7 +218,7 @@ describe("shots", () => {
 });
 
 describe("blocks and holds", () => {
-  // Flower 2 on 22 September 2026: a dosing hold during the ramp, then two zones blocked at their
+  // Room A on 22 September 2026: a dosing hold during the ramp, then two zones blocked at their
   // daily budget until lights-off, and the kill switch off across a restart.
   const day = [
     decision(at("22:00:00", "2026-09-21")),
@@ -561,13 +561,13 @@ describe("what a room's timeline reads", () => {
       "number.crop_steering_lights_on_hour",
     ])
       expect(read.entityIds).toContain(id);
-    expect(read.entityIds.some((id) => id.startsWith("number.crop_steering_f1_"))).toBe(false);
+    expect(read.entityIds.some((id) => id.startsWith("number.crop_steering_room_b_"))).toBe(false);
     expect(read.attributeIds).toEqual(["sensor.crop_steering_current_decision"]);
   });
 });
 
 describe("the demo's day", () => {
-  // Seven hours after Flower 2's demo lights-on, in whatever time zone the test runs.
+  // Seven hours after Room A's demo lights-on, in whatever time zone the test runs.
   const now = new Date(2026, 8, 23, 17, 0).getTime();
   const states = createDemo(now);
   const load = (prefix: string) => {
@@ -625,9 +625,9 @@ describe("the demo's day", () => {
       ["number.crop_steering_irrigation_ec_max", 3.4, 3.5],
     ]);
     expect(Math.abs(changes[1].time - hold.end)).toBeLessThan(60_000);
-    // Flower 1's zone 3, disabled for inspection, is held from then on.
-    const f1 = load("f1_");
-    expect(zoneBlocks(f1.decisions, 3, f1.day.start, now)).toEqual([
+    // Room B's zone 3, disabled for inspection, is held from then on.
+    const roomB = load("room_b_");
+    expect(zoneBlocks(roomB.decisions, 3, roomB.day.start, now)).toEqual([
       expect.objectContaining({ kind: "hold", text: "zone disabled", open: true }),
     ]);
   });

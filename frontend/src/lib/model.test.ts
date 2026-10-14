@@ -70,8 +70,8 @@ describe("room model", () => {
     (roomName) => {
       const states = fixture();
       const attributes = states["sensor.crop_steering_f1_engine_config"].attributes;
-      Object.assign(attributes, { room_name: roomName, friendly_name: "Flower 1 Engine Config" });
-      expect(discoverRooms(states).find((room) => room.id === "room:f1_")?.name).toBe("Flower 1");
+      Object.assign(attributes, { room_name: roomName, friendly_name: "Room B Engine Config" });
+      expect(discoverRooms(states).find((room) => room.id === "room:f1_")?.name).toBe("Room B");
       delete attributes.friendly_name;
       expect(discoverRooms(states).find((room) => room.id === "room:f1_")?.name).toBe("F1");
       expect(discoverRooms(states)[0].name).toBe("Default room");
@@ -421,7 +421,7 @@ describe("verified transport and demo isolation", () => {
     expect(rooms).toHaveLength(2);
     for (const room of rooms) expect(buildRoom(states, room).zones).toHaveLength(3);
     expect(
-      demoHistory(states, ["sensor.crop_steering_f1_vwc_zone_1"], 24)[0].points.length,
+      demoHistory(states, ["sensor.crop_steering_room_b_vwc_zone_1"], 24)[0].points.length,
     ).toBeGreaterThan(10);
     expect(fetch).not.toHaveBeenCalled();
     fetch.mockRestore();

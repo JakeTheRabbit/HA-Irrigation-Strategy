@@ -165,7 +165,7 @@ try {
     const exported = await downloadPlan(
       page.getByRole("button", { name: "Export recipe My saved plan", exact: true }),
     );
-    await page.locator("#desktop-room").selectOption("room:f1_");
+    await page.locator("#desktop-room").selectOption("room:room_b_");
     await page.getByRole("heading", { name: "Schedule", exact: true }).waitFor();
     await openLibrary();
     assert.equal(await library().locator(".recipe-list li").count(), 2);

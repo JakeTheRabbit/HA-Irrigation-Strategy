@@ -34,7 +34,7 @@ export class OperatorDemo {
     private getStates: () => States,
     private updateStates: (states: States) => void,
     whatsNew: string | null = null,
-    /** Whose phone the notifications demo answers as; null: Ben, an administrator. */
+    /** Whose phone the notifications demo answers as; null: the owner, an administrator. */
     private notifyUser: string | null = null,
   ) {
     this.stockDemo = new StockDemo(getStates, updateStates);

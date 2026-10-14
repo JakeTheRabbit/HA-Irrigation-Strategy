@@ -4,7 +4,7 @@ import { DETAIL_HEADINGS, type SettingDetail } from "@/lib/setting-words";
 import "./setting-help.css";
 
 /** The "?" beside an irrigation setting: what it is, when it acts, what it affects and what the
- * Athena Handbook says. Opened by a click or tap, not on hover: it is several paragraphs long,
+ * common practice is. Opened by a click or tap, not on hover: it is several paragraphs long,
  * and a phone has no hover. Escape or a click outside closes it. */
 export function SettingHelp({
   label,

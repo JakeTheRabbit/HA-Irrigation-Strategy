@@ -58,7 +58,7 @@ const put = (entity_id, state, attributes = {}) =>
     last_updated: new Date().toISOString(),
   });
 for (const prefix of ["", "f1_"]) {
-  const name = prefix ? "Flower 1" : "Flower 2",
+  const name = prefix ? "Room B" : "Room A",
     flag = prefix ? "switch.crop_steering_f1_engine_enabled" : "input_boolean.f2_control_enabled";
   put(`sensor.crop_steering_${prefix}engine_config`, "ready", {
     prefix,
@@ -347,7 +347,7 @@ try {
     states["sensor.crop_steering_f1_ec_zone_1"].state = "unavailable";
     await page.getByRole("button", { name: "Refresh controller data" }).click();
     await menu("Today");
-    await visible(page.getByRole("heading", { name: "Flower 1 today", exact: true }));
+    await visible(page.getByRole("heading", { name: "Room B today", exact: true }));
     // The room's line counts the alert; opened, it says which zone and why.
     await page.locator(".today-alerts").click();
     await visible(

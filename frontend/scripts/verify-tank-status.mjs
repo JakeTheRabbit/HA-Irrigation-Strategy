@@ -168,7 +168,7 @@ try {
   );
   await page.mouse.move(0, 0);
   await level.locator(".grow-tip").waitFor({ state: "hidden" });
-  // Every range: one or two refills a day, each to 100 %, as F2's tank is filled.
+  // Every range: one or two refills a day, each to 100 %, as a real batch tank is filled.
   for (const [range, days] of [
     ["3 days", 3],
     ["7 days", 7],
@@ -238,7 +238,7 @@ try {
   );
   assert.equal(await sheet.locator("[data-tank-summary]").count(), 2, "latest, lowest, highest");
   await sheet.screenshot({ path: img("tank-history.png") });
-  // Flower 2 checks its feed water on these probes: its gate is drawn and named as such.
+  // Room A checks its feed water on these probes: its gate is drawn and named as such.
   assert.ok((await chart.locator(".recharts-reference-line").count()) >= 2, "gate lines drawn");
   assert.match(
     await sheet.locator('[data-tank-gate="ec"]').innerText(),
@@ -343,23 +343,25 @@ try {
   );
   await lightContext.close();
 
-  await page.goto(`${origin}/dashboard.html?demo=1&room=room%3Af1_#/equipment/tank`);
+  await page.goto(`${origin}/dashboard.html?demo=1&room=room%3Aroom_b_#/equipment/tank`);
   await page.waitForFunction(
     () => document.querySelector("[data-pump-state]")?.getAttribute("data-pump-state") === "off",
   );
-  // Flower 1's card and level chart are its own tank's: another level, where its chart ends.
-  const f1Level = Number(await page.locator("[data-tank-level]").getAttribute("data-tank-level"));
-  assert.notEqual(f1Level, cardLevel, "Flower 1 reads its own tank");
-  const f1Day = (
+  // Room B's card and level chart are its own tank's: another level, where its chart ends.
+  const roomBLevel = Number(
+    await page.locator("[data-tank-level]").getAttribute("data-tank-level"),
+  );
+  assert.notEqual(roomBLevel, cardLevel, "Room B reads its own tank");
+  const roomBDay = (
     await (await levelChart(page)).locator(".tank-level-svg").getAttribute("aria-label")
   ).match(
     /^Tank level over the last 24 h: latest ([\d.]+)%, .*, highest 100%\..* recorded fills?\.$/,
   );
-  assert.equal(Number(f1Day?.[1]), f1Level, "Flower 1's chart ends where its card reads");
-  // Flower 1 maps no feed-water probe: no gate is drawn, and the panel says its limits hold nothing.
+  assert.equal(Number(roomBDay?.[1]), roomBLevel, "Room B's chart ends where its card reads");
+  // Room B maps no feed-water probe: no gate is drawn, and the panel says its limits hold nothing.
   await page.setViewportSize({ width: 1440, height: 1000 });
   sheet = await openHistory(page);
-  assert.equal(await sheet.locator(".recharts-reference-line").count(), 0, "no gate in Flower 1");
+  assert.equal(await sheet.locator(".recharts-reference-line").count(), 0, "no gate in Room B");
   assert.match(
     await sheet.locator('[data-tank-gate="ec"]').innerText(),
     /Off: no feed-water EC probe is mapped, so 2\.3–3\.5 mS\/cm is not applied\./,

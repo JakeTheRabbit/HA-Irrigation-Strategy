@@ -2,6 +2,7 @@ import { ageText } from "./controller-health";
 import { descriptor } from "./model";
 import { smoothRecorded, type RecordedPoint } from "./planning-curve";
 import type { RoomView, States } from "./types";
+import { growerWords } from "./words";
 
 /** One recorded state of an entity: epoch ms, and attributes only where they were asked for. */
 export interface TimelineRow {
@@ -215,7 +216,7 @@ export function valveShots(
   for (const shot of shots) {
     const row = decisions.find((item) => item.time >= shot.end);
     const fired = row && row.time - shot.end <= 60 * 60_000 && entry(row, "fired", zoneId);
-    if (fired) Object.assign(shot, { phase: fired.phase, reason: fired.text });
+    if (fired) Object.assign(shot, { phase: fired.phase, reason: growerWords(fired.text) });
   }
   return shots;
 }

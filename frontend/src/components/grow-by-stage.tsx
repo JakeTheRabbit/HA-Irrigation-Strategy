@@ -82,10 +82,7 @@ export function GrowByStage({ controller }: { controller: Controller }) {
                   </td>
                   <td data-steering={item.steering}>{capital(item.steering)}</td>
                   <td>{rangeText(item.poreEc)} mS/cm</td>
-                  <td>
-                    {rangeText(item.athena, 0)} % of peak
-                    <small>{rangeText(item.drybackPoints, 0)} points of true water content</small>
-                  </td>
+                  <td>{rangeText(item.drybackPoints, 0)} points of true water content</td>
                   <td>{rangeText(item.runoff, 0)} % of the feed</td>
                 </tr>
               );
@@ -94,9 +91,9 @@ export function GrowByStage({ controller }: { controller: Controller }) {
         </table>
       </div>
       <p className="small muted grow-stages-note">
-        Day 1 is the first day of 12/12. Stages, pore EC and runoff are the guide Jev steers by; the
-        dryback is Athena’s, relative to the day’s peak, the way the P3 dryback target is set. The
-        grow plan below sets each zone’s targets day by day.
+        Day 1 is the first day of 12/12. Stages, pore EC, dryback and runoff are the guide Jev
+        steers by. The dryback is the overnight fall in points; each zone’s day shows it as a share
+        of its own peak. The grow plan below sets each zone’s targets day by day.
       </p>
     </section>
   );

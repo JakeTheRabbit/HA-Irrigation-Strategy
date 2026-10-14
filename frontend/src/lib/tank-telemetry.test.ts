@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDemo } from "./demo";
 import { tankTelemetry } from "./tank-telemetry";
-const room = { id: "room:", name: "Flower 2", prefix: "" };
+const room = { id: "room:", name: "Room A", prefix: "" };
 const now = Date.parse("2026-09-08T08:00:00Z");
 describe("room tank telemetry", () => {
   it("finds renamed HA descriptors by room prefix", () => {
@@ -30,12 +30,12 @@ describe("room tank telemetry", () => {
     const states = createDemo(now);
     // Two rooms' tanks at two levels: each room reads its own.
     states["sensor.demo_tank_level"].state = "42";
-    states["sensor.demo_f1_tank_level"].state = "72";
+    states["sensor.demo_room_b_tank_level"].state = "72";
     const tank = tankTelemetry(states, room, now);
     expect(tank.level.value).toBe(42);
     expect(tank.pump.on).toBe(true);
     expect(tank.lastFill.timestamp).toBe("2026-09-08T06:00:00.000Z");
-    expect(tankTelemetry(states, { ...room, prefix: "f1_" }, now).level.value).toBe(72);
+    expect(tankTelemetry(states, { ...room, prefix: "room_b_" }, now).level.value).toBe(72);
   });
   it("does not guess feed, ambient temperature or other-room mappings", () => {
     const states = createDemo(now);

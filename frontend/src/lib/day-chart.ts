@@ -1,7 +1,6 @@
 import type { PhaseBand, Reading } from "./day-timeline";
 
-/** Pure helpers for the grow-day chart, drawn in the language of Athena's irrigation phase reference
- * chart: a light band on top, phase columns with P0-P3 badges, field capacity with the steering's runoff
+/** Pure helpers for the grow-day chart, drawn as a phase reference chart: a light band on top, phase columns with P0-P3 badges, field capacity with the steering's runoff
  * zone, water content as one line with its shots on it, and pore EC as a second line in the steering's
  * colour. */
 
@@ -21,16 +20,15 @@ export function steeringOf(
   return null;
 }
 
-/** Athena's relative overnight dryback for the stage the controller names, % of the peak (Athena Pro
- * handbook, Irrigation Strategy Targets): stretch 40-50, bulk 30-40, finish 40-50, veg 25 after the
- * first. Null for a stage it does not name. */
-export function athenaDryback(stage: string | null | undefined): [number, number] | null {
-  const name = (stage ?? "").toLowerCase();
-  if (/setting|stretch/.test(name)) return [40, 50];
-  if (/bulk/.test(name)) return [30, 40];
-  if (/finish|ripen/.test(name)) return [40, 50];
-  if (/veg/.test(name)) return [25, 25];
-  return null;
+/** The reference overnight dryback for today's stage, as a share of this zone's own evening peak (%
+ * of peak): the stage arc's band in points of true water content over the peak, so a 10-15 point
+ * band from a 60 % peak reads 17-25 %. Null without the band or a usable peak. */
+export function referenceDryback(
+  points: readonly [number, number] | null | undefined,
+  peak: number | null | undefined,
+): [number, number] | null {
+  if (!points || typeof peak !== "number" || !Number.isFinite(peak) || peak <= 0) return null;
+  return [(points[0] / peak) * 100, (points[1] / peak) * 100];
 }
 
 /** "3.5–6", "25". */
@@ -151,8 +149,8 @@ export function dayScales(input: {
 /** Points of VWC the runoff zone spans beside field capacity. */
 export const RUNOFF_POINTS = 3;
 /** The runoff zone drawn with field capacity, as a thin band: just above it while steering
- * vegetative (a shot past field capacity runs off), just under it while generative (Athena's
- * generative runoff starts a little below). */
+ * vegetative (a shot past field capacity runs off), just under it while generative (generative
+ * runoff starts a little below). */
 export function runoffBand(fc: number, steering: Steering): [number, number] {
   return steering === "vegetative" ? [fc, fc + RUNOFF_POINTS] : [fc - RUNOFF_POINTS, fc];
 }
@@ -215,14 +213,14 @@ export interface Dryback {
   peak: number;
   /** The lowest reading since lights-off. */
   low: number;
-  /** (peak − low) / peak × 100, the relative dryback Athena's targets use. */
+  /** (peak − low) / peak × 100: the relative dryback, the way the P3 dryback target is set. */
   percent: number;
   /** In points of the probe. */
   drop: number;
   /** The night is over: lights came back on. */
   complete: boolean;
 }
-/** How far a zone dried back overnight, relative to its evening peak, as Athena measures P3: from the
+/** How far a zone dried back overnight, relative to its evening peak, the way P3 is measured: from the
  * highest reading in the `window` before lights-off to the lowest reading after it, up to `now` (so far)
  * or the next lights-on (`end`). Null without readings on both sides of lights-off. */
 export function overnightDryback(

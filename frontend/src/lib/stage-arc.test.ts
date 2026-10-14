@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { NOMINAL_FLOWER_DAYS, stageArc, stageNow, weekOf } from "./stage-arc";
 
 describe("the stage arc", () => {
-  it("is the owner's slab-guide arc on a 56-day flower, with Athena's dryback beside it", () => {
+  it("is the owner's slab-guide arc on a 56-day flower, with its dryback in points", () => {
     expect(
       stageArc().map((stage) => [
         stage.name,
@@ -10,15 +10,14 @@ describe("the stage arc", () => {
         stage.last,
         stage.steering,
         stage.poreEc,
-        stage.athena,
+        stage.drybackPoints,
         stage.runoff,
       ]),
     ).toEqual([
-      ["flower setting", 1, 21, "generative", [5, 10], [40, 50], [1, 7]],
-      ["flower bulk", 22, 42, "vegetative", [3.5, 6], [30, 40], [8, 16]],
-      ["finish", 43, 56, "ripening", [3, 4], [40, 50], [1, 7]],
+      ["flower setting", 1, 21, "generative", [5, 10], [15, 25], [1, 7]],
+      ["flower bulk", 22, 42, "vegetative", [3.5, 6], [10, 15], [8, 16]],
+      ["finish", 43, 56, "ripening", [3, 4], [20, 25], [1, 7]],
     ]);
-    expect(stageArc()[1].drybackPoints).toEqual([10, 15]);
   });
   it("keeps a longer cultivar in the bulk until its last two weeks, as the controller does", () => {
     const long = stageArc(70);

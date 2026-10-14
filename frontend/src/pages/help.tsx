@@ -50,7 +50,7 @@ const glossary = [
   ],
   [
     "Runoff",
-    "The water that drains out of the slab, as a share of the water fed: it carries salt out. Athena gives 8–16% steering vegetative and 1–7% generative.",
+    "The water that drains out of the slab, as a share of the water fed: it carries salt out. More runoff steers vegetative and less generative; Plan › Schedule lists each stage’s range.",
   ],
 ];
 

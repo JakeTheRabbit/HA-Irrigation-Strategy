@@ -74,7 +74,7 @@ describe("isolated example recipes", () => {
       new Set(seeded.recipes[1].plan.zones[0].schedule.map((block) => block.bias)).size,
     ).toBeGreaterThan(1);
     expect(readLibrary(storage, { ...scope, demo: false }).recipes).toEqual([]);
-    expect(readLibrary(storage, { ...scope, roomId: "room:f1_" }).recipes).toEqual([]);
+    expect(readLibrary(storage, { ...scope, roomId: "room:room_b_" }).recipes).toEqual([]);
     const again = initializeDemoLibrary(storage, scope, {} as GrowPlan, now);
     expect(again.raw).toBe(seeded.raw);
     expect(storage.writes).toBe(1);
@@ -149,15 +149,22 @@ describe("the demo keeps the clock", () => {
     expect(night["sensor.crop_steering_current_decision"].attributes.fired).toEqual([]);
     expect(night["switch.demo_valve_1"].state).toBe("off");
     expect(night["sensor.crop_steering_zone_1_waiting_for_app"].state).toBe("P3");
-    // Flower 1's lights run 8-20, so at 21:00 it is night there and still evening in Flower 2.
+    // Room B's lights run 8-20, so at 21:00 it is night there and still evening in Room A.
     const evening = demoClock(createDemo(at(21)), at(21));
-    expect(evening["sensor.crop_steering_f1_zone_1_phase"].state).toBe("P3");
+    expect(evening["sensor.crop_steering_room_b_zone_1_phase"].state).toBe("P3");
     expect(phases(evening)).toEqual(["P1", "P2", "P2"]);
     const day = demoClock(night, at(16));
     expect(phases(day)).toEqual(["P1", "P2", "P2"]);
     expect(day["sensor.crop_steering_current_decision"].attributes.fired).toEqual([
-      "Z1 P1 ramp shot 3/6 (demo)",
+      "Z1 P1 ramp shot 6/6 (demo)",
     ]);
+  });
+  it("names the ramp shot the clock has reached, not a fixed one", () => {
+    const fired = (hour: number) =>
+      createDemo(at(hour))["sensor.crop_steering_current_decision"].attributes.fired;
+    expect(fired(11)).toEqual(["Z1 P1 ramp shot 1/6 (demo)"]);
+    expect(fired(13)).toEqual(["Z1 P1 ramp shot 4/6 (demo)"]);
+    expect(fired(16)).toEqual(["Z1 P1 ramp shot 6/6 (demo)"]);
   });
   it("ends the night's activity records with the day's watering, and each zone's move to P3", () => {
     type Event = { timestamp: string; message: string; type: string };
@@ -194,7 +201,7 @@ describe("the demo keeps the clock", () => {
 });
 
 describe("the demo's batch tank", () => {
-  // Four in the afternoon, in whatever time zone the test runs: Flower 2's lights came on at 10.
+  // Four in the afternoon, in whatever time zone the test runs: Room A's lights came on at 10.
   const at = new Date(2026, 8, 28, 16, 0).getTime();
   const HOUR = 3_600_000;
   const states = createDemo(at);
@@ -227,10 +234,10 @@ describe("the demo's batch tank", () => {
     }
     // The two rooms' tanks are two tanks.
     expect(states["sensor.demo_tank_level"].state).not.toBe(
-      states["sensor.demo_f1_tank_level"].state,
+      states["sensor.demo_room_b_tank_level"].state,
     );
   });
-  it("is filled to 100 % once or twice a day, as F2's is, after running down to 25 % or less", () => {
+  it("is filled to 100 % once or twice a day, as a real batch tank is, after running down to 25 % or less", () => {
     const { record } = load(168);
     expect(record.fills.length).toBeGreaterThanOrEqual(7);
     expect(record.fills.length).toBeLessThanOrEqual(14);
@@ -275,7 +282,7 @@ describe("synthetic current and previous run examples", () => {
         ),
       ).toBe(true);
       expect(new Set(document.runs.map((run) => run.room_id))).toEqual(new Set([document.room_id]));
-      const prefix = document.room_id === "room:" ? "" : "f1_";
+      const prefix = document.room_id === "room:" ? "" : "room_b_";
       expect(current.zones[0].vwc_sensor).toBe(`sensor.crop_steering_${prefix}vwc_zone_1`);
       expect(current.lights.on).toBe(prefix ? 8 : 10);
       demo.call("runs_archive", {
@@ -346,7 +353,7 @@ describe("synthetic current and previous run examples", () => {
     },
   );
   it("uses distinct synthetic readings for the two rooms and demonstrates explicit gaps", async () => {
-    const ids = ["sensor.crop_steering_vwc_zone_1", "sensor.crop_steering_f1_vwc_zone_1"];
+    const ids = ["sensor.crop_steering_vwc_zone_1", "sensor.crop_steering_room_b_vwc_zone_1"];
     const history = await demoHistoryWindow({
       entityIds: ids,
       start: new Date(now - 30 * 86400_000).toISOString(),

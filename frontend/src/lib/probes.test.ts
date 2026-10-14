@@ -81,12 +81,12 @@ describe("a zone's probes", () => {
   it("stands the combined sensor in for its probes on an older integration", () => {
     const f1 = buildRoom(
       states,
-      discoverRooms(states).find((item) => item.prefix === "f1_")!,
+      discoverRooms(states).find((item) => item.prefix === "room_b_")!,
     );
     const probes = zoneProbes(f1.zones[0], states, now);
     expect(probes.map((probe) => [probe.id, probe.used, probe.health])).toEqual([
-      ["sensor.crop_steering_f1_vwc_zone_1", null, "ok"],
-      ["sensor.crop_steering_f1_ec_zone_1", null, "ok"],
+      ["sensor.crop_steering_room_b_vwc_zone_1", null, "ok"],
+      ["sensor.crop_steering_room_b_ec_zone_1", null, "ok"],
     ]);
   });
   it("names every probe of the room once, for the page to watch and draw", () => {

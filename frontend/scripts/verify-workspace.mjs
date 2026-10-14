@@ -186,7 +186,7 @@ async function liveSetup(run) {
       prefix: "f1_",
       slug: "f1",
       num_zones: 1,
-      friendly_name: "Flower 1 engine config",
+      friendly_name: "Room B engine config",
       enable_flag: "switch.crop_steering_f1_engine_enabled",
     }),
     entity("switch.crop_steering_f1_engine_enabled", "off"),
@@ -194,7 +194,7 @@ async function liveSetup(run) {
   const room = {
     entry_id: "sizing-fixture-entry",
     revision: 1,
-    room_name: "Flower 1",
+    room_name: "Room B",
     prefix: "f1_",
     slug: "f1",
     active: true,
@@ -427,7 +427,7 @@ try {
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(new URL(page.url()).hash, "#/plan/schedule");
-      await page.locator("#desktop-room").selectOption({ label: "Flower 1" });
+      await page.locator("#desktop-room").selectOption({ label: "Room B" });
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(await page.locator("#desktop-room").inputValue(), "room:");
@@ -461,7 +461,7 @@ try {
     await openPlanner("Steering balance");
     await page.getByRole("button", { name: "Review & save", exact: true }).click();
     await visible(page.getByRole("heading", { name: "Review grow plan", exact: true }));
-    assert.match(await page.getByRole("dialog").innerText(), /Flower 2 only/);
+    assert.match(await page.getByRole("dialog").innerText(), /Room A only/);
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
     assert.equal(
@@ -489,11 +489,11 @@ try {
       await fresh("setup");
       await visible(page.locator("#room-name"));
       await page.locator("#room-name").fill("Must be discarded");
-      await page.locator("#desktop-room").selectOption({ label: "Flower 1" });
+      await page.locator("#desktop-room").selectOption({ label: "Room B" });
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Discard and continue" }).click();
-      assert.equal(await page.locator("#room-name").inputValue(), "Flower 1");
-      assert.equal(await page.locator("#setup-room option:checked").innerText(), "Flower 1");
+      assert.equal(await page.locator("#room-name").inputValue(), "Room B");
+      assert.equal(await page.locator("#setup-room option:checked").innerText(), "Room B");
     },
   );
   await check(
@@ -539,7 +539,7 @@ try {
       await page.getByRole("button", { name: "Restore zone", exact: true }).click();
       await saveSetup();
       assert.equal(await page.locator("#zone-4-plant_count").inputValue(), "12");
-      await page.locator("#setup-room").selectOption({ label: "Flower 1" });
+      await page.locator("#setup-room").selectOption({ label: "Room B" });
       assert.equal(
         await page.getByRole("textbox", { name: "Zone 4 name", exact: true }).count(),
         0,
@@ -883,7 +883,7 @@ try {
           prefix,
           slug: prefix ? "f1" : "",
           num_zones: 1,
-          friendly_name: prefix ? "Flower 1 engine config" : "Flower 2 engine config",
+          friendly_name: prefix ? "Room B engine config" : "Room A engine config",
           enable_flag: flag,
         });
         put(flag, "off");
@@ -947,7 +947,7 @@ try {
       const setupRoom = {
         entry_id: "fixture-f1-entry",
         revision: 1,
-        room_name: "Flower 1",
+        room_name: "Room B",
         prefix: "f1_",
         slug: "f1",
         active: true,
@@ -1230,11 +1230,11 @@ try {
         await lp.screenshot({ path: out + "workspace-stale-plan.png", fullPage: true });
         await navigateTo("Equipment", "Setup", lp);
         await visible(lp.locator("#room-name"));
-        await lp.locator("#room-name").fill("Flower 1 verified");
+        await lp.locator("#room-name").fill("Room B verified");
         await lp.getByRole("button", { name: "Review configuration", exact: true }).click();
         await lp.getByRole("button", { name: "Save configuration", exact: true }).click();
         await lp.getByRole("dialog").waitFor({ state: "hidden" });
-        assert.equal(await lp.locator("#room-name").inputValue(), "Flower 1 verified");
+        assert.equal(await lp.locator("#room-name").inputValue(), "Room B verified");
         assert.equal(setupRoom.revision, 2);
         assert.equal(
           apiCalls.find((c) => c.action === "setup_save").data.entry_id,

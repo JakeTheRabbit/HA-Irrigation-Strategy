@@ -15,6 +15,7 @@ import type {
 import { parseAutoSetpoints } from "./auto-setpoints";
 import { readWaiting } from "./waiting-for";
 import { PHASE_GROUPS, settingWords } from "./setting-words";
+import { growerWords } from "./words";
 import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
 
 const ROOT = "crop_steering_";
@@ -292,7 +293,7 @@ function group(key: string) {
   if (/^p0_/.test(key)) return PHASE_GROUPS[0];
   if (/^p1_/.test(key)) return PHASE_GROUPS[1];
   if (/^p2_/.test(key)) return PHASE_GROUPS[2];
-  // The dryback targets are where Athena puts them: what the substrate dries by overnight.
+  // The dryback targets are P3's: what the substrate dries back by overnight.
   if (/^p3_|dryback/.test(key)) return PHASE_GROUPS[3];
   if (/^ec_target/.test(key)) return "EC targets";
   if (key === "field_capacity") return "Substrate";
@@ -352,6 +353,7 @@ export function eventsForRoom(states: States, room: Room): LogEvent[] {
       )
       .map((e) => ({
         ...e,
+        message: growerWords(e.message),
         type: ["water", "phase", "warning", "info"].includes(e.type) ? e.type : "info",
       }));
   if (typeof log.attributes.feed !== "string") return [];
@@ -373,7 +375,7 @@ export function eventsForRoom(states: States, room: Room): LogEvent[] {
       {
         id: `${log.entity_id}:${i}:${line}`,
         timestamp: match[1],
-        message,
+        message: growerWords(message),
         type: /block|fault|hold|unavailable/i.test(message)
           ? "warning"
           : /P[0-3].*(?:→|->)/.test(message)
