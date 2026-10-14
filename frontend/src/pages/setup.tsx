@@ -457,7 +457,7 @@ export function Setup({
             </p>
             <Button asChild variant="outline">
               <a
-                href="https://my.home-assistant.io/redirect/supervisor_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FJakeTheRabbit%2FHA-Irrigation-Strategy"
+                href="https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FJakeTheRabbit%2FHA-Irrigation-Strategy"
                 target="_blank"
                 rel="noreferrer"
               >

@@ -76,7 +76,7 @@ export function WhatsNewDialog({
           {newest && (
             <a
               className="whats-new-notes"
-              href={releaseUrl(newest.version)}
+              href={releaseUrl(newest)}
               target="_blank"
               rel="noopener noreferrer"
             >

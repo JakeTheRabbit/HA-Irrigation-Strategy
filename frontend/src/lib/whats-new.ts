@@ -27,8 +27,14 @@ export interface WhatsNewSelection {
 export const WINDOW_DAYS = 30;
 /** The most releases the window shows at once. */
 export const MOST = 5;
-export const RELEASES_URL = "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/releases";
-export const releaseUrl = (version: string) => `${RELEASES_URL}/tag/v${version}`;
+export const REPOSITORY_URL = "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy";
+export const RELEASES_URL = `${REPOSITORY_URL}/releases`;
+/** 3.0.0 to 3.11.1 were released before this repository carried the 3.x line, so they have no
+ * release page here: their notes are the changelog's section, `## [x.y.z] - YYYY-MM-DD`. */
+export const releaseUrl = ({ version, date }: Pick<WhatsNewRelease, "version" | "date">) =>
+  compareVersions(version, "3.0.0") >= 0 && compareVersions(version, "3.11.1") <= 0
+    ? `${REPOSITORY_URL}/blob/main/CHANGELOG.md#${version.replaceAll(".", "")}---${date}`
+    : `${RELEASES_URL}/tag/v${version}`;
 
 const VERSION = /^\d+\.\d+\.\d+$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
