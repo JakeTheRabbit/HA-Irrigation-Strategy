@@ -38,6 +38,7 @@ from .const import (
     SOFTWARE_VERSION,
     PROBE_RANGE,
     PROBE_STALE_SECONDS,
+    SUBSTRATES,
 )
 from .room import room_prefix, build_engine_config
 from . import stock
@@ -260,6 +261,29 @@ class CropSteeringEngineConfigSensor(SensorEntity):
         self._attr_object_id = f"{DOMAIN}_{self._prefix}engine_config"
         # Home Assistant ignores _attr_object_id; the controller finds a room by THIS id.
         self.entity_id = f"sensor.{self._attr_object_id}"
+        self._substrate_select = f"select.{DOMAIN}_{self._prefix}substrate"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # Republish when the room's substrate is chosen, so the controller is told.
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass, [self._substrate_select], self._substrate_changed
+            )
+        )
+
+    @callback
+    def _substrate_changed(self, _event) -> None:
+        self.async_write_ha_state()
+
+    def _substrate(self) -> str:
+        hass = getattr(self, "hass", None)
+        state = hass.states.get(self._substrate_select) if hass else None
+        return (
+            state.state
+            if state is not None and state.state in SUBSTRATES
+            else "generic"
+        )
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -286,6 +310,7 @@ class CropSteeringEngineConfigSensor(SensorEntity):
             {**self._entry.data, **self._entry.options},
             integration_version=SOFTWARE_VERSION,
             entry_id=self._entry.entry_id,
+            substrate=self._substrate(),
         )
 
 

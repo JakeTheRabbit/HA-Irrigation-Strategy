@@ -21,6 +21,7 @@ from .const import (
     RECIPE_PARAMS,
     SOFTWARE_VERSION,
     SET_PHASE_OPTIONS,
+    SUBSTRATES,
     WATER_TODAY_VIEWS,
 )
 from .room import restored_state_is_ours, room_prefix, zone_device_name
@@ -61,6 +62,14 @@ SELECT_DESCRIPTIONS = [
         name="Water Today Shown As",
         icon="mdi:water-outline",
         options=WATER_TODAY_VIEWS,
+    ),
+    # What the room grows in. The engine_config descriptor publishes it for the controller;
+    # generic until someone chooses.
+    SelectEntityDescription(
+        key="substrate",
+        name="Substrate",
+        icon="mdi:sprout",
+        options=SUBSTRATES,
     ),
 ]
 
