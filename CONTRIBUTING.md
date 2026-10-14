@@ -10,7 +10,7 @@ A change is one thing a reviewer can hold in their head: one feature, one fix, o
 
 This is not tidiness. Large mixed changes are how problems get in:
 
-- **They cannot be reviewed.** Nobody reads four thousand changed lines. They skim, and approve what they did not read. 2.18.0 arrived as five commits in forty-five minutes touching the setup wizard, the controller's shot sequence, twenty dashboard source files and a new cloud feature; four defects went through with it ([docs/audits/2026-09-21-first-run-review.md](docs/audits/2026-09-21-first-run-review.md)).
+- **They cannot be reviewed.** Nobody reads four thousand changed lines. They skim, and approve what they did not read. 2.18.0 arrived as five commits in forty-five minutes touching the setup wizard, the controller's shot sequence, twenty dashboard source files and a new cloud feature; four defects went through with it ([docs/dev/audits/2026-09-21-first-run-review.md](docs/dev/audits/2026-09-21-first-run-review.md)).
 - **They cannot be tested alone.** When a staging room misbehaves after an update carrying six changes, the first day goes on finding out which one did it.
 - **They cannot be taken back alone.** Reverting one bad feature out of a mixed commit means rewriting it by hand, in a hurry, on the code that drives the pump.
 - **Things hide in them.** A mistake, a debugging leftover, or something deliberately malicious is far easier to slip past a reviewer inside a big change than in a small one. This matters more here than in most projects: boxes build the controller straight from this repository.

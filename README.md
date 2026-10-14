@@ -1,4 +1,4 @@
-# Crop Steering, Jev edition
+# Crop Steering
 
 ![Release](https://img.shields.io/badge/Release-3.11.1-blue)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.10+-41BDF5)
@@ -7,11 +7,11 @@
 
 **Automatic watering for a grow room, run by Home Assistant, with an AI second opinion on every judgement call.**
 
-![Today in the Crop Steering sidebar: the room's status, a card for each zone, and what Jev changed today](https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/jev-today.png)
+![Today in the Crop Steering sidebar: the room's status, a card for each zone, and what Jev changed today](img/jev-today.png)
 
-This is the Jev edition of [Crop Steering for Home Assistant](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy). The controller measures how wet and how salty each group of plants is, decides when they need water and how much, and switches your pump and valves to deliver it. That part is the original, unchanged. This edition adds **Jev**, an AI model the controller asks whenever a decision needs a grower's judgement rather than a fixed number, and a dashboard that shows every answer Jev gave, what the controller did with it, and whether it worked.
+Crop Steering runs a grow room's watering from Home Assistant. The controller measures how wet and how salty each group of plants is, decides when they need water and how much, and switches your pump and valves to deliver it. That part is the rules engine. Beside it sits **Jev**, an optional AI model the controller asks whenever a decision needs a grower's judgement rather than a fixed number, and a dashboard that shows every answer Jev gave, what the controller did with it, and whether it worked.
 
-[New to crop steering?](#new-to-crop-steering-start-here) · [What Jev does](#what-jev-does) · [What Jev can never do](#what-jev-can-never-do) · [The dashboard](#the-dashboard-page-by-page) · [Install](#install) · [Turning Jev off](#turning-jev-off-or-taking-a-setting-back) · [Cost](#what-it-costs) · [The full Jev design](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/JEV.md)
+[New to crop steering?](#new-to-crop-steering-start-here) · [What Jev does](#what-jev-does) · [What Jev can never do](#what-jev-can-never-do) · [The dashboard](#the-dashboard-page-by-page) · [Install](#install) · [Turning Jev off](#turning-jev-off-or-taking-a-setting-back) · [Cost](#what-it-costs) · [The full Jev design](docs/JEV.md)
 
 > **Safety first.** This software switches real pumps and valves, unattended, on living plants. Set up each room with watering switched off, check every probe and switch it uses, and do a catch test (measure what actually comes out of the drippers) before you let it water. It does not replace physical safety devices: use valves that close when power is lost, and a float switch or timer that can stop a pump on its own.
 
@@ -49,7 +49,7 @@ Across a flower run the targets also change by **stage**. Jev follows this arc, 
 ## How it works
 
 1. Every minute the controller reads each zone's probes.
-2. By your targets, it works out where each zone is in its day and whether a shot is due. This is the original engine: fixed rules that are right most of the time.
+2. By your targets, it works out where each zone is in its day and whether a shot is due. This is the rules engine: fixed rules that are right most of the time.
 3. When a decision needs judgement ("is the block full yet?", "is this probe stuck?"), it sends Jev a question in the background, with the evidence already worked out as plain facts ("rose 3.1 points after the 10:40 shot and held"). It never waits for the answer.
 4. When the answer arrives, code checks it against hard limits, called **the envelope**. If the envelope allows it, the controller acts on it. If not, nothing changes and the reason is logged.
 5. Later, code measures whether the action worked, shows you a tick or a cross, and shows Jev its own track record the next time it is asked.
@@ -88,7 +88,7 @@ Code keeps everything physical. An answer from Jev is only a request, and the en
 - It never ends the day's watering early for a zone steered vegetative.
 - The only numbers it can change are each zone's P2 shot size and re-water point: one small step a night, inside a range around your own value, and only after you switch **Auto setpoints** on.
 - It never sets a probe aside on its word alone: that also takes two agreeing answers in a row and evidence code can confirm, and it lapses when Jev stops saying so.
-- If Jev is off, slow, out of its daily budget or unsure, the controller runs exactly as the original. Nothing ever waits for it.
+- If Jev is off, slow, out of its daily budget or unsure, the controller runs exactly as the rules engine alone. Nothing ever waits for it.
 
 ## The dashboard, page by page
 
@@ -104,13 +104,13 @@ Today (the screenshot at the top of this page) answers one question on one scree
 
 On a phone, Today takes about two screens. The first:
 
-<img src="https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/jev-today-phone.png" width="300" alt="Today on a phone: the room's line and the zone cards">
+<img src="img/jev-today-phone.png" width="300" alt="Today on a phone: the room's line and the zone cards">
 
 ### A zone's page: what happened today, and why
 
 Tap a zone's card to open its page. Its chart draws the day the way Athena's Grow Guide draws an irrigation day:
 
-![A zone's day chart: moisture, pore EC, every shot and Jev's decisions, from lights-on to the next lights-on](https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/jev-zone-day.png)
+![A zone's day chart: moisture, pore EC, every shot and Jev's decisions, from lights-on to the next lights-on](img/jev-zone-day.png)
 
 - **The bar along the top**: lights on (yellow) and lights off (dark).
 - **The diamonds under it**: Jev's decisions. Filled means the controller acted on it; an outline means advice only, no action, or refused.
@@ -124,7 +124,7 @@ Tap a zone's card to open its page. Its chart draws the day the way Athena's Gro
 
 Next to the chart, **Jev on this zone** says what Jev may change on this zone and within what range, and lists its latest decisions here:
 
-<img src="https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/jev-zone-panel.png" width="560" alt="Jev on this zone: the range Jev may use and its latest decisions">
+<img src="img/jev-zone-panel.png" width="560" alt="Jev on this zone: the range Jev may use and its latest decisions">
 
 Each row reads: the time, the question (*Ramp hand-over*), Jev's answer and how sure it was (*slab full, 81%*), and what that asked for (*hand over to maintenance*). **Acted** means the controller did it; **No action** means the answer asked for nothing. The tick is the later check: the 01:12 PM hand-over worked.
 
@@ -132,17 +132,17 @@ Each row reads: the time, the question (*Ramp hand-over*), Jev's answer and how 
 
 **Plan › Targets** holds every target of a zone, phase by phase. With Auto setpoints on, the green pill at the top reads **Jev manages the P2 shot size and re-water point**, and the two settings Jev may move carry a blue chip with the range it may use. **Turn auto off…** takes them back.
 
-![Plan › Targets: the zone's targets by phase, with Jev's range beside the two settings it manages](https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/jev-plan-targets.png)
+![Plan › Targets: the zone's targets by phase, with Jev's range beside the two settings it manages](img/jev-plan-targets.png)
 
 **Plan › Schedule** opens with **This flower by stage**, the stage arc Jev checks every zone against. The highlighted row is today's stage.
 
-![This flower by stage: flower setting, flower bulk and finish, with steering, pore EC, dry-back and runoff for each](https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/jev-stages.png)
+![This flower by stage: flower setting, flower bulk and finish, with steering, pore EC, dry-back and runoff for each](img/jev-stages.png)
 
 ### History: everything Jev decided, and whether it worked
 
 **History › Timeline** is one list of the controller's records and Jev's decisions, newest first. Choose **Jev** to see only Jev's. The line above the list counts today's questions, tokens and cost.
 
-![History › Timeline filtered to Jev: each decision, what the controller did, and why](https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/jev-history.png)
+![History › Timeline filtered to Jev: each decision, what the controller did, and why](img/jev-history.png)
 
 - **Acted**: the controller did what Jev asked. **Refused**: the envelope said no, and the orange line underneath says why, such as *the zone is steered vegetative: its watering stops late*. **Advice**: an alert or a suggestion only.
 - A **✓** or **✗** beside a decision is the later check of whether it worked.
@@ -151,7 +151,7 @@ Each row reads: the time, the question (*Ramp hand-over*), Jev's answer and how 
 
 Choose **Setpoints** to see Jev's overnight changes next to your own:
 
-![History › Timeline filtered to setpoints: a change Jev made, and changes the grower made that Jev noted](https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/jev-history-setpoints.png)
+![History › Timeline filtered to setpoints: a change Jev made, and changes the grower made that Jev noted](img/jev-history-setpoints.png)
 
 A change you make yourself is marked **You**. Jev only notes it, and your new value becomes the centre of Jev's range.
 
@@ -159,7 +159,7 @@ A change you make yourself is marked **You**. Jev only notes it, and your new va
 
 **Equipment › Probes** starts with three tiles: the probes, the controller, and Jev (**On** or **Not answering**, with today's calls and cost). Below them, every probe with its reading, its last report and whether the zone uses it.
 
-![Equipment › Probes: the probes, the controller and Jev at a glance](https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/jev-equipment.png)
+![Equipment › Probes: the probes, the controller and Jev at a glance](img/jev-equipment.png)
 
 ### Settings & help
 
@@ -193,33 +193,33 @@ Crop Steering comes in two parts, and automatic watering needs both. They carry 
 | | |
 | --- | --- |
 | **Home Assistant** | **2024.10.0 or newer.** Every change is tested on 2024.10.0 and on 2026.9.3. |
-| **The controller app** | Home Assistant OS or Supervised, where it installs from the app store (amd64, aarch64 or armv7) and brings its own Python 3.12. Home Assistant Container and Core have no app store: there you run the controller yourself (see the [install guide](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/INSTALL.md)). |
+| **The controller app** | Home Assistant OS or Supervised, where it installs from the app store (amd64, aarch64 or armv7) and brings its own Python 3.12. Home Assistant Container and Core have no app store: there you run the controller yourself (see the [install guide](docs/INSTALL.md)). |
 | **HACS** | 1.6.0 or newer for the guided download, or copy `custom_components/crop_steering` into Home Assistant by hand. |
 | **Hardware** | A switch Home Assistant can control for each zone's valve (and your pump and main line, if you have them), and a moisture probe per zone. EC probes and tank sensors are optional but recommended. |
-| **A Jev key** (optional) | A TypeSafe API key. A Cloudflare account with Workers AI starts Jev only on an install that has already run it; a new install needs the TypeSafe key. Without one, this is the original engine. |
+| **A Jev key** (optional) | A TypeSafe API key. A Cloudflare account with Workers AI starts Jev only on an install that has already run it; a new install needs the TypeSafe key. Without one, the rules engine runs alone. |
 | **AI assistant connector** (optional) | Node.js 22 or newer, on the computer that runs your AI assistant. |
 | **Account** | A Home Assistant administrator, to set up rooms and change plans. |
 
 ### Steps
 
-> **Already running the original Crop Steering?** This edition replaces it; it does not run beside it. It is the same integration with the same entity ids, so your rooms and settings stay. Take a Home Assistant backup, remove the original's HACS repository, and stop its controller app before step 1.
+> **Already running Crop Steering from this repository?** You do not install again: HACS offers the integration update and the app store offers the controller update, and your rooms, settings and entity ids stay. Take a Home Assistant backup first.
 
-1. **Download the integration with HACS**, then restart Home Assistant. (Or add it by hand: HACS → ⋮ → Custom repositories → `https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev`, type Integration.)
-   [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=JakeTheRabbit&repository=HA-Crop-Steering-Jev&category=integration)
+1. **Download the integration with HACS**, then restart Home Assistant. (Or add it by hand: HACS → ⋮ → Custom repositories → `https://github.com/JakeTheRabbit/HA-Irrigation-Strategy`, type Integration.)
+   [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=JakeTheRabbit&repository=HA-Irrigation-Strategy&category=integration)
 2. **Add Crop Steering** and name your first room.
    [![Open your Home Assistant instance and start setting up Crop Steering.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=crop_steering)
-3. **Add the app repository**, then install **Crop Steering Controller (Jev)**. Do not start it yet.
-   [![Open your Home Assistant instance and add this app repository.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FJakeTheRabbit%2FHA-Crop-Steering-Jev)
-4. **Give Jev a key.** In Settings → Apps → Crop Steering Controller (Jev) → Configuration, set `typesafe_api_key`: a TypeSafe API key (it starts with `apikey_`). A new install needs this key to start Jev.
+3. **Add the app repository**, then install **Crop Steering Controller**. Do not start it yet.
+   [![Open your Home Assistant instance and add this app repository.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FJakeTheRabbit%2FHA-Irrigation-Strategy)
+4. **Give Jev a key.** In Settings → Apps → Crop Steering Controller → Configuration, set `typesafe_api_key`: a TypeSafe API key (it starts with `apikey_`). A new install needs this key to start Jev.
 
    You can also set `cf_account_id` and `cf_api_token`: your Cloudflare account ID and an API token with the **Workers AI** permission (dash.cloudflare.com → My Profile → API Tokens → Create Token → the Workers AI template). Beside a TypeSafe key, Cloudflare is the second route. On its own it starts Jev only on an install that has already run Jev; on a new install it does not, and the app log says `jev: off`.
 
-   Without a key, the controller runs as the original engine and everything else still works.
+   Without a key, the controller runs the rules engine alone and everything else still works.
 5. **Tell Jev when flowering started.** `jev_flower_start` is the room's first day of 12/12: a date such as `2026-08-22`, or an `input_datetime` helper. `jev_flower_days` is the cultivar's flowering length (56 unless you change it). This is how Jev knows today's stage.
 6. **Start the app**, then open **Crop Steering** in the sidebar. Map your valves, pump and probes in **Equipment › Setup**, check the readings in **Equipment › Probes**, and keep watering switched off until every probe reads correctly. Do a catch test.
 7. **Switch watering on** in the top bar. With a key from step 4, Jev joins in as each decision comes up. To let it tune setpoints as well, use **Turn auto on…** in **Plan › Targets**.
 
-The buttons open the right screen; Home Assistant still asks you to confirm each step. Updates arrive the same way: HACS offers the integration and the app store offers the controller. The [install guide](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/INSTALL.md) covers manual installs, upgrades and rolling back.
+The buttons open the right screen; Home Assistant still asks you to confirm each step. Updates arrive the same way: HACS offers the integration and the app store offers the controller. The [install guide](docs/INSTALL.md) covers manual installs, upgrades and rolling back.
 
 ## Turning Jev off, or taking a setting back
 
@@ -228,7 +228,7 @@ The buttons open the right screen; Home Assistant still asks you to confirm each
 | Stop Jev changing setpoints | Use **Turn auto off…** in Plan › Targets. The values stay where they are until you change them. |
 | Change a value Jev manages | Type your own value in Plan › Targets. It becomes the new centre of Jev's range. |
 | Stop one kind of decision | App option `jev_judges`: list the ones to keep, such as `dawn,ramp,salt,probe,shot,night,zones,stage,setpoints,alerts` (everything except `dusk`, the Day end question). |
-| Switch Jev off completely | App option `jev_enabled` off, then restart the app. The controller runs as the original. |
+| Switch Jev off completely | App option `jev_enabled` off, then restart the app. The controller runs the rules engine alone. |
 | Cap what it can spend | App option `jev_daily_calls` (5,000 by default; CS-706 at 80 %). Once the day's calls are spent, the rest of that day's decisions are the plain engine's. |
 
 ## What it costs
@@ -265,7 +265,7 @@ Twelve of the seventeen:
 
 ## Everything else the controller does
 
-The rest is the original engine, and it all works with or without Jev.
+The rest is the rules engine, and it all works with or without Jev.
 
 **It waters by what the plants need, not by a timer.** Every zone has its own moisture probe, and usually an EC probe. The controller checks them every minute and waters in shots sized from your pot size, plant count and dripper flow.
 
@@ -282,19 +282,19 @@ The rest is the original engine, and it all works with or without Jev.
 
 **It counts the water.** **History › Water use** shows every zone's litres today, this grow week, since the grow started and an estimate for the whole grow, from Home Assistant's long-term statistics.
 
-![History › Water use: litres per zone and per grow week](https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/water-use.png)
+![History › Water use: litres per zone and per grow week](img/water-use.png)
 
 **It keeps the nutrient stock topped up.** **Equipment › Stock tanks** tracks the concentrates each batch tank is dosed from. Every batch you make takes its dose off each stock tank; when one runs low you get a Repairs card saying roughly how many batches are left. Press **Refilled** when you top it up.
 
-![Equipment › Stock tanks: levels, low marks and batches left](https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/stock-tanks.png)
+![Equipment › Stock tanks: levels, low marks and batches left](img/stock-tanks.png)
 
 **It compares runs.** **History › Compare runs** lines this run up against an earlier one by grow week, so you can see whether this grow is tracking the last good one.
 
 **It sets up rooms without YAML.** **Equipment › Setup** maps the Home Assistant entities you already have: valves, pump, main line, moisture and EC probes, tank sensors. You enter each zone's pot size, plant count and drippers. Every save is checked first (units, duplicate valves, everything off before a change) and the controller confirms it has picked the new setup up.
 
-![Equipment › Setup: rooms and their sensor mapping](https://raw.githubusercontent.com/JakeTheRabbit/HA-Crop-Steering-Jev/main/img/rooms-setup.png)
+![Equipment › Setup: rooms and their sensor mapping](img/rooms-setup.png)
 
-**AI assistants (optional).** A separate connector lets an AI assistant such as Claude read your rooms, readings and plans and prepare changes for you to review. It can never switch equipment. See [MCP.md](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/MCP.md).
+**AI assistants (optional).** A separate connector lets an AI assistant such as Claude read your rooms, readings and plans and prepare changes for you to review. It can never switch equipment. See [MCP.md](docs/MCP.md).
 
 ## Good to know
 
@@ -306,19 +306,19 @@ The rest is the original engine, and it all works with or without Jev.
 
 ## Documentation
 
-- [How Jev works in full: every judge, the envelope, the doctrine and the options](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/JEV.md)
-- [User guide: every page of the dashboard](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/USER_GUIDE.md) and [planning a grow](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/GROW_PLANS.md)
-- [Install, upgrade and roll back](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/INSTALL.md)
-- [Error codes: what each alert means and what to do](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/ERROR_CODES.md)
-- [Troubleshooting](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/troubleshooting.md)
-- [What has been tested, and the known limits](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/FEATURE_MATRIX.md)
-- [Entity reference](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/ENTITIES.md) · [Sidebar and menu button](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/HA_SIDEBAR.md)
-- For developers: [architecture](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/REPOSITORY_MAP.md), [testing](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/TESTING.md), [how releases are made](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/RELEASING.md) and [contributing](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/CONTRIBUTING.md)
+- [How Jev works in full: every judge, the envelope, the doctrine and the options](docs/JEV.md)
+- [User guide: every page of the dashboard](docs/USER_GUIDE.md) and [planning a grow](docs/GROW_PLANS.md)
+- [Install, upgrade and roll back](docs/INSTALL.md)
+- [Error codes: what each alert means and what to do](docs/ERROR_CODES.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [What has been tested, and the known limits](docs/FEATURE_MATRIX.md)
+- [Entity reference](docs/ENTITIES.md) · [Sidebar and menu button](docs/HA_SIDEBAR.md)
+- For developers: [architecture](docs/REPOSITORY_MAP.md), [testing](docs/TESTING.md), [how releases are made](docs/RELEASING.md) and [contributing](CONTRIBUTING.md)
 
 ## Support
 
-Report a problem or ask a question in [GitHub issues](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/issues). Include the error code if you have one, both version numbers (shown in the Crop Steering sidebar), and what the controller app's log says.
+Report a problem or ask a question in [GitHub issues](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues). Include the error code if you have one, both version numbers (shown in the Crop Steering sidebar), and what the controller app's log says.
 
 ## License
 
-[MIT](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/LICENSE)
+[MIT](LICENSE)

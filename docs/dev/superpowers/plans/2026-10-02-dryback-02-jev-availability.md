@@ -1659,7 +1659,7 @@ Expected: `ALL CHECKS PASSED`, or, with the real-Home-Assistant tier run separat
 
 ```bash
 git push -u origin feat/dryback-02-jev-availability
-gh pr create --repo JakeTheRabbit/HA-Crop-Steering-Jev --base testing --head feat/dryback-02-jev-availability \
+gh pr create --repo JakeTheRabbit/HA-Irrigation-Strategy --base testing --head feat/dryback-02-jev-availability \
   --title "Jev availability: both routes, retries, second looks, the stricter gate (dryback planner, step 2)" --body-file pr-body.md
 ```
 

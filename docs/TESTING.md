@@ -224,6 +224,10 @@ heading, and the README badge, so a release can't ship a stale number. (The f2-c
 add-on has its own version line in `addons/f2_control/config.yaml`; boxes build the add-on
 from this repository, so there is no second copy to keep in step.)
 
+`tests/test_repo_identity.py` does the same for the repository's own address: the app store
+listing, the app's link, the manifest, HACS, the README, docs and the dashboard all name this
+repository, and every Home Assistant redirect they use is one my.home-assistant.io serves.
+
 ### 5. Lint / format / YAML: ruff, black (scoped to `custom_components/` + `tests/`), yamllint
 Plus, on GitHub only: **hassfest** and **HACS validation** of the integration.
 

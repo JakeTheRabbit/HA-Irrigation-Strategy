@@ -167,7 +167,7 @@ configuration:
     description: >-
       Where each room's first day of 12/12 is, so the judges know the stage: an
       input_datetime or a date for every room, or room=value pairs, e.g.
-      default=input_datetime.f2_flip_date, f1=input_datetime.f1_flip_date. Blank: the
+      default=input_datetime.flower_start, room_b=input_datetime.room_b_flower_start. Blank: the
       judges work without a stage.
   sump_power_sensor:
     name: Sump pump power sensor (optional)

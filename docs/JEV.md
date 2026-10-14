@@ -1,12 +1,12 @@
-# Crop Steering, Jev edition
+# AI brain
 
-This fork of [HA-Irrigation-Strategy](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy) puts
-**TypeSafe Jev**, a typed-decision model served through Cloudflare, in charge of every judgement the
-crop-steering engine makes, while code keeps charge of everything physical.
+The controller's optional AI brain puts **TypeSafe Jev**, a typed-decision model served through
+Cloudflare, in charge of every judgement the crop-steering engine makes, while code keeps charge of
+everything physical.
 
 The base engine is rules: fixed thresholds that are right most of the time and wrong in the cases
 nobody wrote down (a probe channeling, a salt front still passing, a ramp that is done but not by the
-numbers). Each fix added another "if". This edition replaces the "ifs" with a judge.
+numbers). Each fix added another "if". The AI brain replaces the "ifs" with a judge.
 
 ## What "truly insane and amazing" means here
 
@@ -119,7 +119,7 @@ Add-on options (the controller app):
 | `jev_unsure_below` | 0.7 | Under this probability, or with phrasings that disagree, an answer is unsure. |
 | `jev_strict_after` | 3 | Bad calls in a row before a judge is on the stricter gate for a zone (CS-707). |
 | `jev_strict_prob` | 0.8 | How sure an answer must be to act on the stricter gate. |
-| `jev_flower_start` | empty | Each room's first day of 12/12: an input_datetime or a date, for every room or as `room=value` pairs, e.g. `default=input_datetime.f2_flip_date, f1=input_datetime.f1_flip_date`. |
+| `jev_flower_start` | empty | Each room's first day of 12/12: an input_datetime or a date, for every room or as `room=value` pairs, e.g. `default=input_datetime.flower_start, room_b=input_datetime.room_b_flower_start`. |
 | `jev_flower_days` | 56 | The cultivar's flowering length; the finish is its last 14 days. |
 
 ## What Jev can raise

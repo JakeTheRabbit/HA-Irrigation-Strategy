@@ -963,7 +963,7 @@ Expected: `ALL CHECKS PASSED`. With the real-Home-Assistant tier run separately 
 
 ```bash
 git push -u origin feat/dryback-01-remember-nights
-gh pr create --repo JakeTheRabbit/HA-Crop-Steering-Jev --base testing --head feat/dryback-01-remember-nights \
+gh pr create --repo JakeTheRabbit/HA-Irrigation-Strategy --base testing --head feat/dryback-01-remember-nights \
   --title "Remember each zone's plateau and nights (dryback planner, step 1)" --body-file pr-body.md
 ```
 

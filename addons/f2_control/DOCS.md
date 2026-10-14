@@ -1,10 +1,10 @@
-# Crop Steering Controller (Jev)
+# Crop Steering Controller
 
 This companion app runs the P0–P3 irrigation decision loop, sequences mapped pump/valve entities, and asks Jev for the judgement calls. Install the Crop Steering integration first; it owns room configuration, sensor mapping and grow-plan storage.
 
 ## Install and configure
 
-Follow the [installation guide](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/INSTALL.md). After installing this app, review Configuration, start it, and open the integration's **Crop Steering** sidebar page. The ingress dashboard is also available. Both serve the same native workspace.
+Follow the [installation guide](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md). After installing this app, review Configuration, start it, and open the integration's **Crop Steering** sidebar page. The ingress dashboard is also available. Both serve the same native workspace.
 
 Use **Equipment › Setup** for mapping and per-zone sizing. Keep engines off while commissioning. Fresh installations create engine controls; existing mapped enable flags are preserved. The legacy default-room helper may still be input_boolean.f2_control_enabled. The room descriptor/heartbeat identifies the actual flag; do not create a second one blindly.
 
@@ -21,7 +21,7 @@ Jev is an AI decision model the controller asks when a decision needs judgement 
 - `jev_flower_start`: each room's first day of 12/12, as a date or an input_datetime, for every room or as `room=value` pairs, so Jev knows today's stage.
 - `jev_flower_days`: the cultivar's flowering length (56).
 
-Restart the app after changing them. Every decision shows on the dashboard: **Today**, each zone's page, and **History › Timeline**. The [README](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev#readme) explains it all in plain words; [JEV.md](https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/blob/main/docs/JEV.md) has every judge and limit.
+Restart the app after changing them. Every decision shows on the dashboard: **Today**, each zone's page, and **History › Timeline**. The [README](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy#readme) explains it all in plain words; [JEV.md](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/JEV.md) has every judge and limit.
 
 ## Plans and operation
 
@@ -39,4 +39,4 @@ Water cards distinguish total substrate capacity from all-plant zone litres and 
 
 Update the integration and this app together: both carry the same version number, and the dashboard sidebar shows both, as reported by the running parts. Use **Update** or **Rebuild** to include new Python code; restarting an old image does not rebuild it. Preserve persistent data and export plans before upgrades. See the installation guide for rollback instructions.
 
-The display name is Crop Steering Controller (Jev). The existing f2_control slug remains stable for upgrade compatibility. Local browser/unit checks do not constitute a live HA installation test.
+The display name is Crop Steering Controller. The existing f2_control slug remains stable for upgrade compatibility. Local browser/unit checks do not constitute a live HA installation test.
