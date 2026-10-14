@@ -358,6 +358,10 @@ FC_SHIFT_MIN = 1.0
 # at all for 41.6 h: its tables backed up. Checked every SUMP_CHECK_MIN from Home Assistant's history, as a run
 # lasts about a minute and a loop could miss it; a run is more than SUMP_RUN_W.
 SUMP_SILENT_H, SUMP_CHECK_MIN, SUMP_RUN_W = 3.0, 5.0, 20.0
+# The default room's kill switch on an installation from before the setup wizard: a helper the operator
+# made by hand, and this app's shipped `enable_flag` option (config.yaml). A room made by the wizard stops
+# on its own engine switch, named by its setup. Named here once; room_gate() is the rule.
+LEGACY_ENABLE_FLAG = "input_boolean.f2_control_enabled"
 
 
 def room_option(value):
@@ -488,6 +492,18 @@ class Room:
         self._beat_at = None  # and when, by time.monotonic()
         self._statuses = {}  # z -> (label, reason) of its zones' last status
         self._status_at = {}  # z -> when, by time.monotonic()
+
+
+def room_gate(room):
+    """The kill switch this room stops on: the one entity that must read ON for anything in it to be
+    watered (an absent or unreadable one holds). Chosen in two steps and nowhere else: the start-up
+    value from Controller._default_enable_flag (a named room its engine switch; the default room the
+    app's `enable_flag` option, or its setup's flag where that option is the legacy helper and the
+    helper does not exist), then, once a revisioned setup is adopted or resumed, the setup's own flag
+    (Controller._apply_setup_descriptors). An update never moves it: the operator does, through the
+    option on a room with no revisioned setup, or through a new setup revision on one that has one.
+    The heartbeat reports it, so the integration and the dashboard name the same switch."""
+    return room.enable_flag
 
 
 class Controller:
@@ -646,7 +662,7 @@ class Controller:
             log(
                 "rooms:",
                 ", ".join(
-                    f"{r.slug}(prefix='{r.prefix}', {len(r.zones)}z, kill={r.enable_flag})"
+                    f"{r.slug}(prefix='{r.prefix}', {len(r.zones)}z, kill={room_gate(r)})"
                     for r in self.rooms
                 ),
             )
@@ -721,7 +737,7 @@ class Controller:
         return fallback, True  # Home Assistant unreachable: the documented fallback, for now
 
     def _default_enable_flag(self, options, descriptor):
-        legacy = "input_boolean.f2_control_enabled"
+        legacy = LEGACY_ENABLE_FLAG
         requested = descriptor.get("enable_flag")
         configured = options.get("enable_flag", legacy)
         # Fresh native setups have a real integration switch and no legacy YAML
@@ -1186,7 +1202,7 @@ class Controller:
                 flags = {room.enable_flag, desired_flag}
                 if (
                     room.prefix == ""
-                    and room.enable_flag == "input_boolean.f2_control_enabled"
+                    and room.enable_flag == LEGACY_ENABLE_FLAG
                     and desired_flag == "switch.crop_steering_engine_enabled"
                     and ha_get(room.enable_flag)[0] is None
                 ):
@@ -2074,7 +2090,7 @@ class Controller:
                 "last_beat": now.isoformat(),
                 # the kill switch this room ACTUALLY uses — the integration's health
                 # check reads this so a custom enable_flag isn't flagged as "missing"
-                "enable_flag": room.enable_flag,
+                "enable_flag": room_gate(room),
                 "hardware_fault": hardware_fault,
                 "strategy_snapshot_version": 1,
                 "setup_lifecycle_version": 1,
@@ -2228,7 +2244,7 @@ class Controller:
                 room=room,
             )
             return plumbing
-        if not self._on(room.enable_flag, False):
+        if not self._on(room_gate(room), False):
             return "f2-control disabled (kill switch off)"
         retired = getattr(room, "_retired_off", None)
         if retired:  # switched off in their place this pass; the switch may not read OFF yet
@@ -2378,16 +2394,16 @@ class Controller:
             if str(state).lower() != "off":
                 continue
             off.append(name)
-            if getattr(room, "shot_inflight", None) or not self._on(room.enable_flag, False):
+            if getattr(room, "shot_inflight", None) or not self._on(room_gate(room), False):
                 continue  # a shot still to settle, or watering is off already: nothing is switched
-            ha_call(room.enable_flag.split(".", 1)[0], "turn_off", entity_id=room.enable_flag)
-            log(f"[{room.slug}] {name} ({entity}) is off: engine switch {room.enable_flag} switched off")
+            ha_call(room_gate(room).split(".", 1)[0], "turn_off", entity_id=room_gate(room))
+            log(f"[{room.slug}] {name} ({entity}) is off: engine switch {room_gate(room)} switched off")
             self._alert(
                 f"retired_switch_{room.slug}_{key}",
                 "CS-208",
                 f"{name} is off, so watering was switched off",
                 f"{name} no longer stops watering by itself: the room's Watering switch does that, "
-                f"its engine switch ({room.enable_flag}). Because {name} ({entity}) is off, the "
+                f"its engine switch ({room_gate(room)}). Because {name} ({entity}) is off, the "
                 "controller switched watering off in its place, and does so again while it stays "
                 f"off. Switch {name} back on in Home Assistant, then switch watering on in Crop "
                 "Steering → Settings → Watering.",
@@ -2710,8 +2726,8 @@ class Controller:
     def _idle_why(self, room, pub):
         """Why nothing has been watered, as far as this pass can tell: watering switched off, a hold (_blocked), or
         nothing called for water."""
-        if not self._on(room.enable_flag, False):
-            return f"Watering is switched off in this room: its engine switch ({room.enable_flag}) is off."
+        if not self._on(room_gate(room), False):
+            return f"Watering is switched off in this room: its engine switch ({room_gate(room)}) is off."
         holds = []
         for zone in sorted(room.zones):
             if room.state[zone].get("phase") in ("P1", "P2"):
@@ -2977,7 +2993,7 @@ class Controller:
             if fault and (owner is room or entities.intersection(fault["entities"])):
                 return (
                     f"hardware fault in {owner.slug}: {fault['reason']}; turn OFF "
-                    f"{owner.enable_flag} and engines sharing this hardware, "
+                    f"{room_gate(owner)} and engines sharing this hardware, "
                     "verify all hardware OFF, then re-arm"
                 )
         discovered = {r.slug for r in self.rooms}
@@ -3013,7 +3029,7 @@ class Controller:
             "CRITICAL hardware fault, watering stopped",
             "A pump or valve did not confirm it had switched OFF, so watering is stopped on this "
             "hardware and in every room that shares it. Turn OFF "
-            f"{room.enable_flag} and every engine sharing this hardware, then check every pump "
+            f"{room_gate(room)} and every engine sharing this hardware, then check every pump "
             "and valve. The hold clears only once all of them read OFF; then turn the engine "
             "back on."
             + (
@@ -3036,7 +3052,7 @@ class Controller:
                 for r in self.rooms
                 if r is room or entities.intersection(self._hardware_entities(r))
             ]
-            if not all(ha_get(r.enable_flag)[0] == "off" for r in affected):
+            if not all(ha_get(room_gate(r))[0] == "off" for r in affected):
                 continue
             for affected_room in affected:
                 entities.update(self._hardware_entities(affected_room))
@@ -3110,13 +3126,13 @@ class Controller:
         if all(read[0] == "off" for read in reads.values()):
             self._clear_inflight(room, f"{tag}: its valve/main line/pump read OFF - record closed")
             return
-        flag = ha_get(room.enable_flag)[0]
+        flag = ha_get(room_gate(room))[0]
         if flag is None:
             return  # Home Assistant unreachable: nothing can be read or closed; try again next loop
         if flag != "on":
             if not getattr(room, "_inflight_waiting_logged", False):
                 still_on = ", ".join(e for e in order if reads[e][0] != "off")
-                log(f"{tag}: kill switch {room.enable_flag} is {flag}, so the operator has it - "
+                log(f"{tag}: kill switch {room_gate(room)} is {flag}, so the operator has it - "
                     f"leaving {still_on} alone")
                 room._inflight_waiting_logged = True
             return
@@ -3249,7 +3265,7 @@ class Controller:
         valve_seen_on = False
         while time.monotonic() < deadline:
             for entity, stop_state in (
-                (room.enable_flag, "off"),
+                (room_gate(room), "off"),
                 (f"switch.crop_steering_{room.prefix}room_active", "off"),
                 (f"switch.crop_steering_{room.prefix}zone_{zone}_enabled", "off"),
                 (
@@ -3515,7 +3531,7 @@ class Controller:
             if aborted:
                 by = aborted[1]
                 why = {
-                    room.enable_flag: "the engine switch was turned off",
+                    room_gate(room): "the engine switch was turned off",
                     f"switch.crop_steering_{room.prefix}room_active": "Room Active was switched off",
                     f"switch.crop_steering_{room.prefix}zone_{zone}_enabled": "this zone was switched off",
                 }.get(by, "manual override was turned on")
@@ -3587,7 +3603,7 @@ class Controller:
             if all(read[0] == "off" for read in reads.values()):
                 room.shot_inflight = None
                 continue
-            if room is not getattr(self, "_shot_room", None) and ha_get(room.enable_flag)[0] != "on":
+            if room is not getattr(self, "_shot_room", None) and ha_get(room_gate(room))[0] != "on":
                 continue
             close, left, unsure, why = self._inflight_plan(room, rec, reads)
             if close and not self._switch_off_confirmed(close):
@@ -4538,7 +4554,7 @@ class Controller:
             pub = all_pub.get(room.slug) or {}
             if not pub:
                 continue
-            on = self._on(room.enable_flag, False)
+            on = self._on(room_gate(room), False)
             any_live = any_live or on
             head = (room.slug if room.prefix else self.instance_name) + (
                 " LIVE" if on else " HELD"

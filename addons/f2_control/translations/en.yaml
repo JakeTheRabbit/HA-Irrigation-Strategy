@@ -21,10 +21,12 @@ configuration:
   enable_flag:
     name: Kill-switch entity
     description: >-
-      The master safety switch. While this input_boolean is OFF the engine reads
-      sensors and makes decisions but NEVER opens a valve (the safe default).
-      Turn it ON to go live. Leave as input_boolean.f2_control_enabled unless you
-      named your helper something else.
+      The kill switch of a room with no saved setup (an installation from before the
+      setup wizard). While it is OFF the engine reads sensors and makes decisions but
+      NEVER opens a valve (the safe default). Turn it ON to go live. Leave as
+      input_boolean.f2_control_enabled unless you named your helper something else.
+      A room whose setup has been saved stops on the switch its setup names (its
+      Engine Enabled switch); this option does not change that.
   notify_service:
     name: Notification service
     description: >-
