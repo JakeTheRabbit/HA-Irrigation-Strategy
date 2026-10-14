@@ -1,0 +1,1 @@
+{"id": 1, "at": "2026-09-27T13:00:00", "judge": "ramp", "room": "default", "zone": 1, "label": "P2", "action": "advance", "evidence": {"ramp_state": "ec_is_feed_front"}, "check_at": "2026-09-27T14:00:00", "check": {"vwc": 40.5, "ec": 6.5, "daily_vol": 0.0, "phase": "P1"}, "outcome": null}

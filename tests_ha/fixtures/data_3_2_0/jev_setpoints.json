@@ -1,0 +1,12 @@
+{
+ "default:1": {
+  "home": {
+   "p2_shot_size": 5.0,
+   "p2_vwc_threshold": 33.0
+  },
+  "written": {},
+  "pending": null,
+  "last": null,
+  "frozen_until": null
+ }
+}

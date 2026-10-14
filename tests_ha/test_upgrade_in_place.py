@@ -410,6 +410,93 @@ async def test_a_2_25_1_room_with_its_engine_switch_off_stays_dry_after_the_upgr
     assert c._blocked(room, 1) == "f2-control disabled (kill switch off)"
 
 
+# ------------------------------------------------------------------ Jev starts only where it has run
+def _seeded_app(controller_for, monkeypatch, name, saved_state=None):
+    """Start the real controller on an old app as it was left: its options file
+    (tests_ha/fixtures/<name>) and the /data folder it names, copied in beside state.json.
+    Jev's routes are stubbed: `built` records every route list the brain was given."""
+    import functools
+    import shutil
+
+    import jev_bridge
+    import jev_kit
+    from jev.client import Asker
+
+    seed = fixture(name)
+    data = Path(os.environ["F2_STATE_PATH"]).parent
+    if seed["data"]:
+        for path in (Path(__file__).parent / "fixtures" / seed["data"]).iterdir():
+            shutil.copy(path, data / path.name)
+    built, stub = [], jev_kit.FakeTransport({})
+    monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: built.append(found) or stub)
+    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False))
+    c, _fake, _clock = controller_for(seed["options"], saved_state=saved_state)
+    return c, seed, built, stub, data
+
+
+@pytest.mark.parametrize(
+    "options", ["options_2_25_1_cf_policy.json", "options_2_25_1_cf_policy_merged.json"]
+)
+async def test_a_2_25_1_room_with_cloudflare_set_for_the_setpoint_check_gets_no_jev(
+    hass, controller_for, monkeypatch, capsys, options
+):
+    """2.25.1 used Cloudflare only for the hourly Auto Setpoints check. After the update the
+    Supervisor serves jev_enabled: true beside those keys, and no Jev file is in /data: the
+    acting brain must stay off, while the setpoint check keeps its credentials."""
+    seed = fixture(UPSTREAM_2_25_1)
+    await _upgrade(hass, UPSTREAM_2_25_1, registry_ids=seed["registry"])
+    hass.states.async_set(KILL, "on")
+    c, app, built, _stub, data = _seeded_app(
+        controller_for, monkeypatch, options, saved_state=seed["controller_saved"]
+    )
+    assert app["options"].get("jev_enabled") is (True if "merged" in options else None)
+    assert c.jev is None and built == []  # no brain, and no route to ask anything through
+    assert c._cf[:2] == ("fixture-account", "fixture-token")
+    assert [p.name for p in data.iterdir() if p.name.startswith("jev_")] == []
+    said = capsys.readouterr().out
+    assert "jev: off" in said and "fixture-token" not in said
+    assert c.rooms[0]._setup_pending is None  # and the room carries straight on
+
+
+@pytest.mark.parametrize(
+    "options, route",
+    [
+        ("options_3_0_0_jev_cf.json", "Cloudflare"),  # a ledger only
+        ("options_3_2_0_jev_cf.json", "Cloudflare"),  # ledger, journal and setpoint memory
+        ("options_3_3_0_jev_typesafe.json", "TypeSafe"),  # no Jev file: the key is enough
+        ("options_3_11_1_jev_cf_usage.json", "Cloudflare"),  # the usage file alone
+    ],
+)
+async def test_a_jev_line_app_keeps_its_brain_with_no_option_changed(
+    hass, controller_for, monkeypatch, options, route
+):
+    """Each app from the Jev line, its options and /data as that version left them, still
+    reaches its own route after the update, with nothing changed and no re-setup."""
+    await _upgrade(hass, "entry_2_17_wizard.json")
+    c, app, built, stub, data = _seeded_app(controller_for, monkeypatch, options)
+    assert c.jev is not None and c.jev.routes == [route]
+    assert [r.name for r in built[0]] == [route] and c.jev.asker.transport is stub
+    token = app["options"]["typesafe_api_key"] or app["options"]["cf_api_token"]
+    assert built[0][0].token == token  # its own credentials, as saved
+    saved = json.loads((data / "state.json").read_text(encoding="utf-8"))["default"]["1"]
+    assert c.rooms[0].state[1]["phase"] == saved["phase"]
+    if (data / "jev_ledger.jsonl").exists():
+        assert c.jev.ledger.entries  # its ledger is read back, not started again
+
+
+async def test_a_3_0_0_app_on_cloudflare_whose_brain_never_acted_runs_without_jev(
+    hass, controller_for, monkeypatch
+):
+    """Pinned on purpose. A 3.0.0 app on Cloudflare only whose brain never acted wrote no Jev
+    file, so it cannot be told from a 2.x app: it runs without Jev after the update, which the
+    release notes say. Changing this is a decision, not a side effect."""
+    await _upgrade(hass, "entry_2_17_wizard.json")
+    c, _app, built, _stub, _data = _seeded_app(
+        controller_for, monkeypatch, "options_3_0_0_jev_cf_quiet.json"
+    )
+    assert c.jev is None and built == []
+
+
 # ------------------------------------------------------------------ an env-file era install
 async def test_an_env_era_install_with_only_front_and_back_probes_still_loads_and_fuses(
     hass,
