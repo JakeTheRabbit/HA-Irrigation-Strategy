@@ -31,8 +31,9 @@ KILL = "switch.crop_steering_engine_enabled"
 DESCRIPTOR = "sensor.crop_steering_engine_config"
 
 
-async def _upgrade(hass, name, *, registry_ids=None):
-    """Start the new code on top of a seeded old install."""
+async def _upgrade(hass, name, *, registry_ids=None, restored=None):
+    """Start the new code on top of a seeded old install. `restored` adds values the old version
+    left in Home Assistant's restore cache beside the ones the operator tuned."""
     seed = fixture(name)
     for entity_id, (state, attributes) in seed["states"].items():
         hass.states.async_set(entity_id, state, attributes)
@@ -65,7 +66,7 @@ async def _upgrade(hass, name, *, registry_ids=None):
         hass,
         [
             State(eid, *(saved if isinstance(saved, list) else [saved]))
-            for eid, saved in seed["operator_tuned_numbers"].items()
+            for eid, saved in {**(restored or {}), **seed["operator_tuned_numbers"]}.items()
         ],
     )
     assert await hass.config_entries.async_setup(entry.entry_id)
