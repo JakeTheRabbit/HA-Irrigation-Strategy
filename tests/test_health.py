@@ -346,3 +346,34 @@ def test_no_card_says_the_gate_itself_does_not_stop_water():
         descriptor={"enable_flag": OWN, "setup_revision": 1},
         present=["switch.crop_steering_veg_engine_enabled"],
     )
+
+
+def test_a_named_room_card_says_its_engine_switch_does_not_stop_water_until_switched_off():
+    veg_own = "switch.crop_steering_veg_engine_enabled"
+    states = {
+        "sensor.crop_steering_veg_ai_heartbeat": ha_stubs.FakeState(
+            "healthy", {"enable_flag": "input_boolean.veg_kill", "setup_revision": 2}
+        ),
+        "sensor.crop_steering_veg_engine_config": ha_stubs.FakeState(
+            "ok", {"prefix": "veg_", "enable_flag": veg_own, "setup_revision": 2}
+        ),
+        veg_own: ha_stubs.FakeState("on"),
+    }
+    hass = ha_stubs.FakeHass(states=states)
+    entry = ha_stubs.FakeEntry(
+        data={"room_slug": "veg", "room_prefix": "veg_", "zones": {}}, entry_id="veg"
+    )
+    _run(hass, entry)
+    card = hass._issues["kill_switch_missing_veg"]["translation_placeholders"]
+    assert card["kill_switch"] == "input_boolean.veg_kill"
+    assert hass._issues[f"{NOT_GATE}_veg"]["translation_placeholders"] == {
+        "kill_switch": "input_boolean.veg_kill",
+        "engine_switch": veg_own,
+    }
+    hass.states.set("input_boolean.veg_kill", "on")  # its gate back: that card stays
+    _run(hass, entry)
+    assert "kill_switch_missing_veg" not in hass._issues
+    assert f"{NOT_GATE}_veg" in hass._issues
+    hass.states.set("switch.crop_steering_veg_room_active", "off")
+    _run(hass, entry)
+    assert f"{NOT_GATE}_veg" not in hass._issues
