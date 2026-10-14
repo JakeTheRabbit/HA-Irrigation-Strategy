@@ -20,14 +20,20 @@ from urllib.parse import urlencode
 PRODUCTION, STAGING = "main", "testing"
 MANIFEST = "custom_components/crop_steering/manifest.json"
 VALIDATE = ".github/workflows/ci-validate.yml"
-REQUIRED_JOBS = {
-    "Lint (ruff/black/yamllint) and HA validations (3.11)",
-    "Lint (ruff/black/yamllint) and HA validations (3.12)",
-    "Build f2-control add-on image (amd64)",
-    "Real Home Assistant (setup wizard and entity ids)",
-    "Dashboard build and browser workflows",
-    "MCP protocol and reviewed configuration workflows",
-}
+# Each requirement is met by exactly one passing job with any of its names. This code runs
+# from main, so a job is renamed in two steps: main first accepts the new name beside the
+# old one, and only a candidate promoted after that may carry the renamed job.
+REQUIRED_JOBS = (
+    ("Lint (ruff/black/yamllint) and HA validations (3.11)",),
+    ("Lint (ruff/black/yamllint) and HA validations (3.12)",),
+    (
+        "Build f2-control add-on image (amd64)",
+        "Build controller add-on image (amd64)",
+    ),
+    ("Real Home Assistant (setup wizard and entity ids)",),
+    ("Dashboard build and browser workflows",),
+    ("MCP protocol and reviewed configuration workflows",),
+)
 SHA = re.compile(r"[0-9a-f]{40}")
 
 
@@ -163,16 +169,17 @@ def validate_run(runs, *, workflow_id, candidate, repository):
 def validate_jobs(result, *, candidate):
     jobs = result.get("jobs", [])
     require(result.get("total_count") == len(jobs), "Validate job list is incomplete.")
-    for name in REQUIRED_JOBS:
-        matches = [job for job in jobs if job.get("name") == name]
+    for names in REQUIRED_JOBS:
+        matches = [job for job in jobs if job.get("name") in names]
         require(
             len(matches) == 1
             and matches[0].get("head_sha") == candidate
             and matches[0].get("status") == "completed"
             and matches[0].get("conclusion") == "success",
-            f"Required Validate job did not pass for the candidate: {name}",
+            f"Required Validate job did not pass for the candidate: {' or '.join(names)}",
         )
-    return {job["name"]: job["id"] for job in jobs if job["name"] in REQUIRED_JOBS}
+    accepted = {name for names in REQUIRED_JOBS for name in names}
+    return {job["name"]: job["id"] for job in jobs if job["name"] in accepted}
 
 
 def validate_audit(audit, *, tag, candidate, evidence):
