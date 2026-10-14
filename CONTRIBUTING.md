@@ -67,7 +67,7 @@ Conventional commits (`feat:` `fix:` `docs:` `test:` `ci:` `chore:` `release:`),
 - Every `Validate` job is green on the exact commit being merged, with the branch up to date with `testing`.
 - A reviewer who does not understand a change asks, and the answer goes into the code or the pull request, not into a chat that disappears.
 
-Promotion is a separate decision after staging and its recorded audit: run **Promote** from `main`, first with its default read-only dry run, then with the exact candidate authorized for promotion ([docs/RELEASING.md](docs/RELEASING.md)). It checks the candidate before moving production. An assistant can prepare evidence and run the nonmutating preflight; successful CI alone is not permission to promote. Keep `testing` frozen at the candidate throughout that process.
+Promotion is a separate decision after staging and its recorded audit: run **Promote** from `main`, first with its default read-only dry run, then with the exact candidate authorized for promotion ([docs/RELEASING.md](docs/RELEASING.md)). It checks the candidate before moving production. An assistant can prepare evidence and run the nonmutating preflight; successful CI alone is not permission to promote. Keep `testing` frozen at the candidate throughout that process, until it is promoted, abandoned, or soaked and superseded: a candidate whose soak passed but which the owner holds back is marked "soaked, superseded", is never promoted later, and leaves staging auto-update off and staging rooms unrebuilt until the next release pull request merges ([docs/RELEASING.md](docs/RELEASING.md), step 6).
 
 ## Bringing in upstream's changes (forks)
 

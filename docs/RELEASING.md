@@ -86,7 +86,7 @@ Give it real notes: in place of `--notes`, pass `--notes-file <(python scripts/r
 
 Staging rooms now see it: HACS offers the pre-release, Supervisor offers the new controller version from `#testing`. Production rooms see nothing, because `main` has not moved.
 
-**`testing` is now frozen.** From the moment the release pull request merges until the candidate is promoted or abandoned, nothing else merges into `testing`. The reason is mechanical, not tidy-minded: HACS installs the integration from the *tag*, but Supervisor builds the controller from the *tip of the branch at the moment the box updates*. A feature merged behind a candidate carries no version change, so no box is offered it, but a staging room that installs or rebuilds after that merge builds the newer code **under the candidate's version number**, and what soaks is no longer what was tagged. A backup restore can import a saved image instead; it does not always rebuild the branch tip (see *Rolling back*). Pull requests can still be opened, reviewed and checked during a soak; they wait to merge. One staging room can only soak one candidate at a time anyway, so the freeze costs review latency and nothing else. Make it mechanical: switch on **Lock branch** for `testing` when you cut the candidate, and off when it is promoted or abandoned. The one thing that merges into a frozen `testing` is the fix for a failed candidate (step 6).
+**`testing` is now frozen.** From the moment the release pull request merges until the candidate is promoted, abandoned, or soaked and superseded (step 6), nothing else merges into `testing`. The reason is mechanical, not tidy-minded: HACS installs the integration from the *tag*, but Supervisor builds the controller from the *tip of the branch at the moment the box updates*. A feature merged behind a candidate carries no version change, so no box is offered it, but a staging room that installs or rebuilds after that merge builds the newer code **under the candidate's version number**, and what soaks is no longer what was tagged. A backup restore can import a saved image instead; it does not always rebuild the branch tip (see *Rolling back*). Pull requests can still be opened, reviewed and checked during a soak; they wait to merge. One staging room can only soak one candidate at a time anyway, so the freeze costs review latency and nothing else. Make it mechanical: switch on **Lock branch** for `testing` when you cut the candidate, and off when it is promoted, abandoned or superseded. The one thing that merges into a frozen `testing` is the fix for a failed candidate (step 6).
 
 ### 4. Soak on a staging room, on real plumbing
 
@@ -96,7 +96,7 @@ A staging room is a real room you can afford to get wrong: real switch, real pum
 
 - [ ] Take a Supervisor backup of the controller add-on (it holds `/data`) and a Home Assistant backup.
 - [ ] Snapshot every `number.`, `select.` and `switch.crop_steering_*` state before updating.
-- [ ] Update both halves **in place from the previous release**. Never a fresh install standing in for an upgrade.
+- [ ] Update both halves **in place from the previous release** (for a candidate meant for promotion, see *Production path* below). Never a fresh install standing in for an upgrade.
 - [ ] Confirm the installed versions and a current controller heartbeat. A copied file or a clean restart proves nothing.
 - [ ] **Prove the box is running the tagged code**, not a later tip of the branch. On the box (host console, or the *Advanced SSH & Web Terminal* add-on with protection mode off): `docker exec $(docker ps -qf name=f2_control) sha256sum /app/controller.py`. On your machine: `git show v2.19.0:addons/f2_control/f2_control/controller.py | sha256sum`. They must match. Write both into the audit file. If they differ, the soak has not started.
 - [ ] Diff the snapshot: **nothing the operator set has moved**, no entity has changed id, no repair issue has appeared.
@@ -124,6 +124,16 @@ A staging room is a real room you can afford to get wrong: real switch, real pum
 **Rollback rehearsal (C3, and any release that changes the state file)**
 
 - [ ] Restore the backup taken above and confirm the room resumes with its counters and phase intact. Rehearse this on staging; do not discover how rollback behaves on a production room.
+
+**Production path (a candidate meant for promotion)**
+
+When the candidates before it were superseded (step 6) rather than promoted, "the previous release" is not what production runs. For a candidate that will be promoted it means **the release `main` runs**, and its soak adds:
+
+- [ ] A room on the release `main` runs, updated in place to the candidate, both halves, with the whole *Upgrade, engine off* list, the hash of `main`'s release proven before the update.
+- [ ] The rollback rehearsal on that room: restore its backups of `main`'s release, prove that release's hash again, and confirm the room resumes with its counters and phase intact.
+- [ ] While rooms installed from the separate Jev repository remain, a Jev 3.11.1 room moved to the candidate by the move guide the candidate carries (`docs/MOVING_FROM_JEV.md`), every step, with its snapshot diff and catch test.
+
+The update from the superseded candidate before it is soaked as well, but it is not evidence for production.
 
 ### 5. Promote
 
@@ -173,6 +183,14 @@ GitHub's pull request merge button cannot fast-forward: every option it offers c
 ### 6. If the candidate fails
 
 It stays a pre-release forever (put "abandoned" in its title) and `main` never sees it. Fix on a branch, through a pull request into the still-frozen `testing`, take the next version number, cut a new candidate, and **start the soak clock again**. A candidate that needed a fix has not soaked.
+
+**A candidate that soaked clean but is held.** The owner may choose not to promote a candidate whose full soak passed, for instance to let later fixes soak before production takes the jump. Upload its `release-audit-v<version>.md` first, then put "soaked, superseded" in its pre-release title and switch **Lock branch** off so the next change can merge. Three rules hold:
+
+- **It is never promoted later.** `main` moves only to a later candidate that contains it and soaked itself, including the production path in step 4.
+- **Staging stays still until the next candidate.** From the unlock until the next `release/x.y.z` pull request merges, staging auto-update stays off and no staging room installs or rebuilds the controller: the reason for the freeze in step 3 still applies, and a rebuild would run newer code under the superseded number.
+- **A failed soak is still "abandoned"**, never "superseded".
+
+Promote is never given a superseded tag, so nothing in it changes: the candidate that is promoted still has `testing` at its tag.
 
 ## Hotfixes
 
