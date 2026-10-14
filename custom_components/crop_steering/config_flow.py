@@ -751,9 +751,9 @@ async def _versions(hass) -> tuple[str, str | None]:
     replaces the files and Home Assistant goes on running the old ones until it restarts.
     `waiting` is the version on disk when it differs, else None.
 
-    2026-09-21: 2.19.2 was on disk, code from before 2.18.0 was running, and nothing said so.
-    Setup was run twice on it, Home Assistant named every entity, and the controller could not
-    find one of them.
+    Observed on a production room (21 Sep 2026): 2.19.2 was on disk, code from before 2.18.0 was
+    running, and nothing said so. Setup was run twice on it, Home Assistant named every entity, and
+    the controller could not find one of them.
     """
     installed = await hass.async_add_executor_job(_installed_version)
     return SOFTWARE_VERSION, (
