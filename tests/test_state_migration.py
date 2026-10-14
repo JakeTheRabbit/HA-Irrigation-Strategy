@@ -413,3 +413,27 @@ def test_the_history_survives_a_restart_and_junk_in_it_is_dropped(tmp_path):
     st = c2.rooms[0].state[1]
     assert st["plateau_hist"] == [plateau] and st["night_hist"] == []
     assert st["night"] == night
+
+
+def test_a_3_11_1_state_file_loads_and_is_written_back_as_it_was(tmp_path):
+    """What controller 3.11.1 saved for a learned two-zone room mid-grow
+    (tests_ha/fixtures/state_3_11_1_learn_jev.json, recorded from that release): the learner with the
+    working peak Jev held above the learned one (learn.peak_adj, learn.jev), the day before's peak, the
+    P1 rule's state and both histories load, and saving writes back every value 3.11.1 wrote.
+    """
+    fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
+    seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": seed}), encoding="utf-8")
+    c = _make([1, 2], p)
+    c._load_state()
+    for zone in (1, 2):
+        st, old = c.rooms[0].state[zone], seed[str(zone)]
+        assert st["learn"]["peak_adj"] == old["learn"]["peak_adj"] == 1.0
+        assert st["learn"]["jev"] == old["learn"]["jev"]
+        assert st["peak_prev"] == old["peak_prev"]
+        assert st["plateau_hist"] == old["plateau_hist"]
+    c._save_state()
+    saved = json.loads(p.read_text(encoding="utf-8"))["default"]
+    for zone in ("1", "2"):
+        assert {k: saved[zone][k] for k in seed[zone]} == seed[zone]
