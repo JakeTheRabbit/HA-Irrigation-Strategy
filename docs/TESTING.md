@@ -80,7 +80,13 @@ a probe with no unit, bookkeeping keys in `entry.options`). `entry_3_8_learned_t
 Setpoints learner had learned (F2 zone 2 on 4 Oct 2026). `entry_2_25_1_pumped_room.json` is a
 pumped two-zone room as upstream 2.25.1 left it, recorded from that release's own wizard and
 controller: its config entry, every entity id it registered, its app `/data/options.json` and the
-`/data/state.json` its controller wrote. The `options_<version>_*.json` files with a `data` folder
+`/data/state.json` its controller wrote. `entry_3_11_1_pumped_room.json` is the same kind of room as Jev
+3.11.1 left it after two grow-days under its own controller with Auto setpoints on, recorded the same way:
+its config entry, every entity id, the ladder its controller moved, and beside it the app's
+`/data/options.json` on Cloudflare and on TypeSafe (`options_3_11_1_jev_cf.json`,
+`options_3_11_1_jev_typesafe.json`), the `/data/state.json` with the learner and the hourly P2 check's
+working peak (`state_3_11_1_learn_jev.json`), the `/data/jev_usage.json` (`jev_usage_3_11_1.json`) and the
+dosing store (`dosing_3_11_1.json`). The `options_<version>_*.json` files with a `data` folder
 (`data_3_0_0_ledger/`, `data_3_2_0/`, `data_3_3_0_typesafe/`, `data_3_0_0_quiet/`,
 `data_3_11_1_usage/`) are apps from 2.25.1 and the Jev line as each left `/data/options.json` and
 `/data`, recorded by running that version's own controller: they prove the brain starts on Cloudflare
