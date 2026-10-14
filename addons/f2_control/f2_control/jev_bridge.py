@@ -34,6 +34,8 @@ ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage
 PENDING_S = 300  # a write Home Assistant has not reflected yet is not an operator's edit for this long
 REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the old value back
 PAUSE_H = 48  # and the zone's setpoints are left alone this long
+# Only Jev's own code writes these into /data, so any one of them (empty or unreadable too) says Jev has run here.
+JEV_FILES = ("jev_usage.json", "jev_ledger.jsonl", "jev_journal.jsonl", "jev_setpoints.json")
 
 
 def judges():
@@ -54,11 +56,25 @@ def routes(options, cf):
     return found
 
 
+def has_run(data):
+    """True when a file only Jev writes is in `data` (the state file's folder): this install has run Jev before."""
+    return any(os.path.lexists(os.path.join(data, name)) for name in JEV_FILES)
+
+
 def build(options, cf, state_path, log):
     """The brain, or None when Jev is off (no route: no TypeSafe key and no Cloudflare credentials; or `jev_enabled`
-    false). Every route it has is used, TypeSafe first, each retried while a failure may pass (jev.client.Routes)."""
+    false). Every route it has is used, TypeSafe first, each retried while a failure may pass (jev.client.Routes).
+
+    A TypeSafe key starts it as it is: only the Jev line has that option. Cloudflare credentials alone start it only
+    where Jev has run before (has_run): an install updated from a line without Jev may have set them for the Auto
+    Setpoints check, and that must not switch an acting brain on."""
     found = routes(options, cf)
     if options.get("jev_enabled", True) is False or not found:
+        return None
+    data = os.path.dirname(state_path) or "."
+    if found[0].name != "TypeSafe" and not has_run(data):
+        log("jev: off. The Cloudflare credentials start Jev only on an install that has run it before, and no Jev"
+            f" file is in {data}; they still serve the Auto Setpoints check")
         return None
     wanted = str(options.get("jev_judges") or "all").replace(" ", "")
     allowed = set(ALL) if wanted in ("", "all") else set(wanted.split(",")) & set(ALL)
@@ -66,7 +82,6 @@ def build(options, cf, state_path, log):
     asker = Asker(first.account, first.token, first.gateway, daily_budget=int(options.get("jev_daily_calls", 5000)),
                   transport=Routes(found, tries=int(options.get("jev_retries", 3))),
                   warn_pct=float(options.get("jev_budget_warn_pct", 80)))
-    data = os.path.dirname(state_path) or "."
     ledger = Ledger(os.path.join(data, "jev_ledger.jsonl"))
     names = [r.name for r in found]
     log(f"jev: on via {' then '.join(names)}, judges {', '.join(sorted(allowed))}, {asker.daily_budget} calls a day")

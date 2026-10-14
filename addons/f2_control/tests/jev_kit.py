@@ -2,12 +2,20 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 from datetime import datetime, timedelta
 
 from crop_steering_engine import ZoneParams, ZoneSnapshot
 from jev.context import Shot, ZoneContext, ZoneHistory
 
 NOW = datetime(2026, 9, 27, 13, 0)
+
+
+def has_run(state_path=None):
+    """Make the test's /data one Jev has run in (jev_bridge.has_run): an empty ledger, a file only Jev writes."""
+    data = os.path.dirname(state_path or os.environ["F2_STATE_PATH"])
+    open(os.path.join(data, "jev_ledger.jsonl"), "a").close()
+    return data
 
 
 def params(**over):

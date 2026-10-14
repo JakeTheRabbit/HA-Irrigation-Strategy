@@ -49,6 +49,7 @@ def jev_with(monkeypatch):
         monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: transport)
         monkeypatch.setattr(jev_bridge, "Asker", functools.partial(
             Asker, threaded=False, clock=lambda: NOW.timestamp()))
+        K.has_run()  # Cloudflare alone starts Jev only where it has run before
         c, fake = _build({"num_zones": 1, "enable_flag": KILL, "cf_account_id": "acct",
                           "cf_api_token": "tok"}, states=_states())
         c._jev_transport = transport
@@ -121,10 +122,12 @@ def test_the_controller_starts_even_if_jev_cannot(monkeypatch):
     assert c.jev is None
 
 
-def test_the_options_choose_the_judges(jev_with, monkeypatch):
+def test_the_options_choose_the_judges(jev_with, monkeypatch, tmp_path):
     monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: K.FakeTransport({}))
     monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False))
-    brain = jev_bridge.build({"jev_judges": "ramp, salt"}, ("a", "t", ""), "/tmp/state.json", lambda *a: None)
+    state = str(tmp_path / "state.json")
+    K.has_run(state)
+    brain = jev_bridge.build({"jev_judges": "ramp, salt"}, ("a", "t", ""), state, lambda *a: None)
     assert sorted(j.name for j in brain.judges) == ["ramp", "salt"]
     assert jev_bridge.build({"jev_enabled": False}, ("a", "t", ""), "/tmp/s.json", lambda *a: None) is None
     assert controller.Controller.__dict__  # controller imports the bridge

@@ -1,7 +1,9 @@
 """The Jev runtime: the council, the background asker, the envelope, the ledger and the brain."""
+import os
 from datetime import timedelta
 
 import jev_kit as K
+import pytest
 from jev import council
 from jev.brain import Brain
 from jev.client import Asker, parse
@@ -202,16 +204,44 @@ def test_typesafe_answers_are_read_from_the_top_level():
     assert parse_typesafe(None) == (None, None)
 
 
-def test_every_route_jev_has_is_used_typesafe_first():
+def test_every_route_jev_has_is_used_typesafe_first(tmp_path):
     import jev_bridge
     from jev.client import Routes, call, call_typesafe
 
     both = jev_bridge.build({"typesafe_api_key": "apikey_x"}, ("acct", "tok", ""), "/tmp/state.json", lambda *a: None)
     assert isinstance(both.asker.transport, Routes) and both.routes == ["TypeSafe", "Cloudflare"]
     assert [(r.fn, r.token) for r in both.asker.transport.routes] == [(call_typesafe, "apikey_x"), (call, "tok")]
-    cf_only = jev_bridge.build({}, ("acct", "tok", ""), "/tmp/state.json", lambda *a: None)
+    ran = str(tmp_path / "state.json")
+    K.has_run(ran)  # Cloudflare alone starts Jev only where it has run before
+    cf_only = jev_bridge.build({}, ("acct", "tok", ""), ran, lambda *a: None)
     assert cf_only.routes == ["Cloudflare"] and cf_only.asker.daily_budget == 5000
     assert jev_bridge.build({}, ("", "", ""), "/tmp/state.json", lambda *a: None) is None
+
+
+def test_cloudflare_alone_starts_no_jev_where_jev_has_never_run(tmp_path):
+    """An install updated from a line without Jev may have set Cloudflare for the Auto Setpoints check: no brain."""
+    import jev_bridge
+
+    said = []
+    state = str(tmp_path / "state.json")
+    assert jev_bridge.build({"jev_enabled": True}, ("acct", "tok", ""), state, said.append) is None
+    assert "jev: off" in said[0] and str(tmp_path) in said[0] and "tok" not in said[0]
+    assert os.listdir(tmp_path) == []  # nothing written, so the next start decides the same
+    typesafe = jev_bridge.build({"typesafe_api_key": "apikey_x"}, ("", "", ""), state, said.append)
+    assert typesafe.routes == ["TypeSafe"]  # only the Jev line has a TypeSafe key: it starts as before
+
+
+@pytest.mark.parametrize("name", ["jev_usage.json", "jev_ledger.jsonl", "jev_journal.jsonl", "jev_setpoints.json"])
+@pytest.mark.parametrize("content", [b"", b"\xff\x00 not json"], ids=["empty", "unreadable"])
+def test_any_one_jev_file_in_the_state_folder_starts_jev_on_cloudflare_alone(tmp_path, name, content):
+    import jev_bridge
+
+    (tmp_path / name).write_bytes(content)
+    brain = jev_bridge.build({}, ("acct", "tok", ""), str(tmp_path / "state.json"), lambda *a: None)
+    assert brain is not None and brain.routes == ["Cloudflare"]
+    elsewhere = tmp_path / "other"
+    elsewhere.mkdir()
+    assert jev_bridge.build({}, ("acct", "tok", ""), str(elsewhere / "state.json"), lambda *a: None) is None
 
 
 def test_an_old_options_file_keeps_its_budget_and_takes_the_new_defaults():

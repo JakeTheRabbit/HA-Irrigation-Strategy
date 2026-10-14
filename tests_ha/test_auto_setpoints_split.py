@@ -40,6 +40,7 @@ class _Clock(datetime):
 async def _learned_tent(hass, controller_for, monkeypatch):
     import controller
     import jev_bridge
+    import jev_kit
     from jev.client import Asker
 
     # Jev's asker without its background worker: nothing in this test asks Jev anything, and a
@@ -47,6 +48,7 @@ async def _learned_tent(hass, controller_for, monkeypatch):
     monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False))
     _entry, seed = await _upgrade(hass, "entry_3_8_learned_tent.json")
     assert hass.states.get("switch.crop_steering_auto_setpoints").state == "on"
+    jev_kit.has_run()  # a 3.8.0 box has run Jev, so Cloudflare alone starts it
     c, fake, _clock = controller_for(JEV, saved_state=seed["controller_saved"])
     assert jev_bridge.owns_setpoints(c)
     room = c.rooms[0]

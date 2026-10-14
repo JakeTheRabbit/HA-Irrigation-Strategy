@@ -304,6 +304,7 @@ def ramp_clock(monkeypatch):
 
 def _zone_2(auto="on", plan=False, numbers=Z2):
     """Zone 2 with what its learner had learned by 4 Oct, loaded from the block controller 3.8.0 saved."""
+    K.has_run()  # a box that has run Jev: Cloudflare alone starts it
     c, fake, room = asr._rig(auto=auto, numbers=numbers, options=JUDGE)
     room.state[1]["learn"] = c._apply_saved_zone(c._fresh_zone(), {"learn": SAVED_BY_3_8_0})["learn"]
     room.strategy_required = plan
