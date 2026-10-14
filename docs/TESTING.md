@@ -235,6 +235,12 @@ Run comparison tests cover room-scoped persistent metadata, revision conflicts, 
 
 Run `node frontend/scripts/verify-recipe-library.mjs` after building to check named library saves on HTTP-style crypto capabilities, export/import, current-date preservation, explicit dirty-draft replacement, room isolation, removal confirmation, corruption recovery export and desktop/mobile accessibility. This suite also runs in CI and captures `img/recipe-library.png` from isolated demo data.
 
+### 8. Error codes: `tests/test_error_codes.py`
+
+`docs/error-codes.json` is the one list of `CS-xxx` codes. Every code the controller raises or a Repairs card shows is in it, `docs/ERROR_CODES.md` is exactly what it writes, and no code is defined twice: once in the list, on at most one Repairs card in `strings.json` and in `translations/en.json`, and once in each shipped dashboard.
+
+A number is never handed out twice. Every code after the ones 3.11.1 shipped is first reserved in the test's `RESERVED` table, against the branch of the pull request that will add it (JSON has no comments, and `ERROR_CODES.md` is generated, so neither can hold a reservation). That pull request adds the code to the list together with the integration commit that puts it in a notification kind (`tests/test_notify_catalog.py`). A code nobody reserved fails the test until its reservation is added.
+
 ## Manual verification checklist (live Home Assistant)
 
 The automated suite can't drive real hardware. Before trusting a change on the grow:
