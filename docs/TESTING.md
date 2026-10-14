@@ -77,7 +77,10 @@ in a test. `entry_2_17_wizard.json` is a pumped two-zone room from the 2.17 wiza
 `entry_env_era.json` is from the env-file era (legacy front/back probe pairs, no setup revision,
 a probe with no unit, bookkeeping keys in `entry.options`). `entry_3_8_learned_tent.json` is the
 2.18 tent as a 3.8.0 box holds it, with the state file controller 3.8.0 wrote for a zone its Auto
-Setpoints learner had learned (F2 zone 2 on 4 Oct 2026).
+Setpoints learner had learned (F2 zone 2 on 4 Oct 2026). `entry_2_25_1_pumped_room.json` is a
+pumped two-zone room as upstream 2.25.1 left it, recorded from that release's own wizard and
+controller: its config entry, every entity id it registered, its app `/data/options.json` and the
+`/data/state.json` its controller wrote.
 
 **Only the web server is stood in for.** The manifest depends on `frontend` and `http` for the
 sidebar panel; `conftest.py` marks both as set up and gives `hass.http` a mock, and the panel
