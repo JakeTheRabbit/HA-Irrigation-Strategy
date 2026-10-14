@@ -304,6 +304,18 @@ describe("blocks and holds", () => {
     ]);
     expect(zoneBlocks(day, 4, from, START)).toEqual([]);
   });
+  it("reads the kill switch hold under the product's name and under the old one", () => {
+    // History recorded before the update keeps the old wording; both are the same hold.
+    for (const text of [
+      "Crop Steering Controller disabled (kill switch off)",
+      "f2-control disabled (kill switch off)",
+    ]) {
+      const rows = [decision(at("12:00:00"), [], [`Z1 P3 ${text}`]), decision(at("12:01:00"))];
+      expect(zoneBlocks(rows, 1, at("11:00:00"), at("13:00:00"))).toEqual([
+        { kind: "hold", text, start: at("12:00:00"), end: at("12:01:00"), open: false },
+      ]);
+    }
+  });
   it("keeps one interval while only the numbers move, and one still held open at the end", () => {
     const rows = [
       decision(at("12:00:00"), [], ["Z1 P2 BLOCK daily-cap 80/80L (budget; emergencies exempt)"]),
