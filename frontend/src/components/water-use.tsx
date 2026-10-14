@@ -100,7 +100,7 @@ export function WaterUsePanel({
 }) {
   const room = controller.room;
   const lightsOn = room.settings.find((field) => field.entityId.endsWith("_lights_on_hour"))?.value;
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const timeZone = controller.timeZone;
   const today =
     lightsOn === undefined || lightsOn === null ? null : growDayOf(Date.now(), lightsOn, timeZone);
   const series = room.zones.map((zone) => ({ zone, ids: counterIds(controller, zone) }));

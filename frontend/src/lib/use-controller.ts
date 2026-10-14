@@ -11,6 +11,7 @@ import {
   findSession,
   HaClient,
   haSessionToken,
+  haTimeZone,
   type HassSession,
 } from "./client";
 import {
@@ -74,6 +75,9 @@ export class ControllerStore {
   private updated: number | null = null;
   private writing = false;
   private admin: boolean | null = null;
+  private timeZone = haTimeZone();
+  /** The connection whose Home Assistant time zone has been asked for. */
+  private zoneOf?: HaClient;
   readonly demo: boolean;
   private snapshot!: Controller;
   private operatorDemo?: OperatorDemo;
@@ -127,6 +131,7 @@ export class ControllerStore {
       demo: this.demo,
       admin: this.admin,
       connection: this.connection,
+      timeZone: this.timeZone,
       error: this.error,
       lastUpdated: this.updated,
       roomId: this.roomId,
@@ -159,6 +164,7 @@ export class ControllerStore {
         saved.base || (typeof window !== "undefined" ? window.location.origin : "http://localhost");
       const session = saved.token ? undefined : findSession(base);
       this.admin = adminOf(session);
+      this.timeZone = haTimeZone(session?.config);
       const inheritedToken =
         typeof window !== "undefined" && base === window.location.origin ? haSessionToken() : "";
       try {
@@ -207,6 +213,7 @@ export class ControllerStore {
       this.states = states;
       this.settle();
       if (this.live) this.subscribeLive(this.live);
+      if (this.zoneOf !== client) void this.readTimeZone(client);
     } catch (error) {
       if (generation !== this.generation || request !== this.requestId) return;
       this.connection = "offline";
@@ -214,6 +221,18 @@ export class ControllerStore {
     }
     this.publish();
   };
+  /** Home Assistant's time zone, once per connection (again at the next refresh if it fails). */
+  private async readTimeZone(client: HaClient) {
+    this.zoneOf = client;
+    try {
+      const zone = await client.timeZone();
+      if (client !== this.client || zone === this.timeZone) return;
+      this.timeZone = zone;
+      this.publish();
+    } catch {
+      if (client === this.client) this.zoneOf = undefined;
+    }
+  }
   /** New states arrived: keep the selected room (or pick the requested or first one). */
   private settle() {
     const rooms = discoverRooms(this.states);
@@ -343,6 +362,7 @@ export class ControllerStore {
     const session = token.trim() ? undefined : findSession(base);
     const client = new HaClient(base, token.trim(), session);
     this.admin = adminOf(session);
+    this.timeZone = haTimeZone(session?.config);
     this.historyAborters.forEach((abort) => abort.abort());
     this.historyAborters.clear();
     this.generation++;

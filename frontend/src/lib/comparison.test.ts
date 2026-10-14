@@ -9,6 +9,7 @@ import {
   midnight,
   summarize,
   timeAtAge,
+  wallTime,
 } from "./comparison";
 import { loadHistoryWindow } from "./comparison-history";
 import { HaClient } from "./client";
@@ -212,5 +213,27 @@ describe("daily long-term statistics", () => {
     ]);
     expect(dailyStatistics(rows, zone)["sensor.none"]).toEqual([]);
     expect(() => dailyStatistics(null, zone)).toThrow("invalid statistics");
+  });
+});
+
+describe("a wall-clock time in a named time zone", () => {
+  it("is the same instant whatever the browser's own zone", () => {
+    expect(wallTime("2026-09-23", 600, "Pacific/Auckland")).toBe(
+      Date.parse("2026-09-22T22:00:00Z"),
+    );
+    expect(wallTime("2026-09-23", 600, "America/New_York")).toBe(
+      Date.parse("2026-09-23T14:00:00Z"),
+    );
+    expect(wallTime("2026-09-23", 630, "UTC")).toBe(Date.parse("2026-09-23T10:30:00Z"));
+  });
+  it("reads a time a clock change skips or repeats as the browser's Date does", () => {
+    // 02:30 on 27 September 2026 does not exist in Auckland: it reads as 03:30 NZDT.
+    expect(wallTime("2026-09-27", 150, "Pacific/Auckland")).toBe(
+      Date.parse("2026-09-26T14:30:00Z"),
+    );
+    // 02:30 on 5 April 2026 happens twice: the first, NZDT, is taken.
+    expect(wallTime("2026-04-05", 150, "Pacific/Auckland")).toBe(
+      Date.parse("2026-04-04T13:30:00Z"),
+    );
   });
 });

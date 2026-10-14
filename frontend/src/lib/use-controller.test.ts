@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ControllerStore } from "./use-controller";
-import { HaClient } from "./client";
+import { HaClient, haTimeZone } from "./client";
+import { viewerTimeZone } from "./comparison";
 import { createDemo } from "./demo";
 import type { States } from "./types";
 
@@ -317,5 +318,77 @@ describe("controller lifecycle", () => {
       { state: "on", time: Date.parse("2026-09-23T00:01:00Z") },
     ]);
     expect(rows["sensor.crop_steering_current_decision"][1].attributes).toEqual({ a: 1 });
+  });
+});
+
+describe("Home Assistant's time zone", () => {
+  const elsewhere = () =>
+    viewerTimeZone() === "Pacific/Auckland" ? "Europe/Berlin" : "Pacific/Auckland";
+  it("is read from the Home Assistant page the dashboard runs in", async () => {
+    browser();
+    const session = {
+      callApi: vi.fn(),
+      callService: vi.fn(),
+      config: { time_zone: elsewhere() },
+    };
+    vi.stubGlobal("window", {
+      ...window,
+      document: {
+        querySelector: (name: string) => (name === "home-assistant" ? { hass: session } : null),
+      },
+    });
+    vi.spyOn(HaClient.prototype, "states").mockResolvedValue(createDemo());
+    const store = new ControllerStore(false);
+    await store.connect("http://example.test", "");
+    expect(store.getSnapshot().timeZone).toBe(session.config.time_zone);
+    expect(session.callApi).not.toHaveBeenCalled();
+    expect(haTimeZone({ time_zone: "Nowhere/Unknown" })).toBe(viewerTimeZone());
+    expect(haTimeZone({})).toBe(viewerTimeZone());
+  });
+  it("is asked of Home Assistant once per connection outside it, with the token", async () => {
+    browser();
+    const zone = elsewhere();
+    let configFails = true;
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (new URL(String(input)).pathname !== "/api/config")
+        return new Response(JSON.stringify(Object.values(createDemo())), { status: 200 });
+      if (configFails) return new Response("{}", { status: 500 });
+      return new Response(JSON.stringify({ time_zone: zone }), { status: 200 });
+    });
+    const asked = () => fetch.mock.calls.filter(([input]) => String(input).endsWith("/api/config"));
+    const store = new ControllerStore(false);
+    await store.connect("http://example.test", "test");
+    await vi.waitFor(() => expect(asked()).toHaveLength(1));
+    // Not answered yet: the viewer's own clock, and the next refresh asks again.
+    expect(store.getSnapshot().timeZone).toBe(viewerTimeZone());
+    configFails = false;
+    await store.refresh();
+    await vi.waitFor(() => expect(store.getSnapshot().timeZone).toBe(zone));
+    expect(asked()).toHaveLength(2);
+    expect(asked()[1][1]?.headers).toMatchObject({ Authorization: "Bearer test" });
+    await store.refresh();
+    expect(asked()).toHaveLength(2);
+    store.disconnect();
+  });
+  it("is asked with the Home Assistant login a page on its own origin inherits", async () => {
+    browser();
+    const zone = elsewhere();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) =>
+        key === "hassTokens" ? JSON.stringify({ access_token: "inherited" }) : null,
+    });
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const body =
+        new URL(String(input)).pathname === "/api/config"
+          ? { time_zone: zone }
+          : Object.values(createDemo());
+      return new Response(JSON.stringify(body), { status: 200 });
+    });
+    const store = new ControllerStore(false);
+    const stop = store.start();
+    await vi.waitFor(() => expect(store.getSnapshot().timeZone).toBe(zone));
+    const [, init] = fetch.mock.calls.find(([input]) => String(input).endsWith("/api/config"))!;
+    expect(init?.headers).toMatchObject({ Authorization: "Bearer inherited" });
+    stop();
   });
 });

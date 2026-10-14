@@ -139,6 +139,7 @@ export function Today({
     numeric(states[`number.crop_steering_${prefix}lights_on_hour`]),
     numeric(states[`number.crop_steering_${prefix}lights_off_hour`]),
     now,
+    controller.timeZone,
   );
   // Today's readings from lights-on, and at least the last three hours (a morning keeps the night).
   const from = Math.min(day?.start ?? now - 12 * H, now - 3 * H);

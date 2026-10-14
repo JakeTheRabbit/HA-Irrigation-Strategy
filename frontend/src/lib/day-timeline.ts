@@ -1,3 +1,4 @@
+import { addDays, dateInZone, viewerTimeZone, wallTime } from "./comparison";
 import { ageText } from "./controller-health";
 import { descriptor } from "./model";
 import { smoothRecorded, type RecordedPoint } from "./planning-curve";
@@ -133,28 +134,24 @@ export function timelineEntities(room: RoomView, states: States, zoneId?: number
   };
 }
 
-/** The grow-day `now` falls in: lights-on to the next lights-on, in the browser's time zone (as the
- * plan graph folds recorded days). Null without a usable photoperiod. */
+/** The grow-day `now` falls in: lights-on to the next lights-on, on the clock of `timeZone`
+ * (Home Assistant's, as the controller keeps it; the browser's where that is unknown), as the plan
+ * graph folds recorded days. Null without a usable photoperiod. */
 export function growDay(
   lightsOn: number | null,
   lightsOff: number | null,
   now: number,
+  timeZone = viewerTimeZone(),
 ): GrowDay | null {
   const hour = (value: number | null): value is number =>
     value !== null && value >= 0 && value < 24;
   if (!hour(lightsOn) || !hour(lightsOff) || lightsOn === lightsOff || !Number.isFinite(now))
     return null;
-  const at = (day: Date, offset: number, value: number) =>
-    new Date(
-      day.getFullYear(),
-      day.getMonth(),
-      day.getDate() + offset,
-      0,
-      Math.round(value * 60),
-    ).getTime();
-  const today = new Date(now);
+  const at = (day: string, offset: number, value: number) =>
+    wallTime(addDays(day, offset), Math.round(value * 60), timeZone);
+  const today = dateInZone(now, timeZone);
   const start = at(today, 0, lightsOn) > now ? at(today, -1, lightsOn) : at(today, 0, lightsOn);
-  const first = new Date(start);
+  const first = dateInZone(start, timeZone);
   return {
     start,
     lightsOff: at(first, lightsOff > lightsOn ? 0 : 1, lightsOff),
@@ -359,15 +356,16 @@ export function earlierDays(
   day: GrowDay,
   count: number,
   hours: (time: number) => { on: number | null; off: number | null },
+  timeZone = viewerTimeZone(),
 ): GrowDay[] {
   const days: GrowDay[] = [];
   for (let end = day.start; days.length < count;) {
     const middle = end - 12 * 3_600_000;
     const { on, off } = hours(middle);
-    let earlier = growDay(on, off, middle);
+    let earlier = growDay(on, off, middle, timeZone);
     // The schedule changed after this day's lights-on: it came on at the hour in force then.
     const then = earlier && hours(earlier.start);
-    const moved = then && then.on !== on && growDay(then.on, then.off, middle);
+    const moved = then && then.on !== on && growDay(then.on, then.off, middle, timeZone);
     if (moved && hours(moved.start).on === then.on) earlier = moved;
     if (!earlier) break;
     days.push({ start: earlier.start, lightsOff: Math.min(earlier.lightsOff, end), end });
@@ -439,14 +437,17 @@ export function earlierTraces(
   day: GrowDay,
   hours: { on: number | null; off: number | null },
   config?: string,
+  timeZone = viewerTimeZone(),
 ) {
   const root = `crop_steering_${room.room.prefix}`;
   const recorded = (key: "on" | "off", time: number) =>
     valueAt(rows[`number.${root}lights_${key}_hour`], time) ?? hours[key];
-  const days = earlierDays(day, 7, (time) => ({
-    on: recorded("on", time),
-    off: recorded("off", time),
-  }));
+  const days = earlierDays(
+    day,
+    7,
+    (time) => ({ on: recorded("on", time), off: recorded("off", time) }),
+    timeZone,
+  );
   const active = `switch.${root}room_active`;
   return {
     traces: new Map(
