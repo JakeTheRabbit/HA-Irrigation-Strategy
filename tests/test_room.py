@@ -2,16 +2,9 @@
 existing single-room installs (e.g. F2) keep their exact entity ids, while named rooms get an
 isolated prefix."""
 
-import importlib.util
 import types
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-_spec = importlib.util.spec_from_file_location(
-    "cs_room", ROOT / "custom_components" / "crop_steering" / "room.py"
-)
-room = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(room)
+from custom_components.crop_steering import room
 
 
 def _entry(data):

@@ -70,6 +70,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-606](#cs-606) | Grow strategy plan is holding irrigation | Critical | Repairs card |
 | [CS-607](#cs-607) | Grow strategy plan has not moved on to today | Warning | Repairs card |
 | [CS-608](#cs-608) | Stock tanks running low | Warning | Repairs card |
+| [CS-610](#cs-610) | Engine Enabled does not stop water in this room | Warning | Repairs card |
 | [CS-701](#cs-701) | Water isn't reaching this zone | Warning | Notification |
 | [CS-702](#cs-702) | This zone's water per plant is out of line with the others | Information | Notification |
 | [CS-703](#cs-703) | Overnight low reading looks like a probe fault | Warning | Notification |
@@ -899,6 +900,26 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Refill the tank, then press Refilled on Crop Steering → Stock tanks.
 - Or set the level you read off the tank. The card clears itself once every tank is above its low mark.
+
+<a id="cs-610"></a>
+
+### CS-610: Engine Enabled does not stop water in this room
+
+*Warning · Repairs card*
+
+**What it means.** Each room has one kill switch, the switch that must be ON before anything in it is watered. The running controller reports that this room's kill switch is another entity, so switching the room's Engine Enabled switch OFF does not stop water in it. The card is raised only from a current controller heartbeat, because only the running controller knows which switch it stops on.
+
+**Watering meanwhile.** Carries on, gated by the kill switch the card names. Engine Enabled neither stops nor starts it.
+
+**Likely causes**
+
+- An installation from before the setup wizard, which stops on the entity the controller app's enable_flag option names (input_boolean.f2_control_enabled unless the option was changed), and which also has an Engine Enabled switch.
+- The room's setup, or the app's enable_flag option, names a kill switch other than Engine Enabled on purpose.
+
+**Suggested fixes**
+
+- To stop watering in this room, switch OFF the kill switch the card names, and change any automation that switches Engine Enabled OFF to switch that one instead.
+- To make Engine Enabled the room's kill switch, follow "Moving a room's kill switch" in docs/INSTALL.md: on a room with no saved setup, set the app's enable_flag option to it and restart the app; on a room whose setup has been saved, change the kill switch in its setup.
 
 ## Jev (CS-7xx)
 

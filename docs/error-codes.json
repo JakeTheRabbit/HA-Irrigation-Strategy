@@ -695,6 +695,22 @@
       ]
     },
     {
+      "code": "CS-610",
+      "title": "Engine Enabled does not stop water in this room",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "Each room has one kill switch, the switch that must be ON before anything in it is watered. The running controller reports that this room's kill switch is another entity, so switching the room's Engine Enabled switch OFF does not stop water in it. The card is raised only from a current controller heartbeat, because only the running controller knows which switch it stops on.",
+      "watering": "Carries on, gated by the kill switch the card names. Engine Enabled neither stops nor starts it.",
+      "causes": [
+        "An installation from before the setup wizard, which stops on the entity the controller app's enable_flag option names (input_boolean.f2_control_enabled unless the option was changed), and which also has an Engine Enabled switch.",
+        "The room's setup, or the app's enable_flag option, names a kill switch other than Engine Enabled on purpose."
+      ],
+      "fixes": [
+        "To stop watering in this room, switch OFF the kill switch the card names, and change any automation that switches Engine Enabled OFF to switch that one instead.",
+        "To make Engine Enabled the room's kill switch, follow \"Moving a room's kill switch\" in docs/INSTALL.md: on a room with no saved setup, set the app's enable_flag option to it and restart the app; on a room whose setup has been saved, change the kill switch in its setup."
+      ]
+    },
+    {
       "code": "CS-701",
       "title": "Water isn't reaching this zone",
       "source": "notification",

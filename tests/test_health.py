@@ -248,3 +248,101 @@ def test_a_room_switched_off_clears_its_plan_cards():
     hass._issues["strategy_hold"] = {"severity": "error"}
     _run(hass, ha_stubs.FakeEntry(data={"room_slug": "default", "zones": {}}))
     assert "strategy_hold" not in hass._issues
+
+
+# ---------------------------------------------------------------- the card names the running gate
+# One gate per room, and only the running controller knows which: the heartbeat names it unless it
+# is behind the published setup. The kill-switch card names the switch the room stops on. A card of
+# its own says the room's Engine Enabled switch does not stop water, whenever a current heartbeat
+# names another gate: with that gate present and ON, an operator switching Engine Enabled OFF
+# expects water to stop, and it does not.
+NOT_GATE = "engine_switch_not_gate"
+
+
+def _card(**kw):
+    return _behind(**kw)["kill_switch_missing"]["translation_placeholders"]
+
+
+def test_the_card_names_the_gate_the_controller_reports():
+    card = _card(
+        heartbeat={"enable_flag": "input_boolean.my_kill", "setup_revision": 3},
+        descriptor={"enable_flag": OWN, "setup_revision": 3},
+        present=[OWN],
+    )
+    assert card["kill_switch"] == "input_boolean.my_kill"
+    assert card["source"] == "the one its controller reports"
+
+
+def test_with_the_controller_behind_the_card_names_the_published_gate():
+    card = _card(
+        heartbeat={"enable_flag": LEGACY, "setup_revision": 0},
+        descriptor={"enable_flag": "input_boolean.my_kill", "setup_revision": 1},
+        present=[OWN],
+    )
+    assert card["kill_switch"] == "input_boolean.my_kill"
+    assert card["source"].startswith("as the room's setup publishes it")
+
+
+def test_a_current_heartbeat_naming_another_gate_says_engine_enabled_does_not_stop_water():
+    # The gate is there: no kill-switch card, and still this one.
+    issues = _behind(
+        heartbeat={"enable_flag": LEGACY, "setup_revision": 0},
+        descriptor={"enable_flag": LEGACY, "setup_revision": 0},
+        present=[LEGACY, OWN],
+    )
+    assert "kill_switch_missing" not in issues
+    assert issues[NOT_GATE]["severity"] == "warning"
+    assert issues[NOT_GATE]["translation_placeholders"] == {
+        "kill_switch": LEGACY,
+        "engine_switch": OWN,
+    }
+
+
+def test_only_a_current_heartbeat_says_engine_enabled_does_not_stop_water():
+    # Behind the published setup: the gate it names is the one being left behind.
+    assert NOT_GATE not in _behind(
+        heartbeat={"enable_flag": LEGACY, "setup_revision": 0},
+        descriptor={"enable_flag": "input_boolean.my_kill", "setup_revision": 1},
+        present=[LEGACY, "input_boolean.my_kill", OWN],
+    )
+    # No heartbeat: the descriptor's flag is only what the setup publishes.
+    hass = ha_stubs.FakeHass(
+        states={
+            "sensor.crop_steering_engine_config": ha_stubs.FakeState(
+                "ok", {"prefix": "", "enable_flag": LEGACY, "setup_revision": 0}
+            ),
+            LEGACY: ha_stubs.FakeState("on"),
+            OWN: ha_stubs.FakeState("off"),
+        }
+    )
+    _run(hass, ha_stubs.FakeEntry(data={"room_slug": "default", "zones": {}}))
+    assert NOT_GATE not in hass._issues
+    # A stale heartbeat: the controller is not running, and may start on another gate.
+    stale = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    hass = ha_stubs.FakeHass(
+        states={
+            BEAT: ha_stubs.FakeState("healthy", {"enable_flag": LEGACY}, stale),
+            LEGACY: ha_stubs.FakeState("on"),
+            OWN: ha_stubs.FakeState("off"),
+        }
+    )
+    _run(hass, ha_stubs.FakeEntry(data={"room_slug": "default", "zones": {}}))
+    assert "engine_offline" in hass._issues and NOT_GATE not in hass._issues
+
+
+def test_no_card_says_the_gate_itself_does_not_stop_water():
+    # The room stops on its own Engine Enabled switch.
+    assert NOT_GATE not in _behind(
+        heartbeat={"enable_flag": OWN, "setup_revision": 1},
+        descriptor={"enable_flag": OWN, "setup_revision": 1},
+        present=[OWN, LEGACY],
+    )
+    # Another gate, and no Engine Enabled switch in the room: nothing to say about one.
+    assert NOT_GATE not in _behind(
+        heartbeat={
+            "enable_flag": "switch.crop_steering_veg_engine_enabled",
+            "setup_revision": 1,
+        },
+        descriptor={"enable_flag": OWN, "setup_revision": 1},
+        present=["switch.crop_steering_veg_engine_enabled"],
+    )

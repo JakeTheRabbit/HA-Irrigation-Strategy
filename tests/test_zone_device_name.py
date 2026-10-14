@@ -5,18 +5,16 @@ Seen on a first install: the zone was set up as "GT1" and Home Assistant offered
 so the winner was whichever registered last, and none of them used the configured name.
 """
 
-import importlib.util
 import re
 import types
 from pathlib import Path
 
 import pytest
 
+from custom_components.crop_steering import room
+
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "custom_components" / "crop_steering"
-_spec = importlib.util.spec_from_file_location("cs_room_names", INTEGRATION / "room.py")
-room = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(room)
 
 
 def _entry(data=None, options=None):

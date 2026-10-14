@@ -2,6 +2,11 @@
 
 DOMAIN = "crop_steering"
 
+# The default room's kill switch on an installation from before the setup wizard: a helper the
+# operator made by hand, and the controller app's shipped `enable_flag` option. A room made by the
+# wizard stops on its own Engine Enabled switch instead. Named here once; room.room_gate decides.
+LEGACY_KILL_SWITCH = "input_boolean.f2_control_enabled"
+
 # Where a Repairs card's "Learn more" link goes: every card carries a CS code, explained there.
 REPAIRS_DOCS_URL = "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/ERROR_CODES.md"
 
