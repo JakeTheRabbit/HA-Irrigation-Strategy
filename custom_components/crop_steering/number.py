@@ -434,8 +434,10 @@ DEFAULT_VALUES = {
     "ec_target_gen_p1": 5.0,
     "ec_target_gen_p2": 6.0,
     "ec_target_gen_p3": 4.5,
-    "irrigation_ph_min": 5.8,
-    "irrigation_ph_max": 6.2,
+    # A new room's source-water pH band. A room that already has these numbers keeps its own
+    # (restored), so an update never moves the band a room runs on.
+    "irrigation_ph_min": 5.5,
+    "irrigation_ph_max": 6.5,
     "irrigation_ec_min": 0.0,
     "irrigation_ec_max": 0.0,
     "lights_on_hour": 12,

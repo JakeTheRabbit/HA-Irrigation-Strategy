@@ -382,7 +382,7 @@
           "tank_last_fill_sensor": "Timestamp sensor or date-and-time helper recording the last fill. Helpers require both date and time plus a numeric epoch timestamp. A level sensor's last_changed time is not a fill event.",
           "tank_fill_entity": "Read-only switch or binary sensor indicating filling. The dashboard does not operate this entity.",
           "feed_ec_sensor": "An EC probe in the water you IRRIGATE WITH, not in the substrate. When mapped, the controller refuses to water while feed EC is outside your limits or the probe stops reporting. mS/cm, dS/m or µS/cm (converted for you). Leave empty to switch this check off.",
-          "feed_ph_sensor": "A pH probe in the water you irrigate with. When mapped, watering is refused outside your pH limits (5.8-6.2 by default) or when the probe stops reporting. Leave empty to switch this check off."
+          "feed_ph_sensor": "A pH probe in the water you irrigate with. When mapped, watering is refused outside your pH limits (5.5-6.5 on a new room) or when the probe stops reporting. Leave empty to switch this check off."
         }
       },
       "load_env": {
@@ -780,7 +780,7 @@
           "zone_24_name": "What you call zone 24, e.g. 'Tent' or 'Bench 2'. Shown on the dashboard. Changing it later never changes an entity id.",
           "zone_24_active": "Untick to park zone 24: it keeps its number, settings and history, and is never watered.",
           "feed_ec_sensor": "An EC probe in the water you IRRIGATE WITH, not in the substrate. When mapped, the controller refuses to water while feed EC is outside your limits or the probe stops reporting. mS/cm, dS/m or µS/cm (converted for you). Leave empty to switch this check off.",
-          "feed_ph_sensor": "A pH probe in the water you irrigate with. When mapped, watering is refused outside your pH limits (5.8-6.2 by default) or when the probe stops reporting. Leave empty to switch this check off."
+          "feed_ph_sensor": "A pH probe in the water you irrigate with. When mapped, watering is refused outside your pH limits (5.5-6.5 on a new room) or when the probe stops reporting. Leave empty to switch this check off."
         }
       },
       "edit_parameters": {
