@@ -201,7 +201,7 @@ def test_a_zone_never_watered_is_not_given_a_number_of_hours():
     assert alert["title"] == "Zone 1: URGENT, drying out and not being watered (CS-207)"
     assert "has never been watered by the controller" in alert["message"]
     assert "16666666" not in alert["message"]
-    assert "Blocked by: f2-control disabled (kill switch off)" in alert["message"]
+    assert "Blocked by: Crop Steering Controller disabled (kill switch off)" in alert["message"]
 
 
 def test_every_alert_the_controller_raises_passes_a_code():
