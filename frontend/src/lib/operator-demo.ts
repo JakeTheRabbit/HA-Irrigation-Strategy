@@ -2,6 +2,7 @@ import { RunDemo } from "./comparison-demo";
 import { DosingDemo } from "./dosing-demo";
 import { NotifyDemo } from "./notify-demo";
 import { StockDemo } from "./stock-demo";
+import { CalibrationDemo } from "./calibration";
 import type {
   OperatorAction,
   StrategyDocument,
@@ -25,6 +26,7 @@ export class OperatorDemo {
   /** From the start: the tanks drew what the demo's dosing history dosed before it began. */
   private stockDemo: StockDemo;
   private dosingDemo?: DosingDemo;
+  private calibrationDemo?: CalibrationDemo;
   private notifyDemo?: NotifyDemo;
   private plans = new Map<string, StrategyDocument>();
   private rooms: SetupRoom[] | null = null;
@@ -286,6 +288,10 @@ export class OperatorDemo {
       return this.runDemo.call(action, data) as T;
     }
     if (action.startsWith("stock_")) return this.stockDemo.call(action, data) as T;
+    if (action.startsWith("calibration_")) {
+      this.calibrationDemo ||= new CalibrationDemo(this.getStates);
+      return this.calibrationDemo.call(action, data) as T;
+    }
     if (action.startsWith("dosing_")) {
       // The demo's controller draws each dose from its pump's stock tank with stock_draw.
       this.dosingDemo ||= new DosingDemo(this.getStates, this.updateStates, (name, args) =>

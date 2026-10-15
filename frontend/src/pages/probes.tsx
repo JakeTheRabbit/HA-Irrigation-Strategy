@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Empty, Heading, Status, time, type Page } from "@/components/dashboard";
 import { JevTrouble, jevUsage } from "@/components/jev-status";
 import { Pill, Sparkline } from "@/components/mini-visuals";
+import { ProbeCalibration } from "@/components/probe-calibration";
 import { ageText, readHeartbeat } from "@/lib/controller-health";
 import { recentReadings } from "@/lib/dryback";
 import { readJev } from "@/lib/jev";
@@ -221,6 +222,7 @@ export function Probes({
           </ul>
         </section>
       )}
+      <ProbeCalibration controller={controller} />
       <RoomMap controller={controller} navigate={navigate} />
       <ControllerInternals controller={controller} />
       <p className="footnote">

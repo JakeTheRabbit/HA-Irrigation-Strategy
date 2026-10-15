@@ -197,6 +197,8 @@ export class HaClient {
       "stock_save",
       "stock_refill",
       "stock_record_batch",
+      "calibration_get",
+      "calibration_record",
       "dosing_get",
       "dosing_save",
       "dosing_request",
