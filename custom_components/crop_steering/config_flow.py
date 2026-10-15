@@ -22,6 +22,7 @@ from .const import (
     MIN_ZONES,
     MAX_ZONES,
     DEFAULT_NUM_ZONES,
+    MOISTURE_RANGES,
 )
 from .env_parser import load_env_config
 from .plumbing import PLUMBING_LAYOUTS, infer as infer_plumbing
@@ -163,7 +164,13 @@ def _hardware_schema(
         vol.Optional("drippers_per_plant", default=params.get("drippers_per_plant", 1))
     ] = vol.All(vol.Coerce(int), vol.Range(min=1, max=20))
     out[vol.Optional("field_capacity", default=params.get("field_capacity", 70.0))] = (
-        vol.All(vol.Coerce(float), vol.Range(min=30.0, max=95.0))
+        vol.All(
+            vol.Coerce(float),
+            vol.Range(
+                min=MOISTURE_RANGES["field_capacity"][0],
+                max=MOISTURE_RANGES["field_capacity"][1],
+            ),
+        )
     )
     out[vol.Optional("max_ec", default=params.get("max_ec", 9.0))] = vol.All(
         vol.Coerce(float), vol.Range(min=1.0, max=15.0)

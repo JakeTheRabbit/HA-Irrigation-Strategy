@@ -187,7 +187,7 @@ def test_helpers():
 
 def test_validate_clamps():
     p, w = validate_params(P(field_capacity=120, max_ec=20))
-    assert p.field_capacity == 90.0 and p.max_ec == 15.0
+    assert p.field_capacity == 100.0 and p.max_ec == 15.0
     assert any("field_capacity" in x for x in w)
 
 

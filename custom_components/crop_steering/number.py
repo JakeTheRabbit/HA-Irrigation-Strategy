@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
+from .const import DOMAIN, CONF_NUM_ZONES, MOISTURE_RANGES, SOFTWARE_VERSION
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .sizing import SIZING_KEYS, configured_sizing, prefer_setup_value
 
@@ -64,8 +64,8 @@ NUMBER_DESCRIPTIONS = [
         key="field_capacity",
         name="Field Capacity",
         icon="mdi:water-percent",
-        native_min_value=5.0,
-        native_max_value=100.0,
+        native_min_value=MOISTURE_RANGES["field_capacity"][0],
+        native_max_value=MOISTURE_RANGES["field_capacity"][1],
         native_step=1.0,
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
@@ -118,8 +118,8 @@ NUMBER_DESCRIPTIONS = [
         key="p1_target_vwc",
         name="P1 Target VWC",
         icon="mdi:target",
-        native_min_value=5.0,
-        native_max_value=95.0,
+        native_min_value=MOISTURE_RANGES["p1_target_vwc"][0],
+        native_max_value=MOISTURE_RANGES["p1_target_vwc"][1],
         native_step=1.0,
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
@@ -128,8 +128,8 @@ NUMBER_DESCRIPTIONS = [
         key="p2_vwc_threshold",
         name="P2 VWC Threshold",
         icon="mdi:water-alert",
-        native_min_value=5.0,
-        native_max_value=85.0,
+        native_min_value=MOISTURE_RANGES["p2_vwc_threshold"][0],
+        native_max_value=MOISTURE_RANGES["p2_vwc_threshold"][1],
         native_step=1.0,
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
@@ -238,8 +238,8 @@ NUMBER_DESCRIPTIONS = [
         key="p3_emergency_vwc_threshold",
         name="P3 Emergency VWC Threshold",
         icon="mdi:alert",
-        native_min_value=20.0,
-        native_max_value=65.0,
+        native_min_value=MOISTURE_RANGES["p3_emergency_vwc_threshold"][0],
+        native_max_value=MOISTURE_RANGES["p3_emergency_vwc_threshold"][1],
         native_step=1.0,
         native_unit_of_measurement=PERCENTAGE,
         mode="box",

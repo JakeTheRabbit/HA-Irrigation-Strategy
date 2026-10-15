@@ -78,7 +78,7 @@ async def test_an_edit_made_while_a_switch_is_on_is_refused_and_nothing_is_writt
 
 # ------------------------------------------------------------------ the form's limits
 # 2.18.1 made this form open on the LIVE number entities instead of the values recorded at setup.
-# Its own limits were never widened to match: the entities take a P1 target of 5-95 % and a P2
+# Its own limits were never widened to match: the entities took a P1 target of 5-95 % and a P2
 # threshold of 5-85 %, the form still demanded at least 30 and 25. A room steering at P1 20 / P2 15
 # (dry-rooted crops, coarse substrates) could not submit the form at all, not even unchanged, and
 # not to edit the pot size either. (Review finding on JakeTheRabbit/HA-Irrigation-Strategy#47.)

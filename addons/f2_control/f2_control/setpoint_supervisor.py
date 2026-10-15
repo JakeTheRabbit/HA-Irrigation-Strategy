@@ -25,8 +25,8 @@ PEAK_ADJ_RANGE = (-2.0, 2.0)  # how far judgement may move the peak off the lear
 MAX_STEP = {"p1_target_vwc": 6.0, "field_capacity": 20.0, "p2_vwc_threshold": 10.0,
             "p3_emergency_vwc_threshold": 10.0, "dryback_target": 15.0}
 BOUNDS = {  # the engine's own _PARAM_BOUNDS, by setpoint suffix
-    "p1_target_vwc": (20, 85), "p2_vwc_threshold": (10, 70), "field_capacity": (40, 90), "dryback_target": (2, 60),
-    "p0_maximum_wait_time": (5, 240), "p3_emergency_vwc_threshold": (10, 60), "p2_shot_size": (0.5, 20),
+    "p1_target_vwc": (20, 100), "p2_vwc_threshold": (10, 100), "field_capacity": (40, 100), "dryback_target": (2, 60),
+    "p0_maximum_wait_time": (5, 240), "p3_emergency_vwc_threshold": (10, 65), "p2_shot_size": (0.5, 20),
     "p1_initial_shot_size": (0.5, 15), "p1_shot_size_increment": (0, 5), "p1_maximum_shots": (1, 40),
     "p1_time_between_shots": (1, 120), "ec_target_p1": (0.5, 9), "ec_target_p2": (0.5, 9),
 }

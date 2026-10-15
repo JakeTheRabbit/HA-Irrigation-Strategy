@@ -1,8 +1,10 @@
 """The "setting outside the engine's range" alert is for anybody's room, and says what to do.
 
-First real install: a tent set its field capacity to 95 %, which the number entity accepts and the
-engine limits to 90. The notification was titled "F2 config clamp": F2 is one facility's room
-name, and nothing in the text said the value had been limited, or how to clear it.
+First real install: a tent set its field capacity to 95 %, which the number entity accepted and the
+engine limited to 90. The notification was titled "F2 config clamp": F2 is one facility's room
+name, and nothing in the text said the value had been limited, or how to clear it. The engine now
+takes every moisture level its setting accepts (95 included), so these use 35: below field
+capacity's floor of 40, a value only an older install can still hold.
 """
 from datetime import datetime
 
@@ -24,10 +26,10 @@ def _loop(states):
 
 def test_a_value_the_engine_limits_is_reported_in_words_anyone_can_act_on():
     states = _room(1)
-    states["number.crop_steering_zone_1_field_capacity"] = ("95", {})
+    states["number.crop_steering_zone_1_field_capacity"] = ("35", {})
     (alert,) = _loop(states)
     assert "F2" not in alert["title"] and "range" in alert["title"]
-    assert "field_capacity=95" in alert["message"] and "90" in alert["message"]
+    assert "field_capacity=35" in alert["message"] and "40" in alert["message"]
     assert "nearest allowed value" in alert["message"] and alert["title"].endswith("(CS-401)")
     assert alert["notification_id"] == "f2_cfg_default_z1_field_capacity"  # same id: it replaces the old card
 
@@ -42,7 +44,7 @@ def test_the_alert_names_the_zone_the_way_every_other_notification_does():
 
     states = _room(1)
     states[DESCRIPTOR][1]["zone_names"] = {"1": "GT1"}
-    states["number.crop_steering_zone_1_field_capacity"] = ("95", {})
+    states["number.crop_steering_zone_1_field_capacity"] = ("35", {})
     (alert,) = _loop(states)
     assert alert["title"].startswith("GT1 (Z1): ") and "default" not in alert["title"]
     assert alert["notification_id"] == "f2_cfg_default_z1_field_capacity"

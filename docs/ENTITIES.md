@@ -29,13 +29,13 @@ entities scale with your zone count, `N` = 1…zones).
 | `p1_shot_size_increment` | 0.05-10 | 0.5 | % | How much each successive shot grows. |
 | `p1_minimum_shots` | 1-20 | 3 | - | Minimum shots before P1 may exit. |
 | `p1_maximum_shots` | 1-30 | 6 | - | After this many shots P1 exits to P2 even if the target wasn't hit. |
-| `p1_target_vwc` | 5-95 | 60 | % | VWC that ends the ramp and moves the zone to P2. |
+| `p1_target_vwc` | 20-100 | 60 | % | VWC that ends the ramp and moves the zone to P2. |
 | `p1_time_between_shots` | 1-60 | 5 | min | Spacing between ramp shots. |
 
 ### P2: maintenance
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `p2_vwc_threshold` | 5-85 | 55 | % | Shoot a maintenance top-up when VWC falls below this. |
+| `p2_vwc_threshold` | 10-100 | 55 | % | Shoot a maintenance top-up when VWC falls below this. |
 | `p2_shot_size` | 0.5-30 | 5 | % | Size of a P2 maintenance shot. |
 | `p2_ec_high_threshold` | 0.5-3.0 | 1.2 | ×target | EC ratio above which the threshold is raised (water more to flush salts). |
 | `p2_ec_low_threshold` | 0.2-2.0 | 0.8 | ×target | EC ratio below which the threshold is lowered. |
@@ -43,7 +43,7 @@ entities scale with your zone count, `N` = 1…zones).
 ### P3: pre-lights-off / overnight
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `p3_emergency_vwc_threshold` | 20-65 | 40 | % | Overnight emergency floor: a rescue shot fires below this. |
+| `p3_emergency_vwc_threshold` | 10-65 | 40 | % | Overnight emergency floor: a rescue shot fires below this. |
 | `p3_emergency_shot_size` | 0.1-15 | 2 | % | Size of an emergency rescue shot. |
 
 ### EC targets: vegetative & generative (per phase)
@@ -72,7 +72,7 @@ The active EC target = the row for the current phase **and** the zone's steering
 | `substrate_volume` | 1-200 | 6 | L | Substrate volume per plant: converts shot % → mL → valve seconds. |
 | `dripper_flow_rate` | 0.1-50 | 4 | L/hr | Per-dripper flow: the other half of the % → seconds conversion. |
 | `drippers_per_plant` | 1-6 | 1 | - | Drippers feeding each plant. |
-| `field_capacity` | 5-100 | 60 | % | VWC at/above which irrigation is blocked (over-water guard / P1 clamp). |
+| `field_capacity` | 40-100 | 60 | % | VWC at/above which irrigation is blocked (over-water guard / P1 clamp). |
 | `vegetative_dryback_target` | 5-80 | 50 | % | Overnight dryback target in vegetative mode. |
 | `generative_dryback_target` | 5-70 | 40 | % | Overnight dryback target in generative mode. |
 | `lights_on_hour` | 0-23 | 10 | hour | Photoperiod start: P3→P0 + daily-counter reset fire here. |

@@ -101,8 +101,8 @@ async def test_the_p1_target_and_field_capacity_follow_the_highest_reading_and_t
     assert owners[NUMBER + "field_capacity"] == "the zone's highest reading of this grow-day or the one before"
     assert owners[NUMBER + "p2_shot_size"] == "Jev's Setpoints judge, one notch a night"
 
-    # The next lights-on keeps a lower day: 71.5 -> 48 is 23.5 down. The floor would be 18.0, under the real number's
-    # own minimum of 20, which Home Assistant refuses: it stops at 20, and the ladder is written from the bottom.
+    # The next lights-on keeps a lower day: 71.5 -> 48 is 23.5 down. The floor moves to 18.0, inside the real number's
+    # range (its minimum is 10, the engine's), and the ladder is written from the bottom.
     st["peak_prev"], st["peak"] = 48.0, 39.3
     fake.calls.clear()
     c._auto_tick(room, 1, SimpleNamespace(vwc=39.3, ec=5.1, dryback_rate=0.0), c._params(room, 1), False, now)
@@ -110,10 +110,10 @@ async def test_the_p1_target_and_field_capacity_follow_the_highest_reading_and_t
     for entity, value in sent:
         await hass.services.async_call("number", "set_value", {"entity_id": entity, "value": value}, blocking=True)
     _see(hass, fake)
-    assert sent == [(NUMBER + "p3_emergency_vwc_threshold", 20.0), (NUMBER + "p2_vwc_threshold", 25.5),
+    assert sent == [(NUMBER + "p3_emergency_vwc_threshold", 18.0), (NUMBER + "p2_vwc_threshold", 25.5),
                     (NUMBER + "p1_target_vwc", 48.0), (NUMBER + "field_capacity", 48.0)]
     assert {s: _value(hass, s) for s in before} == {"p1_target_vwc": 48.0, "field_capacity": 48.0,
-                                                    "p2_vwc_threshold": 25.5, "p3_emergency_vwc_threshold": 20.0,
+                                                    "p2_vwc_threshold": 25.5, "p3_emergency_vwc_threshold": 18.0,
                                                     "p2_shot_size": 6.0}
 
     c._save_state()

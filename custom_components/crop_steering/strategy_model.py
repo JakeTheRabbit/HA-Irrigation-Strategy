@@ -7,6 +7,8 @@ import math
 import re
 from datetime import date
 
+from .const import MOISTURE_RANGES
+
 SCHEMA_VERSION = 1
 REQUIRED_PARAMETERS = (
     "dryback_target",
@@ -30,17 +32,17 @@ PARAMETERS = REQUIRED_PARAMETERS + (
     "maximum_ec",
     "watchdog_hours",
 )
-# Canonical strategy keys mapped to the engine's validate_params limits.
-# Existing HA entities retain their historical ranges; only new plans intersect these.
+# Canonical strategy keys mapped to the engine's validate_params limits. The four moisture levels'
+# are their settings' own (const.MOISTURE_RANGES).
 ENGINE_BOUNDS = {
-    "p1_target_vwc": (20.0, 85.0),
-    "p2_vwc_threshold": (10.0, 70.0),
+    "p1_target_vwc": MOISTURE_RANGES["p1_target_vwc"],
+    "p2_vwc_threshold": MOISTURE_RANGES["p2_vwc_threshold"],
     "ec_target_p0": (0.5, 9.0),
     "ec_target_p1": (0.5, 9.0),
     "ec_target_p2": (0.5, 9.0),
     "dryback_target": (2.0, 60.0),
-    "p3_emergency_vwc_threshold": (10.0, 60.0),
-    "field_capacity": (40.0, 90.0),
+    "p3_emergency_vwc_threshold": MOISTURE_RANGES["p3_emergency_vwc_threshold"],
+    "field_capacity": MOISTURE_RANGES["field_capacity"],
     "maximum_ec": (3.0, 15.0),
     "watchdog_hours": (0.0, 12.0),
     "p2_shot_size": (0.5, 20.0),
