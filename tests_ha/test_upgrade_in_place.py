@@ -28,6 +28,7 @@ from pytest_homeassistant_custom_component.common import (
 
 DOMAIN = "crop_steering"
 KILL = "switch.crop_steering_engine_enabled"
+PID_TERMS = ("ec_integral", "ec_prev_err")  # the removed EC PID's state: dropped on load
 DESCRIPTOR = "sensor.crop_steering_engine_config"
 
 
@@ -266,7 +267,7 @@ async def test_a_3_8_0_state_file_loads_with_its_history_empty_and_nothing_moves
                written.pop("p1_settled_before"), written.pop("p1_expected_rise"))
         assert new == (None, False, None, 0, None, None)  # the day before's peak and the P1 rule's state, saved empty
         assert (written.pop("capped_in_a_row"), written.pop("max_run_latch")) == (0, None)
-        old = dict(seed["default"][zone])
+        old = {k: v for k, v in seed["default"][zone].items() if k not in PID_TERMS}
         assert written.pop("fc_follow") == {"peak": old["peak"], "day": None, "used": {}}
         assert learn == old.pop("learn")
         assert written == old
@@ -377,9 +378,10 @@ async def test_the_controller_carries_a_2_25_1_room_straight_on_with_its_options
     assert saved["_setup"] == old["_setup"]
     for zone in ("1", "2"):
         written, was = saved[zone], old[zone]
-        assert {k: written[k] for k in was if k != "learn"} == {
-            k: v for k, v in was.items() if k != "learn"
+        assert {k: written[k] for k in was if k not in ("learn", *PID_TERMS)} == {
+            k: v for k, v in was.items() if k not in ("learn", *PID_TERMS)
         }
+        assert not set(PID_TERMS) & set(written)
         assert {k: written["learn"][k] for k in was["learn"]} == was["learn"]
 
     # ...and it still drives the room the way 2.25.1 did: pump, main line, valve.
@@ -629,9 +631,10 @@ async def test_the_controller_carries_a_3_11_1_room_straight_on_with_its_learner
     assert saved["_setup"] == old["_setup"]
     for zone in ("1", "2"):
         written, was = saved[zone], old[zone]
-        assert {k: written[k] for k in was if k != "learn"} == {
-            k: v for k, v in was.items() if k != "learn"
+        assert {k: written[k] for k in was if k not in ("learn", *PID_TERMS)} == {
+            k: v for k, v in was.items() if k not in ("learn", *PID_TERMS)
         }
+        assert not set(PID_TERMS) & set(written)
         assert {k: written["learn"][k] for k in was["learn"]} == was["learn"]
 
     # ...and it still drives the room the way 3.11.1 did: pump, main line, valve.

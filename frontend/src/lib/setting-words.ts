@@ -283,7 +283,7 @@ const DETAILS: Record<string, SettingDetail> = {
     affects:
       "How often maintenance shots fire, runoff and substrate EC. In P0, reaching it ends the wait and starts the ramp. After P0, with lights on, the watchdog waters a zone below it that has had no shot for the watchdog interval. It is always kept at least 1 point below the peak VWC target and 3 points above the rescue level, whatever is entered.",
     stacking:
-      "Moved 1 point down while substrate EC is under 90% of the P2 target (a bigger dryback, less runoff) and 1 point up while it is over 110%, checked every 30 minutes. The PID option can move it up to 20%.",
+      "Moved 1 point down while substrate EC is under 90% of the P2 target (a bigger dryback, less runoff) and 1 point up while it is over 110%, checked every 30 minutes.",
     auto: AUTO,
     practice:
       "As plants grow they dry back faster, and more maintenance shots keep the daytime dryback in hand. Here, that means raising this level.",

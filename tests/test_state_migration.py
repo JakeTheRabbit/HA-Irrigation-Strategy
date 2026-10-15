@@ -147,6 +147,36 @@ def test_save_then_load_roundtrip(tmp_path):
     assert st[1]["last_daily_reset"] == date(2026, 6, 27)
 
 
+def test_pid_era_state_loads_and_drops_the_pid_terms(tmp_path):
+    """The EC PID is gone: a state file it wrote still loads, keeps the EC offset, and the
+    next save carries no ec_integral / ec_prev_err."""
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps(
+            {
+                "default": {
+                    "1": {
+                        "phase": "P2",
+                        "ec_offset": -1.5,
+                        "ec_integral": 0.4,
+                        "ec_prev_err": 0.2,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    c = _make([1], p)
+    c._load_state()
+    st = c.rooms[0].state[1]
+    assert st["phase"] == "P2" and st["ec_offset"] == -1.5
+    assert "ec_integral" not in st and "ec_prev_err" not in st
+    c._save_state()
+    saved = json.loads(p.read_text(encoding="utf-8"))["default"]["1"]
+    assert saved["ec_offset"] == -1.5
+    assert "ec_integral" not in saved and "ec_prev_err" not in saved
+
+
 # ----------------------------------------------------------------------- multi-room (Stage 2)
 
 
@@ -424,7 +454,8 @@ def test_a_3_11_1_state_file_loads_and_is_written_back_as_it_was(tmp_path):
     """What controller 3.11.1 saved for a learned two-zone room mid-grow
     (tests_ha/fixtures/state_3_11_1_learn_jev.json, recorded from that release): the learner with the
     working peak Jev held above the learned one (learn.peak_adj, learn.jev), the day before's peak, the
-    P1 rule's state and both histories load, and saving writes back every value 3.11.1 wrote.
+    P1 rule's state and both histories load, and saving writes back every value 3.11.1 wrote except
+    the removed EC PID's two terms.
     """
     fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
     seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
@@ -440,8 +471,11 @@ def test_a_3_11_1_state_file_loads_and_is_written_back_as_it_was(tmp_path):
         assert st["plateau_hist"] == old["plateau_hist"]
     c._save_state()
     saved = json.loads(p.read_text(encoding="utf-8"))["default"]
+    pid = ("ec_integral", "ec_prev_err")
     for zone in ("1", "2"):
-        assert {k: saved[zone][k] for k in seed[zone]} == seed[zone]
+        kept = {k: v for k, v in seed[zone].items() if k not in pid}
+        assert {k: saved[zone][k] for k in kept} == kept
+        assert not any(k in saved[zone] for k in pid)
 
 
 def test_a_3_11_1_data_folder_gets_an_instance_id_once_and_keeps_it(tmp_path):
