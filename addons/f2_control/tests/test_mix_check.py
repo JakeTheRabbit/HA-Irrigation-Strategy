@@ -74,8 +74,8 @@ def test_a_tank_off_its_band_alerts_and_refuses_an_automations_batch_but_never_h
     assert status["mix"]["verdict"] == "off target" and status["history"][0]["mix"] == "off target"
     assert r.codes() == ["CS-808"]
     alert = r.alert("CS-808")
-    assert alert["title"].startswith("A batch's mix is off its band")
-    assert "its EC reads 3.1, outside the room's irrigation EC band (1.5 to 2.5)" in alert["message"]
+    assert alert["title"].startswith("The mix of a batch is outside its band")
+    assert "its EC reads 3.1, outside the feed EC band of the room (1.5 to 2.5)" in alert["message"]
     assert r.runner.holds(room) is None and r.c._dosing_hold(room) is None
     refused = _batch(r, by=None)["handled_result"]
     assert refused.startswith("refused: the last batch's mix check failed (its EC reads 3.1")
@@ -93,8 +93,8 @@ def test_a_dead_tank_probe_never_stops_irrigation(rig, state):
     r.fake.set_state(TANK_PH, state, {})
     status = _settle(r)
     assert status["mix"]["verdict"] == "not read" and r.codes() == ["CS-808"]
-    assert r.alert("CS-808")["title"].startswith("A batch's mix could not be checked")
-    assert f"its pH probe ({TANK_PH}) can't be read (it reads {state})" in r.alert("CS-808")["message"]
+    assert r.alert("CS-808")["title"].startswith("The mix of a batch was not checked")
+    assert f"its pH probe ({TANK_PH}) is not readable (it reads {state})" in r.alert("CS-808")["message"]
     assert r.runner.holds(room) is None and r.c._dosing_hold(room) is None
     assert _batch(r, by=None)["handled_result"].startswith("refused: the last batch's mix check failed")
 

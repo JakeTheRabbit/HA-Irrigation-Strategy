@@ -59,7 +59,7 @@ def _ec_loop(**fusion):
 
 def test_a_zone_steering_on_bulk_ec_is_told_and_names_the_pore_probe_left_out():
     (alert,) = _ec_loop(ec_type="bulk", used=["sensor.bulk"], excluded={"sensor.pore": "no reading"})
-    assert alert["title"].endswith("steering on bulk EC: no pore EC probe reporting (CS-504)")
+    assert alert["title"].endswith("zone EC from bulk EC: no pore EC probe reports (CS-504)")
     assert alert["notification_id"] == "f2_ec_type_default_z1"
     assert "sensor.pore" in alert["message"] and EC in alert["message"]
 

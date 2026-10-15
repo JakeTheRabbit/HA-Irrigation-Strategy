@@ -57,4 +57,4 @@ async def test_a_room_whose_ids_moved_keeps_watering_and_holds_only_the_zone_it_
     assert "CS-402" in held
     card = _cards(fake)[-1]
     assert "number.crop_steering_p2_vwc_threshold" in card
-    assert "number.crop_steering_max_daily_volume" in card and "is not watered" in card
+    assert "number.crop_steering_max_daily_volume" in card and "gets no shots" in card

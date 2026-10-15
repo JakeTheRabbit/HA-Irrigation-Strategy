@@ -236,7 +236,7 @@ async def test_the_ai_assistants_cards_reach_the_phone_that_ticks_jev(
             DOMAIN, "notify", one, blocking=True, return_response=True
         )
         assert answer == {"sent_to": [STAFF_PHONE], "error": None}
-    assert received[STAFF_PHONE][-1]["message"].startswith("Your Cloudflare settings")
+    assert received[STAFF_PHONE][-1]["message"].startswith("The controller does not use your Cloudflare settings")
 
 
 async def test_the_feed_proposal_reaches_the_phone_that_ticks_jev(

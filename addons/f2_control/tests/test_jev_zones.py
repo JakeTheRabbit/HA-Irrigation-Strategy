@@ -39,4 +39,4 @@ def test_the_alert_says_what_the_zone_was_compared_with():
     verdicts = {"why_different": council.combine(K.both("why_different", answer), "why_different")}
     d = ZonesJudge().decide(verdicts, _ctx(1))
     assert d.value["code"] == "CS-702"
-    assert "2477 mL a plant today, 235% of the room's median zone (1052 mL)" in d.value["message"]
+    assert "got 2477 mL for each plant, 235% of the room's median zone (1052 mL)" in d.value["message"]

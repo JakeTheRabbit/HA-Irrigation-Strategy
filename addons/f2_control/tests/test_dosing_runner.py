@@ -464,8 +464,8 @@ def test_a_dose_that_runs_past_its_time_is_switched_off_and_read_back(rig):
     assert status["handled_result"] == "ran past its time"
     assert status["pumps"]["balance"]["last"]["result"] == "ran past its time"
     alert = r.alert("CS-801")
-    assert alert["title"] == "A dosing pump ran past its time and was switched off (CS-801)"
-    assert "was still dosing after 35 seconds" in alert["message"]
+    assert alert["title"] == "A dosing pump ran past its time, power set to off (CS-801)"
+    assert "still dosed after 35 s" in alert["message"]
     assert "switch it off by hand" not in alert["message"]  # it reads off: the re-send worked
     assert r.actions()[-1] == ("set_value", "number.balance_volume")  # still put back
 
@@ -744,7 +744,7 @@ def test_a_tank_that_does_not_fill_closes_the_valve_and_ends_the_batch(rig):
     assert r.fake.states["input_boolean.tank_hold"][0] == "off"
     assert r.fake.states["input_datetime.tank_filled"][0] == "2026-09-27 19:00:00"  # not stamped
     assert r.runner.holds(r.c.rooms[0]) is None  # the room waters again
-    assert "the fill valve was switched off" in r.alert("CS-804")["message"].lower()
+    assert "the controller set the fill valve to off" in r.alert("CS-804")["message"].lower()
     assert r.alert("CS-804")["title"] == "The batch tank did not fill in time (CS-804)"
 
 
@@ -789,7 +789,7 @@ def test_a_stop_in_the_middle_of_a_batch_switches_everything_off(rig):
     assert status["batch"]["result"] == "stopped: premix: stop requested by Sam"
     assert r.codes() == ["CS-806"]
     message = r.alert("CS-806")["message"]
-    assert "stopped in its premix step" in message and "Dosed before it stopped: nothing" in message
+    assert "stopped in its premix step" in message and "Dosed before the stop: nothing" in message
     assert r.runner.holds(r.c.rooms[0]) is None and r.saved()["inflight"] is None
 
 
@@ -803,7 +803,7 @@ def test_a_dose_that_fails_in_a_batch_ends_it_with_both_codes(rig):
     status = r.status()[1]
     assert status["handled_result"] == "stopped: dose: Bloom: not confirmed"
     assert status["history"][0]["doses"] == {"balance": 300, "bloom": 150.0}
-    assert "Dosed before it stopped: 300 mL of Balance, an unknown amount of Bloom." in (
+    assert "Dosed before the stop: 300 mL of Balance, an unknown amount of Bloom." in (
         r.alert("CS-806")["message"])
 
 
@@ -819,7 +819,7 @@ def test_dosing_hardware_that_does_not_read_off_keeps_the_rooms_held_until_it_do
     assert r.runner.holds(r.c.rooms[0]) == reason and r.c._blocked(r.c.rooms[0], 1) == reason
     message = r.alert("CS-806")["message"]
     assert "switch.tank_mixer still does not read off" in message
-    assert "stay held, and its hold stays on, until they do" in message
+    assert "stay held, and its hold stays on, until they read off" in message
     # The hold stays on while it does not read off: other automations keep off the tank.
     assert r.fake.states["input_boolean.tank_hold"][0] == "on"
     assert r.saved()["inflight"]["kind"] == "batch"  # a restart would still switch it off
@@ -833,7 +833,7 @@ def test_dosing_hardware_that_does_not_read_off_keeps_the_rooms_held_until_it_do
     assert r.fake.states["input_boolean.tank_hold"][0] == "off"
     r.poll()  # and reads off: released
     assert r.runner.holds(r.c.rooms[0]) is None and r.saved()["inflight"] is None
-    assert "Everything now reads off; the hold was released" in r.alert("CS-806")["message"]
+    assert "All the hardware now reads off, and the controller released the hold" in r.alert("CS-806")["message"]
 
 
 def test_a_switch_the_batch_cannot_close_ends_it_before_anything_is_filled(rig):
@@ -1002,7 +1002,7 @@ def test_a_cleanup_that_fails_keeps_the_rooms_held_until_everything_reads_off(ri
     assert r.codes() == ["CS-804", "CS-806"]
     message = r.alert("CS-806")["message"]
     assert "ended (stopped: fill: the tank did not read full within 20 min)" in message
-    assert "Everything now reads off; the hold was released" in message
+    assert "All the hardware now reads off, and the controller released the hold" in message
 
 
 def test_each_step_recovers_first_reads_every_two_seconds_and_survives_an_error(rig):
@@ -1062,7 +1062,7 @@ def test_a_batch_interrupted_by_a_restart_is_switched_off_and_never_resumed(rig,
     assert r.runner.holds(r.c.rooms[0]) is None
     assert r.codes() == ["CS-803"]
     message = r.alert("CS-803")["message"]
-    assert "never resumes" in message and "Everything now reads off; the hold was released" in message
+    assert "does not continue it" in message and "All the hardware now reads off, and the controller released the hold" in message
     saved = r.saved()
     assert saved["inflight"] is None
     assert saved["history"][0]["result"] == "interrupted by a restart"

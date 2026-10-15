@@ -36,11 +36,11 @@ QUESTIONS = {
 }
 
 WORDS = {  # the CS-711 card's first line for each proposal that is one
-    "feed_ec_down_small": "The AI assistant proposes a small step down in this room's feed EC.",
-    "feed_ec_up_small": "The AI assistant proposes a small step up in this room's feed EC.",
-    "feed_ph_out_of_band": "The AI assistant proposes putting this room's feed pH back in its band.",
-    "check_dosing_or_source": "The AI assistant proposes checking this room's dosing and source water before any "
-                              "change to the recipe.",
+    "feed_ec_down_small": "The AI assistant proposes a small decrease of the feed EC of this room.",
+    "feed_ec_up_small": "The AI assistant proposes a small increase of the feed EC of this room.",
+    "feed_ph_out_of_band": "The AI assistant proposes to put the feed pH of this room back in its band.",
+    "check_dosing_or_source": "The AI assistant proposes a check of the dosing system and the source water of this "
+                              "room before a change to the recipe.",
 }
 
 

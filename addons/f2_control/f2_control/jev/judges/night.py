@@ -133,8 +133,8 @@ class NightJudge(Judge):
         if v is None or not v.firm(0.7) or v.label != "probe_fault":
             return None
         s, floor = ctx.snap, ctx.params.p3_emergency_floor
-        message = (f"{ctx.title} reads {s.vwc:.1f}% overnight, close to its emergency floor of {floor:.1f}%, but "
-                   "the way the reading fell looks like a probe fault, not the slab drying. The rescue shot still "
-                   "fires as normal whenever the reading is under the floor. Check the probe in the morning.")
-        alert = {"code": "CS-703", "title": "overnight low reading looks like a probe fault", "message": message}
+        message = (f"{ctx.title} reads {s.vwc:.1f}% overnight, near its rescue floor of {floor:.1f}%. But the fall "
+                   "of the reading looks like a probe fault, not the dryback of the slab. The rescue shot still "
+                   "starts as usual when the reading is below the floor. Check the probe in the morning.")
+        alert = {"code": "CS-703", "title": "low overnight reading: probable probe fault", "message": message}
         return self.directive(ctx, "alert", alert, f"overnight fall looks like a probe fault (p={v.prob:.2f})")

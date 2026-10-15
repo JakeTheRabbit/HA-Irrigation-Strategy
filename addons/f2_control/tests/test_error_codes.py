@@ -61,11 +61,11 @@ def test_a_reading_that_has_not_moved_is_not_called_a_dead_probe():
     """The case on the first real install: a probe in a cube with no plant."""
     stale = (datetime.now(timezone.utc) - timedelta(minutes=47)).isoformat()
     alert = _probe_alert("31.2", last_updated=stale, names={"1": "GT1", "2": "GT4"}, both=True)
-    assert alert["title"] == "GT4 (Z2): moisture reading hasn't changed (CS-101)"
+    assert alert["title"] == "GT4 (Z2): moisture reading has not changed (CS-101)"
     message = alert["message"]
-    assert "stayed at 31.2% for 47 minutes" in message
-    assert "no plant in it" in message
-    assert "one shot every 90 minutes" in message  # no healthy zone to copy: the timer
+    assert "stayed at 31.2% for 47 min" in message
+    assert "no plant gives a flat reading" in message
+    assert "a shot every 90 min" in message  # no healthy zone to copy: the timer
     assert "dead" not in alert["title"] + message
     assert message.endswith(FOOTER.format("CS-101"))
     assert "Sensor: sensor.crop_steering_vwc_zone_2" in message  # the id, kept as a detail line
@@ -73,12 +73,12 @@ def test_a_reading_that_has_not_moved_is_not_called_a_dead_probe():
 
 def test_a_sensor_that_is_not_reporting_says_so():
     for value, words in (("unavailable", "reads 'unavailable'"), ("unknown", "reads 'unknown'"),
-                         ("wet", "reads 'wet', which isn't a number"),
-                         (None, "can't be found in Home Assistant")):
+                         ("wet", "reads 'wet'. This is not a number"),
+                         (None, "is not in Home Assistant")):
         alert = _probe_alert(value)
-        assert alert["title"] == "Zone 2: moisture sensor not reporting (CS-102)", value
+        assert alert["title"] == "Zone 2: moisture probe does not report (CS-102)", value
         assert words in alert["message"], value
-        assert "powered and online" in alert["message"]
+        assert "has power and is online" in alert["message"]
 
 
 def test_an_impossible_number_is_out_of_range():
@@ -91,8 +91,8 @@ def test_a_reading_from_the_future_says_the_clocks_disagree():
     """_read_sensor rejects a reading stamped more than a minute ahead; it is not a dead probe."""
     ahead = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
     alert = _probe_alert("31.2", last_updated=ahead)
-    assert alert["title"] == "Zone 2: moisture sensor not reporting (CS-102)"
-    assert "stamped 5 minutes in the future" in alert["message"]
+    assert alert["title"] == "Zone 2: moisture probe does not report (CS-102)"
+    assert "is 5 min in the future" in alert["message"]
     assert "clock" in alert["message"]
 
 
@@ -137,14 +137,14 @@ def test_the_ec_notification_names_the_sensor_actually_read():
 
 def test_a_zone_with_a_working_neighbour_says_which_one_it_copies():
     alert = _probe_alert("unavailable", names={"1": "GT1", "2": "GT4"})
-    assert "gets the same shots as GT1 (Z1), whose probe is working" in alert["message"]
+    assert "gets the same shots as GT1 (Z1), which has a good probe" in alert["message"]
     assert "timer" not in alert["message"]
 
 
 # ------------------------------------------------------------------ which room
 def test_the_room_is_called_what_the_operator_called_it():
     alert = _probe_alert("unavailable", names={"2": "GT4"}, room_name="Tent")
-    assert alert["title"] == "Tent · GT4 (Z2): moisture sensor not reporting (CS-102)"
+    assert alert["title"] == "Tent · GT4 (Z2): moisture probe does not report (CS-102)"
 
 
 def test_one_unnamed_room_says_nothing_about_the_room():
@@ -189,7 +189,7 @@ def test_notification_ids_do_not_follow_the_wording():
 
 def test_the_log_line_carries_the_code(capsys):
     _probe_alert("unavailable")
-    assert "ALERT Zone 2: moisture sensor not reporting (CS-102) - This zone's" in capsys.readouterr().out
+    assert "ALERT Zone 2: moisture probe does not report (CS-102) - The moisture entity of this zone" in capsys.readouterr().out
 
 
 def test_a_zone_never_watered_is_not_given_a_number_of_hours():
@@ -198,8 +198,8 @@ def test_a_zone_never_watered_is_not_given_a_number_of_hours():
     states["sensor.crop_steering_vwc_zone_1"] = ("20", {"unit_of_measurement": "%"})
     _c, alerts = _alerts(states)
     alert = alerts["f2_wd_default_z1"]
-    assert alert["title"] == "Zone 1: URGENT, drying out and not being watered (CS-207)"
-    assert "has never been watered by the controller" in alert["message"]
+    assert alert["title"] == "Zone 1: URGENT, the zone is dry and gets no shots (CS-207)"
+    assert "the controller has not watered it" in alert["message"]
     assert "16666666" not in alert["message"]
     assert "Blocked by: Crop Steering Controller disabled (kill switch off)" in alert["message"]
 

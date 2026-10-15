@@ -108,7 +108,7 @@ def test_a_zone_held_on_yesterday_whose_day_changes_targets_is_a_missed_transiti
     assert d.cls == "transition_missed" and d.alert and d.ask and d.sev == 1
     assert "zone 2" in d.line and "the dryback target from 18 % of the peak to 22 % of the peak" in d.line
     assert d.extra["zones"] == {2: DAY17}
-    assert d.suggestions[0].startswith("Fix or unmap the probe the plan waits for")
+    assert d.suggestions[0].startswith("Repair the probe that the plan waits for")
 
 
 def test_a_day_that_changes_no_target_is_only_behind_and_raises_nothing():
@@ -236,7 +236,7 @@ def test_a_zone_that_did_not_start_its_day_or_stop_for_the_night_is_a_tripwire()
     zones = view().zones
     stuck = {**zones, 1: {**zones[1], "phase": "P3", "last_daily_reset": YESTERDAY}}
     [d] = A.detect(view(zones=stuck), A.fresh())
-    assert d.cls == "missed_day_start" and d.alert and not d.ask and "report it" in d.suggestions[0]
+    assert d.cls == "missed_day_start" and d.alert and not d.ask and "Report this" in d.suggestions[0]
     night = datetime(2026, 10, 1, 18, 30)
     late = {**zones, 2: {**zones[2], "phase": "P2"}, 1: {**zones[1], "phase": "P3"}}
     assert classes(view(now=night, lights_on=False, zones=late)) == ["missed_lights_off"]

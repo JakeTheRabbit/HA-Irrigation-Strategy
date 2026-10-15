@@ -169,7 +169,7 @@ def test_a_grow_light_that_reads_on_at_night_is_said_once(room):
         _publish_plan(fake, held=False)
         c.loop_once(_Clock.now())
     cards = [d for d in _plan_cards(fake) if "lights_entity" in d["notification_id"]]
-    assert len(cards) == 1 and "reads on but the lights hours say off" in cards[0]["message"]
+    assert len(cards) == 1 and "reads on, but the lights hours say off" in cards[0]["message"]
     assert _writes(fake) == [] and [d for d, s, x in fake.calls if d == "light"] == []  # never switched
 
 

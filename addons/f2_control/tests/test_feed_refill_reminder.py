@@ -48,11 +48,11 @@ def test_a_low_tank_is_told_after_three_reads_and_not_again_that_day(rig):
     _reads(r)
     (alert,) = r.creates("CS-906")
     assert alert["notification_id"] == NOTE
-    assert alert["title"].endswith("Batch tank down to 19%, refill it (CS-906)")
+    assert alert["title"].endswith("Batch tank at 19%, refill it (CS-906)")
     assert alert["message"].startswith(
-        "The batch tank reads 19%, at or under its refill reminder (20%): refill it, by hand or by "
-        "making a batch. Nothing refills it by itself. This comes again each day it stays at or under "
-        "20%, and goes once it reads 25%."
+        "The batch tank reads 19%, at or below its refill reminder (20%). Refill the tank by hand, or "
+        "make a batch. Nothing refills the tank automatically. This alert comes again each day while the "
+        "tank stays at or below 20%. It clears when the tank reads 25%."
     )
     _reads(r, 90)
     assert len(r.creates("CS-906")) == 1

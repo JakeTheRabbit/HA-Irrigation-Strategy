@@ -52,7 +52,7 @@ def test_a_dose_whose_power_will_not_read_off_holds_the_room_until_it_does(rig):
     assert r.runner.holds(room) == reason and r.c._blocked(room, 1) == reason
     assert r.saved()["inflight"]["kind"] == "dose"  # kept: a restart switches it off as well
     assert r.codes() == ["CS-801"]
-    assert "watering in this room is held" in r.alert("CS-801")["message"]
+    assert "The shots of this room are held" in r.alert("CS-801")["message"]
     # Its volume number is not put back while the pump may still run: it waits, recorded.
     assert r.fake.states["number.balance_volume"][0] == "120"
     assert r.saved()["restores"][0]["old_volume"] == 25.0
@@ -69,7 +69,7 @@ def test_a_dose_whose_power_will_not_read_off_holds_the_room_until_it_does(rig):
     _pass(r)
     _pass(r)
     assert r.runner.holds(room) is None and r.saved()["inflight"] is None
-    assert "Everything now reads off" in r.alert("CS-801")["message"]
+    assert "All the hardware now reads off" in r.alert("CS-801")["message"]
     assert r.fake.states["number.balance_volume"][0] == "25" and r.saved()["restores"] == []
 
 
@@ -89,7 +89,7 @@ def test_a_stopped_dose_whose_power_will_not_read_off_is_held_and_a_stop_release
     assert status["history"][0]["result"] == "stopped"
     assert r.runner.holds(r.c.rooms[0]) == "dosing hardware still on: switch.balance_power"
     assert r.codes() == ["CS-806"]
-    assert "was stopped, but switch.balance_power still does not read off" in r.alert("CS-806")["message"]
+    assert "stopped, but switch.balance_power still does not read off" in r.alert("CS-806")["message"]
     # A stop sends the offs again and, once everything reads off, lets the room water.
     r.stuck["switch.balance_power"] = 0
     r.ask("stop")
@@ -146,7 +146,7 @@ def test_a_restart_holds_until_every_recorded_part_reads_off_and_says_so_every_3
     _pass(r)
     assert r.runner.holds(rooms["default"]) is None and r.runner.holds(rooms["room_b"]) is None
     assert r.fake.states["input_boolean.tank_hold"][0] == "off" and r.saved()["inflight"] is None
-    assert "Everything now reads off" in r.alert("CS-803")["message"]
+    assert "All the hardware now reads off" in r.alert("CS-803")["message"]
 
 
 def test_a_restart_puts_back_the_volume_number_a_dose_changed(rig, tmp_path):
@@ -183,8 +183,8 @@ def test_a_full_sensor_that_stops_reporting_mid_fill_closes_the_fill_valve(rig):
     assert r.fake.states["switch.tank_fill"][0] == "off"
     assert r.codes() == ["CS-804", "CS-806"]
     alert = r.alert("CS-804")
-    assert alert["title"] == "The batch tank could not be filled (CS-804)"
-    assert "the full sensor stopped reporting" in alert["message"]
+    assert alert["title"] == "The batch tank did not fill (CS-804)"
+    assert "The full sensor stopped its reports" in alert["message"]
     # Closed 15 s after it went quiet, not at the end of the 20-minute fill timeout.
     closed = min(t for t, service, e in r.times if (service, e) == ("turn_off", "switch.tank_fill") and t > 30)
     assert 30 + 15 <= closed <= 30 + 15 + 4
@@ -243,7 +243,7 @@ def test_two_dosing_events_within_30_minutes_are_two_notifications(rig):
     r.clock.t += 60
     r.ask(ml=50)
     r.poll()
-    assert [a["title"] for a in r.creates("CS-802")] == ["A dose could not be confirmed (CS-802)"] * 2
+    assert [a["title"] for a in r.creates("CS-802")] == ["A dose was not confirmed (CS-802)"] * 2
     assert len(r.alerts()) == 2  # two cards: the second is not swallowed by the first
 
 
@@ -263,7 +263,7 @@ def test_a_dosing_alert_home_assistant_did_not_take_is_raised_again_until_it_doe
     r.created = True
     again.recover()
     r.poll(again)
-    assert [a["title"] for a in r.creates()] == ["A dose could not be confirmed (CS-802)"]
+    assert [a["title"] for a in r.creates()] == ["A dose was not confirmed (CS-802)"]
     r.poll(again)
     assert len(r.creates()) == 1 and _doc(r)["outbox"] == []
 
@@ -318,7 +318,7 @@ def test_a_dose_that_ends_in_less_than_half_its_time_ended_early_and_draws_what_
     r.poll()
     assert r.status()[1]["handled_result"] == "ended early"
     alert = r.alert("CS-802")
-    assert alert["title"] == "A dose ended early (CS-802)" and "it ended early" in alert["message"]
+    assert alert["title"] == "A dose ended early (CS-802)" and "The dose ended early" in alert["message"]
     [draw] = r.draws()
     assert 100 <= draw["draws"]["balance_stock"] <= 120  # the seconds it ran x the flow, not 500
 
@@ -349,7 +349,7 @@ def test_a_volume_number_that_does_not_read_back_is_named_in_cs_806(rig):
     r.ask(ml=50)
     r.poll()
     assert r.status()[1]["handled_result"] == "finished"
-    assert "the volume number of Balance could not be put back to 25 mL" in r.alert("CS-806")["message"]
+    assert "could not set the volume number of Balance back to 25 mL" in r.alert("CS-806")["message"]
 
 
 # ------------------------------------------------------------------ 10. batch commands, read back
@@ -373,7 +373,7 @@ def test_a_fill_valve_that_does_not_open_ends_the_batch_and_is_switched_off(rig)
     r.poll()
     assert r.status()[1]["handled_result"] == "stopped: fill: the fill valve did not open"
     assert r.codes() == ["CS-804", "CS-806"]
-    assert "the fill valve (switch.tank_fill) did not open" in r.alert("CS-804")["message"]
+    assert "The fill valve (switch.tank_fill) did not open" in r.alert("CS-804")["message"]
     assert ("turn_off", "switch.tank_fill") in r.actions()
     assert not any(svc == "set_value" for _d, svc, _data in r.fake.calls)  # nothing dosed
 
@@ -409,7 +409,7 @@ def test_a_batch_whose_fill_time_cannot_be_stamped_finishes_with_a_warning(rig):
     r.ask("batch")
     r.poll()
     assert r.status()[1]["handled_result"] == "finished; input_datetime.tank_filled could not be stamped"
-    assert r.codes() == ["CS-806"] and "record it by hand" in r.alert("CS-806")["message"]
+    assert r.codes() == ["CS-806"] and "Record it by hand" in r.alert("CS-806")["message"]
     assert r.runner.holds(r.c.rooms[0]) is None
 
 
@@ -593,7 +593,7 @@ def test_one_rooms_error_never_stops_the_others_and_is_alerted_when_it_keeps_on(
         _pass(r)
     assert r.status()[1]["handled"] == request["id"]  # the default room carried on
     assert r.codes() == ["CS-806"]
-    assert r.alert("CS-806")["title"] == "veg: dosing in this room keeps failing (CS-806)"
+    assert r.alert("CS-806")["title"] == "veg: dosing in this room fails again and again (CS-806)"
     assert "veg is broken" in r.alert("CS-806")["message"]
 
 

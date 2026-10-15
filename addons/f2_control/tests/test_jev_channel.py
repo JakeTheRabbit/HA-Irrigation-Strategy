@@ -108,8 +108,8 @@ def test_a_firm_bypass_raises_cs_710_with_a_catch_test_and_never_moves_water():
     assert e["code_saw"] and e["substrate_per_plant"] == "2.0 L"
     d = j.decide(_verdicts("channeling_through_slab"), c)
     assert (d.judge, d.kind, d.value["code"]) == ("channel", "alert", CODE) and CODE == "CS-710"
-    assert d.value["title"] == "water may be bypassing the substrate or the probe"
-    assert "catch test" in d.value["message"] and "do not add volume" in d.value["message"]
+    assert d.value["title"] == "water can bypass the substrate or the probe"
+    assert "catch test" in d.value["message"] and "Do not increase the shot size" in d.value["message"]
     assert admit(d, c, confirmed=1, evidence_ok=True) == (True, "alerts never move water")
 
 

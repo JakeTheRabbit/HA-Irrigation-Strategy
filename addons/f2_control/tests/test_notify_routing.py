@@ -261,7 +261,7 @@ def test_a_rooms_events_go_as_one_push_per_kind_within_the_loops_time(router, mo
     c._send_events()
     assert [(d["key"], d.get("zone"), d["title"], d["message"]) for d in routed.sent] == [
         ("phase_default", None, "Phase changes", "Zone 1: P2 → P3, lights-off -> P3\nZone 2: P2 → P3, lights-off -> P3"),
-        ("jev_setpoint_default_z2", 2, "Zone 2: Jev changed P2 shot 5% -> 4.5%", "Smaller shots."),
+        ("jev_setpoint_default_z2", 2, "Zone 2: the AI assistant changed P2 shot 5% -> 4.5%", "Smaller shots."),
     ]
     clock = {"s": 0.0}
     monkeypatch.setattr(controller.time, "monotonic", lambda: clock["s"])
@@ -316,7 +316,7 @@ def test_a_setting_jev_moved_goes_to_the_phones_that_ask_and_a_failure_is_droppe
         "event": "jev_setpoint",
         "room": "",
         "zone": 1,
-        "title": "Zone 1: Jev changed P2 shot 5% -> 4.5%",
+        "title": "Zone 1: the AI assistant changed P2 shot 5% -> 4.5%",
         "message": "Smaller maintenance shots tomorrow.",
     }]
     routed.status = 500
@@ -344,7 +344,7 @@ def test_a_setting_jev_moved_names_its_number_for_keep_and_undo_only_to_an_integ
         c._send_events()
         [sent] = routed.sent
         assert sent.get("overlays") == expected
-        assert sent["title"] == "Zone 1: Jev changed P2 shot 5% -> 4.5%"
+        assert sent["title"] == "Zone 1: the AI assistant changed P2 shot 5% -> 4.5%"
 
 
 # ------------------------------------------------------------------ CS-209, no watering for a while
@@ -373,10 +373,10 @@ def test_a_room_with_nothing_watered_for_idle_hours_says_so_again_and_clears_at_
     assert _cards(fake, "f2_idle_default") == []
     c.loop_once(_at(13, 31))
     [card] = _cards(fake, "f2_idle_default")
-    assert card["title"] == "No watering for a while (CS-209)"
-    assert "watered for 3.0 hours" in card["message"]
-    assert f"Watering is switched off in this room: its engine switch ({KILL}) is off." in card["message"]
-    assert "said again every 3 hours while it lasts" in card["message"]
+    assert card["title"] == "No shots for some hours (CS-209)"
+    assert "got a shot for 3.0 h" in card["message"]
+    assert f"The kill switch of this room ({KILL}) is off." in card["message"]
+    assert "comes again each 3 h while the condition stays" in card["message"]
     [push] = [d for d in routed.sent if d.get("code") == "CS-209"]
     assert push["key"] == "idle_default" and "urgent" not in push and push["room"] == ""
     c.loop_once(_at(14, 0))
@@ -400,7 +400,7 @@ def test_the_hours_come_from_the_integration(router):
     c.loop_once(_at(11, 29))
     assert _cards(fake, "f2_idle_default") == []
     c.loop_once(_at(11, 31))
-    assert "said again every hour while" in _cards(fake, "f2_idle_default")[0]["message"]
+    assert "comes again each hour while" in _cards(fake, "f2_idle_default")[0]["message"]
 
 
 def test_lights_off_or_a_room_in_p0_and_p3_ends_it_and_never_starts_it(router):
@@ -448,10 +448,10 @@ def test_it_says_which_hold_or_that_nothing_called_for_water(router):
     router()
     fake.set_state(KILL, "on")
     fake.set_state("switch.crop_steering_zone_1_enabled", "off")
-    assert c._idle_why(room, {}) == "Watering is held. Zone 1: zone disabled."
-    assert c._idle_why(room, {1: {"block": "making a batch"}}) == "Watering is held. Zone 1: making a batch."
+    assert c._idle_why(room, {}) == "A hold stops the shots. Zone 1: zone disabled."
+    assert c._idle_why(room, {1: {"block": "making a batch"}}) == "A hold stops the shots. Zone 1: making a batch."
     fake.set_state("switch.crop_steering_zone_1_enabled", "on")
-    assert c._idle_why(room, {}).startswith("Nothing called for water: no zone in P1 or P2 dried")
+    assert c._idle_why(room, {}).startswith("No zone asked for water: no zone in P1 or P2 became dry")
 
 
 def test_an_install_from_before_notifications_pushes_as_it_always_did(router):
@@ -463,4 +463,4 @@ def test_an_install_from_before_notifications_pushes_as_it_always_did(router):
     c.loop_once(_at(13, 31))
     c.loop_once(_at(23, 0))
     assert routed.calls == []
-    assert [d["title"] for _svc, d in _option(fake)] == ["No watering for a while (CS-209)"]
+    assert [d["title"] for _svc, d in _option(fake)] == ["No shots for some hours (CS-209)"]

@@ -108,8 +108,8 @@ class ZonesJudge(Judge):
             return None
         return self.directive(ctx, "alert", {
             "code": "CS-702",
-            "title": "this zone's water per plant is out of line with the others",
-            "message": (f"{ctx.title} has had {mine * 1000:.0f} mL a plant today, {ratio * 100:.0f}% of "
-                        f"{basis} ({typical * 1000:.0f} mL). Jev's reading of why: "
-                        f"{CAUSES[v.label]} Watering carries on as normal."),
+            "title": "the water for each plant of this zone differs from the other zones",
+            "message": (f"Today {ctx.title} got {mine * 1000:.0f} mL for each plant, {ratio * 100:.0f}% of "
+                        f"{basis} ({typical * 1000:.0f} mL). The AI assistant gives this cause: "
+                        f"{CAUSES[v.label]} The shots continue as usual."),
         }, f"{v.label} (p={v.prob:.2f})")

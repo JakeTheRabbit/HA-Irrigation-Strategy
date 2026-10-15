@@ -135,7 +135,7 @@ def test_the_cs402_card_names_the_setting_and_says_the_zone_is_not_watered(rig):
     cards = [d["message"] for dom, svc, d in fake.calls
              if (dom, svc) == ("persistent_notification", "create") and "CS-402" in d.get("title", "")]
     assert cards and "number.crop_steering_max_daily_volume" in cards[-1]
-    assert "The daily water limit size a zone's water" in cards[-1] and "is not watered" in cards[-1]
+    assert "The daily water limit set the water of a zone" in cards[-1] and "gets no shots" in cards[-1]
 
 
 def test_a_setting_read_once_then_lost_runs_on_its_last_value_and_its_zone_waters(rig):  # noqa: F811

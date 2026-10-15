@@ -404,27 +404,28 @@ SHIPPED_LIGHTS = (10.0, 22.0)
 # their full entries live in docs/error-codes.json with every other code.
 _PROBE_ALERTS = {
     "CS-101": (
-        "moisture reading hasn't changed",
-        "This is normal for a cube with no plant in it: nothing is drinking, so the number "
-        "doesn't move. With a plant in it, check the probe is still in its cube: one pulled out "
-        "reads steady too. Watering goes back to normal by itself once the reading changes (this "
-        "notification stays until you dismiss it); in an empty room, switching Room Active off "
-        "stops these notifications.",
+        "moisture reading has not changed",
+        "A cube with no plant gives a flat reading, because nothing drinks the water. If the cube "
+        "has a plant, make sure that the probe is fully in the cube. A probe out of its cube also "
+        "gives a flat reading. The zone goes back to usual shots when the reading changes. This "
+        "alert stays until you dismiss it. In an empty room, set Room Active to off to stop these "
+        "alerts.",
     ),
     "CS-102": (
-        "moisture sensor not reporting",
-        "Check the probe is powered and online, and that the zone's moisture sensor is mapped "
-        "correctly in Rooms & setup.",
+        "moisture probe does not report",
+        "Make sure that the probe has power and is online. Make sure that the correct moisture "
+        "entity is mapped to the zone in Rooms & setup.",
     ),
     "CS-103": (
         "moisture reading out of range",
-        "Check the probe's calibration, and that the sensor mapped to this zone reports moisture "
-        "in %.",
+        "Check the calibration of the probe. Make sure that the entity mapped to this zone gives "
+        "the moisture in %.",
     ),
     "CS-503": (
-        "moisture probe set aside for its unit",
-        "Map this zone to the probe's moisture reading in % (or m³/m³), or correct the sensor's "
-        "unit in its own integration. The probe counts again as soon as its reading can be used.",
+        "moisture probe set aside because of its unit",
+        "Map the moisture reading of the probe in % (or m³/m³) to this zone. Alternatively, correct "
+        "the unit of the entity in its own integration. The probe counts again when the controller "
+        "can use its reading.",
     ),
 }
 
@@ -432,10 +433,10 @@ _PROBE_ALERTS = {
 # error cleanup switches off everything the shot may have opened and latches a hardware hold unless
 # it all reads back OFF, which it can't while Home Assistant is unreachable.
 _CANCELLED_SHOT_CLEANUP = (
-    "The controller switches off the pump, main line and valve and checks they read OFF. If that "
-    "can't be confirmed (Home Assistant unreachable, or a switch offline), it latches a hardware "
-    "hold (CS-301) and nothing on this hardware is watered until the hold is cleared; otherwise "
-    "the next shot is tried as normal."
+    "The controller sets the pump, the main-line valve and the zone valve to off, and checks that "
+    "they read off. If it cannot confirm this (Home Assistant cannot be reached, or a switch is "
+    "offline), it latches a hardware hold (CS-301). Then no shot starts on this hardware until the "
+    "hold clears. If the check passes, the controller tries the next shot as usual."
 )
 
 # Switch read-back after a close: see Controller._confirm_switches.
@@ -1780,17 +1781,17 @@ class Controller:
                         self._alert(
                             f"setup_{room.slug}",
                             "CS-201",
-                            "setup change waiting, not watering",
-                            (f"This room's setup (revision {revision}) is being taken on again after a "
-                             "restart" if resuming else
-                             f"A changed setup (revision {revision}) was saved")
-                            + ", and nothing in this room is watered until the controller takes it "
-                            "on. It only does that while these are "
-                            f"OFF: {', '.join(running if resuming else armed + running)}. Turn them "
-                            "off and wait for this notice to "
-                            f"clear (up to {int(getattr(self, 'rediscover_seconds', 300))} seconds)"
-                            + (": it then carries on as before." if resuming
-                               else ", then turn the engine switch back on."),
+                            "setup change on hold, no shots",
+                            (f"The controller loads the setup of this room (revision {revision}) again "
+                             "after a restart" if resuming else
+                             f"The room has a changed setup (revision {revision})")
+                            + ". The room gets no shots until the controller applies the setup. "
+                            "The controller applies it only while these are "
+                            f"OFF: {', '.join(running if resuming else armed + running)}. Set them "
+                            "to off. Then wait for this alert to "
+                            f"clear (up to {int(getattr(self, 'rediscover_seconds', 300))} s)"
+                            + (". Then the room continues as before." if resuming
+                               else ". Then set the kill switch to on again."),
                             room=room,
                         )
                     continue
@@ -1986,9 +1987,9 @@ class Controller:
             self._alert(
                 f"duration_config_{room.slug}",
                 "CS-203",
-                "maximum shot length not valid, not watering",
-                "The room's maximum shot length must be a number of at least 5 seconds, and it "
-                "isn't, so no shot is started. The value set here is never replaced by a default."
+                "maximum shot length not valid, no shots",
+                "The maximum shot length of the room must be a number of 5 s or more. It is not, "
+                "so the controller starts no shot. The controller does not replace the value with a default."
                 f"\n\nSetting: {entity}",
                 room=room,
             )
@@ -2293,13 +2294,13 @@ class Controller:
                 self._alert(
                     "lights_source",
                     "CS-403",
-                    "lights hours now come from the integration",
-                    f"The engine uses lights on at {int(lon)}:00 and off at {int(loff)}:00 from the "
-                    "integration. The controller app's own option still says "
-                    f"{int(room.opt_lon)}:00-{int(room.opt_loff)}:00, which is used only when the "
-                    "integration's hours can't be read and haven't been since the controller app "
-                    "started: set it to the same hours so that can't move lights-on. If the "
-                    "integration's hours are wrong, change its Lights on hour and Lights off hour."
+                    "lights hours come from the integration",
+                    f"The controller uses lights-on at {int(lon)}:00 and lights-off at {int(loff)}:00 from "
+                    "the integration. The option of the controller still says "
+                    f"{int(room.opt_lon)}:00-{int(room.opt_loff)}:00. The controller uses the option only "
+                    "when it cannot read the hours of the integration and has not read them since it "
+                    "started. Set the option to the same hours, so that it cannot move lights-on. If the "
+                    "hours of the integration are wrong, change its Lights on hour and Lights off hour."
                     "\n\nSettings: number.crop_steering_lights_on_hour, number.crop_steering_lights_off_hour",
                     room=room,
                 )
@@ -2417,12 +2418,12 @@ class Controller:
             self._alert(
                 f"cfg_{room.slug}_z{zone}_{w.split('=')[0]}",
                 "CS-401",
-                "setting outside the engine's range",
-                "A setting is outside what the engine accepts, so the engine uses the nearest "
-                "allowed value instead. The setting itself accepts a wider range than the engine "
-                "does. Set it inside the range shown to clear this; where the detail compares two "
-                "settings (a minimum above its maximum), change either one. The minimum daily volume "
-                f"is worked out from mL per plant and plant count.\n\nDetail: {w}",
+                "setting outside the controller range",
+                "A setting is outside the range of the controller, so the controller uses the nearest "
+                "permitted value. The entity accepts a wider range than the controller. Set the value "
+                "inside the range that the detail shows. If the detail compares two settings (a minimum "
+                "above its maximum), change one of them. The controller calculates the minimum daily "
+                f"volume from the mL for each plant and the plant count.\n\nDetail: {w}",
                 room=room,
                 zone=zone,
             )
@@ -2443,12 +2444,12 @@ class Controller:
                     self._alert(
                         f"ec_type_{room.slug}_z{zone}",
                         "CS-504",
-                        "steering on bulk EC: no pore EC probe reporting",
-                        "This zone has pore EC and bulk EC probes, which are never combined. No "
-                        "pore EC probe is reporting, so the zone's EC comes from its bulk EC "
-                        "probes, which read lower than pore EC from the same slab: EC targets, "
-                        "stacking and flushes act on that lower number until a pore EC probe "
-                        "reports again. Check the pore EC probes listed below."
+                        "zone EC from bulk EC: no pore EC probe reports",
+                        "This zone has pore EC probes and bulk EC probes. The integration never mixes "
+                        "the two. No pore EC probe reports, so the zone EC comes from its bulk EC "
+                        "probes. Bulk EC reads lower than pore EC in the same slab. The EC targets, "
+                        "EC stacking and flushes use this lower value until a pore EC probe "
+                        "reports again. Check the pore EC probes in the list below."
                         f"\n\nSensor: {looking}\nLeft out: {left_out}",
                         room=room,
                         zone=zone,
@@ -2463,10 +2464,10 @@ class Controller:
                     f"probe_method_{room.slug}_z{zone}_{metric}",
                     "CS-502",
                     f"too few {what} probes agree for {chosen}",
-                    f"This zone's {what} is set to steer on its {chosen.lower()} probe, which needs "
-                    f"three probes that agree. Fewer do, so it steers on their {steered.lower()} "
-                    "instead and watering carries on. Check the probes left out of the reading "
-                    "(one pulled out of its cube, or in a puddle), or choose Median for the zone."
+                    f"The {what} of this zone steers on its {chosen.lower()} probe. This method needs "
+                    f"3 probes that agree. Fewer probes agree, so the zone steers on their {steered.lower()}, "
+                    "and the shots continue. Check the probes that the reading does not use, for example "
+                    "a probe out of its cube or in a puddle. Alternatively, set the zone to Median."
                     f"\n\nSensor: {looking}\nLeft out: {left_out}",
                     room=room,
                     zone=zone,
@@ -2491,11 +2492,11 @@ class Controller:
             key,
             "CS-505",
             f"the primary {what} probe is offline",
-            f"The probe chosen as this zone's primary for {what} "
-            f"{'gives no reading' if why == 'no reading' else 'has stopped reporting'}. The zone's reading "
-            "carries on from its other probes, and watering with it. Check the probe's cable, "
-            "power and its device in Home Assistant, or choose another primary under the zone's "
-            f"Probes. You are told once; this goes when it reports again.\n\nSensor: {looking}\n"
+            f"The primary {what} probe of this zone "
+            f"{'gives no reading' if why == 'no reading' else 'stopped its reports'}. The zone reading "
+            "comes from its other probes, and the shots continue. Check the cable, the power and the "
+            "Home Assistant device of the probe. Alternatively, choose a different primary probe under "
+            f"Probes for the zone. This alert comes once. It clears when the probe reports again.\n\nSensor: {looking}\n"
             f"Primary: {primary}",
             room=room,
             zone=zone,
@@ -2663,10 +2664,10 @@ class Controller:
             log(f"[{room.slug}] Z{zone} P1 ramp outcome: {outcome} (peak {learn['peak']})")
             if outcome == "suspect":
                 self._alert(f"auto_{room.slug}_z{zone}", "CS-404", "automatic targets paused",
-                            "Automatic adjustment of this zone's targets is paused, because this "
-                            f"morning's ramp didn't look right: {auto_setpoints.frozen_reason(learn)}. "
-                            "Watering carries on with the current targets, and the next morning's "
-                            "ramp is judged again.",
+                            "The controller paused the automatic changes to the targets of this zone, "
+                            f"because the ramp of this morning was not correct: {auto_setpoints.frozen_reason(learn)}. "
+                            "The shots continue with the current targets. The controller examines the "
+                            "ramp again the next morning.",
                             room=room, zone=zone)
             self._save_state()
         if writes:
@@ -3121,10 +3122,10 @@ class Controller:
             self._alert(
                 f"plumbing_{room.slug}",
                 "CS-202",
-                "plumbing and switches disagree, not watering",
-                "The plumbing this room was set up with and the switches mapped to it don't "
-                "match, so nothing in this room is watered until they do. The detail below says "
-                "what to change, in Rooms & setup."
+                "plumbing and switches do not agree, no shots",
+                "The plumbing of the room setup and the switches mapped to it do not agree. "
+                "The room gets no shots until they agree. The detail below tells what to change "
+                "in Rooms & setup."
                 f"\n\nDetail: {plumbing}.",
                 room=room,
             )
@@ -3135,10 +3136,10 @@ class Controller:
             self._alert(
                 f"actuator_{room.slug}_z{zone}",
                 "CS-313",
-                "a valve or pump the controller can't switch, not watering",
-                "This zone's valve, or the room's pump or main line, is a kind of device the controller "
-                "has no way to open and close, so it is never sent a command and the zone is not "
-                "watered. Map a switch, an input_boolean or a valve in its place in Rooms & setup."
+                "a valve or pump the controller cannot switch, no shots",
+                "The zone valve, the pump or the main-line valve has a device type that the controller "
+                "cannot open or close. The controller sends it no command, and the zone gets no shots. "
+                "In Rooms & setup, map a switch, an input_boolean or a valve in its place."
                 f"\n\nCan't be switched: {names}",
                 room=room,
                 zone=zone,
@@ -3341,12 +3342,11 @@ class Controller:
             self._alert(
                 f"retired_switch_{room.slug}_{key}",
                 "CS-208",
-                f"{name} is off, so watering was switched off",
-                f"{name} no longer stops watering by itself: the room's Watering switch does that, "
-                f"its engine switch ({room_gate(room)}). Because {name} ({entity}) is off, the "
-                "controller switched watering off in its place, and does so again while it stays "
-                f"off. Switch {name} back on in Home Assistant, then switch watering on in Crop "
-                "Steering → Settings → Watering.",
+                f"{name} is off, so the kill switch is off",
+                f"{name} is retired. The kill switch of the room ({room_gate(room)}) now stops the "
+                f"water. {name} ({entity}) is off, so the controller set the kill switch to off. The "
+                f"controller does this again while {name} stays off. Set {name} to on in Home Assistant. "
+                "Then set Watering to on in Crop Steering → Settings → Watering.",
                 room=room,
             )
         return off
@@ -3526,11 +3526,12 @@ class Controller:
                 moves.append((zone, f"{was} → {to}", why))
             else:
                 words, why = detail[:2]
-                moves.append((zone, f"Jev changed {words}", why))
+                moves.append((zone, f"the AI assistant changed {words}", why))
         if len(moves) == 1:
             zone, head, why = moves[0]
             return f"{self._where(room, zone)}: {head}", why or head
-        what = "phase changes" if event == "phase" else "settings Jev changed"
+        what = "phase changes" if event == "phase" else "settings the AI assistant changed"
+
         name = self._where(room)
         title = f"{name}: {what}" if name else what[:1].upper() + what[1:]
         return title, "\n".join(
@@ -3570,12 +3571,12 @@ class Controller:
             self._alert(
                 key,
                 "CS-310",
-                "moisture rising with no water: the table is not draining",
-                f"Moisture went from {low:.1f} to {recent[len(recent) // 2]:.1f} % in the last "
-                f"{(now - track[0][0]).total_seconds() / 60:.0f} minutes, but this zone has had no water {since}. "
-                "Water is coming up from below: the table, its drain or the sump is backed up and the slabs are "
-                "sitting in runoff. Check the table, its drains and the sump pump now. The zone's daily minimum is "
-                "held until the reading stops rising.",
+                "VWC increases with no water: the table does not drain",
+                f"The VWC went from {low:.1f}% to {recent[len(recent) // 2]:.1f}% in the last "
+                f"{(now - track[0][0]).total_seconds() / 60:.0f} min, but this zone got no water {since}. "
+                "Water comes up from below. The table, its drain or the sump is blocked, and the slabs stand "
+                "in runoff. Check the table, its drains and the sump pump now. The controller holds the daily "
+                "minimum of the zone until the reading stops its increase.",
                 room=room,
                 zone=zone,
             )
@@ -3613,11 +3614,11 @@ class Controller:
             key,
             "CS-311",
             "the sump pump has not run",
-            f"The sump pump this room drains to has drawn no power for {self.sump_silent_h:g} hours, though it "
-            "normally runs every hour or two while the room is watered. Runoff has nowhere to go: the sump fills and "
-            "backs up into the tables, and the slabs end up sitting in it (CS-310 follows once a zone's moisture "
-            "rises with no water). Check the sump pump now: its power, its float and that it pumps out, or its "
-            f"plug if the reading is unavailable.\n\nSensor: {entity}",
+            f"The sump pump of this room used no power for {self.sump_silent_h:g} h. Usually it runs each hour "
+            "or two while the room gets water. The runoff cannot go out. The sump fills, the water goes back into "
+            "the tables, and the slabs stand in it. CS-310 follows when the VWC of a zone increases with no water. "
+            "Check the sump pump now: its power, its float switch and that it pumps the water out. If the reading "
+            f"is unavailable, check its power plug.\n\nSensor: {entity}",
             room=room,
         )
 
@@ -3697,11 +3698,11 @@ class Controller:
                 self._alert(
                     key,
                     "CS-904",
-                    "the tank is over its full mark, filling stopped",
-                    f"The tank reads {pct:.1f} %, at or over {tank_level.OVER_HOLD_PCT:g} % of the full distance "
-                    "it was mapped with, so a batch's fill valve is switched off, and none is opened, until it "
-                    f"reads {tank_level.OVER_RELEASE_PCT:g} % or less. Watering carries on. Check the fill valve "
-                    "closes, and the tank's full and empty distances in Rooms & setup."
+                    "the tank is above its full mark, the fill stopped",
+                    f"The tank reads {pct:.1f}%, at or above {tank_level.OVER_HOLD_PCT:g}% of its mapped full "
+                    "distance. The controller sets the fill valve of a batch to off, and opens no fill valve, until "
+                    f"the tank reads {tank_level.OVER_RELEASE_PCT:g}% or less. The shots continue. Check that the fill "
+                    "valve closes. Check the full and empty distances of the tank in Rooms & setup."
                     f"\n\nSensor: {room.tank['distance']}",
                     room=room,
                     quiet=False,
@@ -3728,11 +3729,11 @@ class Controller:
             self._alert(
                 f"tank_unknown_{room.slug}",
                 "CS-902",
-                "the tank level can't be read, not watering",
-                "The tank level this room waters from reads nothing usable, or its distance sensor looks stuck "
-                "(it has not fallen while the shots drew from the tank), so how much is left can't be known and "
-                "no shot starts: a pump that draws air runs dry. Watering starts again by itself once the level "
-                f"reads again. Check the sensor, its power and its placement.\n\nSensor: {names}",
+                "the tank level is not readable, no shots",
+                "The tank level of this room gives no usable reading, or its distance sensor seems stuck (the "
+                "level did not decrease while the shots took water from the tank). The controller cannot know how "
+                "much water remains, so no shot starts, because a pump that takes in air runs dry. The shots start "
+                f"again when the level reads again. Check the sensor, its power and its position.\n\nSensor: {names}",
                 room=room,
             )
             return f"tank level unknown ({names})"
@@ -3743,11 +3744,11 @@ class Controller:
             self._alert(
                 f"tank_low_{room.slug}",
                 "CS-901",
-                "the tank is at its minimum, not watering",
-                f"The tank this room waters from {level}: at or below its {tank_level.LOW_HOLD_PCT:g} % minimum, or "
-                "its low float reads low. No shot starts: a pump that draws air runs dry and can lose its prime. "
-                f"Watering starts again by itself once the tank reads {tank_level.LOW_RELEASE_PCT:g} % or more and "
-                "its float, if it has one, no longer reads low. Refill the tank.",
+                "the tank is at its minimum, no shots",
+                f"The tank of this room {level}: at or below its {tank_level.LOW_HOLD_PCT:g}% minimum, or its low "
+                "float switch reads low. No shot starts, because a pump that takes in air runs dry and can lose its "
+                f"prime. The shots start again when the tank reads {tank_level.LOW_RELEASE_PCT:g}% or more and its "
+                "float switch, if it has one, does not read low. Refill the tank.",
                 room=room,
             )
             return f"tank at its minimum ({level})"
@@ -3781,11 +3782,11 @@ class Controller:
             self._alert(
                 key,
                 "CS-903",
-                "refill the tank before the next round of shots",
-                f"The tank reads {pct:.1f} %. One more round of shots ({need:.1f} L, each zone's last) would take it "
-                f"to about {pct - drop:.1f} %, at or below its {tank_level.LOW_HOLD_PCT:g} % minimum, at the "
-                f"{room.tank_drawdown['litres_per_pct']:.2f} L per 1 % the tank has shown. A shot that would cross "
-                "the minimum waits until the tank is refilled. Refill the tank now.",
+                "refill the tank before the next set of shots",
+                f"The tank reads {pct:.1f}%. One more set of shots ({need:.1f} L, the last shot of each zone) takes "
+                f"it to about {pct - drop:.1f}%, at or below its {tank_level.LOW_HOLD_PCT:g}% minimum. The controller "
+                f"calculates this from the {room.tank_drawdown['litres_per_pct']:.2f} L for each 1% that the tank "
+                "showed. A shot that crosses the minimum waits until the tank is full again. Refill the tank now.",
                 room=room,
             )
         elif pct - drop >= tank_level.LOW_RELEASE_PCT:
@@ -3823,10 +3824,10 @@ class Controller:
         if due > getattr(room, "_idle_raised", 0) and self._alert(
             f"idle_{room.slug}",
             "CS-209",
-            "no watering for a while",
-            f"Nothing in this room has been watered for {idle:.1f} hours while its lights were on and a zone "
-            f"was in P1 or P2. {self._idle_why(room, pub)} This is said again every "
-            f"{'hour' if hours == 1 else f'{hours:g} hours'} while it lasts, and clears itself at the next shot.",
+            "no shots for some hours",
+            f"No zone in this room got a shot for {idle:.1f} h while its lights were on and a zone "
+            f"was in P1 or P2. {self._idle_why(room, pub)} This alert comes again each "
+            f"{'hour' if hours == 1 else f'{hours:g} h'} while the condition stays. It clears at the next shot.",
             room=room,
             quiet=False,
         ):
@@ -3865,7 +3866,7 @@ class Controller:
         """Why nothing has been watered, as far as this pass can tell: watering switched off, a hold (_blocked), or
         nothing called for water."""
         if not self._on(room_gate(room), False):
-            return f"Watering is switched off in this room: its engine switch ({room_gate(room)}) is off."
+            return f"The kill switch of this room ({room_gate(room)}) is off."
         holds = []
         for zone in sorted(room.zones):
             if room.state[zone].get("phase") in ("P1", "P2"):
@@ -3873,9 +3874,9 @@ class Controller:
                 if hold:
                     holds.append(f"{self._zone_title(room, zone)}: {hold}")
         if holds:
-            return f"Watering is held. {'; '.join(holds)}."
-        return ("Nothing called for water: no zone in P1 or P2 dried to the point where the engine waters it. If "
-                "the plants are drinking, check the probes and each zone's re-water point.")
+            return f"A hold stops the shots. {'; '.join(holds)}."
+        return ("No zone asked for water: no zone in P1 or P2 became dry enough to reach its re-water point. If "
+                "the plants drink, check the probes and the re-water point of each zone.")
 
     def _dosing_alert(self, room, code, title, message, event=None):
         """An alert the dosing runner raised (docs/DOSING.md) -> True once Home Assistant has it (the
@@ -3973,28 +3974,28 @@ class Controller:
         lo, hi = UNITS["vwc"]["plausible"]
         value, v, unit, lu, taken, attrs = self._device(entity, "vwc")
         if v is None:
-            return "CS-102", "This zone's moisture sensor can't be found in Home Assistant, so the controller has no reading to steer by."
+            return "CS-102", "The moisture entity of this zone is not in Home Assistant, so the controller has no reading to steer by."
         # The integration's zone reading names the probes it set aside for their unit (unit_set_aside).
         aside = (attrs or {}).get("unit_set_aside")
         if v in ("unknown", "unavailable", "") and isinstance(aside, dict) and aside:
             probes = ", ".join(f"{probe} (in '{unit or 'no unit'}')" for probe, unit in aside.items())
             return "CS-503", (
-                f"This zone's moisture probe {probes} reports in a unit the controller can't take as a moisture "
-                "percentage, so the probe is set aside and the zone has no reading to steer by."
+                f"The moisture probe {probes} of this zone reports in a unit that the controller cannot use as a "
+                "moisture percentage. The controller sets the probe aside, and the zone has no reading to steer by."
             )
         if v in ("unknown", "unavailable", ""):
-            return "CS-102", f"This zone's moisture sensor reads '{v or 'empty'}', so the controller has no reading to steer by."
+            return "CS-102", f"The moisture entity of this zone reads '{v or 'empty'}', so the controller has no reading to steer by."
         try:
             float(v)
         except (TypeError, ValueError):
-            return "CS-102", f"This zone's moisture sensor reads '{v}', which isn't a number, so the controller has no reading to steer by."
+            return "CS-102", f"The moisture entity of this zone reads '{v}'. This is not a number, so the controller has no reading to steer by."
         if taken == "refused" or (taken == "implausible" and str(unit or "").strip()):
             return "CS-503", (
-                f"This zone's moisture sensor reads {v} in '{unit}', which the controller can't take as a "
+                f"The moisture entity of this zone reads {v} in '{unit}'. The controller cannot use this as a "
                 "moisture percentage, so it sets the probe aside."
             )
         if value is None or value < lo or value > hi:
-            return "CS-103", f"This zone's moisture sensor reads {v}, which can't be a moisture reading ({lo:g}–{hi:g}%), so the controller ignores it."
+            return "CS-103", f"The moisture entity of this zone reads {v}. A moisture reading must be {lo:g}–{hi:g}%, so the controller ignores it."
         f = value
         try:
             ts = datetime.fromisoformat(str(lu).replace("Z", "+00:00"))
@@ -4002,19 +4003,19 @@ class Controller:
         except (ValueError, TypeError, OverflowError):
             ts = age_min = None
         if age_min is not None and age_min > max_age_min:
-            age = f"{age_min:.0f} minutes" if age_min < 120 else f"{age_min / 60:.1f} hours"
+            age = f"{age_min:.0f} min" if age_min < 120 else f"{age_min / 60:.1f} h"
             return "CS-101", (
-                f"This zone's moisture reading has stayed at {f:g}% for {age}, so the controller "
-                "can't tell a working probe from one that has stopped or been pulled out."
+                f"The moisture reading of this zone stayed at {f:g}% for {age}. The controller cannot "
+                "tell a good probe from a probe that stopped or came out of the cube."
             )
         if age_min is not None and age_min < -1.0:  # _read_sensor: age < -60 s
             return "CS-102", (
-                f"This zone's moisture reading is stamped {-age_min:.0f} minutes in the future, so "
-                "the controller can't trust it: Home Assistant's clock and this app's clock disagree."
+                f"The time of the moisture reading of this zone is {-age_min:.0f} min in the future, so "
+                "the controller cannot trust it. The clocks of Home Assistant and the controller do not agree."
             )
         if age_min is None:
-            return "CS-102", "This zone's moisture sensor has no valid time for its last reading, so the controller has no reading to steer by."
-        return "CS-102", "This zone's moisture sensor had no usable reading a moment ago, so the controller had nothing to steer by."
+            return "CS-102", "The moisture entity of this zone has no valid time for its last reading, so the controller has no reading to steer by."
+        return "CS-102", "The moisture entity of this zone had no usable reading a moment ago, so the controller had no reading to steer by."
 
     def _water_usage(self, room, zone, now):
         """Recorded controller delivery over this grow-day and the previous six.
@@ -4234,16 +4235,18 @@ class Controller:
         self._alert(
             f"hardware_fault_{room.slug}",
             "CS-301",
-            "CRITICAL hardware fault, watering stopped",
-            f"{self._fault_words(room.hardware_fault)}.\n\nA pump or valve did not confirm it had "
-            "switched OFF, so watering is stopped on this hardware and in every room that shares "
-            f"it. Switch watering off ({room_gate(room)}) in each of those rooms, then check that "
-            "switch at the device and in Home Assistant. The hold clears by itself within a minute "
-            "once every pump and valve reads OFF; then switch watering back on."
+            "CRITICAL hardware fault, no shots",
+            f"{self._fault_words(room.hardware_fault)}.\n\nA pump or a valve did not read back off after "
+            "the controller closed it. The controller stops the shots on this hardware and in each room "
+            f"that shares it. CAUTION: Set the kill switch ({room_gate(room)}) of each of these rooms to "
+            "off. A pump or a valve that stays on can flood the room. Check the switch at the device and "
+            "in Home Assistant. The hold clears within a minute when all the pumps and valves read OFF. "
+            "Then set the kill switch to on again."
             + (
                 ""
                 if saved
-                else " THE FAULT COULD NOT BE SAVED: do not restart the controller before it is repaired."
+                else " THE FAULT COULD NOT BE SAVED. CAUTION: Do not restart the controller before the "
+                "repair. A restart can lose the hold."
             ),
             room=room,
         )
@@ -4353,12 +4356,13 @@ class Controller:
                 self._alert(
                     f"inflight_{room.slug}",
                     "CS-308",
-                    "CRITICAL, an interrupted shot's hardware is still ON",
-                    f"A shot that started {rec['started']} never finished cleanly (the controller "
-                    "stopped or lost Home Assistant part-way through, or a switch did not confirm OFF "
-                    "at the end of it). What it opened was switched off and still does not read OFF, "
-                    "so water may still be running. The controller tries again every "
-                    f"loop.\n\nStill ON: {', '.join(close)}",
+                    "CRITICAL, the hardware of an interrupted shot is still ON",
+                    f"A shot that started {rec['started']} did not end correctly. The controller "
+                    "stopped or lost Home Assistant during the shot, or a switch did not read back off "
+                    "at the end. The controller set what the shot opened to off, but it still does not "
+                    "read OFF. Water can still flow. CAUTION: Go to the room now, and stop the device by "
+                    "hand if water flows. Water that flows can flood the room. The controller tries again "
+                    f"each loop.\n\nStill ON: {', '.join(close)}",
                     room=room,
                     zone=zone,
                 )
@@ -4368,13 +4372,14 @@ class Controller:
             self._alert(
                 f"inflight_{room.slug}",
                 "CS-309",
-                "an interrupted shot's hardware may still be ON",
-                f"A shot that started {rec['started']} never finished, and what it opened can't be "
-                "read (or Home Assistant gives no time for its last change, or no history since the "
-                "shot began), so the controller can't tell whether a person has switched it since. It leaves it alone and checks "
-                "again every loop. Check it now and switch it off by hand if water is running: once "
-                "it can be read, the controller switches off only what it can prove this shot "
-                "opened, and leaves anything else on for you to deal with."
+                "the hardware of an interrupted shot can still be ON",
+                f"A shot that started {rec['started']} did not end. The controller cannot read what "
+                "the shot opened, or Home Assistant has no time for its last change or no history since "
+                "the shot started. So the controller cannot tell if a person changed it. The controller "
+                "does not touch it, and checks again each loop. Check it now. If water flows, set it to "
+                "off by hand. When the controller can read it, it sets to off only what it can prove "
+                "that this shot opened. It leaves all other devices on for you."
+
                 f"\n\nCan't be read: {', '.join(unsure)}",
                 room=room,
                 zone=zone,
@@ -4623,19 +4628,19 @@ class Controller:
         changed = _aware(getattr(reads[valve], "last_changed", None)) if reads[valve][0] == "off" else None
         closed_after = (changed - valve_opened).total_seconds() if changed else None
         open_s = closed_after if closed_after is not None and 0 <= closed_after <= elapsed else elapsed
-        what = (f"its valve {by} was switched OFF by something other than this controller" if by == valve
-                else f"the hold {by} turned ON")
+        what = (f"a device other than this controller set its valve {by} to OFF" if by == valve
+                else f"the hold {by} started")
         outcome = " ".join(
-            ([f"Switched off {', '.join(close)}."] if close else [])
-            + ([f"Left {', '.join(left)} on: a hold owns it now."] if left else [])
-        ) or "Nothing it had opened was still on."
+            ([f"The controller set {', '.join(close)} to off."] if close else [])
+            + ([f"The controller left {', '.join(left)} on, because a hold uses it now."] if left else [])
+        ) or "Nothing that the shot opened was still on."
         log(f"[{room.slug}] Z{zone} shot cut short after {open_s:.1f}/{duration_s:.0f}s: {what}. {outcome}")
         self._alert(
             f"cutshort_{room.slug}_z{zone}",
             "CS-307",
-            "shot stopped early, something else closed the feed",
-            f"The shot ended after {open_s:.0f} of {duration_s:.0f} seconds because {what}. Only "
-            f"those {open_s:.0f} seconds of water are counted. {outcome}",
+            "shot stopped early by an external change",
+            f"The shot stopped after {open_s:.0f} s of {duration_s:.0f} s, because {what}. The controller "
+            f"counts only the water of those {open_s:.0f} s. {outcome}",
             room=room,
             zone=zone,
         )
@@ -4755,9 +4760,9 @@ class Controller:
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "CS-302",
-                    "shot cancelled, the pump didn't switch on",
-                    "Home Assistant returned an error when the pump was switched on. No water was "
-                    f"delivered and the shot was not counted. {_CANCELLED_SHOT_CLEANUP}"
+                    "shot cancelled, the pump did not start",
+                    "Home Assistant returned an error when the controller tried to start the pump. No water "
+                    f"went to the zone, and the controller did not count the shot. {_CANCELLED_SHOT_CLEANUP}"
                     f"\n\nPump: {pump}",
                     room=room,
                     zone=zone,
@@ -4771,9 +4776,9 @@ class Controller:
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "CS-303",
-                    "shot cancelled, the main-line valve didn't switch on",
-                    "Home Assistant returned an error when the main-line valve was switched on. No "
-                    f"water was delivered and the shot was not counted. {_CANCELLED_SHOT_CLEANUP}"
+                    "shot cancelled, the main-line valve did not open",
+                    "Home Assistant returned an error when the controller tried to open the main-line valve. "
+                    f"No water went to the zone, and the controller did not count the shot. {_CANCELLED_SHOT_CLEANUP}"
                     f"\n\nMain-line valve: {mainline}",
                     room=room,
                     zone=zone,
@@ -4790,9 +4795,9 @@ class Controller:
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "CS-304",
-                    "shot cancelled, the zone valve didn't switch on",
-                    "Home Assistant returned an error when this zone's valve was switched on. No "
-                    f"water was delivered and the shot was not counted. {_CANCELLED_SHOT_CLEANUP}"
+                    "shot cancelled, the zone valve did not open",
+                    "Home Assistant returned an error when the controller tried to open the valve of this zone. "
+                    f"No water went to the zone, and the controller did not count the shot. {_CANCELLED_SHOT_CLEANUP}"
                     f"\n\nValve: {valve}",
                     room=room,
                     zone=zone,
@@ -4861,17 +4866,18 @@ class Controller:
             elif aborted:
                 by = aborted[1]
                 why = {
-                    room_gate(room): "the engine switch was turned off",
-                    f"switch.crop_steering_{room.prefix}room_active": "Room Active was switched off",
-                    f"switch.crop_steering_{room.prefix}zone_{zone}_enabled": "this zone was switched off",
-                }.get(by, "manual override was turned on")
+                    room_gate(room): "the kill switch was set to off",
+                    f"switch.crop_steering_{room.prefix}room_active": "Room Active was set to off",
+                    f"switch.crop_steering_{room.prefix}zone_{zone}_enabled": "this zone was set to off",
+                }.get(by, "manual override was set to on")
                 self._alert(
                     f"killshot_{room.slug}_z{zone}",
                     "CS-305",
                     "shot stopped early",
-                    f"The shot was stopped after {elapsed:.0f} of {duration_s:.0f} seconds, because "
-                    f"{why} ({by}). The valve and anything upstream were switched off, and the water "
-                    "delivered so far is counted.",
+                    f"The shot stopped after {elapsed:.0f} s of {duration_s:.0f} s, because "
+                    f"{why} ({by}). The controller set the valve and the hardware upstream of it to off. "
+                    "It counts the water of the shot up to the stop.",
+
                     room=room,
                     zone=zone,
                 )
@@ -5176,15 +5182,15 @@ class Controller:
             self._alert(
                 f"wd_{room.slug}_z{zone}",
                 "CS-207",
-                "URGENT, drying out and not being watered",
-                f"This zone is dry (moisture {snap.vwc:.0f}%, below its {p.p2_threshold:.0f}% trigger) and "
+                "URGENT, the zone is dry and gets no shots",
+                f"This zone is dry (VWC {snap.vwc:.0f}%, below its re-water point of {p.p2_threshold:.0f}%) and "
                 + (
-                    "has never been watered by the controller"
+                    "the controller has not watered it"
                     if snap.minutes_since_shot > 1e8
-                    else f"hasn't been watered for {snap.minutes_since_shot/60.0:.1f} hours"
+                    else f"has had no shot for {snap.minutes_since_shot/60.0:.1f} h"
                 )
-                + ", but watering is blocked. If you switched it off on purpose, this is a reminder "
-                f"that the plants are drying out.\n\nBlocked by: {block}",
+                + ". Something blocks each shot. If you set it to off on purpose, this alert tells you "
+                f"that the plants become dry.\n\nBlocked by: {block}",
                 room=room,
                 zone=zone,
             )
@@ -5204,10 +5210,10 @@ class Controller:
                 self._alert(
                     f"sizing_{room.slug}_z{zone}",
                     "CS-204",
-                    "shot size can't be worked out, not watering",
-                    "To size a shot the controller needs this zone's pot size (litres per plant), "
-                    "plant count, drippers per plant and dripper flow, and one of them is missing, "
-                    "zero or unreadable. Set them in Rooms & setup.",
+                    "shot size cannot be calculated, no shots",
+                    "To calculate a shot, the controller needs the substrate volume (litres for each plant), "
+                    "the plant count, the drippers for each plant and the dripper flow of this zone. One of "
+                    "these is missing, zero or not readable. Set them in Rooms & setup.",
                     room=room,
                     zone=zone,
                 )
@@ -5224,11 +5230,11 @@ class Controller:
                 self._alert(
                     f"durcap_{room.slug}_z{zone}",
                     "CS-306",
-                    "shot shortened to the safety limit",
-                    f"The planned shot would run {int(raw_dur)} seconds, longer than the room's "
-                    f"{int(max_dur)}-second limit, so it runs for {int(max_dur)} seconds and delivers "
-                    "less than planned. Check this zone's pot size and dripper flow; if they are "
-                    "right, raise the maximum shot length.",
+                    "shot cut to the safety limit",
+                    f"The planned shot was {int(raw_dur)} s, more than the {int(max_dur)} s limit of the "
+                    f"room. The shot runs for {int(max_dur)} s and gives less water than planned. Check the "
+                    "substrate volume and the dripper flow of this zone. If they are correct, increase the "
+                    "maximum shot length.",
                     room=room,
                     zone=zone,
                 )
@@ -5263,13 +5269,12 @@ class Controller:
                 self._alert(
                     f"block_{room.slug}_z{zone}",
                     "CS-206",
-                    "root-zone EC too high, not watering",
-                    "Root-zone EC is above this zone's maximum, and a flush can't bring it down "
-                    "right now (the feed is no weaker than the root zone, or the cube is already "
-                    "saturated), so the controller holds the zone: no shot runs, the overnight "
-                    "emergency shot and the no-water-for-hours safety shot included. The hold lifts "
-                    "by itself once a flush could help; if the plants may dry out first, check the "
-                    "feed EC and the EC probe now."
+                    "zone EC too high, no shots",
+                    "The EC of this zone is above its maximum EC. A flush cannot decrease it now, because "
+                    "the feed EC is not lower than the EC of the zone, or the cube is at field capacity. "
+                    "So the controller holds the zone. No shot runs, including the rescue shot and the "
+                    "watchdog shot. The hold stops when a flush can help. CAUTION: Check the feed EC and "
+                    "the EC probe now. The plants can become too dry before the hold stops."
                     f"\n\nDetail ({st['phase']}): {reason}",
                     room=room,
                     zone=zone,
@@ -5344,15 +5349,14 @@ class Controller:
             "CS-205",
             "daily water limit reached",
             (
-                "This zone has had its daily water limit. It has no usable moisture reading, so "
-                "every shot it gets is copied or timed and none is exempt: it gets no more water "
-                "until lights-on starts the next day, the overnight emergency shot included. Check "
-                "its probe (this zone's moisture notification says what is wrong)."
+                "This zone got its daily water limit. It has no usable moisture reading, so each of "
+                "its shots is a copied or a timed shot, and no shot is exempt. The zone gets no more "
+                "water until the next lights-on, including the rescue shot. Check its probe. The "
+                "moisture alert of this zone tells what is wrong."
                 if blind
-                else "This zone has had its daily water limit, so routine top-ups and EC-correction "
-                "shots stop until lights-on starts the next day. The morning ramp, the "
-                "overnight emergency shot, the no-water-for-hours safety shot and high-EC "
-                "flushes still run."
+                else "This zone got its daily water limit. The maintenance shots and the EC shots "
+                "stop until the next lights-on. The ramp, the rescue shot, the watchdog shot and "
+                "the high-EC flushes continue."
             )
             + f"\n\nDetail ({st['phase']}): {detail}",
             room=room,
@@ -5400,7 +5404,7 @@ class Controller:
         self._n_defaulted = len(persistent)
         if persistent:
             # Name the ones that size how much water a zone gets, when they are among them.
-            key = [what for part, what in (("substrate_volume", "the pot size"),
+            key = [what for part, what in (("substrate_volume", "the substrate volume"),
                                            ("plant_count", "the plant count"),
                                            ("drippers_per_plant", "the drippers per plant"),
                                            ("dripper_flow_rate", "the dripper flow"),
@@ -5409,14 +5413,15 @@ class Controller:
             self._alert(
                 "defaulted_setpoints",
                 "CS-402",
-                "settings missing, running on built-in values",
-                "These settings can't be read in Home Assistant, so the engine uses the last value it "
-                "read since it started, else its built-in value"
-                + (f". {' and '.join(key).capitalize()} size a zone's water: a zone that has not read "
-                   "one since the controller started is not watered, its rescues included, until it is back"
-                   if key else ". Check those values suit this room")
-                + ": reload the integration, and if Repairs lists settings that are not where the "
-                "controller looks, follow code CS-605.\n\n"
+                "settings missing, the controller uses built-in values",
+                "The controller cannot read these settings in Home Assistant. It uses the last value that "
+                "it read since it started, or its built-in value"
+                + (f". {' and '.join(key).capitalize()} set the water of a zone. A zone that has not read "
+                   "one of them since the controller started gets no shots, including rescue shots, until "
+                   "the setting is back"
+                   if key else ". Make sure that these values are correct for this room")
+                + ". Reload the integration. If Repairs lists settings at unexpected entity IDs, do the "
+                "steps of CS-605.\n\n"
                 + "\n".join(persistent[:20]),
             )
 
@@ -5491,12 +5496,13 @@ class Controller:
             self._alert(
                 f"duplicate_{room.slug}",
                 "CS-609",
-                "another controller is writing this room's heartbeat, holding",
-                "Another controller is reporting for this room, so this one waters nothing and doses "
-                "nothing in it until none has been seen for 3 minutes. Right after an update this is "
-                "expected: the version before it reported without an id, and this clears by itself in "
-                "about 3 minutes. If it stays, two controllers are running this room (an app and a "
-                "container, or two apps): stop and remove the one you no longer use.",
+                "a second controller writes the heartbeat of this room, hold",
+                "A different controller reports for this room. This controller does not water or dose in "
+                "this room until it sees no other report for 3 min. After an update, this is usual: the "
+                "old version reported with no ID, and this alert clears in about 3 min. If the alert "
+                "stays, two controllers run this room (an app and a container, or two apps). Stop and "
+                "remove the controller that you do not use.",
+
                 room=room,
             )
         self._heartbeat(room, now, self._hardware_fault_block(room))
@@ -5789,11 +5795,11 @@ class Controller:
             differ = [z for z in zones if (rows.get(z) or {}).get("parameters") != zones[z]]
             if differ:
                 self._alert(f"plan_bridge_differs_{room.slug}", "CS-713",
-                            "the plan's own values differ from what the controller applied",
-                            f"The plan applied day {day} itself, and its values for zone(s) "
-                            f"{', '.join(map(str, differ))} differ from the ones the controller had applied while "
-                            "it waited. This should not happen: the controller keeps running on the plan's own "
-                            "values; please report it with the controller log.", room=room)
+                            "the values of the plan differ from the values that the controller applied",
+                            f"The plan applied day {day} itself. Its values for zone(s) "
+                            f"{', '.join(map(str, differ))} differ from the values that the controller applied while "
+                            "the plan waited. This is not usual. The controller continues with the values of the "
+                            "plan. Report this with the controller log.", room=room)
         elif attrs.get("degraded_kind") != "probe_stale":
             why = "the plan's day is no longer held by a stale probe"
         if why is None:
@@ -5807,9 +5813,9 @@ class Controller:
                     why = f"read back {wrong[0][1]} on zone {wrong[0][0]} wrong"
                     adh["cooldown_until"] = (now + timedelta(days=7)).isoformat(timespec="minutes")
                     self._alert(f"plan_bridge_{room.slug}", "CS-713", "today's plan targets could not be applied",
-                                "The controller applied today's plan targets while the plan waited, and could not "
-                                f"read them back ({why}). It went back to the plan's own targets in force and will "
-                                "not try again for 7 days. Please report it with the controller log.", room=room)
+                                "The controller applied the plan targets of today while the plan waited. It could "
+                                f"not read them back ({why}). It went back to the targets of the plan, and does not "
+                                "try again for 7 days. Report this with the controller log.", room=room)
                 else:
                     bridge["checked"] = True
                     self._save_state()
@@ -5922,11 +5928,11 @@ class Controller:
                 self._alert(
                     f"ec_unknown_{room.slug}_z{zone}",
                     "CS-104",
-                    "root-zone EC not available",
-                    "There is no usable root-zone EC reading for this zone: it is missing, "
-                    "unavailable, out of range, or hasn't changed for 20 minutes. Watering carries on "
-                    "by moisture alone; EC-based shot sizing and EC learning are paused, and salt "
-                    "build-up can't be checked or flushed."
+                    "zone EC not available",
+                    "This zone has no usable EC reading. The EC entity is missing, unavailable or out of "
+                    "range, or it has not changed for 20 min. The shots continue on the moisture reading "
+                    "only. The controller cannot check or flush salt that builds up."
+
                     f"\n\nSensor: {self._fused_id(room.prefix, 'ec', zone, room.zones[zone].get('ec'))}",
                     room=room,
                     zone=zone,
@@ -6019,8 +6025,8 @@ class Controller:
                 decisions[zone] = (s_fire, s_size, Reason(f"COPY Z{sib} (VWC probe dead)",
                                                           "blind_copy_rescue" if rescue else "blind_copy"))
                 plan = (
-                    "Until it reads normally again, this zone gets the same shots as "
-                    f"{self._zone_title(room, sib)}, whose probe is working."
+                    "Until the reading is normal again, this zone gets the same shots as "
+                    f"{self._zone_title(room, sib)}, which has a good probe."
                 )
             else:
                 mss = self._minutes_since_shot(st, now)
@@ -6030,9 +6036,9 @@ class Controller:
                     Reason("FALLBACK schedule (no live probe)", "blind_fallback"),
                 )
                 plan = (
-                    "Until it reads normally again, this zone is watered on a timer while the engine "
-                    f"is on: one shot every {int(self.blind_fallback_min)} minutes, within its daily "
-                    "water limit. Phase changes that go by moisture wait for the probe."
+                    "Until the reading is normal again, the zone gets a shot every "
+                    f"{int(self.blind_fallback_min)} min while the kill switch is on, inside its daily "
+                    "water limit. Phase changes that use the moisture reading wait for the probe."
                 )
             # Re-alert each tick — _alert's 30-min debounce throttles it to a repeating
             # reminder so a dead probe can't sit unnoticed (the silent-freeze lesson). Why it
@@ -6043,10 +6049,11 @@ class Controller:
                 self._alert(
                     f"blind_{room.slug}_z{zone}",
                     "CS-704",
-                    "Jev set this zone's probe aside",
-                    f"Jev judged, twice in a row and confirmed by the controller's own check, that this "
-                    f"zone's moisture probe is not tracking the substrate ({set_aside}). {plan} It counts "
-                    "again as soon as Jev judges it tracks. Check the probe's placement and wiring."
+                    "the AI assistant set aside the probe of this zone",
+                    "The AI assistant judged twice in sequence that the moisture probe of this zone does not "
+                    f"follow the substrate ({set_aside}). The check of the controller agreed. {plan} The probe "
+                    "counts again when the AI assistant judges that it follows the substrate. Check the "
+                    "position and the wiring of the probe."
                     f"\n\nSensor: {looking}",
                     room=room,
                     zone=zone,
@@ -6137,9 +6144,9 @@ class Controller:
                 f"xzone_{room.slug}_{z}",
                 "CS-501",
                 "much less water than the other zones",
-                "This zone has been given far less water today than the room's other zones. "
-                "Plants that drink less, a probe sitting in a wetter spot, or a valve or dripper "
-                f"problem can all do this. Watering carries on as normal.\n\nDetail: {why}",
+                "Today this zone got much less water than the other zones of the room. Possible causes "
+                "are plants that drink less, a probe in a wetter spot, or a problem with a valve or a "
+                f"dripper. The shots continue as usual.\n\nDetail: {why}",
                 room=room,
                 zone=z,
             )
@@ -6409,7 +6416,7 @@ class Controller:
             return
         head = now.strftime("%H:%M")
         if self._n_defaulted:
-            head += f"  ⚠️ {self._n_defaulted} setpoint(s) missing → engine defaults"
+            head += f"  ⚠️ {self._n_defaulted} setting(s) missing → built-in values"
         msg = f"{head}\n" + "\n".join(blocks)
         title = f"{self.instance_name} vitals"
         if not self._route_vitals(title, msg):
@@ -6475,15 +6482,16 @@ class Controller:
             self._alert(
                 "tz_mismatch",
                 "CS-405",
-                "timezone mismatch, the day may be shifted",
-                f"The controller app's clock is on UTC{off_h:+.1f}h, but Home Assistant is set to "
-                f"{ha_tz} (UTC{ha_off:+.1f}h). Lights on and off, dryback and the daily reset all go "
-                "by the app's clock, so the whole grow-day is shifted by the difference. "
+                "time zone mismatch, the grow-day can move",
+                f"The clock of the controller uses UTC{off_h:+.1f}h, but Home Assistant uses "
+                f"{ha_tz} (UTC{ha_off:+.1f}h). The controller uses its own clock for lights-on, lights-off, "
+                "dryback and the daily reset. So the full grow-day moves by the difference. "
                 + (
-                    "Set TZ in the controller container's compose file to Home Assistant's time zone, "
-                    "or remove it to follow Home Assistant, then restart the container."
+                    "Set TZ in the compose file of the controller container to the time zone of Home "
+                    "Assistant. Alternatively, remove TZ to use the time zone of Home Assistant. Then "
+                    "restart the container."
                     if _GATE.container
-                    else "Update or rebuild the controller app; if it stays, check the time zone under "
+                    else "Upgrade or rebuild the controller. If the alert stays, check the time zone in "
                     "Settings → System → General."
                 ),
             )

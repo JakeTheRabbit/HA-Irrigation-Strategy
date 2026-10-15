@@ -168,7 +168,7 @@ def test_a_step_that_crashes_is_recovered_as_after_a_restart_and_alerted(rig):
     assert r.runner._steps is None and r.runner._job is None
     assert r.runner.holds(r.c.rooms[0]) is not None  # held before the main loop's next shot
     assert ("turn_off", "switch.tank_fill") in r.actions()
-    assert "Dosing stopped with an error and was started again (CS-806)" in [
+    assert "Dosing stopped with an error and started again (CS-806)" in [
         d["title"] for d in r.creates("CS-806")]
 
 

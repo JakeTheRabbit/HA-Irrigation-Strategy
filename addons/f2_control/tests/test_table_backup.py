@@ -42,9 +42,9 @@ def test_moisture_rising_with_no_water_is_a_table_not_draining(rig):  # noqa: F8
     settled(c, room)
     assert feed(c, room, RISING) is True
     [card] = cards(fake)
-    assert card["title"] == "Zone 1: moisture rising with no water: the table is not draining (CS-310)"
+    assert card["title"] == "Zone 1: VWC increases with no water: the table does not drain (CS-310)"
     # said as soon as the rise reaches 3 points: 36.6 to 39.8 in 45 minutes
-    assert "Moisture went from 36.6 to 39.8 % in the last 45 minutes" in card["message"]
+    assert "The VWC went from 36.6% to 39.8% in the last 45 min" in card["message"]
     assert "no water since 11:00" in card["message"] and "sump pump" in card["message"]
     assert "CS-310" in controller.CRITICAL_CODES  # an emergency: a high-priority push
 

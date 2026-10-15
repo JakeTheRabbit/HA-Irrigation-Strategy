@@ -599,7 +599,7 @@ def setpoint_view(c, room, zone, p, now):
             # Back on the operator's own value (an AI overlay that ran out or was undone): no edit by hand.
             if expected is not None and (home is None or abs(v - float(home)) > 1e-6):
                 _note(c, room, zone, "set by hand", f"{suffix.replace('_', ' ')} {expected:g} -> {v:g}",
-                      "acted", "your value is the new centre of Jev's range")
+                      "acted", "your value is the new centre of the AI assistant's range")
             rec["home"][suffix] = v
             rec["written"].pop(suffix, None)
             changed = True
@@ -746,8 +746,9 @@ def guard_setpoints(c, room, zone, now):
     _note(c, room, zone, "safety revert", f"put back: {last['suffix'].replace('_', ' ')} {last['to']:g} -> "
           f"{last['from']:g}", "acted", f"{why}; paused {PAUSE_H} h")
     c._alert(f"auto_{room.slug}_z{zone}", "CS-404", "automatic targets paused",
-             f"Jev's change to this zone's watering ({last['words']}) was put back, because {why}. Jev leaves "
-             f"this zone's setpoints alone for {PAUSE_H} hours; watering carries on with your own values.",
+             f"The AI assistant changed the water of this zone ({last['words']}). The controller put the change "
+             f"back, because {why}. The AI assistant does not change the setpoints of this zone for {PAUSE_H} h. "
+             "The shots continue with your own values.",
              room=room, zone=zone)
 
 
@@ -921,12 +922,13 @@ def route_card(c, room, legacy):
     if not _route_card_due(c):
         return
     if legacy:
-        words = ("This room's AI assistant still runs on a retired Jev route. It keeps working, but it gets no new "
-                 "features. Choose Claude Haiku (brain_provider: claude_haiku and your Anthropic key) to move on.")
+        words = ("The AI assistant of this room still uses a retired Jev route. It continues to work, but it gets no "
+                 "new features. To change, set brain_provider to claude_haiku and add your Anthropic API key.")
     else:
-        words = ("Your Cloudflare settings are no longer used unless you choose them. The brain now runs on Claude "
-                 "Haiku, or on rules with no key. To keep the old Jev route, set the brain to jev_legacy.")
-    if c._jev_alert(room, None, "route", {"code": "CS-712", "title": "the AI assistant's Jev route is retired",
+        words = ("The controller does not use your Cloudflare settings now, unless you choose them. The AI assistant "
+                 "now uses Claude Haiku, or rules with no key. To keep the old Jev route, set brain_provider to "
+                 "jev_legacy.")
+    if c._jev_alert(room, None, "route", {"code": "CS-712", "title": "the Jev route of the AI assistant is retired",
                                           "message": words}):
         _route_card_shown(c)
 
@@ -940,45 +942,46 @@ def runtime_alerts(c, room):
     meter = getattr(asker, "meter", None)
     if asker.take_warning() or (meter is not None and meter.take("warn")):
         c._jev_alert(room, None, "budget", {
-            "code": "CS-706", "title": "Jev has used most of today's calls",
-            "message": (f"Jev has made {asker.stats.get('calls')} of its {asker.daily_budget} calls today, across "
-                        "every room. Once they are spent, the engine's own rules decide until midnight. Raise "
-                        "jev_daily_calls in the app's options if this happens on an ordinary day."
+            "code": "CS-706", "title": "the AI assistant used most of the calls of today",
+            "message": (f"The AI assistant made {asker.stats.get('calls')} of its {asker.daily_budget} calls today, "
+                        "for all rooms. When it uses all the calls, the rules of the controller decide. If this "
+                        "occurs on a usual day, increase jev_daily_calls in the controller options."
                         if meter is None else
-                        f"The AI assistant has used most of its budget of US${meter.budget:.2f} until the next "
-                        "lights-on. Once it is spent, the engine's own rules decide until then.")})
+                        f"The AI assistant used most of its AI budget of US${meter.budget:.2f} until the next "
+                        "lights-on. When it spends the budget, the rules of the controller decide until then.")})
     mine = [e for e in brain.events if e[1] == room.slug]
     brain.events = [e for e in brain.events if e[1] != room.slug]
     for _kind, _room, zone, judge in mine:
         c._jev_alert(room, zone, judge, {
-            "code": "CS-707", "title": "Jev is on the stricter gate for this zone",
-            "message": (f"Jev's {judge} judge made {brain.strict_after} calls in a row for this zone that did not "
-                        f"work out. Until two in a row do, it acts only when both phrasings agree at "
-                        f"{brain.strict_prob:g} or more and a second look gives the same answer. Jev keeps judging; "
-                        "whenever it is not sure enough, the engine's own rules act.")})
+            "code": "CS-707", "title": "the AI assistant uses the stricter gate for this zone",
+            "message": (f"The {judge} judge of the AI assistant made {brain.strict_after} calls in sequence for this "
+                        "zone that were not correct. Until 2 calls in sequence are correct, the judge acts only "
+                        f"when its two questions agree at {brain.strict_prob:g} or more and a second look gives the "
+                        "same answer. The AI assistant continues to judge. When it is not sure enough, the rules of "
+                        "the controller act.")})
     if meter is not None:
         if meter.take("spent") and not c._jev_alert(room, None, "spent", {
-                "code": "CS-708", "title": "the AI assistant has used its budget",
-                "message": (f"The AI assistant has used its budget of US${meter.budget:.2f} until the next lights-on. "
-                            "The engine is running on its own rules, the Auto setpoints learner included, until "
-                            "then. Raise anthropic_daily_budget_usd in the app's options if this happens on an "
-                            "ordinary day.")}):
+                "code": "CS-708", "title": "the AI assistant used its AI budget",
+                "message": (f"The AI assistant used its AI budget of US${meter.budget:.2f} until the next lights-on. "
+                            "Until then, the controller uses its own rules, including the Auto setpoints learner. "
+                            "If this occurs on a usual day, increase anthropic_daily_budget_usd in the controller "
+                            "options.")}):
             meter.again("spent")
         if meter.take("brain") and not c._jev_alert(room, None, "brain", {
                 "code": "CS-709", "title": "the AI assistant is not available",
-                "message": ("The AI assistant cannot reach Claude: " + _STATE_WORDS.get(meter.state(), "it is not "
-                            "answering.") + " The engine is running on its own rules.")}):
+                "message": ("The AI assistant cannot reach Claude. " + _STATE_WORDS.get(meter.state(), "It does "
+                            "not answer.") + " The controller uses its own rules.")}):
             meter.again("brain")
     if _status(brain).deprecated_route:
         route_card(c, room, legacy=True)
 
 
 _STATE_WORDS = {
-    "budget_spent": "Spent today's budget. Rules until the next lights-on.",
-    "paused": "Anthropic asked it to wait. Rules until it answers again.",
-    "unavailable": "Anthropic is not answering. Rules for an hour, then it tries again.",
-    "auth_failed": "The Anthropic key was refused. Rules until the app restarts with a working key.",
-    "model_invalid": "Anthropic does not know the model. Rules until the app restarts.",
+    "budget_spent": "It spent the AI budget of today. Rules until the next lights-on.",
+    "paused": "Anthropic told it to wait. Rules until Anthropic answers again.",
+    "unavailable": "Anthropic does not answer. Rules for 1 h, then it tries again.",
+    "auth_failed": "Anthropic refused the API key. Rules until the controller restarts with a valid key.",
+    "model_invalid": "Anthropic does not know the model. Rules until the controller restarts.",
 }
 
 
@@ -1055,7 +1058,7 @@ def publish(c, room, now, ha_set):
         status = brain.zone_status(room.slug, zone)
         acting = sorted(n for n, v in status.items() if v.get("directive") and not str(v.get("why", "")).startswith("refused"))
         strict = sorted(j for (r, z, j), on in brain.strict.items() if on and r == room.slug and z == zone)
-        attrs = {"judges": status, "strict": strict, "friendly_name": f"Zone {zone} Jev", "engine": PRODUCT}
+        attrs = {"judges": status, "strict": strict, "friendly_name": f"Zone {zone} AI assistant", "engine": PRODUCT}
         sp = setpoints_published(c, room, zone, now, managed)
         if sp is not None:
             attrs["setpoints"] = sp
@@ -1074,7 +1077,7 @@ def publish(c, room, now, ha_set):
     if journal is not None:
         entries = journal.recent(room.slug)
         ha_set(f"sensor.crop_steering_{room.prefix}jev_log", headline(entries[0] if entries else None),
-               {"entries": entries, "friendly_name": "Jev decisions", "engine": PRODUCT})
+               {"entries": entries, "friendly_name": "AI assistant decisions", "engine": PRODUCT})
     feed_task(c, room, now)
     report_task(c, room, now, ha_set)
 
@@ -1215,7 +1218,7 @@ def _plan_catch_up(c, room, now, view, rec):
                                    f"refused: {why}", "advise")
         return
     rec["directive"] = None
-    words = (f"Day {d.value['day']}'s targets applied by the controller for "
+    words = (f"The controller applied the targets of day {d.value['day']} for "
              + ", ".join(view.titles.get(int(z)) or f"zone {z}" for z in d.value["zones"]))
     if getattr(c.jev, "dry_run", False):
         rec["notes"][drift.cls] = (words + " (advising only: not applied).", d.why, "would act")
@@ -1235,9 +1238,10 @@ def _plan_catch_up(c, room, now, view, rec):
     c.jev.log(f"[plan] {room.slug} bridged day {d.value['day']} for zones {sorted(d.value['zones'])}: {d.why}")
     reason = view.attrs.get("degraded_reason") or "a stale probe"
     c._jev_alert(room, None, "plan_bridge", {
-        "code": "CS-713", "title": "today's plan targets applied by the controller",
-        "message": (f"{words} at {now:%H:%M} while the plan waits for: {reason}. They stay until the plan applies "
-                    f"day {d.value['day']} itself or the next lights-on. Nothing in the plan was changed.")})
+        "code": "CS-713", "title": "the controller applied the plan targets of today",
+        "message": (f"{words} at {now:%H:%M}, while the plan waits for this: {reason}. The targets stay until the "
+                    f"plan applies day {d.value['day']} itself, or until the next lights-on. The controller did not "
+                    "change the plan.")})
     rec["notes"][drift.cls] = (words + f" at {now:%H:%M}.", d.why, "acted")
     _plan_note(c, room, rec.get("directive_verdict"), drift, "catch up today's plan day", why, d.why, "acted")
 
@@ -1334,8 +1338,8 @@ def feed_task(c, room, now):
         if label:
             c._jev_alert(room, None, "feed", {
                 "code": "CS-711", "title": "the AI assistant proposes a feed change",
-                "message": " ".join(filter(None, (jev_feed.WORDS[label], note, "Nothing has been changed: a person "
-                                                  "decides whether to change the feed, and makes the change.")))})
+                "message": " ".join(filter(None, (jev_feed.WORDS[label], note, "The controller changed nothing. A "
+                                                  "person decides if the feed changes, and makes the change.")))})
     day = c._grow_day_start(room, now).isoformat()
     since_on = (24.0 - c._hours_to(now, room.lights_on_hour)) % 24.0
     if (task.due(room.slug, day) and c._lights_on(room, now) and since_on >= jev_feed.AFTER_H
@@ -1436,7 +1440,8 @@ def publish_rules(c, room, now, ha_set):
         "friendly_name": FRIENDLY, "engine": PRODUCT})
     for zone in room.zones:
         ha_set(f"sensor.crop_steering_{room.prefix}zone_{zone}_jev", "rules",
-               {"judges": {}, "strict": [], "provider": "rules", "friendly_name": f"Zone {zone} Jev",
+               {"judges": {}, "strict": [], "provider": "rules", "friendly_name": f"Zone {zone} AI assistant",
+
                 "engine": PRODUCT})
     if status.notice == "cloudflare_route_retired":
         route_card(c, room, legacy=False)

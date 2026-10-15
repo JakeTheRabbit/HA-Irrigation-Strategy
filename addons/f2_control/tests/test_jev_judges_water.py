@@ -232,10 +232,10 @@ def test_two_misses_in_a_row_raise_cs701_and_a_landing_resets_the_count():
     c = _shot_ctx(_after(120))
     d = _audit(j, c, "not_reaching_zone")
     assert (d.judge, d.kind) == ("shot", "alert") and CODE == "CS-701"
-    assert d.value["code"] == "CS-701" and d.value["title"] == "water isn't reaching this zone"
-    assert d.value["message"] == ("The last two shots on Zone 1 at 10:20 and 11:00 put in 10.0 L and 10.0 L and "
-                                  "moisture did not rise; check the zone's valve, drippers and line; watering "
-                                  "carries on as normal.")
+    assert d.value["code"] == "CS-701" and d.value["title"] == "water does not reach this zone"
+    assert d.value["message"] == ("The last two shots on Zone 1 at 10:20 and 11:00 gave 10.0 L and 10.0 L, and the "
+                                  "VWC did not increase. Check the valve, the drippers and the line of the zone. "
+                                  "The shots continue as usual.")
     assert _audit(j, _shot_ctx(_after(80)), "landed") is None  # reset
     assert _audit(j, _shot_ctx(_after(40)), "not_reaching_zone") is None  # a first miss again
 

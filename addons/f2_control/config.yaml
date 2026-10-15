@@ -2,11 +2,12 @@ name: Crop Steering Controller
 version: "3.11.1"
 slug: f2_control
 description: >-
-  Autonomous crop steering for Home Assistant. Runs the daily P0-P1-P2-P3 dryback
-  cycle per zone from your live VWC/EC probes (fusing multiple sensors per zone),
-  sequences the pump and valves with valve-close read-back, and is gated by a hard
-  kill switch. Configure once in the Crop Steering UI; the operator dashboards are
-  served right in the sidebar.
+  The controller of Crop Steering for Home Assistant. For each zone, it runs the
+  four phases of the grow-day (P0, P1, P2 and P3) from the VWC and EC readings that
+  the Crop Steering integration publishes. It operates the pump and the valves and
+  reads back each valve after it closes. When the kill switch is off, the controller
+  gives no shots. Configure the room in the Crop Steering dashboard, which opens in
+  the Home Assistant sidebar.
 url: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy
 arch:
   - amd64

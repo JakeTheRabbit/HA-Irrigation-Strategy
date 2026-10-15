@@ -80,7 +80,7 @@ def test_shots_that_never_lifted_vwc_are_a_delivery_problem_not_saturation():
     _ramp(learn, [0.1, 0.0, 0.1], start=24.0)  # flat from the first shot: water is not reaching the probe
     assert au.ramp_outcome(learn, "P1") == "suspect"
     assert learn["peak"] is None and au.p1_target(learn, vwc=24.2, phase="P1") is None
-    assert "not reaching" in au.frozen_reason(learn)
+    assert "does not reach" in au.frozen_reason(learn)
 
 
 def test_a_plateau_far_below_the_known_peak_is_not_believed():

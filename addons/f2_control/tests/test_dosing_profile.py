@@ -84,7 +84,7 @@ def test_a_rooms_mix_power_time_is_waited_for(rig):
     r.ask("batch")
     r.poll()
     assert r.status()[1]["handled_result"] == "stopped: mix: the mix pump did not draw 200 W within 60 s"
-    assert "within 60 seconds" in r.alert("CS-805")["message"]
+    assert "within 60 s" in r.alert("CS-805")["message"]
 
 
 def test_a_rooms_full_sensor_silence_is_waited_for(rig):
@@ -96,7 +96,7 @@ def test_a_rooms_full_sensor_silence_is_waited_for(rig):
     r.clock.at(30, lambda: r.set("binary_sensor.tank_full", "unavailable"))
     r.poll()
     assert r.status()[1]["handled_result"] == "stopped: fill: the full sensor stopped reporting"
-    assert "for 45 seconds" in r.alert("CS-804")["message"]
+    assert "for 45 s" in r.alert("CS-804")["message"]
     closed = min(t for t, service, e in r.times if (service, e) == ("turn_off", "switch.tank_fill") and t > 30)
     assert 30 + 45 <= closed <= 30 + 45 + 4
 
@@ -109,4 +109,4 @@ def test_a_rooms_fill_valve_time_is_waited_for(rig):
     r.ask("batch")
     r.poll()
     assert r.status()[1]["handled_result"] == "stopped: fill: the fill valve did not open"
-    assert "did not read on within 30 seconds" in r.alert("CS-804")["message"]
+    assert "did not read on within 30 s" in r.alert("CS-804")["message"]

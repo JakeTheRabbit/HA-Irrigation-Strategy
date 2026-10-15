@@ -94,7 +94,7 @@ async def test_the_real_controller_reminds_from_what_the_integration_publishes(
     assert notes("create") == []
     reads(1)
     (note,) = notes("create")
-    assert note["title"].endswith("batch tank down to 15%, refill it (CS-906)")
+    assert note["title"].endswith("batch tank at 15%, refill it (CS-906)")
     reads(30)
     assert len(notes("create")) == 1 and notes("dismiss") == []
     fake.set_state(LEVEL, "95", {"unit_of_measurement": "%"})  # refilled

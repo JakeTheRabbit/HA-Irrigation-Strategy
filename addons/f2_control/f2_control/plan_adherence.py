@@ -39,19 +39,19 @@ UNITS = {"dryback_target": " % of the peak", "p2_shot_size": " %", "p1_initial_s
          "watchdog_hours": " h"}
 
 TITLES = {
-    "transition_missed": "today's plan day is not in force",
-    "armed_not_started": "the armed plan has not started",
+    "transition_missed": "the plan day of today is not applied",
+    "armed_not_started": "the armed plan did not start",
     "saved_not_armed": "a saved grow plan is not armed",
     "plan_ending": "the grow plan ends soon",
-    "shadowed_edit": "a change to a setting the plan controls has no effect",
+    "shadowed_edit": "a change to a plan setting has no effect",
     "disarm_return": "the room goes back to its own settings at lights-on",
-    "steering_disagrees": "the steering select disagrees with the plan",
-    "day_boundary": "the controller's day may not match the plan's",
-    "lights_entity": "the room's light disagrees with its lights hours",
+    "steering_disagrees": "the steering select does not agree with the plan",
+    "day_boundary": "the grow-day of the controller can differ from the plan",
+    "lights_entity": "the room light does not agree with the lights hours",
     "missed_day_start": "a zone did not start its day at lights-on",
     "missed_lights_off": "a zone did not stop for the night at lights-off",
     "p0_overrun": "a zone stayed in its morning dryback past its maximum wait",
-    "p1_long": "a zone has been ramping a long time",
+    "p1_long": "a zone is in its ramp for a long time",
 }
 # The `cause` answers each drift the brain is asked about accepts, and which of its suggestions each one shows (the
 # first suggestion is the one shown with no firm answer). A drift class not here is never asked about.
@@ -296,10 +296,10 @@ def _day(view, adh):
                 f"today's targets not applied for {names}: {why}. Day {want0.get('day')} changes {what}.",
                 f"{names} {'has' if len(missed) == 1 else 'have'} not had today's plan day applied, because {why}. "
                 f"For {_zone(view, z0)}, day {want0.get('day')} changes {what}.",
-                ("Fix or unmap the probe the plan waits for; until then that zone stays on the earlier day's "
-                 "targets.",
-                 "Check the plan's dates for this room.",
-                 "Nothing changes today: the plan moves on as soon as the reading is back."),
+                ("Repair the probe that the plan waits for, or remove its mapping. Until then, that zone stays on "
+                 "the targets of the earlier day.",
+                 "Check the dates of the plan for this room.",
+                 "Nothing changes today. The plan continues when the reading is back."),
                 key=_key(view, "transition_missed", None, view.expected_day.isoformat()),
                 extra={"zones": {z: want.get("parameters") for z, _r, want, _d in missed},
                        "days": {z: want.get("day") for z, _r, want, _d in missed}}))
@@ -317,9 +317,10 @@ def _day(view, adh):
             out.append(Drift(
                 "armed_not_started", None, 1, f"armed but not started at this lights-on: {why}.",
                 f"The plan was armed to start at this lights-on and has not, because {why}.",
-                ("Fix or unmap the probe the plan waits for; until then the room stays on its own settings.",
-                 "Check the plan's start dates for this room.",
-                 "Nothing changes today: the plan starts as soon as the reading is back."),
+                ("Repair the probe that the plan waits for, or remove its mapping. Until then, the room stays on "
+                 "its own settings.",
+                 "Check the start dates of the plan for this room.",
+                 "Nothing changes today. The plan starts when the reading is back."),
                 key=_key(view, "armed_not_started", None, view.expected_day.isoformat())))
     return out
 
@@ -344,8 +345,8 @@ def _saved(view, adh):
     return [Drift("saved_not_armed", None, 4, "a saved plan has not been armed, so the room runs on its own settings.",
                   f"A grow plan (revision {rev}) was saved and has not been armed for a whole day; its start dates "
                   "have passed, so nothing in the room is running from it.",
-                  ("Your saved plan has not been armed, so the room is on its own settings. Arm it, or change its "
-                   "start dates.", "If you meant to keep editing, nothing is running from it yet."),
+                  ("Your saved plan is not armed, so the room uses its own settings. Arm the plan, or change its "
+                   "start dates.", "If you want to continue the edit, nothing uses the plan yet."),
                   key=_key(view, "saved_not_armed", None, f"r{rev}"), once=True)]
 
 
@@ -363,8 +364,8 @@ def _ending(view):
             stage = 3 if left >= 2 else 1
             out.append(Drift(
                 "plan_ending", z, 2, f"{_zone(view, z)}'s plan ends after day {zp['of_days']} (in {left} days).",
-                "", (f"{_zone(view, z).capitalize()}'s plan ends after day {zp['of_days']} (in {left} days). After that "
-                     "the plan holds its steering (rescue water only) until you extend or disarm it.",),
+                "", (f"The plan of {_zone(view, z)} ends after day {zp['of_days']} (in {left} days). After that, "
+                     "the plan holds its steering (rescue shots only) until you extend or disarm it.",),
                 key=_key(view, "plan_ending", z, view.attrs.get("revision"), stage), once=True))
     return out
 
@@ -418,11 +419,11 @@ def _edits(view, adh):
                 f"{what.capitalize()} on {_zone(view, z)} was changed from {_fmt(key, values[eid])} to {_fmt(key, v)}, "
                 f"not by the plan. The plan keeps it at {_fmt(key, plan)} today, so the change has no effect while "
                 "the plan runs.",
-                (f"Your change to {what} on {_zone(view, z)} has no effect while the plan runs. To keep it, change "
-                 "the plan's days from today; to drop it, set it back.",
-                 f"The plan moves this setting on day {moves['day']}; edit the plan if that is too late."
-                 if moves else "The plan keeps this setting as it is; edit the plan to move it.",
-                 "No effect today: it comes back into force when the plan is disarmed."),
+                (f"Your change to {what} on {_zone(view, z)} has no effect while the plan runs. To keep the change, "
+                 "change the days of the plan from today. To remove it, set the old value again.",
+                 f"The plan changes this setting on day {moves['day']}. If that is too late, edit the plan."
+                 if moves else "The plan keeps this setting as it is. To change the setting, edit the plan.",
+                 "No effect today. The change applies again when you disarm the plan."),
                 key=_key(view, "shadowed_edit", z, eid.split(".")[-1], view.expected_day.isoformat()),
                 extra={"entity_id": eid}))
     return out
@@ -443,7 +444,8 @@ def _disarm(view):
         return []
     listed = "; ".join(back[:6]) + (f" and {len(back) - 6} more" if len(back) > 6 else "")
     return [Drift("disarm_return", None, 3, f"at lights-on the room goes back to its own settings: {listed}.", "",
-                  (f"At lights-on the room goes back to its own settings. These differ from today's plan: {listed}.",),
+                  (f"At lights-on, the room goes back to its own settings. These settings differ from the plan of "
+                   f"today: {listed}.",),
                   key=_key(view, "disarm_return", None, view.attrs.get("revision")), once=True)]
 
 
@@ -462,10 +464,10 @@ def _steering(view):
                 f"{_zone(view, z)}'s steering select says {mode}; the plan steers it {bias:g} % generative.",
                 f"{_zone(view, z).capitalize()}'s steering select says {mode}; the plan steers it {bias:g} % generative "
                 "today.",
-                (f"{_zone(view, z).capitalize()}'s steering select says {mode} but the plan steers it {bias:g} % "
-                 "generative. The plan sets the targets; the select still decides when the evening dryback may start "
-                 "early. Set the select to match.",
-                 "If you changed the select on purpose, change the plan's bias to match."),
+                (f"The steering select of {_zone(view, z)} says {mode}, but the plan steers it {bias:g}% "
+                 "generative. The plan sets the targets. The select still decides when the evening dryback can start "
+                 "early. Set the select to agree with the plan.",
+                 "If you changed the select on purpose, change the bias of the plan to agree."),
                 key=_key(view, "steering_disagrees", z, view.expected_day.isoformat())))
     return out
 
@@ -478,8 +480,8 @@ def _boundary(view):
         return []
     return [Drift("day_boundary", None, 5,
                   f"the controller is not reading the lights hours from the integration ({view.lights_source}).", "",
-                  ("The controller is not reading the room's lights hours from the integration "
-                   f"({view.lights_source}), so its day may start at a different time from the plan's. Check the "
+                  ("The controller does not read the lights hours of the room from the integration "
+                   f"({view.lights_source}). So its grow-day can start at a different time from the plan. Check the "
                    "lights hours.",),
                   key=_key(view, "day_boundary", None, view.expected_day.isoformat()))]
 
@@ -495,8 +497,8 @@ def _light(view):
             return []
     other = "on" if view.lights_on else "off"
     return [Drift("lights_entity", None, 5, f"the room's light reads {view.light_state} but the hours say {other}.",
-                  "", (f"The room's light reads {view.light_state} but the lights hours say {other}. The engine "
-                       "follows the hours.",),
+                  "", (f"The room light reads {view.light_state}, but the lights hours say {other}. The controller "
+                       "follows the lights hours.",),
                   key=_key(view, "lights_entity", None, view.expected_day.isoformat()))]
 
 
@@ -533,7 +535,7 @@ def _phases(view):
                 "p1_long", z, 4, f"{name} has been ramping for {hours:.1f} h.",
                 f"{name.capitalize()} has been in its ramp (P1) for {hours:.1f} h; the ramp's maximum shots at its "
                 f"time between shots take about {window / 60:.1f} h. {zs.get('waiting') or ''}".strip(),
-                (f"{name.capitalize()} has been ramping for {hours:.1f} h: "
+                (f"{name.capitalize()} is in its ramp for {hours:.1f} h: "
                  f"{zs.get('waiting') or 'the ramp waits for its shots or a gate'}.",),
                 alert=view.now - changed > timedelta(minutes=2 * window),
                 key=_key(view, "p1_long", z, view.expected_day.isoformat())))
@@ -542,8 +544,9 @@ def _phases(view):
 
 def _trip(view, cls, z, words):
     return Drift(cls, z, 1 if cls != "p0_overrun" else 2, words, words,
-                 (f"This should not happen: {words} The controller keeps running; please report it with the "
-                  "controller log.",),
+                 (f"This is not usual: {words} The controller continues. Report this with the controller "
+                  "log.",),
+
                  key=_key(view, cls, z, view.expected_day.isoformat()))
 
 

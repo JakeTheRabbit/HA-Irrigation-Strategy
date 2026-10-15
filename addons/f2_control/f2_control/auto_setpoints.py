@@ -187,11 +187,12 @@ def frozen_reason(learn):
     if learn["outcome"] != "suspect":
         return None
     if learn["veto"]:
-        return f"today's plateau was not believed ({learn['veto']}): check delivery and the probe"
+        return f"the plateau of today was not accepted ({learn['veto']}): check the water delivery and the probe"
     if learn["peak"] is not None and learn["stalled_at"] is not None and learn["stalled_at"] < learn["peak"] - SUSPECT_DROP_PTS:
-        return (f"ramp stalled at {learn['stalled_at']:.1f}%, {learn['peak'] - learn['stalled_at']:.1f} points under "
-                f"the peak this zone has held ({learn['peak']:.1f}%): check delivery and the probe")
-    return "ramp shots are not lifting VWC: water is not reaching this probe (check the dripper, line and probe)"
+        return (f"the ramp stopped at {learn['stalled_at']:.1f}%, {learn['peak'] - learn['stalled_at']:.1f} points "
+                f"below the peak of this zone ({learn['peak']:.1f}%): check the water delivery and the probe")
+    return ("the ramp shots do not increase the VWC: water does not reach this probe (check the dripper, the line "
+            "and the probe)")
 
 
 def p1_target(learn, vwc, phase):

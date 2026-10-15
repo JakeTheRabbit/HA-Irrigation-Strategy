@@ -283,11 +283,11 @@ class DosingRunner:
             self._stuck.clear()
             self._recovered = False
         self.recover()
-        self._alert(None, "CS-806", "dosing stopped with an error and was started again",
-                    f"The controller's dosing stopped with an error ({error!r}), and the controller "
-                    "started it again. Whatever a dose or batch had running was switched off and holds "
-                    "its rooms' watering until it reads off; nothing was resumed. Check the controller "
-                    "app's log, and the tank if a dose or batch was running.",
+        self._alert(None, "CS-806", "dosing stopped with an error and started again",
+                    f"The dosing of the controller stopped with an error ({error!r}), and the controller "
+                    "started it again. The controller set to off what a dose or batch had on. That hardware "
+                    "holds the shots of its rooms until it reads off. The controller did not continue the "
+                    "dose or batch. Read the controller log. If a dose or batch was running, check the tank.",
                     _event("crash", self._now().isoformat()))
 
     def recover(self):
@@ -312,11 +312,11 @@ class DosingRunner:
                 self._write()  # a fresh file; the one that could not be read is kept as .bad
         if swept:
             self._alert(None, "CS-803", "dosing lost its record of what was running",
-                        "dosing_state.json could not be read at start, so whether a dose or a batch "
-                        "was running is not known. It was kept as dosing_state.json.bad, and every "
-                        "room with dosing set up has its dosing pumps' power, fill valve, mix pump and "
-                        "mix valves switched off; a room whose hardware does not read off is held until "
-                        "it does. Check the batch tanks before dosing again.",
+                        "The controller could not read dosing_state.json at start, so it does not know if a "
+                        "dose or a batch was running. It kept the file as dosing_state.json.bad. In each room "
+                        "with dosing, it set the power of the dosing pumps, the fill valve, the mix pump and "
+                        "the mix valves to off. A room whose hardware does not read off stays held until it "
+                        "does. Check the batch tanks before the next dose.",
                         _event("state_file", self._now().isoformat()))
         self._release_stuck()
         return True
@@ -462,11 +462,11 @@ class DosingRunner:
             ):
                 return
             block["reminded_at"] = when.isoformat()
-        self._alert(room.slug, "CS-906", f"batch tank down to {pct:g}%, refill it",
-                    f"The batch tank reads {pct:g}%, at or under its refill reminder ({remind:g}%): refill "
-                    "it, by hand or by making a batch. Nothing refills it by itself. This comes again each "
-                    f"day it stays at or under {remind:g}%, and goes once it reads "
-                    f"{remind + REMIND_CLEAR_PCT:g}%.", "remind")
+        self._alert(room.slug, "CS-906", f"batch tank at {pct:g}%, refill it",
+                    f"The batch tank reads {pct:g}%, at or below its refill reminder ({remind:g}%). Refill "
+                    "the tank by hand, or make a batch. Nothing refills the tank automatically. This alert "
+                    f"comes again each day while the tank stays at or below {remind:g}%. It clears when "
+                    f"the tank reads {remind + REMIND_CLEAR_PCT:g}%.", "remind")
 
     def _end_reminder(self, room):
         """Take the refill reminder down (one waiting for Home Assistant too), so it is said again the
@@ -494,12 +494,12 @@ class DosingRunner:
         count = self._fails[room.slug] = self._fails.get(room.slug, 0) + 1
         self._log(f"[{room.slug}] dosing: error", repr(error))
         if count == POLL_FAILS:
-            self._alert(room.slug, "CS-806", "dosing in this room keeps failing",
-                        f"The controller's dosing has failed {count} times in a row for this room "
-                        f"(the last: {error!r}), so a request for it may not be taken and its status "
-                        "is not up to date. Anything a dose or batch left not reading off is still "
-                        "switched off and held. Check the controller app's log and the room's dosing "
-                        "setup.", _event("poll", self._now().isoformat()))
+            self._alert(room.slug, "CS-806", "dosing in this room fails again and again",
+                        f"The dosing of the controller failed {count} times in sequence for this room "
+                        f"(the last: {error!r}). The controller can miss a dosing request, and the dosing "
+                        "status is not current. Hardware that a dose or batch left on is still set to off "
+                        "and held. Read the controller log. Check the dosing setup of the room.",
+                        _event("poll", self._now().isoformat()))
 
     def _take(self, room, config, request, busy):
         age = self._age(request)
@@ -586,14 +586,14 @@ class DosingRunner:
         if left:
             code = "CS-801" if result == "ran past its time" else "CS-806"
             if result == "stopped":  # the other ends named it in their own alert already
-                self._alert(room.slug, "CS-806", "a dose was stopped, but its pump does not read off",
-                            f"The dose of {pump['name']} was stopped, but {_still(left)}, so watering "
-                            "in this room is held, and the off is sent again every 2 seconds, until it "
-                            "does. Switch it off by hand if it is still running, and check the tank "
-                            "before dosing again.", _event(pump["id"], started))
+                self._alert(room.slug, "CS-806", "a dose stopped, but its pump does not read off",
+                            f"The dose of {pump['name']} stopped, but {_still(left)}. The shots of this room "
+                            "are held, and the controller sends the off again each 2 s until it reads off. "
+                            "If the pump still runs, stop it by hand. Check the tank before the next dose.",
+                            _event(pump["id"], started))
             self._hold_stuck(room, left, None, {room.slug}, code, "a dosing pump does not read off",
                              f"A dose of {pump['name']} ended ({result}).",
-                             "Check the pump, and the tank, before dosing again.",
+                             "Check the pump and the tank before the next dose.",
                              _event(pump["id"], started), alerted=True)
         entry = None
         if not result.startswith("refused"):
@@ -615,12 +615,12 @@ class DosingRunner:
             self._log(f"[{job.room.slug}] dosing: could not switch the pump off", repr(again))
             job.left = [pump["power_entity"]]
         if job.kind == "dose":
-            self._alert(job.room.slug, "CS-806", "a dose was stopped by an error in the controller",
-                        f"The dose of {pump['name']} stopped: an error in the controller ({error!r}). "
-                        f"Its power ({pump['power_entity']}) was switched off"
-                        + (", but it does not read off, so watering in this room is held, and the off "
-                           "is sent again every 2 seconds, until it does." if job.left else ".")
-                        + " How much went in is not known: check the tank before dosing again.",
+            self._alert(job.room.slug, "CS-806", "an error in the controller stopped a dose",
+                        f"The dose of {pump['name']} stopped because of an error in the controller ({error!r}). "
+                        f"The controller set its power ({pump['power_entity']}) to off"
+                        + (", but it does not read off. The shots of this room are held, and the controller "
+                           "sends the off again each 2 s until it reads off." if job.left else ".")
+                        + " The dosed volume is not known. Check the tank before the next dose.",
                         _event(pump["id"], job.started_at))
         return "stopped: an error in the controller"
 
@@ -761,9 +761,9 @@ class DosingRunner:
         if why:
             amounts = ", ".join(f"{_fmt(ml)} mL from {tank}" for tank, ml in (draw.get("draws") or {}).items())
             self._alert(slug, "CS-807", "a dose was not taken off its stock tank",
-                        f"{draw.get('note') or 'A dose'}: {amounts} was not taken off its stock tank: "
-                        f"{why}. That stock tank's level is now higher than what is in it: set it in "
-                        "Stock tanks (Set level), and check the pump's stock tank in the dosing setup.",
+                        f"{draw.get('note') or 'A dose'}: {amounts} was not taken off its stock tank, because "
+                        f"{why}. The level of that stock tank now shows more than the tank contains. Set the "
+                        "level in Stock tanks (Set level). Check the stock tank of the pump in the dosing setup.",
                         _event("draw", draw.get("key")))
 
     def _ask(self, domain, service, data):
@@ -784,10 +784,10 @@ class DosingRunner:
         volume, value = dose["volume_entity"], dose["old_volume"]
         if not self._set_volume(volume, value):
             name = dose.get("name") or dose.get("pump")
-            self._alert(slug, "CS-806", "a dosing pump's volume could not be put back",
-                        f"After a dose, the volume number of {name} could not be put back to "
-                        f"{_fmt(value)} mL: {volume} reads {self._device(volume, 'volume')[1]}. Its firmware may keep "
-                        "its batch recipe in it: set it back by hand before the next batch.",
+            self._alert(slug, "CS-806", "the volume of a dosing pump was not restored",
+                        f"After a dose, the controller could not set the volume number of {name} back to "
+                        f"{_fmt(value)} mL: {volume} reads {self._device(volume, 'volume')[1]}. The firmware of "
+                        "the pump can keep its batch recipe in this number. Set it back by hand before the next batch.",
                         _event("volume", dose.get("pump"), dose.get("at")))
         return True
 
@@ -895,17 +895,18 @@ class DosingRunner:
             if now >= deadline:
                 job.cut_at = now
                 job.left = self._switch_off([pump["power_entity"]])
-                held = (", but it still does not read off, so watering in this room is held, and the off "
-                        "is sent again every 2 seconds, until it does. Switch it off by hand now."
-                        if job.kind == "dose" else ", but it still does not read off: switch it off by hand now.")
+                held = (", but it still does not read off. The shots of this room are held, and the controller "
+                        "sends the off again each 2 s until it reads off. Stop the pump by hand now."
+                        if job.kind == "dose" else ", but it still does not read off. Stop the pump by hand now.")
+
                 self._alert(
-                    job.room.slug, "CS-801", "a dosing pump ran past its time and was switched off",
-                    f"{pump['name']} was asked for {_fmt(ml)} mL, about {expected:.0f} seconds at its "
-                    f"calibrated {_fmt(flow)} mL/s, and was still dosing after {deadline - pressed:.0f} "
-                    f"seconds. Its power ({pump['power_entity']}) was switched off"
+                    job.room.slug, "CS-801", "a dosing pump ran past its time, power set to off",
+                    f"The controller asked {pump['name']} for {_fmt(ml)} mL, about {expected:.0f} s at its "
+                    f"calibrated {_fmt(flow)} mL/s. The pump still dosed after {deadline - pressed:.0f} s. "
+                    f"The controller set its power ({pump['power_entity']}) to off"
                     + (held if job.left else ".")
-                    + " The tank may have more than was asked for. Check the pump, its calibration and "
-                    f"its firmware before dosing again.{batch}",
+                    + " The tank can contain more than the requested volume. Check the pump, its calibration "
+                    f"and its firmware before the next dose.{batch}",
                     _event(pump["id"], job.dose and job.dose["started_at"]),
                 )
                 return "ran past its time"
@@ -923,26 +924,26 @@ class DosingRunner:
         elapsed = self._mono() - job.pressed
         event = _event(pump["id"], job.dose and job.dose["started_at"])
         if blind or dead:
-            self._alert(job.room.slug, "CS-802", "a dose could not be confirmed",
-                        f"{pump['name']} was asked for {_fmt(ml)} mL and its start was pressed, but "
-                        f"{pump['dosing_entity']} read unavailable or unknown during the dose, so whether "
-                        "it dosed, and how much, is not known (a pump that restarts mid-dose drops it). "
-                        f"Check the pump and the tank before dosing again.{batch}", event)
+            self._alert(job.room.slug, "CS-802", "a dose was not confirmed",
+                        f"The controller asked {pump['name']} for {_fmt(ml)} mL and pressed its start, but "
+                        f"{pump['dosing_entity']} read unavailable or unknown during the dose. So the controller "
+                        "does not know if the pump dosed, or how much. A pump that restarts during a dose stops "
+                        f"the dose. Check the pump and the tank before the next dose.{batch}", event)
             return "not confirmed"
         if not (seen or went):
-            self._alert(job.room.slug, "CS-802", "a dose could not be confirmed",
-                        f"{pump['name']} was asked for {_fmt(ml)} mL and its start was pressed, but "
-                        f"{pump['dosing_entity']} never read dosing within {expected + 15:.0f} seconds, "
-                        "so whether it dosed is not known. Check the pump is online and what its dosing "
-                        f"sensor reports, and the tank, before dosing again.{batch}", event)
+            self._alert(job.room.slug, "CS-802", "a dose was not confirmed",
+                        f"The controller asked {pump['name']} for {_fmt(ml)} mL and pressed its start, but "
+                        f"{pump['dosing_entity']} did not read dosing within {expected + 15:.0f} s. So the "
+                        "controller does not know if the pump dosed. Make sure that the pump is online. "
+                        f"Check its dosing sensor and the tank before the next dose.{batch}", event)
             return "not confirmed"
         if elapsed < expected / 2:
             self._alert(job.room.slug, "CS-802", "a dose ended early",
-                        f"{pump['name']} was asked for {_fmt(ml)} mL, about {expected:.0f} seconds at its "
-                        f"calibrated {_fmt(flow)} mL/s, but read not dosing again after {elapsed:.0f} "
-                        f"seconds: it ended early, with about {_fmt(round(min(ml, elapsed * flow), 1))} mL "
-                        "in. Check the pump, its calibration and its firmware, and the tank, before "
-                        f"dosing again.{batch}", event)
+                        f"The controller asked {pump['name']} for {_fmt(ml)} mL, about {expected:.0f} s at its "
+                        f"calibrated {_fmt(flow)} mL/s, but it read not dosing again after {elapsed:.0f} s. "
+                        f"The dose ended early, with about {_fmt(round(min(ml, elapsed * flow), 1))} mL in the "
+                        "tank. Check the pump, its calibration, its firmware and the tank before the next "
+                        f"dose.{batch}", event)
             return "ended early"
         return "finished"
 
@@ -1028,11 +1029,11 @@ class DosingRunner:
             view.update(step="idle", pump=None, result=result, ended_at=self._now().isoformat())
         left = bool(stuck or hold_left)
         if left:
-            title = ("a finished batch's hold did not release" if result.startswith("finished")
-                     else "a batch was stopped")
+            title = ("the hold of a finished batch did not release" if result.startswith("finished")
+                     else "a batch stopped")
             self._hold_stuck(room, stuck, batch.get("hold_entity"), held, "CS-806", title,
                              f"A batch that started {job.started_at} ended ({result}).",
-                             "Check the tank before making another batch.", _event(job.started_at),
+                             "Check the tank before the next batch.", _event(job.started_at),
                              alerted=told)
         else:
             with self._lock:
@@ -1157,8 +1158,8 @@ class DosingRunner:
         self._begin(job, "fill")
         sensor = batch.get("full_entity")
         if full is None:
-            self._fill_alert(job, "the batch tank could not be filled",
-                             f"{sensor} can't be read, so the fill valve was not opened.")
+            self._fill_alert(job, "the batch tank did not fill",
+                             f"The controller cannot read {sensor}, so it did not open the fill valve.")
             raise _Ended("the tank's full sensor can't be read")
         minutes = float(batch.get("fill_timeout_min") or 20)
         open_s, blind_s = job.profile["fill_open_s"], job.profile["full_blind_s"]
@@ -1166,10 +1167,10 @@ class DosingRunner:
         began = self._mono()
         if self._confirm([valve], "on", open_s):
             stuck = self._switch_off([valve])
-            self._fill_alert(job, "the batch tank could not be filled",
-                             f"the fill valve ({valve}) did not open: it did not read on within "
-                             f"{open_s:.0f} seconds. It was switched off"
-                             + (", but it still does not read off: close it by hand now." if stuck else "."))
+            self._fill_alert(job, "the batch tank did not fill",
+                             f"The fill valve ({valve}) did not open. It did not read on within "
+                             f"{open_s:.0f} s. The controller set it to off"
+                             + (", but it still does not read off. Close it by hand now." if stuck else "."))
             raise _Ended("the fill valve did not open")
         filled, blind, why = False, None, None
         while True:
@@ -1191,17 +1192,17 @@ class DosingRunner:
             self._check(job)
             yield POLL_S
         stuck = self._switch_off([valve])  # always closed, and read back
-        closed = ("It was switched off, but it still does not read off: close it by hand now."
-                  if stuck else "The fill valve was switched off.")
+        closed = ("The controller set it to off, but it still does not read off. Close it by hand now."
+                  if stuck else "The controller set the fill valve to off.")
         if why == "the full sensor stopped reporting":
-            self._fill_alert(job, "the batch tank could not be filled",
-                             f"the full sensor stopped reporting: {sensor} read nothing usable for "
-                             f"{blind_s:.0f} seconds while the fill valve ({valve}) was open. {closed}")
+            self._fill_alert(job, "the batch tank did not fill",
+                             f"The full sensor stopped its reports. {sensor} gave no usable reading for "
+                             f"{blind_s:.0f} s while the fill valve ({valve}) was open. {closed}")
             raise _Ended(why)
         if not filled:
             self._fill_alert(job, "the batch tank did not fill in time",
-                             f"the fill valve ({valve}) was open for {minutes:g} minutes and {sensor} "
-                             f"never read {batch.get('full_state') or 'on'}. {closed}")
+                             f"The fill valve ({valve}) was open for {minutes:g} min, and {sensor} "
+                             f"did not read {batch.get('full_state') or 'on'}. {closed}")
             raise _Ended(why)
         if stuck:
             raise _Ended(f"{valve} did not read off after filling")
@@ -1219,7 +1220,7 @@ class DosingRunner:
 
     def _fill_alert(self, job, title, what):
         self._alert(job.room.slug, "CS-804", title,
-                    f"The batch could not fill the tank: {what} The batch stops here. Check the water "
+                    f"The batch could not fill the tank. {what} The batch stops here. Check the water "
                     "supply, the fill valve and the full sensor.", _event(job.started_at))
 
     def _mix(self, job):
@@ -1236,7 +1237,7 @@ class DosingRunner:
             raise _Ended(f"{', '.join(closed)} did not open")
         self._on(job, pump)
         if self._confirm([pump], "on"):
-            self._mix_alert(job, pump, f"The mix pump ({pump}) was switched on, but does not read on")
+            self._mix_alert(job, pump, f"The controller started the mix pump ({pump}), but it does not read on")
             raise _Ended(f"the mix pump ({pump}) did not read on")
         watts, sensor = float(batch.get("mix_min_w") or 0), batch.get("mix_power_sensor")
         if watts > 0 and sensor:
@@ -1246,8 +1247,8 @@ class DosingRunner:
                 if drawn is not None and drawn >= watts:
                     break
                 if self._mono() - began >= within:
-                    self._mix_alert(job, pump, f"The mix pump ({pump}) was switched on, but {sensor} did not "
-                                    f"read {watts:g} W within {within:.0f} seconds (it reads "
+                    self._mix_alert(job, pump, f"The controller started the mix pump ({pump}), but {sensor} did "
+                                    f"not read {watts:g} W within {within:.0f} s (it reads "
                                     f"{reading}{f' {unit}' if unit else ''})")
                     raise _Ended(f"the mix pump did not draw {watts:g} W within {within:.0f} s")
                 self._check(job)
@@ -1256,9 +1257,10 @@ class DosingRunner:
 
     def _mix_alert(self, job, pump, what):
         self._send_off(pump)  # before the alert, whose push can take a while; the batch's end reads it back
-        self._alert(job.room.slug, "CS-805", "the mixing pump did not start",
-                    f"{what}. The batch stops here and the mix pump and valves are switched off. Check "
-                    "the pump, its power sensor, and that the mix valves open.", _event(job.started_at))
+        self._alert(job.room.slug, "CS-805", "the mix pump did not start",
+                    f"{what}. The batch stops here, and the controller sets the mix pump and the mix valves "
+                    "to off. Check the pump and its power sensor. Make sure that the mix valves open.",
+                    _event(job.started_at))
 
     def _pause(self, job, step, minutes):
         minutes = float(minutes or 0)
@@ -1299,17 +1301,17 @@ class DosingRunner:
         if stamp and not self._call("input_datetime", "set_datetime", entity_id=stamp,
                                     timestamp=self._now().timestamp()):
             warning = f"{stamp} could not be stamped"
-            self._alert(job.room.slug, "CS-806", "a finished batch could not be stamped",
-                        f"The batch finished, but its end time could not be stamped on {stamp}. The "
-                        "stock tanks count batches by it, so this one is not taken off the stock tanks "
-                        "that are not linked to a dosing pump: record it by hand (Stock tanks, Record a "
-                        f"batch), and check {stamp}.", _event("stamp", job.started_at))
+            self._alert(job.room.slug, "CS-806", "the end time of a finished batch was not recorded",
+                        f"The batch finished, but the controller could not write its end time to {stamp}. "
+                        "The stock tanks count batches from this time. So this batch is not taken off the "
+                        "stock tanks that have no link to a dosing pump. Record it by hand (Stock tanks, "
+                        f"Record a batch). Check {stamp}.", _event("stamp", job.started_at))
         hold = batch.get("hold_entity")
         hold_left = self._switch_off([hold]) if hold else []
         if hold_left:
-            self._alert(job.room.slug, "CS-806", "a finished batch's hold did not release",
-                        f"The batch finished, but its hold ({hold}) does not read off, so the rooms it "
-                        "held stay held, and the off is sent again every 2 seconds, until it does. "
+            self._alert(job.room.slug, "CS-806", "the hold of a finished batch did not release",
+                        f"The batch finished, but its hold ({hold}) does not read off. The rooms that it "
+                        "held stay held, and the controller sends the off again each 2 s until it reads off. "
                         f"Check {hold}.", _event(job.started_at))
         self._done(job)
         return warning, hold_left
@@ -1329,19 +1331,19 @@ class DosingRunner:
         dosed = ", ".join(f"{_fmt(d['given'])} mL of {d['name']}" if d["given"] is not None
                           else f"an unknown amount of {d['name']}" for d in job.dosed) or "nothing"
         if stuck:
-            after = (f", but {_still(stuck)}, so the rooms the batch held stay held"
+            after = (f", but {_still(stuck)}. The rooms that the batch held stay held"
                      + (", and its hold stays on," if hold else "")
-                     + " until they do: the off is sent again every 2 seconds.")
+                     + " until they read off. The controller sends the off again each 2 s.")
         elif hold_left:
-            after = (f", but its hold ({hold}) does not read off, so the rooms the batch held stay held "
-                     "until it does.")
+            after = (f", but its hold ({hold}) does not read off. The rooms that the batch held stay held "
+                     "until it reads off.")
         else:
-            after = (" and the hold released" if hold else "") + ", and the rooms it held water again."
+            after = (" and released the hold" if hold else "") + ". The rooms that it held get water again."
         self._alert(
-            job.room.slug, "CS-806", "a batch was stopped",
-            f"The batch stopped in its {job.step} step: {reason}. Every dosing pump's power, the fill "
-            f"valve, the mix pump and the mix valves were switched off{after}"
-            f" Dosed before it stopped: {dosed}. Check the tank before making another batch.",
+            job.room.slug, "CS-806", "a batch stopped",
+            f"The batch stopped in its {job.step} step: {reason}. The controller set the power of each "
+            f"dosing pump, the fill valve, the mix pump and the mix valves to off{after}"
+            f" Dosed before the stop: {dosed}. Check the tank before the next batch.",
             _event(job.started_at),
         )
         self._log(f"[{job.room.slug}] dosing: batch stopped in {job.step}: {reason}")
@@ -1460,10 +1462,10 @@ class DosingRunner:
             band = f"{_fmt(lo) if lo > 0 else 'no minimum'} to {_fmt(hi) if hi > 0 else 'no maximum'}"
             found[quantity] = value
             if value is None:
-                unread.append(f"its {name} probe ({probe}) can't be read (it reads {state}"
+                unread.append(f"its {name} probe ({probe}) is not readable (it reads {state}"
                               + (f" {unit}" if unit else "") + ")")
             elif (lo > 0 and value < lo) or (hi > 0 and value > hi):
-                off.append(f"its {name} reads {value:g}, outside the room's irrigation {name} band ({band})")
+                off.append(f"its {name} reads {value:g}, outside the feed {name} band of the room ({band})")
         verdict = None if not bands else "not read" if unread else "off target" if off else "good"
         why = "; ".join(unread + off) or None
         with self._lock:
@@ -1480,12 +1482,12 @@ class DosingRunner:
                   f"{verdict or 'nothing to check'}" + (f" ({why})" if why else ""))
         if verdict in ("not read", "off target"):
             self._alert(room.slug, "CS-808",
-                        "a batch's mix could not be checked" if unread else "a batch's mix is off its band",
-                        f"The batch that started {mix.get('batch')} finished, and its tank was read "
-                        f"{MIX_SETTLE_S / 60:g} minutes after its mix stopped: {why}. The batch is not "
-                        "marked good, and a batch an automation asks for is refused until one made by hand "
-                        "passes this check. This does not hold watering. Check the tank and its probes, "
-                        "then correct the tank or make the next batch by hand.",
+                        "the mix of a batch was not checked" if unread else "the mix of a batch is outside its band",
+                        f"The batch that started {mix.get('batch')} finished. The controller read its tank "
+                        f"{MIX_SETTLE_S / 60:g} min after the mix stopped: {why}. The batch is not marked good. "
+                        "The controller refuses a batch that an automation asks for until a batch made by hand "
+                        "passes this check. The shots continue. Check the tank and its probes. Then correct the "
+                        "tank, or make the next batch by hand.",
                         _event("mix", mix.get("batch")))
 
     def _mix_refuses(self, room):
@@ -1531,18 +1533,18 @@ class DosingRunner:
         held = {s for s in record.get("held") or [] if isinstance(s, str)} | {slug}
         at = record.get("at")
         if kind in ("dose", "batch"):
-            intro = (f"A {kind} that started {at} was still running when the controller app stopped, so "
-                     "it did not finish, and the controller never resumes one. Its dosing pumps' power, "
-                     "the fill valve, the mix pump and the mix valves were switched off"
-                     + (", and its hold is released once they read off." if hold else "."))
-            advice = ("Check the tank: what was dosed before the stop is in it; dose the rest by hand or "
-                      "make a fresh batch.")
+            intro = (f"A {kind} that started {at} was still running when the controller stopped. It did "
+                     "not finish, and the controller does not continue it. The controller set the power of "
+                     "its dosing pumps, the fill valve, the mix pump and the mix valves to off"
+                     + (". It releases the hold when they read off." if hold else "."))
+            advice = ("Check the tank, because it contains what the controller dosed before the stop. Dose "
+                      "the remaining volume by hand, or make a new batch.")
         else:  # swept after a corrupt dosing_state.json
-            intro = ("dosing_state.json could not be read, so this room's dosing pumps' power, fill "
-                     "valve, mix pump and mix valves were switched off.")
-            advice = "Check the batch tank before dosing again."
+            intro = ("The controller could not read dosing_state.json. It set the power of the dosing pumps, "
+                     "the fill valve, the mix pump and the mix valves of this room to off.")
+            advice = "Check the batch tank before the next dose."
         self._held[slug] = held
-        self._stuck[slug] = self._entry(off, hold, held, "CS-803", "a dose or batch was interrupted by a restart",
+        self._stuck[slug] = self._entry(off, hold, held, "CS-803", "a restart stopped a dose or batch",
                                         _event("restart", at), intro, advice, alerted=None,
                                         announce=kind in ("dose", "batch"), sent=False)
         if kind in ("dose", "batch") and not record.get("recovered"):
@@ -1663,12 +1665,13 @@ class DosingRunner:
     @staticmethod
     def _stuck_message(entry, left):
         if left:
-            tail = (f"{_still(left)}, so watering stays held in the rooms it holds, and the off is sent "
-                    "again every 2 seconds until it reads off. Check it, and switch it off by hand if "
-                    "it is still running.")
+            tail = (f"{_still(left)}. The shots stay held in the rooms that it holds, and the controller "
+                    "sends the off again each 2 s until it reads off. Check it. If it still runs, stop it "
+                    "by hand.")
         else:
-            tail = ("Everything now reads off" + ("; the hold was released" if entry["hold"] else "")
-                    + ", so watering carries on.")
+            tail = ("All the hardware now reads off" + (", and the controller released the hold" if entry["hold"]
+                                                        else "")
+                    + ". The shots continue.")
         return f"{entry['intro']} {tail} {entry['advice']}"
 
     # ------------------------------------------------------------------ alerts

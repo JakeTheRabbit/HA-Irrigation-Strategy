@@ -113,7 +113,7 @@ def _waits_on(fake, slug):
     ]
     if not notices:
         return None
-    found = re.search(r"OFF: (.*?)\. Turn them off", notices[-1]["message"])
+    found = re.search(r"OFF: (.*?)\. Set them to off", notices[-1]["message"])
     return found.group(1).split(", ") if found else notices[-1]["message"]
 
 

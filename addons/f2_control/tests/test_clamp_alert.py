@@ -30,7 +30,7 @@ def test_a_value_the_engine_limits_is_reported_in_words_anyone_can_act_on():
     (alert,) = _loop(states)
     assert "config clamp" not in alert["title"] and "range" in alert["title"]
     assert "field_capacity=35" in alert["message"] and "40" in alert["message"]
-    assert "nearest allowed value" in alert["message"] and alert["title"].endswith("(CS-401)")
+    assert "nearest permitted value" in alert["message"] and alert["title"].endswith("(CS-401)")
     assert alert["notification_id"] == "f2_cfg_default_z1_field_capacity"  # same id: it replaces the old card
 
 

@@ -214,7 +214,7 @@ def test_after_a_restart_with_no_history_nothing_is_switched_and_it_is_said_so(r
     c._reconcile_inflight()
     assert offs(fake) == [] and c.rooms[0].shot_inflight is not None  # checked again next loop
     (alert,) = [n for n in notifications(fake) if n["notification_id"] == "f2_inflight_default"]
-    assert alert["title"] == "Zone 1: an interrupted shot's hardware may still be ON (CS-309)"
+    assert alert["title"] == "Zone 1: the hardware of an interrupted shot can still be ON (CS-309)"
     assert "Can't be read: switch.v1" in alert["message"]
 
 
@@ -322,7 +322,7 @@ def test_a_switch_that_will_not_close_latches_the_hold_and_is_retried_every_loop
     c._reconcile_inflight()
     room = c.rooms[0]
     assert room.hardware_fault is not None and room.shot_inflight is not None
-    assert "Zone 1: CRITICAL, an interrupted shot's hardware is still ON (CS-308)" in [
+    assert "Zone 1: CRITICAL, the hardware of an interrupted shot is still ON (CS-308)" in [
         n["title"] for n in notifications(fake)
     ]
     first = offs(fake).count("switch.v1")
@@ -338,7 +338,7 @@ def test_a_switch_that_cannot_be_read_is_left_alone_and_said_so_with_its_code(ri
     c._reconcile_inflight()
     assert offs(fake) == []
     (alert,) = [n for n in notifications(fake) if n["notification_id"] == "f2_inflight_default"]
-    assert alert["title"] == "Zone 1: an interrupted shot's hardware may still be ON (CS-309)"
+    assert alert["title"] == "Zone 1: the hardware of an interrupted shot can still be ON (CS-309)"
     assert "Can't be read: switch.v1" in alert["message"]
 
 
@@ -401,7 +401,7 @@ def test_a_hold_latched_while_home_assistant_was_away_is_announced_once_it_is_ba
     fake.calls.clear()
     c.loop_once(datetime(2026, 9, 23, 12, 0))
     c.loop_once(datetime(2026, 9, 23, 12, 1))
-    latched = [n for n in notifications(fake) if n["title"].endswith("CRITICAL hardware fault, watering stopped (CS-301)")]
+    latched = [n for n in notifications(fake) if n["title"].endswith("CRITICAL hardware fault, no shots (CS-301)")]
     assert len(latched) == 1  # said once it could be heard, and not again every loop
 
 

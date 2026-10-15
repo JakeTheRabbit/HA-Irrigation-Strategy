@@ -171,10 +171,10 @@ class ShotJudge(Judge):
             z.misses = []  # a landing, or no firm answer: the run is broken
         if len(z.misses) == 2:
             a, b = z.misses
-            alert = {"code": CODE, "title": "water isn't reaching this zone",
-                     "message": (f"The last two shots on {ctx.title} at {a.start:%H:%M} and {b.start:%H:%M} put in "
-                                 f"{a.litres:.1f} L and {b.litres:.1f} L and moisture did not rise; check the "
-                                 f"zone's valve, drippers and line; watering carries on as normal.")}
+            alert = {"code": CODE, "title": "water does not reach this zone",
+                     "message": (f"The last two shots on {ctx.title} at {a.start:%H:%M} and {b.start:%H:%M} gave "
+                                 f"{a.litres:.1f} L and {b.litres:.1f} L, and the VWC did not increase. Check the "
+                                 "valve, the drippers and the line of the zone. The shots continue as usual.")}
             z.directive = self.directive(ctx, "alert", alert,
                                          f"two shots in a row did not reach the zone (p={v.prob:.2f})")
         return z.directive

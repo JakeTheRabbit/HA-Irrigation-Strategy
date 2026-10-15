@@ -113,12 +113,12 @@ def test_the_stage_judge_advises_and_never_acts_on_water():
     # code finds the steering mismatch itself (generative steering in flower bulk), whatever Jev says
     d = j.decide(on_arc, ctx)
     assert d.kind == "alert" and d.value["code"] == "CS-705"
-    assert "on generative steering, but the stage calls for vegetative" in d.value["message"]
-    assert "flower day 37" in d.value["message"] and "Nothing was changed" in d.value["message"]
+    assert "uses generative steering, but the stage needs vegetative" in d.value["message"]
+    assert "flower day 37" in d.value["message"] and "changed nothing" in d.value["message"]
     matched = _stage_ctx(steering="vegetative")
     assert j.decide(on_arc, matched) is None  # steering right, Jev content: nothing to say
     firm = {"arc": council.combine(K.both("arc", K.choice_answer("ec_above_band", {"ec_above_band": 0.8})), "arc")}
-    assert "Jev: The settled pore EC sits above" in j.decide(firm, matched).value["message"]
+    assert "AI assistant: The settled pore EC sits above" in j.decide(firm, matched).value["message"]
     split = {"arc": council.combine(K.both("arc", K.choice_answer("ec_above_band", {"ec_above_band": 0.9}),
                                            K.choice_answer("on_arc", {"on_arc": 0.9})), "arc")}
     assert j.decide(split, matched) is None

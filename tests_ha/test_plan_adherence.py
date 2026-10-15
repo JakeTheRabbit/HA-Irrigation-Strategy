@@ -420,5 +420,5 @@ async def test_a_mapped_grow_light_on_at_night_is_said(hass, controller_for, mon
         await _pass(hass, c, fake, monkeypatch, manager, at + timedelta(minutes=minutes), days=())
     assert room_of(c).light_entity == "light.grow"
     [card] = _cards(fake, "f2_plan_lights_entity")
-    assert "reads on but the lights hours say off" in card["message"]
+    assert "reads on, but the lights hours say off" in card["message"]
     assert [d for dom, svc, d in fake.calls if dom == "light"] == []  # checked, never switched

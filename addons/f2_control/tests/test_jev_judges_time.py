@@ -310,9 +310,9 @@ def test_night_alerts_only_on_a_firm_probe_fault():
     j, c = NightJudge(), _night_ctx()
     d = j.decide(_verdicts("night_drop", K.choice_answer("probe_fault", {"probe_fault": 0.8, "real_drying": 0.2})), c)
     assert d.kind == "alert" and d.value["code"] == "CS-703"
-    assert d.value["title"] == "overnight low reading looks like a probe fault"
+    assert d.value["title"] == "low overnight reading: probable probe fault"
     msg = d.value["message"]
-    assert "Zone 1" in msg and "26.5%" in msg and "25.0%" in msg and "rescue shot still fires as normal" in msg
+    assert "Zone 1" in msg and "26.5%" in msg and "25.0%" in msg and "rescue shot still starts as usual" in msg
     split = _verdicts("night_drop", K.choice_answer("probe_fault", {"probe_fault": 0.8}),
                       K.choice_answer("real_drying", {"real_drying": 0.7, "probe_fault": 0.3}))
     below_bar = _verdicts("night_drop", K.choice_answer("probe_fault", {"probe_fault": 0.65, "real_drying": 0.35}))

@@ -30,7 +30,7 @@ def test_the_primary_going_offline_is_told_once_per_episode():
     c.loop_once(NOW)
     (alert,) = _primary_alerts(fake)
     assert alert["title"].endswith("the primary moisture probe is offline (CS-505)")
-    assert "sensor.b" in alert["message"] and "carries on from its other probes" in alert["message"]
+    assert "sensor.b" in alert["message"] and "comes from its other probes" in alert["message"]
     for minutes in (40, 80):  # past any repeat window: still once
         c.loop_once(NOW + timedelta(minutes=minutes))
     assert len(_primary_alerts(fake)) == 1

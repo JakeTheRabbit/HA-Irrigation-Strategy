@@ -125,12 +125,13 @@ class ChannelJudge(Judge):
             return None
         return self.directive(ctx, "alert", {
             "code": CODE,
-            "title": "water may be bypassing the substrate or the probe",
-            "message": (f"On {ctx.title} code saw: {'; '.join(signs(ctx)) or 'shots that did not stay'}. Jev's "
-                        f"reading: {SIGNATURES[v.label]} Do a catch test on a few drippers, and check the blocks: "
-                        f"drippers seated in them, water wetting through rather than running off or out of the "
-                        f"drain, and the probe firm in a representative spot. Watering carries on as normal; do "
-                        f"not add volume to make up for it."),
+            "title": "water can bypass the substrate or the probe",
+            "message": (f"On {ctx.title}, the controller found this: "
+                        f"{'; '.join(signs(ctx)) or 'shots that did not stay'}. The AI assistant reads it as: "
+                        f"{SIGNATURES[v.label]} Do a catch test on some "
+                        "drippers. Make sure that the drippers sit in the blocks. Make sure that the water wets the "
+                        "full block, and does not run off or out of the drain. Make sure that the probe is firm in a "
+                        "typical spot. The shots continue as usual. Do not increase the shot size to compensate."),
         }, f"{v.label} (p={v.prob:.2f})")
 
     def words(self, room, zone, now):
