@@ -5682,7 +5682,13 @@ class Controller:
             if self._alert(d.key, "CS-713", d.title, f"{words}\n\n{d.suggestions[0]}" if d.suggestions else words,
                            room=room, zone=d.zone):
                 plan_adherence.raised(adh, d, view.expected_day)
-        room._plan_panel = plan_adherence.panel(view, drifts)
+        notes = None
+        if getattr(self, "jev", None) is not None:
+            try:  # the brain's plan task (jev_bridge.plan_task): what a drift means, never a write
+                notes = jev_bridge.plan_task(self, room, now, view, drifts)
+            except Exception as e:
+                log("plan task error", room.slug, e)
+        room._plan_panel = plan_adherence.panel(view, drifts, notes)
         if json.dumps(adh, sort_keys=True, default=str) != before:
             self._save_state()
 

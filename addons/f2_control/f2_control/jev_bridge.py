@@ -38,9 +38,12 @@ from jev.judges.stage import StageJudge
 from jev.judges.zones import ZonesJudge
 from jev.journal import Journal
 from jev.ledger import Ledger
+from jev import council
+from jev import plan_task as jev_plan
 from jev.setpoint_memory import SetpointMemory
 
-ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel", "balance", "feed", "report", "why")
+ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel", "balance", "feed", "report", "why",
+       "plan")
 PENDING_S = 300  # a write Home Assistant has not reflected yet is not an operator's edit for this long
 RETRIES = 3  # a write still not read back is sent again this many times, PENDING_S apart and doubling, then failed
 REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the old value back
@@ -232,9 +235,17 @@ def build(options, cf, state_path, log, status=None):
     brain.report = haiku and "report" in allowed  # write_report is a Claude tool: no legacy route can answer it
     brain.report_path = os.path.join(data, REPORTS)
     brain.why = haiku and "why" in allowed  # only the Claude route has the answer_why tool
+    brain.plan = jev_plan.PlanTask(asker, plan_meta) if haiku and "plan" in allowed else None
     brain.flower_start = flower_option(options.get("jev_flower_start"))
     brain.flower_days = int(options.get("jev_flower_days") or 56)
     return brain
+
+
+def plan_meta(room, now):
+    """The "_brain" key of the plan task's question (a room task: it does not pass through Brain)."""
+    return {"room": room, "zone": "room", "judge": "plan", "asked": now.isoformat(timespec="minutes"),
+            "interlocks": "none: the plan task advises, a person changes the plan",
+            "data_quality": "the plan as the integration publishes and previews it, and each zone's phase today"}
 
 
 def feed_meta(room, now):
@@ -1003,7 +1014,8 @@ def panel(c, room, now):
            "judges_advising": [j for j in built if j not in ACTING_JUDGES]
            + (["feed"] if getattr(brain, "feed", None) else [])
            + (["report"] if getattr(brain, "report", False) else [])
-           + (["why"] if getattr(brain, "why", False) else [])}
+           + (["why"] if getattr(brain, "why", False) else [])
+           + (["plan"] if getattr(brain, "plan", None) else [])}
     if haiku(c):
         out["room_health"] = health
     entries = brain.journal.recent(room.slug, 1) if getattr(brain, "journal", None) is not None else []
@@ -1063,6 +1075,69 @@ def publish(c, room, now, ha_set):
                {"entries": entries, "friendly_name": "Jev decisions", "engine": PRODUCT})
     feed_task(c, room, now)
     report_task(c, room, now, ha_set)
+
+
+def _plan_note(c, room, verdict, drift, action, reason, why):
+    journal = getattr(c.jev, "journal", None)
+    if journal is not None:
+        journal.add({"t": datetime.now().isoformat(timespec="seconds"), "room": room.slug, "zone": drift.zone,
+                     "judge": "plan", "title": "Plan", "kind": "decision",
+                     "verdict": "no answer" if verdict is None else str(verdict.label).replace("_", " "),
+                     "p": None if verdict is None else verdict.prob,
+                     "agreed": None if verdict is None else verdict.agreed, "action": action[:80],
+                     "result": "advised", "reason": reason[:120], "why": why or ""})
+
+
+def plan_task(c, room, now, view, drifts):
+    """The plan task's pass for the room (jev/plan_task.py), under the Claude brain only: an answer that came in is
+    read once and picks the suggestion the panel shows for its drift; the room is asked about the highest drift the
+    brain may be asked about when it is due, with the kill switch on, no no-touch window and fresh readings (SF-26).
+    -> {class: (suggestion, why, action)} for the panel, or None. Never a write, never an arm, edit or disarm."""
+    brain = getattr(c, "jev", None)
+    task = getattr(brain, "plan", None)
+    if task is None or not haiku(c):
+        return None
+    rec = task.record(room.slug, view.expected_day.isoformat())
+    asked = [d for d in drifts if d.ask]
+    ans = task.answer(rec)
+    if ans is not None and rec["drift"] is not None:
+        drift = rec["drift"]
+        verdict = council.combine(ans.answers, "cause")
+        index, why = jev_plan.pick(verdict, drift)
+        suggestion = drift.suggestions[index] if index < len(drift.suggestions) else drift.suggestions[0]
+        rec["notes"][drift.cls] = (suggestion, why, "advise")
+        rec["reask_due"] = jev_plan.unsure(verdict) and not rec["reasked"]
+        _plan_note(c, room, verdict, drift, suggestion, "a suggestion for a person: nothing is changed"
+                   if index or why else "unsure: the drift's own suggestion stands", why)
+    target = asked[0] if asked else None
+    if (target is not None and c._on(room.enable_flag, False) and c._no_touch_until(room, now) is None
+            and room_health(c, room, now)[0] == "ok" and task.due(rec, target, now, view.lights_on_at)):
+        extra = {"phase_log": (getattr(room, "_adherence", None) or {}).get("phase_log"),
+                 "holds": _plan_holds(c, room),
+                 "recent_plan_events": [f"{e.get('t', '')[11:16]} {e.get('verdict')}: {e.get('action')}"
+                                        for e in (brain.journal.recent(room.slug, 30) if brain.journal else [])
+                                        if e.get("judge") == "plan"][:3]}
+        state = jev_plan.evidence(view, target, extra)
+        record = brain.ledger.track("plan", room.slug, "room")
+        if record:
+            state["your_track_record"] = record
+        if rec["reask_due"] and rec["cls"] == target.cls:
+            state["second_look"] = {"why_again": "your last answer was unsure, or your two readings of it disagreed"}
+        if task.ask(rec, state, jev_plan.QUESTIONS, now):
+            rec["cls"], rec["drift"] = target.cls, target
+    live = {d.cls for d in drifts}
+    return {cls: note for cls, note in rec["notes"].items() if cls in live}
+
+
+def _plan_holds(c, room):
+    """What holds the whole room now, in words: the kill switch, a hardware latch, a held plan."""
+    holds = [] if c._on(room.enable_flag, False) else ["the kill switch is off: no valve opens"]
+    if getattr(room, "hardware_fault", None):
+        holds.append("a hardware fault has latched")
+    snap = getattr(room, "strategy_snapshot", None) or {}
+    if snap.get("error"):
+        holds.append(f"the plan holds its steering: {snap['error']}")
+    return "; ".join(holds) or "none"
 
 
 def _band(lo, hi, unit):

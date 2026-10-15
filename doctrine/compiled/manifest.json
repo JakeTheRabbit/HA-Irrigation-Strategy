@@ -54,11 +54,11 @@
       "tokens_est_high": 4374
     },
     "sections/03-decisions.md": {
-      "sha256": "c67d6b16742664add5fcef945950428495b9abdc878ef2902b483d03a747cdd9",
-      "chars": 9758,
-      "words": 1660,
-      "tokens_est_low": 2440,
-      "tokens_est_high": 2957
+      "sha256": "26ba75091bc14a0d7c67735c77feb8e2a5dd128962e7b04ba2cd2a35c0684b33",
+      "chars": 10367,
+      "words": 1764,
+      "tokens_est_low": 2592,
+      "tokens_est_high": 3142
     },
     "sections/04-symptoms.md": {
       "sha256": "edb3ed8286d1e65b1678e1e18058f2dc1e0289f872e0e4e2c5d64d7a18082b4f",
@@ -68,11 +68,11 @@
       "tokens_est_high": 2425
     },
     "sections/05-doctrine.md": {
-      "sha256": "0a169b11574fcb38c0d8f2f580d88bd4ddfcfd89ad25476e32758c1f0b6aed82",
-      "chars": 32155,
-      "words": 5159,
-      "tokens_est_low": 8039,
-      "tokens_est_high": 9744
+      "sha256": "6e62139f688ba3f79ba7354cd668b55a8cf77bf35b3bfb09a744caab67d5fa54",
+      "chars": 33267,
+      "words": 5354,
+      "tokens_est_low": 8317,
+      "tokens_est_high": 10081
     },
     "substrates/coco.md": {
       "sha256": "66bae098fdcff5875d44051359c76bf889b48c392126d472049c74fd7c5d651a",
@@ -98,58 +98,58 @@
   },
   "estimates": {
     "block_a": {
-      "chars": 73187,
-      "words": 11991,
-      "tokens_est_low": 18297,
-      "tokens_est_high": 22178
+      "chars": 74908,
+      "words": 12290,
+      "tokens_est_low": 18727,
+      "tokens_est_high": 22699
     },
     "block_a_plus_b": {
       "slab_default+generic": {
-        "chars": 76216,
-        "words": 12507,
-        "tokens_est_low": 19054,
-        "tokens_est_high": 23096
+        "chars": 77937,
+        "words": 12806,
+        "tokens_est_low": 19484,
+        "tokens_est_high": 23617
       },
       "slab_default+rockwool": {
-        "chars": 77916,
-        "words": 12765,
-        "tokens_est_low": 19479,
-        "tokens_est_high": 23611
+        "chars": 79637,
+        "words": 13064,
+        "tokens_est_low": 19909,
+        "tokens_est_high": 24132
       },
       "slab_default+coco": {
-        "chars": 77932,
-        "words": 12759,
-        "tokens_est_low": 19483,
-        "tokens_est_high": 23616
+        "chars": 79653,
+        "words": 13058,
+        "tokens_est_low": 19913,
+        "tokens_est_high": 24137
       },
       "rockwool_default+generic": {
-        "chars": 75677,
-        "words": 12419,
-        "tokens_est_low": 18919,
-        "tokens_est_high": 22932
+        "chars": 77398,
+        "words": 12718,
+        "tokens_est_low": 19350,
+        "tokens_est_high": 23454
       },
       "rockwool_default+rockwool": {
-        "chars": 77377,
-        "words": 12677,
-        "tokens_est_low": 19344,
-        "tokens_est_high": 23448
+        "chars": 79098,
+        "words": 12976,
+        "tokens_est_low": 19774,
+        "tokens_est_high": 23969
       },
       "rockwool_default+coco": {
-        "chars": 77393,
-        "words": 12671,
-        "tokens_est_low": 19348,
-        "tokens_est_high": 23452
+        "chars": 79114,
+        "words": 12970,
+        "tokens_est_low": 19778,
+        "tokens_est_high": 23974
       }
     }
   },
   "rule_counts": {
     "hard_rules": 11,
-    "rules": 131,
+    "rules": 136,
     "by_evidence": {
       "research": 21,
       "vendor": 20,
       "grower-practice": 64,
-      "product-rule": 37
+      "product-rule": 42
     },
     "jev_rules_audited": 123,
     "statements_verified": 46

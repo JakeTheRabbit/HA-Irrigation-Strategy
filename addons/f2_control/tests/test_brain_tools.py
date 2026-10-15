@@ -4,7 +4,7 @@ import json
 import pathlib
 
 import jev_bridge
-from jev import feed, prompt
+from jev import feed, plan_task, prompt
 
 FILE = pathlib.Path(prompt.TOOLS)
 
@@ -12,6 +12,7 @@ FILE = pathlib.Path(prompt.TOOLS)
 def _questions():
     found = {f"{j.name}.{q}": vs for j in jev_bridge.judges() for q, vs in j.questions.items()}
     found.update({f"feed.{q}": vs for q, vs in feed.QUESTIONS.items()})
+    found.update({f"plan.{q}": vs for q, vs in plan_task.QUESTIONS.items()})
     return found
 
 
