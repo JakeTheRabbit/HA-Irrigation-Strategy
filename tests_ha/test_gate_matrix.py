@@ -58,6 +58,9 @@ PRESENCE = ("absent", "on", "off")
 # Not part of what the gate depends on: the version moves with every release, and the other two are
 # Home Assistant's own, not the descriptor's.
 NOT_COMPARED = ("integration_version", "friendly_name", "icon")
+# Descriptor attributes added since 12c6d1a, which the controller reads for something other than
+# the gate and which the setup fingerprint does not cover.
+ADDED_SINCE = ("substrate",)
 
 
 async def _seed(hass, room, setup_flag):
@@ -173,7 +176,7 @@ async def _run(hass, controller_for, room, setup_flag):
             hass.states.async_set(heartbeat, "healthy", {"enable_flag": REPORTED, "setup_revision": have})
         integration[beat] = _integration_gate(hass, prefix)
     return {
-        "descriptor": {k: v for k, v in descriptor.items() if k not in NOT_COMPARED},
+        "descriptor": {k: v for k, v in descriptor.items() if k not in NOT_COMPARED + ADDED_SINCE},
         "fingerprint": fingerprint,
         "integration": integration,
         "cases": cases,

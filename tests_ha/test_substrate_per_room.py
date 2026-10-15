@@ -9,7 +9,7 @@ import os
 import re
 from pathlib import Path
 
-from conftest import fixture
+from conftest import fixture, room_of
 from homeassistant.const import ATTR_OPTION
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
@@ -20,6 +20,17 @@ DOMAIN = "crop_steering"
 SUBSTRATE = "select.crop_steering_substrate"
 DESCRIPTOR = "sensor.crop_steering_engine_config"
 KILL = "switch.crop_steering_engine_enabled"
+# A new room has a slug: the wizard's "Tent" is tent_ (an upgraded room keeps the ids above).
+NEW_SUBSTRATE = "select.crop_steering_tent_substrate"
+NEW_DESCRIPTOR = "sensor.crop_steering_tent_engine_config"
+# What the other changes since 3.11.1 add to an upgraded room, beside the substrate select.
+ADDED_BESIDE = {
+    "select.crop_steering_drainage",
+    "number.crop_steering_sump_power_threshold_w",
+    "number.crop_steering_p3_time_between_shots",
+    "number.crop_steering_zone_1_p3_time_between_shots",
+    "number.crop_steering_zone_2_p3_time_between_shots",
+}
 
 
 async def _choose(hass, entity_id, option):
@@ -56,21 +67,21 @@ async def test_a_new_room_is_generic_until_someone_chooses_and_the_descriptor_fo
     hass, controller_for
 ):
     entry = await _install(hass)
-    select = hass.states.get(SUBSTRATE)
+    select = hass.states.get(NEW_SUBSTRATE)
     assert select.state == "generic"
     assert select.attributes["options"] == ["generic", "rockwool", "coco"]
-    assert hass.states.get(DESCRIPTOR).attributes["substrate"] == "generic"
+    assert hass.states.get(NEW_DESCRIPTOR).attributes["substrate"] == "generic"
 
-    await _choose(hass, SUBSTRATE, "coco")
-    assert hass.states.get(DESCRIPTOR).attributes["substrate"] == "coco"
+    await _choose(hass, NEW_SUBSTRATE, "coco")
+    assert hass.states.get(NEW_DESCRIPTOR).attributes["substrate"] == "coco"
     # The choice is the room's: it survives the room being reloaded (a restart restores it the same way).
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
-    assert hass.states.get(SUBSTRATE).state == "coco"
-    assert hass.states.get(DESCRIPTOR).attributes["substrate"] == "coco"
+    assert hass.states.get(NEW_SUBSTRATE).state == "coco"
+    assert hass.states.get(NEW_DESCRIPTOR).attributes["substrate"] == "coco"
 
     c, _fake, _clock = controller_for({})
-    assert c.rooms[0].substrate == "coco"
+    assert room_of(c).substrate == "coco"
 
 
 async def test_a_named_room_has_its_own_choice(hass, controller_for):
@@ -91,10 +102,11 @@ async def test_a_named_room_has_its_own_choice(hass, controller_for):
     await _choose(hass, "select.crop_steering_veg_tent_substrate", "rockwool")
     descriptor = hass.states.get("sensor.crop_steering_veg_tent_engine_config").attributes
     assert descriptor["substrate"] == "rockwool"
-    assert hass.states.get(DESCRIPTOR).attributes["substrate"] == "generic"  # the other room's is its own
+    assert hass.states.get(NEW_DESCRIPTOR).attributes["substrate"] == "generic"  # the other room's is its own
 
     c, _fake, _clock = controller_for({})
-    assert {room.prefix: room.substrate for room in c.rooms} == {"": "generic", "veg_tent_": "rockwool"}
+    rooms = {room.prefix: room.substrate for room in c.rooms if room.prefix}  # not the app's built-in room
+    assert rooms == {"tent_": "generic", "veg_tent_": "rockwool"}
 
 
 async def test_a_2_25_1_room_reads_generic_moves_no_entity_and_carries_straight_on(
@@ -122,7 +134,7 @@ async def test_a_3_11_1_room_gets_only_the_substrate_select_and_its_controller_c
     entry, _seed = await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
     assert hass.states.get(SUBSTRATE).state == "generic"
     assert hass.states.get(DESCRIPTOR).attributes["substrate"] == "generic"
-    assert _new_since(hass, entry, seed) == ({SUBSTRATE}, set())  # nothing else appears or moves
+    assert _new_since(hass, entry, seed) == ({SUBSTRATE} | ADDED_BESIDE, set())  # nothing else appears or moves
 
     hass.states.async_set(KILL, "on")
     c, _fake, _built, _usage, state = _jev_3_11_1_app(
