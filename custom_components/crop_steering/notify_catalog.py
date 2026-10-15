@@ -95,8 +95,11 @@ KINDS = (
         "id": "jev",
         "name": "Jev",
         "detail": "Jev's advice about a zone, its automatic targets paused, Jev moving a "
-        "setting, its calls running low, and a zone on its stricter gate",
-        "codes": _codes("CS-404 CS-501 CS-702 CS-705 CS-706 CS-707"),
+        "setting, its calls running low, a zone on its stricter gate, and the AI assistant's "
+        "budget spent, its key refused or a retired route",
+        "codes": _codes(
+            "CS-404 CS-501 CS-702 CS-705 CS-706 CS-707 CS-708 CS-709 CS-712"
+        ),
         "events": ("jev_setpoint",),
     },
     {
@@ -115,7 +118,7 @@ KIND_IDS = tuple(kind["id"] for kind in KINDS)
 EVENTS = {event: kind["id"] for kind in KINDS for event in kind["events"]}
 EMERGENCY = KINDS[0]["codes"]
 # Every code whose severity is info in docs/error-codes.json: a digest lists them apart from the warnings.
-INFO = _codes("CS-205 CS-305 CS-403 CS-501 CS-702 CS-705 CS-906")
+INFO = _codes("CS-205 CS-305 CS-403 CS-501 CS-702 CS-705 CS-712 CS-906")
 
 # The integration's own Repairs cards (health.py, stock_api.py, bounds.py) by translation key, with the code each one
 # carries in its title (strings.json). tests/test_notify_catalog.py keeps the two in step.

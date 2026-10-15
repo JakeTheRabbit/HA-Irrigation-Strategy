@@ -64,10 +64,12 @@ These are for Home Assistant OS and Supervised installs, and follow the same sha
    tell the two apps apart. `state.json` holds each zone's phase, today's counters, the accepted setup revision and what
    Auto Setpoints has learned. `dosing_state.json` holds the dosing record, including anything a dose or
    batch left switched on. The `jev_*` files are the brain's day count, ledger, journal and setpoint
-   memory. On Cloudflare they are also what keeps the brain on: Cloudflare credentials start it only
-   where a file the brain writes shows it has run before, and any one of them is enough. A TypeSafe key
-   in the copied options keeps that route on by itself. Without them, a room on Cloudflare runs on the
-   rules, which is safe but changes who decides.
+   memory. On Cloudflare they are also what keeps the brain on: with `brain_provider` at its default
+   `auto`, the app keeps the Jev route (`jev_legacy`) only where a file the brain writes shows it has run
+   before, and any one of them is enough. A TypeSafe key in the copied options keeps that route on by
+   itself. Without them, a room on Cloudflare runs on the rules, which is safe but changes who decides;
+   setting `brain_provider: jev_legacy` keeps the old route, and `claude_haiku` with an Anthropic key moves
+   it to the AI assistant.
 6. **Switch the integration's HACS source.** In HACS, first remove the `HA-Crop-Steering-Jev` repository
    (HACS may delete `custom_components/crop_steering` as it does; Home Assistant keeps running the loaded
    integration until it restarts). Then add `https://github.com/JakeTheRabbit/HA-Irrigation-Strategy` as a
@@ -77,9 +79,10 @@ These are for Home Assistant OS and Supervised installs, and follow the same sha
    domain); check that Settings, Devices & services shows the integration loaded at the new version.
 7. **Start the new app.** In its log check: the version on the `f2-control <version> starting` line;
    `room '<room>' setup revision N adopted with verified OFF hardware` for each room, and no "setup change
-   waiting, not watering" notice; and the brain line, `jev: on via ...` where the old app had a brain, or
-   `jev: off. The Cloudflare credentials start Jev only on an install that has run it before` on a
-   Cloudflare room with no `jev_*` file. Check a fresh heartbeat, and that each zone's phase and today's
+   waiting, not watering" notice; and the brain line, `jev: on via ... (deprecated; brain_provider:
+   claude_haiku replaces it)` where the old app had a brain, or `jev: off. The Cloudflare credentials start
+   Jev only on an install that has run it before` and `brain: rules (rules). Rules.` on a Cloudflare room
+   with no `jev_*` file. The brain panel (the room's AI assistant tile) says the same. Check a fresh heartbeat, and that each zone's phase and today's
    counters are the ones the old app left. Compare every state against step 1: nothing the operator set
    may have moved.
 8. Turn the kill switches back on, turn on the new app's Start on boot and Watchdog, and run a **catch

@@ -190,3 +190,50 @@ async def test_the_channel_judges_alert_reaches_the_phone_that_ticks_hardware(
     assert answer == {"sent_to": [TABLET], "error": None}
     assert received[TABLET][-1]["message"].startswith("Do a catch test.")
     assert not received.get(STAFF_PHONE)
+
+
+async def test_the_ai_assistants_cards_reach_the_phone_that_ticks_jev(
+    hass, hass_admin_user, controller_for, monkeypatch
+):
+    """CS-708 (its budget spent), CS-709 (its key refused) and CS-712 (a retired route, raised by
+    the rules panel with no brain built) are in the jev kind: the phone that ticks Jev gets them."""
+    await _install(hass)
+    staff = await _staff(hass)
+    received, doc = await _set_up(hass, hass_admin_user, staff)
+    phone, tablet = doc["config"]["recipients"]
+    await _call(
+        hass,
+        hass_admin_user,
+        "notify_save",
+        expected_revision=1,
+        recipients=[{**phone, "kinds": ["jev"]}, tablet],
+    )
+    await hass.async_block_till_done()
+    c, fake, _clock = controller_for({"notify_service": "notify/mobile_app_old_phone"})
+    import controller
+    import jev_bridge
+
+    def answered(domain, service, data, timeout=12):
+        fake.calls.append((domain, service, dict(data)))
+        return 200, {"sent_to": [STAFF_PHONE], "error": None}
+
+    monkeypatch.setattr(controller, "ha_service_response", answered)
+    room = c.rooms[0]
+    for code, label in (("CS-708", "spent"), ("CS-709", "brain")):
+        assert c._jev_alert(room, None, label, {"code": code, "title": "t", "message": f"{code} words."})
+    c.brain_status = jev_bridge.BrainStatus(
+        "rules", "rules", "Rules.", notice="cloudflare_route_retired"
+    )
+    jev_bridge.publish_rules(c, room, controller.datetime.now(), controller.ha_set)
+    asked = _asked(fake)
+    assert [(a["code"], a["key"]) for a in asked] == [
+        ("CS-708", "jev_spent_default"),
+        ("CS-709", "jev_brain_default"),
+        ("CS-712", "jev_route_default"),
+    ]
+    for one in asked:
+        answer = await hass.services.async_call(
+            DOMAIN, "notify", one, blocking=True, return_response=True
+        )
+        assert answer == {"sent_to": [STAFF_PHONE], "error": None}
+    assert received[STAFF_PHONE][-1]["message"].startswith("Your Cloudflare settings")

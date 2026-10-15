@@ -211,8 +211,26 @@ export interface JevRoom {
   judges: string[];
   judgeErrors: Record<string, string>;
   stage: JevStage | null;
+  /** Which brain runs: claude_haiku, jev_legacy or rules ("" from a controller before the AI assistant). */
+  provider: string;
+  /** Why it is where it is (acting, dry_run, legacy, budget_spent, rules_no_key, ...): "" when not said. */
+  brainState: string;
+  stateWords: string;
+  notice: string;
+  deprecatedRoute: boolean;
+  /** US$ the Claude brain has spent since the last lights-on; null on the legacy route. */
+  costUsd: number | null;
+  /** The brain is judging the room now. Every other state means the engine is on its own rules. */
+  on: boolean;
 }
-/** The room's Jev sensor: today's calls, tokens and errors, and today's stage. Null without one. */
+
+/** The brain states in which it judges: anything else is rules (a published reason, a fallback). */
+const BRAIN_ON = ["acting", "dry_run", "legacy"];
+
+/** The room's brain sensor: today's calls, tokens and errors, today's stage, which brain runs and whether it is
+ * on. The entity state alone never says that: under rules it reads "rules", and a Claude brain that has fallen back
+ * keeps "on" with the reason in `state`. A sensor with no `state` attribute (an older controller) reads as before.
+ * Null without one. */
 export function parseJevRoom(entity: EntityState | undefined): JevRoom | null {
   if (!entity) return null;
   const a = entity.attributes ?? {};
@@ -237,7 +255,39 @@ export function parseJevRoom(entity: EntityState | undefined): JevRoom | null {
     judges: Array.isArray(a.judges) ? a.judges.map(text).filter(Boolean) : [],
     judgeErrors: errors,
     stage: parseJevStage(a.stage),
+    provider: text(a.provider),
+    brainState: text(a.state),
+    stateWords: text(a.state_words),
+    notice: text(a.notice),
+    deprecatedRoute: a.deprecated_route === true,
+    costUsd: count(a.cost_usd_today),
+    on:
+      !["rules", "error", "unknown", "unavailable"].includes(text(entity.state)) &&
+      (!text(a.state) || BRAIN_ON.includes(text(a.state))),
   };
+}
+
+/** What the pages say of the room's brain, in one place: the tile's word, its small text and the zone panel's
+ * subtitle. Never "On" or "Acting now" while the engine is on its own rules. */
+export function brainWords(room: JevRoom | null): {
+  tile: string;
+  detail: string;
+  subtitle: string | null;
+} {
+  if (!room)
+    return { tile: "Not on this room", detail: "The controller runs without it", subtitle: null };
+  if (room.state === "error") return { tile: "Not answering", detail: "", subtitle: null };
+  if (!room.on) {
+    const why = room.stateWords || "Rules are running.";
+    return { tile: "Rules", detail: why, subtitle: `Rules are running: ${why}` };
+  }
+  const tile =
+    room.brainState === "dry_run"
+      ? "Advising only"
+      : room.brainState === "legacy"
+        ? "On, retired route"
+        : "On";
+  return { tile, detail: "", subtitle: null };
 }
 
 export interface JevZoneJudge {
@@ -255,6 +305,7 @@ export function parseJevZone(
 ): { acting: string[]; judges: JevZoneJudge[] } | null {
   if (!entity) return null;
   const state = text(entity.state);
+  if (state === "rules" || text(entity.attributes?.provider) === "rules") return null;
   const acting =
     !state || ["watching", "unknown", "unavailable"].includes(state)
       ? []
@@ -302,11 +353,12 @@ export function readJev(states: States, prefix: string) {
   return { log: parseJevLog(states[ids.log]), room: parseJevRoom(states[ids.room]) };
 }
 
-/** Workers AI input at $0.042 per million tokens; output is free (docs/JEV.md). */
+/** Workers AI input at $0.042 per million tokens; output is free (docs/JEV.md). The legacy route only: the Claude
+ * brain publishes what it spent (`cost_usd_today`), which wins. */
 export const JEV_USD_PER_MILLION = 0.042;
-export function jevCost(tokens: number | null): string | null {
-  if (tokens === null) return null;
-  const usd = (tokens * JEV_USD_PER_MILLION) / 1e6;
+export function jevCost(tokens: number | null, costUsd: number | null = null): string | null {
+  if (tokens === null && costUsd === null) return null;
+  const usd = costUsd ?? ((tokens ?? 0) * JEV_USD_PER_MILLION) / 1e6;
   return usd < 0.01 ? "under $0.01" : `≈ $${usd < 1 ? usd.toFixed(2) : usd.toFixed(1)}`;
 }
 

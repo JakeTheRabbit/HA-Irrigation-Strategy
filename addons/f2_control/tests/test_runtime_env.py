@@ -595,6 +595,10 @@ def test_the_app_reads_its_file_as_it_always_did(tmp_path, content):
      ["input_boolean.flush", "input_boolean.fill"]),
     ("F2_OPT_HOLD_ENTITIES", '["input_boolean.flush"]', "hold_entities", ["input_boolean.flush"]),
     ("F2_OPT_HOLD_ENTITIES", "", "hold_entities", []),
+    ("F2_OPT_BRAIN_PROVIDER", "auto", "brain_provider", "auto"),
+    ("F2_OPT_BRAIN_PROVIDER", "jev_legacy", "brain_provider", "jev_legacy"),
+    ("F2_OPT_ANTHROPIC_DAILY_BUDGET_USD", "2.5", "anthropic_daily_budget_usd", 2.5),
+    ("F2_OPT_BRAIN_DRY_RUN", "true", "brain_dry_run", True),
 ])
 def test_an_environment_value_takes_its_options_type_and_wins_over_the_file(tmp_path, var, value, key, expected):
     """U2, accepted: each schema type from its string form."""
@@ -612,6 +616,8 @@ def test_an_environment_value_takes_its_options_type_and_wins_over_the_file(tmp_
     ("F2_OPT_JEV_ENABLED", "maybe", "expected true or false"),
     ("F2_OPT_HOLD_ENTITIES", "[1, 2]", "expected a JSON list of entity ids"),
     ("F2_OPT_HOLD_ENTITIES", "input_boolean.flush input_boolean.fill", "is not an entity id"),
+    ("F2_OPT_BRAIN_PROVIDER", "claude", "expected one of auto, rules, claude_haiku, jev_legacy"),
+    ("F2_OPT_ANTHROPIC_DAILY_BUDGET_USD", "-1", "expected a number from 0 to 1000"),
 ])
 def test_an_environment_value_that_cant_be_used_stops_a_container_and_is_left_out_on_the_app(tmp_path, var, value, said):
     """U2, refused: a container names the variable and stops; the app logs it and keeps the file's value."""
@@ -647,6 +653,21 @@ def test_a_secret_comes_from_its_variable_or_a_file_and_is_only_ever_logged_as_s
     assert opts == {"cf_api_token": SENTINEL}
     opts, log2 = _options(tmp_path, None, {"F2_OPT_INSTANCE_NAME_FILE": str(secret)}, container)
     assert opts == {} and "F2_OPT_INSTANCE_NAME_FILE: unknown" in log2  # _FILE is for secrets only
+    assert SENTINEL not in log + log2 + capsys.readouterr().out
+
+
+@pytest.mark.parametrize("container", [False, True])
+def test_the_anthropic_key_comes_from_its_option_variable_or_the_usual_alias(tmp_path, container, capsys):
+    """F2_OPT_ANTHROPIC_API_KEY(_FILE) over ANTHROPIC_API_KEY over the options file, only ever logged as set."""
+    key = tmp_path / "anthropic"
+    key.write_text(SENTINEL + "-file\n")
+    opts, log = _options(tmp_path, {"anthropic_api_key": "from-the-file"}, {"ANTHROPIC_API_KEY": SENTINEL}, container)
+    assert opts["anthropic_api_key"] == SENTINEL and "anthropic_api_key=<set>" in log
+    opts, log2 = _options(tmp_path, None, {"ANTHROPIC_API_KEY": "alias", "F2_OPT_ANTHROPIC_API_KEY_FILE": str(key)},
+                          container)
+    assert opts["anthropic_api_key"] == SENTINEL + "-file"
+    opts, _ = _options(tmp_path, {"anthropic_api_key": "from-the-file"}, {}, container)
+    assert opts["anthropic_api_key"] == "from-the-file"
     assert SENTINEL not in log + log2 + capsys.readouterr().out
 
 

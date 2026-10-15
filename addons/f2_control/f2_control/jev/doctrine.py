@@ -19,6 +19,8 @@ other arc for reference only.
 
 Within each topic the rules are listed most important first, so doctrine(..., limit=n) keeps the core.
 """
+import os
+import re
 from dataclasses import dataclass
 
 TEROS = "https://www.growlabs.nz/wiki/root-zone-teros12.html"
@@ -416,16 +418,85 @@ NOMINAL_FLOWER_DAYS = 56  # the slab guide's nominal days: setting 1-21, bulk 22
 FINISH_DAYS = 14  # "normally the final 10-14 days": the finish starts this many days before the end
 
 
-def stage_intent(flower_day, flower_days=NOMINAL_FLOWER_DAYS):
-    """A copy of the STAGE_ARC row for a day of flower (day 1 = the first day of 12/12), or None when the day is
-    unknown or outside flower. The finish is the last FINISH_DAYS of `flower_days`: a longer cultivar stays in
-    the bulk until then, because the guide moves on when ripening signals dominate, not on a date."""
-    if flower_day is None or not 1 <= flower_day <= flower_days:
+def stage_intent(flower_day, flower_days=NOMINAL_FLOWER_DAYS, rows=STAGE_ARC):
+    """A copy of the arc's row for a day of flower (day 1 = the first day of 12/12), or None when the day is unknown,
+    outside flower or no arc is in force (`rows` empty). The last row is the last FINISH_DAYS of `flower_days`: a
+    longer cultivar stays in the row before it until then, because the guide moves on when ripening signals
+    dominate, not on a date. `rows` are stage_rows(): the default arc is STAGE_ARC itself."""
+    flower = [r for r in rows if r.get("days")]
+    if flower_day is None or not flower or not 1 <= flower_day <= flower_days:
         return None
-    _veg, setting, bulk, finish = STAGE_ARC
-    start = max(flower_days - FINISH_DAYS + 1, bulk["days"][0])
-    if flower_day <= setting["days"][1]:
-        return dict(setting)
-    if flower_day < start:
-        return {**bulk, "days": (bulk["days"][0], start - 1)}
-    return {**finish, "days": (start, flower_days)}
+    *middle, last = flower
+    start = max(flower_days - FINISH_DAYS + 1, middle[-1]["days"][0] if middle else 1)
+    if flower_day >= start:
+        return {**last, "days": (start, flower_days)}
+    for row in middle[:-1]:
+        if flower_day <= row["days"][1]:
+            return dict(row)
+    return {**middle[-1], "days": (middle[-1]["days"][0], start - 1)}
+
+
+DEFAULT_ARC = "slab_default"
+STEERING = ("vegetative", "generative", "ripening")  # what the judges and the envelope compare with
+PACK_ARCS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "doctrine", "arcs")
+
+
+class ArcInvalid(ValueError):
+    """A stage arc this release cannot use as it stands: the reason says what is missing."""
+
+
+def _pair(text, what):
+    found = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*", str(text))
+    if not found:
+        raise ArcInvalid(f"{what} is {text!r}, not a number range")
+    lo, hi = float(found.group(1)), float(found.group(2))
+    if lo > hi:
+        raise ArcInvalid(f"{what} runs from {lo:g} down to {hi:g}")
+    return (int(lo) if lo.is_integer() else lo, int(hi) if hi.is_integer() else hi)
+
+
+def stage_rows(arc=DEFAULT_ARC, pack=PACK_ARCS):
+    """The rows of stage arc `arc` in STAGE_ARC's shape, or ArcInvalid with the reason. slab_default is STAGE_ARC
+    itself, words and all. Any other arc is read from the doctrine pack's table (the controller's copy) and checked:
+    every range a number pair, a steering the judges know, a move-on sign in every row, one veg row and flower rows
+    from day 1 with no gap (the last may be "the last N days")."""
+    if arc == DEFAULT_ARC:
+        return STAGE_ARC
+    try:
+        with open(os.path.join(pack, f"{arc}.md"), encoding="utf-8") as fh:
+            text = fh.read().splitlines()
+    except OSError:
+        raise ArcInvalid(f"there is no stage arc {arc!r} in this release") from None
+    lines = [ln.strip() for ln in text if ln.strip().startswith("|")]
+    head = [c.strip() for c in lines[0].strip("|").split("|")] if lines else []
+    cite = next((ln[4:].strip() for ln in text if ln.startswith("### Stage arc")), arc)
+    rows = []
+    for line in lines[2:]:
+        cell = dict(zip(head, (c.strip() for c in line.strip("|").split("|"))))
+        name = cell.get("stage") or "a row"
+        if cell.get("steering") not in STEERING:
+            raise ArcInvalid(f"{name} steers {cell.get('steering')!r}, not one of {', '.join(STEERING)}")
+        if not cell.get("move_on_when"):
+            raise ArcInvalid(f"{name} has no sign that the stage moves on")
+        dry, ec, runoff = (_pair(cell.get(k), f"{name}'s {w}") for k, w in
+                           (("dryback_points", "dryback"), ("pore_ec", "pore EC"), ("runoff_pct", "runoff")))
+        days = cell.get("flower_days") or ""
+        rows.append({
+            "stage": name, "days": None if not days else (None if days.startswith("last") else _pair(days, name)),
+            "last": days.startswith("last"), "steering": cell["steering"], "peak": cell.get("peak") or "",
+            "dryback": f"{dry[0]:g}-{dry[1]:g} points of true water content", "dryback_points": dry,
+            "pore_ec": f"root-zone EC {ec[0]:g}-{ec[1]:g}", "pore_ec_range": ec,
+            "runoff": f"{runoff[0]:g}-{runoff[1]:g} % of the water fed", "runoff_pct": runoff,
+            "move_on_when": cell["move_on_when"], "source": cite})
+    if len(rows) < 2 or rows[0]["days"] is not None or rows[0]["last"]:
+        raise ArcInvalid("it needs one veg row first and at least one flower row")
+    flower, day = rows[1:], 1
+    for i, row in enumerate(flower):
+        if row["last"] and i == len(flower) - 1:
+            row["days"] = (day, day + FINISH_DAYS - 1)
+        elif row["days"] is None or row["days"][0] != day:
+            raise ArcInvalid(f"{row['stage']} does not start on flower day {day}")
+        day = row["days"][1] + 1
+    for row in rows:
+        row.pop("last")
+    return rows

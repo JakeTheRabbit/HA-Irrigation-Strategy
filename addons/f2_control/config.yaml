@@ -48,6 +48,12 @@ options:
   flow_lps: 0.02
   loop_seconds: 60
   rediscover_seconds: 300
+  brain_provider: auto
+  stage_arc: slab_default
+  anthropic_api_key: ""
+  anthropic_model: claude-haiku-5-5
+  anthropic_daily_budget_usd: 1.0
+  brain_dry_run: false
   cf_account_id: ""
   cf_api_token: ""
   cf_gateway_id: ""
@@ -81,6 +87,12 @@ schema:
   flow_lps: float
   loop_seconds: float
   rediscover_seconds: float
+  brain_provider: list(auto|rules|claude_haiku|jev_legacy)?
+  stage_arc: list(slab_default)?
+  anthropic_api_key: password?
+  anthropic_model: str?
+  anthropic_daily_budget_usd: float(0,1000)?
+  brain_dry_run: bool?
   cf_account_id: str?
   cf_api_token: password?
   cf_gateway_id: str?

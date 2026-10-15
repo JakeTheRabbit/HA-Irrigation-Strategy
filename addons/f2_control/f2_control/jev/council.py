@@ -33,6 +33,7 @@ class Verdict:
     value: float | None = None  # a score's averaged value
     probabilities: dict = field(default_factory=dict)
     labels: list = field(default_factory=list)  # each phrasing's own answer
+    notes: list = field(default_factory=list)  # each phrasing's rationale (the Claude brain's; legacy answers have none)
 
     def firm(self, min_prob=0.6):
         """Both phrasings agree and the averaged probability of the answer is at least `min_prob`."""
@@ -61,6 +62,7 @@ def combine(answers, name):
     vs = _variants(answers, name)
     if not vs:
         return None
+    notes = [str(v["rationale"]) for v in vs if v.get("rationale")]
     kind = vs[0].get("type") or ("noul" if "noul" in vs[0] else "choice" if "choice" in vs[0] else "score")
     try:
         if kind == "noul":
@@ -72,7 +74,7 @@ def combine(answers, name):
             conf = min(abs(p - 0.5) * 2.0 for p in ps)
             return Verdict(name, kind, label, round(prob, 3), round(conf, 3), agreed, len(vs),
                            probabilities={"true": round(avg, 3), "false": round(1 - avg, 3)},
-                           labels=[p >= 0.5 for p in ps])
+                           labels=[p >= 0.5 for p in ps], notes=notes)
         probs = {}
         for v in vs:
             for k, p in (v.get("probabilities") or {}).items():
@@ -83,7 +85,7 @@ def combine(answers, name):
             agreed = all(v.get("choice") == label for v in vs)
             return Verdict(name, kind, label, round(probs.get(label, 0.0), 3), round(conf, 3), agreed,
                            len(vs), probabilities={k: round(p, 3) for k, p in probs.items()},
-                           labels=[v.get("choice") for v in vs])
+                           labels=[v.get("choice") for v in vs], notes=notes)
         scores = [float(v["score"]) for v in vs]
         value = sum(scores) / len(scores)
         level = int(round(value))

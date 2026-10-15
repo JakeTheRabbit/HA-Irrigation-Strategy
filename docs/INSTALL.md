@@ -132,6 +132,34 @@ In **Rooms & setup → Shared room hardware**, map tank fill level to a percenta
 
 Save setup with the affected engines and irrigation equipment off, then verify the readings in **Overview** before restoring the previous engine state. Missing mappings remain labelled; an unavailable pump is never displayed as off. Existing controllers must be updated to publish irrigation timestamps with a timezone offset.
 
+## Optional AI assistant
+
+The controller runs on its own rules unless you turn the AI assistant on. It needs your own Anthropic API key
+(console.anthropic.com, **API keys**), which is billed to you; `anthropic_daily_budget_usd` (US$1.00 by default)
+caps what it spends between one lights-on and the next, and the engine runs on its own rules once it is spent.
+
+- **App (Home Assistant OS or Supervised):** in the app's **Configuration**, set `brain_provider` to
+  `claude_haiku` and paste the key into `anthropic_api_key`, then restart the app. The log shows
+  `brain: claude_haiku, model claude-haiku-5-5, budget US$1.00 until lights-on, key set`, never the key.
+- **Container:** put the key in a file next to `docker-compose.yml`, for example `anthropic_key.txt`, add it as
+  a Docker secret and set `F2_OPT_BRAIN_PROVIDER=claude_haiku` and
+  `F2_OPT_ANTHROPIC_API_KEY_FILE=/run/secrets/anthropic_key`. `F2_OPT_ANTHROPIC_API_KEY` or the usual
+  `ANTHROPIC_API_KEY` work too, but anyone who can run `docker inspect` can read an environment variable. Run
+  `docker compose up -d`; the log shows `anthropic_api_key=<set>`. Building by hand on a 32-bit ARM machine,
+  pass `--build-arg BUILD_ARCH=armv7`: the image then has no Anthropic SDK and runs rules.
+
+**What is sent.** Each question carries the zone's readings, its settings, the day's stage and the room and zone
+names you typed. Never an entity id, a key or personal data. The brain's answers only act through the
+controller's own limits, and every failure runs the engine exactly as on rules. The AI assistant tile on the
+dashboard says which brain runs and why.
+
+### Retired Jev routes
+
+The TypeSafe and Cloudflare routes of the Jev app are retired. An install moved from it keeps them working with
+`brain_provider` at `auto` (where the Jev brain has run) or `jev_legacy`, and gets a CS-712 card once a release.
+They are not offered to new installs. To move on, set `brain_provider: claude_haiku` and an Anthropic key; to
+turn the brain off and keep the old settings saved, set `brain_provider: rules`.
+
 ## Optional LLM / MCP connection
 
 Normal installation does not require an LLM. The optional MCP package requires Node.js 22 or newer and a client that can launch a local stdio process. To connect one, follow [MCP.md](MCP.md) on the client machine after the HA integration is reachable. The documented server uses local stdio with locally configured `HA_URL` and `HA_TOKEN`. It is read-only by default. Setup changes or draft-plan saves require `CROP_STEERING_ALLOW_WRITES=true`, followed by exact proposal review. `preview_setup`/`preview_plan` produce a short-lived, single-use token; `apply_proposal` accepts only that token and its matching room/revision, then reads back the result. Follow the server guide for client configuration and validation evidence.

@@ -34,7 +34,7 @@
     {
       "prefix": "CS-7",
       "name": "Jev",
-      "detail": "Jev's judgements about a zone (advice, a probe it set aside), and how Jev itself is doing: its calls running low, a judge on the stricter gate (docs/JEV.md)."
+      "detail": "Jev's judgements about a zone (advice, a probe it set aside), and how the AI assistant itself is doing: its calls or budget running low or spent, its key refused, a retired route, a judge on the stricter gate (docs/JEV.md)."
     },
     {
       "prefix": "CS-8",
@@ -972,6 +972,41 @@
       ]
     },
     {
+      "code": "CS-708",
+      "title": "The AI assistant has used its budget",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The AI assistant (Claude) has spent its budget (anthropic_daily_budget_usd, US$1.00 by default) between one lights-on and the next. It is not asked again until the next lights-on.",
+      "watering": "Carries on. The engine waters on its own rules, the Auto setpoints learner included, until the next lights-on.",
+      "causes": [
+        "More rooms and zones than the budget was set for: about US$0.12 a zone a day, plus US$0.05.",
+        "Many second looks: the assistant was often unsure today.",
+        "A budget of 0, which means the assistant never asks."
+      ],
+      "fixes": [
+        "Raise anthropic_daily_budget_usd in the app's options, then restart the app.",
+        "Check the AI assistant's projected spend on the brain panel: it shows whether the budget fits a normal day."
+      ]
+    },
+    {
+      "code": "CS-709",
+      "title": "The AI assistant is not available",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Claude refused the Anthropic key, does not know the chosen model, or refused several requests in a row, so the AI assistant has stopped asking.",
+      "watering": "Carries on. The engine waters on its own rules until the assistant can ask again: after an hour for refused requests, after the app restarts for a refused key or model.",
+      "causes": [
+        "The Anthropic key was revoked, mistyped or has no credit.",
+        "The model in anthropic_model is not one this release prices.",
+        "Anthropic is refusing requests for a while."
+      ],
+      "fixes": [
+        "Check the key in the Anthropic console, put a working one in anthropic_api_key, then restart the app.",
+        "Set anthropic_model to claude-haiku-5-5 (the default).",
+        "Read the brain panel's state words and the app log."
+      ]
+    },
+    {
       "code": "CS-710",
       "title": "Water may be bypassing the substrate or the probe",
       "source": "notification",
@@ -987,6 +1022,22 @@
       "fixes": [
         "Do a catch test on a few of the zone's drippers.",
         "Check the blocks: drippers seated in them, the water wetting through, and the probe firm in a representative spot."
+      ]
+    },
+    {
+      "code": "CS-712",
+      "title": "The AI assistant's Jev route is retired",
+      "source": "notification",
+      "severity": "info",
+      "meaning": "This install has Jev route settings (TypeSafe or Cloudflare). Those routes are retired: a room that runs on them keeps working with no new features, and Cloudflare settings alone no longer start a brain. Shown once a release.",
+      "watering": "Unchanged. The engine waters on its own rules, or with the Jev route where it still runs.",
+      "causes": [
+        "An install updated from a release that used the Jev routes."
+      ],
+      "fixes": [
+        "To use the AI assistant, set brain_provider to claude_haiku and add an Anthropic key.",
+        "To keep the old route, set brain_provider to jev_legacy.",
+        "To turn the brain off, set brain_provider to rules."
       ]
     },
     {

@@ -313,7 +313,7 @@
     },
     {
       "id": "CT-13",
-      "text": "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge runs (with one running, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.",
+      "text": "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge holds it (with one running and able to act, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12; from the first loop the brain cannot act, in dry run, with its budget spent, paused, unavailable or its key refused, the learner writes the threshold again until a lights-on at which the brain can act). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.",
       "verified": true
     },
     {
@@ -345,7 +345,7 @@
     },
     {
       "id": "BR-5",
-      "text": "setpoint moves one 0.5 notch, at most once per zone per grow-day, only with the room's Auto Setpoints switch on (so the learner of CT-12 and CT-13 is always running when a notch is possible) and no grow plan owning the room, never while paused, inside a band around the last value of that number the brain did not write: p2_shot_size within 1 and never under 3; p2_vwc_threshold from 2 under to 1 over, at least the rescue floor + 4 and at most min(p1_target, field_capacity) - 2. Any value the brain did not write, a hand edit or a learner move alike, becomes the band's new centre (the evidence calls it 'your value'). These two numbers are the only ones the brain writes (judge_levers).",
+      "text": "setpoint moves one 0.5 notch, at most once per zone per grow-day, only with the room's Auto Setpoints switch on (so the learner of CT-12 and CT-13 is always running when a notch is possible) and no grow plan owning the room, never while paused, inside a band around the last value of that number the brain did not write: p2_shot_size within 1 and never under 3; p2_vwc_threshold from 2 under to 1 over, at least the rescue floor + 4 and at most min(p1_target, field_capacity) - 2. Any value the brain did not write becomes the band's new centre (the evidence calls it 'your value'), except the learner's own writes while it holds the two numbers (CT-13), which leave the centre where it was; a field-capacity shift then moves the centre with it. When the levers come back, the threshold is put inside the band, never where it would break the ladder. These two numbers are the only ones the brain writes (judge_levers).",
       "verified": true
     },
     {

@@ -173,6 +173,9 @@ class ZoneContext:
     setpoints: dict | None = None
     substrate_l: float | None = None  # the zone's total substrate in litres (per-plant block x plants)
     channel: str | None = None  # the channel judge's latest answer for the zone, in words (fresh ones only)
+    # What only the controller knows, for the Claude brain's evidence (jev.enrich): zone settings, interlocks, data
+    # quality, the arc in force. None on the legacy routes and under rules.
+    brain: dict | None = None
 
     @property
     def since_lights_min(self):

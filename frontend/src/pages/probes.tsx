@@ -8,7 +8,7 @@ import { Pill, Sparkline } from "@/components/mini-visuals";
 import { ProbeCalibration } from "@/components/probe-calibration";
 import { ageText, readHeartbeat } from "@/lib/controller-health";
 import { recentReadings } from "@/lib/dryback";
-import { readJev } from "@/lib/jev";
+import { brainWords, readJev } from "@/lib/jev";
 import { descriptor, numeric } from "@/lib/model";
 import type { SetupDocument, SetupRoom } from "@/lib/operator-types";
 import {
@@ -98,12 +98,10 @@ export function Probes({
           </span>
         </div>
         <div>
-          <span className="eyebrow">Jev</span>
-          <strong>
-            {jev ? (jev.state === "error" ? "Not answering" : "On") : "Not on this room"}
-          </strong>
+          <span className="eyebrow">AI assistant</span>
+          <strong>{brainWords(jev).tile}</strong>
           <span className="muted small">
-            {jev ? jevUsage(jev, true) || "No calls today" : "The controller runs without it"}
+            {jev?.on ? jevUsage(jev, true) || "No calls today" : brainWords(jev).detail}
           </span>
         </div>
       </section>

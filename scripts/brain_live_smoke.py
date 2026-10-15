@@ -1,17 +1,22 @@
-"""Ask the real Jev every judge's questions on realistic zone situations, and check its answers.
+"""Ask the real brain every judge's questions on realistic zone situations, and check its answers.
 
-    JEV_TYPESAFE_KEY=<apikey_...> python scripts/jev_live_smoke.py          (TypeSafe direct)
-    JEV_CF_ACCOUNT=<account id> JEV_CF_TOKEN=<Workers AI token> python scripts/jev_live_smoke.py
+    ANTHROPIC_API_KEY=<sk-ant-...> python scripts/brain_live_smoke.py      (Claude, brain_provider claude_haiku)
+    JEV_TYPESAFE_KEY=<apikey_...> python scripts/brain_live_smoke.py       (the retired TypeSafe route)
+    JEV_CF_ACCOUNT=<account id> JEV_CF_TOKEN=<Workers AI token> python scripts/brain_live_smoke.py
 
-Each scenario builds a zone context the way the controller does, runs the judge's own evidence and
-questions through Cloudflare, combines the two council phrasings, and prints the verdict next to what
-an experienced grower would expect. Nothing here touches Home Assistant or any hardware.
+A developer's tool, run by hand with a person's own key (and in the staging soak before a release): it calls
+api.anthropic.com, or the retired routes, and nothing in the app runs it. Each scenario builds a zone context the
+way the controller does, runs the judge's own evidence (through the enrichment hook on Claude) and questions,
+combines the two council phrasings, and prints the verdict next to what an experienced grower would expect. On
+Claude it also prints the prompt's cached size (count_tokens) and each call's cache reads, which prove the prefix
+caches. Nothing here touches Home Assistant or any hardware.
 """
 from __future__ import annotations
 
 import os
 import sys
 from datetime import datetime, timedelta
+from functools import partial
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,10 +24,13 @@ sys.path[:0] = [str(ROOT / "addons/f2_control/f2_control"), str(ROOT / "addons/f
 
 import jev_kit as K  # noqa: E402
 from jev import council  # noqa: E402
-from jev.client import Asker, Route, Routes, call_typesafe  # noqa: E402
+from jev.client import (DEFAULT_MODEL, Asker, Meter, Route, Routes, call_anthropic,  # noqa: E402
+                        call_typesafe, make_client)
 from jev.context import Shot, ZoneHistory  # noqa: E402
-from jev.doctrine import stage_intent  # noqa: E402
+from jev.doctrine import STAGE_ARC, stage_intent  # noqa: E402
+from jev.enrich import enrich  # noqa: E402
 from jev.envelope import admit  # noqa: E402
+from jev.prompt import Prompt  # noqa: E402
 from jev.judges.dawn import DawnJudge  # noqa: E402
 from jev.judges.dusk import DuskJudge  # noqa: E402
 from jev.judges.night import NightJudge  # noqa: E402
@@ -223,22 +231,45 @@ SCENARIOS = [
 ]
 
 
+def claude(key):
+    """The Claude route exactly as jev_bridge.build() makes it, with a Meter and the cached prompt."""
+    model = os.environ.get("ANTHROPIC_MODEL") or DEFAULT_MODEL
+    prompt, meter, client = Prompt(STAGE_ARC, "slab_default"), Meter(5.0, model), make_client(key)
+    if client is None:
+        sys.exit("the anthropic SDK is not installed: pip install -r addons/f2_control/requirements-brain.txt")
+    counted = client.messages.count_tokens(model=model, system=prompt.system, tools=prompt.tools,
+                                           messages=[{"role": "user", "content": "size"}])
+    print(f"{prompt.describe()}; tools and blocks A and B: {counted.input_tokens} tokens by count_tokens")
+    route = Route("Anthropic", partial(call_anthropic, model=model, prompt=prompt, meter=meter, client=client),
+                  "anthropic", key)
+    return Asker("anthropic", key, threaded=False, timeout=60, transport=Routes([route]), meter=meter), meter
+
+
 def main():
     key = os.environ.get("JEV_TYPESAFE_KEY")
     account, token = os.environ.get("JEV_CF_ACCOUNT"), os.environ.get("JEV_CF_TOKEN")
-    if key:
+    meter = None
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        asker, meter = claude(os.environ["ANTHROPIC_API_KEY"])
+    elif key:
         asker = Asker("typesafe", key, None, threaded=False, timeout=60,
                       transport=Routes([Route("TypeSafe", call_typesafe, "typesafe", key)]))
     elif account and token:
         asker = Asker(account, token, os.environ.get("JEV_CF_GATEWAY") or None, threaded=False, timeout=60)
     else:
-        sys.exit("set JEV_TYPESAFE_KEY, or JEV_CF_ACCOUNT and JEV_CF_TOKEN")
+        sys.exit("set ANTHROPIC_API_KEY, or JEV_TYPESAFE_KEY, or JEV_CF_ACCOUNT and JEV_CF_TOKEN")
     good = 0
     for title, judge, build, question, expect in SCENARIOS:
         ctx = build()
         key = f"smoke:{judge.name}:{title}"
-        asker.submit(key, judge.evidence(ctx), council.expand(judge.questions))
+        evidence = judge.evidence(ctx)
+        if meter is not None:
+            evidence = enrich(ctx, judge, evidence)
+        asker.submit(key, evidence, council.expand(judge.questions))
         ans = asker.result(key)
+        if meter is not None and ans is not None:
+            print(f"      cache read {ans.usage.get('cache_read_input_tokens')} of {ans.usage.get('input_tokens')} "
+                  f"input tokens, US${ans.usage.get('cost_usd', 0):.5f}")
         if ans is None:
             print(f"FAIL  {title}: no answer ({asker.stats['last_error']})")
             continue
@@ -257,7 +288,8 @@ def main():
               f"-> {acted} [{'admitted' if admitted else 'refused: ' + why}]  (expected {expect})")
     total = len(SCENARIOS)
     print(f"\n{good}/{total} as a grower would expect; {asker.stats['calls']} calls, "
-          f"{asker.stats['input_tokens']} input tokens, {asker.stats['errors']} errors")
+          f"{asker.stats['input_tokens']} input tokens, {asker.stats['errors']} errors"
+          + ("" if meter is None else f", US${meter.snapshot()['cost_usd']:.4f} spent"))
     return 0 if good == total else 1
 
 

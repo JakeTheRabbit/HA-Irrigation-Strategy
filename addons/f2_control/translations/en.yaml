@@ -97,8 +97,43 @@ configuration:
     description: >-
       How often the controller looks for new rooms and for setup changes saved
       in the Crop Steering page. Default 300 (five minutes).
+  brain_provider:
+    name: AI assistant
+    description: >-
+      Which brain judges the engine's decisions. rules: none, the engine decides alone.
+      claude_haiku: Claude Haiku, with the Anthropic API key below. jev_legacy
+      (deprecated): the retired Jev routes, for an install that still has them. auto
+      (default): keeps the Jev route on an install that has run it, and rules everywhere
+      else, so a new install starts on rules.
+  stage_arc:
+    name: Stage arc
+    description: >-
+      The flower stage arc the AI assistant and the stage card follow once a flower start
+      is set below (slab_default). With no flower start, no arc is used.
+  anthropic_api_key:
+    name: Anthropic API key (optional)
+    description: >-
+      Your own Anthropic API key, for brain_provider claude_haiku. Stored as a password and
+      never shown or logged. Empty: no key, the engine runs on its own rules. The brain sends
+      readings and settings to Anthropic, never entity ids or keys.
+  anthropic_model:
+    name: Claude model
+    description: >-
+      claude-haiku-5-5 (default), claude-sonnet-5-5 or claude-opus-5-5. Any other model runs
+      rules, because this release cannot keep it to your budget.
+  anthropic_daily_budget_usd:
+    name: AI budget until lights-on (US$)
+    description: >-
+      The most the brain may spend between one lights-on and the next (default 1.00). Once it
+      is spent, the engine runs on its own rules until the next lights-on (CS-708). 0: the
+      brain never calls.
+  brain_dry_run:
+    name: AI advises only
+    description: >-
+      On: the brain judges and the log shows what it would have done, but it moves nothing;
+      the engine runs exactly as on rules. Alerts still come through.
   cf_account_id:
-    name: Cloudflare account ID (Jev)
+    name: Cloudflare account ID (deprecated)
     description: >-
       A second route to Jev (typesafe/jev on Cloudflare Workers AI), which judges the
       engine's decisions in every phase inside the controller's safety envelope
@@ -106,23 +141,23 @@ configuration:
       on an install that has already run it; a new install needs the TypeSafe key
       below. LEAVE BLANK to run the plain engine.
   cf_api_token:
-    name: Cloudflare API token (optional)
+    name: Cloudflare API token (deprecated)
     description: >-
       A Cloudflare API token with the Workers AI Read + Edit permission on the account
       above. Stored as a password. Irrigation never waits on this call: if Cloudflare is
       unreachable the controller carries on without a verdict.
   cf_gateway_id:
-    name: Cloudflare AI Gateway ID (optional)
+    name: Cloudflare AI Gateway ID (deprecated)
     description: >-
       Route the Jev calls through an AI Gateway (for logs and rate limits), e.g. default.
       Leave blank to call Workers AI directly.
   typesafe_api_key:
-    name: TypeSafe API key (Jev, direct)
+    name: TypeSafe API key (deprecated)
     description: >-
       A TypeSafe API key (apikey_...). When set, Jev is asked straight from TypeSafe and the
       Cloudflare fields above are not needed. Stored as a password.
   jev_enabled:
-    name: Jev judges decisions
+    name: Jev judges decisions (deprecated)
     description: >-
       Off runs the plain engine even with Cloudflare set. On (default) lets the judges
       below act, each only inside the controller's safety envelope.
@@ -143,7 +178,7 @@ configuration:
       When the day's calls reach this share of the budget above (default 80), the app
       raises CS-706, once that day.
   jev_retries:
-    name: Tries per Jev route
+    name: Tries per Jev route (deprecated)
     description: >-
       How many times each route to Jev is tried while it is busy, failing or slow
       (default 3), inside 60 seconds. A refused key moves straight on to the next route.

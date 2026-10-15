@@ -25,7 +25,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | CS-4xx | **Settings**: A setting is missing, out of range, or read from somewhere new. |
 | CS-5xx | **Checks across zones**: Advice from comparing a room's zones, and a probe set aside for its unit. |
 | CS-6xx | **Repairs cards**: Raised by the integration, under Settings → Repairs. |
-| CS-7xx | **Jev**: Jev's judgements about a zone (advice, a probe it set aside), and how Jev itself is doing: its calls running low, a judge on the stricter gate (docs/JEV.md). |
+| CS-7xx | **Jev**: Jev's judgements about a zone (advice, a probe it set aside), and how the AI assistant itself is doing: its calls or budget running low or spent, its key refused, a retired route, a judge on the stricter gate (docs/JEV.md). |
 | CS-8xx | **Dosing**: Batch-tank dosing: a dose or a batch that did not end as it should (docs/DOSING.md). |
 | CS-9xx | **Reservoir and feed**: The tank a room waters from: at its minimum, a level that can't be read, a refill due before the next round of shots, and a fill stopped over the full mark (docs/USER_GUIDE.md, "Reservoir minimum"); and a batch tank to refill (docs/DOSING.md). |
 
@@ -87,7 +87,10 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-705](#cs-705) | The zone is off the stage's arc | Information | Notification |
 | [CS-706](#cs-706) | Jev has used most of today's calls | Warning | Notification |
 | [CS-707](#cs-707) | Jev is on the stricter gate for this zone | Warning | Notification |
+| [CS-708](#cs-708) | The AI assistant has used its budget | Warning | Notification |
+| [CS-709](#cs-709) | The AI assistant is not available | Warning | Notification |
 | [CS-710](#cs-710) | Water may be bypassing the substrate or the probe | Warning | Notification |
+| [CS-712](#cs-712) | The AI assistant's Jev route is retired | Information | Notification |
 | [CS-801](#cs-801) | A dosing pump ran past its time and was switched off | Critical | Notification |
 | [CS-802](#cs-802) | A dose could not be confirmed, or ended early | Warning | Notification |
 | [CS-803](#cs-803) | A dose or batch was interrupted by a restart | Warning | Notification |
@@ -1255,6 +1258,49 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 - Read the zone's Jev log on the dashboard: the calls and how each was checked.
 - Check the zone's probe and settings.
 
+<a id="cs-708"></a>
+
+### CS-708: The AI assistant has used its budget
+
+*Warning · Notification*
+
+**What it means.** The AI assistant (Claude) has spent its budget (anthropic_daily_budget_usd, US$1.00 by default) between one lights-on and the next. It is not asked again until the next lights-on.
+
+**Watering meanwhile.** Carries on. The engine waters on its own rules, the Auto setpoints learner included, until the next lights-on.
+
+**Likely causes**
+
+- More rooms and zones than the budget was set for: about US$0.12 a zone a day, plus US$0.05.
+- Many second looks: the assistant was often unsure today.
+- A budget of 0, which means the assistant never asks.
+
+**Suggested fixes**
+
+- Raise anthropic_daily_budget_usd in the app's options, then restart the app.
+- Check the AI assistant's projected spend on the brain panel: it shows whether the budget fits a normal day.
+
+<a id="cs-709"></a>
+
+### CS-709: The AI assistant is not available
+
+*Warning · Notification*
+
+**What it means.** Claude refused the Anthropic key, does not know the chosen model, or refused several requests in a row, so the AI assistant has stopped asking.
+
+**Watering meanwhile.** Carries on. The engine waters on its own rules until the assistant can ask again: after an hour for refused requests, after the app restarts for a refused key or model.
+
+**Likely causes**
+
+- The Anthropic key was revoked, mistyped or has no credit.
+- The model in anthropic_model is not one this release prices.
+- Anthropic is refusing requests for a while.
+
+**Suggested fixes**
+
+- Check the key in the Anthropic console, put a working one in anthropic_api_key, then restart the app.
+- Set anthropic_model to claude-haiku-5-5 (the default).
+- Read the brain panel's state words and the app log.
+
 <a id="cs-710"></a>
 
 ### CS-710: Water may be bypassing the substrate or the probe
@@ -1276,6 +1322,26 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Do a catch test on a few of the zone's drippers.
 - Check the blocks: drippers seated in them, the water wetting through, and the probe firm in a representative spot.
+
+<a id="cs-712"></a>
+
+### CS-712: The AI assistant's Jev route is retired
+
+*Information · Notification*
+
+**What it means.** This install has Jev route settings (TypeSafe or Cloudflare). Those routes are retired: a room that runs on them keeps working with no new features, and Cloudflare settings alone no longer start a brain. Shown once a release.
+
+**Watering meanwhile.** Unchanged. The engine waters on its own rules, or with the Jev route where it still runs.
+
+**Likely causes**
+
+- An install updated from a release that used the Jev routes.
+
+**Suggested fixes**
+
+- To use the AI assistant, set brain_provider to claude_haiku and add an Anthropic key.
+- To keep the old route, set brain_provider to jev_legacy.
+- To turn the brain off, set brain_provider to rules.
 
 ## Dosing (CS-8xx)
 

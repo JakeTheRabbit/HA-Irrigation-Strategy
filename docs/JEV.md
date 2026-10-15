@@ -160,7 +160,7 @@ each page with screenshots.
 
 ## Checked against the real Jev
 
-`scripts/jev_live_smoke.py` builds realistic zone situations, runs each judge's own evidence and questions through
+`scripts/brain_live_smoke.py` builds realistic zone situations, runs each judge's own evidence and questions through
 Cloudflare and compares the council's verdict (and what the envelope then admits) with what an experienced grower
 would say. On 27 September 2026, with the doctrine in every question: 14 of 14, about 3,000 input tokens a
 question (cents a day for a room), no errors. The same zone two hours before lights-off was stopped early in
