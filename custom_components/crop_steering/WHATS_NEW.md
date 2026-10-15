@@ -19,6 +19,11 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.12.1 - 2026-10-16
+
+- The AI assistant can now use your own Anthropic-compatible router. Set its address in the app options.
+- Bug fixes and improvements.
+
 ## 3.12.0 - 2026-10-16
 
 - **If a hold switch you set up becomes unavailable, its room now stops watering until it is back**.
