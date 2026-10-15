@@ -23,6 +23,8 @@ the app. Under the AI assistant:
 - `brain_dry_run`: it judges and the log shows what it would have done, but it moves nothing.
 - `stage_arc`: the flower stage arc it and the stage card follow once `jev_flower_start` is set
   (`slab_default`).
+- In a room whose `feed_ec_sensor` is set, it looks at the feed once a grow-day, an hour after lights-on, and
+  may propose a change on a CS-711 card. It never changes the feed or the dosing: a person decides.
 - Every failure (no key, a refused key, Anthropic not answering, a refused question, the budget spent) runs the
   engine exactly as on rules, the Auto setpoints learner included, and the AI assistant tile says why.
 - What is sent to Anthropic: readings and settings, and the room and zone names you typed. Never an entity id, a

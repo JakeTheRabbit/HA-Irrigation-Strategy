@@ -4,13 +4,15 @@ import json
 import pathlib
 
 import jev_bridge
-from jev import prompt
+from jev import feed, prompt
 
 FILE = pathlib.Path(prompt.TOOLS)
 
 
 def _questions():
-    return {f"{j.name}.{q}": vs for j in jev_bridge.judges() for q, vs in j.questions.items()}
+    found = {f"{j.name}.{q}": vs for j in jev_bridge.judges() for q, vs in j.questions.items()}
+    found.update({f"feed.{q}": vs for q, vs in feed.QUESTIONS.items()})
+    return found
 
 
 def _objects(node):

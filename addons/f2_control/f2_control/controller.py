@@ -678,7 +678,7 @@ CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "C
 # 8 hours; an info code once. Each episode starts the schedule again: an alert cleared (or not raised for
 # ALERT_EPISODE_GAP_S) and raised again, or raised under another code. Held in memory only: a restart pushes once.
 NOT_WATERING_CODES = frozenset({"CS-206", "CS-208", "CS-209", "CS-602"})
-INFO_CODES = frozenset({"CS-205", "CS-305", "CS-403", "CS-501", "CS-702", "CS-705", "CS-712", "CS-906"})
+INFO_CODES = frozenset({"CS-205", "CS-305", "CS-403", "CS-501", "CS-702", "CS-705", "CS-711", "CS-712", "CS-906"})
 WARNING_REPUSH_MIN = (15, 60, 120, 240, 480)
 ALERT_EPISODE_GAP_S = 3600
 # CS-310: a zone's moisture rising by BACKUP_RISE_PTS within BACKUP_WINDOW_MIN while no water went in, its valve
@@ -3927,6 +3927,8 @@ class Controller:
             return self._alert(key, "CS-709", title, message, room=room, zone=zone)
         elif code == "CS-710":
             return self._alert(key, "CS-710", title, message, room=room, zone=zone)
+        elif code == "CS-711":
+            return self._alert(key, "CS-711", title, message, room=room, zone=zone)
         elif code == "CS-712":
             return self._alert(key, "CS-712", title, message, room=room, zone=zone)
         log("jev alert refused: not in the error-code list", judge, code)

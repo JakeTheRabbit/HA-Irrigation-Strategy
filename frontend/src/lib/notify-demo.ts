@@ -85,7 +85,7 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "jev",
     name: "Jev",
     detail:
-      "Jev's advice, Jev moving a zone's P2 shot size or re-water point (a push only), and the AI assistant's budget, key and retired route.",
+      "Jev's advice, Jev moving a zone's P2 shot size or re-water point (a push only), and the AI assistant's budget, key, retired route and feed proposals.",
     codes: [
       "CS-501",
       "CS-702",
@@ -94,6 +94,7 @@ export const DEMO_KINDS: NotifyKind[] = [
       "CS-707",
       "CS-708",
       "CS-709",
+      "CS-711",
       "CS-712",
       "CS-404",
     ],
