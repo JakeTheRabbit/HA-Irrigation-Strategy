@@ -5,8 +5,8 @@ A room set up from now on is not switched on by the wizard until its safety chec
 mapped and reading OFF, its probes reporting in a usable unit, and a test shot the controller ran and a
 person saw water from. Sizing still on the generic defaults is a warning, never a block, and nothing
 locks the room's engine switch. Saving the wizard's progress never changes the setup revision, so the
-controller is never asked for a disarm cycle. A room from before (F-3111) is set up already and never
-sees the wizard.
+controller is never asked for a disarm cycle. A room from before (2.25.1 and 3.11.1) is set up already
+and never sees the wizard.
 """
 
 from datetime import datetime
@@ -17,7 +17,7 @@ from homeassistant.core import Context
 from homeassistant.exceptions import HomeAssistantError
 from test_real_flow import VALVE
 from test_setup_entry import _install
-from test_upgrade_in_place import JEV_3_11_1, _upgrade
+from test_upgrade_in_place import JEV_3_11_1, UPSTREAM_2_25_1, _upgrade
 
 DOMAIN = "crop_steering"
 BUTTON = "button.crop_steering_tent_zone_1_test_shot"
@@ -139,9 +139,12 @@ async def test_a_new_test_shot_needs_seeing_again(hass, hass_admin_user):
     )
 
 
-async def test_a_3_11_1_room_is_set_up_already_and_never_sees_the_wizard(hass, hass_admin_user):
-    seed = fixture(JEV_3_11_1)
-    entry, _seed = await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
+@pytest.mark.parametrize("old_install", [UPSTREAM_2_25_1, JEV_3_11_1])
+async def test_a_room_from_before_is_set_up_already_and_never_sees_the_wizard(
+    hass, hass_admin_user, old_install
+):
+    seed = fixture(old_install)
+    entry, _seed = await _upgrade(hass, old_install, registry_ids=seed["registry"])
     assert "commissioning" not in entry.data
     room = await _room(hass, hass_admin_user, entry)
     assert room["commissioning"]["commissioned"] is True
