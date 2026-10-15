@@ -161,6 +161,11 @@ for that zone. (3 zones × 26 = 78 entities on a 3-zone system.)
 | `zone_N_vwc_method`, `zone_N_ec_method` | Median · Average · Lowest · Highest | How the zone's probes become its moisture reading, and apart its EC reading. Median by default. A probe far from the others is left out first; Lowest and Highest need three probes that agree, and with fewer the zone steers on the median and the controller raises CS-502. |
 | `ec_type_<probe>` (one per mapped EC probe, named after the probe's entity id) | unknown · pore · bulk | What the probe measures: pore EC (the water in the substrate's pores) or bulk EC (substrate and water together, which reads lower). unknown by default, which fuses as before. A zone with both a pore and a bulk probe never combines the two: it steers on its pore probes, and on its bulk probes only while no pore probe reports, when the controller raises CS-504. |
 
+### Per-zone buttons (`button.crop_steering_zone_N_*`)
+| Entity | What it does |
+|---|---|
+| `zone_N_test_shot` | Asks the controller for a 10-second test shot in the zone, to check that watering works. It acts at its next pass (within a minute) on a press under 10 minutes old, through every check a shot passes except a held grow plan. Its water counts toward the day's; it is not one of the day's shots. The `crop_steering.test_shot` service presses it by room id. |
+
 ---
 
 ## 5. Sensors (read-only)

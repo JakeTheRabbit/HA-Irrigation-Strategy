@@ -27,6 +27,7 @@ except ImportError:  # pragma: no cover - enables non-HA unit tests
         SWITCH = "switch"
         SELECT = "select"
         NUMBER = "number"
+        BUTTON = "button"
 
 
 from .const import DOMAIN
@@ -54,6 +55,7 @@ PLATFORMS: list[Platform] = [
     Platform.SWITCH,
     Platform.SELECT,
     Platform.NUMBER,
+    Platform.BUTTON,
 ]
 
 # Entities earlier versions created that nothing reads or sets any more, by platform and key. A key
@@ -170,6 +172,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await async_setup_dosing(hass, entry)
     except Exception as err:  # pragma: no cover - never block setup on the dosing store
         _LOGGER.warning("Dosing unavailable: %s", err)
+
+    # Tests from the dashboard: a zone's test shot.
+    from .selftest import async_setup_selftest
+
+    await async_setup_selftest(hass)
 
     _remove_retired_entities(hass, entry)
     _hide_retired_switches(hass, entry)
@@ -358,6 +365,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ]
     if not others_loaded:
         await async_unload_services(hass)
+        from .selftest import async_unload_selftest
+
+        await async_unload_selftest(hass)
         from .setup_panel import async_unload_panel
 
         async_unload_panel(hass)

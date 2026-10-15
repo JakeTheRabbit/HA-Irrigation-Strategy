@@ -47,6 +47,7 @@ CHANGES = {
     "setup_create": {},
     "setup_save": {},
     "setup_remove": {},
+    "test_shot": {"room_id": ROOM, "zone": 1},
 }
 READS = {
     "strategy_get": {"room_id": ROOM},
