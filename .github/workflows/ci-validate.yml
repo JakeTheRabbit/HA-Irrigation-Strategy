@@ -106,7 +106,7 @@ jobs:
           # since hacs/integration#5128 (February 2026).
 
   addon-build:
-    name: Build controller add-on image (amd64)
+    name: Build f2-control add-on image (amd64)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
