@@ -516,7 +516,7 @@ _PARAM_BOUNDS = {
     "p0_max_wait_min": (5.0, 240.0), "p3_emergency_shot": (0.5, 15.0),
     "max_daily_volume": (10.0, 2000.0), "min_daily_volume": (0.0, 500.0),
     "drown_ceiling": (50.0, 100.0), "min_floor_finish_h": (0.0, 12.0),
-    "p2_time_between_min": (0.0, 120.0),
+    "p2_time_between_min": (0.0, 120.0), "p2_min_interval_min": (1.0, 120.0),
 }
 
 
