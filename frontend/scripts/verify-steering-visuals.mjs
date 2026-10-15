@@ -354,7 +354,7 @@ try {
         .getByRole("button", { name: "Compare runs", exact: true })
         .click();
       await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
-      await page.locator('details[data-section="chart"] > summary').click();
+      await page.getByRole("button", { name: "Overlay", exact: true }).click();
       await page.getByRole("img", { name: /Recorded VWC and EC/ }).waitFor();
       await page
         .getByLabel("Previous run", { exact: true })
@@ -431,6 +431,14 @@ try {
       await noOverflow();
       await axe("mobile run comparison");
       await page.screenshot({ path: out + "visual-mobile-comparison.png", fullPage: true });
+      // The overlay view fits a phone as well.
+      await page.getByRole("button", { name: "Overlay", exact: true }).click();
+      await page
+        .getByText("Loading selected-zone Recorder history…", { exact: true })
+        .waitFor({ state: "hidden" });
+      assert.equal(await page.locator(".run-weeks").isVisible(), false);
+      await noOverflow();
+      await axe("mobile run comparison, overlay");
       await page.setViewportSize({ width: 1600, height: 1100 });
     },
   );

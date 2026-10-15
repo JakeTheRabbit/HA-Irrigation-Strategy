@@ -216,8 +216,8 @@ try {
         window.location.hash = "#/compare";
       });
       await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
-      // The full-resolution chart is one tap down, under the weekly comparison.
-      await page.locator('details[data-section="chart"] > summary').click();
+      // The full-resolution chart is the Overlay view, one toggle from the weekly comparison.
+      await page.getByRole("button", { name: "Overlay", exact: true }).click();
       await page.waitForFunction(() =>
         document
           .querySelector('[aria-label="Current run"]')
