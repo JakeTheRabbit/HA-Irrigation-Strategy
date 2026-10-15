@@ -29,7 +29,7 @@ either gets it once.
 | `watering` | Watering stopped | CS-202 to CS-208, CS-602, and **CS-209** (new: no watering for a while) |
 | `phases` | Phase changes | A zone moving P0 → P1 → P2 → P3 (new event, no card) |
 | `stock` | Stock tanks | CS-608, CS-807 |
-| `dosing` | Dosing | CS-801 to CS-806 |
+| `dosing` | Dosing | CS-801 to CS-806, CS-808 |
 | `jev` | Jev | CS-501, CS-702, CS-705, CS-706, CS-707, CS-404, and Jev moving a setting (new event, no card) |
 | `setup` | Setup and settings | CS-201, CS-401 to CS-405 (except 404), CS-601, CS-605, CS-606, CS-607 |
 

@@ -56,7 +56,7 @@ def test_the_table_is_the_contracts():
         "CS-701",
     }
     assert set(_kind("stock")) == {"CS-608", "CS-807"}
-    assert set(_kind("dosing")) == {f"CS-80{n}" for n in range(1, 7)}
+    assert set(_kind("dosing")) == {f"CS-80{n}" for n in range(1, 7)} | {"CS-808"}
     assert "CS-404" not in _kind("setup") and "CS-404" in _kind("jev")
     for kind in catalog.serial():
         assert set(kind) == {"id", "name", "detail", "codes", "events"}
