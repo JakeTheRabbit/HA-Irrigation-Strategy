@@ -4485,6 +4485,8 @@ class Controller:
                     {
                         "engine": PRODUCT,
                         "controller_version": CONTROLLER_VERSION,
+                        "controller_instance": self.instance_id,  # ours: not another controller's write
+                        "controller_runtime": "container" if _GATE.container else "addon",
                         "stopped_at": now.isoformat(),
                         "last_beat": now.isoformat(),
                         "enable_flag": room_gate(room),
