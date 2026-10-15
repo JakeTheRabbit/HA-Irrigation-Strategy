@@ -350,6 +350,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data["enable_flag"] = (
                     f"switch.crop_steering_{data['room_prefix']}engine_enabled"
                 )
+                data["max_run_latch"] = True  # its max-run latch switch starts ON
                 blockers = safety_blockers(self.hass, proposed=data)
                 if blockers:
                     raise ValueError("; ".join(blockers))
@@ -691,6 +692,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data["enable_flag"] = (
             f"switch.crop_steering_{data['room_prefix']}engine_enabled"
         )
+        data["max_run_latch"] = True  # its max-run latch switch starts ON
         if user_input.get("plumbing"):
             data["plumbing"] = user_input["plumbing"]
         try:

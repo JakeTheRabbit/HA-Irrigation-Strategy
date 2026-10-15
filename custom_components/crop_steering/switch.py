@@ -38,6 +38,14 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="Auto Setpoints (supervisor rewrites zone targets)",
         icon="mdi:auto-fix",
     ),
+    # ON: a zone whose shots keep running into the room's longest allowed shot is stopped until
+    # someone resets it in Settings -> Repairs (CS-312). OFF: the same run is only reported. ON for
+    # a room the wizard sets up (it marks the entry), OFF for every room set up before the latch.
+    SwitchEntityDescription(
+        key="max_run_latch",
+        name="Max-Run Latch (stop a zone that keeps hitting its longest shot)",
+        icon="mdi:timer-lock",
+    ),
     SwitchEntityDescription(
         key="ec_stacking_enabled",
         name="EC Stacking Enabled",
@@ -169,8 +177,13 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
             self._attr_is_on = True  # Auto irrigation enabled by default
         elif "zone_" in description.key and "_enabled" in description.key:
             self._attr_is_on = True  # Zones enabled by default
+        elif description.key == "max_run_latch":
+            self._attr_is_on = (entry.data or {}).get("max_run_latch") is True
         else:
             self._attr_is_on = False
+        # Max-run latch only: how many times Settings -> Repairs has reset it. The controller
+        # releases a zone it latched once this number moves.
+        self._resets = 0
 
     async def async_added_to_hass(self) -> None:
         """Restore state when added to hass."""
@@ -184,6 +197,13 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
             last_state = None
         if last_state is not None:
             self._attr_is_on = last_state.state == "on"
+        if self.entity_description.key == "max_run_latch":
+            resets = last_state.attributes.get("resets") if last_state else None
+            if type(resets) is int and resets >= 0:
+                self._resets = resets
+            self.hass.data.setdefault(DOMAIN, {}).setdefault("_max_run_latch", {})[
+                self._entry.entry_id
+            ] = self
         if not self._is_manual_override:
             return
         self._override_loaded = True
@@ -258,8 +278,17 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
         else:
             await self.async_turn_off()
 
+    @callback
+    def reset_latch(self) -> None:
+        """Release every zone of this room the controller has latched (the Repairs fix)."""
+        self._resets += 1
+        self.async_write_ha_state()
+
     async def async_will_remove_from_hass(self) -> None:
         """Stop callbacks while leaving the saved deadline available to RestoreEntity."""
+        latches = self.hass.data.get(DOMAIN, {}).get("_max_run_latch", {})
+        if latches.get(self._entry.entry_id) is self:
+            latches.pop(self._entry.entry_id)
         self._override_loaded = False
         self._cancel_override_timer()
         registry = self.hass.data.get(DOMAIN, {}).get("_manual_overrides", {})
@@ -269,6 +298,8 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
 
     @property
     def extra_state_attributes(self):
+        if self.entity_description.key == "max_run_latch":
+            return {"resets": self._resets}
         if not self._is_manual_override:
             return {}
         return {

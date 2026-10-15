@@ -106,6 +106,7 @@ REPAIRS = {
     "zone_no_sensor": "CS-603",
     "fused_sensor_unavailable": "CS-604",
     "entities_moved": "CS-605",
+    "max_run_latch": "CS-312",
     "strategy_hold": "CS-606",
     "strategy_degraded": "CS-607",
     "stock_low": "CS-608",

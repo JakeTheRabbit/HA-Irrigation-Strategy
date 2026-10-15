@@ -470,6 +470,26 @@
       ]
     },
     {
+      "code": "CS-312",
+      "title": "A zone keeps hitting its longest allowed shot",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "A zone's last 3 shots in a row all wanted to run longer than the room's maximum shot length, so each was cut to it. One cut shot is CS-306; three in a row means the zone keeps asking for more water than one shot may give, which is what a probe stuck dry, or a pot size or dripper flow set wrong, looks like. The card names the zones.",
+      "watering": "With the room's max-run latch switch ON (it starts ON in a room set up since the switch was added), the zone gets no more shots, the rescue shots included, until the card is fixed: open it in Settings → Repairs and confirm. With the switch OFF (how a room set up before it starts), nothing is held: the card only tells you, and it clears itself after the zone's next shot that is not cut.",
+      "causes": [
+        "The zone's moisture probe reads dry when the slab is not (stuck, unplugged from the slab, or out of the substrate), so every shot is sized for a dry slab.",
+        "The zone's pot size, plant count, drippers per plant or dripper flow is set wrong, so its shots are worked out far longer than they should be.",
+        "Drippers are blocked, so the water goes in slower than the dripper flow says.",
+        "The room's maximum shot length is set shorter than this zone's normal shots really need."
+      ],
+      "fixes": [
+        "Look at the zone: is the slab wet or dry, is the probe seated in it, are the drippers running?",
+        "Check the zone's pot size, plant count, drippers per plant and dripper flow in Rooms & setup.",
+        "If all of that is right, raise the room's maximum shot length.",
+        "Then fix the card (open it and confirm) to water the zone again. To have a room report this without stopping the zone, turn its max-run latch switch off; turn it on to have it stop."
+      ]
+    },
+    {
       "code": "CS-401",
       "title": "Setting outside the engine's range",
       "source": "notification",

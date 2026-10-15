@@ -839,6 +839,21 @@
       "title": "Crop Steering: {count} setting(s) are not where the controller looks for them (CS-605)",
       "description": "The controller finds each setting by its exact entity id, and these are somewhere else, so it is running on its built-in defaults for them (daily water cap and plant count included):\n\n{entities}\n\nKeep the engine off until this is fixed. If you changed an entity id yourself, change it back: Settings → Devices & services → Entities → the entity → the cog → Entity ID. If nearly every entity is listed, the room was created while Home Assistant was still running an older version of this integration: delete the Crop Steering entry, restart Home Assistant, and add it again. Nothing is renamed for you, because an id you chose on purpose is yours to keep.\n\nCode CS-605. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
+    "max_run_latch": {
+      "title": "Crop Steering: a zone keeps hitting its longest allowed shot (CS-312)",
+      "description": "The last shots of zone(s) {zones} all wanted to run longer than the room's maximum shot length and were cut to it. A probe stuck dry, or a pot size or dripper flow set wrong, can keep a zone asking for long shots all day. {what}\n\nCheck the zone's probe, its pot size and its dripper flow; if they are right, raise the room's maximum shot length.\n\nCode CS-312. What it means and what to do: Crop Steering → Help & tools → Error codes.",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Water these zones again",
+            "description": "Zone(s) {zones} start watering again at the controller's next pass. Do this once the cause is found: if they keep hitting the longest allowed shot, they are stopped again."
+          }
+        },
+        "abort": {
+          "room_not_loaded": "This room is not loaded right now. Reload the Crop Steering integration, then try again."
+        }
+      }
+    },
     "stock_low": {
       "title": "Crop Steering: {count} stock tank(s) running low (CS-608)",
       "description": "These stock tanks are at or below their low mark:\n\n{tanks}\n\nRefill them, then open Crop Steering → Stock tanks and press Refilled, or set the level you read off the tank. Each batch tank the room makes takes its dose from every stock tank; this card clears itself once every tank is above its low mark.\n\nCode CS-608. What it means and what to do: Crop Steering → Help & tools → Error codes."

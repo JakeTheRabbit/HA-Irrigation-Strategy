@@ -29,6 +29,7 @@ ISSUE_IDS = (
     "strategy_hold",
     "strategy_degraded",
     "entities_moved",
+    "max_run_latch",
     # Raised and cleared by stock_api.py, not by the checks here; listed so every card this
     # integration can show is in one place.
     "stock_low",
@@ -51,14 +52,16 @@ def clear_all(hass: HomeAssistant, slug: str = "default") -> None:
         ir.async_delete_issue(hass, DOMAIN, _iid(base, slug))
 
 
-def _issue(hass, present, issue_id, severity, placeholders=None):
-    """Create the issue when `present` is True, otherwise clear it."""
+def _issue(hass, present, issue_id, severity, placeholders=None, fix=None):
+    """Create the issue when `present` is True, otherwise clear it. `fix`: the data its
+    fix flow gets (repairs.py); without it the card has no Fix button."""
     if present:
         ir.async_create_issue(
             hass,
             DOMAIN,
             issue_id,
-            is_fixable=False,
+            data=fix,
+            is_fixable=fix is not None,
             severity=severity,
             translation_key=_base_key(issue_id),
             translation_placeholders=placeholders or {},
@@ -188,6 +191,45 @@ def _check_moved(hass: HomeAssistant, entry: ConfigEntry, slug: str) -> None:
     )
 
 
+def _check_max_run(hass, entry, prefix, slug, heartbeat):
+    """CS-312: zones whose last shots all ran into the room's longest allowed shot, as the
+    controller reports them on its heartbeat. A zone it latched (the room's max-run latch switch
+    is ON) is stopped until this card is fixed; otherwise the card only reports. A latched zone
+    whose reset the controller has not seen yet is left off the card."""
+    beat = (getattr(heartbeat, "attributes", {}) or {}) if heartbeat is not None else {}
+    zones = beat.get("max_run") if isinstance(beat.get("max_run"), dict) else {}
+    switch = hass.states.get(f"switch.{DOMAIN}_{prefix}max_run_latch")
+    resets = (getattr(switch, "attributes", {}) or {}).get("resets", 0)
+    latched, capped = [], []
+    for zone, row in sorted(zones.items()):
+        if not isinstance(row, dict):
+            continue
+        if row.get("latched"):
+            if row.get("resets") == resets:
+                latched.append(str(zone))
+        else:
+            capped.append(str(zone))
+    if latched:
+        what = (
+            "The controller has stopped watering zone(s) "
+            + ", ".join(latched)
+            + " until this card is fixed: open it and confirm."
+        )
+    else:
+        what = (
+            "Nothing has been stopped: the room's max-run latch switch is off, so the zones "
+            "keep watering."
+        )
+    _issue(
+        hass,
+        bool(latched or capped),
+        _iid("max_run_latch", slug),
+        ir.IssueSeverity.ERROR if latched else ir.IssueSeverity.WARNING,
+        {"zones": ", ".join(latched or capped), "what": what},
+        fix={"entry_id": entry.entry_id} if latched else None,
+    )
+
+
 def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Evaluate one room's setup health and create/clear its Repairs issues."""
     try:
@@ -260,6 +302,8 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
             ir.IssueSeverity.WARNING,
             {"zones": ", ".join(dead)},
         )
+
+        _check_max_run(hass, entry, prefix, slug, None if offline else hb)
 
         # Every hold of the room's grow-strategy plan, and a plan running on its last snapshot.
         plan = hass.states.get(f"sensor.{DOMAIN}_{prefix}strategy_plan")
