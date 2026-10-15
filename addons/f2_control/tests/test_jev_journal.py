@@ -92,7 +92,7 @@ def _published(tmp_path, entries=0, reason="x"):
                            "title": "Pore EC", "kind": "decision", "verdict": "below band vegetative",
                            "p": 0.72, "agreed": True, "action": "hold the EC steer", "result": "acted",
                            "reason": reason})
-    c = SimpleNamespace(jev=brain, _jev_read=lambda e: "2026-08-22")
+    c = SimpleNamespace(jev=brain, _jev_read=lambda e: "2026-08-22", _no_touch_until=lambda room, now: None)
     room = SimpleNamespace(slug="default", prefix="", zones={1: {}, 2: {}, 3: {}})
     out = {}
     jev_bridge.publish(c, room, K.NOW, lambda eid, state, attrs: out.__setitem__(eid, (state, attrs)))

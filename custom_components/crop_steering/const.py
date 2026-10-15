@@ -74,6 +74,9 @@ WATER_TODAY_VIEWS = ["Zone total", "Per plant"]
 # room drains freely, and matches "free_drain" by this id. Unknown, the first, is every room that has
 # not said, which is watched as before.
 DRAINAGE_TYPES = ["unknown", "flood_table", "free_drain"]
+# A room's no-touch window: Off, or how long the AI assistant asks nothing and changes nothing there
+# (an operator sampling or visiting). The controller matches these words and sets Off when it ends.
+NO_TOUCH_OPTIONS = ["Off", "1 h", "Until lights-on", "24 h"]
 STEERING_MODES = ["Vegetative", "Generative"]
 # What the room grows in, published in its descriptor for the controller. "generic" (the default,
 # and what every upgraded room reads) changes nothing; the ids match the doctrine pack's substrates.
