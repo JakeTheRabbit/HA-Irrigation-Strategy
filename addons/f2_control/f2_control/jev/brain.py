@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 
 from . import council
 from . import journal as jn
-from .envelope import admit
+from .envelope import admit, cools_down
 
 ACTING_KINDS = ("advance", "distrust", "ec_mode", "setpoint")  # what dry run journals instead of returning
 
@@ -166,6 +166,9 @@ class Brain:
         if not ok:
             if new:
                 self._note(ctx, judge, st, d, "refused", why)
+                if d.kind == "setpoint" and cools_down(why):  # the notch budget's cool-down starts here
+                    self.ledger.record(judge.name, ctx.room, ctx.zone, _label(d), "refused", evidence={"why": why},
+                                       at=ctx.now)
             return None
         if self.dry_run and d.kind in ACTING_KINDS:
             st.last = self._shown(st, d, f"would act (advising only): {why}")
@@ -224,7 +227,7 @@ class Brain:
             result = judge.outcome(entry, ctx) if judge else ("judge no longer runs", False)
             if result is not None:
                 was = self.ledger.strict(entry["judge"], ctx.room, ctx.zone, after=self.strict_after)
-                self.ledger.resolve(entry["id"], result[0], result[1])
+                self.ledger.resolve(entry["id"], result[0], result[1], at=ctx.now)
                 if not was and self.ledger.strict(entry["judge"], ctx.room, ctx.zone, after=self.strict_after):
                     self.events.append(("strict", ctx.room, ctx.zone, entry["judge"]))
                 if self.journal is not None:

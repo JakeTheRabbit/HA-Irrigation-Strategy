@@ -19,6 +19,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from ..doctrine import doctrine
+from ..envelope import notch_budget
 from .base import Judge, choice, common, with_doctrine
 from .zones import water_vs_room
 
@@ -101,6 +102,8 @@ class SetpointsJudge(Judge):
         sp = ctx.setpoints or {}
         if not sp.get("enabled") or sp.get("frozen") or sp.get("changed_today") or not sp.get("current"):
             return False
+        if all(notch_budget(sp, suffix, ctx.now) for suffix in sp["current"]):
+            return False  # nothing it could pick would be admitted: no ask
         if ctx.lights_on or ctx.since_lights_min > 180:  # the first three hours of the night
             return False
         return super().due(ctx, last_asked)
