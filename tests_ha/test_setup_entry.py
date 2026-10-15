@@ -87,8 +87,8 @@ async def test_the_lights_hours_the_wizard_asked_for_are_the_ones_that_run(hass)
     the grow-day, the P3->P0 reset and the overnight dry-back all ran on the wrong clock."""
     entry = await _install(hass, {"lights_on_hour": 6, "lights_off_hour": 22})
     assert entry.data["parameters"]["lights_on_hour"] == 6
-    assert float(hass.states.get("number.crop_steering_lights_on_hour").state) == 6
-    assert float(hass.states.get("number.crop_steering_lights_off_hour").state) == 22
+    assert float(hass.states.get("number.crop_steering_tent_lights_on_hour").state) == 6
+    assert float(hass.states.get("number.crop_steering_tent_lights_off_hour").state) == 22
 
 
 async def test_the_sizing_the_wizard_accepted_is_a_value_the_entity_can_hold(hass):
@@ -96,8 +96,8 @@ async def test_the_sizing_the_wizard_accepted_is_a_value_the_entity_can_hold(has
     1-6, so a 0.65 L rockwool cube could be set up and then never adjusted."""
     await _install(hass)
     for entity_id, value in (
-        ("number.crop_steering_substrate_volume", 0.65),
-        ("number.crop_steering_drippers_per_plant", 12),
+        ("number.crop_steering_tent_substrate_volume", 0.65),
+        ("number.crop_steering_tent_drippers_per_plant", 12),
     ):
         await hass.services.async_call(
             "number", "set_value", {"entity_id": entity_id, "value": value}, blocking=True

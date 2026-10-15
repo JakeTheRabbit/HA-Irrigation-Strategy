@@ -12,7 +12,8 @@ from test_real_flow import VALVE
 from test_setup_entry import _install
 from test_upgrade_in_place import _upgrade
 
-TARGET = "number.crop_steering_p1_target_vwc"
+PREFIX = "tent_"  # every new room has a slug: the wizard's "Tent". An upgraded room may have ""
+TARGET = f"number.crop_steering_{PREFIX}p1_target_vwc"
 
 
 async def _open(hass, entry, step):
@@ -51,7 +52,7 @@ async def test_editing_a_parameter_changes_what_the_engine_reads(hass):
 
     assert entry.data["parameters"]["p1_target_vwc"] == 61.0  # it always got this far...
     assert float(hass.states.get(TARGET).state) == 61.0  # ...and never this far
-    assert float(hass.states.get("number.crop_steering_p2_vwc_threshold").state) == 55.0
+    assert float(hass.states.get(f"number.crop_steering_{PREFIX}p2_vwc_threshold").state) == 55.0
 
 
 async def test_the_form_opens_on_the_live_value_not_the_one_recorded_at_setup(hass):
@@ -82,18 +83,17 @@ async def test_an_edit_made_while_a_switch_is_on_is_refused_and_nothing_is_writt
 # threshold of 5-85 %, the form still demanded at least 30 and 25. A room steering at P1 20 / P2 15
 # (dry-rooted crops, coarse substrates) could not submit the form at all, not even unchanged, and
 # not to edit the pot size either. (Review finding on JakeTheRabbit/HA-Irrigation-Strategy#47.)
-FIELDS = {
-    "substrate_volume": "number.crop_steering_substrate_volume",
-    "dripper_flow_rate": "number.crop_steering_dripper_flow_rate",
-    "p1_target_vwc": TARGET,
-    "p2_vwc_threshold": "number.crop_steering_p2_vwc_threshold",
-}
+def _fields(prefix=PREFIX):
+    return {key: f"number.crop_steering_{prefix}{key}" for key in EDIT}
 
 
-async def _set(hass, values):
+FIELDS = _fields()
+
+
+async def _set(hass, values, prefix=PREFIX):
     for key, value in values.items():
         await hass.services.async_call(
-            "number", "set_value", {"entity_id": FIELDS[key], "value": value}, blocking=True
+            "number", "set_value", {"entity_id": _fields(prefix)[key], "value": value}, blocking=True
         )
 
 
@@ -164,7 +164,7 @@ async def test_an_upgraded_room_tuned_low_can_use_the_form_and_nothing_else_move
     """In-place upgrade: the same form on rooms as OLD versions left them (tests_ha/fixtures)."""
     hass.states.async_set("input_boolean.f2_control_enabled", "off")  # an env-era room's kill switch
     entry, seed = await _upgrade(hass, name)
-    await _set(hass, {"p1_target_vwc": 20.0, "p2_vwc_threshold": 15.0})
+    await _set(hass, {"p1_target_vwc": 20.0, "p2_vwc_threshold": 15.0}, prefix="")
     before = _numbers(hass)
     flow = await _open(hass, entry, "edit_parameters")
     done = await hass.config_entries.options.async_configure(flow["flow_id"], _shown(flow))
@@ -256,18 +256,19 @@ async def test_clearing_the_pump_of_a_room_that_says_it_has_one_is_refused_in_th
 # The controller reads the lights hours from these two numbers every loop. The zones-and-hardware
 # form showed, and saved, the hours recorded at setup, which only seed them once: a room ran its
 # lights 20-7 while this form said 7-20, and saving 7-20 here changed nothing the controller read.
-LIGHTS = ("number.crop_steering_lights_on_hour", "number.crop_steering_lights_off_hour")
+def _lights_ids(prefix=PREFIX):
+    return (f"number.crop_steering_{prefix}lights_on_hour", f"number.crop_steering_{prefix}lights_off_hour")
 
 
-async def _set_lights(hass, on, off):
-    for entity_id, hour in zip(LIGHTS, (on, off)):
+async def _set_lights(hass, on, off, prefix=PREFIX):
+    for entity_id, hour in zip(_lights_ids(prefix), (on, off)):
         await hass.services.async_call(
             "number", "set_value", {"entity_id": entity_id, "value": hour}, blocking=True
         )
 
 
-def _lights(hass):
-    return tuple(float(hass.states.get(entity_id).state) for entity_id in LIGHTS)
+def _lights(hass, prefix=PREFIX):
+    return tuple(float(hass.states.get(entity_id).state) for entity_id in _lights_ids(prefix))
 
 
 async def test_the_lights_hours_open_on_the_live_ones_and_a_save_reaches_the_controller(hass):
@@ -298,13 +299,13 @@ async def test_an_upgraded_room_keeps_its_lights_hours_until_configure_changes_t
     ec = hass.states.get("sensor.veg_ec_template")
     if ec is not None:  # the env-era room's EC template reports no unit, which the form refuses
         hass.states.async_set(ec.entity_id, ec.state, {**ec.attributes, "unit_of_measurement": "mS/cm"})
-    await _set_lights(hass, 20, 7)
+    await _set_lights(hass, 20, 7, prefix="")
     zones = int(entry.data["num_zones"])
     flow = await _save_map(hass, entry, zones=zones)
     assert (_shown(flow)["lights_on_hour"], _shown(flow)["lights_off_hour"]) == (20, 7)
-    assert _lights(hass) == (20.0, 7.0)  # an untouched save leaves them where they are
+    assert _lights(hass, prefix="") == (20.0, 7.0)  # an untouched save leaves them where they are
     await _save_map(hass, entry, zones=zones, lights_on_hour=7, lights_off_hour=20)
-    assert _lights(hass) == (7.0, 20.0)
+    assert _lights(hass, prefix="") == (7.0, 20.0)
 
 
 # ------------------------------------------------------------------ messages

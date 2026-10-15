@@ -130,6 +130,18 @@ export function descriptor(states: States, room: Room): EntityState | undefined 
       e.attributes.prefix === room.prefix,
   );
 }
+/** The slug a new room's entity ids get from its name, made as the integration makes it: every
+ * new room has one, so its ids read crop_steering_<slug>_... Only a room from an older install
+ * keeps un-prefixed ids, and "default" is reserved for it. */
+export function roomSlug(name: string): string {
+  return (
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "room"
+  );
+}
 export function discoverRooms(states: States): Room[] {
   const rooms: Room[] = [];
   for (const entity of Object.values(states)) {

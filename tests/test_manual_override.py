@@ -229,6 +229,23 @@ def test_default_named_room_and_zone_timers_are_isolated(rig):
     assert not room_b_z2._attr_is_on
 
 
+def test_a_call_naming_no_room_reaches_the_only_room_when_it_has_a_slug(rig):
+    """Every new room has a slug, so a new install's one room is prefixed. A call that names no
+    room still means that room, as it did when the first room had no prefix."""
+    tent = rig.make("tent_")
+    rig.make("tent_", 2)
+    rig.request(timeout_minutes=5)
+    assert tent._attr_is_on
+
+
+def test_a_call_naming_no_room_is_refused_when_several_rooms_have_slugs(rig):
+    veg, flower = rig.make("veg_"), rig.make("flower_")
+    with pytest.raises(HomeAssistantError, match="name the room"):
+        rig.request(timeout_minutes=5)
+    assert not veg._attr_is_on and not flower._attr_is_on
+    assert not rig.hass.bus.events and not rig.hass.services.calls
+
+
 def test_service_rejects_unloaded_zone_without_a_success_event(rig):
     with pytest.raises(HomeAssistantError, match="not loaded"):
         rig.request()

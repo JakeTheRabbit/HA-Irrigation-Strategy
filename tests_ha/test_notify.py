@@ -323,7 +323,7 @@ async def test_the_low_stock_card_reaches_the_phone_that_ticks_stock_once(
     stock = await hass.services.async_call(
         DOMAIN,
         "stock_get",
-        {"room_id": "room:"},
+        {"room_id": "room:tent_"},
         blocking=True,
         return_response=True,
     )
@@ -331,7 +331,7 @@ async def test_the_low_stock_card_reaches_the_phone_that_ticks_stock_once(
         DOMAIN,
         "stock_save",
         {
-            "room_id": "room:",
+            "room_id": "room:tent_",
             "expected_revision": stock["revision"],
             "tanks": [
                 {"name": "Bloom", "capacity_l": 10, "level_l": 1, "low_l": 2, "dose_ml": 500}
@@ -342,24 +342,24 @@ async def test_the_low_stock_card_reaches_the_phone_that_ticks_stock_once(
         context=Context(user_id=hass_admin_user.id),
     )
     await hass.async_block_till_done()
-    assert ir.async_get(hass).async_get_issue(DOMAIN, "stock_low") is not None
+    assert ir.async_get(hass).async_get_issue(DOMAIN, "stock_low_tent") is not None
     push = received[STAFF_PHONE][-1]
     assert push["title"] == "Tent: 1 stock tank(s) running low (CS-608)"
     assert "- Bloom: 1 L of 10 L" in push["message"]
     assert push["message"].endswith(
         "Code CS-608. What it means and what to do: Crop Steering → Help & tools → Error codes."
     )
-    assert push["data"] == {"tag": "stock_low", **LINK}
+    assert push["data"] == {"tag": "stock_low_tent", **LINK}  # the card of the room that has the slug
     assert received[TABLET] == []  # not an emergency
 
     # Still raised, with new numbers: the card changes, the phone is not pushed again.
     stock = await hass.services.async_call(
-        DOMAIN, "stock_get", {"room_id": "room:"}, blocking=True, return_response=True
+        DOMAIN, "stock_get", {"room_id": "room:tent_"}, blocking=True, return_response=True
     )
     await hass.services.async_call(
         DOMAIN,
         "stock_record_batch",
-        {"room_id": "room:", "expected_revision": stock["revision"]},
+        {"room_id": "room:tent_", "expected_revision": stock["revision"]},
         blocking=True,
         return_response=True,
         context=Context(user_id=hass_admin_user.id),

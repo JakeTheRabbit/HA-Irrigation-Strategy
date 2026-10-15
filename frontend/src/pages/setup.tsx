@@ -31,6 +31,7 @@ import {
   useSizingUnits,
 } from "@/components/zone-sizing";
 import type { Controller } from "@/lib/types";
+import { roomSlug } from "@/lib/model";
 import { SIZING_UNITS, reviewValue, sizingError } from "@/lib/units";
 import {
   PLUMBING_HINTS,
@@ -335,6 +336,8 @@ export function Setup({
       errors.push(...plumbingErrors(plumbing, draft.hardware));
     }
     if (!draft.room_name.trim()) errors.push("Name the room.");
+    else if (isNew && roomSlug(draft.room_name) === "default")
+      errors.push("Default is reserved for the original room. Choose another room name.");
     if (!draft.zones.length) errors.push("Add a zone.");
     if (activeZones.some((z) => !z.name.trim() || !z.valve))
       errors.push("Every active zone needs a name and valve.");
@@ -395,12 +398,18 @@ export function Setup({
       setBusy(false);
     }
   }
-  const engineConfig = Object.values(controller.states).find(
-    (e) => e.entity_id.endsWith("engine_config") && e.attributes.prefix === draft?.prefix,
-  );
-  const heartbeat = Object.values(controller.states).find(
-    (e) => e.entity_id === "sensor.crop_steering_" + draft?.prefix + "ai_heartbeat",
-  );
+  // A new room has no prefix until it is created (it then gets its own slug), so it never
+  // borrows the descriptor or heartbeat of an older install's un-prefixed room.
+  const engineConfig = isNew
+    ? undefined
+    : Object.values(controller.states).find(
+        (e) => e.entity_id.endsWith("engine_config") && e.attributes.prefix === draft?.prefix,
+      );
+  const heartbeat = isNew
+    ? undefined
+    : Object.values(controller.states).find(
+        (e) => e.entity_id === "sensor.crop_steering_" + draft?.prefix + "ai_heartbeat",
+      );
   const confirmedRevision = Number(heartbeat?.attributes.setup_revision);
   const mappingConfirmed =
     !isNew && draft && Number.isFinite(confirmedRevision) && confirmedRevision >= draft.revision;
@@ -642,7 +651,7 @@ export function Setup({
                     <span className="mapping-label">Configuration</span>
                     <p>
                       {isNew
-                        ? "New namespace generated on creation"
+                        ? "Entity ids will start crop_steering_" + roomSlug(draft.room_name) + "_"
                         : "Revision " + draft.revision + " · " + (draft.prefix || "Default room")}
                     </p>
                     <Pill dot tone={engineConfig ? "on" : "warn"}>

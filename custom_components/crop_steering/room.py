@@ -1,9 +1,10 @@
 """Multi-room helpers.
 
-Each config entry is a *room*. The first/default room uses **no** entity prefix, so existing
-single-room installs are completely unchanged. Additional rooms namespace their
-entities as ``crop_steering_<slug>_*`` so rooms are fully isolated — own zones, sensors,
-hardware and setpoints, nothing shared.
+Each config entry is a *room*. Every room namespaces its entities as
+``crop_steering_<slug>_*`` so rooms are fully isolated — own zones, sensors, hardware and
+setpoints, nothing shared. Only a room created before every new room got a slug, or imported
+from a .env file (the default room), keeps **no** entity prefix, so those installs are
+completely unchanged.
 """
 
 from __future__ import annotations

@@ -15,9 +15,9 @@ from test_upgrade_in_place import _known_numbers, _upgrade
 from conftest import fixture
 
 DOMAIN = "crop_steering"
-PLANTS = "number.crop_steering_zone_1_plant_count"
-CAP = "number.crop_steering_zone_1_max_daily_volume"
-ROOM = "switch.crop_steering_room_active"
+PLANTS = "number.crop_steering_tent_zone_1_plant_count"
+CAP = "number.crop_steering_tent_zone_1_max_daily_volume"
+ROOM = "switch.crop_steering_tent_room_active"
 
 
 def _card(hass, slug="default"):
@@ -33,7 +33,7 @@ async def test_fresh_install_has_no_card(hass):
     entry = await _install(hass)
     assert health.moved_entities(hass, entry) == []
     health.run_health_check(hass, entry)
-    assert _card(hass) is None
+    assert _card(hass, "tent") is None
 
 
 async def test_a_setting_that_has_moved_is_named_with_where_it_should_be(hass):
@@ -42,7 +42,7 @@ async def test_a_setting_that_has_moved_is_named_with_where_it_should_be(hass):
     _move(hass, CAP, "number.gt1_crop_steering_zone_1_max_daily_volume")
     await hass.async_block_till_done()
     health.run_health_check(hass, entry)
-    card = _card(hass)
+    card = _card(hass, "tent")
     assert card is not None and card.severity is ir.IssueSeverity.WARNING
     assert card.translation_placeholders["count"] == "2"
     listed = card.translation_placeholders["entities"]
@@ -56,7 +56,7 @@ async def test_a_setting_that_has_moved_is_named_with_where_it_should_be(hass):
     _move(hass, "number.gt1_crop_steering_zone_1_max_daily_volume", CAP)
     await hass.async_block_till_done()
     health.run_health_check(hass, entry)
-    assert _card(hass) is None
+    assert _card(hass, "tent") is None
 
 
 async def test_it_is_shown_while_the_room_is_off_which_is_when_it_is_safest_to_find(
@@ -69,7 +69,7 @@ async def test_it_is_shown_while_the_room_is_off_which_is_when_it_is_safest_to_f
     _move(hass, PLANTS, "number.somewhere_else")
     await hass.async_block_till_done()
     health.run_health_check(hass, entry)
-    assert _card(hass) is not None
+    assert _card(hass, "tent") is not None
 
 
 async def test_a_long_list_is_cut_short_and_counted(hass):
@@ -83,14 +83,14 @@ async def test_a_long_list_is_cut_short_and_counted(hass):
         _move(hass, entity_id, f"number.stale_code_made_this_{index}")
     await hass.async_block_till_done()
     health.run_health_check(hass, entry)
-    placeholders = _card(hass).translation_placeholders
+    placeholders = _card(hass, "tent").translation_placeholders
     assert placeholders["count"] == "9" and "and 3 more" in placeholders["entities"]
 
 
 async def test_sensors_are_not_judged(hass):
     """The controller tolerates the fused sensors' legacy naming."""
     entry = await _install(hass)
-    _move(hass, "sensor.crop_steering_vwc_zone_1", "sensor.crop_steering_zone_1_vwc")
+    _move(hass, "sensor.crop_steering_tent_vwc_zone_1", "sensor.crop_steering_tent_zone_1_vwc")
     await hass.async_block_till_done()
     assert health.moved_entities(hass, entry) == []
 

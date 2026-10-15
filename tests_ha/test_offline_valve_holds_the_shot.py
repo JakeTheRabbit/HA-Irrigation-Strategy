@@ -7,7 +7,7 @@ maps the valve, a real Home Assistant says it is unavailable, and the real contr
 zone until it reads again, with nothing latched.
 """
 
-from conftest import switch_calls
+from conftest import switch_calls, room_of
 from test_real_flow import VALVE
 from test_recreated_room_controller import ARMED, KILL, _see
 from test_setup_entry import _install
@@ -18,7 +18,7 @@ async def test_a_zone_is_held_while_its_valve_is_offline_and_freed_when_it_reads
 ):
     await _install(hass)
     c, fake, _clock = controller_for({"enable_flag": KILL})
-    room = c.rooms[0]
+    room = room_of(c)
     assert room.hw["valves"] == {1: VALVE}
 
     hass.states.async_set(VALVE, "unavailable")

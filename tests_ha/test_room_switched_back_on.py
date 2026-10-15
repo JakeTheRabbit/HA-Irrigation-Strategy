@@ -8,10 +8,11 @@ here is the integration's own entity; only the controller's REST reads stand in 
 
 from datetime import datetime, timedelta
 
+from conftest import room_of
 from test_recreated_room_controller import _see
 from test_setup_entry import _install
 
-ROOM = "switch.crop_steering_room_active"
+ROOM = "switch.crop_steering_tent_room_active"
 
 
 class _Clock(datetime):
@@ -39,7 +40,7 @@ async def test_a_room_switched_off_and_on_again_carries_on_where_it_was(
 
     monkeypatch.setattr(controller, "datetime", _Clock)
     _Clock.current = _Clock(2026, 9, 25, 20, 50)  # the lights are on (the new room's 12:00 to 00:00)
-    room = c.rooms[0]
+    room = room_of(c)
     zone = next(iter(room.zones))
     room.state[zone].update(
         phase="P2", shots=4, daily_vol=12.0, last_daily_reset=_Clock.current.date()
