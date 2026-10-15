@@ -32,7 +32,7 @@ entities scale with your zone count, `N` = 1…zones).
 | `p0_dryback_drop_percent` | 2-40 | 15 | % | An old setting that stays for older rooms and recipes. The controller does not read this setting. The P0 dryback comes from the P0 extra dryback of each zone (`zone_N_p0_additional_dryback`, section 2). |
 | `p0_maximum_wait_time` | 30-600 | 120 | min | The longest time that the morning dryback (P0) lasts after lights-on. At this time, the zone goes to P1, also when the dryback is not complete. |
 
-### P1: ramp-up
+### P1: ramp
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
 | `p1_initial_shot_size` | 0.1-20 | 2 | % | The size of the first ramp shot, as a percentage of the substrate volume. Each later ramp shot adds the ramp shot increase to the shot before it. |
