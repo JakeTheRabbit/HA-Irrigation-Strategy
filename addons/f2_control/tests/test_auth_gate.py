@@ -275,8 +275,8 @@ def test_a_batch_refused_mid_fill_switches_its_hardware_off_once_and_keeps_its_r
     r.runner._refused = lambda: refused[0]
     r.clock.at(30, lambda: refused.__setitem__(0, True))  # the fill valve opened at about 2 s
     r.ask("batch")
-    with pytest.raises(dosing_runner._Refused):
-        r.runner.poll()
+    r.poll()  # the main loop steps the batch until the refusal ends it
+    assert r.runner._steps is None and not r.runner._recovered
     offs = [e for (s, e) in r.actions() if s == "turn_off"][4:]  # after the batch's own close step
     hardware = r.runner._dosing_hardware(r.runner._config(r.c.rooms[0]))
     assert sorted(offs) == sorted(hardware)  # one off each, no second round

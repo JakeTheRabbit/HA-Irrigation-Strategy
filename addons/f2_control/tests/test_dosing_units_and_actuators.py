@@ -102,13 +102,13 @@ def _everything(r, reads):
     r.runner._get = watch
     _batch(r, **OLD_DOMAINS)
     r.ask(ml=50)
-    r.runner.poll()
+    r.poll()
     r.behaviour["button.balance_start"] = "overrun"
     r.ask(ml=120)
-    r.runner.poll()
+    r.poll()
     r.behaviour.clear()
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     return _sent(r), r.status()[1]["history"]
 
 
@@ -173,7 +173,7 @@ def test_a_mix_plug_in_kw_reads_its_power_in_watts(rig):
     _batch(r, mix_min_w=30)
     r.watts = 0.05  # 50 W
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "finished" and "CS-805" not in r.codes()
 
 
@@ -183,7 +183,7 @@ def test_a_mix_plug_in_kw_below_the_minimum_still_fails_the_batch(rig):
     _batch(r, mix_min_w=30)
     r.watts = 0.02  # 20 W
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert "CS-805" in r.codes() and "(it reads 0.02 kW)" in r.alert("CS-805")["message"]
 
 
@@ -193,7 +193,7 @@ def test_a_flow_of_60_ml_per_minute_gives_one_second_per_ml(rig):
     r.behaviour["button.balance_start"] = "overrun"  # the motor runs until the clock stops it
     r.ask(ml=30)
     r.clock.at(31, lambda: r._halt(BALANCE))  # 30 mL at 1 mL/s, pressed at 1 s
-    r.runner.poll()
+    r.poll()
     status = r.status()[1]
     assert status["handled_result"] == "finished" and r.codes() == []
     assert status["pumps"]["balance"]["flow_ml_s"] == 1.0
@@ -207,7 +207,7 @@ def test_a_volume_number_in_litres_is_written_and_read_back_in_litres(rig):
     r.behaviour["button.balance_start"] = "overrun"
     r.ask(ml=100)
     r.clock.at(11, lambda: r._halt(BALANCE))  # 100 mL at 10 mL/s, pressed at 1 s
-    r.runner.poll()
+    r.poll()
     assert [d["value"] for _dom, svc, d in r.fake.calls if svc == "set_value"] == [0.1, 0.025]
     assert r.status()[1]["handled_result"] == "finished" and r.codes() == []
     assert r.fake.states["number.balance_volume"][0] == "0.025"
@@ -217,7 +217,7 @@ def test_a_volume_number_that_does_not_read_back_in_its_unit_is_refused(rig):
     r = rig({"number.balance_volume": ("0.025", {"unit_of_measurement": "L"})})
     r.config()  # the rig drops the unit on the write: the number reads 0.1 mL, not 100
     r.ask(ml=100)
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == (
         "refused: number.balance_volume did not read back 100 mL, so start was not pressed")
     assert ("press", "button.balance_start") not in r.actions()
@@ -246,7 +246,7 @@ def test_a_valve_fill_and_mix_valve_run_a_batch_opened_closed_and_read_back(rig)
     r = _valve_rig(rig)
     _batch(r, **VALVES)
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "finished" and r.codes() == []
     assert r.actions("valve.tank_fill", "valve.mix_valve") == [
         ("open_valve", "valve.tank_fill"),
@@ -263,7 +263,7 @@ def test_a_fill_valve_that_does_not_close_takes_the_stuck_hardware_path(rig, fil
     _batch(r, fill_valve=fill)
     r.stuck[fill] = 99
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     room = r.c.rooms[0]
     assert r.runner.holds(room) == f"dosing hardware still on: {fill}"
     assert f"{fill} did not read off after filling" in r.status()[1]["handled_result"]
@@ -311,13 +311,13 @@ def test_every_dosing_number_and_actuator_goes_through_the_tables(rig):
     r.set("sensor.mixer_power", "0")
     reads, calls = _spy(r)
     r.ask(ml=50)
-    r.runner.poll()
+    r.poll()
     r.behaviour["button.balance_start"] = "overrun"  # its power is switched off and read back
     r.ask(ml=120)
-    r.runner.poll()
+    r.poll()
     r.behaviour.clear()
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert [entry["result"] for entry in r.status()[1]["history"]] == ["finished", "ran past its time", "finished"]
     assert _bypasses(reads, calls) == []
     assert {entity for entity, _how in reads} == NUMBERS | ACTUATORS  # every one was read

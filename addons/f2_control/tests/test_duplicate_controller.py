@@ -261,6 +261,6 @@ def test_a_dose_running_when_the_other_controller_appears_runs_to_its_end(dosing
     # The other controller's beat lands while the dose runs (2 s in, between two of its reads).
     r.clock.at(2, lambda: (r.fake.set_state(BEAT, "healthy", {"controller_instance": "x"}),
                            r.c._guard_read(room)))
-    r.runner.poll()
+    r.poll()  # the main loop steps the dose to its end
     assert r.c.duplicate_hold(room)
     assert (r.status()[1]["handled"], r.status()[1]["handled_result"]) == (request["id"], "finished")

@@ -117,7 +117,7 @@ not the whole setup.
 
 - `notify` works out the push's kinds from `code` (the catalog) or `event`, then sends to every recipient
   that ticks one of them and whose `rooms` is empty or includes `room`, once per service. A push about no
-  room in particular (no `room`: the controller's dosing thread, its clock) goes to every recipient that
+  room in particular (no `room`: the controller's dosing as a whole, its clock) goes to every recipient that
   ticks one of its kinds. `urgent` (the controller sets it for critical codes) adds the high-priority data
   for a recipient with `urgent_high_priority`: Android
   `{"priority": "high", "channel": "Crop Steering urgent"}`, iOS

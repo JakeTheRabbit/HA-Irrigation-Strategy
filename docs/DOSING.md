@@ -118,8 +118,10 @@ back yet.
 
 ## Requests and the controller
 
-The controller runs one dosing thread for all rooms. Every 2 s it reads each room's
-`dosing_config`. A request is taken once (its `id` is remembered, in `dosing_state.json` so a
+Dosing runs on the controller's main loop, for all rooms, with no thread of its own: between two
+passes the loop wakes whenever dosing is due. Every 2 s it reads each room's `dosing_config`, and a
+dose or batch runs on to its next wait (a read of the pump, the fill, the mix, a pause) each time the
+loop wakes for it. While a shot runs, dosing waits for the shot to end. A request is taken once (its `id` is remembered, in `dosing_state.json` so a
 restart does not take it again, and published as `handled`). A room whose `dosing_config` can't be
 read has no request taken.
 
@@ -137,7 +139,7 @@ read has no request taken.
 - `dose`: one pump, `ml` mL, into the tank as it is.
 - `batch`: the batch sequence. Refused while `hold_entity` is already on (something else is
   dosing) or can't be read, or while the room has a latched hardware fault.
-- The thread does one thing at a time: while a dose or a batch runs, in any room, a `dose` or a
+- Dosing does one thing at a time: while a dose or a batch runs, in any room, a `dose` or a
   `batch` is refused (a `stop` is always acted on), and so is one for a room held by dosing hardware
   that does not read off ("refused: <entity> does not read off yet"). A request refused meanwhile
   keeps its own `handled_result`: the end of the running dose or batch never takes its place.
@@ -285,15 +287,14 @@ power, the fill valve, the mix pump, the mix valves; never `hold_entity`, which 
 else's) switched off and held the same way, as soon as its setup can be read. Every write of the file
 is atomic, and the file and its directory are synced.
 
-The dosing thread is watched: the controller's main loop checks it every loop, and one that has died
-is started again (whatever it had recorded is held and switched off as after a restart) with CS-806;
-one that has not gone round for 10 minutes raises CS-806 (once every 30 minutes).
+A dose or batch that stops with an error it does not settle itself is recovered as after a restart
+(whatever it had recorded is held and switched off; nothing is resumed), with CS-806.
 
 When the app is stopped (SIGTERM: an update, a restart), no dose, batch or dosing switch-on starts
-any more, and the dosing thread switches its own dose's or batch's hardware off; then the shot in
-flight is closed; then dosing waits for a switch-on already on its way to Home Assistant (5 s at
-most) and for its thread (3 s at most), and everything recorded is switched off again, each off with
-a 2 s timeout and without waiting to read it back. The record stays, and a batch's `hold_entity`
+any more; then the shot in flight is closed; then everything a dose or batch recorded is switched
+off, each off with a 2 s timeout and without waiting to read it back. The signal is handled on the
+main loop, so when it lands while a dosing switch-on is on its way to Home Assistant, the way out
+waits for that call to land (4 s at most) before it starts, and its offs come after it. The record stays, and a batch's `hold_entity`
 stays on, for the next start. The app's `timeout: 30` (`addons/f2_control/config.yaml`) has the
 Supervisor wait 30 s after SIGTERM, rather than its default 10, before it kills the container.
 

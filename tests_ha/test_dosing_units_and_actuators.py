@@ -45,6 +45,15 @@ def _firmware(c, fake, clock, monkeypatch):
     c.dosing._mono, c.dosing._sleep = clock.monotonic, sleep
 
 
+def _run(runner):
+    """What the controller's main loop does for dosing (Controller._sleep_for): the requests read now,
+    then a wake whenever the dose it took is due, until it has ended."""
+    runner.poll()
+    while runner._steps is not None:
+        runner._sleep(runner._due - runner._mono())
+        runner.step()
+
+
 def _commands(fake):
     return [
         [domain, service, data]
@@ -83,7 +92,7 @@ async def test_a_3_11_1_dosing_store_doses_with_the_calls_3_11_1_sent(
     c, fake, clock = controller_for()
     _firmware(c, fake, clock, monkeypatch)
     assert c.dosing.recover()
-    c.dosing.poll()
+    _run(c.dosing)
 
     assert _commands(fake) == [
         ["number", "set_value", {"entity_id": "number.doser_a_volume", "value": 22}],
@@ -105,6 +114,6 @@ async def test_a_3_8_tent_from_before_dosing_loads_with_none_and_sends_nothing(
     c, fake, clock = controller_for()
     _firmware(c, fake, clock, monkeypatch)
     assert c.dosing.recover()
-    c.dosing.poll()
+    _run(c.dosing)
     assert _commands(fake) == []
     assert c.dosing.holds(c.rooms[0]) is None
