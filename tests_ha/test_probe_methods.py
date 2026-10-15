@@ -126,7 +126,7 @@ async def test_the_controller_says_when_lowest_has_too_few_probes_and_steers_on_
     await _choose(hass, VWC_METHOD, "Lowest")
     await _read(hass, freezer, **{A: "40", B: "46"})
     c, fake, _clock = controller_for({"enable_flag": "switch.crop_steering_engine_enabled"})
-    assert c._read_sensor(c._fused_id("", "vwc", 1), lo=0, hi=100) == 43.0
+    assert c._read_sensor(c._fused_id("", "vwc", 1), "vwc") == 43.0
     c.loop_once(datetime(2026, 9, 21, 14, 0, 0))
     raised = [
         data["title"]

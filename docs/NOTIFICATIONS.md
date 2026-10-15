@@ -25,7 +25,7 @@ either gets it once.
 |---|---|---|
 | `emergency` | Emergencies | Every alert whose severity is critical in docs/error-codes.json (CS-201 to 204, 207, 301, 308, 310, 311, 402, 601, 606, 801) |
 | `hardware` | Hardware lockouts | CS-301 to CS-309 (a pump or valve that did not do what it was told, a hardware hold, a shot cut), CS-310 (moisture rising with no water: a table not draining), CS-311 (the sump pump has not run) and CS-701 (water isn't reaching a zone) |
-| `sensors` | Sensors and drift | CS-101 to CS-104, CS-502 (a zone's probes disagree), CS-603, CS-604, CS-703, CS-704 |
+| `sensors` | Sensors and drift | CS-101 to CS-104, CS-502 (a zone's probes disagree), CS-503 (a moisture probe set aside for its unit), CS-603, CS-604, CS-703, CS-704 |
 | `watering` | Watering stopped | CS-202 to CS-208, CS-602, and **CS-209** (new: no watering for a while) |
 | `phases` | Phase changes | A zone moving P0 → P1 → P2 → P3 (new event, no card) |
 | `stock` | Stock tanks | CS-608, CS-807 |

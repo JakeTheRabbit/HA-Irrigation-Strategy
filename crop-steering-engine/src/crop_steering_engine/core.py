@@ -92,6 +92,11 @@ class ZoneParams:
     #                                 the floor holds (never flood). 90 ~= unreachable in coco -> truly probe-blind.
     min_floor_finish_h: float = 3.0  # the min-daily floor is paced to be complete this many hours before lights-off,
     #                                  when the evening dryback (predictive P3) may start.
+    p3_time_between_min: float | None = None  # min minutes from the last shot to a P3 emergency shot, so a rescue
+    #                                  soaks down to the probe before moisture is judged again. Without it a zone
+    #                                  still reading under the rescue level got another rescue every pass (60 s)
+    #                                  until the water arrived. The gap counts from the last shot, so the first
+    #                                  rescue of a night still goes at once. 0 = off. None: as before (no gap).
 
 
 @dataclass
@@ -312,7 +317,8 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
                 fire, size, ir, kind = True, p.p2_shot_size * 1.5, f"P2 dilute EC {ec:.1f}", "p2_dilute"
             elif s.vwc < p2_thr:
                 fire, size, ir, kind = True, ec_adjust(p.p2_shot_size, ec, p.ec_target_p2), f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}", "p2_topup"
-    if not fire and phase == "P3" and s.vwc < p.p3_emergency_floor:
+    p3_gap = p.p3_time_between_min or 0.0
+    if not fire and phase == "P3" and s.vwc < p.p3_emergency_floor and s.minutes_since_shot >= p3_gap:
         fire, size, ir, kind = True, p.p3_emergency_shot, f"P3 emergency VWC {s.vwc:.0f}<{p.p3_emergency_floor:.0f}", "p3_emergency"
 
     # PRIORITY 3 — LIGHTS-ON WATERING WATCHDOG: backstop so no enabled zone ever starves. Never in P0: at
@@ -412,7 +418,9 @@ def waiting_for(s: ZoneSnapshot, p: ZoneParams) -> list:
                 add("p2_dilute", shot=True, metric="ec", op=">", value=p.ec_target_p2 * 1.2, now=ec)
         add("lights_off", to="P3", in_min=s.hours_to_lights_off * 60.0)
     elif s.phase == "P3":
-        add("p3_emergency", shot=True, metric="vwc", op="<", value=p.p3_emergency_floor, now=s.vwc)
+        p3_gap = p.p3_time_between_min or 0.0
+        add("p3_emergency", shot=True, metric="vwc", op="<", value=p.p3_emergency_floor, now=s.vwc,
+            in_min=p3_gap - s.minutes_since_shot if p3_gap > 0 else None)
         add("lights_on", to="P0", in_min=s.hours_to_lights_on * 60.0)
     return items
 

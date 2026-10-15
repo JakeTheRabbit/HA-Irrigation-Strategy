@@ -74,7 +74,7 @@ async def test_a_probe_going_offline_does_not_step_what_the_controller_reads(
 
     assert float((await _read(hass, freezer, **{A: "38"})).state) == 41.0
     c, _fake, _clock = controller_for()
-    assert c._read_sensor(c._fused_id("", "vwc", 1), lo=0, hi=100) == 41.0
+    assert c._read_sensor(c._fused_id("", "vwc", 1), "vwc") == 41.0
 
 
 async def test_a_probe_that_stops_reporting_is_set_aside_while_another_still_reports(

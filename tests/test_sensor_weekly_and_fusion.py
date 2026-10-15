@@ -333,6 +333,30 @@ def test_a_probe_that_stops_reporting_is_set_aside_without_stepping_the_zone():
     assert entity.extra_state_attributes["excluded"] == {"sensor.b": "not reporting"}
 
 
+def test_a_probe_set_aside_for_its_unit_is_named_with_that_unit():
+    """What the controller names in CS-503: the probe and its unit, not only that the zone is blind."""
+    states = {"sensor.a": _reported(1250, "mV", 1)}
+    entity = _zone(states, vwc_sensors=["sensor.a"])
+    assert entity._get_zone_vwc(1) is None
+    assert entity.extra_state_attributes["excluded"] == {
+        "sensor.a": "set aside for its unit"
+    }
+    assert entity.extra_state_attributes["unit_set_aside"] == {"sensor.a": "mV"}
+    states["sensor.a"] = _reported(45, "%", 0)  # its unit corrected: it counts again
+    assert entity._get_zone_vwc(1) == 45.0
+    assert "unit_set_aside" not in entity.extra_state_attributes
+
+
+def test_a_unitless_probe_out_of_range_is_excluded_as_out_of_range_as_before():
+    entity = _zone(
+        {"sensor.a": _reported(450, "", 1), "sensor.b": _reported(44, "%", 1)},
+        vwc_sensors=["sensor.a", "sensor.b"],
+    )
+    assert entity._get_zone_vwc(1) == 44.0
+    assert entity.extra_state_attributes["excluded"] == {"sensor.a": "out of range"}
+    assert "unit_set_aside" not in entity.extra_state_attributes
+
+
 def test_the_legacy_front_and_back_pair_is_still_a_zones_probes():
     entity = _zone(
         {"sensor.front": _probe(40, "%"), "sensor.back": _probe(46, "%")},
