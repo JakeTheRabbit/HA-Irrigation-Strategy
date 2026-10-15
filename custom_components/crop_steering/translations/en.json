@@ -884,6 +884,10 @@
         "batch": {
           "name": "Batch",
           "description": "The batch tank's fill, mixing and hold hardware, and the recipe."
+        },
+        "profile": {
+          "name": "Hardware profile",
+          "description": "This room's dosing times and limits: the wait for a shot in flight, the fill valve and mix pump read-backs, the full sensor silence, the lowest calibrated flow and the longest dose. Each one left out takes its default; with no profile the stored one is kept."
         }
       }
     },

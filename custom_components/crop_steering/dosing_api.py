@@ -39,6 +39,8 @@ def _valid(value) -> dict:
     data["pumps"], data["batch"] = dosing.clean(
         value.get("pumps", []), value.get("batch")
     )
+    # A setup stored before the hardware profile has none: it takes the defaults, today's timings.
+    data["profile"] = dosing.clean_profile(value.get("profile"))
     request = value.get("request")
     data["request"] = (
         request if isinstance(request, dict) and request.get("id") else None
@@ -123,13 +125,14 @@ class DosingStore:
 
     def sensor(self) -> tuple:
         """sensor.crop_steering_<prefix>dosing_config as (state, attributes): the setup's revision,
-        and its pumps, batch and request. Unknown while the stored setup cannot be read, so the
+        and its pumps, batch, hardware profile and request. Unknown while the stored setup cannot be read, so the
         controller acts on nothing it cannot read."""
         if self.error:
             return None, {"error": self.error}
         return self.data["revision"], {
             "pumps": deepcopy(self.data["pumps"]),
             "batch": deepcopy(self.data["batch"]),
+            "profile": deepcopy(self.data["profile"]),
             "request": deepcopy(self.data["request"]),
         }
 
@@ -148,6 +151,10 @@ class DosingStore:
                     self._exists,
                     self._stock_tanks(),
                 )
+                # A save that sends no profile keeps the stored one.
+                profile = dosing.clean_profile(
+                    data.get("profile", self.data["profile"])
+                )
             except dosing.DosingError as error:
                 return self.response(str(error), can_edit)
             draft = deepcopy(self.data)
@@ -155,6 +162,7 @@ class DosingStore:
                 revision=self.data["revision"] + 1,
                 pumps=pumps,
                 batch=batch,
+                profile=profile,
                 updated_at=_now().isoformat(),
             )
             await self._commit(draft)
@@ -278,6 +286,7 @@ async def async_setup_dosing(hass, entry):
             vol.Required("expected_revision"): vol.All(int, vol.Range(min=0)),
             vol.Required("pumps"): list,
             vol.Required("batch"): dict,
+            vol.Optional("profile"): dict,
         },
         "dosing_request": {
             vol.Required("room_id"): str,
