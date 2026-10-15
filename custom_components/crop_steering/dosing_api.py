@@ -141,10 +141,15 @@ class DosingStore:
                 return self.response("revision", can_edit)
             if self.pending() or self.running():
                 return self.response("busy", can_edit)
+            batch = data.get("batch")
+            # A page that does not send the refill reminder keeps the stored one.
+            if isinstance(batch, dict):
+                kept = {key: self.data["batch"][key] for key in dosing.REMINDER}
+                batch = {**kept, **batch}
             try:
                 pumps, batch = dosing.clean(
                     data.get("pumps"),
-                    data.get("batch"),
+                    batch,
                     self._exists,
                     self._stock_tanks(),
                 )

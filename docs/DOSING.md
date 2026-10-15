@@ -58,6 +58,8 @@ pump name or recipe is assumed.
     "close_entities": ["switch.x"],    // 0..16 switch.*, switched off before filling (another room's feed path)
     "hold_entity": "input_boolean.x",  // input_boolean.* | null   on for the whole batch, for other automations
     "filled_at_entity": "input_datetime.x", // input_datetime.* | null   stamped with the end time of a finished batch
+    "level_entity": "sensor.x",        // sensor.* | number.* | input_number.* | null   the tank's level, in %
+    "remind_pct": 20,                  // 0..100; 0 = no refill reminder; needs level_entity
     "recipe": [                        // dose order = list order; each pump at most once
       {"pump": "balance", "ml": 300, "ml_entity": null} // ml_entity (number.*|input_number.*|sensor.*) is read
                                                         // at batch start and wins over ml; 0 skips the pump
@@ -71,12 +73,13 @@ pump name or recipe is assumed.
 Validation (`dosing.py`, pure): every entity exists and is in its allowed domain; pump ids unique;
 recipe pumps exist; a pump appears in the recipe at most once; `full_entity` set whenever
 `fill_valve` is; `mix_power_sensor` set whenever `mix_min_w` is above 0 (else the power could not be
-checked); no entity is both a dosing pump's `power_entity` and batch hardware; a `mix_pump`,
+checked); `level_entity` set whenever `remind_pct` is above 0; no entity is both a dosing pump's `power_entity` and batch hardware; a `mix_pump`,
 `mix_valves` or `close_entities` switch may be a room's irrigation pump or main line (the batch
 holds that room's watering); a pump's `stock_tank` is one of the room's stock tanks, and a stock
 tank is linked to at most one pump. A room with no pumps is valid and does nothing. "Exists" is checked
 when a setup is saved; a stored setup read back at start-up is kept although a device has not come
-back yet.
+back yet. A save that does not send `level_entity` or `remind_pct` keeps the stored ones, so a page
+that does not know them never switches the reminder off.
 
 ## Services
 

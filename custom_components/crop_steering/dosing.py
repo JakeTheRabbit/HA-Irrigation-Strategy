@@ -39,6 +39,10 @@ POWER = ("switch",)
 FLOW = ("number", "input_number", "sensor")
 FULL = ("binary_sensor", "sensor")
 ML_ENTITY = ("number", "input_number", "sensor")
+LEVEL = ("sensor", "number", "input_number")
+# The refill reminder's settings: a save that does not send them keeps the stored ones, so a page
+# that does not know them never switches the reminder off (dosing_api.py).
+REMINDER = ("level_entity", "remind_pct")
 
 _ID = re.compile(r"^[a-z0-9_]{1,24}$")
 _OBJECT = re.compile(r"^[a-z0-9_]+$")
@@ -63,6 +67,8 @@ def empty_batch() -> dict:
         "close_entities": [],
         "hold_entity": None,
         "filled_at_entity": None,
+        "level_entity": None,
+        "remind_pct": 0,
         "recipe": [],
     }
 
@@ -256,6 +262,14 @@ def _batch(raw, pumps: dict, exists) -> dict:
         raise DosingError(
             "a mix pump minimum power needs the mix pump power sensor that reads it"
         )
+    level_entity = _entity(
+        raw.get("level_entity"), LEVEL, "tank level entity", exists, optional=True
+    )
+    remind_pct = _number(raw.get("remind_pct"), 0, 100, "refill reminder (%)", 0)
+    if remind_pct > 0 and not level_entity:
+        raise DosingError(
+            "a refill reminder needs the entity that reads the tank's level"
+        )
     return {
         "fill_valve": fill_valve,
         "full_entity": full_entity,
@@ -290,6 +304,8 @@ def _batch(raw, pumps: dict, exists) -> dict:
             exists,
             optional=True,
         ),
+        "level_entity": level_entity,
+        "remind_pct": remind_pct,
         "recipe": _recipe(raw.get("recipe"), pumps, exists),
     }
 
