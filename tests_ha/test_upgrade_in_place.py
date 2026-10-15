@@ -267,11 +267,13 @@ async def test_a_3_8_0_state_file_loads_with_its_history_empty_and_nothing_moves
         assert written == old
 
 
+@pytest.mark.parametrize("options_file", [False, True], ids=["as-a-dict", "read-from-options-json"])
 async def test_3_8_0_app_options_keep_their_jev_budget_and_take_the_new_defaults(
-    hass, controller_for, monkeypatch
+    hass, controller_for, monkeypatch, options_file
 ):
     """F2's 3.8.0 options (tests_ha/fixtures/options_3_8_0_f2.json) start Jev on the TypeSafe
-    route with the owner's 2000 calls, and every new setting at its default."""
+    route with the owner's 2000 calls, and every new setting at its default: handed over as a dict,
+    and written to options.json and read by the controller's own load_options, as the app does."""
     import functools
 
     import jev_bridge
@@ -281,7 +283,8 @@ async def test_3_8_0_app_options_keep_their_jev_budget_and_take_the_new_defaults
     monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False))
     await _upgrade(hass, "entry_2_17_wizard.json")
     options = fixture("options_3_8_0_f2.json")["options"]
-    c, _fake, _clock = controller_for(options)
+    c, _fake, _clock = controller_for(options, options_file=options_file)
+    assert c._options == options
     assert c.jev is not None and c.jev.routes == ["TypeSafe"]
     assert c.jev.asker.daily_budget == 2000  # the owner's value stays until the owner changes it
     settings = (c.jev.reask_max, c.jev.unsure_below, c.jev.strict_after, c.jev.strict_prob)

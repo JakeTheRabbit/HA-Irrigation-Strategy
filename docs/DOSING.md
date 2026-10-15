@@ -269,13 +269,26 @@ The dosing thread is watched: the controller's main loop checks it every loop, a
 is started again (whatever it had recorded is held and switched off as after a restart) with CS-806;
 one that has not gone round for 10 minutes raises CS-806 (once every 30 minutes).
 
-When the app is stopped (SIGTERM: an update, a restart), the shot in flight is closed first; then no
-dosing switch-on starts any more (one already on its way to Home Assistant lands first, 5 s at most),
-the dosing thread gets 3 s to switch its own dose's or batch's hardware off, and everything recorded
-is switched off again, each off with a 2 s timeout and without waiting to read it back. The record
-stays, and a batch's `hold_entity` stays on, for the next start. The app's `timeout: 30`
-(`addons/f2_control/config.yaml`) has the Supervisor wait 30 s after SIGTERM, rather than its
-default 10, before it kills the container.
+When the app is stopped (SIGTERM: an update, a restart), no dose, batch or dosing switch-on starts
+any more, and the dosing thread switches its own dose's or batch's hardware off; then the shot in
+flight is closed; then dosing waits for a switch-on already on its way to Home Assistant (5 s at
+most) and for its thread (3 s at most), and everything recorded is switched off again, each off with
+a 2 s timeout and without waiting to read it back. The record stays, and a batch's `hold_entity`
+stays on, for the next start. The app's `timeout: 30` (`addons/f2_control/config.yaml`) has the
+Supervisor wait 30 s after SIGTERM, rather than its default 10, before it kills the container.
+
+All of that runs inside a 25 s budget (or `F2_STOP_BUDGET_S` seconds, when that environment variable
+is set), so a slow Home Assistant can never make the Supervisor kill the app half way. While a dose
+or batch has anything recorded, dosing keeps the last 5 s of it (a fifth of a shorter budget). Each
+room with a shot recorded gets an equal share of the rest, the shot running now first. Inside a
+room's share a read waits only as long as leaves time for the offs it may prove, each counted as long
+as Home Assistant's slowest answer so far in the stop, and a read that could not come back in what
+is left is not made: a slow Home Assistant costs reads, never the offs they prove, and no call is cut
+shorter than Home Assistant is answering. A read that is not made or not answered never counts as
+off: while a hold or another valve on the shot's line cannot be read, the main line and pump are left
+on. The valve of the shot running now is switched off even when there was no time to prove it is the
+shot's. Whatever does not fit is not sent and stays recorded, as an off that is not confirmed always
+has, and the state file is always saved.
 
 ### Status: `sensor.crop_steering_<prefix>dosing`
 

@@ -1,0 +1,75 @@
+# Crop Steering Controller as a standalone container, for Home Assistant Container or Core.
+#
+# This file builds the controller image from addons/f2_control, the same Dockerfile the Home
+# Assistant app is built from, in the checkout of the release that matches your integration:
+#   docker compose up -d --build
+# docs/INSTALL.md, "Home Assistant Container or Core", has every step and what the log should say.
+#
+# Next to this file, create (keep both out of git; .gitignore already lists them):
+#   ha_token.txt   only the long-lived access token of a Home Assistant ADMINISTRATOR
+#                  (profile -> Security -> Long-lived access tokens). It is mounted as a Docker
+#                  secret, because `docker inspect` shows environment values to anyone who can run it.
+#   .env           with:
+#     HA_URL=http://homeassistant.local:8123   # Home Assistant's OWN address and port, not a
+#                                              # reverse proxy, tunnel or public URL
+#     TZ=                            # optional; empty = follow Home Assistant's time zone
+#
+# Never run this and the Home Assistant app against the same room: both would drive the same
+# pump and valves.
+
+services:
+  crop-steering-controller:
+    build:
+      context: addons/f2_control
+    image: crop-steering-controller:local
+    container_name: crop-steering-controller
+    restart: unless-stopped
+
+    # On stop the controller closes the shot in flight and switches off running dosing before it
+    # exits (SIGTERM safe-off), inside its stop budget (F2_STOP_BUDGET_S below).
+    # Anything Home Assistant was too slow to confirm OFF stays recorded and is switched off again
+    # on the next start. The grace period is the budget plus a 15 s margin; if you change the
+    # budget, keep stop_grace_period at least 5 s above it. Do not use `docker kill`.
+    stop_grace_period: 90s
+    stop_signal: SIGTERM
+
+    # Do NOT set `init: true`: the image's own init must be PID 1.
+    # Do NOT use network_mode: host: it would put the internal dashboard port on your LAN.
+
+    environment:
+      HA_URL: ${HA_URL:?set HA_URL in .env, e.g. http://homeassistant.local:8123}
+      HA_TOKEN_FILE: /run/secrets/ha_token
+      # Empty or unset = adopt Home Assistant's time zone. If set, it must be a real zone name
+      # (e.g. Europe/Berlin) and MUST match Home Assistant's, or the whole grow-day shifts.
+      TZ: ${TZ:-}
+      # Tells the image it is a standalone container (the Home Assistant app sets "addon").
+      F2_RUNTIME: container
+      F2_DATA_DIR: /data
+      # Safe-off budget on stop, in seconds; keep stop_grace_period at least this + 5 s.
+      F2_STOP_BUDGET_S: "75"
+
+    secrets:
+      - ha_token
+
+    volumes:
+      # state.json (phase, counters, the shot-in-flight record) and the dosing files.
+      - crop-steering-data:/data
+
+    # No ports. The dashboard is the "Crop Steering" sidebar entry in Home Assistant, served by the
+    # integration. The container's own copy of the page files on 8420 has no login and is off
+    # unless F2_SERVE_UI=1; if you enable it, bind loopback only:
+    # ports:
+    #   - "127.0.0.1:8420:8420"
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  crop-steering-data:
+
+secrets:
+  ha_token:
+    file: ./ha_token.txt

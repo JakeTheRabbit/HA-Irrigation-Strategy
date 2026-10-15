@@ -45,6 +45,7 @@ Three kinds of file in this repository are produced from other files. They chang
 | `www/`, `custom_components/crop_steering/www/` and `addons/f2_control/www/` (the dashboard, one ~1 MB minified file) | `frontend/src` via `npm run build --prefix frontend` | CI rebuilds it and fails if the committed file differs by one byte |
 | `addons/f2_control/f2_control/crop_steering_engine/` | `crop-steering-engine/src/crop_steering_engine/` | CI diffs the two copies |
 | `doctrine/` outputs: the numbered `*.md` files, `engine-rules.generated.json` and `compiled/` | `doctrine/doctrine.rules.json` plus the code it describes, via `python doctrine/tools/build_doctrine.py` | `build_doctrine.py --check` fails if any output is stale |
+| `addons/f2_control/LICENSE` (the licence inside the controller image) | `LICENSE`, copied as it is | `addons/f2_control/tests/test_container_packaging.py` fails if the two differ by one byte |
 
 The doctrine also depends on code. A change to a value it prints (from the engine's `core.py`, or the integration's default dryback targets and P0 wait in `number.py`) regenerates the doctrine in the same commit; a change that makes one of its checked sentences false in the engine, the controller, the brain code or `number.py` rewords that rule in the same commit, or the build fails. Any other edit to those files needs nothing ([doctrine/README.md](doctrine/README.md)).
 

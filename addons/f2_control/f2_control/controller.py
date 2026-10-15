@@ -16,7 +16,8 @@ fail-safe OFF until their per-room kill switch is turned on. The rooms share onl
 one process (one shot fires at a time) and the notify service.
 
 Talks to HA through the Supervisor proxy (http://supervisor/core/api) with the
-auto-injected SUPERVISOR_TOKEN. Safe-offs the hardware on exit.
+auto-injected SUPERVISOR_TOKEN as the app, or as a standalone container to HA_URL with HA_TOKEN(_FILE)
+(runtime_env). Safe-offs the hardware on exit.
 """
 import dataclasses
 import json
@@ -33,6 +34,7 @@ import requests
 import auto_setpoints
 import dosing_runner
 import jev_bridge
+import runtime_env
 import setpoint_supervisor
 import zone_history
 from strategy_runtime import parse_snapshot, parameter_override, strategy_block
@@ -55,9 +57,9 @@ from crop_steering_engine import (
     zone_status_label,
 )
 
-# ---------------------------------------------------------------- HA REST (Supervisor proxy)
-BASE = os.environ.get("HA_URL", "http://supervisor/core/api")
-TOKEN = os.environ.get("SUPERVISOR_TOKEN") or os.environ.get("HA_TOKEN", "")
+# ---------------------------------------------------------------- HA REST (Supervisor proxy, or HA_URL)
+BASE = runtime_env.resolve_base(os.environ)
+TOKEN = runtime_env.resolve_token(os.environ)[0]
 HDR = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 _S = requests.Session()  # the main loop's
 _LOCAL = threading.local()
@@ -79,6 +81,89 @@ def log(*a):
     print("[f2-control]", *a, flush=True)
 
 
+class _AuthGate:
+    """What a 401 or 403 from Home Assistant does to the requests below (runtime_env.preflight checks the
+    token before the controller is built; this is for one refused later).
+
+    The app: nothing, apart from one log line every 10 min at most; its requests go through the
+    Supervisor's proxy, which never bans it. A standalone container: Home Assistant counts every refused
+    request as a failed login and may ban the machine, so the gate closes and requests are not sent:
+      * "all" (a 401 or 403 on a read or a service call, or a 403 on a state write): nothing is sent but
+        this process's own close of what it has on (own(): the shot in flight's valve, main line and
+        pump, and the running dose's or batch's hardware): each its one turn_off, and reads of those
+        back until the first is refused. The shot ends at _wait_shot's next check, a dose or batch the
+        way it ends when the app stops, and the main loop parks (Controller._park_refused). The refusal
+        may come from a proxy in front of Home Assistant that recovers, so any accepted answer opens
+        the gate again.
+      * "writes" (a 401 on a state write only: the token's user is no longer an administrator): state
+        writes are not sent; reads and service calls are, so the shot in flight closes as usual.
+    A request the gate holds back returns its function's usual failure, with no request sent."""
+
+    LOG_EVERY_S = 600.0
+
+    def __init__(self):
+        self.container = runtime_env.runtime(os.environ) == "container"
+        self.state = None  # None (open), "all" or "writes"
+        self.own = lambda: ()  # set by the Controller: what this process has switched on now
+        self._lock = threading.Lock()
+        self._sent = set()  # what has had its one turn_off while closed
+        self._read_refused = False
+        self._probe = None  # the one read the park sends (Controller._park_refused)
+        self._logged = None  # the app: when the last refusal was logged
+
+    def allows(self, kind, entity=None):
+        """Whether a request may be sent: kind "read" (of one entity), "off" (a turn_off), "write" (a
+        state), or "other"."""
+        with self._lock:
+            if self.state is None:
+                return True
+            if self.state == "writes":
+                return kind != "write"
+            if kind == "read" and entity is not None and entity == self._probe:
+                return True
+            if kind == "off" and entity in set(self.own()) - self._sent:
+                self._sent.add(entity)
+                return True
+            return kind == "read" and entity in self._sent and not self._read_refused
+
+    def saw(self, kind, status, request):
+        """Note Home Assistant's answer to a request that was sent."""
+        refused = status in (401, 403)
+        with self._lock:
+            if not self.container:
+                now = time.monotonic()
+                if refused and (self._logged is None or now - self._logged >= self.LOG_EVERY_S):
+                    self._logged = now
+                    log(f"Home Assistant rejected a request: {request} -> HTTP {status}")
+                return
+            if not refused:
+                if self.state == "all" and status is not None and status < 500:
+                    self.state = None
+                    log("Home Assistant refused a request, then accepted one: probably a proxy in front of it")
+                return
+            if kind == "write" and status == 401 and self.state is None:
+                self.state = "writes"
+                log(f"Home Assistant refused a state write: {request} -> HTTP 401. The token's user must be "
+                    "an administrator: the shot in flight is closed, then the controller waits.")
+            elif self.state != "all":
+                self.state, self._sent, self._read_refused = "all", set(), False
+                log(f"Home Assistant refused a request: {request} -> HTTP {status}. Only the close of what "
+                    "this controller has on is sent; then it waits, asking again while anything is recorded.")
+            elif kind == "read":
+                self._read_refused = True
+
+    def probe(self, entity):
+        """One read of `entity` while closed: the park's question whether Home Assistant accepts again."""
+        self._probe = entity
+        try:
+            return ha_get(entity)
+        finally:
+            self._probe = None
+
+
+_GATE = _AuthGate()
+
+
 class HAState(tuple):
     """What ha_get returns: (state, attributes, last_updated), unpacked exactly as it always was, plus
     `last_changed`: when the state VALUE last changed, as Home Assistant reports it (None if unknown)."""
@@ -91,8 +176,11 @@ class HAState(tuple):
 
 def ha_get(entity, timeout=8):
     """Return (state_str, attributes, last_updated_iso) or (None, {}, None); see HAState."""
+    if not _GATE.allows("read", entity):
+        return HAState()
     try:
         r = _session().get(f"{BASE}/states/{entity}", headers=HDR, timeout=timeout)
+        _GATE.saw("read", r.status_code, f"GET {BASE}/states/{entity}")
         if r.status_code != 200:
             return HAState()
         d = r.json()
@@ -113,8 +201,11 @@ def _aware(stamp):
 def ha_get_all():
     """Return the full /api/states list (or [] on failure). Used once at startup for
     multi-room discovery — find every sensor.crop_steering_*engine_config descriptor."""
+    if not _GATE.allows("other"):
+        return []
     try:
         r = _session().get(f"{BASE}/states", headers=HDR, timeout=12)
+        _GATE.saw("other", r.status_code, f"GET {BASE}/states")
         if r.status_code != 200:
             return []
         return r.json() or []
@@ -126,6 +217,8 @@ def ha_history(entity, since, timeout=12):
     """Every state `entity` has had from `since` (an aware datetime) to now, oldest first, as
     [(state, last_changed_iso), ...]; the first is the state it was already in at `since`.
     None when Home Assistant can't say: unreachable, an error, or nothing recorded for it."""
+    if not _GATE.allows("other"):
+        return None
     try:
         r = _session().get(
             f"{BASE}/history/period/{since.isoformat()}",
@@ -138,6 +231,7 @@ def ha_history(entity, since, timeout=12):
             },
             timeout=timeout,
         )
+        _GATE.saw("other", r.status_code, f"GET {BASE}/history/period")
         if r.status_code != 200:
             return None
         rows = (r.json() or [[]])[0]
@@ -147,10 +241,14 @@ def ha_history(entity, since, timeout=12):
 
 
 def ha_call(domain, service, *, timeout=12, **data):
+    kind = "off" if service == "turn_off" else "other"
+    if not _GATE.allows(kind, data.get("entity_id")):
+        return False
     try:
         r = _session().post(
             f"{BASE}/services/{domain}/{service}", headers=HDR, json=data, timeout=timeout
         )
+        _GATE.saw(kind, r.status_code, f"POST {BASE}/services/{domain}/{service}")
         if r.status_code >= 300:
             log("call_service FAILED", domain, service, "HTTP", r.status_code)
             return False
@@ -165,6 +263,8 @@ def ha_service_response(domain, service, data, timeout=12):
     crop_steering.stock_draw) -> (HTTP status, the service's answer), or (None, None) when Home
     Assistant can't be reached. The status tells a refusal (4xx: sending it again changes nothing)
     from a failure worth trying again."""
+    if not _GATE.allows("other"):
+        return None, None
     try:
         r = _session().post(
             f"{BASE}/services/{domain}/{service}", headers=HDR, json=data,
@@ -173,6 +273,7 @@ def ha_service_response(domain, service, data, timeout=12):
     except Exception as e:
         log("call_service failed", domain, service, e)
         return None, None
+    _GATE.saw("other", r.status_code, f"POST {BASE}/services/{domain}/{service}")
     if r.status_code >= 300:
         log("call_service FAILED", domain, service, "HTTP", r.status_code)
     try:
@@ -183,27 +284,27 @@ def ha_service_response(domain, service, data, timeout=12):
 
 
 def ha_set(entity, state, attributes=None, timeout=8):
+    """Write a state -> Home Assistant's HTTP status, or None when it was not sent or not answered."""
+    if not _GATE.allows("write"):
+        return None
     try:
-        _session().post(
+        r = _session().post(
             f"{BASE}/states/{entity}",
             headers=HDR,
             json={"state": state, "attributes": attributes or {}},
             timeout=timeout,
         )
     except Exception:
-        pass
+        return None
+    _GATE.saw("write", r.status_code, f"POST {BASE}/states/{entity}")
+    return r.status_code
 
 
-# ---------------------------------------------------------------- config (defaults; override via /data/options.json)
+# ---------------------------------------------------------------- config (defaults; override via options.json or F2_OPT_*)
 def load_options():
-    opts = {}
-    for p in ("/data/options.json",):
-        try:
-            with open(p) as fh:
-                opts = json.load(fh)
-        except Exception:
-            pass
-    return opts
+    """The add-on options: /data/options.json as the Supervisor wrote it, or a container's own (checked)
+    with F2_OPT_<OPTION> over it (runtime_env.load_options)."""
+    return runtime_env.load_options(os.environ, log)
 
 
 def read_controller_version(module_dir=None):
@@ -265,6 +366,83 @@ _CANCELLED_SHOT_CLEANUP = (
 # Switch read-back after a close: see Controller._confirm_switches.
 CONFIRM_FIRST_READ_S, CONFIRM_POLL_S, CONFIRM_TIMEOUT_S = 1.0, 0.5, 6.0
 CONFIRM_RETRY_S = 10.0  # a second read-back, after OFF is sent again to what still reads on
+
+# The safe-off on SIGTERM (Controller._safe_exit) runs inside runtime_env.stop_budget(). Dosing keeps
+# STOP_DOSING_S of it (a fifth at most) for its own offs while a dose or batch has anything recorded.
+# Each room with a shot recorded gets an equal share of the rest (see _Stop).
+STOP_DOSING_S = 5.0
+
+
+class _Stop:
+    """A part of the stop's budget: it ends at `until` on the monotonic clock. A read inside it waits only
+    as long as leaves time for the `keep` switch-offs it may prove, each as long as the slowest Home
+    Assistant call of this stop so far (`slowest`, shared by every part of one stop), and the second's
+    pause after a valve's off; a read that could not come back in what that leaves is not made. So a
+    slow Home Assistant costs reads, never the offs they prove, and a call is never cut shorter than
+    Home Assistant is answering."""
+
+    def __init__(self, until, slowest=None, keep=0):
+        self.until, self.keep = until, keep
+        self.slowest = [0.0] if slowest is None else slowest
+
+    def keeping(self, keep):
+        """This part, keeping time for `keep` offs after each read."""
+        return _Stop(self.until, self.slowest, keep)
+
+    def timeout(self, default, keep=None):
+        """A read's timeout, or None when it would not come back in time (it is not made)."""
+        keep = self.keep if keep is None else keep
+        left, took = self.until - time.monotonic(), self.slowest[0]
+        # Nothing timed yet: this read and the offs after it share what is left equally.
+        free = (left - keep * took - (1.0 if keep > 1 else 0.0)) if took else left / (keep + 1)
+        timeout = min(default, free)
+        return timeout if timeout > 0 and timeout >= took else None
+
+    def off_timeout(self, default, keep):
+        """An off's timeout: as a read's, keeping time for the `keep` offs after it, else all that is left
+        (the valve's off comes before the main line's, and that before the pump's); None when none is."""
+        timeout = self.timeout(default, keep)
+        if timeout is None:
+            left = self.until - time.monotonic()
+            timeout = min(default, left) if left > 0 else None
+        return timeout
+
+    def timed(self, call, *args, **kwargs):
+        began = time.monotonic()
+        try:
+            return call(*args, **kwargs)
+        finally:
+            self.slowest[0] = max(self.slowest[0], time.monotonic() - began)
+
+
+def _read(entity, deadline=None):
+    """ha_get, inside the stop's `deadline` (a _Stop) when there is one: a read that no longer fits is
+    not made and reads as unknown."""
+    if deadline is None:
+        return ha_get(entity)
+    timeout = deadline.timeout(8)
+    return HAState() if timeout is None else deadline.timed(ha_get, entity, timeout=timeout)
+
+
+def _switch_off(entity, deadline=None, keep=0):
+    """A switch's turn_off, inside the stop's `deadline` when there is one, keeping time for `keep` offs
+    after it -> whether Home Assistant took it. One that no longer fits is not sent."""
+    if deadline is None:
+        return ha_call("switch", "turn_off", entity_id=entity)
+    timeout = deadline.off_timeout(12, keep)
+    return timeout is not None and deadline.timed(ha_call, "switch", "turn_off", entity_id=entity, timeout=timeout)
+
+
+def _history(entity, since, deadline=None):
+    if deadline is None:
+        return ha_history(entity, since)
+    timeout = deadline.timeout(12)
+    return None if timeout is None else deadline.timed(ha_history, entity, since, timeout=timeout)
+
+
+def _pause(seconds, deadline=None):
+    time.sleep(seconds if deadline is None else max(0.0, min(seconds, deadline.until - time.monotonic())))
+
 
 # The shortest shot the controller runs, in seconds (a shot sized shorter is lengthened to this).
 MIN_SHOT_S = 5
@@ -523,7 +701,7 @@ class Controller:
         self._cf = tuple((o.get(k) or "").strip() for k in ("cf_account_id", "cf_api_token", "cf_gateway_id"))
         # The Jev edition: Jev judges the engine's decisions inside a code envelope (docs/JEV.md). None = off.
         try:
-            self.jev = jev_bridge.build(o, self._cf, os.environ.get("F2_STATE_PATH") or "/data/state.json", log)
+            self.jev = jev_bridge.build(o, self._cf, runtime_env.state_path(os.environ), log)
         except Exception as e:  # Jev can never stop the controller starting
             log("jev: off, it could not start:", e)
             self.jev = None
@@ -536,10 +714,10 @@ class Controller:
         )  # generic last-resort fallback — real volume read live from the integration
         self._opt_lon = float(o.get("lights_on_hour", SHIPPED_LIGHTS[0]))
         self._opt_loff = float(o.get("lights_off_hour", SHIPPED_LIGHTS[1]))
-        # Live installs always use /data/state.json (HA-managed, survives Rebuild). The env
-        # override exists so a test/dev rig can redirect the file BEFORE this constructor's
-        # own _load_state()/adoption pass reads and writes it.
-        self._state_path = os.environ.get("F2_STATE_PATH") or "/data/state.json"
+        # The app always uses /data/state.json (HA-managed, survives Rebuild); a container keeps it in
+        # its data volume (F2_DATA_DIR). F2_STATE_PATH lets a test/dev rig redirect the file BEFORE this
+        # constructor's own _load_state()/adoption pass reads and writes it.
+        self._state_path = runtime_env.state_path(os.environ)
         # Dosing runs on its own thread, started by run(). Like Jev, it can never stop the controller
         # starting, and it only ever acts on an explicit request for a room with dosing set up.
         try:
@@ -554,12 +732,14 @@ class Controller:
                     domain, service, data, timeout),
                 state_path=os.path.join(os.path.dirname(self._state_path) or ".", "dosing_state.json"),
                 log=log,
+                refused=lambda: _GATE.state == "all",
             )
         except Exception as e:
             log("dosing: off, it could not start:", e)
             self.dosing = None
         self._busy = False
         self._shot_room = None  # the room whose shot is in flight (see _execute_shot / _safe_off)
+        _GATE.own = self._switched_on  # what a refused token still closes (_AuthGate)
         self._alerted = {}
         self._alert_codes = {}  # key -> the code last raised under it (see _alert_due)
         self._fused_id_cache = (
@@ -761,6 +941,7 @@ class Controller:
         the add-on options + default descriptor above.
         """
         rooms = []
+        versions = set()
         for ent in ha_get_all():
             eid = ent.get("entity_id", "")
             if not (
@@ -769,6 +950,7 @@ class Controller:
             ):
                 continue
             a = ent.get("attributes", {}) or {}
+            versions.add(a.get("integration_version"))
             if a.get("active", True) is False:
                 continue
             prefix = a.get("prefix", "")
@@ -810,6 +992,10 @@ class Controller:
                 )
             except Exception as e:
                 log("room discovery error for", eid, e)
+        for theirs in sorted({str(v) for v in versions if v} - {CONTROLLER_VERSION}):
+            fix = (f"set CONTROLLER_VERSION to {theirs}" if _GATE.container
+                   else "update the app, or the integration, so both run the same version")
+            log(f"version: controller {CONTROLLER_VERSION}, integration {theirs}; {fix}")
         return rooms
 
     # ---------- entity id helper ----------
@@ -3137,7 +3323,7 @@ class Controller:
             return
         self._clear_inflight(room, f"{tag}: closed and read back OFF - record closed")
 
-    def _inflight_plan(self, room, rec, reads):
+    def _inflight_plan(self, room, rec, reads, deadline=None):
         """Which of a recorded shot's switches are provably its own -> (close, left, unsure, why).
 
         Walks valve -> main line -> pump. A switch is the shot's own while it has been ON since the shot
@@ -3147,7 +3333,9 @@ class Controller:
         switched since, or that was on before, is theirs (`left`, with everything upstream of it), and so
         are the main line and pump while another valve on the line is open, and the pump while a hold is
         on. One that cannot be read, has no change time, or has no readable history stops it too
-        (`unsure`): whose it is cannot be told."""
+        (`unsure`): whose it is cannot be told. Inside the stop's `deadline` (a _Stop), so does a read
+        it needed that was not made in time or not answered (a hold or another valve it could not read
+        may be on); each read keeps time for the offs of what it would prove and of what is proven."""
         order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
         started = _aware(rec.get("started"))
         lo, hi = INFLIGHT_OPEN_WINDOW_S
@@ -3159,44 +3347,72 @@ class Controller:
             changed = _aware(getattr(read, "last_changed", None))
             if read[0] != "on" or changed is None or started is None:
                 return close, [], order[i:], ""
+            part = None if deadline is None else deadline.keeping(len(close) + 1)
             if not lo <= (changed - started).total_seconds() <= hi:
                 # A Home Assistant restart or the switch reconnecting also moves last_changed: ask the
                 # recorder whether anyone switched it since the shot opened it.
-                own = _on_since_shot(ha_history(ent, started + timedelta(seconds=lo)), started)
+                own = _on_since_shot(_history(ent, started + timedelta(seconds=lo), part), started)
                 if own is None:
                     return close, [], order[i:], ""
                 if not own:
                     return close, order[i:], [], f"{ent} changed at {changed.isoformat()}, not when the shot opened it"
             if ent != rec.get("valve"):
                 if line_in_use is None:
-                    line_in_use = self._line_in_use(room, rec)
+                    line_in_use = self._line_in_use(room, rec, part)
+                    if line_in_use is None:
+                        return close, [], order[i:], ""
                 if line_in_use:
                     return close, order[i:], [], "another valve on this line is open"
-            if ent == rec.get("pump") and any(self._on(f, False) for f in self.hold_entities):
-                return close, order[i:], [], "a hold (dosing / fill / flush / circulation) is on"
+            if ent == rec.get("pump"):
+                hold = self._hold_on(part)
+                if hold is None:
+                    return close, [], order[i:], ""
+                if hold:
+                    return close, order[i:], [], "a hold (dosing / fill / flush / circulation) is on"
             close.append(ent)
         return close, [], [], ""
 
-    def _switch_off_confirmed(self, entities):
-        """Switch these off, the valve first and then back up the line as after a normal shot, and
-        report whether every one reads back OFF."""
-        ok = ha_call("switch", "turn_off", entity_id=entities[0])
-        if len(entities) > 1:
-            time.sleep(1)
-        for ent in entities[1:]:
-            ok = ha_call("switch", "turn_off", entity_id=ent) and ok
-        return ok and self._confirm_switches(entities, "off")
+    def _hold_on(self, deadline=None):
+        """A hold (hold_entities) is on. Inside the stop's `deadline` (a _Stop), None when one was not read
+        in time or not answered and none read is on: it may be on."""
+        if deadline is None:
+            return any(self._on(f, False) for f in self.hold_entities)
+        unread = False
+        for entity in self.hold_entities:
+            v = _read(entity, deadline)[0]
+            if v is None:
+                unread = True
+            elif v not in ("unknown", "unavailable", "") and str(v).lower() in ON_STATES:
+                return True
+        return None if unread else False
 
-    def _line_in_use(self, room, rec):
-        """Another valve fed by this shot's main line or pump is open: someone is watering through it."""
+    def _switch_off_confirmed(self, entities, deadline=None):
+        """Switch these off, the valve first and then back up the line as after a normal shot, and
+        report whether every one reads back OFF (inside the stop's `deadline`, a _Stop, when given)."""
+        ok = _switch_off(entities[0], deadline, len(entities) - 1)
+        if len(entities) > 1:
+            _pause(1, deadline)
+        for i, ent in enumerate(entities[1:], 2):
+            ok = _switch_off(ent, deadline, len(entities) - i) and ok
+        return ok and self._confirm_switches(entities, "off", deadline)
+
+    def _line_in_use(self, room, rec, deadline=None):
+        """Another valve fed by this shot's main line or pump is open: someone is watering through it.
+        Inside the stop's `deadline` (a _Stop), None when one was not read in time or not answered and
+        none read is open: it may be."""
         line = {rec.get("mainline"), rec.get("pump")} - {None}
+        unread = False
         for other in self.rooms:
             if other is not room and not line & {other.hw.get("mainline"), other.hw.get("pump")}:
                 continue
             for valve in other.hw.get("valves", {}).values():
-                if valve and valve != rec.get("valve") and ha_get(valve)[0] == "on":
+                if not valve or valve == rec.get("valve"):
+                    continue
+                v = _read(valve, deadline)[0]
+                if v == "on":
                     return True
-        return False
+                unread = unread or (deadline is not None and v is None)
+        return None if unread else False
 
     def _clear_inflight(self, room, message):
         room.shot_inflight = None
@@ -3214,6 +3430,8 @@ class Controller:
         shutdown. Returns actual seconds elapsed and what ended the shot early, or None:
           ("abort", entity): a definitive kill OFF / room OFF / zone OFF / override ON. The
             operator's own switches are read first in every round, so they win.
+          ("refused", None): Home Assistant refused this controller's token (_AuthGate, a container):
+            the shot closes as after a kill-switch abort, with nothing sent but its own offs.
           ("external", entity): something else closed the feed path: a hold (hold_entities) reads
             ON (the test _blocked applies before a shot), or the shot's own valve reads OFF. The
             caller closes only what is still this shot's (_close_cut_short).
@@ -3237,6 +3455,8 @@ class Controller:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     break
+                if _GATE.state == "all":
+                    return time.monotonic() - started, ("refused", None)
                 # Account for network time, and never start an eight-second read when
                 # less than that remains. HTTP/socket scheduling can still overshoot;
                 # return measured time rather than pretending sleep time was delivery.
@@ -3247,6 +3467,8 @@ class Controller:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     break
+                if _GATE.state == "all":
+                    return time.monotonic() - started, ("refused", None)
                 state = ha_get(entity, timeout=min(step, remaining))[0]
                 if entity != valve:
                     ended = str(state).lower() in ON_STATES
@@ -3311,42 +3533,50 @@ class Controller:
         return open_s
 
     @staticmethod
-    def _confirm_switches(entities, want):
+    def _confirm_switches(entities, want, deadline=None):
         """True only when every switch reads back `want`.
 
         Zigbee/MQTT plugs accept a command at once but report the new state later
         (a pump's OFF report: usually under 1 s; 1.6 s on 15 Sep and about 10 s on 28 Sep 2026 on a
         live install). A read-back that gives up too early latches a false hardware hold; one that
         waits too long stalls every room (this loop is synchronous) before a real stuck-open is caught.
+        On the way out (SIGTERM) it gives up when the stop's `deadline` (a _Stop) runs out.
         """
 
         def settled(window, first):
-            deadline = time.monotonic() + window
-            time.sleep(first)
+            end = time.monotonic() + window
+            if deadline is not None:
+                end = min(end, deadline.until)
+            _pause(first, deadline)
             while True:
-                if all(ha_get(ent)[0] == want for ent in entities):
+                if deadline is not None and deadline.timeout(8) is None:
+                    return False  # no read-back fits in what is left of the stop
+                if all(_read(ent, deadline)[0] == want for ent in entities):
                     return True
-                if time.monotonic() >= deadline:
+                if time.monotonic() >= end:
                     return False
-                time.sleep(CONFIRM_POLL_S)
+                _pause(CONFIRM_POLL_S, deadline)
 
         # First read at 1 s, exactly as before, so a plug that reports promptly costs nothing extra.
         # A late report is then re-read every 0.5 s up to 6 s. The pump has already been commanded
         # OFF by the time this runs.
         if settled(CONFIRM_TIMEOUT_S, CONFIRM_FIRST_READ_S):
             return True
-        if want != "off":
+        if want != "off" or (deadline is not None and deadline.timeout(8) is None):
             return False
         # Whatever still does not read OFF is sent OFF again (a plug may have missed the first) and
         # read back for 10 s more: 16 s in all, still inside the minute's loop for a genuinely
         # stuck-open valve.
         for ent in entities:
-            if ha_get(ent)[0] != "off":
-                ha_call("switch", "turn_off", entity_id=ent)
+            if _read(ent, deadline)[0] != "off":
+                _switch_off(ent, deadline)
         return settled(CONFIRM_RETRY_S, CONFIRM_POLL_S)
 
     def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None, plan_exempt=False):
         if self._hardware_fault_block(room):
+            return
+        if _GATE.state is not None:
+            log(f"[{room.slug}] Z{zone} shot held: Home Assistant refuses this controller's token")
             return
         if getattr(room, "shot_inflight", None):
             log(f"[{room.slug}] Z{zone} shot held: an interrupted shot's hardware is not accounted for yet")
@@ -3471,7 +3701,12 @@ class Controller:
                 close_ok = ha_call("switch", "turn_off", entity_id=ent) and close_ok
             # Only a definitive OFF is safe, including pump/mainline read-back.
             closed = self._confirm_switches((valve, *upstream), "off")
-            if not close_ok or not closed:
+            if (not close_ok or not closed) and _GATE.state == "all":
+                # Refused, not stuck: what is not confirmed stays recorded for the reconciler, which
+                # reads it back once Home Assistant accepts this controller again.
+                log(f"[{room.slug}] Z{zone} shot closed with Home Assistant refusing: its offs were sent, "
+                    "not read back; left recorded")
+            elif not close_ok or not closed:
                 for ent in reversed(upstream):
                     ha_call("switch", "turn_off", entity_id=ent)
                 self._latch_hardware_fault(
@@ -3489,7 +3724,10 @@ class Controller:
                 room, zone, delivered_pct,
                 delivered_l=nominal_l * (elapsed / duration_s if duration_s > 0 else 1.0),
             )
-            if aborted:
+            if aborted and aborted[0] == "refused":
+                log(f"[{room.slug}] Z{zone} shot ended after {elapsed:.0f}/{duration_s:.0f}s: Home Assistant "
+                    "refused this controller's token")
+            elif aborted:
                 by = aborted[1]
                 why = {
                     room.enable_flag: "the engine switch was turned off",
@@ -3546,7 +3784,7 @@ class Controller:
                 self._busy = False
                 self._shot_room = None
 
-    def _safe_off(self):
+    def _safe_off(self, deadline=None):
         """Stopping (SIGTERM: the app stopped, updated or restarted): close only what this controller has
         in flight, by the reconciler's rules (_inflight_plan), and nothing else.
 
@@ -3554,47 +3792,85 @@ class Controller:
         heat it and zones are hand-watered with the valves and main line open, and stopping the app must
         end neither. The shot running NOW is closed whatever its kill switch reads (it is this process's
         own); an older interrupted shot is left to the operator while its kill switch is not ON, as in the
-        loop. Anything that cannot be closed and read back OFF stays recorded for the next start."""
-        for room in self.rooms:
-            rec = getattr(room, "shot_inflight", None)
-            if not rec:
-                continue
-            order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
-            reads = {e: ha_get(e) for e in order}
-            if all(read[0] == "off" for read in reads.values()):
-                room.shot_inflight = None
-                continue
-            if room is not getattr(self, "_shot_room", None) and ha_get(room.enable_flag)[0] != "on":
-                continue
-            close, left, unsure, why = self._inflight_plan(room, rec, reads)
-            if close and not self._switch_off_confirmed(close):
-                log(f"[{room.slug}] stopping: {', '.join(close)} not confirmed OFF - left recorded for the next start")
-                continue
-            if close:
-                log(f"[{room.slug}] stopping: switched off {', '.join(close)} (the shot in flight)")
-            if left:
-                log(f"[{room.slug}] stopping: left {', '.join(left)} alone ({why})")
-            if not unsure:
-                room.shot_inflight = None
+        loop. Anything that cannot be closed and read back OFF stays recorded for the next start.
+
+        With a `deadline` (the monotonic clock) every room with a shot recorded gets an equal share of the
+        time left, the room whose shot is running now first, so a slow room never takes the next one's
+        time. What no longer fits is not read or sent, and stays recorded (see _Stop)."""
+        shot_room = getattr(self, "_shot_room", None)
+        rooms = [room for room in self.rooms if getattr(room, "shot_inflight", None)]
+        rooms.sort(key=lambda room: room is not shot_room)
+        slowest = [0.0]  # how slow Home Assistant is answering, carried from room to room
+        for i, room in enumerate(rooms):
+            stop = None
+            if deadline is not None:
+                now = time.monotonic()
+                stop = _Stop(now + max(0.0, deadline - now) / (len(rooms) - i), slowest)
+            self._safe_off_room(room, room is shot_room, stop)
+
+    def _safe_off_room(self, room, running, stop):
+        rec = room.shot_inflight
+        order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
+        # Each read keeps time for its own switch's off and those of the switches read before it.
+        reads = {e: _read(e, stop and stop.keeping(i)) for i, e in enumerate(order, 1)}
+        if all(read[0] == "off" for read in reads.values()):
+            room.shot_inflight = None
+            return
+        if not running and _read(room.enable_flag, stop and stop.keeping(1))[0] != "on":
+            return
+        close, left, unsure, why = self._inflight_plan(room, rec, reads, stop)
+        if running and unsure[:1] == [rec.get("valve")]:
+            # The valve of the shot running now is this process's own: when whose it is could not be told
+            # (no time left, or no read), it is switched off all the same. What is upstream stays recorded.
+            close, unsure = unsure[:1], unsure[1:]
+        if close and not self._switch_off_confirmed(close, stop):
+            log(f"[{room.slug}] stopping: {', '.join(close)} not confirmed OFF - left recorded for the next start")
+            return
+        if close:
+            log(f"[{room.slug}] stopping: switched off {', '.join(close)} (the shot in flight)")
+        if left:
+            log(f"[{room.slug}] stopping: left {', '.join(left)} alone ({why})")
+        if not unsure:
+            room.shot_inflight = None
 
     def _safe_exit(self, *_):
-        log("SIGTERM — closing what is in flight, saving state, exiting")
+        budget = runtime_env.stop_budget(os.environ)
+        deadline = time.monotonic() + budget
+        log(f"SIGTERM — closing what is in flight within {budget:g} s, saving state, exiting")
         try:
-            # The shot in flight first: it is water running now, and dosing's way out waits on its thread.
-            self._safe_off()
-            self._exit_dosing()
-            self._save_state()
+            try:
+                # Dosing starts nothing from here on. Then the shot in flight: it is water running now.
+                # Dosing's way out waits on its thread, so it goes last, in the time the stop keeps for it.
+                self._stop_dosing_starts()
+                reserve = min(STOP_DOSING_S, budget / 5) if self._dosing_recorded() else 0.0
+                self._safe_off(deadline - reserve)
+                self._exit_dosing(deadline)
+            finally:
+                self._save_state()
         finally:
             sys.exit(0)
 
-    def _exit_dosing(self):
-        """Stopping: no dosing switch-on starts from here, the dosing thread switches its own job off,
-        and what a dose or batch has recorded is switched off again, each off with a short timeout
-        (dosing_runner.exit). Its record stays in dosing_state.json, so the next start reads it back
-        OFF and raises CS-803."""
+    def _stop_dosing_starts(self):
         try:
             if self.dosing is not None:
-                self.dosing.exit()
+                self.dosing.stop_starting()
+        except Exception as e:
+            log("dosing: could not be stopped from starting on the way out:", e)
+
+    def _dosing_recorded(self):
+        try:
+            return self.dosing is not None and self.dosing.recorded()
+        except Exception:
+            return True  # whether it has anything to switch off can't be told: keep it its time
+
+    def _exit_dosing(self, deadline=None):
+        """Stopping: no dosing switch-on starts from here, the dosing thread switches its own job off,
+        and what a dose or batch has recorded is switched off again, each off with a short timeout
+        (dosing_runner.exit), all before the stop's `deadline` (the monotonic clock) when given. Its
+        record stays in dosing_state.json, so the next start reads it back OFF and raises CS-803."""
+        try:
+            if self.dosing is not None:
+                self.dosing.exit(None if deadline is None else max(0.0, deadline - time.monotonic()))
         except Exception as e:
             log("dosing: could not switch off on the way out:", e)
 
@@ -4580,8 +4856,10 @@ class Controller:
             f"(UTC{off_h:+.1f}h) TZ={os.environ.get('TZ', 'unset')}"
         )
         try:
-            r = _session().get(f"{BASE}/config", headers=HDR, timeout=8)
-            ha_tz = (r.json() or {}).get("time_zone") if r.status_code == 200 else None
+            r = _session().get(f"{BASE}/config", headers=HDR, timeout=8) if _GATE.allows("other") else None
+            if r is not None:
+                _GATE.saw("other", r.status_code, f"GET {BASE}/config")
+            ha_tz = (r.json() or {}).get("time_zone") if r is not None and r.status_code == 200 else None
         except Exception:
             ha_tz = None
         if not ha_tz:
@@ -4600,9 +4878,14 @@ class Controller:
                 "timezone mismatch, the day may be shifted",
                 f"The controller app's clock is on UTC{off_h:+.1f}h, but Home Assistant is set to "
                 f"{ha_tz} (UTC{ha_off:+.1f}h). Lights on and off, dryback and the daily reset all go "
-                "by the app's clock, so the whole grow-day is shifted by the difference. Update or "
-                "rebuild the controller app; if it stays, check the time zone under Settings → "
-                "System → General.",
+                "by the app's clock, so the whole grow-day is shifted by the difference. "
+                + (
+                    "Set TZ in the controller container's compose file to Home Assistant's time zone, "
+                    "or remove it to follow Home Assistant, then restart the container."
+                    if _GATE.container
+                    else "Update or rebuild the controller app; if it stays, check the time zone under "
+                    "Settings → System → General."
+                ),
             )
         else:
             log(f"timezone: matches Home Assistant ({ha_tz})")
@@ -4619,12 +4902,82 @@ class Controller:
         self._log_timezone()
         self._start_dosing()
         while True:
+            if _GATE.state is not None:
+                self._park_refused()
             try:
                 self.loop_once(datetime.now())
             except Exception as e:
                 log("loop error", e)
-            time.sleep(self.loop_seconds)
+            if _GATE.state is None:
+                time.sleep(self.loop_seconds)
+
+    # ---------------------------------------------------------------- a refused token (container mode)
+    def _switched_on(self):
+        """What this process has switched on now, which a refused token still switches off (_AuthGate):
+        the shot in flight's valve, main line and pump, and the running dose's or batch's hardware."""
+        rec = getattr(self._shot_room, "shot_inflight", None) if self._shot_room is not None else None
+        own = [rec.get(k) for k in ("valve", "mainline", "pump")] if rec else []
+        if self.dosing is not None:
+            own += self.dosing.running_off()
+        return [e for e in own if e]
+
+    def _recorded_entity(self):
+        """The first switch a shot or a dose has recorded as maybe still on, or None."""
+        for room in self.rooms:
+            rec = getattr(room, "shot_inflight", None)
+            for key in ("valve", "mainline", "pump"):
+                if rec and rec.get(key):
+                    return rec[key]
+        return self.dosing.recorded_entity() if self.dosing is not None else None
+
+    def _park_refused(self):
+        """Home Assistant refuses this controller's token (_AuthGate): no more requests, but one question
+        while anything is recorded, one read of a recorded switch every 60 s for 10 min and every 15 min
+        after, so that if the refusal came from a proxy that recovers, the run carries on and the
+        reconciler closes what is left. Returns once Home Assistant accepts again. A token whose user is
+        no longer an administrator ("writes") never gets that back by itself: the shot in flight closed
+        as usual, so the safe-off of a stop runs (without exiting), and while a shot stays recorded the
+        reconciler, which needs no administrator, is run on the same schedule."""
+        if _GATE.state == "writes":
+            budget = runtime_env.stop_budget(os.environ)
+            deadline = time.monotonic() + budget
+            self._stop_dosing_starts()
+            self._safe_off(deadline - (min(STOP_DOSING_S, budget / 5) if self._dosing_recorded() else 0.0))
+            self._exit_dosing(deadline)
+            self._save_state()
+        since, said = time.monotonic(), False
+        while True:
+            writes = _GATE.state == "writes"
+            entity = (next((r.shot_inflight["valve"] for r in self.rooms if getattr(r, "shot_inflight", None)),
+                           None) if writes else self._recorded_entity())
+            if entity is None:
+                if not said:
+                    log("parked: nothing this controller started is recorded, so nothing more is sent to Home "
+                        "Assistant until the controller is restarted")
+                    said = True
+                time.sleep(runtime_env.PROBE_SLOW_S)
+                continue
+            due = since + runtime_env.next_probe(time.monotonic() - since)
+            time.sleep(max(0.0, due - time.monotonic()))
+            if writes:
+                self._reconcile_inflight()
+            else:
+                _GATE.probe(entity)
+                if _GATE.state is None:
+                    return
+
+
+def close_only_start():
+    """For runtime_env.preflight: the token works but its user is not an administrator, and the previous
+    run left a shot or a dose recorded. Close what is recorded with this token, by the usual rules (the
+    reconciler, dosing's recovery), switch nothing on and write no state to Home Assistant, then return."""
+    _GATE.state = "writes"
+    controller = Controller()
+    controller._reconcile_inflight()
+    if controller.dosing is not None:
+        controller.dosing.recover()
 
 
 if __name__ == "__main__":
+    runtime_env.preflight(close_only_start, version=CONTROLLER_VERSION)
     Controller().run()

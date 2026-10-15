@@ -14,10 +14,11 @@ import json
 import os
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import custom_components
 import pytest
+from homeassistant.setup import async_setup_component
 
 # The test plugin ships its own `custom_components` package (its sample integrations) and imports it
 # first, so Home Assistant's loader would never look in this repository. Add ours to that package's
@@ -45,6 +46,20 @@ def _custom_integrations(hass, enable_custom_integrations):
     yield
 
 
+@pytest.fixture
+async def real_api(hass, aiohttp_client, socket_enabled):
+    """Home Assistant's real REST API, with its auth and ban middlewares, served on a loopback port:
+    the address (ending in /api) for the controller's own `requests` code. The one thing stood in for
+    is the HTTP component's own listener start, which would bind port 8123. A module that uses this
+    overrides `_custom_integrations` (above, which puts a MagicMock in place of `http`) with one that
+    only enables the custom integrations."""
+    with patch("homeassistant.components.http.HomeAssistantHTTP.start", AsyncMock()):
+        assert await async_setup_component(hass, "http", {})
+        assert await async_setup_component(hass, "api", {})
+    client = await aiohttp_client(hass.http.app)
+    return str(client.make_url("/api"))
+
+
 # ------------------------------------------------------------------ seeded old installs
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -65,6 +80,10 @@ for _path in (_ADDON / "f2_control", _ADDON / "tests"):
 def _hermetic_controller_state(tmp_path, monkeypatch):
     """The add-on Controller must never read or write this machine's real /data/state.json."""
     monkeypatch.setenv("F2_STATE_PATH", str(tmp_path / "state.json"))
+    # It runs as the Home Assistant app (runtime_env.runtime() is "addon"), as the Supervisor starts it.
+    monkeypatch.setenv("F2_RUNTIME", "addon")
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "test-supervisor-token")
+    monkeypatch.delenv("HA_URL", raising=False)
 
 
 @pytest.fixture
@@ -89,7 +108,9 @@ def controller_for(hass, monkeypatch):
         def monotonic(self):
             return self.seconds
 
-    def build(options=None, *, saved_state=None):
+    def build(options=None, *, saved_state=None, options_file=False):
+        """`options_file`: write the options to the data folder's options.json and let the controller
+        read it with its own load_options, as the app does, instead of handing it the dict."""
         fake = fake_ha.FakeHA()
         for state in hass.states.async_all():
             attributes = json.loads(json.dumps(dict(state.attributes), default=str))
@@ -99,7 +120,14 @@ def controller_for(hass, monkeypatch):
                 json.dumps(saved_state), encoding="utf-8"
             )
         clock = Clock()
-        monkeypatch.setattr(controller, "load_options", lambda: dict(options or {}))
+        monkeypatch.setattr(controller, "_GATE", controller._AuthGate())  # as the app (see above)
+        if options_file:
+            path = Path(os.environ["F2_STATE_PATH"]).parent / "options.json"
+            path.write_text(json.dumps(options or {}), encoding="utf-8")
+            monkeypatch.setenv("F2_OPTIONS_PATH", str(path))
+            assert controller.load_options.__module__ == "controller"  # the real one, not a stand-in
+        else:
+            monkeypatch.setattr(controller, "load_options", lambda: dict(options or {}))
         for name in ("ha_get", "ha_call", "ha_get_all", "ha_set", "ha_service_response"):
             monkeypatch.setattr(controller, name, getattr(fake, name))
         # No recorder behind the fake: history is never asked of a real Home Assistant.
