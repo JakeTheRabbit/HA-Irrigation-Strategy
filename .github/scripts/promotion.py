@@ -33,6 +33,7 @@ REQUIRED_JOBS = (
     ("Real Home Assistant (setup wizard and entity ids)",),
     ("Dashboard build and browser workflows",),
     ("MCP protocol and reviewed configuration workflows",),
+    ("Controller container smoke (both modes)",),
 )
 SHA = re.compile(r"[0-9a-f]{40}")
 

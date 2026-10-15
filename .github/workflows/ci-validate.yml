@@ -149,6 +149,50 @@ jobs:
           build-args: |
             BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
 
+  container-smoke:
+    # One image, both install modes: the same amd64 image runs tests_container as a standalone
+    # container and as the Supervisor runs the app, against a fake Home Assistant. Runs on every
+    # Validate run with no path or `if` filter, so a required check never waits on a job that did
+    # not run. Nothing is pushed.
+    name: Controller container smoke (both modes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pytest
+        run: python -m pip install pytest==8.2.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the controller image
+        # As the add-on build job, plus load: the image must be in the local daemon to be run.
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: addons/f2_control
+          push: false
+          load: true
+          build-args: |
+            BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
+
+      - name: Container smoke, both modes, on that image
+        # tests_container skips without an image; inspecting it first keeps a skip from passing.
+        env:
+          CONTROLLER_IMAGE: ${{ steps.build.outputs.imageid }}
+        run: |
+          docker image inspect "$CONTROLLER_IMAGE" > /dev/null
+          python -m pytest tests_container -q -rs
+
   dependency-review:
     name: Dependency Review (PR only)
     if: github.event_name == 'pull_request'
