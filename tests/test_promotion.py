@@ -304,6 +304,43 @@ def test_the_add_on_build_job_is_required_under_one_name(mutate):
     assert not api.writes
 
 
+SMOKE = "Controller container smoke (both modes)"
+
+
+def smoke_job(api):
+    return next(job for job in api.jobs if job["name"] == SMOKE)
+
+
+def test_the_container_smoke_job_is_in_validate_and_passes_when_green():
+    workflow = (ROOT / ".github" / "workflows" / "ci-validate.yml").read_text(
+        encoding="utf-8"
+    )
+    assert f"name: {SMOKE}\n" in workflow
+    api = FakeGitHub()
+    plan = promotion.promote(api, TAG)
+    assert plan["validate_jobs"][SMOKE] == smoke_job(api)["id"]
+    assert not api.writes
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda api: api.jobs.remove(smoke_job(api)),
+        lambda api: smoke_job(api).update(conclusion="failure"),
+    ],
+    ids=["missing", "failed"],
+)
+def test_the_container_smoke_job_is_required(mutate):
+    api = FakeGitHub()
+    mutate(api)
+    message = re.escape(
+        f"Required Validate job did not pass for the candidate: {SMOKE}"
+    )
+    with pytest.raises(promotion.Rejected, match=message):
+        promotion.promote(api, TAG, apply=True)
+    assert not api.writes
+
+
 def test_apply_needs_prior_read_only_plan_and_trusted_context(monkeypatch):
     api = FakeGitHub()
     with pytest.raises(promotion.Rejected, match="read-only preflight"):

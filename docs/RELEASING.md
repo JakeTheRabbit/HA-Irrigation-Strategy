@@ -62,7 +62,7 @@ Every pull request states its class. The class sets the minimum soak. When in do
 
 ### 2. Automated checks, green on the exact commit
 
-`bash tests/run_ci.sh` locally, and on GitHub every job of `Validate`: ruff, black, yamllint, vendored engine identical, the stub suite, the controller suite, the engine suite, **the real-Home-Assistant tier (`tests_ha/`)**, hassfest, HACS validation, the add-on image build, the dashboard build (**and proof that the committed dashboard file is exactly what `frontend/src` builds**), the browser checks, MCP.
+`bash tests/run_ci.sh` locally, and on GitHub every job of `Validate`: ruff, black, yamllint, vendored engine identical, the stub suite, the controller suite, the engine suite, **the real-Home-Assistant tier (`tests_ha/`)**, hassfest, HACS validation, the add-on image build, **the controller container smoke in both modes (`tests_container/`)**, the dashboard build (**and proof that the committed dashboard file is exactly what `frontend/src` builds**), the browser checks, MCP.
 
 A C2 or C3 change is not reviewable without:
 
@@ -220,7 +220,7 @@ Open it as a pull request into `testing` like any other change. You cannot split
 
 People skip checklists at 11 pm. Repository settings do not.
 
-- **Protect `testing`:** require a pull request, require an approval from someone other than the author, require every `Validate` job (they must include *Real Home Assistant*, *Build f2-control add-on image* and *Dashboard build and browser workflows*, not only lint), require the branch to be up to date before merging, block force-pushes and deletion.
+- **Protect `testing`:** require a pull request, require an approval from someone other than the author, require every `Validate` job (they must include *Real Home Assistant*, *Build f2-control add-on image*, *Controller container smoke (both modes)* and *Dashboard build and browser workflows*, not only lint), require the branch to be up to date before merging, block force-pushes and deletion.
 - **Protect `main`:** block force-pushes and deletion. It takes no pull requests at all: the only thing that ever arrives is a fast-forward, pushed by whoever is allowed to promote. On an organisation's repository, restrict pushes to those people. On a personal repository classic branch protection cannot do that (the *Restrict who can push* option exists only for organisations): anyone with write access can push, so keep write access to yourself, or use a ruleset with *Restrict updates* and yourself as the only bypass. (Not checked against GitHub's current settings pages; confirm when you set it up.)
 - **Freeze `testing` during a soak** with *Lock branch* (step 3).
 - **Production boxes:** plain repository address, add-on auto-update OFF, HACS beta versions OFF.

@@ -164,6 +164,17 @@ or the add-on's own container does, and there the suites used to write a real fi
 into the next test. All three conftests now set `F2_STATE_PATH` per test. Unset, as on every
 live install, the path is `/data/state.json`.
 
+### Both install modes, in the real image
+
+`tests_container/test_container.py` runs the built controller image against
+`tests_container/fake_ha_server.py`, as a standalone container and as the Supervisor runs the app.
+It needs Docker and `CONTROLLER_IMAGE`, and skips without them. CI's *Controller container smoke
+(both modes)* job builds the amd64 image once and runs it on that image on every Validate run; the
+*Promote* preflight requires that job to have passed. Locally:
+
+    docker build -t crop-steering-controller:test addons/f2_control
+    CONTROLLER_IMAGE=crop-steering-controller:test python -m pytest tests_container -q
+
 ### Stopping mid-shot, in the real image
 
 `tests_container/stop_mid_shot.sh <image>` needs Docker and is run by hand. It starts the built
