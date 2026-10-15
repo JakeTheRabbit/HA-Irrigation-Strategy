@@ -8,8 +8,11 @@
 # valve). From the valve's switch-on every answer from "Home Assistant" waits, so closing up takes
 # far longer than 3 s. Six seconds into the shot, `docker stop -t 30` (the app's `timeout: 30`).
 # Passes when the valve's turn_off arrives after the stop, the log says the shot in flight was
-# switched off, and the container exits 0 inside the 30 s. The stop path has no time limit of its
-# own yet, so with answers that wait 2 s it can still run past the 30 s. Needs Docker; build with
+# switched off, and the container exits 0 inside the 30 s. The stop path keeps inside its 25 s
+# budget however long the answers wait, but the longer they wait the less of the close and its
+# read-back fits in it: what is not confirmed off stays recorded for the next start and the
+# "switched off" line is not logged, so this check is for answers up to about 2 s. Needs Docker;
+# build with
 #   docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20 \
 #     -t crop-steering-controller addons/f2_control
 set -u
