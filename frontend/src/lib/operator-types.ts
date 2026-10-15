@@ -106,6 +106,12 @@ export interface SetupZone {
   substrate_volume?: number;
   drippers_per_plant?: number;
   dripper_flow_rate?: number;
+  /** Mapped probes that do not count towards the zone's reading, and the primary one ("" none):
+   * the Probes page's choice. Absent from an older integration. */
+  vwc_unused?: string[];
+  vwc_primary?: string;
+  ec_unused?: string[];
+  ec_primary?: string;
 }
 export interface SetupRoom {
   entry_id: string;

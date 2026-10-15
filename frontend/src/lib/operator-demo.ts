@@ -341,6 +341,12 @@ export class OperatorDemo {
         const room = this.rooms!.find((r) => r.entry_id === data.entry_id);
         if (action !== "setup_create" && (!room || room.revision !== data.expected_revision))
           throw new Error("Room changed. Reload setup.");
+        const rows = data.zones as Record<string, unknown>[] | undefined;
+        if (action === "setup_save" && room && isProbeChoice(data, rows)) {
+          // As the integration does: which probes count and which leads, alone, while watering.
+          this.saveProbeChoice(room, rows!);
+          return clone(room) as T;
+        }
         if (room && !room.safety.ready) throw new Error(room.safety.blockers.join(" "));
         if (action === "setup_remove") {
           if (data.confirm_name !== room!.room_name) throw new Error("Enter the exact room name.");
@@ -437,4 +443,50 @@ export class OperatorDemo {
     if (result === undefined) throw new Error("Unsupported demo action.");
     return clone(result) as T;
   }
+  /** Keep a zone's probe choice, and show it on its combined sensors as the integration does: a
+   * probe that does not count left out as "not counted", the primary named. */
+  private saveProbeChoice(room: SetupRoom, rows: Record<string, unknown>[]) {
+    const states = { ...this.getStates() };
+    for (const row of rows) {
+      const zone = room.zones.find((item) => item.id === row.id);
+      if (zone) Object.assign(zone, row);
+      for (const kind of ["vwc", "ec"] as const) {
+        const id = `sensor.crop_steering_${room.prefix}${kind}_zone_${row.id}`;
+        const attributes = states[id]?.attributes;
+        if (!attributes || !Array.isArray(attributes.used) || !(`${kind}_unused` in row)) continue;
+        const unused = row[`${kind}_unused`] as string[];
+        const before = (attributes.excluded ?? {}) as Record<string, string>;
+        const probes = [...(attributes.used as string[]), ...Object.keys(before)];
+        const excluded = Object.fromEntries(
+          probes.flatMap((probe) =>
+            unused.includes(probe)
+              ? [[probe, "not counted"]]
+              : before[probe] && before[probe] !== "not counted"
+                ? [[probe, before[probe]]]
+                : [],
+          ),
+        );
+        states[id] = {
+          ...states[id],
+          attributes: {
+            ...attributes,
+            used: probes.filter((probe) => !(probe in excluded)),
+            excluded,
+            primary: row[`${kind}_primary`] || null,
+          },
+        };
+      }
+    }
+    room.revision++;
+    this.updateStates(states);
+  }
+}
+/** A setup save of only which probes count and which leads (lib/probes.ts probeChoicePayload). */
+function isProbeChoice(data: Record<string, unknown>, rows: Record<string, unknown>[] | undefined) {
+  const choice = ["id", "active", "vwc_unused", "vwc_primary", "ec_unused", "ec_primary"];
+  return (
+    Array.isArray(rows) &&
+    Object.keys(data).every((key) => ["entry_id", "expected_revision", "zones"].includes(key)) &&
+    rows.every((row) => Object.keys(row).every((key) => choice.includes(key)))
+  );
 }
