@@ -149,6 +149,7 @@ for that zone. (3 zones × 24 = 72 entities on a 3-zone system.)
 | `zone_N_set_phase` | Keep · P0 · P1 · P2 · P3 | Moves the zone to a phase by hand. The controller applies a pick once, within a minute, and sets it back to Keep; its own rules carry on from that phase. Today's water and shot counts stay; P1 ramps from its first shot, and P0 measures its dry-back from the moisture at the move. |
 | `zone_N_steering_mode` | Vegetative · Generative | Per-zone veg/gen bias. |
 | `zone_N_vwc_method`, `zone_N_ec_method` | Median · Average · Lowest · Highest | How the zone's probes become its moisture reading, and apart its EC reading. Median by default. A probe far from the others is left out first; Lowest and Highest need three probes that agree, and with fewer the zone steers on the median and the controller raises CS-502. |
+| `ec_type_<probe>` (one per mapped EC probe, named after the probe's entity id) | unknown · pore · bulk | What the probe measures: pore EC (the water in the substrate's pores) or bulk EC (substrate and water together, which reads lower). unknown by default, which fuses as before. A zone with both a pore and a bulk probe never combines the two: it steers on its pore probes, and on its bulk probes only while no pore probe reports, when the controller raises CS-504. |
 
 ---
 

@@ -25,7 +25,24 @@ def _combine(values, method):
     return statistics.median(values)
 
 
-def fuse_probes(readings, offsets, lo, hi, stale_s, method="Median", far=None):
+def ec_type_key(probe):
+    """The key of the select saying what EC probe `probe` (an entity id) measures (select.py)."""
+    return f"ec_type_{probe.split('.', 1)[-1]}"
+
+
+def _passes(v, age, lo, hi, stale_s):
+    """A probe reading the zone can use as it is: a number in lo..hi, reported within stale_s."""
+    return (
+        v is not None
+        and math.isfinite(v)
+        and lo <= v <= hi
+        and (age is None or age <= stale_s)
+    )
+
+
+def fuse_probes(
+    readings, offsets, lo, hi, stale_s, method="Median", far=None, ec_types=None
+):
     """Combine one zone's probes into the single reading the controller steers by.
 
     `readings` is every probe the zone maps as (entity_id, value or None, age in seconds or None),
@@ -43,10 +60,36 @@ def fuse_probes(readings, offsets, lo, hi, stale_s, method="Median", far=None):
     - With every probe used, each probe's offset is learned against that reading. With a probe
       missing, each remaining probe is first shifted by its offset, so losing a probe does not step
       the reading the controller measures dryback and thresholds from.
+    - `ec_types` says what each EC probe measures (EC_TYPES; unknown when absent). A zone with
+      both a pore and a bulk probe never combines the two: it steers on its pore probes (and the
+      unknown ones) while one of them passes, else on its bulk probes (and the unknown ones), and
+      detail["ec_type"] says which. Unknown probes alone, or beside one type only, fuse as before.
 
     Returns (reading or None, detail for the sensor's attributes).
     """
     readings = list({pid: (pid, v, age) for pid, v, age in readings}.values())
+    kept_apart, ec_type = {}, None
+    types = {pid: (ec_types or {}).get(pid) for pid, _v, _age in readings}
+    if {"pore", "bulk"} <= set(types.values()):
+        pore = any(
+            types[pid] == "pore" and _passes(v, age, lo, hi, stale_s)
+            for pid, v, age in readings
+        )
+        ec_type = "pore" if pore else "bulk"
+        kept_apart = {
+            pid: (
+                "bulk EC, kept apart from pore EC"
+                if pore
+                else (
+                    "no reading"
+                    if v is None or not math.isfinite(v)
+                    else "out of range" if not lo <= v <= hi else "not reporting"
+                )
+            )
+            for pid, v, _age in readings
+            if types[pid] == ("bulk" if pore else "pore")
+        }
+        readings = [r for r in readings if r[0] not in kept_apart]
     if offsets and set(offsets) != {pid for pid, _v, _age in readings}:
         offsets.clear()  # another set of probes: what this one learned says nothing about it
     usable = {
@@ -72,9 +115,10 @@ def fuse_probes(readings, offsets, lo, hi, stale_s, method="Median", far=None):
         else "Median"
     )
     detail = {
-        "probes": len(readings),
+        "probes": len(readings) + len(kept_apart),
         "used": sorted(pool),
-        "excluded": {
+        "excluded": kept_apart
+        | {
             pid: (
                 "no reading"
                 if v is None or not math.isfinite(v)
@@ -91,6 +135,8 @@ def fuse_probes(readings, offsets, lo, hi, stale_s, method="Median", far=None):
         "method": method,
         "steered_by": steered_by,
     }
+    if ec_type:
+        detail["ec_type"] = ec_type
     if not pool:
         return None, detail
     if len(pool) == len(readings):

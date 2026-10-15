@@ -43,7 +43,7 @@ from .const import (
 )
 from .room import room_prefix, build_engine_config
 from . import stock
-from .calculations import ShotCalculator, fuse_probes
+from .calculations import ShotCalculator, ec_type_key, fuse_probes
 from .units import to_native
 from .zone_status import mirrored_status, status_app_entity
 
@@ -784,6 +784,17 @@ class CropSteeringSensor(SensorEntity):
         """The zone's select of how its probes become its `kind` reading (select.py)."""
         return f"select.{DOMAIN}_{self._prefix}zone_{self._zone_number}_{kind}_method"
 
+    def _ec_types(self, sensor_ids: list[str]) -> dict[str, str]:
+        """What each EC probe measures, from its select (select.py); unknown without one."""
+        types = {}
+        for probe in sensor_ids:
+            state = probe and self.hass.states.get(
+                f"select.{DOMAIN}_{self._prefix}{ec_type_key(probe)}"
+            )
+            if state:
+                types[probe] = state.state
+        return types
+
     def _fuse_zone(self, sensor_ids: list[str], kind: str) -> float | None:
         """One zone's reading from its probes (calculations.fuse_probes), combined as the zone's
         select says; Median without it."""
@@ -797,6 +808,7 @@ class CropSteeringSensor(SensorEntity):
             PROBE_STALE_SECONDS,
             method.state if method is not None else "Median",
             PROBE_FAR[kind],
+            self._ec_types(sensor_ids) if kind == "ec" else None,
         )
         if value is not None and not self._fusion["excluded"]:
             self._offsets_at = dt_util.utcnow().isoformat()

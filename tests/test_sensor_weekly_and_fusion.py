@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from custom_components.crop_steering import units
-from custom_components.crop_steering.calculations import fuse_probes
+from custom_components.crop_steering.calculations import ec_type_key, fuse_probes
 from custom_components.crop_steering.const import (
     DOMAIN,
     PROBE_FAR,
@@ -40,6 +40,7 @@ def sensor(states, prefix=""):
         "_probe_readings",
         "_fuse_zone",
         "_probe_method_entity",
+        "_ec_types",
         "_get_zone_vwc",
         "_get_zone_ec",
     }
@@ -57,6 +58,7 @@ def sensor(states, prefix=""):
         "_LOGGER": logging.getLogger(__name__),
         "to_native": units.to_native,
         "fuse_probes": fuse_probes,
+        "ec_type_key": ec_type_key,
         "DOMAIN": DOMAIN,
         "PROBE_FAR": PROBE_FAR,
         "PROBE_RANGE": PROBE_RANGE,
