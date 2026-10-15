@@ -132,6 +132,7 @@ for that zone. (3 zones × 23 = 69 entities on a 3-zone system.)
 | `recipe_stage` | Veg · Transition · Bulk · Ripen · Custom | Picking a stage applies its setpoints to the zones. |
 | `water_today_view` | Zone total · Per plant | How Water today reads for the room: each zone's total, or its water and daily limit divided by its plant count. The dashboard shows it that way for everyone (Settings → Appearance), and the controller's vitals notification follows it. Zone total by default. |
 | `substrate` | generic · rockwool · coco | What the room grows in. Published in the room's `engine_config` descriptor and read by the controller, which takes a change with no disarm cycle. `generic` by default, and on every upgraded room; choosing another changes nothing the controller does yet. |
+| `ai_no_touch` | Off · 1 h · Until lights-on · 24 h | Pause AI changes: a no-touch window for the room (an operator sampling or visiting). While it runs the AI assistant asks nothing and changes nothing there, and the rules carry on; the brain panel's `no_touch_until` says when it ends. It runs from the choice (its `since` attribute), and the controller sets it back to Off when it is over. Off by default, and on every upgraded room. |
 
 ### Per-zone (`select.crop_steering_zone_N_*`)
 | Entity | Options | What it does |

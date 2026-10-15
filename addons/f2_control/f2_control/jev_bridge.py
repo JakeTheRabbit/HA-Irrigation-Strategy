@@ -326,6 +326,8 @@ def tick(c, room, zone, snap, p, now, lights_on):
     guard_setpoints(c, room, zone, now)
     levers = judge_levers(c, room)
     _handover(c, room, zone, p, now, levers)
+    if c._no_touch_until(room, now) is not None:
+        return {}  # the room's no-touch window: nothing is asked and nothing acts until it ends; the rules carry on
     if haiku(c):
         if not c._on(room.enable_flag, False):
             return {}  # the kill switch is off: the engine decides alone, and nothing is asked (it costs money)
@@ -853,9 +855,11 @@ def panel(c, room, now):
     elif not getattr(brain, "_fallback_since", None):
         brain._fallback_since = now.isoformat(timespec="seconds")
     built = sorted(j.name for j in brain.judges)
+    no_touch = c._no_touch_until(room, now)
     out = {"provider": status.provider, "model": status.model, "mode": "dry_run" if brain.dry_run else "acting",
            "state": state, "state_words": words, "notice": status.notice, "key_set": status.key_set,
            "deprecated_route": status.deprecated_route, "fallback_since": getattr(brain, "_fallback_since", None),
+           "no_touch_until": no_touch.isoformat(timespec="minutes") if no_touch else None,
            "stage_arc": {"id": getattr(brain, "arc", DEFAULT_ARC), "in_force": bool(getattr(brain, "arc_rows", STAGE_ROWS)),
                          "words": getattr(brain, "arc_note", None)},
            "judges_acting": [j for j in built if j in ACTING_JUDGES] if acting else [],

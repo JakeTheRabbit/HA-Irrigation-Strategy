@@ -465,6 +465,10 @@ RETIRED_SWITCHES = (
 # (_blocked) and ends one in flight (_wait_shot): the same test, so the two can never disagree.
 ON_STATES = ("on", "true", "open", "1", "home")
 
+# A room's no-touch window, as its Pause AI Changes select names it: how long it runs from the choice
+# (None: until the next lights-on). Off, or any other word, is no window.
+NO_TOUCH_HOURS = {"1 h": 1.0, "24 h": 24.0, "Until lights-on": None}
+
 # A switch a shot opened changed state inside this window of the shot's recorded start, in seconds:
 # the pump prime (2 s), the main-line lead (1 s) and, at worst, a slow Home Assistant acknowledging
 # each command. A switch that changed outside it was already on, or has been touched by a person since,
@@ -4236,6 +4240,25 @@ class Controller:
         log(f"[{room.slug}] Z{zone} phase {was} -> {wanted}: set by hand")
         self._save_state()
         self._notify_event("phase", room, zone, was, wanted, "set by hand")
+
+    def _no_touch_until(self, room, now):
+        """When the room's no-touch window ends, or None when none runs. The operator chose it on the room's
+        Pause AI Changes select; it runs from that choice (the select's `since`, else when its value changed)
+        for an hour, a day or until the next lights-on. Once it is over the select is set back to Off."""
+        entity = f"select.crop_steering_{room.prefix}ai_no_touch"
+        read = ha_get(entity)
+        if read[0] not in NO_TOUCH_HOURS:
+            return None  # Off, or a Home Assistant without the select
+        since = _aware(read[1].get("since") or read.last_changed)
+        if since is None:
+            return None
+        since = since.astimezone().replace(tzinfo=None)
+        hours = NO_TOUCH_HOURS[read[0]] or self._hours_to(since, room.lights_on_hour) or 24.0
+        until = since + timedelta(hours=hours)
+        if now < until:
+            return until
+        ha_call("select", "select_option", entity_id=entity, option="Off")
+        return None
 
     def _strategy_preflight(self, room, zone, now):
         if getattr(room, "_strategy_batch_invalid", False):

@@ -1,7 +1,8 @@
 """A room's no-touch window (Pause AI Changes) is one select per room, and it is additive: a new room and every
-upgraded one get it at Off, and a choice records when it was made and survives a reload."""
+upgraded one get it at Off, a choice records when it was made and survives a reload, and the real controller reads
+the window from Home Assistant, keeps the brain from asking inside it, and sets it back to Off once it is over."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 from conftest import fixture
@@ -39,3 +40,30 @@ async def test_a_new_room_has_no_window_until_someone_chooses_one(hass):
 async def test_an_upgraded_room_gets_the_select_at_off(hass, name):
     await _upgrade(hass, name, registry_ids=fixture(name).get("registry"))
     assert hass.states.get(NO_TOUCH).state == "Off"
+
+
+async def test_the_controller_reads_the_window_asks_nothing_inside_it_and_ends_it(
+    hass, controller_for, monkeypatch
+):
+    import functools
+
+    import brain_kit as B
+    import jev_bridge
+    from jev import client as jc
+
+    client = B.FakeClient(B.judging())
+    monkeypatch.setattr(jc, "anthropic", B.FakeSDK(client))
+    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(jc.Asker, threaded=False))
+    await _install(hass)
+    await _choose(hass, "1 h")
+    c, fake, _clock = controller_for(
+        {"brain_provider": "claude_haiku", "anthropic_api_key": B.SENTINEL}
+    )
+    room, now = c.rooms[0], datetime.now()
+    until = c._no_touch_until(room, now)
+    assert until is not None and timedelta(minutes=58) < until - now <= timedelta(hours=1)
+    c.loop_once(now)
+    assert client.requests == []
+    assert fake.sets["sensor.crop_steering_jev"][1]["no_touch_until"] == until.isoformat(timespec="minutes")
+    assert c._no_touch_until(room, now + timedelta(hours=1, minutes=1)) is None
+    assert ("select", "select_option", {"entity_id": NO_TOUCH, "option": "Off"}) in fake.calls
