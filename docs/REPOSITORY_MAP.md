@@ -11,6 +11,7 @@
 | www/dashboard.html | Generated static web application |
 | custom_components/crop_steering/www/dashboard.html | Identical generated application served by the integration |
 | addons/f2_control/www/public/dashboard.html | Identical generated application served through ingress |
+| doctrine | The crop-steering doctrine pack for the optional AI brain: hand-edited rules, outputs generated and checked against the code by doctrine/tools/build_doctrine.py; nothing reads it yet |
 | tests | Integration and repository contract tests |
 | docs | Install, operation, architecture and release process |
 | docs/dev | Working notes for developers: design specs, implementation plans and review write-ups. Not operator documentation |
