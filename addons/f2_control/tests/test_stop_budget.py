@@ -332,7 +332,8 @@ def test_the_normal_close_after_a_shot_waits_as_it_always_did(rig, monkeypatch):
 APP = {"F2_RUNTIME": "addon", "SUPERVISOR_TOKEN": "t"}  # what the Supervisor gives the app
 
 
-@pytest.mark.parametrize("runtime, default", [(APP, 25.0), ({"F2_RUNTIME": "container"}, 75.0), ({}, 75.0)])
+@pytest.mark.parametrize("runtime, default", [(APP, 25.0), ({"F2_RUNTIME": "container"}, 75.0), ({}, 25.0),
+                                              ({"SUPERVISOR_TOKEN": "t"}, 25.0)])
 @pytest.mark.parametrize(
     "value, budget",
     [(None, None), ("", None), ("40", 40.0), ("7.5", 7.5), ("0", None), ("-3", None), ("soon", None),

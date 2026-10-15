@@ -312,8 +312,11 @@ def test_c5_anything_short_of_what_the_supervisor_gives_is_a_container(rig, env,
     rig.fake(alias="supervisor")
     ctl = rig.controller(**env)
     rig.wait(ctl, f"runtime: container (not the app: {refused})")
+    # Gated as a container, but what would harm an app that lost its F2_RUNTIME keys on
+    # F2_RUNTIME=container only: the app's 25 s stop budget and its dashboard stay.
+    rig.wait(ctl, "stop budget: 25 s")
     time.sleep(3)
-    assert not serves_8420(ctl)
+    assert serves_8420(ctl)
 
 
 def test_c5_the_app_is_built_at_once_while_home_assistant_is_unreachable(rig):
