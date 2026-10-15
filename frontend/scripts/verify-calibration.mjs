@@ -36,7 +36,7 @@ try {
     await page.goto(`${origin}/dashboard.html?demo=1#/equipment/probes`);
     const panel = page.getByRole("region", { name: "Feed probe calibration" });
     await panel.waitFor();
-    // Flower 2 maps both feed probes; its pH probe was checked before and was drifting.
+    // Room A maps both feed probes; its pH probe was checked before and was drifting.
     const ph = panel.locator('[data-calibration-probe="feed_ph"]');
     await ph.getByText("Drifting", { exact: false }).waitFor();
     await panel.locator('[data-calibration-probe="feed_ec"]').getByText("Never checked").waitFor();
@@ -81,9 +81,9 @@ try {
     await page.screenshot({ path: file(`probe-calibration-${width}.png`), fullPage: true });
     await context.close();
   }
-  // Flower 1 maps no feed-water probe: nothing to check, and it says where to map one.
+  // Room B maps no feed-water probe: nothing to check, and it says where to map one.
   const page = await browser.newPage();
-  await page.goto(`${origin}/dashboard.html?demo=1&room=room%3Af1_#/equipment/probes`);
+  await page.goto(`${origin}/dashboard.html?demo=1&room=room%3Aroom_b_#/equipment/probes`);
   await page
     .getByRole("region", { name: "Feed probe calibration" })
     .getByText("No feed-water probe is mapped")
