@@ -43,5 +43,6 @@ def _no_real_history(monkeypatch):
     import controller
 
     monkeypatch.setattr(controller, "ha_history", lambda entity, since, timeout=12: None)
+    monkeypatch.setattr(controller, "ha_logbook", lambda entity, since, timeout=8: [])
     # ...nor fire an event at one: a rig that records events patches its own (fake_ha.FakeHA).
     monkeypatch.setattr(controller, "ha_fire", lambda event, data, timeout=4: True)
