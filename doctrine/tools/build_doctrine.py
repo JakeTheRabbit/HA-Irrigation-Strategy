@@ -330,7 +330,7 @@ def engine_facts(doc, paths):
     # The Auto Setpoints learner: the controller's _follow_fc and the learner's wanted(), checked in their own source.
     follow = re.search(r"    def _follow_fc\(.*?(?=\n    def )", ctrl, re.S)
     follow = follow.group(0) if follow else ""
-    shift = re.search(r"^FC_SHIFT_MIN = ([0-9.]+)$", ctrl, re.M)
+    shift = re.search(r'"fc_shift_min": ([0-9.]+)', table)  # the generic substrate profile's
     shift = float(shift.group(1)) if shift else None
     blind_follow = re.search(r"for zone, p in blind:\n(?:.*\n){0,4}?.*self\._follow_fc\(room, zone, p, now\)", ctrl)
     ctrl_checks = [
@@ -364,7 +364,7 @@ def engine_facts(doc, paths):
          and 'getattr(room, "strategy_required", False)' in follow
          and 'return max(st.get("peak") or 0.0, prev), prev' in ctrl and "if prev is None or prev <= 0.0:" in ctrl
          and 'fc = bounded("field_capacity", seen)' in follow and 'target = bounded("p1_target_vwc", min(yday, fc))' in follow
-         and "if abs(delta) >= FC_SHIFT_MIN:" in follow and 'new_thr = bounded("p2_vwc_threshold", thr + delta)' in follow
+         and 'if abs(delta) >= _profile(room)["fc_shift_min"]:' in follow and 'new_thr = bounded("p2_vwc_threshold", thr + delta)' in follow
          and 'rescue = bounded("p3_emergency_vwc_threshold", p.p3_emergency_floor + delta)' in follow
          and "if rescue + 3.0 <= new_thr < target <= fc:" in follow and blind_follow is not None
          and 'if ha_get(entity)[0] in (None, "unknown", "unavailable", ""):' in ctrl),

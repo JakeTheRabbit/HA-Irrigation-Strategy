@@ -12,6 +12,8 @@ Nothing here fires a shot or writes a setpoint: setpoint_supervisor turns a plan
 """
 from dataclasses import dataclass
 
+from crop_steering_engine.defaults import SUBSTRATE_PROFILES
+
 
 @dataclass
 class ZoneModel:
@@ -32,13 +34,23 @@ class Recipe:
     ec_range: tuple = (3.0, 6.0)  # pore EC band for the stage, mS/cm
 
 
-# The tuning surface. Athena's Precision Irrigation Strategy targets per growth stage (midpoints).
-ATHENA = {
-    "veg": Recipe(1.0, 25.0, 60, 3.0, 20, 3.0, (3.0, 5.0)),
-    "stretch": Recipe(0.0, 45.0, 90, 3.0, 20, 1.5, (4.0, 10.0)),  # generative: big dryback, small shots, stack EC
-    "bulk": Recipe(1.0, 35.0, 60, 4.0, 20, 3.0, (3.5, 6.0)),  # vegetative: more runoff, lower EC
-    "finish": Recipe(1.0, 45.0, 90, 3.0, 20, 3.0, (3.0, 4.0)),  # vegetative EC + generative dryback
-}
+def curve(substrate="generic"):
+    """The day planner's recipe per stage for a substrate (its profile's curve; generic when unknown)."""
+    profile = SUBSTRATE_PROFILES.get(substrate, SUBSTRATE_PROFILES["generic"])
+    return {stage: Recipe(*row) for stage, row in profile["curve"].items()}
+
+
+def stage(recipe_stage, substrate="generic"):
+    """A recipe stage (Veg, Transition, Bulk, Ripen) -> (curve stage, steered generatively), or (None, None)."""
+    profile = SUBSTRATE_PROFILES.get(substrate, SUBSTRATE_PROFILES["generic"])
+    name = profile["stage_map"].get(recipe_stage)
+    return name, (None if name is None else name in profile["generative_stages"])
+
+
+# The tuning surface. Athena's Precision Irrigation Strategy targets per growth stage (midpoints): stretch is
+# generative (big dryback, small shots, stack EC), bulk vegetative (more runoff, lower EC), finish vegetative EC
+# with a generative dryback. The generic substrate profile's curve.
+ATHENA = curve()
 
 
 @dataclass

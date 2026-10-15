@@ -58,6 +58,8 @@ from crop_steering_engine import (
 # What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
 # controller column of the one defaults table, pinned to the values installed controllers use.
 from crop_steering_engine.defaults import CONTROLLER_FALLBACKS as FALLBACK
+# What depends on what a room grows in (its substrate select): "generic" is what every room ran on before.
+from crop_steering_engine.defaults import SUBSTRATE_PROFILES
 
 # ---------------------------------------------------------------- HA REST (Supervisor proxy)
 BASE = os.environ.get("HA_URL", "http://supervisor/core/api")
@@ -355,7 +357,8 @@ CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "C
 BACKUP_RISE_PTS, BACKUP_WINDOW_MIN, BACKUP_GRACE_MIN, BACKUP_CLEAR_MIN = 3.0, 60.0, 45.0, 60.0
 # Field capacity follows the zone's highest readings (_follow_fc). When it moves by this many points or more, the P2
 # re-water threshold and the rescue (P3 emergency) floor move with it; a smaller move is field capacity only.
-FC_SHIFT_MIN = 1.0
+# The room's substrate profile sets it (fc_shift_min); this is the generic profile's.
+FC_SHIFT_MIN = SUBSTRATE_PROFILES["generic"]["fc_shift_min"]
 # CS-311: the sump pump a room drains to (option sump_power_sensor) drawing no power for SUMP_SILENT_H while the
 # room is on. F2's ran every 1 to 1.5 hours, day and night, 22-28 Sep 2026 (its longest gap 2.37 h) and then not
 # at all for 41.6 h: its tables backed up. Checked every SUMP_CHECK_MIN from Home Assistant's history, as a run
@@ -382,7 +385,12 @@ PER_PLANT = "Per plant"
 # What a room grows in, published as the descriptor's `substrate` from its substrate select. The
 # integration offers the same ids (SUBSTRATES in its const.py). An integration from before the select
 # publishes none, and a value this controller does not know reads as "generic": nothing changes.
-SUBSTRATES = ("generic", "rockwool", "coco")
+SUBSTRATES = tuple(SUBSTRATE_PROFILES)
+
+
+def _profile(room):
+    """The room's substrate profile (defaults.SUBSTRATE_PROFILES): generic unless the room chose another."""
+    return SUBSTRATE_PROFILES.get(getattr(room, "substrate", "generic"), SUBSTRATE_PROFILES["generic"])
 
 # How a room is plumbed, as DECLARED in the integration's setup and published as the descriptor's
 # `plumbing`: layout -> (has a pump switch, has a main-line valve). The integration carries the same
@@ -1617,6 +1625,7 @@ class Controller:
         # Keep learned state for recovery, but never apply stale EC steering while blind to EC.
         p2_thr = base + (float(room.state[zone].get("ec_offset", 0.0)) if ec_known else 0.0)
         p2_thr = max(efloor + 3.0, min(min(p1t, fc) - 1.0, p2_thr))
+        prof = _profile(room)
         raw = ZoneParams(
             p1_target=p1t,
             p2_threshold=p2_thr,
@@ -1662,6 +1671,12 @@ class Controller:
             drown_ceiling=self._zone_num(
                 room, zone, "min_floor_drown_ceiling", FALLBACK["min_floor_drown_ceiling"], optional=True
             ),  # hard anti-drown VWC cap on the floor (engine-only knob — no integration entity)
+            ec_settle_min=prof["ec_settle_min"],
+            p1_rise_pts=prof["p1_rise_pts"],
+            p0_ec_flush_ratio=prof["p0_ec_flush_ratio"],
+            p0_ec_flush_shot=prof["p0_ec_flush_shot"],
+            ec_adjust_up=prof["ec_adjust_up"],
+            ec_adjust_down=prof["ec_adjust_down"],
         )
         p, warns = validate_params(raw)
         for w in warns:
@@ -1702,7 +1717,7 @@ class Controller:
             dt_h = (now - t0).total_seconds() / 3600.0
             if dt_h > 0:
                 rate = max(0.0, (v0 - vwc) / dt_h)
-        ec_settled = self._settled_ec(st, ec, now)
+        ec_settled = self._settled_ec(st, ec, now, _profile(room)["ec_settle_min"])
         feed_live = self._read_feed_ec(room)
         if feed_live is not None:
             feed_ec = feed_live
@@ -1756,10 +1771,11 @@ class Controller:
         )
         return snap, self._params(room, zone, ec_known=ec is not None)
 
-    def _settled_ec(self, st, ec, now):
+    def _settled_ec(self, st, ec, now, settle_min=EC_SETTLE_MIN):
         """The pore EC the engine's EC rules act on (ZoneSnapshot.ec_settled).
 
-        A reading counts as settled only EC_SETTLE_MIN after the last shot ended: before that the probe
+        A reading counts as settled only settle_min (the room's substrate profile; EC_SETTLE_MIN for generic)
+        after the last shot ended: before that the probe
         reads the feed front passing it (6-8 mS/cm during the 22 Sep ramp, on zones whose quiet readings
         were ~4.5). Between settled readings the last one stands. None while the probe itself reads
         nothing valid, and before the first settled reading (decide() then uses the raw reading, as it
@@ -1767,7 +1783,7 @@ class Controller:
         if ec is None:
             return None
         last = st.get("last_shot")
-        if last is None or st.get("last_shot_is_anchor") or (now - last).total_seconds() >= EC_SETTLE_MIN * 60.0:
+        if last is None or st.get("last_shot_is_anchor") or (now - last).total_seconds() >= settle_min * 60.0:
             previous = st.get("ec_smooth")
             st["ec_smooth"] = (
                 ec if previous is None or not math.isfinite(previous)
@@ -1835,7 +1851,7 @@ class Controller:
                     self._cf[0], self._cf[1],
                     auto_setpoints.evidence(learn, st["phase"], snap.vwc, p.p1_target, ec_rules, p.ec_target_p2,
                                             self._read_feed_ec(room), p.p2_shot_size, st["shots"]),
-                    gateway=self._cf[2] or None, timeout=5.0))
+                    gateway=self._cf[2] or None, timeout=5.0), learner=_profile(room)["learner"])
                 jev = jev_state[zone] = "ok" if verdict is not None else "unavailable"
                 if verdict and verdict.get("freeze"):  # a guard can only make it MORE careful
                     auto_setpoints.distrust(learn, f"Jev: {verdict['freeze']}")
@@ -1859,9 +1875,10 @@ class Controller:
                 self._cf[0], self._cf[1],
                 auto_setpoints.evidence(learn, "P2", snap.vwc, p.p1_target, ec_rules, p.ec_target_p2,
                                         self._read_feed_ec(room), p.p2_shot_size, st["shots"]),
-                gateway=self._cf[2] or None, timeout=5.0))
+                gateway=self._cf[2] or None, timeout=5.0), learner=_profile(room)["learner"])
             jev = jev_state[zone] = "ok" if verdict is not None else "unavailable"
-            asked = auto_setpoints.jev_verdict(learn, stamp, verdict, p.p2_shot_size, now.strftime("%H:%M"))
+            asked = auto_setpoints.jev_verdict(learn, stamp, verdict, p.p2_shot_size, now.strftime("%H:%M"),
+                                               _profile(room)["learner"])
             for suffix, value in asked.items():
                 self._auto_write(room, zone, suffix, p.p2_shot_size, value, learn, now, by="Jev")
             log(f"[{room.slug}] Z{zone} Jev P2: {learn['jev']['last']}")
@@ -1970,7 +1987,7 @@ class Controller:
             return False
         delta = round(fc - p.field_capacity, 1)
         new_thr, rescue = thr, p.p3_emergency_floor
-        if abs(delta) >= FC_SHIFT_MIN:
+        if abs(delta) >= _profile(room)["fc_shift_min"]:
             new_thr = bounded("p2_vwc_threshold", thr + delta)
             rescue = bounded("p3_emergency_vwc_threshold", p.p3_emergency_floor + delta)
         if rescue + 3.0 <= new_thr < target <= fc:

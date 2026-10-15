@@ -18,10 +18,13 @@ target fit what the ramp is showing. Any judge failure leaves the arithmetic in 
 from dataclasses import dataclass
 
 import curve_tracker as ct
+from crop_steering_engine.defaults import SUBSTRATE_PROFILES
 
-ADDITIONAL_DRYBACK_PCT = 3.0  # Athena: 1-5% further dryback after lights-on before the first shot
-P2_SHOT_RANGE = (1.0, 4.0)  # the EC lever: bigger shots force runoff and lower pore EC, smaller shots stack it
-PEAK_ADJ_RANGE = (-2.0, 2.0)  # how far judgement may move the peak off the learned knee
+# From the room's substrate profile (learner); these are the generic profile's.
+_LEARNER = SUBSTRATE_PROFILES["generic"]["learner"]
+ADDITIONAL_DRYBACK_PCT = _LEARNER["additional_dryback_pct"]  # Athena: 1-5% further dryback after lights-on
+P2_SHOT_RANGE = _LEARNER["p2_shot_range"]  # the EC lever: bigger shots force runoff and lower pore EC, smaller stack it
+PEAK_ADJ_RANGE = _LEARNER["peak_adj_range"]  # how far judgement may move the peak off the learned knee
 MAX_STEP = {"p1_target_vwc": 6.0, "field_capacity": 20.0, "p2_vwc_threshold": 10.0,
             "p3_emergency_vwc_threshold": 10.0, "dryback_target": 15.0}
 BOUNDS = {  # the engine's own _PARAM_BOUNDS, by setpoint suffix
