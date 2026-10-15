@@ -47,6 +47,14 @@ from .zone_status import mirrored_status, status_app_entity
 
 _LOGGER = logging.getLogger(__name__)
 
+# The configured shot each shot-duration sensor times: P1's first ramp shot, P2's maintenance shot,
+# and P3's emergency (rescue) shot.
+SHOT_SIZE_KEYS = {
+    "p1_shot_duration_seconds": "p1_initial_shot_size",
+    "p2_shot_duration_seconds": "p2_shot_size",
+    "p3_shot_duration_seconds": "p3_emergency_shot_size",
+}
+
 
 # Base sensor descriptions (non-zone specific)
 BASE_SENSOR_DESCRIPTIONS = [
@@ -512,12 +520,9 @@ class CropSteeringSensor(SensorEntity):
                 return self._get_zone_irrigation_count_today(self._zone_number)
 
         # Implement critical calculations ported from template entities
-        if self.entity_description.key == "p1_shot_duration_seconds":
-            return self._calculate_p1_shot_duration()
-        elif self.entity_description.key == "p2_shot_duration_seconds":
-            return self._calculate_p2_shot_duration()
-        elif self.entity_description.key == "p3_shot_duration_seconds":
-            return self._calculate_p3_shot_duration()
+        if self.entity_description.key in SHOT_SIZE_KEYS:
+            seconds = self._shot_seconds_by_zone(self.entity_description.key)
+            return max(seconds.values()) if seconds else None
         elif self.entity_description.key == "ec_ratio":
             return self._calculate_ec_ratio()
         elif self.entity_description.key == "p2_vwc_threshold_adjusted":
@@ -532,32 +537,65 @@ class CropSteeringSensor(SensorEntity):
             # Other sensors return None (placeholder)
             return None
 
-    def _calculate_p1_shot_duration(self) -> float:
-        """Calculate P1 shot duration in seconds."""
-        dripper_flow = self._get_number_value("dripper_flow_rate")
-        substrate_vol = self._get_number_value("substrate_volume")
-        shot_size = self._get_number_value("p1_initial_shot_size")  # Simplified for now
-        return ShotCalculator.calculate_shot_duration(
-            dripper_flow, substrate_vol, shot_size
-        )
+    def _zone_setting(self, zone_num: int, key: str) -> float | None:
+        """A zone's setting as the controller reads it: the zone's own number, else the room's.
+        None when neither reads as a number."""
+        for entity_id in (
+            f"number.crop_steering_{self._prefix}zone_{zone_num}_{key}",
+            f"number.crop_steering_{self._prefix}{key}",
+        ):
+            state = self.hass.states.get(entity_id)
+            if state is None or state.state in ("unknown", "unavailable", "none", ""):
+                continue
+            try:
+                value = float(state.state)
+            except (TypeError, ValueError):
+                return None
+            return value if math.isfinite(value) else None
+        return None
 
-    def _calculate_p2_shot_duration(self) -> float:
-        """Calculate P2 shot duration in seconds."""
-        dripper_flow = self._get_number_value("dripper_flow_rate")
-        substrate_vol = self._get_number_value("substrate_volume")
-        shot_size = self._get_number_value("p2_shot_size")
-        return ShotCalculator.calculate_shot_duration(
-            dripper_flow, substrate_vol, shot_size
-        )
-
-    def _calculate_p3_shot_duration(self) -> float:
-        """Calculate P3 emergency shot duration in seconds."""
-        dripper_flow = self._get_number_value("dripper_flow_rate")
-        substrate_vol = self._get_number_value("substrate_volume")
-        shot_size = self._get_number_value("p3_emergency_shot_size")
-        return ShotCalculator.calculate_shot_duration(
-            dripper_flow, substrate_vol, shot_size
-        )
+    def _shot_seconds_by_zone(self, key: str) -> dict[int, int]:
+        """How long the controller runs the configured shot `key` times, in each of the room's
+        active zones: the zone's pot size, drippers per plant and dripper flow, in whole seconds
+        within the room's shot limits. A zone whose sizing doesn't give a flow is left out.
+        """
+        zones = sorted(
+            int(zone)
+            for zone, config in self._zones_config.items()
+            if str(zone).isdigit() and (config or {}).get("active", True)
+        ) or [1]
+        # The room's maximum shot length, or its older entity's, as the controller reads it.
+        cap = None
+        for suffix in ("max_shot_duration", "maximum_shot_duration"):
+            cap_state = self.hass.states.get(
+                f"number.crop_steering_{self._prefix}{suffix}"
+            )
+            if cap_state is None:
+                continue
+            try:
+                cap = float(cap_state.state)
+            except (TypeError, ValueError):
+                cap = None
+            break
+        seconds = {}
+        for zone in zones:
+            sizing = [
+                self._zone_setting(zone, setting)
+                for setting in (
+                    "substrate_volume",
+                    SHOT_SIZE_KEYS[key],
+                    "drippers_per_plant",
+                    "dripper_flow_rate",
+                )
+            ]
+            if any(value is None or value <= 0 for value in sizing):
+                continue
+            substrate, size, drippers, flow = sizing
+            raw = ShotCalculator.calculate_shot_duration(
+                flow, substrate, size, drippers
+            )
+            seconds[zone] = ShotCalculator.capped_shot_seconds(raw, cap)
+        return seconds
 
     def _calculate_ec_ratio(self) -> float:
         """Calculate current EC ratio vs target."""
@@ -688,8 +726,12 @@ class CropSteeringSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict | None:
-        """Expose the weekly producer's coverage so partial history stays visible, and which
-        probes a zone's VWC/EC reading was made from."""
+        """Expose the weekly producer's coverage so partial history stays visible, which probes
+        a zone's VWC/EC reading was made from, and a shot-duration sensor's seconds in each zone
+        (it shows the longest)."""
+        if self.entity_description.key in SHOT_SIZE_KEYS:
+            seconds = self._shot_seconds_by_zone(self.entity_description.key)
+            return {"zones": {str(zone): value for zone, value in seconds.items()}}
         if self._zone_number and self.entity_description.key in (
             f"vwc_zone_{self._zone_number}",
             f"ec_zone_{self._zone_number}",
