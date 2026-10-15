@@ -14,6 +14,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from .const import (
     DOMAIN,
     CONF_NUM_ZONES,
+    DRAINAGE_TYPES,
     PHASES,
     STEERING_MODES,
     GROWTH_STAGES,
@@ -70,6 +71,15 @@ SELECT_DESCRIPTIONS = [
         name="Substrate",
         icon="mdi:sprout",
         options=SUBSTRATES,
+    ),
+    # How the room's runoff leaves it. A free-draining room is not watched for a table backing up
+    # (CS-310); Unknown and flood tables are. Setup asks; a room from before reads Unknown.
+    SelectEntityDescription(
+        key="drainage",
+        name="Drainage",
+        icon="mdi:pipe",
+        options=DRAINAGE_TYPES,
+        translation_key="drainage",
     ),
 ]
 
@@ -151,6 +161,11 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         # Set default values based on entity type
         if description.key == "growth_stage":
             self._attr_current_option = "Vegetative"
+        elif (
+            description.key == "drainage"
+            and entry.data.get("drainage") in DRAINAGE_TYPES
+        ):
+            self._attr_current_option = entry.data["drainage"]  # setup's answer
         else:
             self._attr_current_option = (
                 description.options[0] if description.options else None

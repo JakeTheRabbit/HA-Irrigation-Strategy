@@ -10,6 +10,8 @@ from datetime import date, timedelta
 from types import SimpleNamespace
 
 import controller
+import pytest
+from crop_steering_engine.defaults import ENTITY_DEFAULTS
 from test_plan_hold_never_stops_rescues import Clock, probe, rig  # noqa: F401 (rig: a pytest fixture)
 
 T0 = Clock(2026, 9, 23, 14, 0)  # the rig pins the controller's clock to Clock: times are Clocks
@@ -193,3 +195,86 @@ def test_the_option_takes_one_sensor_or_room_pairs():
     assert controller.room_option(SUMP) == {"*": SUMP}
     assert controller.room_option(f"default={SUMP}, f1=sensor.f1_sump_power") == {
         "default": SUMP, "f1": "sensor.f1_sump_power"}
+
+
+# ------------------------------------------------------------------ the room's drainage
+DRAINAGE = "select.crop_steering_drainage"
+
+
+@pytest.mark.parametrize("drainage", [None, "unknown", "flood_table"])
+def test_a_room_on_tables_or_that_has_not_said_is_watched_as_before(rig, drainage):  # noqa: F811
+    c, fake, room = rig
+    if drainage:
+        fake.set_state(DRAINAGE, drainage)  # None: an integration from before the select
+    settled(c, room)
+    assert feed(c, room, RISING) is True and len(cards(fake)) == 1
+
+
+def test_a_free_draining_room_is_never_held_for_a_table_backing_up(rig):  # noqa: F811
+    c, fake, room = rig
+    fake.set_state(DRAINAGE, "free_drain")
+    settled(c, room)
+    assert feed(c, room, RISING) is False and cards(fake) == []
+
+
+def test_saying_the_room_drains_freely_clears_a_card_it_had(rig):  # noqa: F811
+    c, fake, room = rig
+    settled(c, room)
+    assert feed(c, room, RISING) is True
+    fake.set_state(DRAINAGE, "free_drain")
+    assert feed(c, room, [(65, 41.2)]) is False  # at once, not an hour later
+    assert any((dom, svc, d.get("notification_id")) == ("persistent_notification", "dismiss", "f2_backup_default_z1")
+               for dom, svc, d in fake.calls)
+    assert "backup_default_z1" not in c._alerted
+
+
+def test_a_free_draining_room_gets_its_ec_flush(rig):  # noqa: F811
+    c, fake, room = rig
+    fake.set_state(DRAINAGE, "free_drain")
+    now = Clock.instant = Clock(2026, 9, 23, 14, 0)
+    for zone in (1, 2):
+        probe(fake, zone, 50, ec=10.0)
+        room.state[zone].update(phase="P2", last_shot=now - timedelta(minutes=60), last_daily_reset=date(2026, 9, 23))
+    room._backed_up = {1: now}  # held before the room said it drains freely
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] and pub[1]["reason"].kind == "flush_high_ec"
+
+
+# ------------------------------------------------------------------ the sump pump's run threshold
+THRESHOLD = "number.crop_steering_sump_power_threshold_w"
+
+
+def stopped(c, fake, monkeypatch, room, unit, rows):
+    """Whether CS-311 says the sump pump has not run, its plug reporting in `unit`."""
+    c.sump_sensors = {"*": SUMP}
+    fake.set_state(SUMP, rows[-1][0], {"unit_of_measurement": unit})
+    sump_history(monkeypatch, [rows])
+    room._sump_checked = None  # a fresh check, and a card said afresh
+    c._alerted.pop("sump_default", None)
+    fake.calls.clear()
+    c._watch_sump(room, Clock.instant)
+    return bool(sump_cards(fake))
+
+
+def test_the_threshold_is_compared_in_watts(rig, monkeypatch):  # noqa: F811
+    c, fake, room = rig
+    Clock.instant = Clock(2026, 9, 23, 14, 0)
+    fake.set_state(THRESHOLD, "10")
+    assert stopped(c, fake, monkeypatch, room, "kW", [("0", "a"), ("0.015", "b"), ("0", "c")]) is False  # 15 W
+    assert stopped(c, fake, monkeypatch, room, "kW", [("0", "a"), ("0.005", "b"), ("0", "c")]) is True  # 5 W
+    fake.set_state(THRESHOLD, "50")
+    assert stopped(c, fake, monkeypatch, room, "W", [("0", "a"), ("30", "b"), ("0", "c")]) is True
+
+
+@pytest.mark.parametrize("threshold", [None, "unavailable", "unknown", ""])
+def test_without_a_readable_threshold_it_is_the_20_w_it_always_was(rig, monkeypatch, threshold):  # noqa: F811
+    c, fake, room = rig
+    Clock.instant = Clock(2026, 9, 23, 14, 0)
+    if threshold is not None:  # None: an integration from before the setting
+        fake.set_state(THRESHOLD, threshold)
+    assert stopped(c, fake, monkeypatch, room, "W", [("0", "a"), ("15", "b"), ("0", "c")]) is True
+    assert stopped(c, fake, monkeypatch, room, "W", [("0", "a"), ("25", "b"), ("0", "c")]) is False
+
+
+def test_a_new_rooms_threshold_starts_where_the_controller_falls_back():
+    assert ENTITY_DEFAULTS["sump_power_threshold_w"] == controller.SUMP_RUN_W == 20

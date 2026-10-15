@@ -23,7 +23,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | CS-2xx | **Watering held**: Something is stopping shots in a room or a zone. |
 | CS-3xx | **Pumps and valves**: A switch did not do what it was told, or a shot was cut. |
 | CS-4xx | **Settings**: A setting is missing, out of range, or read from somewhere new. |
-| CS-5xx | **Checks across zones**: Advice from comparing a room's zones. |
+| CS-5xx | **Checks across zones**: Advice from comparing a room's zones, and a probe set aside for its unit. |
 | CS-6xx | **Repairs cards**: Raised by the integration, under Settings → Repairs. |
 | CS-7xx | **Jev**: Jev's judgements about a zone (advice, a probe it set aside), and how Jev itself is doing: its calls running low, a judge on the stricter gate (docs/JEV.md). |
 | CS-8xx | **Dosing**: Batch-tank dosing: a dose or a batch that did not end as it should (docs/DOSING.md). |
@@ -62,6 +62,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-404](#cs-404) | Automatic targets paused | Warning | Notification |
 | [CS-405](#cs-405) | Timezone mismatch, the day may be shifted | Warning | Notification |
 | [CS-501](#cs-501) | Much less water than the other zones | Information | Notification |
+| [CS-503](#cs-503) | Moisture probe set aside for its unit | Warning | Notification |
 | [CS-601](#cs-601) | Kill switch helper missing | Critical | Repairs card |
 | [CS-602](#cs-602) | Engine not running | Warning | Repairs card |
 | [CS-603](#cs-603) | Zone with no moisture sensor | Warning | Repairs card |
@@ -571,7 +572,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 *Critical · Notification*
 
-**What it means.** A zone's moisture reading rose by 3 points or more within an hour while no water went in: its valve was not open, by the controller or by hand, during the rise or in the 45 minutes before it. Water is reaching the slabs from below: the table or its drain is blocked, or the sump is not pumping, and the slabs are sitting in runoff. The notification says how far the reading rose, over how long, and when the zone last had water.
+**What it means.** A zone's moisture reading rose by 3 points or more within an hour while no water went in: its valve was not open, by the controller or by hand, during the rise or in the 45 minutes before it. Water is reaching the slabs from below: the table or its drain is blocked, or the sump is not pumping, and the slabs are sitting in runoff. The notification says how far the reading rose, over how long, and when the zone last had water. Rooms whose Drainage setting is free drain are not watched: nothing there can back up.
 
 **Watering meanwhile.** The zone's daily minimum and its EC flushes are held while this lasts, so the controller never pours water into a flooded table; a zone reading this wet gets no routine shots anyway. It is said again every 30 minutes while the reading keeps rising, and clears itself once the reading has stopped rising for an hour.
 
@@ -595,7 +596,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 *Critical · Notification*
 
-**What it means.** The power reading of the sump pump the room's tables drain to (the controller app's sump_power_sensor option) has shown no run for the hours set in sump_silent_hours (3 unless changed) while the room is on. A sump pump that normally runs every hour or two has stopped: runoff has nowhere to go, the sump fills and backs up into the tables, and the slabs end up sitting in it. The notification names the sensor.
+**What it means.** The power reading of the sump pump the room's tables drain to (the controller app's sump_power_sensor option) has shown no run (no reading above the room's Sump Pump Run Threshold, 20 W unless changed, whatever unit the plug reports) for the hours set in sump_silent_hours (3 unless changed) while the room is on. A sump pump that normally runs every hour or two has stopped: runoff has nowhere to go, the sump fills and backs up into the tables, and the slabs end up sitting in it. The notification names the sensor.
 
 **Watering meanwhile.** Nothing changes: this only tells you. It is said again every 30 minutes while the pump stays still, and clears itself at its next run. Once a zone's moisture starts rising with no water, CS-310 follows and holds that zone's daily minimum and EC flushes.
 
@@ -738,6 +739,26 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Compare the plants, and check the probe's position.
 - Do a catch test on this zone and a neighbour.
+
+<a id="cs-503"></a>
+
+### CS-503: Moisture probe set aside for its unit
+
+*Warning · Notification*
+
+**What it means.** The zone's moisture probe reports in a unit that can't be taken as a moisture percentage, and its number is outside 0 to 100, so the probe is set aside and the zone has no moisture reading. Moisture is read in %, and m³/m³ is converted; a probe whose unit is unknown, or that has none, is still read as % while its number is between 0 and 100. The notification names the probe and its unit, and Home Assistant's log says once which probe was set aside.
+
+**Watering meanwhile.** The same as for CS-102: for its first 15 minutes out the zone waits, then it carries on without the probe while the engine is on: the same shots as a zone whose probe is working, or one shot every 90 minutes (the app's blind_fallback_min option) within the daily water limit if there is none. Phase changes that go by moisture wait for the probe. Nothing is held.
+
+**Likely causes**
+
+- The sensor mapped to the zone is another reading from the same device: a raw count, a voltage or a temperature.
+- The probe's own integration reports its moisture reading in an unusual unit.
+
+**Suggested fixes**
+
+- In Crop Steering → Rooms & setup, map the zone to the probe's moisture reading in % (or m³/m³).
+- If the sensor is the moisture reading, correct its unit in its own integration.
 
 ## Repairs cards (CS-6xx)
 

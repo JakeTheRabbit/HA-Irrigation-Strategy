@@ -114,7 +114,7 @@ def test_sensor_accepts_valid_aware_time_and_small_clock_skew(rig):
     c, fake, _, _ = rig
     for stamp in ("2026-09-08T12:00:59+00:00", "2026-09-09T00:00:00+12:00"):
         probe(fake, "sensor.ec", 4.2, stamp)
-        assert c._read_sensor("sensor.ec", 0, 20) == 4.2
+        assert c._read_sensor("sensor.ec", "ec") == 4.2
 
 
 def test_weekly_total_rolls_at_lights_on_and_survives_restart(rig):

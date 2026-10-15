@@ -172,10 +172,12 @@ configuration:
   sump_power_sensor:
     name: Sump pump power sensor (optional)
     description: >-
-      The power reading (W) of the sump pump the room's tables drain to, e.g. sensor.f2_sump_pump_power;
-      for more than one room, room=sensor pairs, e.g. default=sensor.f2_sump_pump_power. When set, a
-      pump that shows no run for the hours below while the room is on raises CS-311 (critical): the
-      tables are about to back up. Blank: not watched.
+      The power reading of the sump pump the room's tables drain to, e.g. sensor.sump_pump_power, in
+      W, kW or mW; for more than one room, room=sensor pairs, e.g.
+      default=sensor.sump_pump_power, veg=sensor.veg_sump_power. When set, a pump that shows no run
+      (no reading above the room's Sump Pump Run Threshold, 20 W unless changed) for the hours below
+      while the room is on raises CS-311 (critical): the tables are about to back up. Blank: not
+      watched.
   sump_silent_hours:
     name: Sump pump may stand still for (hours)
     description: >-

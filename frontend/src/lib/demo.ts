@@ -126,6 +126,7 @@ export function createDemo(now = Date.now()): States {
     number(prefix, "irrigation_ec_max", 3.5, 0, 8, 0.1, "mS/cm");
     number(prefix, "irrigation_ph_min", 5.5, 3, 9, 0.05, "pH");
     number(prefix, "irrigation_ph_max", 6.5, 3, 9, 0.05, "pH");
+    number(prefix, "sump_power_threshold_w", 20, 1, 10000, 1, "W");
     for (let id = 1; id <= 3; id++) {
       put(`switch.demo_${prefix}valve_${id}`, !index && id === 1 ? "on" : "off");
       put(

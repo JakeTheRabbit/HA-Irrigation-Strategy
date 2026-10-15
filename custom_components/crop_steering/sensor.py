@@ -765,9 +765,11 @@ class CropSteeringSensor(SensorEntity):
         """(entity_id, value, age in seconds) for every probe, each value first converted to the
         unit the room steers in (`kind` "ec" -> mS/cm, "vwc" -> %). Mixed probes are common: one
         Atlas in uS/cm beside one TEROS in mS/cm would otherwise average to nonsense far over any
-        EC target. Value None = no usable number; age None = the state carries no time.
+        EC target. Value None = no usable number; age None = the state carries no time. The probes
+        set aside for their unit are left in self._unit_set_aside as {entity_id: unit}.
         """
         readings = []
+        self._unit_set_aside = {}
         for sensor_id in sensor_ids:
             if not sensor_id:
                 continue
@@ -782,7 +784,9 @@ class CropSteeringSensor(SensorEntity):
                         unit = (getattr(state, "attributes", None) or {}).get(
                             "unit_of_measurement"
                         )
-                        value = to_native(kind, unit, value)
+                        value, aside = to_native(kind, unit, value, sensor_id)
+                        if aside:
+                            self._unit_set_aside[sensor_id] = unit or ""
                     # last_reported moves on every report, last_updated only on a change.
                     stamp = getattr(state, "last_reported", None) or getattr(
                         state, "last_updated", None
@@ -804,6 +808,18 @@ class CropSteeringSensor(SensorEntity):
             hi,
             PROBE_STALE_SECONDS,
         )
+        # Say which probes were set aside for their unit, so the controller can name the probe and
+        # its unit (CS-503) rather than only that the zone has no reading.
+        aside = {
+            pid: unit
+            for pid, unit in self._unit_set_aside.items()
+            if pid in self._fusion["excluded"]
+        }
+        if aside:
+            self._fusion["excluded"].update(
+                {pid: "set aside for its unit" for pid in aside}
+            )
+            self._fusion["unit_set_aside"] = aside
         return value
 
     def _average_sensor_values(
