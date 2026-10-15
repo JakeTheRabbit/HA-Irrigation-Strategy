@@ -13,12 +13,14 @@ One source of truth, doctrine.rules.json, plus the code itself:
      compiled/substrates/* (block B, chosen per install), and compiled/manifest.json;
   6. strip lint: the public denylist (denylist.public.txt) always, the private one (site-specific, from a CI
      secret) unless explicitly skipped, which only a fork pull request may do;
-  7. keep the controller's copy of compiled/ byte-identical when that directory exists.
+  7. keep the controller's copy of compiled/ byte-identical when that directory exists, and write the dashboard's
+     copy of the stage arcs (frontend/src/lib/generated/arcs.json) when the dashboard source exists.
 
 Usage:  python tools/build_doctrine.py [--repo ROOT] [--core PATH] [--controller PATH] [--jev PATH] [--brain DIR]
-            [--bridge PATH] [--auto PATH] [--numbers PATH] [--controller-copy DIR] [--private-denylist PATH]
-            [--private-skip REASON] [--check]
---check rebuilds in memory and fails if any committed output (or the controller copy) differs (CI drift guard).
+            [--bridge PATH] [--auto PATH] [--numbers PATH] [--controller-copy DIR] [--dashboard-arcs FILE]
+            [--private-denylist PATH] [--private-skip REASON] [--check]
+--check rebuilds in memory and fails if any committed output (or the controller or dashboard copy) differs (CI drift
+guard).
 With no path flags the build reads the repository it sits in (doctrine/ at the repository root); --repo or the
 per-file flags point it at other code.
 """
@@ -62,7 +64,7 @@ def resolve_paths(a):
     p = {"core": repo / "crop-steering-engine/src/crop_steering_engine/core.py", "controller": ctrls[0],
          "jev": pkg / "jev" / "doctrine.py", "brain": pkg / "jev", "bridge": pkg / "jev_bridge.py",
          "auto": pkg / "auto_setpoints.py", "numbers": repo / "custom_components/crop_steering/number.py",
-         "controller_copy": pkg / "doctrine"}
+         "controller_copy": pkg / "doctrine", "dashboard_arcs": repo / "frontend/src/lib/generated/arcs.json"}
     for k in p:
         v = getattr(a, k)
         if v:
@@ -736,6 +738,13 @@ def compile_block_b(doc):
     return out
 
 
+def dashboard_arcs(doc):
+    """The stage arcs as the dashboard reads them: the same rows as compiled/arcs/, as data."""
+    return {"default_arc": doc["stage_arcs"]["default"],
+            "arcs": {k: {"title": doc["stage_arcs"][k]["title"], "stages": doc["stage_arcs"][k]["stages"]}
+                     for k in arc_keys(doc)}}
+
+
 def estimate_tokens(text):
     # No tokenizer offline: bracket with two common English heuristics for Claude-family tokenizers.
     return {"chars": len(text), "words": len(text.split()), "tokens_est_low": round(len(text) / 4.0),
@@ -754,8 +763,9 @@ def manifest(doc, facts, compiled, jev_count):
         "doctrine_version": doc["doctrine_version"],
         "block_a": a_files,
         "block_b": {"arcs": {k: f"arcs/{k}.md" for k in arc_keys(doc)},
-                    "arcs_note": "a preview and drift check: the prompt renders the arc table from the rows the "
-                                 "judges use, and a test checks these files' numbers against them",
+                    "arcs_note": "the arc source: the controller's stage_rows() reads these tables from its copy, "
+                                 "the prompt renders the arc table from those rows, and the dashboard reads the same "
+                                 "rows from frontend/src/lib/generated/arcs.json",
                     "substrates": {k: f"substrates/{k}.md" for k in SUBSTRATES},
                     "order": "the install's arc file(s), then its substrate file(s), each sorted by id"},
         "defaults": {"stage_arc": doc["stage_arcs"]["default"], "substrate": doc["substrates"]["default"]},
@@ -776,6 +786,7 @@ def main():
     for k in ("core", "controller", "jev", "brain", "bridge", "auto", "numbers"):
         ap.add_argument(f"--{k}")
     ap.add_argument("--controller-copy", dest="controller_copy", help="the controller's copy of compiled/")
+    ap.add_argument("--dashboard-arcs", dest="dashboard_arcs", help="the dashboard's copy of the stage arcs (JSON)")
     ap.add_argument("--private-denylist", default=os.environ.get("DOCTRINE_PRIVATE_DENYLIST"))
     ap.add_argument("--private-skip", metavar="REASON", help="only where no secret exists (a fork pull request, a "
                     "contributor's machine): skip the private list, and say so")
@@ -863,6 +874,18 @@ def main():
         print(f"controller doctrine copy: {'checked' if a.check else 'written'} ({copy})")
     else:
         print("controller doctrine copy: none yet, skipped")
+    board = Path(paths["dashboard_arcs"])
+    if board.parent.parent.is_dir():
+        text = json.dumps(dashboard_arcs(doc), indent=2) + "\n"
+        if a.check:
+            if not board.exists() or board.read_bytes() != text.encode("utf-8"):
+                problems.append(f"dashboard arcs differ: {board} (run tools/build_doctrine.py)")
+        else:
+            board.parent.mkdir(exist_ok=True)
+            board.write_text(text, encoding="utf-8", newline="\n")
+        print(f"dashboard arcs: {'checked' if a.check else 'written'} ({board})")
+    else:
+        print("dashboard arcs: no dashboard source, skipped")
 
     # Report only, never written to a generated file: which code this run was checked against.
     checked = {k: sha(paths[k])[:12] for k in ("core", "controller", "bridge", "auto", "numbers")}

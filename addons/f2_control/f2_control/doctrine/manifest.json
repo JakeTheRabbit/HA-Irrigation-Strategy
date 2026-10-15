@@ -12,7 +12,7 @@
       "slab_default": "arcs/slab_default.md",
       "rockwool_default": "arcs/rockwool_default.md"
     },
-    "arcs_note": "a preview and drift check: the prompt renders the arc table from the rows the judges use, and a test checks these files' numbers against them",
+    "arcs_note": "the arc source: the controller's stage_rows() reads these tables from its copy, the prompt renders the arc table from those rows, and the dashboard reads the same rows from frontend/src/lib/generated/arcs.json",
     "substrates": {
       "generic": "substrates/generic.md",
       "rockwool": "substrates/rockwool.md",

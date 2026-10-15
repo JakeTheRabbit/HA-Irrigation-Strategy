@@ -56,7 +56,18 @@ def pack(tmp_path):
 
 def _build(pack: Path, *args: str, env: dict | None = None):
     no_copy = str(pack.parent / "no-controller-copy")
-    return _run(pack, "--repo", str(ROOT), "--controller-copy", no_copy, *args, env=env)
+    no_board = str(pack.parent / "no-dashboard" / "generated" / "arcs.json")
+    return _run(
+        pack,
+        "--repo",
+        str(ROOT),
+        "--controller-copy",
+        no_copy,
+        "--dashboard-arcs",
+        no_board,
+        *args,
+        env=env,
+    )
 
 
 def _plant(pack: Path, words: str) -> None:
@@ -145,3 +156,32 @@ def test_check_fails_when_a_generated_file_is_stale(pack):
     r = _build(pack, "--check", "--private-skip", "test")
     assert r.returncode == 1
     assert "stale generated file: 04-doctrine-rules.md" in r.stdout
+
+
+def _one_byte_off(path: Path) -> None:
+    data = bytearray(path.read_bytes())
+    data[-2] = ord("x") if data[-2] != ord("x") else ord("y")
+    path.write_bytes(bytes(data))
+
+
+def test_check_fails_when_the_controllers_arc_copy_is_one_byte_off(pack, tmp_path):
+    copy = tmp_path / "controller-copy"
+    shutil.copytree(ROOT / "addons/f2_control/f2_control/doctrine", copy)
+    args = ("--check", "--private-skip", "test", "--controller-copy", str(copy))
+    assert _run(pack, "--repo", str(ROOT), *args).returncode == 0
+    _one_byte_off(copy / "arcs" / "slab_default.md")
+    r = _run(pack, "--repo", str(ROOT), *args)
+    assert r.returncode == 1
+    assert "controller doctrine copy differs: arcs/slab_default.md" in r.stdout
+
+
+def test_check_fails_when_the_dashboards_arc_copy_is_one_byte_off(pack, tmp_path):
+    board = tmp_path / "frontend" / "generated" / "arcs.json"
+    board.parent.mkdir(parents=True)
+    shutil.copy(ROOT / "frontend/src/lib/generated/arcs.json", board)
+    args = ("--check", "--private-skip", "test", "--dashboard-arcs", str(board))
+    assert _run(pack, "--repo", str(ROOT), *args).returncode == 0
+    _one_byte_off(board)
+    r = _run(pack, "--repo", str(ROOT), *args)
+    assert r.returncode == 1
+    assert "dashboard arcs differ" in r.stdout
