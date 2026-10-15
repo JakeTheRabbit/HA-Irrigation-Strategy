@@ -91,8 +91,8 @@ The active EC target = the row for the current phase **and** the zone's steering
 | `dripper_flow_rate` | 0.1-50 | 1.2 | L/hr | Per-dripper flow: the other half of the % → seconds conversion. |
 | `drippers_per_plant` | 1-6 | 2 | - | Drippers feeding each plant. |
 | `field_capacity` | 40-100 | 70 | % | VWC at/above which irrigation is blocked (over-water guard / P1 clamp). |
-| `vegetative_dryback_target` | 5-80 | 50 | % | Overnight dryback target in vegetative mode. |
-| `generative_dryback_target` | 5-70 | 40 | % | Overnight dryback target in generative mode. |
+| `vegetative_dryback_target` | 5-80 | 35 | % | Overnight dryback target in vegetative mode. |
+| `generative_dryback_target` | 5-70 | 45 | % | Overnight dryback target in generative mode. |
 | `lights_on_hour` | 0-23 | 12 | hour | Photoperiod start: P3→P0 + daily-counter reset fire here. |
 | `lights_off_hour` | 0-23 | 0 | hour | Photoperiod end: zones move to P3. |
 

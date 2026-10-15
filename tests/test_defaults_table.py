@@ -46,8 +46,8 @@ ENTITY_DEFAULTS_12C6D1A = {
     "field_capacity": 70.0,
     "maximum_ec": 9.0,
     "watchdog_hours": 3.0,
-    "vegetative_dryback_target": 50.0,
-    "generative_dryback_target": 40.0,
+    "vegetative_dryback_target": 35.0,  # a new room's, since; a room set up before keeps 50
+    "generative_dryback_target": 45.0,  # a new room's, since; a room set up before keeps 40
     "p1_target_vwc": 65.0,
     "p2_vwc_threshold": 60.0,
     "p0_maximum_wait_time": 120.0,

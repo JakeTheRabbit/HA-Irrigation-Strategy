@@ -52,8 +52,11 @@ DEFAULTS = {
     "maximum_ec": (9.0, 9),
     "watchdog_hours": (3.0, 3),
     # P0
-    "vegetative_dryback_target": (50.0, 20),
-    "generative_dryback_target": (40.0, 20),
+    # A new room's overnight dryback: the middle of the common ranges (vegetative 30-40%,
+    # generative 40-50%, % below the peak). A room set up before keeps its own (restored),
+    # the old 50/40 included.
+    "vegetative_dryback_target": (35.0, 20),
+    "generative_dryback_target": (45.0, 20),
     "p0_maximum_wait_time": (120.0, 45),
     # Per zone only: the integration starts a new room's zones at 3 and an updated room's at 0
     # (off), so the entity column does not apply; the controller falls back to 0, off.
