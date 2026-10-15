@@ -36,6 +36,7 @@ REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the
 PAUSE_H = 48  # and the zone's setpoints are left alone this long
 # Only Jev's own code writes these into /data, so any one of them (empty or unreadable too) says Jev has run here.
 JEV_FILES = ("jev_usage.json", "jev_ledger.jsonl", "jev_journal.jsonl", "jev_setpoints.json")
+PRODUCT = "Crop Steering Controller"  # controller.PRODUCT: the `engine` value on what Jev publishes
 
 
 def judges():
@@ -478,7 +479,7 @@ def publish(c, room, now, ha_set):
         status = brain.zone_status(room.slug, zone)
         acting = sorted(n for n, v in status.items() if v.get("directive") and not str(v.get("why", "")).startswith("refused"))
         strict = sorted(j for (r, z, j), on in brain.strict.items() if on and r == room.slug and z == zone)
-        attrs = {"judges": status, "strict": strict, "friendly_name": f"Zone {zone} Jev", "engine": "f2-control"}
+        attrs = {"judges": status, "strict": strict, "friendly_name": f"Zone {zone} Jev", "engine": PRODUCT}
         sp = setpoints_published(c, room, zone, now, managed)
         if sp is not None:
             attrs["setpoints"] = sp
@@ -491,9 +492,9 @@ def publish(c, room, now, ha_set):
             "failovers_today": s.get("failovers"), "reasks_today": s.get("reasks"),
             "routes": list(getattr(brain, "routes", [])), "last_route": s.get("route"),
             "judges": sorted(j.name for j in brain.judges), "judge_errors": dict(brain.errors),
-            "stage": stage_info(c, room, now), "friendly_name": "Jev", "engine": "f2-control"})
+            "stage": stage_info(c, room, now), "friendly_name": "Jev", "engine": PRODUCT})
     journal = getattr(brain, "journal", None)
     if journal is not None:
         entries = journal.recent(room.slug)
         ha_set(f"sensor.crop_steering_{room.prefix}jev_log", headline(entries[0] if entries else None),
-               {"entries": entries, "friendly_name": "Jev decisions", "engine": "f2-control"})
+               {"entries": entries, "friendly_name": "Jev decisions", "engine": PRODUCT})

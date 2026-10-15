@@ -409,7 +409,7 @@ async def test_a_2_25_1_room_with_its_engine_switch_off_stays_dry_after_the_upgr
     room = c.rooms[0]
 
     assert room.enable_flag == KILL
-    assert c._blocked(room, 1) == "f2-control disabled (kill switch off)"
+    assert c._blocked(room, 1) == "Crop Steering Controller disabled (kill switch off)"
 
 
 # ------------------------------------------------------------------ Jev starts only where it has run

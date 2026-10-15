@@ -36,7 +36,7 @@ def test_an_off_room_says_so_on_the_same_entity():
     c.loop_once(datetime(2026, 9, 23, 12, 0))
     assert fake.sets["sensor.crop_steering_zone_1_status_app"] == (
         "Room off", {"reason": "Room off (nothing growing)", "friendly_name": "Zone 1 status (controller)",
-                     "engine": "f2-control"})
+                     "engine": "Crop Steering Controller"})
     assert "sensor.crop_steering_zone_1_status" not in fake.sets
 
 
