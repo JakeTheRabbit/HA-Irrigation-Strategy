@@ -23,7 +23,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | CS-2xx | **Watering held**: Something is stopping shots in a room or a zone. |
 | CS-3xx | **Pumps and valves**: A switch did not do what it was told, or a shot was cut. |
 | CS-4xx | **Settings**: A setting is missing, out of range, or read from somewhere new. |
-| CS-5xx | **Checks across zones**: Advice from comparing a room's zones. |
+| CS-5xx | **Checks across zones**: Advice from comparing a room's zones, and a probe set aside for its unit. |
 | CS-6xx | **Repairs cards**: Raised by the integration, under Settings → Repairs. |
 | CS-7xx | **Jev**: Jev's judgements about a zone (advice, a probe it set aside), and how Jev itself is doing: its calls running low, a judge on the stricter gate (docs/JEV.md). |
 | CS-8xx | **Dosing**: Batch-tank dosing: a dose or a batch that did not end as it should (docs/DOSING.md). |
@@ -63,6 +63,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-404](#cs-404) | Automatic targets paused | Warning | Notification |
 | [CS-405](#cs-405) | Timezone mismatch, the day may be shifted | Warning | Notification |
 | [CS-501](#cs-501) | Much less water than the other zones | Information | Notification |
+| [CS-503](#cs-503) | Moisture probe set aside for its unit | Warning | Notification |
 | [CS-601](#cs-601) | Kill switch helper missing | Critical | Repairs card |
 | [CS-602](#cs-602) | Engine not running | Warning | Repairs card |
 | [CS-603](#cs-603) | Zone with no moisture sensor | Warning | Repairs card |
@@ -760,6 +761,26 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Compare the plants, and check the probe's position.
 - Do a catch test on this zone and a neighbour.
+
+<a id="cs-503"></a>
+
+### CS-503: Moisture probe set aside for its unit
+
+*Warning · Notification*
+
+**What it means.** The zone's moisture probe reports in a unit that can't be taken as a moisture percentage, and its number is outside 0 to 100, so the probe is set aside and the zone has no moisture reading. Moisture is read in %, and m³/m³ is converted; a probe whose unit is unknown, or that has none, is still read as % while its number is between 0 and 100. The notification names the probe and its unit, and Home Assistant's log says once which probe was set aside.
+
+**Watering meanwhile.** The same as for CS-102: for its first 15 minutes out the zone waits, then it carries on without the probe while the engine is on: the same shots as a zone whose probe is working, or one shot every 90 minutes (the app's blind_fallback_min option) within the daily water limit if there is none. Phase changes that go by moisture wait for the probe. Nothing is held.
+
+**Likely causes**
+
+- The sensor mapped to the zone is another reading from the same device: a raw count, a voltage or a temperature.
+- The probe's own integration reports its moisture reading in an unusual unit.
+
+**Suggested fixes**
+
+- In Crop Steering → Rooms & setup, map the zone to the probe's moisture reading in % (or m³/m³).
+- If the sensor is the moisture reading, correct its unit in its own integration.
 
 ## Repairs cards (CS-6xx)
 

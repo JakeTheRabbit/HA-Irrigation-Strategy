@@ -38,12 +38,13 @@ The pull request template asks for all of this.
 
 ## Generated files
 
-Two kinds of file in this repository are produced from other files. They change **only** in the same pull request as their source, and the checks prove they match:
+Some files in this repository are produced from other files. They change **only** in the same pull request as their source, and the checks prove they match:
 
 | Generated | From | Check |
 | --- | --- | --- |
 | `www/`, `custom_components/crop_steering/www/` and `addons/f2_control/www/` (the dashboard, one ~1 MB minified file) | `frontend/src` via `npm run build --prefix frontend` | CI rebuilds it and fails if the committed file differs by one byte |
 | `addons/f2_control/f2_control/crop_steering_engine/` | `crop-steering-engine/src/crop_steering_engine/` | CI diffs the two copies |
+| `custom_components/crop_steering/generated/defaults.py` (the one defaults table and the device-unit table, for the integration, which cannot import the engine) | `crop-steering-engine/src/crop_steering_engine/defaults.py`, copied with `cp` | `tests/test_generated_copies.py` byte-compares it, and the vendored engine's copy, with the source |
 
 Nobody can review a minified bundle by eye, so nobody is asked to: review `frontend/src`, and let the check prove the bundle is that source and nothing else. **A pull request that changes a generated file without its source, or fails that check, is not merged**, whatever the explanation.
 
