@@ -97,4 +97,6 @@ def test_a_run_with_the_secret_runs_the_private_list(tmp_path):
     # A list entry that matches the pack proves the secret reaches the matcher.
     r, _ = _run(tmp_path, json.dumps([["dryback", "canary"]]), no_secrets="false")
     assert r.returncode == 1
-    assert "doctrine.rules.json: canary: 'dryback'" in r.stdout
+    assert ": a word on the private denylist" in r.stdout
+    # The secret's entries never reach the log.
+    assert "canary" not in r.stdout + r.stderr

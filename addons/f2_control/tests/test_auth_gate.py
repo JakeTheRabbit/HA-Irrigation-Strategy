@@ -27,7 +27,7 @@ PUMP, MAIN, VALVE = "switch.p", "switch.m", "switch.v1"
 OPTIONS = {"num_zones": 1, "enable_flag": KILL, "hardware": {"pump": PUMP, "mainline": MAIN, "valves": {"1": VALVE}}}
 CONTAINER = {"F2_RUNTIME": "container", "HA_URL": "http://ha:8123", "HA_TOKEN": "tok"}
 # The controller's own REST functions, before any other test module's fake_ha.install replaces them.
-REST = ("ha_get", "ha_get_status", "ha_call", "ha_get_all", "ha_set", "ha_service_response")
+REST = ("ha_get", "ha_get_status", "ha_call", "ha_get_all", "ha_set", "ha_service_response", "ha_fire")
 REAL = {name: getattr(controller, name) for name in REST}
 
 
@@ -298,6 +298,16 @@ def test_the_gate_lets_through_only_this_processs_own_offs_once_and_their_read_b
     assert gate.state is None and gate.allows("other")
 
 
+def test_a_closed_gate_fires_no_event(rig):
+    """The controller's naming of its own setpoint writes (an event) goes through the gate like a service call."""
+    c, fake, session, clock = rig()
+    refuse_from(session, 0, 401)
+    assert not controller.ha_fire("crop_steering_setpoint_write", {"entity_id": "number.x"})
+    assert controller._GATE.state == "all" and len(session.sent) == 1
+    assert not controller.ha_fire("crop_steering_setpoint_write", {"entity_id": "number.x"})
+    assert len(session.sent) == 1
+
+
 # ------------------------------------------------------------------ U8 (m): the close-only start
 def test_a_non_admin_token_with_a_shot_recorded_closes_it_and_sends_nothing_more(rig, monkeypatch, tmp_path):
     first, fake, session, clock = rig()
@@ -320,3 +330,13 @@ def test_a_non_admin_token_with_a_shot_recorded_closes_it_and_sends_nothing_more
     closed = max(t for t, m, p, _s in session.sent if p == f"/states/{VALVE}")
     assert [s for s in session.sent if s[0] > closed] == []  # nothing more over the hour
     assert "_shot_inflight" not in json.load(open(first._state_path))["default"]
+
+
+def test_the_log_shows_home_assistants_address_without_a_password():
+    """HA_URL may carry a user name and password; every log line names the address through SHOWN_BASE."""
+    with open(controller.__file__, encoding="utf-8") as fh:
+        source = fh.read()
+    assert "{BASE}" not in "".join(line for line in source.splitlines() if "_GATE.saw(" in line or "log(" in line)
+    assert '"| base:", BASE)' not in source
+    shown = runtime_env._shown("http://grower:hunter2@ha:8123/api")
+    assert "hunter2" not in shown and shown.endswith("@ha:8123/api")
