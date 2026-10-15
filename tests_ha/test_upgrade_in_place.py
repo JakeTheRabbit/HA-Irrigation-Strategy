@@ -233,8 +233,8 @@ async def test_a_3_8_0_state_file_loads_with_its_history_empty_and_nothing_moves
 ):
     """3.8.0 kept no plateau or night history (tests_ha/fixtures/state_3_8_0_mid_grow.json).
     The new controller loads that file exactly as it was, starts the history empty, and writing
-    it back changes nothing else but four new zone keys (the day before's peak and the P1 rule's
-    state), all saved empty."""
+    it back changes nothing else but six new zone keys (the day before's peak, the P1 rule's
+    state and the max-run latch's run of cut shots and latch), all saved empty."""
     await _upgrade(hass, "entry_2_17_wizard.json")
     seed = fixture("state_3_8_0_mid_grow.json")["state"]
     hass.states.async_set(KILL, "on")
@@ -262,6 +262,7 @@ async def test_a_3_8_0_state_file_loads_with_its_history_empty_and_nothing_moves
         learn = dict(written.pop("learn"))
         new = (written.pop("peak_prev"), written.pop("p1_reached"), written.pop("p1_peak_before"), written.pop("p1_extra"))
         assert new == (None, False, None, 0)  # the day before's peak and the P1 rule's state, saved empty
+        assert (written.pop("capped_in_a_row"), written.pop("max_run_latch")) == (0, None)
         old = dict(seed["default"][zone])
         assert learn == old.pop("learn")
         assert written == old
