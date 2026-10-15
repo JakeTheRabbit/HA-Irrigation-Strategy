@@ -82,8 +82,6 @@ DEFAULTS = {
     # Photoperiod
     "lights_on_hour": (12, None),
     "lights_off_hour": (0, None),
-    # Controller-only: the highest VWC the minimum-daily floor may water a zone up to
-    "min_floor_drown_ceiling": (None, 90),
 }
 
 ENTITY_DEFAULTS = {

@@ -109,6 +109,7 @@ for that zone. (3 zones × 24 = 72 entities on a 3-zone system.)
 |---|---|---|---|---|
 | `zone_N_plant_count` | 1-50 | 4 | - | Plants in the zone: scales total water volume. |
 | `zone_N_max_daily_volume` | 0-200 | 20 | L | Daily water budget for the zone. Top-ups and EC-correction shots stop at it, and a shot that would cross it gets only what is left; rescues (watchdog, P3 emergency, high-EC flushes) and the P1 ramp are exempt. |
+| `zone_N_min_daily_ml_per_plant` | 0-10000 | 0 (off) | mL | Minimum daily water per plant. From lights-on (never in P0), paced to finish 3 h before lights-off, the zone is watered up to this times its plant count whatever the probe reads, so a probe that reads wet cannot starve the plants (and a correct probe is watered anyway). Stops once moisture is 5 points above the zone's field capacity, and never past the daily limit. A new entity takes the value of the old `input_number` helper of the same name. |
 | `zone_N_substrate_volume` / `zone_N_drippers_per_plant` / `zone_N_dripper_flow_rate` | as the globals | from setup | - | Created only when setup sizes the zone itself; otherwise the room-wide value applies. |
 
 ---

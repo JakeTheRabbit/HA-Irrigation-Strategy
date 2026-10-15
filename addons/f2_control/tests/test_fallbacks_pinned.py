@@ -41,7 +41,9 @@ PARAMS_12C6D1A = ZoneParams(
     stacking_on=False,
     watchdog_hours=3,
     min_daily_volume=0.0,
-    drown_ceiling=90,
+    # 12c6d1a's was a fixed 90. It is now field capacity (the 70 fallback) plus 5, announced in bold
+    # with the minimum daily water setting; with the floor off (0 here) it waters nothing either way.
+    drown_ceiling=75,
 )
 
 

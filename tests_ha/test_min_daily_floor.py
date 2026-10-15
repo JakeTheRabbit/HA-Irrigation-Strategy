@@ -44,6 +44,22 @@ async def test_an_upgraded_room_keeps_the_value_its_old_helper_held(hass):
     assert float(hass.states.get(ENTITY.format(2)).state) == 0  # no helper: still off
 
 
+async def test_the_controller_waters_the_upgraded_floor_from_the_new_setting(
+    hass, controller_for
+):
+    await _helper(hass, 250)
+    await _upgrade(hass, JEV_3_11_1)
+    c, fake, _clock = controller_for({})
+    fake.set_state(HELPER, "unavailable")  # the setting alone carries the value now
+    room = c.rooms[0]
+    room.strategy_snapshot = None
+    plants = float(hass.states.get("number.crop_steering_zone_1_plant_count").state)
+    fc = c._zone_num(room, 1, "field_capacity", 0)
+    p = c._params(room, 1, ec_known=False)
+    assert p.min_daily_volume == 250 * plants / 1000
+    assert p.drown_ceiling == max(50.0, min(100.0, fc + 5))
+
+
 def test_the_helper_is_set_up_before_the_integration_reads_it():
     manifest = Path(__file__).resolve().parents[1] / (
         "custom_components/crop_steering/manifest.json"

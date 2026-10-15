@@ -102,7 +102,6 @@ CONTROLLER_FALLBACKS_12C6D1A = {
     "watchdog_hours": 3,
     "plant_count": 0,
     "drippers_per_plant": 1,
-    "min_floor_drown_ceiling": 90,
     "p3_time_between_shots": 10.0,
 }
 
@@ -163,9 +162,17 @@ def _zone_num_calls():
 
 
 # Call sites whose fallback is not a fixed value, and so not in the table: the substrate falls back to
-# the add-on's substrate_l option, the dripper flow to the room's own setting, and one P2 read wants
-# no value at all when the setting is missing. None of them may be a number typed at the call site.
-NOT_FROM_THE_TABLE = {"substrate_volume", "dripper_flow_rate", "p2_vwc_threshold"}
+# the add-on's substrate_l option, the dripper flow to the room's own setting, the minimum daily water
+# to the old input_number helper, the floor's drown ceiling to field capacity plus a margin (it was a
+# fixed 90 until the minimum daily water became a setting), and one P2 read wants no value at all when
+# the setting is missing. None of them may be a number typed at the call site.
+NOT_FROM_THE_TABLE = {
+    "substrate_volume",
+    "dripper_flow_rate",
+    "p2_vwc_threshold",
+    "min_daily_ml_per_plant",
+    "min_floor_drown_ceiling",
+}
 
 
 def test_every_controller_fallback_is_read_from_the_table_under_its_own_name():
