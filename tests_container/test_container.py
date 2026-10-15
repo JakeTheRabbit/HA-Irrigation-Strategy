@@ -316,10 +316,25 @@ def test_c5_the_app_as_the_supervisor_runs_it(rig):
     rig.wait(ctl, "base: http://supervisor/core/api")
     rig.wait(ctl, "starting")
     assert serves_8420(ctl)
-    frozen = docker("exec", ctl, "pip3", "freeze").lower().split()
-    pinned = [line.split()[0].lower() for line in (ROOT / "addons/f2_control/requirements.txt").read_text().splitlines()
-              if "==" in line and not line.startswith("#")]
-    assert sorted(frozen) == sorted(pinned)
+    # Exactly the pinned code: requirements.txt, plus the Anthropic SDK's requirements-brain.txt on every arch
+    # but armv7, which the Dockerfile skips by name. Names compare PEP 503-normalised (pip freeze prints
+    # typing_extensions where the pin file says typing-extensions); versions compare exactly.
+    files = ["requirements.txt"] + ([] if docker("exec", ctl, "apk", "--print-arch") == "armv7"
+                                    else ["requirements-brain.txt"])
+    frozen = pins(docker("exec", ctl, "pip3", "freeze"))
+    pinned = set().union(*(pins((ROOT / "addons/f2_control" / name).read_text()) for name in files))
+    assert frozen == pinned, (sorted(frozen - pinned), sorted(pinned - frozen))
+
+
+def pins(text):
+    """`name==version` for each requirement line, the name PEP 503-normalised."""
+    found = set()
+    for line in text.splitlines():
+        spec = line.split("#", 1)[0].split()
+        if spec and "==" in spec[0]:
+            name, _, version = spec[0].partition("==")
+            found.add(f'{re.sub(r"[-_.]+", "-", name.lower())}=={version}')
+    return found
 
 
 @pytest.mark.parametrize("env, refused", [
