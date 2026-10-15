@@ -37,6 +37,10 @@ SET_PHASE_OPTIONS = ["Keep", *PHASES]
 # How Water today reads, in the dashboard and the controller's vitals notification: each zone's
 # total, or what each of its plants got. The controller matches "Per plant" by these words.
 WATER_TODAY_VIEWS = ["Zone total", "Per plant"]
+# How a room's runoff leaves it. The controller watches for a table backing up (CS-310) unless the
+# room drains freely, and matches "free_drain" by this id. Unknown, the first, is every room that has
+# not said, which is watched as before.
+DRAINAGE_TYPES = ["unknown", "flood_table", "free_drain"]
 STEERING_MODES = ["Vegetative", "Generative"]
 
 # Growth stages (for growth_stage select entity)

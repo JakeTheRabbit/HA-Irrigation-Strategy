@@ -22,6 +22,7 @@ from .const import (
     MIN_ZONES,
     MAX_ZONES,
     DEFAULT_NUM_ZONES,
+    DRAINAGE_TYPES,
 )
 from .env_parser import load_env_config
 from .generated.defaults import ENTITY_DEFAULTS, SIZING_DEFAULTS
@@ -60,6 +61,17 @@ def _plumbing_sel():
         selector.SelectSelectorConfig(
             options=list(PLUMBING_LAYOUTS),
             translation_key="plumbing",
+            mode=selector.SelectSelectorMode.LIST,
+        )
+    )
+
+
+def _drainage_sel():
+    # How the room's runoff leaves it: a free-draining room is not watched for a table backing up.
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=DRAINAGE_TYPES,
+            translation_key="drainage",
             mode=selector.SelectSelectorMode.LIST,
         )
     )
@@ -294,6 +306,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
                 "env": "Load from crop_steering.env file (advanced)",
             }
         ),
+        vol.Required("drainage", default="unknown"): _drainage_sel(),
     }
 )
 
@@ -420,7 +433,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             return self.async_show_form(
                 step_id="room",
-                data_schema=vol.Schema({vol.Required("room_name"): str}),
+                data_schema=vol.Schema(
+                    {
+                        vol.Required("room_name"): str,
+                        vol.Required("drainage", default="unknown"): _drainage_sel(),
+                    }
+                ),
                 description_placeholders={
                     "info": "Name this room (e.g. Veg, Flower B). It gets its own zones, "
                     "sensors, pump and setpoints — completely isolated from your other rooms.",
@@ -436,6 +454,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._data["room_name"] = user_input["room_name"]
         self._data["room_slug"] = slug
         self._data["room_prefix"] = f"{slug}_"
+        self._data["drainage"] = user_input.get("drainage", "unknown")
         return await self.async_step_manual_zones()
 
     async def async_step_load_env(
@@ -502,6 +521,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "room_name": self._data.get("room_name", "Crop Steering"),
                     "room_prefix": "",
                     "room_slug": "default",
+                    "drainage": self._data.get("drainage", "unknown"),
                     "num_zones": env_config["num_zones"],
                     "zones": env_config["zones"],
                     "hardware": env_config["hardware"],
@@ -709,6 +729,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "room_name": self._data.get("room_name", "Crop Steering"),
             "room_prefix": self._data.get("room_prefix", ""),
             "room_slug": self._data.get("room_slug", "default"),
+            "drainage": self._data.get("drainage", "unknown"),
             CONF_NUM_ZONES: int(self._data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES)),
             "zones": self._data.get("zones", {}),
             "hardware": _build_hardware(user_input),
