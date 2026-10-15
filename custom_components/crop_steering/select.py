@@ -173,7 +173,6 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
                 manufacturer="Home Assistant Community",
                 model="Zone Controller",
                 sw_version=SOFTWARE_VERSION,
-                via_device=(DOMAIN, self._entry.entry_id),
             )
         else:
             # Main device

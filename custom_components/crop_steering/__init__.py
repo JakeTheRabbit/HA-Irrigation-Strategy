@@ -176,6 +176,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _link_zone_devices(hass, entry)
 
     # Set up services
     await async_setup_services(hass)
@@ -227,6 +228,30 @@ def _is_new_room(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from homeassistant.helpers import entity_registry as er
 
     return not er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+
+
+def _link_zone_devices(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Show each zone's device under its room's device, as Home Assistant's device pages list it.
+
+    The zones' DeviceInfo used to name the room with `via_device`, which Home Assistant 2026.9
+    deprecates (it stops working in 2027.8.0). The device registry's `via_device_id` gives the same
+    link on every supported Home Assistant. The devices themselves are kept, ids and all, and a zone
+    already under its room is left alone.
+    """
+    from homeassistant.helpers import device_registry as dr
+
+    registry = dr.async_get(hass)
+    devices = dr.async_entries_for_config_entry(registry, entry.entry_id)
+    room = next((d for d in devices if (DOMAIN, entry.entry_id) in d.identifiers), None)
+    if room is None:
+        return
+    zone = f"{entry.entry_id}_zone_"
+    for device in devices:
+        if device.via_device_id != room.id and any(
+            domain == DOMAIN and str(key).startswith(zone)
+            for domain, key in device.identifiers
+        ):
+            registry.async_update_device(device.id, via_device_id=room.id)
 
 
 def _remove_retired_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
