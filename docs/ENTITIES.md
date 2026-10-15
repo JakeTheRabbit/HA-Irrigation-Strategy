@@ -170,7 +170,7 @@ for that zone. (3 zones × 26 = 78 entities on a 3-zone system.)
 | `current_decision` | - | What the controller decided this cycle. |
 | `app_status` | - | The controller's state for the room (`active` / `safe_idle` / …). |
 | `system_safety_status` | - | `safe` / fault. |
-| `ai_heartbeat` | - | Self-correction loop status (`healthy` / anomaly). Attribute `controller_version`: the controller app that is actually running (shown in the dashboard sidebar beside the descriptor's `integration_version`). |
+| `ai_heartbeat` | - | Self-correction loop status (`healthy` / anomaly), or `stopped` once the controller app has been stopped, updated or restarted (attribute `stopped_at`). Attribute `controller_version`: the controller app that is actually running (shown in the dashboard sidebar beside the descriptor's `integration_version`). |
 | `engine_config` | - | The room's descriptor: what the controller reads to find and drive the room (valves, pump, main line, kill switch, zones, `setup_revision`). Attribute `integration_version`: the integration Home Assistant actually loaded. Attribute `entry_id`: WHICH room this is. A room that is deleted and set up again keeps its entity ids and starts its revision again at 1, so this is how a running controller tells it from the room it already adopted; it then adopts the new setup through the usual gate (kill switch and hardware OFF). Neither attribute enters the setup fingerprint. |
 | `configured_avg_vwc` / `configured_avg_ec` | % / mS/cm | Means across every mapped zone probe. |
 | `ec_ratio` | - | Current EC ÷ target EC. |

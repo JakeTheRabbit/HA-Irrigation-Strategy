@@ -92,3 +92,45 @@ async def test_a_slow_home_assistant_never_takes_the_stop_past_the_apps_timeout(
     assert switch_calls(fake) == [("turn_off", e) for e in taken]  # what Home Assistant took, valve first
     if len(taken) < 3:  # what is still on is closed at the next start
         assert saved["_shot_inflight"]["valve"] == VALVE
+
+
+@pytest.mark.parametrize("seeded", [UPSTREAM_2_25_1, JEV_3_11_1])
+async def test_the_stop_says_stopped_on_the_heartbeat_and_the_integration_still_finds_the_switch(
+    hass, controller_for, monkeypatch, seeded
+):
+    """Stopped mid-shot with Home Assistant answering at once: the heartbeat says "stopped", and the
+    real integration, reading it, still finds the room's engine switch."""
+    from custom_components.crop_steering import health
+
+    monkeypatch.delenv("F2_STOP_BUDGET_S", raising=False)
+    seed = fixture(seeded)
+    await _upgrade(hass, seeded, registry_ids=seed["registry"])
+    hass.states.async_set(KILL, "on")
+    if seeded == JEV_3_11_1:
+        c, fake, _built, _usage, _state = _jev_3_11_1_app(
+            controller_for, monkeypatch, "options_3_11_1_jev_cf.json"
+        )
+    else:
+        c, fake, _clock = controller_for(
+            seed["addon_options"], saved_state=seed["controller_saved"]
+        )
+    import controller
+
+    clock = controller.time.sleep.__self__
+    room = c.rooms[0]
+    for switch in (
+        "switch.crop_steering_system_enabled",
+        "switch.crop_steering_auto_irrigation_enabled",
+        "switch.crop_steering_zone_1_enabled",
+    ):
+        fake.set_state(switch, "on")
+    stop = _slow_then_stop(c, fake, clock, monkeypatch, 0.0)
+
+    with pytest.raises(SystemExit):
+        c._execute_shot(room, 1, 300, 5, flow_lps=0.05)
+
+    assert clock.seconds - stop["at"] <= 25
+    state, attributes = fake.sets["sensor.crop_steering_ai_heartbeat"]
+    assert state == "stopped" and "strategy_snapshot_version" not in attributes
+    hass.states.async_set("sensor.crop_steering_ai_heartbeat", state, attributes)
+    assert health._kill_switch(hass, "") == room.enable_flag

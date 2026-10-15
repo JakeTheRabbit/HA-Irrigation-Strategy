@@ -347,6 +347,8 @@ export function controllerReach(
       return { live: false, reason: "The controller is not running." };
     if (beat.health === "stale")
       return { live: false, reason: "The controller has stopped reporting." };
+    if (beat.health === "stopped")
+      return { live: false, reason: "The controller app has stopped." };
   }
   if (!status)
     return {

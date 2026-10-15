@@ -341,3 +341,65 @@ APP = {"F2_RUNTIME": "addon", "SUPERVISOR_TOKEN": "t"}  # what the Supervisor gi
 def test_the_stop_budget_is_f2_stop_budget_s_when_it_is_a_number_above_0(runtime, default, value, budget):
     env = dict(runtime) if value is None else {**runtime, "F2_STOP_BUDGET_S": value}
     assert runtime_env.stop_budget(env) == (default if budget is None else budget)
+
+
+BEATS = {"default": "sensor.crop_steering_ai_heartbeat", "b": "sensor.crop_steering_b_ai_heartbeat",
+         "c": "sensor.crop_steering_c_ai_heartbeat"}
+
+
+def test_the_stop_ends_with_every_rooms_heartbeat_saying_stopped(rig):
+    """An update, a restart or a stop by hand: the dashboard shows a stopped controller, and since when,
+    not one that went quiet. The integration still finds each room's engine switch, and no grow plan is
+    armed on a stopped controller."""
+    c, fake, clock, rooms = rig
+    rooms["c"]._beat = (None, False)  # its last report said the room is off
+    fake.sets.clear()
+    took = stop(c, clock)
+    assert took <= runtime_env.STOP_BUDGET_S
+    for slug, beat in BEATS.items():
+        state, attrs = fake.sets[beat]
+        assert state == "stopped" and attrs["stopped_at"] == attrs["last_beat"], slug
+        assert attrs["controller_version"] == controller.CONTROLLER_VERSION
+        assert attrs["enable_flag"] == rooms[slug].enable_flag
+        assert "strategy_snapshot_version" not in attrs
+    assert fake.sets[BEATS["c"]][1]["room_active"] is False
+    assert fake.sets[BEATS["default"]][1]["room_active"] is True
+
+
+def unanswered_writes(monkeypatch, clock):
+    """Home Assistant never answers a state write: requests waits out the connect and then the read."""
+    tried = []
+
+    def put(entity, state, attributes=None, timeout=8):
+        tried.append((entity, timeout))
+        clock.sleep(2 * timeout)
+
+    monkeypatch.setattr(controller, "ha_set", put)
+    return tried
+
+
+def test_the_stopped_heartbeat_fits_in_what_is_left_of_the_budget(rig, monkeypatch):
+    c, _fake, clock, _rooms = rig
+    monkeypatch.setattr(c, "_safe_off", lambda deadline: clock.sleep(deadline - clock.seconds - 3))
+    tried = unanswered_writes(monkeypatch, clock)
+    took = stop(c, clock)
+    assert took <= runtime_env.STOP_BUDGET_S
+    assert [entity for entity, _ in tried] == list(BEATS.values())
+
+
+def test_a_stop_with_no_time_left_sends_no_heartbeat(rig, monkeypatch):
+    c, _fake, clock, _rooms = rig
+    c.dosing._doc["rooms"].clear()
+    monkeypatch.setattr(c, "_safe_off", lambda deadline: clock.sleep(deadline - clock.seconds))
+    tried = unanswered_writes(monkeypatch, clock)
+    took = stop(c, clock)
+    assert took <= runtime_env.STOP_BUDGET_S and tried == []
+
+
+def test_a_home_assistant_that_never_answers_still_stops_inside_the_budget_with_the_heartbeat(rig, monkeypatch):
+    c, fake, clock, _rooms = rig
+    slow(monkeypatch, c, fake, clock)
+    tried = unanswered_writes(monkeypatch, clock)
+    took = stop(c, clock)
+    assert took <= runtime_env.STOP_BUDGET_S + 2  # the safe-off's own bound: the heartbeat adds nothing
+    assert all(timeout >= 0.25 for _, timeout in tried)

@@ -92,6 +92,39 @@ describe("controller heartbeat", () => {
     expect(stale.alerts[0].detail).toMatch(/last reported 11 min ago/);
     expect(stale.zones.every((zone) => zone.stale)).toBe(true);
   });
+  it("says the controller app stopped, and when, once the controller has said so", () => {
+    // SIGTERM: an update, a restart or a stop by hand. It starts again by itself after the first two.
+    const stopped = entity(HEARTBEAT, "stopped", { stopped_at: ago(3 * 60_000) }, ago(3 * 60_000));
+    const room = view(fixture([stopped]));
+    expect(room.alerts[0]).toMatchObject({ severity: "warning", title: "Controller stopped" });
+    expect(room.alerts[0].detail).toMatch(
+      /^The controller app stopped 3 min ago\. After an update or a restart it starts again by itself/,
+    );
+    expect(room.zones.map((zone) => zone.stale)).toEqual([true, true]);
+    expect(status(fixture([stopped]))).toMatchObject({
+      tone: "stopped",
+      text: "Not watering",
+      reportedAt: NOW - 3 * 60_000,
+    });
+    expect(status(fixture([stopped])).detail).toMatch(/^The controller app stopped 3 min ago\. /);
+    // Long after it stopped it still says stopped, not "data old".
+    const long = entity(HEARTBEAT, "stopped", { stopped_at: ago(3 * 3_600_000) }, ago(3 * 3_600_000));
+    expect(view(fixture([long])).alerts[0].title).toBe("Controller stopped");
+    expect(status(fixture([long])).detail).toMatch(/^The controller app stopped 3 h ago\. /);
+  });
+  it("reads when it stopped from the controller, then from Home Assistant", () => {
+    const at = (attributes: Record<string, unknown>, updated?: string) =>
+      readHeartbeat({ ...entity(HEARTBEAT, "stopped", attributes), last_updated: updated }, NOW);
+    expect(at({ stopped_at: ago(60_000) }, ago(30_000))).toMatchObject({
+      health: "stopped",
+      at: NOW - 60_000,
+    });
+    expect(at({ stopped_at: "soon" }, ago(30_000)).at).toBe(NOW - 30_000);
+    expect(at({}).at).toBeNull();
+    expect(
+      status(fixture([{ ...entity(HEARTBEAT, "stopped"), last_updated: undefined }])).detail,
+    ).toMatch(/^The controller app has stopped\. /);
+  });
   describe("while a quiet controller has a zone valve open", () => {
     const VALVE = "switch.zone_1_valve";
     const quiet = (opened: number, extra: EntityState[] = []) =>

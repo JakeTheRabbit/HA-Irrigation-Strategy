@@ -4266,8 +4266,42 @@ class Controller:
                 self._exit_dosing(deadline)
             finally:
                 self._save_state()
+                self._say_stopped(datetime.now(), deadline)
         finally:
             sys.exit(0)
+
+    def _say_stopped(self, now, deadline):
+        """Stopping (an update, a restart or by hand): each room's heartbeat says so, so the dashboard
+        shows a stopped controller, and since when, rather than one that stopped reporting. It keeps
+        what the integration reads to find the engine switch, and leaves out strategy_snapshot_version,
+        so no grow plan is armed on a stopped controller. Last, after the safe-off and the state file,
+        and only in what is left of the stop's budget (`deadline`, the monotonic clock): requests
+        applies the timeout to the connect and the read separately, so each write gets half its share,
+        at most 2 s, and none is sent once that is under 0.25 s."""
+        try:
+            for i, room in enumerate(self.rooms):
+                timeout = min(2.0, (deadline - time.monotonic()) / (2 * (len(self.rooms) - i)))
+                if timeout < 0.25:
+                    return
+                beat = getattr(room, "_beat", None)
+                ha_set(
+                    f"sensor.crop_steering_{room.prefix}ai_heartbeat",
+                    "stopped",
+                    {
+                        "engine": "f2-control",
+                        "controller_version": CONTROLLER_VERSION,
+                        "stopped_at": now.isoformat(),
+                        "last_beat": now.isoformat(),
+                        "enable_flag": room.enable_flag,
+                        "hardware_fault": self._hardware_fault_block(room),
+                        "setup_revision": getattr(room, "setup_revision", 0),
+                        "setup_active": getattr(room, "setup_active", True),
+                        "room_active": beat[1] if beat else True,
+                    },
+                    timeout=timeout,
+                )
+        except Exception as e:
+            log("could not say stopped on the heartbeat:", e)
 
     def _stop_dosing_starts(self):
         try:
