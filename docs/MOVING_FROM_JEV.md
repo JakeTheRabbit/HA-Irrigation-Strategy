@@ -74,7 +74,8 @@ These are for Home Assistant OS and Supervised installs, and follow the same sha
    `custom_components/crop_steering` afresh. Removing first means only one HACS repository ever provides
    the integration. Restart Home Assistant once. The config entry and entities are untouched (same
    domain); check that Settings, Devices & services shows the integration loaded at the new version.
-7. **Start the new app.** In its log check: the version on the `f2-control <version> starting` line;
+7. **Start the new app.** In its log check: the version on the `Crop Steering Controller <version> starting` line
+   (older controllers wrote `f2-control <version> starting`);
    `room '<room>' setup revision N adopted with verified OFF hardware` for each room, and no "setup change
    waiting, not watering" notice; and the brain line, `jev: on via ...` where the old app had a brain, or
    `jev: off. The Cloudflare credentials start Jev only on an install that has run it before` on a
