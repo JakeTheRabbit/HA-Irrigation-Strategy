@@ -24,6 +24,7 @@ from .const import (
     DEFAULT_NUM_ZONES,
 )
 from .env_parser import load_env_config
+from .generated.defaults import ENTITY_DEFAULTS, SIZING_DEFAULTS
 from .plumbing import PLUMBING_LAYOUTS, infer as infer_plumbing
 from .room import slugify_room
 
@@ -84,7 +85,7 @@ def _zone_schema(num_zones: int, zones: dict | None = None) -> dict:
         ec = zc.get("ec_sensors") or (
             _as_list(zc.get("ec_front")) + _as_list(zc.get("ec_back"))
         )
-        pc = zc.get("plant_count", 4)
+        pc = zc.get("plant_count", SIZING_DEFAULTS["plant_count"])
         out[vol.Optional(f"zone_{z}_name", default=zc.get("name", f"Zone {z}"))] = str
         out[vol.Optional(f"zone_{z}_active", default=zc.get("active", True))] = bool
         out[
@@ -154,20 +155,38 @@ def _hardware_schema(
         vol.All(vol.Coerce(int), vol.Range(min=0, max=23))
     )
     out[
-        vol.Optional("substrate_volume", default=params.get("substrate_volume", 6.0))
+        vol.Optional(
+            "substrate_volume",
+            default=params.get("substrate_volume", SIZING_DEFAULTS["substrate_volume"]),
+        )
     ] = vol.All(vol.Coerce(float), vol.Range(min=0.1, max=200.0))
     out[
-        vol.Optional("dripper_flow_rate", default=params.get("dripper_flow_rate", 2.0))
+        vol.Optional(
+            "dripper_flow_rate",
+            default=params.get(
+                "dripper_flow_rate", SIZING_DEFAULTS["dripper_flow_rate"]
+            ),
+        )
     ] = vol.All(vol.Coerce(float), vol.Range(min=0.1, max=50.0))
     out[
-        vol.Optional("drippers_per_plant", default=params.get("drippers_per_plant", 1))
+        vol.Optional(
+            "drippers_per_plant",
+            default=params.get(
+                "drippers_per_plant", SIZING_DEFAULTS["drippers_per_plant"]
+            ),
+        )
     ] = vol.All(vol.Coerce(int), vol.Range(min=1, max=20))
-    out[vol.Optional("field_capacity", default=params.get("field_capacity", 70.0))] = (
-        vol.All(vol.Coerce(float), vol.Range(min=30.0, max=95.0))
-    )
-    out[vol.Optional("max_ec", default=params.get("max_ec", 9.0))] = vol.All(
-        vol.Coerce(float), vol.Range(min=1.0, max=15.0)
-    )
+    out[
+        vol.Optional(
+            "field_capacity",
+            default=params.get("field_capacity", ENTITY_DEFAULTS["field_capacity"]),
+        )
+    ] = vol.All(vol.Coerce(float), vol.Range(min=30.0, max=95.0))
+    out[
+        vol.Optional(
+            "max_ec", default=params.get("max_ec", ENTITY_DEFAULTS["maximum_ec"])
+        )
+    ] = vol.All(vol.Coerce(float), vol.Range(min=1.0, max=15.0))
     _ent("temperature_sensor", _sensor_one())
     _ent("humidity_sensor", _sensor_one())
     _ent("vpd_sensor", _sensor_one())
@@ -217,9 +236,11 @@ def _build_zones(num_zones: int, data: dict, existing: dict | None = None) -> di
             "vwc_back": vwc[1] if len(vwc) > 1 else "",
             "ec_front": ec[0] if ec else "",
             "ec_back": ec[1] if len(ec) > 1 else "",
-            "plant_count": int(data.get(f"zone_{z}_plant_count", 4)),
+            "plant_count": int(
+                data.get(f"zone_{z}_plant_count", SIZING_DEFAULTS["plant_count"])
+            ),
             "max_daily_volume": ((existing or {}).get(str(z)) or {}).get(
-                "max_daily_volume", 20.0
+                "max_daily_volume", ENTITY_DEFAULTS["max_daily_volume"]
             ),
         }
     return zones
@@ -248,11 +269,17 @@ def _build_hardware(data: dict) -> dict:
 
 def _build_parameters(data: dict) -> dict:
     return {
-        "substrate_volume": data.get("substrate_volume", 6.0),
-        "dripper_flow_rate": data.get("dripper_flow_rate", 2.0),
-        "drippers_per_plant": data.get("drippers_per_plant", 1),
-        "field_capacity": data.get("field_capacity", 70.0),
-        "max_ec": data.get("max_ec", 9.0),
+        "substrate_volume": data.get(
+            "substrate_volume", SIZING_DEFAULTS["substrate_volume"]
+        ),
+        "dripper_flow_rate": data.get(
+            "dripper_flow_rate", SIZING_DEFAULTS["dripper_flow_rate"]
+        ),
+        "drippers_per_plant": data.get(
+            "drippers_per_plant", SIZING_DEFAULTS["drippers_per_plant"]
+        ),
+        "field_capacity": data.get("field_capacity", ENTITY_DEFAULTS["field_capacity"]),
+        "max_ec": data.get("max_ec", ENTITY_DEFAULTS["maximum_ec"]),
         "lights_on_hour": data.get("lights_on_hour", 12),
         "lights_off_hour": data.get("lights_off_hour", 0),
     }
@@ -951,13 +978,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {
                     vol.Optional(
-                        key, default=current_params.get(key, fallback)
+                        key, default=current_params.get(key, ENTITY_DEFAULTS[key])
                     ): vol.All(vol.Coerce(float), _number_range(key))
-                    for key, fallback in (
-                        ("substrate_volume", 10.0),
-                        ("dripper_flow_rate", 2.0),
-                        ("p1_target_vwc", 65.0),
-                        ("p2_vwc_threshold", 60.0),
+                    for key in (
+                        "substrate_volume",
+                        "dripper_flow_rate",
+                        "p1_target_vwc",
+                        "p2_vwc_threshold",
                     )
                 }
             ),

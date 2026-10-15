@@ -11,6 +11,16 @@ entities scale with your zone count, `N` = 1…zones).
   per-zone value for that zone and falls back to the global otherwise.
 - The engine reads these by `entity_id`. Renaming a friendly-name in HA or on a
   dashboard does not affect it.
+- **Defaults** are the entity-default column of one table,
+  `crop-steering-engine/src/crop_steering_engine/defaults.py`: what a new entity starts at and
+  what setup offers a new room. A restored or operator-set value always wins over it. The
+  table's other column is what the controller uses when neither the zone's nor the room's
+  setting can be read (around a Home Assistant restart, or a setting an older integration
+  lacks); for some settings it differs from the entity default, and it is kept at the values
+  installed controllers already use.
+- **Sizing** (substrate litres, plant count, drippers per plant, dripper flow) starts at generic
+  values, not any one room's. Setup shows them pre-filled for you to check, and the room's
+  setup reports each one still at its generic value (`sizing_generic`) until it is changed.
 
 ---
 
@@ -29,13 +39,13 @@ entities scale with your zone count, `N` = 1…zones).
 | `p1_shot_size_increment` | 0.05-10 | 0.5 | % | How much each successive shot grows. |
 | `p1_minimum_shots` | 1-20 | 3 | - | Minimum shots before P1 may exit. |
 | `p1_maximum_shots` | 1-30 | 6 | - | After this many shots P1 exits to P2 even if the target wasn't hit. |
-| `p1_target_vwc` | 5-95 | 60 | % | VWC that ends the ramp and moves the zone to P2. |
-| `p1_time_between_shots` | 1-60 | 5 | min | Spacing between ramp shots. |
+| `p1_target_vwc` | 5-95 | 65 | % | VWC that ends the ramp and moves the zone to P2. |
+| `p1_time_between_shots` | 1-60 | 15 | min | Spacing between ramp shots. |
 
 ### P2: maintenance
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `p2_vwc_threshold` | 5-85 | 55 | % | Shoot a maintenance top-up when VWC falls below this. |
+| `p2_vwc_threshold` | 5-85 | 60 | % | Shoot a maintenance top-up when VWC falls below this. |
 | `p2_shot_size` | 0.5-30 | 5 | % | Size of a P2 maintenance shot. |
 | `p2_ec_high_threshold` | 0.5-3.0 | 1.2 | ×target | EC ratio above which the threshold is raised (water more to flush salts). |
 | `p2_ec_low_threshold` | 0.2-2.0 | 0.8 | ×target | EC ratio below which the threshold is lowered. |
@@ -59,8 +69,8 @@ The active EC target = the row for the current phase **and** the zone's steering
 ### EC & safety limits
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `irrigation_ec_min` | 0-20 | 2.3 | mS/cm | Source-water EC gate (low bound). Irrigation blocked below it. `0` disables. |
-| `irrigation_ec_max` | 0-20 | 3.5 | mS/cm | Source-water EC gate (high bound). |
+| `irrigation_ec_min` | 0-20 | 0 | mS/cm | Source-water EC gate (low bound). Irrigation blocked below it. `0` disables. |
+| `irrigation_ec_max` | 0-20 | 0 | mS/cm | Source-water EC gate (high bound). |
 | `irrigation_ph_min` | 3.0-9.0 | 5.8 | pH | Source-water pH gate (low bound). |
 | `irrigation_ph_max` | 3.0-9.0 | 6.2 | pH | Source-water pH gate (high bound). |
 | `maximum_ec` | 1-20 | 9.0 | mS/cm | Hard substrate-EC cutoff: no shot above it (salt-burn guard). |
@@ -70,14 +80,14 @@ The active EC target = the row for the current phase **and** the zone's steering
 ### Substrate & schedule
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `substrate_volume` | 1-200 | 6 | L | Substrate volume per plant: converts shot % → mL → valve seconds. |
-| `dripper_flow_rate` | 0.1-50 | 4 | L/hr | Per-dripper flow: the other half of the % → seconds conversion. |
-| `drippers_per_plant` | 1-6 | 1 | - | Drippers feeding each plant. |
-| `field_capacity` | 5-100 | 60 | % | VWC at/above which irrigation is blocked (over-water guard / P1 clamp). |
+| `substrate_volume` | 1-200 | 10 | L | Substrate volume per plant: converts shot % → mL → valve seconds. |
+| `dripper_flow_rate` | 0.1-50 | 1.2 | L/hr | Per-dripper flow: the other half of the % → seconds conversion. |
+| `drippers_per_plant` | 1-6 | 2 | - | Drippers feeding each plant. |
+| `field_capacity` | 5-100 | 70 | % | VWC at/above which irrigation is blocked (over-water guard / P1 clamp). |
 | `vegetative_dryback_target` | 5-80 | 50 | % | Overnight dryback target in vegetative mode. |
 | `generative_dryback_target` | 5-70 | 40 | % | Overnight dryback target in generative mode. |
-| `lights_on_hour` | 0-23 | 10 | hour | Photoperiod start: P3→P0 + daily-counter reset fire here. |
-| `lights_off_hour` | 0-23 | 22 | hour | Photoperiod end: zones move to P3. |
+| `lights_on_hour` | 0-23 | 12 | hour | Photoperiod start: P3→P0 + daily-counter reset fire here. |
+| `lights_off_hour` | 0-23 | 0 | hour | Photoperiod end: zones move to P3. |
 
 ---
 
@@ -97,8 +107,8 @@ for that zone. (3 zones × 24 = 72 entities on a 3-zone system.)
 **Per-zone only (no global equivalent):**
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `zone_N_plant_count` | 1-50 | - | - | Plants in the zone: scales total water volume. |
-| `zone_N_max_daily_volume` | 0-200 | 200 | L | Daily water budget for the zone. Top-ups and EC-correction shots stop at it, and a shot that would cross it gets only what is left; rescues (watchdog, P3 emergency, high-EC flushes) and the P1 ramp are exempt. |
+| `zone_N_plant_count` | 1-50 | 4 | - | Plants in the zone: scales total water volume. |
+| `zone_N_max_daily_volume` | 0-200 | 20 | L | Daily water budget for the zone. Top-ups and EC-correction shots stop at it, and a shot that would cross it gets only what is left; rescues (watchdog, P3 emergency, high-EC flushes) and the P1 ramp are exempt. |
 | `zone_N_substrate_volume` / `zone_N_drippers_per_plant` / `zone_N_dripper_flow_rate` | as the globals | from setup | - | Created only when setup sizes the zone itself; otherwise the room-wide value applies. |
 
 ---
