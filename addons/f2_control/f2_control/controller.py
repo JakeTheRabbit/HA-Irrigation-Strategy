@@ -598,6 +598,7 @@ class Controller:
                     domain, service, data, timeout),
                 state_path=os.path.join(os.path.dirname(self._state_path) or ".", "dosing_state.json"),
                 log=log,
+                actuators=ACTUATORS,
             )
         except Exception as e:
             log("dosing: off, it could not start:", e)
@@ -1523,15 +1524,19 @@ class Controller:
         value, taken = self._canonical(entity, quantity, f, unit, keep_refused)
         return value, v, unit, lu, taken, attrs
 
-    def _canonical(self, entity, quantity, number, unit, keep_refused=False):
+    def _canonical(self, entity, quantity, number, unit, keep_refused=False, keep_unknown=False):
         """`number` from `entity` in its quantity's canonical unit -> (value or None, how the unit was taken). A
         unit that is not simply recognised is said once a run in the log, naming the sensor and the unit.
         `keep_refused`: a refused unit is read as the canonical unit while plausible, as before the table (the
-        source-water gate holds on a dead feed probe, so setting one aside would stop a room that waters)."""
+        source-water gate holds on a dead feed probe, so setting one aside would stop a room that waters).
+        `keep_unknown`: a unit the table does not know, or none, is read as the canonical unit whatever the
+        number, as before the table (the dosing runner: its own checks bound every dose)."""
         value, taken = to_canonical(quantity, number, unit)
         lo, hi = UNITS[quantity]["plausible"]
         if taken == "refused" and keep_refused and lo <= number <= hi:
             value, taken = number, "kept"
+        if taken in ("unrecognised", "implausible") and keep_unknown:
+            value, taken = number, "as before"
         said = self.__dict__.setdefault("_unit_notices", set())
         if taken != "recognised" and (entity, unit, taken) not in said:
             said.add((entity, unit, taken))
@@ -1544,6 +1549,7 @@ class Controller:
                                 f"while it stays within {lo:g}-{hi:g}",
                 "implausible": f"not a unit the table knows, and {number:g} is outside {lo:g}-{hi:g} "
                                f"{table['canonical']}, so the reading is set aside",
+                "as before": f"not a unit the table knows, so it is read as {table['canonical']}, as it always was",
             }[taken])
         return value, taken
 
