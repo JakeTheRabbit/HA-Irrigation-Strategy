@@ -66,6 +66,11 @@ class _Exit(BaseException):
     handler meant for a failure catches it."""
 
 
+class _Refused(_Exit):
+    """Home Assistant refuses the controller's token (controller._AuthGate): the job ends as when the app
+    stops, its record stays, and the thread waits, then recovers it once Home Assistant accepts again."""
+
+
 def _domain(entity):
     return entity.split(".", 1)[0]
 
@@ -121,7 +126,8 @@ class _Job:
 
 class DosingRunner:
     def __init__(self, controller, *, get, call, publish, alert, state_path, log=print,
-                 sleep=time.sleep, monotonic=time.monotonic, now=None, history=None, respond=None):
+                 sleep=time.sleep, monotonic=time.monotonic, now=None, history=None, respond=None,
+                 refused=None):
         self.c = controller
         # get(entity, timeout=...) -> (state, attributes, last_updated) with .last_changed;
         # call(domain, service, timeout=..., **data) -> bool; publish(entity, state, attributes);
@@ -132,6 +138,7 @@ class DosingRunner:
         self._deliver, self._log = alert, log
         self._history = history or (lambda _entity, _since: None)
         self._respond = respond
+        self._refused = refused or (lambda: False)  # Home Assistant refuses the token (_Refused)
         self._sleep, self._mono = sleep, monotonic
         self._now = now or (lambda: datetime.now(timezone.utc))
         self.path = state_path
@@ -241,6 +248,27 @@ class DosingRunner:
             return any(isinstance(block, dict) and isinstance(block.get("inflight"), dict)
                        for block in self._doc["rooms"].values())
 
+    def recorded_entity(self):
+        """The first switch a recorded dose or batch lists to switch off, or None."""
+        with self._lock:
+            for block in self._doc["rooms"].values():
+                record = block.get("inflight") if isinstance(block, dict) else None
+                for entity in (record.get("off") or []) if isinstance(record, dict) else []:
+                    if isinstance(entity, str) and "." in entity:
+                        return entity
+        return None
+
+    def running_off(self):
+        """What the running dose or batch has on: what _exit_off switches off."""
+        with self._lock:
+            job = self._job
+        return [] if job is None else self._job_off(job)
+
+    def _job_off(self, job):
+        if job.kind == "dose":
+            return [job.pump["power_entity"]] if job.pump else []
+        return self._dosing_hardware(job.config)
+
     def stop_starting(self):
         """The app is stopping (SIGTERM, before the irrigation's own safe-off): no dose, batch or
         switch-on starts from here on. One already on its way lands; exit() waits for it."""
@@ -291,8 +319,13 @@ class DosingRunner:
         while not self._exiting:
             self.beat = self._mono()
             try:
-                if self.recover():
+                if self._refused():
+                    pass  # nothing is asked of Home Assistant while it refuses the token
+                elif self.recover():
                     self.poll()
+            except _Refused:
+                with self._lock:
+                    self._recovered = False  # what the job left is recovered once Home Assistant accepts
             except _Exit:
                 return
             except Exception as e:  # the dosing thread must never die
@@ -1159,10 +1192,12 @@ class DosingRunner:
         return stuck, hold_left
 
     def _check(self, job, catch=False):
-        """End the batch now if it must: the app stopping, a stop request (read now when `catch`,
-        rather than at the next pass), or its watchdog."""
+        """End the batch now if it must: the app stopping, Home Assistant refusing the token, a stop
+        request (read now when `catch`, rather than at the next pass), or its watchdog."""
         if self._exiting:
             raise _Exit()
+        if self._refused():
+            raise _Refused()
         if catch:
             self._catch_stop(job)
         if job.stopped:
@@ -1192,6 +1227,8 @@ class DosingRunner:
             with self._lock:
                 if self._exiting:
                     raise _Exit()
+                if self._refused():
+                    raise _Refused()
                 if job.stopped:
                     raise _Ended(self._stop_reason(job))
             return self._call(_domain(entity), service, entity_id=entity, timeout=ON_TIMEOUT_S)
@@ -1204,13 +1241,10 @@ class DosingRunner:
         return "stop requested" + (f" by {job.stopped_by}" if job.stopped_by else "")
 
     def _exit_off(self, job):
-        """The thread's own way out of a dose or batch (the app is stopping): its hardware off at
-        once, each with a QUICK_S timeout and no read-back. The record stays for the next start."""
-        if job.kind == "dose":
-            entities = [job.pump["power_entity"]] if job.pump else []
-        else:
-            entities = self._dosing_hardware(job.config)
-        for entity in entities:
+        """The thread's own way out of a dose or batch (the app is stopping, or Home Assistant refuses
+        the token): its hardware off at once, each with a QUICK_S timeout and no read-back. The record
+        stays for the next start."""
+        for entity in self._job_off(job):
             try:
                 self._send_off(entity)
             except Exception as e:
@@ -1630,6 +1664,8 @@ class DosingRunner:
 
     def _wait(self, job, seconds):
         """Sleep a moment, answering every room's requests on the way (a stop among them)."""
+        if self._refused():
+            raise _Refused()
         self.beat = self._mono()
         if self._polled is None or self._mono() - self._polled >= POLL_S:
             self.poll(busy=job)

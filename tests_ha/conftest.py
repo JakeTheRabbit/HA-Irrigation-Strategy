@@ -108,7 +108,9 @@ def controller_for(hass, monkeypatch):
         def monotonic(self):
             return self.seconds
 
-    def build(options=None, *, saved_state=None):
+    def build(options=None, *, saved_state=None, options_file=False):
+        """`options_file`: write the options to the data folder's options.json and let the controller
+        read it with its own load_options, as the app does, instead of handing it the dict."""
         fake = fake_ha.FakeHA()
         for state in hass.states.async_all():
             attributes = json.loads(json.dumps(dict(state.attributes), default=str))
@@ -118,7 +120,14 @@ def controller_for(hass, monkeypatch):
                 json.dumps(saved_state), encoding="utf-8"
             )
         clock = Clock()
-        monkeypatch.setattr(controller, "load_options", lambda: dict(options or {}))
+        monkeypatch.setattr(controller, "_GATE", controller._AuthGate())  # as the app (see above)
+        if options_file:
+            path = Path(os.environ["F2_STATE_PATH"]).parent / "options.json"
+            path.write_text(json.dumps(options or {}), encoding="utf-8")
+            monkeypatch.setenv("F2_OPTIONS_PATH", str(path))
+            assert controller.load_options.__module__ == "controller"  # the real one, not a stand-in
+        else:
+            monkeypatch.setattr(controller, "load_options", lambda: dict(options or {}))
         for name in ("ha_get", "ha_call", "ha_get_all", "ha_set", "ha_service_response"):
             monkeypatch.setattr(controller, name, getattr(fake, name))
         # No recorder behind the fake: history is never asked of a real Home Assistant.

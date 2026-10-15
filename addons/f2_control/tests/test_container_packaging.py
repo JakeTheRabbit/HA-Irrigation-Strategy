@@ -5,13 +5,13 @@ plain `docker build` (or the root docker-compose.yml) has no Supervisor to pass 
 Dockerfile carries build.yaml's amd64 base as its default; these tests keep the two equal, so the
 container and the app never drift onto different bases. The image also carries the licence (a copy
 of the root LICENSE, since the build context is this directory), and run.sh starts the dashboard's
-listener, which has no login of its own, everywhere except a standalone container that has not asked
-for it, so an app whose Supervisor has not yet applied F2_RUNTIME keeps its dashboard.
+listener, which has no login of its own, only for the app (as runtime_env decides) or when asked for.
 """
 import os
 import pathlib
 import re
 import subprocess
+import sys
 
 import pytest
 import yaml
@@ -58,9 +58,10 @@ def test_the_compose_file_builds_this_image_and_stops_inside_its_grace():
 GATE_CASES = [
     # (environment, nginx started)
     ({"F2_RUNTIME": "addon", "SUPERVISOR_TOKEN": "t"}, True),  # what the Supervisor gives the app
-    ({"SUPERVISOR_TOKEN": "t"}, True),  # an app whose Supervisor has not applied `environment:`
-    ({"F2_RUNTIME": "addon"}, True),
-    ({}, True),
+    ({"SUPERVISOR_TOKEN": "t"}, False),  # runtime_env: no F2_RUNTIME=addon is a container
+    ({"F2_RUNTIME": "addon"}, False),
+    ({"F2_RUNTIME": "addon", "SUPERVISOR_TOKEN": "t", "HA_URL": "http://ha:8123"}, False),
+    ({}, False),
     ({"F2_RUNTIME": "container", "HA_URL": "http://ha:8123"}, False),  # what compose gives it
     ({"F2_RUNTIME": "container", "SUPERVISOR_TOKEN": "t"}, False),
     ({"F2_RUNTIME": "container", "F2_SERVE_UI": "1"}, True),
@@ -69,14 +70,16 @@ GATE_CASES = [
 
 @pytest.mark.skipif(os.name == "nt", reason="runs run.sh with stub executables (POSIX only)")
 @pytest.mark.parametrize("env,started", GATE_CASES)
-def test_run_sh_keeps_the_dashboard_listener_off_only_in_a_container(tmp_path, env, started):
+def test_run_sh_starts_the_dashboard_listener_only_for_the_app_as_runtime_env_decides(tmp_path, env, started):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    for name, body in (("nginx", f"touch {tmp_path}/nginx-started"), ("python3", "exit 0")):
+    real = f'case "$1" in -c) exec {sys.executable} "$@";; esac'  # runtime_env's answer, for real
+    for name, body in (("nginx", f"touch {tmp_path}/nginx-started"), ("python3", f"{real}\nexit 0")):
         stub = bin_dir / name
         stub.write_text(f"#!/bin/sh\n{body}\n")
         stub.chmod(0o755)
     script = (ADDON / "run.sh").read_text().replace("\r\n", "\n")
+    script = script.replace("cd /app", f"cd {ADDON / 'f2_control'}")
     run_env = {"PATH": f"{bin_dir}:/usr/bin:/bin", **env}
     result = subprocess.run(
         ["bash", "-c", script], env=run_env, capture_output=True, text=True, timeout=30

@@ -89,7 +89,7 @@ async def _staff_token(hass, local_auth):
 async def _preflight(hass, base, token, tmp_path):
     await hass.config.async_set_time_zone(ZONE)
     env = {"F2_RUNTIME": "container", "HA_URL": base, "HA_TOKEN": token, "TZ": "",
-           "F2_STATE_PATH": str(tmp_path / "state.json")}
+           "F2_STATE_PATH": str(tmp_path / "state.json"), "F2_DATA_DIR": str(tmp_path)}
     http, clock = Recorded(), Clock()
     run = partial(runtime_env.preflight, None, env, version="test", http=http, sleep=clock.sleep,
                   clock=clock.monotonic)
@@ -126,3 +126,55 @@ async def test_an_administrators_token_passes_the_admin_probe(hass, real_api, ha
     assert outcome == "returned"
     assert [status for _method, _url, status in sent] == [200, 200, 201]
     assert hass.states.get(runtime_env.RUNTIME_ENTITY).state == "container"
+
+
+async def test_a_non_admin_token_closes_a_recorded_shot_through_the_real_service_registry(
+    hass, real_api, local_auth, tmp_path, monkeypatch
+):
+    """The close-only start: the previous run died mid-shot with its valve open, and the token now
+    works but is not an administrator's. The real preflight hands it to controller.close_only_start,
+    which switches the valve off through Home Assistant's own switch.turn_off with that token and
+    writes no state; then it parks and sends nothing more."""
+    import json
+
+    import controller
+
+    token = await _staff_token(hass, local_auth)
+    hass.states.async_set("input_boolean.kill", "on")
+    hass.states.async_set(VALVE, "on")
+
+    async def turn_off(call):  # the valve's device, behind Home Assistant's real service registry
+        for entity in call.data["entity_id"] if isinstance(call.data["entity_id"], list) else [call.data["entity_id"]]:
+            hass.states.async_set(entity, "off")
+
+    hass.services.async_register("switch", "turn_off", turn_off)
+    calls = []
+    hass.bus.async_listen(EVENT_CALL_SERVICE, calls.append)
+    state = tmp_path / "state.json"
+    started = hass.states.get(VALVE).last_changed.isoformat()
+    state.write_text(json.dumps({"default": {"_shot_inflight": {
+        "zone": 1, "valve": VALVE, "mainline": None, "pump": None, "started": started}}}))
+    monkeypatch.setenv("F2_STATE_PATH", str(state))
+    monkeypatch.setenv("F2_RUNTIME", "container")
+    monkeypatch.setenv("HA_URL", real_api)
+    monkeypatch.setattr(controller, "_GATE", controller._AuthGate())
+    monkeypatch.setattr(controller.signal, "signal", lambda *a: None)  # built off the main thread here
+    monkeypatch.setattr(controller, "BASE", real_api)
+    monkeypatch.setattr(controller, "HDR", {"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+    monkeypatch.setattr(controller, "load_options", lambda: {"enable_flag": "input_boolean.kill",
+                                                             "hardware": {"valves": {"1": VALVE}}})
+    await hass.config.async_set_time_zone(ZONE)
+    env = {"F2_RUNTIME": "container", "HA_URL": real_api, "HA_TOKEN": token, "TZ": "",
+           "F2_STATE_PATH": str(state), "F2_DATA_DIR": str(tmp_path)}
+    http, clock = Recorded(), Clock()
+    run = partial(runtime_env.preflight, controller.close_only_start, env, version="test", http=http,
+                  sleep=clock.sleep, clock=clock.monotonic)
+    with pytest.raises(Hour):
+        await hass.async_add_executor_job(run)
+
+    assert http.sent[-1] == ("POST", f"{real_api}/states/{runtime_env.RUNTIME_ENTITY}", 401)
+    assert hass.states.get(VALVE).state == "off"
+    assert [(c.data["domain"], c.data["service"]) for c in calls if c.data["domain"] == "switch"] == [
+        ("switch", "turn_off")]
+    assert hass.states.get(runtime_env.RUNTIME_ENTITY) is None
+    assert "_shot_inflight" not in json.loads(state.read_text())["default"]

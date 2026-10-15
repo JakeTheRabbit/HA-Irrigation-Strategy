@@ -36,6 +36,9 @@ def _runs_as_the_app(monkeypatch):
     monkeypatch.setenv("F2_RUNTIME", "addon")
     monkeypatch.setenv("SUPERVISOR_TOKEN", "test-supervisor-token")
     monkeypatch.delenv("HA_URL", raising=False)
+    import controller
+
+    monkeypatch.setattr(controller, "_GATE", controller._AuthGate())  # decided now, as the app
 
 
 @pytest.fixture

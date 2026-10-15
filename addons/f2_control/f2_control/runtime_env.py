@@ -13,10 +13,16 @@ plus 5 s.
 resolve_base(), resolve_token(), preflight(): where Home Assistant's API is, the token to use, and
 the checks made before the controller is built. Nothing here switches anything; importing it never
 raises or exits, and only preflight() exits or parks.
+
+state_path(), load_options(): where the controller keeps its state (F2_DATA_DIR, /data by default) and
+its options: options.json there, with any F2_OPT_<OPTION> environment variable over it. The app's file
+is read as it is, because the Supervisor has checked it against config.yaml's schema; a container's
+file is checked here against OPTION_TYPES instead, and a value of the wrong type stops it (exit 2).
 """
 import json
 import math
 import os
+import re
 import signal
 import sys
 import threading
@@ -111,8 +117,18 @@ def resolve_token(env):
     return "", None
 
 
-def _state_path(env):
-    return env.get("F2_STATE_PATH") or "/data/state.json"
+def data_dir(env):
+    return env.get("F2_DATA_DIR") or "/data"
+
+
+def state_path(env):
+    """state.json: F2_STATE_PATH (the tests' seam), else in F2_DATA_DIR, else /data/state.json. Every other
+    file the controller keeps (dosing_state.json, the jev_* files) lives beside it."""
+    return env.get("F2_STATE_PATH") or os.path.join(data_dir(env), "state.json")
+
+
+def options_path(env):
+    return env.get("F2_OPTIONS_PATH") or os.path.join(data_dir(env), "options.json")
 
 
 def _shot_recorded(doc):
@@ -200,7 +216,7 @@ def _why(error):
         return "no answer in time"
     if any(s in text for s in ("NameResolution", "Name does not resolve", "Name or service not known",
                                "Temporary failure in name resolution", "nodename nor servname")):
-        return "the name in HA_URL does not resolve here (use Home Assistant's IP address)"
+        return "the host name does not resolve here (in HA_URL, use Home Assistant's IP address)"
     return f"not reachable ({type(error).__name__})"
 
 
@@ -212,7 +228,7 @@ def _positive(value, default):
     return number if math.isfinite(number) and number > 0 else default
 
 
-def _next_probe(waited):
+def next_probe(waited):
     """Seconds after the first refusal at which to ask again: every 60 s for 10 min, then every 15 min."""
     if waited < PROBE_FAST_FOR_S:
         return (math.floor(waited / PROBE_FAST_S) + 1) * PROBE_FAST_S
@@ -277,12 +293,16 @@ class _Preflight:
         if parts.scheme not in ("http", "https") or not parts.netloc:
             self.stop(f"HA_URL {_shown(self.base)} is not an http:// or https:// address")
         log(f"base: {_shown(self.base)}")
-        self.state_path = _state_path(self.env)
+        self.state_path = state_path(self.env)
         folder = os.path.dirname(self.state_path) or "."
         problem = _unwritable(folder)
         if problem:
             self.stop(f"data folder {folder} is not writable ({problem}): the shot-in-flight record and the "
                       "rest of the state are saved there")
+        try:
+            load_options(self.env)
+        except OptionsError as e:
+            self.stop(str(e))
         self.zone = self.env.get("TZ") or ""
         if self.zone and not _follows(self.zone):
             self.stop(f"TZ={self.zone} is not a time zone this image knows: set it to Home Assistant's "
@@ -311,7 +331,7 @@ class _Preflight:
                 log("parked: the last run left a shot or a dose recorded, so Home Assistant is asked again "
                     "every 60 s for 10 min, then every 15 min")
                 parked_at = self.clock()
-            due = parked_at + _next_probe(self.clock() - parked_at)
+            due = parked_at + next_probe(self.clock() - parked_at)
             while due > self.clock():
                 self.sleep(min(due - self.clock(), TOKEN_FILE_CHECK_S))
                 self.new_token()
@@ -441,3 +461,228 @@ def preflight(close_only=None, env=None, *, version="unknown", http=requests, sl
     finally:
         if previous is not None:
             signal.signal(signal.SIGTERM, previous)
+
+
+# ------------------------------------------------------------------ options
+# The type of every option the controller reads: config.yaml's `schema:` (a test keeps the two equal),
+# plus feed_grace_min and blind_fallback_min, which the code reads but the schema does not offer, and
+# zones and hardware, which only a test or hand-built rig writes, in the file. "?" marks an option the
+# app may leave out; "password" is a secret, never logged or echoed.
+OPTION_TYPES = {
+    "num_zones": "int",
+    "lights_on_hour": "float",
+    "lights_off_hour": "float",
+    "enable_flag": "str",
+    "notify_service": "str?",
+    "notify_min": "float",
+    "instance_name": "str?",
+    "feed_ec_sensor": "str?",
+    "feed_ph_sensor": "str?",
+    "sump_power_sensor": "str?",
+    "sump_silent_hours": "float?",
+    "hold_entities": "[str]",
+    "substrate_l": "float",
+    "flow_lps": "float",
+    "loop_seconds": "float",
+    "rediscover_seconds": "float",
+    "cf_account_id": "str?",
+    "cf_api_token": "password?",
+    "cf_gateway_id": "str?",
+    "typesafe_api_key": "password?",
+    "jev_enabled": "bool?",
+    "jev_judges": "str?",
+    "jev_daily_calls": "int?",
+    "jev_budget_warn_pct": "int?",
+    "jev_retries": "int?",
+    "jev_reask_max": "int?",
+    "jev_unsure_below": "float?",
+    "jev_strict_after": "int?",
+    "jev_strict_prob": "float?",
+    "jev_flower_start": "str?",
+    "jev_flower_days": "int?",
+    "feed_grace_min": "float",
+    "blind_fallback_min": "float",
+    "zones": "dict",
+    "hardware": "dict",
+}
+SECRET_KEYS = frozenset(k for k, t in OPTION_TYPES.items() if t.rstrip("?") == "password")
+ENTITY_ID = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
+_TRUE, _FALSE = ("true", "1", "yes", "on"), ("false", "0", "no", "off")
+_JSON_TYPE = {bool: "true or false", int: "a number", float: "a number", str: "a string", list: "a list",
+              dict: "an object", type(None): "null"}
+
+
+class OptionsError(ValueError):
+    """An option that can't be used: the message names the file or variable and the key, never the value."""
+
+
+def _choices(kind):
+    found = re.fullmatch(r"list\((.*)\)", kind)
+    return found.group(1).split("|") if found else None
+
+
+def _expected(kind):
+    if _choices(kind):
+        return "one of " + ", ".join(_choices(kind))
+    return {"int": "a whole number", "float": "a number", "bool": "true or false", "[str]": "a list of entity ids",
+            "dict": "an object"}.get(kind, "text")
+
+
+def _not_entity_ids(items):
+    bad = [i for i in items if i and not ENTITY_ID.match(i)]
+    return f"{bad[0]!r} is not an entity id" if bad else None
+
+
+def _file_value_problem(kind, value):
+    """Why a JSON value from a container's options file is not of `kind`, or None when it is."""
+    kind = kind.rstrip("?")
+    if _choices(kind):
+        ok = value in _choices(kind)
+    else:
+        ok = {
+            "int": isinstance(value, int) and not isinstance(value, bool),
+            "float": isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value),
+            "bool": isinstance(value, bool),
+            "dict": isinstance(value, dict),
+            "[str]": isinstance(value, list) and all(isinstance(i, str) for i in value),
+        }.get(kind, isinstance(value, str))
+    if not ok:
+        hint = '; write ["input_boolean.a", "input_boolean.b"]' if kind == "[str]" else ""
+        return f"expected {_expected(kind)}, got {_JSON_TYPE.get(type(value), 'something else')}{hint}"
+    return _not_entity_ids(value) if kind == "[str]" else None
+
+
+def _coerced(kind, text):
+    """An environment value (always a string) as `kind` -> (value, None), or (None, why it is not)."""
+    kind = kind.rstrip("?")
+    if kind == "int":
+        found = re.fullmatch(r"[+-]?\d+", text.strip())
+        return (int(found.group(0)), None) if found else (None, "expected a whole number")
+    if kind == "float":
+        try:
+            number = float(text)
+        except ValueError:
+            number = math.nan
+        return (number, None) if math.isfinite(number) else (None, "expected a number")
+    if kind == "bool":
+        word = text.strip().lower()
+        return (word in _TRUE, None) if word in _TRUE + _FALSE else (None, "expected true or false")
+    if kind == "[str]":
+        if not text.strip().startswith("["):
+            return [i.strip() for i in text.split(",") if i.strip()], None
+        try:
+            items = json.loads(text)
+        except ValueError:
+            items = None
+        if isinstance(items, list) and all(isinstance(i, str) for i in items):
+            return items, None
+        return None, "expected a JSON list of entity ids"
+    if _choices(kind):
+        return (text, None) if text in _choices(kind) else (None, f"expected {_expected(kind)}")
+    return text, None
+
+
+def _read_options_file(path, container, log):
+    """The options file. The app's as it is ({} when it is missing or can't be read, as always). A
+    container's checked against OPTION_TYPES: unknown keys named and dropped, a null optional dropped."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            opts = json.load(fh)
+    except FileNotFoundError:
+        return {}
+    except (OSError, UnicodeDecodeError):
+        if container:
+            raise OptionsError(f"options file {path}: not readable") from None
+        return {}
+    except ValueError as e:
+        if container:
+            where = f" (line {e.lineno}, column {e.colno})" if hasattr(e, "lineno") else ""
+            raise OptionsError(f"options file {path}: not valid JSON{where}") from None
+        return {}
+    if not container:
+        return opts
+    if not isinstance(opts, dict):
+        raise OptionsError(f"options file {path}: expected a JSON object")
+    name, checked = os.path.basename(path), {}
+    for key, value in opts.items():
+        kind = OPTION_TYPES.get(key)
+        if kind is None:
+            if log:
+                log(f"option {key} ({name}): unknown, ignored")
+            continue
+        if value is None and kind.endswith("?"):
+            continue
+        problem = _file_value_problem(kind, value)
+        if problem:
+            raise OptionsError(f"option {key} ({name}): {problem}")
+        checked[key] = value
+    return checked
+
+
+def _options_from_env(env, container, log):
+    """Every F2_OPT_<OPTION>, as its option's type, and for a password F2_OPT_<OPTION>_FILE (the file's
+    contents) when F2_OPT_<OPTION> is not set. A value that can't be used stops a container
+    (OptionsError) and is left out of the app's options, with a log line."""
+    names = {"F2_OPT_" + key.upper(): key for key in OPTION_TYPES}
+    files = {name + "_FILE": key for name, key in names.items() if key in SECRET_KEYS}
+    found = {}
+
+    def refuse(message):
+        if container:
+            raise OptionsError(message)
+        if log:
+            log(message + "; ignored")
+
+    for var in sorted(v for v in env if v.startswith("F2_OPT_") and v not in files):
+        key = names.get(var)
+        if key is None or OPTION_TYPES[key] == "dict":
+            if log:
+                log(f"option {var}: " + ("unknown, ignored" if key is None else "set it in the options file; ignored"))
+            continue
+        value, why = _coerced(OPTION_TYPES[key], env[var])
+        if why:
+            why += "" if key in SECRET_KEYS else f", got {env[var]!r}"
+        elif OPTION_TYPES[key] == "[str]" and container:
+            why = _not_entity_ids(value)
+        if why:
+            refuse(f"option {var}: {why}")
+        else:
+            found[key] = value
+    for var, key in sorted(files.items()):
+        if key in found or not env.get(var):
+            continue
+        value, problem = _read_token_file(env[var])
+        if problem and problem != "is empty":
+            refuse(f"option {var}: file not readable")
+        else:
+            found[key] = value
+    return found
+
+
+def describe(path, from_file, from_env):
+    """The options log line: where they came from, the names taken from the environment, and every
+    secret only as <set> or <unset>."""
+    opts = {**from_file, **from_env}
+    secrets = ", ".join(f"{k}={'<set>' if opts.get(k) else '<unset>'}" for k in sorted(SECRET_KEYS))
+    from_env_part = f" + env ({', '.join(sorted(from_env))})" if from_env else ""
+    return f"options: {path} ({len(from_file)} keys){from_env_part} | {secrets}"
+
+
+def load_options(env, log=None):
+    """The controller's options: the file at options_path() with every F2_OPT_<OPTION> over it.
+
+    The app (runtime "addon"): the file exactly as the Supervisor wrote it, or {} when it is missing or
+    can't be read, as always; with no F2_OPT_* set (the Supervisor sets none) that is all. A container:
+    nobody has checked its file, so a file that can't be read, is not a JSON object or holds a value of
+    the wrong type (OPTION_TYPES), and an environment value that can't be used, raise OptionsError,
+    naming the key and never the value; unknown keys are named and dropped. A missing file is {} in
+    both."""
+    container = runtime(env) == "container"
+    path = options_path(env)
+    from_file = _read_options_file(path, container, log)
+    from_env = _options_from_env(env, container, log)
+    if log:
+        log(describe(path, from_file if isinstance(from_file, dict) else {}, from_env))
+    if not from_env:
+        return from_file
+    return {**(from_file if isinstance(from_file, dict) else {}), **from_env}

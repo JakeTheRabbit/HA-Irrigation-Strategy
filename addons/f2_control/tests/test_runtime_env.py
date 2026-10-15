@@ -1,9 +1,10 @@
 """How the controller tells the Home Assistant app from a standalone container, where Home Assistant is,
 which token it uses, and the checks it makes before it starts (runtime_env.preflight).
 
-Nothing calls the new names yet: the app runs exactly as before, and only stop_budget() is read (its
-default is still 25 s for the app). preflight() is called directly here, against a Home Assistant
-that answers each request as a test says and a test clock: no Docker, no network.
+The controller's __main__ runs preflight() before it builds anything; the app gets exactly the address,
+token, options and state path it always had. preflight() is called directly here, against a Home
+Assistant that answers each request as a test says and a test clock: no Docker, no network. The options
+reader (load_options) is tested the same way: the app's file as it is, a container's checked.
 
 Container mode never exits on a refused token (a 401 or 403): exiting hands the retry to the restart
 policy, which sends the same refused token again on every start and walks into Home Assistant's IP
@@ -106,7 +107,7 @@ def _known_zones(monkeypatch):
 def box(tmp_path):
     """A container's environment, with its data folder in tmp_path."""
     return {"F2_RUNTIME": "container", "HA_URL": "http://ha:8123", "HA_TOKEN": TOKEN, "TZ": "UTC",
-            "F2_STATE_PATH": str(tmp_path / "state.json")}
+            "F2_STATE_PATH": str(tmp_path / "state.json"), "F2_DATA_DIR": str(tmp_path)}
 
 
 def run(env, answer=None, until=HOUR, close_only=None):
@@ -212,18 +213,14 @@ def test_importing_it_reads_nothing_and_never_raises(monkeypatch):
     importlib.reload(runtime_env)
 
 
-def test_nothing_outside_the_tests_calls_anything_new_yet():
-    """Only 2a's stop_budget() is read by the running controller; the rest has no caller yet."""
-    used = set()
-    for path in PKG.rglob("*.py"):
-        if path.name == "runtime_env.py":
-            continue
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id == "runtime_env":
-                used.add(node.attr)
-            if isinstance(node, ast.ImportFrom) and node.module == "runtime_env":
-                used.update(alias.name for alias in node.names)
-    assert used == {"stop_budget"}
+def test_the_controller_checks_before_it_builds_anything():
+    """__main__: preflight (with the close-only start for a non-administrator's token), then Controller()."""
+    tree = ast.parse((PKG / "controller.py").read_text(encoding="utf-8"))
+    main = next(n for n in tree.body if isinstance(n, ast.If) and "__main__" in ast.unparse(n.test))
+    assert [ast.unparse(s) for s in main.body] == [
+        "runtime_env.preflight(close_only_start, version=CONTROLLER_VERSION)",
+        "Controller().run()",
+    ]
 
 
 # ------------------------------------------------------------------ the app: one GET, logged, nothing more
@@ -505,3 +502,211 @@ def test_a_tz_the_image_does_not_know_really_exits_2(box, real_zone):
     time.tzset()
     outcome, fake = run({**box, "TZ": "Not/AZone"})
     assert outcome == 2 and fake.sent == []
+
+
+# ------------------------------------------------------------------ paths
+def test_state_and_options_follow_the_data_folder_and_the_test_seam_still_wins():
+    assert runtime_env.state_path({}) == "/data/state.json"
+    assert runtime_env.options_path({}) == "/data/options.json"
+    box = {"F2_DATA_DIR": "/srv/cs"}
+    assert runtime_env.state_path(box) == os.path.join("/srv/cs", "state.json")
+    assert runtime_env.options_path(box) == os.path.join("/srv/cs", "options.json")
+    seam = {**box, "F2_STATE_PATH": "/tmp/t/state.json", "F2_OPTIONS_PATH": "/etc/cs.json"}
+    assert runtime_env.state_path(seam) == "/tmp/t/state.json"  # dosing_state.json and jev_* go beside it
+    assert runtime_env.options_path(seam) == "/etc/cs.json"
+
+
+def test_the_controller_keeps_its_state_where_runtime_env_says(monkeypatch, tmp_path):
+    import controller
+
+    monkeypatch.delenv("F2_STATE_PATH")
+    monkeypatch.setenv("F2_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(controller, "load_options", lambda: {})
+    monkeypatch.setattr(controller, "ha_get_all", lambda: [])
+    monkeypatch.setattr(controller, "ha_get", lambda entity, timeout=8: controller.HAState())
+    monkeypatch.setattr(controller, "ha_set", lambda *a, **k: None)
+    monkeypatch.setattr(controller, "ha_call", lambda *a, **k: True)
+    c = controller.Controller()
+    assert c._state_path == str(tmp_path / "state.json")
+    assert c.dosing.path == str(tmp_path / "dosing_state.json")
+
+
+# ------------------------------------------------------------------ options
+FIXTURES = pathlib.Path(__file__).parents[3] / "tests_ha" / "fixtures"
+LINEAGE = sorted(FIXTURES.glob("options_*.json"))
+
+
+def _schema_types():
+    import yaml
+
+    config = yaml.safe_load((PKG.parent / "config.yaml").read_text(encoding="utf-8"))
+    return {k: "[str]" if v == ["str"] else v for k, v in config["schema"].items()}, config["options"]
+
+
+def test_option_types_are_the_apps_schema_plus_the_code_only_keys():
+    """U3: a new option in config.yaml without its type here (or the other way round) fails."""
+    schema, _ = _schema_types()
+    code_only = {"feed_grace_min": "float", "blind_fallback_min": "float", "zones": "dict", "hardware": "dict"}
+    assert runtime_env.OPTION_TYPES == {**schema, **code_only}
+    assert runtime_env.SECRET_KEYS == {k for k, t in schema.items() if t.startswith("password")}
+
+
+def _options(tmp_path, content, env=None, container=False):
+    path = tmp_path / "options.json"
+    if content is not None:
+        path.write_text(content if isinstance(content, str) else json.dumps(content))
+    base = ({"F2_RUNTIME": "container", "HA_URL": "http://ha:8123"} if container else dict(APP))
+    lines = []
+    opts = runtime_env.load_options({**base, "F2_OPTIONS_PATH": str(path), **(env or {})}, lines.append)
+    return opts, "\n".join(lines)
+
+
+@pytest.mark.parametrize("fixture", LINEAGE, ids=lambda p: p.stem)
+def test_an_old_apps_options_load_exactly_as_written_in_both_modes(tmp_path, fixture):
+    """U1 and U15 (i): what each old app wrote loads equal, value for value and type for type."""
+    written = json.loads(fixture.read_text(encoding="utf-8"))["options"]
+    for container in (False, True):
+        opts, _ = _options(tmp_path, written, container=container)
+        assert opts == written
+        assert {k: type(v) for k, v in opts.items()} == {k: type(v) for k, v in written.items()}
+
+
+def test_this_versions_own_defaults_load_exactly_in_both_modes(tmp_path):
+    _, defaults = _schema_types()
+    for container in (False, True):
+        opts, _ = _options(tmp_path, defaults, container=container)
+        assert opts == defaults and {k: type(v) for k, v in opts.items()} == {k: type(v) for k, v in defaults.items()}
+
+
+@pytest.mark.parametrize("content", [None, "{trunc", "", "[1, 2]"])
+def test_the_app_reads_its_file_as_it_always_did(tmp_path, content):
+    opts, _ = _options(tmp_path, content)
+    assert opts == ({} if content in (None, "{trunc", "") else [1, 2])
+
+
+@pytest.mark.parametrize("var, value, key, expected", [
+    ("F2_OPT_NUM_ZONES", " 4 ", "num_zones", 4),
+    ("F2_OPT_LOOP_SECONDS", "30.5", "loop_seconds", 30.5),
+    ("F2_OPT_NOTIFY_MIN", "15", "notify_min", 15.0),
+    ("F2_OPT_JEV_ENABLED", "Off", "jev_enabled", False),
+    ("F2_OPT_JEV_ENABLED", "YES", "jev_enabled", True),
+    ("F2_OPT_NOTIFY_SERVICE", " notify.phone ", "notify_service", " notify.phone "),
+    ("F2_OPT_HOLD_ENTITIES", "input_boolean.flush, input_boolean.fill,", "hold_entities",
+     ["input_boolean.flush", "input_boolean.fill"]),
+    ("F2_OPT_HOLD_ENTITIES", '["input_boolean.flush"]', "hold_entities", ["input_boolean.flush"]),
+    ("F2_OPT_HOLD_ENTITIES", "", "hold_entities", []),
+])
+def test_an_environment_value_takes_its_options_type_and_wins_over_the_file(tmp_path, var, value, key, expected):
+    """U2, accepted: each schema type from its string form."""
+    for container in (False, True):
+        opts, log = _options(tmp_path, {"num_zones": 3}, {var: value}, container)
+        assert opts[key] == expected and type(opts[key]) is type(expected)
+        assert key in log.split("env (", 1)[1]
+
+
+@pytest.mark.parametrize("var, value, said", [
+    ("F2_OPT_NUM_ZONES", "3.5", "expected a whole number"),
+    ("F2_OPT_LOOP_SECONDS", "sixty", "expected a number"),
+    ("F2_OPT_LOOP_SECONDS", "nan", "expected a number"),
+    ("F2_OPT_LOOP_SECONDS", "", "expected a number"),
+    ("F2_OPT_JEV_ENABLED", "maybe", "expected true or false"),
+    ("F2_OPT_HOLD_ENTITIES", "[1, 2]", "expected a JSON list of entity ids"),
+    ("F2_OPT_HOLD_ENTITIES", "input_boolean.flush input_boolean.fill", "is not an entity id"),
+])
+def test_an_environment_value_that_cant_be_used_stops_a_container_and_is_left_out_on_the_app(tmp_path, var, value, said):
+    """U2, refused: a container names the variable and stops; the app logs it and keeps the file's value."""
+    with pytest.raises(runtime_env.OptionsError, match=f"option {var}: .*{said}"):
+        _options(tmp_path, {}, {var: value}, container=True)
+    if said == "is not an entity id":
+        return  # only a container checks the entity-id form, as only its file is not checked by the Supervisor
+    opts, log = _options(tmp_path, {"num_zones": 3}, {var: value})
+    assert f"option {var}" in log
+    assert opts.get("num_zones") == 3
+
+
+def test_unknown_and_file_only_variables_are_named_and_ignored(tmp_path):
+    opts, log = _options(tmp_path, None, {"F2_OPT_LIGHTS_ON_HOUR_TYPO": "6", "F2_OPT_ZONES": "{}"}, container=True)
+    assert opts == {}
+    assert "option F2_OPT_LIGHTS_ON_HOUR_TYPO: unknown, ignored" in log
+    assert "option F2_OPT_ZONES: set it in the options file" in log
+
+
+SENTINEL = "sk-SENTINEL-do-not-print"
+
+
+@pytest.mark.parametrize("container", [False, True])
+def test_a_secret_comes_from_its_variable_or_a_file_and_is_only_ever_logged_as_set(tmp_path, container, capsys):
+    """U7, the reader half: F2_OPT_<KEY> and F2_OPT_<KEY>_FILE, only for a password, never in the log."""
+    secret = tmp_path / "cf_token"
+    secret.write_text(SENTINEL + "\n")
+    opts, log = _options(tmp_path, None, {"F2_OPT_CF_API_TOKEN_FILE": str(secret)}, container)
+    assert opts == {"cf_api_token": SENTINEL}
+    assert "cf_api_token=<set>" in log and "typesafe_api_key=<unset>" in log
+    opts, log = _options(tmp_path, None, {"F2_OPT_CF_API_TOKEN": SENTINEL, "F2_OPT_CF_API_TOKEN_FILE": "/nope"},
+                         container)
+    assert opts == {"cf_api_token": SENTINEL}
+    opts, log2 = _options(tmp_path, None, {"F2_OPT_INSTANCE_NAME_FILE": str(secret)}, container)
+    assert opts == {} and "F2_OPT_INSTANCE_NAME_FILE: unknown" in log2  # _FILE is for secrets only
+    assert SENTINEL not in log + log2 + capsys.readouterr().out
+
+
+def test_a_secret_that_cant_be_read_never_shows_in_the_error(tmp_path):
+    with pytest.raises(runtime_env.OptionsError) as raised:
+        _options(tmp_path, None, {"F2_OPT_CF_API_TOKEN_FILE": str(tmp_path)}, container=True)
+    assert str(raised.value) == "option F2_OPT_CF_API_TOKEN_FILE: file not readable"
+    with pytest.raises(runtime_env.OptionsError) as raised:
+        _options(tmp_path, {"cf_api_token": [SENTINEL]}, container=True)
+    assert SENTINEL not in str(raised.value)
+
+
+# U15: a container's options file is checked against OPTION_TYPES before Home Assistant is asked.
+BAD_FILES = {
+    "a truncated object": ('{"num_zones": 3, "hold', "not valid JSON (line 1, column"),
+    "an empty file": ("", "not valid JSON"),
+    "hold_entities as one string": ({"hold_entities": "input_boolean.flush"},
+                                    "option hold_entities (options.json): expected a list of entity ids, got a string"),
+    "a number as words": ({"loop_seconds": "sixty"}, "option loop_seconds (options.json): expected a number, got a string"),
+    "two holds in one item": ({"hold_entities": ["input_boolean.flush input_boolean.fill"]}, "is not an entity id"),
+    "a list at the top": ("[]", "expected a JSON object"),
+    "true for a number": ({"num_zones": True}, "option num_zones (options.json): expected a whole number, got true or false"),
+    "null for a required option": ({"notify_min": None}, "option notify_min (options.json): expected a number, got null"),
+    "a secret of the wrong type": ({"cf_api_token": [SENTINEL]}, "option cf_api_token (options.json): expected text"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(BAD_FILES))
+def test_a_containers_options_file_with_a_mistake_exits_2_before_home_assistant_is_asked(box, tmp_path, case, capsys):
+    content, said = BAD_FILES[case]
+    (tmp_path / "options.json").write_text(content if isinstance(content, str) else json.dumps(content))
+    outcome, fake = run(box)
+    out = capsys.readouterr().out
+    assert outcome == 2 and fake.sent == []
+    assert said in out
+    assert "sixty" not in out and SENTINEL not in out
+
+
+@pytest.mark.parametrize("kind", ["a directory", "unreadable"])
+def test_a_containers_options_file_that_cant_be_read_exits_2(box, tmp_path, kind, capsys):
+    path = tmp_path / "options.json"
+    if kind == "a directory":
+        path.mkdir()
+    else:
+        path.write_text("{}")
+        path.chmod(0)
+        if os.access(path, os.R_OK):
+            pytest.skip("this user reads any file (root)")
+    outcome, fake = run(box)
+    assert outcome == 2 and fake.sent == []
+    assert f"options file {path}: not readable" in capsys.readouterr().out
+
+
+def test_a_containers_file_drops_unknown_keys_and_null_optionals_and_none_is_zero_setup(tmp_path):
+    opts, log = _options(tmp_path, {"foo": 1, "notify_service": None, "num_zones": 2}, container=True)
+    assert opts == {"num_zones": 2}
+    assert "option foo (options.json): unknown, ignored" in log
+    assert _options(tmp_path / "nothing", None, container=True)[0] == {}
+
+
+def test_the_hold_entities_env_form_is_checked_in_a_container_too(tmp_path):
+    with pytest.raises(runtime_env.OptionsError, match="F2_OPT_HOLD_ENTITIES: 'input_boolean.flush input_boolean.fill'"):
+        _options(tmp_path, None, {"F2_OPT_HOLD_ENTITIES": "input_boolean.flush input_boolean.fill"}, container=True)
