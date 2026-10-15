@@ -165,7 +165,8 @@ configuration:
     name: Jev judges that may act
     description: >-
       all (default), or a comma-separated list of dawn, ramp, salt, dusk, probe, shot,
-      night, zones, stage, setpoints and alerts. A judge not listed is never asked.
+      night, zones, stage, setpoints, balance (Claude route only) and alerts. A judge
+      not listed is never asked.
       Setpoints also needs the room's Auto setpoints switch on.
   jev_daily_calls:
     name: Jev calls a day

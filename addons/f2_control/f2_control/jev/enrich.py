@@ -3,8 +3,9 @@
 The transport sees only the evidence dict, never the zone's context, so Brain calls `enrich(ctx, judge, ev)` before
 every ask under brain_provider claude_haiku (never on the legacy routes, whose payloads stay as they are). It
 returns a copy with the probe's entity id replaced by words, `stage_today` dropped (the `stage` block carries it,
-from the install's own arc), one site's wording made neutral, and a "_brain" key holding the room, zone, judge and
-time and the numbers, settings, interlocks, data quality, stage and sibling zones code knows.
+from the install's own arc), one site's wording made neutral, the balance judge's verdict for the setpoints judge
+(`room_balance`), and a "_brain" key holding the room, zone, judge and time and the numbers, settings, interlocks,
+data quality, stage and sibling zones code knows.
 """
 from __future__ import annotations
 
@@ -53,5 +54,8 @@ def enrich(ctx, judge, ev):
         out["probe"] = PROBE_WORDS
     out.pop("stage_today", None)
     out = neutral_all(out)
+    balance = (getattr(ctx, "brain", None) or {}).get("room_balance")
+    if judge.name == "setpoints" and balance:
+        out["room_balance"] = balance  # the balance judge's verdict: it informs the one writer, never writes
     out["_brain"] = brain_meta(ctx, judge.name)
     return out

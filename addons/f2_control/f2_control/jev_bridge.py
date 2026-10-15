@@ -22,6 +22,8 @@ from jev.doctrine import STAGE_ARC as STAGE_ROWS
 from jev.enrich import enrich
 from jev.judges.channel import ChannelJudge
 from jev.prompt import Prompt
+from jev.judges.balance import HARDWARE as ZONES_HARDWARE
+from jev.judges.balance import BalanceJudge
 from jev.judges.dawn import DawnJudge
 from jev.judges.dusk import DuskJudge
 from jev.judges.night import NightJudge
@@ -37,7 +39,7 @@ from jev.journal import Journal
 from jev.ledger import Ledger
 from jev.setpoint_memory import SetpointMemory
 
-ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel")
+ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel", "balance")
 PENDING_S = 300  # a write Home Assistant has not reflected yet is not an operator's edit for this long
 RETRIES = 3  # a write still not read back is sent again this many times, PENDING_S apart and doubling, then failed
 REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the old value back
@@ -54,7 +56,7 @@ FRIENDLY = "AI assistant"
 
 def judges():
     return [DawnJudge(), RampJudge(), SaltJudge(), DuskJudge(), ProbeJudge(), ShotJudge(), NightJudge(),
-            ZonesJudge(), StageJudge(), SetpointsJudge(), ChannelJudge()]
+            ZonesJudge(), StageJudge(), SetpointsJudge(), ChannelJudge(), BalanceJudge()]
 
 
 def routes(options, cf):
@@ -167,6 +169,9 @@ def build(options, cf, state_path, log, status=None):
     jev_client.log = log
     wanted = str(options.get("jev_judges") or "all").replace(" ", "")
     allowed = set(ALL) if wanted in ("", "all") else set(wanted.split(",")) & set(ALL)
+    haiku = status.provider == "claude_haiku"
+    if not haiku:
+        allowed.discard("balance")  # its answer reaches the setpoints judge only through the Claude route's evidence
     arc = str(options.get("stage_arc") or DEFAULT_ARC).strip()
     try:
         rows, arc_note = stage_rows(arc), None
@@ -198,7 +203,6 @@ def build(options, cf, state_path, log, status=None):
     else:
         log(f"jev: on via {' then '.join(names)}, judges {', '.join(sorted(allowed))}, {asker.daily_budget} calls a "
             "day (deprecated; brain_provider: claude_haiku replaces it)" + (", advising only (dry run)" if dry else ""))
-    haiku = status.provider == "claude_haiku"
     brain = Brain(asker, ledger, judges(), allowed=allowed, log=log,
                   reask_max=int(options.get("jev_reask_max", 2)),
                   unsure_below=float(options.get("jev_unsure_below", 0.7)),
@@ -269,7 +273,27 @@ def _setting(c, room, zone, suffix):
     return None
 
 
-def brain_context(c, room, zone, snap):
+def _judge(brain, name):
+    return next((j for j in getattr(brain, "judges", ()) if j.name == name), None)
+
+
+def zones_hardware(c, room, zone, now):
+    """The hardware cause the zones judge named for the zone since lights-on (firm, as its alert needs), or None."""
+    st = getattr(c.jev, "state", {}).get((room.slug, zone, "zones"))
+    v = st.verdicts.get("why_different") if st is not None else None
+    if v is None or st.last_asked is None or v.label not in ZONES_HARDWARE or not v.firm_in(ZONES_HARDWARE, 0.6):
+        return None
+    since_on = timedelta(hours=(24.0 - c._hours_to(now, room.lights_on_hour)) % 24.0)
+    return v.label if now - st.last_asked <= since_on else None
+
+
+def room_balance(c, room, zone, now):
+    """The balance judge's latest answer for the zone in words, for tonight's setpoints judge, or None."""
+    judge = _judge(c.jev, "balance")
+    return None if judge is None else judge.words(room.slug, zone, now)
+
+
+def brain_context(c, room, zone, snap, now):
     """What only the controller knows about the zone, for the Claude brain's evidence (ZoneContext.brain)."""
     plants = _setting(c, room, zone, "plant_count")
     zone_on = c._on(f"switch.crop_steering_{room.prefix}zone_{zone}_enabled", True)
@@ -285,6 +309,7 @@ def brain_context(c, room, zone, snap):
         "data_quality": ("a usable moisture reading this pass; pore EC "
                          + ("settled since the last shot" if settled else "not settled since the last shot")),
         "arc": getattr(c.jev, "arc", None), "arc_note": getattr(c.jev, "arc_note", None),
+        "zones_hardware": zones_hardware(c, room, zone, now), "room_balance": room_balance(c, room, zone, now),
     }
 
 
@@ -295,7 +320,7 @@ def zone_context(c, room, zone, snap, p, now, lights_on):
     fdays = getattr(c.jev, "flower_days", 56)
     return ZoneContext(
         flower_day=fday, flower_days=fdays, stage=stage_intent(fday, fdays, getattr(c.jev, "arc_rows", STAGE_ROWS)),
-        brain=brain_context(c, room, zone, snap) if haiku(c) else None,
+        brain=brain_context(c, room, zone, snap, now) if haiku(c) else None,
         steering="vegetative" if c._veg(room, zone) else "generative",
         room=room.slug, prefix=room.prefix, zone=zone, title=c._zone_title(room, zone), now=now,
         phase=st["phase"], snap=snap, params=p, history=_hist(room, zone), lights_on=lights_on,
