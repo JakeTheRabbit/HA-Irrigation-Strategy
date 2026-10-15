@@ -268,11 +268,11 @@ describe("who may change a row, and what it is called", () => {
     const watering = kindCoverage(DEMO_KINDS.find((kind) => kind.id === "watering")!);
     expect(watering.codes[0]).toEqual({
       code: "CS-202",
-      title: "Plumbing and switches disagree, not watering",
+      title: "Pump or main-line mismatch",
     });
     expect(watering.codes.find((item) => item.code === "CS-209")).toEqual({
       code: "CS-209",
-      title: "No watering for a while",
+      title: "No shots for some hours",
     });
     expect(kindCoverage(DEMO_KINDS.find((kind) => kind.id === "phases")!).events).toEqual([
       "a zone changing phase",

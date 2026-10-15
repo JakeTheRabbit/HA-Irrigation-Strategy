@@ -1823,8 +1823,8 @@ try {
       await table.getByRole("button", { name: "Hardware lockouts", exact: true }).click();
       const covers = page.getByRole("dialog", { name: "Hardware lockouts" });
       await expectVisible(covers);
-      assert.match(await covers.innerText(), /CS-301\s+CRITICAL hardware fault, watering stopped/);
-      assert.match(await covers.innerText(), /CS-701\s+Water isn't reaching this zone/);
+      assert.match(await covers.innerText(), /CS-301\s+Hardware fault latch/);
+      assert.match(await covers.innerText(), /CS-701\s+No water at the zone/);
       await axe("notifications: what a kind covers");
       await page.keyboard.press("Escape");
       await covers.waitFor({ state: "hidden" });
@@ -2227,7 +2227,7 @@ try {
     assert.equal(await codes.count(), 1);
     const found = page.locator("details#cs-101");
     assert.equal(await found.getAttribute("open"), "", "A code typed in full opens by itself");
-    await expectVisible(found.getByText("Likely causes", { exact: true }));
+    await expectVisible(found.getByText("Probable causes", { exact: true }));
     await expectVisible(found.getByText(/No plant in the cube/));
     await search.fill("zqxw vjqk"); // words in no code (real words turn up as the catalog grows)
     await expectVisible(page.getByText(/No code matches/));

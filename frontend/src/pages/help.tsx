@@ -174,11 +174,11 @@ function ErrorCodes() {
                       <dd>{entry.meaning}</dd>
                     </div>
                     <div>
-                      <dt>Watering meanwhile</dt>
+                      <dt>Effect on water</dt>
                       <dd>{entry.watering}</dd>
                     </div>
                     <div>
-                      <dt>Likely causes</dt>
+                      <dt>Probable causes</dt>
                       <dd>
                         <ul>
                           {entry.causes.map((cause) => (
@@ -188,7 +188,7 @@ function ErrorCodes() {
                       </dd>
                     </div>
                     <div>
-                      <dt>Suggested fixes</dt>
+                      <dt>What to do</dt>
                       <dd>
                         <ul>
                           {entry.fixes.map((fix) => (

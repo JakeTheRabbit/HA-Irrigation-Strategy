@@ -43,7 +43,7 @@ describe("error codes", () => {
   });
 
   it("finds a Repairs card by the words on the card", () => {
-    const codes = findErrorCodes("grow strategy plan").map((entry) => entry.code);
+    const codes = findErrorCodes("grow plan").map((entry) => entry.code);
     expect(codes).toContain("CS-606");
     expect(codes).toContain("CS-607");
   });
