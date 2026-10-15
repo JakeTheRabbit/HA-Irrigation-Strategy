@@ -184,8 +184,13 @@ async def test_a_cover_is_refused_as_a_valve_by_the_wizard_and_by_the_setup_page
 
 
 async def test_a_cover_mapped_by_hand_holds_its_zone_with_cs_313_and_is_never_driven(
-    hass, controller_for
+    hass, controller_for, monkeypatch
 ):
+    import controller
+
+    # No room is installed, so no setting exists: run on built-in values at once (test_settings_wait.py).
+    monkeypatch.setattr(controller, "SETTINGS_WAIT_PASSES", 0)
+    monkeypatch.setattr(controller, "WATER_SIZING", ())
     _seed(hass)
     c, fake, _clock = controller_for(
         {"enable_flag": KILL, "num_zones": 2, "hardware": {"valves": {"1": COVER, "2": VALVE}}}

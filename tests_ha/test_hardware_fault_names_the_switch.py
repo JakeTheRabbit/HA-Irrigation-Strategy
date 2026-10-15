@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 
+from conftest import room_of
 from test_real_flow import VALVE
 from test_recreated_room_controller import KILL, _see
 from test_setup_entry import _install
@@ -45,7 +46,7 @@ async def test_the_hold_names_the_valve_that_stayed_on_and_still_does_after_a_re
     await _install(hass)
     hass.states.async_set(VALVE, "on", {"friendly_name": NAME})
     c, fake, _clock = controller_for({"enable_flag": KILL})
-    room = c.rooms[0]
+    room = room_of(c)  # the new room: every new room has a slug, tent_
     assert room.hw["valves"] == {1: VALVE}
     _stuck(monkeypatch, fake, VALVE)
 
@@ -64,8 +65,8 @@ async def test_the_hold_names_the_valve_that_stayed_on_and_still_does_after_a_re
     saved = json.loads(Path(os.environ["F2_STATE_PATH"]).read_text(encoding="utf-8"))
     _see(hass, fake)
     again, _fake, _ = controller_for({"enable_flag": KILL}, saved_state=saved)
-    assert again.rooms[0].hardware_fault["switches"] == failures
-    assert f"{NAME} ({VALVE}) still read ON" in again._hardware_fault_block(again.rooms[0])
+    assert room_of(again).hardware_fault["switches"] == failures
+    assert f"{NAME} ({VALVE}) still read ON" in again._hardware_fault_block(room_of(again))
 
 
 async def test_an_offline_switch_is_named_as_unavailable(hass, controller_for):

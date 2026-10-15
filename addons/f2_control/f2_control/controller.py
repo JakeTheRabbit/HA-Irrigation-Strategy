@@ -4483,11 +4483,11 @@ class Controller:
                     f"sensor.crop_steering_{room.prefix}ai_heartbeat",
                     "stopped",
                     {
-                        "engine": "f2-control",
+                        "engine": PRODUCT,
                         "controller_version": CONTROLLER_VERSION,
                         "stopped_at": now.isoformat(),
                         "last_beat": now.isoformat(),
-                        "enable_flag": room.enable_flag,
+                        "enable_flag": room_gate(room),
                         "hardware_fault": self._hardware_fault_block(room),
                         "setup_revision": getattr(room, "setup_revision", 0),
                         "setup_active": getattr(room, "setup_active", True),
@@ -4768,7 +4768,7 @@ class Controller:
     def _max_run_hold(self, room, zone):
         """The hold of a latched zone, or None. Released once its Repairs card is fixed (the switch's `resets`
         moved) or the switch reads OFF; a switch that can't be read keeps it held."""
-        st = room.state[zone]
+        st = room.state.get(zone) or {}
         latch = st.get("max_run_latch")
         if not latch:
             return None

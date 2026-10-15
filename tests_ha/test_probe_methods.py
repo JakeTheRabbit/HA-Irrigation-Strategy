@@ -17,6 +17,8 @@ from test_probe_fusion import A, B, C, ZONE, _install, _read
 from test_upgrade_in_place import JEV_3_11_1, _upgrade
 
 VWC_METHOD = "select.crop_steering_zone_1_vwc_method"
+OLD_ZONE = "sensor.crop_steering_vwc_zone_1"  # an upgraded room keeps its un-prefixed ids
+NEW_VWC_METHOD = "select.crop_steering_tent_zone_1_vwc_method"  # a new room has a slug (ZONE is its reading)
 
 
 async def _choose(hass, select, option):
@@ -45,7 +47,7 @@ async def test_a_3_11_1_room_gets_the_selects_at_median_and_reads_as_before(hass
                 "Highest",
             ]
     # Zone 1's two probes read 50 and 54: their median, as 3.11.1 read it.
-    vwc = hass.states.get(ZONE)
+    vwc = hass.states.get(OLD_ZONE)
     assert float(vwc.state) == 52.0
     assert (vwc.attributes["method"], vwc.attributes["steered_by"]) == (
         "Median",
@@ -67,12 +69,12 @@ async def test_a_room_that_already_chose_average_keeps_it(hass, monkeypatch):
         hass, "entry_2_17_wizard.json", registry_ids={VWC_METHOD: "zone_1_vwc_method"}
     )
     assert hass.states.get(VWC_METHOD).state == "Average"
-    assert hass.states.get(ZONE).attributes["method"] == "Average"
+    assert hass.states.get(OLD_ZONE).attributes["method"] == "Average"
 
 
 async def test_a_probe_pulled_out_does_not_drive_lowest(hass, freezer):
     await _install(hass, [A, B, C])
-    await _choose(hass, VWC_METHOD, "Lowest")
+    await _choose(hass, NEW_VWC_METHOD, "Lowest")
     state = await _read(hass, freezer, **{A: "48", B: "50", C: "52"})
     assert float(state.state) == 48.0 and state.attributes["steered_by"] == "Lowest"
 
@@ -92,7 +94,7 @@ async def test_a_new_choice_shows_at_once(hass, freezer):
     await _install(hass, [A, B, C])
     await _read(hass, freezer, **{A: "40", B: "44", C: "46"})
     assert float(hass.states.get(ZONE).state) == 44.0
-    await _choose(hass, VWC_METHOD, "Highest")  # no poll in between
+    await _choose(hass, NEW_VWC_METHOD, "Highest")  # no poll in between
     assert float(hass.states.get(ZONE).state) == 46.0
 
 
@@ -123,15 +125,15 @@ async def test_the_controller_says_when_lowest_has_too_few_probes_and_steers_on_
     from datetime import datetime
 
     await _install(hass, [A, B])
-    await _choose(hass, VWC_METHOD, "Lowest")
+    await _choose(hass, NEW_VWC_METHOD, "Lowest")
     await _read(hass, freezer, **{A: "40", B: "46"})
-    c, fake, _clock = controller_for({"enable_flag": "switch.crop_steering_engine_enabled"})
-    assert c._read_sensor(c._fused_id("", "vwc", 1), "vwc") == 43.0
+    c, fake, _clock = controller_for({"enable_flag": "switch.crop_steering_tent_engine_enabled"})
+    assert c._read_sensor(c._fused_id("tent_", "vwc", 1), "vwc") == 43.0
     c.loop_once(datetime(2026, 9, 21, 14, 0, 0))
     raised = [
         data["title"]
         for domain, service, data in fake.calls
         if (domain, service) == ("persistent_notification", "create")
-        and data["notification_id"] == "f2_probe_method_default_z1_vwc"
+        and data["notification_id"] == "f2_probe_method_tent_z1_vwc"
     ]
     assert len(raised) == 1 and raised[0].endswith("(CS-502)"), raised

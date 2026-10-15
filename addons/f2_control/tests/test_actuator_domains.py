@@ -13,6 +13,8 @@ import pytest
 import controller
 import fake_ha
 
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
 VALVE, PUMP, MAIN = "valve.v1", "input_boolean.p", "switch.m"
 STARTED = datetime(2026, 9, 23, 1, 0, tzinfo=timezone.utc)
 

@@ -11,25 +11,28 @@ import re
 from datetime import datetime
 
 import pytest
-from conftest import fixture
+from conftest import fixture, room_of
 from test_setup_entry import _install
 from test_upgrade_in_place import JEV_3_11_1, UPSTREAM_2_25_1, _upgrade
 
 SETTINGS = {"p1_rise_pts": (0.5, 0.1, 5), "p1_maximum_extra_shots": (3, 1, 10)}
 
 
-def _numbers(hass, key):
+def _numbers(hass, key, prefix=""):
     """The room's own number for this setting, then one per zone."""
-    zone = re.compile(rf"number\.crop_steering_zone_\d+_{key}$")
+    zone = re.compile(rf"number\.crop_steering_{prefix}zone_\d+_{key}$")
     zones = sorted(s.entity_id for s in hass.states.async_all("number") if zone.match(s.entity_id))
-    return [f"number.crop_steering_{key}", *zones]
+    return [f"number.crop_steering_{prefix}{key}", *zones]
 
 
 async def test_a_new_room_has_the_rule_as_it_was_with_a_cap_of_three(hass):
-    await _install(hass)
+    await _install(hass)  # a new room has a slug: the wizard's "Tent" is tent_
     for key, (default, low, high) in SETTINGS.items():
-        assert _numbers(hass, key) == [f"number.crop_steering_{key}", f"number.crop_steering_zone_1_{key}"]
-        for entity_id in _numbers(hass, key):
+        assert _numbers(hass, key, "tent_") == [
+            f"number.crop_steering_tent_{key}",
+            f"number.crop_steering_tent_zone_1_{key}",
+        ]
+        for entity_id in _numbers(hass, key, "tent_"):
             state = hass.states.get(entity_id)
             assert float(state.state) == default, entity_id
             assert (state.attributes["min"], state.attributes["max"]) == (low, high)
@@ -54,13 +57,13 @@ async def test_a_room_updated_in_place_gets_them_and_nothing_it_restored_moves(h
 
 async def test_the_controller_reads_the_zones_own_values(hass, controller_for):
     await _install(hass)
-    for entity_id, value in (("number.crop_steering_zone_1_p1_rise_pts", 0.8),
-                             ("number.crop_steering_zone_1_p1_maximum_extra_shots", 2)):
+    for entity_id, value in (("number.crop_steering_tent_zone_1_p1_rise_pts", 0.8),
+                             ("number.crop_steering_tent_zone_1_p1_maximum_extra_shots", 2)):
         await hass.services.async_call(
             "number", "set_value", {"entity_id": entity_id, "value": value}, blocking=True
         )
     c, _fake, _clock = controller_for({})
-    p = c._params(c.rooms[0], 1)
+    p = c._params(room_of(c), 1)
     assert (p.p1_rise_pts, p.p1_max_extra_shots) == (0.8, 2)
 
 

@@ -56,7 +56,6 @@ class CropSteeringTestShotButton(ButtonEntity):
             manufacturer="Home Assistant Community",
             model="Zone Controller",
             sw_version=SOFTWARE_VERSION,
-            via_device=(DOMAIN, self._entry.entry_id),
         )
 
     async def async_press(self) -> None:

@@ -14,6 +14,8 @@ import pytest
 import controller
 import fake_ha
 
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
 ROOM = "number.crop_steering_p3_time_between_shots"
 ZONE = "number.crop_steering_zone_1_p3_time_between_shots"
 

@@ -81,7 +81,7 @@ async def test_the_controller_spaces_a_rescue_by_the_zones_own_time_and_says_whe
 ):
     await _install(hass)
     await _night(hass, "tent_")
-    await _set(hass, _new(RESCUE_LEVEL), 65)  # over the probe's reading: a rescue is wanted
+    await _set(hass, _new(RESCUE_LEVEL), 50)  # over the probe's reading, under the re-water level: a rescue is wanted
     await _set(hass, _new(ZONE), 12)  # the zone's own value wins over the room's 10
     c, fake, _clock = controller_for({})
     room = room_of(c)

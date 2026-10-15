@@ -14,6 +14,8 @@ import pytest
 import controller
 from test_controller import _build, _desc
 
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
 KILL = "input_boolean.kill"
 HOLD = "input_boolean.tank_dosing"
 UNREADABLE = f"external hold {HOLD} unreadable (reads neither on nor off)"

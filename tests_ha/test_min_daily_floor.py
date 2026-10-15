@@ -34,7 +34,8 @@ async def _helper(hass, value):
 
 async def test_a_fresh_room_starts_with_the_floor_off(hass):
     await _install(hass)
-    assert float(hass.states.get(ENTITY.format(1)).state) == 0
+    new = ENTITY.replace("crop_steering_", "crop_steering_tent_")  # every new room has a slug, tent_
+    assert float(hass.states.get(new.format(1)).state) == 0
 
 
 async def test_an_upgraded_room_keeps_the_value_its_old_helper_held(hass):

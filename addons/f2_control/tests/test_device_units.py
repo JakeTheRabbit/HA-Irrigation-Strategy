@@ -15,6 +15,8 @@ import pytest
 import controller
 from test_plan_hold_never_stops_rescues import Clock, probe, rig  # noqa: F401 (rig: a pytest fixture)
 
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
 EC1, VWC1, VWC2 = "sensor.crop_steering_ec_zone_1", "sensor.crop_steering_vwc_zone_1", "sensor.crop_steering_vwc_zone_2"
 SUMP = "sensor.sump_plug_power"
 FEED_EC, FEED_PH, RAW2 = "sensor.feed_ec", "sensor.feed_ph", "sensor.zone_2_raw_moisture"

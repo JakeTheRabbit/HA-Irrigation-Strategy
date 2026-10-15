@@ -100,7 +100,7 @@ async def test_the_stop_says_stopped_on_the_heartbeat_and_the_integration_still_
 ):
     """Stopped mid-shot with Home Assistant answering at once: the heartbeat says "stopped", and the
     real integration, reading it, still finds the room's engine switch."""
-    from custom_components.crop_steering import health
+    from custom_components.crop_steering.room import room_gate
 
     monkeypatch.delenv("F2_STOP_BUDGET_S", raising=False)
     seed = fixture(seeded)
@@ -133,4 +133,4 @@ async def test_the_stop_says_stopped_on_the_heartbeat_and_the_integration_still_
     state, attributes = fake.sets["sensor.crop_steering_ai_heartbeat"]
     assert state == "stopped" and "strategy_snapshot_version" not in attributes
     hass.states.async_set("sensor.crop_steering_ai_heartbeat", state, attributes)
-    assert health._kill_switch(hass, "") == room.enable_flag
+    assert room_gate(hass, "") == room.enable_flag

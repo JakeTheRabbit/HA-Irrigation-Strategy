@@ -130,6 +130,7 @@ def _blind_ctrl_and_room(phase):
             "last_daily_reset": None,
             "ec_offset": 1.0,
             "last_ec_steer": None,
+            "fc_follow": {"peak": 0.0, "day": None, "used": {}},
         }
     }
     return c, room

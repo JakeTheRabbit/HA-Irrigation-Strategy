@@ -10,7 +10,7 @@ import dataclasses
 from datetime import datetime
 
 import pytest
-from conftest import fixture
+from conftest import fixture, room_of
 from crop_steering_engine import validate_params
 from crop_steering_engine.core import _PARAM_BOUNDS
 from custom_components.crop_steering.const import MOISTURE_RANGES
@@ -37,11 +37,11 @@ async def _set(hass, entity_id, value):
 async def test_each_level_has_one_range_everywhere(hass, controller_for):
     await _install(hass)
     c, _fake, _clock = controller_for({})
-    params = c._params(c.rooms[0], 1)
+    params = c._params(room_of(c), 1)
     for key, (engine, expected) in LEVELS.items():
         for entity_id in (
-            f"number.crop_steering_{key}",
-            f"number.crop_steering_zone_1_{key}",
+            f"number.crop_steering_tent_{key}",  # a new room has a slug: the wizard's "Tent"
+            f"number.crop_steering_tent_zone_1_{key}",
         ):
             state = hass.states.get(entity_id)
             assert (state.attributes["min"], state.attributes["max"]) == expected
@@ -62,10 +62,10 @@ async def test_each_level_has_one_range_everywhere(hass, controller_for):
 
 async def test_a_peak_target_of_87_is_used_as_set(hass, controller_for):
     await _install(hass)
-    await _set(hass, "number.crop_steering_zone_1_field_capacity", 90)
-    await _set(hass, "number.crop_steering_zone_1_p1_target_vwc", 87)
+    await _set(hass, "number.crop_steering_tent_zone_1_field_capacity", 90)
+    await _set(hass, "number.crop_steering_tent_zone_1_p1_target_vwc", 87)
     c, fake, _clock = controller_for({})
-    assert c._params(c.rooms[0], 1).p1_target == 87
+    assert c._params(room_of(c), 1).p1_target == 87
     c.loop_once(datetime.now())
     notices = [
         d.get("title", "")
@@ -128,8 +128,9 @@ async def test_a_recipe_stage_is_judged_as_one_set(hass):
 
     entry = await _install(hass)
     mgr = get_manager(hass, entry)
-    before = {scope: _ladder(hass, scope) for scope in ("number.crop_steering_", Z1)}
-    assert before[Z1] == {
+    z1 = Z1.replace("crop_steering_", "crop_steering_tent_")  # a new room has a slug: tent_
+    before = {scope: _ladder(hass, scope) for scope in ("number.crop_steering_tent_", z1)}
+    assert before[z1] == {
         "p3_emergency_vwc_threshold": 40.0,
         "p2_vwc_threshold": 60.0,
         "p1_target_vwc": 65.0,
@@ -158,5 +159,5 @@ async def test_a_recipe_stage_is_judged_as_one_set(hass):
         await hass.services.async_call(
             "crop_steering", "apply_recipe", {"stage": "Custom"}, blocking=True
         )
-    assert _ladder(hass, Z1)["p1_target_vwc"] == 58.0
-    assert float(hass.states.get(Z1 + "p2_shot_size").state) != 3.0
+    assert _ladder(hass, z1)["p1_target_vwc"] == 58.0
+    assert float(hass.states.get(z1 + "p2_shot_size").state) != 3.0

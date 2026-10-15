@@ -275,10 +275,10 @@ def engine_facts(doc, paths):
          and run({"ec": 10.0, "ec_settled": 10.0, "vwc": 50, "minutes_since_shot": 30})[4].kind == "hold_high_ec"),
         ("IR-4", "P0 fires nothing routine: only an EC flush (fixed 10% shot) when pore EC is over 2.5x the P0 target, the feed is dilutive and the interval has passed.",
          not run({"phase": "P0", "vwc": 50, "ec": 5.0})[2] and run({"phase": "P0", "vwc": 50, "ec": 8.5}, {"ec_target_p0": 3})[4].kind == "p0_ec_flush"),
-        ("IR-5", "P1 ramp: every p1_time_between_min a shot of p1_initial + p1_incr x shots so far (capped at p1_initial + p1_incr x p1_max_shots, which in practice never binds because P1 ends at p1_max_shots), scaled by ec_adjust against the P1 EC target. Ramp shots, and the extra shot at the target, are cap-exempt.",
+        ("IR-5", "P1 ramp: every p1_time_between_min a shot of p1_initial + p1_incr x shots so far (capped at p1_initial + p1_incr x p1_max_shots, which in practice never binds because P1 ends at p1_max_shots), scaled by ec_adjust against the P1 EC target. Ramp shots are cap-exempt; the extra shots at the target count toward the daily water limit.",
          run({"phase": "P1", "vwc": 50, "ec": 5.0, "shot_count": 2})[3] == 3.0
          and run({"phase": "P1", "vwc": 50, "ec": 5.0, "shot_count": 2, "minutes_since_shot": 10})[2] is False
-         and core.CAP_EXEMPT["p1_ramp"] and core.CAP_EXEMPT["p1_extra"]),
+         and core.CAP_EXEMPT["p1_ramp"] and not core.CAP_EXEMPT["p1_extra"]),
         ("IR-6", "P2, first match wins: rescue flush at pore EC >= max_ec - 1 (dilutive, under field_capacity - 2, interval ok; 1.5x shot, cap-exempt); dilute at EC > 1.2x the P2 target (dilutive, interval ok; 1.5x shot, inside the budget); top-up when VWC < the P2 threshold (shot scaled by ec_adjust).",
          run({"ec": 8.2, "vwc": 50})[4].kind == "p2_rescue" and run({"ec": 7.5, "vwc": 50})[4].kind == "p2_dilute"
          and run({"ec": 6.0, "vwc": 44})[4].kind == "p2_topup" and not run({"ec": 6.0, "vwc": 50})[2]),
@@ -330,6 +330,8 @@ def engine_facts(doc, paths):
     follow = follow.group(0) if follow else ""
     shift = re.search(r"^FC_SHIFT_MIN = ([0-9.]+)$", ctrl, re.M)
     shift = float(shift.group(1)) if shift else None
+    step = re.search(r"^FC_STEP_MAX = ([0-9.]+)$", ctrl, re.M)
+    step = float(step.group(1)) if step else None
     blind_follow = re.search(r"for zone, p in blind:\n(?:.*\n){0,4}?.*self\._follow_fc\(room, zone, p, now\)", ctrl)
     ctrl_checks = [
         ("CT-1", "The P2 threshold the engine sees is p2_vwc_threshold plus the controller's EC offset (offset dropped while EC is unknown), clamped between rescue floor + 3 and min(p1_target, field_capacity) - 1.",
@@ -349,35 +351,36 @@ def engine_facts(doc, paths):
         ("CT-7", "SIGTERM closes whatever is in flight, saves state and exits.", "signal.SIGTERM" in ctrl),
         ("CT-8", f"With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller hands decide() an assumed feed EC of {core.ZoneSnapshot.__dataclass_fields__['feed_ec'].default:.1f} mS/cm, not a measurement, for every dilutive test.",
          "feed_ec=(feed_ec if feed_ec is not None else 3.0)" in ctrl and core.ZoneSnapshot.__dataclass_fields__["feed_ec"].default == 3.0),
-        ("CT-9", "The minimum daily floor is read from a per-zone helper (min_daily_ml_per_plant, made by hand; the integration creates no such setting) times the zone's plant count, defaulting to 0: a fresh install runs with the floor off.",
-         re.search(r'zone_\{zone\}_min_daily_ml_per_plant",\s*0\.0,\s*\)\s*\*\s*self\._zone_num\(room, zone, "plant_count", (?:0|FALLBACK\["plant_count"\])\)', ctrl) is not None
-         and "min_daily" not in nums),
+        ("CT-9", "The minimum daily floor is each zone's Min Daily Water Per Plant setting (min_daily_ml_per_plant, mL per plant per grow-day; an integration older than the setting has only the hand-made helper of the same name, read in its place) times the zone's plant count, defaulting to 0: a fresh install runs with the floor off. Its VWC ceiling is field capacity plus a margin, inside 50-100.",
+         re.search(r'"min_daily_ml_per_plant",\s*self\._num\(f"[^"]*zone_\{zone\}_min_daily_ml_per_plant", 0\.0\)', ctrl) is not None
+         and 'min_daily_key = f"zone_{zone_num}_min_daily_ml_per_plant"' in nums
+         and "max(50.0, min(100.0, fc + MIN_FLOOR_FC_MARGIN))" in ctrl),
         ("CT-10", "A zone whose moisture rises with no water going in (a backed-up table) gets the floor set to 0 and no EC correction.",
          "dataclasses.replace(p, min_daily_volume=0.0)" in ctrl and "dataclasses.replace(snap, backed_up=True)" in ctrl),
         ("CT-11", "dryback_target is read from vegetative_dryback_target or generative_dryback_target by the zone's steering mode; the integration's p0_dryback_drop_percent setting is not read by the controller.",
          "_dryback_target\"" in ctrl and "{'vegetative' if veg else 'generative'}_dryback_target" in ctrl
          and "p0_dryback_drop" not in ctrl and '"p0_dryback_drop_percent"' in nums),
-        ("CT-12", f"Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity is set to the zone's highest reading of this grow-day or the one before, and the P1 target to the highest reading of the grow-day before, with no step limit (only the engine's bounds and each number's own min and max); when field capacity moves by {shift if shift is not None else 0:g} point or more in one write, the P2 re-water threshold and the rescue floor (the P3 emergency threshold) move by the same points, down as well as up. It runs for a zone whose probe is dead or set aside too. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity). A hand edit to field capacity or the P1 target does not stick while the switch is on; one to the threshold or the rescue floor is shifted along with field capacity rather than replaced (CT-13 says when the learner rewrites them itself).",
-         shift == 1.0 and 'if not self._on(f"' in follow and '{room.prefix}auto_setpoints", False):' in follow
+        ("CT-12", f"Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity follows the zone's highest counted reading of this grow-day or the one before, and the P1 target the highest reading of the grow-day before (no higher than field capacity); when field capacity moves by {shift if shift is not None else 0:g} point or more, the P2 re-water threshold moves by the same points, down as well as up. Each of the three moves at most {step if step is not None else 0:g} point a grow-day, counted from where it stood, so a drifting probe or a flood drags the ladder no further than that a day and an edit by hand is moved from, never undone; all within the engine's bounds and each number's own min and max. The readings counted are the trusted ones outside a day the table backed up (CS-310), and a zone without a usable probe is not followed. The rescue floor (the P3 emergency threshold) is the operator's and never moves. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity): then field capacity alone moves if that is valid (CT-13 says when the learner writes the threshold itself).",
+         shift == 1.0 and step == 1.0 and 'if not self._on(f"' in follow and '{room.prefix}auto_setpoints", False):' in follow
          and 'getattr(room, "strategy_required", False)' in follow
-         and 'return max(st.get("peak") or 0.0, prev), prev' in ctrl and "if prev is None or prev <= 0.0:" in ctrl
-         and 'fc = bounded("field_capacity", seen)' in follow and 'target = bounded("p1_target_vwc", min(yday, fc))' in follow
-         and "if abs(delta) >= FC_SHIFT_MIN:" in follow and 'new_thr = bounded("p2_vwc_threshold", thr + delta)' in follow
-         and 'rescue = bounded("p3_emergency_vwc_threshold", p.p3_emergency_floor + delta)' in follow
-         and "if rescue + 3.0 <= new_thr < target <= fc:" in follow and blind_follow is not None
+         and 'return max((st.get("fc_follow") or {}).get("peak") or 0.0, prev), prev' in ctrl and "if prev is None or prev <= 0.0:" in ctrl
+         and 'fc = bounded("field_capacity", p.field_capacity, seen)' in follow
+         and 'target = bounded("p1_target_vwc", p.p1_target, min(yday, fc))' in follow
+         and 'new_thr = bounded("p2_vwc_threshold", thr, thr + delta) if abs(delta) >= FC_SHIFT_MIN else thr' in follow
+         and "rescue = p.p3_emergency_floor" in follow and "if rescue + 3.0 <= new_thr < target <= fc:" in follow
+         and "left = max(0.0, FC_STEP_MAX - used.get(suffix, 0.0))" in follow and blind_follow is None
          and 'if ha_get(entity)[0] in (None, "unknown", "unavailable", ""):' in ctrl),
-        ("CT-13", "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge runs (with one running, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12), and lowers the rescue floor to the threshold - 3 whenever it would otherwise sit less than 3 points under the threshold.",
+        ("CT-13", "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge runs (with one running, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.",
          'want = auto_setpoints.wanted(learn, current, snap.vwc, st["phase"], ctx, others=judged)' in ctrl
          and "if self._follow_fc(room, zone, p, now):" in ctrl and "writes = enabled and not planned" in ctrl
          and 'if "p2_vwc_threshold" in others:' in auto
-         and 'if current["p3_emergency_vwc_threshold"] + 3.0 > thr:' in auto
-         and 'want["p3_emergency_vwc_threshold"] = round(thr - 3.0, 1)' in auto
+         and 'MANAGED = ("p1_target_vwc", "field_capacity", "p2_vwc_threshold")' in auto
          and "return (SHOT, THRESHOLD) if owns_setpoints(c) else ()" in bridge),
-        ("CT-14", "So with Auto Setpoints on, the safety label (zone_safety_status) reads over_saturated whenever the zone matches or beats its highest reading of this grow-day and the one before (each new high), and approaching_saturation within 5 points of it: under the switch those labels say where the zone sits against its own peak, not that it is over-watered.",
+        ("CT-14", f"So with Auto Setpoints on, field capacity sits at the zone's own followed peak (moved at most {step if step is not None else 0:g} point a grow-day): the safety label (zone_safety_status) reads over_saturated whenever the zone reaches that field capacity, and approaching_saturation within 5 points of it. Under the switch those labels say where the zone sits against its own peak, not that it is over-watered.",
          core.zone_safety_status(60.0, 5.0, 60.0, 9.0) == "over_saturated"
          and core.zone_safety_status(55.5, 5.0, 60.0, 9.0) == "approaching_saturation"
          and core.zone_safety_status(54.9, 5.0, 60.0, 9.0) == "safe"
-         and 'fc = bounded("field_capacity", seen)' in follow),
+         and 'fc = bounded("field_capacity", p.field_capacity, seen)' in follow),
     ]
 
     brain_checks = brain_facts(doc, paths, core, base_p, base_s, ctrl)

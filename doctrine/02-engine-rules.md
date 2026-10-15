@@ -21,7 +21,7 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 - **IR-2** At max_ec with a non-dilutive feed or a backed-up (not draining) zone, the engine BLOCKS rather than adds salt or water; the block self-clears. On a tick that blocks, or holds (IR-3), nothing else fires: not the P3 emergency, the watchdog or the minimum floor.
 - **IR-3** Anti-short-cycle: an EC correction waits p2_min_interval_min after the last shot (at least 45 min when judged on a settled reading); at max_ec inside that gap the zone HOLDS so the last flush can drain.
 - **IR-4** P0 fires nothing routine: only an EC flush (fixed 10% shot) when pore EC is over 2.5x the P0 target, the feed is dilutive and the interval has passed.
-- **IR-5** P1 ramp: every p1_time_between_min a shot of p1_initial + p1_incr x shots so far (capped at p1_initial + p1_incr x p1_max_shots, which in practice never binds because P1 ends at p1_max_shots), scaled by ec_adjust against the P1 EC target. Ramp shots, and the extra shot at the target, are cap-exempt.
+- **IR-5** P1 ramp: every p1_time_between_min a shot of p1_initial + p1_incr x shots so far (capped at p1_initial + p1_incr x p1_max_shots, which in practice never binds because P1 ends at p1_max_shots), scaled by ec_adjust against the P1 EC target. Ramp shots are cap-exempt; the extra shots at the target count toward the daily water limit.
 - **IR-6** P2, first match wins: rescue flush at pore EC >= max_ec - 1 (dilutive, under field_capacity - 2, interval ok; 1.5x shot, cap-exempt); dilute at EC > 1.2x the P2 target (dilutive, interval ok; 1.5x shot, inside the budget); top-up when VWC < the P2 threshold (shot scaled by ec_adjust).
 - **IR-7** P3 is emergency-only: a p3_emergency_shot when VWC falls below p3_emergency_floor (the rescue floor). Cap-exempt.
 - **IR-8** Watchdog: with lights on and outside P0, a zone with no water for watchdog_hours that sits under its P2 threshold gets a p2_shot_size shot, even over the daily budget. A probe reading at or above the threshold silences it.
@@ -46,12 +46,12 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 - **CT-6** Source-water gate, two halves (feed EC, feed pH), each only when its feed sensor is configured and its band is set (feed sensors default to empty): a feed outside its band holds the zone; a dead feed probe holds after feed_grace_min (default 30). External holds apply only when configured (none by default). Offline pump or valve switches hold too.
 - **CT-7** SIGTERM closes whatever is in flight, saves state and exits.
 - **CT-8** With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller hands decide() an assumed feed EC of 3.0 mS/cm, not a measurement, for every dilutive test.
-- **CT-9** The minimum daily floor is read from a per-zone helper (min_daily_ml_per_plant, made by hand; the integration creates no such setting) times the zone's plant count, defaulting to 0: a fresh install runs with the floor off.
+- **CT-9** The minimum daily floor is each zone's Min Daily Water Per Plant setting (min_daily_ml_per_plant, mL per plant per grow-day; an integration older than the setting has only the hand-made helper of the same name, read in its place) times the zone's plant count, defaulting to 0: a fresh install runs with the floor off. Its VWC ceiling is field capacity plus a margin, inside 50-100.
 - **CT-10** A zone whose moisture rises with no water going in (a backed-up table) gets the floor set to 0 and no EC correction.
 - **CT-11** dryback_target is read from vegetative_dryback_target or generative_dryback_target by the zone's steering mode; the integration's p0_dryback_drop_percent setting is not read by the controller.
-- **CT-12** Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity is set to the zone's highest reading of this grow-day or the one before, and the P1 target to the highest reading of the grow-day before, with no step limit (only the engine's bounds and each number's own min and max); when field capacity moves by 1 point or more in one write, the P2 re-water threshold and the rescue floor (the P3 emergency threshold) move by the same points, down as well as up. It runs for a zone whose probe is dead or set aside too. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity). A hand edit to field capacity or the P1 target does not stick while the switch is on; one to the threshold or the rescue floor is shifted along with field capacity rather than replaced (CT-13 says when the learner rewrites them itself).
-- **CT-13** With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge runs (with one running, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12), and lowers the rescue floor to the threshold - 3 whenever it would otherwise sit less than 3 points under the threshold.
-- **CT-14** So with Auto Setpoints on, the safety label (zone_safety_status) reads over_saturated whenever the zone matches or beats its highest reading of this grow-day and the one before (each new high), and approaching_saturation within 5 points of it: under the switch those labels say where the zone sits against its own peak, not that it is over-watered.
+- **CT-12** Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity follows the zone's highest counted reading of this grow-day or the one before, and the P1 target the highest reading of the grow-day before (no higher than field capacity); when field capacity moves by 1 point or more, the P2 re-water threshold moves by the same points, down as well as up. Each of the three moves at most 1 point a grow-day, counted from where it stood, so a drifting probe or a flood drags the ladder no further than that a day and an edit by hand is moved from, never undone; all within the engine's bounds and each number's own min and max. The readings counted are the trusted ones outside a day the table backed up (CS-310), and a zone without a usable probe is not followed. The rescue floor (the P3 emergency threshold) is the operator's and never moves. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity): then field capacity alone moves if that is valid (CT-13 says when the learner writes the threshold itself).
+- **CT-13** With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge runs (with one running, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.
+- **CT-14** So with Auto Setpoints on, field capacity sits at the zone's own followed peak (moved at most 1 point a grow-day): the safety label (zone_safety_status) reads over_saturated whenever the zone reaches that field capacity, and approaching_saturation within 5 points of it. Under the switch those labels say where the zone sits against its own peak, not that it is over-watered.
 
 ## The brain's guard (envelope) and levers
 
@@ -79,7 +79,7 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 | flush_high_ec | yes |
 | p0_ec_flush | no |
 | p1_ramp | yes |
-| p1_extra | yes |
+| p1_extra | no |
 | p1_flush | no |
 | p2_rescue | yes |
 | p2_dilute | no |
@@ -92,14 +92,14 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 
 | param | min | max |
 |---|---|---|
-| p1_target | 20 | 85 |
-| p2_threshold | 10 | 70 |
+| p1_target | 20 | 100 |
+| p2_threshold | 10 | 100 |
 | ec_target_p0 | 0.5 | 9 |
 | ec_target_p1 | 0.5 | 9 |
 | ec_target_p2 | 0.5 | 9 |
 | dryback_target | 2 | 60 |
-| p3_emergency_floor | 10 | 60 |
-| field_capacity | 40 | 90 |
+| p3_emergency_floor | 10 | 65 |
+| field_capacity | 40 | 100 |
 | max_ec | 3 | 15 |
 | watchdog_hours | 0 | 12 |
 | p2_shot_size | 0.5 | 20 |
@@ -113,6 +113,8 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 | min_daily_volume | 0 | 500 |
 | drown_ceiling | 50 | 100 |
 | min_floor_finish_h | 0 | 12 |
+| p1_rise_pts | 0.1 | 5 |
+| p1_max_extra_shots | 1 | 10 |
 
 ## Constants
 

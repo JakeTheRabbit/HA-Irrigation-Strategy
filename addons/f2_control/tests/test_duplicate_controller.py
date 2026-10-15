@@ -17,6 +17,8 @@ import fake_ha
 from test_dosing_runner import make_rig
 from test_plan_hold_never_stops_rescues import Clock, opened, probe, rig  # noqa: F401 (rig: a fixture)
 
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
 BEAT = "sensor.crop_steering_ai_heartbeat"
 REFUSED = "refused: another controller is driving this room"
 

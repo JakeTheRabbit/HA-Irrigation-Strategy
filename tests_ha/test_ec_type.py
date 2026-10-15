@@ -16,7 +16,7 @@ from custom_components.crop_steering.plumbing import infer
 from test_real_flow import ZONES, _seed, _to_zones_step
 from test_upgrade_in_place import JEV_3_11_1, _upgrade
 
-ZONE_EC = "sensor.crop_steering_ec_zone_1"
+ZONE_EC = "sensor.crop_steering_tent_ec_zone_1"  # the new room: every new room has a slug, tent_
 PORE, BULK = "sensor.slab_pore_ec", "sensor.slab_bulk_ec"
 
 
@@ -79,8 +79,8 @@ async def test_a_zone_with_a_bulk_and_a_pore_probe_steers_on_pore(hass, freezer)
     assert (
         float((await _read(hass, freezer, **{PORE: "3.0", BULK: "1.2"})).state) == 2.1
     )
-    await _choose(hass, _type_select(PORE), "pore")
-    await _choose(hass, _type_select(BULK), "bulk")
+    await _choose(hass, _type_select(PORE, "tent_"), "pore")
+    await _choose(hass, _type_select(BULK, "tent_"), "bulk")
     state = await _read(hass, freezer, **{PORE: "3.0", BULK: "1.2"})
     assert float(state.state) == 3.0  # averaged with the bulk probe it read 2.1
     assert state.attributes["ec_type"] == "pore"
@@ -98,20 +98,20 @@ async def test_the_controller_says_when_a_zone_steers_on_bulk_ec(
     from datetime import datetime
 
     await _install(hass)
-    await _choose(hass, _type_select(PORE), "pore")
-    await _choose(hass, _type_select(BULK), "bulk")
+    await _choose(hass, _type_select(PORE, "tent_"), "pore")
+    await _choose(hass, _type_select(BULK, "tent_"), "bulk")
     hass.states.async_set(PORE, "unavailable")
     await _read(hass, freezer, **{BULK: "1.2"})
     c, fake, _clock = controller_for(
-        {"enable_flag": "switch.crop_steering_engine_enabled"}
+        {"enable_flag": "switch.crop_steering_tent_engine_enabled"}
     )
-    assert c._read_sensor(c._fused_id("", "ec", 1), "ec") == 1.2
+    assert c._read_sensor(c._fused_id("tent_", "ec", 1), "ec") == 1.2
     c.loop_once(datetime(2026, 9, 21, 14, 0, 0))
     raised = [
         data
         for domain, service, data in fake.calls
         if (domain, service) == ("persistent_notification", "create")
-        and data["notification_id"] == "f2_ec_type_default_z1"
+        and data["notification_id"] == "f2_ec_type_tent_z1"
     ]
     assert len(raised) == 1 and raised[0]["title"].endswith("(CS-504)"), raised
     assert PORE in raised[0]["message"]

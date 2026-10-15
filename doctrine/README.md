@@ -241,15 +241,15 @@ These were stale or wrong in the advisor notes or in earlier drafts. The doctrin
    decision catalogue lists every question, its acting answers, their effect and code's guard; every `ACTS`
    lever names a decision and an answer that acts. Dusk's `continue_p2` acts on nothing (it cannot delay the
    engine's own P3), so SYM-04 lists the later end of the day as advice.
-16. **Minimum daily floor.** The integration creates no setting for it: the controller reads a hand-made per-zone
-   helper times the plant count, defaulting to 0, and zeroes the floor for a zone whose table is backing up (CT-9,
-   CT-10). Beyond the morning ramp, a fresh install has no guard that waters a zone whose probe keeps reading high
+16. **Minimum daily floor.** Each zone's Min Daily Water Per Plant setting (the old hand-made helper on an older
+   integration) times the plant count, defaulting to 0; the controller zeroes the floor for a zone whose table is
+   backing up (CT-9, CT-10). Beyond the morning ramp, a fresh install has no guard that waters a zone whose probe keeps reading high
    (PRB-08, ACT-06, SYM-13).
-17. **The Auto Setpoints learner.** With the room's switch on, `_follow_fc` sets field capacity to the zone's
-   highest reading of this grow-day or the one before and the P1 target to the one before's, and on any
-   field-capacity move of `FC_SHIFT_MIN` (1) point or more shifts the re-water threshold and the rescue floor by
-   the same amount, down too; `wanted()` also lowers the rescue floor to keep it 3 points under the threshold
-   (CT-12, CT-13). The Setpoints question is asked only under that switch, and the band's centre is the last value
+17. **The Auto Setpoints learner.** With the room's switch on, `_follow_fc` moves field capacity toward the zone's
+   highest counted reading of this grow-day or the one before and the P1 target toward the one before's, and on
+   any field-capacity move of `FC_SHIFT_MIN` (1) point or more shifts the re-water threshold by the same amount,
+   down too; each moves at most `FC_STEP_MAX` (1) point a grow-day, and neither it nor `wanted()` ever writes the
+   rescue floor (CT-12, CT-13). The Setpoints question is asked only under that switch, and the band's centre is the last value
    the brain did not write, the learner's included (BR-5, H-11, ACT-07). Under the switch `over_saturated` marks
    each new high (CT-14), so the Over-water row and SYM-07 do not count it, and PRB-14 tells the brain to raise a
    field capacity and floor walking with a drifting probe for a person.

@@ -7,7 +7,7 @@ integration older than them, it keeps waiting 2 s and 1 s, without the missing-s
 
 import pytest
 import controller
-from conftest import fixture
+from conftest import fixture, room_of
 from test_declared_plumbing import KILL, _arm
 from test_real_flow import VALVE
 from test_setup_entry import _install
@@ -15,6 +15,9 @@ from test_upgrade_in_place import JEV_3_11_1, UPSTREAM_2_25_1, _upgrade
 
 PRIME = "number.crop_steering_pump_prime_time"
 LEAD = "number.crop_steering_main_line_lead_time"
+# A new room has a slug: the wizard's "Tent" is tent_ (an upgraded room keeps the ids above).
+NEW_PRIME = "number.crop_steering_tent_pump_prime_time"
+NEW_LEAD = "number.crop_steering_tent_main_line_lead_time"
 PUMP, MAIN = "switch.room_pump", "switch.room_main_line"
 
 
@@ -39,7 +42,7 @@ async def _pumped_room(hass):
 
 def _opened(c, fake, clock, monkeypatch):
     """Fire one shot: when the controller switched each of pump, main line and valve on."""
-    room = c.rooms[0]
+    room = room_of(c)
     _arm(fake)
     opened = {}
     real = controller.ha_call  # the fake Home Assistant controller_for installed
@@ -57,7 +60,7 @@ def _opened(c, fake, clock, monkeypatch):
 
 async def test_a_new_room_has_them_at_two_and_one_second(hass):
     await _install(hass)
-    for entity_id, value, top in ((PRIME, 2, 20), (LEAD, 1, 10)):
+    for entity_id, value, top in ((NEW_PRIME, 2, 20), (NEW_LEAD, 1, 10)):
         state = hass.states.get(entity_id)
         assert float(state.state) == value
         attributes = state.attributes
@@ -80,8 +83,8 @@ async def test_the_controller_waits_the_rooms_own_times(
     hass, controller_for, monkeypatch
 ):
     await _pumped_room(hass)
-    await _set(hass, PRIME, 4)
-    await _set(hass, LEAD, 0.5)
+    await _set(hass, NEW_PRIME, 4)
+    await _set(hass, NEW_LEAD, 0.5)
     c, fake, clock = controller_for({"enable_flag": KILL})
     assert _opened(c, fake, clock, monkeypatch) == {PUMP: 0.0, MAIN: 4.0, VALVE: 4.5}
 
@@ -91,8 +94,8 @@ async def test_an_integration_without_them_leaves_the_controller_at_two_and_one_
 ):
     await _pumped_room(hass)
     # As an integration from before these settings has none.
-    for entity_id in (PRIME, LEAD):
+    for entity_id in (NEW_PRIME, NEW_LEAD):
         hass.states.async_remove(entity_id)
     c, fake, clock = controller_for({"enable_flag": KILL})
     assert _opened(c, fake, clock, monkeypatch) == {PUMP: 0.0, MAIN: 2.0, VALVE: 3.0}
-    assert PRIME not in c._defaulted_this_loop and LEAD not in c._defaulted_this_loop
+    assert NEW_PRIME not in c._defaulted_this_loop and NEW_LEAD not in c._defaulted_this_loop

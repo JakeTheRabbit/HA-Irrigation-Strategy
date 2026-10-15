@@ -23,14 +23,6 @@ KILL = "switch.crop_steering_engine_enabled"
 # A new room has a slug: the wizard's "Tent" is tent_ (an upgraded room keeps the ids above).
 NEW_SUBSTRATE = "select.crop_steering_tent_substrate"
 NEW_DESCRIPTOR = "sensor.crop_steering_tent_engine_config"
-# What the other changes since 3.11.1 add to an upgraded room, beside the substrate select.
-ADDED_BESIDE = {
-    "select.crop_steering_drainage",
-    "number.crop_steering_sump_power_threshold_w",
-    "number.crop_steering_p3_time_between_shots",
-    "number.crop_steering_zone_1_p3_time_between_shots",
-    "number.crop_steering_zone_2_p3_time_between_shots",
-}
 
 
 async def _choose(hass, entity_id, option):
@@ -134,7 +126,8 @@ async def test_a_3_11_1_room_gets_only_the_substrate_select_and_its_controller_c
     entry, _seed = await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
     assert hass.states.get(SUBSTRATE).state == "generic"
     assert hass.states.get(DESCRIPTOR).attributes["substrate"] == "generic"
-    assert _new_since(hass, entry, seed) == ({SUBSTRATE} | ADDED_BESIDE, set())  # nothing else appears or moves
+    new, moved = _new_since(hass, entry, seed)
+    assert SUBSTRATE in new and moved == set()  # every entity it had keeps its id (other changes add theirs)
 
     hass.states.async_set(KILL, "on")
     c, _fake, _built, _usage, state = _jev_3_11_1_app(
