@@ -130,7 +130,7 @@ changes, never taken from the caller.
 |---|---|---|---|
 | `crop_steering.dosing_get` | any user | `room_id` | `{schema_version: 1, room_id, config, feed_now, candidates[], can_edit, error}` |
 | `crop_steering.dosing_save` | admin | `room_id, expected_revision, pumps, batch, feed?` | the same as `dosing_get`, or `error` |
-| `crop_steering.dosing_request` | admin; a `stop`: any signed-in user | `room_id, action ("dose" \| "batch" \| "stop"), pump?, ml?` | `{request, error}` |
+| `crop_steering.dosing_request` | admin; a `stop`: any signed-in user | `room_id, action ("dose" \| "batch" \| "stop"), pump?, ml?, run_anyway?` | `{request, error}` |
 
 - `room_id` is `"room:<prefix>"`, as for the stock services.
 - Who: as for every service that changes something, "admin" means a signed-in administrator, and a
@@ -152,6 +152,13 @@ changes, never taken from the caller.
   `batch` returns `error: "busy"` while one is pending, and a `dose` is refused when the pump is
   unknown or `ml` is not in 0 < ml ≤ `max_ml` (`error` then says which). A request does not move
   the revision.
+- A test refill run anyway: a `batch` with `run_anyway: true` (an administrator's call, as every
+  batch is) is stored with `run_anyway: true`; without it the key is left out, as before. Only a
+  batch may carry it: on a `dose` or a `stop` it is refused ("only a batch (a test refill) can be
+  run anyway"). It is the person's word that they checked the fill, never a way past a safety
+  check: the controller refuses a batch run anyway for every reason it refuses any other (a hold
+  entity on or unreadable, a latched hardware fault, a full sensor that can't be read), and the
+  overfill guard still keeps the fill valve shut.
 - `dosing_save` returns `error: "busy"` too (the same word) while a request is pending or while
   `sensor.crop_steering_<prefix>dosing` reads `dosing` or `batch` (a dose or a batch runs from the
   setup it started with, which must not change under it),

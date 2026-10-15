@@ -214,7 +214,8 @@ class DosingStore:
 
     async def request(self, data, by) -> dict:
         """Store one request for the controller. A stop always replaces what is pending; a dose or a
-        batch waits for the one before it to be handled. The setup's revision does not move.
+        batch waits for the one before it to be handled. The setup's revision does not move. A batch
+        run anyway (an administrator's test refill) says so with `run_anyway`.
         """
         async with self._lock:
             if self.error:
@@ -224,7 +225,11 @@ class DosingStore:
                 return {"request": None, "error": "busy"}
             try:
                 pump, ml = dosing.check_request(
-                    self.data, action, data.get("pump"), data.get("ml")
+                    self.data,
+                    action,
+                    data.get("pump"),
+                    data.get("ml"),
+                    data.get("run_anyway", False),
                 )
             except dosing.DosingError as error:
                 return {"request": None, "error": str(error)}
@@ -236,6 +241,8 @@ class DosingStore:
                 "at": _now().isoformat(),
                 "by": by,
             }
+            if data.get("run_anyway"):
+                request["run_anyway"] = True
             draft = deepcopy(self.data)
             draft["request"] = request
             await self._commit(draft)
@@ -340,6 +347,7 @@ async def async_setup_dosing(hass, entry):
             vol.Required("action"): vol.In(dosing.ACTIONS),
             vol.Optional("pump"): str,
             vol.Optional("ml"): vol.Coerce(float),
+            vol.Optional("run_anyway"): bool,
         },
     }
     for service in SERVICES:

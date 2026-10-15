@@ -171,6 +171,32 @@ async def test_an_ordinary_user_can_read_and_stop_dosing_but_never_save_or_dose(
     assert hass.states.get(SENSOR).attributes["request"] == stop["request"]
 
 
+async def test_a_test_refill_run_anyway_reaches_the_sensor_the_controller_reads(
+    hass, hass_admin_user
+):
+    """Through Home Assistant's own schema and auth: an administrator's batch run anyway is published
+    with run_anyway on the request the controller reads; an ordinary user is refused one, and a
+    value that is not true or false is refused by the schema."""
+    await _install(hass)
+    _devices(hass)
+    await _call(
+        hass, hass_admin_user, "dosing_save", expected_revision=0, pumps=[PUMP], batch={}
+    )
+    staff = await _staff(hass)
+    with pytest.raises(HomeAssistantError, match=REFUSED):
+        await _call(hass, staff, "dosing_request", action="batch", run_anyway=True)
+    with pytest.raises(Exception, match="run_anyway"):
+        await _call(
+            hass, hass_admin_user, "dosing_request", action="batch", run_anyway="maybe"
+        )
+    answer = await _call(
+        hass, hass_admin_user, "dosing_request", action="batch", run_anyway=True
+    )
+    assert answer["error"] is None and answer["request"]["run_anyway"] is True
+    await hass.async_block_till_done()
+    assert hass.states.get(SENSOR).attributes["request"] == answer["request"]
+
+
 async def test_the_setup_is_never_saved_under_a_dose_or_batch_the_controller_reports(
     hass, hass_admin_user
 ):

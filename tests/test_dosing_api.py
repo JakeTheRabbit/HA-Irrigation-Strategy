@@ -177,6 +177,27 @@ def test_a_request_is_stored_for_the_controller_and_the_revision_does_not_move(
     )
 
 
+def test_a_test_refill_run_anyway_says_so_and_an_ordinary_request_keeps_its_shape():
+    """A batch run anyway is stored with run_anyway, which the controller reads with the request; a
+    request without it is stored as before, with no such key. Refused on a dose or a stop, and
+    nothing is stored."""
+    hass, store = rig()
+    save(store)
+    plain = ask(store, "batch")["request"]
+    assert "run_anyway" not in plain
+    handled(hass, plain["id"])
+    anyway = ask(store, "batch", run_anyway=True)
+    assert anyway["error"] is None and anyway["request"]["run_anyway"] is True
+    assert store._store.value["request"]["run_anyway"] is True
+    # ...and published on the sensor the controller reads.
+    assert store.sensor()[1]["request"]["run_anyway"] is True
+    handled(hass, anyway["request"]["id"])
+    for action in ("dose", "stop"):
+        refused = ask(store, action, run_anyway=True)
+        assert refused["request"] is None and "only a batch" in refused["error"]
+    assert store.data["request"] == anyway["request"]
+
+
 def handled_by(store):
     handled(store.hass, store.data["request"]["id"])
     return store
@@ -398,9 +419,19 @@ def test_the_services_find_the_room_and_record_who_asked(services):
     # A stop only switches things off: any signed-in user may ask for one, and is named.
     staff = services.call("dosing_request", user="staff", action="stop")
     assert (staff["error"], staff["request"]["by"]) == (None, "Staff phone")
-    for action, data in (("dose", {"pump": "balance", "ml": 5}), ("batch", {})):
+    for action, data in (
+        ("dose", {"pump": "balance", "ml": 5}),
+        ("batch", {}),
+        # A test refill run anyway is an administrator's alone.
+        ("batch", {"run_anyway": True}),
+    ):
         with pytest.raises(HomeAssistantError, match="administrator"):
             services.call("dosing_request", user="staff", action=action, **data)
+    # A stop is open to anyone, but run anyway is not: it is refused, and nothing is stored.
+    refused = services.call(
+        "dosing_request", user="staff", action="stop", run_anyway=True
+    )
+    assert refused["request"] is None and "only a batch" in refused["error"]
     with pytest.raises(HomeAssistantError, match="signed-in Home Assistant user"):
         services.call("dosing_request", user="deleted", action="stop")
     assert services.call("dosing_get")["config"]["request"] == staff["request"]

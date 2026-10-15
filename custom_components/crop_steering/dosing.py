@@ -558,11 +558,16 @@ def feed_now(feed: dict, today: date) -> dict:
     }
 
 
-def check_request(config: dict, action, pump=None, ml=None) -> tuple:
+def check_request(config: dict, action, pump=None, ml=None, run_anyway=False) -> tuple:
     """A request's action, pump and mL, checked against the room's setup -> (pump, ml) to store.
-    A stop and a batch carry neither."""
+    A stop and a batch carry neither. `run_anyway`: only a batch (a test refill) may carry it.
+    """
     if action not in ACTIONS:
         raise DosingError("the action must be dose, batch or stop")
+    if not isinstance(run_anyway, bool):
+        raise DosingError("run anyway must be true or false")
+    if run_anyway and action != "batch":
+        raise DosingError("only a batch (a test refill) can be run anyway")
     if action != "dose":
         return None, None
     found = next((p for p in config["pumps"] if p["id"] == pump), None)
