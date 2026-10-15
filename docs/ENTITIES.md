@@ -75,6 +75,8 @@ The active EC target = the row for the current phase **and** the zone's steering
 | `irrigation_ph_max` | 3.0-9.0 | 6.2 | pH | Source-water pH gate (high bound). |
 | `maximum_ec` | 1-20 | 9.0 | mS/cm | Hard substrate-EC cutoff: no shot above it (salt-burn guard). |
 | `max_shot_duration` | 5-3600 | 900 | s | Longest a single shot may run. The controller refuses to water a room whose cap is missing or below 5 s (CS-203). |
+| `pump_prime_time` | 0-20 | 2 | s | How long the pump runs before the main line (or, with no main line, the zone valve) opens. Raise it for a pump that takes longer to reach pressure. |
+| `main_line_lead_time` | 0-10 | 1 | s | How long the main-line valve is open before the zone valve opens. |
 | `watchdog_hours` | 0-12 | 3 | h | Lights-on backstop: a zone below its P2 trigger that has had no water for this long gets a watchdog shot, or an urgent alert (CS-207) when watering is blocked. `0` turns it off. |
 
 ### Substrate & schedule
