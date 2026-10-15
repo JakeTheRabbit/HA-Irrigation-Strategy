@@ -60,7 +60,8 @@ These are for Home Assistant OS and Supervised installs, and follow the same sha
 
    The command finds the app data folder under either name the Supervisor has used (`apps/data`, or
    `addons/data` on older Supervisors) and copies only the files that exist; it never touches the old
-   folder. `state.json` holds each zone's phase, today's counters, the accepted setup revision and what
+   folder. Do **not** copy `instance_id`: the new app makes its own, so the duplicate-controller guard can
+   tell the two apps apart. `state.json` holds each zone's phase, today's counters, the accepted setup revision and what
    Auto Setpoints has learned. `dosing_state.json` holds the dosing record, including anything a dose or
    batch left switched on. The `jev_*` files are the brain's day count, ledger, journal and setpoint
    memory. On Cloudflare they are also what keeps the brain on: Cloudflare credentials start it only
@@ -85,7 +86,8 @@ These are for Home Assistant OS and Supervised installs, and follow the same sha
    test**: run a shot, catch what one dripper delivers and compare it with the zone's dripper flow
    (the calculator is in Equipment › Setup › Water & calibration). Only that proves water is delivered.
 9. After a full photoperiod, uninstall the Jev app. Two controllers on one room are two things opening
-   the same valves, which is why step 4 stops the old app before the new one starts.
+   the same valves, which is why step 4 stops the old app before the new one starts. The newer app also
+   holds when it sees the other one's beat.
 
 ## Going back
 
