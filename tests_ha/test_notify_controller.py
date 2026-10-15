@@ -153,3 +153,40 @@ async def test_jevs_own_alerts_reach_the_phone_that_ticks_jev(
         )
         assert answer == {"sent_to": [STAFF_PHONE], "error": None}
         assert received[STAFF_PHONE][-1]["message"].startswith(words)
+
+
+async def test_the_channel_judges_alert_reaches_the_phone_that_ticks_hardware(
+    hass, hass_admin_user, controller_for, monkeypatch
+):
+    """CS-710 (water may be bypassing the substrate or the probe) is in the hardware kind, beside CS-701: the
+    tablet that ticks Hardware lockouts gets it, the staff phone that ticks only stock tanks does not."""
+    await _install(hass)
+    staff = await _staff(hass)
+    received, _doc = await _set_up(hass, hass_admin_user, staff)
+    c, fake, _clock = controller_for({"notify_service": "notify/mobile_app_old_phone"})
+    import controller
+
+    def answered(domain, service, data, timeout=12):
+        fake.calls.append((domain, service, dict(data)))
+        return 200, {"sent_to": [TABLET], "error": None}
+
+    monkeypatch.setattr(controller, "ha_service_response", answered)
+    c._jev_alert(
+        c.rooms[0],
+        1,
+        "channel",
+        {
+            "code": "CS-710",
+            "title": "water may be bypassing the substrate or the probe",
+            "message": "Do a catch test.",
+        },
+    )
+    [asked] = _asked(fake)
+    assert (asked["code"], asked["key"]) == ("CS-710", "jev_channel_default_z1")
+    assert not asked.get("urgent")
+    answer = await hass.services.async_call(
+        DOMAIN, "notify", asked, blocking=True, return_response=True
+    )
+    assert answer == {"sent_to": [TABLET], "error": None}
+    assert received[TABLET][-1]["message"].startswith("Do a catch test.")
+    assert not received.get(STAFF_PHONE)

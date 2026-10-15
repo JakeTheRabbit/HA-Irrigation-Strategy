@@ -77,6 +77,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-705](#cs-705) | The zone is off the stage's arc | Information | Notification |
 | [CS-706](#cs-706) | Jev has used most of today's calls | Warning | Notification |
 | [CS-707](#cs-707) | Jev is on the stricter gate for this zone | Warning | Notification |
+| [CS-710](#cs-710) | Water may be bypassing the substrate or the probe | Warning | Notification |
 | [CS-801](#cs-801) | A dosing pump ran past its time and was switched off | Critical | Notification |
 | [CS-802](#cs-802) | A dose could not be confirmed, or ended early | Warning | Notification |
 | [CS-803](#cs-803) | A dose or batch was interrupted by a restart | Warning | Notification |
@@ -1046,6 +1047,28 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Read the zone's Jev log on the dashboard: the calls and how each was checked.
 - Check the zone's probe and settings.
+
+<a id="cs-710"></a>
+
+### CS-710: Water may be bypassing the substrate or the probe
+
+*Warning · Notification*
+
+**What it means.** Code saw shots on this zone spike the probe and fall straight back, or the zone drinking under 40 % of the room's typical water per plant (counted only once the room drinks at least a tenth of a plant's substrate a day), and Jev's Channel judge reads it as water running past the probe or through the block, a dry block, restricted delivery or plants drinking less. The message says which.
+
+**Watering meanwhile.** Carries on as normal. This is advice only: adding volume does not fix water that is not going in.
+
+**Likely causes**
+
+- Water running down past the probe, or through the block and out of the drain without wetting it.
+- A block that has dried hard, or drippers sitting off the block.
+- A slow dripper, a partly closed valve or a restricted line.
+- Plants that use less water than their neighbours.
+
+**Suggested fixes**
+
+- Do a catch test on a few of the zone's drippers.
+- Check the blocks: drippers seated in them, the water wetting through, and the probe firm in a representative spot.
 
 ## Dosing (CS-8xx)
 

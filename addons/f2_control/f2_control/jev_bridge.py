@@ -14,6 +14,7 @@ from jev.brain import Brain
 from jev.client import Asker, Route, Routes, call, call_typesafe
 from jev.context import Shot, ZoneContext, ZoneHistory, response, words_response
 from jev.doctrine import stage_intent
+from jev.judges.channel import ChannelJudge
 from jev.judges.dawn import DawnJudge
 from jev.judges.dusk import DuskJudge
 from jev.judges.night import NightJudge
@@ -30,7 +31,7 @@ from jev.ledger import Ledger
 from jev.setpoint_memory import SetpointMemory
 from jev.triage import Triage
 
-ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "alerts")
+ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel", "alerts")
 PENDING_S = 300  # a write Home Assistant has not reflected yet is not an operator's edit for this long
 REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the old value back
 PAUSE_H = 48  # and the zone's setpoints are left alone this long
@@ -40,7 +41,7 @@ JEV_FILES = ("jev_usage.json", "jev_ledger.jsonl", "jev_journal.jsonl", "jev_set
 
 def judges():
     return [DawnJudge(), RampJudge(), SaltJudge(), DuskJudge(), ProbeJudge(), ShotJudge(), NightJudge(),
-            ZonesJudge(), StageJudge(), SetpointsJudge()]
+            ZonesJudge(), StageJudge(), SetpointsJudge(), ChannelJudge()]
 
 
 def routes(options, cf):
@@ -150,9 +151,16 @@ def zone_context(c, room, zone, snap, p, now, lights_on):
         substrate_l=c._substrate_l(room, zone),
         feed_ec=getattr(snap, "feed_ec", None) if snap is not None else None,
         probe_entity=c._fused_id(room.prefix, "vwc", zone, room.zones[zone].get("vwc")),
+        channel=channel_words(c.jev, room.slug, zone, now),
         # read only in the night, where the Setpoints judge runs: an edit by hand is caught before it is asked
         setpoints=setpoint_view(c, room, zone, p, now) if st["phase"] == "P3" else None,
     )
+
+
+def channel_words(brain, room, zone, now):
+    """The channel judge's latest answer for the zone, for the probe judge's evidence, or None."""
+    judge = next((j for j in getattr(brain, "judges", ()) if j.name == "channel"), None)
+    return None if judge is None else judge.words(room, zone, now)
 
 
 def tick(c, room, zone, snap, p, now, lights_on):

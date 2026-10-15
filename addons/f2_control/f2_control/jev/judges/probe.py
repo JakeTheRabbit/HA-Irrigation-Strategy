@@ -79,6 +79,8 @@ class ProbeJudge(Judge):
         sib = {f"zone {z}": v.get("rise_words") for z, v in ctx.siblings.items() if v.get("rise_words")}
         if sib:
             e["sibling_zones_latest_shot"] = sib
+        if ctx.channel:
+            e["channel_judge_latest"] = ctx.channel
         return e
 
     def decide(self, verdicts, ctx):
