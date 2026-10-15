@@ -669,27 +669,36 @@ export function Notifications({
                     <h3>{view.label.title}</h3>
                     {view.label.subtitle && <p>{view.label.subtitle}</p>}
                   </div>
+                  {testCell(view)}
                   {removeButton(view)}
                 </div>
+                {/* Chips, not a list of ticks: a phone's whole row fits a screen. */}
                 <ul className="notify-card-kinds" aria-label={`What ${view.label.name} gets`}>
                   {doc.kinds.map((kind) => (
-                    <li key={kind.id} data-changed={kindChanged(view, kind)}>
-                      <label>
+                    <li key={kind.id}>
+                      <label className="notify-chip" data-changed={kindChanged(view, kind)}>
                         {kindBox(view, kind)}
+                        {view.recipient.kinds.includes(kind.id) && (
+                          <Check size={13} aria-hidden="true" />
+                        )}
                         <span>{kind.name}</span>
                       </label>
                     </li>
                   ))}
+                  <li>
+                    <label className="notify-chip" data-changed={urgentChanged(view)}>
+                      {urgentBox(view)}
+                      {view.recipient.urgent_high_priority && (
+                        <Check size={13} aria-hidden="true" />
+                      )}
+                      <span>High priority for emergencies</span>
+                    </label>
+                  </li>
                 </ul>
                 <div className="notify-card-rooms">
                   <span aria-hidden="true">Rooms</span>
                   {roomChips(view)}
                 </div>
-                <label className="notify-card-urgent" data-changed={urgentChanged(view)}>
-                  {urgentBox(view)}
-                  <span>High priority for emergencies</span>
-                </label>
-                {testCell(view)}
               </article>
             ))}
           </div>
