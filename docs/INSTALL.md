@@ -60,7 +60,7 @@ Developers build the dashboard using `npm ci --prefix frontend` then `npm run bu
 
 ## Upgrading an existing installation
 
-Update an existing controller in place from this repository. The old `JakeTheRabbit/f2-control` mirror no longer receives releases; a controller installed from it moves once, as described in [Moving a controller installed from f2-control](#moving-a-controller-installed-from-f2-control). Never run two controllers against one room: each app has its own identity and runtime data, and both would drive the same pump and valves.
+Update an existing controller in place from this repository. The old `JakeTheRabbit/f2-control` mirror no longer receives releases; a controller installed from it moves once, as described in [Moving a controller installed from f2-control](#moving-a-controller-installed-from-f2-control). A room on the Jev edition (the `HA-Crop-Steering-Jev` repository) also moves once: see [Moving a room from the Jev edition](MOVING_FROM_JEV.md). Never run two controllers against one room: each app has its own identity and runtime data, and both would drive the same pump and valves.
 
 1. Back up HA, the controller's persistent data and existing setpoints. Export grow plans if available. Record which engines are enabled.
 2. Turn the affected engines off and wait for the pump, mainline and valves to be OFF. Stop the existing controller while replacing software.
