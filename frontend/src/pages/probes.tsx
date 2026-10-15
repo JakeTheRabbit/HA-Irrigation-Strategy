@@ -75,7 +75,9 @@ export function Probes({
                 ? "Not reporting"
                 : heartbeat.health === "missing"
                   ? "No heartbeat"
-                  : "Heartbeat unreadable"}
+                  : heartbeat.health === "stopped"
+                    ? "Stopped"
+                    : "Heartbeat unreadable"}
           </strong>
           <span className="muted small">
             {heartbeat.at === null

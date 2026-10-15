@@ -218,6 +218,17 @@ describe("a pump's card", () => {
     const old = { ...status, updated_at: null };
     expect(controllerReach(states, "", old, NOW).live).toBe(true);
     expect(controllerReach(noBeat, "", old, NOW).reason).toBe("The controller is not running.");
+    const stopped = {
+      ...states,
+      "sensor.crop_steering_ai_heartbeat": {
+        ...states["sensor.crop_steering_ai_heartbeat"],
+        state: "stopped",
+      },
+    };
+    expect(controllerReach(stopped, "", old, NOW)).toEqual({
+      live: false,
+      reason: "The controller app has stopped.",
+    });
     // Python's naive local isoformat is read too.
     const naive = new Date(NOW - 30_000);
     const local = `${naive.getFullYear()}-${String(naive.getMonth() + 1).padStart(2, "0")}-${String(naive.getDate()).padStart(2, "0")}T${String(naive.getHours()).padStart(2, "0")}:${String(naive.getMinutes()).padStart(2, "0")}:${String(naive.getSeconds()).padStart(2, "0")}.123456`;

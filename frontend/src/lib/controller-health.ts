@@ -11,9 +11,10 @@ export const AGE_RED_MS = 10 * 60_000;
 
 export interface Heartbeat {
   /** "missing": no heartbeat entity. The controller posts it over REST, so after a Home Assistant
-   * restart with the controller stopped it simply does not exist. "unreadable": no usable time. */
-  health: "fresh" | "stale" | "missing" | "unreadable";
-  /** When the controller last reported (epoch ms); null when unknown. */
+   * restart with the controller stopped it simply does not exist. "unreadable": no usable time.
+   * "stopped": the controller said it was stopping: the app was updated, restarted or stopped. */
+  health: "fresh" | "stale" | "missing" | "unreadable" | "stopped";
+  /** When the controller last reported, or said it was stopping (epoch ms); null when unknown. */
   at: number | null;
   attributes: Record<string, unknown>;
 }
@@ -38,6 +39,12 @@ export function readHeartbeat(entity: EntityState | undefined, now: number): Hea
   // Every beat changes last_beat, so Home Assistant restamps last_updated (UTC) on each post: the
   // clock the integration's own health check uses. The naive local last_beat is the fallback.
   const updated = entity.last_updated ? Date.parse(entity.last_updated) : NaN;
+  if (entity.state === "stopped")
+    return {
+      health: "stopped",
+      at: parseControllerTime(attributes.stopped_at) ?? (Number.isFinite(updated) ? updated : null),
+      attributes,
+    };
   const at = Number.isFinite(updated) ? updated : parseControllerTime(attributes.last_beat);
   if (at === null || ["unknown", "unavailable"].includes(entity.state))
     return { health: "unreadable", at: null, attributes };
