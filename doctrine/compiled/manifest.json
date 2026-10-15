@@ -40,11 +40,11 @@
       "tokens_est_high": 521
     },
     "sections/01-role-and-hard-rules.md": {
-      "sha256": "ab10ed6e07b4c7788b859cef52284bdae6f50e39b8879c9effa7e3e95f4af4a2",
-      "chars": 8844,
-      "words": 1523,
-      "tokens_est_low": 2211,
-      "tokens_est_high": 2680
+      "sha256": "0b35eb36a77a8df0a5168e9a9323858ea2eaa56f1bb2f24e62d0d67bb30f1457",
+      "chars": 8838,
+      "words": 1521,
+      "tokens_est_low": 2210,
+      "tokens_est_high": 2678
     },
     "sections/02-engine.md": {
       "sha256": "93e238044579f4bf4e10ed525b98009c7fa2f3e78253a6b880e2f97d408cfcae",
@@ -54,11 +54,11 @@
       "tokens_est_high": 4186
     },
     "sections/03-decisions.md": {
-      "sha256": "6a4d783c11756d7c1555070c3735160d7004c2312f219feca1c776361a03f5be",
-      "chars": 10092,
-      "words": 1717,
-      "tokens_est_low": 2523,
-      "tokens_est_high": 3058
+      "sha256": "d0c17ef03b35908d358fb3ead7edc7b8e5152d2a997db5d8435d1290505b4283",
+      "chars": 9759,
+      "words": 1660,
+      "tokens_est_low": 2440,
+      "tokens_est_high": 2957
     },
     "sections/04-symptoms.md": {
       "sha256": "edb3ed8286d1e65b1678e1e18058f2dc1e0289f872e0e4e2c5d64d7a18082b4f",
@@ -68,11 +68,11 @@
       "tokens_est_high": 2425
     },
     "sections/05-doctrine.md": {
-      "sha256": "8722e8de723c7f8ebbcd6aa17cc99fad058e3e6e732498c8d00959ffafcc9432",
-      "chars": 32091,
-      "words": 5144,
-      "tokens_est_low": 8023,
-      "tokens_est_high": 9725
+      "sha256": "9317c8e7199c7205ff2bff43222c0f4d8405f7cb57761d1823701613e3fec524",
+      "chars": 32048,
+      "words": 5136,
+      "tokens_est_low": 8012,
+      "tokens_est_high": 9712
     },
     "substrates/coco.md": {
       "sha256": "66bae098fdcff5875d44051359c76bf889b48c392126d472049c74fd7c5d651a",
@@ -98,47 +98,47 @@
   },
   "estimates": {
     "block_a": {
-      "chars": 72843,
-      "words": 11923,
-      "tokens_est_low": 18211,
-      "tokens_est_high": 22074
+      "chars": 72461,
+      "words": 11856,
+      "tokens_est_low": 18115,
+      "tokens_est_high": 21958
     },
     "block_a_plus_b": {
       "slab_default+generic": {
-        "chars": 75872,
-        "words": 12439,
-        "tokens_est_low": 18968,
-        "tokens_est_high": 22992
+        "chars": 75490,
+        "words": 12372,
+        "tokens_est_low": 18872,
+        "tokens_est_high": 22876
       },
       "slab_default+rockwool": {
-        "chars": 77572,
-        "words": 12697,
-        "tokens_est_low": 19393,
-        "tokens_est_high": 23507
+        "chars": 77190,
+        "words": 12630,
+        "tokens_est_low": 19298,
+        "tokens_est_high": 23391
       },
       "slab_default+coco": {
-        "chars": 77588,
-        "words": 12691,
-        "tokens_est_low": 19397,
-        "tokens_est_high": 23512
+        "chars": 77206,
+        "words": 12624,
+        "tokens_est_low": 19302,
+        "tokens_est_high": 23396
       },
       "rockwool_default+generic": {
-        "chars": 75333,
-        "words": 12351,
-        "tokens_est_low": 18833,
-        "tokens_est_high": 22828
+        "chars": 74951,
+        "words": 12284,
+        "tokens_est_low": 18738,
+        "tokens_est_high": 22712
       },
       "rockwool_default+rockwool": {
-        "chars": 77033,
-        "words": 12609,
-        "tokens_est_low": 19258,
-        "tokens_est_high": 23343
+        "chars": 76651,
+        "words": 12542,
+        "tokens_est_low": 19163,
+        "tokens_est_high": 23228
       },
       "rockwool_default+coco": {
-        "chars": 77049,
-        "words": 12603,
-        "tokens_est_low": 19262,
-        "tokens_est_high": 23348
+        "chars": 76667,
+        "words": 12536,
+        "tokens_est_low": 19167,
+        "tokens_est_high": 23232
       }
     }
   },

@@ -252,6 +252,7 @@ def test_a_move_that_went_back_to_the_operators_value_is_not_an_edit_by_hand(tmp
     ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
     jev_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
     c.numbers[SHOT] = 4.5
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=5))  # the write landed
     jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=10))
     c.numbers[SHOT] = 5.0  # put back to the operator's own value
     sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(days=2))

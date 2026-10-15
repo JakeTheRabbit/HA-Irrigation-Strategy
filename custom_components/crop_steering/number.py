@@ -1025,9 +1025,8 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Update the value, append who moved it from what to the room's change log, and open or end an
-        AI overlay. A moisture
-        level that breaks the ladder's order is refused (ladder.py); a recipe stage is judged as one set
-        before any of it is written."""
+        AI overlay. A moisture level that breaks the ladder's order is refused (ladder.py); a recipe
+        stage is judged as one set before any of it is written."""
         key = self.entity_description.key
         if self._zone_num is not None:
             key = key.removeprefix(f"zone_{self._zone_num}_")

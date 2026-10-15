@@ -45,7 +45,7 @@ TOPIC_TITLES = {
     "climate": "Climate", "contract": "Brain contract (observer -> planner -> guarded controller -> executor -> audit)",
 }
 SECTIONS = ("01-role-and-hard-rules.md", "02-engine.md", "03-decisions.md", "04-symptoms.md", "05-doctrine.md")
-JUDGE_FILE = {"alerts": "triage.py"}  # the alert-urgency question lives beside the judges, not in judges/
+JUDGE_FILE = {}  # a judge whose question lives outside judges/: none now
 SYMPTOM_CLASS = ("Symptom entries carry no evidence class of their own: they are product-rule, drawn from the "
                  "decision rules and engine facts they cite.")
 

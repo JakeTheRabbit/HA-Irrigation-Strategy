@@ -259,8 +259,6 @@ These were stale or wrong in the advisor notes or in earlier drafts. The doctrin
 19. **Shots the maximum-EC block stops.** At maximum EC with a non-dilutive feed or a backed-up table, `decide()`
    blocks or holds before every other rule, so on that tick the P3 emergency, the watchdog and the floor do not
    fire either (IR-2). The dusk and night rows say so.
-20. **Alert urgency.** A firm `remind` or `quiet` keeps that alert's repeats to a card with no phone push until it
-   is asked again 6 h later; the catalogue says so, though it moves no water.
 
 ## What was stripped, and why
 

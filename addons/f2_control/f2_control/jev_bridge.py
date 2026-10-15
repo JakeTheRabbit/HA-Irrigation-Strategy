@@ -30,7 +30,7 @@ from jev.journal import Journal
 from jev.ledger import Ledger
 from jev.setpoint_memory import SetpointMemory
 
-ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel", "alerts")
+ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel")
 PENDING_S = 300  # a write Home Assistant has not reflected yet is not an operator's edit for this long
 RETRIES = 3  # a write still not read back is sent again this many times, PENDING_S apart and doubling, then failed
 REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the old value back
