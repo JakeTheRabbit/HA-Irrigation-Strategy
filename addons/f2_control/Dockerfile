@@ -1,6 +1,11 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
+# Stopping the app sends SIGTERM to the controller itself, so it gets the whole `timeout:` in
+# config.yaml to close the shot in flight. Without this the base image's init signals it only after
+# its own services are down and kills it 3 s later, before a slow Home Assistant has answered.
+ENV S6_CMD_RECEIVE_SIGNALS=1
+
 # nginx serves the bundled crop-steering dashboards on the ingress port (8420);
 # tzdata lets the container honour the Supervisor-injected TZ so the photoperiod /
 # dryback / daily-reset windows run on real local time, not UTC.
