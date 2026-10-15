@@ -51,6 +51,7 @@ export const ROOM_PARAMETERS = new Set([
   "irrigation_ph_max",
   "max_shot_duration",
   "maximum_shot_duration",
+  "sump_power_threshold_w",
 ]);
 export const emptyRoom: Room = {
   id: "",
@@ -298,7 +299,7 @@ function group(key: string) {
   if (key === "field_capacity") return "Substrate";
   if (/substrate|plant_count|dripper/.test(key)) return "Hardware sizing";
   if (/light.*hour/.test(key)) return "Schedule";
-  if (/max_|maximum_shot_duration|maximum_ec|watchdog|irrigation_(ec|ph)|drown/.test(key))
+  if (/max_|maximum_shot_duration|maximum_ec|watchdog|irrigation_(ec|ph)|drown|sump/.test(key))
     return "Safety";
   return "General";
 }
