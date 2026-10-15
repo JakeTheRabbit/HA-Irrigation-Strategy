@@ -108,6 +108,11 @@ async def test_the_dashboards_test_shot_waters_the_zone_through_the_real_control
     room = room_of(c)
     for switch in ARMED:
         fake.set_state(switch, "on")
+    # Lights off, mid-night, whatever the wall clock says: in the light the zone's own steering is
+    # due on every pass (the seeded probe reads under the P2 threshold), so only the test shot runs.
+    now = datetime.now()
+    fake.set_state("number.crop_steering_tent_lights_on_hour", str((now.hour + 6) % 24))
+    fake.set_state("number.crop_steering_tent_lights_off_hour", str((now.hour + 18) % 24))
     c.loop_once(datetime.now())  # the button's state now is where the controller starts from
     shots, water = room.state[1]["shots"], room.state[1]["daily_vol"]
     fake.calls.clear()
