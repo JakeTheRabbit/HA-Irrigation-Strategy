@@ -19,6 +19,14 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.12.0 - 2026-10-16
+
+- **If a hold switch you set up becomes unavailable, its room now stops watering until it is back**.
+- **P3 rescue shots now wait 10 minutes between shots. Set "P3 time between shots" to 0 to remove the gap**.
+- An optional AI assistant can now decide inside the safety limits. Turn it on with your own key and a daily budget.
+- The controller tells you when a room does not run its grow plan, and every setting has an "About" tip.
+- Bug fixes and improvements.
+
 ## 3.11.1 - 2026-10-06
 
 - The re-water point and the rescue floor now always stay in the right order under field capacity, even when they all move down together.

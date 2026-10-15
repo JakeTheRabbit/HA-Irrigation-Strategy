@@ -1,3 +1,7 @@
+# 3.12.0
+
+Pair with integration 3.12.0. **C3.** The Jev edition 3.11.1 brought into this repository, plus the controller side of the 13 change groups in #133 to #145: container mode (one image, app or plain Docker), a bounded safe-off on stop, the duplicate-controller hold, safety ports (settings wait, fail-closed holds, max-run latch, settled P1 rise, guarded probe use, test shot, stopped heartbeat, P3 time between shots), engine ports (P0 extra dryback, P2 spacing, P3 hold, EC interval, zone-sized caps), change log and read-back, decaying re-notify, shot-landed check, dosing on the main loop with tank level and reservoir minimum, the optional Claude Haiku brain with its judges and plan adherence (CS-713), and STE text. The state file gains optional keys only; an old file loads unchanged.
+
 # 3.11.1
 
 Pair with integration 3.11.1. **C3.** The ladder fix (#42). The four setpoints that follow the zone's highest readings stay inside each number's own min and max as well as the engine's bounds, are written top-down when field capacity rises and bottom-up when it falls, and a refused write stops the rest, so the ladder never inverts (6 Oct: F2 zone 2's floor of 17.9 was refused under 20 after its threshold had moved). Nothing moves until a lights-on has kept a day before (`peak_prev`): the day in progress is no stand-in. No state-file change.
