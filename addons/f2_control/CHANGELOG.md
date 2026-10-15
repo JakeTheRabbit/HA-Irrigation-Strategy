@@ -1,3 +1,7 @@
+# 3.12.1
+
+Pair with integration 3.12.1. **C3.** #147: optional `anthropic_base_url`, so the Claude brain can call an Anthropic-compatible router (tolerant reply parsing, router-prefixed model ids). Blank keeps the direct Anthropic path. No state-file change.
+
 # 3.12.0
 
 Pair with integration 3.12.0. **C3.** The Jev edition 3.11.1 brought into this repository, plus the controller side of the 13 change groups in #133 to #145: container mode (one image, app or plain Docker), a bounded safe-off on stop, the duplicate-controller hold, safety ports (settings wait, fail-closed holds, max-run latch, settled P1 rise, guarded probe use, test shot, stopped heartbeat, P3 time between shots), engine ports (P0 extra dryback, P2 spacing, P3 hold, EC interval, zone-sized caps), change log and read-back, decaying re-notify, shot-landed check, dosing on the main loop with tank level and reservoir minimum, the optional Claude Haiku brain with its judges and plan adherence (CS-713), and STE text. The state file gains optional keys only; an old file loads unchanged.

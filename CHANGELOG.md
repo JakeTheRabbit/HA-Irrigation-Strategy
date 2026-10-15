@@ -9,6 +9,18 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.12.1] - 2026-10-16
+
+Pair: **controller 3.12.1**. One change, #147. Released by the owner's decision without a staging soak (approved rehearsal).
+
+### 🌱 In plain English
+
+- **The AI assistant can now use an Anthropic-compatible router.** Set the new `anthropic_base_url` option to the router's address, and the controller sends the AI questions there with your router key. Leave it blank to use Anthropic directly, as before. If the router does not answer, the controller uses its rules for that decision.
+
+### 🔧 Technical notes
+
+- New add-on option `anthropic_base_url` (blank by default; an old options file loads unchanged). With it set, a requests-based client reads the first JSON object of each reply (a trailing `data: [DONE]` line is ignored) and maps a suffixed tool name back only to a tool the request offered. `anthropic_model` then also accepts `<prefix>/<model>`, billed at that model's price row. Failure classes, the budget and key handling are unchanged.
+
 ## [3.12.0] - 2026-10-16
 
 Pair: **controller 3.12.0**. This release brings the Jev edition (3.11.1) into this repository and adds 13 groups of
