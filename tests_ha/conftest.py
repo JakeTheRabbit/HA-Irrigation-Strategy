@@ -100,7 +100,7 @@ def controller_for(hass, monkeypatch):
             )
         clock = Clock()
         monkeypatch.setattr(controller, "load_options", lambda: dict(options or {}))
-        for name in ("ha_get", "ha_call", "ha_get_all", "ha_set", "ha_service_response"):
+        for name in ("ha_get", "ha_call", "ha_get_all", "ha_set", "ha_service_response", "ha_fire"):
             monkeypatch.setattr(controller, name, getattr(fake, name))
         # No recorder behind the fake: history is never asked of a real Home Assistant.
         monkeypatch.setattr(controller, "ha_history", lambda entity, since, timeout=12: None)

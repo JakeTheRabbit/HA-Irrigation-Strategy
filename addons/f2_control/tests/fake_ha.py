@@ -23,6 +23,7 @@ class FakeHA:
         self.states: dict[str, tuple] = {}
         self.changed: dict[str, str] = {}  # entity_id -> last_changed_iso (when the VALUE last changed)
         self.calls: list[tuple] = []  # (domain, service, data)
+        self.events: list[tuple] = []  # (event_type, data)
         self.sets: dict[str, tuple] = {}  # entity_id -> (state, attributes)
         self.history: dict[str, list] = {}  # entity_id -> what ha_history returns (a test's own)
 
@@ -48,6 +49,10 @@ class FakeHA:
             self.set_state(
                 data["entity_id"], "on" if service == "turn_on" else "off"
             )
+        return True
+
+    def ha_fire(self, event, data, timeout=4):
+        self.events.append((event, dict(data)))
         return True
 
     def ha_service_response(self, domain, service, data, timeout=12):
@@ -86,6 +91,7 @@ def install(controller, fake: FakeHA, options: dict):
         controller.ha_set,
         controller.ha_history,
         controller.ha_service_response,
+        controller.ha_fire,
     )
     controller.load_options = lambda: dict(options)
     controller.ha_get = fake.ha_get
@@ -94,4 +100,5 @@ def install(controller, fake: FakeHA, options: dict):
     controller.ha_set = fake.ha_set
     controller.ha_history = fake.ha_history
     controller.ha_service_response = fake.ha_service_response
+    controller.ha_fire = fake.ha_fire
     return orig
