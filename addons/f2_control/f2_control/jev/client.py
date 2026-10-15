@@ -17,6 +17,8 @@ import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
+from types import SimpleNamespace
+from urllib.parse import urlsplit
 
 from .scrub import scrub
 
@@ -149,13 +151,123 @@ def anthropic_key(options):
     return str(options.get("anthropic_api_key") or "").strip()
 
 
-def make_client(key):
-    """The one SDK client, or None without the SDK or a key. The key and the API's address are given explicitly, so
-    no environment variable can pick another credential or host, and the SDK never retries: Routes does."""
-    if anthropic is None or not key:
+def anthropic_base_url(options):
+    """The anthropic_base_url option, stripped, without a trailing slash. Empty (the default) is the Anthropic API."""
+    return str(options.get("anthropic_base_url") or "").strip().rstrip("/")
+
+
+def base_url_ok(url):
+    """True for an http or https address with a host (and a valid port, if any)."""
+    try:
+        parts = urlsplit(url)
+        parts.port  # noqa: B018 - raises ValueError for a port that is not a number
+    except ValueError:
+        return False
+    return parts.scheme in ("http", "https") and bool(parts.hostname)
+
+
+def show_url(url):
+    """The address as the log shows it: scheme, host, port and path, never a user name or password."""
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.hostname}{f':{parts.port}' if parts.port else ''}{parts.path}"
+
+
+def price_key(model, routed=False):
+    """The PRICES row that `model` is billed at, or None. Through a router (`routed`), "<prefix>/<model>" is billed at
+    the row of <model>."""
+    if model in PRICES:
+        return model
+    prefix, _sep, name = str(model).rpartition("/")
+    return name if routed and prefix and name in PRICES else None
+
+
+def make_client(key, base_url=""):
+    """The one client, or None without a key, or without the SDK for the API itself. The key and the address are
+    given explicitly, so no environment variable can pick another credential or host, and the client never retries:
+    Routes does. With `base_url` (a router), a RouterClient sends the requests there."""
+    if not key or (anthropic is None and not base_url):
         return None
     _keys.add(key)
+    if base_url:
+        return RouterClient(key, base_url)
     return anthropic.Anthropic(api_key=key, base_url=API_URL, max_retries=0)
+
+
+ANTHROPIC_VERSION = "2023-06-01"
+
+
+class APITimeoutError(Exception):
+    """The router did not answer in time (classify() reads the name, as for the SDK's own error)."""
+
+
+class APIConnectionError(Exception):
+    """The router could not be reached, or the connection dropped."""
+
+
+class ConnectError(Exception):
+    """The cause of an error raised before anything was sent: maybe_billed() reads the name, as for httpx's own."""
+
+
+class APIStatusError(Exception):
+    """The router answered with an HTTP error: classify() reads the status code and the retry-after header."""
+
+    def __init__(self, status_code, response=None):
+        super().__init__(f"HTTP {status_code}")
+        self.status_code, self.response = status_code, response
+
+
+def tool_name(name, offered):
+    """A router's name for a tool call -> the request's own tool name. A router can add a suffix to the name
+    ("answer_choice" comes back as "answer_choice_ide"): a name that starts with "<offered tool>_" is that tool
+    (the longest that matches). Any other name stays as it is, so validate_answer() refuses it."""
+    if not isinstance(name, str) or name in offered:
+        return name
+    found = [t for t in offered if isinstance(t, str) and name.startswith(t + "_")]
+    return max(found, key=len) if found else name
+
+
+class RouterClient:
+    """The Messages API through an Anthropic-compatible router (anthropic_base_url), over requests. It has the SDK's
+    messages.create() and its error shapes, so call_anthropic() and classify() use it as they use the SDK. A router
+    can add a line after the JSON message ("data: [DONE]"), so the first JSON object of the body is the message; a
+    body with no JSON object is a message with no answer, charged as an estimate."""
+
+    def __init__(self, key, base_url, post=None):
+        self.url = base_url.rstrip("/") + "/v1/messages"
+        self._headers = {"x-api-key": key, "anthropic-version": ANTHROPIC_VERSION,
+                         "content-type": "application/json"}
+        self._post = post
+        self.messages = self
+
+    def __repr__(self):
+        return f"RouterClient({show_url(self.url)!r})"  # never the key
+
+    def create(self, timeout=LANE_TIMEOUT_S, **request):
+        post = self._post or (requests.post if requests is not None else None)
+        if post is None:
+            raise APIConnectionError(NO_REQUESTS)
+        try:
+            resp = post(self.url, json=request, headers=self._headers, timeout=timeout)
+        except Exception as e:  # noqa: BLE001 - mapped to the SDK's shapes; classify() keeps only the name
+            name, text = type(e).__name__, str(e)
+            unsent = name == "ConnectTimeout" or "NewConnectionError" in text or "NameResolutionError" in text
+            kind = APITimeoutError if "Timeout" in name else APIConnectionError
+            raise kind(name) from (ConnectError(name) if unsent else e)
+        if resp.status_code != 200:
+            raise APIStatusError(resp.status_code, resp)
+        try:
+            body = json.JSONDecoder().raw_decode(resp.content.decode("utf-8", "replace").lstrip())[0]
+        except ValueError:
+            body = None
+        if not isinstance(body, dict):
+            return SimpleNamespace(content=[], stop_reason=None, usage=estimate(request), stop_details=None)
+        offered = {t.get("name") for t in request.get("tools") or () if isinstance(t, dict)}
+        blocks = [SimpleNamespace(**{**b, "name": tool_name(b.get("name"), offered)} if b.get("type") == "tool_use"
+                                  else b)
+                  for b in body.get("content") or () if isinstance(b, dict)]
+        details = body.get("stop_details")
+        return SimpleNamespace(content=blocks, stop_reason=body.get("stop_reason"), usage=body.get("usage") or {},
+                               stop_details=SimpleNamespace(**details) if isinstance(details, dict) else None)
 
 
 def redact(text, key=None):
@@ -189,7 +301,7 @@ def tokens(usage):
 def cost(usage, model):
     """US$ for one response, at the price row of the model that billed it."""
     uncached, w5m, w1h, read, out = tokens(usage)
-    row = PRICES[model]
+    row = PRICES[price_key(model, routed=True)]
     if uncached + w5m + w1h + read > LONG_PROMPT:
         row = row.get("long", row)
     return (uncached * row["in"] + w5m * row["w5m"] + w1h * row["w1h"] + read * row["read"]
