@@ -634,6 +634,10 @@ FC_LADDER = ("field_capacity", "p1_target_vwc", "p2_vwc_threshold")  # what the 
 # Pump Run Threshold, or SUMP_RUN_W where the integration has no such setting (compared in W, whatever unit the
 # plug reports: _device_history).
 SUMP_SILENT_H, SUMP_CHECK_MIN, SUMP_RUN_W = 3.0, 5.0, 20.0
+# CS-312: a zone whose last MAX_RUN_IN_A_ROW shots were all cut to the room's maximum shot length (CS-306 each) keeps
+# asking for more water than a shot may give, as a probe stuck dry does all day. With the room's max-run latch switch
+# ON the zone is latched until its Repairs card is fixed; OFF, or absent (an older integration), it is only reported.
+MAX_RUN_IN_A_ROW = 3
 # The default room's kill switch on an installation from before the setup wizard: a helper the operator
 # made by hand, and this app's shipped `enable_flag` option (config.yaml). A room made by the wizard stops
 # on its own engine switch, named by its setup. Named here once; room_gate() is the rule.
@@ -1192,6 +1196,8 @@ class Controller:
             "p1_reached": False,  # the P1 rule (core.decide): this P1 has read at or over its target
             "p1_peak_before": None,  # ...the zone's peak right before its last P1 shot
             "p1_extra": 0,  # ...and the P1 shots fired since the target was reached
+            "capped_in_a_row": 0,  # CS-312: the shots in a row cut to the room's maximum shot length
+            "max_run_latch": None,  # ...and, once latched, {"since", "resets"} (_count_capped)
             **zone_history.fresh(),
         }
 
@@ -1269,6 +1275,12 @@ class Controller:
             pass
         if isinstance(d.get("p1_extra"), int) and not isinstance(d.get("p1_extra"), bool) and 0 <= d["p1_extra"] <= 100:
             s["p1_extra"] = d["p1_extra"]
+        capped = d.get("capped_in_a_row")  # both absent before the max-run latch: 0 and None
+        if type(capped) is int and 0 <= capped <= 10000:
+            s["capped_in_a_row"] = capped
+        latch = d.get("max_run_latch")
+        if isinstance(latch, dict) and type(latch.get("resets")) is int and isinstance(latch.get("since"), str):
+            s["max_run_latch"] = {"since": latch["since"], "resets": latch["resets"]}
         try:  # absent before 3.11.0: None, and the grow-day in progress stands in (_vwc_maxima)
             prev = float(d.get("peak_prev"))
             if math.isfinite(prev) and 0.0 < prev <= 100.0:
@@ -1629,6 +1641,8 @@ class Controller:
             "p1_reached": bool(s.get("p1_reached")),
             "p1_peak_before": s.get("p1_peak_before"),
             "p1_extra": int(s.get("p1_extra") or 0),
+            "capped_in_a_row": int(s.get("capped_in_a_row") or 0),
+            "max_run_latch": s.get("max_run_latch"),
             "shots": s.get("shots"),
             "daily_vol": s.get("daily_vol"),
             "water_history": s.get("water_history"),
@@ -2546,6 +2560,7 @@ class Controller:
                 "setup_active": getattr(room, "setup_active", True),
                 "setup_pending": getattr(room, "_setup_pending", None),
                 "room_active": room_active,
+                "max_run": self._max_run_report(room),
             },
             **({"timeout": timeout} if timeout else {}),
         )
@@ -2671,6 +2686,9 @@ class Controller:
         fault = self._hardware_fault_block(room)
         if fault:
             return fault
+        latched = self._max_run_hold(room, zone)
+        if latched:
+            return latched
         hw = room.hw
         if not hw["valves"].get(zone):
             return (
@@ -4397,6 +4415,7 @@ class Controller:
             # so later sizing edits cannot change an already delivered volume.
             self._execute_shot(room, zone, dur, size, flow_lps=flow,
                                plan_exempt=getattr(reason, "kind", None) in PLAN_HOLD_EXEMPT)
+            self._count_capped(room, zone, raw_dur > max_dur)
         else:
             if "BLOCK" in reason and (
                 getattr(reason, "kind", None) == "block_daily_cap" or "daily-cap" in reason
@@ -4421,6 +4440,63 @@ class Controller:
             # room blocked since a restart used to look exactly like a healthy one until lights-on.
             log(f"[{room.slug}] Z{zone} {st['phase']} hold — {reason}"
                 + (f" [blocked: {block}]" if block else ""))
+
+    # ---------- CS-312: the max-run latch ----------
+    def _max_run_switch(self, room):
+        """-> (state, resets) of the room's max-run latch switch: its state as read, None when it can't be
+        read (absent, as on an integration from before the latch), and how many times its Repairs card was fixed."""
+        state, attributes, _ = ha_get(f"switch.crop_steering_{room.prefix}max_run_latch")
+        resets = (attributes or {}).get("resets")
+        return state, resets if type(resets) is int else 0
+
+    def _count_capped(self, room, zone, capped):
+        """After a shot: count it into the zone's run of shots cut to the room's maximum shot length, and latch
+        the zone at MAX_RUN_IN_A_ROW while the room's max-run latch switch reads ON. The integration's CS-312
+        card reports the run either way, from the heartbeat (_max_run_report)."""
+        st = room.state[zone]
+        st["capped_in_a_row"] = int(st.get("capped_in_a_row") or 0) + 1 if capped else 0
+        if st["capped_in_a_row"] < MAX_RUN_IN_A_ROW or st.get("max_run_latch"):
+            return
+        state, resets = self._max_run_switch(room)
+        if str(state).lower() not in ON_STATES:
+            log(f"[{room.slug}] Z{zone} {st['capped_in_a_row']} shots in a row cut to the longest allowed shot "
+                "(CS-312); the max-run latch is off, so it keeps watering")
+            return
+        st["max_run_latch"] = {"since": datetime.now().isoformat(), "resets": resets}
+        self._save_state()
+        log(f"[{room.slug}] Z{zone} max-run latch: {st['capped_in_a_row']} shots in a row cut to the longest "
+            "allowed shot; no more water until its Repairs card (CS-312) is fixed")
+
+    def _max_run_hold(self, room, zone):
+        """The hold of a latched zone, or None. Released once its Repairs card is fixed (the switch's `resets`
+        moved) or the switch reads OFF; a switch that can't be read keeps it held."""
+        st = room.state[zone]
+        latch = st.get("max_run_latch")
+        if not latch:
+            return None
+        state, resets = self._max_run_switch(room)
+        off = str(state).lower() == "off"
+        if off or (state not in (None, "unknown", "unavailable", "") and resets != latch["resets"]):
+            st["max_run_latch"], st["capped_in_a_row"] = None, 0
+            self._save_state()
+            log(f"[{room.slug}] Z{zone} max-run latch released: " + ("switched off" if off else "reset in Repairs"))
+            return None
+        return (
+            f"max-run latch: {MAX_RUN_IN_A_ROW} shots in a row cut to the longest allowed shot; "
+            "fix its Repairs card (CS-312) to water again"
+        )
+
+    def _max_run_report(self, room):
+        """The heartbeat's `max_run`: each zone in a run of MAX_RUN_IN_A_ROW or more cut shots, or latched, with the
+        `resets` it was latched at (the integration's card leaves a zone off once the switch has moved past it)."""
+        report = {}
+        for zone, st in (getattr(room, "state", None) or {}).items():
+            latch, capped = st.get("max_run_latch"), int(st.get("capped_in_a_row") or 0)
+            if latch:
+                report[str(zone)] = {"capped": capped, "latched": True, "resets": latch["resets"]}
+            elif capped >= MAX_RUN_IN_A_ROW:
+                report[str(zone)] = {"capped": capped, "latched": False}
+        return report
 
     def _alert_daily_cap(self, room, zone, st, blind, detail):
         """CS-205. A zone with a working probe still gets its rescue shots past its daily limit; a zone

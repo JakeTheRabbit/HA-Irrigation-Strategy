@@ -461,3 +461,39 @@ def test_a_corrupt_instance_id_is_replaced_and_an_unwritable_one_never_stops_the
     assert path.read_text(encoding="utf-8").strip() == made != "not a uuid"
     elsewhere = tmp_path / "missing-folder" / "instance_id"
     assert C.uuid.UUID(C._instance_id(str(elsewhere))) and not elsewhere.exists()
+
+
+def test_an_old_zone_loads_unlatched_and_a_latch_survives_a_restart(tmp_path):
+    """Before the max-run latch a zone kept no run of cut shots: it loads with none, and is not
+    latched. A latched zone stays latched across a restart; a malformed latch is dropped.
+    """
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"default": {"1": {"phase": "P2", "peak": 60.0, "shots": 4}}}),
+        encoding="utf-8",
+    )
+    c = _make([1], p)
+    c._load_state()
+    st = c.rooms[0].state[1]
+    assert (st["shots"], st["capped_in_a_row"], st["max_run_latch"]) == (4, 0, None)
+
+    st["capped_in_a_row"] = 3
+    st["max_run_latch"] = {"since": "2026-10-15T10:00:00", "resets": 2}
+    assert c._save_state()
+    again = _make([1], p)
+    again._load_state()
+    st = again.rooms[0].state[1]
+    assert st["capped_in_a_row"] == 3
+    assert st["max_run_latch"] == {"since": "2026-10-15T10:00:00", "resets": 2}
+
+    for junk in ({"since": "x"}, {"resets": "2"}, "latched", 5):
+        p.write_text(
+            json.dumps(
+                {"default": {"1": {"max_run_latch": junk, "capped_in_a_row": -1}}}
+            ),
+            encoding="utf-8",
+        )
+        c = _make([1], p)
+        c._load_state()
+        st = c.rooms[0].state[1]
+        assert (st["capped_in_a_row"], st["max_run_latch"]) == (0, None), junk

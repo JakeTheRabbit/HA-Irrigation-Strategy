@@ -56,6 +56,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-309](#cs-309) | An interrupted shot's hardware may still be ON | Warning | Notification |
 | [CS-310](#cs-310) | Moisture rising with no water: the table is not draining | Critical | Notification |
 | [CS-311](#cs-311) | The sump pump has not run | Critical | Notification |
+| [CS-312](#cs-312) | A zone keeps hitting its longest allowed shot | Warning | Repairs card |
 | [CS-313](#cs-313) | A valve or pump the controller can't switch, not watering | Warning | Notification |
 | [CS-401](#cs-401) | Setting outside the engine's range | Warning | Notification |
 | [CS-402](#cs-402) | Settings missing, running on built-in values | Critical | Notification |
@@ -616,6 +617,30 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 - Clear what stops the water reaching or leaving the sump, and watch the pump run.
 - If the plug is offline, bring it back: until then the pump's runs can't be seen.
 - Set sump_silent_hours longer only if the pump really runs less often than that.
+
+<a id="cs-312"></a>
+
+### CS-312: A zone keeps hitting its longest allowed shot
+
+*Warning · Repairs card*
+
+**What it means.** A zone's last 3 shots in a row all wanted to run longer than the room's maximum shot length, so each was cut to it. One cut shot is CS-306; three in a row means the zone keeps asking for more water than one shot may give, which is what a probe stuck dry, or a pot size or dripper flow set wrong, looks like. The card names the zones.
+
+**Watering meanwhile.** With the room's max-run latch switch ON (it starts ON in a room set up since the switch was added), the zone gets no more shots, the rescue shots included, until the card is fixed: open it in Settings → Repairs and confirm. With the switch OFF (how a room set up before it starts), nothing is held: the card only tells you, and it clears itself after the zone's next shot that is not cut.
+
+**Likely causes**
+
+- The zone's moisture probe reads dry when the slab is not (stuck, unplugged from the slab, or out of the substrate), so every shot is sized for a dry slab.
+- The zone's pot size, plant count, drippers per plant or dripper flow is set wrong, so its shots are worked out far longer than they should be.
+- Drippers are blocked, so the water goes in slower than the dripper flow says.
+- The room's maximum shot length is set shorter than this zone's normal shots really need.
+
+**Suggested fixes**
+
+- Look at the zone: is the slab wet or dry, is the probe seated in it, are the drippers running?
+- Check the zone's pot size, plant count, drippers per plant and dripper flow in Rooms & setup.
+- If all of that is right, raise the room's maximum shot length.
+- Then fix the card (open it and confirm) to water the zone again. To have a room report this without stopping the zone, turn its max-run latch switch off; turn it on to have it stop.
 
 <a id="cs-313"></a>
 

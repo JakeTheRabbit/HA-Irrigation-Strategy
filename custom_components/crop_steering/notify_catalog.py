@@ -28,11 +28,12 @@ KINDS = (
         "id": "hardware",
         "name": "Hardware lockouts",
         "detail": "A pump or valve that did not do what it was told, a hardware hold, a shot "
-        "cut, water that isn't reaching a zone, a table that isn't draining, a sump pump that stopped "
-        "and a pump or valve the controller can't switch",
+        "cut, a zone that keeps hitting its longest allowed shot, water that isn't reaching a "
+        "zone, a table that isn't draining, a sump pump that stopped and a pump or valve the "
+        "controller can't switch",
         "codes": _codes(
             "CS-301 CS-302 CS-303 CS-304 CS-305 CS-306 CS-307 CS-308 CS-309 CS-310 CS-311 "
-            "CS-313 CS-701"
+            "CS-312 CS-313 CS-701"
         ),
         "events": (),
     },
@@ -109,6 +110,7 @@ REPAIRS = {
     "zone_no_sensor": "CS-603",
     "fused_sensor_unavailable": "CS-604",
     "entities_moved": "CS-605",
+    "max_run_latch": "CS-312",
     "strategy_hold": "CS-606",
     "strategy_degraded": "CS-607",
     "stock_low": "CS-608",
