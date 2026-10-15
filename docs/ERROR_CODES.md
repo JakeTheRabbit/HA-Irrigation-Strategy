@@ -66,6 +66,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-501](#cs-501) | Much less water than the other zones | Information | Notification |
 | [CS-502](#cs-502) | Too few probes agree for Lowest or Highest | Warning | Notification |
 | [CS-503](#cs-503) | Moisture probe set aside for its unit | Warning | Notification |
+| [CS-504](#cs-504) | Steering on bulk EC: no pore EC probe reporting | Warning | Notification |
 | [CS-601](#cs-601) | Kill switch helper missing | Critical | Repairs card |
 | [CS-602](#cs-602) | Engine not running | Warning | Repairs card |
 | [CS-603](#cs-603) | Zone with no moisture sensor | Warning | Repairs card |
@@ -832,6 +833,26 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - In Crop Steering → Rooms & setup, map the zone to the probe's moisture reading in % (or m³/m³).
 - If the sensor is the moisture reading, correct its unit in its own integration.
+
+<a id="cs-504"></a>
+
+### CS-504: Steering on bulk EC: no pore EC probe reporting
+
+*Warning · Notification*
+
+**What it means.** The zone has probes marked pore EC and probes marked bulk EC, and the two are never combined. No pore EC probe is reporting a usable reading, so the zone's EC comes from its bulk EC probes. Bulk EC reads lower than pore EC from the same slab, so EC targets, stacking and flushes act on that lower number until a pore EC probe reports again.
+
+**Watering meanwhile.** Carries on, with the zone's EC read from its bulk EC probes.
+
+**Likely causes**
+
+- A pore EC probe is offline, not reporting, or reading out of range.
+- A probe was marked pore EC by mistake, or marked bulk EC when it measures pore EC.
+
+**Suggested fixes**
+
+- Check the pore EC probes the zone's reading leaves out, under the zone's Probes.
+- Correct what each probe measures in its EC Type setting (pore, bulk or unknown).
 
 ## Repairs cards (CS-6xx)
 

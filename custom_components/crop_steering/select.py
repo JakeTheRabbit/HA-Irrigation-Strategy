@@ -15,6 +15,7 @@ from .const import (
     DOMAIN,
     CONF_NUM_ZONES,
     DRAINAGE_TYPES,
+    EC_TYPES,
     PHASES,
     PROBE_METHODS,
     STEERING_MODES,
@@ -28,6 +29,7 @@ from .const import (
 )
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .recipe import get_manager
+from .calculations import ec_type_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -102,6 +104,7 @@ async def async_setup_entry(
     num_zones = config_data.get(CONF_NUM_ZONES, 1)
 
     # Add zone-specific select entities
+    ec_types = set()
     for zone_num in range(1, num_zones + 1):
         # Zone Steering Mode (per-row Vegetative/Generative; the engine falls back to global).
         # Retained from the lean branch: the master app's _zone_is_vegetative() reads this
@@ -149,6 +152,33 @@ async def async_setup_entry(
                         name=f"Zone {zone_num} {label} From Probes",
                         options=PROBE_METHODS,
                         icon=icon,
+                    ),
+                    zone_num=zone_num,
+                )
+            )
+
+        # What each of the zone's EC probes measures, pore or bulk EC: unknown until someone
+        # says, which fuses as before. The zone's EC sensor never combines a pore with a bulk
+        # reading (calculations.fuse_probes).
+        zone_config = config_data.get("zones", {})
+        zone_config = zone_config.get(zone_num) or zone_config.get(str(zone_num)) or {}
+        probes = list(zone_config.get("ec_sensors", [])) or [
+            zone_config.get("ec_front"),
+            zone_config.get("ec_back"),
+        ]
+        for probe in probes:
+            key = probe and ec_type_key(probe)
+            if not key or key in ec_types:
+                continue
+            ec_types.add(key)
+            selects.append(
+                CropSteeringSelect(
+                    entry,
+                    SelectEntityDescription(
+                        key=key,
+                        name=f"EC Type {probe}",
+                        options=EC_TYPES,
+                        icon="mdi:lightning-bolt-outline",
                     ),
                     zone_num=zone_num,
                 )

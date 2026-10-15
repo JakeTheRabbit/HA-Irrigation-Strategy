@@ -640,6 +640,22 @@
       ]
     },
     {
+      "code": "CS-504",
+      "title": "Steering on bulk EC: no pore EC probe reporting",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The zone has probes marked pore EC and probes marked bulk EC, and the two are never combined. No pore EC probe is reporting a usable reading, so the zone's EC comes from its bulk EC probes. Bulk EC reads lower than pore EC from the same slab, so EC targets, stacking and flushes act on that lower number until a pore EC probe reports again.",
+      "watering": "Carries on, with the zone's EC read from its bulk EC probes.",
+      "causes": [
+        "A pore EC probe is offline, not reporting, or reading out of range.",
+        "A probe was marked pore EC by mistake, or marked bulk EC when it measures pore EC."
+      ],
+      "fixes": [
+        "Check the pore EC probes the zone's reading leaves out, under the zone's Probes.",
+        "Correct what each probe measures in its EC Type setting (pore, bulk or unknown)."
+      ]
+    },
+    {
       "code": "CS-601",
       "title": "Kill switch helper missing",
       "source": "repairs",

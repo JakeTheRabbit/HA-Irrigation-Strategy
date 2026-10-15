@@ -38,6 +38,10 @@ PROBE_EXTREME_MIN = 3
 # A probe further from the zone's median than the larger of this many units and this share of the
 # median reads something no probe beside it agrees with (pulled out of its cube, in a puddle).
 PROBE_FAR = {"vwc": (15.0, 0.4), "ec": (1.0, 0.4)}
+# What each EC probe measures, chosen per probe: the EC of the water in the substrate's pores, or
+# the bulk EC of substrate and water together, which reads lower. unknown is the first option, so
+# the default, and fuses as before; a zone never combines a bulk with a pore reading (CS-504).
+EC_TYPES = ["unknown", "pore", "bulk"]
 
 # The four moisture levels, (lowest, highest) %: each setting accepts exactly this, and grow plans,
 # Auto setpoints and the engine (crop-steering-engine _PARAM_BOUNDS) use the same range, so the

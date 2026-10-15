@@ -43,3 +43,27 @@ def test_a_zone_steering_as_chosen_hears_nothing():
 def test_an_older_integration_or_a_probe_mapped_straight_to_the_controller_hears_nothing():
     """No `method` attribute: an integration from before the selects, or a raw probe."""
     assert _loop() == []
+
+
+# CS-504: a zone with pore and bulk EC probes steering on bulk, as no pore EC probe reports.
+EC = "sensor.crop_steering_ec_zone_1"
+
+
+def _ec_loop(**fusion):
+    states = _room(2)
+    states[EC] = ("1.2", {"unit_of_measurement": "mS/cm", **fusion})
+    c, fake = _build({"num_zones": 2, "enable_flag": "input_boolean.f2_control_enabled"}, states=states)
+    c.loop_once(NOW)
+    return [a for a in _alerts(fake) if a["notification_id"].startswith("f2_ec_type_")]
+
+
+def test_a_zone_steering_on_bulk_ec_is_told_and_names_the_pore_probe_left_out():
+    (alert,) = _ec_loop(ec_type="bulk", used=["sensor.bulk"], excluded={"sensor.pore": "no reading"})
+    assert alert["title"].endswith("steering on bulk EC: no pore EC probe reporting (CS-504)")
+    assert alert["notification_id"] == "f2_ec_type_default_z1"
+    assert "sensor.pore" in alert["message"] and EC in alert["message"]
+
+
+def test_a_zone_steering_on_pore_ec_or_an_older_integration_hears_nothing():
+    assert _ec_loop(ec_type="pore", excluded={"sensor.bulk": "bulk EC, kept apart from pore EC"}) == []
+    assert _ec_loop() == []

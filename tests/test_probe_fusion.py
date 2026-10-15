@@ -277,3 +277,63 @@ def test_offsets_are_forgotten_when_the_zones_probes_change():
     # shift the zone by what it once read against a probe that is gone.
     value, _detail = guarded([THREE[0], THREE[1], ("sensor.d", None, None)], offsets)
     assert value == 49.0 and offsets == {}
+
+
+# ------------------------------------------------------------------ bulk or pore EC, per probe
+EC_LO, EC_HI = PROBE_RANGE["ec"]
+PORE, BULK, UNTAGGED = "sensor.ec_pore", "sensor.ec_bulk", "sensor.ec_other"
+
+
+def fuse_ec(readings, types, offsets=None):
+    return fuse_probes(
+        readings,
+        {} if offsets is None else offsets,
+        EC_LO,
+        EC_HI,
+        PROBE_STALE_SECONDS,
+        "Median",
+        PROBE_FAR["ec"],
+        types,
+    )
+
+
+def test_unknown_ec_probes_fuse_as_before():
+    readings = [(PORE, 3.0, FRESH), (BULK, 2.0, FRESH)]
+    before = fuse_ec(readings, None)
+    for types in ({}, {PORE: "unknown", BULK: "unknown"}, {BULK: "bulk"}):
+        assert fuse_ec(readings, types) == before
+    assert before[0] == 2.5 and "ec_type" not in before[1]
+
+
+def test_a_zone_with_a_pore_and_a_bulk_probe_steers_on_pore():
+    value, detail = fuse_ec(
+        [(PORE, 3.0, FRESH), (BULK, 1.2, FRESH), (UNTAGGED, 3.2, FRESH)],
+        {PORE: "pore", BULK: "bulk"},
+    )
+    assert value == 3.1  # the pore probe and the untagged one, never the bulk reading
+    assert detail["ec_type"] == "pore" and detail["probes"] == 3
+    assert detail["used"] == [UNTAGGED, PORE]
+    assert detail["excluded"] == {BULK: "bulk EC, kept apart from pore EC"}
+
+
+def test_with_no_pore_probe_reporting_the_zone_steers_on_bulk():
+    for pore, why in (
+        (None, "no reading"),
+        (25.0, "out of range"),
+        (3.0, "not reporting"),
+    ):
+        age = STALE if pore == 3.0 else FRESH
+        value, detail = fuse_ec(
+            [(PORE, pore, age), (BULK, 1.2, FRESH)], {PORE: "pore", BULK: "bulk"}
+        )
+        assert value == 1.2 and detail["ec_type"] == "bulk", pore
+        assert detail["excluded"] == {PORE: why}
+
+
+def test_what_a_zone_learned_on_one_ec_type_is_not_applied_to_the_other():
+    offsets = {}
+    types = {PORE: "pore", BULK: "bulk"}
+    fuse_ec([(PORE, 3.0, FRESH), (BULK, 1.2, FRESH)], types, offsets)
+    assert set(offsets) == {PORE}
+    value, _detail = fuse_ec([(PORE, None, FRESH), (BULK, 1.2, FRESH)], types, offsets)
+    assert value == 1.2 and set(offsets) == {BULK}

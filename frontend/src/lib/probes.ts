@@ -161,6 +161,16 @@ export function fusionMethod(fused: EntityState | undefined): string | null {
     : `${steered.toLowerCase()} of its probes: ${method} needs three that agree`;
 }
 
+/** Which EC the zone steers on, in words, when it has both pore and bulk EC probes (calculations.py
+ * fuse_probes publishes `ec_type`; the two are never combined): bulk only while no pore probe
+ * reports (CS-504). Null otherwise, and from an older integration. */
+export function ecType(fused: EntityState | undefined): string | null {
+  const type = fused?.attributes.ec_type;
+  if (type === "pore") return "steers on its pore EC probes";
+  if (type === "bulk") return "steers on its bulk EC probes: no pore EC probe is reporting";
+  return null;
+}
+
 /** Every probe the room's combined sensors name: what the page watches and draws. */
 export function roomProbeIds(zones: readonly Zone[], states: States): string[] {
   const ids = new Set<string>();
