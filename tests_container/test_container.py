@@ -156,7 +156,8 @@ def test_c1_a_bare_address_gets_api_and_the_heartbeat_carries_the_version(rig):
     beat = next(line for line in rig.logs(rig.ha).splitlines() if "STATE sensor.crop_steering_ai_heartbeat" in line)
     version = next(line.split('"')[1] for line in (ROOT / "addons/f2_control/config.yaml").read_text().splitlines()
                    if line.startswith("version:"))
-    assert json.loads(beat.split("ai_heartbeat ", 1)[1])["attributes"]["controller_version"] == version
+    attributes = json.loads(beat.split("ai_heartbeat ", 1)[1])["attributes"]
+    assert attributes["controller_version"] == version and attributes["controller_runtime"] == "container"
     assert "runtime: container" in rig.logs(ctl)
     assert not serves_8420(ctl)
 

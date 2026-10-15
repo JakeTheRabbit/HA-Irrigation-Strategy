@@ -2316,6 +2316,7 @@ class Controller:
                 # which controller is actually RUNNING, for the dashboard's sidebar
                 "controller_version": CONTROLLER_VERSION,
                 "controller_instance": self.instance_id,  # the duplicate-controller guard's (duplicate_hold)
+                "controller_runtime": "container" if _GATE.container else "addon",  # for support
                 "last_beat": now.isoformat(),
                 # the kill switch this room ACTUALLY uses — the integration's health
                 # check reads this so a custom enable_flag isn't flagged as "missing"

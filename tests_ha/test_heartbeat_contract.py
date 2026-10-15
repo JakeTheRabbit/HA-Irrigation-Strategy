@@ -174,6 +174,7 @@ async def test_h6_the_integration_accepts_the_new_beat_and_the_old_ones(
         wire(c, fake, monkeypatch)
         await hass.async_add_executor_job(c._heartbeat, c.rooms[0], datetime.now(), None)
         assert hass.states.get(BEAT).attributes["controller_instance"] == c.instance_id
+        assert hass.states.get(BEAT).attributes["controller_runtime"] == "addon"
     else:
         old = {**OLD_BEATS[version], "last_beat": datetime.now().isoformat()}
         await hass.async_add_executor_job(
