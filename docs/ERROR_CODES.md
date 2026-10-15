@@ -78,6 +78,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-608](#cs-608) | Stock tanks running low | Warning | Repairs card |
 | [CS-609](#cs-609) | Another controller is reporting for this room | Warning | Notification |
 | [CS-610](#cs-610) | Engine Enabled does not stop water in this room | Warning | Repairs card |
+| [CS-611](#cs-611) | Settings above the limit for the zone's size | Warning | Repairs card |
 | [CS-701](#cs-701) | Water isn't reaching this zone | Warning | Notification |
 | [CS-702](#cs-702) | This zone's water per plant is out of line with the others | Information | Notification |
 | [CS-703](#cs-703) | Overnight low reading looks like a probe fault | Warning | Notification |
@@ -1078,6 +1079,26 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - To stop watering in this room, switch OFF the kill switch the card names, and change any automation that switches Engine Enabled OFF to switch that one instead.
 - To make Engine Enabled the room's kill switch, follow "Moving a room's kill switch" in docs/INSTALL.md: on a room with no saved setup, set the app's enable_flag option to it and restart the app; on a room whose setup has been saved, change the kill switch in its setup.
+
+<a id="cs-611"></a>
+
+### CS-611: Settings above the limit for the zone's size
+
+*Warning · Repairs card*
+
+**What it means.** The limits on a zone's daily water and the room's maximum shot length follow each zone's size: its plants, litres per plant and dripper flow. These settings were already above their limit when it arrived, so they are kept exactly as they were.
+
+**Watering meanwhile.** Carries on exactly as before: the controller uses the settings as they are.
+
+**Likely causes**
+
+- A setting was raised for a bigger zone than the one now set up.
+- A zone's plant count, litres per plant or dripper flow is set smaller than the real zone.
+
+**Suggested fixes**
+
+- If the zone's size is wrong, correct it in Rooms & setup and the limit follows.
+- Otherwise lower the setting to within its limit when you next change it. The card clears itself once every setting is within its limit.
 
 ## Jev (CS-7xx)
 

@@ -85,7 +85,7 @@ export const DEMO_KINDS: NotifyKind[] = [
     name: "Setup and settings",
     detail:
       "A setup change waiting, settings missing or out of range, a grow plan holding, and an Engine Enabled switch that does not stop water.",
-    codes: ["CS-201", ...codes(401, 405, [404]), "CS-601", "CS-605", "CS-606", "CS-607", "CS-610"],
+    codes: ["CS-201", ...codes(401, 405, [404]), "CS-601", "CS-605", "CS-606", "CS-607", "CS-610", "CS-611"],
     events: [],
   },
 ];

@@ -2147,9 +2147,9 @@ class Controller:
             ),
             # Fallback used ONLY when a zone has no readable max_daily_volume entity — e.g. a zone the
             # engine detected from its VWC sensor but the integration never built a cap entity for
-            # (num_zones < detected zones). Must fail LOW: the integration's own entity maxes at 200 L,
-            # so the engine can never grant more daily water than the UI can express. Was 300 (above the
-            # UI max) which let orphaned zones free-run to 300 L/day while wired zones honoured their cap.
+            # (num_zones < detected zones). Must fail LOW: under the 200 L the integration's entity allowed
+            # when this was set (its limit now follows the zone's size, ZONE_BOUNDS). Was 300, which let
+            # orphaned zones free-run to 300 L/day while wired zones honoured their cap.
             max_daily_volume=self._zone_num(room, zone, "max_daily_volume", FALLBACK["max_daily_volume"]),
             field_capacity=fc,
             max_ec=self._zone_num(room, zone, "maximum_ec", FALLBACK["maximum_ec"]),

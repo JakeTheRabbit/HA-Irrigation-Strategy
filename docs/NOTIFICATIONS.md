@@ -31,7 +31,7 @@ either gets it once.
 | `stock` | Stock tanks | CS-608, CS-807 |
 | `dosing` | Dosing | CS-801 to CS-806 |
 | `jev` | Jev | CS-501, CS-702, CS-705, CS-706, CS-707, CS-404, and Jev moving a setting (new event, no card) |
-| `setup` | Setup and settings | CS-201, CS-401 to CS-405 (except 404), CS-601, CS-605, CS-606, CS-607, CS-610 |
+| `setup` | Setup and settings | CS-201, CS-401 to CS-405 (except 404), CS-601, CS-605, CS-606, CS-607, CS-610, CS-611 |
 
 The mapping lives in one place in the integration (`notify_catalog.py`) and is returned by `notify_get`,
 so the page shows exactly what each checkbox covers. A code the catalog does not know goes to
@@ -127,7 +127,7 @@ not the whole setup.
   three change. They may not change `idle_hours`, which is the site's.
 - `notify_test` sends at normal priority, with `data.tag = "crop_steering_test"`, and says what the phone's
   row ticks.
-- The integration's own Repairs cards (CS-601 to CS-608) go out through `notify` when a card is created,
+- The integration's own Repairs cards (CS-601 to CS-609) go out through `notify` when a card is created,
   with key = its issue id, its room, and the card's own title and text; not when a card still raised is
   updated, or raised again after Home Assistant restarts, and not again within 30 minutes when a card
   clears and comes back (a probe going on and off line), as the controller repeats an alert. The 30 minutes

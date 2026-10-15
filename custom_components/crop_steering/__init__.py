@@ -184,6 +184,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _link_zone_devices(hass, entry)
+    # Every number has restored its value by now: name each one held above its zone's limit.
+    from .bounds import check_held_values
+
+    check_held_values(
+        hass, entry, hass.data[DOMAIN]["_numbers"][entry.entry_id].values()
+    )
 
     # Set up services
     await async_setup_services(hass)
@@ -336,6 +342,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pass
 
     hass.data.get(DOMAIN, {}).get("_recipe", {}).pop(entry.entry_id, None)
+    hass.data.get(DOMAIN, {}).get("_numbers", {}).pop(entry.entry_id, None)
     from .strategy import async_unload_strategy
 
     await async_unload_strategy(hass, entry)

@@ -13,6 +13,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.restore_state import async_get as restore_state_data
 
+from .bounds import check_held_values, daily_volume_bound, shot_duration_bound
 from .const import (
     DOMAIN,
     CONF_NUM_ZONES,
@@ -846,6 +847,11 @@ async def async_setup_entry(
             )
         )
 
+    # Each number reads its siblings for a limit that follows the zone's size (bounds.py).
+    room = {number.entity_description.key: number for number in numbers}
+    for number in numbers:
+        number._room = room
+    hass.data[DOMAIN].setdefault("_numbers", {})[entry.entry_id] = room
     async_add_entities(numbers)
 
 
@@ -875,6 +881,7 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         self._legacy_helper = legacy_helper
         self._setup_value = None
         self._setup_revision = 0
+        self._room = {}
         if zone_num is not None:
             sizing, revision = configured_sizing(entry, zone_num)
             key = description.key.removeprefix(f"zone_{zone_num}_")
@@ -949,6 +956,41 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
                 # Keep default value if restore fails
                 pass
 
+    def _sizing(self, zone, key):
+        """A zone's sizing setting: its own number, else the room's."""
+        number = self._room.get(f"zone_{zone}_{key}") or self._room.get(key)
+        return None if number is None else number.native_value
+
+    @property
+    def zone_bound(self) -> float | None:
+        """The limit that follows the zone's size, or None for a setting with a fixed one."""
+        key = self.entity_description.key
+        if key == f"zone_{self._zone_num}_max_daily_volume":
+            return daily_volume_bound(
+                self._sizing(self._zone_num, "plant_count"),
+                self._sizing(self._zone_num, "substrate_volume"),
+            )
+        if key == "max_shot_duration":
+            zones = [
+                int(k.split("_")[1]) for k in self._room if k.endswith("_plant_count")
+            ]
+            bounds = [
+                shot_duration_bound(
+                    self._sizing(zone, "substrate_volume"),
+                    self._sizing(zone, "drippers_per_plant"),
+                    self._sizing(zone, "dripper_flow_rate"),
+                )
+                for zone in zones
+            ]
+            bounds = [bound for bound in bounds if bound is not None]
+            return max(bounds) if bounds else None
+        return None
+
+    @property
+    def native_max_value(self) -> float:
+        bound = self.zone_bound
+        return self.entity_description.native_max_value if bound is None else bound
+
     @property
     def extra_state_attributes(self):
         if self._setup_value is not None:
@@ -1002,6 +1044,8 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
                 )
         self._attr_native_value = value
         self.async_write_ha_state()
+        # A setting brought within its limit, or a zone's size changed, can clear the card.
+        check_held_values(self.hass, self._entry, self._room.values())
 
     @property
     def available(self) -> bool:

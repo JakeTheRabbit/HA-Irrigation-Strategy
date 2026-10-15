@@ -78,7 +78,7 @@ The active EC target = the row for the current phase **and** the zone's steering
 | `irrigation_ph_min` | 3.0-9.0 | 5.5 | pH | Source-water pH gate (low bound), used only when a feed pH probe is mapped. A room set up before 5.5-6.5 became the default keeps its own band. |
 | `irrigation_ph_max` | 3.0-9.0 | 6.5 | pH | Source-water pH gate (high bound). |
 | `maximum_ec` | 1-20 | 9.0 | mS/cm | Hard substrate-EC cutoff: no shot above it (salt-burn guard). |
-| `max_shot_duration` | 5-3600 | 900 | s | Longest a single shot may run. The controller refuses to water a room whose cap is missing or below 5 s (CS-203). |
+| `max_shot_duration` | 5 to the room's limit | 900 | s | Longest a single shot may run. The limit follows the zones' size: the time the slowest zone's drippers take to deliver its whole substrate, never under 900 s. The controller refuses to water a room whose cap is missing or below 5 s (CS-203). |
 | `sump_power_threshold_w` | 1-10000 | 20 | W | The sump pump counts as running while its power plug (the controller app's `sump_power_sensor` option) reads above this, after the reading is put into watts. No run for `sump_silent_hours` raises CS-311. |
 | `pump_prime_time` | 0-20 | 2 | s | How long the pump runs before the main line (or, with no main line, the zone valve) opens. Raise it for a pump that takes longer to reach pressure. |
 | `main_line_lead_time` | 0-10 | 1 | s | How long the main-line valve is open before the zone valve opens. |
@@ -117,7 +117,7 @@ for that zone. (3 zones × 27 = 81 entities on a 3-zone system.)
 |---|---|---|---|---|
 | `zone_N_plant_count` | 1-50 | 4 | - | Plants in the zone: scales total water volume. |
 | `zone_N_p0_additional_dryback` | 0-40 | 3 on a room set up from this release, 0 on a room updated in place | % | P0 ends once moisture is this far below the highest reading since lights-on, the small extra dryback before the first shot. `0` is off: P0 waits for the dryback target, as before. Its other exits (the maximum wait, the maintenance trigger) are unchanged. |
-| `zone_N_max_daily_volume` | 0-200 | 20 | L | Daily water budget for the zone. Top-ups and EC-correction shots stop at it, and a shot that would cross it gets only what is left; rescues (watchdog, P3 emergency, high-EC flushes) and the P1 ramp are exempt. |
+| `zone_N_max_daily_volume` | 0 to the zone's limit | 20 | L | Daily water budget for the zone. The limit is 4 times the zone's substrate (plants x litres per plant), never under 20 L; a value already above it is kept and listed in Repairs (CS-611). Top-ups and EC-correction shots stop at it, and a shot that would cross it gets only what is left; rescues (watchdog, P3 emergency, high-EC flushes) and the P1 ramp are exempt. |
 | `zone_N_min_daily_ml_per_plant` | 0-10000 | 0 (off) | mL | Minimum daily water per plant. From lights-on (never in P0), paced to finish 3 h before lights-off, the zone is watered up to this times its plant count whatever the probe reads, so a probe that reads wet cannot starve the plants (and a correct probe is watered anyway). Stops once moisture is 5 points above the zone's field capacity, and never past the daily limit. A new entity takes the value of the old `input_number` helper of the same name. |
 | `zone_N_substrate_volume` / `zone_N_drippers_per_plant` / `zone_N_dripper_flow_rate` | as the globals | from setup | - | Created only when setup sizes the zone itself; otherwise the room-wide value applies. |
 
