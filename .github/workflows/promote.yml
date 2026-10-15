@@ -53,7 +53,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: write
-      # Only to start the Pages demo deploy below.
+      # Only to start the Pages demo deploy and the container image re-tag below.
       actions: write
     steps:
       - name: Checkout the same trusted main workflow code
@@ -74,3 +74,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
+      - name: Re-tag the promoted controller image as stable
+        # The same token limit: container.yml re-tags :latest and :<major.minor> to the digest
+        # the candidate already published. Nothing is rebuilt.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+        run: gh workflow run container.yml --repo "$GITHUB_REPOSITORY" --ref main -f tag="$CANDIDATE_TAG" -f channel=stable

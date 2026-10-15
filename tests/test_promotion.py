@@ -541,3 +541,15 @@ def test_a_promotion_republishes_the_demo():
     assert "gh workflow run pages.yml" in promote and "--ref main" in promote
     assert promote.index("--apply") < promote.index("gh workflow run pages.yml")
     assert "actions: write" in promote and "actions: write" not in before
+
+
+def test_a_promotion_retags_the_controller_image_without_a_rebuild():
+    """The same token limit: the stable re-tag is a dispatch, made only after main moved."""
+    workflow = (ROOT / ".github/workflows/promote.yml").read_text(encoding="utf-8")
+    before, promote = workflow.split("  promote:")
+    dispatch = "gh workflow run container.yml"
+    assert dispatch in promote and dispatch not in before
+    assert promote.index("--apply") < promote.index(dispatch)
+    line = next(x for x in promote.splitlines() if dispatch in x)
+    assert "--ref main" in line and "-f channel=stable" in line
+    assert '-f tag="$CANDIDATE_TAG"' in line

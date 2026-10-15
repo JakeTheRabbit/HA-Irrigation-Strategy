@@ -1,0 +1,256 @@
+name: Controller container
+
+# Publishes the controller image for standalone containers (Home Assistant Container or Core).
+# The Home Assistant app keeps building on the box from addons/f2_control; it does not use this.
+#
+# - A pre-release (a candidate) builds the image once per architecture, runs both modes' smoke
+#   (tests_container) on that exact image, and pushes it by digest as :<version> and :testing.
+#   A version is never pushed twice with different bytes.
+# - Promote dispatches channel=stable after a promotion: :latest and :<major.minor> are re-tagged
+#   to the digest :<version> already has. Nothing is rebuilt, so what ships is what soaked.
+#   (Promote flips the release with its own token, which starts no `release` workflow.)
+# - dry_run builds and smokes a candidate, or checks a stable plan, and pushes nothing.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (vX.Y.Z)
+        required: true
+        type: string
+      channel:
+        description: candidate builds a pre-release; stable re-tags a promoted release
+        type: choice
+        options: [stable, candidate]
+        default: stable
+      dry_run:
+        description: Build, smoke and check everything, push nothing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ inputs.tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan (version, bases, channel)
+    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      minor: ${{ steps.plan.outputs.minor }}
+      channel: ${{ steps.plan.outputs.channel }}
+      image: ${{ steps.plan.outputs.image }}
+      amd64_from: ${{ steps.plan.outputs.amd64_from }}
+      aarch64_from: ${{ steps.plan.outputs.aarch64_from }}
+    steps:
+      - name: Checkout the tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag || github.event.release.tag_name }}
+          persist-credentials: false
+      - name: Check tag, versions, bases and release state
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.event.release.tag_name }}
+          CHANNEL: ${{ inputs.channel || 'candidate' }}
+        run: python3 .github/scripts/container_plan.py
+
+  build:
+    name: Build and smoke (${{ matrix.arch }})
+    needs: plan
+    if: needs.plan.outputs.channel == 'candidate'
+    strategy:
+      matrix:
+        include:
+          - { arch: amd64, platform: linux/amd64, runner: ubuntu-24.04 }
+          - { arch: aarch64, platform: linux/arm64, runner: ubuntu-24.04-arm }  # native, no QEMU
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ${{ needs.plan.outputs.image }}
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - name: Checkout the tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag || github.event.release.tag_name }}
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Install pytest
+        run: python -m pip install pytest==8.2.2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - name: Resolve build.yaml's base to the digest this build uses, and the tag's commit
+        id: base
+        env:
+          BASE: ${{ needs.plan.outputs[format('{0}_from', matrix.arch)] }}
+        run: |
+          digest=$(docker buildx imagetools inspect "$BASE" --format '{{json .Manifest}}' | jq -r .digest)
+          echo "name=$BASE" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Build the image once
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: addons/f2_control
+          platforms: ${{ matrix.platform }}
+          load: true
+          build-args: BUILD_FROM=${{ steps.base.outputs.name }}@${{ steps.base.outputs.digest }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.plan.outputs.version }}
+            org.opencontainers.image.revision=${{ steps.base.outputs.revision }}
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.base.name=${{ steps.base.outputs.name }}
+            org.opencontainers.image.base.digest=${{ steps.base.outputs.digest }}
+      - name: Container smoke, both modes, on that image
+        env:
+          CONTROLLER_IMAGE: ${{ steps.build.outputs.imageid }}
+        run: |
+          docker image inspect "$CONTROLLER_IMAGE" > /dev/null
+          python -m pytest tests_container -q -rs
+      - name: Log in to GHCR
+        if: ${{ !inputs.dry_run }}
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Push the same build by digest
+        id: push
+        if: ${{ !inputs.dry_run }}
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: addons/f2_control
+          platforms: ${{ matrix.platform }}
+          build-args: BUILD_FROM=${{ steps.base.outputs.name }}@${{ steps.base.outputs.digest }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.plan.outputs.version }}
+            org.opencontainers.image.revision=${{ steps.base.outputs.revision }}
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.base.name=${{ steps.base.outputs.name }}
+            org.opencontainers.image.base.digest=${{ steps.base.outputs.digest }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          provenance: mode=max
+          sbom: true
+      - name: Record the digest
+        if: ${{ !inputs.dry_run }}
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: mkdir -p digests && echo "$DIGEST" > "digests/${{ matrix.arch }}"
+      - name: Upload the digest
+        if: ${{ !inputs.dry_run }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: digest-${{ matrix.arch }}
+          path: digests/${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish :<version> and :testing
+    needs: [plan, build]
+    if: needs.plan.outputs.channel == 'candidate' && !inputs.dry_run
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write  # the digest line in the pre-release notes
+      packages: write
+    env:
+      IMAGE: ${{ needs.plan.outputs.image }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download the digests
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: digest-*
+          path: digests
+          merge-multiple: true
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Refuse a version that already exists with other bytes, then publish
+        run: |
+          set -euo pipefail
+          refs=$(for f in digests/*; do printf '%s@%s ' "$IMAGE" "$(cat "$f")"; done)
+          # The index this run would push, and its digest; a re-run of this job alone pushes
+          # the same index again, a rebuild never does.
+          index=$(docker buildx imagetools create --dry-run -t "$IMAGE:$VERSION" $refs)
+          want="sha256:$(printf '%s' "$index" | sha256sum | cut -d' ' -f1)"
+          have=$(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' 2>/dev/null | jq -r .digest || true)
+          if [ -n "$have" ] && [ "$have" != "$want" ]; then
+            echo "::error::$IMAGE:$VERSION already exists as $have; a version is never overwritten with other bytes."
+            exit 1
+          fi
+          docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:testing" $refs
+          got=$(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)
+          test "$got" = "$want"
+          echo "DIGEST=$got" >> "$GITHUB_ENV"
+      - name: Name the digest in the pre-release notes
+        run: |
+          set -euo pipefail
+          line="Controller image: \`$IMAGE:$VERSION\` = \`$IMAGE@$DIGEST\`"
+          notes=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)
+          case "$notes" in *"$line"*) exit 0;; esac
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$notes"$'\n\n'"$line"
+
+  promote:
+    name: Re-tag :latest and :<major.minor>
+    needs: plan
+    if: needs.plan.outputs.channel == 'stable'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ${{ needs.plan.outputs.image }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      MINOR: ${{ needs.plan.outputs.minor }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Re-tag the candidate's digest, no rebuild
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          want=$(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)
+          test -n "$want" && test "$want" != null || { echo "::error::$IMAGE:$VERSION was never built."; exit 1; }
+          echo "$IMAGE:$VERSION is $want"
+          if [ "$DRY_RUN" = true ]; then echo "dry run: :latest and :$MINOR not moved"; exit 0; fi
+          docker buildx imagetools create -t "$IMAGE:latest" -t "$IMAGE:$MINOR" "$IMAGE@$want"
+          for t in latest "$MINOR"; do
+            got=$(docker buildx imagetools inspect "$IMAGE:$t" --format '{{json .Manifest}}' | jq -r .digest)
+            test "$got" = "$want" || { echo "::error::$IMAGE:$t is $got, not $want."; exit 1; }
+          done
