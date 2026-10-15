@@ -33,6 +33,29 @@
   stroke: var(--surface);
   stroke-width: 1;
 }
+.tank-level .level-mark {
+  stroke-width: 1.4;
+  stroke-dasharray: 6 4;
+}
+.tank-level .level-mark-minimum {
+  stroke: var(--destructive);
+}
+.tank-level .level-mark-remind {
+  stroke: var(--warning);
+}
+.tank-level .level-mark-label {
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+}
+.tank-level .key-minimum,
+.tank-level .key-remind {
+  height: 0 !important;
+  border-top: 2px dashed var(--destructive);
+}
+.tank-level .key-remind {
+  border-top-color: var(--warning);
+}
 .tank-level .key-level {
   border-top: 2px solid var(--primary);
 }

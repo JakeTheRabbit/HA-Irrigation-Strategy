@@ -179,6 +179,10 @@ try {
     (await level.locator('[data-run="filling"]').count()) >= 1,
     "the filling before a fill",
   );
+  // The controller's minimum across the level, in the key; this room sets no refill reminder.
+  assert.equal(await level.locator('[data-level-line="minimum"]').getAttribute("data-value"), "8");
+  assert.equal(await level.locator('[data-level-line="remind"]').count(), 0, "no reminder here");
+  assert.match(await level.locator(".grow-legend").innerText(), /Minimum 8 %/);
   // The newest recorded fill is the demo's last fill, two hours ago.
   assert.equal(
     await level.locator("[data-fill]").last().getAttribute("data-fill"),
@@ -197,6 +201,17 @@ try {
   );
   await page.mouse.move(0, 0);
   await level.locator(".grow-tip").waitFor({ state: "hidden" });
+  // Half a day: the newest fill, two hours ago, and the shots since it.
+  await level.getByRole("button", { name: "12 h", exact: true }).click();
+  await page.waitForFunction(() =>
+    document
+      .querySelector("[data-tank-level-chart] .tank-level-svg")
+      ?.getAttribute("aria-label")
+      ?.startsWith("Tank level over the last 12 h:"),
+  );
+  assert.ok((await level.locator("[data-fill]").count()) >= 1, "a fill in the last 12 h");
+  assert.ok((await level.locator('[data-layer="shots"] circle').count()) > 0, "shots in 12 h");
+  assert.equal(await level.locator('[data-level-line="minimum"]').count(), 1);
   // Every range: one or two refills a day, each to 100 %, as F2's tank is filled.
   for (const [range, days] of [
     ["3 days", 3],
@@ -249,8 +264,9 @@ try {
       );
     }
   }
-  // At phone width the level chart keeps its shots and its tooltip.
+  // At phone width the level chart keeps its shots, its minimum and its tooltip.
   assert.match(await hoverShot(page, await levelChart(page)), /· Zone \d\n/);
+  assert.equal(await page.locator('[data-level-line="minimum"]').count(), 1);
   await page.mouse.move(0, 0);
   await page.screenshot({ path: file("tank-status-mobile.png"), fullPage: true });
 
@@ -398,6 +414,9 @@ try {
     /^Tank level over the last 24 h: latest ([\d.]+)%, .*, highest 100%\..* recorded fills?\.$/,
   );
   assert.equal(Number(f1Day?.[1]), f1Level, "Flower 1's chart ends where its card reads");
+  // Flower 1: no minimum, its level not read by the controller; the refill reminder at 20 %.
+  assert.equal(await page.locator('[data-level-line="minimum"]').count(), 0, "no minimum in F1");
+  assert.equal(await page.locator('[data-level-line="remind"]').getAttribute("data-value"), "20");
   // Flower 1 maps no feed-water probe: no gate is drawn, and the panel says its limits hold nothing.
   await page.setViewportSize({ width: 1440, height: 1000 });
   sheet = await openHistory(page);

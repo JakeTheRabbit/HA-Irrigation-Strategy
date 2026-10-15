@@ -376,6 +376,9 @@ function demoDosing(
         close_entities: [],
         hold_entity: null,
         filled_at_entity: null,
+        // Nothing fills Flower 1's tank by itself: a person is reminded to at 20 %.
+        level_entity: "sensor.demo_f1_tank_level",
+        remind_pct: 20,
         recipe,
       }
     : {

@@ -14,12 +14,16 @@ import { appendLive, duration, joinRows, type Level, type TimelineRows } from "@
 import { numeric } from "@/lib/model";
 import { rangeTicks, tickLabel } from "@/lib/tank-history";
 import {
+  DEFAULT_LEVEL_HOURS,
   LEVEL_RANGES,
   levelAt,
+  levelLines,
   recordWindows,
+  shotGap,
   shotMarks,
   tankEntities,
   tankRecord,
+  type LevelLine,
   type Run,
   type TankIds,
   type TankRecord,
@@ -111,7 +115,8 @@ function useTankRecord(
 }
 
 /** The tank's level over a range beside what moved it: each zone's shots on the line, the pump's
- * runs and the tank filling above it, each recorded fill across it. */
+ * runs and the tank filling above it, each recorded fill across it, and the minimum and refill
+ * reminder levels. */
 export function TankLevel({
   controller,
   onConfigure,
@@ -125,7 +130,7 @@ export function TankLevel({
     const timer = window.setInterval(() => tick((value) => value + 1), 60_000);
     return () => window.clearInterval(timer);
   }, []);
-  const [hours, setHours] = useState<number>(LEVEL_RANGES[0].hours);
+  const [hours, setHours] = useState<number>(DEFAULT_LEVEL_HOURS);
   const now = Date.now();
   const read = tankEntities(controller.room, controller.states);
   const { level } = tankTelemetry(controller.states, controller.room.room);
@@ -234,6 +239,7 @@ function LevelRecord({
 }) {
   const start = now - hours * HOUR;
   const record = tankRecord(rows, ids, start, now);
+  const lines = levelLines(controller.states, controller.room.room.prefix, ids.level);
   const range = LEVEL_RANGES.find((option) => option.hours === hours)?.label ?? `${hours} h`;
   const zones = controller.room.zones;
   const flows = new Map(
@@ -292,6 +298,7 @@ function LevelRecord({
       <LevelChart
         record={record}
         ids={ids}
+        lines={lines}
         start={start}
         end={now}
         hours={hours}
@@ -328,6 +335,12 @@ function LevelRecord({
               Recorded fill
             </li>
           )}
+          {lines.map((line) => (
+            <li key={line.key} title={line.title}>
+              <i className={`key-${line.key}`} aria-hidden="true" />
+              {line.label}
+            </li>
+          ))}
         </ul>
         <details className="timeline-events">
           <summary>{counts.join(" · ")}</summary>
@@ -390,6 +403,7 @@ const diamond = (cx: number, cy: number) =>
 function LevelChart({
   record,
   ids,
+  lines,
   start,
   end,
   hours,
@@ -398,6 +412,7 @@ function LevelChart({
 }: {
   record: TankRecord;
   ids: TankIds;
+  lines: LevelLine[];
   start: number;
   end: number;
   hours: number;
@@ -467,8 +482,10 @@ function LevelChart({
         `V${f(bottom)}Z`,
     )
     .join("");
-  // Shots too close to tell apart share a mark, on the line where the first one opened.
-  const marks = shotMarks(record.shots, record.level, (8 / plotW) * (end - start)).map((mark) => ({
+  // Shots too close to tell apart share a mark, on the line where the first one opened; across a
+  // week, every shot in the hour.
+  const gap = shotGap(hours, (8 / plotW) * (end - start));
+  const marks = shotMarks(record.shots, record.level, gap).map((mark) => ({
     ...mark,
     cx: x(mark.time),
     cy: mark.level === null ? bottom - 6 : y(mark.level),
@@ -497,6 +514,15 @@ function LevelChart({
       y1: bottom,
       rank: 1,
       text: () => texts.fill(time),
+    })),
+    ...lines.map((line) => ({
+      x0: L,
+      x1: L + plotW,
+      y0: y(line.value) - 4,
+      y1: y(line.value) + 4,
+      rank: 3,
+      text: () => `${line.label}
+${line.title}`,
     })),
     ...strips.flatMap((strip, row) =>
       strip.runs.map((run) => ({
@@ -592,6 +618,25 @@ function LevelChart({
             </g>
           ))}
           <path d={area} className="level-area" />
+          {lines.map((line) => (
+            <g key={line.key} data-level-line={line.key} data-value={line.value}>
+              <line
+                x1={L}
+                x2={L + plotW}
+                y1={y(line.value)}
+                y2={y(line.value)}
+                className={`level-mark level-mark-${line.key}`}
+              />
+              <text
+                x={L + plotW - 4}
+                y={y(line.value) - 4}
+                className="axis-label level-mark-label"
+                textAnchor="end"
+              >
+                {line.label}
+              </text>
+            </g>
+          ))}
           {record.fills.map((time) => (
             <g key={time} data-fill={new Date(time).toISOString()}>
               <line
