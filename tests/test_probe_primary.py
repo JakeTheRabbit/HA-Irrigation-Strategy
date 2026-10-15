@@ -57,6 +57,7 @@ def test_a_probe_choice_alone_is_saved_while_the_room_waters():
     hass, entry, states = _rig()
     states["switch.crop_steering_veg_engine_enabled"].state = "on"
     states["switch.v2"].state = "on"
+    revision = entry.data["setup_revision"]
     asyncio.run(
         api.save_setup(
             hass, _choose(hass, vwc_primary="sensor.vwc2", vwc_unused=["sensor.vwc"])
@@ -64,6 +65,8 @@ def test_a_probe_choice_alone_is_saved_while_the_room_waters():
     )
     zone = entry.data["zones"]["2"]
     assert (zone["vwc_primary"], zone["vwc_unused"]) == ("sensor.vwc2", ["sensor.vwc"])
+    # No new setup revision: the controller has nothing to take on, so the room keeps watering.
+    assert entry.data["setup_revision"] == revision
     # Anything else in the same save still needs the room off.
     with pytest.raises(ValueError, match="OFF"):
         asyncio.run(api.save_setup(hass, _choose(hass, name="Back")))
