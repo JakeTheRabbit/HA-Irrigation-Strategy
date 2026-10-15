@@ -30,8 +30,8 @@ function liveZone(controller: Controller, id: number): RunZone | null {
 }
 
 /** History › Compare runs: is this crop tracking the last good one, and where did it differ, week
- * by week? The full-resolution chart and the record's quality are one tap down; the run records
- * themselves are kept in Settings. */
+ * by week? A toggle swaps that for both runs overlaid on one full-resolution chart; the record's
+ * quality is one tap down and the run records themselves are kept in Settings. */
 export function Comparison({
   controller,
   navigate,
@@ -56,7 +56,8 @@ export function Comparison({
   const [loaded, setLoaded] = useState<Loaded | null>(null),
     [historyError, setHistoryError] = useState<string | null>(null),
     [loading, setLoading] = useState(false);
-  const [weekNotes, setWeekNotes] = useState<string[]>([]);
+  const [weekNotes, setWeekNotes] = useState<string[]>([]),
+    [overlay, setOverlay] = useState(false);
   const roomRef = useRef(controller.roomId);
   roomRef.current = controller.roomId;
   const doc = document?.room_id === controller.roomId ? document : null;
@@ -369,7 +370,7 @@ export function Comparison({
         <div className="comparison-notice">
           <p>
             No runs are recorded for this room yet. Record this crop and a past one, each with its
-            real start date, to compare them week by week. The chart below works on dates without a
+            real start date, to compare them week by week. The Overlay view works on dates without a
             run; Recorder history already purged cannot be recovered by adding one.
           </p>
           <Button variant="outline" onClick={openRecords}>
@@ -377,17 +378,36 @@ export function Comparison({
           </Button>
         </div>
       )}
-      <RunWeeks
-        controller={controller}
-        current={currentRun}
-        previous={previousRun}
-        zoneId={effectiveZone}
-        zoneName={zoneName}
-        refresh={refresh}
-        onNotes={setWeekNotes}
-      />
-      <details className="comparison-more" data-section="chart">
-        <summary>Full-resolution chart, with a target reference</summary>
+      <div className="history-toggle comparison-view" role="group" aria-label="Compare view">
+        {(
+          [
+            ["By grow week", false],
+            ["Overlay", true],
+          ] as const
+        ).map(([label, value]) => (
+          <button
+            type="button"
+            key={label}
+            aria-pressed={overlay === value}
+            onClick={() => setOverlay(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {/* Both views stay mounted, so switching is instant and the weekly notes stay filled. */}
+      <div className="comparison-pane" hidden={overlay}>
+        <RunWeeks
+          controller={controller}
+          current={currentRun}
+          previous={previousRun}
+          zoneId={effectiveZone}
+          zoneName={zoneName}
+          refresh={refresh}
+          onNotes={setWeekNotes}
+        />
+      </div>
+      <div className="comparison-pane" hidden={!overlay} data-section="chart">
         <div className="comparison-more-body">
           <section className="panel comparison-range">
             <label>
@@ -493,7 +513,7 @@ export function Comparison({
             </>
           )}
         </div>
-      </details>
+      </div>
       <details className="comparison-more" data-section="quality">
         <summary>Data quality: daily ranges and history coverage</summary>
         <div className="comparison-more-body">

@@ -937,7 +937,7 @@ try {
     },
   );
   await check(
-    "compare runs: by grow week, the biggest differences, and the detail one tap down",
+    "compare runs: by grow week, the biggest differences, the overlay toggle, the detail one tap down",
     async () => {
       await go("history/compare");
       // The run in progress against the latest ended one, chosen to start with.
@@ -960,16 +960,27 @@ try {
       const differences = page.locator(".rw-differences li");
       assert.ok((await differences.count()) > 0 && (await differences.count()) <= 3);
       assert.match(await differences.first().innerText(), /^Week \d+: /);
-      // The full-resolution chart and the daily ranges are collapsed.
-      for (const section of ["chart", "quality"])
-        assert.equal(
-          await page
-            .locator(`details.comparison-more[data-section="${section}"]`)
-            .getAttribute("open"),
-          null,
-        );
-      await page.locator('details[data-section="chart"] > summary').click();
+      // The daily ranges are collapsed; the full-resolution overlay is behind the view toggle.
+      assert.equal(
+        await page.locator('details.comparison-more[data-section="quality"]').getAttribute("open"),
+        null,
+      );
+      const view = page.getByRole("group", { name: "Compare view" });
+      const byWeek = view.getByRole("button", { name: "By grow week", exact: true }),
+        overlay = view.getByRole("button", { name: "Overlay", exact: true });
+      assert.equal(await byWeek.getAttribute("aria-pressed"), "true");
+      assert.equal(await page.locator(".comparison-chart svg").isVisible(), false);
+      await overlay.click();
+      assert.equal(await overlay.getAttribute("aria-pressed"), "true");
       await expectVisible(page.locator(".comparison-chart svg"));
+      // Both runs on one chart, by grow age.
+      for (const series of ["current-vwc", "current-ec", "previous-vwc", "previous-ec"])
+        await page.locator(`[data-comparison-series="${series}"]`).first().waitFor();
+      assert.equal(await weeks.first().isVisible(), false, "the weekly table steps aside");
+      await axe("compare runs, overlay", ".comparison-page");
+      await byWeek.click();
+      await expectVisible(weeks.first());
+      assert.equal(await page.locator(".comparison-chart svg").isVisible(), false);
       await page.locator('details[data-section="quality"] > summary').click();
       const table = ".comparison-table tbody";
       await page.locator(`${table} .meter`).first().waitFor();
