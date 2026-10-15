@@ -130,6 +130,7 @@ class _Job:
         self.cut_at = None  # when a stop or a cut was sent to the running dose, on the runner's clock
         self.left = []  # what the running dose's end left not reading off
         self.doses = {}  # pump -> mL of every dose started, for the history
+        self.dosed = []  # each dose in the order it went in: pump, name, mL asked, mL given, result
         self.started_at = None
 
 
@@ -509,7 +510,8 @@ class DosingRunner:
         entry = None
         if not result.startswith("refused"):
             entry = {"kind": "dose", "at": started, "ended_at": self._now().isoformat(),
-                     "result": result, "doses": {pump["id"]: request.get("ml")}, "by": request.get("by")}
+                     "result": result, "doses": {pump["id"]: request.get("ml")},
+                     "dosed": list(job.dosed), "by": request.get("by")}
         self._settle(room, config, request, result, entry=entry, clear=not left, final=True)
         self._safely(self._send_draws)  # what it drew, now that nothing runs
 
@@ -553,7 +555,7 @@ class DosingRunner:
         job.started_at = job.started_at or started
         job.dose = {"pump": pump["id"], "ml": ml, "started_at": started,
                     "expected_s": round(expected, 1)}
-        record = {"pump": pump["id"], "ml": ml, "at": started}
+        record = {"pump": pump["id"], "name": pump["name"], "ml": ml, "at": started}
         if old is not None:  # what to put back, even after a restart (recover)
             record.update(old_volume=old, **{key: pump.get(key) for key in _PUT_BACK})
         fields = {"dose": record, "doses": {**job.doses, pump["id"]: ml}}
@@ -576,29 +578,42 @@ class DosingRunner:
             self._queue_put_back(job.room.slug, record)  # the pump may still run: later
         end = job.cut_at if job.cut_at is not None else self._mono()
         elapsed = end - job.pressed if job.pressed is not None else 0.0
-        result = self._stock_draw(job, pump, ml, flow, result, elapsed, started)
+        given = self._given(result, ml, flow, elapsed)
+        result = self._stock_draw(job, pump, given, result, started)
         if not result.startswith("refused"):
             job.doses[pump["id"]] = ml
+            job.dosed.append({"pump": pump["id"], "name": pump["name"], "ml": ml, "given": given,
+                              "result": result, "at": started})
             with self._lock:
-                self._block(job.room)["last"][pump["id"]] = {"ml": ml, "at": started, "result": result}
+                self._block(job.room)["last"][pump["id"]] = {"ml": ml, "given": given, "at": started,
+                                                            "result": result}
+            self._record(job, {"dosed": list(job.dosed)}, merge=True)  # kept if the app stops next
         return result
 
-    def _stock_draw(self, job, pump, ml, flow, result, elapsed, started):
-        """What the dose took from the pump's stock tank (docs/DOSING.md, Stock tanks): finished, the
-        mL asked for; any other end that pressed start, that or the seconds from the press to the
-        moment it ended, or its stop or cut was sent, x the flow, whichever is less; not confirmed,
-        nothing, and the result says so. Queued for stock_draw."""
+    @staticmethod
+    def _given(result, ml, flow, elapsed):
+        """What a dose gave, in mL (docs/DOSING.md, Exact dose record): finished, the mL asked for;
+        not confirmed or refused, not known (None); any other end, that or the seconds from the press
+        to the moment it ended, or its stop or cut was sent, x the flow, whichever is less."""
+        if result == "finished":
+            return ml
+        if result == "not confirmed" or result.startswith("refused"):
+            return None
+        return round(min(ml, max(0.0, elapsed) * flow), 1)
+
+    def _stock_draw(self, job, pump, given, result, started):
+        """What the dose took from the pump's stock tank (docs/DOSING.md, Stock tanks): what it gave;
+        not confirmed, nothing, and the result says so. Queued for stock_draw."""
         tank = pump.get("stock_tank")
         if not tank or result.startswith("refused"):
             return result
-        if result == "not confirmed":
+        if given is None:
             return "not confirmed; nothing drawn from its stock tank"
-        amount = ml if result == "finished" else min(ml, max(0.0, elapsed) * flow)
-        if amount > 0:
+        if given > 0:
             self._queue_draw(job.room, {
                 "key": f"{job.room.prefix}:{pump['id']}:{started}",
                 "room_id": f"room:{job.room.prefix}",
-                "draws": {tank: round(amount, 1)},
+                "draws": {tank: round(given, 1)},
                 "source": job.kind,
                 "note": f"{pump['name']}: {result}",
             })
@@ -879,7 +894,8 @@ class DosingRunner:
             return self._settle(room, config, request, f"refused: {why}")
         job.started_at = self._now().isoformat()
         record = {"kind": "batch", "at": job.started_at, "request": request["id"],
-                  "by": request.get("by"), "off": self._dosing_hardware(config),
+                  "name": batch.get("name") or "", "by": request.get("by"),
+                  "off": self._dosing_hardware(config),
                   "hold": batch.get("hold_entity"), "held": sorted(held), "doses": {}}
         if not self._record(job, record):
             return self._settle(room, config, request,
@@ -891,7 +907,8 @@ class DosingRunner:
             job.deadline = self._mono() + self._watchdog(batch, plan)
             with self._lock:
                 self._live_of(room)["batch"] = {
-                    "step": "idle", "pump": None, "started_at": job.started_at, "step_started_at": None,
+                    "step": "idle", "pump": None, "name": batch.get("name") or "",
+                    "started_at": job.started_at, "step_started_at": None,
                     "steps": [], "result": None, "ended_at": None}
             yield from self._hold(job, held)
             self._close(job, held)
@@ -935,7 +952,8 @@ class DosingRunner:
             if result.startswith("finished"):
                 self._plan_mix(room, job.started_at)
         entry = {"kind": "batch", "at": job.started_at, "ended_at": view["ended_at"], "result": result,
-                 "doses": dict(job.doses), "by": request.get("by")}
+                 "name": batch.get("name") or "", "doses": dict(job.doses), "dosed": list(job.dosed),
+                 "by": request.get("by")}
         self._settle(room, config, request, result, entry=entry, clear=not left, final=True)
         self._safely(self._send_draws)  # what its doses drew, now that nothing runs
 
@@ -1218,8 +1236,8 @@ class DosingRunner:
         stuck = self._switch_off(self._dosing_hardware(job.config))
         hold = batch.get("hold_entity")
         hold_left = self._switch_off([hold]) if hold and not stuck else []
-        names = {pump["id"]: pump["name"] for pump in job.config["pumps"]}
-        dosed = ", ".join(f"{_fmt(ml)} mL of {names.get(p, p)}" for p, ml in job.doses.items()) or "nothing"
+        dosed = ", ".join(f"{_fmt(d['given'])} mL of {d['name']}" if d["given"] is not None
+                          else f"an unknown amount of {d['name']}" for d in job.dosed) or "nothing"
         if stuck:
             after = (f", but {_still(stuck)}, so the rooms the batch held stay held"
                      + (", and its hold stays on," if hold else "")
@@ -1438,11 +1456,19 @@ class DosingRunner:
                                         _event("restart", at), intro, advice, alerted=None,
                                         announce=kind in ("dose", "batch"), sent=False)
         if kind in ("dose", "batch") and not record.get("recovered"):
-            self._add_history(block, {
-                "kind": kind, "at": at, "ended_at": self._now().isoformat(),
-                "result": "interrupted by a restart", "doses": record.get("doses") or {},
-                "by": record.get("by"),
-            })
+            dosed = [d for d in record.get("dosed") or [] if isinstance(d, dict)]
+            dose = record.get("dose")
+            if isinstance(dose, dict) and not any(d.get("at") == dose.get("at") for d in dosed):
+                # the dose the stop cut: how much it gave is not known
+                dosed.append({"pump": dose.get("pump"), "name": dose.get("name") or dose.get("pump"),
+                              "ml": dose.get("ml"), "given": None, "result": "interrupted by a restart",
+                              "at": dose.get("at")})
+            entry = {"kind": kind, "at": at, "ended_at": self._now().isoformat(),
+                     "result": "interrupted by a restart", "doses": record.get("doses") or {},
+                     "dosed": dosed, "by": record.get("by")}
+            if kind == "batch":
+                entry["name"] = record.get("name") or ""
+            self._add_history(block, entry)
             block["inflight"] = {**record, "recovered": True}  # its history is written once
         dose = record.get("dose")
         if isinstance(dose, dict) and dose.get("old_volume") is not None and dose.get("volume_entity"):
@@ -1681,6 +1707,7 @@ class DosingRunner:
             "handled_result": block["handled_result"],
             "history": block["history"],
             "mix": block.get("mix") if isinstance(block.get("mix"), dict) else None,
+            "last_batch": block["last_batch"],
             "friendly_name": "Dosing (controller)",
         }
 
@@ -1893,13 +1920,14 @@ class DosingRunner:
 
     def _block(self, room):
         """One room's saved part (the caller holds the lock): the last request handled and its result,
-        the dose or batch in flight, each pump's last dose, the history, the stock draws not yet
-        delivered and the volume numbers still to put back."""
+        the dose or batch in flight, each pump's last dose, the last batch, the history, the stock
+        draws not yet delivered and the volume numbers still to put back."""
         slug = getattr(room, "slug", room)
         block = self._doc["rooms"].get(slug)
         if not isinstance(block, dict):
             block = self._doc["rooms"][slug] = {}
-        for key, default in (("handled", None), ("handled_result", None), ("inflight", None)):
+        for key, default in (("handled", None), ("handled_result", None), ("inflight", None),
+                             ("last_batch", None)):
             block.setdefault(key, default)
         for key in ("history", "draws", "restores"):
             if not isinstance(block.get(key), list):
@@ -1911,6 +1939,8 @@ class DosingRunner:
     @staticmethod
     def _add_history(block, entry):
         block["history"] = [entry, *block["history"]][:HISTORY]
+        if entry.get("kind") == "batch":
+            block["last_batch"] = entry  # named, and kept past the history's last 20
 
     def _record(self, job, fields, merge=False):
         """What is about to move, saved before it moves. A new record also takes the job's request, in

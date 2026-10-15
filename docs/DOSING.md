@@ -59,6 +59,8 @@ pump name or recipe is assumed.
     "hold_entity": "input_boolean.x",  // input_boolean.* | null   on for the whole batch, for other automations
     "filled_at_entity": "input_datetime.x", // input_datetime.* | null   stamped with the end time of a finished batch
     "part_ml": 12.5,                   // 0.1..5000, only when set: "1 part (mL)", the mL one part is per batch
+    "name": "Week 3",                  // the recipe's name, 0..40 characters; "" (a setup from before names) = none.
+                                       // A save that leaves the key out keeps the stored name
     "recipe": [                        // dose order = list order (the operator's); each pump at most once
       {"pump": "balance", "ml": 300, "ml_entity": null}, // ml_entity (number.*|input_number.*|sensor.*) is read
                                                         // at batch start and wins over ml; 0 skips the pump
@@ -82,7 +84,7 @@ pump name or recipe is assumed.
 
 Validation (`dosing.py`, pure): every entity exists and is in its allowed domain; pump ids unique;
 recipe pumps exist; a pump appears in the recipe at most once; `full_entity` set whenever
-`fill_valve` is; `mix_power_sensor` set whenever `mix_min_w` is above 0 (else the power could not be
+`fill_valve` is; the recipe's `name` at most 40 characters; `mix_power_sensor` set whenever `mix_min_w` is above 0 (else the power could not be
 checked); no entity is both a dosing pump's `power_entity` and batch hardware; a `mix_pump`,
 `mix_valves` or `close_entities` switch may be a room's irrigation pump or main line (the batch
 holds that room's watering); a pump's `stock_tank` is one of the room's stock tanks, and a stock
@@ -383,20 +385,38 @@ State: `idle` | `dosing` | `batch` | `unavailable` (the room's configuration can
 {
   "pumps": {"balance": {"state": "idle" | "dosing" | "unavailable", "flow_ml_s": 11.06,
                         "target_ml": 25, "started_at": "…", "expected_s": 2.3,
-                        "last": {"ml": 25, "at": "…", "result": "finished" | "ended early" | "ran past its time" | "not confirmed" | "stopped"}}},
+                        "last": {"ml": 25, "given": 25, "at": "…", "result": "finished" | "ended early" | "ran past its time" | "not confirmed" | "stopped"}}},
   "batch": {"step": "idle" | "hold" | "close" | "fill" | "mix" | "premix" | "dose" | "postmix" | "finish",
-            "pump": "bloom" | null, "started_at": "…", "step_started_at": "…",
+            "pump": "bloom" | null, "name": "Week 3", "started_at": "…", "step_started_at": "…",
             "steps": [{"step": "fill", "state": "done" | "running" | "skipped" | "failed", "at": "…", "note": "…"}],
             "result": null | "finished" | "stopped: <reason>", "ended_at": null | "…"},
   "handled": "<request id>", "handled_result": "…",
   "history": [{"kind": "dose" | "batch" | "draw", "at": "…", "ended_at": "…", "result": "…",
-               "doses": {"balance": 300, "bloom": 1800}, "by": "…",
+               "name": "Week 3",                                  // a batch's recipe name
+               "doses": {"balance": 300, "bloom": 1800},           // what was asked
+               "dosed": [{"pump": "balance", "name": "Balance", "ml": 300, "given": 300,
+                          "result": "finished", "at": "…"}],      // each dose, in order (below)
+               "by": "…",
                "mix": "good" | "off target" | "not read"}],  // newest first, 20 kept; mix once checked
+  "last_batch": {"kind": "batch", "name": "Week 3", …} | null,     // the newest batch, kept past the 20
   "mix": null | {"batch": "<its started_at>", "due": "…", "verdict": null | "good" | "off target" | "not read",
                  "checked_at": "…", "why": "…", "ec": 2.1, "ph": 5.9},  // the last batch's mix check
   "updated_at": "…"                    // the controller's last publish
 }
 ```
+
+### Exact dose record
+
+Every dose, alone or in a batch, is recorded in the order it went in with what was asked (`ml`) and
+what it gave (`given`, in mL): finished, the amount asked for; ended early, ran past its time or
+stopped, the seconds from the press to the moment it ended, or its stop or cut was sent, x the
+pump's calibrated flow, never more than asked (a pump that ran past its time may have given more);
+not confirmed, not known (`null`). The stock tanks are drawn down by the same `given`. A batch is
+recorded with its recipe's `name`, and the newest batch is kept apart as `last_batch`, so single
+doses never push it out of the history. A batch's record in `dosing_state.json` carries each dose
+given so far, so one cut by a restart keeps them, with the dose in flight `given: null`. A
+`dosing_state.json` or a history from before this record loads as it is: no `dosed`, no `given`,
+`last_batch` null until the next batch. `doses` (what was asked) is kept as it was.
 
 `updated_at` is the time of the controller's last publish, refreshed at least every 60 s even
 when nothing changes, so the page can tell a stale controller. It is published on every change as
@@ -406,7 +426,7 @@ draws not yet taken, alerts not yet created and volume numbers still to put back
 runs, so they never hold up its watch. When one read of the setup fails while a dose or batch runs
 in the room, the status keeps the setup it started with (`dosing` or `batch`, not `unavailable`).
 Nothing is published for a room whose integration has no `dosing_config` (one from before dosing).
-`dosing_state.json` keeps `handled`, each pump's `last`, the `history` (with a `draw` entry for a
+`dosing_state.json` keeps `handled`, each pump's `last`, the `last_batch`, the `history` (with a `draw` entry for a
 stock draw that was dropped, below), the draws and alerts not yet delivered and the volume numbers
 still to put back across a restart.
 

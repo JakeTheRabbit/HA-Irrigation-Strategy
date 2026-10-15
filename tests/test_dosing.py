@@ -437,3 +437,12 @@ def test_a_feed_schedule_that_cannot_be_dosed_is_refused():
     )
     assert [recipe["id"] for recipe in made["recipes"]] == ["late", "late_flower"]
     assert dosing.clean_feed(None, []) == dosing.empty_feed()
+
+
+def test_a_recipe_may_be_named_and_a_setup_from_before_names_has_none():
+    # BATCH has no name, as every setup saved before names.
+    assert clean()[1]["name"] == ""
+    assert clean(batch=batch(name="  Week 3  "))[1]["name"] == "Week 3"
+    assert clean(batch=batch(name="x" * 40))[1]["name"] == "x" * 40
+    with pytest.raises(dosing.DosingError, match="at most 40 characters"):
+        clean(batch=batch(name="x" * 41))

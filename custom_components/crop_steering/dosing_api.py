@@ -177,10 +177,14 @@ class DosingStore:
             stored = self.data["feed"]
             # A save without the feed (a dashboard from before it) keeps the stored one.
             sent = data.get("feed")
+            batch = data.get("batch")
+            if isinstance(batch, dict) and "name" not in batch:
+                # A page from before recipe names keeps the stored one.
+                batch = {**batch, "name": self.data["batch"].get("name")}
             try:
                 pumps, batch = dosing.clean(
                     data.get("pumps"),
-                    data.get("batch"),
+                    batch,
                     self._exists,
                     self._stock_tanks(),
                 )

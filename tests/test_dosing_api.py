@@ -488,3 +488,14 @@ def test_a_store_saved_before_the_feed_schedule_loads_with_none():
     _, attributes = again.sensor()
     assert attributes["batch"] == stored["batch"]  # its own recipe, unchanged
     assert attributes["feed"]["source"] == "batch"
+
+
+def test_a_recipe_name_is_kept_by_a_save_from_a_page_that_does_not_know_it():
+    _, store = rig()
+    named = {**copy.deepcopy(BATCH), "name": "Week 3"}
+    assert save(store, batch=named)["error"] is None
+    assert store.data["batch"]["name"] == "Week 3"
+    assert save(store)["error"] is None  # BATCH has no name key: an older page
+    assert store.data["batch"]["name"] == "Week 3"
+    assert save(store, batch={**copy.deepcopy(BATCH), "name": ""})["error"] is None
+    assert store.data["batch"]["name"] == ""

@@ -41,7 +41,7 @@ def _room_with_probes(rig, ec=("2.0", "mS/cm"), ph=("5.9", None), bands=True):
     return r, room
 
 
-def _batch(r, by="Ben"):
+def _batch(r, by="Alex"):
     r.ask("batch", by=by)
     r.poll()
     return r.status()[1]
