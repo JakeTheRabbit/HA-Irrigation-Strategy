@@ -65,7 +65,7 @@ class ZoneParams:
     p1_incr: float
     p1_max_shots: int
     p1_time_between_min: float
-    dryback_target: float       # P0 morning dryback %, also the overnight target
+    dryback_target: float       # overnight dryback %, also P0's while p0_additional_dryback is 0
     p0_max_wait_min: float
     ec_target_p0: float
     ec_target_p1: float
@@ -92,6 +92,9 @@ class ZoneParams:
     #                                 the floor holds (never flood). 90 ~= unreachable in coco -> truly probe-blind.
     min_floor_finish_h: float = 3.0  # the min-daily floor is paced to be complete this many hours before lights-off,
     #                                  when the evening dryback (predictive P3) may start.
+    p0_additional_dryback: float = 0.0  # P0 ends once VWC is this % below the highest reading since lights-on,
+    #                                     the small extra dryback before the first shot. 0 = off: P0 waits for
+    #                                     dryback_target, as before.
 
 
 @dataclass
@@ -128,6 +131,11 @@ class ZoneSnapshot:
     p1_reached: bool = False  # this P1 has read at or over its ceiling (the caller latches it)
     p1_peak_before_shot: float | None = None  # the zone's peak_vwc right before its last P1 shot
     p1_extra_shots: int = 0  # P1 shots fired after the ceiling was reached
+
+
+def p0_dryback(p: ZoneParams) -> float:
+    """PURE. How far below the highest reading since lights-on P0 lets a zone dry before the ramp starts."""
+    return p.p0_additional_dryback if p.p0_additional_dryback > 0 else p.dryback_target
 
 
 def floor_share(s: ZoneSnapshot, p: ZoneParams) -> float:
@@ -210,7 +218,7 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     elif phase == "P0":
         if s.vwc <= p.p2_threshold:
             phase, treason = "P1", f"P0 bypass VWC {s.vwc:.0f}<=rewater {p.p2_threshold:.0f}"
-        elif s.dryback_pct >= p.dryback_target:
+        elif s.dryback_pct >= p0_dryback(p):
             phase, treason = "P1", f"P0 dryback done {s.dryback_pct:.0f}%"
         elif s.phase_minutes >= p.p0_max_wait_min:
             phase, treason = "P1", f"P0 timeout {s.phase_minutes:.0f}min"
@@ -393,7 +401,7 @@ def waiting_for(s: ZoneSnapshot, p: ZoneParams) -> list:
         add("p0_bypass", to="P1", metric="vwc", op="<=", value=p.p2_threshold, now=s.vwc)
         if s.peak_vwc > 0:
             add("p0_dryback", to="P1", metric="vwc", op="<=",
-                value=s.peak_vwc * (1.0 - p.dryback_target / 100.0), now=s.vwc)
+                value=s.peak_vwc * (1.0 - p0_dryback(p) / 100.0), now=s.vwc)
     elif s.phase == "P1":
         ceiling = min(p.p1_target, p.field_capacity)
         reached = s.p1_reached or s.vwc >= ceiling
@@ -500,7 +508,7 @@ _PARAM_BOUNDS = {
     "p1_max_shots": (1.0, 40.0), "p1_time_between_min": (1.0, 120.0),
     "p0_max_wait_min": (5.0, 240.0), "p3_emergency_shot": (0.5, 15.0),
     "max_daily_volume": (10.0, 2000.0), "min_daily_volume": (0.0, 500.0),
-    "drown_ceiling": (50.0, 100.0), "min_floor_finish_h": (0.0, 12.0),
+    "drown_ceiling": (50.0, 100.0), "min_floor_finish_h": (0.0, 12.0), "p0_additional_dryback": (0.0, 40.0),
 }
 
 
