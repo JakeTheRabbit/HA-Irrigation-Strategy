@@ -291,7 +291,7 @@ def test_c4_home_assistants_zone_unreadable_exits_2_after_the_wait(rig, config):
 
 # ------------------------------------------------------------------ C5
 def test_c5_the_app_as_the_supervisor_runs_it(rig):
-    options = json.loads((ROOT / "tests_ha/fixtures/options_3_8_0_f2.json").read_text())["options"]
+    options = json.loads((ROOT / "tests_ha/fixtures/options_3_8_0_jev_typesafe.json").read_text())["options"]
     rig.fake(alias="supervisor")
     ctl = rig.controller(options=options, F2_RUNTIME="addon", SUPERVISOR_TOKEN="x")
     rig.wait(ctl, "runtime: addon")
@@ -315,7 +315,11 @@ def test_c5_anything_short_of_what_the_supervisor_gives_is_a_container(rig, env,
     # Gated as a container, but what would harm an app that lost its F2_RUNTIME keys on
     # F2_RUNTIME=container only: the app's 25 s stop budget and its dashboard stay.
     rig.wait(ctl, "stop budget: 25 s")
-    time.sleep(3)
+    if "HA_URL" not in env:
+        # A container's gate: with no HA_URL it stops before Home Assistant is asked.
+        assert rig.exit_code(ctl) == 2 and "HA_URL is not set" in rig.logs(ctl)
+        return
+    rig.wait(ctl, "starting")
     assert serves_8420(ctl)
 
 
