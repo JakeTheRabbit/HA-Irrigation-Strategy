@@ -2,8 +2,9 @@
 update, and the one record of the last release it showed, kept for the whole installation.
 
 A new installation starts at its own version and shows nothing. One that was already running before
-this existed has missed an unknown number of releases. Marking only ever moves forward, never past
-the installed version, and survives a restart.
+this existed has missed an unknown number of releases, and so has one whose record is numbered above
+the installed release. Marking only ever moves forward, never past the installed version, and
+survives a restart.
 """
 
 import json
@@ -54,6 +55,17 @@ async def test_an_installation_that_was_already_running_has_missed_an_unknown_nu
         registry_ids={"sensor.crop_steering_engine_config": "engine_config"},
     )
     assert (await _get(hass))["seen"] is None  # the dashboard shows the last 30 days
+
+
+async def test_a_record_numbered_above_the_installed_release_is_unknown(hass, hass_storage):
+    """The numbers started again, or an older release was put back: a dashboard that last showed a
+    higher number shows what came since (the last 30 days), then carries on from this release."""
+    hass_storage[STORE] = _stored("99.0.0")
+    await _install(hass)
+    assert (await _get(hass))["seen"] is None
+    assert await _seen(hass, VERSION) == {"seen": VERSION}
+    await hass.async_block_till_done()
+    assert hass_storage[STORE]["data"] == {"seen": VERSION}
 
 
 async def test_marking_moves_forward_only_and_survives_a_restart(hass, hass_storage):
