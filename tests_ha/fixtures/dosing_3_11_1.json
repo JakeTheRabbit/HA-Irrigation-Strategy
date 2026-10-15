@@ -1,0 +1,63 @@
+{
+ "_about": "The dosing store crop_steering.dosing.<entry_id> as the 3.11.1 integration saved it through its dosing_save service for entry_3_11_1_pumped_room.json, recorded by running that release's own wizard and controller (v3.11.1, 12c6d1a) in a real Home Assistant 2026.9.3 with every Jev answer stubbed and no network, not written by hand: two doser pumps and the batch tank's fill valve, float switch, mixer and recipe. Seed 'dosing' as that store's data.",
+ "dosing": {
+  "revision": 1,
+  "pumps": [
+   {
+    "id": "part_a",
+    "name": "Part A",
+    "volume_entity": "number.doser_a_volume",
+    "start_entity": "button.doser_a_start",
+    "dosing_entity": "binary_sensor.doser_a_dosing",
+    "dosing_prefix": "Dosing",
+    "power_entity": "switch.doser_a_power",
+    "flow_entity": "number.doser_a_flow",
+    "max_ml": 2000,
+    "restore_volume": true,
+    "stock_tank": null
+   },
+   {
+    "id": "part_b",
+    "name": "Part B",
+    "volume_entity": "number.doser_b_volume",
+    "start_entity": "button.doser_b_start",
+    "dosing_entity": "binary_sensor.doser_b_dosing",
+    "dosing_prefix": "Dosing",
+    "power_entity": "switch.doser_b_power",
+    "flow_entity": "number.doser_b_flow",
+    "max_ml": 2000,
+    "restore_volume": true,
+    "stock_tank": null
+   }
+  ],
+  "batch": {
+   "fill_valve": "switch.tank_fill",
+   "full_entity": "binary_sensor.tank_full",
+   "full_state": "on",
+   "fill_timeout_min": 20,
+   "mix_pump": "switch.tank_mixer",
+   "mix_valves": [],
+   "mix_power_sensor": null,
+   "mix_min_w": 0,
+   "premix_min": 2,
+   "postmix_min": 5,
+   "close_entities": [],
+   "hold_entity": "input_boolean.tank_dosing",
+   "filled_at_entity": "input_datetime.tank_filled_at",
+   "recipe": [
+    {
+     "pump": "part_a",
+     "ml": 400,
+     "ml_entity": null
+    },
+    {
+     "pump": "part_b",
+     "ml": 380,
+     "ml_entity": null
+    }
+   ]
+  },
+  "request": null,
+  "updated_at": "2026-10-14T21:32:14.650049+00:00"
+ }
+}

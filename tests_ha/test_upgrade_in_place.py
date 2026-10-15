@@ -12,6 +12,7 @@ straight on. To cover another kind of old install, add a snapshot rather than ha
 import json
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -495,6 +496,168 @@ async def test_a_3_0_0_app_on_cloudflare_whose_brain_never_acted_runs_without_je
         controller_for, monkeypatch, "options_3_0_0_jev_cf_quiet.json"
     )
     assert c.jev is None and built == []
+
+
+# ------------------------------------------------------------------ a Jev 3.11.1 install
+JEV_3_11_1 = "entry_3_11_1_pumped_room.json"
+
+
+async def test_a_3_11_1_room_keeps_every_entity_id_its_moved_ladder_and_its_dosing_setup(
+    hass, hass_storage
+):
+    """The last Jev release (tests_ha/fixtures/entry_3_11_1_pumped_room.json, recorded from 3.11.1's own
+    wizard and controller): every entity it registered keeps its id and has a state, except those this
+    code retires on purpose; each zone's ladder stays where 3.11.1's Auto setpoints moved it; the entry
+    is loaded as it is; and the dosing setup it saved is the one the controller app is shown."""
+    from custom_components.crop_steering import _RETIRED
+
+    seed = fixture(JEV_3_11_1)
+    dosing = fixture("dosing_3_11_1.json")["dosing"]
+    store = f"{DOMAIN}.dosing.{seed['entry_id']}"
+    hass_storage[store] = {"version": 1, "minor_version": 1, "key": store, "data": dosing}
+    entry, _seed = await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
+    assert (entry.version, entry.minor_version) == (seed["version"], seed["minor_version"])
+    assert entry.data == seed["data"] and entry.options == seed["options"]
+
+    registry = er.async_get(hass)
+    kept = [
+        entity_id
+        for entity_id, key in seed["registry"].items()
+        if re.sub(r"^zone_\d+_", "zone_", key) not in _RETIRED.get(entity_id.split(".")[0], ())
+    ]
+    assert len(kept) > 100
+    assert [e for e in kept if registry.async_get(e) is None] == []
+    assert [e for e in kept if hass.states.get(e) is None] == []
+
+    for entity_id, saved in seed["operator_tuned_numbers"].items():
+        tuned = saved[0] if isinstance(saved, list) else saved
+        state = hass.states.get(entity_id).state
+        if entity_id.startswith("number."):
+            assert float(state) == float(tuned), entity_id
+        else:
+            assert state == tuned, entity_id
+    for entity_id, value in seed["moved_by_the_controller"].items():
+        assert float(hass.states.get(entity_id).state) == value, entity_id
+    assert float(hass.states.get("number.crop_steering_lights_on_hour").state) == 6
+    assert float(hass.states.get("number.crop_steering_lights_off_hour").state) == 18
+
+    descriptor = hass.states.get(DESCRIPTOR).attributes
+    assert (descriptor["pump"], descriptor["mainline"], descriptor["plumbing"]) == (
+        "switch.irrigation_pump",
+        "switch.irrigation_main_line",
+        "pump_mainline_valves",
+    )
+    assert descriptor["setup_revision"] == 1
+
+    shown = hass.states.get("sensor.crop_steering_dosing_config")
+    assert int(shown.state) == dosing["revision"]
+    assert shown.attributes["pumps"] == dosing["pumps"]
+    assert shown.attributes["batch"] == dosing["batch"]
+
+
+def _jev_3_11_1_app(controller_for, monkeypatch, options):
+    """The real controller on the 3.11.1 room's app: its options file, and the /data/state.json and
+    /data/jev_usage.json 3.11.1 left, on the day that usage file was written. Jev's routes are stubbed:
+    `built` records every route list the brain was given."""
+    import functools
+
+    import jev_bridge
+    import jev_kit
+    from jev.client import Asker
+
+    usage = fixture("jev_usage_3_11_1.json")["usage"]
+    data = Path(os.environ["F2_STATE_PATH"]).parent
+    (data / "jev_usage.json").write_text(json.dumps(usage), encoding="utf-8")
+    noon = datetime.fromisoformat(usage["day"]).replace(hour=12).timestamp()
+    built, stub = [], jev_kit.FakeTransport({})
+    monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: built.append(found) or stub)
+    monkeypatch.setattr(
+        jev_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: noon)
+    )
+    state = fixture("state_3_11_1_learn_jev.json")["state"]
+    c, fake, _clock = controller_for(fixture(options)["options"], saved_state=state)
+    return c, fake, built, usage, state
+
+
+async def test_the_controller_carries_a_3_11_1_room_straight_on_with_its_learner_and_jev(
+    hass, controller_for, monkeypatch
+):
+    """Both layers updated on an armed 3.11.1 box on Cloudflare. The new controller resumes the adopted
+    setup with no disarm cycle, its brain starts on the same route with the same credentials and the
+    day's call count, every learned value (the working peak Jev held above the learned one included)
+    and the day before's peak load as they were, and writing the state back keeps every value 3.11.1
+    wrote."""
+    seed = fixture(JEV_3_11_1)
+    await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
+    hass.states.async_set(KILL, "on")  # armed and growing: nobody is going to disarm it
+    c, fake, built, usage, state = _jev_3_11_1_app(
+        controller_for, monkeypatch, "options_3_11_1_jev_cf.json"
+    )
+    room, old = c.rooms[0], state["default"]
+
+    assert room._setup_pending is None, room._setup_pending
+    assert room.setup_revision == 1
+    assert "Setup" not in (c._blocked(room, 1) or "")
+    assert c.jev is not None and c.jev.routes == ["Cloudflare"]
+    assert built[0][0].token == "fixture-token"
+    assert c.jev.asker.stats["calls"] == usage["calls"]  # the day's count survives the update
+    assert "setpoints" not in {j.name for j in c.jev.judges}  # the judges the operator chose
+    c._refresh_lights(room)
+    assert (room.lights_on_hour, room.lights_off_hour) == (6.0, 18.0)
+    for zone in (1, 2):
+        st, was = room.state[zone], old[str(zone)]
+        assert (st["phase"], st["peak"], st["peak_prev"], st["shots"], st["daily_vol"]) == (
+            was["phase"],
+            was["peak"],
+            was["peak_prev"],
+            was["shots"],
+            was["daily_vol"],
+        )
+        assert st["learn"] == was["learn"]
+        assert st["learn"]["peak_adj"] == 1.0 and st["learn"]["jev"]["nudged"] == ["peak"]
+
+    assert c._save_state()
+    saved = json.loads(Path(os.environ["F2_STATE_PATH"]).read_text(encoding="utf-8"))["default"]
+    assert saved["_setup"] == old["_setup"]
+    for zone in ("1", "2"):
+        written, was = saved[zone], old[zone]
+        assert {k: written[k] for k in was if k != "learn"} == {
+            k: v for k, v in was.items() if k != "learn"
+        }
+        assert {k: written["learn"][k] for k in was["learn"]} == was["learn"]
+
+    # ...and it still drives the room the way 3.11.1 did: pump, main line, valve.
+    for switch in (
+        "switch.crop_steering_system_enabled",
+        "switch.crop_steering_auto_irrigation_enabled",
+        "switch.crop_steering_zone_1_enabled",
+    ):
+        fake.set_state(switch, "on")
+    fake.calls.clear()
+    c._execute_shot(room, 1, 10, 5, flow_lps=0.05)
+    assert switch_calls(fake) == [
+        ("turn_on", "switch.irrigation_pump"),
+        ("turn_on", "switch.irrigation_main_line"),
+        ("turn_on", "switch.zone_1_valve"),
+        ("turn_off", "switch.zone_1_valve"),
+        ("turn_off", "switch.irrigation_main_line"),
+        ("turn_off", "switch.irrigation_pump"),
+    ]
+
+
+async def test_a_3_11_1_app_on_typesafe_keeps_its_brain_and_the_room_its_state(
+    hass, controller_for, monkeypatch
+):
+    seed = fixture(JEV_3_11_1)
+    await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
+    hass.states.async_set(KILL, "on")
+    c, _fake, built, _usage, state = _jev_3_11_1_app(
+        controller_for, monkeypatch, "options_3_11_1_jev_typesafe.json"
+    )
+    assert c.jev is not None and c.jev.routes == ["TypeSafe"]
+    assert built[0][0].token == "fixture-typesafe-key"
+    assert c.rooms[0]._setup_pending is None
+    assert c.rooms[0].state[1]["learn"] == state["default"]["1"]["learn"]
 
 
 # ------------------------------------------------------------------ an env-file era install
