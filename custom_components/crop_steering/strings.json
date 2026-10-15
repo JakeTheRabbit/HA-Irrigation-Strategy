@@ -964,7 +964,7 @@
         },
         "mutes": {
           "name": "Muted rooms",
-          "description": "A map from each room prefix to the time that its mute ends. A muted room sends only emergency notifications. The map replaces all mutes. Empty: the integration keeps the stored mutes. Use an ISO time with its offset, at most 30 days ahead. Only an administrator can mute a room. Example: `{\"f1_\": \"2026-10-20T08:00:00+13:00\"}`."
+          "description": "A map from each room prefix to the time that its mute ends. A muted room sends only emergency notifications. The map replaces all mutes. Empty: the integration keeps the stored mutes. Use an ISO time with its offset, at most 30 days ahead. Only an administrator can mute a room. Example: the key `f1_` with the value `2026-10-20T08:00:00+13:00`."
         }
       }
     },
