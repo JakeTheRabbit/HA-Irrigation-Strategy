@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDemo } from "./demo";
 import { buildRoom, discoverRooms } from "./model";
-import { probeHealth, roomProbeIds, STUCK_MS, zoneProbes } from "./probes";
+import { fusionMethod, probeHealth, roomProbeIds, STUCK_MS, zoneProbes } from "./probes";
 
 const now = new Date(2026, 8, 28, 16, 0).getTime();
 const H = 3_600_000;
@@ -99,5 +99,27 @@ describe("a zone's probes", () => {
         )
         .sort(),
     );
+  });
+});
+
+describe("how a zone's reading is made from its probes", () => {
+  const fused = (attributes: Record<string, unknown>) =>
+    ({ entity_id: "sensor.crop_steering_vwc_zone_1", state: "51", attributes }) as never;
+  it("names the method the zone steered by", () => {
+    expect(fusionMethod(fused({ method: "Median", steered_by: "Median" }))).toBe(
+      "median of its probes",
+    );
+    expect(fusionMethod(fused({ method: "Lowest", steered_by: "Lowest" }))).toBe(
+      "lowest of its probes",
+    );
+  });
+  it("says why Lowest or Highest fell back to the median", () => {
+    expect(fusionMethod(fused({ method: "Lowest", steered_by: "Median" }))).toBe(
+      "median of its probes: Lowest needs three that agree",
+    );
+  });
+  it("says nothing for an older integration", () => {
+    expect(fusionMethod(fused({ used: ["sensor.a"] }))).toBeNull();
+    expect(fusionMethod(undefined)).toBeNull();
   });
 });

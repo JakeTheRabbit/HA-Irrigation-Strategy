@@ -64,6 +64,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-404](#cs-404) | Automatic targets paused | Warning | Notification |
 | [CS-405](#cs-405) | Timezone mismatch, the day may be shifted | Warning | Notification |
 | [CS-501](#cs-501) | Much less water than the other zones | Information | Notification |
+| [CS-502](#cs-502) | Too few probes agree for Lowest or Highest | Warning | Notification |
 | [CS-503](#cs-503) | Moisture probe set aside for its unit | Warning | Notification |
 | [CS-601](#cs-601) | Kill switch helper missing | Critical | Repairs card |
 | [CS-602](#cs-602) | Engine not running | Warning | Repairs card |
@@ -790,6 +791,27 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Compare the plants, and check the probe's position.
 - Do a catch test on this zone and a neighbour.
+
+<a id="cs-502"></a>
+
+### CS-502: Too few probes agree for Lowest or Highest
+
+*Warning · Notification*
+
+**What it means.** The zone's moisture or EC is set to steer on its lowest or highest probe, which needs three probes that agree. Fewer do, so the zone steers on their median instead. A probe far from the others is left out of the reading.
+
+**Watering meanwhile.** Carries on, steered by the median of the probes that are left.
+
+**Likely causes**
+
+- A probe pulled out of its cube, or sitting in a puddle, reads far from the others.
+- A probe is offline or not reporting.
+- The zone has only one or two probes.
+
+**Suggested fixes**
+
+- Check the probes the zone's reading leaves out, under the zone's Probes.
+- With fewer than three probes, choose Median for the zone (its "From Probes" setting).
 
 <a id="cs-503"></a>
 

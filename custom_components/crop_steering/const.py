@@ -30,6 +30,14 @@ VWC_ADJUSTMENT_PERCENT = 5.0
 # while another probe in the zone is still reporting.
 PROBE_RANGE = {"vwc": (0.0, 100.0), "ec": (0.0, 20.0)}
 PROBE_STALE_SECONDS = 20 * 60
+# How a zone's probes become its one reading, chosen per zone for moisture and EC apart. Median is
+# the first option, so the default. Lowest and Highest let one probe steer the zone, so they need
+# PROBE_EXTREME_MIN probes that agree; with fewer the zone steers on the Median (CS-502).
+PROBE_METHODS = ["Median", "Average", "Lowest", "Highest"]
+PROBE_EXTREME_MIN = 3
+# A probe further from the zone's median than the larger of this many units and this share of the
+# median reads something no probe beside it agrees with (pulled out of its cube, in a puddle).
+PROBE_FAR = {"vwc": (15.0, 0.4), "ec": (1.0, 0.4)}
 
 # The four moisture levels, (lowest, highest) %: each setting accepts exactly this, and grow plans,
 # Auto setpoints and the engine (crop-steering-engine _PARAM_BOUNDS) use the same range, so the

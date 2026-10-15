@@ -2158,6 +2158,31 @@ class Controller:
             )
         return p
 
+    def _watch_probe_methods(self, room):
+        """CS-502: a zone set to steer on its Lowest or Highest probe that has too few probes that
+        agree, so the integration steers it on their median (calculations.fuse_probes publishes the
+        choice as `method`, what it used as `steered_by`). Watering carries on, on the median."""
+        for zone in room.zones:
+            for metric, what in (("vwc", "moisture"), ("ec", "EC")):
+                looking = self._fused_id(room.prefix, metric, zone, room.zones[zone].get(metric))
+                attrs = ha_get(looking)[1] or {}
+                chosen, steered = attrs.get("method"), attrs.get("steered_by")
+                if not chosen or not steered or chosen == steered:
+                    continue
+                left_out = ", ".join(sorted((attrs.get("excluded") or {}).keys())) or "none"
+                self._alert(
+                    f"probe_method_{room.slug}_z{zone}_{metric}",
+                    "CS-502",
+                    f"too few {what} probes agree for {chosen}",
+                    f"This zone's {what} is set to steer on its {chosen.lower()} probe, which needs "
+                    f"three probes that agree. Fewer do, so it steers on their {steered.lower()} "
+                    "instead and watering carries on. Check the probes left out of the reading "
+                    "(one pulled out of its cube, or in a puddle), or choose Median for the zone."
+                    f"\n\nSensor: {looking}\nLeft out: {left_out}",
+                    room=room,
+                    zone=zone,
+                )
+
     def _snapshot(self, room, zone, now, lights_on, lights_just_on):
         st = room.state[zone]
         vwc = self._read_sensor(
@@ -5276,6 +5301,7 @@ class Controller:
                 room=room,
                 zone=z,
             )
+        self._watch_probe_methods(room)
         if getattr(self, "jev", None) is not None:
             try:
                 jev_bridge.siblings(self, room, snaps, params, now)

@@ -28,7 +28,7 @@ import {
 import { referenceLines } from "@/lib/sensor-context";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { jevChip, TARGET_GROUPS } from "@/lib/targets";
-import { PROBE_TONE, zoneProbes } from "@/lib/probes";
+import { fusionMethod, PROBE_TONE, zoneProbes } from "@/lib/probes";
 import type { Controller, Zone } from "@/lib/types";
 import { dayWord } from "@/lib/utils";
 import { waitingText } from "@/lib/waiting-for";
@@ -391,6 +391,7 @@ function ZoneProbes({
           const spread =
             typeof fused?.attributes.spread === "number" ? fused.attributes.spread : null;
           const mine = probes.filter((probe) => probe.kind === kind);
+          const method = fusionMethod(fused);
           return (
             <div className="zone-probe-group" key={kind}>
               <h3>
@@ -402,6 +403,7 @@ function ZoneProbes({
                   {spread !== null &&
                     mine.filter((probe) => probe.used).length > 1 &&
                     ` · probes ${number(spread, kind === "ec" ? 2 : 1)} apart`}
+                  {method && ` · the ${method}`}
                 </span>
               </h3>
               <ul className="zone-probe-list">
