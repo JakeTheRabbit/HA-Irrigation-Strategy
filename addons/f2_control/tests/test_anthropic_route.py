@@ -133,6 +133,32 @@ def test_every_sdk_error_becomes_a_key_free_string(error, said, effect):
     assert (answers, usage) == (None, None) and got == said and B.SENTINEL not in got
 
 
+def test_a_request_that_may_have_been_billed_is_charged_and_the_budget_still_stops_retries():
+    meter = Meter(0.0008, clock=lambda: 1000.0)
+    fake = B.FakeClient(B.APITimeoutError("slow"))
+    routes = client.Routes([client.Route("Anthropic", lambda *a, **kw: _call(fake, meter=meter), "anthropic",
+                                         B.SENTINEL)], tries=3, sleep=lambda s: None)
+    assert routes("anthropic", B.SENTINEL, B.STATE, B.QUESTIONS)[2] == "Anthropic: budget spent"
+    assert meter.snapshot()["cost_usd"] > 0 and meter.state() == "budget_spent"
+    assert len(fake.requests) == 1  # the retry found the budget spent and sent nothing
+
+
+def test_an_api_error_or_a_connection_never_opened_is_not_charged():
+    refused = B.APIConnectionError("no route")
+    refused.__cause__ = type("ConnectError", (Exception,), {})()
+    for error in (B.APIStatusError(503), refused):
+        meter = Meter(1.0, clock=lambda: 1000.0)
+        _call(B.FakeClient(error), meter=meter)
+        assert meter.snapshot()["cost_usd"] == 0.0
+
+
+def test_a_response_is_charged_before_any_other_bookkeeping(monkeypatch):
+    meter = Meter(1.0, clock=lambda: 1000.0)
+    monkeypatch.setattr(client, "add_usage", lambda *a: 1 / 0)
+    assert _call(B.FakeClient(B.answering()), meter=meter) == (None, None, INTERNAL)
+    assert meter.snapshot()["cost_usd"] > 0
+
+
 def test_three_bad_requests_in_a_row_make_the_brain_unavailable_for_an_hour():
     now = {"t": 1000.0}
     meter = Meter(1.0, clock=lambda: now["t"])

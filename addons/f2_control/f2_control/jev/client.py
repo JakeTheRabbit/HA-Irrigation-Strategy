@@ -10,6 +10,7 @@ pass.
 """
 from __future__ import annotations
 
+import json
 import queue
 import re
 import threading
@@ -391,6 +392,21 @@ def classify(e, meter=None):
     return name[:60]  # an unknown transport fault: worth another try
 
 
+def maybe_billed(e):
+    """An SDK error from a request the API may have taken and billed: no HTTP status came back (a timeout, a dropped
+    connection, a reply that would not parse) and the connection was not refused before anything was sent."""
+    if isinstance(getattr(e, "status_code", None), int):
+        return False  # the API answered with an error, which is not billed
+    return type(e.__cause__).__name__ not in ("ConnectError", "ConnectTimeout")
+
+
+def estimate(request):
+    """A usage block for a request whose reply was never read, on the dear side: one prompt token for every two
+    characters sent, all at the 1-hour cache-write rate (the dearest prompt rate), and all of max_tokens as output."""
+    return {"cache_creation_input_tokens": len(json.dumps(request, default=str)) // 2,
+            "output_tokens": int(request.get("max_tokens") or 0)}
+
+
 def _clean(text):
     """A model's text as the journal keeps it: one line, no control characters, no entity id or key, at most
     MAX_TEXT."""
@@ -472,7 +488,8 @@ def call_anthropic(account, token, state, questions, gateway=None, timeout=20.0,
     `token` (the key) only ever built `client`; `account` and `gateway` are unused. `state` is the judge's evidence
     with the "_brain" key the enrichment hook added (none: NO_CONTEXT, nothing is sent). Lane i carries every
     question's phrasing i, one request each, the evidence block built once and cached between them. Every response
-    is charged to the Meter before it is read. One lane answering is an answer (the council sees one phrasing and
+    is charged to the Meter before it is read, and a request that failed once it may have been sent is charged an
+    estimate (estimate()), so a run of timeouts still spends the budget. One lane answering is an answer (the council sees one phrasing and
     counts it unsure); once any lane was billed, the error returned is never one Routes retries, so a call is never
     billed twice."""
     if client is None:
@@ -487,18 +504,19 @@ def call_anthropic(account, token, state, questions, gateway=None, timeout=20.0,
             if meter is not None and not meter.can_spend():
                 errors.append(BUDGET)
                 break
+            request = prompt.request(model, evidence, prompt.questions(snap_id, i, lane), prompt.max_tokens(lane))
             try:
-                msg = client.messages.create(**prompt.request(model, evidence, prompt.questions(snap_id, i, lane),
-                                                              prompt.max_tokens(lane)),
-                                             timeout=min(timeout, LANE_TIMEOUT_S))
+                msg = client.messages.create(**request, timeout=min(timeout, LANE_TIMEOUT_S))
             except Exception as e:  # noqa: BLE001 - classify() maps every SDK error to a key-free string
+                if meter is not None and maybe_billed(e):
+                    meter.charge(estimate(request), model)  # counted as billed, so retries stay inside the budget
                 errors.append(redact(classify(e, meter), token))
                 break
             billed = True
-            add_usage(usage, msg.usage, model)
             if meter is not None:
-                meter.charge(msg.usage, model)
+                meter.charge(msg.usage, model)  # first, so no fault in the bookkeeping below leaves it uncounted
                 meter.good()
+            add_usage(usage, msg.usage, model)
             if msg.stop_reason == "refusal":
                 usage["refusals"] += 1
                 category = getattr(getattr(msg, "stop_details", None), "category", None)
