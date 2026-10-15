@@ -305,7 +305,8 @@ The AI assistant is not available on 32-bit ARM (armv7). On armv7, the controlle
 | --- | --- | --- |
 | `brain_provider` | `auto` | `rules`: no AI assistant. `claude_haiku`: the AI assistant with your Anthropic key. `jev_legacy`: the retired Jev routes. `auto`: keeps a Jev route that ran before, else rules. |
 | `anthropic_api_key` | empty | Your Anthropic API key. It is a password field. The controller never shows, logs or publishes it. |
-| `anthropic_model` | `claude-haiku-5-5` | Also `claude-sonnet-5-5` or `claude-opus-5-5`. With another model, the controller uses its rules. |
+| `anthropic_model` | `claude-haiku-5-5` | Also `claude-sonnet-5-5` or `claude-opus-5-5`. With another model, the controller uses its rules. With a router, also a model after a router prefix, for example `cc/claude-haiku-5-5`. |
+| `anthropic_base_url` | empty | The address of an Anthropic-compatible router, for example `http://router.example.local:20128`. Empty: the Anthropic API. The controller sends your key to this address, so use only a router that you control. If the router does not answer, the controller uses its rules. |
 | `anthropic_daily_budget_usd` | US$1.00 | The most that the AI assistant can spend from one lights-on to the next. When the budget is spent, the controller uses its rules until the next lights-on, and alert CS-708 tells you. With 0, the AI assistant never asks. |
 | `brain_dry_run` | off | On: the AI assistant judges, and the log shows its decisions. It changes nothing. |
 | `jev_judges` | `all` | The judges that can act. Remove a judge from the list to stop it. |

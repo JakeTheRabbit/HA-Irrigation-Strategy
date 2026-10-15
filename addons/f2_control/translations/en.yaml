@@ -150,7 +150,19 @@ configuration:
       The Claude model that the AI assistant uses: claude-haiku-5-5 (default),
       claude-sonnet-5-5 or claude-opus-5-5. A larger model costs more for each call, so the
       same AI budget gives fewer calls. Any other model name makes the controller use its
-      own rules, because this release does not know the price of that model.
+      own rules, because this release does not know the price of that model. With a
+      router in anthropic_base_url, you can also put a router prefix before the model
+      name, for example cc/claude-haiku-5-5. The AI budget uses the price of the model
+      after the prefix.
+  anthropic_base_url:
+    name: Anthropic-compatible router
+    description: >-
+      The address of an Anthropic-compatible router that sends the calls of the AI
+      assistant to Claude, for example http://router.example.local:20128. Blank (the
+      default): the controller calls the Anthropic API directly. The controller sends
+      your key in anthropic_api_key to this address, so use only a router that you
+      control. If the router does not answer, the controller uses its own rules for that
+      decision.
   anthropic_daily_budget_usd:
     name: AI budget (US$)
     description: >-

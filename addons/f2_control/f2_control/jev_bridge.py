@@ -14,8 +14,8 @@ from functools import partial
 
 from jev import client as jev_client
 from jev.brain import Brain
-from jev.client import (DEFAULT_MODEL, PRICES, Asker, Meter, Route, Routes, anthropic_key, call, call_anthropic,
-                        call_typesafe, make_client)
+from jev.client import (DEFAULT_MODEL, PRICES, Asker, Meter, Route, Routes, anthropic_base_url, anthropic_key,
+                        base_url_ok, call, call_anthropic, call_typesafe, make_client, price_key, show_url)
 from jev.context import Shot, ZoneContext, ZoneHistory, response, words_response
 from jev.doctrine import DEFAULT_ARC, ArcInvalid, stage_intent, stage_rows
 from jev.doctrine import STAGE_ARC as STAGE_ROWS
@@ -132,6 +132,7 @@ def resolve_provider(options, cf, data):
     provider = provider if provider in PROVIDERS else "auto"
     model = str(options.get("anthropic_model") or DEFAULT_MODEL).strip()
     key = bool(anthropic_key(options))
+    base = anthropic_base_url(options)
     legacy = bool(routes(options, cf))
 
     def rules(state, words, notice=None):
@@ -142,10 +143,14 @@ def resolve_provider(options, cf, data):
     if provider == "claude_haiku":
         if not key:
             return rules("rules_no_key", "Rules: no Anthropic key.")
-        if model not in PRICES:
+        if base and not base_url_ok(base):
+            return rules("start_failed", "Rules: anthropic_base_url is not an http or https address. Correct it or "
+                                         "make it blank.")
+        if price_key(model, routed=bool(base)) is None:
             return rules("model_invalid", f"Rules: this release does not know the price of {model}, so it cannot keep "
-                                          f"to your budget. Use {', '.join(PRICES)}.")
-        if jev_client.anthropic is None:
+                                          f"to your budget. Use {', '.join(PRICES)}"
+                                          + (", or one of them after a router prefix (prefix/model)." if base else "."))
+        if jev_client.anthropic is None and not base:
             return rules("sdk_missing", "The Claude brain is not available on this device (32-bit ARM). Rules are "
                                         "running.")
         dry = options.get("brain_dry_run") is True
@@ -174,7 +179,7 @@ def start_failed():
 
 def build(options, cf, state_path, log, status=None):
     """The brain, or None when rules run (BrainStatus says why). Under claude_haiku its one route is the Anthropic
-    API with the key, a Meter for the budget and the cached prompt; under jev_legacy every legacy route it has,
+    API (or the router at anthropic_base_url) with the key, a Meter for the budget and the cached prompt; under jev_legacy every legacy route it has,
     TypeSafe first, each retried while a failure may pass (jev.client.Routes), exactly as before."""
     data = os.path.dirname(state_path) or "."
     status = status or resolve_provider(options, cf, data)
@@ -202,9 +207,9 @@ def build(options, cf, state_path, log, status=None):
         budget = 1.0 if budget is None else max(0.0, float(budget))
         meter = Meter(budget, status.model, warn_pct=float(options.get("jev_budget_warn_pct", 80)))
         prompt = Prompt(rows, arc if rows else None)
-        key = anthropic_key(options)
+        key, base = anthropic_key(options), anthropic_base_url(options)
         found = [Route("Anthropic", partial(call_anthropic, model=status.model, prompt=prompt, meter=meter,
-                                            client=make_client(key)), "anthropic", key)]
+                                            client=make_client(key, base)), "anthropic", key)]
     else:
         found = routes(options, cf)
     first = found[0]
@@ -215,6 +220,7 @@ def build(options, cf, state_path, log, status=None):
     names = [r.name for r in found]
     if meter is not None:
         log(f"brain: claude_haiku, model {status.model}, budget US${meter.budget:.2f} until lights-on, key set"
+            + (f", through the router at {show_url(base)}" if base else "")
             + (", advising only (dry run)" if dry else "") + f", judges {', '.join(sorted(allowed))}")
         log(prompt.describe())
     else:

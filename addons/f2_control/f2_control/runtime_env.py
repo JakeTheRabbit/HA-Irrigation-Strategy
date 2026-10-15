@@ -492,6 +492,7 @@ OPTION_TYPES = {
     "stage_arc": "list(slab_default)?",
     "anthropic_api_key": "password?",
     "anthropic_model": "str?",
+    "anthropic_base_url": "str?",
     "anthropic_daily_budget_usd": "float(0,1000)?",
     "brain_dry_run": "bool?",
     "cf_account_id": "str?",
