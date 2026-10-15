@@ -316,3 +316,20 @@ async def test_an_upgraded_room_keeps_its_lights_hours_until_configure_changes_t
     await _save_map(hass, entry, zones=zones, lights_on_hour=7, lights_off_hour=20)
     assert _lights(hass, prefix="") == (7.0, 20.0)
 
+
+
+async def test_lights_on_and_off_at_the_same_hour_are_refused_and_nothing_is_written(hass):
+    """The controller reads equal hours as lights never on, and would keep every zone in its overnight phase all
+    day. Configure refuses them, says why, and writes neither hour; swapping the two hours still saves."""
+    entry = await _install(hass)
+    await _set_lights(hass, 6, 22)
+    revision = entry.data["setup_revision"]
+    flow = await _open(hass, entry, "edit_zones")
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"num_zones": 1})
+    answers = {**_shown(flow), **_suggested(flow), "lights_on_hour": 8, "lights_off_hour": 8}
+    result = await hass.config_entries.options.async_configure(flow["flow_id"], answers)
+    assert result["type"] is FlowResultType.FORM and result["step_id"] == "edit_zones_map"
+    assert "lights never on" in result["description_placeholders"]["error"]
+    assert _lights(hass) == (6.0, 22.0) and entry.data["setup_revision"] == revision
+    await _save_map(hass, entry, lights_on_hour=22, lights_off_hour=6)
+    assert _lights(hass) == (22.0, 6.0)

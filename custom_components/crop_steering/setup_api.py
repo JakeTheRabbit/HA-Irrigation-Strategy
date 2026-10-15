@@ -99,6 +99,22 @@ def engine_flag(hass, data):
     return room_gate(hass, data.get("room_prefix", ""), data)
 
 
+LIGHTS_SAME_HOUR = (
+    "Lights on and lights off at the same hour read as lights never on, so the controller "
+    "would keep every zone in its overnight phase. A room lit around the clock is not "
+    "supported yet: set the hours the lights switch on and off"
+)
+
+
+def _same_lights_hour(parameters):
+    """True when a setup's two lights hours are the same hour."""
+    try:
+        on, off = parameters["lights_on_hour"], parameters["lights_off_hour"]
+        return int(round(float(on))) == int(round(float(off)))
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
 def safety_blockers(hass, entry=None, proposed=None):
     """Require affected engines and union of old/new plumbing definitively OFF."""
     old = effective(entry) if entry else {}
@@ -130,6 +146,8 @@ def safety_blockers(hass, entry=None, proposed=None):
         for eid in sorted(controls | entities)
         if (blocker := _off_blocker(hass, eid))
     ]
+    if _same_lights_hour((proposed or {}).get("parameters") or {}):
+        blockers.append(LIGHTS_SAME_HOUR)
     plan = _plan_blocker(hass, entry, proposed)
     return blockers + [plan] if plan else blockers
 
