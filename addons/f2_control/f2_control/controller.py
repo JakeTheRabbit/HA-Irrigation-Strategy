@@ -487,6 +487,17 @@ def _pause(seconds, deadline=None):
     time.sleep(seconds if deadline is None else max(0.0, min(seconds, deadline.until - time.monotonic())))
 
 
+# How a switch failed to read OFF after a close (Controller._close_failures), in the words the
+# hardware fault (CS-301) names it with: in its notification, its log line and the zone's status.
+CLOSE_FAILURES = {
+    "refused": "was not switched off: Home Assistant returned an error",
+    "on": f"still read ON {CONFIRM_TIMEOUT_S + CONFIRM_RETRY_S:g} s after it was switched off",
+    "unavailable": "read unavailable: Home Assistant could not reach it",
+    "unknown": "read unknown instead of OFF",
+    "unreadable": "could not be read from Home Assistant",
+    "late": f"reported OFF only after the {CONFIRM_TIMEOUT_S + CONFIRM_RETRY_S:g} s check",
+}
+
 # The shortest shot the controller runs, in seconds (a shot sized shorter is lengthened to this).
 MIN_SHOT_S = 5
 
@@ -1779,7 +1790,7 @@ class Controller:
             last = seen.get(per, seen.get(glob))
             if last is not None:  # read earlier in this run: a real value, not a guess
                 return last
-        return float(default)
+        return None if default is None else float(default)
 
     def _room_duration_cap(self, room):
         """Read the canonical room cap, or its same-room legacy entity if absent."""
@@ -2660,12 +2671,15 @@ class Controller:
         comes), so a stale "Room off" is never repeated for it while it waters."""
         room._statuses, room._status_at = {}, {}
         snapshot = getattr(room, "strategy_snapshot", None)
+        # A hardware fault holds every zone of the room, wanting water or not: none reads "Optimal".
+        held = self._hardware_fault_short(room)
         for zone, (fire, _size, reason) in decisions.items():
             if not fire:
                 self._publish_zone_status(
                     room, zone,
-                    zone_status_label(room.state[zone]["phase"], False, strategy_block(snapshot, zone),
-                                      zone not in snaps, reason),
+                    zone_status_label(room.state[zone]["phase"], False,
+                                      held or strategy_block(snapshot, zone),
+                                      not held and zone not in snaps, reason),
                     reason,
                 )
         self._heartbeat(room, now, self._hardware_fault_block(room))
@@ -3545,7 +3559,14 @@ class Controller:
     @staticmethod
     def _fault_record(fault, fallback_entities=()):
         entities = fault.get("entities") if isinstance(fault, dict) else None
+        # Which switches did not read OFF, and how: a fault saved by an older controller has none.
+        switches = fault.get("switches") if isinstance(fault, dict) else None
         return {
+            "switches": [
+                s
+                for s in (switches if isinstance(switches, list) else [])
+                if isinstance(s, dict) and isinstance(s.get("problem"), str)
+            ],
             "reason": (
                 str(fault.get("reason", "unconfirmed hardware close"))
                 if isinstance(fault, dict)
@@ -3560,15 +3581,31 @@ class Controller:
             ),
         }
 
+    @staticmethod
+    def _fault_words(fault):
+        """What a hardware fault was, in words: where, then each switch that did not read OFF and
+        how ("zone 1 shot end: Pump (switch.pump) still read ON 16 s after it was switched off")."""
+        told = []
+        for s in fault.get("switches") or []:
+            what = CLOSE_FAILURES.get(s["problem"], f"read \"{s.get('state')}\" instead of OFF")
+            entity = s.get("entity_id")
+            if not entity:
+                told.append(f"a pump or valve {what}")
+                continue
+            name = s.get("name")
+            told.append(f"{name} ({entity}) {what}" if name and name != entity else f"{entity} {what}")
+        return f"{fault['reason']}: {'; '.join(told)}" if told else fault["reason"]
+
     def _hardware_fault_block(self, room):
         entities = self._hardware_entities(room)
         for owner in self.rooms:
             fault = owner.hardware_fault
             if fault and (owner is room or entities.intersection(fault["entities"])):
+                if owner is room:
+                    return f"hardware fault (CS-301): {self._fault_words(fault)}"
                 return (
-                    f"hardware fault in {owner.slug}: {fault['reason']}; turn OFF "
-                    f"{room_gate(owner)} and engines sharing this hardware, "
-                    "verify all hardware OFF, then re-arm"
+                    f"hardware fault in {self._where(owner) or owner.slug} (CS-301), which shares "
+                    f"this hardware: {self._fault_words(fault)}"
                 )
         discovered = {r.slug for r in self.rooms}
         for slug, block in getattr(self, "_saved_room_blocks", {}).items():
@@ -3588,10 +3625,18 @@ class Controller:
                 )
         return None
 
-    def _latch_hardware_fault(self, room, reason):
+    def _hardware_fault_short(self, room):
+        """A hardware fault holding this room, as each zone's status says it: briefly, with its code
+        ("hardware fault (CS-301)"); the room's alert and notification name the switch. None when
+        there is none."""
+        block = self._hardware_fault_block(room)
+        return block.split(":", 1)[0] if block else None
+
+    def _latch_hardware_fault(self, room, reason, switches=None):
         room.hardware_fault = {
             "reason": reason,
             "entities": sorted(self._hardware_entities(room)),
+            "switches": list(switches or []),
         }
         saved = self._save_state()
         self._alert_hardware_fault(room, saved)
@@ -3601,17 +3646,16 @@ class Controller:
             f"hardware_fault_{room.slug}",
             "CS-301",
             "CRITICAL hardware fault, watering stopped",
-            "A pump or valve did not confirm it had switched OFF, so watering is stopped on this "
-            "hardware and in every room that shares it. Turn OFF "
-            f"{room_gate(room)} and every engine sharing this hardware, then check every pump "
-            "and valve. The hold clears only once all of them read OFF; then turn the engine "
-            "back on."
+            f"{self._fault_words(room.hardware_fault)}.\n\nA pump or valve did not confirm it had "
+            "switched OFF, so watering is stopped on this hardware and in every room that shares "
+            f"it. Switch watering off ({room_gate(room)}) in each of those rooms, then check that "
+            "switch at the device and in Home Assistant. The hold clears by itself within a minute "
+            "once every pump and valve reads OFF; then switch watering back on."
             + (
                 ""
                 if saved
                 else " THE FAULT COULD NOT BE SAVED: do not restart the controller before it is repaired."
-            )
-            + f"\n\nDetail: {room.hardware_fault['reason']}.",
+            ),
             room=room,
         )
 
@@ -3640,7 +3684,8 @@ class Controller:
                 room.shot_inflight = inflight
                 continue
             log(
-                f"[{room.slug}] hardware hold cleared: engine OFF and hardware verified OFF; re-arm required"
+                f"[{room.slug}] hardware hold (CS-301) cleared: watering is off and every pump and valve "
+                "reads OFF; switch watering back on to resume"
             )
             # The next hold is a new fault: announce it, don't take it for this one still quiet.
             self._alerted.pop(f"hardware_fault_{room.slug}", None)
@@ -3712,9 +3757,10 @@ class Controller:
             return
         close, left, unsure, why = self._inflight_plan(room, rec, reads)
         if close:
-            if not self._switch_off_confirmed(close):
+            failures = self._switch_off_failures(close)
+            if failures:
                 if not room.hardware_fault:
-                    self._latch_hardware_fault(room, f"zone {zone} interrupted shot: close not confirmed")
+                    self._latch_hardware_fault(room, f"zone {zone} interrupted shot", failures)
                 self._alert(
                     f"inflight_{room.slug}",
                     "CS-308",
@@ -3812,6 +3858,47 @@ class Controller:
             elif v not in ("unknown", "unavailable", "") and str(v).lower() in ON_STATES:
                 return True
         return None if unread else False
+
+    def _switch_off_failures(self, entities):
+        """As _switch_off_confirmed, saying which did not read back OFF and how (_close_failures):
+        empty when every one did."""
+        refused = []
+        for index, entity in enumerate(entities):
+            if index == 1:
+                time.sleep(1)
+            if not hw_call(entity, False):
+                refused.append(entity)
+        if not refused and self._confirm_switches(entities, "off"):
+            return []
+        return self._close_failures(entities, refused)
+
+    @staticmethod
+    def _close_failures(entities, refused=()):
+        """Each switch that did not read OFF after a close, and how (CLOSE_FAILURES): Home Assistant
+        refused to switch it off, or it reads ON, unavailable, unknown or nothing. When every one
+        reads OFF by now, one was late: the read-back gave up first, so the hold stands and says so."""
+        failures = []
+        for entity in entities:
+            state, attributes = hw_get(entity)[:2]
+            if entity not in refused and state == "off":
+                continue
+            problem = (
+                "refused"
+                if entity in refused
+                else state
+                if state in ("on", "unavailable", "unknown")
+                else "unreadable"
+                if state is None
+                else "other"
+            )
+            record = {"entity_id": entity, "problem": problem}
+            name = attributes.get("friendly_name") if isinstance(attributes, dict) else None
+            if isinstance(name, str) and name.strip():
+                record["name"] = name.strip()
+            if problem == "other":
+                record["state"] = state
+            failures.append(record)
+        return failures or [{"entity_id": None, "problem": "late"}]
 
     def _switch_off_confirmed(self, entities, deadline=None):
         """Switch these off, the valve first and then back up the line as after a normal shot, and
@@ -3934,8 +4021,9 @@ class Controller:
         left = []
         if pump and reads[pump][0] != "off":
             (left if any(self._on(f, False) for f in self.hold_entities) else close).append(pump)
-        if close and not self._switch_off_confirmed(close):
-            self._latch_hardware_fault(room, f"zone {zone} shot cut short: {', '.join(close)} close not confirmed")
+        failures = self._switch_off_failures(close) if close else []
+        if failures:
+            self._latch_hardware_fault(room, f"zone {zone} shot cut short", failures)
         else:
             room.shot_inflight = None  # as after a normal close: nothing of this shot's is left open
         changed = _aware(getattr(reads[valve], "last_changed", None)) if reads[valve][0] == "off" else None
@@ -4132,7 +4220,7 @@ class Controller:
             # pump-relay-default-off / independent watchdog) can. So check EVERY turn_off + the
             # read-back and ALERT loudly on any non-close (the old code ignored turn_off failures
             # and a dead-HA read-back masked a stuck-open valve as "closed" — silent danger).
-            close_ok = hw_call(valve, False)
+            refused = [] if hw_call(valve, False) else [valve]
             # Delivery is estimated, not flow-metered. Include the acknowledgement
             # interval conservatively because the exact physical close time is unknown.
             elapsed = max(elapsed, time.monotonic() - valve_started)
@@ -4140,20 +4228,21 @@ class Controller:
             if upstream:
                 time.sleep(1)
             for ent in upstream:
-                close_ok = hw_call(ent, False) and close_ok
+                if not hw_call(ent, False):
+                    refused.append(ent)
             # Only a definitive OFF is safe, including pump/mainline read-back.
             closed = self._confirm_switches((valve, *upstream), "off")
-            if (not close_ok or not closed) and _GATE.state == "all":
+            if (refused or not closed) and _GATE.state == "all":
                 # Refused, not stuck: what is not confirmed stays recorded for the reconciler, which
                 # reads it back once Home Assistant accepts this controller again.
                 log(f"[{room.slug}] Z{zone} shot closed with Home Assistant refusing: its offs were sent, "
                     "not read back; left recorded")
-            elif not close_ok or not closed:
+            elif refused or not closed:
+                # Which one, and how, as it is now: before the second try below changes it.
+                failures = self._close_failures((valve, *upstream), refused)
                 for ent in reversed(upstream):
                     hw_call(ent, False)
-                self._latch_hardware_fault(
-                    room, f"zone {zone} valve/pump/mainline close not confirmed"
-                )
+                self._latch_hardware_fault(room, f"zone {zone} shot end", failures)
             else:
                 room.shot_inflight = None  # closed and read back OFF: this shot left nothing open
             shutdown_checked = True
@@ -4207,17 +4296,19 @@ class Controller:
                     closing = [
                         e for e in (valve, hw.get("mainline"), hw.get("pump")) if e
                     ]
-                    close_ok = True
-                    for ent in closing:
-                        close_ok = (
-                            hw_call(ent, False) and close_ok
-                        )
+                    refused = [
+                        ent
+                        for ent in closing
+                        if not hw_call(ent, False)
+                    ]
                     # Read back as patiently as after a normal close: a plug that reports OFF 1.6 s
                     # late is not a stuck pump (the 15 Sep false hold, on this very path).
                     closed = self._confirm_switches(closing, "off")
-                    if not close_ok or not closed:
+                    if refused or not closed:
                         self._latch_hardware_fault(
-                            room, f"zone {zone} error cleanup close not confirmed"
+                            room,
+                            f"zone {zone} shot error cleanup",
+                            self._close_failures(closing, refused),
                         )
                     else:
                         room.shot_inflight = None
@@ -5267,9 +5358,11 @@ class Controller:
                         "max_ec_limit": p.max_ec,
                     },
                 )
+                held = self._hardware_fault_short(room)
                 self._publish_zone_status(
                     room, zone,
-                    zone_status_label(d["phase"], d["fire"], d["block"], d["blind"], d["reason"]),
+                    zone_status_label(d["phase"], False, held, False, d["reason"]) if held
+                    else zone_status_label(d["phase"], d["fire"], d["block"], d["blind"], d["reason"]),
                     d["reason"],
                 )
                 # Advisory Vmax (detected P1 wet-up ceiling); operator eyeballs it,
