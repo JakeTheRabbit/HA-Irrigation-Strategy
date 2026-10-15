@@ -231,6 +231,9 @@ async function liveSetup(run) {
     const reply = (data, status = 200) =>
       route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
     if (u.pathname === "/api/states") return reply(states);
+    // Home Assistant's time zone is a read, not a service: answer with the browser's own zone.
+    if (u.pathname === "/api/config")
+      return reply({ time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone });
     const action = u.pathname.split("/").at(-1),
       data = req.postDataJSON();
     calls.push({ action, data });
@@ -994,6 +997,9 @@ try {
         if (req.headers().authorization !== "Bearer workspace-fixture-token")
           return reply({ message: "Fixture authentication missing" }, 401);
         if (u.pathname === "/api/states") return reply(Object.values(states));
+        // Home Assistant's time zone is a read, not a service: answer with the browser's own zone.
+        if (u.pathname === "/api/config")
+          return reply({ time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone });
         if (u.pathname.startsWith("/api/history/")) return reply([]);
         const action = u.pathname.split("/").at(-1),
           data = req.postDataJSON();

@@ -21,6 +21,7 @@ naive local last_beat OLD_BEAT_OFFSET_H hours (0) off, logged as `OLD BEAT`, the
 
 import json
 import os
+import sys
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -35,11 +36,17 @@ ADMIN_ONLY_WRITES = os.environ.get("ADMIN_ONLY_WRITES") == "1"
 STARTED = time.monotonic()
 SLOW = threading.Event()
 LOCK = threading.Lock()
+OUT = threading.Lock()
 STATES = {}
 
 
 def log(*parts):
-    print(f"[fake-ha {time.time():.3f}]", *parts, flush=True)
+    # One write per line, under a lock: print() writes each part on its own, so two handler threads
+    # (the controller's loop and its dosing thread both ask) interleave pieces of their lines.
+    line = " ".join([f"[fake-ha {time.time():.3f}]", *map(str, parts)]) + "\n"
+    with OUT:
+        sys.stdout.write(line)
+        sys.stdout.flush()
 
 
 def put(entity, state, attributes=None):
