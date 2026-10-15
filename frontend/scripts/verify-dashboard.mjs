@@ -1716,12 +1716,13 @@ try {
         "Sensors and drift",
         "Watering stopped",
         "Phase changes",
+        "Vitals",
         "Stock tanks",
         "Dosing",
         "Jev",
         "Setup and settings",
       ]);
-      assert.equal((await ticked("notify.mobile_app_phone_1")).length, 9);
+      assert.equal((await ticked("notify.mobile_app_phone_1")).length, 10);
       assert.deepEqual(await ticked("notify.mobile_app_phone_2"), ["hardware", "stock", "dosing"]);
       assert.deepEqual(await ticked("notify.mobile_app_phone_3"), ["emergency"]);
       assert.equal(await page.locator("[data-uncovered]").count(), 0);
@@ -1828,7 +1829,7 @@ try {
       await expectVisible(cards.first());
       assert.equal(await cards.count(), 3);
       assert.equal(await table.isVisible(), false);
-      assert.equal(await cards.first().locator("input[data-kind]").count(), 9);
+      assert.equal(await cards.first().locator("input[data-kind]").count(), 10);
       await noOverflow();
       await page.screenshot({ path: path.join(out, "mobile-notifications.png"), fullPage: true });
       await box("Grower (Phone 2): Jev").check();
