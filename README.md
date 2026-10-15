@@ -237,7 +237,7 @@ Each question is about 3,000 input tokens. Cloudflare prices Jev at US$0.042 per
 
 ## Checked against the real Jev
 
-The repository's `scripts/jev_live_smoke.py` builds realistic situations, sends them to the real Jev with the same evidence and questions the controller uses, and compares the answers, and what the envelope then admits, with what an experienced grower would do.
+The repository's `scripts/brain_live_smoke.py` builds realistic situations, sends them to the real Jev with the same evidence and questions the controller uses, and compares the answers, and what the envelope then admits, with what an experienced grower would do.
 
 <details>
 <summary>Seventeen of seventeen as a grower would expect (27 and 28 September 2026)</summary>

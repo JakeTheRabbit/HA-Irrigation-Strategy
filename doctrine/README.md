@@ -4,9 +4,11 @@ The generic crop-steering knowledge the optional AI brain will get in its cached
 does (checked against the code on every build), what each of the brain's acting answers does, how to read the
 symptoms, and the agronomy rules, each with an evidence class and its sources.
 
-**Nothing reads this pack yet.** It is data. The brain's prompt module, which arrives in a later pull request,
-reads a generated copy of `compiled/` placed beside the controller code (the app's build context cannot reach the
-repository root). Until then a change here cannot change watering.
+**The AI assistant reads this pack** (`brain_provider: claude_haiku`). Its prompt module
+(`addons/f2_control/f2_control/jev/prompt.py`) reads a generated copy of `compiled/` placed beside the controller
+code (the app's build context cannot reach the repository root), `addons/f2_control/f2_control/doctrine/`. The
+pack is advice to the brain; the engine and the brain's guard decide what moves water, so a change here never
+changes watering on its own.
 
 ## How it is built
 
