@@ -34,6 +34,7 @@ from email.utils import parsedate_to_datetime
 
 import requests
 import auto_setpoints
+import curve_tracker
 import dosing_runner
 import jev_bridge
 import jev_policy
@@ -2430,6 +2431,7 @@ class Controller:
             jev = "disabled"
         writes = enabled and not planned
         stall = None
+        note = stop = None  # today's plan: what the dryback gets, and when maintenance shots stop for it
         was = learn["outcome"]
         outcome = auto_setpoints.ramp_outcome(learn, st["phase"])
         if outcome != was:
@@ -2483,7 +2485,11 @@ class Controller:
                 shots_today=st["shots"], dryback_pct=p.dryback_target, p0_wait_min=p.p0_max_wait_min,
                 p1_shot_pct=p.p1_initial, p1_gap_min=p.p1_time_between_min,
                 start_vwc=learn["ramp_start"] if learn["ramp_start"] is not None else snap.vwc,
+                generative=not self._veg(room, zone),
             )
+            today = None if "p2_vwc_threshold" in judged else auto_setpoints.day_plan(learn, current, ctx)
+            if today:
+                note, stop = today[1].note, curve_tracker.clock(today[1].p2_stop_h)
             if self._follow_fc(room, zone, p, now):
                 pass  # the setpoints moved with the zone's highest readings; the learner acts on the next pass
             else:
@@ -2493,7 +2499,7 @@ class Controller:
                 stall = auto_setpoints.stalled(current, want)
                 for suffix, value, _why in setpoint_supervisor.writes(current, want):
                     self._auto_write(room, zone, suffix, current[suffix], value, learn, now)
-        state, attrs = auto_setpoints.status(learn, enabled, stall)
+        state, attrs = auto_setpoints.status(learn, enabled, stall, note, stop)
         if enabled and planned:
             state, attrs["frozen_reason"] = "frozen", "an armed grow plan owns this room's targets"
         who = dict.fromkeys(auto_setpoints.MANAGED, "Auto setpoints learner")

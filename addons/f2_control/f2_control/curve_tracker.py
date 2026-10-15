@@ -32,12 +32,17 @@ class Recipe:
     p1_gap_min: float
     p2_shot_pct: float  # starting maintenance shot; EC steering moves it
     ec_range: tuple = (3.0, 6.0)  # pore EC band for the stage, mS/cm
+    generative: bool = False  # the dryback may take maintenance shots from the middle of the day on
 
 
 def curve(substrate="generic"):
-    """The day planner's recipe per stage for a substrate (its profile's curve; generic when unknown)."""
+    """The day planner's recipe per stage for a substrate (its profile's curve; generic when unknown). The
+    profile's generative stages are the ones whose dryback may start from the middle of the day."""
     profile = SUBSTRATE_PROFILES.get(substrate, SUBSTRATE_PROFILES["generic"])
-    return {stage: Recipe(*row) for stage, row in profile["curve"].items()}
+    return {
+        stage: Recipe(*row, generative=stage in profile["generative_stages"])
+        for stage, row in profile["curve"].items()
+    }
 
 
 def stage(recipe_stage, substrate="generic"):
@@ -85,21 +90,33 @@ def plan_day(model, recipe, lights_on_h, lights_off_h, start_vwc):
     p1_end = p1_start + (n - 1) * gap_h
 
     p2_lift = model.gain * recipe.p2_shot_pct
+    day_h = (lights_off_h - lights_on_h) % 24
     night_pts = model.night_rate * ((lights_on_h - lights_off_h) % 24)
     need = peak * recipe.dryback_pct / 100.0
-    early_h = max(0.0, (need - night_pts) / model.day_rate)
-    p2_stop, note = lights_off_h - early_h, ""
-    if p2_stop < p1_end:  # P1 always runs in full; the dryback gets whatever is physically left
-        p2_stop, early_h = p1_end, lights_off_h - p1_end
+    # Maintenance shots stop early enough for the night to finish the dryback, but only so early: the
+    # dryback is set by adding or taking away P2 shots at the end of the day, never by dropping the whole
+    # day. A vegetative day keeps them until its last 3 hours (where the engine's own early stop acts), a
+    # generative one until the middle of the day, and P1 always runs in full. A dryback that needs more is
+    # not chased: the zone gets the deepest one left, and says so.
+    earliest = max((p1_end - lights_on_h) % 24, day_h / 2.0 if recipe.generative else day_h - 3.0)
+    early_h = min(max(0.0, (need - night_pts) / model.day_rate), max(0.0, day_h - earliest))
+    p2_stop, note = lights_on_h + day_h - early_h, ""
     achievable = (early_h * model.day_rate + night_pts) / peak * 100.0
     if achievable < recipe.dryback_pct - 0.01:
-        note = f"dryback {recipe.dryback_pct:.0f}% unreachable at today's uptake: max {achievable:.0f}%"
+        note = (f"{recipe.dryback_pct:g}% dryback unreachable at this zone's uptake: about "
+                f"{achievable:.0f}% tonight, with maintenance shots until {clock(p2_stop)}")
     floor = peak * (1.0 - min(recipe.dryback_pct, achievable) / 100.0)
     return DayPlan(
         lights_on_h, lights_off_h, start_vwc, peak, p1_start, n, p1_end, p2_lift,
         p2_lift / model.day_rate * 60.0, (round(peak - p2_lift, 2), peak), p2_stop, achievable, floor, note,
         model.day_rate, model.night_rate,
     )
+
+
+def clock(hour):
+    """A plan's clock hour, which may run past midnight (past 24), as "HH:MM"."""
+    minutes = round(hour * 60) % 1440
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
 def reference(plan, h):

@@ -609,6 +609,26 @@ const PHASE_TARGET: Record<string, TargetKey> = {
 export interface TargetStep extends Level {
   phase: string;
 }
+/** Auto setpoints' planned stop of the maintenance shots (the zone's p2_stop, local "HH:MM") on the
+ * grow day: the first such time after lights-on, or null without one. */
+export function maintenanceStop(stop: string | null, day: Span): number | null {
+  const match = stop && /^(\d\d):(\d\d)$/.exec(stop);
+  if (!match) return null;
+  const on = new Date(day.start);
+  const minutes = (+match[1] * 60 + +match[2] - on.getHours() * 60 - on.getMinutes() + 1440) % 1440;
+  return day.start + minutes * 60_000;
+}
+/** The maintenance band's segments from that stop on are `stopped`: their floor is no trigger the day
+ * waters at, only a top-up under it. A segment set within the minute before the stop still counts. */
+export function stoppedSegments<T extends Span>(
+  segments: readonly T[],
+  stop: number | null,
+): (T & { stopped: boolean })[] {
+  return segments.map((segment) => ({
+    ...segment,
+    stopped: stop !== null && segment.start >= stop - 60_000,
+  }));
+}
 /** What the controller aims at in each phase, as steps along `bands` (the recorded phases, then the
  * projected ones): in P0 the dryback target as a VWC level below the highest reading since P0
  * began, in P1 the P1 target, in P2 the P2 threshold, in P3 the emergency floor. `setpoint` gives

@@ -44,6 +44,7 @@ import {
   earlierTraces,
   growDay,
   joinRows,
+  maintenanceStop,
   nextShot,
   NOT_REPORTING,
   phaseAt,
@@ -51,6 +52,7 @@ import {
   readings,
   setpointChanges,
   setpointSteps,
+  stoppedSegments,
   timelineEntities,
   typicalDay,
   unprojected,
@@ -94,6 +96,8 @@ const PHASES: Record<string, { name: string; short: string; what: string }> = {
   P2: { name: "Maintenance", short: "Maintenance", what: "shots through the lights-on hours" },
   P3: { name: "Overnight dryback", short: "Night", what: "dries back until lights-on" },
 };
+// The maintenance band after Auto setpoints' planned stop (stoppedSegments): a floor, not a trigger.
+const STOPPED = "Maintenance stopped";
 const HELD: Record<Block["kind"], string> = {
   cap: "daily budget spent",
   block: "blocked",
@@ -169,6 +173,8 @@ interface Lane {
   status: string | null;
   setupNote: string | null;
   rescue: number | null;
+  /** When Auto setpoints' plan stopped the maintenance shots for the dryback today, else null. */
+  p2Stop: number | null;
 }
 /** Earlier grow-days as loaded: per zone, each day's trace, yesterday first (null where there is
  * nothing to draw), and the room's setup revision as each day began. */
@@ -632,6 +638,7 @@ function buildLane(
         ? "Rooms & setup saved since yesterday: its probe may have differed"
         : `${moved} of ${compared.length} days before the last Rooms & setup save`,
     rescue: read("p3_emergency_vwc_threshold"),
+    p2Stop: zone.auto?.state === "tracking" ? maintenanceStop(zone.auto.p2Stop, day) : null,
   };
 }
 
@@ -1094,9 +1101,13 @@ function Chart({
   // The references: field capacity all day, the maintenance band over the ramp and maintenance
   // hours, and the rescue floor overnight.
   const fc = steps("field_capacity", day);
-  const band = lane.columns
-    .filter((column) => column.phase === "P1" || column.phase === "P2")
-    .flatMap((column) => bandSegments(steps, column));
+  const band = stoppedSegments(
+    lane.columns
+      .filter((column) => column.phase === "P1" || column.phase === "P2")
+      .flatMap((column) => bandSegments(steps, column)),
+    lane.p2Stop,
+  );
+  const stoppedAt = band.find((segment) => segment.stopped);
   const rescue = lane.columns
     .filter((column) => column.phase === "P3" && column.end - column.start >= 30 * 60_000)
     .flatMap((column) =>
@@ -1373,7 +1384,7 @@ function Chart({
                 width={x(segment.end) - x(segment.start)}
                 y={y(segment.high)}
                 height={Math.max(1, y(segment.low) - y(segment.high))}
-                className="maintenance-band"
+                className={segment.stopped ? "maintenance-band stopped" : "maintenance-band"}
               />
             ))}
           </g>
@@ -1443,6 +1454,11 @@ function Chart({
           textAnchor="end"
         >
           FC {number(fcNow)}%{onAxis(fcNow) ? "" : fcNow > vwcAxis.max ? " ↑" : " ↓"}
+        </text>
+      )}
+      {show("band") && stoppedAt && onAxis(stoppedAt.low) && (
+        <text x={x(stoppedAt.start) + 4} y={y(stoppedAt.low) - 4} className="ref-label">
+          {STOPPED}
         </text>
       )}
       {show("rescue") && rescueNow && vwcAxis && (
@@ -1624,7 +1640,7 @@ function readingText(
   before: Reading[],
   typical: TypicalPoint[],
   fc: Level[],
-  band: { start: number; end: number; high: number; low: number }[],
+  band: { start: number; end: number; high: number; low: number; stopped: boolean }[],
   rescue: Level[],
   compare: Compare,
   show: (layer: ChartLayer) => boolean,
@@ -1670,7 +1686,9 @@ function readingText(
   const maintenance = show("band") ? inside(band) : undefined;
   if (maintenance)
     lines.push(
-      `Maintenance band ${number(maintenance.low)}–${number(maintenance.high)}%: re-waters under ${number(maintenance.low)}%`,
+      maintenance.stopped
+        ? `${STOPPED} for the dryback: a top-up only below ${number(maintenance.low)}%`
+        : `Maintenance band ${number(maintenance.low)}–${number(maintenance.high)}%: re-waters under ${number(maintenance.low)}%`,
     );
   const floor = show("rescue") ? inside(rescue) : undefined;
   if (floor) lines.push(`Rescue shot only under ${number(floor.value)}%`);

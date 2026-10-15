@@ -295,7 +295,7 @@ const DETAILS: Record<string, SettingDetail> = {
       "How often maintenance shots fire, runoff and substrate EC. In P0, reaching it ends the wait and starts the ramp. After P0, with lights on, the watchdog waters a zone below it that has had no shot for the watchdog interval. It is always kept at least 1 point below the peak VWC target and 3 points above the rescue level, whatever is entered.",
     stacking:
       "Moved 1 point down while substrate EC is under 90% of the P2 target (a bigger dryback, less runoff) and 1 point up while it is over 110%, checked every 30 minutes.",
-    auto: AUTO,
+    auto: "The controller adjusts this zone’s value itself: by day, one maintenance shot under the peak VWC target; from the time its plan stops maintenance shots for the dryback (3 hours before lights-off at the earliest on a vegetative zone, the middle of the day on a generative one), under where the P3 dryback target ends, through the night and P0. Auto setpoints is off by default.",
     practice:
       "As plants grow they dry back faster, and more maintenance shots keep the daytime dryback in hand. Here, that means raising this level.",
   },

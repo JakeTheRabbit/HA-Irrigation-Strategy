@@ -56,9 +56,9 @@ def test_generic_keeps_the_learner_and_judge_bounds_it_had():
     assert jev_policy.PEAK_STEP == {"lower_peak": -0.5, "keep": 0.0, "raise_peak": 0.5}
     assert ct.ATHENA == {
         "veg": ct.Recipe(1.0, 25.0, 60, 3.0, 20, 3.0, (3.0, 5.0)),
-        "stretch": ct.Recipe(0.0, 45.0, 90, 3.0, 20, 1.5, (4.0, 10.0)),
+        "stretch": ct.Recipe(0.0, 45.0, 90, 3.0, 20, 1.5, (4.0, 10.0), True),
         "bulk": ct.Recipe(1.0, 35.0, 60, 4.0, 20, 3.0, (3.5, 6.0)),
-        "finish": ct.Recipe(1.0, 45.0, 90, 3.0, 20, 3.0, (3.0, 4.0)),
+        "finish": ct.Recipe(1.0, 45.0, 90, 3.0, 20, 3.0, (3.0, 4.0), True),
     }
 
 
