@@ -8,6 +8,7 @@ from jev import council
 from jev.brain import Brain
 from jev.client import Asker
 from jev.judges.salt import MODE, SaltJudge
+from jev.context import Shot, ShotResponse, expected_rise, landed_share
 from jev.judges.shot import CODE, ShotJudge
 from jev.ledger import Ledger
 
@@ -170,6 +171,36 @@ def test_shot_evidence_is_plain_words_about_that_shot():
     assert e["sibling_zones_latest_shot"] == {"zone 2": "retained +1.4 points (normal)"}
     assert e["moisture_now_vs_before_the_shot"] == "+2.0 points, no shot since"
     assert e["minutes_since_it_ended"] == 37
+    assert e["code_landed_check"] == "the zone's substrate volume is unknown"
+
+
+def test_code_computes_the_shot_landed_share():
+    sh = Shot(K.NOW, 200, 10.0, "p2_topup", 30.0, 4.0)
+    assert expected_rise(sh, 200.0) == 5.0  # 10 L into 200 L of substrate: +5 points
+    assert landed_share(ShotResponse(sh, 3.0, 2.0, -0.4, True), 200.0) == 0.6
+    assert landed_share(ShotResponse(sh, 1.0, 0.5, 0.0, True), 200.0) == 0.2
+    assert landed_share(ShotResponse(sh, None, None, None, True), 200.0) is None  # no reading
+    for substrate in (None, 0.0, -5.0):
+        assert expected_rise(sh, substrate) is None and landed_share(ShotResponse(sh, 3.0, 2.0, 0.0, True),
+                                                                     substrate) is None
+    assert expected_rise(Shot(K.NOW, 0, 0.0, "p2_topup", 30.0, 4.0), 200.0) is None  # nothing was sent
+
+
+@pytest.mark.parametrize("spike_to,words", [
+    (33.0, "the spike was 60% of the +5.0 points 10.0 L should give 200.0 L of substrate: landed by code's check "
+           "(30% or more lands)"),
+    (31.0, "the spike was 20% of the +5.0 points 10.0 L should give 200.0 L of substrate: did not land by code's "
+           "check (30% or more lands)"),
+])
+def test_the_shot_judge_receives_the_landed_check(spike_to, words):
+    pts = [(m, 30.0 if m > 37 else spike_to if m >= 32 else 30.5, 4.0) for m in range(0, 120)]
+    h = K.history(points=pts, shots=[(40, 200, 30.0, 4.0, "p2_topup")])
+    c = K.ctx("P2", h=h, s=K.snap(vwc=30.5), substrate_l=200.0)
+    j = ShotJudge()
+    assert j.due(c, None)
+    e = j.evidence(c)
+    assert _plain_evidence(e)
+    assert e["code_landed_check"] == words
 
 
 # ------------------------------------------------------------------ (c) salt decide

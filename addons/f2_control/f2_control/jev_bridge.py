@@ -147,6 +147,7 @@ def zone_context(c, room, zone, snap, p, now, lights_on):
         hours_to_on=c._hours_to(now, room.lights_on_hour), hours_to_off=c._hours_to(now, room.lights_off_hour),
         siblings={z: v for z, v in room.__dict__.get("_jev_sib", {}).items() if z != zone},
         plants=int(plants) if plants and float(plants).is_integer() else None,
+        substrate_l=c._substrate_l(room, zone),
         feed_ec=getattr(snap, "feed_ec", None) if snap is not None else None,
         probe_entity=c._fused_id(room.prefix, "vwc", zone, room.zones[zone].get("vwc")),
         # read only in the night, where the Setpoints judge runs: an edit by hand is caught before it is asked
