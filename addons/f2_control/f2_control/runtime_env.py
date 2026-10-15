@@ -48,7 +48,7 @@ TOKEN_FILE_CHECK_S = 30.0  # while parked: a new token in HA_TOKEN_FILE starts t
 
 
 def log(*a):
-    print("[f2-control]", *a, flush=True)
+    print("[Crop Steering Controller]", *a, flush=True)
 
 
 def _not_addon(env):

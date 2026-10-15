@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock
 import controller
 import pytest
 import requests
-from conftest import switch_calls
+from conftest import room_of, switch_calls
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.restore_state import async_get as restore_state
 from test_real_flow import VALVE
@@ -29,10 +29,10 @@ from test_setup_entry import _install
 from custom_components.crop_steering import health, setup_api
 from custom_components.crop_steering.const import DOMAIN
 
-BEAT = "sensor.crop_steering_ai_heartbeat"
-KILL = "switch.crop_steering_engine_enabled"
-ARMED = (KILL, "switch.crop_steering_system_enabled", "switch.crop_steering_auto_irrigation_enabled",
-         "switch.crop_steering_zone_1_enabled")
+BEAT = "sensor.crop_steering_tent_ai_heartbeat"
+KILL = "switch.crop_steering_tent_engine_enabled"
+ARMED = (KILL, "switch.crop_steering_tent_system_enabled", "switch.crop_steering_tent_auto_irrigation_enabled",
+         "switch.crop_steering_tent_zone_1_enabled")
 REAL = {name: getattr(controller, name) for name in ("ha_get_status", "ha_set")}
 # The heartbeat each version wrote (its controller.py _heartbeat), last_beat a naive local time.
 OLD_BEATS = {
@@ -80,12 +80,12 @@ def due(c, fake):
     for switch in ARMED:
         fake.set_state(switch, "on")
     fake.set_state(VALVE, "off")
-    fake.set_state("sensor.crop_steering_vwc_zone_1", "30", {"unit_of_measurement": "%"})
-    fake.set_state("sensor.crop_steering_ec_zone_1", "3.1", {"unit_of_measurement": "mS/cm"})
+    fake.set_state("sensor.crop_steering_tent_vwc_zone_1", "30", {"unit_of_measurement": "%"})
+    fake.set_state("sensor.crop_steering_tent_ec_zone_1", "3.1", {"unit_of_measurement": "mS/cm"})
     now = datetime.now()
-    fake.set_state("number.crop_steering_lights_on_hour", str((now.hour - 1) % 24))
-    fake.set_state("number.crop_steering_lights_off_hour", str((now.hour + 3) % 24))
-    room = c.rooms[0]
+    fake.set_state("number.crop_steering_tent_lights_on_hour", str((now.hour - 1) % 24))
+    fake.set_state("number.crop_steering_tent_lights_off_hour", str((now.hour + 3) % 24))
+    room = room_of(c)  # the installed room: a new room has a slug, tent_
     room.state[1].update(phase="P2", last_shot=now - timedelta(hours=4), last_phase_change=now - timedelta(hours=5))
     room._was_lights_on = True
     return room
@@ -129,7 +129,7 @@ async def test_h4_the_first_start_after_an_update_holds_3_minutes_then_waters(
     assert len(set(stamps)) == 3
     assert ("turn_on", VALVE) not in switch_calls(fake)
     assert [d for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "create")
-            and d["notification_id"] == "f2_duplicate_default"]
+            and d["notification_id"] == "f2_duplicate_tent"]
     # (g) 3 min of the clock past the pass that saw the old beat: it carries on, with no operator action.
     clock.sleep(181 - 3 * 59)
     assert not c.duplicate_hold(room)
@@ -172,7 +172,7 @@ async def test_h6_the_integration_accepts_the_new_beat_and_the_old_ones(
     if version is None:
         c, fake, _clock = controller_for({"enable_flag": KILL})
         wire(c, fake, monkeypatch)
-        await hass.async_add_executor_job(c._heartbeat, c.rooms[0], datetime.now(), None)
+        await hass.async_add_executor_job(c._heartbeat, room_of(c), datetime.now(), None)
         assert hass.states.get(BEAT).attributes["controller_instance"] == c.instance_id
         assert hass.states.get(BEAT).attributes["controller_runtime"] == "addon"
     else:

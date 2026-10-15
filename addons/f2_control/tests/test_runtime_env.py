@@ -148,7 +148,7 @@ def test_only_all_three_signs_together_make_the_app(env, runtime, named, box, ca
     if runtime == "container":
         run({**{k: v for k, v in box.items() if k != "F2_RUNTIME"}, **env})
         first = capsys.readouterr().out.splitlines()[0]
-        assert first == "[f2-control] runtime: container" + (f" (not the app: {named})" if named else "")
+        assert first == "[Crop Steering Controller] runtime: container" + (f" (not the app: {named})" if named else "")
 
 
 def test_the_app_keeps_its_25_s_stop_and_a_container_gets_75_s():

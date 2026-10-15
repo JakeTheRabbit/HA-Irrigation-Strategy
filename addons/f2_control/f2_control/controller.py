@@ -515,12 +515,12 @@ ACTUATORS = {
 }
 
 
-def hw_call(entity, on, timeout=12):
+def hw_call(entity, on, **timeout):
     """Open (on=True) or close one zone valve, main line or pump -> whether Home Assistant took it.
     One whose domain is not in ACTUATORS is not sent anything, and that is a failure."""
     domain = entity.split(".", 1)[0]
     row = ACTUATORS.get(domain)
-    return bool(row) and ha_call(domain, row[0] if on else row[1], entity_id=entity, timeout=timeout)
+    return bool(row) and ha_call(domain, row[0] if on else row[1], entity_id=entity, **timeout)
 
 
 def hw_state(entity, state):
@@ -536,9 +536,9 @@ def hw_get(entity, timeout=8):
     return HAState(hw_state(entity, read[0]), read[1], read[2], getattr(read, "last_changed", None))
 
 
-def hw_history(entity, since, timeout=12):
+def hw_history(entity, since, **timeout):
     """ha_history for a zone valve, main line or pump, each state in on/off words (hw_state)."""
-    rows = ha_history(entity, since, timeout=timeout)
+    rows = ha_history(entity, since, **timeout)
     return rows and [(hw_state(entity, state), stamp) for state, stamp in rows]
 
 
