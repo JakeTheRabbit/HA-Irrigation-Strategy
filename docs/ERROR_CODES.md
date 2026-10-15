@@ -27,7 +27,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | CS-6xx | **Repairs cards**: Raised by the integration, under Settings → Repairs. |
 | CS-7xx | **Jev**: Jev's judgements about a zone (advice, a probe it set aside), and how Jev itself is doing: its calls running low, a judge on the stricter gate (docs/JEV.md). |
 | CS-8xx | **Dosing**: Batch-tank dosing: a dose or a batch that did not end as it should (docs/DOSING.md). |
-| CS-9xx | **Reservoir**: The tank a room waters from: at its minimum, a level that can't be read, a refill due before the next round of shots, and a fill stopped over the full mark (docs/USER_GUIDE.md, "Reservoir minimum"). |
+| CS-9xx | **Reservoir and feed**: The tank a room waters from: at its minimum, a level that can't be read, a refill due before the next round of shots, and a fill stopped over the full mark (docs/USER_GUIDE.md, "Reservoir minimum"); and a batch tank to refill (docs/DOSING.md). |
 
 ## All codes
 
@@ -100,6 +100,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-902](#cs-902) | Tank level can't be read | Critical | Notification |
 | [CS-903](#cs-903) | Refill the tank before the next round of shots | Warning | Notification |
 | [CS-904](#cs-904) | Tank over its full mark | Warning | Notification |
+| [CS-906](#cs-906) | Batch tank low, refill it | Information | Notification |
 
 ## Sensors (CS-1xx)
 
@@ -1461,7 +1462,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 - Bring the probe back online, calibrate it, or set it to report mS/cm or µS/cm.
 - Make the next batch by hand: once one passes the check, an automation's batches run again.
 
-## Reservoir (CS-9xx)
+## Reservoir and feed (CS-9xx)
 
 <a id="cs-901"></a>
 
@@ -1541,3 +1542,22 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Check the fill valve closes.
 - Check the tank's full distance in Crop Steering → Rooms & setup.
+
+<a id="cs-906"></a>
+
+### CS-906: Batch tank low, refill it
+
+*Information · Notification*
+
+**What it means.** The room's batch tank has read at or under its refill reminder level (remind_pct in the dosing setup) on three reads a minute apart. Nothing refills the tank by itself, so a person has to: by hand, or by making a batch. The notification gives the level it read.
+
+**Watering meanwhile.** Carries on as normal.
+
+**Likely causes**
+
+- The room's shots have drawn the batch tank down since it was last filled.
+
+**Suggested fixes**
+
+- Refill the tank by hand, or make a batch. The reminder goes once the level reads 5 points above its reminder level; it comes again each day the level stays at or under it.
+- To stop these reminders, set the refill reminder to 0% in the dosing setup.

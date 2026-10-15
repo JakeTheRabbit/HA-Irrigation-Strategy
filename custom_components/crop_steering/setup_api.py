@@ -783,6 +783,8 @@ HARDWARE_WORDS = {
     "tank_ph_sensor": "tank pH sensor",
     "tank_last_fill_sensor": "tank last-fill sensor",
     "tank_fill_entity": "tank fill",
+    "tank_distance_sensor": "tank distance sensor",
+    "tank_low_float": "tank low float",
 }
 ZONE_WORDS = {
     "valve": "valve",

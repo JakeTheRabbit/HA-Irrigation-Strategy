@@ -677,7 +677,7 @@ CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "C
 # 8 hours; an info code once. Each episode starts the schedule again: an alert cleared (or not raised for
 # ALERT_EPISODE_GAP_S) and raised again, or raised under another code. Held in memory only: a restart pushes once.
 NOT_WATERING_CODES = frozenset({"CS-206", "CS-208", "CS-209", "CS-602"})
-INFO_CODES = frozenset({"CS-205", "CS-305", "CS-403", "CS-501", "CS-702", "CS-705"})
+INFO_CODES = frozenset({"CS-205", "CS-305", "CS-403", "CS-501", "CS-702", "CS-705", "CS-906"})
 WARNING_REPUSH_MIN = (15, 60, 120, 240, 480)
 ALERT_EPISODE_GAP_S = 3600
 # CS-310: a zone's moisture rising by BACKUP_RISE_PTS within BACKUP_WINDOW_MIN while no water went in, its valve
@@ -3848,7 +3848,7 @@ class Controller:
         event (a dose, a batch, a restart) has its own notification: a second one within 30 minutes
         is never swallowed by the first. The runner paces an event's repeats itself (and a repeat
         replaces its card)."""
-        key = f"dosing_{getattr(room, 'slug', 'gone')}_{code[3:]}" + (f"_{event}" if event else "")
+        key = self._dosing_key(room, code, event)
         if code == "CS-801":
             return self._alert(key, "CS-801", title, message, room=room, quiet=False)
         if code == "CS-802":
@@ -3865,8 +3865,22 @@ class Controller:
             return self._alert(key, "CS-807", title, message, room=room, quiet=False)
         if code == "CS-808":
             return self._alert(key, "CS-808", title, message, room=room, quiet=False)
+        if code == "CS-906":
+            return self._alert(key, "CS-906", title, message, room=room, quiet=False)
         log("dosing alert refused: not in the error-code list", code)
         return True  # never deliverable: not kept
+
+    @staticmethod
+    def _dosing_key(room, code, event=None):
+        return f"dosing_{getattr(room, 'slug', 'gone')}_{code[3:]}" + (f"_{event}" if event else "")
+
+    def _dosing_dismiss(self, room, code, event=None):
+        """Take down an alert the dosing runner raised (the refill reminder, once the tank is refilled)
+        -> True once Home Assistant has dismissed it."""
+        key = self._dosing_key(room, code, event)
+        self._alerted.pop(key, None)
+        self._alert_codes.pop(key, None)
+        return ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
 
     def _dosing_hold(self, room):
         """Why dosing holds this room's watering ("making a batch", or "dosing hardware still on: ..."

@@ -61,6 +61,8 @@ pump name or recipe is assumed.
     "part_ml": 12.5,                   // 0.1..5000, only when set: "1 part (mL)", the mL one part is per batch
     "name": "Week 3",                  // the recipe's name, 0..40 characters; "" (a setup from before names) = none.
                                        // A save that leaves the key out keeps the stored name
+    "level_entity": "sensor.x",        // sensor.* | number.* | input_number.* | null   the tank's level, in %
+    "remind_pct": 20,                  // 0..100; 0 = no refill reminder (Refill reminder, below); needs level_entity
     "recipe": [                        // dose order = list order (the operator's); each pump at most once
       {"pump": "balance", "ml": 300, "ml_entity": null}, // ml_entity (number.*|input_number.*|sensor.*) is read
                                                         // at batch start and wins over ml; 0 skips the pump
@@ -85,7 +87,7 @@ pump name or recipe is assumed.
 Validation (`dosing.py`, pure): every entity exists and is in its allowed domain; pump ids unique;
 recipe pumps exist; a pump appears in the recipe at most once; `full_entity` set whenever
 `fill_valve` is; the recipe's `name` at most 40 characters; `mix_power_sensor` set whenever `mix_min_w` is above 0 (else the power could not be
-checked); no entity is both a dosing pump's `power_entity` and batch hardware; a `mix_pump`,
+checked); `level_entity` set whenever `remind_pct` is above 0; no entity is both a dosing pump's `power_entity` and batch hardware; a `mix_pump`,
 `mix_valves` or `close_entities` switch may be a room's irrigation pump or main line (the batch
 holds that room's watering); a pump's `stock_tank` is one of the room's stock tanks, and a stock
 tank is linked to at most one pump; a dose in `parts` needs `part_ml`, and its mL is at most the
@@ -94,7 +96,8 @@ the pump): a fixed `ml`, and `parts` x `part_ml`, when they are saved, and an `m
 the controller when the batch starts. A setup saved without `part_ml` or `parts` has neither key, and
 reads back unchanged. A room with no pumps is valid and does nothing. "Exists" is checked
 when a setup is saved; a stored setup read back at start-up is kept although a device has not come
-back yet. Each feed recipe follows the recipe's rules, names are unique, and every week of the
+back yet. A save that does not send `level_entity` or `remind_pct` keeps the stored ones, so a page
+that does not know them never switches the reminder off. Each feed recipe follows the recipe's rules, names are unique, and every week of the
 schedule names one of the recipes.
 
 ### Feed schedule
@@ -426,11 +429,22 @@ draws not yet taken, alerts not yet created and volume numbers still to put back
 runs, so they never hold up its watch. When one read of the setup fails while a dose or batch runs
 in the room, the status keeps the setup it started with (`dosing` or `batch`, not `unavailable`).
 Nothing is published for a room whose integration has no `dosing_config` (one from before dosing).
-`dosing_state.json` keeps `handled`, each pump's `last`, the `last_batch`, the `history` (with a `draw` entry for a
+`dosing_state.json` keeps `handled`, each pump's `last`, the `last_batch`, when the refill reminder was last said (`reminded_at`), the `history` (with a `draw` entry for a
 stock draw that was dropped, below), the draws and alerts not yet delivered and the volume numbers
 still to put back across a restart.
 
-## Alerts (controller, group CS-8xx "Dosing")
+### Refill reminder
+
+Nothing refills a batch tank by itself. With `remind_pct` above 0, the controller reads the room's
+`level_entity` once a minute while no dose or batch runs in the room. Three reads in a row at or
+under `remind_pct` (one bad echo is not a low tank) raise **CS-906**, "batch tank down to N%, refill
+it". It comes again each day the level stays there (the time it was said is kept in
+`dosing_state.json`, so a restart does not say it sooner), and the notification is dismissed once
+the level reads 5 points above `remind_pct`; the next low tank is then told at once. A level that
+reads nothing changes nothing. Setting `remind_pct` to 0 takes a reminder that is up down. Watering
+is never held by it.
+
+## Alerts (controller, group CS-8xx "Dosing", and CS-906)
 
 | Code | Title | Watering |
 |---|---|---|
@@ -442,6 +456,7 @@ still to put back across a restart.
 | CS-806 | Dosing was stopped, or needs a check | held rooms water again once the hardware reads off; a dose's pump that does not read off holds its room |
 | CS-807 | A dose was not taken off its stock tank | carries on |
 | CS-808 | A batch's mix is off its band, or could not be checked | carries on; an automation's next batch is refused |
+| CS-906 | Batch tank low, refill it (Refill reminder, above) | carries on |
 
 Each event (a dose, a batch, a restart) raises its own notification, so a second one within half an
 hour is never swallowed by the first, and an alert about hardware that does not read off is updated

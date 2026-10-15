@@ -178,9 +178,11 @@ class DosingStore:
             # A save without the feed (a dashboard from before it) keeps the stored one.
             sent = data.get("feed")
             batch = data.get("batch")
-            if isinstance(batch, dict) and "name" not in batch:
-                # A page from before recipe names keeps the stored one.
-                batch = {**batch, "name": self.data["batch"].get("name")}
+            if isinstance(batch, dict):
+                # A page from before recipe names, or one that does not send the refill reminder, keeps
+                # the stored ones.
+                kept = {key: self.data["batch"].get(key) for key in ("name", *dosing.REMINDER)}
+                batch = {**kept, **batch}
             try:
                 pumps, batch = dosing.clean(
                     data.get("pumps"),

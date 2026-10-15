@@ -43,8 +43,8 @@
     },
     {
       "prefix": "CS-9",
-      "name": "Reservoir",
-      "detail": "The tank a room waters from: at its minimum, a level that can't be read, a refill due before the next round of shots, and a fill stopped over the full mark (docs/USER_GUIDE.md, \"Reservoir minimum\")."
+      "name": "Reservoir and feed",
+      "detail": "The tank a room waters from: at its minimum, a level that can't be read, a refill due before the next round of shots, and a fill stopped over the full mark (docs/USER_GUIDE.md, \"Reservoir minimum\"); and a batch tank to refill (docs/DOSING.md)."
     }
   ],
   "codes": [
@@ -1201,6 +1201,21 @@
       "fixes": [
         "Check the fill valve closes.",
         "Check the tank's full distance in Crop Steering → Rooms & setup."
+      ]
+    },
+    {
+      "code": "CS-906",
+      "title": "Batch tank low, refill it",
+      "source": "notification",
+      "severity": "info",
+      "meaning": "The room's batch tank has read at or under its refill reminder level (remind_pct in the dosing setup) on three reads a minute apart. Nothing refills the tank by itself, so a person has to: by hand, or by making a batch. The notification gives the level it read.",
+      "watering": "Carries on as normal.",
+      "causes": [
+        "The room's shots have drawn the batch tank down since it was last filled."
+      ],
+      "fixes": [
+        "Refill the tank by hand, or make a batch. The reminder goes once the level reads 5 points above its reminder level; it comes again each day the level stays at or under it.",
+        "To stop these reminders, set the refill reminder to 0% in the dosing setup."
       ]
     }
   ]
