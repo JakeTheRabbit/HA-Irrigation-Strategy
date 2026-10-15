@@ -144,6 +144,7 @@ for that zone. (3 zones × 24 = 72 entities on a 3-zone system.)
 | `recipe_stage` | Veg · Transition · Bulk · Ripen · Custom | Picking a stage applies its setpoints to the zones. |
 | `drainage` | unknown · flood_table · free_drain | How the room's runoff leaves it, asked on the first page of setup. A table that is not draining (CS-310) is watched for in every room except a free-draining one, so a `free_drain` room never has its daily minimum or EC flushes held for it. A room set up before this reads `unknown`, watched as before. |
 | `water_today_view` | Zone total · Per plant | How Water today reads for the room: each zone's total, or its water and daily limit divided by its plant count. The dashboard shows it that way for everyone (Settings → Appearance), and the controller's vitals notification follows it. Zone total by default. |
+| `substrate` | generic · rockwool · coco | What the room grows in. Published in the room's `engine_config` descriptor and read by the controller, which takes a change with no disarm cycle. `generic` by default, and on every upgraded room; choosing another changes nothing the controller does yet. |
 
 ### Per-zone (`select.crop_steering_zone_N_*`)
 | Entity | Options | What it does |

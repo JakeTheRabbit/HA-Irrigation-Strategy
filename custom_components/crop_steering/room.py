@@ -129,6 +129,7 @@ def build_engine_config(
     setup=None,
     integration_version=None,
     entry_id=None,
+    substrate=None,
 ):
     """PURE. The room descriptor the f2-control add-on reads from
     ``sensor.crop_steering_<prefix>engine_config`` to DISCOVER and drive an additional room
@@ -168,10 +169,15 @@ def build_engine_config(
     # it from the room it already adopted, and goes on driving the old map. Like the version, it
     # is not one of the keys the setup fingerprint reads.
     which = {"entry_id": entry_id} if entry_id else {}
+    # What the room grows in (its substrate select), passed in like the version. The controller
+    # reads it with "generic" as the default and adopts it with no disarm cycle: it is not one of
+    # the keys the setup fingerprint reads.
+    grown_in = {"substrate": substrate} if substrate else {}
     return {
         **declared,
         **versions,
         **which,
+        **grown_in,
         "setup_api_version": 1,
         "setup_revision": setup.get("setup_revision", 0),
         "active": setup.get("active", True),
