@@ -304,6 +304,18 @@ def test_the_add_on_build_job_is_required_under_one_name(mutate):
     assert not api.writes
 
 
+def test_validate_names_the_add_on_build_job_by_product():
+    """The build job reports the product name, which promotion accepts for that requirement."""
+    import yaml
+
+    workflow = yaml.load(
+        (ROOT / promotion.VALIDATE).read_text(), Loader=yaml.BaseLoader
+    )
+    name = workflow["jobs"]["addon-build"]["name"]
+    assert name == NEW_BUILD
+    assert (OLD_BUILD, NEW_BUILD) in promotion.REQUIRED_JOBS
+
+
 def test_apply_needs_prior_read_only_plan_and_trusted_context(monkeypatch):
     api = FakeGitHub()
     with pytest.raises(promotion.Rejected, match="read-only preflight"):
