@@ -68,7 +68,9 @@ def test_a_billed_lane_is_never_billed_again(first, then, said):
     fake = B.FakeClient(first, then)
     (answers, _usage, error), slept = _send(fake, meter)
     assert answers is None and error == f"Anthropic: {said}"
-    assert len(fake.requests) == 2 and slept == [] and meter.snapshot()["calls"] == 1
+    assert len(fake.requests) == 2 and slept == []
+    # a timed-out lane may have been billed, so it is charged an estimate too
+    assert meter.snapshot()["calls"] == (2 if isinstance(then, B.APITimeoutError) else 1)
     if isinstance(then, B.RateLimitError):
         assert meter.state() == "paused"
 

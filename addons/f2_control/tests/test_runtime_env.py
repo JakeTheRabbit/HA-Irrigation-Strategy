@@ -154,7 +154,10 @@ def test_only_all_three_signs_together_make_the_app(env, runtime, named, box, ca
 def test_the_app_keeps_its_25_s_stop_and_a_container_gets_75_s():
     assert runtime_env.stop_budget(APP) == 25.0
     assert runtime_env.stop_budget({"F2_RUNTIME": "container"}) == 75.0
-    assert runtime_env.stop_budget({**APP, "HA_URL": "http://ha:8123"}) == 75.0
+    # Only F2_RUNTIME=container gives 75 s: an app that lost its F2_RUNTIME counts as a container, but
+    # a budget past the Supervisor's `timeout: 30` would get its safe-off killed part-way.
+    assert runtime_env.stop_budget({"SUPERVISOR_TOKEN": "t"}) == 25.0
+    assert runtime_env.stop_budget({**APP, "HA_URL": "http://ha:8123"}) == 25.0
     assert runtime_env.stop_budget({**APP, "F2_STOP_BUDGET_S": "40"}) == 40.0
 
 

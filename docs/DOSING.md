@@ -202,7 +202,9 @@ in use today (Feed schedule, above), and `feed` (also `feed_now` in `dosing_get`
 Dosing runs on the controller's main loop, for all rooms, with no thread of its own: between two
 passes the loop wakes whenever dosing is due. Every 2 s it reads each room's `dosing_config`, and a
 dose or batch runs on to its next wait (a read of the pump, the fill, the mix, a pause) each time the
-loop wakes for it. While a shot runs, dosing waits for the shot to end. A request is taken once (its `id` is remembered, in `dosing_state.json` so a
+loop wakes for it. While a shot runs, a dose or batch already running goes on with its steps the same
+way (a batch's open fill valve is still watched for its full sensor); with none running, dosing waits
+for the shot to end. A request is taken once (its `id` is remembered, in `dosing_state.json` so a
 restart does not take it again, and published as `handled`). A room whose `dosing_config` can't be
 read has no request taken.
 

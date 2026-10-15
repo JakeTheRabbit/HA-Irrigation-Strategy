@@ -203,9 +203,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Every number has restored its value by now: name each one held above its zone's limit.
     from .bounds import check_held_values
 
-    check_held_values(
-        hass, entry, hass.data[DOMAIN]["_numbers"][entry.entry_id].values()
-    )
+    # A number platform that failed to set up leaves nothing to check, never a failed room.
+    numbers = hass.data[DOMAIN].get("_numbers", {}).get(entry.entry_id, {})
+    check_held_values(hass, entry, numbers.values())
 
     # Set up services
     await async_setup_services(hass)

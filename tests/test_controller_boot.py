@@ -10,8 +10,17 @@ back with its controller stopped and its rooms unwatered until someone noticed.
 import re
 from pathlib import Path
 
-CONFIG = Path(__file__).resolve().parents[1] / "addons" / "f2_control" / "config.yaml"
+ROOT = Path(__file__).resolve().parents[1]
+CONFIG = ROOT / "addons" / "f2_control" / "config.yaml"
 
 
 def test_the_controller_starts_with_its_host_unless_its_owner_said_otherwise():
     assert re.search(r"^boot: auto$", CONFIG.read_text(encoding="utf-8"), re.M)
+
+
+def test_the_container_starts_again_with_docker_and_install_says_so():
+    """A container has no `boot:`; the compose file's restart policy is its Start on boot."""
+    compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    assert re.search(r"^    restart: unless-stopped$", compose, re.M)
+    install = (ROOT / "docs" / "INSTALL.md").read_text(encoding="utf-8")
+    assert "`restart: unless-stopped`" in install

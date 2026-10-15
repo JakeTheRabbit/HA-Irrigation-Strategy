@@ -114,14 +114,17 @@ def load_private_denylist(a):
     if path is None or not path.exists() or not path.read_text(encoding="utf-8").strip():
         return [], ["private denylist secret missing: pass --private-denylist FILE (CI writes the secret to it), "
                     "or --private-skip REASON on a fork pull request"]
-    return [("all", pat, why) for pat, why in json.loads(path.read_text(encoding="utf-8"))], []
+    # The list is a secret: a hit names the file and line only, never the entry, its reason or the match.
+    return [("all", pat, None) for pat, _why in json.loads(path.read_text(encoding="utf-8"))], []
 
 
 def lint(name, text, patterns, scopes):
     hits = []
     for scope, pat, why in patterns:
         if scope in scopes:
-            hits += [f"{name}: {why}: {m.group(0)!r}" for m in re.finditer(pat, text)]
+            hits += [f"{name}: {why}: {m.group(0)!r}" if why is not None
+                     else f"{name}:{text.count(chr(10), 0, m.start()) + 1}: a word on the private denylist"
+                     for m in re.finditer(pat, text)]
     return hits
 
 

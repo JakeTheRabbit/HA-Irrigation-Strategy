@@ -182,4 +182,8 @@ export interface SetupDocument {
   rooms: SetupRoom[];
   candidates: SetupCandidate[];
   limits: { max_zones: number };
+  /** What a new zone's sizing starts at: the integration's one defaults table (absent before it). */
+  sizing_defaults?: Partial<
+    Pick<SetupZone, "plant_count" | "substrate_volume" | "drippers_per_plant" | "dripper_flow_rate">
+  >;
 }

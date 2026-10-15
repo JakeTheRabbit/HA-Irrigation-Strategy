@@ -76,7 +76,8 @@ The build fails when any of these checks fails:
      secret. When it is missing or empty the build **fails** ("private denylist secret missing"). Only
      `--private-skip REASON` turns it off, for a run where no secret exists (a fork pull request, a contributor's
      machine); the skip is printed and written to the job summary. The public list itself is linted with the
-     private one, so it cannot carry a word it exists to keep out.
+     private one, so it cannot carry a word it exists to keep out. A private hit is reported by file and line
+     only ("a word on the private denylist"): the list is a secret, so the log never shows the word or its entry.
    - A `vendor-snapshot/` folder inside the pack fails the build: audit inputs that hold site text never ship.
 5. **Generated files current** (`--check`): every output matches, and no file is left in `compiled/` that the
    build no longer produces (a write run deletes such files). An output goes stale only when a value the pack
@@ -258,9 +259,10 @@ These were stale or wrong in the advisor notes or in earlier drafts. The doctrin
    the brain did not write, the learner's included (BR-5, H-11, ACT-07). Under the switch `over_saturated` marks
    each new high (CT-14), so the Over-water row and SYM-07 do not count it, and PRB-14 tells the brain to raise a
    field capacity and floor walking with a drifting probe for a person.
-18. **Notches persist.** A setpoint notch is written to the zone's own number and stays; only the rescue-shot
-   revert, a person's edit or a learner move replaces it (BRN-04). Phase calls, EC modes and set-asides are
-   directives that expire. The notch is off while a grow plan owns the room (BR-5).
+18. **Notches run out.** A setpoint notch is written to the zone's own number as an overlay that goes back to the
+   operator's own value at the lights-on that ends the grow-day it is for; the rescue-shot revert, a person's
+   edit, Keep or Undo, or a learner move ends it sooner (BRN-04). Phase calls, EC modes and set-asides are
+   directives that expire too. The notch is off while a grow plan owns the room (BR-5).
 19. **Shots the maximum-EC block stops.** At maximum EC with a non-dilutive feed or a backed-up table, `decide()`
    blocks or holds before every other rule, so on that tick the P3 emergency, the watchdog and the floor do not
    fire either (IR-2). The dusk and night rows say so.

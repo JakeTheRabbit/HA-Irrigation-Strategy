@@ -7,8 +7,9 @@ Supervisor's own token and no HA_URL, so no single copied variable makes a conta
 stop_budget(): how long the safe-off on SIGTERM may take (Controller._safe_exit). The Supervisor
 waits `timeout: 30` (config.yaml) after SIGTERM before it kills the app, so the app's budget of 25 s
 leaves 5 s for the process to end; a container's compose file waits 90 s (`stop_grace_period`), so
-its budget is 75 s. Raise the stop timeout with F2_STOP_BUDGET_S, never to less than the budget
-plus 5 s.
+with F2_RUNTIME=container its budget is 75 s. Anything else keeps 25 s, as a budget longer than the
+stop timeout is cut off part-way. Set it with F2_STOP_BUDGET_S, and keep the stop timeout at least
+the budget plus 5 s.
 
 resolve_base(), resolve_token(), preflight(): where Home Assistant's API is, the token to use, and
 the checks made before the controller is built. Nothing here switches anything; importing it never
@@ -69,8 +70,10 @@ def runtime(env):
 
 def stop_budget(env):
     """Seconds the safe-off on SIGTERM may take: F2_STOP_BUDGET_S when it is a number above 0, else
-    STOP_BUDGET_S for the app and CONTAINER_STOP_BUDGET_S for a container."""
-    default = STOP_BUDGET_S if runtime(env) == "addon" else CONTAINER_STOP_BUDGET_S
+    CONTAINER_STOP_BUDGET_S only when F2_RUNTIME=container says so, and STOP_BUDGET_S otherwise. A longer
+    budget than the stop timeout gets the safe-off killed part-way, so an app that lost its F2_RUNTIME
+    (and so counts as a container) keeps the app's."""
+    default = CONTAINER_STOP_BUDGET_S if env.get("F2_RUNTIME") == "container" else STOP_BUDGET_S
     try:
         budget = float(env.get("F2_STOP_BUDGET_S") or default)
     except (TypeError, ValueError):

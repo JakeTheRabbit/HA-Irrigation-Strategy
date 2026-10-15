@@ -19,7 +19,8 @@ the app. Under the AI assistant:
   runs rules, because this release cannot keep it to your budget.
 - `anthropic_daily_budget_usd`: the most it may spend between one lights-on and the next (US$1.00). Once it is
   spent, the engine runs on its own rules until the next lights-on, and CS-708 says so. A rule of thumb: about
-  US$0.12 per zone a day, plus US$0.05.
+  US$0.12 per zone a day, plus US$0.05. A question that timed out or lost its connection may still have been
+  billed, so it counts an estimate on the dear side.
 - `brain_dry_run`: it judges and the log shows what it would have done, but it moves nothing.
 - A daily report: three hours after lights-off it writes the grow-day that just ended in plain words (each
   zone's water, moisture and pore EC, what changed, what to check tomorrow) on
