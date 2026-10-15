@@ -22,6 +22,30 @@ Each new day is applied at lights-on. If it cannot be applied then (Home Assista
 
 The calendar supports grow days 1-366 per zone, distinct start dates and complete contiguous schedule ranges. Missing/finished/invalid schedules are visible and hold managed zones rather than inventing targets. A hold stops the plan's steering, never the zone's water safety: the overnight emergency shot, the lights-on watchdog and the minimum daily volume still water a held zone, and Repairs shows *holding irrigation* with the reason. Each room stores its plan in HA persistent storage with optimistic revision checks. Restart recovery uses the stored plan and controller latch.
 
+## How the controller checks the plan is running
+
+The plan is applied when the controller reads its targets, so an active plan's numbers are the ones the engine
+uses. What can still go wrong is that the plan does not move on, does not start, ends, or is quietly ignored. Every
+pass, under every brain (rules included), the controller compares what the plan expects since lights-on with what
+the room is doing, using the integration's own preview of the plan, and says plainly when they differ: one
+**CS-713** card per episode, and a one-line plan headline on the AI assistant panel ("Plan: Bulk · day 17 of 84
+(week 3) · on track"). It checks for:
+
+- today's plan day not in force for a zone (with the targets it changes and why it waits), or an armed plan that
+  did not start;
+- a plan saved and not armed for a whole day after its start dates, and a plan ending within three days;
+- a setting the plan controls changed by hand or by an automation: while the plan runs that change has no effect,
+  and it is **never overwritten**; the card says how to keep it (change the plan's days) or drop it;
+- what comes back when a plan is disarmed, where it differs from today's plan;
+- a steering select that disagrees with the plan's bias (under 40 % or over 60 % generative), and lights hours
+  read from somewhere other than the integration;
+- a zone that did not start its day at lights-on, did not stop at lights-off, or stayed in its morning dryback past
+  its maximum wait (each should never happen: please send the controller log), and a ramp that runs very long.
+
+Nothing is checked in a room that is off, in the first 10 minutes after a start, or on plan data older than
+six hours. A plan with the same lights-on and lights-off hour has no lights-on edge, so the checks that wait for one
+are skipped.
+
 ## Read the combined graph
 
 - **VWC axis:** percent substrate water content. P1 target, P2 trigger and the P3 emergency floor come from the selected interpolated profile.

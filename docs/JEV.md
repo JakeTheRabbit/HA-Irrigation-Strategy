@@ -133,6 +133,9 @@ zone, **CS-702** a zone's water per plant is out of line, **CS-703** an overnigh
 today's calls, **CS-707** a judge is on the stricter gate for a zone, **CS-710** water may be bypassing the substrate or the probe. The controller raises them through one method with each code written
 out, so a judge can never raise anything the list does not explain.
 
+**CS-713**, the room not running its grow plan as written, is raised by code under every brain, rules included
+(plan adherence, [docs/GROW_PLANS.md](GROW_PLANS.md#how-the-controller-checks-the-plan-is-running)).
+
 ## What it shows
 
 The dashboard reads these live. **Today** puts today's stage in the room's line and lists what Jev changed
@@ -152,6 +155,9 @@ each page with screenshots.
 - `sensor.crop_steering_<prefix>jev`: calls and input tokens today, errors and the last error, the judges on, and
   `stage`: today's row of the owner's stage arc as numbers (day of flower, stage, steering, pore EC range, dryback
   points, runoff %), which the dashboard draws on its day chart.
+- `plan` on the same sensor, under every brain: the grow plan's status, its one-line headline ("Plan: Bulk · day 17
+  of 84 (week 3) · on track"), each zone's day, week, profile and next change, the day expected and the day in
+  force, and each drift code found with its suggestion (docs/GROW_PLANS.md). Null headline with no plan.
 - `sensor.crop_steering_<prefix>jev_log`: the dashboard's live log. Its state is the newest decision in one line;
   `entries` holds the room's last 30, newest first: time, zone, judge, Jev's answer with its probability and
   whether both phrasings agreed, what it asked for, and what code did (`acted`, `refused` with why, `no action`,

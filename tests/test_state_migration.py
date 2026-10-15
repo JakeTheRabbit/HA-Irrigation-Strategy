@@ -572,3 +572,56 @@ def test_vmax_series_stays_bounded_and_drops_bad_readings(tmp_path):
     c = _make([1], p)
     c._load_state()
     assert c.rooms[0].state[1]["vmax_wetup"] == series[25:]
+
+
+# ---- plan adherence's record (_adherence): additive, field by field ----
+def test_a_file_without_plan_adherence_loads_fresh_and_saves_no_record(tmp_path):
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": {"1": {"phase": "P2"}}}), encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()
+    assert c.rooms[0]._adherence == C.plan_adherence.fresh()
+    c._save_state()
+    assert "_adherence" not in json.loads(p.read_text(encoding="utf-8"))["default"]
+
+
+def test_a_plan_adherence_record_that_is_not_one_loads_fresh(tmp_path):
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": {"_adherence": ["junk"]}}), encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()
+    assert c.rooms[0]._adherence == C.plan_adherence.fresh()
+
+
+def test_each_wrong_field_of_the_record_starts_fresh_and_a_later_field_is_kept(
+    tmp_path,
+):
+    p = tmp_path / "state.json"
+    today = datetime.now().date().isoformat()
+    saved = {
+        "v": 1,
+        "draft_seen": "yesterday",
+        "baseline": {"revision": 3, "values": "x"},
+        "alerted": {"plan_saved_not_armed_default_r3": today, "bad": 7},
+        "phase_log": {
+            "1": [{"at": "x", "from": "P3", "to": "P0", "how": "lights-on"}, 5]
+        },
+        "bridge": 5,
+        "bridge_day": 12,
+        "cooldown_until": None,
+        "from_a_later_release": {"kept": True},
+    }
+    p.write_text(json.dumps({"default": {"_adherence": saved}}), encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()
+    adh = c.rooms[0]._adherence
+    assert (
+        adh["draft_seen"] is None and adh["baseline"] is None and adh["bridge"] is None
+    )
+    assert adh["bridge_day"] is None
+    assert adh["alerted"] == {"plan_saved_not_armed_default_r3": today}
+    assert adh["phase_log"] == {"1": [saved["phase_log"]["1"][0]]}
+    c._save_state()
+    written = json.loads(p.read_text(encoding="utf-8"))["default"]["_adherence"]
+    assert written["from_a_later_release"] == {"kept": True}
+    assert written["alerted"] == {"plan_saved_not_armed_default_r3": today}

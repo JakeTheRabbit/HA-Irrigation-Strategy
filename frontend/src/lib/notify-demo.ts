@@ -85,7 +85,7 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "jev",
     name: "Jev",
     detail:
-      "Jev's advice, Jev moving a zone's P2 shot size or re-water point (a push only), and the AI assistant's budget, key, retired route and feed proposals.",
+      "Jev's advice, Jev moving a zone's P2 shot size or re-water point (a push only), the AI assistant's budget, key, retired route and feed proposals, and whether the room runs its grow plan.",
     codes: [
       "CS-501",
       "CS-702",
@@ -96,6 +96,7 @@ export const DEMO_KINDS: NotifyKind[] = [
       "CS-709",
       "CS-711",
       "CS-712",
+      "CS-713",
       "CS-404",
     ],
     events: ["jev_setpoint"],
@@ -105,7 +106,17 @@ export const DEMO_KINDS: NotifyKind[] = [
     name: "Setup and settings",
     detail:
       "A setup change waiting, settings missing or out of range, a grow plan holding, and an Engine Enabled switch that does not stop water.",
-    codes: ["CS-201", ...codes(401, 405, [404]), "CS-601", "CS-605", "CS-606", "CS-607", "CS-610", "CS-611"],
+    codes: [
+      "CS-201",
+      ...codes(401, 405, [404]),
+      "CS-601",
+      "CS-605",
+      "CS-606",
+      "CS-607",
+      "CS-610",
+      "CS-611",
+      "CS-713",
+    ],
     events: [],
   },
 ];

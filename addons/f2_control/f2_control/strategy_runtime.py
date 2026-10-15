@@ -50,7 +50,8 @@ def parse_snapshot(state, attributes, prefix, now, was_required=False):
     """Missing new capability preserves legacy behaviour unless previously activated."""
     attrs = attributes if isinstance(attributes, dict) else {}
     required = was_required or attrs.get("enabled") is True
-    result = {"required": required, "error": None, "zones": {}, "managed": set()}
+    result = {"required": required, "error": None, "zones": {}, "managed": set(),
+              "grow_day": attrs.get("grow_day"), "revision": attrs.get("revision")}
     if not required:
         return result
     try:
@@ -114,6 +115,8 @@ def parse_snapshot(state, attributes, prefix, now, was_required=False):
             result["zones"][zid] = {
                 "parameters": parameters or {},
                 "status": zone.get("status"),
+                # the date whose targets these are: a zone held on an earlier day says so
+                "applied_day": zone.get("applied_day") or attrs.get("grow_day"),
             }
         if result["zones"].keys() != result["managed"]:
             raise ValueError("Strategy snapshot is missing assigned zones")

@@ -39,6 +39,7 @@ import curve_tracker
 import dosing_runner
 import jev_bridge
 import log_words
+import plan_adherence
 import runtime_env
 from jev import client as jev_client
 import setpoint_supervisor
@@ -1526,6 +1527,8 @@ class Controller:
         room._strategy_persisted = True
         room._off_since = None
         block = per_room.get(room.slug)
+        # Plan adherence's own record (plan_adherence.load): absent on an older file, field by field otherwise.
+        room._adherence = plan_adherence.load(block.get("_adherence") if isinstance(block, dict) else None)
         room.tank_drawdown = tank_level.load(block.get("_tank") if isinstance(block, dict) else None)
         if isinstance(block, dict):
             room.strategy_required = bool(block.get("_strategy_required", False))
@@ -1900,6 +1903,11 @@ class Controller:
                 block["_room_off_since"] = room._off_since.isoformat()
             else:
                 block.pop("_room_off_since", None)
+            adherence = plan_adherence.dump(getattr(room, "_adherence", None) or plan_adherence.fresh(), datetime.now().date())
+            if adherence:
+                block["_adherence"] = adherence
+            else:
+                block.pop("_adherence", None)
             if getattr(room, "_setup_fingerprint_adopted", None):  # else keep whatever was saved
                 block["_setup"] = {
                     "revision": room.setup_revision,
@@ -2296,6 +2304,7 @@ class Controller:
                 )
             room._lights_logged = True
         room.lights_on_hour, room.lights_off_hour = float(lon), float(loff)
+        room._lights_source = src
 
     def _lights_option_was_never_the_source(self, room):
         """A room made by the setup wizard, on an app whose lights option nobody touched.
@@ -5574,6 +5583,109 @@ class Controller:
         ha_call("select", "select_option", entity_id=entity, option="Off")
         return None
 
+    # ---------- plan adherence (plan_adherence.py): is the room running its grow plan? ----------
+    PLAN_FETCH_H = 6.0  # the plan itself is fetched again at least this often while it exists
+    PLAN_NATIVES_MIN = 15.0  # the numbers a running plan controls are read this often (an edit by hand)
+
+    def _plan_fetch(self, room, now, state, attrs, expected_day, lights_on_at):
+        """The plan (strategy_get) and today's and yesterday's previews (strategy_preview), kept on the room and
+        fetched again only when the plan sensor's revision, status or day changes, once 10 min after lights-on and
+        every PLAN_FETCH_H hours: the integration's own code says what the plan wants, never this controller's.
+        A call that fails keeps what was had; its age says how old it is. -> the runtime record."""
+        rt = room.__dict__.setdefault("_plan_rt", {"key": None, "at": None, "plan": None, "preview": {},
+                                                   "natives_at": None, "natives": None})
+        rev = attrs.get("revision")
+        if state not in ("draft", "armed", "active", "disarming", "error") or (
+                state == "draft" and not (type(rev) is int and rev >= 1)):
+            rt.update(key=None, at=None, plan=None, preview={}, natives_at=None, natives=None)
+            return rt
+        key = (rev, state, attrs.get("grow_day"))
+        settled = lights_on_at + timedelta(minutes=10) if lights_on_at is not None else None
+        due = (rt["key"] != key or rt["at"] is None or now - rt["at"] >= timedelta(hours=self.PLAN_FETCH_H)
+               or (settled is not None and rt["at"] < settled <= now))
+        room_id = {"room_id": f"room:{room.prefix}"}
+        if due:
+            status, body = ha_service_response("crop_steering", "strategy_get", room_id)
+            if status == 200 and isinstance(body, dict) and isinstance(body.get("plan"), dict):
+                previews = {}
+                if state in ("armed", "active", "disarming"):
+                    for name, day in (("today", expected_day), ("yesterday", expected_day - timedelta(days=1))):
+                        got = ha_service_response("crop_steering", "strategy_preview",
+                                                  {**room_id, "date": day.isoformat()})[1]
+                        rows = ((got or {}).get("preview") or {}).get("zones") if isinstance(got, dict) else None
+                        if isinstance(rows, list):
+                            previews[name] = {r["zone_id"]: r for r in rows
+                                              if isinstance(r, dict) and type(r.get("zone_id")) is int}
+                rt.update(key=key, at=now, plan=body, preview=previews)
+        if state in ("active", "disarming") and rt["plan"] is not None and (
+                rt["natives_at"] is None or now - rt["natives_at"] >= timedelta(minutes=self.PLAN_NATIVES_MIN)):
+            wanted = {e for z in (rt["plan"].get("catalog") or {}).values() for v in (z or {}).values()
+                      for e in (v or {}).get("entity_ids") or ()}
+            found = {}
+            for st in ha_get_all():
+                if st.get("entity_id") in wanted:
+                    try:
+                        found[st["entity_id"]] = float(st.get("state"))
+                    except (TypeError, ValueError):
+                        pass
+            rt.update(natives=found, natives_at=now)
+        return rt
+
+    def _plan_view(self, room, now, lights_on, params):
+        """This pass of the room as plan adherence reads it (plan_adherence.View)."""
+        state, attrs = getattr(room, "_strategy_raw", None) or (None, {})
+        expected = self._grow_day_start(room, now)
+        lights_on_at = (None if room.lights_on_hour == room.lights_off_hour
+                        else datetime.combine(expected, datetime.min.time()) + timedelta(hours=room.lights_on_hour))
+        rt = self._plan_fetch(room, now, state, attrs, expected, lights_on_at)
+        source = getattr(room, "_lights_source", "integration")
+        rt["lights_bad_since"] = None if source == "integration" else (rt.get("lights_bad_since") or now)
+        zones = {}
+        for z in room.zones:
+            st, p = room.state[z], params.get(z)
+            zones[z] = {"phase": st.get("phase"), "last_phase_change": st.get("last_phase_change"),
+                        "last_daily_reset": st.get("last_daily_reset"), "shots": st.get("shots"),
+                        "blind": z in getattr(room, "_blind_zones", set()),
+                        "p0_wait": getattr(p, "p0_max_wait_min", None), "p1_shots": getattr(p, "p1_max_shots", None),
+                        "p1_gap": getattr(p, "p1_time_between_min", None)}
+        active = state == "active"
+        return plan_adherence.View(
+            now=now, expected_day=expected, uptime_min=(now - self._start).total_seconds() / 60.0,
+            lights_on=lights_on, on_hour=room.lights_on_hour, off_hour=room.lights_off_hour, lights_source=source,
+            status=state if state in ("draft", "armed", "active", "disarming", "error") else "none", attrs=attrs,
+            plan=rt["plan"], plan_age_h=None if rt["at"] is None else (now - rt["at"]).total_seconds() / 3600.0,
+            preview=rt["preview"], natives=rt["natives"],
+            steering={z: "vegetative" if self._veg(room, z) else "generative" for z in room.zones} if active else {},
+            zones=zones, titles={z: self._zone_title(room, z) for z in room.zones},
+            lights_bad_since=rt["lights_bad_since"], slug=room.slug)
+
+    def _watch_plan(self, room, now, lights_on, params):
+        """Plan adherence, every pass under every brain: the drifts code finds (plan_adherence.detect), one CS-713
+        card per episode, the plan line for the brain panel and, under the Claude brain, its plan task. It never
+        writes a number, and never arms, edits or disarms a plan."""
+        adh = room.__dict__.setdefault("_adherence", plan_adherence.fresh())
+        before = json.dumps(adh, sort_keys=True, default=str)
+        view = self._plan_view(room, now, lights_on, params)
+        on = view.lights_on_at
+        day_start = now if on is None else (on if now >= on else on - timedelta(days=1))
+        hows = {z: str(d[2]) for event, r, z, d in self.__dict__.get("_events", [])
+                if event == "phase" and r is room and len(d) > 2}
+        for z in room.zones if plan_adherence.has_plan(view) else ():  # a room with no plan keeps no record
+            plan_adherence.observe(adh, z, room.state[z].get("phase"), now, hows.get(z), day_start)
+        drifts = plan_adherence.detect(view, adh)
+        for d in drifts:
+            if not plan_adherence.due(adh, d, view.expected_day):
+                continue
+            if d.cls in plan_adherence.TRIPWIRES:
+                log(f"[{room.slug}] PLAN TRIPWIRE {d.cls} Z{d.zone}: {d.line} state={room.state.get(d.zone)}")
+            words = d.line[:1].upper() + d.line[1:]
+            if self._alert(d.key, "CS-713", d.title, f"{words}\n\n{d.suggestions[0]}" if d.suggestions else words,
+                           room=room, zone=d.zone):
+                plan_adherence.raised(adh, d, view.expected_day)
+        room._plan_panel = plan_adherence.panel(view, drifts)
+        if json.dumps(adh, sort_keys=True, default=str) != before:
+            self._save_state()
+
     def _strategy_preflight(self, room, zone, now):
         if getattr(room, "_strategy_batch_invalid", False):
             return "Strategy changed or held; recompute the irrigation batch on the next loop"
@@ -5603,6 +5715,7 @@ class Controller:
 
     def _load_strategy_snapshot(self, room, now):
         state, attrs, _ = ha_get(self._cs(room, "sensor", "strategy_plan"))
+        room._strategy_raw = (state, attrs if isinstance(attrs, dict) else {})  # what plan adherence reads
         was_required = getattr(room, "strategy_required", False)
         snapshot = parse_snapshot(
             state, attrs, room.prefix, now.timestamp(), was_required
@@ -5949,6 +6062,10 @@ class Controller:
                 zone=z,
             )
         self._watch_probe_methods(room)
+        try:  # CS-713 only ever tells: the plan's targets in force are the integration's, never this check's
+            self._watch_plan(room, now, lights_on, params)
+        except Exception as e:
+            log("plan watch error", room.slug, e)
         if getattr(self, "jev", None) is not None:
             try:
                 jev_bridge.siblings(self, room, snaps, params, now)

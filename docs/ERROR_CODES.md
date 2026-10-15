@@ -92,6 +92,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-710](#cs-710) | Water may be bypassing the substrate or the probe | Warning | Notification |
 | [CS-711](#cs-711) | The AI assistant proposes a change to the feed | Information | Notification |
 | [CS-712](#cs-712) | The AI assistant's Jev route is retired | Information | Notification |
+| [CS-713](#cs-713) | The room is not running its grow plan as written | Warning | Notification |
 | [CS-801](#cs-801) | A dosing pump ran past its time and was switched off | Critical | Notification |
 | [CS-802](#cs-802) | A dose could not be confirmed, or ended early | Warning | Notification |
 | [CS-803](#cs-803) | A dose or batch was interrupted by a restart | Warning | Notification |
@@ -1364,6 +1365,31 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 - To use the AI assistant, set brain_provider to claude_haiku and add an Anthropic key.
 - To keep the old route, set brain_provider to jev_legacy.
 - To turn the brain off, set brain_provider to rules.
+
+<a id="cs-713"></a>
+
+### CS-713: The room is not running its grow plan as written
+
+*Warning · Notification*
+
+**What it means.** The controller compared the grow plan with what the room is doing and found a difference: today's plan day not applied, an armed plan that did not start, a plan saved but not armed, a plan about to end, a change to a setting the plan controls (which has no effect while the plan runs), the settings the room goes back to when a plan is disarmed, a steering select that disagrees with the plan, the lights hours read from somewhere else, the room's light disagreeing with its lights hours, or a phase that did not change when it should have. The card says which, and what to do.
+
+**Watering meanwhile.** Carries on. The engine keeps watering on the targets in force; the card only tells you. A setting changed by hand is never overwritten.
+
+**Likely causes**
+
+- A zone's moisture probe that stopped reporting keeps that zone on an earlier day's targets.
+- A plan saved and not armed, or armed and waiting for a reading.
+- The plan's last scheduled day is near.
+- A setting changed by hand or by an automation while the plan runs.
+- The steering select or the lights hours disagree with the plan.
+- A controller fault (rare).
+
+**Suggested fixes**
+
+- Follow the card's suggestion.
+- Fix or unmap the probe it names; arm, extend or disarm the plan; make a change in the plan's days instead of the setting; set the steering select to match; check the lights hours.
+- If the card says a phase did not change, send the controller log.
 
 ## Dosing (CS-8xx)
 

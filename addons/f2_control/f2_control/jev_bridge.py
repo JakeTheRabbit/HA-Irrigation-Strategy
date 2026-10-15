@@ -1054,8 +1054,8 @@ def publish(c, room, now, ha_set):
             "failovers_today": s.get("failovers"), "reasks_today": s.get("reasks"),
             "routes": list(getattr(brain, "routes", [])), "last_route": s.get("route"),
             "judges": sorted(j.name for j in brain.judges), "judge_errors": dict(brain.errors),
-            "stage": stage_info(c, room, now), **panel(c, room, now), "friendly_name": FRIENDLY,
-            "engine": PRODUCT})
+            "stage": stage_info(c, room, now), **panel(c, room, now), "plan": room.__dict__.get("_plan_panel"),
+            "friendly_name": FRIENDLY, "engine": PRODUCT})
     journal = getattr(brain, "journal", None)
     if journal is not None:
         entries = journal.recent(room.slug)
@@ -1220,8 +1220,8 @@ def publish_rules(c, room, now, ha_set):
     ha_set(f"sensor.crop_steering_{room.prefix}jev", "rules", {
         "provider": "rules", "state": status.state, "state_words": status.words, "key_set": status.key_set,
         "model": None, "mode": None, "fallback_since": status.since, "deprecated_route": status.deprecated_route,
-        "notice": status.notice, "judges_acting": [], "stage": None, "friendly_name": FRIENDLY,
-        "engine": PRODUCT})
+        "notice": status.notice, "judges_acting": [], "stage": None, "plan": room.__dict__.get("_plan_panel"),
+        "friendly_name": FRIENDLY, "engine": PRODUCT})
     for zone in room.zones:
         ha_set(f"sensor.crop_steering_{room.prefix}zone_{zone}_jev", "rules",
                {"judges": {}, "strict": [], "provider": "rules", "friendly_name": f"Zone {zone} Jev",
