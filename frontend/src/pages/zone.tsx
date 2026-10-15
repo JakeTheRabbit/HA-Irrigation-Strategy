@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +23,7 @@ import {
   jevResult,
   JEV_TITLES,
   outcomeText,
+  parseBrainAnswers,
   parseJevSetpoints,
   parseJevZone,
   readJev,
@@ -36,6 +37,7 @@ import { ecType, fusionMethod, PROBE_TONE, zoneProbes } from "@/lib/probes";
 import type { Controller, Zone } from "@/lib/types";
 import { dayWord } from "@/lib/utils";
 import { waitingText } from "@/lib/waiting-for";
+import { aiRead, zoneReasons } from "@/lib/zone-why";
 import "./zone.css";
 
 const PHASE_NAMES: Record<string, string> = {
@@ -115,11 +117,11 @@ export function ZonePage({
         )}
         <Pill
           dot
-          tone={zone.valveOn === true ? "on" : zone.valveOn === false ? "off" : "unknown"}
+          tone={zone.valveOn === true ? "on" : zone.valveOn === false ? "neutral" : "unknown"}
           data-zone-valve={zone.id}
           title={zone.valveEntity ?? "No valve mapped in this room's engine configuration"}
         >
-          Valve {zone.valveOn === true ? "open" : zone.valveOn === false ? "shut" : "unknown"}
+          Valve {zone.valveOn === true ? "open" : zone.valveOn === false ? "closed" : "unknown"}
         </Pill>
         {zone.enabled === false && (
           <Pill dot tone="warn">
@@ -133,33 +135,145 @@ export function ZonePage({
         )}
       </div>
       <ZoneDay key={zone.id} controller={controller} zone={zone} />
-      {/* Why it did what it did beside what happens next: Jev's decisions and the probes on the
-          left, the controller's next step, the controls and the targets on the right. Without Jev
-          the controls join the probes, so the columns stay about even. */}
+      <ZoneWhy key={`why-${zone.id}`} controller={controller} zone={zone} />
+      {/* The AI on this zone beside the controls; without it the controls take the width. */}
       <div className="zone-page-grid">
         <div className="zone-page-column">
           <BrainOnZone controller={controller} zone={zone.id} navigate={navigate} />
           {jev && <JevOnZone controller={controller} zone={zone} navigate={navigate} />}
-          <ZoneProbes controller={controller} zone={zone} navigate={navigate} />
-          {!jev && <ZoneControls key={zone.id} controller={controller} zone={zone} />}
         </div>
-        <div className="zone-page-column">
-          {jev && <ZoneControls key={zone.id} controller={controller} zone={zone} />}
-          <ZoneTargets controller={controller} zone={zone} navigate={navigate} />
-        </div>
+        <ZoneControls key={zone.id} controller={controller} zone={zone} />
       </div>
-      <HistoryChart
-        key={`history-${zone.id}`}
-        controller={controller}
-        zones={[zone]}
-        title="History"
-        ranges={[
-          { hours: 48, label: "Yesterday" },
-          { hours: 168, label: "7 days" },
-        ]}
-      />
+      {/* The rest on request: the day chart above already shows today. */}
+      <Collapsed key={`targets-${zone.id}`} title="Targets, read only">
+        {() => <ZoneTargets controller={controller} zone={zone} navigate={navigate} />}
+      </Collapsed>
+      <Collapsed key={`probes-${zone.id}`} title="Probes used and left out">
+        {() => <ZoneProbes controller={controller} zone={zone} navigate={navigate} />}
+      </Collapsed>
+      <Collapsed key={`history-${zone.id}`} title="7-day history">
+        {() => (
+          <HistoryChart
+            controller={controller}
+            zones={[zone]}
+            title="History"
+            ranges={[{ hours: 168, label: "7 days" }]}
+          />
+        )}
+      </Collapsed>
       <RecordedBehaviour key={`recorded-${zone.id}`} controller={controller} zone={zone} />
     </div>
+  );
+}
+
+/** Why this zone is doing what it is doing: the controller's reason from its decision record and what
+ * it waits for next; with the AI on, the AI's read and a "Why?" that asks it. On rules, the
+ * controller's reason only. */
+function ZoneWhy({ controller, zone }: { controller: Controller; zone: Zone }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const { states, room } = controller;
+  const ids = jevIds(room.room.prefix);
+  const reasons = zoneReasons(
+    zone,
+    states[`sensor.crop_steering_${room.room.prefix}current_decision`],
+  );
+  const waiting = zone.waiting
+    ? waitingText(zone.waiting, { number: (value) => number(value), clock })
+    : "";
+  const on = !!readJev(states, room.room.prefix).room?.on;
+  const sensor = on ? parseJevZone(states[ids.zone(zone.id)]) : null;
+  const read = sensor ? aiRead(sensor.judges, sensor.acting) : null;
+  // "Why?" needs a controller that answers (its answers sensor); asking costs from the AI budget.
+  const answers = on ? parseBrainAnswers(states[ids.answers]) : null;
+  const answer = answers?.answers.find((item) => item.zone === zone.id);
+  const locked = controller.admin === false;
+  async function ask() {
+    setBusy(true);
+    setError("");
+    try {
+      await controller.operator("brain_ask", {
+        question: `Why is ${zone.name} doing what it is doing now?`,
+        zone: zone.id,
+      });
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel zone-why-panel" aria-labelledby="zone-why-title" data-zone-why>
+      <div className="panel-heading">
+        <div>
+          <h2 id="zone-why-title">Why this zone is doing this</h2>
+          <p>{on ? "The controller’s reason, then the AI’s read" : "The controller’s reason"}</p>
+        </div>
+        {answers && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy || locked || !!answers.pending}
+            onClick={() => void ask()}
+          >
+            Why?
+          </Button>
+        )}
+      </div>
+      <div className="zone-panel-body">
+        {reasons.length ? (
+          <ul className="zone-reasons" aria-label="The controller’s reason">
+            {reasons.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted small">The controller has not said anything about this zone yet.</p>
+        )}
+        {waiting && (
+          <p className="zone-waiting">
+            <span>The controller waits for</span> {waiting}
+          </p>
+        )}
+        {read && (
+          <p className="zone-ai-read">
+            <span>AI’s read · {read.title}</span> {read.why}
+          </p>
+        )}
+        {answers && locked && (
+          <p className="muted small">
+            Only an administrator can ask: each answer costs from the room’s AI budget.
+          </p>
+        )}
+        {error && (
+          <p className="jev-trouble" role="alert">
+            {error}
+          </p>
+        )}
+        {!!answers?.pending && <p className="muted small">Asking…</p>}
+        {answer && (
+          <p className="zone-ai-read" data-cannot={answer.cannotAnswer || undefined}>
+            <span>AI’s answer{answer.answeredAt !== null && ` · ${clock(answer.answeredAt)}`}</span>{" "}
+            {answer.answer}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** A section left closed until asked for: it renders only while open. */
+function Collapsed({ title, children }: { title: string; children: () => ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details
+      className="zone-more"
+      open={open}
+      onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
+    >
+      <summary>{title}</summary>
+      {open && children()}
+    </details>
   );
 }
 
@@ -190,7 +304,7 @@ function JevOnZone({
     <section className="panel zone-jev" aria-labelledby="zone-jev-title" data-zone-jev>
       <div className="panel-heading">
         <div>
-          <h2 id="zone-jev-title">Jev on this zone</h2>
+          <h2 id="zone-jev-title">AI on this zone</h2>
           <p>
             {rules ??
               (sensor?.acting.length
@@ -450,21 +564,12 @@ function ZoneControls({ controller, zone }: { controller: Controller; zone: Zone
   const connected = ["live", "demo"].includes(controller.connection);
   const pauseWords =
     "Paused, the zone gets no water at all, not even a rescue shot, and a shot already running in it stops within a few seconds. It is not an emergency stop: use the installation's physical shut-off for that.";
-  // The controller's own thresholds against the readings now: what moving a phase by hand skips.
-  const waiting = zone.waiting
-    ? waitingText(zone.waiting, { number: (value) => number(value), clock })
-    : "";
   return (
     <section className="panel zone-controls" aria-labelledby="zone-controls-title">
       <div className="panel-heading">
         <h2 id="zone-controls-title">Controls</h2>
       </div>
       <div className="zone-panel-body">
-        {waiting && (
-          <p className="zone-waiting">
-            <span>The controller waits for</span> {waiting}
-          </p>
-        )}
         <div className="zone-control-row">
           <span>
             Scheduling{" "}

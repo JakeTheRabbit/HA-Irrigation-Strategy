@@ -1300,6 +1300,7 @@ try {
         );
         // The zone's page shows the plan's targets, not the numbers kept for after it.
         await lp.evaluate(() => (location.hash = "#/zone/1"));
+        await lp.getByText("Targets, read only", { exact: true }).click();
         const targets = lp.locator(".zone-targets");
         await visible(targets.getByText("Set by the armed grow plan", { exact: true }));
         const rewater = targets.locator("tr").filter({ hasText: "Re-water point" });
@@ -1360,6 +1361,7 @@ try {
         await lp.getByRole("button", { name: "Refresh controller data" }).click();
         await visible(lp.locator(".today-critical").getByText("Grow plan snapshot unavailable."));
         await lp.evaluate(() => (location.hash = "#/zone/1"));
+        await lp.getByText("Targets, read only", { exact: true }).click();
         await visible(rewater);
         assert.doesNotMatch(await rewater.innerText(), /77|54/);
         await lp.screenshot({ path: out + "workspace-stale-plan.png", fullPage: true });
