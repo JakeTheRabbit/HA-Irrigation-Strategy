@@ -113,6 +113,15 @@ def build_engine_config(
     # descriptor it always did, so the controller's saved setup fingerprint still matches and an
     # update does not strand the room behind a disarm cycle.
     declared = {"plumbing": setup["plumbing"]} if setup.get("plumbing") else {}
+    # The tank level, likewise only when mapped: a distance sensor and/or a low float, and how the
+    # controller turns them into a level (full and empty distances, the float's low state).
+    declared.update(
+        {k: hw[k] for k in ("tank_distance_sensor", "tank_low_float") if hw.get(k)}
+    )
+    if setup.get("tank_level") and (
+        hw.get("tank_distance_sensor") or hw.get("tank_low_float")
+    ):
+        declared["tank_level"] = setup["tank_level"]
     # Which integration Home Assistant actually loaded, for the dashboard's sidebar and for pairing
     # diagnostics. Passed in (this module stays import-free so it can be loaded on its own). The
     # controller's setup fingerprint reads named keys only, so this does not disturb a
