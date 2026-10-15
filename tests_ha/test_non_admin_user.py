@@ -35,6 +35,12 @@ CHANGES = {
     "stock_refill": {"room_id": ROOM, "expected_revision": 0, "id": "bloom"},
     "stock_record_batch": {"room_id": ROOM, "expected_revision": 0},
     "stock_draw": {"room_id": ROOM, "key": "k", "draws": {}, "source": "dose"},
+    "calibration_record": {
+        "room_id": ROOM,
+        "expected_revision": 0,
+        "probe": "feed_ph",
+        "points": [],
+    },
     "dosing_save": {"room_id": ROOM, "expected_revision": 0, "pumps": [], "batch": {}},
     # A stop is the one dosing request anyone may make (test_an_ordinary_user_may_stop_dosing).
     "dosing_request": {"room_id": ROOM, "action": "dose", "pump": "balance", "ml": 5},
@@ -53,6 +59,7 @@ READS = {
     "strategy_preview": {"room_id": ROOM},
     "runs_get": {"room_id": ROOM},
     "stock_get": {"room_id": ROOM},
+    "calibration_get": {"room_id": ROOM},
     "dosing_get": {"room_id": ROOM},
     "notify_get": {},
     "whats_new_get": {},

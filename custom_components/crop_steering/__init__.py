@@ -162,6 +162,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the stock store
         _LOGGER.warning("Stock tanks unavailable: %s", err)
 
+    # Feed-probe calibration checks: two points each, stored per room as a history.
+    try:
+        from .calibration import async_setup_calibration
+
+        await async_setup_calibration(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on this store
+        _LOGGER.warning("Probe calibration history unavailable: %s", err)
+
     # Batch-tank dosing: each room's setup and its one request, stored; the dosing_config sensor
     # publishes them for the controller app, which does every action (docs/DOSING.md).
     try:
@@ -313,6 +321,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .stock_api import async_unload_stock
 
     await async_unload_stock(hass, entry)
+    from .calibration import async_unload_calibration
+
+    await async_unload_calibration(hass, entry)
     from .dosing_api import async_unload_dosing
 
     await async_unload_dosing(hass, entry)

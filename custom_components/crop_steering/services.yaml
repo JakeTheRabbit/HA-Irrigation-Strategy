@@ -288,6 +288,44 @@ runs_import:
       required: true
       selector:
         object:
+calibration_get:
+  name: Read probe calibration history
+  description: Read this room's two-point calibration checks of its feed-water pH and EC probes, newest first, and which sensor each probe is now. Does not change anything.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+calibration_record:
+  name: Record a probe calibration check
+  description: Record what the room's feed-water pH or EC probe read in two reference solutions. The answer gives the probe's slope, its offset and whether it passes, is drifting or fails. Changes no reading and no hardware. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    probe:
+      required: true
+      selector:
+        select:
+          options:
+            - feed_ph
+            - feed_ec
+    points:
+      required: true
+      example: '[{"reference": 7.0, "reading": 7.05}, {"reference": 4.0, "reading": 4.1}]'
+      selector:
+        object:
+    note:
+      required: false
+      selector:
+        text:
 stock_get:
   name: Read stock tanks
   description: Read this room's stock tanks, their levels, what one batch takes from each, and the batches recorded. Does not change anything.
