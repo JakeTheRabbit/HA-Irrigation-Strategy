@@ -142,6 +142,11 @@ const WORDS: Record<string, SettingWords> = {
     short: "Daily minimum stops at",
     help: "Shots that make up a zone’s daily minimum water only fire while moisture reads below this.",
   },
+  min_daily_ml_per_plant: {
+    label: "Daily minimum water per plant",
+    short: "Daily minimum",
+    help: "Warning: this waters whatever the probe reads. With lights on and after P0, the zone gets at least this times its plant count each grow-day, spread to finish 3 hours before lights-off, until moisture is 5 points above full saturation or the daily limit is reached. 0 turns it off.",
+  },
   irrigation_ec_min: {
     label: "Feed EC, lowest",
     short: "Feed EC, lowest",

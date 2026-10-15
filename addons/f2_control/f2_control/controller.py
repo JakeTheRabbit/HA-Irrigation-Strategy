@@ -490,6 +490,9 @@ def _pause(seconds, deadline=None):
 # The shortest shot the controller runs, in seconds (a shot sized shorter is lengthened to this).
 MIN_SHOT_S = 5
 
+# The minimum daily water stops once moisture is this many VWC points above field capacity.
+MIN_FLOOR_FC_MARGIN = 5.0
+
 # A probe unreadable for less than this many minutes is a blip (Home Assistant restarting, a sensor
 # reconnecting): its zone gets no timer shot and no probe alert until it has been out this long.
 BLIND_GRACE_MIN = 15
@@ -2106,15 +2109,22 @@ class Controller:
                 f"switch.crop_steering_{room.prefix}ec_stacking_enabled", False
             ),
             watchdog_hours=self._zone_num(room, zone, "watchdog_hours", FALLBACK["watchdog_hours"]),
-            min_daily_volume=self._num(
-                f"input_number.crop_steering_{room.prefix}zone_{zone}_min_daily_ml_per_plant",
-                0.0,
+            # mL/plant x plants -> zone-L floor (0 if either unset). An integration older than the
+            # zone's number has only the old input_number helper (TODO: drop that site-shaped id).
+            min_daily_volume=self._zone_num(
+                room,
+                zone,
+                "min_daily_ml_per_plant",
+                self._num(f"input_number.crop_steering_{room.prefix}zone_{zone}_min_daily_ml_per_plant", 0.0),
+                optional=True,
             )
             * self._zone_num(room, zone, "plant_count", FALLBACK["plant_count"])
-            / 1000.0,  # mL/plant x plants -> zone-L floor (0 if either unset)
+            / 1000.0,
+            # Anti-drown VWC cap on the floor: field capacity plus a margin, inside the engine's
+            # 50-100 band. An engine-only knob (no integration entity) still overrides it.
             drown_ceiling=self._zone_num(
-                room, zone, "min_floor_drown_ceiling", FALLBACK["min_floor_drown_ceiling"], optional=True
-            ),  # hard anti-drown VWC cap on the floor (engine-only knob — no integration entity)
+                room, zone, "min_floor_drown_ceiling", max(50.0, min(100.0, fc + MIN_FLOOR_FC_MARGIN)), optional=True
+            ),
         )
         p, warns = validate_params(raw)
         for w in warns:
@@ -4567,7 +4577,7 @@ class Controller:
         for suffix in WATER_SIZING:
             if parameter_override(getattr(room, "strategy_snapshot", None), zone, suffix) is not None:
                 continue
-            self._zone_num(room, zone, suffix, 0)  # a read is remembered; a miss is noted for CS-402
+            self._zone_num(room, zone, suffix, None)  # a read is remembered; a miss is noted for CS-402
             per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
             glob = f"number.crop_steering_{room.prefix}{suffix}"
             if per not in seen and glob not in seen:

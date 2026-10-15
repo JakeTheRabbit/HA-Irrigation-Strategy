@@ -40,6 +40,9 @@ DEFAULTS = {
     "plant_count": (4, 0),
     "max_shot_duration": (900, None),  # seconds
     "max_daily_volume": (20.0, 150),  # litres per zone per grow-day
+    # mL per plant per grow-day, 0 = off. The controller falls back to the old
+    # input_number helper of the same name, then to 0.
+    "min_daily_ml_per_plant": (0.0, None),
     # Substrate limits
     "field_capacity": (70.0, 70),
     "maximum_ec": (9.0, 9),
@@ -90,8 +93,6 @@ DEFAULTS = {
     # The sump pump's power above which it counts as running (W), for CS-311. The
     # controller falls back to its own SUMP_RUN_W, the same 20 W it always compared with.
     "sump_power_threshold_w": (20.0, None),
-    # Controller-only: the highest VWC the minimum-daily floor may water a zone up to
-    "min_floor_drown_ceiling": (None, 90),
 }
 
 ENTITY_DEFAULTS = {

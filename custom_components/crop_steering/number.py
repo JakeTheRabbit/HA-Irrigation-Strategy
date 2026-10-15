@@ -657,6 +657,28 @@ async def async_setup_entry(
             )
         )
 
+        # Minimum daily water: watered whatever the probe reads, so it starts off. It replaces
+        # the input_number helper of the same name nothing created; a new entity takes its value.
+        min_daily_key = f"zone_{zone_num}_min_daily_ml_per_plant"
+        numbers.append(
+            CropSteeringNumber(
+                entry,
+                NumberEntityDescription(
+                    key=min_daily_key,
+                    name=f"Crop Steering Zone {zone_num} Min Daily Water Per Plant",
+                    icon="mdi:water-plus",
+                    native_min_value=0,
+                    native_max_value=10000,
+                    native_step=1,
+                    native_unit_of_measurement=UnitOfVolume.MILLILITERS,
+                    mode="box",
+                ),
+                zone_num=zone_num,
+                default_value=ENTITY_DEFAULTS["min_daily_ml_per_plant"],
+                legacy_helper=f"input_number.{DOMAIN}_{room_prefix(entry)}{min_daily_key}",
+            )
+        )
+
         # Per-zone copy of every steering parameter (the engine falls back to global).
         for _key in PER_ZONE_STEERING_KEYS:
             _g = _DESC_BY_KEY[_key]
@@ -692,6 +714,7 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         zone_num: int = None,
         default_value: float = None,
         entity_seed: dict | None = None,
+        legacy_helper: str | None = None,
     ) -> None:
         """Initialize the number entity.
 
@@ -704,6 +727,7 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         self.entity_description = description
         self._entry = entry
         self._zone_num = zone_num
+        self._legacy_helper = legacy_helper
         self._setup_value = None
         self._setup_revision = 0
         if zone_num is not None:
@@ -744,6 +768,14 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         """Restore state when added to hass."""
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
+        if last_state is None and self._legacy_helper:
+            # First start of this entity: keep the value its old helper held (manifest
+            # after_dependencies sets input_number up first).
+            helper = self.hass.states.get(self._legacy_helper)
+            try:
+                self._attr_native_value = float(helper.state)
+            except (AttributeError, ValueError, TypeError):
+                pass
         # A state left behind by a DELETED room is not this room's: keep the wizard's answer.
         if last_state is not None and restored_state_is_ours(self._entry, last_state):
             if self._setup_value is not None and prefer_setup_value(
