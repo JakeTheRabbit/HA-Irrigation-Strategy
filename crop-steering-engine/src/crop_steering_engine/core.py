@@ -455,10 +455,12 @@ def waiting_for(s: ZoneSnapshot, p: ZoneParams) -> list:
     A list of conditions; whichever comes first acts. Each is {"rule", "shot", "to"} (a shot, or the
     phase it leads to) with a reading test {"metric": "vwc"|"ec", "op", "value", "now"}, a wait
     {"in_min"}, or both when a shot needs both. The EC reading is the settled one when there is one,
-    as decide() uses. A held plan (steering_held) leaves out the routine shots it stops. It says what
-    the engine checks, not what will happen: the controller's gates (switches, feed water, the daily
-    water limit), the EC flush and rescue rules, the watchdog, the daily minimum and P2's early move
-    to P3 in the last three hours before lights-off are not in it, and nothing is forecast.
+    as decide() uses. P0's dryback says which dryback, from which peak ({"dryback", "peak"}), and a P2
+    top-up waits out the time between P2 shots when one is set. A held plan (steering_held) leaves out
+    the routine shots it stops. It says what the engine checks, not what will happen: the controller's
+    gates (switches, feed water, the daily water limit), the EC flush and rescue rules, the watchdog,
+    the daily minimum and P2's early move to P3 in the last three hours before lights-off are not in
+    it, and nothing is forecast.
     """
     settled = s.ec_settled is not None and math.isfinite(s.ec_settled)
     ec = s.ec_settled if settled else s.ec
@@ -480,7 +482,8 @@ def waiting_for(s: ZoneSnapshot, p: ZoneParams) -> list:
         add("p0_bypass", to="P1", metric="vwc", op="<=", value=p.p2_threshold, now=s.vwc)
         if s.peak_vwc > 0:
             add("p0_dryback", to="P1", metric="vwc", op="<=",
-                value=s.peak_vwc * (1.0 - p0_dryback(p) / 100.0), now=s.vwc)
+                value=s.peak_vwc * (1.0 - p0_dryback(p) / 100.0), now=s.vwc,
+                dryback=round(p0_dryback(p), 2), peak=round(s.peak_vwc, 1))
     elif s.phase == "P1":
         ceiling = min(p.p1_target, p.field_capacity)
         reached = s.p1_reached or s.vwc >= ceiling

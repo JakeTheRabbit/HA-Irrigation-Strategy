@@ -15,6 +15,10 @@ export interface WaitingCondition {
   shots_left?: number;
   ec_max?: number | null;
   ec_now?: number | null;
+  /** p0_dryback: the dryback its level is worked out from, % below the peak. */
+  dryback?: number;
+  /** p0_dryback: that peak, the highest reading since lights-on. */
+  peak?: number;
 }
 export interface Waiting {
   /** When the controller worked it out: a wait ends `in_min` after this. */
@@ -68,13 +72,18 @@ export function waitingText(waiting: Waiting, format: WaitingFormat): string {
 
   const timeout = find("p0_timeout");
   if (timeout) {
-    // Whichever moisture level drying reaches first: the trigger, or the P3 dryback's level.
+    // Whichever moisture level drying reaches first: the trigger, or the dryback's level.
     const levels = [find("p0_bypass"), find("p0_dryback")].filter(
       (item): item is WaitingCondition => item?.value !== undefined,
     );
     const first = levels.sort((a, b) => (b.value ?? 0) - (a.value ?? 0))[0];
     const at = when(timeout);
-    return `P1 ${at ? `by ${at}` : "now"}${first ? `, or sooner at ${test(first, "%", "VWC")} (${now(first, "%")})` : ""}`;
+    // Which dryback, from which peak: never a dryback from the reading beside it.
+    const dryback =
+      first?.rule === "p0_dryback" && first.dryback !== undefined && first.peak
+        ? `, ${n(first.dryback)}% below the ${n(first.peak)}% high since lights-on`
+        : "";
+    return `P1 ${at ? `by ${at}` : "now"}${first ? `, or sooner at ${test(first, "%", "VWC")} (${now(first, "%")}${dryback})` : ""}`;
   }
 
   const done = find("p1_done");
@@ -111,8 +120,19 @@ export function waitingText(waiting: Waiting, format: WaitingFormat): string {
         ? ""
         : `, ≈ ${clock(format.shotEstimate)} at this dry-down`;
     const dilute = find("p2_dilute");
+    // Under the trigger, a maintenance shot may still wait out the time between P2 shots.
+    const wait = topup ? when(topup) : null;
+    const below =
+      wait !== null &&
+      topup?.now !== null &&
+      topup?.now !== undefined &&
+      topup.now < (topup.value ?? 0);
     return [
-      topup ? `shot when ${test(topup, "%", "VWC")} (${now(topup, "%")}${estimate})` : null,
+      topup
+        ? below
+          ? `shot at ${wait} (VWC ${n(topup.now ?? NaN)}% under ${n(topup.value ?? NaN)}%)`
+          : `shot when ${test(topup, "%", "VWC")} (${now(topup, "%")}${estimate})`
+        : null,
       dilute ? `dilution if ${test(dilute, "", "pwEC")} (${now(dilute, "")})` : null,
       // By, not at: in its last three hours P2 moves early when the night is too short to dry back.
       off ? `P3 by ${when(off) ?? "lights-off"}` : null,
