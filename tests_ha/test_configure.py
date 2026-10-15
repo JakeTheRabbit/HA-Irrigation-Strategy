@@ -57,14 +57,14 @@ async def test_editing_a_parameter_changes_what_the_engine_reads(hass):
 async def test_the_form_opens_on_the_live_value_not_the_one_recorded_at_setup(hass):
     entry = await _install(hass)
     await hass.services.async_call(
-        "number", "set_value", {"entity_id": TARGET, "value": 58.5}, blocking=True
+        "number", "set_value", {"entity_id": TARGET, "value": 62.5}, blocking=True
     )  # tuned on a dashboard since setup
     flow = await _open(hass, entry, "edit_parameters")
-    assert _shown(flow)["p1_target_vwc"] == 58.5
+    assert _shown(flow)["p1_target_vwc"] == 62.5
     # Pressing Submit without touching anything must therefore change nothing.
     await hass.config_entries.options.async_configure(flow["flow_id"], _shown(flow))
     await hass.async_block_till_done()
-    assert float(hass.states.get(TARGET).state) == 58.5
+    assert float(hass.states.get(TARGET).state) == 62.5
 
 
 async def test_an_edit_made_while_a_switch_is_on_is_refused_and_nothing_is_written(hass):
@@ -90,11 +90,20 @@ FIELDS = {
 }
 
 
+# Low targets keep the ladder's order (rescue + 3 <= re-water < peak): the rescue level goes down too.
+LOW = {"p3_emergency_vwc_threshold": 10.0, "p1_target_vwc": 20.0, "p2_vwc_threshold": 15.0}
+RESCUE = "number.crop_steering_p3_emergency_vwc_threshold"
+
+
 async def _set(hass, values):
-    for key, value in values.items():
-        await hass.services.async_call(
-            "number", "set_value", {"entity_id": FIELDS[key], "value": value}, blocking=True
-        )
+    """Written as one move: a level its neighbour still blocks is written on a later pass."""
+    from custom_components.crop_steering.number import async_set_numbers
+
+    entities = {**FIELDS, "p3_emergency_vwc_threshold": RESCUE}
+    _written, failed = await async_set_numbers(
+        hass, [(entities[key], value) for key, value in values.items()]
+    )
+    assert failed == []
 
 
 def _numbers(hass):
@@ -107,7 +116,7 @@ def _limits(hass, which):
 
 async def test_a_room_running_low_targets_can_submit_the_form_unchanged(hass):
     entry = await _install(hass)
-    await _set(hass, {"p1_target_vwc": 20.0, "p2_vwc_threshold": 15.0})
+    await _set(hass, LOW)
     flow = await _open(hass, entry, "edit_parameters")
     shown = _shown(flow)
     assert (shown["p1_target_vwc"], shown["p2_vwc_threshold"]) == (20.0, 15.0)
@@ -120,7 +129,7 @@ async def test_a_room_running_low_targets_can_submit_the_form_unchanged(hass):
 
 async def test_the_pot_size_can_be_edited_while_the_targets_stay_low(hass):
     entry = await _install(hass)
-    await _set(hass, {"p1_target_vwc": 20.0, "p2_vwc_threshold": 15.0})
+    await _set(hass, LOW)
     flow = await _open(hass, entry, "edit_parameters")
     done = await hass.config_entries.options.async_configure(
         flow["flow_id"], {**_shown(flow), "substrate_volume": 3.5}
@@ -135,7 +144,9 @@ async def test_the_pot_size_can_be_edited_while_the_targets_stay_low(hass):
 async def test_every_value_the_entities_accept_the_form_accepts_up_to_both_limits(hass, which):
     entry = await _install(hass)
     limits = _limits(hass, which)  # read from the live entities, not restated here
-    await _set(hass, limits)
+    # The ladder narrows the re-water level: 3 points over the lowest rescue level, under the peak.
+    limits["p2_vwc_threshold"] = 13.0 if which == "min" else limits["p1_target_vwc"] - 1
+    await _set(hass, {"p3_emergency_vwc_threshold": 10.0, **limits})
     flow = await _open(hass, entry, "edit_parameters")
     assert _shown(flow) == limits
     done = await hass.config_entries.options.async_configure(flow["flow_id"], limits)
@@ -164,7 +175,7 @@ async def test_an_upgraded_room_tuned_low_can_use_the_form_and_nothing_else_move
     """In-place upgrade: the same form on rooms as OLD versions left them (tests_ha/fixtures)."""
     hass.states.async_set("input_boolean.f2_control_enabled", "off")  # an env-era room's kill switch
     entry, seed = await _upgrade(hass, name)
-    await _set(hass, {"p1_target_vwc": 20.0, "p2_vwc_threshold": 15.0})
+    await _set(hass, LOW)
     before = _numbers(hass)
     flow = await _open(hass, entry, "edit_parameters")
     done = await hass.config_entries.options.async_configure(flow["flow_id"], _shown(flow))

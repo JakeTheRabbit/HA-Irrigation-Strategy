@@ -110,7 +110,7 @@ async def test_the_real_sequence_delete_and_set_up_again_in_one_home_assistant(h
         "switch", "turn_off", {"entity_id": ROOM}, blocking=True
     )
     await hass.services.async_call(
-        "number", "set_value", {"entity_id": P1, "value": 58}, blocking=True
+        "number", "set_value", {"entity_id": P1, "value": 62}, blocking=True
     )
     assert _read(hass, KILL) == "on"
 

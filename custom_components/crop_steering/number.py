@@ -13,6 +13,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN, CONF_NUM_ZONES, MOISTURE_RANGES, SOFTWARE_VERSION
+from .ladder import LADDER, peak_above_field_capacity, refusal
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .sizing import SIZING_KEYS, configured_sizing, prefer_setup_value
 
@@ -524,6 +525,51 @@ PARAM_TO_ENTITY_KEY: dict[str, str] = {
 }
 
 
+def read_ladder(hass, entry, zone=None) -> dict[str, float]:
+    """{level: value} of one zone's moisture ladder (zone None: the room-level numbers), as Home
+    Assistant holds it now. Found by unique id, so a renamed entity id is still found; a level with
+    no number or no numeric state is left out."""
+    from homeassistant.helpers import entity_registry as er
+
+    registry = er.async_get(hass)
+    scope = "" if zone is None else f"zone_{zone}_"
+    out = {}
+    for key in LADDER:
+        entity_id = registry.async_get_entity_id(
+            "number", DOMAIN, f"{DOMAIN}_{entry.entry_id}_{scope}{key}"
+        )
+        state = hass.states.get(entity_id) if entity_id else None
+        try:
+            out[key] = float(state.state)
+        except (AttributeError, TypeError, ValueError):
+            continue
+    return out
+
+
+async def async_set_numbers(hass, values) -> tuple[int, list]:
+    """Write [(entity_id, value)] as one move. A moisture level refused because its neighbour has
+    not moved yet is written on a later pass. Returns (how many were written, [(entity_id, error)]
+    for each that never was)."""
+    written, pending = 0, list(values)
+    while pending:
+        refused = []
+        for entity_id, value in pending:
+            try:
+                await hass.services.async_call(
+                    "number",
+                    "set_value",
+                    {"entity_id": entity_id, "value": value},
+                    blocking=True,
+                )
+                written += 1
+            except Exception as err:  # noqa: BLE001 - reported to the caller
+                refused.append((entity_id, value, err))
+        if len(refused) == len(pending):
+            return written, [(entity_id, err) for entity_id, _v, err in refused]
+        pending = [(entity_id, value) for entity_id, value, _err in refused]
+    return written, []
+
+
 # Reverse map: entity key → parsed parameter value (built at setup time).
 # Used by CropSteeringNumber to seed its initial value.
 def _build_entity_seed(entry_data: dict) -> dict[str, float]:
@@ -772,7 +818,25 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             )
 
     async def async_set_native_value(self, value: float) -> None:
-        """Update the value."""
+        """Update the value. A moisture level that breaks the ladder's order is refused
+        (ladder.py); a recipe stage is judged as one set before any of it is written."""
+        key = self.entity_description.key
+        if self._zone_num is not None:
+            key = key.removeprefix(f"zone_{self._zone_num}_")
+        if key in LADDER:
+            current = read_ladder(self.hass, self._entry, self._zone_num)
+            why = refusal(current, {key: float(value)})
+            if why:
+                from homeassistant.exceptions import ServiceValidationError
+
+                raise ServiceValidationError(
+                    f"{self.name} not changed: {why}. Move the other level first."
+                )
+            if peak_above_field_capacity(current, {key: float(value)}):
+                _LOGGER.warning(
+                    "%s: the peak target is above field capacity; the ramp stops at field capacity",
+                    self.entity_id,
+                )
         self._attr_native_value = value
         self.async_write_ha_state()
 

@@ -901,24 +901,33 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         return live
 
     async def _set_live_numbers(self, values: dict) -> None:
-        for key, value in values.items():
-            if self.hass.states.get(self._number_id(key)) is None:
-                continue
-            await self.hass.services.async_call(
-                "number",
-                "set_value",
-                {"entity_id": self._number_id(key), "value": value},
-                blocking=True,
-            )
+        from .number import async_set_numbers
+
+        _written, failed = await async_set_numbers(
+            self.hass,
+            [
+                (self._number_id(key), value)
+                for key, value in values.items()
+                if self.hass.states.get(self._number_id(key)) is not None
+            ],
+        )
+        if failed:
+            raise failed[0][1]
 
     async def async_step_edit_parameters(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Edit irrigation parameters via UI."""
+        from .ladder import refusal
+        from .number import read_ladder
         from .setup_api import effective, safety_blockers, _update
 
         if user_input is not None:
             blockers = safety_blockers(self.hass, self._entry)
+            ladder = read_ladder(self.hass, self._entry)
+            why = refusal(ladder, {k: v for k, v in user_input.items() if k in ladder})
+            if why:  # the peak and re-water level are one move, judged together
+                blockers = [*blockers, why]
             if blockers:
                 return self.async_abort(
                     reason="setup_invalid",
