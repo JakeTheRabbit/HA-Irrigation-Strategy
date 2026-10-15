@@ -4554,7 +4554,12 @@ class Controller:
             self._keep_alive(deadline - time.monotonic())
             remaining = deadline - time.monotonic()
             if remaining > 0:
-                time.sleep(min(step, remaining))
+                # A dose or batch running goes on through the wait: a batch's open fill valve is still
+                # watched for its full sensor (dosing_runner._fill). With none running, a plain sleep.
+                if self.dosing is not None and self.dosing.running():
+                    self._sleep_for(min(step, remaining))
+                else:
+                    time.sleep(min(step, remaining))
         return time.monotonic() - started, None
 
     def _close_cut_short(self, room, zone, by, elapsed, duration_s, valve_opened):
@@ -5028,7 +5033,7 @@ class Controller:
 
     def _sleep_for(self, seconds):
         """Wait `seconds` for the next pass, waking whenever dosing is due to run its next step
-        (dosing_runner.step). Dosing never runs in the middle of a shot: it waits for the shot to end."""
+        (dosing_runner.step). A shot's wait does the same while a dose or batch runs (_wait_shot)."""
         end = time.monotonic() + seconds
         while True:
             left = end - time.monotonic()
