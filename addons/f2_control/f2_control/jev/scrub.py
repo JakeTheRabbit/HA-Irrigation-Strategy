@@ -13,9 +13,9 @@ import threading
 HA_DOMAINS = (
     "ai_task", "air_quality", "alarm_control_panel", "assist_satellite", "automation", "binary_sensor", "button",
     "calendar", "camera", "climate", "conversation", "counter", "cover", "date", "datetime", "device_tracker",
-    "event", "fan", "geo_location", "group", "humidifier", "image", "image_processing", "input_boolean",
+    "event", "fan", "geo_location", "group", "humidifier", "image", "image_processing", "infrared", "input_boolean",
     "input_button", "input_datetime", "input_number", "input_select", "input_text", "lawn_mower", "light", "lock",
-    "media_player", "notify", "number", "person", "remote", "scene", "schedule", "script",
+    "media_player", "notify", "number", "person", "radio_frequency", "remote", "scene", "schedule", "script",
     "select", "sensor", "siren", "stt", "sun", "switch", "text", "time", "timer", "todo", "tts", "update", "vacuum",
     "valve", "wake_word", "water_heater", "weather", "zone",
 )

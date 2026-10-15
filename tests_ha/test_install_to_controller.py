@@ -80,3 +80,40 @@ async def test_the_controller_reads_the_tents_microsiemens_probe_as_millisiemens
     assert c._read_sensor("sensor.crop_steering_ec_zone_1", lo=0, hi=20) == pytest.approx(
         3.1
     )
+
+
+async def test_a_fresh_install_left_at_its_defaults_runs_rules_and_says_so(hass, controller_for):
+    """Zero setup: no key, brain_provider auto. No brain is built, nothing is asked anywhere, and the
+    brain panel the dashboard reads says rules, with the words for a fresh install."""
+    await _install(hass)
+    c, fake, _clock = controller_for({"enable_flag": KILL})
+    assert c.jev is None and (c.brain_status.provider, c.brain_status.state) == ("rules", "rules")
+    from datetime import datetime
+
+    c.loop_once(datetime.now())
+    state, attrs = fake.sets["sensor.crop_steering_jev"]
+    assert state == "rules" and attrs["state_words"].startswith("Rules. Choose Claude Haiku")
+    assert fake.sets["sensor.crop_steering_zone_1_jev"][0] == "rules"
+
+
+async def test_a_fresh_install_on_claude_builds_its_brain_from_the_options_alone(
+    hass, controller_for, monkeypatch
+):
+    """The one stand-in is the Anthropic API itself (a client whose every call fails): the brain is
+    built from the options alone, with its prompt and arc, and the key shows in nothing printable."""
+    import brain_kit as B
+    from jev import client as jc
+
+    import functools
+
+    import jev_bridge
+
+    monkeypatch.setattr(jc, "anthropic", B.FakeSDK(B.FakeClient(B.APIStatusError(503))))
+    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(jc.Asker, threaded=False))
+    await _install(hass)
+    c, fake, _clock = controller_for(
+        {"enable_flag": KILL, "brain_provider": "claude_haiku", "anthropic_api_key": B.SENTINEL}
+    )
+    assert c.jev is not None and c.brain_status.provider == "claude_haiku"
+    assert c.jev.prompt is not None and c.jev.arc_rows
+    assert B.SENTINEL not in repr(c.jev.asker) and B.SENTINEL not in repr(c.jev.asker.transport.routes)

@@ -42,8 +42,11 @@ def always(code):
 
 
 class Triage:
-    def __init__(self, asker):
-        self.asker = asker
+    """`may_quiet=False` (the Claude brain): the answer is kept as a note on the alert and never keeps a push off the
+    phone, which is code's call. `meta(key, now)` adds the "_brain" key the Claude route needs to what is asked."""
+
+    def __init__(self, asker, may_quiet=True, meta=None):
+        self.asker, self.may_quiet, self.meta = asker, may_quiet, meta
         self.raised: dict[str, int] = {}
         self.last: dict[str, dict] = {}
 
@@ -56,13 +59,17 @@ class Triage:
         ans = self.asker.result(k)
         age_h = None if ans is None else (self.asker.clock() - ans.at) / 3600.0
         if ans is None or age_h > REASK_H:
-            self.asker.submit(k, {
-                "alert_code": code, "title": title, "message": " ".join(message.split())[:500],
-                "local_time": f"{now:%H:%M}", "raised_today": self.raised[key],
-            }, council.expand(QUESTIONS))
+            state = {"alert_code": code, "title": title, "message": " ".join(message.split())[:500],
+                     "local_time": f"{now:%H:%M}", "raised_today": self.raised[key]}
+            if self.meta is not None:
+                state["_brain"] = self.meta(key, now)
+            self.asker.submit(k, state, council.expand(QUESTIONS))
             return True, "first time: pushed as always"
         v = council.combine(ans.answers, "urgency")
-        self.last[key] = {"answer": None if v is None else v.label, "p": None if v is None else v.prob}
+        self.last[key] = {"answer": None if v is None else v.label, "p": None if v is None else v.prob,
+                          "note": (v.notes or [None])[0] if v is not None else None}
+        if not self.may_quiet:
+            return True, f"AI assistant: {'no answer' if v is None else v.label}, noted; pushed by its severity"
         if v is not None and v.firm(0.6) and v.label in ("remind", "quiet"):
             return False, f"Jev: {v.label} (p={v.prob:.2f}), card only"
         return True, "Jev: escalate or unsure, pushed"

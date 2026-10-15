@@ -20,9 +20,25 @@ def score(instructions, criteria):
 
 def with_doctrine(questions, text):
     """Every phrasing of every question, with the owner's doctrine (jev.doctrine) appended: Jev knows
-    none of its own, so each question carries the rules it is to judge by."""
-    return {name: [dict(v, instructions=f"{v['instructions']} {text}") for v in variants]
+    none of its own, so each question carries the rules it is to judge by. Each phrasing also keeps its bare
+    wording and the doctrine topics the text holds: the Claude brain has the doctrine in its system prompt, so it
+    is sent those instead (the legacy routes send the appended text, byte for byte)."""
+    topics = doctrine_topics(text)
+    return {name: [dict(v, instructions=f"{v['instructions']} {text}", base_instructions=v["instructions"],
+                        doctrine_topics=topics) for v in variants]
             for name, variants in questions.items()}
+
+
+def doctrine_topics(text):
+    """The jev.doctrine topics one of whose rules occurs in `text`, in order of first occurrence."""
+    from ..doctrine import RULES
+
+    found = {}
+    for topic, rules in RULES.items():
+        at = [text.find(r.text) for r in rules if r.text in text]
+        if at:
+            found[topic] = min(at)
+    return tuple(sorted(found, key=found.get))
 
 
 def stage_words(ctx):

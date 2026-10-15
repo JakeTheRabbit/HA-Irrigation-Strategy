@@ -455,6 +455,7 @@ async def test_a_2_25_1_room_with_cloudflare_set_for_the_setpoint_check_gets_no_
     )
     assert app["options"].get("jev_enabled") is (True if "merged" in options else None)
     assert c.jev is None and built == []  # no brain, and no route to ask anything through
+    assert (c.brain_status.provider, c.brain_status.notice) == ("rules", "cloudflare_route_retired")
     assert c._cf[:2] == ("fixture-account", "fixture-token")
     assert [p.name for p in data.iterdir() if p.name.startswith("jev_")] == []
     said = capsys.readouterr().out
@@ -479,6 +480,7 @@ async def test_a_jev_line_app_keeps_its_brain_with_no_option_changed(
     await _upgrade(hass, "entry_2_17_wizard.json")
     c, app, built, stub, data = _seeded_app(controller_for, monkeypatch, options)
     assert c.jev is not None and c.jev.routes == [route]
+    assert (c.brain_status.provider, c.brain_status.state) == ("jev_legacy", "legacy")
     assert [r.name for r in built[0]] == [route] and c.jev.asker.transport is stub
     token = app["options"]["typesafe_api_key"] or app["options"]["cf_api_token"]
     assert built[0][0].token == token  # its own credentials, as saved
@@ -499,6 +501,7 @@ async def test_a_3_0_0_app_on_cloudflare_whose_brain_never_acted_runs_without_je
         controller_for, monkeypatch, "options_3_0_0_jev_cf_quiet.json"
     )
     assert c.jev is None and built == []
+    assert (c.brain_status.provider, c.brain_status.notice) == ("rules", "cloudflare_route_retired")  # OD-11
 
 
 # ------------------------------------------------------------------ a Jev 3.11.1 install

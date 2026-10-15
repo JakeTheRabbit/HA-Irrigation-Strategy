@@ -170,6 +170,7 @@ async def test_any_one_jev_file_copied_keeps_a_cloudflare_brain_on(
     assert sorted(p.name for p in new.iterdir()) == sorted(("state.json", only))
     c, _fake, built = _start(controller_for, monkeypatch, new, "options_3_11_1_jev_cf.json")
     assert c.jev is not None and c.jev.routes == ["Cloudflare"] and built
+    assert (c.brain_status.provider, c.brain_status.state) == ("jev_legacy", "legacy")  # Jev has run here
     assert c.rooms[0]._setup_pending is None
 
 
@@ -182,6 +183,7 @@ async def test_a_typesafe_key_keeps_the_brain_on_with_no_jev_file(
     c, _fake, built = _start(controller_for, monkeypatch, new, "options_3_11_1_jev_typesafe.json")
     assert c.jev is not None and c.jev.routes == ["TypeSafe"]
     assert built[0][0].token == "fixture-typesafe-key"
+    assert c.brain_status.provider == "jev_legacy"  # only the Jev line ever had a TypeSafe key
 
 
 async def test_cloudflare_with_no_jev_file_runs_on_the_rules_and_asks_nothing(
@@ -192,6 +194,7 @@ async def test_cloudflare_with_no_jev_file_runs_on_the_rules_and_asks_nothing(
     assert _move(tmp_path).returncode == 0
     c, _fake, built = _start(controller_for, monkeypatch, new, "options_3_11_1_jev_cf.json")
     assert c.jev is None and built == []  # no brain, and no route to ask anything through
+    assert (c.brain_status.provider, c.brain_status.notice) == ("rules", "cloudflare_route_retired")
     said = capsys.readouterr().out
     assert "jev: off. The Cloudflare credentials start Jev only on an install that has run it before" in said
     assert "fixture-token" not in said
@@ -234,6 +237,8 @@ def test_the_copy_list_names_every_file_the_controller_keeps_in_its_data_folder(
     for path in APP_CODE.rglob("*.py"):
         for name in re.findall(r"[\"'](?:/data/)?([A-Za-z0-9_.-]+\.jsonl?)[\"']", path.read_text(encoding="utf-8")):
             named.add(name)
-    assert set(_copied()) == named - {"options.json"}
+    # Not data to move: the Supervisor's options.json, files that ship beside the code (the brain's tools and the
+    # doctrine manifest), and brain_notices.json, which only this app writes (a Jev app never had one).
+    assert set(_copied()) == named - {"options.json", "brain_tools.json", "manifest.json", "brain_notices.json"}
     assert {p.name for p in RECORDED.iterdir()} | {"state.json", "jev_usage.json"} == set(_copied())
     assert hashlib.sha256("\n".join(sorted(_copied())).encode()).hexdigest() == COPIED_SHA256

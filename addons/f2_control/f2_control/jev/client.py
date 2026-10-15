@@ -47,6 +47,14 @@ def parse(payload):
     return answers, body.get("usage") or {}
 
 
+LEGACY_FIELDS = ("type", "instructions", "criteria")
+
+
+def legacy_questions(questions):
+    """Each phrasing as the legacy routes have always had it: the Claude route's extra keys never reach them."""
+    return {k: {f: v[f] for f in LEGACY_FIELDS if f in v} if isinstance(v, dict) else v for k, v in questions.items()}
+
+
 def call(account, token, state, questions, gateway=None, timeout=20.0):
     """One Jev evaluation -> (answers, usage, error). Never raises."""
     if requests is None:
@@ -54,7 +62,7 @@ def call(account, token, state, questions, gateway=None, timeout=20.0):
     headers = {"Authorization": f"Bearer {token}"}
     if gateway:
         headers["cf-aig-gateway-id"] = gateway
-    body = {"model": MODEL, "input": {"state": state, "questions": questions}}
+    body = {"model": MODEL, "input": {"state": state, "questions": legacy_questions(questions)}}
     try:
         resp = requests.post(URL.format(account=account), json=body, headers=headers, timeout=timeout)
     except Exception as e:  # noqa: BLE001 - a network fault of any kind is a missing answer
@@ -88,7 +96,7 @@ def call_typesafe(account, token, state, questions, gateway=None, timeout=20.0):
     if requests is None:
         return None, None, NO_REQUESTS
     headers = {"Authorization": f"Bearer {token}"}
-    body = {"model": TYPESAFE_MODEL, "state": state, "questions": questions}
+    body = {"model": TYPESAFE_MODEL, "state": state, "questions": legacy_questions(questions)}
     try:
         resp = requests.post(TYPESAFE_URL, json=body, headers=headers, timeout=timeout)
     except Exception as e:  # noqa: BLE001 - a network fault of any kind is a missing answer
@@ -302,6 +310,11 @@ class Meter:
                 self._open(now, "lights_on")
                 return True
             return False
+
+    def again(self, event):
+        """Raise `event` again on a later pass (its card did not reach Home Assistant)."""
+        with self._lock:
+            self._events.append(event)
 
     def take(self, event):
         """True once for each "warn" (CS-706), "spent" (CS-708) and "brain" (CS-709) since it was last taken."""
@@ -582,8 +595,8 @@ class Asker:
     more than `max_wait_s` in the queue (behind calls that were failing) is dropped unasked: its evidence is stale."""
 
     def __init__(self, account, token, gateway=None, daily_budget=5000, transport=call,
-                 threaded=True, clock=time.time, timeout=20.0, warn_pct=80, max_wait_s=300.0):
-        self.account, self.token, self.gateway = account, token, gateway
+                 threaded=True, clock=time.time, timeout=20.0, warn_pct=80, max_wait_s=300.0, meter=None):
+        self.account, self.token, self.gateway, self.meter = account, token, gateway, meter
         self.daily_budget, self.transport, self.clock, self.timeout = daily_budget, transport, clock, timeout
         self.warn_pct, self.max_wait_s = warn_pct, max_wait_s
         self._warn = False
@@ -598,6 +611,9 @@ class Asker:
             self._queue = queue.Queue()
             threading.Thread(target=self._work, name="jev-asker", daemon=True).start()
 
+    def __repr__(self):
+        return f"Asker(account={self.account!r}, calls={self.stats.get('calls')})"
+
     @property
     def enabled(self):
         return bool(self.account and self.token)
@@ -610,8 +626,8 @@ class Asker:
 
     def submit(self, key, state, questions):
         """Queue one evaluation. False when Jev is off, the day's budget is spent, or `key` is in flight."""
-        if not self.enabled:
-            return False
+        if not self.enabled or (self.meter is not None and self.meter.state() is not None):
+            return False  # off, or the Claude brain's budget, pause or latch says no new ask
         with self._lock:
             self._roll_day()
             if key in self._pending or self.stats["calls"] >= self.daily_budget:
@@ -653,6 +669,9 @@ class Asker:
         if waited > self.max_wait_s:
             self._fail(key, f"dropped unasked: it waited {waited:.0f} s in the queue")
             return
+        if self.meter is not None and not self.meter.can_spend():
+            self._fail(key, BUDGET)
+            return
         answers, usage, error = self.transport(self.account, self.token, state, questions,
                                                gateway=self.gateway, timeout=self.timeout)
         if error or answers is None:
@@ -673,7 +692,7 @@ class Asker:
         with self._lock:
             self._pending.discard(key)
             self.stats["errors"] += 1
-            self.stats["last_error"] = str(error)[:200]
+            self.stats["last_error"] = redact(error, self.token)[:200]
 
     def result(self, key):
         """The latest answer for `key`, or None."""

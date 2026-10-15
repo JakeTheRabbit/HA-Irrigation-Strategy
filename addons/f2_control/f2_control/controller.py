@@ -21,6 +21,7 @@ auto-injected SUPERVISOR_TOKEN as the app, or as a standalone container to HA_UR
 """
 import dataclasses
 import json
+import logging
 import math
 import os
 import re
@@ -35,6 +36,7 @@ import auto_setpoints
 import dosing_runner
 import jev_bridge
 import runtime_env
+from jev import client as jev_client
 import setpoint_supervisor
 import zone_history
 from strategy_runtime import parse_snapshot, parameter_override, strategy_block
@@ -699,12 +701,21 @@ class Controller:
         self.sump_silent_h = float(o.get("sump_silent_hours") or SUMP_SILENT_H)
         # Optional: Jev (TypeSafe, via Cloudflare AI) as a guard on auto setpoints. Unset = arithmetic only.
         self._cf = tuple((o.get(k) or "").strip() for k in ("cf_account_id", "cf_api_token", "cf_gateway_id"))
-        # The Jev edition: Jev judges the engine's decisions inside a code envelope (docs/JEV.md). None = off.
+        # The AI assistant: a brain judges the engine's decisions inside a code envelope (docs/JEV.md). None = rules;
+        # brain_status says which brain runs and why, whether or not one is built (the brain panel shows it).
+        logging.getLogger("anthropic").setLevel(logging.WARNING)  # no request or header ever reaches the log
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        log("brain SDK: " + (f"anthropic {getattr(jev_client.anthropic, '__version__', '')}".strip()
+                             if jev_client.anthropic is not None else "not installed (rules only on this device)"))
+        data_dir = os.path.dirname(runtime_env.state_path(os.environ)) or "."
         try:
-            self.jev = jev_bridge.build(o, self._cf, runtime_env.state_path(os.environ), log)
-        except Exception as e:  # Jev can never stop the controller starting
-            log("jev: off, it could not start:", e)
-            self.jev = None
+            self.brain_status = jev_bridge.resolve_provider(o, self._cf, data_dir)
+            self.jev = jev_bridge.build(o, self._cf, runtime_env.state_path(os.environ), log, self.brain_status)
+            if self.jev is None:
+                log(f"brain: rules ({self.brain_status.state}). {self.brain_status.words}")
+        except Exception as e:  # the brain can never stop the controller starting
+            log("jev: off, it could not start:", jev_client.redact(str(e)))
+            self.jev, self.brain_status = None, jev_bridge.start_failed()
         self.loop_seconds = float(o.get("loop_seconds", 60))
         self.flow_lps = float(
             o.get("flow_lps", 0.02)
@@ -1995,7 +2006,7 @@ class Controller:
         # Each lever has one writer. With Jev's Setpoints judge running, the P2 shot size and re-water threshold
         # are its own (jev_bridge) and this learner writes the rest. Writing nothing at all under the judge left
         # nobody on the P1 target: zone 2 sat at 29.5 under a probe reading 44 % and never ramped (4 Oct 2026).
-        judged = jev_bridge.judge_levers(self)
+        judged = jev_bridge.judge_levers(self, room)
         writes = enabled and not planned
         was = learn["outcome"]
         outcome = auto_setpoints.ramp_outcome(learn, st["phase"])
@@ -2030,7 +2041,10 @@ class Controller:
                 for suffix in ("p1_target_vwc", "field_capacity"):  # the zone's highest readings set these
                     want.pop(suffix, None)
                 for suffix, value, _why in setpoint_supervisor.writes(current, want):
-                    self._auto_write(room, zone, suffix, current[suffix], value, learn, now)
+                    if (self._auto_write(room, zone, suffix, current[suffix], value, learn, now)
+                            and suffix in ("p2_shot_size", "p2_vwc_threshold") and jev_bridge.owns_setpoints(self)):
+                        # the learner holds the judge's lever while the brain cannot act: not an edit by hand
+                        jev_bridge.learner_wrote(self, room, zone, suffix, current[suffix], value, now)
         state, attrs = auto_setpoints.status(learn, enabled)
         if enabled and planned:
             state, attrs["frozen_reason"] = "frozen", "an armed grow plan owns this room's targets"
@@ -2094,17 +2108,7 @@ class Controller:
             return False
 
         def bounded(suffix, value):
-            lo, hi = setpoint_supervisor.BOUNDS[suffix]
-            attrs = ha_get(f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}")[1] or {}
-            try:
-                lo = max(lo, float(attrs["min"]))
-            except (KeyError, TypeError, ValueError):
-                pass
-            try:
-                hi = min(hi, float(attrs["max"]))
-            except (KeyError, TypeError, ValueError):
-                pass
-            return round(max(lo, min(hi, value)), 1)
+            return self._zone_bounded(room, zone, suffix, value)
 
         fc = bounded("field_capacity", seen)
         target = bounded("p1_target_vwc", min(yday, fc))
@@ -2132,7 +2136,27 @@ class Controller:
                 if not self._auto_write(room, zone, suffix, old, value, learn, now, by="auto (highest reading)"):
                     return wrote  # refused: what is still to move waits for the next loop, the ladder holds
                 wrote = True
+                if suffix == "p2_vwc_threshold" and jev_bridge.owns_setpoints(self):
+                    try:  # the judge's range follows field capacity while the learner holds its levers
+                        jev_bridge.fc_moved(self, room, zone, old, value, now)
+                    except Exception as e:
+                        log("jev fc error", room.slug, zone, e)
         return wrote
+
+    def _zone_bounded(self, room, zone, suffix, value):
+        """`value` inside the engine's bounds for `suffix` and the zone number's own min and max (which Home
+        Assistant enforces), rounded to 0.1."""
+        lo, hi = setpoint_supervisor.BOUNDS[suffix]
+        attrs = ha_get(f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}")[1] or {}
+        try:
+            lo = max(lo, float(attrs["min"]))
+        except (KeyError, TypeError, ValueError):
+            pass
+        try:
+            hi = min(hi, float(attrs["max"]))
+        except (KeyError, TypeError, ValueError):
+            pass
+        return round(max(lo, min(hi, value)), 1)
 
     def _auto_write(self, room, zone, suffix, old, value, learn, now, by="auto"):
         """Write one per-zone number -> False when it was not written (no such number, or Home Assistant refused)."""
@@ -2950,19 +2974,25 @@ class Controller:
         key = f"jev_{judge}_{room.slug}" + ("" if zone is None else f"_z{zone}")
         code, title, message = alert.get("code"), alert.get("title", ""), alert.get("message", "")
         if code == "CS-701":
-            self._alert(key, "CS-701", title, message, room=room, zone=zone)
+            return self._alert(key, "CS-701", title, message, room=room, zone=zone)
         elif code == "CS-702":
-            self._alert(key, "CS-702", title, message, room=room, zone=zone)
+            return self._alert(key, "CS-702", title, message, room=room, zone=zone)
         elif code == "CS-703":
-            self._alert(key, "CS-703", title, message, room=room, zone=zone)
+            return self._alert(key, "CS-703", title, message, room=room, zone=zone)
         elif code == "CS-705":
-            self._alert(key, "CS-705", title, message, room=room, zone=zone)
+            return self._alert(key, "CS-705", title, message, room=room, zone=zone)
         elif code == "CS-706":
-            self._alert(key, "CS-706", title, message, room=room, zone=zone)
+            return self._alert(key, "CS-706", title, message, room=room, zone=zone)
         elif code == "CS-707":
-            self._alert(key, "CS-707", title, message, room=room, zone=zone)
-        else:
-            log("jev alert refused: not in the error-code list", judge, code)
+            return self._alert(key, "CS-707", title, message, room=room, zone=zone)
+        elif code == "CS-708":
+            return self._alert(key, "CS-708", title, message, room=room, zone=zone)
+        elif code == "CS-709":
+            return self._alert(key, "CS-709", title, message, room=room, zone=zone)
+        elif code == "CS-712":
+            return self._alert(key, "CS-712", title, message, room=room, zone=zone)
+        log("jev alert refused: not in the error-code list", judge, code)
+        return False
 
     @staticmethod
     def _jev_read(entity):
@@ -4292,6 +4322,11 @@ class Controller:
         )
         lights_just_on = lights_on and was_off
         lights_just_off = room._was_lights_on is True and not lights_on
+        if lights_just_on and getattr(self, "jev", None) is not None:
+            try:  # the brain's budget window and the Setpoints judge's levers, before any zone is judged
+                jev_bridge.lights_on(self, room, now)
+            except Exception as e:
+                log("jev lights-on error", room.slug, e)
         snaps, decisions, healthy, blind, params = {}, {}, [], [], {}
         for zone in room.zones:
             st = room.state[zone]
@@ -4601,6 +4636,11 @@ class Controller:
                 jev_bridge.publish(self, room, now, ha_set)
             except Exception as e:
                 log("jev publish error", room.slug, e)
+        else:
+            try:  # with no brain built, the brain panel still says why rules run
+                jev_bridge.publish_rules(self, room, now, ha_set)
+            except Exception as e:
+                log("brain panel error", room.slug, e)
         try:  # CS-209 only ever tells: it can never stop the room being watered
             self._watch_idle(room, now, lights_on, pub)
         except Exception as e:

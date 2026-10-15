@@ -364,13 +364,15 @@ def engine_facts(doc, paths):
          and 'rescue = bounded("p3_emergency_vwc_threshold", p.p3_emergency_floor + delta)' in follow
          and "if rescue + 3.0 <= new_thr < target <= fc:" in follow and blind_follow is not None
          and 'if ha_get(entity)[0] in (None, "unknown", "unavailable", ""):' in ctrl),
-        ("CT-13", "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge runs (with one running, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12), and lowers the rescue floor to the threshold - 3 whenever it would otherwise sit less than 3 points under the threshold.",
+        ("CT-13", "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge holds it (with one running and able to act, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12; from the first loop the brain cannot act, in dry run, with its budget spent, paused, unavailable or its key refused, the learner writes the threshold again until a lights-on at which the brain can act), and lowers the rescue floor to the threshold - 3 whenever it would otherwise sit less than 3 points under the threshold.",
          'want = auto_setpoints.wanted(learn, current, snap.vwc, st["phase"], ctx, others=judged)' in ctrl
          and "if self._follow_fc(room, zone, p, now):" in ctrl and "writes = enabled and not planned" in ctrl
          and 'if "p2_vwc_threshold" in others:' in auto
          and 'if current["p3_emergency_vwc_threshold"] + 3.0 > thr:' in auto
          and 'want["p3_emergency_vwc_threshold"] = round(thr - 3.0, 1)' in auto
-         and "return (SHOT, THRESHOLD) if owns_setpoints(c) else ()" in bridge),
+         and "return (SHOT, THRESHOLD) if held[room.slug] else ()" in bridge
+         and "elif held[room.slug] and not can_act(c):" in bridge
+         and "judged = jev_bridge.judge_levers(self, room)" in ctrl),
         ("CT-14", "So with Auto Setpoints on, the safety label (zone_safety_status) reads over_saturated whenever the zone matches or beats its highest reading of this grow-day and the one before (each new high), and approaching_saturation within 5 points of it: under the switch those labels say where the zone sits against its own peak, not that it is over-watered.",
          core.zone_safety_status(60.0, 5.0, 60.0, 9.0) == "over_saturated"
          and core.zone_safety_status(55.5, 5.0, 60.0, 9.0) == "approaching_saturation"
@@ -485,12 +487,14 @@ def brain_facts(doc, paths, core, base_p, base_s, ctrl):
          and 'st["ec_offset"] = round(float(st.get("ec_offset", 0.0)) * 0.5, 2)' in ctrl
          and "(now - les).total_seconds() >= 1800" in ctrl
          and all(f'"{k}": "{m}"' in judge_src["salt"] for k, m in salt_modes.items())),
-        ("BR-5", "setpoint moves one 0.5 notch, at most once per zone per grow-day, only with the room's Auto Setpoints switch on (so the learner of CT-12 and CT-13 is always running when a notch is possible) and no grow plan owning the room, never while paused, inside a band around the last value of that number the brain did not write: p2_shot_size within 1 and never under 3; p2_vwc_threshold from 2 under to 1 over, at least the rescue floor + 4 and at most min(p1_target, field_capacity) - 2. Any value the brain did not write, a hand edit or a learner move alike, becomes the band's new centre (the evidence calls it 'your value'). These two numbers are the only ones the brain writes (judge_levers).",
+        ("BR-5", "setpoint moves one 0.5 notch, at most once per zone per grow-day, only with the room's Auto Setpoints switch on (so the learner of CT-12 and CT-13 is always running when a notch is possible) and no grow plan owning the room, never while paused, inside a band around the last value of that number the brain did not write: p2_shot_size within 1 and never under 3; p2_vwc_threshold from 2 under to 1 over, at least the rescue floor + 4 and at most min(p1_target, field_capacity) - 2. Any value the brain did not write becomes the band's new centre (the evidence calls it 'your value'), except the learner's own writes while it holds the two numbers (CT-13), which leave the centre where it was; a field-capacity shift then moves the centre with it. When the levers come back, the threshold is put inside the band, never where it would break the ladder. These two numbers are the only ones the brain writes (judge_levers).",
          setpoint and 'SHOT, THRESHOLD = "p2_shot_size", "p2_vwc_threshold"' in sp_src and "STEP = 0.5" in sp_src
          and "SHOT_FLOOR = 3.0" in sp_src and "return max(SHOT_FLOOR, home - 1.0), home + 1.0" in sp_src
          and "lo = max(home - 2.0, params.p3_emergency_floor + 4.0)" in sp_src
          and "hi = min(home + 1.0, min(params.p1_target, params.field_capacity) - 2.0)" in sp_src
-         and "return (SHOT, THRESHOLD) if owns_setpoints(c) else ()" in bridge
+         and "return (SHOT, THRESHOLD) if held[room.slug] else ()" in bridge
+         and "def learner_wrote(" in bridge and "def hand_back(" in bridge
+         and "elif not p.p3_emergency_floor + 3.0 <= value < p.p1_target <= p.field_capacity:" in bridge
          and 'enabled = (c._on(f"' in bridge and '{room.prefix}auto_setpoints", False)' in bridge
          and 'and not getattr(room, "strategy_required", False))\n    return {' in bridge
          and 'if not sp.get("enabled")' in sp_src

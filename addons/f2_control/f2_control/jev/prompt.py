@@ -120,8 +120,16 @@ class Prompt:
     """Everything call_anthropic() sends, built once at start."""
 
     def __init__(self, rows=(), arc=None, substrates=("generic",), pack=PACK):
-        self.tools = load_tools()
-        self.a, self.b = block_a(pack), block_b(rows, arc, substrates, pack)
+        self.tools, self.rows, self.arc, self.pack = load_tools(), rows, arc, pack
+        self.a, self.substrates = block_a(pack), None
+        self.use(substrates)
+
+    def use(self, substrates):
+        """Block B for the rooms' substrates: rebuilt (one cache rewrite) only when the set of them changes."""
+        subs = tuple(sorted({s for s in substrates if s in SUBSTRATES} or {"generic"}))
+        if subs == self.substrates:
+            return
+        self.substrates, self.b = subs, block_b(self.rows, self.arc, subs, self.pack)
         self.system = [{"type": "text", "text": self.a, "cache_control": {"type": "ephemeral", "ttl": "1h"}},
                        {"type": "text", "text": self.b, "cache_control": {"type": "ephemeral", "ttl": "1h"}}]
 

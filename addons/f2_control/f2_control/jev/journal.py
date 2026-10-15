@@ -12,6 +12,8 @@ import threading
 
 MAX_KEPT = 400  # on disk and in memory; the oldest go first
 SHOWN = 30  # entries published on the room's jev_log sensor (Home Assistant records attributes under 16 KB)
+WHY_CAP = 140  # the Claude brain's own sentence on a decision, as the published entry keeps it
+WHY_SHOWN = 10  # ...on the newest this many entries only, so the published list stays under 16 KB
 
 TITLES = {
     "dawn": "Morning start", "ramp": "Ramp hand-over", "salt": "Pore EC", "dusk": "Day end",
@@ -76,9 +78,9 @@ class Journal:
         fields capped, so the published list stays well under Home Assistant's 16 KB attribute limit."""
         with self._lock:
             mine = [e for e in reversed(self.entries) if e.get("room") == room][:limit]
-        caps = {"reason": 120, "verdict": 80, "action": 80}
-        return [{k: (v[:caps[k]] if k in caps and isinstance(v, str) else v) for k, v in e.items() if k != "room"}
-                for e in mine]
+        caps = {"reason": 120, "verdict": 80, "action": 80, "why": WHY_CAP}
+        return [{k: (v[:caps[k]] if k in caps and isinstance(v, str) else v) for k, v in e.items()
+                 if k != "room" and (k != "why" or i < WHY_SHOWN)} for i, e in enumerate(mine)]
 
     def _save(self, entry, rewrite):
         if not self.path:
@@ -101,13 +103,14 @@ def decision(room, zone, judge, at, verdicts, directive, result, reason):
     """One decision entry: the judge's main verdict, what it asked for, and what code did with it.
     `result` is "acted", "refused", "no action" or "waiting"; `reason` is code's why."""
     main = next((v for v in verdicts.values() if v is not None), None)
+    why = {"why": main.notes[0][:WHY_CAP]} if main is not None and getattr(main, "notes", None) else {}
     return {
         "t": at.isoformat(timespec="seconds"), "room": room, "zone": zone, "judge": judge,
         "title": TITLES.get(judge, judge), "kind": "decision",
         "verdict": verdict_words(None if main is None else main.label),
         "p": None if main is None or main.prob is None else round(float(main.prob), 2),
         "agreed": None if main is None else bool(main.agreed),
-        "action": action_words(directive), "result": result, "reason": str(reason or "")[:120],
+        "action": action_words(directive), "result": result, "reason": str(reason or "")[:120], **why,
     }
 
 

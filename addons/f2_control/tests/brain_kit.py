@@ -134,3 +134,38 @@ def scenarios(**over):
         base.update(over)
         out.append((judge, K.ctx(phase, **base)))
     return out
+
+
+def judging(picks=None, p_yes=0.5, sure=0.9):
+    """A request callable that answers every question in the lane: a choice question with `picks[<name>]` (else
+    insufficient_evidence when it is allowed, else its first key), a yes/no question with `p_yes`."""
+    import re
+
+    picks = picks or {}
+
+    def answer(request):
+        text = request["messages"][0]["content"][1]["text"]
+        snap = re.search(r'snapshot_id="([^"]+)"', text).group(1)
+        blocks = []
+        for qid, kind, body in re.findall(r'<question id="([^"]+)" kind="([^"]+)">(.*?)</question>', text, re.S):
+            if kind == "yes_no":
+                blocks.append(yes_no(snap, qid, p_yes))
+                continue
+            keys = re.findall(r"^- ([a-z_0-9]+):", body, re.M)
+            name = qid.split("__v")[0]
+            pick = picks.get(name) or ("insufficient_evidence" if "insufficient_evidence" in keys else keys[0])
+            rest = (1.0 - sure) / max(1, len(keys) - 1)
+            blocks.append(choice(snap, qid, pick, {k: (sure if k == pick else rest) for k in keys}))
+        return message(*blocks)
+    return answer
+
+
+class FakeSDK:
+    """Stands in for the anthropic module: Anthropic(**kw) hands back `client` and records how it was built."""
+
+    def __init__(self, client):
+        self.client, self.built = client, []
+
+    def Anthropic(self, **kw):  # noqa: N802 - the SDK's own name
+        self.built.append(kw)
+        return self.client

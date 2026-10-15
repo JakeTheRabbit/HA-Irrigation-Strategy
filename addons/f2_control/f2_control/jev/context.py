@@ -155,6 +155,9 @@ class ZoneContext:
     # What the Setpoints judge may move tonight (jev_bridge.setpoint_view): {"enabled", "current", "home", "bands",
     # "changed_today", "frozen", "day", "last_words"}; None when the room has no setpoint memory.
     setpoints: dict | None = None
+    # What only the controller knows, for the Claude brain's evidence (jev.enrich): zone settings, interlocks, data
+    # quality, the arc in force. None on the legacy routes and under rules.
+    brain: dict | None = None
 
     @property
     def since_lights_min(self):
