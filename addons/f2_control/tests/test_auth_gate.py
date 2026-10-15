@@ -28,7 +28,7 @@ PUMP, MAIN, VALVE = "switch.p", "switch.m", "switch.v1"
 OPTIONS = {"num_zones": 1, "enable_flag": KILL, "hardware": {"pump": PUMP, "mainline": MAIN, "valves": {"1": VALVE}}}
 CONTAINER = {"F2_RUNTIME": "container", "HA_URL": "http://ha:8123", "HA_TOKEN": "tok"}
 # The controller's own REST functions, before any other test module's fake_ha.install replaces them.
-REST = ("ha_get", "ha_call", "ha_get_all", "ha_set", "ha_service_response")
+REST = ("ha_get", "ha_get_status", "ha_call", "ha_get_all", "ha_set", "ha_service_response")
 REAL = {name: getattr(controller, name) for name in REST}
 
 
@@ -59,6 +59,8 @@ class Clock:
 
 
 class Answer:
+    headers = {}
+
     def __init__(self, status, body):
         self.status_code, self._body = status, body
 

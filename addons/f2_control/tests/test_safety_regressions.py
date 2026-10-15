@@ -29,7 +29,7 @@ def rig(monkeypatch, tmp_path):
         "enable_flag": "input_boolean.kill",
     }
     monkeypatch.setattr(controller, "load_options", lambda: options)
-    for name in ("ha_get", "ha_call", "ha_get_all", "ha_set"):
+    for name in ("ha_get", "ha_get_status", "ha_call", "ha_get_all", "ha_set"):
         monkeypatch.setattr(controller, name, getattr(fake, name))
     # Never read a developer machine's /data/state.json during construction.
     with monkeypatch.context() as setup:

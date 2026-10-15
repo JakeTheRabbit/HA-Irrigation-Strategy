@@ -28,7 +28,9 @@ import signal
 import sys
 import threading
 import time
+import uuid
 from datetime import date, datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 
 import requests
 import auto_setpoints
@@ -167,7 +169,10 @@ _GATE = _AuthGate()
 
 class HAState(tuple):
     """What ha_get returns: (state, attributes, last_updated), unpacked exactly as it always was, plus
-    `last_changed`: when the state VALUE last changed, as Home Assistant reports it (None if unknown)."""
+    `last_changed`: when the state VALUE last changed, as Home Assistant reports it (None if unknown).
+    `served_at` (ha_get_status only): Home Assistant's own time of the answer, from its Date header."""
+
+    served_at = None
 
     def __new__(cls, state=None, attributes=None, last_updated=None, last_changed=None):
         obj = super().__new__(cls, (state, {} if attributes is None else attributes, last_updated))
@@ -188,6 +193,27 @@ def ha_get(entity, timeout=8):
         return HAState(d.get("state"), d.get("attributes", {}), d.get("last_updated"), d.get("last_changed"))
     except Exception:
         return HAState()
+
+
+def ha_get_status(entity, timeout=8):
+    """(HTTP status, HAState) of one entity: the status ha_get drops, 404 for a state Home Assistant
+    does not have, None when nothing answered. Its HAState carries `served_at`."""
+    if not _GATE.allows("read", entity):
+        return None, HAState()
+    try:
+        r = _session().get(f"{BASE}/states/{entity}", headers=HDR, timeout=timeout)
+        _GATE.saw("read", r.status_code, f"GET {BASE}/states/{entity}")
+        if r.status_code != 200:
+            return r.status_code, HAState()
+        d = r.json()
+        found = HAState(d.get("state"), d.get("attributes", {}), d.get("last_updated"), d.get("last_changed"))
+        try:
+            found.served_at = parsedate_to_datetime(r.headers.get("Date"))
+        except (TypeError, ValueError):
+            pass
+        return 200, found
+    except Exception:
+        return None, HAState()
 
 
 def _aware(stamp):
@@ -451,6 +477,10 @@ MIN_SHOT_S = 5
 # A probe unreadable for less than this many minutes is a blip (Home Assistant restarting, a sensor
 # reconnecting): its zone gets no timer shot and no probe alert until it has been out this long.
 BLIND_GRACE_MIN = 15
+# The duplicate-controller guard (Controller.duplicate_hold): a room holds for this many seconds of this
+# process's monotonic clock after the last pass that saw another controller write its heartbeat, and at
+# start a heartbeat Home Assistant stamped less than this long ago counts as fresh.
+DUPLICATE_HOLD_S = 180
 # System Enabled and Auto Irrigation Enabled each stopped every shot, as the room's engine switch
 # does, but less well: a shot already running carried on. The engine switch is the one switch now.
 # While either still exists and reads off, the controller switches the engine switch off in its
@@ -610,6 +640,25 @@ def plumbing_hold(hw):
     return None
 
 
+def _instance_id(path):
+    """This install's own id (a uuid4) from `path`, the `instance_id` file beside state.json, made the
+    first time. One that is missing, unreadable or not a uuid is replaced; one that cannot be written
+    leaves an id for this run only, never a stop."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return str(uuid.UUID(fh.read().strip()))
+    except (OSError, ValueError):
+        pass
+    made = str(uuid.uuid4())
+    try:
+        with open(path + ".tmp", "w", encoding="utf-8") as fh:
+            fh.write(made + "\n")
+        os.replace(path + ".tmp", path)
+    except OSError as e:
+        log("instance_id could not be written, an id for this run only:", e)
+    return made
+
+
 class Room:
     """One fully-isolated grow room the engine steers. `prefix` is "" for the default
     (un-prefixed) room or "<slug>_" for an additional room, applied to every
@@ -713,6 +762,11 @@ class Controller:
         # its data volume (F2_DATA_DIR). F2_STATE_PATH lets a test/dev rig redirect the file BEFORE this
         # constructor's own _load_state()/adoption pass reads and writes it.
         self._state_path = runtime_env.state_path(os.environ)
+        # Who this controller is, in its heartbeat, so the duplicate-controller guard can tell another one
+        # apart (duplicate_hold). Beside state.json, as dosing_state.json is: one data folder, one identity.
+        self.instance_id = _instance_id(os.path.join(os.path.dirname(self._state_path) or ".", "instance_id"))
+        self._guard = {}  # room slug -> {"answered", "seen", "until"} (_guard_read)
+        self._guard_lock = threading.Lock()
         # Dosing runs on its own thread, started by run(). Like Jev, it can never stop the controller
         # starting, and it only ever acts on an explicit request for a room with dosing set up.
         try:
@@ -834,6 +888,10 @@ class Controller:
         # state for all rooms (nested by slug; old flat single-room files load as 'default')
         self._load_state()
         self._apply_setup_descriptors()  # Gate tombstones/revisions before the very first shot.
+        # The guard's first read, before run() starts the dosing thread: a room counts as held until its
+        # heartbeat has been read.
+        for room in self.rooms:
+            self._guard_read(room)
         signal.signal(signal.SIGTERM, self._safe_exit)
         signal.signal(signal.SIGINT, self._safe_exit)
 
@@ -2257,6 +2315,7 @@ class Controller:
                 "engine": "f2-control",
                 # which controller is actually RUNNING, for the dashboard's sidebar
                 "controller_version": CONTROLLER_VERSION,
+                "controller_instance": self.instance_id,  # the duplicate-controller guard's (duplicate_hold)
                 "last_beat": now.isoformat(),
                 # the kill switch this room ACTUALLY uses — the integration's health
                 # check reads this so a custom enable_flag isn't flagged as "missing"
@@ -4161,6 +4220,7 @@ class Controller:
                 log("rediscover error", e)
         all_pub = {}
         for room in self.rooms:
+            self._guard_read(room)  # before this pass writes the room's heartbeat
             self._refresh_lights(room)
             pub = self._loop_room(room, now)
             self._publish_status(room, pub, now)
@@ -4168,6 +4228,61 @@ class Controller:
         self._check_defaulted_setpoints()
         self._maybe_notify(all_pub, now)
         self._send_events()
+
+    # ---------------------------------------------------------------- two controllers on one room
+    def _guard_read(self, room):
+        """Read the room's heartbeat for the duplicate-controller guard (duplicate_hold). Another
+        controller's write is a beat whose controller_instance is not ours, or missing (a controller
+        from before the guard), with a last_updated other than the last such one seen. Home Assistant
+        stamps last_updated itself, so neither controller's clock or time zone matters; only at the
+        first answer is a beat's age judged, by Home Assistant's own clock when it says (its Date), and
+        an old one is not counted. No heartbeat at all (404: Home Assistant restarted, as a state set
+        over REST is not restored) is nobody's. No answer changes nothing."""
+        status, beat = ha_get_status(f"sensor.crop_steering_{room.prefix}ai_heartbeat")
+        if status not in (200, 404):
+            return
+        with self._guard_lock:
+            guard = self._guard.setdefault(room.slug, {"answered": False, "seen": None, "until": None})
+            first, guard["answered"] = not guard["answered"], True
+            _state, attributes, stamp = beat
+            if status == 404 or attributes.get("controller_instance") == self.instance_id or stamp == guard["seen"]:
+                return
+            guard["seen"] = stamp
+            when, now = _aware(stamp), beat.served_at or datetime.now(timezone.utc)
+            if first and when is not None and (now - when).total_seconds() >= DUPLICATE_HOLD_S:
+                return
+            guard["until"] = time.monotonic() + DUPLICATE_HOLD_S
+        log(f"[{room.slug}] another controller wrote this room's heartbeat "
+            f"({attributes.get('controller_instance') or 'no id: a version before the guard'}): holding")
+
+    def duplicate_hold(self, room):
+        """Whether the room holds for another controller: from start until its heartbeat has been read,
+        and for DUPLICATE_HOLD_S of this process's monotonic clock after the last read that saw another
+        controller write it. A lock and a clock read, so the dosing thread asks it too."""
+        with self._guard_lock:
+            guard = self._guard.get(room.slug)
+            return (guard is None or not guard["answered"]
+                    or (guard["until"] is not None and time.monotonic() < guard["until"]))
+
+    def _hold_duplicate(self, room, now):
+        """A room duplicate_hold holds: nothing in it is switched on and none of its logic runs, so no
+        phase, setpoint, EC step or shot, and the dosing thread refuses its dose and batch requests.
+        Offs still run. Only its heartbeat is written, which makes the other controller hold too."""
+        with self._guard_lock:
+            seen = (self._guard.get(room.slug) or {}).get("until") is not None
+        if seen:
+            self._alert(
+                f"duplicate_{room.slug}",
+                "CS-609",
+                "another controller is writing this room's heartbeat, holding",
+                "Another controller is reporting for this room, so this one waters nothing and doses "
+                "nothing in it until none has been seen for 3 minutes. Right after an update this is "
+                "expected: the version before it reported without an id, and this clears by itself in "
+                "about 3 minutes. If it stays, two controllers are running this room (an app and a "
+                "container, or two apps): stop and remove the one you no longer use.",
+                room=room,
+            )
+        self._heartbeat(room, now, self._hardware_fault_block(room))
 
     def _blind_time_transition(self, room, zone, now, lights_on, lights_just_on):
         """Time-only phase forces for a BLIND zone (dead/missing probe), so it can never
@@ -4292,6 +4407,13 @@ class Controller:
         if getattr(room, "setup_active", True) is False:
             self._idle_reset(room, now)
             return {}
+        if self.duplicate_hold(room):
+            self._hold_duplicate(room, now)
+            return {}
+        if f"duplicate_{room.slug}" in self._alerted:
+            log(f"[{room.slug}] no other controller seen for {DUPLICATE_HOLD_S // 60} min: carrying on")
+            ha_call("persistent_notification", "dismiss", notification_id=f"f2_duplicate_{room.slug}")
+            del self._alerted[f"duplicate_{room.slug}"]
         active, was = self._room_active(room), getattr(room, "_was_room_active", None)
         room._was_room_active = active
         if not active:

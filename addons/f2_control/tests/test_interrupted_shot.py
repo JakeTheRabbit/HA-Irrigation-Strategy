@@ -39,7 +39,7 @@ def rig(monkeypatch, tmp_path):
         "enable_flag": "input_boolean.kill",
     }
     monkeypatch.setattr(controller, "load_options", lambda: options)
-    for name in ("ha_get", "ha_call", "ha_get_all", "ha_set", "ha_history"):
+    for name in ("ha_get", "ha_get_status", "ha_call", "ha_get_all", "ha_set", "ha_history"):
         monkeypatch.setattr(controller, name, getattr(fake, name))
     with monkeypatch.context() as setup:
         setup.setattr(controller.Controller, "_read_state_file", lambda self: {})

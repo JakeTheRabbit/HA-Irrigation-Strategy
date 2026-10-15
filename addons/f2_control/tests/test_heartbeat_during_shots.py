@@ -42,7 +42,7 @@ def rig(monkeypatch, tmp_path):
         "hold_entities": [],
     }
     monkeypatch.setattr(controller, "load_options", lambda: options)
-    for name in ("ha_get", "ha_call", "ha_get_all"):
+    for name in ("ha_get", "ha_get_status", "ha_call", "ha_get_all"):
         monkeypatch.setattr(controller, name, getattr(fake, name))
     with monkeypatch.context() as setup:
         setup.setattr(controller.Controller, "_read_state_file", lambda self: {})
