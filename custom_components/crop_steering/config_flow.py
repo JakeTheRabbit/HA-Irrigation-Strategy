@@ -334,7 +334,7 @@ def _retry_form(flow, step_id, schema, user_input, info, error):
         data_schema=prefill(schema, user_input) if prefill else schema,
         errors={"base": "setup_invalid"},
         description_placeholders={
-            "info": f"{info}\n\n**Not saved yet.** {error}",
+            "info": f"{info}\n\n**The setup is not saved.** {error}",
             "error": str(error),
         },
     )
@@ -450,8 +450,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     }
                 ),
                 description_placeholders={
-                    "info": "Name this room (e.g. Veg, Flower B). It gets its own zones, "
-                    "sensors, pump and setpoints — completely isolated from your other rooms.",
+                    "info": "Each room has its own zones, probes, pump and setpoints. It does "
+                    "not share them with other rooms. Example names: Veg, Flower B.",
                     "version": SOFTWARE_VERSION,
                 },
             )
@@ -484,8 +484,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     }
                 ),
                 description_placeholders={
-                    "info": f"Configure {MIN_ZONES}-{MAX_ZONES} irrigation zones. "
-                    "Each zone can have independent sensors and controls."
+                    "info": f"A room can have {MIN_ZONES} to {MAX_ZONES} zones. "
+                    "Each zone has its own valve, probes and settings."
                 },
             )
 
@@ -500,9 +500,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Map each zone's valve and sensors via entity pickers."""
         num = int(self._data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES))
         info = (
-            f"Pick the valve and probe(s) for each of your {num} zones. "
-            "You can choose MORE THAN ONE moisture/EC sensor per zone — the engine "
-            "averages valid readings. Outliers are not automatically rejected."
+            f"Select the valve and the probes of each of the {num} zones. A zone can have "
+            "more than one VWC probe and more than one EC probe. The integration combines "
+            "the probes of a zone into one reading, by default with the median. It does not "
+            "use a reading that is out of range. With three or more probes, it also does not "
+            "use a probe that is far from the others."
         )
         if user_input is None:
             return self.async_show_form(
@@ -532,10 +534,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Map shared hardware (pump/mainline/lights) and substrate properties."""
         info = (
-            "Shared plumbing, lights and the substrate facts used to size shots. Start by saying how "
-            "the room is plumbed: a room with one switch per zone, such as a tent on a single smart "
-            "plug, is zone valves only and needs nothing more than the valves you have already "
-            "picked. If water only flows while a pump runs, say so and choose the pump."
+            "The shared plumbing, the lights and the substrate data for the shot size. A room "
+            "with one switch for each zone, for example a tent on one power plug, uses zone "
+            "valves only. It needs only the valves that you selected in the last step. If water "
+            "flows only while a pump runs, select a plumbing type with a pump and select the pump."
         )
         if user_input is None:
             return self.async_show_form(
@@ -615,8 +617,8 @@ def _restart_notice(running: str, waiting: str | None) -> str:
     if not waiting:
         return ""
     return (
-        f"⚠️ Home Assistant is still running {running}, but {waiting} is installed. Restart "
-        "Home Assistant to run it: an update downloaded by HACS does nothing until then."
+        f"⚠️ Home Assistant runs {running}, but {waiting} is installed. Restart Home "
+        f"Assistant to run {waiting}. An update from HACS has no effect until the restart."
     )
 
 
@@ -753,8 +755,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 }
             ),
             description_placeholders={
-                "info": "Edit irrigation parameters. Changes take effect immediately. "
-                "You can also edit these via number entities in Home Assistant."
+                "info": "Change the most used settings. A change has an effect immediately. "
+                "You can also change these settings with their number entities in Home Assistant."
             },
         )
 
@@ -776,8 +778,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     }
                 ),
                 description_placeholders={
-                    "info": "Set how many zones you have. Increase it to ADD a zone, decrease to "
-                    "remove the highest ones. You'll map entities on the next screen."
+                    "info": "Set the number of zones. To add a zone, increase the number. To "
+                    "stop the zones with the highest numbers, decrease the number. The integration "
+                    "keeps their configuration and sets them to inactive. Map the entities in the "
+                    "next step."
                 },
             )
         self._edit_num = int(user_input["num_zones"])
@@ -812,8 +816,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             }
         )
         info = (
-            "Add, remove or swap the sensors and switches for each zone. "
-            "Pick multiple moisture/EC probes per zone if you have them — they get fused."
+            "Add, remove or replace the switches and the probes of each zone. A zone can have "
+            "more than one VWC probe and more than one EC probe. The integration combines them "
+            "into one reading."
         )
         if user_input is None:
             return self.async_show_form(
