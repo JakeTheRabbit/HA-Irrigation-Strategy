@@ -50,10 +50,8 @@ RESCUE_ROOM_PTS = 2.0 + LADDER_PTS
 # What the learner writes. Never the rescue level (p3_emergency_vwc_threshold): that is the operator's
 # emergency floor.
 MANAGED = ("p1_target_vwc", "field_capacity", "p2_vwc_threshold")
-JEV_MANAGED = ("p2_shot_size",)  # additionally, while the judge is configured: see jev_verdict
-# The bounds Jev steers within come from the room's substrate profile; these are the generic profile's.
-JEV_SHOT_RANGE = SUBSTRATE_PROFILES["generic"]["learner"]["p2_shot_range"]  # % of substrate: the P2 shot size
-JEV_PEAK_ADJ_RANGE = SUBSTRATE_PROFILES["generic"]["learner"]["peak_adj_range"]  # points off the learned peak
+# points a saved working-peak adjustment may hold it off the learned one (the generic profile's)
+JEV_PEAK_ADJ_RANGE = SUBSTRATE_PROFILES["generic"]["learner"]["peak_adj_range"]
 
 _NUMBERS = ("peak", "gain", "day_rate", "night_rate")
 
@@ -310,75 +308,3 @@ def status(learn, enabled, stall=None, dryback_note=None, p2_stop=None):
         "frozen_reason": reason, "last_change": learn["last_change"],
         "dryback_note": dryback_note or None, "p2_stop": p2_stop or None,
     }
-
-
-def evidence(learn, phase, vwc, target, ec, ec_target, feed_ec, p2_shot, shots_today):
-    """The situation for the judge (Jev), every comparison already made and put into words."""
-    ramp = learn["ramp"]
-    top = max([r["settled"] for r in ramp] + [vwc])
-    reach = "reached the peak target" if top >= target - 0.3 else f"{target - top:.1f} points short of the peak target"
-    normal = 0.5 * learn["gain"] if learn["gain"] else None
-    responses = []
-    for r in ramp[-4:]:
-        ok = r["rise"] >= (normal * r["pct"] if normal else 1.0)
-        responses.append(f"+{r['rise']:.1f} {'normal' if ok else 'weak'}")
-    e = {"phase": phase, "peak_target": f"{target:.1f}% VWC", "highest_vwc_today": f"{top:.1f}% ({reach})",
-         "vwc_now": f"{vwc:.1f}%", "shots_today": shots_today, "p2_shot_size_now": f"{p2_shot:.1f}%",
-         "last_shot_responses": responses}
-    held = max(learn["peak"] or 0.0, learn["prev_peak"] or 0.0)
-    if held:
-        e["highest_vwc_this_zone_has_held"] = f"{held:.1f}%"
-    if ec is not None and ec_target:
-        lo, hi = ec_target * 0.85, ec_target * 1.15
-        where = "BELOW" if ec < lo else "ABOVE" if ec > hi else "INSIDE"
-        e["pore_ec"] = f"{ec:.1f} mS/cm, {where} the stage range {lo:.1f} to {hi:.1f}"
-        if feed_ec is not None:
-            side, effect = ("lower", "lowers") if feed_ec < ec else ("higher", "raises")
-            e["feed_ec"] = f"{feed_ec:.1f} mS/cm ({side} than pore EC, so runoff {effect} pore EC)"
-    return e
-
-
-def jev_due(learn, hour_stamp):
-    """Once per clock hour. Pore EC and the ceiling answer over hours, not loops."""
-    return learn["jev"]["asked"] != hour_stamp
-
-
-def jev_verdict(learn, hour_stamp, verdict, p2_shot, clock, learner=None):
-    """Record the judge's hourly P2 answer and return the setpoints to write: {"p2_shot_size": %} or {}.
-
-    It can only nudge: one step per lever per grow-day, inside fixed bounds. A guard that trips, or no
-    answer at all, changes nothing. `verdict` is jev_policy.verdicts(...) or None. `learner`: the room's
-    substrate profile's bounds (generic when None)."""
-    learner = learner or SUBSTRATE_PROFILES["generic"]["learner"]
-    jev = learn["jev"]
-    if jev["day"] != learn["day"]:
-        jev.update(day=learn["day"], nudged=[], changed=None)
-    jev["asked"] = hour_stamp
-    if verdict is None:
-        jev["last"] = f"{clock} no answer from Cloudflare: nothing changed"
-        return {}
-    if verdict.get("freeze"):
-        jev["last"] = f"{clock} hands off ({verdict['freeze']})"
-        return {}
-    out, said = {}, []
-    delta = verdict.get("p2_shot_delta") or 0.0
-    if delta and "ec" not in jev["nudged"]:
-        lo, hi = learner["p2_shot_range"]
-        shot = round(max(lo, min(hi, p2_shot + delta)), 1)
-        if shot != round(p2_shot, 1):
-            out["p2_shot_size"] = shot
-            jev["nudged"].append("ec")
-            said.append(f"p2_shot_size {p2_shot:g} -> {shot:g}")
-    delta = verdict.get("peak_delta") or 0.0
-    if delta and "peak" not in jev["nudged"] and learn["peak"] is not None:
-        lo, hi = learner["peak_adj_range"]
-        adj = round(max(lo, min(hi, learn["peak_adj"] + delta)), 1)
-        if adj != learn["peak_adj"]:
-            learn["peak_adj"] = adj
-            jev["nudged"].append("peak")
-            said.append(f"working peak {adj:+g} on the learned {learn['peak']:g}")
-    if said:  # the latest hourly answer is usually "no change": keep what it DID change today in view
-        jev["changed"] = f"{clock} " + "; ".join(said)
-    why = "; ".join(verdict.get("why") or [])
-    jev["last"] = f"{clock} " + ("; ".join(said) if said else "no change") + (f" ({why})" if why else "")
-    return out

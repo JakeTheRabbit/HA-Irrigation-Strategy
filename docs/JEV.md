@@ -74,7 +74,7 @@ automatic writer. With the switch off, or under a plan, neither writes anything.
 | P1 target, field capacity | The zone's own highest readings (the controller) | The P1 target is the highest reading of the grow-day before, kept at lights-on. Field capacity is the higher of today's and the day before's highest readings. When field capacity moves by a point or more, the re-water threshold moves by the same points (the threshold's move re-centres the Setpoints judge's range). Bounded: each moves at most 1 point a grow-day, only readings from a trusted probe count, a grow-day with moisture rising from below (CS-310) does not count, a zone watering without its probe is not followed, and the threshold stays at least 3 points over the rescue floor. |
 | P3 rescue floor | The operator | Nothing automatic moves it. Without the judge, the learner keeps its re-water threshold at least 3 points over it, and plans a dryback that would end under it only as deep as it lets the zone go. When no threshold fits between it and the P1 target, the learner writes nothing and its sensor says why. |
 
-The old hourly P2 check stays off while the Setpoints judge runs. Each zone's
+The old hourly P2 check is retired: nothing asks it, with or without the Setpoints judge. Each zone's
 `sensor.crop_steering_<prefix>zone_N_auto_setpoints` lists these numbers in `managed` and names each one's writer
 in `managed_by`.
 

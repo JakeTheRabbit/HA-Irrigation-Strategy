@@ -428,15 +428,7 @@ def _sent(fake, suffix=None):
             and (suffix is None or d["entity_id"] == f"number.crop_steering_zone_1_{suffix}")]
 
 
-def _never_ask_the_hourly_judge(monkeypatch):
-    def boom(*a, **k):
-        raise AssertionError("the old per-hour judge must not be asked while the Setpoints judge runs")
-
-    monkeypatch.setattr(asr.controller.jev_policy, "call", boom)
-
-
-def test_the_learner_never_writes_the_judges_levers_nor_the_rescue_level(ramp_clock, monkeypatch):
-    _never_ask_the_hourly_judge(monkeypatch)
+def test_the_learner_never_writes_the_judges_levers_nor_the_rescue_level(ramp_clock):
     c, fake, room = _zone_2(numbers={**Z2, "number.crop_steering_zone_1_p3_emergency_vwc_threshold": ("26", {})})
     _day(c, fake, room, p2_passes=150)  # well over an hour of P2, where the old hourly judge moved the shot
     assert _sent(fake, THRESHOLD) == [] and _sent(fake, SHOT) == []  # its band wanted 57.3: not its lever

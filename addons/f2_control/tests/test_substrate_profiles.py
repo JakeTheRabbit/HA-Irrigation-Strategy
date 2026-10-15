@@ -1,13 +1,12 @@
 """The controller runs each room on its substrate profile, and a generic room (every upgraded room) on
 exactly the numbers it used before the pack: the engine's EC settle, P1 rise, P0 flush and shot
-scaling, the Auto setpoints shift, and the learner's and its judge's bounds."""
+scaling, the Auto setpoints shift, and the learner's bounds."""
 import dataclasses
 from datetime import datetime, timedelta
 
 import auto_setpoints
 import controller
 import curve_tracker as ct
-import jev_policy
 import setpoint_supervisor as ss
 from crop_steering_engine import ZoneParams
 from crop_steering_engine.defaults import SUBSTRATE_PROFILES
@@ -47,32 +46,16 @@ def test_the_settled_reading_waits_for_the_rooms_settle_time():
     assert c._settled_ec(dict(st), 6.0, now, SUBSTRATE_PROFILES["coco"]["ec_settle_min"]) == 4.0  # coco: 60, held
 
 
-def test_generic_keeps_the_learner_and_judge_bounds_it_had():
+def test_generic_keeps_the_learner_bounds_it_had():
     assert controller.FC_SHIFT_MIN == 1.0
-    assert auto_setpoints.JEV_SHOT_RANGE == (1.0, 4.0)
     assert auto_setpoints.JEV_PEAK_ADJ_RANGE == (-2.0, 2.0)
     assert ss.ADDITIONAL_DRYBACK_PCT == 3.0 and ss.P2_SHOT_RANGE == (1.0, 4.0) and ss.PEAK_ADJ_RANGE == (-2.0, 2.0)
-    assert jev_policy.EC_STEP == {0: 1.0, 1: 0.5, 2: 0.0, 3: -0.5, 4: -1.0}
-    assert jev_policy.PEAK_STEP == {"lower_peak": -0.5, "keep": 0.0, "raise_peak": 0.5}
     assert ct.ATHENA == {
         "veg": ct.Recipe(1.0, 25.0, 60, 3.0, 20, 3.0, (3.0, 5.0)),
         "stretch": ct.Recipe(0.0, 45.0, 90, 3.0, 20, 1.5, (4.0, 10.0), True),
         "bulk": ct.Recipe(1.0, 35.0, 60, 4.0, 20, 3.0, (3.5, 6.0)),
         "finish": ct.Recipe(1.0, 45.0, 90, 3.0, 20, 3.0, (3.0, 4.0), True),
     }
-
-
-def test_the_judge_steers_within_the_rooms_learner_bounds():
-    narrow = {**SUBSTRATE_PROFILES["generic"]["learner"], "p2_shot_range": (1.0, 2.5), "ec_step": (2.0,) * 5}
-    answers = {"ec_steer": {"score": 0, "confidence": 0.9}}
-    assert jev_policy.verdicts(answers)["p2_shot_delta"] == 1.0
-    verdict = jev_policy.verdicts(answers, learner=narrow)
-    assert verdict["p2_shot_delta"] == 2.0
-    learn = auto_setpoints.fresh()
-    learn["day"] = "2026-10-01"
-    assert auto_setpoints.jev_verdict(dict(learn, jev=dict(learn["jev"])), "h", verdict, 2.0, "12:00") == {
-        "p2_shot_size": 4.0}
-    assert auto_setpoints.jev_verdict(learn, "h", verdict, 2.0, "12:00", narrow) == {"p2_shot_size": 2.5}
 
 
 def test_the_stage_map_names_each_recipe_stage():
