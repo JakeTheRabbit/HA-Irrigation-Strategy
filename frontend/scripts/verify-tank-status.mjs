@@ -96,7 +96,7 @@ try {
       .getByRole("navigation", { name: "Equipment views" })
       .locator('[aria-current="page"]')
       .innerText(),
-    "Tank & feed",
+    "Tank and feed",
   );
   // The demo tank was filled to 100 % two hours ago and is being drawn down since.
   const cardLevel = Number(await tank.locator("[data-tank-level]").getAttribute("data-tank-level"));
@@ -293,7 +293,7 @@ try {
     await sheet.locator('[data-tank-gate="ec"]').innerText(),
     /2\.3–3\.5 mS\/cm\. Irrigation is held while this probe reads outside the gate/,
   );
-  // A room saved in Rooms & setup gates on the probes mapped there: no word of app options.
+  // A room saved in Rooms and setup gates on the probes mapped there: no word of app options.
   assert.equal(await sheet.locator("[data-tank-gate-option]").count(), 0);
   for (const range of ["7 days", "30 days"]) {
     await sheet.getByRole("button", { name: range, exact: true }).click();

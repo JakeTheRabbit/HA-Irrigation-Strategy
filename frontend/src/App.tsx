@@ -39,6 +39,7 @@ import {
   type Route,
 } from "@/lib/routes";
 import { AppHeader, StaleBanner } from "@/components/app-header";
+import { UiTip } from "@/components/info-tip";
 import { PageTabs, pageLabel, SECTION_LABELS } from "@/components/page-tabs";
 import { WaterViewProvider } from "@/lib/water-view";
 import { WhatsNewOnUpdate } from "@/components/whats-new";
@@ -192,7 +193,10 @@ export default function App() {
         </span>
       </a>
       <div className="room-selector">
-        <label htmlFor={variant + "-room"}>Room</label>
+        <span className="label-with-tip">
+          <label htmlFor={variant + "-room"}>Room</label>
+          <UiTip copyKey="room" />
+        </span>
         <select
           id={variant + "-room"}
           value={controller.roomId}
@@ -248,8 +252,8 @@ export default function App() {
         {!controller.demo && (
           <dl
             className="sidebar-versions"
-            aria-label="Running versions"
-            title="Reported by the running integration and controller, not by this page"
+            aria-label="Current versions"
+            title="Reported versions. The integration and the controller report these versions. The dashboard does not calculate them."
           >
             <div>
               <dt>Integration</dt>

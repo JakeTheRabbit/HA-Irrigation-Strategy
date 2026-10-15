@@ -10,6 +10,7 @@ import { LoaderCircle, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, number, time as clock } from "@/components/dashboard";
 import { inPairs } from "@/components/day-timeline";
+import { UiTip } from "@/components/info-tip";
 import { appendLive, duration, joinRows, type Level, type TimelineRows } from "@/lib/day-timeline";
 import { numeric } from "@/lib/model";
 import { rangeTicks, tickLabel } from "@/lib/tank-history";
@@ -149,7 +150,7 @@ export function TankLevel({
       data-tank-level-chart
     >
       <div className="panel-heading">
-        <h2 id="tank-level-title">Tank level and watering</h2>
+        <h2 id="tank-level-title">Tank level and shots</h2>
         <div className="tank-history-range" role="group" aria-label="Tank level range">
           {LEVEL_RANGES.map((option) => (
             <button
@@ -166,30 +167,37 @@ export function TankLevel({
       <div className="timeline-body">
         {!level.entityId ? (
           <Empty
-            title="No tank level is mapped"
-            detail="Map the tank’s level sensor, a percentage, in Rooms & setup to chart it here with the shots, pump runs and fills."
+            title="No tank level sensor"
+            tip={<UiTip copyKey="no tank level is mapped" />}
+            detail="Map the level sensor of the tank, in %, in Rooms and setup. The chart then shows it with the shots, pump runs and fills."
             action={mapSensors}
           />
         ) : !read.ids.level ? (
           <Empty
-            title="The tank level sensor is missing"
+            title="Tank level sensor missing"
+            tip={<UiTip copyKey="the tank level sensor is missing" />}
             detail={`Home Assistant has no ${level.entityId}.`}
             action={mapSensors}
           />
         ) : !charted ? (
           <Empty
-            title="The tank level is not charted"
+            title="Tank level not on chart"
+            tip={<UiTip copyKey="the tank level is not charted" />}
             detail={`${level.entityId} reports in “${level.unit}”, not %.`}
             action={mapSensors}
           />
         ) : record.error ? (
           <Empty
-            title="The tank’s history could not load"
+            title="Tank history did not load"
+            tip={<UiTip copyKey="the tank’s history could not load" />}
             detail={record.error}
             action={
-              <Button variant="outline" onClick={record.retry}>
-                Retry
-              </Button>
+              <span className="label-with-tip">
+                <Button variant="outline" onClick={record.retry}>
+                  Retry
+                </Button>
+                <UiTip copyKey="retry" />
+              </span>
             }
           />
         ) : !record.rows || record.at === null ? (
@@ -308,30 +316,30 @@ function LevelRecord({
       />
       <div className="grow-foot">
         <ul className="grow-legend" aria-label="Chart key">
-          <li title="What the mapped level sensor reported, held until its next reading">
+          <li title="Tank level. The values of the mapped level sensor. Each value stays on the chart until the next reading.">
             <i className="key-level" aria-hidden="true" />
             Tank level
           </li>
           {ids.valves.length > 0 && (
-            <li title="A zone valve opening, on the level line where it opened">
+            <li title="Shot. A zone valve opened. The mark is on the level line at the time that the valve opened.">
               <i className="key-shot" aria-hidden="true" />
               Shot
             </li>
           )}
           {ids.pump && (
-            <li title="The pump switch’s own report, not measured flow">
+            <li title="Pump on. The pump switch reports that it is on. The chart does not show measured flow.">
               <i className="key-pump" aria-hidden="true" />
               Pump on
             </li>
           )}
           {ids.filling && (
-            <li title="The tank filling status mapped for this room">
+            <li title="Tank fill. The mapped fill status of the tank for this room.">
               <i className="key-filling" aria-hidden="true" />
               Filling
             </li>
           )}
           {ids.fill && (
-            <li title="A newer time on the last-fill record">
+            <li title="Recorded fill. The last-fill record of the tank shows a newer time.">
               <i className="key-fill" aria-hidden="true" />
               Recorded fill
             </li>

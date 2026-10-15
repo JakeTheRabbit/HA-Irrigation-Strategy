@@ -2,6 +2,7 @@ import { useId, useState, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Heading, time as clock, type Page } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { Meter } from "@/components/mini-visuals";
 import {
   BRAIN_DEMO_STATES,
@@ -161,7 +162,8 @@ function DemoSwitcher({ demo }: { demo: BrainDemoState }) {
   const id = useId();
   return (
     <div className="brain-demo">
-      <label htmlFor={id}>Demo brain state</label>
+      <label htmlFor={id}>Sample AI state</label>
+      <UiTip copyKey="demo brain state" />
       <select
         id={id}
         value={demo}
@@ -222,7 +224,7 @@ export function BrainPage({ controller, navigate }: { controller: Controller; na
       {panel && budget && (
         <section className="panel" aria-labelledby="brain-budget-title">
           <div className="panel-heading">
-            <h2 id="brain-budget-title">Budget</h2>
+            <h2 id="brain-budget-title">AI budget</h2>
           </div>
           <div className="brain-body">
             <p className="brain-line">
@@ -281,7 +283,7 @@ export function BrainPage({ controller, navigate }: { controller: Controller; na
       </section>
       <section className="panel" aria-labelledby="brain-may-title">
         <div className="panel-heading">
-          <h2 id="brain-may-title">What it may do</h2>
+          <h2 id="brain-may-title">What each judge can do</h2>
         </div>
         <div className="brain-body">
           <MayDo panel={panel} />

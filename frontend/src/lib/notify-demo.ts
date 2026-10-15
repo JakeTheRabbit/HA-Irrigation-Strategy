@@ -46,7 +46,7 @@ export const DEMO_KINDS: NotifyKind[] = [
   },
   {
     id: "watering",
-    name: "Watering stopped",
+    name: "Shots stopped",
     detail:
       "Something stopping the shots in a room or a zone, a room that has watered nothing for a while with the lights on, the tank it waters from at its minimum, due a refill or over its full mark, and a batch tank to refill.",
     codes: [...codes(202, 208), "CS-602", "CS-609", "CS-209", ...codes(901, 904), "CS-906"],
@@ -83,7 +83,7 @@ export const DEMO_KINDS: NotifyKind[] = [
   },
   {
     id: "jev",
-    name: "Jev",
+    name: "AI assistant",
     detail:
       "Jev's advice, Jev moving a zone's P2 shot size or re-water point (a push only), the AI assistant's budget, key, retired route and feed proposals, and whether the room runs its grow plan.",
     codes: [
@@ -247,7 +247,7 @@ export class NotifyDemo {
       hours > IDLE_HOURS.max
     )
       return this.document(
-        `Watering stopped needs ${IDLE_HOURS.min} to ${IDLE_HOURS.max} whole hours.`,
+        `Shots stopped needs ${IDLE_HOURS.min} to ${IDLE_HOURS.max} whole hours.`,
       );
     if (!this.user.admin) {
       const before = new Map(this.config.recipients.map((item) => [item.service, item]));

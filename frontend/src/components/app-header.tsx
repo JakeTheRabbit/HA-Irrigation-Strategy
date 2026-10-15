@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, House, Menu, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActivityPanel } from "@/components/activity-panel";
+import { UiTip } from "@/components/info-tip";
 import { BrainChip } from "@/components/brain";
 import { SafetySwitches } from "@/components/room-controls";
 import { ageText, ageTone, updatedText } from "@/lib/controller-health";
@@ -101,7 +102,7 @@ export function AppHeader({
         {controller.demo && (
           <span
             className="demo-pill"
-            title="Sample readings: try any setting safely. Changes stay in this tab, and no live equipment is connected."
+            title="Sample readings. The dashboard shows sample readings. Your changes stay in this browser tab. The dashboard connects to no live equipment."
           >
             Demo<span className="wide-only"> data</span>
           </span>
@@ -109,7 +110,7 @@ export function AppHeader({
         <span
           className="data-age"
           data-age={connection === "offline" ? "red" : ageTone(age)}
-          title="How old the selected room's latest controller report is"
+          title="Age of the latest report. The time since the controller of the selected room sent its latest report."
         >
           {connection === "offline"
             ? "Offline"
@@ -154,6 +155,7 @@ export function StaleBanner({
       <button type="button" className="stale-banner-link" onClick={openProbes}>
         Probes <ArrowRight size={14} aria-hidden="true" />
       </button>
+      <UiTip copyKey="probes" />
     </div>
   );
 }

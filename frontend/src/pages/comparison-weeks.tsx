@@ -221,8 +221,8 @@ export function RunWeeks({
       ) : (
         <>
           {data.theirs && (
-            <div className="rw-differences" aria-label="Biggest differences">
-              <h3>Biggest differences</h3>
+            <div className="rw-differences" aria-label="Largest differences">
+              <h3>Largest differences</h3>
               {differences.length ? (
                 <ul>
                   {differences.map((item) => (

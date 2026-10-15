@@ -75,7 +75,7 @@ export function createDemo(now = Date.now()): States {
       tank_last_fill_sensor: `sensor.demo_${prefix}tank_last_fill`,
       tank_fill_entity: `binary_sensor.demo_${prefix}tank_filling`,
       // Room A checks its feed water on the tank probes (the source-water gate); Room B maps
-      // no feed-water probe, so its gate is off. Both have been saved in Rooms & setup.
+      // no feed-water probe, so its gate is off. Both have been saved in Rooms and setup.
       ...(index
         ? {}
         : { feed_ec_sensor: "sensor.demo_tank_ec", feed_ph_sensor: "sensor.demo_tank_ph" }),

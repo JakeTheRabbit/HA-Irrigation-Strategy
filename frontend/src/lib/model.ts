@@ -915,7 +915,7 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
       "Not watering",
       pending.startsWith("Setup changed")
         ? `${pending}. Switch watering off, wait up to 5 minutes for the controller to adopt the setup, then switch it back on.`
-        : `${pending}. Correct the room in Rooms & setup.`,
+        : `${pending}. Correct the room in Rooms and setup.`,
     );
   // System Enabled and Auto Irrigation Enabled are retired: while one reads off, the controller
   // keeps the engine switch off (CS-208), and an older controller holds every shot itself. Named

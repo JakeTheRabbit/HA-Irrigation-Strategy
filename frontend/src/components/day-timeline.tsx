@@ -8,6 +8,7 @@ import {
 } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { UiTip } from "@/components/info-tip";
 import { dailyLimit, Empty, number, time as clock } from "@/components/dashboard";
 import { ageText, ageTone, readHeartbeat } from "@/lib/controller-health";
 import {
@@ -353,9 +354,12 @@ export function ZoneDay({ controller, zone }: { controller: Controller; zone: Zo
           <h2 id={`zone-day-${zone.id}`}>Today</h2>
           {rows && (
             <div className="timeline-heading-side">
-              <label htmlFor="day-timeline-compare" className="timeline-compare">
-                Compare with
-              </label>
+              <span className="label-with-tip">
+                <label htmlFor="day-timeline-compare" className="timeline-compare">
+                  Compare with
+                </label>
+                <UiTip copyKey="compare with" />
+              </span>
               <select
                 id="day-timeline-compare"
                 value={compare}
@@ -380,11 +384,13 @@ export function ZoneDay({ controller, zone }: { controller: Controller; zone: Zo
         ) : !day ? (
           <Empty
             title="No lights schedule"
+            tip={<UiTip copyKey="no lights schedule" />}
             detail="Set this room’s lights-on and lights-off hours to draw its grow day."
           />
         ) : error ? (
           <Empty
-            title="The grow day could not load"
+            title="Grow-day did not load"
+            tip={<UiTip copyKey="the grow day could not load" />}
             detail={error}
             action={
               <Button variant="outline" onClick={() => setRetry((value) => value + 1)}>
@@ -635,8 +641,8 @@ function buildLane(
     setupNote: !moved
       ? null
       : compare === "yesterday"
-        ? "Rooms & setup saved since yesterday: its probe may have differed"
-        : `${moved} of ${compared.length} days before the last Rooms & setup save`,
+        ? "Rooms and setup saved since yesterday: its probe can be different"
+        : `${moved} of ${compared.length} days before the last Rooms and setup save`,
     rescue: read("p3_emergency_vwc_threshold"),
     p2Stop: zone.auto?.state === "tracking" ? maintenanceStop(zone.auto.p2Stop, day) : null,
   };
@@ -695,7 +701,7 @@ function ZoneNumbers({
           {rate !== null && (
             <dd
               className="zone-sub"
-              title={`VWC points lost per hour since the last shot settled, over up to the last ${DRYBACK_WINDOW_H} hours`}
+              title={`Dryback rate. The VWC points that the zone lost each hour since the last shot settled. The calculation uses up to the last ${DRYBACK_WINDOW_H} hours.`}
             >
               {Math.abs(rate) < 0.05
                 ? "steady"
@@ -742,7 +748,7 @@ function ZoneNumbers({
           {share !== null && (
             <dd
               className="zone-sub"
-              title="Routine shots stop at the zone's daily water limit; ramp, rescue and watchdog shots and high-EC flushes can go past it"
+              title="Daily water limit. Routine shots, for example maintenance shots, stop at the daily water limit of the zone. Ramp shots, rescue shots, watchdog shots and high-EC flushes can go past it."
             >
               {number(share, 0)}% of the {number(limit)} L limit
             </dd>
@@ -768,7 +774,7 @@ function ZoneNumbers({
           {reference && stage?.drybackPoints && (
             <dd
               className="zone-sub"
-              title={`Reference dryback for ${stage.name}: ${rangeText(stage.drybackPoints, 0)} points of true water content, as a share of this zone’s peak; the zone’s own P3 target is under Targets`}
+              title={`Reference dryback. The reference dryback for ${stage.name}: ${rangeText(stage.drybackPoints, 0)} points of VWC, as a part of the peak of this zone. The P3 target of the zone is on the Targets page.`}
             >
               Reference {rangeText(reference, 0)}%
             </dd>
@@ -884,15 +890,18 @@ function DayChart({
           hidden={hidden}
           onToggle={toggle}
         />
-        <label className="grow-readout-choice">
-          Readings
-          <select value={readout} onChange={(event) => place(event.target.value as Readout)}>
-            <option value="below">Under the chart</option>
-            <option value="over">On the chart</option>
-          </select>
-        </label>
+        <span className="label-with-tip">
+          <label className="grow-readout-choice">
+            Readings
+            <select value={readout} onChange={(event) => place(event.target.value as Readout)}>
+              <option value="below">Under the chart</option>
+              <option value="over">On the chart</option>
+            </select>
+          </label>
+          <UiTip copyKey="readings" />
+        </span>
         <details className="timeline-events">
-          <summary>Today’s events ({events.length})</summary>
+          <summary>Today's events ({events.length})</summary>
           {events.length ? (
             <ol>
               {events.map((event, index) => (

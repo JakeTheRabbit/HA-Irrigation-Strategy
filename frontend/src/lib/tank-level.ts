@@ -28,7 +28,7 @@ export const LEVEL_RANGES = [
 /** The range the chart opens on. */
 export const DEFAULT_LEVEL_HOURS = 24;
 
-/** The room descriptor's keys for the tank and pump mapped in Rooms & setup. */
+/** The room descriptor's keys for the tank and pump mapped in Rooms and setup. */
 export const TANK_KEYS = {
   level: "water_level_sensor",
   pump: "pump",

@@ -225,13 +225,13 @@ try {
       );
       assert.match(
         await page
-          .getByLabel("Previous run", { exact: true })
+          .getByLabel("Past run", { exact: true })
           .locator("option:checked")
           .innerText(),
         /Demo • previous run/,
       );
       for (const period of ["day", "week", "month", "run"]) {
-        await page.getByLabel("Comparison history range", { exact: true }).selectOption(period);
+        await page.getByLabel("History range", { exact: true }).selectOption(period);
         await page.waitForFunction(() => {
           const button = [...document.querySelectorAll("button")].find((item) =>
             item.textContent.includes("Refresh history"),

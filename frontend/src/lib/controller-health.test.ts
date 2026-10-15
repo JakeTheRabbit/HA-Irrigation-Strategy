@@ -399,7 +399,7 @@ describe("room status line", () => {
     [
       "the setup is invalid",
       [entity(HEARTBEAT, "healthy", { setup_pending: "Invalid setup descriptor: bad valve" })],
-      /^Invalid setup descriptor: bad valve\. Correct the room in Rooms & setup\.$/,
+      /^Invalid setup descriptor: bad valve\. Correct the room in Rooms and setup\.$/,
     ],
     [
       "hardware is stuck",

@@ -510,7 +510,7 @@ try {
   await check(
     "Setup room-change discard resets selected configuration and stale draft",
     async () => {
-      // An old address: Rooms & setup is Equipment › Setup.
+      // An old address: Rooms and setup is Equipment › Setup.
       await fresh("setup");
       await visible(page.locator("#room-name"));
       await page.locator("#room-name").fill("Must be discarded");
@@ -625,7 +625,7 @@ try {
       assert.ok(id);
       await page.getByRole("button", { name: "Archive room", exact: true }).click();
       await page
-        .getByRole("textbox", { name: "Type the room name to confirm" })
+        .getByRole("textbox", { name: "Type the room name" })
         .fill("Verification room");
       await page
         .getByRole("dialog")
@@ -704,7 +704,7 @@ try {
       await visible(page.locator(".main-inner"));
       assert.equal(await page.locator(".tour").count(), 0, "No tour on an upgraded installation");
       await fresh("help");
-      await page.getByRole("button", { name: "Take the tour again", exact: true }).click();
+      await page.getByRole("button", { name: "Show the tour again", exact: true }).click();
       await visible(page.getByRole("dialog", { name: "Today" }).getByText("Stop 1 of 5"));
       assert.equal(new URL(page.url()).hash, "#/today");
       await page.setViewportSize({ width: 390, height: 844 });
@@ -874,28 +874,28 @@ try {
       const catchTest = page.locator("#zone-1-catch-test");
       await catchTest.locator("summary").click();
       assert.match(await catchTest.innerText(), /never opens a valve or runs a pump/);
-      const use = catchTest.getByRole("button");
+      const use = catchTest.getByRole("button", { name: /^Use / });
       assert.equal(await use.isDisabled(), true);
-      await catchTest.getByLabel("Run time · seconds").fill("0");
-      await catchTest.getByLabel("Water caught from one dripper · mL").fill("65");
+      await catchTest.getByLabel("Run time · s", { exact: true }).fill("0");
+      await catchTest.getByLabel("Water from one dripper · mL", { exact: true }).fill("65");
       assert.equal(
         await page.locator("#zone-1-catch-test-result").innerText(),
         "Run time must be more than 0 seconds.",
       );
       assert.equal(
-        await catchTest.getByLabel("Run time · seconds").getAttribute("aria-invalid"),
+        await catchTest.getByLabel("Run time · s", { exact: true }).getAttribute("aria-invalid"),
         "true",
       );
       assert.equal(await use.isDisabled(), true);
-      await catchTest.getByLabel("Run time · seconds").fill("1");
-      await catchTest.getByLabel("Water caught from one dripper · mL").fill("5000");
+      await catchTest.getByLabel("Run time · s", { exact: true }).fill("1");
+      await catchTest.getByLabel("Water from one dripper · mL", { exact: true }).fill("5000");
       assert.match(
         await page.locator("#zone-1-catch-test-result").innerText(),
         /^That works out to 18000 L\/h, above the 50 L\/h maximum for a dripper\./,
       );
       assert.equal(await use.isDisabled(), true);
-      await catchTest.getByLabel("Run time · seconds").fill("60");
-      await catchTest.getByLabel("Water caught from one dripper · mL").fill("65");
+      await catchTest.getByLabel("Run time · s", { exact: true }).fill("60");
+      await catchTest.getByLabel("Water from one dripper · mL", { exact: true }).fill("65");
       assert.equal(
         await page.locator("#zone-1-catch-test-result").innerText(),
         "Flow per dripper: 3.9 L/h",
@@ -912,8 +912,8 @@ try {
       await liveSetup(async (lp, calls) => {
         const live = lp.locator("#zone-1-catch-test");
         await live.locator("summary").click();
-        await live.getByLabel("Run time · seconds").fill("47");
-        await live.getByLabel("Water caught from one dripper · mL").fill("100");
+        await live.getByLabel("Run time · s", { exact: true }).fill("47");
+        await live.getByLabel("Water from one dripper · mL", { exact: true }).fill("100");
         await lp.getByRole("button", { name: "Use 7.66 L/h as Zone 1 dripper flow" }).click();
         assert.equal(
           calls.some((call) => call.action === "setup_save"),
@@ -972,7 +972,7 @@ try {
           await visible(page.getByRole("heading", { name: "AI assistant", exact: true }));
           await visible(page.locator(".brain-page .brain-status strong").getByText(headline));
           assert.equal(
-            await page.getByLabel("Demo brain state").inputValue(),
+            await page.getByLabel("Sample AI state", { exact: true }).inputValue(),
             state,
             `${state}: the switcher shows the state`,
           );
@@ -982,7 +982,7 @@ try {
         }
       }
       // The switcher moves the header chip with the page, with no reload.
-      await page.getByLabel("Demo brain state").selectOption("budget");
+      await page.getByLabel("Sample AI state", { exact: true }).selectOption("budget");
       await visible(page.locator(".brain-chip").getByText("AI paused: budget"));
       await page.setViewportSize({ width: 1440, height: 1000 });
     },
@@ -1312,7 +1312,7 @@ try {
         );
         // The zone's page shows the plan's targets, not the numbers kept for after it.
         await lp.evaluate(() => (location.hash = "#/zone/1"));
-        await lp.getByText("Targets, read only", { exact: true }).click();
+        await lp.getByText("Targets (read only)", { exact: true }).click();
         const targets = lp.locator(".zone-targets");
         await visible(targets.getByText("Set by the armed grow plan", { exact: true }));
         const rewater = targets.locator("tr").filter({ hasText: "Re-water point" });
@@ -1373,7 +1373,7 @@ try {
         await lp.getByRole("button", { name: "Refresh controller data" }).click();
         await visible(lp.locator(".today-critical").getByText("Grow plan snapshot unavailable."));
         await lp.evaluate(() => (location.hash = "#/zone/1"));
-        await lp.getByText("Targets, read only", { exact: true }).click();
+        await lp.getByText("Targets (read only)", { exact: true }).click();
         await visible(rewater);
         assert.doesNotMatch(await rewater.innerText(), /77|54/);
         await lp.screenshot({ path: out + "workspace-stale-plan.png", fullPage: true });
@@ -1412,7 +1412,7 @@ try {
           "The stale band and the header fit 390 px",
         );
         await lp.screenshot({ path: out + "workspace-stale-banner-390.png", fullPage: true });
-        await band.getByRole("button", { name: "Probes" }).click();
+        await band.getByRole("button", { name: "Probes", exact: true }).click();
         await visible(lp.getByRole("heading", { name: "Probes", exact: true }));
         await visible(band);
         await lp.setViewportSize({ width: 1440, height: 1000 });
@@ -1524,7 +1524,7 @@ try {
           await frame.evaluate(() => document.documentElement.classList.contains("dark")),
           false,
         );
-        await frame.getByRole("button", { name: "Home Assistant / system", exact: true }).click();
+        await frame.getByRole("button", { name: "Home Assistant or system", exact: true }).click();
         await frame.waitForFunction(
           () =>
             document.documentElement.dataset.themeSource === "home-assistant" &&

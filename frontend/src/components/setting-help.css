@@ -57,3 +57,29 @@
 .setting-help dd {
   margin: 2px 0 0;
 }
+.info-tip-what {
+  margin: 0 0 8px;
+}
+.info-tip-notice {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--warning-bg);
+}
+.info-tip-notice.is-warning {
+  border-left-color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 10%, var(--surface));
+}
+.info-tip-notice strong {
+  letter-spacing: 0.04em;
+}
+.setting-help .info-tip-notice + dl,
+.setting-help .info-tip-what + dl {
+  margin-top: 4px;
+}
+.label-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

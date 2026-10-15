@@ -2,7 +2,7 @@ import type { PillTone } from "@/components/mini-visuals";
 import { BATCH_STEPS, STEP_LABELS, resultTone, resultWords, type DosingStatus } from "./dosing";
 import type { States } from "./types";
 
-/** The tank level the controller reads from the level mapped in Rooms & setup, with its minimum and
+/** The tank level the controller reads from the level mapped in Rooms and setup, with its minimum and
  * overfill marks (docs/USER_GUIDE.md, "Reservoir minimum"). Published only for a room with a tank
  * level mapped. */
 export const tankLevelId = (prefix: string) => `sensor.crop_steering_${prefix}tank_level`;
@@ -66,7 +66,7 @@ export function reservoirView(states: States, prefix: string): ReservoirView {
       "unmapped",
       "Off: no tank level mapped",
       "neutral",
-      "Map the tank's distance sensor or low float in Rooms & setup and watering is held before the pump draws air.",
+      "Map the distance sensor or the low float of the tank in Rooms and setup. The controller then holds shots before the pump draws air.",
     );
   if (attrs.stuck === true || level === null)
     return view(

@@ -182,7 +182,7 @@ export function PlanCellContext({
               preserveAspectRatio="none"
               shapeRendering="crispEdges"
               role="img"
-              aria-label={`Steering balance by grow day, days 1 to ${days}, ${unit(column).toLowerCase()} highlighted`}
+              aria-label={`Steering balance by grow-day, from day 1 to day ${days}, with ${unit(column).toLowerCase()} highlighted`}
             >
               <rect
                 className="plan-cell-window"

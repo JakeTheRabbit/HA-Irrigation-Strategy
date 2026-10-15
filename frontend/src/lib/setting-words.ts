@@ -131,17 +131,17 @@ const WORDS: Record<string, SettingWords> = {
   max_daily_volume: {
     label: "Daily water limit",
     short: "Daily water limit",
-    help: "The most water a zone gets in one grow-day. Routine shots stop at it; ramp, rescue and watchdog shots and high-EC flushes can go past it.",
+    help: "The most water that a zone gets in one grow-day, in litres. Maintenance shots, extra ramp shots, dilution shots and P0 EC flushes stop at this limit. Ramp shots, rescue shots, watchdog shots and high-EC flushes can go past it.",
   },
   maximum_ec: {
-    label: "Maximum substrate EC",
+    label: "Maximum pore EC",
     short: "Maximum EC",
-    help: "At this substrate EC a flush fires in any phase (in P2, from 1 mS/cm below it), when the feed is weaker than the substrate (with no feed EC sensor, the feed counts as 3.0 mS/cm). If the feed isn't weaker, or moisture is within 2 points of full saturation, the zone gets no shots at all, rescue and watchdog included, until its EC falls below this.",
+    help: "The highest pore EC that the controller accepts in a zone. At or above this level, the controller gives a flush in any phase when the feed EC is lower than the pore EC. When the feed EC is not lower, or the zone does not drain, the zone gets no shot of any type.",
   },
   watchdog_hours: {
     label: "Watchdog interval",
     short: "Watchdog interval",
-    help: "After P0, with lights on, a zone below its maintenance trigger that has had no shot for this long gets one, even past the daily limit. 0 turns it off.",
+    help: "The longest time that a zone can go without a shot while the lights are on. When this time is past and VWC is below the re-water point, the controller gives a watchdog shot. The watchdog does not operate in P0.",
   },
   min_floor_drown_ceiling: {
     label: "Daily minimum stops at",
@@ -151,57 +151,57 @@ const WORDS: Record<string, SettingWords> = {
   min_daily_ml_per_plant: {
     label: "Daily minimum water per plant",
     short: "Daily minimum",
-    help: "Warning: this waters whatever the probe reads. With lights on and after P0, the zone gets at least this times its plant count each grow-day, spread to finish 3 hours before lights-off, until moisture is 5 points above full saturation or the daily limit is reached. 0 turns it off.",
+    help: "The least water that each plant gets in one grow-day, in millilitres. The controller gives it at any probe reading. It spreads the water through the day, so that it is complete 3 h before lights-off.",
   },
   irrigation_ec_min: {
     label: "Feed EC, lowest",
     short: "Feed EC, lowest",
-    help: "Shots wait while the feed (tank) EC reads below this; 0 means no lower limit. It needs a feed EC sensor set in the controller app.",
+    help: "The lowest feed EC at which the controller starts shots. While the feed EC is below this value, all shots in the room wait. It operates only when the controller app has a feed EC sensor.",
   },
   irrigation_ec_max: {
     label: "Feed EC, highest",
     short: "Feed EC, highest",
-    help: "Shots wait while the feed (tank) EC reads above this; 0 means no upper limit. It needs a feed EC sensor set in the controller app.",
+    help: "The highest feed EC at which the controller starts shots. While the feed EC is above this value, all shots in the room wait. It operates only when the controller app has a feed EC sensor.",
   },
   irrigation_ph_min: {
     label: "Feed pH, lowest",
     short: "Feed pH, lowest",
-    help: "Shots wait while the feed (tank) pH reads below this; 0 means no lower limit. It needs a feed pH sensor set in the controller app.",
+    help: "The lowest feed pH at which the controller starts shots. While the feed pH is below this value, all shots in the room wait. It operates only when the controller app has a feed pH sensor.",
   },
   irrigation_ph_max: {
     label: "Feed pH, highest",
     short: "Feed pH, highest",
-    help: "Shots wait while the feed (tank) pH reads above this; 0 means no upper limit. It needs a feed pH sensor set in the controller app.",
+    help: "The highest feed pH at which the controller starts shots. While the feed pH is above this value, all shots in the room wait. It operates only when the controller app has a feed pH sensor.",
   },
   sump_power_threshold_w: {
-    label: "Sump pump runs above",
+    label: "Sump pump run power",
     short: "Sump pump runs above",
-    help: "The sump pump counts as running while its power reads above this. A sump pump that shows no run for the hours set in the controller app raises an urgent alert.",
+    help: "The power above which the sump pump counts as on. If the sump pump draws no power above this value for the hours set in the controller app, the controller sends a CS-311 alert.",
   },
   max_shot_duration: {
     label: "Longest shot",
     short: "Longest shot",
-    help: "The longest any valve in this room stays open for one shot. A longer planned shot is cut short and delivers less.",
+    help: "The longest time that a valve in this room stays open for one shot. The controller cuts a longer planned shot to this time, and that shot gives less water than planned.",
   },
   substrate_volume: {
     label: "Substrate per plant",
     short: "Substrate per plant",
-    help: "Litres of substrate in each plant’s pot or block. Shot sizes are a percentage of it.",
+    help: "The litres of substrate for each plant, for example the volume of one block or pot. All shot sizes are a percentage of this volume. The water of a shot is the shot size, times this volume, times the plant count.",
   },
   plant_count: {
     label: "Plants",
     short: "Plants",
-    help: "Plants in this zone. A shot’s water is its size times the substrate per plant, times this.",
+    help: "The number of plants in this zone. The water of a shot is the shot size, times the substrate per plant, times this number.",
   },
   drippers_per_plant: {
     label: "Drippers per plant",
     short: "Drippers per plant",
-    help: "With the dripper flow, this sets how long a shot runs: its water divided by the zone’s total dripper flow.",
+    help: "The number of drippers on each plant. With the dripper flow and the plant count, it gives the zone flow. The shot time is the water of the shot divided by the zone flow.",
   },
   dripper_flow_rate: {
     label: "Dripper flow",
     short: "Dripper flow",
-    help: "Litres per hour from each dripper.",
+    help: "The litres per hour that one dripper gives. The controller uses it to calculate how long each shot runs.",
   },
   lights_on_hour: {
     label: "Lights on",

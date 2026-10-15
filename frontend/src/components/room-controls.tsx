@@ -3,6 +3,7 @@ import { Droplets, Power, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ReviewDialog, Status } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { allZones, allZonesChanges } from "@/lib/all-zones";
 import {
   autoFrozenReason,
@@ -72,7 +73,7 @@ function WateringDialog({
       open={open}
       onOpenChange={onOpenChange}
       controller={controller}
-      title="Review watering"
+      title="Review the kill switch"
       items={
         engine.entityId
           ? [
@@ -262,6 +263,7 @@ export function AllZonesSwitch({ controller }: { controller: Controller }) {
       >
         <span className="switch-thumb" aria-hidden="true" />
       </button>
+      <UiTip copyKey="every zone in {x}" values={[controller.room.room.name]} />
       <ReviewDialog
         open={review}
         onOpenChange={setReview}
@@ -406,7 +408,11 @@ export function AutoZoneChip({ status, name }: { status: AutoSetpointStatus; nam
 }
 export function AutoBadge() {
   return (
-    <Badge variant="outline" className="auto-badge" title="Managed by auto setpoints">
+    <Badge
+      variant="outline"
+      className="auto-badge"
+      title="Managed by auto setpoints. Auto setpoints can change this setting."
+    >
       <Sparkles aria-hidden="true" />
       Auto
     </Badge>

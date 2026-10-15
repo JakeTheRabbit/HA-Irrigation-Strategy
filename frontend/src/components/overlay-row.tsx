@@ -50,7 +50,7 @@ export function OverlayRows({
   const shown = review?.overlay;
   return (
     <>
-      <ul className="overlay-rows" aria-label="Settings the AI changed that go back by themselves">
+      <ul className="overlay-rows" aria-label="Temporary AI changes">
         {overlays.map((overlay) => (
           <li key={overlay.entity_id} data-overlay={overlay.entity_id}>
             <span>

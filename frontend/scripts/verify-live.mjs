@@ -393,7 +393,7 @@ try {
       );
       assert.match(await page.locator(".probes-status").innerText(), /Probes\s+2 of 4 OK/);
       // The controller's own sensors, one tap down: stale is amber, reporting green, down red.
-      const internals = page.locator("details.probes-more", { hasText: "Controller internals" });
+      const internals = page.locator("details.probes-more", { hasText: "All sensors of this room" });
       await internals.locator("summary").click();
       const row = internals.locator(".sensors-table tr").filter({ hasText: probe });
       await visible(row.getByText("Stale or unverified", { exact: true }));
@@ -420,7 +420,7 @@ try {
       );
       assert.match(await internals.locator("summary").innerText(), /\(\d+ of \d+ reporting\)/);
       await internals
-        .getByRole("combobox", { name: "Filter sensor availability" })
+        .getByRole("combobox", { name: "Sensor status filter" })
         .selectOption("unavailable");
       await visible(row);
     },
@@ -459,7 +459,7 @@ try {
       // The controller's sensors, once opened: one request for every numeric one. A later re-read may
       // repeat a request; it is never one request per row.
       history.length = 0;
-      const internals = page.locator("details.probes-more", { hasText: "Controller internals" });
+      const internals = page.locator("details.probes-more", { hasText: "All sensors of this room" });
       if ((await internals.getAttribute("open")) === null)
         await internals.locator("summary").click();
       await page.waitForFunction(() => document.querySelectorAll(".sensors-table tr").length > 1);
@@ -485,7 +485,7 @@ try {
       await menu("Equipment");
       await page
         .getByRole("navigation", { name: "Equipment views" })
-        .getByRole("button", { name: "Tank & feed", exact: true })
+        .getByRole("button", { name: "Tank and feed", exact: true })
         .click();
       await visible(
         page
@@ -506,12 +506,12 @@ try {
     noEntities = true;
     await page.getByRole("button", { name: "Refresh controller data" }).click();
     await menu("Today");
-    await visible(page.getByRole("heading", { name: "No zones discovered", exact: true }));
+    await visible(page.getByRole("heading", { name: "No zones found", exact: true }));
     await visible(page.getByRole("heading", { level: 1, name: "Today", exact: true }));
     assert.equal(await page.locator("#desktop-room").isDisabled(), true);
     // A zone's old address finds no zone either, and says so.
     await page.evaluate(() => (location.hash = "#/zone/1"));
-    await visible(page.getByRole("heading", { name: "No zones discovered", exact: true }));
+    await visible(page.getByRole("heading", { name: "No zones found", exact: true }));
     await visible(page.getByRole("heading", { level: 1, name: "Zone", exact: true }));
   });
   await check(
@@ -610,7 +610,10 @@ try {
     assert.deepEqual(told(), [
       { path: "/api/services/crop_steering/whats_new_seen?return_response", version: "2.25.0" },
     ]);
-    await dialog.getByRole("button", { name: "Got it", exact: true }).click();
+    await dialog
+      .locator(".whats-new-actions")
+      .getByRole("button", { name: "Close", exact: true })
+      .click();
     await page.reload({ waitUntil: "networkidle" });
     await page.waitForTimeout(300);
     assert.equal(await dialog.count(), 0, "the next visit, by anyone, does not show it again");

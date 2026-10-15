@@ -3,6 +3,7 @@ import { ArrowRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Empty, Heading, Status, time, type Page } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { JevTrouble, jevUsage } from "@/components/jev-status";
 import { Pill, Sparkline } from "@/components/mini-visuals";
 import { ProbeCalibration } from "@/components/probe-calibration";
@@ -66,8 +67,8 @@ export function Probes({
   ].filter(([, id]) => id) as [string, string][];
   return (
     <>
-      <Heading title="Probes" />
-      <section className="panel probes-status" aria-label="Controller and Jev">
+      <Heading title="Probes" action={<UiTip copyKey="probes" />} />
+      <section className="panel probes-status" aria-label="Controller and AI assistant">
         <div>
           <span className="eyebrow">Probes</span>
           <strong>
@@ -121,7 +122,7 @@ export function Probes({
       <section className="panel" aria-labelledby="probes-title">
         <div className="panel-heading">
           <div>
-            <h2 id="probes-title">Each zone’s probes</h2>
+            <h2 id="probes-title">Probes of each zone</h2>
             <p>
               What each probe reads, when it last reported, and whether the zone’s reading uses it
             </p>
@@ -132,7 +133,7 @@ export function Probes({
         </div>
         {!room.zones.length ? (
           <Empty
-            title="No zones discovered"
+            title="No zones found"
             detail="Probes appear once the room’s zones are mapped in Setup."
           />
         ) : (
@@ -168,7 +169,7 @@ export function Probes({
                             : "unknown"}
                       </Pill>
                       {zone.enabled === false && (
-                        <Status enabled={false} label="Scheduling paused" />
+                        <Status enabled={false} label="Zone paused" />
                       )}
                     </th>
                   </tr>
@@ -193,7 +194,7 @@ export function Probes({
         <section className="panel" aria-labelledby="probes-room-title">
           <div className="panel-heading">
             <div>
-              <h2 id="probes-room-title">The room’s pump, main line and feed water</h2>
+              <h2 id="probes-room-title">Pump, main line and feed</h2>
               <p>As Home Assistant reports them. “Off” does not prove a valve closed or no flow.</p>
             </div>
           </div>
@@ -336,7 +337,7 @@ function ProbePicker({ controller, probes }: { controller: Controller; probes: P
     <section className="panel" aria-labelledby="probe-picker-title">
       <div className="panel-heading">
         <div>
-          <h2 id="probe-picker-title">Which probes count</h2>
+          <h2 id="probe-picker-title">Probes that count</h2>
           <p>
             Each zone’s reading is made from the probes that count. If its primary goes offline you
             are told once, and the zone reads on from the others.
@@ -484,7 +485,7 @@ function RoomMap({
       open={open}
       onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
     >
-      <summary>Room map: how the pump, valves and probes connect</summary>
+      <summary>Room map</summary>
       {open && (
         <section className="panel">
           <div className="panel-heading">
@@ -595,7 +596,7 @@ function ControllerInternals({ controller }: { controller: Controller }) {
       onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
     >
       <summary>
-        Controller internals: every sensor of this room ({reporting} of {sensors.length} reporting)
+        All sensors of this room ({reporting} of {sensors.length} reporting)
       </summary>
       {open && (
         <>
@@ -604,13 +605,13 @@ function ControllerInternals({ controller }: { controller: Controller }) {
               <Search size={17} />
               <Input
                 aria-label="Search sensors"
-                placeholder="Search name or entity ID…"
+                placeholder="Name or entity ID"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
             <select
-              aria-label="Filter sensor availability"
+              aria-label="Sensor status filter"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
             >
@@ -623,7 +624,7 @@ function ControllerInternals({ controller }: { controller: Controller }) {
           <section className="panel">
             {!visible.length ? (
               <Empty
-                title="No matching sensors"
+                title="No sensors found"
                 detail={
                   sensors.length
                     ? "Clear your filters to see all sensor entities."

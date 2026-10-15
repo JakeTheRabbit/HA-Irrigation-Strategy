@@ -1,11 +1,14 @@
 import { CircleHelp } from "lucide-react";
 import { Popover } from "radix-ui";
+import { InfoTip } from "@/components/info-tip";
 import { DETAIL_HEADINGS, type SettingDetail } from "@/lib/setting-words";
+import { SETTING_COPY } from "@/lib/ste-copy";
 import "./setting-help.css";
 
-/** The "?" beside an irrigation setting: what it is, when it acts, what it affects and what the
- * common practice is. Opened by a click or tap, not on hover: it is several paragraphs long,
- * and a phone has no hover. Escape or a click outside closes it. */
+/** The "?" beside an irrigation setting. A setting with STE copy shows what it is, any warning and
+ * caution, the impact of a change and the guidance; one without shows its own explanation. Opened
+ * by a click or tap, not on hover: it is several paragraphs long, and a phone has no hover. Escape
+ * or a click outside closes it. */
 export function SettingHelp({
   label,
   param,
@@ -15,6 +18,8 @@ export function SettingHelp({
   param: string;
   detail: SettingDetail;
 }) {
+  const copy = SETTING_COPY[param];
+  if (copy) return <InfoTip label={label} copy={copy} code={param} />;
   return (
     <Popover.Root>
       <Popover.Trigger asChild>

@@ -194,7 +194,7 @@ try {
       ["activity", "history/timeline", "Timeline"],
       ["sensors", "equipment/probes", "Probes"],
       ["stock", "equipment/stock", "Stock tanks"],
-      ["setup", "equipment/setup", "Rooms & setup"],
+      ["setup", "equipment/setup", "Rooms and setup"],
       ["plan", "plan/targets", "Targets"],
       ["history", "history/timeline", "Timeline"],
       ["equipment", "equipment/probes", "Probes"],
@@ -230,9 +230,9 @@ try {
     ["history/compare", "Compare runs"],
     ["equipment/probes", "Probes"],
     ["equipment/stock", "Stock tanks"],
-    ["equipment/feed", "Tank & pump"],
+    ["equipment/feed", "Tank and pump"],
     ["equipment/dosing", "Dosing"],
-    ["equipment/setup", "Rooms & setup"],
+    ["equipment/setup", "Rooms and setup"],
     ["settings", "Settings"],
     ["settings/notifications", "Notifications"],
     ["settings/ai", "AI assistant"],
@@ -309,7 +309,7 @@ try {
       assert.equal(await chip("room:").getAttribute("aria-pressed"), "true");
       assert.match(await chip("room:").innerText(), /Room A\s+Watering/);
       assert.match(await page.locator(".data-age").innerText(), /^Updated \d+ (s|min) ago$/);
-      await expectVisible(page.getByRole("button", { name: "Recent activity" }));
+      await expectVisible(page.getByRole("button", { name: "Recent activity", exact: true }));
       assert.equal(await page.locator(".stale-banner").count(), 0, "a reporting room has no band");
       const switches = page.getByRole("group", { name: "Room A safety switches" });
       await expectVisible(
@@ -329,7 +329,7 @@ try {
       await page
         .getByRole("button", { name: "Watering on: switch watering off…", exact: true })
         .click();
-      const review = page.getByRole("dialog", { name: "Review watering" });
+      const review = page.getByRole("dialog", { name: "Review the kill switch" });
       await expectVisible(review);
       await axe("header: watering review");
       await review.getByRole("button", { name: /Apply 1 change/ }).click();
@@ -533,7 +533,7 @@ try {
       await day.locator(".cursor-bar").waitFor({ state: "detached" });
       assert.match(await readout.innerText(), /Point at the chart/);
       // Or over the chart by the pointer, when that is chosen.
-      const readings = day.getByLabel("Readings");
+      const readings = day.getByRole("combobox", { name: "Readings" });
       await readings.selectOption("over");
       assert.equal(await readout.count(), 0);
       await page.mouse.move(box.x + dot.x, box.y + dot.y);
@@ -554,7 +554,7 @@ try {
       assert.doesNotMatch(await readout.innerText(), /pore EC/);
       await page.mouse.move(0, 0);
       assert.equal(await key.getByRole("button").count(), await key.locator("li").count());
-      const compare = day.getByLabel("Compare with");
+      const compare = day.getByRole("combobox", { name: "Compare with" });
       await compare.selectOption("typical");
       await expectVisible(layer("typical"));
       assert.ok(
@@ -601,10 +601,10 @@ try {
       await jev.locator(".zone-jev-setpoints").innerText(),
       /^Jev may move the P2 shot size 3\.5–5\.5% \(yours 4\.5%, now 4%\) and re-water point 59–62% \(yours 61%\)\. Last change /,
     );
-    const decisions = jev.getByRole("list", { name: "Jev's latest decisions on this zone" });
+    const decisions = jev.getByRole("list", { name: "Last AI assistant decisions" });
     assert.ok((await decisions.locator("li").count()) > 0);
     // Probes: each one of the zone's reading, zone 3's back EC probe left out.
-    await page.getByText("Probes used and left out", { exact: true }).click();
+    await page.getByText("Probes used and not used", { exact: true }).click();
     const probes = page.locator(".zone-probes .zone-probe-list li");
     await expectVisible(probes.first());
     assert.equal(await probes.count(), 4);
@@ -613,7 +613,7 @@ try {
       "warn",
     ]);
     // Targets, read only, with Jev's ranges where it manages them.
-    await page.getByText("Targets, read only", { exact: true }).click();
+    await page.getByText("Targets (read only)", { exact: true }).click();
     const targets = page.locator(".zone-targets");
     await expectVisible(targets);
     assert.deepEqual(await targets.locator(".jev-chip").allInnerTexts(), [
@@ -623,7 +623,7 @@ try {
     // Pause scheduling, through its review.
     const controls = page.locator(".zone-controls");
     await controls.getByRole("button", { name: "Pause zone scheduling" }).click();
-    const review = page.getByRole("dialog", { name: "Review zone scheduling" });
+    const review = page.getByRole("dialog", { name: "Review zone switch" });
     await expectVisible(review);
     await review.getByRole("button", { name: /Apply 1 change/ }).click();
     await review.waitFor({ state: "hidden" });
@@ -642,7 +642,7 @@ try {
       .getByRole("button", { name: "Zone 2" })
       .click();
     await expectVisible(page.getByRole("heading", { name: "Zone 2", exact: true }));
-    await page.getByText("Targets, read only", { exact: true }).click();
+    await page.getByText("Targets (read only)", { exact: true }).click();
     await page.getByRole("button", { name: "Edit in Plan" }).click();
     await expectVisible(page.getByRole("heading", { name: "Targets", exact: true }));
     assert.equal(
@@ -721,7 +721,7 @@ try {
     assert.match(await page.locator(".zone-next").innerText(), /^Next: \S/);
   });
   await check(
-    "targets: a setting's ? explains it, in both themes, and closes on Escape",
+    "targets: a setting's ? explains it in STE (what, impact, guidance), in both themes, and closes on Escape",
     async () => {
       const trigger = () => page.getByRole("button", { name: "About Re-water point", exact: true });
       const help = () => page.getByRole("dialog", { name: "Re-water point" });
@@ -730,9 +730,9 @@ try {
         await trigger().click();
         await expectVisible(help());
         const text = await help().innerText();
-        for (const part of ["What it is", "When it acts", "What it affects", "In practice"])
+        for (const part of ["Impact:", "Guidance:"])
           assert.match(text, new RegExp(part, "i"), `the explainer has "${part}"`);
-        assert.match(text, /a level, not a crossing/);
+        assert.match(text, /it gives a shot when VWC is below this value/);
       });
       await go("plan/targets");
       await trigger().click();
@@ -809,7 +809,7 @@ try {
         "substrate is set up in Equipment",
       );
       await page.getByRole("button", { name: "Equipment › Setup" }).click();
-      await expectVisible(page.getByRole("heading", { name: "Rooms & setup", exact: true }));
+      await expectVisible(page.getByRole("heading", { name: "Rooms and setup", exact: true }));
     },
   );
   await check("targets: a draft survives refresh, validates, reviews and applies", async () => {
@@ -1008,10 +1008,10 @@ try {
       assert.ok(count >= 6 && count % 3 === 0, `one bar per zone and grow week, got ${count}`);
       await panel.screenshot({ path: img("water-use.png") });
       // The definition of "This week" is reachable from the keyboard.
-      await panel.getByRole("button", { name: "How this week is counted" }).focus();
+      await panel.getByRole("button", { name: "About this week" }).focus();
       await expectVisible(panel.getByRole("tooltip", { name: /grow week/ }));
       // This grow-day's water per plant, the table the Zones page had.
-      const plants = page.getByRole("region", { name: "Daily water by zone and per plant" });
+      const plants = page.getByRole("region", { name: "Daily water by zone" });
       assert.match(
         await plants.locator("tbody tr").first().innerText(),
         /Zone 1\s+36\s+5\.3 L\s+147\.2 mL/,
@@ -1031,7 +1031,7 @@ try {
         /^Demo • current run/,
       );
       assert.match(
-        await page.getByLabel("Previous run").locator("option:checked").innerText(),
+        await page.getByLabel("Past run").locator("option:checked").innerText(),
         /^Demo • previous run/,
       );
       const weeks = page.locator(".rw-table tbody tr");
@@ -1050,7 +1050,7 @@ try {
         await page.locator('details.comparison-more[data-section="quality"]').getAttribute("open"),
         null,
       );
-      const view = page.getByRole("group", { name: "Compare view" });
+      const view = page.getByRole("group", { name: "Comparison view" });
       const byWeek = view.getByRole("button", { name: "By grow week", exact: true }),
         overlay = view.getByRole("button", { name: "Overlay", exact: true });
       assert.equal(await byWeek.getAttribute("aria-pressed"), "true");
@@ -1090,12 +1090,12 @@ try {
       );
       assert.equal(new Set(cells.map(([, width]) => width)).size, 1, "one scale width for all");
       await expectVisible(
-        page.getByRole("heading", { name: "Where the weekly figures come from" }),
+        page.getByRole("heading", { name: "Source of the weekly figures" }),
       );
       await axe("compare runs, all open");
       await axeDark("compare runs", ".comparison-page");
       // The run records themselves are kept in Settings.
-      await page.getByRole("button", { name: "Run records" }).click();
+      await page.getByRole("button", { name: "Run records", exact: true }).click();
       await expectVisible(page.getByRole("heading", { name: "Settings", exact: true }));
       await expectVisible(page.locator("#run-records"));
       assert.deepEqual(await pillTones(".comparison-run-list h3 .pill"), [
@@ -1130,7 +1130,7 @@ try {
         /Probes\s+11 of 12 OK[\s\S]*Controller\s+Reporting[\s\S]*AI assistant\s+On/,
       );
       // The controller's own sensors: collapsed, then as the Sensors page had them.
-      const internals = page.locator("details.probes-more", { hasText: "Controller internals" });
+      const internals = page.locator("details.probes-more", { hasText: "All sensors of this room" });
       assert.equal(await internals.getAttribute("open"), null);
       await internals.locator("summary").click();
       const trends = "[data-sensor-trend] .sparkline";
@@ -1209,16 +1209,16 @@ try {
       );
       // Part B starts within half again of its low mark: amber, "Getting low".
       assert.equal(await card("part_b").locator(".pill").textContent(), "Getting low");
-      await card("part_b").getByRole("button", { name: "Refilled" }).click();
+      await card("part_b").getByRole("button", { name: "Refilled", exact: true }).click();
       await expectVisible(card("part_b").getByText("OK", { exact: true }));
       assert.match(await card("part_b").locator("dd").first().textContent(), /^20 of 20 L$/);
 
       await card("cleaner").getByRole("button", { name: "Set level" }).click();
-      await card("cleaner").getByLabel("Level read off the tank (L)").fill("0.8");
-      await card("cleaner").getByRole("button", { name: "Save level" }).click();
+      await card("cleaner").getByLabel("Tank level (L)", { exact: true }).fill("0.8");
+      await card("cleaner").getByRole("button", { name: "Save level", exact: true }).click();
       await expectVisible(card("cleaner").getByText("Low", { exact: true }));
 
-      await page.getByRole("button", { name: "Record a batch" }).click();
+      await page.getByRole("button", { name: "Record a batch", exact: true }).click();
       const confirm = page.getByRole("dialog");
       if (await confirm.count())
         await confirm.getByRole("button", { name: "Record the batch" }).click();
@@ -1233,7 +1233,7 @@ try {
       await page.getByRole("button", { name: "Edit stock tanks" }).click();
       const editor = page.getByRole("dialog");
       await editor.getByRole("button", { name: "Add a stock tank" }).click();
-      const names = editor.getByLabel("Name");
+      const names = editor.getByLabel("Name", { exact: true });
       await names.last().fill("Enzymes");
       await editor.getByRole("button", { name: "Save stock tanks" }).click();
       await expectVisible(card("enzymes"));
@@ -1313,7 +1313,7 @@ try {
       ]);
       // A dose of Part B, through its review: its card doses, then the history has it.
       await page.locator('[data-dosing-pump="part_b"] .dosing-pump-select').click();
-      await page.getByLabel("Amount (mL)").fill("60");
+      await page.getByLabel("Quantity (mL)", { exact: true }).fill("60");
       assert.match(
         await page.locator("[data-dose-summary]").innerText(),
         /^Your request: 60 mL of Part B, about 5\.7 s$/,
@@ -1548,7 +1548,7 @@ try {
       const veg_base = live.locator('[data-dosing-pump="veg_base"]');
       assert.equal(await veg_base.getAttribute("data-state"), "unavailable");
       assert.equal(await veg_base.locator(".pp-unknown").textContent(), "?");
-      await live.getByLabel("Amount (mL)").fill("60");
+      await live.getByLabel("Quantity (mL)", { exact: true }).fill("60");
       await live.getByRole("button", { name: /^Start Part B/ }).click();
       await live
         .getByRole("dialog")
@@ -1687,8 +1687,8 @@ try {
       );
       const water = section.locator("details.controller-settings-water");
       await water.locator("> summary").click();
-      await section.getByLabel("Collected water per dripper · mL").fill("200");
-      await section.getByLabel("Collection time · minutes").fill("3");
+      await section.getByLabel("Water from one dripper · mL", { exact: true }).fill("200");
+      await section.getByLabel("Catch test time · min", { exact: true }).fill("3");
       assert.match(await section.locator(".calibration-result").innerText(), /4 L\/h/);
       await section.getByRole("button", { name: "Use estimate in the calculation" }).click();
       await expectVisible(
@@ -1748,15 +1748,15 @@ try {
   });
   await check("settings: water today per plant is the room's choice", async () => {
     await go("settings");
-    const choice = page.getByRole("group", { name: "Water today, shown as", exact: true });
+    const choice = page.getByRole("group", { name: "Water today display", exact: true });
     const pressed = (name) =>
       choice.getByRole("button", { name, exact: true }).getAttribute("aria-pressed");
     assert.equal(await pressed("Zone total"), "true");
-    await choice.getByRole("button", { name: "Per plant", exact: true }).click();
+    await choice.getByRole("button", { name: "For each plant", exact: true }).click();
     await page.waitForFunction(() =>
       [...document.querySelectorAll(".water-view-options button")].some(
         (button) =>
-          button.textContent.trim() === "Per plant" &&
+          button.textContent.trim() === "For each plant" &&
           button.getAttribute("aria-pressed") === "true",
       ),
     );
@@ -1767,7 +1767,7 @@ try {
     assert.equal(await pressed("Zone total"), "true");
     await page.locator("#desktop-room").selectOption("room:");
     await page.waitForTimeout(300);
-    assert.equal(await pressed("Per plant"), "true");
+    assert.equal(await pressed("For each plant"), "true");
     // A zone's page leads with each plant's share, the zone's litres under it.
     await page.evaluate(() => (location.hash = "#/zone/1"));
     const water = page.locator(".zone-numbers > div", { hasText: "Water today" });
@@ -1807,12 +1807,12 @@ try {
         "Emergencies",
         "Hardware lockouts",
         "Sensors and drift",
-        "Watering stopped",
+        "Shots stopped",
         "Phase changes",
         "Vitals",
         "Stock tanks",
         "Dosing",
-        "Jev",
+        "AI assistant",
         "Setup and settings",
       ]);
       assert.equal((await ticked("notify.mobile_app_phone_1")).length, 10);
@@ -1841,7 +1841,7 @@ try {
       await saveDraft();
       await expectVisible(review);
       assert.deepEqual(await review.locator(".review-row").allInnerTexts(), [
-        "Grower (Phone 2)\nStarts getting: Phase changes\nRooms: All rooms → Room B",
+        "Grower (Phone 2)\nNew alert kinds: Phase changes\nRooms: All rooms → Room B",
       ]);
       await axe("notifications: the review");
       await review.getByRole("button", { name: "Save notifications", exact: true }).click();
@@ -1945,7 +1945,7 @@ try {
       );
       await noOverflow();
       await page.screenshot({ path: path.join(out, "mobile-notifications.png"), fullPage: true });
-      await box("Grower (Phone 2): Jev").check();
+      await box("Grower (Phone 2): AI assistant").check();
       await expectVisible(page.locator(".draft-bar"));
       await noOverflow();
       await axe("notifications on a phone");
@@ -1965,14 +1965,14 @@ try {
         assert.equal(await box(`${name}: Emergencies`).isDisabled(), true, `${name} is read-only`);
         assert.equal(await box(`${name}: High priority for emergencies`).isDisabled(), true);
         assert.equal(
-          await page.getByRole("button", { name: `Send a test to ${name}` }).isDisabled(),
+          await page.getByRole("button", { name: `Send a test to ${name}`, exact: true }).isDisabled(),
           true,
         );
       }
       assert.equal(await page.getByRole("button", { name: "Add a phone" }).count(), 0);
       assert.equal(await page.getByRole("button", { name: /^Remove / }).count(), 0);
       assert.equal(
-        await page.getByLabel("Tell me when a room has watered nothing for").isDisabled(),
+        await page.getByRole("spinbutton", { name: /^Alert after no shot for/ }).isDisabled(),
         true,
       );
       await box("Grower (Phone 2): Emergencies").check();
@@ -2094,7 +2094,7 @@ try {
         "Owner",
       ]);
       await box("Grower (Pixel 7): Phase changes", live).check();
-      await live.getByLabel("Tell me when a room has watered nothing for").fill("4");
+      await live.getByRole("spinbutton", { name: /^Alert after no shot for/ }).fill("4");
       await live.getByRole("button", { name: /^Review and save/ }).click();
       const liveReview = live.getByRole("dialog", { name: "Save notifications?" });
       const liveSave = liveReview.getByRole("button", { name: "Save notifications", exact: true });
@@ -2160,7 +2160,10 @@ try {
         "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/releases/tag/v2.24.0",
       );
       await page.screenshot({ path: path.join(out, "whats-new-desktop.png") });
-      await dialog.getByRole("button", { name: "Got it", exact: true }).click();
+      await dialog
+        .locator(".whats-new-actions")
+        .getByRole("button", { name: "Close", exact: true })
+        .click();
       await dialog.waitFor({ state: "hidden" });
       await page.evaluate(() => (location.hash = "#/plan/targets")); // another page, same visit
       await page.waitForTimeout(300);
@@ -2190,7 +2193,7 @@ try {
       assert.ok(fit.margins >= 16, `${fit.margins}px from the screen's edge`);
       assert.ok(fit.inside, "the window fits the screen");
       assert.ok(fit.scrolls, "the releases scroll inside the window");
-      assert.deepEqual(fit.reach, [true, true], "Got it and the release notes stay in reach");
+      assert.deepEqual(fit.reach, [true, true], "Close and the release notes stay in reach");
       await axe("what's new on a phone");
       await noOverflow();
       await page.screenshot({ path: path.join(out, "whats-new-phone.png") });
@@ -2202,21 +2205,24 @@ try {
       await page.getByRole("button", { name: "What’s new", exact: true }).click();
       await expectVisible(dialog);
       assert.equal((await versions()).length, 4);
-      await dialog.getByRole("button", { name: "Got it", exact: true }).click();
+      await dialog
+        .locator(".whats-new-actions")
+        .getByRole("button", { name: "Close", exact: true })
+        .click();
       await dialog.waitFor({ state: "hidden" });
     },
   );
   await check("help: every error code is listed, searchable and linkable", async () => {
     const catalog = JSON.parse(await readFile(path.join(root, "docs/error-codes.json"), "utf8"));
     await go("help");
-    await expectVisible(page.getByRole("heading", { name: "Error codes", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Alert codes", exact: true }));
     const codes = page.locator("details.error-code");
     assert.deepEqual(
       await codes.evaluateAll((all) => all.map((d) => d.id)),
       catalog.codes.map((entry) => entry.code.toLowerCase()),
       "Help must list exactly the codes in docs/error-codes.json",
     );
-    const search = page.getByRole("textbox", { name: "Search error codes" });
+    const search = page.getByRole("textbox", { name: "Search alert codes" });
     await search.fill("101");
     assert.equal(await codes.count(), 1);
     const found = page.locator("details#cs-101");
@@ -2298,7 +2304,8 @@ try {
     await page.getByRole("button", { name: "Open navigation" }).click();
     await axe("mobile navigation");
     const mobileMenu = page.getByRole("dialog");
-    const entries = await mobileMenu.getByRole("button").allInnerTexts();
+    // The "About" buttons of the menu's controls are help, not entries.
+    const entries = await mobileMenu.locator("button:not(.info-tip-trigger)").allInnerTexts();
     assert.deepEqual(
       entries.filter((text) => text !== "Close"),
       ["Today", "Plan", "History", "Equipment", "Settings & help"],
@@ -2320,6 +2327,23 @@ try {
       });
     }
     await axe("mobile help");
+    // An "About" button on a phone, by keyboard: it opens with Enter, fits the screen, shows its
+    // caution, and Escape closes it.
+    await go("settings");
+    const about = page.getByRole("button", { name: "About Watering", exact: true });
+    await about.focus();
+    await page.keyboard.press("Enter");
+    const tip = page.getByRole("dialog", { name: "Watering", exact: true });
+    await expectVisible(tip);
+    const box = await tip.boundingBox();
+    assert.ok(box && box.x >= 0 && box.x + box.width <= 390, "the tip fits a 390 px screen");
+    const notices = await tip.locator(".info-tip-notice strong").allInnerTexts();
+    assert.deepEqual(notices, ["CAUTION:"], "the kill switch tip shows its caution");
+    assert.match(await tip.innerText(), /Impact:[\s\S]*Guidance:/i);
+    await axe("mobile about tip");
+    await page.keyboard.press("Escape");
+    assert.equal(await tip.count(), 0, "Escape closes the tip");
+    await noOverflow();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
   assert.deepEqual(forbidden, [], "Demo attempted live API or external CDN requests");

@@ -3,6 +3,7 @@ import { SlidersHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UiTip } from "@/components/info-tip";
 import {
   buildPlanningCurve,
   dryRates,
@@ -260,7 +261,10 @@ export function PlanningCurve({
     <section className="panel planning-curve" aria-labelledby={`${id}-title`}>
       <div className="panel-heading">
         <div>
-          <h2 id={`${id}-title`}>Daily VWC & EC plan</h2>
+          <div className="label-with-tip">
+            <h2 id={`${id}-title`}>Daily VWC and EC plan</h2>
+            <UiTip copyKey="daily vwc & ec plan" />
+          </div>
           <p>
             {description ??
               (onChange
@@ -374,7 +378,7 @@ export function PlanningCurve({
           width="100%"
           height="322"
           role="group"
-          aria-label="Twenty-four-hour phase and setpoint planning curve"
+          aria-label="24-hour phase and setpoint chart"
         >
           <title>
             {hasRecorded

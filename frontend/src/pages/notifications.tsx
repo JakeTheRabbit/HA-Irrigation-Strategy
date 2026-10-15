@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, Heading } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import {
   IDLE_HOURS,
   canEditRow,
@@ -187,7 +188,7 @@ function RoomChips({
           key={`gone-${prefix}`}
           aria-pressed="true"
           disabled={disabled}
-          title="Not a room of this site now"
+          title="Room not on this site. This room is not on this site now. Select it to remove it from the phone."
           onClick={() => onPress(prefix)}
         >
           {prefix || "Default room"} (gone)
@@ -261,11 +262,14 @@ function AddPhone({
       </fieldset>
       {!choice && (
         <div className="notify-add-service">
-          <Label htmlFor={`${id}-service`}>Notify service</Label>
+          <span className="label-with-tip">
+            <Label htmlFor={`${id}-service`}>Notify service</Label>
+            <UiTip copyKey="notify service" />
+          </span>
           <Input
             id={`${id}-service`}
             value={typed}
-            placeholder="notify.mobile_app_pixel_7"
+            placeholder="notify.mobile_app_phone"
             autoComplete="off"
             spellCheck={false}
             autoFocus
@@ -282,9 +286,12 @@ function AddPhone({
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={!ready}>
-          Add
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button type="submit" className="flex-1 sm:flex-none" disabled={!ready}>
+            Add
+          </Button>
+          <UiTip copyKey="add" />
+        </div>
       </DialogFooter>
     </form>
   );
@@ -347,7 +354,7 @@ export function Notifications({
         <Heading title="Notifications" />
         {loadError ? (
           <Empty
-            title="Notifications are not available"
+            title="Notifications not available"
             detail={`${loadError} Choosing who gets which alerts needs the updated Crop Steering integration.`}
           />
         ) : (
@@ -430,22 +437,27 @@ export function Notifications({
 
   const removeButton = (view: RowView) =>
     admin && (
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="notify-remove"
-        aria-label={`Remove ${view.label.name}`}
-        disabled={!connected}
-        onClick={() =>
-          edit((current) => ({
-            ...current,
-            recipients: current.recipients.filter((row) => row.service !== view.recipient.service),
-          }))
-        }
-      >
-        <Trash2 size={15} />
-      </Button>
+      <span className="label-with-tip">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="notify-remove"
+          aria-label={`Remove ${view.label.name}`}
+          disabled={!connected}
+          onClick={() =>
+            edit((current) => ({
+              ...current,
+              recipients: current.recipients.filter(
+                (row) => row.service !== view.recipient.service,
+              ),
+            }))
+          }
+        >
+          <Trash2 size={15} />
+        </Button>
+        <UiTip copyKey="remove {x}" values={[view.label.name]} />
+      </span>
     );
   const kindBox = (view: RowView, kind: NotifyKind) => (
     <input
@@ -494,17 +506,20 @@ export function Notifications({
     const test = tests[view.recipient.service];
     return (
       <div className="notify-test">
-        <Button
-          type="button"
-          variant="outline"
-          size="xs"
-          disabled={!view.editable || !connected || test?.busy}
-          aria-label={`Send a test to ${view.label.name}`}
-          onClick={() => void sendTest(view.recipient.service)}
-        >
-          {test?.busy ? <LoaderCircle className="spin" /> : <Send />}
-          Send a test
-        </Button>
+        <span className="label-with-tip">
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            disabled={!view.editable || !connected || test?.busy}
+            aria-label={`Send a test to ${view.label.name}`}
+            onClick={() => void sendTest(view.recipient.service)}
+          >
+            {test?.busy ? <LoaderCircle className="spin" /> : <Send />}
+            Send a test
+          </Button>
+          <UiTip copyKey="send a test to {x}" values={[view.label.name]} />
+        </span>
         <span
           className="notify-test-result"
           role="status"
@@ -555,7 +570,7 @@ export function Notifications({
       {!shown.recipients.length ? (
         <section className="panel">
           <Empty
-            title="No phones yet"
+            title="No phones"
             detail="Until a phone is added here, every push goes to the controller app's notify_service option, the way it always has. Add a phone to choose who gets which alerts, room by room."
             action={
               addButton || (
@@ -643,7 +658,7 @@ export function Notifications({
             </table>
           </div>
           <details className="notify-legend">
-            <summary>What each kind of alert covers</summary>
+            <summary>Kinds of alert</summary>
             <dl>
               {doc.kinds.map((kind) => (
                 <div key={kind.id}>
@@ -673,7 +688,7 @@ export function Notifications({
                   {removeButton(view)}
                 </div>
                 {/* Chips, not a list of ticks: a phone's whole row fits a screen. */}
-                <ul className="notify-card-kinds" aria-label={`What ${view.label.name} gets`}>
+                <ul className="notify-card-kinds" aria-label={`Alerts for ${view.label.name}`}>
                   {doc.kinds.map((kind) => (
                     <li key={kind.id}>
                       <label className="notify-chip" data-changed={kindChanged(view, kind)}>
@@ -705,9 +720,12 @@ export function Notifications({
         </section>
       )}
       <section className="panel notify-idle" aria-labelledby={`${id}-idle`}>
-        <h2 id={`${id}-idle`}>Watering stopped</h2>
+        <div className="label-with-tip">
+          <h2 id={`${id}-idle`}>No shots alert</h2>
+          <UiTip copyKey="tell me when a room has watered nothing for" />
+        </div>
         <label className="notify-idle-sentence">
-          Tell me when a room has watered nothing for{" "}
+          Alert after no shot for{" "}
           <Input
             type="number"
             inputMode="numeric"
@@ -734,7 +752,7 @@ export function Notifications({
           </p>
         )}
         <p className="muted small">
-          Sent as CS-209 to the phones that tick Watering stopped, again every{" "}
+          Sent as CS-209 to the phones that tick Shots stopped, again every{" "}
           {errors.length ? "so many hours" : hoursWords(hours)} while it lasts, and over at the next
           shot. A room counts only while a zone is in P1 or P2: the morning dryback (P0) and the
           night (P3) do not start the clock.
@@ -802,7 +820,7 @@ export function Notifications({
               ))}
               {changes.idle && (
                 <div className="review-row" data-review-idle>
-                  <strong>Watering stopped</strong>
+                  <strong>Shots stopped</strong>
                   <span>
                     After {hoursWords(changes.idle.before)} <span aria-hidden="true">→</span>{" "}
                     <b>{hoursWords(changes.idle.after)}</b>

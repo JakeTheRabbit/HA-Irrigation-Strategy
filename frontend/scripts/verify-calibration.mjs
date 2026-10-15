@@ -43,24 +43,24 @@ try {
 
     await ph.getByRole("button", { name: "Check pH" }).click();
     const form = panel.getByRole("form", { name: "Check the Feed-water pH probe" });
-    assert.equal(await form.getByLabel("Reference (pH)").first().inputValue(), "7");
-    await form.getByLabel("Probe read (pH)").first().fill("7.05");
-    await form.getByLabel("Probe read (pH)").last().fill("4.1");
+    assert.equal(await form.getByLabel("Reference (pH)", { exact: true }).first().inputValue(), "7");
+    await form.getByLabel("Probe value (pH)", { exact: true }).first().fill("7.05");
+    await form.getByLabel("Probe value (pH)", { exact: true }).last().fill("4.1");
     const result = form.locator("[data-calibration-result]");
     assert.match(await result.innerText(), /Slope 98\.3 % · offset \+0\.05 pH/);
     assert.match(await result.innerText(), /Passes/);
     // References too close together cannot be saved.
-    await form.getByLabel("Reference (pH)").last().fill("6.5");
+    await form.getByLabel("Reference (pH)", { exact: true }).last().fill("6.5");
     assert.match(await result.innerText(), /at least 1 apart/);
-    assert.ok(await form.getByRole("button", { name: "Save the check" }).isDisabled());
-    await form.getByLabel("Reference (pH)").last().fill("4");
+    assert.ok(await form.getByRole("button", { name: "Save the check", exact: true }).isDisabled());
+    await form.getByLabel("Reference (pH)", { exact: true }).last().fill("4");
     // The live reading can be taken straight from the probe.
     await form.getByRole("button", { name: "Use the reading now" }).first().click();
-    assert.match(await form.getByLabel("Probe read (pH)").first().inputValue(), /^\d+(\.\d+)?$/);
-    await form.getByLabel("Probe read (pH)").first().fill("7.05");
-    await form.getByLabel("Note (optional)").fill("Fresh buffers");
+    assert.match(await form.getByLabel("Probe value (pH)", { exact: true }).first().inputValue(), /^\d+(\.\d+)?$/);
+    await form.getByLabel("Probe value (pH)", { exact: true }).first().fill("7.05");
+    await form.getByLabel("Note (optional)", { exact: true }).fill("Fresh buffers");
     if (width === 1440) await page.screenshot({ path: file("probe-calibration-form.png") });
-    await form.getByRole("button", { name: "Save the check" }).click();
+    await form.getByRole("button", { name: "Save the check", exact: true }).click();
     await form.waitFor({ state: "detached" });
 
     const rows = panel.locator("[data-calibration-record]");

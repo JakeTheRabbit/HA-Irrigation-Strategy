@@ -41,7 +41,7 @@ const KINDS: Record<TimelineKind, { label: string; icon: LucideIcon }> = {
   phase: { label: "Phase", icon: Repeat },
   setpoint: { label: "Setpoint", icon: SlidersHorizontal },
   alert: { label: "Alert", icon: TriangleAlert },
-  jev: { label: "Jev", icon: Bot },
+  jev: { label: "AI assistant", icon: Bot },
   note: { label: "Note", icon: Info },
 };
 const TYPES: { type: TimelineType; label: string }[] = [
@@ -115,7 +115,7 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
           <Search size={17} />
           <Input
             aria-label="Search the timeline"
-            placeholder="Search the timeline…"
+            placeholder="Search the timeline"
             value={filter.query}
             onChange={(event) => set({ query: event.target.value })}
           />

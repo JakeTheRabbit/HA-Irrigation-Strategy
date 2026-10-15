@@ -324,7 +324,7 @@ export function draftErrors(draft: NotifyDraft): string[] {
   const hours = draft.idle_hours;
   return Number.isInteger(hours) && hours >= IDLE_HOURS.min && hours <= IDLE_HOURS.max
     ? []
-    : [`Watering stopped needs ${IDLE_HOURS.min} to ${IDLE_HOURS.max} whole hours.`];
+    : [`Shots stopped needs ${IDLE_HOURS.min} to ${IDLE_HOURS.max} whole hours.`];
 }
 
 /** What `notify_save` is sent. The threshold is the site's, an administrator's to change: anyone
@@ -478,8 +478,9 @@ export function draftChanges(
     const started = row.kinds.filter((id) => !was.kinds.includes(id));
     const stopped = was.kinds.filter((id) => !row.kinds.includes(id));
     if (started.length)
-      lines.push({ label: "Starts getting", before: null, after: names(started) });
-    if (stopped.length) lines.push({ label: "Stops getting", before: null, after: names(stopped) });
+      lines.push({ label: "New alert kinds", before: null, after: names(started) });
+    if (stopped.length)
+      lines.push({ label: "Removed alert kinds", before: null, after: names(stopped) });
     // As JSON: the default room's prefix is "", which a plain join cannot tell from no room.
     if (JSON.stringify(sorted(row.rooms)) !== JSON.stringify(sorted(was.rooms)))
       lines.push({

@@ -223,7 +223,7 @@ export function Today({
         <h1 className="today-empty-title">Today</h1>
         <section className="panel">
           <Empty
-            title="No zones discovered"
+            title="No zones found"
             detail="Connect Home Assistant in Settings. Zones are discovered from the controller entities available to your account."
             action={<Button onClick={() => navigate("settings")}>Open connection settings</Button>}
           />
@@ -328,7 +328,7 @@ function TodayStatus({
         {day && (
           <span
             className="today-fact"
-            title={`Lights on ${clock(day.start)}–${clock(day.lightsOff)}: the grow-day runs from one lights-on to the next.`}
+            title={`Lights on ${clock(day.start)} to ${clock(day.lightsOff)}. The grow-day starts at one lights-on and ends at the next lights-on.`}
           >
             {now < day.lightsOff
               ? `Lights on until ${clock(day.lightsOff)}`
@@ -493,9 +493,9 @@ function MoistureBar({
     hi = Math.min(100, Math.max(...known) + 4);
   const at = (level: number) => `${((level - lo) / (hi - lo)) * 100}%`;
   const marks = [
-    { key: "rescue", level: rescue, label: "rescue" },
-    { key: "rewater", level: rewater, label: "re-water" },
-    { key: "peak", level: peak, label: "peak" },
+    { key: "rescue", level: rescue, label: "Rescue floor" },
+    { key: "rewater", level: rewater, label: "Re-water" },
+    { key: "peak", level: peak, label: "Peak" },
   ].filter((mark): mark is { key: string; level: number; label: string } => mark.level !== null);
   const words = marks.map((mark) => `${mark.label} ${number(mark.level)}%`).join(", ");
   return (
@@ -503,7 +503,7 @@ function MoistureBar({
       <div
         className="moisture-track"
         role="img"
-        aria-label={`Moisture ${number(value)}%: ${words}`}
+        aria-label={`VWC ${number(value)}%: ${words}`}
       >
         {rewater !== null && peak !== null && peak > rewater && (
           <span
@@ -751,7 +751,7 @@ function JevToday({
   return (
     <section className="panel today-jev" aria-labelledby="today-jev-title" data-jev-today>
       <div className="panel-heading">
-        <h2 id="today-jev-title">What Jev changed today</h2>
+        <h2 id="today-jev-title">AI assistant changes today</h2>
         <Button variant="ghost" size="sm" onClick={openHistory}>
           History <ArrowRight size={15} aria-hidden="true" />
         </Button>

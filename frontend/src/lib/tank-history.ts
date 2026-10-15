@@ -171,7 +171,7 @@ export interface SourceGate {
   /** The feed-water probe the controller checks against them. With none mapped, this half of the
    * gate is off whatever the limits say. */
   probe: string | null;
-  /** The default room before its first save in Rooms & setup: until then the controller app's own
+  /** The default room before its first save in Rooms and setup: until then the controller app's own
    * feed_<key>_sensor option, when set, names the probe instead, and the dashboard cannot see
    * app options. Once the room has a setup revision the descriptor's probe is the one in force. */
   option: boolean;

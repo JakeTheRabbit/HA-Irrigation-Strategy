@@ -16,6 +16,7 @@ import { smoothRecorded } from "@/lib/planning-curve";
 import { useSensorContext } from "@/components/sensor-context";
 import { AutoSetpointsControl, AutoZoneChip } from "@/components/room-controls";
 import { SettingRow } from "@/components/setting-row";
+import { UiTip } from "@/components/info-tip";
 import { managedBy } from "@/lib/auto-setpoints";
 import { jevIds, parseJevSetpoints } from "@/lib/jev";
 import { setpointParam } from "@/lib/sensor-context";
@@ -311,6 +312,7 @@ export function Strategy({
             >
               <Upload size={16} /> Import
             </Button>
+            <UiTip copyKey="import targets" />
             <Button
               disabled={!items.length || Boolean(errors.length) || !canEdit}
               onClick={() => setReview(true)}
@@ -369,7 +371,7 @@ export function Strategy({
         </div>
       )}
       {!planEngaged && (
-        <ol className="workflow-steps" aria-label="Changing targets">
+        <ol className="workflow-steps" aria-label="Steps to change targets">
           {["Edit draft", "Review changes", "Apply & verify"].map((label, index) => (
             <li key={label} aria-current={step === index ? "step" : undefined}>
               <i>{index + 1}</i>
@@ -567,7 +569,7 @@ export function Strategy({
         </section>
         <aside
           className={`setpoint-preview ${expanded ? "is-expanded" : ""}`}
-          aria-label="Setpoint planning preview"
+          aria-label="Setpoint preview"
         >
           <div className="setpoint-preview-context">
             <div>
@@ -593,7 +595,10 @@ export function Strategy({
           </div>
           {zoneId === "room" && (
             <div className="setpoint-preview-zone">
-              <label htmlFor="setpoint-preview-zone">Preview room changes in</label>
+              <span className="label-with-tip">
+                <label htmlFor="setpoint-preview-zone">Preview room changes in</label>
+                <UiTip copyKey="preview room changes in" />
+              </span>
               <select
                 id="setpoint-preview-zone"
                 value={previewZoneId ?? ""}

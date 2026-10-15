@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Heading, Empty } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { ControllerSettings } from "@/components/controller-settings";
 import { SetupWizard } from "@/components/setup-wizard";
 import { Pill } from "@/components/mini-visuals";
@@ -136,7 +137,7 @@ export function MappingPicker({
           </DialogHeader>
           <Input
             autoFocus
-            placeholder="Search name or entity ID…"
+            placeholder="Name or entity ID"
             aria-label={"Search " + label + " entities"}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -437,7 +438,7 @@ export function Setup({
     !isNew && draft && Number.isFinite(confirmedRevision) && confirmedRevision >= draft.revision;
   const Installation = () => (
     <section className="panel workspace-card">
-      <h2>Install once, then map your devices</h2>
+      <h2>Install, then map devices</h2>
       <p className="muted">
         Home Assistant requires confirmation for custom integrations and controller apps. These
         shortcuts take you directly to the correct steps.
@@ -481,7 +482,9 @@ export function Setup({
         <li>
           <span className="step-number">3</span>
           <div>
-            <h3>Install the controller app</h3>
+            <h3>
+              Install the controller app <UiTip copyKey="install the controller app" />
+            </h3>
             <p>
               For Home Assistant OS/Supervised, add the repository and install Crop Steering. Keep
               watering off in every room while mapping hardware.
@@ -510,11 +513,13 @@ export function Setup({
         <li>
           <span className="step-number">4</span>
           <div>
-            <h3>Map, verify and start</h3>
+            <h3>
+              Map, verify and start <UiTip copyKey="map, verify and start" />
+            </h3>
             <p>
-              Use Rooms & setup to select valves and probes, enter pot/dripper measurements, confirm
-              the controller acknowledges the mapping, then review your grow plan. Switch watering
-              on deliberately in Settings.
+              Use Rooms and setup to select valves and probes, enter pot/dripper measurements,
+              confirm the controller acknowledges the mapping, then review your grow plan. Switch
+              watering on deliberately in Settings.
             </p>
             <Button
               variant="outline"
@@ -539,7 +544,7 @@ export function Setup({
   return (
     <>
       <Heading
-        title="Rooms & setup"
+        title="Rooms and setup"
         action={
           <Button
             disabled={!data?.capabilities.create || dirty || busy || !connected}
@@ -590,7 +595,10 @@ export function Setup({
         <>
           <section className="panel workspace-card workspace-section-heading">
             <div className="setup-room-select">
-              <Label htmlFor="setup-room">Room configuration</Label>
+              <span className="label-with-tip">
+                <Label htmlFor="setup-room">Room</Label>
+                <UiTip copyKey="room configuration" />
+              </span>
               <select
                 id="setup-room"
                 disabled={busy || dirty}
@@ -633,9 +641,14 @@ export function Setup({
           </section>
           {!draft ? (
             <Empty
-              title="Create your first room"
+              title="Make your first room"
               detail="Add a room and map devices that already exist in Home Assistant."
-              action={<Button onClick={addRoom}>Add room</Button>}
+              action={
+                <span className="label-with-tip">
+                  <Button onClick={addRoom}>Add room</Button>
+                  <UiTip copyKey="add room" />
+                </span>
+              }
             />
           ) : (
             <>
@@ -658,7 +671,7 @@ export function Setup({
               <section className="panel workspace-card">
                 <div className="workspace-section-heading">
                   <div>
-                    <h2>Room identity & readiness</h2>
+                    <h2>Room name and status</h2>
                     <p className="muted">
                       Room labels can change. Existing controller identifiers stay stable.
                     </p>
@@ -673,7 +686,10 @@ export function Setup({
                 </div>
                 <div className="workspace-form-grid">
                   <div>
-                    <Label htmlFor="room-name">Room name</Label>
+                    <span className="label-with-tip">
+                      <Label htmlFor="room-name">Room name</Label>
+                      <UiTip copyKey="room name" />
+                    </span>
                     <Input
                       id="room-name"
                       value={draft.room_name}
@@ -723,7 +739,10 @@ export function Setup({
                 </div>
                 {asksPlumbing && (
                   <div className="setup-plumbing">
-                    <Label htmlFor="room-plumbing">How is this room plumbed?</Label>
+                    <span className="label-with-tip">
+                      <Label htmlFor="room-plumbing">Room plumbing</Label>
+                      <UiTip copyKey="how is this room plumbed?" />
+                    </span>
                     <select
                       id="room-plumbing"
                       disabled={busy}
@@ -797,7 +816,7 @@ export function Setup({
               <section className="panel workspace-card">
                 <div className="workspace-section-heading">
                   <div>
-                    <h2>Zones & sensor mapping</h2>
+                    <h2>Zones and probe mapping</h2>
                     <p className="muted">
                       Each zone has its own valve, probes and delivery sizing. Archived IDs are
                       never renumbered.
@@ -972,7 +991,9 @@ export function Setup({
               {!isNew && draft.active && (
                 <section className="panel workspace-card workspace-section-heading">
                   <div>
-                    <h2>Remove this room</h2>
+                    <h2>
+                      Remove this room <UiTip copyKey="remove this room" />
+                    </h2>
                     <p className="muted">
                       Archive the room while retaining its identifiers and configuration. Watering
                       and the hardware must be off.
@@ -1019,7 +1040,10 @@ export function Setup({
           </DialogHeader>
           {review === "remove" ? (
             <div>
-              <Label htmlFor="confirm-room-name">Type the room name to confirm</Label>
+              <span className="label-with-tip">
+                <Label htmlFor="confirm-room-name">Type the room name</Label>
+                <UiTip copyKey="type the room name to confirm" />
+              </span>
               <Input
                 id="confirm-room-name"
                 value={confirmName}

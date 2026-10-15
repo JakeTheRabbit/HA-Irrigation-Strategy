@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { UiTip } from "@/components/info-tip";
 import { time as clock } from "@/components/dashboard";
 import { jevIds, parseBrainAnswers } from "@/lib/jev";
 import type { Controller } from "@/lib/types";
@@ -43,8 +44,8 @@ export function AskWhy({ controller, zone }: { controller: Controller; zone?: nu
         }}
       >
         <Input
-          aria-label="Ask the AI assistant why"
-          placeholder="Ask why… e.g. why did zone 1 not water after lights-on?"
+          aria-label="Question for the AI assistant"
+          placeholder="Ask why…"
           maxLength={MAX}
           value={question}
           disabled={busy || locked}
@@ -53,6 +54,7 @@ export function AskWhy({ controller, zone }: { controller: Controller; zone?: nu
         <Button type="submit" disabled={busy || locked || !question.trim()}>
           Ask
         </Button>
+        <UiTip copyKey="ask" />
       </form>
       <p className="muted small">
         {locked

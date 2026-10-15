@@ -367,7 +367,7 @@ describe("the draft", () => {
     expect(draftErrors(draft)).toEqual([]);
     for (const hours of [0, 13, 2.5, Number.NaN])
       expect(draftErrors({ ...draft, idle_hours: hours })).toEqual([
-        "Watering stopped needs 1 to 12 whole hours.",
+        "Shots stopped needs 1 to 12 whole hours.",
       ]);
   });
 });
@@ -519,8 +519,8 @@ describe("saving", () => {
         title: "Grower (Phone 2)",
         change: "changed",
         lines: [
-          { label: "Starts getting", before: null, after: "Phase changes" },
-          { label: "Stops getting", before: null, after: "Dosing" },
+          { label: "New alert kinds", before: null, after: "Phase changes" },
+          { label: "Removed alert kinds", before: null, after: "Dosing" },
           { label: "Rooms", before: "All rooms", after: "Room B" },
           { label: "High priority for emergencies", before: "Off", after: "On" },
         ],

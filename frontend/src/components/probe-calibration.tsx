@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UiTip } from "@/components/info-tip";
 import { Pill, type PillTone } from "@/components/mini-visuals";
 import {
   PROBES,
@@ -201,7 +202,10 @@ function CheckForm({
         <fieldset key={index} className="calibration-point">
           <legend>Solution {index + 1}</legend>
           <div>
-            <Label htmlFor={`${id}-ref-${index}`}>Reference ({spec.unit})</Label>
+            <span className="label-with-tip">
+              <Label htmlFor={`${id}-ref-${index}`}>Reference ({spec.unit})</Label>
+              <UiTip copyKey="reference (" values={[spec.unit]} />
+            </span>
             <Input
               id={`${id}-ref-${index}`}
               type="number"
@@ -211,7 +215,10 @@ function CheckForm({
             />
           </div>
           <div>
-            <Label htmlFor={`${id}-read-${index}`}>Probe read ({spec.unit})</Label>
+            <span className="label-with-tip">
+              <Label htmlFor={`${id}-read-${index}`}>Probe value ({spec.unit})</Label>
+              <UiTip copyKey="probe read (" values={[spec.unit]} />
+            </span>
             <Input
               id={`${id}-read-${index}`}
               type="number"
@@ -232,7 +239,10 @@ function CheckForm({
         </fieldset>
       ))}
       <div className="calibration-note">
-        <Label htmlFor={`${id}-note`}>Note (optional)</Label>
+        <span className="label-with-tip">
+          <Label htmlFor={`${id}-note`}>Note (optional)</Label>
+          <UiTip copyKey="note (optional)" />
+        </span>
         <Input
           id={`${id}-note`}
           maxLength={200}
@@ -261,6 +271,7 @@ function CheckForm({
         <Button type="submit" size="sm" disabled={busy || !result || "error" in result}>
           Save the check
         </Button>
+        <UiTip copyKey="save the check" />
         <Button type="button" size="sm" variant="ghost" onClick={() => onDone(null)}>
           Cancel
         </Button>

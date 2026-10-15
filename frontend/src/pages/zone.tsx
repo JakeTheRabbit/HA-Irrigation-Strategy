@@ -10,6 +10,7 @@ import {
   type Page,
 } from "@/components/dashboard";
 import { BrainOnZone } from "@/components/brain";
+import { UiTip } from "@/components/info-tip";
 import { ZoneDay } from "@/components/day-timeline";
 import { OverlayRows, useOverlays } from "@/components/overlay-row";
 import { Pill } from "@/components/mini-visuals";
@@ -65,10 +66,13 @@ export function ZonePage({
   if (!zone)
     return (
       <>
-        <h1 className="zone-empty-title">Zone</h1>
+        <div className="label-with-tip">
+          <h1 className="zone-empty-title">Zone</h1>
+          <UiTip copyKey="zone" />
+        </div>
         <section className="panel">
           <Empty
-            title="No zones discovered"
+            title="No zones found"
             detail="Zones appear once the room’s zones are configured in Equipment › Setup."
             action={<Button onClick={() => navigate("equipment/setup")}>Open setup</Button>}
           />
@@ -145,10 +149,10 @@ export function ZonePage({
         <ZoneControls key={zone.id} controller={controller} zone={zone} />
       </div>
       {/* The rest on request: the day chart above already shows today. */}
-      <Collapsed key={`targets-${zone.id}`} title="Targets, read only">
+      <Collapsed key={`targets-${zone.id}`} title="Targets (read only)">
         {() => <ZoneTargets controller={controller} zone={zone} navigate={navigate} />}
       </Collapsed>
-      <Collapsed key={`probes-${zone.id}`} title="Probes used and left out">
+      <Collapsed key={`probes-${zone.id}`} title="Probes used and not used">
         {() => <ZoneProbes controller={controller} zone={zone} navigate={navigate} />}
       </Collapsed>
       <Collapsed key={`history-${zone.id}`} title="7-day history">
@@ -206,7 +210,7 @@ function ZoneWhy({ controller, zone }: { controller: Controller; zone: Zone }) {
     <section className="panel zone-why-panel" aria-labelledby="zone-why-title" data-zone-why>
       <div className="panel-heading">
         <div>
-          <h2 id="zone-why-title">Why this zone is doing this</h2>
+          <h2 id="zone-why-title">Reason for this action</h2>
           <p>{on ? "The controller’s reason, then the AI’s read" : "The controller’s reason"}</p>
         </div>
         {answers && (
@@ -222,7 +226,7 @@ function ZoneWhy({ controller, zone }: { controller: Controller; zone: Zone }) {
       </div>
       <div className="zone-panel-body">
         {reasons.length ? (
-          <ul className="zone-reasons" aria-label="The controller’s reason">
+          <ul className="zone-reasons" aria-label="Controller reason">
             {reasons.map((line) => (
               <li key={line}>{line}</li>
             ))}
@@ -304,7 +308,7 @@ function JevOnZone({
     <section className="panel zone-jev" aria-labelledby="zone-jev-title" data-zone-jev>
       <div className="panel-heading">
         <div>
-          <h2 id="zone-jev-title">AI on this zone</h2>
+          <h2 id="zone-jev-title">AI assistant on this zone</h2>
           <p>
             {rules ??
               (sensor?.acting.length
@@ -320,7 +324,7 @@ function JevOnZone({
         {setpoints && <JevSetpointsLine setpoints={setpoints} />}
         <OverlayRows controller={controller} overlays={overlays} reload={reload} />
         {!!sensor?.judges.length && (
-          <ul className="zone-judges" aria-label="Each judge's last word on this zone">
+          <ul className="zone-judges" aria-label="Last answer of each judge">
             {sensor.judges.map((judge) => (
               <li key={judge.judge}>
                 <strong>{judge.title}</strong>{" "}
@@ -332,7 +336,7 @@ function JevOnZone({
           </ul>
         )}
         {recent.length > 0 && (
-          <ol className="zone-jev-list" aria-label="Jev's latest decisions on this zone">
+          <ol className="zone-jev-list" aria-label="Last AI assistant decisions">
             {recent.map((entry) => {
               const result = jevResult(entry);
               const checked = outcomes.get(entry.key)?.at(-1);
@@ -493,7 +497,10 @@ function ZoneProbes({
     <section className="panel zone-probes" aria-labelledby="zone-probes-title">
       <div className="panel-heading">
         <div>
-          <h2 id="zone-probes-title">Probes</h2>
+          <div className="label-with-tip">
+            <h2 id="zone-probes-title">Probes</h2>
+            <UiTip copyKey="probes" />
+          </div>
           <p>What each probe reads, and whether the zone’s reading uses it</p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => navigate("equipment/probes")}>
@@ -620,7 +627,7 @@ function ZoneControls({ controller, zone }: { controller: Controller; zone: Zone
           open={review}
           onOpenChange={setReview}
           controller={controller}
-          title="Review zone scheduling"
+          title="Review zone switch"
           items={[
             {
               change: { entityId: zone.enabledEntity, value: !zone.enabled },
@@ -675,7 +682,7 @@ function RecordedBehaviour({ controller, zone }: { controller: Controller; zone:
       open={open}
       onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
     >
-      <summary>Recorded behaviour against the targets: typical peak, trough and dryback</summary>
+      <summary>Recorded behaviour against targets</summary>
       {open && (
         <SensorContextCard
           context={sensor}

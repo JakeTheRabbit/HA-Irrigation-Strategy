@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Heading, ReviewDialog, Status } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { Pill, type PillTone } from "@/components/mini-visuals";
 import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
@@ -36,7 +37,7 @@ import "./settings.css";
 const CONNECTION: Record<Controller["connection"], { label: string; tone: PillTone }> = {
   live: { label: "Connected", tone: "on" },
   demo: { label: "Demo mode", tone: "warn" },
-  connecting: { label: "Connecting…", tone: "warn" },
+  connecting: { label: "Connection pending", tone: "warn" },
   offline: { label: "Offline", tone: "off" },
 };
 
@@ -125,7 +126,10 @@ export function Settings({
           </div>
           <form onSubmit={connect} className="connection-form">
             <div>
-              <Label htmlFor="ha-url">Home Assistant URL</Label>
+              <span className="label-with-tip">
+                <Label htmlFor="ha-url">Home Assistant URL</Label>
+                <UiTip copyKey="home assistant url" />
+              </span>
               <Input
                 id="ha-url"
                 type="url"
@@ -138,12 +142,15 @@ export function Settings({
               </p>
             </div>
             <div>
-              <Label htmlFor="ha-token">Long-lived access token</Label>
+              <span className="label-with-tip">
+                <Label htmlFor="ha-token">Long-lived access token</Label>
+                <UiTip copyKey="long-lived access token" />
+              </span>
               <Input
                 id="ha-token"
                 type="password"
                 autoComplete="off"
-                placeholder="Paste token for this tab"
+                placeholder="Token for this tab"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
               />
@@ -191,7 +198,9 @@ export function Settings({
         {controller.room.roomActiveEntity && (
           <section className="panel settings-section">
             <div className="settings-label">
-              <h2>Room on / off</h2>
+              <h2>
+                Room on or off <UiTip copyKey="room on / off" />
+              </h2>
               <p>
                 Switch {controller.room.room.name} off when nothing is growing in it, and on again
                 when the next crop goes in.
@@ -210,7 +219,9 @@ export function Settings({
         )}
         <section className="panel settings-section">
           <div className="settings-label">
-            <h2>Watering</h2>
+            <h2>
+              Watering <UiTip copyKey="watering" />
+            </h2>
             <p>
               Lets the controller water {controller.room.room.name}. This is the room’s engine
               switch
@@ -249,7 +260,7 @@ export function Settings({
             </p>
             {controller.room.zones.length > 0 && (
               <div className="settings-zones">
-                <h3>Every zone’s scheduling</h3>
+                <h3>All zone switches</h3>
                 <AllZonesSwitch controller={controller} />
                 <p className="small muted">
                   Pause or switch on every zone of {controller.room.room.name} at once, through a
@@ -261,7 +272,9 @@ export function Settings({
         </section>
         <section className="panel settings-section">
           <div className="settings-label">
-            <h2>Run records</h2>
+            <h2>
+              Run records <UiTip copyKey="run records" />
+            </h2>
             <p>
               Each crop in {controller.room.room.name}, from its start date: what History › Compare
               runs lines up by grow week.
@@ -281,9 +294,9 @@ export function Settings({
             </p>
           </div>
           <div className="appearance-options">
-            <div className="theme-options" aria-label="Appearance preference">
+            <div className="theme-options" aria-label="Theme">
               {[
-                { value: "auto", label: "Home Assistant / system", icon: Monitor },
+                { value: "auto", label: "Home Assistant or system", icon: Monitor },
                 { value: "light", label: "Light", icon: Sun },
                 { value: "dark", label: "Dark", icon: Moon },
               ].map((option) => (
@@ -300,7 +313,10 @@ export function Settings({
               ))}
             </div>
             <div>
-              <h3 id="water-view-label">Water today, shown as</h3>
+              <div className="label-with-tip">
+                <h3 id="water-view-label">Water today display</h3>
+                <UiTip copyKey="water today, shown as" />
+              </div>
               <div
                 className="theme-options water-view-options"
                 role="group"
@@ -309,7 +325,7 @@ export function Settings({
                 {(
                   [
                     { value: "zone", label: "Zone total", icon: Droplets },
-                    { value: "plant", label: "Per plant", icon: Sprout },
+                    { value: "plant", label: "For each plant", icon: Sprout },
                   ] as const
                 ).map((option) => (
                   <button
@@ -351,7 +367,10 @@ export function Settings({
             <p>The controller&rsquo;s vitals report, for {controller.room.room.name}.</p>
           </div>
           <div>
-            <h3 id="predictions-label">Include what each zone does next</h3>
+            <div className="label-with-tip">
+              <h3 id="predictions-label">Next action of each zone</h3>
+              <UiTip copyKey="include what each zone does next" />
+            </div>
             <div
               className="theme-options water-view-options"
               role="group"
@@ -360,7 +379,7 @@ export function Settings({
               {(
                 [
                   { value: true, label: "Included", icon: Telescope },
-                  { value: false, label: "Left out", icon: EyeOff },
+                  { value: false, label: "Not included", icon: EyeOff },
                 ] as const
               ).map((option) => (
                 <button
@@ -450,7 +469,7 @@ export function Settings({
         open={review}
         onOpenChange={setReview}
         controller={controller}
-        title="Review watering"
+        title="Review the kill switch"
         items={
           controller.room.engine.entityId
             ? [

@@ -23,7 +23,7 @@ export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
   equipment: [
     { page: "equipment/probes", label: "Probes" },
     { page: "equipment/stock", label: "Stock tanks" },
-    { page: "equipment/feed", label: "Tank & feed" },
+    { page: "equipment/feed", label: "Tank and feed" },
     { page: "equipment/dosing", label: "Dosing" },
     { page: "equipment/setup", label: "Setup" },
   ],

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Search } from "lucide-react";
 import { Heading } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { WhatsNewButton } from "@/components/whats-new";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,9 +66,12 @@ export function Help({ controller }: { controller: Controller }) {
         title="Help"
         action={
           <div className="help-actions">
-            <Button variant="outline" onClick={startTour}>
-              Take the tour again
-            </Button>
+            <span className="label-with-tip">
+              <Button variant="outline" onClick={startTour}>
+                Show the tour again
+              </Button>
+              <UiTip copyKey="take the tour again" />
+            </span>
             <WhatsNewButton controller={controller} />
           </div>
         }
@@ -116,7 +120,7 @@ function ErrorCodes() {
     <section ref={section} className="panel error-codes" aria-labelledby="error-codes-title">
       <div className="panel-heading">
         <div>
-          <h2 id="error-codes-title">Error codes</h2>
+          <h2 id="error-codes-title">Alert codes</h2>
           <p>
             Every Crop Steering alert and Repairs card ends with a code such as CS-101 (the
             controller's regular status summary has none). Look it up here for what it means, what
@@ -128,8 +132,8 @@ function ErrorCodes() {
         <div className="search-field">
           <Search size={17} />
           <Input
-            aria-label="Search error codes"
-            placeholder="A code or words, e.g. 101 or probe"
+            aria-label="Search alert codes"
+            placeholder="A code or a word"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />

@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { UiTip } from "@/components/info-tip";
 import { MappingPicker } from "@/pages/setup";
 import {
   DOMAINS,
@@ -267,7 +268,10 @@ export function DosingSetup({
           <div className="dosing-setup-pump" key={pump.key} data-setup-pump={pump.key}>
             <div className="dosing-setup-pump-head">
               <div className="dosing-field">
-                <Label htmlFor={`${id}-${pump.key}-name`}>Name</Label>
+                <span className="label-with-tip">
+                  <Label htmlFor={`${id}-${pump.key}-name`}>Name</Label>
+                  <UiTip copyKey="name" />
+                </span>
                 <Input
                   id={`${id}-${pump.key}-name`}
                   value={pump.name}
@@ -277,7 +281,7 @@ export function DosingSetup({
                   onChange={(event) => updatePump(pump.key, { name: event.target.value })}
                 />
               </div>
-              <code className="dosing-mono" title="The pump's id in this room">
+              <code className="dosing-mono" title="Pump ID. The ID of the pump in this room. For a new pump, the dashboard makes the ID from the name.">
                 {pump.id ?? newPumpId(pump.name, taken)}
               </code>
               <Button
@@ -415,7 +419,10 @@ export function DosingSetup({
             </span>
             <strong>{pumpName(line.pump)}</strong>
             <div className="dosing-field">
-              <Label htmlFor={`${id}-${line.pump}-ml`}>mL</Label>
+              <span className="label-with-tip">
+                <Label htmlFor={`${id}-${line.pump}-ml`}>mL</Label>
+                <UiTip copyKey="ml" />
+              </span>
               <Input
                 id={`${id}-${line.pump}-ml`}
                 type="number"
@@ -455,6 +462,7 @@ export function DosingSetup({
               >
                 <ArrowUp size={16} />
               </Button>
+              <UiTip copyKey="move {x} earlier" values={[pumpName(line.pump)]} />
               <Button
                 type="button"
                 variant="ghost"
@@ -465,23 +473,28 @@ export function DosingSetup({
               >
                 <ArrowDown size={16} />
               </Button>
+              <UiTip copyKey="move {x} later" values={[pumpName(line.pump)]} />
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label={`Take ${pumpName(line.pump)} out of the recipe`}
+                aria-label={`Remove ${pumpName(line.pump)} from the recipe`}
                 onClick={() =>
                   updateBatch({ recipe: draft.batch.recipe.filter((_, i) => i !== index) })
                 }
               >
                 <Trash2 size={16} />
               </Button>
+              <UiTip copyKey="take {x} out of the recipe" values={[pumpName(line.pump)]} />
             </div>
           </div>
         ))}
         {!!unused.length && (
           <div className="dosing-field dosing-setup-add">
-            <Label htmlFor={`${id}-add-line`}>Add a pump to the recipe</Label>
+            <span className="label-with-tip">
+              <Label htmlFor={`${id}-add-line`}>Add pump to recipe</Label>
+              <UiTip copyKey="add a pump to the recipe" />
+            </span>
             <select
               id={`${id}-add-line`}
               value=""
@@ -584,7 +597,7 @@ function SetupSummary({
   return (
     <>
       {config.pumps.length ? (
-        <div className="table-scroll" tabIndex={0} aria-label="Dosing pumps and their hardware">
+        <div className="table-scroll" tabIndex={0} aria-label="Dosing pumps and hardware">
           <table className="data-table dosing-setup-table">
             <thead>
               <tr>

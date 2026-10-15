@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { UiTip } from "@/components/info-tip";
 import { MARK_SYMBOL, WIZARD_STEPS, stepMark, switchOn, warnings } from "@/lib/commissioning";
 import type { Controller } from "@/lib/types";
 import type { Commissioning, SetupDocument, SetupRoom } from "@/lib/operator-types";
@@ -67,7 +68,7 @@ export function SetupWizard({
     <section className="panel workspace-card setup-wizard" aria-label="Setup wizard">
       <div className="workspace-section-heading">
         <div>
-          <h2>Set up this room</h2>
+          <h2>Configure this room</h2>
           <p className="muted">
             Step {Math.min(next < 0 ? WIZARD_STEPS.length : next + 1, WIZARD_STEPS.length)} of{" "}
             {WIZARD_STEPS.length} · {WIZARD_STEPS[next < 0 ? WIZARD_STEPS.length - 1 : next].label}.
@@ -116,7 +117,9 @@ export function SetupWizard({
         </div>
       )}
       <div className="wizard-test-shots">
-        <h3>Test shot</h3>
+        <h3>
+          Test shot <UiTip copyKey="test shot" />
+        </h3>
         <p className="muted">
           A 10-second shot through the controller's safety checks. Watering must be on for it to
           run. Watch a dripper while it runs.
