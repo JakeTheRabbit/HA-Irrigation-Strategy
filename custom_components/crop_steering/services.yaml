@@ -525,3 +525,25 @@ whats_new_seen:
       example: "2.25.0"
       selector:
         text:
+brain_ask:
+  name: Ask the AI assistant why
+  description: Ask the room's AI assistant why the controller or the assistant did something. The question is stored with the room and the controller app answers it on the room's AI assistant answers sensor, when the brain runs on Claude Haiku; each answer costs from the room's AI budget, and a room asks at most 20 a day. Needs a Home Assistant administrator when a signed-in user calls it; automations are unaffected.
+  fields:
+    room_id:
+      required: true
+      example: "room:"
+      selector:
+        text:
+    question:
+      required: true
+      example: "Why did zone 1 not water after lights-on?"
+      selector:
+        text:
+          multiline: true
+    zone:
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 24
+          mode: box

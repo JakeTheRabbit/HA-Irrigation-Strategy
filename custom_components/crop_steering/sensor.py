@@ -234,6 +234,7 @@ async def async_setup_entry(
     )
     sensors.append(CropSteeringStockSensor(entry))
     sensors.append(CropSteeringDosingConfigSensor(entry))
+    sensors.append(CropSteeringBrainQuestionsSensor(entry))
 
     async_add_entities(sensors)
 
@@ -445,6 +446,62 @@ class CropSteeringDosingConfigSensor(SensorEntity):
         from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
         from .dosing_api import SIGNAL
+
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, f"{SIGNAL}_{self._entry.entry_id}", self.async_write_ha_state
+            )
+        )
+
+
+class CropSteeringBrainQuestionsSensor(SensorEntity):
+    """The room's last questions to the AI assistant (crop_steering.brain_ask), for the
+    controller app, which answers each once as sensor.crop_steering_<prefix>brain_answers.
+    State: how many are kept; attribute: questions, oldest first (brain_api.py)."""
+
+    _attr_should_poll = False
+    _attr_icon = "mdi:chat-question-outline"
+
+    def __init__(self, entry):
+        self._entry = entry
+        self._prefix = room_prefix(entry)
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_brain_questions"
+        self._attr_name = "AI assistant questions"
+        self._attr_object_id = f"{DOMAIN}_{self._prefix}brain_questions"
+        # Home Assistant ignores _attr_object_id; the controller finds the questions by THIS id.
+        self.entity_id = f"sensor.{self._attr_object_id}"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name="Crop Steering System",
+            manufacturer="Home Assistant Community",
+            model="Professional Irrigation Controller",
+            sw_version=SOFTWARE_VERSION,
+        )
+
+    def _manager(self):
+        return (
+            self.hass.data.get(DOMAIN, {})
+            .get("_brain_questions", {})
+            .get(self._entry.entry_id)
+        )
+
+    @property
+    def native_value(self) -> Any:
+        manager = self._manager()
+        return manager.sensor()[0] if manager is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        manager = self._manager()
+        return manager.sensor()[1] if manager is not None else {}
+
+    async def async_added_to_hass(self) -> None:
+        from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
+        from .brain_api import SIGNAL
 
         self.async_on_remove(
             async_dispatcher_connect(

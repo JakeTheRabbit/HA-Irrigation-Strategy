@@ -171,6 +171,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the dosing store
         _LOGGER.warning("Dosing unavailable: %s", err)
 
+    # Ask why: the room's questions to the AI assistant, stored; the controller app answers them.
+    try:
+        from .brain_api import async_setup_brain
+
+        await async_setup_brain(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the questions
+        _LOGGER.warning("Ask why unavailable: %s", err)
+
     _remove_retired_entities(hass, entry)
     _hide_retired_switches(hass, entry)
 
@@ -316,6 +324,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .dosing_api import async_unload_dosing
 
     await async_unload_dosing(hass, entry)
+    from .brain_api import async_unload_brain
+
+    await async_unload_brain(hass, entry)
     from .notify_api import async_unload_notify
 
     await async_unload_notify(hass, entry)
