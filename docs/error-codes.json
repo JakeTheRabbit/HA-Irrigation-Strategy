@@ -967,6 +967,24 @@
       ]
     },
     {
+      "code": "CS-710",
+      "title": "Water may be bypassing the substrate or the probe",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Code saw shots on this zone spike the probe and fall straight back, or the zone drinking under 40 % of the room's typical water per plant (counted only once the room drinks at least a tenth of a plant's substrate a day), and Jev's Channel judge reads it as water running past the probe or through the block, a dry block, restricted delivery or plants drinking less. The message says which.",
+      "watering": "Carries on as normal. This is advice only: adding volume does not fix water that is not going in.",
+      "causes": [
+        "Water running down past the probe, or through the block and out of the drain without wetting it.",
+        "A block that has dried hard, or drippers sitting off the block.",
+        "A slow dripper, a partly closed valve or a restricted line.",
+        "Plants that use less water than their neighbours."
+      ],
+      "fixes": [
+        "Do a catch test on a few of the zone's drippers.",
+        "Check the blocks: drippers seated in them, the water wetting through, and the probe firm in a representative spot."
+      ]
+    },
+    {
       "code": "CS-801",
       "title": "A dosing pump ran past its time and was switched off",
       "source": "notification",

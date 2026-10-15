@@ -36,6 +36,8 @@ Eight properties. Each one is concrete and checked by a test or a published numb
 | **Night** | P3 | every 20 min within 3 points of the emergency floor | real drying / a probe fault | raises CS-703 | never stops a rescue |
 | **Zones** | P1, P2 | hourly with lights on, when a zone's water per plant is under 70 % or over 140 % of the room's median zone (itself included; the other zone in a room of two) | why one zone differs (recipe, plants drinking less, wet spot, delivery fault, water not landing) | raises CS-702 with the likely cause | alert only |
 | **Stage** | P2 | once a grow-day, with lights on, when the flower day is known | is last night's dryback, the settled pore EC, and the stage's move-on signs where the owner's stage arc wants them for today | CS-705 advice; code itself states a steering mode that is not the stage's | advice only: never changes a setting |
+| **Alerts** | all | once per alert, again after 6 h | escalate / remind / quiet | whether its repeats push to a phone (every alert is always a card; its first raise always pushes) | pump and valve faults (CS-3xx), lost probes (CS-101 to 103), CS-207, CS-701, CS-703, CS-704, and dosing's CS-801, CS-803 and CS-806 always push |
+| **Channel** | all | hourly with lights on, when two of the last four shots spiked and fell back to under a quarter of the zone's typical rise, or the zone's water per plant is under 40 % of the room's median zone while that median is at least a tenth of a plant's substrate | is water running past the probe or through the block, a dry block, restricted delivery, or plants drinking less | raises CS-710 with a catch-test and block-check suggestion; its latest answer is evidence for the probe judge | alert only: never adds water |
 | **Setpoints** | P3 | once a grow-day, in the first 3 h after lights-off, while the room's **Auto setpoints** switch is on | tomorrow's maintenance watering: smaller shots / bigger shots / re-water later / re-water sooner / keep, from the day's water per plant against the room, the shots and how they held, pore EC against the stage's range (code states which way the EC and the room call for) | one notch on the zone's OWN number: P2 shot size ±0.5 % or P2 re-water threshold ±0.5 points | one notch a grow-day; inside a range around the operator's own value (shot ±1 %, never under 3 %; threshold 2 under to 1 over, 4 above the rescue floor, 2 under the ramp ceiling); an edit by hand always wins and re-centres the range; a P3 rescue shot within 30 h puts the old value back, pauses the zone 48 h and raises CS-404; the base engine's own Auto Setpoints learner never writes these two, and keeps the P1 target and field capacity ([who writes which setpoint](#who-writes-which-setpoint)) |
 
 ## The owner's doctrine
@@ -110,7 +112,7 @@ Add-on options (the controller app):
 | `typesafe_api_key` | empty | A TypeSafe API key (`apikey_...`): Jev straight from TypeSafe (`api.typesafe.ai/v1/systemone`, model `jev-latest`). Tried first when set; Cloudflare, when set too, is the second route. |
 | `cf_account_id`, `cf_api_token`, `cf_gateway_id` | empty | Or Jev through Cloudflare Workers AI: the account, a token with Workers AI access, and the AI Gateway (optional). With neither a TypeSafe key nor these, Jev is off. These alone start Jev only on an install that has run it before (one of the `/data/jev_*` files below is there), because an install updated from a line without Jev may have set them just for the Auto Setpoints check. |
 | `jev_enabled` | on | Off runs the plain engine even with Cloudflare set. |
-| `jev_judges` | all | The judges that may act, e.g. `dawn,ramp,salt,dusk,probe,shot,night,zones,stage,setpoints`. Setpoints also needs the room's **Auto setpoints** switch on; while it runs, it owns the P2 shot size and re-water threshold, and the base engine's own Auto Setpoints learner the P1 target and field capacity. |
+| `jev_judges` | all | The judges that may act, e.g. `dawn,ramp,salt,dusk,probe,shot,night,zones,stage,setpoints,channel,alerts`. Setpoints also needs the room's **Auto setpoints** switch on; while it runs, it owns the P2 shot size and re-water threshold, and the base engine's own Auto Setpoints learner the P1 target and field capacity. |
 | `jev_daily_calls` | 5000 | The day's call budget across rooms. |
 | `jev_budget_warn_pct` | 80 | CS-706 once a day when the calls reach this share of the budget. |
 | `jev_retries` | 3 | Tries per route, inside 60 seconds, while a failure may pass. |
@@ -123,10 +125,10 @@ Add-on options (the controller app):
 
 ## What Jev can raise
 
-Seven codes, in their own group of the error-code list (docs/ERROR_CODES.md): **CS-701** water isn't reaching a
+Eight codes, in their own group of the error-code list (docs/ERROR_CODES.md): **CS-701** water isn't reaching a
 zone, **CS-702** a zone's water per plant is out of line, **CS-703** an overnight low looks like a probe fault,
 **CS-704** Jev set a zone's probe aside, **CS-705** a zone is off its stage's arc, **CS-706** Jev has used most of
-today's calls, **CS-707** a judge is on the stricter gate for a zone. The controller raises them through one method with each code written
+today's calls, **CS-707** a judge is on the stricter gate for a zone, **CS-710** water may be bypassing the substrate or the probe. The controller raises them through one method with each code written
 out, so a judge can never raise anything the list does not explain.
 
 ## What it shows

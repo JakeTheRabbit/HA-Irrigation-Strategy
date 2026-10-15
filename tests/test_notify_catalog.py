@@ -55,6 +55,7 @@ def test_the_table_is_the_contracts():
         "CS-312",
         "CS-313",
         "CS-701",
+        "CS-710",
     }
     assert set(_kind("stock")) == {"CS-608", "CS-807"}
     assert set(_kind("dosing")) == {f"CS-80{n}" for n in range(1, 7)}

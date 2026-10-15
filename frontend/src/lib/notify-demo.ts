@@ -32,8 +32,8 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "hardware",
     name: "Hardware lockouts",
     detail:
-      "A pump or valve that did not do what it was told, a hardware hold, a shot cut, a zone that keeps hitting its longest allowed shot, water that isn't reaching a zone, a table that isn't draining, a sump pump that stopped and a pump or valve the controller can't switch.",
-    codes: [...codes(301, 312), "CS-313", "CS-701"],
+      "A pump or valve that did not do what it was told, a hardware hold, a shot cut, a zone that keeps hitting its longest allowed shot, water that isn't reaching a zone or may be bypassing its substrate, a table that isn't draining, a sump pump that stopped and a pump or valve the controller can't switch.",
+    codes: [...codes(301, 312), "CS-313", "CS-701", "CS-710"],
     events: [],
   },
   {

@@ -172,6 +172,7 @@ class ZoneContext:
     # "changed_today", "frozen", "day", "last_words"}; None when the room has no setpoint memory.
     setpoints: dict | None = None
     substrate_l: float | None = None  # the zone's total substrate in litres (per-plant block x plants)
+    channel: str | None = None  # the channel judge's latest answer for the zone, in words (fresh ones only)
 
     @property
     def since_lights_min(self):
