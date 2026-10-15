@@ -323,6 +323,15 @@ def ha_service_response(domain, service, data, timeout=12):
     return r.status_code, body.get("service_response") if isinstance(body, dict) else None
 
 
+def ha_fire(event, data, timeout=4):
+    """Fire a Home Assistant event, best effort -> True when Home Assistant took it."""
+    try:
+        r = _session().post(f"{BASE}/events/{event}", headers=HDR, json=data, timeout=timeout)
+        return r.status_code < 300
+    except Exception:
+        return False
+
+
 def ha_set(entity, state, attributes=None, timeout=8):
     """Write a state -> Home Assistant's HTTP status, or None when it was not sent or not answered."""
     if not _GATE.allows("write"):
@@ -2649,6 +2658,10 @@ class Controller:
         last = written.get((zone, suffix))
         if last and last[0] == value and (now - last[1]).total_seconds() < 300:
             return True  # HA has not reflected the last write yet: do not spam it
+        # Home Assistant sees only this app's token: name the writer first, for the room's setpoint
+        # change log (the integration's setpoint_log.py). The brain's put-back is the safety writer.
+        who = "safety" if by.endswith("(put back)") else "brain" if by.startswith("Jev") else "learner"
+        ha_fire("crop_steering_setpoint_write", {"entity_id": entity, "value": value, "who": who})
         if not ha_call("number", "set_value", entity_id=entity, value=value):
             return False
         written[(zone, suffix)] = (value, now)

@@ -183,6 +183,7 @@ export class HaClient {
       "runs_save",
       "runs_archive",
       "runs_import",
+      "setpoint_log_get",
       "strategy_get",
       "strategy_save",
       "strategy_preview",

@@ -1,4 +1,5 @@
 import { attachOutcomes, jevAnswer, jevResult, type JevEntry } from "./jev";
+import { CHANGE_ID } from "./setpoint-log";
 import type { LogEvent } from "./types";
 
 /** History › Timeline: the controller's activity records and Jev's journal as one list, newest
@@ -53,6 +54,7 @@ export function eventKind(event: LogEvent): TimelineKind {
   if (event.type === "water") return "water";
   if (event.type === "phase") return "phase";
   if (event.type === "warning") return "alert";
+  if (event.id.startsWith(CHANGE_ID)) return "setpoint";
   return SETPOINT_CHANGE.test(event.message) ? "setpoint" : "note";
 }
 

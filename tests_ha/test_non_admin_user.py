@@ -53,6 +53,7 @@ READS = {
     "strategy_get": {"room_id": ROOM},
     "strategy_preview": {"room_id": ROOM},
     "runs_get": {"room_id": ROOM},
+    "setpoint_log_get": {"room_id": ROOM},
     "stock_get": {"room_id": ROOM},
     "dosing_get": {"room_id": ROOM},
     "notify_get": {},
