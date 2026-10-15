@@ -656,6 +656,21 @@ def test_a_secret_comes_from_its_variable_or_a_file_and_is_only_ever_logged_as_s
     assert SENTINEL not in log + log2 + capsys.readouterr().out
 
 
+@pytest.mark.parametrize("container", [False, True])
+def test_the_anthropic_key_comes_from_its_option_variable_or_the_usual_alias(tmp_path, container, capsys):
+    """F2_OPT_ANTHROPIC_API_KEY(_FILE) over ANTHROPIC_API_KEY over the options file, only ever logged as set."""
+    key = tmp_path / "anthropic"
+    key.write_text(SENTINEL + "-file\n")
+    opts, log = _options(tmp_path, {"anthropic_api_key": "from-the-file"}, {"ANTHROPIC_API_KEY": SENTINEL}, container)
+    assert opts["anthropic_api_key"] == SENTINEL and "anthropic_api_key=<set>" in log
+    opts, log2 = _options(tmp_path, None, {"ANTHROPIC_API_KEY": "alias", "F2_OPT_ANTHROPIC_API_KEY_FILE": str(key)},
+                          container)
+    assert opts["anthropic_api_key"] == SENTINEL + "-file"
+    opts, _ = _options(tmp_path, {"anthropic_api_key": "from-the-file"}, {}, container)
+    assert opts["anthropic_api_key"] == "from-the-file"
+    assert SENTINEL not in log + log2 + capsys.readouterr().out
+
+
 def test_a_secret_that_cant_be_read_never_shows_in_the_error(tmp_path):
     with pytest.raises(runtime_env.OptionsError) as raised:
         _options(tmp_path, None, {"F2_OPT_CF_API_TOKEN_FILE": str(tmp_path)}, container=True)

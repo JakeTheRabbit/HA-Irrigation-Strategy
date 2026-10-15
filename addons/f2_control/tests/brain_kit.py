@@ -1,0 +1,112 @@
+"""Stand-ins for the Anthropic SDK in the lean harness (it has no SDK, and no test reaches the network): a client whose
+messages.create() answers from a script, the SDK's error shapes, and tool-call answers as the API returns them."""
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+SENTINEL = "sk-ant-SENTINEL-0123456789abcdef"
+
+
+class APIStatusError(Exception):
+    def __init__(self, status_code, message="", retry_after=None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.response = SimpleNamespace(headers={"retry-after": retry_after} if retry_after else {})
+
+
+class AuthenticationError(APIStatusError):
+    def __init__(self, message=""):
+        super().__init__(401, message)
+
+
+class RateLimitError(APIStatusError):
+    def __init__(self, message="", retry_after=None):
+        super().__init__(429, message, retry_after)
+
+
+class APITimeoutError(Exception):
+    pass
+
+
+class APIConnectionError(Exception):
+    pass
+
+
+def usage(uncached=800, w5m=1500, w1h=0, read=35450, out=345):
+    return SimpleNamespace(input_tokens=uncached, cache_creation_input_tokens=w5m + w1h, cache_read_input_tokens=read,
+                           output_tokens=out,
+                           cache_creation=SimpleNamespace(ephemeral_5m_input_tokens=w5m, ephemeral_1h_input_tokens=w1h))
+
+
+def tool(name, **args):
+    return SimpleNamespace(type="tool_use", name=name, input=args)
+
+
+def choice(snap, qid, pick, probs, confidence=0.8, rationale="the probe says so"):
+    return tool("answer_choice", snapshot_id=snap, question_id=qid, choice=pick,
+                probabilities=[{"key": k, "p": p} for k, p in probs.items()], confidence=confidence,
+                rationale=rationale)
+
+
+def yes_no(snap, qid, p, confidence=0.8, rationale="it tracks"):
+    return tool("answer_yes_no", snapshot_id=snap, question_id=qid, p_yes=p, confidence=confidence,
+                rationale=rationale)
+
+
+def message(*blocks, stop="tool_use", category=None, use=None):
+    return SimpleNamespace(content=list(blocks), stop_reason=stop, usage=use or usage(),
+                           stop_details=SimpleNamespace(category=category) if stop == "refusal" else None)
+
+
+class FakeClient:
+    """`script` items are messages, exceptions to raise, or callables(request) -> either; the last one repeats."""
+
+    def __init__(self, *script):
+        self.script, self.requests = list(script), []
+        self.messages = SimpleNamespace(create=self._create)
+
+    def _create(self, **request):
+        self.requests.append(request)
+        item = self.script.pop(0) if len(self.script) > 1 else self.script[0]
+        if callable(item) and not isinstance(item, type):
+            item = item(request)
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+
+class FakePrompt:
+    """The shape jev.prompt.Prompt has, with a fixed snapshot id."""
+
+    snap = "default:z1:dusk:2026-09-27T13:00:abcd"
+
+    def evidence(self, state):
+        return self.snap, "<snapshot>evidence</snapshot>"
+
+    def questions(self, snap_id, lane_index, lane):
+        return f"<questions lane={lane_index}>{sorted(lane)}</questions>"
+
+    def request(self, model, evidence, questions, max_tokens):
+        return {"model": model, "max_tokens": max_tokens, "messages": [{"role": "user", "content": [
+            {"type": "text", "text": evidence}, {"type": "text", "text": questions}]}]}
+
+    def max_tokens(self, lane):
+        return 2048
+
+
+DUSK = {"enter_p3_now": "stop", "continue_p2": "carry on", "insufficient_evidence": "unknown"}
+QUESTIONS = {"dusk_call__v0": {"type": "choice", "instructions": "stop now?", "criteria": DUSK},
+             "dusk_call__v1": {"type": "choice", "instructions": "should it stop?", "criteria": DUSK}}
+STATE = {"phase": "P2", "_brain": {"room": "default", "zone": 1, "judge": "dusk", "asked": "2026-09-27T13:00"}}
+GOOD = {"enter_p3_now": 0.7, "continue_p2": 0.2, "insufficient_evidence": 0.1}
+
+
+def answering(prompt=None):
+    """A request callable that answers the lane's own question id with GOOD."""
+    snap = (prompt or FakePrompt()).snap
+
+    def answer(request):
+        text = request["messages"][0]["content"][1]["text"]
+        qid = "dusk_call__v1" if "lane=1" in text else "dusk_call__v0"
+        return message(choice(snap, qid, "enter_p3_now", GOOD))
+    return answer

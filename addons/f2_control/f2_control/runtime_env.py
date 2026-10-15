@@ -677,6 +677,8 @@ def _options_from_env(env, container, log):
             refuse(f"option {var}: file not readable")
         else:
             found[key] = value
+    if "anthropic_api_key" not in found and env.get("ANTHROPIC_API_KEY"):  # the usual name, below F2_OPT_* only
+        found["anthropic_api_key"] = env["ANTHROPIC_API_KEY"]
     return found
 
 

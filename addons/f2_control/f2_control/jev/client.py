@@ -11,15 +11,22 @@ pass.
 from __future__ import annotations
 
 import queue
+import re
 import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from .scrub import scrub
+
 try:
     import requests
 except ImportError:  # the lean test harness stubs it; the add-on image installs it
     requests = None
+try:
+    import anthropic
+except ImportError:  # armv7 images skip the SDK, and the lean test harness has none: the brain runs rules
+    anthropic = None
 
 URL = "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run"
 MODEL = "typesafe/jev"
@@ -95,6 +102,418 @@ def call_typesafe(account, token, state, questions, gateway=None, timeout=20.0):
     if answers is None:
         return None, None, NO_ANSWERS
     return answers, usage, None
+
+
+# ---------- Claude over the Anthropic API (brain_provider: claude_haiku) ----------
+API_URL = "https://api.anthropic.com"  # given explicitly: a stray ANTHROPIC_BASE_URL can never send the key elsewhere
+DEFAULT_MODEL = "claude-haiku-5-5"
+BAD_OUTPUT = "model answer failed validation"
+REFUSED = "refused"
+BUDGET = "budget spent"
+NO_SDK = "anthropic not installed"
+PAUSED = "brain paused"
+NO_CONTEXT = "no brain context"
+INTERNAL = "brain transport error"
+LANE_TIMEOUT_S = 15.0
+MAX_TEXT = 300  # a model's rationale, line or answer, as the journal keeps it
+LONG_PROMPT = 100_000  # Haiku's dearer rate card applies to a prompt above this many tokens
+# US$ per million tokens: input, output, cache read, 5-minute and 1-hour cache writes. This is also the model
+# allowlist: a model with no row is never called, so every call the Meter charges is priced at the row of the model
+# that billed it, and no unknown model can be under-priced.
+PRICES = {
+    "claude-haiku-5-5": {"in": 0.10, "out": 0.50, "read": 0.01, "w5m": 0.125, "w1h": 0.20,
+                         "long": {"in": 0.50, "out": 2.50, "read": 0.05, "w5m": 0.625, "w1h": 1.00}},
+    "claude-sonnet-5-5": {"in": 2.00, "out": 10.00, "read": 0.20, "w5m": 2.50, "w1h": 4.00},
+    "claude-opus-5-5": {"in": 4.00, "out": 20.00, "read": 0.20, "w5m": 5.00, "w1h": 8.00},
+}
+ERROR_TYPES = {400: "invalid_request_error", 401: "authentication_error", 403: "permission_error",
+               404: "not_found_error", 413: "request_too_large", 422: "invalid_request_error",
+               429: "rate_limit_error", 529: "overloaded_error"}
+_KEY_RUN = re.compile(r"sk-ant-[A-Za-z0-9_\-]+")
+_keys: set = set()
+log = print  # jev_bridge.build() points this at the controller's log
+
+
+def anthropic_key(options):
+    """The anthropic_api_key option, stripped. Empty (the default) is no key."""
+    return str(options.get("anthropic_api_key") or "").strip()
+
+
+def make_client(key):
+    """The one SDK client, or None without the SDK or a key. The key and the API's address are given explicitly, so
+    no environment variable can pick another credential or host, and the SDK never retries: Routes does."""
+    if anthropic is None or not key:
+        return None
+    _keys.add(key)
+    return anthropic.Anthropic(api_key=key, base_url=API_URL, max_retries=0)
+
+
+def redact(text, key=None):
+    """`text` with the key, any key make_client() was given and any `sk-ant-` run taken out."""
+    text = str(text)
+    for k in sorted(_keys | ({key} if key else set()), key=len, reverse=True):
+        if len(k) >= 8:
+            text = text.replace(k, "<key>")
+    return _KEY_RUN.sub("<key>", text)
+
+
+def _n(obj, name):
+    value = obj.get(name) if isinstance(obj, dict) else getattr(obj, name, None)
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def tokens(usage):
+    """(uncached input, 5-minute cache write, 1-hour cache write, cache read, output) from an API usage block. With no
+    split of the cache writes, all of them are priced at the 1-hour rate: the safe side."""
+    split = usage.get("cache_creation") if isinstance(usage, dict) else getattr(usage, "cache_creation", None)
+    if split is not None:
+        w5m, w1h = _n(split, "ephemeral_5m_input_tokens"), _n(split, "ephemeral_1h_input_tokens")
+    else:
+        w5m, w1h = 0, _n(usage, "cache_creation_input_tokens")
+    return (_n(usage, "input_tokens"), w5m, w1h, _n(usage, "cache_read_input_tokens"), _n(usage, "output_tokens"))
+
+
+def cost(usage, model):
+    """US$ for one response, at the price row of the model that billed it."""
+    uncached, w5m, w1h, read, out = tokens(usage)
+    row = PRICES[model]
+    if uncached + w5m + w1h + read > LONG_PROMPT:
+        row = row.get("long", row)
+    return (uncached * row["in"] + w5m * row["w5m"] + w1h * row["w1h"] + read * row["read"]
+            + out * row["out"]) / 1e6
+
+
+class Meter:
+    """The Claude brain's spend until the next lights-on, and every reason it may not ask now. The worker thread
+    charges it while the control loop reads it, so every method takes its lock.
+
+    A window opens at a lights-on, at least WINDOW_MIN_H after the last one opened (one reset a day with staggered
+    rooms); a window opened at start closes at the first lights-on, and any window closes WINDOW_MAX_H after it
+    opened (24 h light). `can_spend()` is the budget and the latches, checked before every call; `state()` adds a
+    429/529 pause, which stops new asks once the routes stop retrying."""
+
+    WINDOW_MIN_H = 20.0
+    WINDOW_MAX_H = 24.0
+    UNAVAILABLE_S = 3600.0
+    DECLINE_AFTER = 3  # refusals in a row for one judge mark it declined
+
+    def __init__(self, budget_usd, model=DEFAULT_MODEL, clock=time.time, warn_pct=80):
+        self._lock = threading.Lock()
+        self.budget, self.model, self.clock = max(0.0, float(budget_usd)), model, clock
+        self.warn_pct = float(warn_pct)
+        self.latched = None  # "auth_failed" or "model_invalid": no ask until the controller starts again
+        self.paused_until = self.unavailable_until = None
+        self._bad, self.runs, self.declined, self._events = 0, {}, set(), []
+        self._open(clock(), "start")
+
+    def _open(self, now, by):
+        self.window_start, self.opened_by = now, by
+        self.spent, self.calls, self.warned, self.spent_said = 0.0, 0, False, False
+        self.tokens = {"uncached": 0, "cache_read": 0, "cache_write": 0, "output": 0}
+
+    def _state(self, now):
+        if now - self.window_start >= self.WINDOW_MAX_H * 3600.0:
+            self._open(now, "timer")
+        if self.latched:
+            return self.latched
+        if self.unavailable_until and now < self.unavailable_until:
+            return "unavailable"
+        if self.spent >= self.budget:
+            return "budget_spent"
+        if self.paused_until and now < self.paused_until:
+            return "paused"
+        return None
+
+    def state(self):
+        """None while the brain may ask, else why not: budget_spent, paused, unavailable, auth_failed or
+        model_invalid."""
+        with self._lock:
+            return self._state(self.clock())
+
+    def can_spend(self):
+        """Another call may start: within budget and not latched (a pause only stops new asks)."""
+        with self._lock:
+            return self._state(self.clock()) in (None, "paused")
+
+    def live(self):
+        """The brain can act: may ask now, and the Setpoints judge has not declined."""
+        with self._lock:
+            return self._state(self.clock()) is None and "setpoints" not in self.declined
+
+    def charge(self, usage, model=None):
+        """Count one billed response -> its cost in US$."""
+        uncached, w5m, w1h, read, out = tokens(usage)
+        spent = cost(usage, model or self.model)
+        with self._lock:
+            self._state(self.clock())
+            self.spent += spent
+            self.calls += 1
+            for k, v in (("uncached", uncached), ("cache_write", w5m + w1h), ("cache_read", read), ("output", out)):
+                self.tokens[k] += v
+            if not self.warned and self.budget > 0 and self.spent * 100.0 >= self.budget * self.warn_pct:
+                self.warned = True
+                self._events.append("warn")
+            if not self.spent_said and self.spent >= self.budget:
+                self.spent_said = True
+                self._events.append("spent")
+        return spent
+
+    def latch(self, kind):
+        with self._lock:
+            if self.latched is None:
+                self._events.append("brain")
+            self.latched = kind
+
+    def pause(self, seconds):
+        with self._lock:
+            self.paused_until = max(self.paused_until or 0.0, self.clock() + float(seconds))
+
+    def bad_request(self):
+        """Three refused requests in a row make the brain unavailable for an hour."""
+        with self._lock:
+            self._bad += 1
+            if self._bad >= 3:
+                self._bad, self.unavailable_until = 0, self.clock() + self.UNAVAILABLE_S
+                self._events.append("brain")
+
+    def good(self):
+        with self._lock:
+            self._bad = 0
+
+    def refused(self, judge, category=None):
+        with self._lock:
+            self.runs[judge] = self.runs.get(judge, 0) + 1
+            if self.runs[judge] >= self.DECLINE_AFTER:
+                self.declined.add(judge)
+
+    def answered(self, judge):
+        with self._lock:
+            self.runs[judge] = 0
+            self.declined.discard(judge)
+
+    def lights_on(self, now=None):
+        """A room's lights came on -> True when that opened a new window."""
+        with self._lock:
+            now = self.clock() if now is None else now
+            if self.opened_by == "start" or now - self.window_start >= self.WINDOW_MIN_H * 3600.0:
+                self._open(now, "lights_on")
+                return True
+            return False
+
+    def take(self, event):
+        """True once for each "warn" (CS-706), "spent" (CS-708) and "brain" (CS-709) since it was last taken."""
+        with self._lock:
+            if event in self._events:
+                self._events = [e for e in self._events if e != event]
+                return True
+            return False
+
+    def snapshot(self):
+        """Everything the usage file and the brain panel keep. Never the key."""
+        with self._lock:
+            state = self._state(self.clock())
+            return {"window_start": self.window_start, "opened_by": self.opened_by, "cost_usd": round(self.spent, 6),
+                    "budget_usd": self.budget, "calls": self.calls, "uncached_tokens": self.tokens["uncached"],
+                    "cached_tokens": self.tokens["cache_read"], "cache_write_tokens": self.tokens["cache_write"],
+                    "output_tokens": self.tokens["output"], "paused_until": self.paused_until,
+                    "warned": self.warned, "spent_said": self.spent_said, "refusal_runs": dict(self.runs),
+                    "declined": sorted(self.declined), "state": state, "model": self.model}
+
+    def restore(self, saved):
+        """Carry a window across a restart when it is under 30 h old; a latch is never carried (a restart, the usual
+        result of a new key, tries once more)."""
+        with self._lock:
+            try:
+                start = float(saved["window_start"])
+            except (KeyError, TypeError, ValueError):
+                return False
+            if not 0 <= self.clock() - start < 30 * 3600.0:
+                return False
+            self._open(start, str(saved.get("opened_by") or "start"))
+            self.spent = float(saved.get("cost_usd") or 0.0)
+            self.calls = int(saved.get("calls") or 0)
+            self.tokens = {"uncached": int(saved.get("uncached_tokens") or 0),
+                           "cache_read": int(saved.get("cached_tokens") or 0),
+                           "cache_write": int(saved.get("cache_write_tokens") or 0),
+                           "output": int(saved.get("output_tokens") or 0)}
+            self.warned, self.spent_said = bool(saved.get("warned")), bool(saved.get("spent_said"))
+            self.paused_until = saved.get("paused_until") or None
+            self.runs = {str(k): int(v) for k, v in (saved.get("refusal_runs") or {}).items()}
+            self.declined = {j for j, n in self.runs.items() if n >= self.DECLINE_AFTER}
+            return True
+
+
+def _retry_after(e):
+    try:
+        return float(e.response.headers.get("retry-after"))
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def classify(e, meter=None):
+    """A key-free error string for an exception from the SDK call, built from the status code and the API's error type
+    only (never the message or a response body), and what it does to the Meter: a refused key latches auth_failed, an
+    unknown model model_invalid, a 429 or 529 pauses it, three bad requests in a row make it unavailable for an
+    hour."""
+    status = getattr(e, "status_code", None)
+    if isinstance(status, int):
+        if meter is not None:
+            if status in (401, 403):
+                meter.latch("auth_failed")
+            elif status == 404:
+                meter.latch("model_invalid")
+            elif status in (429, 529):
+                meter.pause(_retry_after(e) or 60.0)
+            elif status in (400, 413, 422):
+                meter.bad_request()
+        return f"HTTP {status}: {ERROR_TYPES.get(status, 'api_error')}"
+    name = type(e).__name__
+    if "Timeout" in name:
+        return "APITimeoutError"
+    if "Connection" in name:
+        return "APIConnectionError"
+    return name[:60]  # an unknown transport fault: worth another try
+
+
+def _clean(text):
+    """A model's text as the journal keeps it: one line, no control characters, no entity id or key, at most
+    MAX_TEXT."""
+    text = "".join(ch if ch.isprintable() else " " for ch in str(text))
+    return redact(scrub(" ".join(text.split())))[:MAX_TEXT]
+
+
+def _unit(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and 0.0 <= x <= 1.0
+
+
+def validate_answer(block, snap_id, lane):
+    """(question id, the council's answer) for one tool call that passes every check, or None: the right tool for the
+    question's type, this lane's snapshot id and one of its question ids, a choice among that question's own keys and
+    the arg-max of probabilities over those keys that sum to about 1, and every number between 0 and 1."""
+    name, args = getattr(block, "name", None), getattr(block, "input", None)
+    if not isinstance(args, dict) or args.get("snapshot_id") != snap_id:
+        return None
+    qid = args.get("question_id")
+    variant = lane.get(qid) if isinstance(qid, str) else None
+    conf = args.get("confidence")
+    if not isinstance(variant, dict) or not _unit(conf):
+        return None
+    why = _clean(args.get("rationale") or "")
+    if variant.get("type") == "noul" and name == "answer_yes_no":
+        p = args.get("p_yes")
+        return (qid, {"type": "noul", "noul": float(p), "confidence": float(conf), "rationale": why}) if _unit(p) else None
+    if variant.get("type") != "choice" or name != "answer_choice" or not isinstance(args.get("probabilities"), list):
+        return None
+    keys, choice, probs = list(variant.get("criteria") or {}), args.get("choice"), {}
+    for item in args["probabilities"]:
+        k, p = (item.get("key"), item.get("p")) if isinstance(item, dict) else (None, None)
+        if k not in keys or k in probs or not _unit(p):
+            return None
+        probs[k] = float(p)
+    total = sum(probs.values())
+    if choice not in keys or not 0.9 <= total <= 1.1:
+        return None
+    probs = {k: probs.get(k, 0.0) / total for k in keys}
+    if probs[choice] < max(probs.values()) - 1e-9:
+        return None  # an answer that contradicts its own probabilities is not a vote
+    return qid, {"type": "choice", "choice": choice, "probabilities": probs, "confidence": float(conf),
+                 "rationale": why}
+
+
+def split_lanes(questions):
+    """{"<q>__v<i>": variant} -> {i: {"<q>__v<i>": variant}}: lane i carries every question's phrasing i, so each
+    reader sees one wording. A key with no phrasing index (a room task) is lane 0."""
+    lanes = {}
+    for qid, variant in questions.items():
+        _base, sep, idx = qid.rpartition("__v")
+        lanes.setdefault(int(idx) if sep and idx.isdigit() else 0, {})[qid] = variant
+    return lanes
+
+
+def empty_usage(model):
+    return {"input_tokens": 0, "uncached_input_tokens": 0, "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0, "cache_creation_5m": 0, "cache_creation_1h": 0, "output_tokens": 0,
+            "cost_usd": 0.0, "calls": 0, "model": model, "refusals": 0, "lanes_answered": 0}
+
+
+def add_usage(total, usage, model):
+    uncached, w5m, w1h, read, out = tokens(usage)
+    total["input_tokens"] += uncached + w5m + w1h + read
+    total["uncached_input_tokens"] += uncached
+    total["cache_creation_input_tokens"] += w5m + w1h
+    total["cache_creation_5m"] += w5m
+    total["cache_creation_1h"] += w1h
+    total["cache_read_input_tokens"] += read
+    total["output_tokens"] += out
+    total["cost_usd"] = round(total["cost_usd"] + cost(usage, model), 8)
+    total["calls"] += 1
+
+
+def call_anthropic(account, token, state, questions, gateway=None, timeout=20.0, *,
+                   model=DEFAULT_MODEL, prompt=None, meter=None, client=None):
+    """One brain evaluation over the Anthropic API -> (answers, usage, error). Never raises.
+
+    `token` (the key) only ever built `client`; `account` and `gateway` are unused. `state` is the judge's evidence
+    with the "_brain" key the enrichment hook added (none: NO_CONTEXT, nothing is sent). Lane i carries every
+    question's phrasing i, one request each, the evidence block built once and cached between them. Every response
+    is charged to the Meter before it is read. One lane answering is an answer (the council sees one phrasing and
+    counts it unsure); once any lane was billed, the error returned is never one Routes retries, so a call is never
+    billed twice."""
+    if client is None:
+        return None, None, NO_SDK
+    if not isinstance(state, dict) or "_brain" not in state:
+        return None, None, NO_CONTEXT
+    try:
+        snap_id, evidence = prompt.evidence(state)
+        judge = str(state["_brain"].get("judge") or "brain")
+        answers, usage, errors, billed = {}, empty_usage(model), [], False
+        for i, lane in sorted(split_lanes(questions).items()):
+            if meter is not None and not meter.can_spend():
+                errors.append(BUDGET)
+                break
+            try:
+                msg = client.messages.create(**prompt.request(model, evidence, prompt.questions(snap_id, i, lane),
+                                                              prompt.max_tokens(lane)),
+                                             timeout=min(timeout, LANE_TIMEOUT_S))
+            except Exception as e:  # noqa: BLE001 - classify() maps every SDK error to a key-free string
+                errors.append(redact(classify(e, meter), token))
+                break
+            billed = True
+            add_usage(usage, msg.usage, model)
+            if meter is not None:
+                meter.charge(msg.usage, model)
+                meter.good()
+            if msg.stop_reason == "refusal":
+                usage["refusals"] += 1
+                category = getattr(getattr(msg, "stop_details", None), "category", None)
+                log(f"[brain] {judge}: the model declined to answer ({category})")
+                if meter is not None:
+                    meter.refused(judge, category)
+                errors.append(REFUSED)
+                continue
+            got = {}
+            for block in msg.content or ():
+                found = validate_answer(block, snap_id, lane) if getattr(block, "type", None) == "tool_use" else None
+                if found is not None and found[0] not in got:
+                    got[found[0]] = found[1]
+            answers.update(got)
+            if got:
+                usage["lanes_answered"] += 1
+                if meter is not None:
+                    meter.answered(judge)
+            else:
+                errors.append(BAD_OUTPUT)
+        if answers:
+            return answers, usage, None
+        if billed:
+            return None, None, next((e for e in reversed(errors) if not retryable(e)), BAD_OUTPUT)
+        return None, None, errors[-1] if errors else BAD_OUTPUT
+    except Exception as e:  # noqa: BLE001 - the transport never raises; the name goes to the log, never back
+        log(f"[brain] transport error: {type(e).__name__}")
+        return None, None, INTERNAL
 
 
 def retryable(error):
