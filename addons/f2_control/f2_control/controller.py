@@ -2938,6 +2938,8 @@ class Controller:
             return self._alert(key, "CS-806", title, message, room=room, quiet=False)
         if code == "CS-807":
             return self._alert(key, "CS-807", title, message, room=room, quiet=False)
+        if code == "CS-808":
+            return self._alert(key, "CS-808", title, message, room=room, quiet=False)
         log("dosing alert refused: not in the error-code list", code)
         return True  # never deliverable: not kept
 

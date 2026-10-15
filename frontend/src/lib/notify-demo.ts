@@ -69,8 +69,8 @@ export const DEMO_KINDS: NotifyKind[] = [
   {
     id: "dosing",
     name: "Dosing",
-    detail: "A dose or a batch that did not end as it should.",
-    codes: codes(801, 806),
+    detail: "A dose or batch that did not end as it should, or a mix off its EC or pH band.",
+    codes: [...codes(801, 806), "CS-808"],
     events: [],
   },
   {

@@ -16,6 +16,10 @@ irrigation loop asks holds() before every shot. A batch sets its hold under the 
 under (Controller._shot_lock): a shot either started before it, and the batch waits for that shot to
 end, or never starts. Every switch-on goes through _on; a stop signal that lands in the middle of one
 waits for it to land (defer_exit), so the way out (exit) never overtakes it.
+
+A finished batch's tank is read MIX_SETTLE_S after its mix stops (_check_mixes): the room's feed EC and pH
+probes against its irrigation EC and pH bands. A reading off its band, or a probe that can't be read, raises
+CS-808, leaves the batch not marked good and refuses a batch an automation asks for, never watering.
 """
 from __future__ import annotations
 
@@ -26,7 +30,7 @@ import re
 import threading
 import time
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 POLL_S = 2.0  # each room's dosing_config is read this often
 READ_S = 1.0  # a dosing pump is read this often during a dose
@@ -49,6 +53,7 @@ REALERT_S = 1800.0  # hardware that does not read off is alerted again this ofte
 DRAW_GIVE_UP_S = 86400.0  # a stock draw not taken within this is given up, with an alert
 POLL_FAILS = 15  # one room failing this many passes in a row (30 s) is alerted
 REPUBLISH_S = 60.0  # an unchanged status is published again this often (with a new updated_at)
+MIX_SETTLE_S = 300.0  # a finished batch's tank is read this long after its mix stopped (the mix check)
 HISTORY = 20
 OUTBOX = 50  # alerts waiting for Home Assistant, at most
 DEAD = ("", "unknown", "unavailable", "none")
@@ -328,6 +333,7 @@ class DosingRunner:
             self._chores = now
             for chore in (self._restore_pending, self._send_draws, self._send_alerts):
                 self._safely(chore)
+        self._safely(self._check_mixes)
         for room in list(self.c.rooms):
             try:
                 self._poll_room(room, busy or self._job)  # one taken here is running from now on
@@ -387,6 +393,9 @@ class DosingRunner:
             return self._settle(room, config, request, f"refused: {_does(left)} not read off yet")
         if action not in ("dose", "batch"):
             return self._settle(room, config, request, f"refused: unknown action {action!r}")
+        why = self._mix_refuses(room) if action == "batch" and request.get("by") is None else None
+        if why:  # an automation's batch (no user): a person makes the next one after a failed mix check
+            return self._settle(room, config, request, f"refused: {why}")
         with self._lock:  # taken: from here on it is handled, whatever comes of it
             block = self._block(room)
             block["handled"], block["handled_result"] = request["id"], _RUNNING[action]
@@ -880,6 +889,8 @@ class DosingRunner:
         else:
             with self._lock:
                 self._held.pop(room.slug, None)
+            if result.startswith("finished"):
+                self._plan_mix(room, job.started_at)
         entry = {"kind": "batch", "at": job.started_at, "ended_at": view["ended_at"], "result": result,
                  "doses": dict(job.doses), "by": request.get("by")}
         self._settle(room, config, request, result, entry=entry, clear=not left, final=True)
@@ -1237,6 +1248,91 @@ class DosingRunner:
             except Exception as e:
                 self._log(f"[{job.room.slug}] dosing: could not switch {entity} off on the way out", repr(e))
 
+    # ------------------------------------------------------------------ the mix check
+    def _mix_bands(self, room):
+        """What a finished batch's tank is checked against: [(quantity, its tank probe, low, high)] for each of
+        the room's feed EC and pH probes that is mapped and has a band (a bound of 0 or less is no bound)."""
+        bands = []
+        for quantity, probe in (("ec", getattr(room, "feed_ec_sensor", "")),
+                                ("ph", getattr(room, "feed_ph_sensor", ""))):
+            lo = self.c._num(f"number.crop_steering_{room.prefix}irrigation_{quantity}_min", 0)
+            hi = self.c._num(f"number.crop_steering_{room.prefix}irrigation_{quantity}_max", 0)
+            if probe and (lo > 0 or hi > 0):
+                bands.append((quantity, probe, lo, hi))
+        return bands
+
+    def _plan_mix(self, room, started_at):
+        """A finished batch's mix check, due MIX_SETTLE_S from now; none when nothing can check it (no tank
+        probe with a band), which also lets go of an older batch's verdict."""
+        due = (self._now() + timedelta(seconds=MIX_SETTLE_S)).isoformat()
+        with self._lock:
+            self._block(room)["mix"] = ({"batch": started_at, "due": due, "verdict": None}
+                                        if self._mix_bands(room) else None)
+            self._write()
+
+    def _check_mixes(self):
+        """Each room's mix check that is due, read now (never in a room making a batch: it remakes the tank)."""
+        for room in list(self.c.rooms):
+            with self._lock:
+                block = self._doc["rooms"].get(room.slug)
+                mix = deepcopy(block.get("mix")) if isinstance(block, dict) else None
+                busy = self._job is not None and self._job.room.slug == room.slug
+            if not isinstance(mix, dict) or mix.get("verdict") is not None or busy:
+                continue
+            due = _aware(mix.get("due"))
+            if due is None or self._now() >= due:
+                self._judge_mix(room, mix)
+
+    def _judge_mix(self, room, mix):
+        """The tank read through the device-unit table and judged: "good" with every reading inside its band,
+        else "off target" or "not read" with CS-808. Neither holds watering."""
+        bands = self._mix_bands(room)
+        found, off, unread = {}, [], []
+        for quantity, probe, lo, hi in bands:
+            value, state, unit = self._device(probe, quantity, keep_unknown=False)
+            name = {"ec": "EC", "ph": "pH"}[quantity]
+            band = f"{_fmt(lo) if lo > 0 else 'no minimum'} to {_fmt(hi) if hi > 0 else 'no maximum'}"
+            found[quantity] = value
+            if value is None:
+                unread.append(f"its {name} probe ({probe}) can't be read (it reads {state}"
+                              + (f" {unit}" if unit else "") + ")")
+            elif (lo > 0 and value < lo) or (hi > 0 and value > hi):
+                off.append(f"its {name} reads {value:g}, outside the room's irrigation {name} band ({band})")
+        verdict = None if not bands else "not read" if unread else "off target" if off else "good"
+        why = "; ".join(unread + off) or None
+        with self._lock:
+            block = self._block(room)
+            if not isinstance(block.get("mix"), dict) or block["mix"].get("batch") != mix.get("batch"):
+                return  # a newer batch has replaced it
+            block["mix"] = None if verdict is None else {
+                **mix, "verdict": verdict, "checked_at": self._now().isoformat(), "why": why, **found}
+            for entry in block["history"]:
+                if isinstance(entry, dict) and entry.get("kind") == "batch" and entry.get("at") == mix.get("batch"):
+                    entry["mix"] = verdict
+            self._write()
+        self._log(f"[{room.slug}] dosing: mix check of the batch that started {mix.get('batch')}: "
+                  f"{verdict or 'nothing to check'}" + (f" ({why})" if why else ""))
+        if verdict in ("not read", "off target"):
+            self._alert(room.slug, "CS-808",
+                        "a batch's mix could not be checked" if unread else "a batch's mix is off its band",
+                        f"The batch that started {mix.get('batch')} finished, and its tank was read "
+                        f"{MIX_SETTLE_S / 60:g} minutes after its mix stopped: {why}. The batch is not "
+                        "marked good, and a batch an automation asks for is refused until one made by hand "
+                        "passes this check. This does not hold watering. Check the tank and its probes, "
+                        "then correct the tank or make the next batch by hand.",
+                        _event("mix", mix.get("batch")))
+
+    def _mix_refuses(self, room):
+        """Why a batch an automation asks for is refused: the last batch's mix check failed, or is still due."""
+        with self._lock:
+            block = self._doc["rooms"].get(room.slug)
+            mix = block.get("mix") if isinstance(block, dict) else None
+        if not isinstance(mix, dict) or mix.get("verdict") == "good":
+            return None
+        if mix.get("verdict") is None:
+            return "the last batch's mix is not checked yet"
+        return f"the last batch's mix check failed ({mix.get('why') or mix.get('verdict')}); make the next batch by hand"
+
     # ------------------------------------------------------------------ what does not read off
     def _hold_stuck(self, room, entities, hold, held, code, title, intro, advice, event, alerted):
         """What a dose or batch left not reading off: its rooms held, and _release_stuck switches it
@@ -1526,6 +1622,7 @@ class DosingRunner:
             "handled": block["handled"],
             "handled_result": block["handled_result"],
             "history": block["history"],
+            "mix": block.get("mix") if isinstance(block.get("mix"), dict) else None,
             "friendly_name": "Dosing (controller)",
         }
 
@@ -1568,13 +1665,14 @@ class DosingRunner:
         state = self._fetch(entity, quick)[0]
         return None if state is None else str(state)
 
-    def _device(self, entity, quantity, quick=False):
+    def _device(self, entity, quantity, quick=False, keep_unknown=True):
         """One read of a dosing device's number (a pump's volume or flow, a recipe amount, the mix pump's
-        power) through the device-unit table (Controller._canonical) -> (the number in the quantity's
-        canonical unit, mL, mL/s or W, or None; the state as read; its unit). A unit the table does not
-        know, or none, is read in that unit as it always was, never set aside: a dose is refused all
-        the same for an uncalibrated flow, more than max_ml, more than MAX_DOSE_S and a volume that
-        does not read back."""
+        power, a tank probe) through the device-unit table (Controller._canonical) -> (the number in the
+        quantity's canonical unit, mL, mL/s, W, mS/cm or pH, or None; the state as read; its unit). A unit
+        the table does not know, or none, is read in that unit as it always was, never set aside: a dose
+        is refused all the same for an uncalibrated flow, more than max_ml, more than MAX_DOSE_S and a
+        volume that does not read back. `keep_unknown=False` (a tank probe): such a unit is read only
+        while plausible, and a refused one (ppm) not at all."""
         read = self._fetch(entity, quick)
         state, unit = read[0], (read[1] or {}).get("unit_of_measurement")
         state = None if state is None else str(state)
@@ -1584,7 +1682,7 @@ class DosingRunner:
             return None, state, unit
         if not math.isfinite(number):
             return None, state, unit
-        return self.c._canonical(entity, quantity, number, unit, keep_unknown=True)[0], state, unit
+        return self.c._canonical(entity, quantity, number, unit, keep_unknown=keep_unknown)[0], state, unit
 
     def _actuator(self, entity):
         """(on service, off service, on state, off state) for dosing hardware: its domain's row in the
