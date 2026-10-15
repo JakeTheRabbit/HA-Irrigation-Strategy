@@ -222,6 +222,7 @@ try {
   const routes = [
     ["today", "Room A today"],
     ["zone/1", "Zone 1"],
+    ["today/ai", "AI assistant"],
     ["plan/targets", "Targets"],
     ["plan/schedule", "Schedule"],
     ["history/timeline", "Timeline"],
@@ -234,6 +235,7 @@ try {
     ["equipment/setup", "Rooms & setup"],
     ["settings", "Settings"],
     ["settings/notifications", "Notifications"],
+    ["settings/ai", "AI assistant"],
     ["help", "Help"],
   ];
   const sectionOf = (route) =>

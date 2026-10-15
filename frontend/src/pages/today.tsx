@@ -3,6 +3,7 @@ import { ArrowRight, Check, ChevronDown, ChevronRight, TriangleAlert, X } from "
 import { Button } from "@/components/ui/button";
 import { Empty, number, time as clock, type Page } from "@/components/dashboard";
 import { RoomOffBanner } from "@/components/room-controls";
+import { BrainCard } from "@/components/brain";
 import {
   roomReference,
   zoneAttention,
@@ -247,14 +248,17 @@ export function Today({
           />
         ))}
       </section>
-      {jev.log && (
-        <JevToday
-          controller={controller}
-          entries={jev.log.entries}
-          day={day}
-          openHistory={() => navigate("history/timeline")}
-        />
-      )}
+      <div className="today-pair">
+        <BrainCard controller={controller} navigate={navigate} />
+        {jev.log && (
+          <JevToday
+            controller={controller}
+            entries={jev.log.entries}
+            day={day}
+            openHistory={() => navigate("history/timeline")}
+          />
+        )}
+      </div>
     </div>
   );
 }

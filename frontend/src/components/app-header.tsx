@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, House, Menu, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActivityPanel } from "@/components/activity-panel";
+import { BrainChip } from "@/components/brain";
 import { SafetySwitches } from "@/components/room-controls";
 import { ageText, ageTone, updatedText } from "@/lib/controller-health";
 import { roomStatus, staleBanner } from "@/lib/model";
@@ -9,14 +10,15 @@ import type { Controller } from "@/lib/types";
 import "./app-header.css";
 
 /** The frame's top bar on every page: each room as a status dot and a short state (the selected one
- * pressed; another one opens it), how old the selected room's controller data is, the recent
- * records and refresh, and the room's two safety switches. */
+ * pressed; another one opens it), how old the selected room's controller data is, the AI assistant's
+ * state, the recent records and refresh, and the room's two safety switches. */
 export function AppHeader({
   controller,
   haMenu,
   openNavigation,
   selectRoom,
   openLog,
+  openBrain,
   refresh,
   refreshing,
 }: {
@@ -26,6 +28,8 @@ export function AppHeader({
   openNavigation: () => void;
   selectRoom: (id: string) => void;
   openLog: () => void;
+  /** Opens the AI assistant page. */
+  openBrain: () => void;
   refresh: () => void;
   refreshing: boolean;
 }) {
@@ -115,6 +119,7 @@ export function AppHeader({
                 ? "No controller data"
                 : updatedText(age)}
         </span>
+        <BrainChip controller={controller} open={openBrain} />
         <ActivityPanel controller={controller} openLog={openLog} />
         <Button
           variant="ghost"

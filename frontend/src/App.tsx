@@ -58,6 +58,7 @@ import { StockTanks } from "@/pages/stock";
 import { Reservoir } from "@/pages/reservoir";
 import { Dosing } from "@/pages/dosing";
 import { WaterUsePage } from "@/pages/water-use";
+import { AiSettings, BrainPage } from "@/components/brain";
 
 const navigation = [
   { page: "today", label: SECTION_LABELS.today, icon: House },
@@ -293,6 +294,7 @@ export default function App() {
           openNavigation={() => setMobile(true)}
           selectRoom={selectRoom}
           openLog={() => navigate("history/timeline")}
+          openBrain={() => navigate("today/ai")}
           refresh={() => void refresh()}
           refreshing={refreshing}
         />
@@ -338,6 +340,9 @@ export default function App() {
                 zoneId={route.zone ?? null}
                 navigate={navigate}
               />
+            )}
+            {page === "today/ai" && (
+              <BrainPage key={pageKey} controller={controller} navigate={navigate} />
             )}
             {page === "plan/targets" && (
               <Strategy
@@ -399,6 +404,7 @@ export default function App() {
                 onDirtyChange={setWorkspaceDirty}
               />
             )}
+            {page === "settings/ai" && <AiSettings key={pageKey} controller={controller} />}
             {page === "help" && <Help controller={controller} />}
           </div>
         </main>

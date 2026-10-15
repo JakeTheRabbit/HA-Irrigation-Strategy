@@ -9,6 +9,7 @@ import {
   time as clock,
   type Page,
 } from "@/components/dashboard";
+import { BrainOnZone } from "@/components/brain";
 import { ZoneDay } from "@/components/day-timeline";
 import { OverlayRows, useOverlays } from "@/components/overlay-row";
 import { Pill } from "@/components/mini-visuals";
@@ -137,6 +138,7 @@ export function ZonePage({
           the controls join the probes, so the columns stay about even. */}
       <div className="zone-page-grid">
         <div className="zone-page-column">
+          <BrainOnZone controller={controller} zone={zone.id} navigate={navigate} />
           {jev && <JevOnZone controller={controller} zone={zone} navigate={navigate} />}
           <ZoneProbes controller={controller} zone={zone} navigate={navigate} />
           {!jev && <ZoneControls key={zone.id} controller={controller} zone={zone} />}

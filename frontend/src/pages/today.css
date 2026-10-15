@@ -421,6 +421,13 @@
 .today-jev {
   margin-bottom: 0;
 }
+/* The AI assistant's card beside what Jev changed: side by side when there is room. */
+.today-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 16px;
+  align-items: start;
+}
 .today-jev .panel-heading {
   padding: 12px 18px 6px;
 }
