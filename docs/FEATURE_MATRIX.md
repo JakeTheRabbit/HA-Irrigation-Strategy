@@ -63,6 +63,6 @@ Measured-flow reconciliation is the strongest next step: compare commanded litre
 
 ## Evidence
 
-Each release's audit is attached to its GitHub release as `release-audit-v<version>.md`, together with the approval that let it be promoted. The review that shaped the release process is the [first-run setup review](audits/2026-09-21-first-run-review.md).
+Each release's audit is attached to its GitHub release as `release-audit-v<version>.md`, together with the approval that let it be promoted. The review that shaped the release process is the [first-run setup review](dev/audits/2026-09-21-first-run-review.md).
 
 Reproduce the checks using [TESTING.md](TESTING.md). Machine-readable browser results and screenshots are generated in the ignored output/playwright folder.

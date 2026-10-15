@@ -13,6 +13,7 @@
 | addons/f2_control/www/public/dashboard.html | Identical generated application served through ingress |
 | tests | Integration and repository contract tests |
 | docs | Install, operation, architecture and release process |
+| docs/dev | Working notes for developers: design specs, implementation plans and review write-ups. Not operator documentation |
 | docs/TESTING.md / docs/ENTITIES.md | Development checks and entity reference |
 | docs/DOSING.md | The batch-tank dosing contract between the integration, the controller app and the dashboard: configuration, services, requests, the batch sequence, restart recovery and status |
 | docs/NOTIFICATIONS.md | The contract for who gets which alerts on the phones: the kinds of alert, the site's one store, the services, the routing, and the controller's fallback to its own notify service |
