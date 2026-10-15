@@ -906,6 +906,10 @@
         "ml": {
           "name": "Millilitres",
           "description": "How much to dose: more than 0, up to the pump's maximum."
+        },
+        "run_anyway": {
+          "name": "Run anyway",
+          "description": "For a batch only (a test refill): an administrator checked the fill and asks for it anyway. The controller still refuses it for any safety reason."
         }
       }
     },

@@ -438,6 +438,10 @@ dosing_request:
           step: 0.1
           unit_of_measurement: mL
           mode: box
+    run_anyway:
+      required: false
+      selector:
+        boolean:
 # Names and descriptions of the notification services are in strings.json (translations/en.json).
 notify_get:
 notify_save:

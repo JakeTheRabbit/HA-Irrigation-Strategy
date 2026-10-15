@@ -330,6 +330,20 @@ def test_a_dose_request_names_a_pump_and_an_amount_it_can_dose():
         dosing.check_request(config, "flush")
 
 
+def test_only_a_batch_can_be_run_anyway():
+    """A test refill run anyway is a batch's alone: a dose or a stop carrying it is refused, and the
+    word is true or false, never a string that reads as one."""
+    config = {"pumps": clean()[0]}
+    assert dosing.check_request(config, "batch", run_anyway=True) == (None, None)
+    assert dosing.check_request(config, "batch", run_anyway=False) == (None, None)
+    for action, pump, ml in (("dose", "balance", 25), ("stop", None, None)):
+        with pytest.raises(dosing.DosingError, match="only a batch"):
+            dosing.check_request(config, action, pump, ml, run_anyway=True)
+    for bad in ("true", 1, None):
+        with pytest.raises(dosing.DosingError, match="true or false"):
+            dosing.check_request(config, "batch", run_anyway=bad)
+
+
 def test_a_request_waits_until_it_is_handled_or_too_old_to_act_on():
     request = {"id": "abc", "at": (NOW - timedelta(seconds=30)).isoformat()}
     assert dosing.pending(request, None, NOW)
