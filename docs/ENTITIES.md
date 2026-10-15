@@ -75,6 +75,7 @@ The active EC target = the row for the current phase **and** the zone's steering
 | `irrigation_ph_max` | 3.0-9.0 | 6.2 | pH | Source-water pH gate (high bound). |
 | `maximum_ec` | 1-20 | 9.0 | mS/cm | Hard substrate-EC cutoff: no shot above it (salt-burn guard). |
 | `max_shot_duration` | 5-3600 | 900 | s | Longest a single shot may run. The controller refuses to water a room whose cap is missing or below 5 s (CS-203). |
+| `sump_power_threshold_w` | 1-10000 | 20 | W | The sump pump counts as running while its power plug (the controller app's `sump_power_sensor` option) reads above this, after the reading is put into watts. No run for `sump_silent_hours` raises CS-311. |
 | `watchdog_hours` | 0-12 | 3 | h | Lights-on backstop: a zone below its P2 trigger that has had no water for this long gets a watchdog shot, or an urgent alert (CS-207) when watering is blocked. `0` turns it off. |
 
 ### Substrate & schedule
@@ -141,6 +142,7 @@ for that zone. (3 zones × 24 = 72 entities on a 3-zone system.)
 | `growth_stage` | Vegetative · Generative · Transition | Current growth stage: shifts EC targets + dryback aggressiveness. |
 | `irrigation_phase` | P0 · P1 · P2 · P3 | A manual phase indicator, read by `current_phase` and `ec_ratio`. The controller keeps each zone's phase itself and does not read it. |
 | `recipe_stage` | Veg · Transition · Bulk · Ripen · Custom | Picking a stage applies its setpoints to the zones. |
+| `drainage` | unknown · flood_table · free_drain | How the room's runoff leaves it, asked on the first page of setup. A table that is not draining (CS-310) is watched for in every room except a free-draining one, so a `free_drain` room never has its daily minimum or EC flushes held for it. A room set up before this reads `unknown`, watched as before. |
 | `water_today_view` | Zone total · Per plant | How Water today reads for the room: each zone's total, or its water and daily limit divided by its plant count. The dashboard shows it that way for everyone (Settings → Appearance), and the controller's vitals notification follows it. Zone total by default. |
 
 ### Per-zone (`select.crop_steering_zone_N_*`)

@@ -434,7 +434,7 @@
       "title": "Moisture rising with no water: the table is not draining",
       "source": "notification",
       "severity": "critical",
-      "meaning": "A zone's moisture reading rose by 3 points or more within an hour while no water went in: its valve was not open, by the controller or by hand, during the rise or in the 45 minutes before it. Water is reaching the slabs from below: the table or its drain is blocked, or the sump is not pumping, and the slabs are sitting in runoff. The notification says how far the reading rose, over how long, and when the zone last had water.",
+      "meaning": "A zone's moisture reading rose by 3 points or more within an hour while no water went in: its valve was not open, by the controller or by hand, during the rise or in the 45 minutes before it. Water is reaching the slabs from below: the table or its drain is blocked, or the sump is not pumping, and the slabs are sitting in runoff. The notification says how far the reading rose, over how long, and when the zone last had water. Rooms whose Drainage setting is free drain are not watched: nothing there can back up.",
       "watering": "The zone's daily minimum and its EC flushes are held while this lasts, so the controller never pours water into a flooded table; a zone reading this wet gets no routine shots anyway. It is said again every 30 minutes while the reading keeps rising, and clears itself once the reading has stopped rising for an hour.",
       "causes": [
         "A table's drain or drain line is blocked: substrate, roots or debris in the outlet.",
@@ -454,7 +454,7 @@
       "title": "The sump pump has not run",
       "source": "notification",
       "severity": "critical",
-      "meaning": "The power reading of the sump pump the room's tables drain to (the controller app's sump_power_sensor option) has shown no run for the hours set in sump_silent_hours (3 unless changed) while the room is on. A sump pump that normally runs every hour or two has stopped: runoff has nowhere to go, the sump fills and backs up into the tables, and the slabs end up sitting in it. The notification names the sensor.",
+      "meaning": "The power reading of the sump pump the room's tables drain to (the controller app's sump_power_sensor option) has shown no run (no reading above the room's Sump Pump Run Threshold, 20 W unless changed, whatever unit the plug reports) for the hours set in sump_silent_hours (3 unless changed) while the room is on. A sump pump that normally runs every hour or two has stopped: runoff has nowhere to go, the sump fills and backs up into the tables, and the slabs end up sitting in it. The notification names the sensor.",
       "watering": "Nothing changes: this only tells you. It is said again every 30 minutes while the pump stays still, and clears itself at its next run. Once a zone's moisture starts rising with no water, CS-310 follows and holds that zone's daily minimum and EC flushes.",
       "causes": [
         "The sump pump has failed, or its float is stuck.",
