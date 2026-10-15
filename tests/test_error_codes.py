@@ -128,7 +128,11 @@ def _repairs_codes(path: Path) -> dict[str, str]:
     for key, issue in issues.items():
         match = re.search(r"\((CS-\d{3})\)$", issue["title"])
         assert match, f"{path.name}: Repairs card {key} has no code in its title"
-        assert f"Code {match.group(1)}." in issue["description"], key
+        # a fixable card explains itself in its fix flow's confirm step
+        body = issue.get("description")
+        if body is None:
+            body = issue["fix_flow"]["step"]["confirm"]["description"]
+        assert f"Code {match.group(1)}." in body, key
         out[key] = match.group(1)
     return out
 
