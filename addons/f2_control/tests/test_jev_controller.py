@@ -166,3 +166,12 @@ def test_jev_pushes_when_a_judge_goes_on_the_stricter_gate(jev_with):
     c.jev.events.append(("strict", "default", 1, "ramp"))
     c.loop_once(NOW)
     assert _created(fake, "CS-707") == ["f2_jev_ramp_default_z1"] and c.jev.events == []
+
+
+def test_the_zone_context_carries_the_zone_total_substrate():
+    c, fake = _build({"num_zones": 1, "enable_flag": KILL}, states=_states())
+    fake.set_state("number.crop_steering_zone_1_substrate_volume", "6", {})
+    fake.set_state("number.crop_steering_zone_1_plant_count", "4", {})
+    room = c.rooms[0]
+    ctx = jev_bridge.zone_context(c, room, 1, K.snap(), K.params(), NOW, True)
+    assert ctx.substrate_l == 24.0  # 6 L a plant x 4 plants: the shot-landed check's denominator

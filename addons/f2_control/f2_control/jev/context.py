@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 
 SETTLE_MIN = 20.0  # a shot's retained rise is read this long after it (the free-water spike is gone)
 PEAK_WINDOW_MIN = 10.0  # the spike: the highest reading this soon after a shot
+LANDED_SHARE = 0.3  # a shot whose spike is under this share of the rise its litres should give did not land
 
 
 @dataclass
@@ -75,6 +76,21 @@ def response(history: ZoneHistory, shot: Shot, now: datetime) -> ShotResponse:
         None if later is None or later[2] is None or pre_e is None else round(later[2] - pre_e, 2),
         settled,
     )
+
+
+def expected_rise(shot: Shot, substrate_l):
+    """The VWC rise in points a shot's litres should give the zone's substrate (litres / litres x 100), or None."""
+    if not substrate_l or substrate_l <= 0 or shot.litres <= 0:
+        return None
+    return round(shot.litres / substrate_l * 100.0, 2)
+
+
+def landed_share(r: ShotResponse, substrate_l):
+    """The deterministic shot-landed check: the spike as a share of the expected rise, or None if unknown."""
+    expected = expected_rise(r.shot, substrate_l)
+    if expected is None or r.peak_rise is None:
+        return None
+    return round(r.peak_rise / expected, 2)
 
 
 def trend(history: ZoneHistory, now: datetime, minutes: float, index: int = 1):
@@ -155,6 +171,7 @@ class ZoneContext:
     # What the Setpoints judge may move tonight (jev_bridge.setpoint_view): {"enabled", "current", "home", "bands",
     # "changed_today", "frozen", "day", "last_words"}; None when the room has no setpoint memory.
     setpoints: dict | None = None
+    substrate_l: float | None = None  # the zone's total substrate in litres (per-plant block x plants)
 
     @property
     def since_lights_min(self):

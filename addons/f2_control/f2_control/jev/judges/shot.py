@@ -13,7 +13,7 @@ in a row did not reach the zone. Watering carries on as normal either way.
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from ..context import response
+from ..context import LANDED_SHARE, expected_rise, landed_share, response
 from ..doctrine import doctrine
 from .base import Judge, choice, common, with_doctrine
 
@@ -73,6 +73,15 @@ def _retained(r, typical):
     return out
 
 
+def _landed(r, substrate_l):
+    expected, share = expected_rise(r.shot, substrate_l), landed_share(r, substrate_l)
+    if share is None:
+        return "no reading to judge it by" if expected is not None else "the zone's substrate volume is unknown"
+    verdict = "landed" if share >= LANDED_SHARE else "did not land"
+    return (f"the spike was {share * 100:.0f}% of the {expected:+.1f} points {r.shot.litres:.1f} L should give "
+            f"{substrate_l:.1f} L of substrate: {verdict} by code's check ({LANDED_SHARE * 100:.0f}% or more lands)")
+
+
 def _ec_move(r, feed):
     if r.ec_move is None:
         return "no reading to judge it by"
@@ -130,6 +139,7 @@ class ShotJudge(Judge):
             "before_the_shot": f"VWC {_pct(sh.pre_vwc)}, pore EC {_ec(sh.pre_ec)}",
             "spike_first_10_min": ("no reading to judge it by" if r.peak_rise is None
                                    else f"{r.peak_rise:+.1f} points at the highest"),
+            "code_landed_check": _landed(r, ctx.substrate_l),
             "retained_rise_at_20_min": _retained(r, typical),
             "pore_ec_move_at_20_min": _ec_move(r, ctx.feed_ec),
             "typical_retained_rise": "unknown" if typical is None else f"{typical:.2f} points per shot today",
