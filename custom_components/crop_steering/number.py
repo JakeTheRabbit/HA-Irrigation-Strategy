@@ -12,7 +12,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
+from .const import (
+    DOMAIN,
+    CONF_NUM_ZONES,
+    CONF_P0_ADDITIONAL_DRYBACK,
+    SOFTWARE_VERSION,
+)
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .sizing import SIZING_KEYS, configured_sizing, prefer_setup_value
 
@@ -660,6 +665,26 @@ async def async_setup_entry(
                     entity_seed=entry_seed,
                 )
             )
+
+        # P0 additional dryback, per zone only: P0 ends once moisture is this % below the highest
+        # reading since lights-on. 0 is off (P0 waits for the dryback target, as before).
+        numbers.append(
+            CropSteeringNumber(
+                entry,
+                NumberEntityDescription(
+                    key=f"zone_{zone_num}_p0_additional_dryback",
+                    name=f"Crop Steering Zone {zone_num} P0 Additional Dryback",
+                    icon="mdi:water-minus",
+                    native_min_value=0.0,
+                    native_max_value=40.0,
+                    native_step=0.5,
+                    native_unit_of_measurement=PERCENTAGE,
+                    mode="box",
+                ),
+                zone_num=zone_num,
+                default_value=entry.data.get(CONF_P0_ADDITIONAL_DRYBACK, 0.0),
+            )
+        )
 
     async_add_entities(numbers)
 
