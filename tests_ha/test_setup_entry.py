@@ -44,6 +44,31 @@ async def test_the_entry_sets_up_on_a_home_assistant_that_has_no_async_panel_exi
     assert hass.http.async_register_static_paths.await_count == 1
 
 
+async def test_the_dashboard_is_a_custom_panel_on_the_same_url(hass):
+    """Home Assistant draws its own title bar above an iframe panel and none above a custom
+    panel. The page the panel shows is the one the iframe panel showed."""
+    from pathlib import Path
+
+    from custom_components.crop_steering.const import SOFTWARE_VERSION
+
+    entry = await _install(hass)
+    assert entry.state is ConfigEntryState.LOADED
+    panel = hass.data[frontend.DATA_PANELS][PANEL]
+    assert panel.component_name == "custom"
+    assert panel.config["url"] == f"/crop_steering/dashboard.html?v={SOFTWARE_VERSION}"
+    custom = panel.config["_panel_custom"]
+    assert custom["name"] == "crop-steering-panel"
+    assert custom["module_url"] == f"/crop_steering/panel.js?v={SOFTWARE_VERSION}"
+    assert custom["embed_iframe"] is False and custom["trust_external"] is False
+    # Both files are served from the integration's www/, which the panel's static path maps.
+    import custom_components.crop_steering as integration
+
+    www = Path(integration.__file__).parent / "www"
+    assert (www / "panel.js").is_file() and (www / "dashboard.html").is_file()
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert PANEL not in hass.data[frontend.DATA_PANELS]
+
+
 async def test_a_home_assistant_that_has_the_helper_is_asked_through_it(
     hass, monkeypatch
 ):
