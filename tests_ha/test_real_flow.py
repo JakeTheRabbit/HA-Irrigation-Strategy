@@ -26,7 +26,7 @@ async def _to_zones_step(hass):
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
     assert result["type"] is FlowResultType.FORM and result["step_id"] == "user"
-    result = await flow.async_configure(result["flow_id"], {"name": "Tent", "config_method": "manual"})
+    result = await flow.async_configure(result["flow_id"], {"name": "Tent"})
     assert result["step_id"] == "manual_zones"
     result = await flow.async_configure(result["flow_id"], {"num_zones": 1})
     assert result["type"] is FlowResultType.FORM and result["step_id"] == "zones"

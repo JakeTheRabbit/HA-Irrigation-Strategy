@@ -664,13 +664,23 @@ async def test_a_3_11_1_app_on_typesafe_keeps_its_brain_and_the_room_its_state(
 async def test_an_env_era_install_with_only_front_and_back_probes_still_loads_and_fuses(
     hass,
 ):
+    """Nothing reads crop_steering.env any more: setup no longer imports one and Configure no
+    longer reloads one. A room set up from one runs on what its entry stored, left as found."""
     seed = fixture("entry_env_era.json")
     entry, _ = await _upgrade(
         hass, "entry_env_era.json", registry_ids=_known_numbers(seed)
     )
+    assert not Path(hass.config.config_dir, "crop_steering.env").exists()
     assert float(hass.states.get("sensor.crop_steering_vwc_zone_1").state) == 60.0
     assert float(hass.states.get("number.crop_steering_substrate_volume").state) == 8
+    assert entry.data == seed["data"]  # config_method "env" and all
     assert entry.options == seed["options"]  # old bookkeeping keys are left exactly as found
+    hardware = seed["data"]["hardware"]
+    descriptor = hass.states.get(DESCRIPTOR).attributes
+    assert (descriptor["pump"], descriptor["mainline"]) == (
+        hardware["pump_switch"],
+        hardware["main_line_switch"],
+    )
 
 
 async def test_a_probe_with_no_unit_on_an_old_install_reads_exactly_as_it_always_did(hass):

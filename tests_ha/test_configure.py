@@ -306,11 +306,3 @@ async def test_an_upgraded_room_keeps_its_lights_hours_until_configure_changes_t
     await _save_map(hass, entry, zones=zones, lights_on_hour=7, lights_off_hour=20)
     assert _lights(hass) == (7.0, 20.0)
 
-
-# ------------------------------------------------------------------ messages
-async def test_reloading_env_on_a_room_that_never_used_one_explains_itself(hass):
-    """`not_env_config` had no translation, so the dialog showed the raw key."""
-    entry = await _install(hass)
-    done = await _open(hass, entry, "reload_env")
-    assert done["type"] is FlowResultType.ABORT and done["reason"] == "not_env_config"
-    assert "not configured from .env" in done["description_placeholders"]["message"]

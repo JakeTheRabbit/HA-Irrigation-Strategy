@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import yaml
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +21,6 @@ from .const import (
     MAX_ZONES,
     DEFAULT_NUM_ZONES,
 )
-from .env_parser import load_env_config
 from .plumbing import PLUMBING_LAYOUTS, infer as infer_plumbing
 from .room import slugify_room
 
@@ -72,7 +69,7 @@ def _as_list(v):
 
 def _zone_schema(num_zones: int, zones: dict | None = None) -> dict:
     """Build the {marker: selector} map for per-zone entity mapping, prefilled from
-    an existing `zones` dict (env_parser/config-entry shape)."""
+    an existing `zones` dict (the config entry's shape)."""
     zones = zones or {}
     out: dict = {}
     for z in range(1, int(num_zones) + 1):
@@ -196,7 +193,7 @@ def _hardware_schema(
 
 
 def _build_zones(num_zones: int, data: dict, existing: dict | None = None) -> dict:
-    """Build the config-entry `zones` dict (env_parser shape) from submitted form data."""
+    """Build the config entry's `zones` dict from submitted form data."""
     zones: dict = {str(k): {**v, "active": False} for k, v in (existing or {}).items()}
     for z in range(1, int(num_zones) + 1):
         vwc = _as_list(data.get(f"zone_{z}_vwc"))
@@ -261,12 +258,6 @@ def _build_parameters(data: dict) -> dict:
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required("name", default="Crop Steering System"): str,
-        vol.Required("config_method", default="manual"): vol.In(
-            {
-                "manual": "Search and select devices (Recommended)",
-                "env": "Load from crop_steering.env file (advanced)",
-            }
-        ),
     }
 )
 
@@ -368,9 +359,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user",
                 data_schema=STEP_USER_DATA_SCHEMA,
                 description_placeholders={
-                    "info": "Choose how to configure the Crop Steering System. "
-                    "Select devices with searchable pickers (recommended). "
-                    "Advanced users can import an existing .env file.",
                     "version": running,
                     "restart_notice": "",
                 },
@@ -382,8 +370,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._data["room_prefix"] = ""
         self._data["room_name"] = user_input.get("name", "Crop Steering")
 
-        if user_input["config_method"] == "env":
-            return await self.async_step_load_env()
         return await self.async_step_manual_zones()
 
     async def async_step_room(
@@ -411,89 +397,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._data["room_prefix"] = f"{slug}_"
         return await self.async_step_manual_zones()
 
-    async def async_step_load_env(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Load configuration from crop_steering.env file."""
-        env_path = os.path.join(self.hass.config.config_dir, "crop_steering.env")
-
-        if not await self.hass.async_add_executor_job(os.path.exists, env_path):
-            return self.async_abort(
-                reason="env_not_found",
-                description_placeholders={
-                    "path": env_path,
-                    "message": f"File not found: {env_path}\n\n"
-                    "Please create crop_steering.env in your Home Assistant config directory, "
-                    "or choose Manual configuration.",
-                },
-            )
-
-        try:
-            # Load and parse .env file off the event loop (file I/O must not block it)
-            env_config = await self.hass.async_add_executor_job(
-                load_env_config, self.hass.config.config_dir
-            )
-
-            if env_config["num_zones"] == 0:
-                return self.async_abort(
-                    reason="no_zones_configured",
-                    description_placeholders={
-                        "message": "No zones detected in crop_steering.env file. "
-                        "Please add at least one ZONE_N_SWITCH entry."
-                    },
-                )
-
-            # Validate entity IDs (skip if user chose to ignore missing)
-            ignore_missing = (
-                user_input.get("ignore_missing", False) if user_input else False
-            )
-            missing_entities = await self._validate_env_entities(env_config)
-            if missing_entities and not ignore_missing:
-                return self.async_show_form(
-                    step_id="load_env",
-                    data_schema=vol.Schema(
-                        {vol.Required("ignore_missing", default=False): bool}
-                    ),
-                    errors={"base": "missing_entities"},
-                    description_placeholders={
-                        "missing": "\n".join(missing_entities[:10]),
-                        "count": str(len(missing_entities)),
-                    },
-                )
-
-            # Create entry with .env configuration
-            _LOGGER.info(
-                f"Creating entry from .env: {env_config['num_zones']} zones, "
-                f"zones: {list(env_config['zones'].keys())}"
-            )
-
-            return self.async_create_entry(
-                title=f"Crop Steering ({env_config['num_zones']} zones from .env)",
-                data={
-                    "name": self._data.get("name", "Crop Steering System"),
-                    "config_method": "env",
-                    "room_name": self._data.get("room_name", "Crop Steering"),
-                    "room_prefix": "",
-                    "room_slug": "default",
-                    "num_zones": env_config["num_zones"],
-                    "zones": env_config["zones"],
-                    "hardware": env_config["hardware"],
-                    "parameters": env_config["parameters"],
-                    "features": env_config["features"],
-                    "env_file_path": env_path,
-                },
-            )
-
-        except Exception as e:
-            _LOGGER.error(f"Error loading .env file: {e}", exc_info=True)
-            return self.async_abort(
-                reason="env_parse_error",
-                description_placeholders={
-                    "error": str(e),
-                    "message": "Failed to parse crop_steering.env file. Please check the format.",
-                },
-            )
-
     async def async_step_manual_zones(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -520,111 +423,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._data[CONF_NUM_ZONES] = user_input[CONF_NUM_ZONES]
 
         return await self.async_step_zones()
-
-    async def async_step_load_yaml(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Load configuration from config.yaml."""
-        config_path = os.path.join(self.hass.config.config_dir, "config.yaml")
-
-        def _read_yaml():
-            # Existence check + read + parse together, off the event loop.
-            if not os.path.exists(config_path):
-                return None
-            with open(config_path, "r") as f:
-                return yaml.safe_load(f)
-
-        try:
-            config = await self.hass.async_add_executor_job(_read_yaml)
-        except yaml.YAMLError:
-            return self.async_abort(reason="yaml_error")
-
-        if config is None:
-            return self.async_abort(reason="yaml_not_found")
-
-        # Basic validation
-        if not isinstance(config, dict) or "zones" not in config:
-            return self.async_abort(reason="yaml_invalid_format")
-
-        # Extract and validate entities
-        entities_to_validate = []
-        if hardware := config.get("irrigation_hardware"):
-            entities_to_validate.extend(
-                [
-                    v
-                    for k, v in hardware.items()
-                    if v and isinstance(v, str) and "." in v
-                ]
-            )
-        if env_sensors := config.get("environmental_sensors"):
-            entities_to_validate.extend(
-                [
-                    v
-                    for k, v in env_sensors.items()
-                    if v and isinstance(v, str) and "." in v
-                ]
-            )
-
-        zones_config = {}
-        for zone in config.get("zones", []):
-            zone_id = zone.get("zone_id")
-            if not zone_id:
-                continue
-
-            zones_config[zone_id] = {
-                "zone_number": zone_id,
-                "zone_switch": zone.get("switch"),
-            }
-            entities_to_validate.append(zone.get("switch"))
-
-            if sensors := zone.get("sensors"):
-                zones_config[zone_id].update(
-                    {
-                        "vwc_front": sensors.get("vwc_front"),
-                        "vwc_back": sensors.get("vwc_back"),
-                        "ec_front": sensors.get("ec_front"),
-                        "ec_back": sensors.get("ec_back"),
-                    }
-                )
-                entities_to_validate.extend(
-                    [
-                        v
-                        for k, v in sensors.items()
-                        if v and isinstance(v, str) and "." in v
-                    ]
-                )
-
-        missing_entities = [
-            entity
-            for entity in entities_to_validate
-            if entity and not self.hass.states.get(entity)
-        ]
-
-        if missing_entities:
-            return self.async_abort(
-                reason="missing_entities",
-                description_placeholders={"missing": "\n".join(missing_entities[:5])},
-            )
-
-        # Build data for config entry
-        hardware_config = {
-            **config.get("irrigation_hardware", {}),
-            **config.get("environmental_sensors", {}),
-        }
-
-        data = {
-            "installation_mode": "yaml",
-            "name": self._data.get("name", "Crop Steering System"),
-            CONF_NUM_ZONES: len(zones_config),
-            "zones": zones_config,
-            "hardware": hardware_config,
-            "config_yaml": config,  # Store the full yaml config
-        }
-
-        return self.async_create_entry(
-            title=data["name"],
-            data=data,
-        )
 
     async def async_step_zones(
         self, user_input: dict[str, Any] | None = None
@@ -702,30 +500,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data["setup_revision"] = 1
         return self.async_create_entry(title=data["name"], data=data)
 
-    async def _validate_env_entities(self, env_config: dict) -> list[str]:
-        """Validate entity IDs from .env configuration."""
-        missing = []
-
-        # Check hardware entities
-        for key, entity_id in env_config.get("hardware", {}).items():
-            if entity_id and not self.hass.states.get(entity_id):
-                missing.append(f"{key}: {entity_id}")
-
-        # Check zone entities
-        for zone_num, zone_config in env_config.get("zones", {}).items():
-            for key, entity_id in zone_config.items():
-                if key in [
-                    "zone_switch",
-                    "vwc_front",
-                    "vwc_back",
-                    "ec_front",
-                    "ec_back",
-                ]:
-                    if entity_id and not self.hass.states.get(entity_id):
-                        missing.append(f"Zone {zone_num} {key}: {entity_id}")
-
-        return missing
-
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
@@ -797,7 +571,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_menu(
             step_id="init",
             menu_options=[
-                "reload_env",
                 "edit_parameters",
                 "edit_zones",
             ],
@@ -808,73 +581,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 "restart_notice": _restart_notice(running, waiting),
             },
         )
-
-    async def async_step_reload_env(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Reload configuration from .env file."""
-        if self._entry.data.get("config_method") != "env":
-            return self.async_abort(
-                reason="not_env_config",
-                description_placeholders={
-                    "message": "This integration was not configured from .env file. "
-                    "Use 'Edit Parameters' or 'Edit Zones' instead."
-                },
-            )
-
-        try:
-            # Reload .env file off the event loop (file I/O must not block it)
-            env_config = await self.hass.async_add_executor_job(
-                load_env_config, self.hass.config.config_dir
-            )
-
-            from .setup_api import (
-                effective,
-                configuration_payload,
-                prepare_setup,
-                safety_blockers,
-                _update,
-            )
-
-            prior = effective(self._entry)
-            zones = {
-                str(k): {**v, "active": False}
-                for k, v in prior.get("zones", {}).items()
-            }
-            for key, zone in env_config["zones"].items():
-                zones[str(key)] = {**zones.get(str(key), {}), **zone, "active": True}
-            proposed = {
-                **prior,
-                "num_zones": max(
-                    int(prior.get("num_zones", 1)), env_config["num_zones"]
-                ),
-                "zones": zones,
-                "hardware": {**prior.get("hardware", {}), **env_config["hardware"]},
-                "parameters": {
-                    **prior.get("parameters", {}),
-                    **env_config["parameters"],
-                },
-                "features": {**prior.get("features", {}), **env_config["features"]},
-            }
-            proposed = prepare_setup(
-                self.hass,
-                configuration_payload(proposed),
-                proposed,
-                self._entry.entry_id,
-            )
-            blockers = safety_blockers(self.hass, self._entry, proposed)
-            if blockers:
-                raise ValueError("; ".join(blockers))
-            _update(self.hass, self._entry, proposed)
-
-            return self.async_create_entry(
-                title="",
-                data={"reloaded": True, "zones_detected": env_config["num_zones"]},
-            )
-
-        except Exception as e:
-            _LOGGER.error(f"Error reloading .env: {e}")
-            return self.async_abort(reason="reload_failed")
 
     def _number_id(self, key: str) -> str:
         from .setup_api import effective

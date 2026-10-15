@@ -71,6 +71,8 @@ Update an existing controller in place from this repository. The old `JakeTheRab
 
 If an update is missing from the app store, refresh the repository information first. Use Update for published versions or Rebuild for a local source installation. HACS and the app store update separate components.
 
+A room first set up from a `crop_steering.env` file keeps loading and running on what its entry stored; the file is no longer read. Setup no longer imports one and Configure no longer reloads one. To set up another room, or to rebuild one, keep the old file open as a checklist and pick the same switches and probes in the setup wizard, which checks units, valves and the pump before it saves.
+
 ### Moving a controller installed from f2-control
 
 The controller used to be mirrored to `JakeTheRabbit/f2-control`. That mirror is retired; this repository is the only source. Supervisor names an app after the repository it came from (`4d457e60_f2_control` from the mirror, `6db5faba_f2_control` from here), so the move is a one-time reinstall that carries the runtime state across:

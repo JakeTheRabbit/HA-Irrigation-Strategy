@@ -2,15 +2,13 @@
   "config": {
     "step": {
       "user": {
-        "title": "Crop Steering — setup method",
-        "description": "Choose how to configure the system. The UI wizard maps everything with dropdowns (no file). The .env file is for power users who prefer text.\n\nRunning: **Crop Steering {version}**. {restart_notice}",
+        "title": "Crop Steering — set up",
+        "description": "Name this installation, then pick its zones and devices with searchable dropdowns.\n\nRunning: **Crop Steering {version}**. {restart_notice}",
         "data": {
-          "name": "System name",
-          "config_method": "Setup method"
+          "name": "System name"
         },
         "data_description": {
-          "name": "A label for this integration in Home Assistant.",
-          "config_method": "UI = pick entities with dropdowns. .env = read your crop_steering.env text file."
+          "name": "A label for this integration in Home Assistant."
         }
       },
       "room": {
@@ -384,31 +382,13 @@
           "feed_ec_sensor": "An EC probe in the water you IRRIGATE WITH, not in the substrate. When mapped, the controller refuses to water while feed EC is outside your limits or the probe stops reporting. mS/cm, dS/m or µS/cm (converted for you). Leave empty to switch this check off.",
           "feed_ph_sensor": "A pH probe in the water you irrigate with. When mapped, watering is refused outside your pH limits (5.8-6.2 by default) or when the probe stops reporting. Leave empty to switch this check off."
         }
-      },
-      "load_env": {
-        "title": "Load from crop_steering.env",
-        "description": "Some entities in the file weren't found. Tick to proceed anyway, or fix the file and retry.",
-        "data": {
-          "ignore_missing": "Proceed despite missing entities"
-        },
-        "data_description": {
-          "ignore_missing": "Create the integration even though {count} entity id(s) in the file don't exist yet."
-        }
       }
     },
     "error": {
-      "missing_entities": "Some entities in the file don't exist.",
       "setup_invalid": "Not saved yet: {error}"
     },
     "abort": {
       "already_configured": "Crop Steering is already configured.",
-      "env_not_found": "{message}",
-      "no_zones_configured": "{message}",
-      "env_parse_error": "{message}",
-      "yaml_not_found": "config.yaml not found.",
-      "yaml_error": "config.yaml could not be parsed.",
-      "yaml_invalid_format": "config.yaml is not in the expected format.",
-      "missing_entities": "Missing entities: {missing}",
       "setup_invalid": "Setup could not be saved: {error}",
       "reserved_room_name": "Default is reserved for the original room. Choose another room name.",
       "restart_required": "Home Assistant is still running Crop Steering {running}, but {installed} is installed. HACS replaces the files; Home Assistant goes on running the old code until it restarts. Restart Home Assistant, then add Crop Steering again. Nothing was set up."
@@ -420,14 +400,9 @@
         "title": "Crop Steering — options",
         "description": "Reconfigure the system without reinstalling.\n\nRunning: **Crop Steering {version}**. {restart_notice}",
         "menu_options": {
-          "reload_env": "Reload from crop_steering.env file",
           "edit_zones": "Edit zones & hardware (add/remove sensors)",
           "edit_parameters": "Edit irrigation parameters"
         }
-      },
-      "reload_env": {
-        "title": "Reload .env",
-        "description": "Re-reads crop_steering.env and updates the zone/hardware mapping. Only works if this integration was set up from .env."
       },
       "edit_zones": {
         "title": "Zones — count",
@@ -802,9 +777,7 @@
     },
     "abort": {
       "setup_invalid": "Setup could not be saved: {error}",
-      "reserved_room_name": "Default is reserved for the original room. Choose another room name.",
-      "not_env_config": "{message}",
-      "reload_failed": "crop_steering.env could not be reloaded. The Home Assistant log has the reason."
+      "reserved_room_name": "Default is reserved for the original room. Choose another room name."
     },
     "error": {
       "setup_invalid": "Not saved yet: {error}"
