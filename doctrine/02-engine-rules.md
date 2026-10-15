@@ -20,7 +20,7 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 - **IR-1** Priority 1, anti-lockout: pore EC at or above max_ec flushes in any phase when the feed is dilutive (feed EC below pore EC), the zone is draining and VWC is under field_capacity - 2. Size = p2_shot_size x (1.5 + 0.3 x min(EC excess, 3)). It is cap-exempt.
 - **IR-2** At max_ec with a non-dilutive feed or a backed-up (not draining) zone, the engine BLOCKS rather than adds salt or water; the block self-clears. On a tick that blocks, or holds (IR-3), nothing else fires: not the P3 emergency, the watchdog or the minimum floor.
 - **IR-3** Anti-short-cycle: an EC correction waits p2_min_interval_min after the last shot (at least 45 min when judged on a settled reading); at max_ec inside that gap the zone HOLDS so the last flush can drain.
-- **IR-4** P0 fires nothing routine: only an EC flush (fixed 10% shot) when pore EC is over 2.5x the P0 target, the feed is dilutive and the interval has passed.
+- **IR-4** P0 fires nothing routine: only an EC flush (a 10% shot) when pore EC is over 2.5x the P0 target, the feed is dilutive and the interval has passed. The room's substrate profile sets both numbers; these are the generic profile's.
 - **IR-5** P1 ramp: every p1_time_between_min a shot of p1_initial + p1_incr x shots so far (capped at p1_initial + p1_incr x p1_max_shots, which in practice never binds because P1 ends at p1_max_shots), scaled by ec_adjust against the P1 EC target. Ramp shots are cap-exempt; the extra shots at the target count toward the daily water limit.
 - **IR-6** P2, first match wins: rescue flush at pore EC >= max_ec - 1 (dilutive, under field_capacity - 2, interval ok; 1.5x shot, cap-exempt); dilute at EC > 1.2x the P2 target (dilutive, interval ok; 1.5x shot, inside the budget); top-up when VWC < the P2 threshold (shot scaled by ec_adjust).
 - **IR-7** P3 is emergency-only: a p3_emergency_shot when VWC falls below p3_emergency_floor (the rescue floor). Cap-exempt.
@@ -30,7 +30,7 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 - **IR-11** While steering is held (a grow plan held, stale or missing) only the water-safety shots run: the P3 emergency, the watchdog and the minimum floor. Phases still move.
 - **IR-12** When a settled pore-EC reading is supplied, every EC rule uses it instead of the raw reading.
 - **IR-13** With pore EC unknown the zone waters by VWC alone; EC corrections do not fire and the reason says salt protection is unverified.
-- **PH-11** At the integration's default dryback_target (40 % generative, 50 % vegetative) a morning drop of a few percent never ends P0: it waits for p0_max_wait_min (default 120 min), the bypass or a brain start.
+- **PH-11** At the integration's default dryback_target (45 % generative, 35 % vegetative) a morning drop of a few percent never ends P0: it waits for p0_max_wait_min (default 120 min), the bypass or a brain start.
 
 ## Shot scaling
 
@@ -85,6 +85,7 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 | p2_dilute | no |
 | p2_topup | no |
 | p3_emergency | yes |
+| p3_hold | no |
 | watchdog | yes |
 | min_daily | no |
 
@@ -115,6 +116,9 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 | min_floor_finish_h | 0 | 12 |
 | p1_rise_pts | 0.1 | 5 |
 | p1_max_extra_shots | 1 | 10 |
+| p0_additional_dryback | 0 | 40 |
+| p2_time_between_min | 0 | 120 |
+| p2_min_interval_min | 1 | 120 |
 
 ## Constants
 

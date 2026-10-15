@@ -63,6 +63,12 @@ def sensor(states, prefix=""):
         "PROBE_FAR": PROBE_FAR,
         "PROBE_RANGE": PROBE_RANGE,
         "PROBE_STALE_SECONDS": PROBE_STALE_SECONDS,
+        "SHOT_SIZE_KEYS": next(
+            ast.literal_eval(node.value)
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and getattr(node.targets[0], "id", None) == "SHOT_SIZE_KEYS"
+        ),
         "dt_util": SimpleNamespace(
             parse_datetime=datetime.fromisoformat,
             as_local=lambda value: value.replace(tzinfo=timezone.utc),

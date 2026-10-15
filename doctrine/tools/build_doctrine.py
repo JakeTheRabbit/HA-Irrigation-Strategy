@@ -223,6 +223,9 @@ def engine_facts(doc, paths):
     # number.py takes its entity defaults from its copy of the one defaults table: "key": (entity default, fallback).
     table = (Path(paths["numbers"]).parent / "generated" / "defaults.py").read_text(encoding="utf-8")
 
+    # The integration's entity defaults live in the one defaults table, beside the engine's core.py.
+    table = Path(paths["core"]).with_name("defaults.py").read_text(encoding="utf-8")
+
     def num_default(key):
         m = re.search(rf'"{key}":\s*\(([0-9.]+),', table)
         return float(m.group(1)) if m else None
@@ -273,8 +276,9 @@ def engine_facts(doc, paths):
         ("IR-3", f"Anti-short-cycle: an EC correction waits p2_min_interval_min after the last shot (at least {core.EC_SETTLE_MIN:g} min when judged on a settled reading); at max_ec inside that gap the zone HOLDS so the last flush can drain.",
          run({"ec": 10.0, "vwc": 50, "minutes_since_shot": 5})[4].kind == "hold_high_ec"
          and run({"ec": 10.0, "ec_settled": 10.0, "vwc": 50, "minutes_since_shot": 30})[4].kind == "hold_high_ec"),
-        ("IR-4", "P0 fires nothing routine: only an EC flush (fixed 10% shot) when pore EC is over 2.5x the P0 target, the feed is dilutive and the interval has passed.",
-         not run({"phase": "P0", "vwc": 50, "ec": 5.0})[2] and run({"phase": "P0", "vwc": 50, "ec": 8.5}, {"ec_target_p0": 3})[4].kind == "p0_ec_flush"),
+        ("IR-4", f"P0 fires nothing routine: only an EC flush (a {core.P0_EC_FLUSH_SHOT:g}% shot) when pore EC is over {core.P0_EC_FLUSH_RATIO:g}x the P0 target, the feed is dilutive and the interval has passed. The room's substrate profile sets both numbers; these are the generic profile's.",
+         not run({"phase": "P0", "vwc": 50, "ec": 5.0})[2] and run({"phase": "P0", "vwc": 50, "ec": 8.5}, {"ec_target_p0": 3})[4].kind == "p0_ec_flush"
+         and run({"phase": "P0", "vwc": 50, "ec": 8.5}, {"ec_target_p0": 3})[3] == core.P0_EC_FLUSH_SHOT),
         ("IR-5", "P1 ramp: every p1_time_between_min a shot of p1_initial + p1_incr x shots so far (capped at p1_initial + p1_incr x p1_max_shots, which in practice never binds because P1 ends at p1_max_shots), scaled by ec_adjust against the P1 EC target. Ramp shots are cap-exempt; the extra shots at the target count toward the daily water limit.",
          run({"phase": "P1", "vwc": 50, "ec": 5.0, "shot_count": 2})[3] == 3.0
          and run({"phase": "P1", "vwc": 50, "ec": 5.0, "shot_count": 2, "minutes_since_shot": 10})[2] is False
@@ -328,7 +332,7 @@ def engine_facts(doc, paths):
     # The Auto Setpoints learner: the controller's _follow_fc and the learner's wanted(), checked in their own source.
     follow = re.search(r"    def _follow_fc\(.*?(?=\n    def )", ctrl, re.S)
     follow = follow.group(0) if follow else ""
-    shift = re.search(r"^FC_SHIFT_MIN = ([0-9.]+)$", ctrl, re.M)
+    shift = re.search(r'"fc_shift_min": ([0-9.]+)', table)  # the generic substrate profile's
     shift = float(shift.group(1)) if shift else None
     step = re.search(r"^FC_STEP_MAX = ([0-9.]+)$", ctrl, re.M)
     step = float(step.group(1)) if step else None
@@ -366,7 +370,7 @@ def engine_facts(doc, paths):
          and 'return max((st.get("fc_follow") or {}).get("peak") or 0.0, prev), prev' in ctrl and "if prev is None or prev <= 0.0:" in ctrl
          and 'fc = bounded("field_capacity", p.field_capacity, seen)' in follow
          and 'target = bounded("p1_target_vwc", p.p1_target, min(yday, fc))' in follow
-         and 'new_thr = bounded("p2_vwc_threshold", thr, thr + delta) if abs(delta) >= FC_SHIFT_MIN else thr' in follow
+         and 'new_thr = bounded("p2_vwc_threshold", thr, thr + delta) if abs(delta) >= _profile(room)["fc_shift_min"] else thr' in follow
          and "rescue = p.p3_emergency_floor" in follow and "if rescue + 3.0 <= new_thr < target <= fc:" in follow
          and "left = max(0.0, FC_STEP_MAX - used.get(suffix, 0.0))" in follow and blind_follow is None
          and 'if ha_get(entity)[0] in (None, "unknown", "unavailable", ""):' in ctrl),
@@ -422,6 +426,10 @@ def engine_facts(doc, paths):
 def brain_facts(doc, paths, core, base_p, base_s, ctrl):
     """The brain's guard and levers, checked against the code: admit() is called, the rest is read from source."""
     brain = Path(paths["brain"])
+    # The envelope imports the engine package (crop_steering_engine), which sits beside core.py.
+    engine_src = str(Path(paths["core"]).parent.parent)
+    if engine_src not in sys.path:
+        sys.path.insert(0, engine_src)
     env = load_module(brain / "envelope.py", "envelope_snapshot")
     bridge = Path(paths["bridge"]).read_text(encoding="utf-8")
     judge_src = {d["judge"]: (brain / JUDGE_FILE.get(d["judge"], f"judges/{d['judge']}.py")).read_text(encoding="utf-8")

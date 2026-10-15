@@ -28,6 +28,14 @@ P1_RISE_GAIN_FRACTION = 0.3
 P1_MAX_EXTRA_SHOTS = 3
 # Minutes of readings a settled moisture reading is the median of (settled_reading).
 SETTLED_VWC_MIN = 10.0
+# P0 flushes when pore EC is over this multiple of the P0 EC target, with a shot this size (% of substrate).
+P0_EC_FLUSH_RATIO = 2.5
+P0_EC_FLUSH_SHOT = 10.0
+# ec_adjust's multipliers by pore EC / target, the first row that matches: over the ratio, then under it.
+EC_ADJUST_UP = ((1.5, 2.0), (1.2, 1.5), (1.0, 1.2))
+EC_ADJUST_DOWN = ((0.5, 0.5), (0.8, 0.7))
+# These are the "generic" substrate profile's values (defaults.SUBSTRATE_PROFILES); the caller passes the room's
+# profile through ZoneParams, and a caller that passes nothing gets these.
 
 
 class Reason(str):
@@ -121,6 +129,12 @@ class ZoneParams:
     #                        only below the rescue level, as before.
     p3_dryback_target: float | None = None  # the overnight dryback, a relative % of the day's peak, read by
     #                                         predictive P3 and the P3 hold. None: dryback_target, as before.
+    # From the room's substrate profile (defaults.SUBSTRATE_PROFILES); the defaults are the generic profile's.
+    ec_settle_min: float = EC_SETTLE_MIN
+    p0_ec_flush_ratio: float = P0_EC_FLUSH_RATIO
+    p0_ec_flush_shot: float = P0_EC_FLUSH_SHOT
+    ec_adjust_up: tuple = EC_ADJUST_UP
+    ec_adjust_down: tuple = EC_ADJUST_DOWN
 
 
 @dataclass
@@ -217,21 +231,17 @@ def p3_hold_level(s: ZoneSnapshot, p: ZoneParams) -> float | None:
     return s.peak_vwc * (1.0 - p3_dryback(p) / 100.0)
 
 
-def ec_adjust(size: float, ec: float | None, target: float) -> float:
+def ec_adjust(size: float, ec: float | None, target: float, up=EC_ADJUST_UP, down=EC_ADJUST_DOWN) -> float:
     """Scale a shot by pore-EC vs target: high EC -> bigger (dilute), low EC -> smaller (conserve)."""
     if ec is None or not math.isfinite(ec) or target <= 0:
         return size
     r = ec / target
-    if r > 1.5:
-        return size * 2.0
-    if r > 1.2:
-        return size * 1.5
-    if r > 1.0:
-        return size * 1.2
-    if r < 0.5:
-        return size * 0.5
-    if r < 0.8:
-        return size * 0.7
+    for over, mult in up:
+        if r > over:
+            return size * mult
+    for under, mult in down:
+        if r < under:
+            return size * mult
     return size
 
 
@@ -338,7 +348,7 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     # shots STACK EC instead of diluting it (the pump-cycling-every-minute failure mode seen live).
     # Judged on a SETTLED reading it also waits for the next settled one: a held value cannot see what the
     # last correction did, and re-firing on it would flush every few minutes for ever.
-    ec_gap = max(p.p2_min_interval_min, EC_SETTLE_MIN) if settled else p.p2_min_interval_min
+    ec_gap = max(p.p2_min_interval_min, p.ec_settle_min) if settled else p.p2_min_interval_min
     ec_gap_ok = s.minutes_since_shot >= ec_gap
     # An EC correction needs water that can dilute (feed below pore EC) and a table that drains (not backed up):
     # the runoff carries the salt out, so a full slab is where a flush works. The capped corrections (P0 flush,
@@ -372,9 +382,9 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     if not fire and not s.steering_held:
         if phase == "P0":
             # P0 is the morning dryback: it fires only a genuine EC flush, gated like every other flush.
-            if (ec_known and p.ec_target_p0 > 0 and ec / p.ec_target_p0 > 2.5
+            if (ec_known and p.ec_target_p0 > 0 and ec / p.ec_target_p0 > p.p0_ec_flush_ratio
                     and dilutive and ec_gap_ok):
-                fire, size, ir, kind = True, 10.0, f"P0 EC flush {ec:.1f}", "p0_ec_flush"
+                fire, size, ir, kind = True, p.p0_ec_flush_shot, f"P0 EC flush {ec:.1f}", "p0_ec_flush"
         elif phase == "P1":
             p1_ceiling = min(p.p1_target, p.field_capacity)
             reached = s.p1_reached or s.vwc >= p1_ceiling
@@ -391,14 +401,14 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
                 else:
                     ir, kind = f"P1 extra shot: the last one raised the peak {rise:.1f}", "p1_extra"
                 if kind != "hold_backed_up":
-                    fire, size = True, ec_adjust(raw, ec, p.ec_target_p1)
+                    fire, size = True, ec_adjust(raw, ec, p.ec_target_p1, p.ec_adjust_up, p.ec_adjust_down)
         elif phase == "P2":
             if ec_known and ec >= p.max_ec - 1.0 and flush_ok and ec_gap_ok:
                 fire, size, ir, kind = True, p.p2_shot_size * 1.5, f"P2 rescue flush EC {ec:.1f}", "p2_rescue"
             elif ec_known and p.ec_target_p2 > 0 and ec / p.ec_target_p2 > 1.2 and dilutive and ec_gap_ok:
                 fire, size, ir, kind = True, p.p2_shot_size * 1.5, f"P2 dilute EC {ec:.1f}", "p2_dilute"
             elif s.vwc < p2_thr and s.minutes_since_shot >= p.p2_time_between_min:
-                fire, size, ir, kind = True, ec_adjust(p.p2_shot_size, ec, p.ec_target_p2), f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}", "p2_topup"
+                fire, size, ir, kind = True, ec_adjust(p.p2_shot_size, ec, p.ec_target_p2, p.ec_adjust_up, p.ec_adjust_down), f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}", "p2_topup"
     p3_gap = p.p3_time_between_min or 0.0
     if not fire and phase == "P3" and s.vwc < p.p3_emergency_floor and s.minutes_since_shot >= p3_gap:
         fire, size, ir, kind = True, p.p3_emergency_shot, f"P3 emergency VWC {s.vwc:.0f}<{p.p3_emergency_floor:.0f}", "p3_emergency"
@@ -470,9 +480,9 @@ def next_shot_size(s: ZoneSnapshot, p: ZoneParams) -> float:
     if phase in ("P0", "P1"):
         count = s.shot_count if s.phase == "P1" and phase == "P1" else 0
         raw = min(p.p1_initial + p.p1_incr * count, p.p1_initial + p.p1_incr * p.p1_max_shots)
-        return ec_adjust(raw, ec, p.ec_target_p1)
+        return ec_adjust(raw, ec, p.ec_target_p1, p.ec_adjust_up, p.ec_adjust_down)
     if phase == "P2":
-        return ec_adjust(p.p2_shot_size, ec, p.ec_target_p2)
+        return ec_adjust(p.p2_shot_size, ec, p.ec_target_p2, p.ec_adjust_up, p.ec_adjust_down)
     return p.p3_emergency_shot
 
 

@@ -13,6 +13,7 @@ made and each question carries its rule in words. Any failure returns None and t
 arithmetic carries on alone: nothing ever waits on a cloud API.
 """
 import requests
+from crop_steering_engine.defaults import SUBSTRATE_PROFILES
 
 URL = "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run"
 MODEL = "typesafe/jev"
@@ -20,8 +21,10 @@ MODEL = "typesafe/jev"
 # ---- the tuning surface ----
 MIN_CONFIDENCE = 0.7  # below this a verdict is ignored
 GUARD_VETO = 0.5  # delivery_failure / runaway >= this, or probe_trust <= 1 - this, freezes the setpoints
-EC_STEP = {0: 1.0, 1: 0.5, 2: 0.0, 3: -0.5, 4: -1.0}  # P2 shot size change, in % of substrate
-PEAK_STEP = {"lower_peak": -0.5, "keep": 0.0, "raise_peak": 0.5}  # VWC points
+# From the room's substrate profile (learner); these are the generic profile's.
+_LEARNER = SUBSTRATE_PROFILES["generic"]["learner"]
+EC_STEP = dict(enumerate(_LEARNER["ec_step"]))  # P2 shot size change, in % of substrate
+PEAK_STEP = {"lower_peak": -_LEARNER["peak_step"], "keep": 0.0, "raise_peak": _LEARNER["peak_step"]}  # VWC points
 
 QUESTIONS = {
     "ec_steer": {
@@ -81,8 +84,12 @@ def call(account, token, state, gateway=None, timeout=5.0):
         return None
 
 
-def verdicts(answers, min_confidence=MIN_CONFIDENCE, veto=GUARD_VETO):
-    """answers -> {"freeze": reason or None, "p2_shot_delta": %, "peak_delta": pts, "why": [...]}, or None."""
+def verdicts(answers, min_confidence=MIN_CONFIDENCE, veto=GUARD_VETO, learner=None):
+    """answers -> {"freeze": reason or None, "p2_shot_delta": %, "peak_delta": pts, "why": [...]}, or None.
+    `learner`: the room's substrate profile's steps (generic when None)."""
+    ec_step = EC_STEP if learner is None else dict(enumerate(learner["ec_step"]))
+    peak_step = PEAK_STEP if learner is None else {
+        "lower_peak": -learner["peak_step"], "keep": 0.0, "raise_peak": learner["peak_step"]}
     if not answers:
         return None
     fail = (answers.get("delivery_failure") or {}).get("noul")
@@ -95,10 +102,10 @@ def verdicts(answers, min_confidence=MIN_CONFIDENCE, veto=GUARD_VETO):
     ec = answers.get("ec_steer") or {}
     if ec.get("score") is not None and (ec.get("confidence") or 0.0) >= min_confidence:
         level = int(round(ec["score"]))
-        out["p2_shot_delta"] = EC_STEP.get(level, 0.0)
+        out["p2_shot_delta"] = ec_step.get(level, 0.0)
         out["why"].append(f"ec_steer level {level} ({ec['confidence']:.2f})")
     peak = answers.get("peak_fit") or {}
-    if peak.get("choice") in PEAK_STEP and (peak.get("confidence") or 0.0) >= min_confidence:
-        out["peak_delta"] = PEAK_STEP[peak["choice"]]
+    if peak.get("choice") in peak_step and (peak.get("confidence") or 0.0) >= min_confidence:
+        out["peak_delta"] = peak_step[peak["choice"]]
         out["why"].append(f"peak_fit {peak['choice']} ({peak['confidence']:.2f})")
     return out
