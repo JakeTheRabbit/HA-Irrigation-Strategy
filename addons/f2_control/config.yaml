@@ -18,6 +18,8 @@ startup: application
 # Seconds the Supervisor waits after SIGTERM before it kills the app (10 by default): the shot in
 # flight is closed first, then dosing switches off what it has running (docs/DOSING.md).
 timeout: 30
+# The oldest Home Assistant the integration and this app support: the same number as hacs.json.
+homeassistant: "2024.10.0"
 homeassistant_api: true
 hassio_api: false
 host_network: false

@@ -145,7 +145,7 @@ something else cannot pass.
 | Leg (check name) | Python | Plugin release | Home Assistant | What it proves |
 | --- | --- | --- | --- | --- |
 | Production: `Real Home Assistant (setup wizard and entity ids)` | 3.14 | 0.13.366, from `requirements-test-ha.txt` | 2026.9.3 | What production runs. Branch protection requires this check on `testing` and `main`. |
-| Oldest supported: the same name followed by ` - oldest supported Home Assistant` | 3.12 | 0.13.171, with `josepy==1.14.0` | 2024.10.0 | The minimum in `hacs.json`, the README badge and [INSTALL.md](INSTALL.md). |
+| Oldest supported: the same name followed by ` - oldest supported Home Assistant` | 3.12 | 0.13.171, with `josepy==1.14.0` | 2024.10.0 | The minimum in `hacs.json`, the controller app's `config.yaml`, the README badge and [INSTALL.md](INSTALL.md). |
 
 The Python requirement follows Home Assistant: 2026.9 needs Python 3.14.2 or newer, and no plugin
 release for 2026.3 or later installs on an older Python; 2024.10 runs on 3.12. Before the matrix the
@@ -159,7 +159,8 @@ Moving a leg:
   (and `python`, if the new Home Assistant needs a newer one). Keep that leg's name exactly as it
   is: branch protection looks for it by name.
 - **Oldest supported.** That version is a promise to users, and HACS reads the one in `hacs.json`
-  as the minimum. Change the leg, `hacs.json`, the README badge and `INSTALL.md` together. Nothing
+  as the minimum; the Supervisor reads the one in the controller app's `config.yaml`
+  (`homeassistant:`). Change the leg, both files, the README badge and `INSTALL.md` together. Nothing
   older than 2024.10.0 passes today. Before 2024.9.0 the integration itself fails: it unloads a
   room through `ConfigEntries.async_loaded_entries`, which Home Assistant added in 2024.9.0, so on
   anything older unloading raises `AttributeError`, and every reload with it, including the one

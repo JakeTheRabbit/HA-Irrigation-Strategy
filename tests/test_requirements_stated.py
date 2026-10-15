@@ -1,8 +1,9 @@
 """What the README says it needs is what the repository actually asks for and tests.
 
-The minimum Home Assistant lives in five places: `hacs.json` (what HACS enforces), the oldest leg of
-the Real Home Assistant job (what is tested), the README badge, the README's *What you need* table
-and docs/INSTALL.md. docs/TESTING.md says to move them together; this fails when one is left
+The minimum Home Assistant lives in six places: `hacs.json` (what HACS enforces), the controller
+app's `config.yaml` `homeassistant:` (what the Supervisor enforces), the oldest leg of the Real Home
+Assistant job (what is tested), the README badge, the README's *What you need* table and
+docs/INSTALL.md. docs/TESTING.md says to move them together; this fails when one is left
 behind. The Python and Node versions the README names are read from where they are set.
 """
 
@@ -43,6 +44,12 @@ def test_the_minimum_home_assistant_is_one_number_everywhere():
     minimum = json.loads((ROOT / "hacs.json").read_text(encoding="utf-8"))[
         "homeassistant"
     ]
+    controller = yaml.safe_load(
+        (ROOT / "addons" / "f2_control" / "config.yaml").read_text(encoding="utf-8")
+    ).get("homeassistant")
+    assert (
+        controller == minimum
+    ), "the controller app's config.yaml `homeassistant:` is not hacs.json's minimum"
     oldest = min((leg["homeassistant"] for leg in _legs()), key=_key)
     assert (
         oldest == minimum
