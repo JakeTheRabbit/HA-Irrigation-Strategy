@@ -862,6 +862,13 @@ def _record(hass, action, before, result, context):
             message = f"set up (revision {room['revision']})"
         elif action == "setup_remove":
             message = f"archived (revision {room['revision']})"
+        elif action == "setup_commission":
+            # The wizard's draft is not part of the setup: it moves no revision and no mapping.
+            message = (
+                "set up: every switch-on check passed"
+                if room["commissioning"]["commissioned"]
+                else "setup wizard progress saved"
+            )
         else:
             changes = setup_changes(before or {}, room)
             message = f"setup saved (revision {room['revision']}): " + (
