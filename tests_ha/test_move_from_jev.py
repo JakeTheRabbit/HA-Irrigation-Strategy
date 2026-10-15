@@ -240,8 +240,10 @@ def test_the_copy_list_names_every_file_the_controller_keeps_in_its_data_folder(
         for name in re.findall(r"[\"'](?:/data/)?([A-Za-z0-9_.-]+\.jsonl?)[\"']", path.read_text(encoding="utf-8")):
             named.add(name)
     # Not data to move: the Supervisor's options.json, files that ship beside the code (the brain's tools and the
-    # doctrine manifest), and brain_notices.json, which only this app writes (a Jev app never had one).
-    assert set(_copied()) == named - {"options.json", "brain_tools.json", "manifest.json", "brain_notices.json"}
+    # doctrine manifest), and brain_notices.json and brain_report.json, which only this app writes (a Jev app never
+    # had either).
+    assert set(_copied()) == named - {
+        "options.json", "brain_tools.json", "manifest.json", "brain_notices.json", "brain_report.json"}
     assert {p.name for p in RECORDED.iterdir()} | {"state.json", "jev_usage.json"} == set(_copied())
     assert hashlib.sha256("\n".join(sorted(_copied())).encode()).hexdigest() == COPIED_SHA256
 

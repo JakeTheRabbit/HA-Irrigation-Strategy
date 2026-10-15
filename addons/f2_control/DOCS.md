@@ -21,6 +21,9 @@ the app. Under the AI assistant:
   spent, the engine runs on its own rules until the next lights-on, and CS-708 says so. A rule of thumb: about
   US$0.12 per zone a day, plus US$0.05.
 - `brain_dry_run`: it judges and the log shows what it would have done, but it moves nothing.
+- A daily report: three hours after lights-off it writes the grow-day that just ended in plain words (each
+  zone's water, moisture and pore EC, what changed, what to check tomorrow) on
+  `sensor.crop_steering_<prefix>brain_report`. One ask a day, counted against the budget; it advises only.
 - `stage_arc`: the flower stage arc it and the stage card follow once `jev_flower_start` is set
   (`slab_default`).
 - In a room whose `feed_ec_sensor` is set, it looks at the feed once a grow-day, an hour after lights-on, and
@@ -43,7 +46,7 @@ These routes are retired: an install that has them keeps them working (`brain_pr
 - `typesafe_api_key`: a TypeSafe API key (`apikey_...`). Tried first when set.
 - `cf_account_id` and `cf_api_token`, with `cf_gateway_id` optional: or Jev through Cloudflare Workers AI (with a TypeSafe key as well, Cloudflare is the second route). Without a TypeSafe key, these start Jev only on an install that has run Jev before (a `jev_` file in the app's data folder), or with `brain_provider: jev_legacy`. The token needs the **Workers AI** permission: dash.cloudflare.com, My Profile, API Tokens, Create Token, Workers AI template.
 - `jev_enabled`: off runs the plain engine even with a key set.
-- `jev_judges` (any brain): the judges that may act, `all` or a list such as `dawn,ramp,salt,dusk,probe,shot,night,zones,stage,setpoints,channel,balance,alerts` (balance runs on the Claude route only).
+- `jev_judges` (any brain): the judges that may act, `all` or a list such as `dawn,ramp,salt,dusk,probe,shot,night,zones,stage,setpoints,channel,balance,alerts,report` (balance runs on the Claude route only).
 - `jev_daily_calls`: the day's call budget across rooms (5000); `jev_budget_warn_pct` raises CS-706 at 80 % of it.
 - `jev_retries`, `jev_reask_max`, `jev_unsure_below`, `jev_strict_after`, `jev_strict_prob`: how hard the app tries to reach Jev (3 tries per route), how often it asks again when Jev is unsure (twice, under 0.7), and when a judge goes on the stricter gate (3 bad calls in a row; then it needs 0.8 and an agreeing second look).
 - `jev_flower_start`: each room's first day of 12/12, as a date or an input_datetime, for every room or as `room=value` pairs, so Jev knows today's stage.

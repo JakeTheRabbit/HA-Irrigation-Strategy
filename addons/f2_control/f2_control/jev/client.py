@@ -124,6 +124,7 @@ NO_CONTEXT = "no brain context"
 INTERNAL = "brain transport error"
 LANE_TIMEOUT_S = 15.0
 MAX_TEXT = 300  # a model's rationale, line or answer, as the journal keeps it
+HA_STATE_MAX = 255  # a Home Assistant state's length limit (the report's headline is one)
 LONG_PROMPT = 100_000  # Haiku's dearer rate card applies to a prompt above this many tokens
 # US$ per million tokens: input, output, cache read, 5-minute and 1-hour cache writes. This is also the model
 # allowlist: a model with no row is never called, so every call the Meter charges is priced at the row of the model
@@ -409,6 +410,9 @@ def validate_answer(block, snap_id, lane):
     name, args = getattr(block, "name", None), getattr(block, "input", None)
     if not isinstance(args, dict) or args.get("snapshot_id") != snap_id:
         return None
+    if name == "write_report":
+        qid = next((q for q, v in lane.items() if isinstance(v, dict) and v.get("type") == "report"), None)
+        return None if qid is None else _report(qid, args)
     qid = args.get("question_id")
     variant = lane.get(qid) if isinstance(qid, str) else None
     conf = args.get("confidence")
@@ -434,6 +438,20 @@ def validate_answer(block, snap_id, lane):
         return None  # an answer that contradicts its own probabilities is not a vote
     return qid, {"type": "choice", "choice": choice, "probabilities": probs, "confidence": float(conf),
                  "rationale": why}
+
+
+def _report(qid, args):
+    """(question id, the report) for a write_report call, or None. Every string is cleaned like a rationale; the
+    headline becomes a Home Assistant state, so it stays within HA_STATE_MAX characters; at most three watch items."""
+    headline, zones, watch = args.get("headline"), args.get("zones"), args.get("watch")
+    if not isinstance(headline, str) or not isinstance(zones, list) or not isinstance(watch, list):
+        return None
+    lines = [{"zone": z["zone"], "line": _clean(z["line"])} for z in zones
+             if isinstance(z, dict) and isinstance(z.get("zone"), int) and not isinstance(z.get("zone"), bool)
+             and isinstance(z.get("line"), str)]
+    items = [_clean(w) for w in watch if isinstance(w, str)]
+    return qid, {"type": "report", "headline": _clean(headline)[:HA_STATE_MAX], "zones": lines,
+                 "watch": [w for w in items if w][:3]}
 
 
 def split_lanes(questions):
