@@ -177,6 +177,8 @@ export class HaClient {
       "setup_create",
       "setup_save",
       "setup_remove",
+      "setup_commission",
+      "test_shot",
       "stock_get",
       "stock_save",
       "stock_refill",

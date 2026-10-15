@@ -11,6 +11,8 @@ import type {
   GrowPlan,
   ParameterLimit,
   PlanZonePreview,
+  Commissioning,
+  CommissioningCheck,
 } from "./operator-types";
 import type { States } from "./types";
 import { discoverRooms, numeric, roomSlug } from "./model";
@@ -28,6 +30,11 @@ export class OperatorDemo {
   private notifyDemo?: NotifyDemo;
   private plans = new Map<string, StrategyDocument>();
   private rooms: SetupRoom[] | null = null;
+  /** The setup wizard's draft for each room made in the demo; the demo's own rooms are set up. */
+  private wizard = new Map<
+    string,
+    { water_seen: Record<string, string>; sizing_confirmed: boolean; done: boolean }
+  >();
   /** The last release What's new showed: the demo's own unless the page asks otherwise. */
   private whatsNewSeen: string | null;
   constructor(
@@ -94,6 +101,7 @@ export class OperatorDemo {
         safety: { ready: false, blockers: [] },
       }));
     for (const room of this.rooms) {
+      if (this.wizard.has(room.entry_id)) room.commissioning = this.readiness(room, states);
       room.plumbing_inferred = inferPlumbing(room.hardware);
       const descriptor = states["sensor.crop_steering_" + room.prefix + "engine_config"];
       const flag = String(descriptor?.attributes.enable_flag || "");
@@ -267,7 +275,103 @@ export class OperatorDemo {
     });
     return { ...clone(doc), plan: clone(plan), preview: { date, zones } };
   }
+  /** As the integration's commissioning.readiness does, for the demo's hardware (which is OFF). */
+  private readiness(room: SetupRoom, states: States): Commissioning {
+    const draft = this.wizard.get(room.entry_id)!;
+    const zones = room.zones.filter((z) => z.active);
+    const check = (
+      id: CommissioningCheck["id"],
+      step: number,
+      blocking: boolean,
+      problems: string[],
+    ): CommissioningCheck => ({ id, step, ok: !problems.length, blocking, problems });
+    const valves = zones.flatMap((z) =>
+      !z.valve
+        ? ["Zone " + z.id + ": select a valve"]
+        : (states[z.valve]?.state ?? "off") === "off"
+          ? []
+          : [
+              z.valve +
+                " must read OFF before changing setup (it is ON: turn it off, then submit again)",
+            ],
+    );
+    const probes = zones.flatMap((z) =>
+      !z.vwc_sensors.length
+        ? ["Zone " + z.id + ": map a moisture probe"]
+        : [...z.vwc_sensors, ...z.ec_sensors]
+            .filter((id) => numeric(states[id]) === null)
+            .map((id) => "Zone " + z.id + ": " + id + " is not reporting a number"),
+    );
+    // The one defaults table's generic sizing (crop_steering_engine/defaults.py).
+    const generic = zones.some(
+      (z) =>
+        z.substrate_volume === 10 ||
+        z.dripper_flow_rate === 1.2 ||
+        z.drippers_per_plant === 2 ||
+        z.plant_count === 4,
+    );
+    const shots = zones.flatMap((z) => {
+      const pressed = states["button.crop_steering_" + room.prefix + "zone_" + z.id + "_test_shot"];
+      if (!pressed) return ["Zone " + z.id + ": run a test shot"];
+      return draft.water_seen[String(z.id)] === pressed.state
+        ? []
+        : ["Zone " + z.id + ": confirm water reached the drippers"];
+    });
+    const checks = [
+      check("controller", 0, false, []),
+      check("room", 1, false, []),
+      check("valves", 2, true, valves),
+      check("probes", 3, true, probes),
+      check(
+        "sizing",
+        4,
+        false,
+        generic && !draft.sizing_confirmed
+          ? ["Sizing still on the generic defaults: check and confirm it"]
+          : [],
+      ),
+      check("test_shot", 6, true, shots),
+    ];
+    const failing = checks.find((c) => c.blocking && !c.ok);
+    return {
+      commissioned: draft.done,
+      ready: !failing,
+      waiting_for: failing ? failing.problems[0] : null,
+      checks,
+      draft: { water_seen: { ...draft.water_seen }, sizing_confirmed: draft.sizing_confirmed },
+    };
+  }
   async call<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
+    if (action === "test_shot") {
+      // The demo's controller answers at once: the button records the press, the shot runs.
+      const prefix = String(data.room_id).replace(/^room:/, "");
+      const id = "button.crop_steering_" + prefix + "zone_" + Number(data.zone) + "_test_shot";
+      const room = this.setup().rooms.find((r) => r.prefix === prefix);
+      if (!room?.zones.some((z) => z.id === Number(data.zone) && z.active))
+        throw new Error("This room has no zone " + data.zone + " to test");
+      const requested = new Date().toISOString();
+      this.updateStates({
+        ...this.getStates(),
+        [id]: { entity_id: id, state: requested, attributes: {}, last_updated: requested },
+      });
+      return { requested } as T;
+    }
+    if (action === "setup_commission") {
+      const room = this.setup().rooms.find((r) => r.entry_id === data.entry_id);
+      const draft = room && this.wizard.get(room.entry_id);
+      if (!room || room.revision !== data.expected_revision)
+        throw new Error("Room changed. Reload setup.");
+      if (!draft || draft.done) throw new Error("This room is already set up");
+      Object.assign(draft.water_seen, (data.water_seen as Record<string, string>) || {});
+      if (typeof data.sizing_confirmed === "boolean")
+        draft.sizing_confirmed = data.sizing_confirmed;
+      if (data.done === true) {
+        const status = this.readiness(room, this.getStates());
+        if (!status.ready) throw new Error("Not ready to switch on: " + status.waiting_for);
+        draft.done = true;
+      }
+      return clone(this.setup().rooms.find((r) => r.entry_id === room.entry_id)) as T;
+    }
     if (action === "whats_new_get")
       return clone({ ...DEMO_WHATS_NEW, seen: this.whatsNewSeen }) as T;
     if (action === "whats_new_seen") {
@@ -398,7 +502,15 @@ export class OperatorDemo {
           fresh.revision++;
           fresh.num_zones = Math.max(...zones.map((z) => z.id));
           fresh.active_zone_ids = zones.filter((z) => z.active).map((z) => z.id);
-          if (!room) this.rooms!.push(fresh);
+          if (!room) {
+            this.rooms!.push(fresh);
+            this.wizard.set(fresh.entry_id, {
+              water_seen: {},
+              sizing_confirmed: false,
+              done: false,
+            });
+            fresh.commissioning = this.readiness(fresh, this.getStates());
+          }
           result = fresh;
         }
         const states = { ...this.getStates() },

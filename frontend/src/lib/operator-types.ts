@@ -12,6 +12,8 @@ export type OperatorAction =
   | "setup_create"
   | "setup_save"
   | "setup_remove"
+  | "setup_commission"
+  | "test_shot"
   | "stock_get"
   | "stock_save"
   | "stock_refill"
@@ -123,6 +125,26 @@ export interface SetupRoom {
   /** What the SAVED switches imply: a prefill for a room that never declared, never stored. */
   plumbing_inferred?: string;
   safety: { ready: boolean; blockers: string[] };
+  /** The setup wizard's live checks (lib/commissioning.ts); absent from an older integration. */
+  commissioning?: Commissioning;
+}
+export type CommissioningCheckId =
+  "controller" | "room" | "valves" | "probes" | "sizing" | "test_shot";
+export interface CommissioningCheck {
+  id: CommissioningCheckId;
+  step: number;
+  ok: boolean;
+  /** A safety check: Switch on waits for it. The others only warn. */
+  blocking: boolean;
+  problems: string[];
+}
+export interface Commissioning {
+  /** Set up already: every room from before the wizard, and one the wizard finished. */
+  commissioned: boolean;
+  ready: boolean;
+  waiting_for: string | null;
+  checks: CommissioningCheck[];
+  draft: { water_seen: Record<string, string>; sizing_confirmed: boolean };
 }
 export interface SetupCandidate {
   entity_id: string;
@@ -141,6 +163,8 @@ export interface SetupDocument {
     stable_zone_ids: boolean;
     /** The integration stores and checks a declared plumbing layout (absent before 2.19). */
     plumbing?: boolean;
+    /** The setup API reports each room's readiness and saves the wizard's draft. */
+    commissioning?: boolean;
   };
   rooms: SetupRoom[];
   candidates: SetupCandidate[];

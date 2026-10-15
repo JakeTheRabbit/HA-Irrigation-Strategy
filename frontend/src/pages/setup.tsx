@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Heading, Empty } from "@/components/dashboard";
 import { ControllerSettings } from "@/components/controller-settings";
+import { SetupWizard } from "@/components/setup-wizard";
 import { Pill } from "@/components/mini-visuals";
 import {
   CatchTestCalculator,
@@ -44,7 +45,14 @@ import {
   type PlumbingLayout,
 } from "@/lib/plumbing";
 import { errorText } from "@/lib/utils";
-import type { SetupCandidate, SetupDocument, SetupRoom, SetupZone } from "@/lib/operator-types";
+import { needsWizard } from "@/lib/commissioning";
+import type {
+  Commissioning,
+  SetupCandidate,
+  SetupDocument,
+  SetupRoom,
+  SetupZone,
+} from "@/lib/operator-types";
 
 export function MappingPicker({
   label,
@@ -285,6 +293,16 @@ export function Setup({
     setDraft(room);
     setNotice("");
     setError("");
+  }
+  // The wizard's checks change nothing in the room's setup: patch both copies, so they never make
+  // the room look edited.
+  function wizardStatus(commissioning: Commissioning) {
+    setOriginal((room) => room && { ...room, commissioning });
+    setDraft((room) => room && { ...room, commissioning });
+    if (commissioning.commissioned)
+      setNotice(
+        "This room is set up. Switch watering on with the Watering switch; it asks you to review first.",
+      );
   }
   function editZone(id: number, patch: Partial<SetupZone>) {
     if (draft)
@@ -619,6 +637,9 @@ export function Setup({
                     Restore room
                   </Button>
                 </div>
+              )}
+              {!isNew && original && needsWizard(original) && (
+                <SetupWizard controller={controller} room={original} onStatus={wizardStatus} />
               )}
               <section className="panel workspace-card">
                 <div className="workspace-section-heading">

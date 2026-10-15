@@ -729,3 +729,38 @@
     display: block;
   }
 }
+.wizard-steps {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+.wizard-steps li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.wizard-mark {
+  width: 1.4em;
+  font-weight: 700;
+  text-align: center;
+}
+.wizard-steps li[data-mark="done"] .wizard-mark {
+  color: var(--success);
+}
+.wizard-steps li[data-mark="attention"] .wizard-mark {
+  color: var(--warning);
+}
+.wizard-problem {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.wizard-test-shot,
+.wizard-switch-on {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
