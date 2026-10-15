@@ -3,6 +3,7 @@ import type {
   ParameterLimit,
   ScheduleBlock,
   SteeringProfile,
+  StrategyDocument,
   ZonePlan,
 } from "./operator-types";
 import { settingWords } from "./setting-words";
@@ -253,6 +254,50 @@ export function planErrors(
     if (!zone.schedule.length) errors.push("Zone " + zone.zone_id + ": add a schedule.");
   }
   return [...new Set(errors)];
+}
+/** The stored plan's state in one word and one sentence, so a saved plan that is not live yet
+ * says why. A plan whose every zone is past its schedule's last day has finished. */
+export function planState(doc: Pick<StrategyDocument, "status" | "active" | "error">): {
+  label: string;
+  sentence: string;
+} {
+  const zones = doc.active?.zones ?? [];
+  if (doc.status === "draft")
+    return {
+      label: "Draft",
+      sentence: "Saved, not running. The room keeps its own targets until you arm the plan.",
+    };
+  if (doc.status === "armed")
+    return {
+      label: "Scheduled",
+      sentence:
+        "Armed for the next lights-on. Until then the room keeps its own targets; the plan takes over at lights-on.",
+    };
+  if (doc.status === "active" && zones.length && zones.every((z) => z.status === "complete"))
+    return {
+      label: "Finished",
+      sentence:
+        "Every zone is past the last day of its schedule, so the plan sets no targets and only rescue shots run. Disarm it to give the room back its own targets at the next lights-on.",
+    };
+  if (doc.status === "active")
+    return {
+      label: "Active",
+      sentence:
+        "Running. Each zone's targets come from this plan and move on one grow day at each lights-on.",
+    };
+  if (doc.status === "disarming")
+    return {
+      label: "Stopping",
+      sentence:
+        "Disarmed. The plan's targets stay until the next lights-on, then the room returns to its own targets.",
+    };
+  return {
+    label: "Held",
+    sentence:
+      "The plan is held" +
+      (doc.error ? ": " + doc.error : "") +
+      ". Only rescue shots run until it is fixed or the plan is disarmed.",
+  };
 }
 export function parsePlanImport(text: string): GrowPlan {
   if (text.length > 500000) throw new Error("Plan file is too large.");

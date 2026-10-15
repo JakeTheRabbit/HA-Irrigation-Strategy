@@ -49,6 +49,7 @@ import {
   parseBalance,
   parsePlanImport,
   planErrors,
+  planState,
   rangeBlock,
   replaceRange,
 } from "@/lib/grow-plan";
@@ -468,9 +469,10 @@ export function GrowPlanner({
             <div>
               <span className="eyebrow">Plan status</span>
               <strong className="plan-state">
-                {document.status}
+                {planState(document).label}
                 {dirty ? " · unsaved changes" : ""}
               </strong>
+              <p className="plan-state-why">{planState(document).sentence}</p>
               <p className="muted small">
                 Revision {document.revision} ·{" "}
                 {controller.demo ? "Isolated sample plan" : "Stored in Home Assistant"}

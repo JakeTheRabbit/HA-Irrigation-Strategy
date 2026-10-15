@@ -12,3 +12,8 @@
 .plan-advanced[open] > summary {
   margin-bottom: 12px;
 }
+/* The plan state's sentence: why a saved plan is or is not live. */
+.plan-state-why {
+  margin: 4px 0;
+  max-width: 60ch;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ScheduleBlock } from "./operator-types";
+import type { ScheduleBlock, StrategyDocument } from "./operator-types";
 import {
   blockForDay,
   columnRange,
@@ -9,6 +9,7 @@ import {
   parseBalance,
   parsePlanImport,
   planErrors,
+  planState,
   rangeBlock,
   replaceRange,
   setpointRows,
@@ -210,5 +211,44 @@ describe("grow planner", () => {
     ).toBe("p");
     expect(() => parsePlanImport('{"schema_version":2}')).toThrow();
     expect(() => parsePlanImport('{"schema_version":1,"profiles":[],"zones":[{}]}')).toThrow();
+  });
+  it("says in one sentence what each plan state means", () => {
+    const zone = (status: string) => ({
+      zone_id: 1,
+      day: 90,
+      profile_id: "p",
+      bias: 50,
+      parameters: {},
+      status,
+    });
+    const state = (
+      status: StrategyDocument["status"],
+      zones: ReturnType<typeof zone>[] = [],
+      error: string | null = null,
+    ) => planState({ status, active: { grow_day: null, zones }, error });
+    expect(state("draft")).toEqual({
+      label: "Draft",
+      sentence: "Saved, not running. The room keeps its own targets until you arm the plan.",
+    });
+    expect(state("armed").label).toBe("Scheduled");
+    expect(state("armed").sentence).toMatch(/^Armed for the next lights-on\. Until then/);
+    expect(state("active", [zone("active")]).label).toBe("Active");
+    expect(state("active", [zone("active")]).sentence).toMatch(/targets come from this plan/);
+    // One zone still on its schedule keeps the plan active; every zone past it finishes it.
+    expect(state("active", [zone("complete"), zone("active")]).label).toBe("Active");
+    expect(state("active", [zone("complete"), zone("complete")]).label).toBe("Finished");
+    expect(state("active", [zone("complete")]).sentence).toMatch(/past the last day/);
+    expect(state("disarming").label).toBe("Stopping");
+    expect(state("disarming").sentence).toMatch(/until the next lights-on/);
+    expect(state("error", [], "Readable room lights_on_hour is required")).toEqual({
+      label: "Held",
+      sentence:
+        "The plan is held: Readable room lights_on_hour is required. Only rescue shots run until it is fixed or the plan is disarmed.",
+    });
+    expect(state("error").sentence).toMatch(/^The plan is held\. /);
+    const sentences = (["draft", "armed", "active", "disarming", "error"] as const).map(
+      (s) => state(s).sentence,
+    );
+    expect(new Set(sentences).size).toBe(sentences.length);
   });
 });
