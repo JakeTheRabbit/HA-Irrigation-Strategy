@@ -48,6 +48,7 @@ CAP_EXEMPT = {
     "p2_dilute": False,
     "p2_topup": False,
     "p3_emergency": True,
+    "p3_hold": False,  # holds the overnight dryback at its target: steering, not a rescue
     "watchdog": True,
     "min_daily": False,  # never over the budget by construction: min_daily_volume <= max_daily_volume
 }
@@ -65,7 +66,7 @@ class ZoneParams:
     p1_incr: float
     p1_max_shots: int
     p1_time_between_min: float
-    dryback_target: float       # P0 morning dryback %, also the overnight target
+    dryback_target: float       # P0 morning dryback %, and the overnight one unless p3_dryback_target is given
     p0_max_wait_min: float
     ec_target_p0: float
     ec_target_p1: float
@@ -97,6 +98,10 @@ class ZoneParams:
     #                                  still reading under the rescue level got another rescue every pass (60 s)
     #                                  until the water arrived. The gap counts from the last shot, so the first
     #                                  rescue of a night still goes at once. 0 = off. None: as before (no gap).
+    p3_hold: bool = False  # P3 holds the overnight dryback at its target with rescue-sized shots. Off: P3 waters
+    #                        only below the rescue level, as before.
+    p3_dryback_target: float | None = None  # the overnight dryback, a relative % of the day's peak, read by
+    #                                         predictive P3 and the P3 hold. None: dryback_target, as before.
 
 
 @dataclass
@@ -144,6 +149,19 @@ def floor_share(s: ZoneSnapshot, p: ZoneParams) -> float:
     if window <= 0:
         return 1.0
     return min(1.0, max(0.0, s.hours_since_lights_on / window))
+
+
+def p3_dryback(p: ZoneParams) -> float:
+    """The overnight dryback, a relative % of the day's peak: its own target when given, else the shared one."""
+    return p.dryback_target if p.p3_dryback_target is None else p.p3_dryback_target
+
+
+def p3_hold_level(s: ZoneSnapshot, p: ZoneParams) -> float | None:
+    """The VWC P3 holds a zone at overnight when the hold is on: the day's peak less the overnight dryback,
+    a relative % (a 30% dryback from an 86.5% peak ends at 60.55%). None when it is off or no peak is known."""
+    if not p.p3_hold or s.peak_vwc <= 0:
+        return None
+    return s.peak_vwc * (1.0 - p3_dryback(p) / 100.0)
 
 
 def ec_adjust(size: float, ec: float | None, target: float) -> float:
@@ -239,7 +257,7 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
             rate = s.dryback_rate if (s.dryback_rate and s.dryback_rate > 0) else 0.1
             # Target is relative % of detected peak; measured rate is VWC
             # percentage points/hour. Predict only the still-needed point drop.
-            target_vwc = s.peak_vwc * (1.0 - p.dryback_target / 100.0)
+            target_vwc = s.peak_vwc * (1.0 - p3_dryback(p) / 100.0)
             remaining_points = max(0.0, s.vwc - target_vwc)
             hours_needed = remaining_points / rate if s.peak_vwc > 0 else float("inf")
             if hours_needed <= 12 and s.hours_to_lights_on <= hours_needed:
@@ -320,6 +338,14 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     p3_gap = p.p3_time_between_min or 0.0
     if not fire and phase == "P3" and s.vwc < p.p3_emergency_floor and s.minutes_since_shot >= p3_gap:
         fire, size, ir, kind = True, p.p3_emergency_shot, f"P3 emergency VWC {s.vwc:.0f}<{p.p3_emergency_floor:.0f}", "p3_emergency"
+    # P3 HOLD (opt-in): instead of letting a fast night dry on to the rescue level, a rescue-sized shot each
+    # time the zone dries to the day's peak less the overnight dryback, the P3 time between shots apart. It
+    # steers, so a held plan stops it and the daily budget holds it (CAP_EXEMPT); the rescue stays the floor.
+    hold = p3_hold_level(s, p)
+    if (not fire and phase == "P3" and not s.steering_held and hold is not None and s.vwc < hold
+            and s.minutes_since_shot >= p3_gap):
+        why = f"P3 hold dryback VWC {s.vwc:.1f}<{hold:.1f} ({p3_dryback(p):g}% of peak {s.peak_vwc:.1f})"
+        fire, size, ir, kind = True, p.p3_emergency_shot, why, "p3_hold"
 
     # PRIORITY 3 — LIGHTS-ON WATERING WATCHDOG: backstop so no enabled zone ever starves. Never in P0: at
     # lights-on the whole night counts as "no water", and P0 is the dryback the day is meant to start with.
@@ -421,6 +447,10 @@ def waiting_for(s: ZoneSnapshot, p: ZoneParams) -> list:
         p3_gap = p.p3_time_between_min or 0.0
         add("p3_emergency", shot=True, metric="vwc", op="<", value=p.p3_emergency_floor, now=s.vwc,
             in_min=p3_gap - s.minutes_since_shot if p3_gap > 0 else None)
+        hold = p3_hold_level(s, p)
+        if hold is not None and not s.steering_held:
+            add("p3_hold", shot=True, metric="vwc", op="<", value=hold, now=s.vwc,
+                in_min=p3_gap - s.minutes_since_shot if p3_gap > 0 else None, dryback=p3_dryback(p))
         add("lights_on", to="P0", in_min=s.hours_to_lights_on * 60.0)
     return items
 
@@ -576,5 +606,7 @@ def zone_status_label(phase, fire, blocked, blind, reason=""):
     if "BLOCK" in (reason or ""):
         return "Blocked — EC/cap"
     if fire:
+        if getattr(reason, "kind", None) == "p3_hold":
+            return "Holding dryback"
         return {"P0": "Flushing", "P1": "Refilling", "P2": "Topping up", "P3": "Emergency"}.get(phase, "Watering")
     return {"P0": "Drying back", "P1": "Ramping", "P2": "Optimal", "P3": "Overnight dryback"}.get(phase, "Idle")
