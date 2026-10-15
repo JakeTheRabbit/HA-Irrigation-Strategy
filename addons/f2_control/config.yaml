@@ -28,7 +28,7 @@ ingress_port: 8420
 panel_icon: mdi:sprout
 panel_title: Crop Steering
 # Set by the Supervisor on every start: this process runs as the Home Assistant app. A standalone
-# container sets F2_RUNTIME=container instead. Today only run.sh reads it (the dashboard listener).
+# container sets F2_RUNTIME=container instead. The controller (runtime_env) and run.sh read it.
 environment:
   F2_RUNTIME: addon
 options:

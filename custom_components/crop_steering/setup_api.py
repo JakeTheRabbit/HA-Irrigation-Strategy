@@ -596,6 +596,8 @@ def read_setup(hass):
             "plumbing": True,
         },
         "limits": {"max_zones": MAX_ZONES},
+        # What a new zone's sizing starts at: the one defaults table, as the HA wizard offers it.
+        "sizing_defaults": dict(SIZING_DEFAULTS),
         "rooms": [
             setup_room(hass, e) for e in hass.config_entries.async_entries(DOMAIN)
         ],
