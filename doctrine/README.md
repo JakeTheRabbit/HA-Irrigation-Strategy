@@ -74,7 +74,8 @@ The build fails when any of these checks fails:
      secret. When it is missing or empty the build **fails** ("private denylist secret missing"). Only
      `--private-skip REASON` turns it off, for a run where no secret exists (a fork pull request, a contributor's
      machine); the skip is printed and written to the job summary. The public list itself is linted with the
-     private one, so it cannot carry a word it exists to keep out.
+     private one, so it cannot carry a word it exists to keep out. A private hit is reported by file and line
+     only ("a word on the private denylist"): the list is a secret, so the log never shows the word or its entry.
    - A `vendor-snapshot/` folder inside the pack fails the build: audit inputs that hold site text never ship.
 5. **Generated files current** (`--check`): every output matches, and no file is left in `compiled/` that the
    build no longer produces (a write run deletes such files). An output goes stale only when a value the pack
