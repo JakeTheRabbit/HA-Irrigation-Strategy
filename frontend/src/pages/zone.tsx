@@ -10,6 +10,7 @@ import {
   type Page,
 } from "@/components/dashboard";
 import { ZoneDay } from "@/components/day-timeline";
+import { OverlayRows, useOverlays } from "@/components/overlay-row";
 import { Pill } from "@/components/mini-visuals";
 import { SensorContextCard, useSensorContext } from "@/components/sensor-context";
 import { rangeText, steeringOf } from "@/lib/day-chart";
@@ -26,6 +27,7 @@ import {
   type JevSetpoints,
 } from "@/lib/jev";
 import { referenceLines } from "@/lib/sensor-context";
+import { zoneOverlays } from "@/lib/overlays";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { jevChip, TARGET_GROUPS } from "@/lib/targets";
 import { PROBE_TONE, zoneProbes } from "@/lib/probes";
@@ -182,7 +184,9 @@ function JevOnZone({
   const { log } = readJev(states, room.room.prefix);
   const sensor = parseJevZone(states[ids.zone(zone.id)]);
   const setpoints = parseJevSetpoints(states[ids.zone(zone.id)]);
-  if (!log && !sensor) return null;
+  const { doc, reload } = useOverlays(controller);
+  const overlays = zoneOverlays(doc, controller.roomId, zone.id);
+  if (!log && !sensor && !overlays.length) return null;
   const { rest, outcomes } = attachOutcomes(log?.entries ?? []);
   const recent = rest.filter((entry) => entry.zone === zone.id).slice(0, 6);
   const now = Date.now();
@@ -203,6 +207,7 @@ function JevOnZone({
       </div>
       <div className="zone-panel-body">
         {setpoints && <JevSetpointsLine setpoints={setpoints} />}
+        <OverlayRows controller={controller} overlays={overlays} reload={reload} />
         {!!sensor?.judges.length && (
           <ul className="zone-judges" aria-label="Each judge's last word on this zone">
             {sensor.judges.map((judge) => (

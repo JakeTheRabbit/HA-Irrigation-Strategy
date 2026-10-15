@@ -469,6 +469,7 @@ export class ControllerStore {
       action.startsWith("strategy_") ||
       action.startsWith("runs_") ||
       action.startsWith("setpoint_log_") ||
+      action.startsWith("overlay_") ||
       action.startsWith("stock_") ||
       action.startsWith("dosing_");
     const payload = scoped ? { ...data, room_id: roomId } : data;
@@ -483,6 +484,7 @@ export class ControllerStore {
         "setup_read",
         "runs_get",
         "setpoint_log_get",
+        "overlay_get",
         "stock_get",
         "dosing_get",
         "notify_get",

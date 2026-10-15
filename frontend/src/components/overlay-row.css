@@ -1,0 +1,27 @@
+/* AI overlays: a setting the AI changed, when it goes back, and Keep / Undo. */
+.overlay-rows {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.overlay-rows li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  background: var(--muted);
+}
+.overlay-rows small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.overlay-actions {
+  display: inline-flex;
+  gap: 4px;
+}

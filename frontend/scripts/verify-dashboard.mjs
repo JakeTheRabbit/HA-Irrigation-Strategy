@@ -635,6 +635,32 @@ try {
     await axe("zone page, lower half", ".zone-page-grid");
     await axeDark("zone page, lower half", ".zone-page-grid");
   });
+  await check(
+    "zone page: an AI change goes back by itself, or is kept or undone through the review",
+    async () => {
+      for (const [button, title] of [
+        ["Keep", "Keep the AI's change?"],
+        ["Undo", "Undo the AI's change?"],
+      ]) {
+        // A fresh demo each time: the first pass's Keep has ended its overlay.
+        await go("zone/3");
+        await page.reload({ waitUntil: "networkidle" });
+        const row = page.locator("[data-zone-jev] .overlay-rows li");
+        await expectVisible(row);
+        assert.match(
+          await row.innerText(),
+          /^Maintenance shot size 4\.5% → 4%\s*Set by AI .+ · goes back at lights-on /,
+        );
+        await row.getByRole("button", { name: button, exact: true }).click();
+        const review = page.getByRole("dialog", { name: title });
+        await expectVisible(review);
+        assert.match(await review.locator(".review-row").innerText(), /4% \(AI\)/);
+        await review.getByRole("button", { name: /Apply 1 change/ }).click();
+        await review.waitFor({ state: "hidden" });
+        await row.waitFor({ state: "detached" });
+      }
+    },
+  );
   await check("zone page: a zone is moved to a phase by hand, through the review", async () => {
     await go("zone/1");
     const picker = page.getByRole("group", { name: "Move Zone 1 to" });

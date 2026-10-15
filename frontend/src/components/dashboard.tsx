@@ -416,6 +416,7 @@ export function ReviewDialog({
   onApplied,
   title = "Review changes",
   note,
+  run,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -424,6 +425,9 @@ export function ReviewDialog({
   onApplied?: (applied: string[]) => void;
   title?: string;
   note?: string;
+  /** Applies the reviewed change some other way than writing its values (an AI overlay's Keep or
+   * Undo); it throws when Home Assistant refuses. */
+  run?: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -434,6 +438,12 @@ export function ReviewDialog({
     setBusy(true);
     setErrors([]);
     try {
+      if (run) {
+        await run();
+        onApplied?.(items.map((item) => item.change.entityId));
+        onOpenChange(false);
+        return;
+      }
       const result = await controller.write(items.map((item) => item.change));
       onApplied?.(result.applied);
       if (result.failed.length)

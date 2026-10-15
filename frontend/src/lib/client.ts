@@ -169,6 +169,9 @@ export class HaClient {
       "runs_archive",
       "runs_import",
       "setpoint_log_get",
+      "overlay_get",
+      "overlay_keep",
+      "overlay_undo",
       "strategy_get",
       "strategy_save",
       "strategy_preview",
@@ -192,6 +195,11 @@ export class HaClient {
       "whats_new_seen",
     ];
     if (!allowed.includes(action)) throw new Error("Unsupported workspace action.");
+    // Keep and Undo answer nothing: asking them for a response is refused.
+    if (action === "overlay_keep" || action === "overlay_undo") {
+      await this.service("crop_steering", action, data);
+      return undefined as T;
+    }
     const response = await this.request<{ service_response?: T }>(
       "POST",
       "services/crop_steering/" + action + "?return_response",
