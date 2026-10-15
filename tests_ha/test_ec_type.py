@@ -90,3 +90,28 @@ async def test_a_zone_with_a_bulk_and_a_pore_probe_steers_on_pore(hass, freezer)
     state = await _read(hass, freezer, **{BULK: "1.2"})
     assert float(state.state) == 1.2 and state.attributes["ec_type"] == "bulk"
     assert state.attributes["excluded"] == {PORE: "no reading"}
+
+
+async def test_the_controller_says_when_a_zone_steers_on_bulk_ec(
+    hass, freezer, controller_for
+):
+    from datetime import datetime
+
+    await _install(hass)
+    await _choose(hass, _type_select(PORE), "pore")
+    await _choose(hass, _type_select(BULK), "bulk")
+    hass.states.async_set(PORE, "unavailable")
+    await _read(hass, freezer, **{BULK: "1.2"})
+    c, fake, _clock = controller_for(
+        {"enable_flag": "switch.crop_steering_engine_enabled"}
+    )
+    assert c._read_sensor(c._fused_id("", "ec", 1), "ec") == 1.2
+    c.loop_once(datetime(2026, 9, 21, 14, 0, 0))
+    raised = [
+        data
+        for domain, service, data in fake.calls
+        if (domain, service) == ("persistent_notification", "create")
+        and data["notification_id"] == "f2_ec_type_default_z1"
+    ]
+    assert len(raised) == 1 and raised[0]["title"].endswith("(CS-504)"), raised
+    assert PORE in raised[0]["message"]

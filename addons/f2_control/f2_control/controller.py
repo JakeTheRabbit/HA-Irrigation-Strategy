@@ -1743,11 +1743,28 @@ class Controller:
     def _watch_probe_methods(self, room):
         """CS-502: a zone set to steer on its Lowest or Highest probe that has too few probes that
         agree, so the integration steers it on their median (calculations.fuse_probes publishes the
-        choice as `method`, what it used as `steered_by`). Watering carries on, on the median."""
+        choice as `method`, what it used as `steered_by`). Watering carries on, on the median.
+        CS-504: a zone with pore and bulk EC probes steering on bulk (`ec_type`), as no pore probe
+        reports. Watering carries on."""
         for zone in room.zones:
             for metric, what in (("vwc", "moisture"), ("ec", "EC")):
                 looking = self._fused_id(room.prefix, metric, zone, room.zones[zone].get(metric))
                 attrs = self._device(looking, metric)[5] or {}
+                if metric == "ec" and attrs.get("ec_type") == "bulk":
+                    left_out = ", ".join(sorted((attrs.get("excluded") or {}).keys())) or "none"
+                    self._alert(
+                        f"ec_type_{room.slug}_z{zone}",
+                        "CS-504",
+                        "steering on bulk EC: no pore EC probe reporting",
+                        "This zone has pore EC and bulk EC probes, which are never combined. No "
+                        "pore EC probe is reporting, so the zone's EC comes from its bulk EC "
+                        "probes, which read lower than pore EC from the same slab: EC targets, "
+                        "stacking and flushes act on that lower number until a pore EC probe "
+                        "reports again. Check the pore EC probes listed below."
+                        f"\n\nSensor: {looking}\nLeft out: {left_out}",
+                        room=room,
+                        zone=zone,
+                    )
                 chosen, steered = attrs.get("method"), attrs.get("steered_by")
                 if not chosen or not steered or chosen == steered:
                     continue
