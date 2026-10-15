@@ -487,6 +487,7 @@ class Room:
         self._beat = None  # (hardware_fault, room_active) of its last heartbeat
         self._beat_at = None  # and when, by time.monotonic()
         self._statuses = {}  # z -> (label, reason) of its zones' last status
+        self._safety_shown = {}  # z -> (label, since) of its zones' safety status (the hysteresis)
         self._status_at = {}  # z -> when, by time.monotonic()
 
 
@@ -4368,7 +4369,13 @@ class Controller:
             for zone in sorted(pub):
                 d = pub[zone]
                 p = d["p"]
-                saf = zone_safety_status(d["vwc"], d["ec"], p.field_capacity, p.max_ec)
+                shown, since = room._safety_shown.get(zone, (None, None))
+                saf = zone_safety_status(
+                    d["vwc"], d["ec"], p.field_capacity, p.max_ec,
+                    shown, None if since is None else (now - since).total_seconds() / 60,
+                )
+                if saf != shown:
+                    room._safety_shown[zone] = (saf, now)
                 labels.append(saf)
                 ha_set(
                     f"sensor.crop_steering_{px}zone_{zone}_phase",

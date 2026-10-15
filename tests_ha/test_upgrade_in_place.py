@@ -660,6 +660,34 @@ async def test_a_3_11_1_app_on_typesafe_keeps_its_brain_and_the_room_its_state(
     assert c.rooms[0].state[1]["learn"] == state["default"]["1"]["learn"]
 
 
+async def test_a_3_11_1_room_shows_the_same_safety_status_under_the_same_ids(
+    hass, controller_for, monkeypatch
+):
+    """The safety status now holds its label through a small band: on the first reading after the
+    update a 3.11.1 room shows exactly what 3.11.1 showed (the label at the thresholds), under the
+    same entity ids, and a reading that has not moved does not move it."""
+    from crop_steering_engine import zone_safety_status
+
+    seed = fixture(JEV_3_11_1)
+    await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
+    c, fake, _built, _usage, _state = _jev_3_11_1_app(
+        controller_for, monkeypatch, "options_3_11_1_jev_cf.json"
+    )
+    room = c.rooms[0]
+    now = datetime(2026, 1, 1, 12, 0)
+    for minute in (0, 1):
+        pub = c._loop_room(room, now.replace(minute=minute))
+        c._publish_status(room, pub, now.replace(minute=minute))
+        for zone in (1, 2):
+            d = pub[zone]
+            shown = fake.sets[f"sensor.crop_steering_zone_{zone}_safety_status"][0]
+            assert shown == zone_safety_status(
+                d["vwc"], d["ec"], d["p"].field_capacity, d["p"].max_ec
+            )
+            assert shown == "approaching_saturation"  # 3.11.1's label for these readings
+        assert fake.sets["sensor.crop_steering_system_safety_status"][0] == "warning"
+
+
 # ------------------------------------------------------------------ an env-file era install
 async def test_an_env_era_install_with_only_front_and_back_probes_still_loads_and_fuses(
     hass,
