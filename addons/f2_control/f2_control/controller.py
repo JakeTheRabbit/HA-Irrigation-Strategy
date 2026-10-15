@@ -295,7 +295,7 @@ def ha_logbook(entity, since, timeout=8):
             params={"entity": entity, "end_time": datetime.now(timezone.utc).isoformat()},
             timeout=timeout,
         )
-        _GATE.saw("other", r.status_code, f"GET {BASE}/logbook")
+        _GATE.saw("other", r.status_code, f"GET {SHOWN_BASE}/logbook")
         entries = r.json() if r.status_code == 200 else []
         return entries if isinstance(entries, list) else []
     except Exception:
