@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AskWhy } from "@/components/ask-why";
 import { Empty, Heading, time as clock } from "@/components/dashboard";
 import { JevTrouble, jevUsage } from "@/components/jev-status";
 import { Pill } from "@/components/mini-visuals";
@@ -152,6 +153,7 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
           <JevTrouble jev={jev.room} />
         </div>
       )}
+      <AskWhy controller={controller} zone={zone} />
       <section className="panel timeline-panel" aria-label="Timeline records">
         {!shown.length ? (
           <Empty

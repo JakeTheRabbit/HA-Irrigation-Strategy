@@ -469,7 +469,8 @@ export class ControllerStore {
       action.startsWith("strategy_") ||
       action.startsWith("runs_") ||
       action.startsWith("stock_") ||
-      action.startsWith("dosing_");
+      action.startsWith("dosing_") ||
+      action.startsWith("brain_");
     const payload = scoped ? { ...data, room_id: roomId } : data;
     if (scoped && !roomId) throw new Error("Select an available room.");
     // What's new's record and a test push change nothing a refresh would show, and must neither

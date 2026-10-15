@@ -189,6 +189,7 @@ export class HaClient {
       "notify_test",
       "whats_new_get",
       "whats_new_seen",
+      "brain_ask",
     ];
     if (!allowed.includes(action)) throw new Error("Unsupported workspace action.");
     const response = await this.request<{ service_response?: T }>(

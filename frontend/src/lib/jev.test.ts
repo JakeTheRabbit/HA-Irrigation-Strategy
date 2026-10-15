@@ -9,6 +9,7 @@ import {
   jevCost,
   jevResult,
   outcomeText,
+  parseBrainAnswers,
   parseJevEntry,
   parseJevLog,
   parseJevRoom,
@@ -499,5 +500,45 @@ describe("which brain runs, and whether it is on", () => {
   it("costs the Claude brain at what it spent", () => {
     expect(jevCost(null, 0.4)).toBe("≈ $0.40");
     expect(jevCost(3_000_000, 0.004)).toBe("under $0.01");
+  });
+});
+
+describe("parseBrainAnswers", () => {
+  it("reads the answers newest first, how many are asking, and drops a malformed one", () => {
+    const read = parseBrainAnswers(
+      entity("sensor.crop_steering_brain_answers", "asking", {
+        answers: [
+          {
+            id: "a",
+            question: "Why no water?",
+            zone: 1,
+            answer: "Still drying back.",
+            answered_at: "2026-10-15T08:00:00+00:00",
+            cannot_answer: false,
+          },
+          {
+            id: "b",
+            question: "Why the pump?",
+            answer: "The record does not say.",
+            cannot_answer: true,
+          },
+          { question: "no id" },
+          null,
+        ],
+        pending: ["c"],
+        asked_today: 3,
+        daily_limit: 20,
+      }),
+    );
+    expect(read?.answers.map((a) => [a.id, a.cannotAnswer, a.zone])).toEqual([
+      ["b", true, null],
+      ["a", false, 1],
+    ]);
+    expect(read?.answers[1].answeredAt).toBe(Date.parse("2026-10-15T08:00:00Z"));
+    expect([read?.pending, read?.askedToday, read?.limit]).toEqual([1, 3, 20]);
+  });
+
+  it("is null for a controller from before Ask why", () => {
+    expect(parseBrainAnswers(undefined)).toBeNull();
   });
 });

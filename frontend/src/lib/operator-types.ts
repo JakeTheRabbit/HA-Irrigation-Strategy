@@ -23,7 +23,8 @@ export type OperatorAction =
   | "notify_save"
   | "notify_test"
   | "whats_new_get"
-  | "whats_new_seen";
+  | "whats_new_seen"
+  | "brain_ask";
 
 export interface ParameterLimit {
   value: number | null;

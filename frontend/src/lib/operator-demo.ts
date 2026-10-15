@@ -279,6 +279,12 @@ export class OperatorDemo {
         this.whatsNewSeen = version;
       return { seen: this.whatsNewSeen } as T;
     }
+    if (action === "brain_ask")
+      // The demo has no AI assistant: the question is taken and never answered.
+      return {
+        question: { id: `demo-${Date.now()}`, question: data.question, zone: data.zone ?? null },
+        error: null,
+      } as T;
     if (action.startsWith("runs_")) {
       this.runDemo ||= new RunDemo(this.getStates);
       return this.runDemo.call(action, data) as T;
