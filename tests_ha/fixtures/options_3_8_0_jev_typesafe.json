@@ -1,5 +1,5 @@
 {
- "_about": "F2's controller app options as 3.8.0 saved them in /data/options.json (2 Oct 2026), the TypeSafe key replaced. 3.8.0 had no second route, retries, re-asks or stricter gate, and a 2000-call budget.",
+ "_about": "A production room's controller app options as 3.8.0 saved them in /data/options.json (2 Oct 2026), the TypeSafe key and the room's sensor names replaced. 3.8.0 had no second route, retries, re-asks or stricter gate, and a 2000-call budget.",
  "options": {
   "num_zones": 3,
   "lights_on_hour": 10,
@@ -10,7 +10,7 @@
   "instance_name": "Crop Steering",
   "feed_ec_sensor": "",
   "feed_ph_sensor": "",
-  "sump_power_sensor": "default=sensor.f2_sump_pump_power",
+  "sump_power_sensor": "default=sensor.sump_pump_power",
   "sump_silent_hours": 3,
   "hold_entities": [],
   "substrate_l": 5,

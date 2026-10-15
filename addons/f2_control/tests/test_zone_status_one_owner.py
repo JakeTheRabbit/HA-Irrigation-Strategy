@@ -41,8 +41,8 @@ def test_an_off_room_says_so_on_the_same_entity():
 
 
 def test_the_publisher_names_the_rooms_prefix():
-    room = controller.Room("f1", "f1_", {1: {}}, {"pump": None, "mainline": None, "valves": {1: "switch.f1_v1"}},
-                           "switch.crop_steering_f1_engine_enabled", "", "", 10, 22)
+    room = controller.Room("room_b", "room_b_", {1: {}}, {"pump": None, "mainline": None, "valves": {1: "switch.room_b_v1"}},
+                           "switch.crop_steering_room_b_engine_enabled", "", "", 10, 22)
     published = {}
     original = controller.ha_set
     controller.ha_set = lambda entity, state, attributes=None: published.update({entity: state})
@@ -50,4 +50,4 @@ def test_the_publisher_names_the_rooms_prefix():
         controller.Controller._publish_zone_status(room, 1, "Optimal", "in band")
     finally:
         controller.ha_set = original
-    assert published == {"sensor.crop_steering_f1_zone_1_status_app": "Optimal"}
+    assert published == {"sensor.crop_steering_room_b_zone_1_status_app": "Optimal"}

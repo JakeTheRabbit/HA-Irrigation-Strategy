@@ -1,7 +1,7 @@
 """Tests for the per-room Repairs health checks (#22).
 
 Confirms the kill-switch / heartbeat health checks resolve per room instead of
-hardcoding the F2 default, so a custom default kill switch and additional rooms are
+hardcoding one site's default, so a custom default kill switch and additional rooms are
 all monitored.
 """
 

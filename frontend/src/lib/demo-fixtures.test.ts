@@ -230,7 +230,7 @@ describe("the demo's batch tank", () => {
       states["sensor.demo_f1_tank_level"].state,
     );
   });
-  it("is filled to 100 % once or twice a day, as F2's is, after running down to 25 % or less", () => {
+  it("is filled to 100 % once or twice a day, as a real tank is, after running down to 25 % or less", () => {
     const { record } = load(168);
     expect(record.fills.length).toBeGreaterThanOrEqual(7);
     expect(record.fills.length).toBeLessThanOrEqual(14);

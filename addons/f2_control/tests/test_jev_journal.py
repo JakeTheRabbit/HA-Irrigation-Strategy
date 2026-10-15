@@ -69,7 +69,7 @@ def test_the_journal_survives_a_restart_and_keeps_only_the_newest(tmp_path):
     path = str(tmp_path / "j.jsonl")
     j = Journal(path)
     for i in range(MAX_KEPT + 25):
-        j.add({"t": f"2026-09-28T10:{i % 60:02d}:00", "room": "default" if i % 2 else "f1", "zone": 1,
+        j.add({"t": f"2026-09-28T10:{i % 60:02d}:00", "room": "default" if i % 2 else "room_b", "zone": 1,
                "judge": "salt", "title": "Pore EC", "verdict": str(i), "result": "no action"})
     again = Journal(path)
     assert len(again.entries) == MAX_KEPT and again.entries[-1]["verdict"] == str(MAX_KEPT + 24)

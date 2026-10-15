@@ -34,6 +34,13 @@ describe("run comparison calendar and aggregation", () => {
     for (const start of ["2026-09-27", "2026-04-05"])
       expect(ageAt(timeAtAge(0.5, start, zone), start, zone)).toBeCloseTo(0.5);
   });
+  it("uses 23/25-hour New York dates, the northern hemisphere's clock changes", () => {
+    const ny = "America/New_York";
+    expect(midnight("2026-03-09", ny) - midnight("2026-03-08", ny)).toBe(23 * 3600000);
+    expect(midnight("2026-11-02", ny) - midnight("2026-11-01", ny)).toBe(25 * 3600000);
+    for (const start of ["2026-03-08", "2026-11-01"])
+      expect(ageAt(timeAtAge(0.5, start, ny), start, ny)).toBeCloseTo(0.5);
+  });
   it("aligns previous progress by local grow age and truncates closed runs", () => {
     const current = record("2026-09-27"),
       previous = record("2026-04-05");

@@ -106,8 +106,11 @@ describe("watched entities", () => {
         zone_names: { 1: "Front" },
         feed_ec_sensor: "sensor.not_created_yet",
       }),
-      entity("sensor.crop_steering_f1_engine_config", "ready", { prefix: "f1_", num_zones: 1 }),
-      entity("sensor.crop_steering_f1_ai_heartbeat", "healthy", {
+      entity("sensor.crop_steering_room_b_engine_config", "ready", {
+        prefix: "room_b_",
+        num_zones: 1,
+      }),
+      entity("sensor.crop_steering_room_b_ai_heartbeat", "healthy", {
         enable_flag: "switch.custom_flag",
       }),
       entity("number.crop_steering_zone_1_p1_target_vwc", "60"),
@@ -146,18 +149,18 @@ describe("watched entities", () => {
       "sensor.crop_steering_current_decision",
       "sensor.crop_steering_zone_2_phase",
       "sensor.crop_steering_zone_2_status",
-      "sensor.crop_steering_f1_ai_heartbeat",
-      "sensor.crop_steering_f1_zone_1_last_irrigation_app",
+      "sensor.crop_steering_room_b_ai_heartbeat",
+      "sensor.crop_steering_room_b_zone_1_last_irrigation_app",
       // Jev's sensors: a log first posted after the page opened still updates live.
       "sensor.crop_steering_jev",
       "sensor.crop_steering_jev_log",
       "sensor.crop_steering_zone_2_jev",
-      "sensor.crop_steering_f1_jev_log",
-      "sensor.crop_steering_f1_zone_1_jev",
+      "sensor.crop_steering_room_b_jev_log",
+      "sensor.crop_steering_room_b_zone_1_jev",
     ])
       expect(ids).toContain(id);
-    expect(ids).not.toContain("sensor.crop_steering_f1_zone_2_phase");
-    expect(ids).not.toContain("sensor.crop_steering_f1_zone_2_jev");
+    expect(ids).not.toContain("sensor.crop_steering_room_b_zone_2_phase");
+    expect(ids).not.toContain("sensor.crop_steering_room_b_zone_2_jev");
   });
   it("includes each probe a zone's combined reading names, used or left out", () => {
     const ids = watchedEntities({
@@ -202,7 +205,7 @@ describe("watched entities", () => {
       "switch.recirc",
       // The controller's dosing report, before it has posted one.
       "sensor.crop_steering_dosing",
-      "sensor.crop_steering_f1_dosing",
+      "sensor.crop_steering_room_b_dosing",
     ])
       expect(ids).toContain(id);
     expect(ids).not.toContain("switch.not_in_ha");
@@ -365,7 +368,7 @@ describe("inside Home Assistant", () => {
     expect(store.getSnapshot().states[VWC].state).toBe("61.5");
   });
   it("shows a Jev log first posted after the page opened, and each decision after it", async () => {
-    // Flower 1's controller has not posted its log yet (an older controller, or Jev just switched on).
+    // The demo's second room has not posted its log yet (an older controller, or Jev just switched on).
     const LOG = "sensor.crop_steering_f1_jev_log";
     const { home, store } = await started();
     const [, message] = home.connection.subscribeMessage.mock.calls[0] as unknown as [

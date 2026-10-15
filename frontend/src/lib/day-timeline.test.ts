@@ -87,7 +87,7 @@ describe("grow day", () => {
   });
 });
 
-// Flower 2 on 23 September 2026 (UTC; lights-on 10:00 NZST is 22:00Z), as the recorder returned it.
+// A production room on 23 September 2026 (UTC; lights-on 10:00 NZST is 22:00Z), as the recorder returned it.
 const START = at("22:00:00");
 const decisions = [
   decision(START),
@@ -218,7 +218,7 @@ describe("shots", () => {
 });
 
 describe("blocks and holds", () => {
-  // Flower 2 on 22 September 2026: a dosing hold during the ramp, then two zones blocked at their
+  // The same room on 22 September 2026: a dosing hold during the ramp, then two zones blocked at their
   // daily budget until lights-off, and the kill switch off across a restart.
   const day = [
     decision(at("22:00:00", "2026-09-21")),

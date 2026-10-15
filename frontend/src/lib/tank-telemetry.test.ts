@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDemo } from "./demo";
 import { tankTelemetry } from "./tank-telemetry";
-const room = { id: "room:", name: "Flower 2", prefix: "" };
+const room = { id: "room:", name: "Room A", prefix: "" };
 const now = Date.parse("2026-09-08T08:00:00Z");
 describe("room tank telemetry", () => {
   it("finds renamed HA descriptors by room prefix", () => {

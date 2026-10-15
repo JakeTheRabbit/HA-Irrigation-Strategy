@@ -69,7 +69,7 @@ def save(store, **data):
     return asyncio.run(store.save(data))
 
 
-def ask(store, action="dose", by="Ben", **data):
+def ask(store, action="dose", by="Alex", **data):
     if action == "dose":
         data = {"pump": "balance", "ml": 25, **data}
     return asyncio.run(store.request({"action": action, **data}, by))
@@ -162,7 +162,7 @@ def test_a_request_is_stored_for_the_controller_and_the_revision_does_not_move(
         "pump": "balance",
         "ml": 12.5,
         "at": NOW.isoformat(),
-        "by": "Ben",
+        "by": "Alex",
     }
     assert store.data["request"] == request and store.data["revision"] == 1
     assert store._store.value["request"] == request  # stored, not only in memory
@@ -260,14 +260,14 @@ def test_the_sensor_the_controller_reads():
 
 
 def test_the_status_it_reads_belongs_to_its_own_room():
-    hass, store = rig(prefix="f1_")
-    assert store.status_entity == "sensor.crop_steering_f1_dosing"
+    hass, store = rig(prefix="room_b_")
+    assert store.status_entity == "sensor.crop_steering_room_b_dosing"
     save(store)
     request = ask(store)["request"]
     handled(hass, request["id"])  # another room's controller status: not this room's
     assert ask(store)["error"] == "busy"
     hass.states.set(
-        "sensor.crop_steering_f1_dosing", "idle", {"handled": request["id"]}
+        "sensor.crop_steering_room_b_dosing", "idle", {"handled": request["id"]}
     )
     assert ask(store)["error"] is None
 
@@ -321,7 +321,7 @@ def services(monkeypatch):
     hass = ha_stubs.FakeHass(states={e: "off" for e in KNOWN})
     hass.services = Services()
     users = {
-        "admin": SimpleNamespace(is_admin=True, name="Ben"),
+        "admin": SimpleNamespace(is_admin=True, name="Alex"),
         "staff": SimpleNamespace(is_admin=False, name="Staff phone"),
     }
     hass.auth = SimpleNamespace(async_get_user=AsyncMock(side_effect=users.get))
@@ -373,7 +373,7 @@ def test_the_services_find_the_room_and_record_who_asked(services):
         services.call("dosing_request", action="dose", pump="balance", ml=5)["request"][
             "by"
         ]
-        == "Ben"
+        == "Alex"
     )
     handled(services.hass, services.call("dosing_get")["config"]["request"]["id"])
     automation = services.call("dosing_request", user=None, action="stop")
@@ -388,8 +388,8 @@ def test_the_services_find_the_room_and_record_who_asked(services):
         services.call("dosing_request", user="deleted", action="stop")
     assert services.call("dosing_get")["config"]["request"] == staff["request"]
     with pytest.raises(HomeAssistantError, match="unknown or ambiguous"):
-        services.call("dosing_get", room_id="room:f1_")
+        services.call("dosing_get", room_id="room:room_b_")
     with pytest.raises(HomeAssistantError, match="canonical room_id"):
-        services.call("dosing_get", room_id="f1")
+        services.call("dosing_get", room_id="room_b")
     asyncio.run(dosing_api.async_unload_dosing(services.hass, services.entry))
     assert services.hass.services.registered == {}

@@ -25,7 +25,7 @@ from jev.setpoint_memory import SetpointMemory
 NIGHT = datetime(2026, 9, 27, 23, 0)  # an hour after lights-off (lights 10:00-22:00)
 Z1 = K.params(p2_shot_size=5.0, p2_threshold=30.5, p3_emergency_floor=20.7, p1_target=36.5, field_capacity=40.0)
 
-# F2 zone 2 on 4 Oct 2026, before the operator's stopgap, and its learner block as controller 3.8.0 wrote it
+# Zone 2 of a production room on 4 Oct 2026, before the operator's stopgap, and its learner block as controller 3.8.0 wrote it
 # (tests_ha/fixtures/entry_3_8_learned_tent.json); kept here from the retired ratchet-guard tests.
 Z2 = dict(p1_target_vwc=29.5, field_capacity=50.0, p2_vwc_threshold=27.5, p3_emergency_vwc_threshold=20.0,
           p2_shot_size=6.0)

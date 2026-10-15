@@ -13,11 +13,11 @@ describe("workspace response transport", () => {
       .mockResolvedValue({ changed_states: [], service_response: { revision: 3 } });
     const callService = vi.fn();
     const client = new HaClient("http://ha.test", "", { callApi, callService } as HassSession);
-    expect(await client.operator("strategy_get", { room_id: "room:f1_" })).toEqual({ revision: 3 });
+    expect(await client.operator("strategy_get", { room_id: "room:room_b_" })).toEqual({ revision: 3 });
     expect(callApi).toHaveBeenCalledWith(
       "POST",
       "services/crop_steering/strategy_get?return_response",
-      { room_id: "room:f1_" },
+      { room_id: "room:room_b_" },
     );
     expect(callService).not.toHaveBeenCalled();
   });

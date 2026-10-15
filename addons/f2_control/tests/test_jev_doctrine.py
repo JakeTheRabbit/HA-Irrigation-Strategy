@@ -8,7 +8,7 @@ TOPICS = ("ramp", "dryback", "maintenance", "ec", "probe", "stage", "ripening", 
 ALL = [(t, i, r) for t, rules in RULES.items() for i, r in enumerate(rules)]
 
 # A moisture number (a % or points) must say how to read it: the wiki's numbers are true water content and the
-# F2 probes read about 33-41 at saturation, so a raw band is never presented as the truth. "of the water fed"
+# probes on a production room read about 33-41 at saturation, so a raw band is never presented as the truth. "of the water fed"
 # marks a runoff share and "of the substrate" a shot size: volumes, not probe readings.
 NUMBER = re.compile(r"\d\s*(?:%|points?\b)")
 MOISTURE = ("moisture", "water content", "vwc", "dryback", "field capacity", "full mark", "floor", "wetter", "drier")

@@ -1,6 +1,6 @@
 """Day planner + reference curve.
 
-Model numbers are the F2 Zone 1 fit from 9 days of history (2026-09-19): knee 36, 0.6 pts per 1% shot,
+Model numbers are a production room's zone 1 fit from 9 days of history (2026-09-19): knee 36, 0.6 pts per 1% shot,
 0.72 pts/h lights-on, 0.37 pts/h lights-off. Recipe numbers follow Athena's Precision Irrigation Strategy.
 """
 import curve_tracker as ct

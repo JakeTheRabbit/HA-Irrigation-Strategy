@@ -162,11 +162,11 @@ describe("setpoint to metric mapping", () => {
   });
   it("reads the parameter from zone and room number entities of one room only", () => {
     expect(setpointParam("number.crop_steering_zone_2_p1_target_vwc", "")).toBe("p1_target_vwc");
-    expect(setpointParam("number.crop_steering_f1_zone_12_ec_target_gen_p1", "f1_")).toBe(
+    expect(setpointParam("number.crop_steering_room_b_zone_12_ec_target_gen_p1", "room_b_")).toBe(
       "ec_target_gen_p1",
     );
-    expect(setpointParam("number.crop_steering_f1_maximum_ec", "f1_")).toBe("maximum_ec");
-    expect(setpointParam("number.crop_steering_zone_1_field_capacity", "f1_")).toBeNull();
+    expect(setpointParam("number.crop_steering_room_b_maximum_ec", "room_b_")).toBe("maximum_ec");
+    expect(setpointParam("number.crop_steering_zone_1_field_capacity", "room_b_")).toBeNull();
     expect(setpointParam("sensor.crop_steering_vwc_zone_1", "")).toBeNull();
   });
 });

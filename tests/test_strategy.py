@@ -281,12 +281,12 @@ def test_activation_requires_capability_and_only_changes_at_grow_day_boundary(
 
 
 def test_stale_probe_holds_activation_and_room_resolution_never_falls_back(monkeypatch):
-    manager, states, now = manager_fixture(monkeypatch, "f2_")
+    manager, states, now = manager_fixture(monkeypatch, "room_b_")
 
     async def scenario():
         await manager.async_init()
         await manager.save(plan(), 0)
-        states["sensor.crop_steering_f2_vwc_zone_1"].last_updated = now - timedelta(
+        states["sensor.crop_steering_room_b_vwc_zone_1"].last_updated = now - timedelta(
             hours=1
         )
         with pytest.raises(ValueError, match="stale"):
@@ -294,11 +294,11 @@ def test_stale_probe_holds_activation_and_room_resolution_never_falls_back(monke
         manager.hass.data["crop_steering"]["_strategy"] = {
             manager.entry.entry_id: manager
         }
-        assert resolve_manager(manager.hass, "room:f2_") is manager
+        assert resolve_manager(manager.hass, "room:room_b_") is manager
         with pytest.raises(ValueError):
             resolve_manager(manager.hass, "room:")
         with pytest.raises(ValueError):
-            resolve_manager(manager.hass, "f2")
+            resolve_manager(manager.hass, "room_b")
 
     asyncio.run(scenario())
 

@@ -184,8 +184,8 @@ def _slow_switch_report(monkeypatch, fake, clock, entity, service, lag_s):
 
 
 def test_slow_pump_off_report_does_not_latch_false_fault(rig, monkeypatch):
-    # Live 2026-09-14 18:52: veg_main_pump reported OFF 1.6 s after turn_off, past the
-    # fixed 1 s read-back — a false hold that stopped F2 irrigation for 16 h.
+    # Live 2026-09-14 18:52: a production room's pump reported OFF 1.6 s after turn_off, past the
+    # fixed 1 s read-back — a false hold that stopped that room's irrigation for 16 h.
     c, fake, clock = rig
     _slow_switch_report(monkeypatch, fake, clock, "switch.p", "turn_off", 1.6)
     c._execute_shot(c.rooms[0], 1, 6, 6)
@@ -194,8 +194,8 @@ def test_slow_pump_off_report_does_not_latch_false_fault(rig, monkeypatch):
 
 
 def test_a_pump_off_report_ten_seconds_late_does_not_latch(rig, monkeypatch):
-    # Live 2026-09-28 11:18: veg_main_pump reported OFF about 10 s after its turn_off, past the 6 s
-    # read-back, and F2 stayed held until someone cleared it. What still reads on is sent OFF again
+    # Live 2026-09-28 11:18: the same pump reported OFF about 10 s after its turn_off, past the 6 s
+    # read-back, and the room stayed held until someone cleared it. What still reads on is sent OFF again
     # and read back once more before any hold.
     c, fake, clock = rig
     _slow_switch_report(monkeypatch, fake, clock, "switch.p", "turn_off", 10)

@@ -1,5 +1,5 @@
 """Multi-room namespacing — lock the contract that the DEFAULT room stays un-prefixed so
-existing single-room installs (e.g. F2) keep their exact entity ids, while named rooms get an
+existing single-room installs keep their exact entity ids, while named rooms get an
 isolated prefix."""
 
 import importlib.util
@@ -19,7 +19,7 @@ def _entry(data):
 
 
 def test_default_room_is_unprefixed():
-    # No room_prefix, or an explicit "" -> default room -> F2 entities unchanged.
+    # No room_prefix, or an explicit "" -> default room -> entity ids unchanged.
     assert room.room_prefix(_entry({})) == ""
     assert room.room_prefix(_entry({"room_prefix": ""})) == ""
 
@@ -69,12 +69,12 @@ def test_named_room_engine_config_has_own_kill_switch_and_hardware():
 
 def test_default_room_engine_config_uses_global_kill_switch():
     d = room.build_engine_config(
-        "", "default", 1, {"1": {"zone_switch": "switch.f2_row1"}}, {}
+        "", "default", 1, {"1": {"zone_switch": "switch.row1"}}, {}
     )
     assert (
         d["enable_flag"] == "input_boolean.f2_control_enabled"
     )  # default keeps the global kill switch
-    assert d["prefix"] == "" and d["valves"] == {1: "switch.f2_row1"}
+    assert d["prefix"] == "" and d["valves"] == {1: "switch.row1"}
     assert (
         d["feed_ec_sensor"] == "" and d["feed_ph_sensor"] == ""
     )  # unset -> gate disabled

@@ -182,21 +182,21 @@ async function liveSetup(run) {
     last_changed: stamp,
   });
   const states = [
-    entity("sensor.crop_steering_f1_engine_config", "ready", {
-      prefix: "f1_",
-      slug: "f1",
+    entity("sensor.crop_steering_room_b_engine_config", "ready", {
+      prefix: "room_b_",
+      slug: "room_b",
       num_zones: 1,
-      friendly_name: "Flower 1 engine config",
-      enable_flag: "switch.crop_steering_f1_engine_enabled",
+      friendly_name: "Room B engine config",
+      enable_flag: "switch.crop_steering_room_b_engine_enabled",
     }),
-    entity("switch.crop_steering_f1_engine_enabled", "off"),
+    entity("switch.crop_steering_room_b_engine_enabled", "off"),
   ];
   const room = {
     entry_id: "sizing-fixture-entry",
     revision: 1,
-    room_name: "Flower 1",
-    prefix: "f1_",
-    slug: "f1",
+    room_name: "Room B",
+    prefix: "room_b_",
+    slug: "room_b",
     active: true,
     num_zones: 1,
     active_zone_ids: [1],
@@ -254,7 +254,7 @@ async function liveSetup(run) {
   lp.setDefaultTimeout(10000);
   lp.on("pageerror", (e) => pageErrors.push(e.message));
   try {
-    await lp.goto(origin + "/dashboard.html?room=f1#/setup");
+    await lp.goto(origin + "/dashboard.html?room=room_b#/setup");
     await visible(lp.locator("#room-name"));
     assert.equal(
       await lp.locator("#room-plumbing").count(),
@@ -877,13 +877,13 @@ try {
         p1_time_between_shots: 15,
         p1_maximum_shots: 8,
       };
-      for (const prefix of ["", "f1_"]) {
+      for (const prefix of ["", "room_b_"]) {
         const flag = `switch.crop_steering_${prefix}engine_enabled`;
         put(`sensor.crop_steering_${prefix}engine_config`, "ready", {
           prefix,
-          slug: prefix ? "f1" : "",
+          slug: prefix ? "room_b" : "",
           num_zones: 1,
-          friendly_name: prefix ? "Flower 1 engine config" : "Flower 2 engine config",
+          friendly_name: prefix ? "Room B engine config" : "Room A engine config",
           enable_flag: flag,
         });
         put(flag, "off");
@@ -913,12 +913,12 @@ try {
             max: key.includes("time") ? 360 : 100,
             step: 0.1,
             unit: key.startsWith("ec_") ? "mS/cm" : "%",
-            entity_ids: [`number.crop_steering_f1_zone_1_${key}`],
+            entity_ids: [`number.crop_steering_room_b_zone_1_${key}`],
           },
         ]),
       );
       const document = {
-        room_id: "room:f1_",
+        room_id: "room:room_b_",
         revision: 1,
         status: "draft",
         error: null,
@@ -945,11 +945,11 @@ try {
         capabilities: { strategy_snapshot_version: 1, controller_supported: true },
       };
       const setupRoom = {
-        entry_id: "fixture-f1-entry",
+        entry_id: "fixture-room-b-entry",
         revision: 1,
-        room_name: "Flower 1",
-        prefix: "f1_",
-        slug: "f1",
+        room_name: "Room B",
+        prefix: "room_b_",
+        slug: "room_b",
         active: true,
         num_zones: 1,
         active_zone_ids: [1],
@@ -959,8 +959,8 @@ try {
             name: "Zone 1",
             active: true,
             valve: "switch.fixture_valve",
-            vwc_sensors: ["sensor.crop_steering_f1_vwc_zone_1"],
-            ec_sensors: ["sensor.crop_steering_f1_ec_zone_1"],
+            vwc_sensors: ["sensor.crop_steering_room_b_vwc_zone_1"],
+            ec_sensors: ["sensor.crop_steering_room_b_ec_zone_1"],
             plant_count: 12,
             substrate_volume: 6,
             drippers_per_plant: 1,
@@ -1029,7 +1029,7 @@ try {
         };
         if (!schemas[action] || Object.keys(data).some((k) => !schemas[action].includes(k)))
           return reply({ message: "Strict fixture schema rejected extra data" }, 400);
-        if (data.room_id !== "room:f1_")
+        if (data.room_id !== "room:room_b_")
           return reply({ message: "Wrong canonical room scope" }, 400);
         if (!u.searchParams.has("return_response"))
           return reply({ message: "Service response flag required" }, 400);
@@ -1071,7 +1071,7 @@ try {
       lp.setDefaultTimeout(10000);
       lp.on("pageerror", (e) => pageErrors.push(e.message));
       try {
-        await lp.goto(origin + "/dashboard.html?room=f1#/grow-plan");
+        await lp.goto(origin + "/dashboard.html?room=room_b#/grow-plan");
         await openPlanner("Steering balance", lp);
         await lp.locator("#steering-balance").fill("80");
         await lp.getByRole("button", { name: "Review & save", exact: true }).click();
@@ -1104,7 +1104,7 @@ try {
         await lp.getByRole("button", { name: "Confirm disarm", exact: true }).click();
         await lp.getByRole("dialog").waitFor({ state: "hidden" });
         assert.deepEqual(apiCalls.find((c) => c.action === "strategy_disarm").data, {
-          room_id: "room:f1_",
+          room_id: "room:room_b_",
         });
         const pendingRead = new Promise((resolve) => (readStarted = resolve));
         deferRead = true;
@@ -1140,10 +1140,10 @@ try {
           await lp.getByRole("button", { name: "Disarm plan", exact: true }).isEnabled(),
           true,
         );
-        put("sensor.crop_steering_f1_strategy_plan", "active", {
+        put("sensor.crop_steering_room_b_strategy_plan", "active", {
           enabled: true,
           snapshot_version: 1,
-          room_id: "room:f1_",
+          room_id: "room:room_b_",
           updated_at: stamp(),
           valid_until: new Date(Date.now() + 120000).toISOString(),
           zones: [
@@ -1198,7 +1198,7 @@ try {
           writesBeforeToday,
           "Reading scheduled targets must not write services",
         );
-        states["sensor.crop_steering_f1_strategy_plan"].attributes.valid_until = new Date(
+        states["sensor.crop_steering_room_b_strategy_plan"].attributes.valid_until = new Date(
           Date.now() - 1000,
         ).toISOString();
         await lp.getByRole("button", { name: "Refresh controller data" }).click();
@@ -1230,15 +1230,15 @@ try {
         await lp.screenshot({ path: out + "workspace-stale-plan.png", fullPage: true });
         await navigateTo("Equipment", "Setup", lp);
         await visible(lp.locator("#room-name"));
-        await lp.locator("#room-name").fill("Flower 1 verified");
+        await lp.locator("#room-name").fill("Room B verified");
         await lp.getByRole("button", { name: "Review configuration", exact: true }).click();
         await lp.getByRole("button", { name: "Save configuration", exact: true }).click();
         await lp.getByRole("dialog").waitFor({ state: "hidden" });
-        assert.equal(await lp.locator("#room-name").inputValue(), "Flower 1 verified");
+        assert.equal(await lp.locator("#room-name").inputValue(), "Room B verified");
         assert.equal(setupRoom.revision, 2);
         assert.equal(
           apiCalls.find((c) => c.action === "setup_save").data.entry_id,
-          "fixture-f1-entry",
+          "fixture-room-b-entry",
         );
       } finally {
         await live.close();

@@ -79,13 +79,18 @@ def test_call_fails_open_and_sends_the_documented_request(monkeypatch):
     assert jp.call("acc123", "tok", {}) is None
 
 
-def test_recorded_live_responses_parse_into_verdicts():
-    path = os.path.join(os.path.dirname(__file__), "fixtures", "jev_supervisor_recorded.json")
-    if not os.path.exists(path):  # recorded by the live twin run; absent on a fresh checkout until then
-        return
+def test_answers_in_the_route_shape_parse_into_their_verdicts():
+    """fixtures/jev_supervisor_synthetic.json: invented rooms and answers in the shape the route returns. Each
+    parses into the verdict stored beside it, and together they reach every EC step, every peak step and
+    both freezes."""
+    path = os.path.join(os.path.dirname(__file__), "fixtures", "jev_supervisor_synthetic.json")
     with open(path, encoding="utf-8") as fh:
         rec = json.load(fh)
-    assert rec
     for r in rec:
         v = jp.verdicts(jp.parse(r["response"]))
-        assert v is not None and v["p2_shot_delta"] in jp.EC_STEP.values() and v["peak_delta"] in jp.PEAK_STEP.values()
+        assert v == r["verdict"], r["state"]
+        assert v["p2_shot_delta"] in jp.EC_STEP.values() and v["peak_delta"] in jp.PEAK_STEP.values()
+    verdicts = [r["verdict"] for r in rec]
+    assert {v["p2_shot_delta"] for v in verdicts} == set(jp.EC_STEP.values())
+    assert {v["peak_delta"] for v in verdicts} == set(jp.PEAK_STEP.values())
+    assert {(v["freeze"] or "none").split()[0] for v in verdicts} == {"none", "delivery", "probe"}

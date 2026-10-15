@@ -58,7 +58,7 @@ BATCH = {
     "mix_min_w": 200,
     "premix_min": 2,
     "postmix_min": 5,
-    "close_entities": ["switch.f1_feed"],
+    "close_entities": ["switch.room_b_feed"],
     "hold_entity": "input_boolean.tank_hold",
     "filled_at_entity": "input_datetime.tank_filled",
     "recipe": [
@@ -82,7 +82,7 @@ DEVICES = {
     "switch.tank_mixer": "off",
     "switch.mix_valve": "off",
     "sensor.mixer_power": "0",
-    "switch.f1_feed": "on",
+    "switch.room_b_feed": "on",
     "input_boolean.tank_hold": "off",
     "input_datetime.tank_filled": "2026-09-27 19:00:00",
     "number.recipe_bloom": "150",
@@ -276,7 +276,7 @@ class Rig:
         self.fake.set_state(CONFIG, revision, json.loads(json.dumps(
             {"pumps": list(pumps), "batch": batch, "request": request})))
 
-    def ask(self, action="dose", age=0.0, by="Ben", **data):
+    def ask(self, action="dose", age=0.0, by="Alex", **data):
         if action == "dose":
             data = {"pump": "balance", "ml": 50, **data}
         request = {"id": uuid.uuid4().hex, "action": action, "pump": data.get("pump"),
@@ -360,7 +360,7 @@ def test_a_dose_sets_the_volume_presses_start_waits_for_it_and_puts_the_volume_b
     assert status["pumps"]["balance"]["last"] == {"ml": 50, "at": BASE.isoformat(), "result": "finished"}
     assert status["pumps"]["balance"]["flow_ml_s"] == 10.0
     assert status["history"][0] == {"kind": "dose", "at": BASE.isoformat(), "ended_at": r.clock.now().isoformat(),
-                                    "result": "finished", "doses": {"balance": 50}, "by": "Ben"}
+                                    "result": "finished", "doses": {"balance": 50}, "by": "Alex"}
     assert r.saved()["inflight"] is None and r.saved()["handled"] == request["id"]
     assert r.codes() == [] and ("turn_off", "switch.balance_power") not in r.actions()
     # Taken once: the same request read again does nothing.
@@ -661,7 +661,7 @@ def test_a_whole_batch_in_order(rig):
         ("turn_off", "switch.row1"),  # close: the room's valve, main line and pump, then close_entities
         ("turn_off", "switch.main_line"),
         ("turn_off", "switch.main_pump"),
-        ("turn_off", "switch.f1_feed"),
+        ("turn_off", "switch.room_b_feed"),
         ("turn_on", "switch.tank_fill"),  # fill until full, then closed
         ("turn_off", "switch.tank_fill"),
         ("turn_on", "switch.mix_valve"),  # mix: the valves first, then the pump
@@ -824,10 +824,10 @@ def test_dosing_hardware_that_does_not_read_off_keeps_the_rooms_held_until_it_do
 def test_a_switch_the_batch_cannot_close_ends_it_before_anything_is_filled(rig):
     r = rig()
     _full_batch(r)
-    r.stuck["switch.f1_feed"] = 99
+    r.stuck["switch.room_b_feed"] = 99
     r.ask("batch")
     r.runner.poll()
-    assert r.status()[1]["handled_result"] == "stopped: close: switch.f1_feed did not read off"
+    assert r.status()[1]["handled_result"] == "stopped: close: switch.room_b_feed did not read off"
     assert ("turn_on", "switch.tank_fill") not in r.actions()
     assert r.codes() == ["CS-806"]
     assert r.runner.holds(r.c.rooms[0]) is None  # its own hardware reads off: the rooms water again
@@ -890,19 +890,19 @@ def test_a_room_with_a_latched_hardware_fault_or_its_hold_on_refuses_a_batch(rig
 
 
 def test_the_batch_holds_its_room_and_every_room_on_its_hardware_and_no_other(rig, capsys):
-    shared = _desc(prefix="f1_", slug="f1", pump=None, mainline="switch.f1_feed",
-                   valves={"1": "switch.f1_row1"})  # fed through a switch the batch closes
+    shared = _desc(prefix="room_b_", slug="room_b", pump=None, mainline="switch.room_b_feed",
+                   valves={"1": "switch.room_b_row1"})  # fed through a switch the batch closes
     same_pump = _desc(prefix="veg_", slug="veg", pump="switch.main_pump", mainline=None,
                       valves={"1": "switch.veg_row1"})  # shares the batch room's pump
     other = _desc(prefix="clone_", slug="clone", pump="switch.clone_pump", mainline=None,
                   valves={"1": "switch.clone_row1"})
-    r = rig({"sensor.crop_steering_f1_engine_config": ("ok", shared),
+    r = rig({"sensor.crop_steering_room_b_engine_config": ("ok", shared),
              "sensor.crop_steering_veg_engine_config": ("ok", same_pump),
              "sensor.crop_steering_clone_engine_config": ("ok", other),
-             "switch.f1_row1": ("off", {}), "switch.veg_row1": ("off", {}),
+             "switch.room_b_row1": ("off", {}), "switch.veg_row1": ("off", {}),
              "switch.clone_row1": ("off", {}), "switch.clone_pump": ("off", {})})
     rooms = {room.slug: room for room in r.c.rooms}
-    assert set(rooms) == {"default", "f1", "veg", "clone"}
+    assert set(rooms) == {"default", "room_b", "veg", "clone"}
     _full_batch(r)
     seen, shots = {}, []
 
@@ -915,13 +915,13 @@ def test_the_batch_holds_its_room_and_every_room_on_its_hardware_and_no_other(ri
     r.clock.at(100, during)
     r.ask("batch")
     r.runner.poll()
-    assert seen["default"] == seen["f1"] == seen["veg"] == "making a batch"
+    assert seen["default"] == seen["room_b"] == seen["veg"] == "making a batch"
     assert seen["clone"] != "making a batch"
     assert shots == [] and not r.c._busy
     assert "[veg] Z1 shot held: making a batch" in capsys.readouterr().out
-    # f1's feed and every valve of the rooms it holds were closed; the clone room was left alone.
+    # room_b's feed and every valve of the rooms it holds were closed; the clone room was left alone.
     closed = {entity for service, entity in r.actions() if service == "turn_off"}
-    assert {"switch.f1_row1", "switch.f1_feed", "switch.veg_row1", "switch.row1"} <= closed
+    assert {"switch.room_b_row1", "switch.room_b_feed", "switch.veg_row1", "switch.row1"} <= closed
     assert not {"switch.clone_row1", "switch.clone_pump"} & closed
     assert all(r.c._blocked(room, 1) != "making a batch" for room in rooms.values())
 
@@ -1025,7 +1025,7 @@ def test_a_batch_that_overruns_its_watchdog_is_ended(rig):
 
 # ------------------------------------------------------------------ restarts
 def _interrupted(tmp_path, kind="batch", **extra):
-    record = {"kind": kind, "at": BASE.isoformat(), "request": "abc", "by": "Ben",
+    record = {"kind": kind, "at": BASE.isoformat(), "request": "abc", "by": "Alex",
               "off": ["switch.balance_power", "switch.bloom_power", "switch.tank_fill", "switch.tank_mixer",
                       "switch.mix_valve"],
               "hold": "input_boolean.tank_hold", "doses": {"balance": 300}, **extra}

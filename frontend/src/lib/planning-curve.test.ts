@@ -369,7 +369,7 @@ describe("recorded readings on the plan graph", () => {
 });
 
 describe("the projected day: every phase drawn the way the engine runs it", () => {
-  // live F2 zone 1, 2026-09-20
+  // zone 1 of a production room, 2026-09-20
   const live = {
     field_capacity: 55,
     dryback_target: 10,
@@ -481,7 +481,7 @@ describe("the projected day: every phase drawn the way the engine runs it", () =
 });
 
 describe("the rest of today, projected from now on the same rules", () => {
-  // live F2 zone 1, 2026-09-20; lights 10:00-22:00, so hours count from lights-on
+  // zone 1 of a production room, 2026-09-20; lights 10:00-22:00, so hours count from lights-on
   const live = {
     dryback_target: 10,
     p1_target_vwc: 40,

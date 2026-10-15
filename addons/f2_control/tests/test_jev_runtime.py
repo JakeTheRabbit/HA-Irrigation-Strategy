@@ -247,9 +247,9 @@ def test_any_one_jev_file_in_the_state_folder_starts_jev_on_cloudflare_alone(tmp
 def test_an_old_options_file_keeps_its_budget_and_takes_the_new_defaults():
     import jev_bridge
 
-    f2_3_8_0 = {"typesafe_api_key": "apikey_x", "jev_enabled": True, "jev_judges": "all",
+    options_3_8_0 = {"typesafe_api_key": "apikey_x", "jev_enabled": True, "jev_judges": "all",
                 "jev_daily_calls": 2000, "jev_flower_start": "", "jev_flower_days": 56}
-    brain = jev_bridge.build(f2_3_8_0, ("", "", ""), "/tmp/state.json", lambda *a: None)
+    brain = jev_bridge.build(options_3_8_0, ("", "", ""), "/tmp/state.json", lambda *a: None)
     assert brain.routes == ["TypeSafe"] and brain.asker.daily_budget == 2000
     assert (brain.reask_max, brain.unsure_below, brain.strict_after, brain.strict_prob) == (2, 0.7, 3, 0.8)
     assert (brain.asker.warn_pct, brain.asker.transport.tries) == (80, 3)

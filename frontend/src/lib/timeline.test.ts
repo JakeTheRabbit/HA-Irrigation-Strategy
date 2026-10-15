@@ -202,13 +202,13 @@ describe("the merged timeline", () => {
     expect(zones({ query: "stage's arc" })).toEqual(["jev:4:2026-09-27T15:01:00:alerts"]);
   });
   it("exports as CSV with the local time, the row in words and Jev's result", () => {
-    const csv = timelineCsv(merged, "Flower 2").split("\r\n");
+    const csv = timelineCsv(merged, "Room A").split("\r\n");
     expect(csv[0]).toBe('"Timestamp","Room","Zone","Type","Message","Result"');
     expect(csv).toContain(
-      '"2026-09-27 22:48:00","Flower 2","3","setpoint","Jev · Setpoints: smaller shots, 70% → P2 shot 4.5% → 4%","Acted; worked"',
+      '"2026-09-27 22:48:00","Room A","3","setpoint","Jev · Setpoints: smaller shots, 70% → P2 shot 4.5% → 4%","Acted; worked"',
     );
     expect(csv).toContain(
-      '"2026-09-27 12:00:00","Flower 2","Room","alert","Pump fault: holding",""',
+      '"2026-09-27 12:00:00","Room A","Room","alert","Pump fault: holding",""',
     );
     expect(
       timelineCsv(

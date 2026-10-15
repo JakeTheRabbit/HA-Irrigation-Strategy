@@ -77,7 +77,10 @@ in a test. `entry_2_17_wizard.json` is a pumped two-zone room from the 2.17 wiza
 `entry_env_era.json` is from the env-file era (legacy front/back probe pairs, no setup revision,
 a probe with no unit, bookkeeping keys in `entry.options`). `entry_3_8_learned_tent.json` is the
 2.18 tent as a 3.8.0 box holds it, with the state file controller 3.8.0 wrote for a zone its Auto
-Setpoints learner had learned (F2 zone 2 on 4 Oct 2026). `entry_2_25_1_pumped_room.json` is a
+Setpoints learner had learned (zone 2 of a production room on 4 Oct 2026). `entry_us_units_tent.json` is
+that 2.18 tent in a Home Assistant set to US customary units in a northern-hemisphere time zone, its probes
+reporting m³/m³ and μS/cm: derived from the recorded file rather than recorded itself, it proves both layers
+read those units as percent and mS/cm. `entry_2_25_1_pumped_room.json` is a
 pumped two-zone room as upstream 2.25.1 left it, recorded from that release's own wizard and
 controller: its config entry, every entity id it registered, its app `/data/options.json` and the
 `/data/state.json` its controller wrote. `entry_3_11_1_pumped_room.json` is the same kind of room as Jev
@@ -186,6 +189,8 @@ node frontend/scripts/verify-ha-shell.mjs
 ```
 
 The browser scripts start loopback servers. Demo workflows reject API/external traffic; mocked-HA workflows intercept all API calls. The checks cover all eleven pages, desktop/mobile navigation, accessibility, drafts, partial failures, readback, room identity, stale probes, and legacy route compatibility. Screenshots and JSON results are written to `output/playwright/`. This frontend job also runs in GitHub CI. The Python packaging tests verify that the HA and add-on artifacts match and retain room/demo navigation.
+
+Test data names no real site. Where a test builds its own rooms and people it uses neutral ones: `Room A`, `Room B` with prefix `room_b_`, or a room named after a grow stage (`veg`), and `Alex`. Two kinds of test keep other names on purpose. The old `?room=f1` / `?room=f2` links (to the room with prefix `f1_` and to the default room) and the older integration's `system_` sensors (read for the `f1_` room only) are product behaviour, so the tests that prove them (`verify-live.mjs`, `model.test.ts`, `review-regressions.test.ts`, `test_dashboard_layout.py`) use those names. Assertions that read the demo's own rooms, staff and phones (the phone constants in `notify.test.ts`, every browser check that opens the demo page with `?demo=1`, which is all of `verify-dashboard.mjs` and parts of the other `verify-*.mjs` suites, and the demo-backed unit tests that select its `f1_` room) still use the names the demo ships today; they change in the same pull request that renames the demo.
 
 The workspace suite also covers day/week scheduling, reactive VWC/EC previews, profile editing, setup lifecycle, strict response-bearing service contracts, invalid/expired snapshots and draft preservation. Integration tests use a minimal HA fixture, not a running HA instance. HACS/hassfest and an actual Supervisor image build run in CI, not in the local browser harness.
 

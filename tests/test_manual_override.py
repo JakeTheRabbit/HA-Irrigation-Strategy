@@ -216,17 +216,17 @@ def test_legacy_or_invalid_deadline_never_releases_an_indefinite_hold(rig, metad
 
 def test_default_named_room_and_zone_timers_are_isolated(rig):
     default = rig.make()
-    f1 = rig.make("f1_")
-    f1z2 = rig.make("f1_", 2)
+    room_b = rig.make("room_b_")
+    room_b_z2 = rig.make("room_b_", 2)
     rig.request(timeout_minutes=5)
-    rig.request(room="f1", timeout_minutes=10)
-    rig.request(room="f1", zone=2, timeout_minutes=15)
+    rig.request(room="room_b", timeout_minutes=10)
+    rig.request(room="room_b", zone=2, timeout_minutes=15)
     rig.advance(5)
-    assert not default._attr_is_on and f1._attr_is_on and f1z2._attr_is_on
+    assert not default._attr_is_on and room_b._attr_is_on and room_b_z2._attr_is_on
     rig.advance(5)
-    assert not f1._attr_is_on and f1z2._attr_is_on
+    assert not room_b._attr_is_on and room_b_z2._attr_is_on
     rig.advance(5)
-    assert not f1z2._attr_is_on
+    assert not room_b_z2._attr_is_on
 
 
 def test_service_rejects_unloaded_zone_without_a_success_event(rig):
