@@ -58,9 +58,12 @@ pump name or recipe is assumed.
     "close_entities": ["switch.x"],    // 0..16 switch.*, switched off before filling (another room's feed path)
     "hold_entity": "input_boolean.x",  // input_boolean.* | null   on for the whole batch, for other automations
     "filled_at_entity": "input_datetime.x", // input_datetime.* | null   stamped with the end time of a finished batch
-    "recipe": [                        // dose order = list order; each pump at most once
-      {"pump": "balance", "ml": 300, "ml_entity": null} // ml_entity (number.*|input_number.*|sensor.*) is read
+    "part_ml": 12.5,                   // 0.1..5000, only when set: "1 part (mL)", the mL one part is per batch
+    "recipe": [                        // dose order = list order (the operator's); each pump at most once
+      {"pump": "balance", "ml": 300, "ml_entity": null}, // ml_entity (number.*|input_number.*|sensor.*) is read
                                                         // at batch start and wins over ml; 0 skips the pump
+      {"pump": "bloom", "ml": 19, "ml_entity": null, "parts": 1.5} // parts (0..100), only when set:
+                                                        // ml = parts x part_ml, in whole mL
     ]
   },
   "feed": {                            // Feed schedule, below; an empty one changes nothing
@@ -83,7 +86,11 @@ recipe pumps exist; a pump appears in the recipe at most once; `full_entity` set
 checked); no entity is both a dosing pump's `power_entity` and batch hardware; a `mix_pump`,
 `mix_valves` or `close_entities` switch may be a room's irrigation pump or main line (the batch
 holds that room's watering); a pump's `stock_tank` is one of the room's stock tanks, and a stock
-tank is linked to at most one pump. A room with no pumps is valid and does nothing. "Exists" is checked
+tank is linked to at most one pump; a dose in `parts` needs `part_ml`, and its mL is at most the
+pump's `max_ml`. Every recipe amount is whole mL, rounded half up (12.5 -> 13, 0.4 -> 0, which skips
+the pump): a fixed `ml`, and `parts` x `part_ml`, when they are saved, and an `ml_entity`'s reading by
+the controller when the batch starts. A setup saved without `part_ml` or `parts` has neither key, and
+reads back unchanged. A room with no pumps is valid and does nothing. "Exists" is checked
 when a setup is saved; a stored setup read back at start-up is kept although a device has not come
 back yet. Each feed recipe follows the recipe's rules, names are unique, and every week of the
 schedule names one of the recipes.
@@ -266,7 +273,7 @@ take more than 20 minutes. The watchdog is set from these doses.
 | Fill | skipped when `full_entity` already reads full or there is no `fill_valve`; else open it, read it back on within 10 s, and wait for full; always close it and read back | the fill valve does not read on (**CS-804**, "the fill valve did not open"); `full_entity` reads nothing usable as the fill begins or for 15 s while it fills (**CS-804**, "the full sensor stopped reporting"); not full within `fill_timeout_min` (**CS-804**) |
 | Mix | skipped without a `mix_pump`; open `mix_valves` and read them back, start `mix_pump` and read it back on; with `mix_min_w` and a `mix_power_sensor`, wait up to 20 s for the power | a mix valve does not open (CS-806); the pump does not read on or does not draw its power (**CS-805**) |
 | Premix | `premix_min` minutes | |
-| Dose | each recipe pump in order, as "One dose", with the amounts read before Hold; 0 skips | a dose ends any other way than finished (CS-801/802) |
+| Dose | each recipe pump in order, as "One dose", with the amounts read before Hold, in whole mL; 0 skips | a dose ends any other way than finished (CS-801/802) |
 | Postmix | `postmix_min` minutes | |
 | Finish | stop `mix_pump`, close `mix_valves`, read back; stamp `filled_at_entity` (`input_datetime.set_datetime` with the end time as a timestamp); `hold_entity` off, read back | a switch does not read off (CS-806) |
 

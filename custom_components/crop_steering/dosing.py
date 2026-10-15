@@ -24,6 +24,7 @@ MAX_PUMPS = 8
 MAX_MIX_VALVES = 4
 MAX_CLOSE = 16
 MAX_ML = 5000
+MAX_PARTS = 100
 REQUEST_MAX_AGE_S = 120
 MAX_RECIPES = 12
 MAX_WEEKS = 52  # a feed schedule's weeks
@@ -214,7 +215,12 @@ def _pump(raw, taken, exists, stock_tanks=None) -> dict:
     }
 
 
-def _recipe(raw, pumps: dict, exists) -> list[dict]:
+def whole_ml(ml) -> int:
+    """A recipe dose in whole mL, half up (12.5 -> 13): what the pump is sent."""
+    return math.floor(ml + 0.5)
+
+
+def _recipe(raw, pumps: dict, exists, part_ml=None) -> list[dict]:
     if raw is None:
         return []
     if not isinstance(raw, list) or len(raw) > MAX_PUMPS:
@@ -232,19 +238,33 @@ def _recipe(raw, pumps: dict, exists) -> list[dict]:
             raise DosingError(f"the recipe doses {pump['name']} twice")
         seen.add(pump["id"])
         label = f"the recipe's {pump['name']} dose"
-        out.append(
-            {
-                "pump": pump["id"],
-                "ml": _number(item.get("ml"), 0, pump["max_ml"], f"{label} (mL)", 0),
-                "ml_entity": _entity(
-                    item.get("ml_entity"),
-                    ML_ENTITY,
-                    f"{label}: mL entity",
-                    exists,
-                    optional=True,
-                ),
-            }
-        )
+        parts = item.get("parts")
+        if parts is None:
+            ml = _number(item.get("ml"), 0, pump["max_ml"], f"{label} (mL)", 0)
+        elif part_ml is None:
+            raise DosingError(f"{label} is in parts: set how many mL 1 part is")
+        else:
+            parts = _number(parts, 0, MAX_PARTS, f"{label} (parts)")
+            ml = parts * part_ml
+            if ml > pump["max_ml"]:
+                raise DosingError(
+                    f"{label}: {parts:g} parts is {ml:g} mL, more than its "
+                    f"{pump['max_ml']:g} mL"
+                )
+        line = {
+            "pump": pump["id"],
+            "ml": whole_ml(ml),
+            "ml_entity": _entity(
+                item.get("ml_entity"),
+                ML_ENTITY,
+                f"{label}: mL entity",
+                exists,
+                optional=True,
+            ),
+        }
+        if parts is not None:
+            line["parts"] = parts
+        out.append(line)
     return out
 
 
@@ -276,7 +296,10 @@ def _batch(raw, pumps: dict, exists) -> dict:
         raise DosingError(
             "a mix pump minimum power needs the mix pump power sensor that reads it"
         )
-    return {
+    part_ml = raw.get("part_ml")
+    if part_ml is not None:
+        part_ml = _number(part_ml, 0.1, MAX_ML, "1 part (mL)")
+    cleaned = {
         "fill_valve": fill_valve,
         "full_entity": full_entity,
         "full_state": _text(raw.get("full_state"), "on", "the full state"),
@@ -310,8 +333,11 @@ def _batch(raw, pumps: dict, exists) -> dict:
             exists,
             optional=True,
         ),
-        "recipe": _recipe(raw.get("recipe"), pumps, exists),
+        "recipe": _recipe(raw.get("recipe"), pumps, exists, part_ml),
     }
+    if part_ml is not None:  # only when set, so an older store reads back unchanged
+        cleaned["part_ml"] = part_ml
+    return cleaned
 
 
 def clean(pumps, batch, exists=None, stock_tanks=None) -> tuple[list[dict], dict]:

@@ -83,6 +83,11 @@ def _fmt(value):
     return f"{value:g}" if isinstance(value, (int, float)) else str(value)
 
 
+def _whole_ml(ml):
+    """A recipe dose in whole mL, half up (12.5 -> 13), as the integration stores one."""
+    return math.floor(ml + 0.5)
+
+
 def _dead(state):
     return state is None or str(state).strip().lower() in DEAD
 
@@ -936,7 +941,7 @@ class DosingRunner:
 
     def _batch_check(self, job):
         """Why this batch must not start, else its doses: [(pump, ml, flow)] in recipe order, each
-        recipe mL entity read now (it wins over the recipe's mL; 0 skips the pump)."""
+        recipe mL entity read now (it wins over the recipe's mL; 0 skips the pump), in whole mL."""
         room, config = job.room, job.config
         batch = config["batch"]
         if self.c._hardware_fault_block(room):
@@ -964,6 +969,7 @@ class DosingRunner:
                 ml = self._device(item["ml_entity"], "volume")[0]
                 if ml is None:
                     return f"the recipe amount for {pump['name']} can't be read", None
+            ml = _whole_ml(ml)
             if ml <= 0:
                 continue
             if ml > float(pump.get("max_ml") or 0):
