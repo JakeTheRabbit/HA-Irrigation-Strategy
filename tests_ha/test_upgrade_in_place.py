@@ -564,7 +564,12 @@ async def test_a_3_11_1_room_keeps_every_entity_id_its_moved_ladder_and_its_dosi
     assert int(shown.state) == dosing["revision"]
     assert shown.attributes["pumps"] == dosing["pumps"]
     # Shown with the refill reminder off: the setup was saved before it (docs/DOSING.md).
-    assert shown.attributes["batch"] == {**dosing["batch"], "level_entity": None, "remind_pct": 0}
+    assert shown.attributes["batch"] == {
+        **dosing["batch"],
+        "name": "",
+        "level_entity": None,
+        "remind_pct": 0,
+    }
 
 
 def _jev_3_11_1_app(controller_for, monkeypatch, options):

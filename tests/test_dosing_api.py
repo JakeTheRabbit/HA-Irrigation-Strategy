@@ -277,7 +277,13 @@ def test_the_sensor_the_controller_reads():
     save(store)
     ask(store)
     state, attributes = store.sensor()
-    assert state == 1 and set(attributes) == {"pumps", "batch", "profile", "request", "feed"}
+    assert state == 1 and set(attributes) == {
+        "pumps",
+        "batch",
+        "profile",
+        "request",
+        "feed",
+    }
     assert attributes["pumps"][0]["power_entity"] == PUMP["power_entity"]
     assert attributes["batch"]["recipe"][0]["ml_entity"] == "number.recipe_balance"
     assert attributes["request"] == store.data["request"]

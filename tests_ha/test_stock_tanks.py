@@ -326,7 +326,7 @@ async def test_an_upgraded_rooms_batches_left_follow_the_feed_schedules_recipe(
         hass.states.async_set(entity_id, "off")
     await _upgrade(hass, "entry_2_17_wizard.json")
     stored = seed["stock"]
-    doc = await _service(hass, hass_admin_user, "stock_get")
+    doc = await _service(hass, hass_admin_user, "stock_get", room_id=UPGRADED_ROOM)
     assert (doc["revision"], doc["tanks"], doc["history"]) == (
         stored["revision"],
         stored["tanks"],
@@ -350,6 +350,7 @@ async def test_an_upgraded_rooms_batches_left_follow_the_feed_schedules_recipe(
         hass,
         hass_admin_user,
         "dosing_save",
+        room_id=UPGRADED_ROOM,
         expected_revision=seed["dosing"]["revision"],
         pumps=seed["dosing"]["pumps"],
         batch=batch,
@@ -357,10 +358,10 @@ async def test_an_upgraded_rooms_batches_left_follow_the_feed_schedules_recipe(
     )
     assert saved["error"] is None and saved["feed_now"]["recipe"] == "Bloom"
     await hass.async_block_till_done()
-    doc = await _service(hass, hass_admin_user, "stock_get")
+    doc = await _service(hass, hass_admin_user, "stock_get", room_id=UPGRADED_ROOM)
     assert doc["doses"] == {"balance": 0, "bloom": 900, "core": 540, "cleanse": 0}
     assert (doc["revision"], doc["tanks"]) == (stored["revision"], stored["tanks"])
-    tanks = {t["id"]: t for t in hass.states.get(SENSOR).attributes["tanks"]}
+    tanks = {t["id"]: t for t in hass.states.get(UPGRADED_SENSOR).attributes["tanks"]}
     assert [tanks[t]["batches_left"] for t in ("balance", "bloom", "core")] == [
         None,
         22,

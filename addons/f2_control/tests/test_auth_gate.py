@@ -18,7 +18,6 @@ from datetime import datetime
 import pytest
 
 import controller
-import dosing_runner
 import fake_ha
 import runtime_env
 from test_dosing_runner import _full_batch, make_rig

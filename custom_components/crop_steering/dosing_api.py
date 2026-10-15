@@ -186,7 +186,10 @@ class DosingStore:
             if isinstance(batch, dict):
                 # A page from before recipe names, or one that does not send the refill reminder, keeps
                 # the stored ones.
-                kept = {key: self.data["batch"].get(key) for key in ("name", *dosing.REMINDER)}
+                kept = {
+                    key: self.data["batch"].get(key)
+                    for key in ("name", *dosing.REMINDER)
+                }
                 batch = {**kept, **batch}
             try:
                 pumps, batch = dosing.clean(

@@ -9,13 +9,14 @@ does after a recipe declares an EC.
 
 from datetime import datetime, timezone
 
-from conftest import fixture
+from conftest import fixture, room_of
 from test_dosing import PUMP, _call, _devices
 from test_setup_entry import _install
 from test_upgrade_in_place import JEV_3_11_1, _upgrade
 
 DOMAIN = "crop_steering"
 SENSOR = "sensor.crop_steering_dosing_config"
+NEW_SENSOR = "sensor.crop_steering_tent_dosing_config"
 FEED = {
     "recipes": [
         {
@@ -29,10 +30,10 @@ FEED = {
 }
 
 
-def _feed_ecs(c, fake=None):
+def _feed_ecs(c, fake=None, prefix=""):
     """Each zone's feed EC in the snapshot the engine decides on (a zone with no moisture reading has
     none); with `fake`, every zone is first given a fresh moisture reading."""
-    room, now = c.rooms[0], datetime.now()
+    room, now = room_of(c, prefix), datetime.now()
     out = {}
     for zone in sorted(room.zones):
         if fake is not None:
@@ -51,16 +52,17 @@ def _feed_ecs(c, fake=None):
 async def test_a_recipe_declared_ec_reaches_the_real_controller_without_a_probe(
     hass, hass_admin_user, controller_for
 ):
-    await _install(hass)
+    await _install(hass)  # a new room has a slug: the wizard's "Tent" is tent_
     _devices(hass)
     c, fake, _clock = controller_for()
     # No probe and no declared EC: 3.0, as before.
-    assert set(_feed_ecs(c, fake).values()) == {3.0}
+    assert set(_feed_ecs(c, fake, "tent_").values()) == {3.0}
 
     saved = await _call(
         hass,
         hass_admin_user,
         "dosing_save",
+        room_id="room:tent_",
         expected_revision=0,
         pumps=[PUMP],
         batch={},
@@ -68,10 +70,10 @@ async def test_a_recipe_declared_ec_reaches_the_real_controller_without_a_probe(
     )
     assert saved["error"] is None and saved["feed_now"]["ec"] == 2.4
     await hass.async_block_till_done()
-    assert hass.states.get(SENSOR).attributes["feed"]["ec"] == 2.4
+    assert hass.states.get(NEW_SENSOR).attributes["feed"]["ec"] == 2.4
     c, fake, _clock = controller_for()
-    assert set(_feed_ecs(c, fake).values()) == {2.4}
-    assert c._read_feed_ec(c.rooms[0]) is None  # the source-water gate never runs on it
+    assert set(_feed_ecs(c, fake, "tent_").values()) == {2.4}
+    assert c._read_feed_ec(room_of(c)) is None  # the source-water gate never runs on it
 
 
 async def test_a_3_11_1_room_waters_on_its_feed_probe_before_and_after_a_recipe_declares_an_ec(
@@ -94,7 +96,7 @@ async def test_a_3_11_1_room_waters_on_its_feed_probe_before_and_after_a_recipe_
     before = _feed_ecs(c)
     assert before and set(before.values()) == {2.2}
 
-    doc = await _call(hass, hass_admin_user, "dosing_get")
+    doc = await _call(hass, hass_admin_user, "dosing_get", room_id="room:")
     config = doc["config"]
     pump = config["pumps"][0]["id"]
     feed = {
@@ -112,6 +114,7 @@ async def test_a_3_11_1_room_waters_on_its_feed_probe_before_and_after_a_recipe_
         hass,
         hass_admin_user,
         "dosing_save",
+        room_id="room:",
         expected_revision=config["revision"],
         pumps=config["pumps"],
         batch=config["batch"],
@@ -122,4 +125,4 @@ async def test_a_3_11_1_room_waters_on_its_feed_probe_before_and_after_a_recipe_
     assert hass.states.get(SENSOR).attributes["feed"]["ec"] == 2.8
     c, _fake, _clock = controller_for()
     assert _feed_ecs(c) == before  # the measured probe still wins
-    assert c._read_feed_ec(c.rooms[0]) == 2.2  # and the source-water gate runs on it
+    assert c._read_feed_ec(room_of(c, "")) == 2.2  # and the source-water gate runs on it

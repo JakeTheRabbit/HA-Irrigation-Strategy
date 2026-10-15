@@ -78,6 +78,8 @@ async def test_a_muted_room_and_a_digest_phone(hass, hass_admin_user):
     )
     assert sorted(answer["sent_to"]) == [TABLET, STAFF_PHONE]
 
+    # The room's controller is running (its heartbeat is fresh), so nothing else is held meanwhile.
+    hass.states.async_set("sensor.crop_steering_tent_ai_heartbeat", "healthy")
     # The digest phone: what is not an emergency waits for one push two hours after the first it holds.
     notifier = hass.data[DOMAIN]["_notify"]
     clock = {"s": 1000.0}

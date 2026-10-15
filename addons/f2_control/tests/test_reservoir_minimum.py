@@ -14,6 +14,8 @@ from test_dosing_runner import BATCH, BALANCE, make_rig
 from test_plan_hold_never_stops_rescues import rig  # noqa: F401 (rig: a pytest fixture)
 from test_tank_level import DESCRIPTOR, DIST, FLOAT, LEVEL, _learned
 
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
 # Full at 100 mm down, empty at 1100 mm: the level is (1100 - mm) / 10 %.
 MM = {2: "1080", 8: "1020", 10: "1000", 11.9: "981", 12: "980", 70: "400", 90: "200",
       98: "120", 99: "110", 100: "100", 102: "80"}

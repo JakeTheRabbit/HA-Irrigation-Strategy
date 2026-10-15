@@ -9,7 +9,7 @@ saved by 3.11.1, from before the schedule, loads in place with none and doses it
 from datetime import datetime
 from types import SimpleNamespace
 
-from conftest import fixture
+from conftest import fixture, room_of
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 from test_dosing import PUMP, _call, _devices
@@ -33,8 +33,9 @@ def _local(hass, *parts):
 
 
 def _shown(hass):
-    """What the controller is shown: which feed recipe and why, and the batch's doses."""
-    attributes = hass.states.get(SENSOR).attributes
+    """What the controller is shown for the new room (a slug, tent_): which feed recipe and why, and
+    the batch's doses."""
+    attributes = hass.states.get(SENSOR.replace("crop_steering_", "crop_steering_tent_")).attributes
     doses = [(dose["pump"], dose["ml"]) for dose in attributes["batch"]["recipe"]]
     return attributes["feed"], doses
 
@@ -100,9 +101,12 @@ async def test_the_schedule_moves_the_recipe_at_midnight_and_a_pick_holds_until_
 
     # The REAL controller, reading that sensor as REST sends it, plans its next batch on Bloom.
     c, _fake, _clock = controller_for()
-    room = c.rooms[0]
+    room = room_of(c)
     config = c.dosing._config(room)
-    why, plan = c.dosing._batch_check(SimpleNamespace(room=room, config=config))
+    import dosing_runner
+
+    job = SimpleNamespace(room=room, config=config, profile=dosing_runner._profile(config))
+    why, plan = c.dosing._batch_check(job)
     assert why is None
     assert [(pump["id"], ml) for pump, ml, _flow in plan] == [("balance", 300)]
 
@@ -117,12 +121,13 @@ async def test_a_3_11_1_dosing_store_loads_with_no_schedule_and_doses_its_own_re
     hass_storage[store] = {"version": 1, "minor_version": 1, "key": store, "data": dosing}
     await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
     shown = hass.states.get(SENSOR)
-    assert shown.attributes["batch"] == dosing["batch"]
+    # As stored, beside the recipe name and refill reminder a store gains (none, off).
+    assert {key: shown.attributes["batch"][key] for key in dosing["batch"]} == dosing["batch"]
     assert (shown.attributes["feed"]["recipe"], shown.attributes["feed"]["source"]) == (
         None,
         "batch",
     )
-    doc = await _call(hass, hass_admin_user, "dosing_get")
+    doc = await _call(hass, hass_admin_user, "dosing_get", room_id="room:")
     assert doc["error"] is None and doc["config"]["revision"] == dosing["revision"]
     assert doc["config"]["feed"] == {
         "recipes": [],

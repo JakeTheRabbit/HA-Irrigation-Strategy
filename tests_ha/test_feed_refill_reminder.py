@@ -11,8 +11,14 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from conftest import fixture
-from test_dosing import _call
+from test_dosing import _call as _dosing_call
 from test_upgrade_in_place import JEV_3_11_1, _upgrade
+
+
+async def _call(hass, user, name, **data):
+    """test_dosing's call, for this file's upgraded room: it keeps its un-prefixed ids (room:)."""
+    return await _dosing_call(hass, user, name, **{"room_id": "room:", **data})
+
 
 DOMAIN = "crop_steering"
 SENSOR = "sensor.crop_steering_dosing_config"

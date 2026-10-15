@@ -3647,7 +3647,7 @@ class Controller:
                 "below_minimum": drawdown["low"],
                 "over_full": drawdown["over"],
                 "minimum_pct": tank_level.LOW_HOLD_PCT,
-                "engine": "f2-control",
+                "engine": PRODUCT,
             },
         )
         self._tank_marks(room, pct)

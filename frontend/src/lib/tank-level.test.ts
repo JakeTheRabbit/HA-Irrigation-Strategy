@@ -371,15 +371,15 @@ describe("the minimum and refill reminder lines", () => {
     expect(levelLines(bare, "", null).map((line) => line.value)).toEqual([8]);
   });
   it("draws the refill reminder where the dosing setup reads it on the level charted", () => {
-    // Flower 1: no level for the controller's minimum, a person reminded to refill at 20 %.
-    expect(levelLines(states, "f1_", "sensor.demo_f1_tank_level")).toEqual([
+    // Room B: no level for the controller's minimum, a person reminded to refill at 20 %.
+    expect(levelLines(states, "room_b_", "sensor.demo_room_b_tank_level")).toEqual([
       expect.objectContaining({ key: "remind", value: 20, label: "Refill reminder 20 %" }),
     ]);
     // Read on another entity, or switched off, the reminder is not this line.
-    expect(levelLines(states, "f1_", "sensor.another_level")).toEqual([]);
+    expect(levelLines(states, "room_b_", "sensor.another_level")).toEqual([]);
     const off = structuredClone(states);
-    (off[dosingConfigId("f1_")].attributes.batch as Record<string, unknown>).remind_pct = 0;
-    expect(levelLines(off, "f1_", "sensor.demo_f1_tank_level")).toEqual([]);
+    (off[dosingConfigId("room_b_")].attributes.batch as Record<string, unknown>).remind_pct = 0;
+    expect(levelLines(off, "room_b_", "sensor.demo_room_b_tank_level")).toEqual([]);
   });
   it("draws neither in a room with nothing set, nor from a dosing setup from before them", () => {
     expect(levelLines({}, "", "sensor.tank_level")).toEqual([]);

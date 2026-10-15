@@ -9,15 +9,16 @@ from test_setup_entry import _install
 from test_upgrade_in_place import _upgrade
 
 DOMAIN = "crop_steering"
-ROOM = "room:"
+ROOM = "room:tent_"  # the wizard's room is new, so it has a slug: tent_
+UPGRADED = "room:"  # an upgraded room keeps its un-prefixed ids
 PH = "sensor.feed_ph"
 
 
-async def _service(hass, admin, name, **data):
+async def _service(hass, admin, name, room=ROOM, **data):
     return await hass.services.async_call(
         DOMAIN,
         name,
-        {"room_id": ROOM, **data},
+        {"room_id": room, **data},
         blocking=True,
         return_response=True,
         context=Context(user_id=admin.id),
@@ -98,13 +99,14 @@ async def test_a_check_is_recorded_kept_across_a_reload_and_refused_when_stale(
 )
 async def test_an_old_install_upgrades_to_an_empty_history(hass, hass_admin_user, seed):
     await _upgrade(hass, seed)
-    doc = await _service(hass, hass_admin_user, "calibration_get")
+    doc = await _service(hass, hass_admin_user, "calibration_get", UPGRADED)
     assert (doc["records"], doc["revision"], doc["error"]) == ([], 0, None)
     assert doc["sensors"] == {"feed_ph": "sensor.feed_ph", "feed_ec": "sensor.feed_ec"}
     doc = await _service(
         hass,
         hass_admin_user,
         "calibration_record",
+        UPGRADED,
         expected_revision=0,
         probe="feed_ec",
         points=[

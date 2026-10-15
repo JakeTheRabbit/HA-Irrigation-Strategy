@@ -48,7 +48,7 @@ describe("the reservoir minimum in words", () => {
   it("reads the room's own sensor by its prefix", () => {
     const states = createDemo(Date.parse("2026-09-28T04:00:00Z"));
     expect(reservoirView(states, "").state).toBe("ok");
-    expect(reservoirView(states, "f1_").state).toBe("unmapped");
+    expect(reservoirView(states, "room_b_").state).toBe("unmapped");
   });
 });
 
