@@ -583,6 +583,7 @@ _PARAM_BOUNDS = {
     "p1_rise_pts": (0.1, 5.0), "p1_max_extra_shots": (1.0, 10.0),
     "p0_additional_dryback": (0.0, 40.0),
     "p2_time_between_min": (0.0, 120.0),
+    "p2_min_interval_min": (1.0, 120.0),
 }
 
 
