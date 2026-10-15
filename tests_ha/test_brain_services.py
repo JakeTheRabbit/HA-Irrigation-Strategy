@@ -92,3 +92,58 @@ async def test_the_last_five_questions_are_kept_across_a_reload(hass, hass_admin
     assert [q["question"] for q in shown.attributes["questions"]] == [
         f"why {n}?" for n in range(2, 7)
     ]
+
+
+async def test_the_controller_answers_on_brain_answers(
+    hass, hass_admin_user, controller_for, monkeypatch
+):
+    """Across the seam: the question the real service stored is read by the REAL controller from
+    sensor.crop_steering_brain_questions (as REST sends it), asked of its Claude brain (the API
+    itself stood in for), and answered on sensor.crop_steering_brain_answers by its id."""
+    import functools
+    import re
+    from datetime import datetime
+
+    import brain_kit as B
+    import jev_bridge
+    from jev import client as jc
+
+    def why(request):
+        text = request["messages"][0]["content"][1]["text"]
+        snap = re.search(r'snapshot_id="([^"]+)"', text)
+        if 'kind="why"' not in text or snap is None:
+            return B.message()
+        return B.message(
+            B.tool(
+                "answer_why",
+                snapshot_id=snap.group(1),
+                answer="Zone 1 is still drying back after lights-on.",
+                grounded_in=["phases"],
+                cannot_answer=False,
+            )
+        )
+
+    monkeypatch.setattr(jc, "anthropic", B.FakeSDK(B.FakeClient(why)))
+    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(jc.Asker, threaded=False))
+    await _install(hass)
+    said = "Why no water yet?"
+    asked = (await _ask(hass, hass_admin_user, question=said, zone=1))["question"]
+    await hass.async_block_till_done()
+    c, fake, _clock = controller_for(
+        {
+            "enable_flag": "switch.crop_steering_engine_enabled",
+            "brain_provider": "claude_haiku",
+            "anthropic_api_key": B.SENTINEL,
+        }
+    )
+    c.loop_once(datetime.now())
+    state, attributes = fake.sets["sensor.crop_steering_brain_answers"]
+    [answer] = attributes["answers"]
+    assert state == "answered"
+    assert (answer["id"], answer["question"], answer["zone"]) == (
+        asked["id"],
+        "Why no water yet?",
+        1,
+    )
+    assert answer["answer"] == "Zone 1 is still drying back after lights-on."
+    assert answer["cannot_answer"] is False

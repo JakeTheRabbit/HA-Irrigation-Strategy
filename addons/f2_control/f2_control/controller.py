@@ -4641,6 +4641,10 @@ class Controller:
                 jev_bridge.publish_rules(self, room, now, ha_set)
             except Exception as e:
                 log("brain panel error", room.slug, e)
+        try:  # Ask why: the grower's questions, answered on the room's brain_answers sensor
+            jev_bridge.why_task(self, room, now, ha_get, ha_set)
+        except Exception as e:
+            log("ask why error", room.slug, e)
         try:  # CS-209 only ever tells: it can never stop the room being watered
             self._watch_idle(room, now, lights_on, pub)
         except Exception as e:

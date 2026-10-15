@@ -37,7 +37,7 @@ from jev.ledger import Ledger
 from jev.setpoint_memory import SetpointMemory
 from jev.triage import Triage
 
-ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "alerts")
+ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "alerts", "why")
 PENDING_S = 300  # a write Home Assistant has not reflected yet is not an operator's edit for this long
 REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the old value back
 PAUSE_H = 48  # and the zone's setpoints are left alone this long
@@ -48,6 +48,13 @@ NOTICES = "brain_notices.json"  # {"cs712": "<release>"}: the retired-route card
 # The judges whose answers can act (the rest advise); empty on the panel while the brain cannot act.
 ACTING_JUDGES = ("dawn", "ramp", "salt", "dusk", "probe", "setpoints")
 FRIENDLY = "AI assistant"
+WHY_PER_DAY = 20  # the questions a room may ask the brain a day; each is counted against the budget too
+WHY_KEEP = 5  # the answers published, as the integration keeps the questions
+WHY_FRESH_H = 1.0  # a question first seen older than this (the controller was away) is not asked
+WHY = {"type": "why", "instructions": (
+    "The grower asks why the controller or the AI assistant did something, or did not. Their question is the "
+    "`question` in operator_text, and `zone_asked_about` says which zone it is about. Answer from this snapshot's "
+    "`decisions` (the assistant's decision record for the room, newest first) and its other facts only.")}
 
 
 def judges():
@@ -216,6 +223,7 @@ def build(options, cf, state_path, log, status=None):
         brain.triage = Triage(asker, may_quiet=False, meta=alert_meta)
     else:
         brain.triage = Triage(asker)
+    brain.why = haiku and "why" in allowed  # only the Claude route has the answer_why tool
     brain.flower_start = flower_option(options.get("jev_flower_start"))
     brain.flower_days = int(options.get("jev_flower_days") or 56)
     return brain
@@ -859,7 +867,8 @@ def panel(c, room, now):
            "stage_arc": {"id": getattr(brain, "arc", DEFAULT_ARC), "in_force": bool(getattr(brain, "arc_rows", STAGE_ROWS)),
                          "words": getattr(brain, "arc_note", None)},
            "judges_acting": [j for j in built if j in ACTING_JUDGES] if acting else [],
-           "judges_advising": [j for j in built if j not in ACTING_JUDGES] + (["alerts"] if brain.triage else [])}
+           "judges_advising": [j for j in built if j not in ACTING_JUDGES] + (["alerts"] if brain.triage else [])
+           + (["why"] if getattr(brain, "why", False) else [])}
     entries = brain.journal.recent(room.slug, 1) if getattr(brain, "journal", None) is not None else []
     if entries:
         e = entries[0]
@@ -945,3 +954,93 @@ def lights_on(c, room, now):
         meter.lights_on(now.timestamp())
     if owns_setpoints(c) and can_act(c):
         brain.__dict__.setdefault("levers_held", {})[room.slug] = True
+
+
+def _asked_at(question):
+    """When the question was asked, as an aware time, or None."""
+    try:
+        at = datetime.fromisoformat(str(question.get("at")).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return at if at.tzinfo is not None else at.astimezone()
+
+
+def why_state(c, room, question, now):
+    """The evidence for one why question: the grower's words (sent as operator text), the room's decision record,
+    each zone's phase and today's stage, with the "_brain" key the Claude route needs."""
+    journal = getattr(c.jev, "journal", None)
+    keep = ("t", "zone", "judge", "title", "kind", "verdict", "p", "agreed", "action", "result", "reason", "why")
+    decisions = [{k: e[k] for k in keep if e.get(k) is not None}
+                 for e in (journal.recent(room.slug, 15) if journal is not None else [])]
+    return {"question": question["question"], "zone_asked_about": question.get("zone") or "the whole room",
+            "decisions": decisions or "no decisions recorded yet", "local_time": f"{now:%H:%M}",
+            "phases": {z: room.state[z].get("phase") for z in room.zones}, "stage_today": stage_info(c, room, now),
+            "_brain": {"room": room.slug, "zone": "room", "judge": "why", "asked": now.isoformat(timespec="minutes"),
+                       "siblings": room.__dict__.get("_jev_sib") or {},
+                       "interlocks": "a question, not a decision: nothing is changed by the answer",
+                       "data_quality": "the decision record as the controller keeps it"}}
+
+
+def why_task(c, room, now, ha_get, ha_set):
+    """Ask why (haiku-brain-design section 5): each question the integration keeps for this room
+    (sensor..._brain_questions) is asked of the brain once, at most WHY_PER_DAY a day, and answered on
+    sensor..._brain_answers (the last WHY_KEEP, by the question's id). Under any brain but Claude Haiku, a question
+    the brain cannot ask, and one it could not answer, are answered with why not. Never changes a setting."""
+    brain = getattr(c, "jev", None)
+    book = c.__dict__.setdefault("_why", {}).setdefault(room.slug, {"answers": None, "day": None, "asked": 0,
+                                                                      "sent": set()})
+    out_id = f"sensor.crop_steering_{room.prefix}brain_answers"
+    if book["answers"] is None:  # first pass: what was published before a restart stays answered
+        old = ha_get(out_id)[1].get("answers")
+        old = old if isinstance(old, list) else []
+        book["answers"] = [a for a in old if isinstance(a, dict) and isinstance(a.get("id"), str)][-WHY_KEEP:]
+    if book["day"] != now.date().isoformat():
+        book.update(day=now.date().isoformat(), asked=0)
+    asked = ha_get(f"sensor.crop_steering_{room.prefix}brain_questions")[1].get("questions")
+    done, pending = {a["id"] for a in book["answers"]}, []
+    on = brain is not None and getattr(brain, "why", False)
+
+    def answer(q, words, cannot, grounded=()):
+        book["answers"] = (book["answers"] + [{
+            "id": q["id"], "question": q["question"], "zone": q.get("zone"), "asked_at": q.get("at"),
+            "answered_at": now.isoformat(timespec="seconds"), "answer": words, "grounded_in": list(grounded),
+            "cannot_answer": bool(cannot)}])[-WHY_KEEP:]
+        book["sent"].discard(q["id"])
+
+    for q in asked if isinstance(asked, list) else []:
+        if not isinstance(q, dict) or not isinstance(q.get("id"), str) or q["id"] in done:
+            continue
+        q = {**q, "question": str(q.get("question") or "")[:300]}
+        if not on:
+            status = getattr(brain, "status", None) if brain is not None else getattr(c, "brain_status", None)
+            answer(q, "Only the Claude Haiku brain answers questions. This room: "
+                   + getattr(status, "words", "Rules."), True)
+            continue
+        key = f"why:{room.slug}:{q['id']}"
+        if q["id"] not in book["sent"]:
+            at = _asked_at(q)
+            if at is None or (now.astimezone() - at).total_seconds() > WHY_FRESH_H * 3600:
+                answer(q, "Not asked: the question waited too long for the controller.", True)
+                continue
+            if book["asked"] >= WHY_PER_DAY:
+                answer(q, f"Not asked: this room has asked its {WHY_PER_DAY} questions today.", True)
+                continue
+            meter = getattr(brain.asker, "meter", None)
+            if not brain.asker.submit(key, why_state(c, room, q, now), {"why": dict(WHY)}):
+                answer(q, "Not asked: " + _STATE_WORDS.get(meter.state() if meter is not None else None,
+                                                           "the AI assistant cannot ask now."), True)
+                continue
+            book["asked"] += 1
+            book["sent"].add(q["id"])
+        got = brain.asker.result(key)
+        if got is not None:
+            w = got.answers.get("why") or {}
+            answer(q, w.get("answer") or "No answer.", w.get("cannot_answer", True), w.get("grounded_in") or ())
+        elif brain.asker.pending(key):
+            pending.append(q["id"])
+        else:
+            answer(q, "The AI assistant could not answer: " + str(brain.asker.stats.get("last_error") or "no answer"),
+                   True)
+    ha_set(out_id, "asking" if pending else ("answered" if book["answers"] else "none"),
+           {"answers": book["answers"], "pending": pending, "asked_today": book["asked"],
+            "daily_limit": WHY_PER_DAY, "friendly_name": "AI assistant answers", "engine": "f2-control"})
