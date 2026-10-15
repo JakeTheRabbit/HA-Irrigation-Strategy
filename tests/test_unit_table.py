@@ -30,6 +30,10 @@ from custom_components.crop_steering.generated.defaults import UNITS, to_canonic
         ("temperature", 293.15, "K", 20.0),
         ("power", 0.05, "kW", 50.0),
         ("power", 25000, "mW", 25.0),
+        ("volume", 0.1, "L", 100.0),
+        ("volume", 25, "ml", 25.0),
+        ("flow", 60, "mL/min", 1.0),
+        ("flow", 36, "L/h", 10.0),
     ],
 )
 def test_recognised_units_convert_exactly(quantity, value, unit, expected):
@@ -45,6 +49,8 @@ def test_recognised_units_convert_exactly(quantity, value, unit, expected):
         ("ph", "pH"),
         ("temperature", "°C"),
         ("power", "W"),
+        ("volume", "mL"),
+        ("flow", "mL/s"),
     ],
 )
 def test_a_reading_already_in_the_steering_unit_is_untouched(quantity, unit):

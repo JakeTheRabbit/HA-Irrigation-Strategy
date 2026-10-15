@@ -121,17 +121,21 @@ class _Job:
 
 class DosingRunner:
     def __init__(self, controller, *, get, call, publish, alert, state_path, log=print,
-                 sleep=time.sleep, monotonic=time.monotonic, now=None, history=None, respond=None):
+                 sleep=time.sleep, monotonic=time.monotonic, now=None, history=None, respond=None,
+                 actuators=None):
         self.c = controller
         # get(entity, timeout=...) -> (state, attributes, last_updated) with .last_changed;
         # call(domain, service, timeout=..., **data) -> bool; publish(entity, state, attributes);
         # alert(room, code, title, message, event) -> True once Home Assistant has it;
         # history(entity, since) -> [(state, last_changed), ...] or None;
-        # respond(domain, service, data, timeout) -> (HTTP status or None, the service's answer).
+        # respond(domain, service, data, timeout) -> (HTTP status or None, the service's answer);
+        # actuators: the controller's actuator table (controller.ACTUATORS), domain -> (on service, off
+        # service, on state, off state).
         self._get, self._call, self._publish = get, call, publish
         self._deliver, self._log = alert, log
         self._history = history or (lambda _entity, _since: None)
         self._respond = respond
+        self._actuators = actuators or {}
         self._sleep, self._mono = sleep, monotonic
         self._now = now or (lambda: datetime.now(timezone.utc))
         self.path = state_path
@@ -451,7 +455,7 @@ class DosingRunner:
         volume = pump["volume_entity"]
         old = None
         if pump.get("restore_volume", True):
-            old = self._number(volume)
+            old = self._device(volume, "volume")[0]
             if old is None:
                 return f"refused: {volume} can't be read, so it could not be put back"
         expected = ml / flow
@@ -582,15 +586,14 @@ class DosingRunner:
         wait (queued, and tried again with the chores)."""
         pump = {"dosing_entity": dose.get("dosing_entity") or "", "dosing_prefix": dose.get("dosing_prefix")}
         idle = bool(pump["dosing_entity"]) and self._dosing(pump)[0] is False
-        if not idle and self._state(dose.get("power_entity")) != "off":
+        if not idle and self._hw_state(dose.get("power_entity")) != "off":
             return False
         volume, value = dose["volume_entity"], dose["old_volume"]
-        self._call(_domain(volume), "set_value", entity_id=volume, value=value)
-        if not self._confirm_value(volume, value):
+        if not self._set_volume(volume, value):
             name = dose.get("name") or dose.get("pump")
             self._alert(slug, "CS-806", "a dosing pump's volume could not be put back",
                         f"After a dose, the volume number of {name} could not be put back to "
-                        f"{_fmt(value)} mL: {volume} reads {self._state(volume)}. Its firmware may keep "
+                        f"{_fmt(value)} mL: {volume} reads {self._device(volume, 'volume')[1]}. Its firmware may keep "
                         "its batch recipe in it: set it back by hand before the next batch.",
                         _event("volume", dose.get("pump"), dose.get("at")))
         return True
@@ -623,10 +626,9 @@ class DosingRunner:
         """Why the pump's flow can't be used, or None: it must read a number of at least
         MIN_FLOW_ML_S (a firmware that divides by a zero flow runs its motor for ever, and a tiny one
         would put every time limit hours away)."""
-        flow = self._number(pump["flow_entity"])
+        flow, reading, _unit = self._device(pump["flow_entity"], "flow")
         if flow is not None and flow >= MIN_FLOW_ML_S:
             return None
-        reading = self._state(pump["flow_entity"])
         return f"{pump['name']} is not calibrated (flow {'missing' if reading is None else reading})"
 
     @staticmethod
@@ -639,7 +641,7 @@ class DosingRunner:
         why = self._uncalibrated(pump)
         if why:
             return why, None
-        flow = self._number(pump["flow_entity"])
+        flow = self._device(pump["flow_entity"], "flow")[0]
         if (isinstance(ml, bool) or not isinstance(ml, (int, float)) or not math.isfinite(ml)
                 or not 0 < ml <= float(pump.get("max_ml") or 0)):
             return f"{_fmt(ml)} mL is not more than 0 and at most {_fmt(pump.get('max_ml'))} mL", None
@@ -650,15 +652,14 @@ class DosingRunner:
             return f"{pump['name']} already reads dosing", None
         if dosing is None:  # it could not be watched
             return f"{pump['name']}'s dosing state ({pump['dosing_entity']}) can't be read", None
-        if str(self._state(pump["power_entity"])).strip().lower() == "on":
+        if str(self._hw_state(pump["power_entity"])).strip().lower() == "on":
             return f"{pump['name']} is running by hand", None  # its power is its motor's own switch
         return None, flow
 
     def _run_one(self, job, pump, ml, flow, expected):
         """Set the volume, read it back, press start, and watch the pump dose and stop."""
         volume, start = pump["volume_entity"], pump["start_entity"]
-        self._call(_domain(volume), "set_value", entity_id=volume, value=ml)
-        if not self._confirm_value(volume, ml):
+        if not self._set_volume(volume, ml):
             return f"refused: {volume} did not read back {_fmt(ml)} mL, so start was not pressed"
         pressed_at, pressed = self._now(), self._mono()  # before the press: the recorder is read from here
         domain = _domain(start)
@@ -873,7 +874,7 @@ class DosingRunner:
                 return f"the recipe doses {item.get('pump')}, which is not set up", None
             ml = item.get("ml") or 0
             if item.get("ml_entity"):  # it wins over the fixed mL, and is never replaced by it
-                ml = self._number(item["ml_entity"])
+                ml = self._device(item["ml_entity"], "volume")[0]
                 if ml is None:
                     return f"the recipe amount for {pump['name']} can't be read", None
             if ml <= 0:
@@ -883,7 +884,7 @@ class DosingRunner:
             why = self._uncalibrated(pump)
             if why:
                 return why, None
-            flow = self._number(pump["flow_entity"])
+            flow = self._device(pump["flow_entity"], "flow")[0]
             if ml / flow > MAX_DOSE_S:
                 return self._too_long(pump, ml, flow), None
             plan.append((pump, ml, flow))
@@ -1028,13 +1029,13 @@ class DosingRunner:
         if watts > 0 and sensor:
             began = self._mono()
             while True:
-                drawn = self._number(sensor)
+                drawn, reading, unit = self._device(sensor, "power")
                 if drawn is not None and drawn >= watts:
                     break
                 if self._mono() - began >= MIX_POWER_S:
                     self._mix_alert(job, pump, f"The mix pump ({pump}) was switched on, but {sensor} did not "
                                     f"read {watts:g} W within {MIX_POWER_S:.0f} seconds (it reads "
-                                    f"{self._state(sensor)})")
+                                    f"{reading}{f' {unit}' if unit else ''})")
                     raise _Ended(f"the mix pump did not draw {watts:g} W within {MIX_POWER_S:.0f} s")
                 self._check(job)
                 self._wait(job, READ_S)
@@ -1157,8 +1158,9 @@ class DosingRunner:
         if request["id"] != handled:
             self._take(job.room, config, request, job)
 
-    def _on(self, job, entity, service="turn_on"):
-        """Every switch-on, and every start press, goes through here. A stop is read first (and the
+    def _on(self, job, entity, service=None):
+        """Every switch-on (its domain's on service, _actuator), and every start press (`service`), goes
+        through here. A stop is read first (and the
         watchdog checked); then, with the gate held across the call so the way out (exit) never
         overtakes it, the exit and stop flags are checked under the runner lock immediately before
         the call."""
@@ -1169,7 +1171,8 @@ class DosingRunner:
                     raise _Exit()
                 if job.stopped:
                     raise _Ended(self._stop_reason(job))
-            return self._call(_domain(entity), service, entity_id=entity, timeout=ON_TIMEOUT_S)
+            return self._call(_domain(entity), service or self._actuator(entity)[0], entity_id=entity,
+                              timeout=ON_TIMEOUT_S)
 
     def _late(self, job):
         return job.deadline is not None and self._mono() > job.deadline
@@ -1325,7 +1328,7 @@ class DosingRunner:
         """-> (the ones that do not read off, each sent off again; whether Home Assistant answered)."""
         left, answered = [], False
         for entity in entities:
-            state = self._state(entity, quick=True)
+            state = self._hw_state(entity, quick=True)
             answered = answered or state is not None
             if state != "off":
                 left.append(entity)
@@ -1448,7 +1451,7 @@ class DosingRunner:
         for pump in config["pumps"]:
             dosing = self._dosing(pump, quick=True)[0]
             readings[pump["id"]] = {
-                "flow": self._number(pump["flow_entity"], quick=True),
+                "flow": self._device(pump["flow_entity"], "flow", quick=True)[0],
                 "state": "unavailable" if dosing is None else "dosing" if dosing else "idle",
             }
         with self._lock:
@@ -1522,12 +1525,37 @@ class DosingRunner:
         state = self._fetch(entity, quick)[0]
         return None if state is None else str(state)
 
-    def _number(self, entity, quick=False):
+    def _device(self, entity, quantity, quick=False):
+        """One read of a dosing device's number (a pump's volume or flow, a recipe amount, the mix pump's
+        power) through the device-unit table (Controller._canonical) -> (the number in the quantity's
+        canonical unit, mL, mL/s or W, or None; the state as read; its unit). A unit the table does not
+        know, or none, is read in that unit as it always was, never set aside: a dose is refused all
+        the same for an uncalibrated flow, more than max_ml, more than MAX_DOSE_S and a volume that
+        does not read back."""
+        read = self._fetch(entity, quick)
+        state, unit = read[0], (read[1] or {}).get("unit_of_measurement")
+        state = None if state is None else str(state)
         try:
-            value = float(self._state(entity, quick))
+            number = float(state)
         except (TypeError, ValueError):
+            return None, state, unit
+        if not math.isfinite(number):
+            return None, state, unit
+        return self.c._canonical(entity, quantity, number, unit, keep_unknown=True)[0], state, unit
+
+    def _actuator(self, entity):
+        """(on service, off service, on state, off state) for dosing hardware: its domain's row in the
+        actuator table, so a valve opens and closes; any other domain is switched turn_on / turn_off and
+        read back on / off, as dosing always drove it (a light or fan relay works)."""
+        return self._actuators.get(_domain(entity), ("turn_on", "turn_off", "on", "off"))
+
+    def _hw_state(self, entity, quick=False):
+        """Dosing hardware's state in on/off words: its domain's on state reads "on", its off state "off"."""
+        state = self._state(entity, quick)
+        if state is None:
             return None
-        return value if math.isfinite(value) else None
+        row = self._actuator(entity)
+        return {row[2]: "on", row[3]: "off"}.get(state, state)
 
     def _dosing(self, pump, quick=False):
         """(True / False / None when it reads nothing usable, when its state last changed)."""
@@ -1569,35 +1597,43 @@ class DosingRunner:
         OFF must never be the reason a pump or valve was not told."""
         entities = [e for e in dict.fromkeys(entities) if e]
         for e in entities:
-            self._call(_domain(e), "turn_off", entity_id=e)
+            self._call(_domain(e), self._actuator(e)[1], entity_id=e)
         stuck = self._confirm(entities, "off")
         for e in stuck:
-            self._call(_domain(e), "turn_off", entity_id=e)
+            self._call(_domain(e), self._actuator(e)[1], entity_id=e)
         return self._confirm(stuck, "off")
 
     def _send_off(self, entity):
         """An off with a QUICK_S timeout and no read-back -> whether Home Assistant took it."""
-        return self._call(_domain(entity), "turn_off", entity_id=entity, timeout=QUICK_S)
+        return self._call(_domain(entity), self._actuator(entity)[1], entity_id=entity, timeout=QUICK_S)
 
     def _confirm(self, entities, want, timeout=None):
-        """Read these back until each reads `want`: first at 1 s, then every 0.5 s up to `timeout`
-        (CONFIRM_TIMEOUT_S) -> the ones that don't."""
+        """Read these back until each reads `want` ("on" or "off", _hw_state): first at 1 s, then every
+        0.5 s up to `timeout` (CONFIRM_TIMEOUT_S) -> the ones that don't."""
         if not entities:
             return []
         deadline = self._mono() + (CONFIRM_TIMEOUT_S if timeout is None else timeout)
         self._sleep(CONFIRM_FIRST_S)
         while True:
-            left = [e for e in entities if self._state(e) != want]
+            left = [e for e in entities if self._hw_state(e) != want]
             if not left or self._mono() >= deadline:
                 return left
             self._sleep(CONFIRM_POLL_S)
 
-    def _confirm_value(self, entity, value):
+    def _set_volume(self, entity, ml):
+        """Set a pump's volume number to `ml` mL in the number's own unit (0.1 for 100 mL in L) and read
+        it back -> whether it reads `ml` mL again."""
+        unit = self._device(entity, "volume")[2]
+        per_unit = self.c._canonical(entity, "volume", 1.0, unit, keep_unknown=True)[0]  # mL in one of it
+        self._call(_domain(entity), "set_value", entity_id=entity, value=ml if per_unit == 1 else ml / per_unit)
+        return self._confirm_value(entity, ml)
+
+    def _confirm_value(self, entity, ml):
         deadline = self._mono() + CONFIRM_TIMEOUT_S
         self._sleep(CONFIRM_FIRST_S)
         while True:
-            read = self._number(entity)
-            if read is not None and abs(read - value) <= VOLUME_TOLERANCE_ML:
+            read = self._device(entity, "volume")[0]
+            if read is not None and abs(read - ml) <= VOLUME_TOLERANCE_ML:
                 return True
             if self._mono() >= deadline:
                 return False

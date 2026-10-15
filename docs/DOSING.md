@@ -29,12 +29,13 @@ pump name or recipe is assumed.
     {
       "id": "balance",                 // [a-z0-9_]{1,24}, unique in the room
       "name": "Balance",               // 1..40 chars
-      "volume_entity": "number.x",     // number.* | input_number.*   the firmware's dose volume (mL)
+      "volume_entity": "number.x",     // number.* | input_number.*   the firmware's dose volume (mL or L)
       "start_entity": "button.x",      // button.* | input_button.* | script.*   starts the on-device dose
       "dosing_entity": "sensor.x",     // binary_sensor.* (on = dosing) | sensor.* (state starts with dosing_prefix)
       "dosing_prefix": "Dosing",       // sensor type only; default "Dosing"
       "power_entity": "switch.x",      // switch.*   turning it off stops the motor (the stop and the overrun cut)
       "flow_entity": "number.x",       // number.* | input_number.* | sensor.*   calibrated flow, mL/s
+                                       // (or mL/min, L/h: Units and hardware, below)
       "max_ml": 2000,                  // 1..5000; a request above it is refused
       "restore_volume": true,          // put the volume number back after a single dose (firmware that
                                        // keeps its batch recipe in that number); default true
@@ -49,7 +50,7 @@ pump name or recipe is assumed.
     "fill_timeout_min": 20,            // 1..60
     "mix_pump": "switch.x",            // switch.* | null
     "mix_valves": ["switch.x"],        // 0..4 switch.*, opened before the mix pump starts
-    "mix_power_sensor": "sensor.x",    // sensor.* (W) | null
+    "mix_power_sensor": "sensor.x",    // sensor.* (W, kW or mW) | null
     "mix_min_w": 200,                  // 0 = no power check; else the mix pump must draw this within 20 s
                                        // (needs mix_power_sensor)
     "premix_min": 2,                   // 0..30
@@ -150,6 +151,25 @@ drawn from its stock tank"); for a batch "making a batch", then "finished", "fin
 could not be stamped" or "stopped: <step>: <reason>"; a refusal "refused: <reason>" (for example
 "refused: Bloom is not calibrated (flow 0)" or "refused: a batch is running"); an old request "too
 old to act on"; a stop "stopped", or "stopped; <entity> does not read off".
+
+### Units and hardware
+
+Every number the controller reads from a dosing device goes through the one device-unit table
+(`UNITS` in `crop-steering-engine/src/crop_steering_engine/defaults.py`), which irrigation's probes
+use too: a pump's `volume_entity` and a recipe's `ml_entity` in mL (mL or L), a pump's `flow_entity`
+in mL/s (mL/s, mL/min or L/h) and the `mix_power_sensor` in W (W, kW or mW). A volume number is
+written in its own unit (0.1 for 100 mL in L) and read back in it. A unit the table does not know,
+or none, is read as mL, mL/s or W, as it always was, and said once in the log; it is never set aside,
+because a dose is refused all the same for an uncalibrated flow, more than `max_ml`, more than 20
+minutes and a volume that does not read back.
+
+The fill valve, the mix pump, the mix valves, the hold, the valves, main lines and pumps a batch
+closes, and each pump's `power_entity` are switched and read back through the controller's actuator
+table, the one irrigation uses: a `switch` or `input_boolean` is sent `turn_on` / `turn_off` and
+reads `on` / `off`; a `valve` is sent `open_valve` / `close_valve` and reads `open` / `closed`. Any
+other on/off domain is switched `turn_on` / `turn_off` and read back `on` / `off`, as before. Below,
+"on" and "off" mean the domain's own words. The configuration above still offers `switch.*` for
+these.
 
 ### One dose (`ml` into a pump)
 

@@ -1,7 +1,7 @@
 """One table of setting defaults, shared by the integration and the controller.
 
-Also the one table of device units, further down: how a reading from a probe or a power
-plug becomes the unit the system steers in.
+Also the one table of device units, further down: how a reading from a probe, a power
+plug or a dosing pump becomes the unit the system steers in.
 
 Pure data and one pure function, with no imports, so every layer can carry it. This file is the source,
 crop-steering-engine/src/crop_steering_engine/defaults.py. Two byte-for-byte copies
@@ -176,6 +176,25 @@ UNITS = {
         },
         "refused": {},
         "plausible": (0.0, 10000.0),
+    },
+    # A dosing pump's volume number and a recipe amount. The dosing runner reads a unit this table
+    # does not know as mL whatever the number, as it always did (its own checks bound every dose).
+    "volume": {
+        "canonical": "mL",
+        "convert": {"ml": (0.0, 1, 1), "l": (0.0, 1000, 1)},
+        "refused": {},
+        "plausible": (0.0, 100000.0),
+    },
+    # A dosing pump's calibrated flow; read as mL/s when its unit is not known, as it always was.
+    "flow": {
+        "canonical": "mL/s",
+        "convert": {
+            "ml/s": (0.0, 1, 1),
+            "ml/min": (0.0, 1, 60),
+            "l/h": (0.0, 1000, 3600),
+        },
+        "refused": {},
+        "plausible": (0.0, 1000.0),
     },
 }
 
