@@ -148,6 +148,7 @@ def rig(monkeypatch):
     dosing = SimpleNamespace(
         room_id=ROOM,
         async_init=AsyncMock(),
+        start=MagicMock(return_value=None),
         response=MagicMock(return_value={"config": {}}),
         save=AsyncMock(return_value={"config": {}}),
         request=AsyncMock(return_value={"request": None, "error": None}),

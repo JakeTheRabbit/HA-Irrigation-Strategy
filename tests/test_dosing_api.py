@@ -51,6 +51,7 @@ def dispatcher(monkeypatch):
 def clock(monkeypatch):
     now = {"at": NOW}
     monkeypatch.setattr(dosing_api, "_now", lambda: now["at"])
+    monkeypatch.setattr(dosing_api, "_today", lambda: now["at"].date())
     return now
 
 
@@ -244,12 +245,17 @@ def test_the_sensor_the_controller_reads():
     _, store = rig()
     assert store.sensor() == (
         0,
-        {"pumps": [], "batch": dosing.empty_batch(), "request": None},
+        {
+            "pumps": [],
+            "batch": dosing.empty_batch(),
+            "request": None,
+            "feed": dosing.feed_now(dosing.empty_feed(), NOW.date()),
+        },
     )
     save(store)
     ask(store)
     state, attributes = store.sensor()
-    assert state == 1 and set(attributes) == {"pumps", "batch", "request"}
+    assert state == 1 and set(attributes) == {"pumps", "batch", "request", "feed"}
     assert attributes["pumps"][0]["power_entity"] == PUMP["power_entity"]
     assert attributes["batch"]["recipe"][0]["ml_entity"] == "number.recipe_balance"
     assert attributes["request"] == store.data["request"]
@@ -326,6 +332,17 @@ def services(monkeypatch):
     }
     hass.auth = SimpleNamespace(async_get_user=AsyncMock(side_effect=users.get))
     entry = ha_stubs.FakeEntry(entry_id="entry")
+    entry.unloads = []
+    entry.async_on_unload = entry.unloads.append
+    event = types.ModuleType("homeassistant.helpers.event")
+    event.midnight = []
+
+    def track(hass, action, **at):
+        event.midnight.append((action, at))
+        return lambda: event.midnight.remove((action, at))
+
+    event.async_track_time_change = track
+    monkeypatch.setitem(sys.modules, "homeassistant.helpers.event", event)
     monkeypatch.setattr(dosing_api, "DosingStore", _memory_store)
     asyncio.run(dosing_api.async_setup_dosing(hass, entry))
 
@@ -337,7 +354,7 @@ def services(monkeypatch):
         )
         return asyncio.run(hass.services.registered[(DOMAIN, name)](request))
 
-    return SimpleNamespace(hass=hass, call=call, entry=entry)
+    return SimpleNamespace(hass=hass, call=call, entry=entry, event=event)
 
 
 _REAL_STORE = dosing_api.DosingStore
@@ -393,3 +410,81 @@ def test_the_services_find_the_room_and_record_who_asked(services):
         services.call("dosing_get", room_id="room_b")
     asyncio.run(dosing_api.async_unload_dosing(services.hass, services.entry))
     assert services.hass.services.registered == {}
+    # The midnight rewrite goes with the room: Home Assistant runs its unsubscribe on unload.
+    for unsubscribe in services.entry.unloads:
+        unsubscribe()
+    assert services.event.midnight == []
+
+
+FEED = {
+    "recipes": [
+        {"id": "vege", "name": "Vege", "doses": [{"pump": "balance", "ml": 200}]},
+        {"id": "bloom", "name": "Bloom", "doses": [{"pump": "balance", "ml": 300}]},
+    ],
+    # Week 1 from Monday 21 September 2026: NOW (Monday 28 September) is week 2, Bloom.
+    "schedule": {"start": "2026-09-21", "weeks": ["vege", "bloom"]},
+}
+
+
+def test_the_sensor_doses_the_week_s_recipe_and_moves_on_at_midnight(
+    services, dispatcher, clock
+):
+    saved = services.call(
+        "dosing_save",
+        expected_revision=0,
+        pumps=[copy.deepcopy(PUMP)],
+        batch=copy.deepcopy(BATCH),
+        feed=copy.deepcopy(FEED),
+    )
+    assert saved["error"] is None
+    assert saved["feed_now"]["recipe"] == "Bloom"
+    store = dosing_api.resolve_dosing(services.hass, "room:")
+    _, attributes = store.sensor()
+    assert attributes["batch"]["recipe"] == [
+        {"pump": "balance", "ml": 300, "ml_entity": None}
+    ]
+    assert (attributes["feed"]["week"], attributes["feed"]["source"]) == (2, "schedule")
+    # The batch's own recipe is kept as saved, for when no feed recipe is in use.
+    assert store.data["batch"]["recipe"][0]["ml_entity"] == "number.recipe_balance"
+    # Home Assistant's midnight: the sensor is written again, and reads the new day.
+    [(midnight, at)] = services.event.midnight
+    assert at == {"hour": 0, "minute": 0, "second": 0}
+    dispatcher.sent.clear()
+    midnight(None)
+    assert dispatcher.sent == [f"{dosing_api.SIGNAL}_entry"]
+    clock["at"] = NOW - timedelta(days=7)
+    assert store.sensor()[1]["batch"]["recipe"][0]["ml"] == 200
+
+
+def test_a_pick_holds_and_a_save_without_the_feed_keeps_it(clock):
+    _, store = rig()
+    assert save(store, feed=copy.deepcopy(FEED))["error"] is None
+    picked = save(
+        store, feed={**copy.deepcopy(FEED), "stage": "vege", "held_until": None}
+    )
+    assert picked["config"]["feed"]["held_until"] == "2026-10-05"  # week 3 starts
+    assert picked["feed_now"]["source"] == "held"
+    # The caller never says how long a pick holds; the same pick saved again keeps its hold.
+    again = save(
+        store, feed={**copy.deepcopy(FEED), "stage": "vege", "held_until": "2027-01-01"}
+    )
+    assert again["config"]["feed"]["held_until"] == "2026-10-05"
+    # A dashboard from before the feed schedule saves pumps and batch only: the feed stays.
+    kept = save(store)
+    assert kept["error"] is None and kept["config"]["feed"] == again["config"]["feed"]
+    # ... and is checked against the pumps saved: none may be taken from under a recipe.
+    refused = save(store, pumps=[], batch={})
+    assert "feed recipe Vege" in refused["error"]
+    assert store.data["revision"] == kept["config"]["revision"]
+
+
+def test_a_store_saved_before_the_feed_schedule_loads_with_none():
+    _, store = rig()
+    save(store)
+    stored = copy.deepcopy(store._store.value)
+    del stored["feed"]
+    _, again = rig(value=stored)
+    assert again.error is None and again.data["feed"] == dosing.empty_feed()
+    _, attributes = again.sensor()
+    assert attributes["batch"] == stored["batch"]  # its own recipe, unchanged
+    assert attributes["feed"]["source"] == "batch"
