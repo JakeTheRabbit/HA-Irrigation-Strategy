@@ -138,6 +138,11 @@ for that zone. (3 zones × 23 = 69 entities on a 3-zone system.)
 | `zone_N_set_phase` | Keep · P0 · P1 · P2 · P3 | Moves the zone to a phase by hand. The controller applies a pick once, within a minute, and sets it back to Keep; its own rules carry on from that phase. Today's water and shot counts stay; P1 ramps from its first shot, and P0 measures its dry-back from the moisture at the move. |
 | `zone_N_steering_mode` | Vegetative · Generative | Per-zone veg/gen bias. |
 
+### Per-zone buttons (`button.crop_steering_zone_N_*`)
+| Entity | What it does |
+|---|---|
+| `zone_N_test_shot` | Asks the controller for a 10-second test shot in the zone, to check that watering works. It acts at its next pass (within a minute) on a press under 10 minutes old, through every check a shot passes except a held grow plan. Its water counts toward the day's; it is not one of the day's shots. The `crop_steering.test_shot` service presses it by room id. |
+
 ---
 
 ## 5. Sensors (read-only)

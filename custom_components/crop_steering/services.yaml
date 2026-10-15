@@ -513,6 +513,21 @@ notify:
       default: false
       selector:
         boolean:
+test_shot:
+  name: Test a zone's watering
+  description: Ask the controller app for a 10-second test shot in one zone, as the zone's Test Shot button does, to check that watering works. It passes every check a shot passes except a held irrigation strategy's, and its water counts toward the day's. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    zone:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 99
+          mode: box
 whats_new_get:
   name: Read what's new
   description: The release highlights shipped with this integration, the installed version and the last release the dashboard's What's new window showed. Changes nothing.
