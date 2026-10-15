@@ -31,7 +31,7 @@ from jev.judges.night import NightJudge
 from jev.judges.probe import ProbeJudge
 from jev.judges.ramp import RampJudge
 from jev.judges.salt import SaltJudge
-from jev.judges.setpoints import CHOICES, SHOT, THRESHOLD, SetpointsJudge
+from jev.judges.setpoints import CHOICES, MOVES, SHOT, THRESHOLD, SetpointsJudge
 from jev.judges.setpoints import band as setpoint_band
 from jev.judges.shot import ShotJudge
 from jev.judges.stage import StageJudge
@@ -601,7 +601,7 @@ def setpoint_view(c, room, zone, p, now):
     return {
         "enabled": bool(enabled), "current": current, "home": dict(rec["home"]),
         "bands": {s: setpoint_band(s, rec["home"][s], p) for s in current},
-        "changed_today": last.get("day") == day, "frozen": frozen, "day": day,
+        "changed_today": last.get("day") == day, "frozen": frozen, "day": day, **notch_history(c, room, zone, now),
         "last_words": _last_words(last),
     }
 
@@ -656,6 +656,30 @@ def readback(c, room, zone, now):
     why = (f"Home Assistant still shows {frm:g} after {pend['tries'] + 1} tries" if allowed
            else "automatic targets were switched off before it landed")
     _note(c, room, zone, "write failed", f"{suffix.replace('_', ' ')} {frm:g} -> {to:g}", "failed", why)
+
+
+def notch_history(c, room, zone, now):
+    """The notch budget's history for a zone from the ledger (envelope.notch_budget): `notches`, the (at, suffix,
+    step) moves made, and `setbacks`, when a move was refused or a move's check came back bad. Read with defaults:
+    an entry without a time is skipped, and an outcome without its own time counts from check_at."""
+    notches, setbacks = [], []
+    for e in list(getattr(getattr(c.jev, "ledger", None), "entries", None) or ()):
+        if e.get("judge") != "setpoints" or e.get("room") != room.slug or e.get("zone") != zone:
+            continue
+        try:
+            at = datetime.fromisoformat(e.get("at") or "")
+            outcome = e.get("outcome") if isinstance(e.get("outcome"), dict) else {}
+            bad = outcome and outcome.get("good") is False
+            known = datetime.fromisoformat(outcome.get("at") or e.get("check_at") or e["at"]) if bad else None
+        except (TypeError, ValueError):
+            continue
+        if e.get("action") == "setpoint" and e.get("label") in MOVES:
+            notches.append((at, MOVES[e["label"]][0], abs(MOVES[e["label"]][1])))
+        elif e.get("action") == "refused":
+            setbacks.append(at)
+        if known is not None:
+            setbacks.append(known)
+    return {"notches": notches, "setbacks": setbacks}
 
 
 def apply_setpoint(c, room, zone, d, ctx, now):

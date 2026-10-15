@@ -2,19 +2,26 @@
 
 A judge turns Jev's answer into a `Directive`. `admit()` then checks it against arithmetic Jev can't do
 and limits Jev can't cross: the daily order of the phases, how far into a phase the zone is, the P3
-emergency floor, the ramp's minimum shots, the evidence needed to set a probe aside. A refused directive
-does nothing; the base engine decides as it always has.
+emergency floor, the ramp's minimum shots, the evidence needed to set a probe aside, the notch budget on
+the setpoints. A refused directive does nothing; the base engine decides as it always has.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from crop_steering_engine import p0_dryback
 
 ORDER = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
 NEXT = {"P0": "P1", "P1": "P2", "P2": "P3"}
 FLAT_MIN = 30.0  # a probe reading unchanged this long can't show a dryback: the P0 timer decides
+
+# The notch budget: how far a setting may move, every notch added up, however the band moves under it.
+NOTCH_24H = 0.5  # in any 24 h: one notch
+NOTCH_7D = 1.0  # in any 7 days: two notches
+COOL_DOWN_H = 36.0  # no notch this long after a refused move or one that did not work out: the next night is skipped
+BUDGET = "notch budget"  # how the budget's refusals start
+MOVE_REFUSALS = ("not a setting", "one notch at a time", "is outside its range")  # the move itself was wrong
 
 
 @dataclass(frozen=True)
@@ -108,7 +115,8 @@ def admit(d: Directive, ctx, confirmed=0, evidence_ok=False):
 
 def _admit_setpoint(d, ctx):
     """One notch on one of the zone's own numbers, inside the band around the operator's value, at most once a
-    grow-day, only with the room's Auto setpoints switch on, and never while the zone is paused after a revert."""
+    grow-day, only with the room's Auto setpoints switch on, never while the zone is paused after a revert, and
+    within the notch budget (notch_budget)."""
     sp = getattr(ctx, "setpoints", None) or {}
     v = d.value if isinstance(d.value, dict) else {}
     suffix, frm, to = v.get("suffix"), v.get("from"), v.get("to")
@@ -129,4 +137,28 @@ def _admit_setpoint(d, ctx):
     lo, hi = band
     if not lo - 1e-9 <= float(to) <= hi + 1e-9:
         return False, f"{to:g} is outside its range {lo:g}-{hi:g} around your value"
+    spent = notch_budget(sp, suffix, ctx.now, abs(float(to) - float(frm)))
+    if spent:
+        return False, spent
     return True, "one notch inside its range around your value"
+
+
+def notch_budget(sp, suffix, now, step=0.5):
+    """Why a notch of `step` on `suffix` may not be made at `now`, or None. `sp["setbacks"]` holds when a move was
+    refused or did not work out, `sp["notches"]` the (at, suffix, step) moves made (jev_bridge reads both from the
+    ledger); either may be missing."""
+    for at in sp.get("setbacks") or ():
+        until = at + timedelta(hours=COOL_DOWN_H)
+        if until > now:
+            return f"{BUDGET}: resting until {until:%Y-%m-%d %H:%M} after a change was refused or did not work out"
+    for hours, cap, span in ((24, NOTCH_24H, "24 h"), (24 * 7, NOTCH_7D, "7 days")):
+        used = sum(abs(n) for at, s, n in sp.get("notches") or () if s == suffix and now - at < timedelta(hours=hours))
+        if used + step > cap + 1e-9:
+            return f"{BUDGET}: {used:g} already moved in {span} (at most {cap:g})"
+    return None
+
+
+def cools_down(why):
+    """True when a refused setpoint move starts the cool-down: the move itself was wrong, not its timing (the
+    switch, a pause, today's change, the budget) and not an edit by hand made while Jev was asked."""
+    return any(r in why for r in MOVE_REFUSALS)

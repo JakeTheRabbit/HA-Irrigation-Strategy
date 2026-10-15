@@ -59,7 +59,9 @@ The live runs drew the line between doctrine for Jev and doctrine for code. Told
   with which lever).
 - **Setpoints:** only the zone's own P2 shot size and re-water threshold, one notch a night, inside a range around
   the operator's value that no string of notches can leave; never a room-level number, a daily limit, a floor or
-  a ceiling. 26 Sep 2026 is why: the base engine's learner walked zone 1's shot from 3 % to 1 % (30-second shots
+  a ceiling. However that range moves, a setting moves at most one notch in any 24 hours and two in any 7 days,
+  and nothing moves for 36 hours after a move code refused or one whose next-day check came back bad (the notch
+  budget, read from the ledger). 26 Sep 2026 is why: the base engine's learner walked zone 1's shot from 3 % to 1 % (30-second shots
   every 96 seconds) and ratcheted zone 3's targets to 74.5 in four days.
 - **Probes:** the last usable probe is never set aside by Jev alone: it takes the council, the code-confirmed
   evidence, and it expires.
