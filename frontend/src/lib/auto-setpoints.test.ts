@@ -50,7 +50,21 @@ describe("auto setpoint status", () => {
       updated: "2026-09-08T00:58:00+00:00",
       holdDays: 3,
       frozenReason: null,
+      drybackNote: null,
+      p2Stop: null,
     });
+  });
+  it("reads today's dryback note, and when its plan stops maintenance shots, as a clock time or nothing", () => {
+    const note = "30% dryback unreachable at this zone's uptake: about 24% tonight, with maintenance shots until 19:00";
+    const status = parseAutoSetpoints(entity("tracking", { dryback_note: note, p2_stop: "19:00" }))!;
+    expect(status.drybackNote).toBe(note);
+    expect(autoStatusText(status)).toContain(note);
+    expect(parseAutoSetpoints(entity("tracking", { dryback_note: 3 }))!.drybackNote).toBeNull();
+    const stop = (value: unknown) =>
+      parseAutoSetpoints(entity("tracking", { p2_stop: value }))!.p2Stop;
+    expect(stop("17:00")).toBe("17:00");
+    expect(stop("00:30")).toBe("00:30");
+    for (const bad of [null, "24:00", "5pm", "17:0", 17, undefined]) expect(stop(bad)).toBeNull();
   });
   it.each(["pending", "reached", "plateau", "suspect", "short"])(
     "accepts the %s P1 outcome",

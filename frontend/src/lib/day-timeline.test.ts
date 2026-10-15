@@ -13,6 +13,7 @@ import {
   growDay,
   joinRows,
   levels,
+  maintenanceStop,
   morningDryback,
   nextShot,
   NOT_REPORTING,
@@ -25,6 +26,7 @@ import {
   revisionAt,
   setpointChanges,
   setpointSteps,
+  stoppedSegments,
   timelineEntities,
   typicalDay,
   unprojected,
@@ -55,6 +57,30 @@ const decision = (time: number, fired: string[] = [], blocked: string[] = []) =>
 describe("grow day", () => {
   const local = (day: number, hour: number, minute = 0) =>
     new Date(2026, 8, day, hour, minute).getTime();
+  it("marks the maintenance band from Auto setpoints' planned stop as stopped, not as a trigger", () => {
+    // Lights 07:00 to 20:00, the stop at 17:00: the band all day, then two lower levels from 17:00.
+    const day = { start: local(1, 7), end: local(2, 7) };
+    expect(maintenanceStop("17:00", day)).toBe(local(1, 17));
+    expect(maintenanceStop("01:30", day)).toBe(local(2, 1, 30)); // later in the grow day, past midnight
+    for (const bad of [null, "5pm", "17:0"]) expect(maintenanceStop(bad, day)).toBeNull();
+    const segment = (from: number, to: number) => ({ start: from, end: to, low: 60, high: 70 });
+    const band = [
+      segment(local(1, 9), local(1, 17)),
+      segment(local(1, 17), local(1, 17, 1)),
+      segment(local(1, 17, 1), local(1, 20)),
+    ];
+    const stop = maintenanceStop("17:00", day);
+    expect(stoppedSegments(band, stop).map((item) => item.stopped)).toEqual([false, true, true]);
+    // A level set within the minute before the stop still counts; two minutes before is the day's.
+    const early = (seconds: number) => [segment(local(1, 17) - seconds * 1000, local(1, 20))];
+    expect(stoppedSegments(early(30), stop)[0].stopped).toBe(true);
+    expect(stoppedSegments(early(120), stop)[0].stopped).toBe(false);
+    // No stop (a zone not on Auto setpoints) marks nothing; neither does one later in the grow day.
+    expect(stoppedSegments(band, null).some((item) => item.stopped)).toBe(false);
+    expect(stoppedSegments(band, maintenanceStop("01:30", day)).some((item) => item.stopped)).toBe(
+      false,
+    );
+  });
   it("runs from the last lights-on to the next, lights-off inside it", () => {
     expect(growDay(10, 22, local(23, 14))).toEqual({
       start: local(23, 10),

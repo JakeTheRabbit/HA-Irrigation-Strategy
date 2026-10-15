@@ -222,6 +222,11 @@ export function createDemo(now = Date.now()): States {
         hold_days: supervisor === "tracking" ? 3 : 0,
         frozen_reason:
           supervisor === "frozen" ? "probe response looks suspect after a sensor dropout" : null,
+        dryback_note:
+          supervisor === "tracking"
+            ? "8% dryback unreachable at this zone's uptake: about 6% tonight, with maintenance shots until 19:00"
+            : null,
+        p2_stop: supervisor === "tracking" ? "19:00" : null,
         managed: index
           ? []
           : [

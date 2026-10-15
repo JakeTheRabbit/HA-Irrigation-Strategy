@@ -26,6 +26,11 @@ export interface AutoSetpointStatus {
   holdDays: number | null;
   /** Why the supervisor is frozen, e.g. an armed grow plan owns the targets. */
   frozenReason: string | null;
+  /** Today's plan cannot reach the P3 dryback target: what the zone gets instead, and until when
+   * its maintenance shots run. */
+  drybackNote: string | null;
+  /** When today's plan stops maintenance shots for the dryback, local "HH:MM". */
+  p2Stop: string | null;
 }
 const finite = (value: unknown): number | null => {
   const parsed =
@@ -66,6 +71,11 @@ export function parseAutoSetpoints(entity: EntityState | undefined): AutoSetpoin
       finite(attributes.hold_days),
     ),
     frozenReason: text(attributes.frozen_reason),
+    drybackNote: text(attributes.dryback_note),
+    p2Stop:
+      typeof attributes.p2_stop === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(attributes.p2_stop)
+        ? attributes.p2_stop
+        : null,
   };
 }
 export const autoStateLabel = (state: AutoSetpointState) => state[0].toUpperCase() + state.slice(1);
@@ -91,6 +101,7 @@ export function autoStatusText(status: AutoSetpointStatus): string {
       ? "learned peak not yet known"
       : `learned peak ${status.learnedPeak.toFixed(1)}%${hold ? `, ${hold}` : ""}`,
     status.lastChange ? `last change: ${status.lastChange}` : "no changes yet",
+    ...(status.drybackNote ? [status.drybackNote] : []),
     `Jev: ${status.jev ?? "not reported"}`,
     ...(status.jevChangedToday ? [`Jev changed today: ${status.jevChangedToday}`] : []),
     ...(status.jevLast ? [`Jev last said: ${status.jevLast}`] : []),
