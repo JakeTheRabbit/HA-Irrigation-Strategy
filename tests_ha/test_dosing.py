@@ -222,3 +222,38 @@ async def test_an_install_from_before_dosing_loads_with_an_empty_setup(hass):
     doc = await _call(hass, None, "dosing_get")  # an automation: it reads, and may not edit
     assert doc["error"] is None and doc["config"]["pumps"] == []
     assert doc["can_edit"] is False
+
+
+async def test_a_recipe_in_parts_reaches_the_controller_in_whole_ml(
+    hass, hass_admin_user
+):
+    """docs/DOSING.md, Configuration: a dose in parts of the batch's 1 part, and a fixed amount, are both
+    published in whole mL rounded half up; the parts survive a reload."""
+    entry = await _install(hass)
+    _devices(hass)
+    bloom = {k: v.replace("balance", "bloom") for k, v in PUMP.items() if k != "max_ml"}
+    bloom["max_ml"] = 2000
+    for key, state in (("volume_entity", "25"), ("start_entity", "unknown"),
+                       ("dosing_entity", "off"), ("power_entity", "off"), ("flow_entity", "10")):
+        hass.states.async_set(bloom[key], state)
+    recipe = [{"pump": "bloom", "parts": 1.5}, {"pump": "balance", "ml": 12.5}]
+    doc = await _call(
+        hass,
+        hass_admin_user,
+        "dosing_save",
+        expected_revision=0,
+        pumps=[PUMP, bloom],
+        batch={"part_ml": 12.5, "recipe": recipe},
+    )
+    assert doc["error"] is None
+    published = [
+        {"pump": "bloom", "ml": 19, "ml_entity": None, "parts": 1.5},
+        {"pump": "balance", "ml": 13, "ml_entity": None},
+    ]
+    await hass.async_block_till_done()
+    batch = hass.states.get(SENSOR).attributes["batch"]
+    assert (batch["part_ml"], batch["recipe"]) == (12.5, published)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    batch = hass.states.get(SENSOR).attributes["batch"]
+    assert (batch["part_ml"], batch["recipe"]) == (12.5, published)
