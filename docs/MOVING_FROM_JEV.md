@@ -36,7 +36,9 @@ These are for Home Assistant OS and Supervised installs, and follow the same sha
    to the app store (`...#testing` for a staging room), install the **Crop Steering Controller** app from
    it, and leave it stopped with Start on boot and Watchdog off.
 3. **Copy every option.** Copy the old app's Configuration into the new one, every option, including
-   `enable_flag`, `typesafe_api_key`, the `cf_*` fields and the `jev_*` fields.
+   `enable_flag`, `typesafe_api_key`, the `cf_*` fields and the `jev_*` fields. The new app's form no
+   longer shows `typesafe_api_key`, the `cf_*` fields, `jev_enabled` or `jev_retries` (they are deprecated):
+   set those in YAML mode (the Configuration tab's menu, Edit in YAML).
 4. **Make the room safe.** Turn each room's kill switch off: the one its health card names (its engine
    switch, or the `input_boolean` helper on older rooms). Wait until the pump, main line and valves read
    OFF. Stop the Jev app and turn off its Start on boot and Watchdog.

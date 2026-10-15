@@ -54,15 +54,9 @@ options:
   anthropic_model: claude-haiku-5-5
   anthropic_daily_budget_usd: 1.0
   brain_dry_run: false
-  cf_account_id: ""
-  cf_api_token: ""
-  cf_gateway_id: ""
-  typesafe_api_key: ""
-  jev_enabled: true
   jev_judges: all
   jev_daily_calls: 5000
   jev_budget_warn_pct: 80
-  jev_retries: 3
   jev_reask_max: 2
   jev_unsure_below: 0.7
   jev_strict_after: 3
@@ -93,6 +87,8 @@ schema:
   anthropic_model: str?
   anthropic_daily_budget_usd: float(0,1000)?
   brain_dry_run: bool?
+  # Deprecated Jev route keys: in the schema only, so a new install's form leaves them out and a
+  # saved value is kept (YAML mode sets one). The controller reads each with its old default.
   cf_account_id: str?
   cf_api_token: password?
   cf_gateway_id: str?
