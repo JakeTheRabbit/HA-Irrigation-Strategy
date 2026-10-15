@@ -385,6 +385,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     room_prefix=f"{slug}_",
                     config_method="manual",
                     setup_revision=1,
+                    commissioning={
+                        "done": False
+                    },  # the setup wizard checks it before switch-on
                 )
                 data["enable_flag"] = (
                     f"switch.crop_steering_{data['room_prefix']}engine_enabled"
@@ -757,6 +760,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "hardware", vol.Schema(_hardware_schema()), user_input, info, err
             )
         data["setup_revision"] = 1
+        data["commissioning"] = {
+            "done": False
+        }  # the setup wizard checks it before switch-on
         return self.async_create_entry(title=data["name"], data=data)
 
     async def _validate_env_entities(self, env_config: dict) -> list[str]:

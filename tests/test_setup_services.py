@@ -36,7 +36,13 @@ def test_response_services_require_admin_and_return_actual_saved_revision(monkey
     hass.auth = SimpleNamespace(async_get_user=user)
     asyncio.run(api.async_setup_setup_services(hass))
     asyncio.run(api.async_setup_setup_services(hass))
-    assert set(handlers) == {"setup_read", "setup_save", "setup_create", "setup_remove"}
+    assert set(handlers) == {
+        "setup_read",
+        "setup_save",
+        "setup_create",
+        "setup_remove",
+        "setup_commission",
+    }
     call = SimpleNamespace(
         context=SimpleNamespace(user_id="person"), return_response=True, data=payload()
     )

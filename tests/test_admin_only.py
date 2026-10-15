@@ -50,7 +50,7 @@ READ_ONLY = {
 # Changes nothing but whether the dashboard's What's new window shows again: whoever opens the
 # dashboard first after an update may dismiss it, administrator or not.
 NOTICES = {"whats_new_seen": {"version": "2.0.0"}}
-SETUP = {"setup_read", "setup_create", "setup_save", "setup_remove"}
+SETUP = {"setup_read", "setup_create", "setup_save", "setup_remove", "setup_commission"}
 # Every other service changes something. What each is called with:
 CHANGES = {
     "set_manual_override": {"zone": 1},
@@ -174,6 +174,7 @@ def rig(monkeypatch):
         "create_setup": AsyncMock(return_value={}),
         "save_setup": AsyncMock(return_value={}),
         "remove_setup": AsyncMock(return_value={}),
+        "commission_setup": AsyncMock(return_value={}),
     }
     for name, fake in setup.items():
         monkeypatch.setattr(setup_api, name, fake)
@@ -222,6 +223,7 @@ def rig(monkeypatch):
             setup["create_setup"],
             setup["save_setup"],
             setup["remove_setup"],
+            setup["commission_setup"],
         )
         return (
             len(hass.bus.events),

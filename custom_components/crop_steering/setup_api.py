@@ -495,6 +495,8 @@ def setup_sizing(hass, data, cfg, zone, key):
 
 
 def setup_room(hass, entry):
+    from .commissioning import readiness
+
     data = effective(entry)
     zones = []
     for z in range(1, int(data.get("num_zones", 1)) + 1):
@@ -540,6 +542,8 @@ def setup_room(hass, entry):
         "plumbing": data.get("plumbing") or "",
         "plumbing_inferred": infer_plumbing(data.get("hardware", {})),
         "safety": {"ready": not blockers, "blockers": blockers},
+        # The setup wizard's live checks; a room from before is commissioned and never sees it.
+        "commissioning": readiness(hass, entry),
     }
 
 
@@ -553,6 +557,7 @@ def read_setup(hass):
             "restore": True,
             "stable_zone_ids": True,
             "plumbing": True,
+            "commissioning": True,
         },
         "limits": {"max_zones": MAX_ZONES},
         "rooms": [
@@ -659,6 +664,13 @@ async def create_setup(hass, payload):
     }
 
 
+async def commission_setup(hass, payload):
+    """The setup wizard's draft (commissioning.py): saved beside the setup, revision-checked."""
+    from .commissioning import save_commissioning
+
+    return await save_commissioning(hass, payload)
+
+
 async def async_setup_setup_services(hass):
     """Response services are discoverable through the standard HA service registry."""
     from homeassistant.core import SupportsResponse
@@ -674,6 +686,7 @@ async def async_setup_setup_services(hass):
         "setup_create": create_setup,
         "setup_save": save_setup,
         "setup_remove": remove_setup,
+        "setup_commission": commission_setup,
     }
     for name, handler in handlers.items():
 
