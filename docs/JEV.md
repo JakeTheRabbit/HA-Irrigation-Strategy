@@ -145,7 +145,7 @@ this zone**: the range Jev may use for the P2 shot size and re-water point, and 
 later check of how they worked. **Plan › Targets** puts Jev's range beside the values it manages, and **Plan ›
 Schedule** opens with the stage arc. **History › Timeline** lists every decision (the actions by default, all of
 them with **All Jev decisions**) with today's calls, tokens and cost, and **Equipment › Probes** says whether Jev
-is on. A room without Jev shows none of it. The [README](../README.md#the-dashboard-page-by-page) walks through
+is on. A room without Jev shows none of it. The [README](../README.md#daily-use) walks through
 each page with screenshots.
 
 - `sensor.crop_steering_<prefix>zone_N_jev`: the judges acting on the zone (or `watching`); `setpoints` (the

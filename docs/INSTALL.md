@@ -34,7 +34,7 @@ Install the integration and the controller app at the same version: from 2.21.0 
 
 Steps 2 and 3 can be done in either order. A controller started before any room exists waits, invents no zones, and picks the room up by itself within a minute of setup finishing; no restart is needed. On earlier versions that order produced errors for zones that did not exist and a Repairs card asking for a kill-switch helper: **do not create that helper**, update instead.
 
-See the [step-by-step mapping workflow](USER_GUIDE.md#set-up-rooms-zones-and-sensors) for field meanings, revision conflicts and controller adoption.
+See the [step-by-step mapping workflow](USER_GUIDE.md#setup) for field meanings, revision conflicts and controller adoption.
 
 Room and zone removal means archive. Archived IDs remain reserved, so restoring or adding a zone cannot silently point an old recipe at different hardware. Changing names preserves entity identity. The default room retains its legacy IDs.
 
@@ -128,7 +128,7 @@ The existing app slug `f2_control` and entity IDs are deliberately stable. Exist
 
 ## Optional tank display mappings
 
-In **Rooms & setup → Shared room hardware**, map tank fill level to a percentage sensor, tank EC to mS/cm or dS/m, tank pH to pH, and tank temperature to a temperature sensor. These tank-quality display mappings do not enable feed-water safety gates. Choose a fill valve or binary sensor for filling status and a timestamp sensor or full date-and-time helper for **Last recorded tank fill**. Use an actual recorded fill event; an automation trigger time or sensor `last_changed` is not proof of filling. Shared tanks can be explicitly mapped to more than one room. The [tank mapping table](USER_GUIDE.md#tank-and-pump-display) lists the exact labels and configuration keys. A recorded fill can be operator-confirmed or float-confirmed according to its producer; it is not proof that dosing finished. Filling status must represent the fill valve or a genuine fill-active signal, not a mode-enable or dosing-lock helper.
+In **Rooms & setup → Shared room hardware**, map tank fill level to a percentage sensor, tank EC to mS/cm or dS/m, tank pH to pH, and tank temperature to a temperature sensor. These tank-quality display mappings do not enable feed-water safety gates. Choose a fill valve or binary sensor for filling status and a timestamp sensor or full date-and-time helper for **Last recorded tank fill**. Use an actual recorded fill event; an automation trigger time or sensor `last_changed` is not proof of filling. Shared tanks can be explicitly mapped to more than one room. The [tank mapping table](USER_GUIDE.md#tank-and-feed) lists the exact labels and configuration keys. A recorded fill can be operator-confirmed or float-confirmed according to its producer; it is not proof that dosing finished. Filling status must represent the fill valve or a genuine fill-active signal, not a mode-enable or dosing-lock helper.
 
 Save setup with the affected engines and irrigation equipment off, then verify the readings in **Overview** before restoring the previous engine state. Missing mappings remain labelled; an unavailable pump is never displayed as off. Existing controllers must be updated to publish irrigation timestamps with a timezone offset.
 
