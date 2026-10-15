@@ -2989,6 +2989,8 @@ class Controller:
             return self._alert(key, "CS-708", title, message, room=room, zone=zone)
         elif code == "CS-709":
             return self._alert(key, "CS-709", title, message, room=room, zone=zone)
+        elif code == "CS-711":
+            return self._alert(key, "CS-711", title, message, room=room, zone=zone)
         elif code == "CS-712":
             return self._alert(key, "CS-712", title, message, room=room, zone=zone)
         log("jev alert refused: not in the error-code list", judge, code)

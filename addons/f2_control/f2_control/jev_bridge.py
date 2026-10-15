@@ -19,6 +19,7 @@ from jev.client import (DEFAULT_MODEL, PRICES, Asker, Meter, Route, Routes, anth
 from jev.context import Shot, ZoneContext, ZoneHistory, response, words_response
 from jev.doctrine import DEFAULT_ARC, ArcInvalid, stage_intent, stage_rows
 from jev.doctrine import STAGE_ARC as STAGE_ROWS
+from jev import feed as jev_feed
 from jev.enrich import enrich
 from jev.prompt import Prompt
 from jev.judges.dawn import DawnJudge
@@ -37,7 +38,7 @@ from jev.ledger import Ledger
 from jev.setpoint_memory import SetpointMemory
 from jev.triage import Triage
 
-ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "alerts")
+ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "alerts", "feed")
 PENDING_S = 300  # a write Home Assistant has not reflected yet is not an operator's edit for this long
 REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the old value back
 PAUSE_H = 48  # and the zone's setpoints are left alone this long
@@ -216,6 +217,7 @@ def build(options, cf, state_path, log, status=None):
         brain.triage = Triage(asker, may_quiet=False, meta=alert_meta)
     else:
         brain.triage = Triage(asker)
+    brain.feed = jev_feed.Feed(asker, feed_meta) if haiku and "feed" in allowed else None
     brain.flower_start = flower_option(options.get("jev_flower_start"))
     brain.flower_days = int(options.get("jev_flower_days") or 56)
     return brain
@@ -225,6 +227,13 @@ def alert_meta(key, now):
     """The "_brain" key of an alert's question on the Claude route (it does not pass through Brain)."""
     return {"room": "room", "zone": "alert", "judge": "alerts", "asked": now.isoformat(timespec="minutes"),
             "interlocks": "not part of an alert question", "data_quality": "the alert's own text"}
+
+
+def feed_meta(room, now):
+    """The "_brain" key of the Feed task's question (a room task: it does not pass through Brain)."""
+    return {"room": room, "zone": "room", "judge": "feed", "asked": now.isoformat(timespec="minutes"),
+            "interlocks": "none: a feed proposal moves nothing, a person decides",
+            "data_quality": "the feed's readings this pass and each zone's latest probe reading"}
 
 
 def flower_option(value):
@@ -859,7 +868,8 @@ def panel(c, room, now):
            "stage_arc": {"id": getattr(brain, "arc", DEFAULT_ARC), "in_force": bool(getattr(brain, "arc_rows", STAGE_ROWS)),
                          "words": getattr(brain, "arc_note", None)},
            "judges_acting": [j for j in built if j in ACTING_JUDGES] if acting else [],
-           "judges_advising": [j for j in built if j not in ACTING_JUDGES] + (["alerts"] if brain.triage else [])}
+           "judges_advising": [j for j in built if j not in ACTING_JUDGES] + (["alerts"] if brain.triage else [])
+           + (["feed"] if getattr(brain, "feed", None) else [])}
     entries = brain.journal.recent(room.slug, 1) if getattr(brain, "journal", None) is not None else []
     if entries:
         e = entries[0]
@@ -915,6 +925,73 @@ def publish(c, room, now, ha_set):
         entries = journal.recent(room.slug)
         ha_set(f"sensor.crop_steering_{room.prefix}jev_log", headline(entries[0] if entries else None),
                {"entries": entries, "friendly_name": "Jev decisions", "engine": "f2-control"})
+    feed_task(c, room, now)
+
+
+def _band(lo, hi, unit):
+    if lo > 0 and hi > 0:
+        return f"{lo:g} to {hi:g}{unit}"
+    return f"at least {lo:g}{unit}" if lo > 0 else f"at most {hi:g}{unit}" if hi > 0 else "none set"
+
+
+def feed_facts(c, room, now):
+    """What the Feed task is shown: the feed's EC and pH against their bands, and each zone's latest pore EC against
+    its maintenance target."""
+    num = c._num
+    feed, lo, hi = (c._read_feed_ec(room), num(f"number.crop_steering_{room.prefix}irrigation_ec_min", 0),
+                    num(f"number.crop_steering_{room.prefix}irrigation_ec_max", 0))
+    facts = {"feed_ec": "not reading" if feed is None else f"{feed:.2f} mS/cm",
+             "feed_ec_band": _band(lo, hi, " mS/cm")}
+    if room.feed_ph_sensor:
+        ph = c._read_feed_ph(room)
+        facts["feed_ph"] = "not reading" if ph is None else f"{ph:.2f}"
+        facts["feed_ph_band"] = _band(num(f"number.crop_steering_{room.prefix}irrigation_ph_min", 0),
+                                      num(f"number.crop_steering_{room.prefix}irrigation_ph_max", 0), "")
+    params, zones = room.__dict__.get("_jev_params") or {}, {}
+    for zone in room.zones:
+        h = room.__dict__.get("_jev_hist", {}).get(zone)
+        ec = next((r[2] for r in reversed(h.readings) if r[2] is not None), None) if h else None
+        p = params.get(zone)
+        words = "pore EC not reading" if ec is None else f"pore EC {ec:.2f} mS/cm"
+        if p is not None and p.ec_target_p2 > 0:
+            words += f", maintenance target {p.ec_target_p2:.2f} mS/cm"
+        zones[f"zone {zone}"] = words + (", vegetative" if c._veg(room, zone) else ", generative")
+    facts["zones"] = zones
+    st = stage_info(c, room, now)
+    if st:
+        facts["stage"] = f"flower day {st['day']} of about {st['days']}: {st['name']}, steering {st['steering']}"
+    return facts
+
+
+def feed_task(c, room, now):
+    """The Feed task's pass for the room (jev/feed.py): in a room whose feed EC sensor is mapped, asked once a grow-day
+    an hour after lights-on with the kill switch on; a firm proposal is a CS-711 card for a person. Never a write."""
+    task = getattr(c.jev, "feed", None)
+    if task is None or not room.feed_ec_sensor:
+        return
+    ans = task.answer(room.slug)
+    if ans is not None:
+        v = jev_feed.verdict(ans)
+        label = jev_feed.proposal(v)
+        note = (v.notes or [None])[0] if v is not None else None
+        journal = getattr(c.jev, "journal", None)
+        if journal is not None:
+            journal.add({"t": datetime.now().isoformat(timespec="seconds"), "room": room.slug, "zone": None,
+                         "judge": "feed", "title": "Feed", "kind": "decision",
+                         "verdict": "no answer" if v is None else str(v.label), "p": None if v is None else v.prob,
+                         "agreed": None if v is None else v.agreed,
+                         "action": "CS-711: a proposal for a person" if label else "no proposal",
+                         "result": "advised", "reason": "the feed is never changed by the brain", "why": note or ""})
+        if label:
+            c._jev_alert(room, None, "feed", {
+                "code": "CS-711", "title": "the AI assistant proposes a feed change",
+                "message": " ".join(filter(None, (jev_feed.WORDS[label], note, "Nothing has been changed: a person "
+                                                  "decides whether to change the feed, and makes the change.")))})
+    day = c._grow_day_start(room, now).isoformat()
+    since_on = (24.0 - c._hours_to(now, room.lights_on_hour)) % 24.0
+    if (task.due(room.slug, day) and c._lights_on(room, now) and since_on >= jev_feed.AFTER_H
+            and c._on(room.enable_flag, False)):
+        task.ask(room.slug, day, feed_facts(c, room, now), now)
 
 
 def publish_rules(c, room, now, ha_set):

@@ -4,13 +4,14 @@ import json
 import pathlib
 
 import jev_bridge
-from jev import prompt, triage
+from jev import feed, prompt, triage
 
 FILE = pathlib.Path(prompt.TOOLS)
 
 
 def _questions():
     found = {f"{j.name}.{q}": vs for j in jev_bridge.judges() for q, vs in j.questions.items()}
+    found.update({f"feed.{q}": vs for q, vs in feed.QUESTIONS.items()})
     found.update({f"alerts.{q}": vs for q, vs in triage.QUESTIONS.items()})
     return found
 

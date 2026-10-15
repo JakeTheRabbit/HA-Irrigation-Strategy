@@ -79,6 +79,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-707](#cs-707) | Jev is on the stricter gate for this zone | Warning | Notification |
 | [CS-708](#cs-708) | The AI assistant has used its budget | Warning | Notification |
 | [CS-709](#cs-709) | The AI assistant is not available | Warning | Notification |
+| [CS-711](#cs-711) | The AI assistant proposes a change to the feed | Information | Notification |
 | [CS-712](#cs-712) | The AI assistant's Jev route is retired | Information | Notification |
 | [CS-801](#cs-801) | A dosing pump ran past its time and was switched off | Critical | Notification |
 | [CS-802](#cs-802) | A dose could not be confirmed, or ended early | Warning | Notification |
@@ -1096,6 +1097,27 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 - Check the key in the Anthropic console, put a working one in anthropic_api_key, then restart the app.
 - Set anthropic_model to claude-haiku-5-5 (the default).
 - Read the brain panel's state words and the app log.
+
+<a id="cs-711"></a>
+
+### CS-711: The AI assistant proposes a change to the feed
+
+*Information · Notification*
+
+**What it means.** Once a grow-day, an hour after lights-on, in a room whose feed EC sensor is set, the AI assistant's Feed task reads the feed's EC and pH against their bands and each zone's pore EC against its target. When both of its readings agree firmly that the feed should change, or that the dosing or the source water needs checking, it says so here. It is a proposal for a person: nothing is changed.
+
+**Watering meanwhile.** Unchanged. The AI assistant never writes a feed, dosing or any other value; watering and dosing carry on as set.
+
+**Likely causes**
+
+- Pore EC running above or below the zones' targets across the room while the feed is in its band.
+- The feed's pH outside its band.
+- The feed's EC off its band, not reading, or not what the recipe should make.
+
+**Suggested fixes**
+
+- Read the proposal and the zones' pore EC, and decide whether to change the feed.
+- Before changing the recipe, check the dosing and the source water when the card asks for it.
 
 <a id="cs-712"></a>
 
