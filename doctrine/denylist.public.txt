@@ -1,0 +1,26 @@
+# Public strip-lint denylist for the doctrine pack. Runs on every build, forks included; needs no secret.
+# One pattern per line: SCOPE<TAB>REGEX<TAB>WHY. Lines starting with # are comments.
+#   all    - may appear in no linted file.
+#   cited  - vendor, product and brand names: allowed only in the citation registry (the "sources" object of
+#            doctrine.rules.json and the 09-sources.md generated from it), never in an id, a default, rule text,
+#            a compiled prompt, the README or the build script.
+# Patterns only: shapes such as an IP address, a phone number, a room id or a URL off the allowlist. A site's own
+# words (names, site numbers, the phrases that must never ship) live in the private denylist, read from a CI secret.
+# The cited vendor names are the one exception, because 09-sources.md publishes them anyway (README OD-9). Only
+# names the sources actually cite are listed here; any other name belongs in the private list.
+# The URL allowlist is the hosts the sources cite; a new source on another host adds its host here.
+all	\b(?:sensor|number|switch|input_boolean|input_number|input_datetime|input_select|select|binary_sensor)\.(?!(?:py|md|json|txt)\b)[a-z0-9_]+	entity id
+all	\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b	IP address
+all	(?i)chat[_ ]?id|bot[_ ]?token|api[_ ]?key\s*[:=]	messaging credential
+all	\bheartbeat\b.*\d{4}-\d{2}-\d{2}	dated heartbeat log
+all	\b[A-Z]:[/\\]	local absolute path
+all	[\w.+-]+@[\w-]+\.[a-z]{2,}	email address
+all	\+\d{1,3}[ -]?\d{1,4}[ -]?\d{3,4}[ -]?\d{3,4}\b	phone number
+all	\b(?:Mr|Mrs|Ms|Dr)\.? [A-Z][a-z]+	named person
+all	\b(?!P\d\b)[A-Z][1-9]\d?\b	site room id (a capital letter and a number as a whole token; P0-P3 are the phases)
+all	(?i)\b(?:https?|ftp)://(?!(?:[a-z0-9-]+\.)*(?:doi\.org|growlabs\.nz|athenaag\.com|pulsegrow\.com|mdpi\.com|ncbi\.nlm\.nih\.gov)(?![\w.-]))[^\s)>\]"'`]+	URL outside the allowlist
+cited	(?i)\bathena(?:ag)?\b	vendor name
+cited	(?i)\bgrodan\b	vendor name
+cited	(?i)\bteros\b|teros-?12	product name
+cited	(?i)\bpulse ?(?:grow|labs)\b	vendor name
+cited	\bCCI\b	vendor name

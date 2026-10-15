@@ -38,6 +38,9 @@ SET_PHASE_OPTIONS = ["Keep", *PHASES]
 # total, or what each of its plants got. The controller matches "Per plant" by these words.
 WATER_TODAY_VIEWS = ["Zone total", "Per plant"]
 STEERING_MODES = ["Vegetative", "Generative"]
+# What the room grows in, published in its descriptor for the controller. "generic" (the default,
+# and what every upgraded room reads) changes nothing; the ids match the doctrine pack's substrates.
+SUBSTRATES = ["generic", "rockwool", "coco"]
 
 # Growth stages (for growth_stage select entity)
 GROWTH_STAGES = ["Vegetative", "Generative", "Transition"]
