@@ -2,28 +2,20 @@
 
 A controller updated ahead of its integration has no such number and spaces top-ups by its built-in
 value instead. Both are 0 (off); if either moves alone, a controller-only update and a full update
-would water the same room differently.
+would water the same room differently. Both are a row of the one defaults table, which the
+integration and the controller each carry a copy of.
 """
 
-import ast
+import importlib.util
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _assigned(path, name):
-    tree = ast.parse((ROOT / path).read_text(encoding="utf-8"))
-    return next(
-        ast.literal_eval(node.value)
-        for node in tree.body
-        if isinstance(node, ast.Assign)
-        and any(isinstance(t, ast.Name) and t.id == name for t in node.targets)
-    )
-
-
 def test_the_controller_falls_back_to_the_numbers_default_of_off():
-    default = _assigned("custom_components/crop_steering/number.py", "DEFAULT_VALUES")
-    fallback = _assigned(
-        "addons/f2_control/f2_control/controller.py", "P2_TIME_BETWEEN_SHOTS_MIN"
-    )
-    assert default["p2_time_between_shots"] == fallback == 0
+    path = ROOT / "crop-steering-engine/src/crop_steering_engine/defaults.py"
+    spec = importlib.util.spec_from_file_location("defaults_table", path)
+    table = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(table)
+    entity_default, controller_fallback = table.DEFAULTS["p2_time_between_shots"]
+    assert entity_default == controller_fallback == 0

@@ -10,6 +10,7 @@ import math
 from . import units
 from .admin import async_require_admin
 from .const import DOMAIN, MAX_ZONES
+from .generated.defaults import SIZING_DEFAULTS
 from .plumbing import (
     PLUMBING_LAYOUTS,
     infer as infer_plumbing,
@@ -489,15 +490,7 @@ def setup_sizing(hass, data, cfg, zone, key):
             return int(value) if integer else value
     return cfg.get(
         key,
-        data.get("parameters", {}).get(
-            key,
-            {
-                "plant_count": 4,
-                "substrate_volume": 6,
-                "drippers_per_plant": 1,
-                "dripper_flow_rate": 2,
-            }[key],
-        ),
+        data.get("parameters", {}).get(key, SIZING_DEFAULTS[key]),
     )
 
 
@@ -506,6 +499,7 @@ def setup_room(hass, entry):
     zones = []
     for z in range(1, int(data.get("num_zones", 1)) + 1):
         cfg = data.get("zones", {}).get(str(z)) or data.get("zones", {}).get(z) or {}
+        sizing = {key: setup_sizing(hass, data, cfg, z, key) for key in SIZING}
         zones.append(
             {
                 "id": z,
@@ -517,7 +511,14 @@ def setup_room(hass, entry):
                     or [cfg[k] for k in (f"{kind}_front", f"{kind}_back") if cfg.get(k)]
                     for kind in ("vwc", "ec")
                 },
-                **{key: setup_sizing(hass, data, cfg, z, key) for key in SIZING},
+                **sizing,
+                # Sizing still at the generic value setup offers a new room, so not yet
+                # confirmed as this room's own: changing it to anything else clears it.
+                "sizing_generic": sorted(
+                    key
+                    for key, value in sizing.items()
+                    if value == SIZING_DEFAULTS[key]
+                ),
             }
         )
     blockers = safety_blockers(hass, entry)
