@@ -1,6 +1,7 @@
 """Stage arcs (jev.doctrine.stage_rows / stage_intent): the default arc is the one the judges always had, every arc
 the stage_arc option offers passes the check and runs every judge, and an arc the judges could not read is refused
 with a reason instead of breaking them (haiku-brain-design sections 2 and 7, test_stage_arcs)."""
+import json
 import pathlib
 
 import jev_bridge
@@ -39,6 +40,28 @@ def test_the_default_arc_is_the_one_the_judges_always_had():
         for day in [None] + list(range(0, 121)):
             assert stage_intent(day, days) == _before(day, days) == stage_intent(day, days, STAGE_ARC)
     assert stage_intent(10, 56, ()) is None
+
+
+def test_the_default_arc_is_read_from_the_pack_and_keeps_todays_numbers():
+    """One copy: the default arc is the pack's slab_default table, and its numbers are the ones 3.11.1 kept by hand."""
+    assert STAGE_ARC == doctrine._read_arc("slab_default", doctrine.PACK_ARCS)
+    assert [(r["days"], r["steering"], r["dryback_points"], r["pore_ec_range"], r["runoff_pct"]) for r in STAGE_ARC] == [
+        (None, "vegetative", (10, 15), (3.0, 5.0), (8, 16)),
+        ((1, 21), "generative", (15, 25), (5.0, 10.0), (1, 7)),
+        ((22, 42), "vegetative", (10, 15), (3.5, 6.0), (8, 16)),
+        ((43, 56), "ripening", (20, 25), (3.0, 4.0), (1, 7)),
+    ]
+
+
+def test_the_dashboard_reads_the_same_arc():
+    board = ADDON.parents[1] / "frontend" / "src" / "lib" / "generated" / "arcs.json"
+    pack = json.loads(board.read_text(encoding="utf-8"))
+    assert pack["default_arc"] == doctrine.DEFAULT_ARC
+    bulk = next(r for r in pack["arcs"]["slab_default"]["stages"] if r["stage"] == "flower bulk")
+    ours = stage_intent(30)
+    assert ours["stage"] == bulk["stage"] and ours["steering"] == bulk["steering"]
+    assert [list(ours[k]) for k in ("days", "dryback_points", "pore_ec_range", "runoff_pct")] == [
+        bulk["flower_days"], bulk["dryback_points"], bulk["pore_ec"], bulk["runoff_pct"]]
 
 
 def test_every_offered_arc_passes_and_no_released_one_is_withdrawn():

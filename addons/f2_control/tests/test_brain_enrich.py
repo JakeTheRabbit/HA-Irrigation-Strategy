@@ -37,7 +37,7 @@ def test_the_stage_block_carries_what_stage_today_said_from_the_installs_arc():
     ctx = _ctx("stage")
     stage = enrich(ctx, StageJudge(), StageJudge().evidence(ctx))["_brain"]["stage"]
     row = doctrine.STAGE_ARC[1]
-    assert stage.startswith("flower day 10 of about 56: flower setting (days 1-21)")
+    assert stage.startswith("flower day 10 of about 56: flower setting (stretch) (days 1-21)")
     assert row["move_on_when"] in stage and "pore EC 5-10" in stage and "% of this zone's peak" in stage
     assert stage.endswith("The grower's steering mode for this zone: generative.")
 

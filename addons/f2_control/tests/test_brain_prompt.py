@@ -43,7 +43,7 @@ def test_block_a_is_the_pack_with_the_preamble_after_its_first_section():
 
 
 def test_block_b_has_the_arc_only_when_one_is_in_force():
-    assert "| flower setting | 1-21 | generative |" in prompt.block_b(doctrine.STAGE_ARC, "slab_default")
+    assert "| flower setting (stretch) | 1-21 | generative |" in prompt.block_b(doctrine.STAGE_ARC, "slab_default")
     assert "Stage arc `slab_default`" in prompt.block_b(doctrine.STAGE_ARC, "slab_default")
     assert "| stage |" not in prompt.block_b((), None)
 
