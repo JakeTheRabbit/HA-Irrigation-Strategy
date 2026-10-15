@@ -30,7 +30,8 @@ def table():
 
 
 # number.py DEFAULT_VALUES at 12c6d1a, and the per-zone plant count and daily cap defaults beside it,
-# plus P3 Time Between Shots (10 minutes, added after it).
+# plus P3 Time Between Shots (10 minutes) and the sump pump's run threshold (the 20 W the controller
+# always compared with), both added after it.
 ENTITY_DEFAULTS_12C6D1A = {
     "max_shot_duration": 900,
     "substrate_volume": 10.0,
@@ -72,6 +73,7 @@ ENTITY_DEFAULTS_12C6D1A = {
     "plant_count": 4,
     "max_daily_volume": 20.0,
     "p3_time_between_shots": 10.0,
+    "sump_power_threshold_w": 20.0,
 }
 
 # The literal at each controller _zone_num call site at 12c6d1a, plus P3 Time Between Shots.
