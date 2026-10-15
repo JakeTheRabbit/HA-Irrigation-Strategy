@@ -1,9 +1,9 @@
 """The controller image builds the same with or without the Supervisor, and stays the app's image.
 
 The Supervisor builds the app from this directory with build.yaml's base for each architecture. A
-plain `docker build` (or the root docker-compose.yml) has no Supervisor to pass that base, so the
-Dockerfile carries build.yaml's amd64 base as its default; these tests keep the two equal, so the
-container and the app never drift onto different bases. The image also carries the licence (a copy
+plain `docker build` has no Supervisor to pass that base, so the Dockerfile carries build.yaml's
+amd64 base as its default; these tests keep the two equal, so the container and the app never
+drift onto different bases. The image also carries the licence (a copy
 of the root LICENSE, since the build context is this directory), and run.sh starts the dashboard's
 listener, which has no login of its own, only for the app (as runtime_env decides) or when asked for.
 """
@@ -40,11 +40,16 @@ def test_the_app_tells_the_process_it_is_the_app_and_nothing_else():
     assert config["environment"] == {"F2_RUNTIME": "addon"}
 
 
-def test_the_compose_file_builds_this_image_and_stops_inside_its_grace():
+def test_the_compose_file_pulls_the_integrations_version_and_stops_inside_its_grace():
     service = yaml.safe_load((ROOT / "docker-compose.yml").read_text())["services"][
         "crop-steering-controller"
     ]
-    assert service["build"]["context"] == "addons/f2_control"
+    # the published image at the integration's version: no default tag, no `latest`, no build
+    image = service["image"]
+    assert re.fullmatch(
+        r"ghcr\.io/[a-z0-9-]+/crop-steering-controller:\$\{CONTROLLER_VERSION:\?[^}]+\}", image
+    )
+    assert "build" not in service
     env = service["environment"]
     assert env["F2_RUNTIME"] == "container"
     grace = int(re.fullmatch(r"(\d+)s", service["stop_grace_period"]).group(1))

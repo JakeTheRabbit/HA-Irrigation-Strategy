@@ -7,6 +7,7 @@ manifest.json's; the bases are build.yaml's; stable needs a promoted release wit
 import importlib.util
 import json
 from pathlib import Path
+import re
 
 import pytest
 import yaml
@@ -67,6 +68,21 @@ def test_stable_needs_the_promoted_release_with_main_at_its_tag():
 def test_anything_else_is_refused(kwargs, refusal):
     with pytest.raises(container_plan.Refused, match=refusal):
         run(**kwargs)
+
+
+def test_the_compose_file_pulls_the_image_this_workflow_publishes():
+    workflow = (ROOT / ".github/workflows/container.yml").read_text(encoding="utf-8")
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+    image = compose["services"]["crop-steering-controller"]["image"]
+    published = run(release=PRE)["image"].replace("owner", "jaketherabbit")
+    # pinned to the integration's version, with no default and no `latest`
+    assert re.fullmatch(
+        re.escape(published) + r":\$\{CONTROLLER_VERSION:\?[^}]+\}", image
+    )
+    assert "container_plan.py" in workflow
+    # a version is pushed once; promotion re-tags that digest and never rebuilds
+    stable = workflow.split("\n  promote:")[1]
+    assert "build-push-action" not in stable and "imagetools create" in stable
 
 
 def test_a_version_already_published_with_other_bytes_is_refused():
