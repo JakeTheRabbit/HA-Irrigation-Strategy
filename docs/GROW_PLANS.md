@@ -37,8 +37,9 @@ the room is doing, using the integration's own preview of the plan, and says pla
 - a setting the plan controls changed by hand or by an automation: while the plan runs that change has no effect,
   and it is **never overwritten**; the card says how to keep it (change the plan's days) or drop it;
 - what comes back when a plan is disarmed, where it differs from today's plan;
-- a steering select that disagrees with the plan's bias (under 40 % or over 60 % generative), and lights hours
-  read from somewhere other than the integration;
+- a steering select that disagrees with the plan's bias (under 40 % or over 60 % generative), lights hours
+  read from somewhere other than the integration, and a grow light mapped in setup that reads on while the hours
+  say off, or the reverse, for 15 minutes away from either edge (the engine follows the hours);
 - a zone that did not start its day at lights-on, did not stop at lights-off, or stayed in its morning dryback past
   its maximum wait (each should never happen: please send the controller log), and a ramp that runs very long.
 

@@ -155,3 +155,26 @@ def test_a_failed_plan_fetch_is_not_guessed_at(room, monkeypatch):
     c.loop_once(_Clock.now())
     assert _plan_cards(fake) == []  # without the plan's own preview, a missed day is not claimed
     assert fake.sets["sensor.crop_steering_jev"][1]["plan"]["drifts"][0]["class"] == "day_behind"
+
+
+def test_a_grow_light_that_reads_on_at_night_is_said_once(room):
+    c, fake, _calls = room
+    _publish_plan(fake, held=False)
+    state, attrs, _ = fake.ha_get("sensor.crop_steering_engine_config")
+    fake.set_state("sensor.crop_steering_engine_config", state, {**attrs, "light_entity": "light.grow"})
+    _Clock.current = _Clock.current.replace(hour=23)  # the rig's lights are 10:00-22:00
+    fake.set_state("light.grow", "on")
+    for minutes in (0, 10, 6, 30):
+        _Clock.current += timedelta(minutes=minutes)
+        _publish_plan(fake, held=False)
+        c.loop_once(_Clock.now())
+    cards = [d for d in _plan_cards(fake) if "lights_entity" in d["notification_id"]]
+    assert len(cards) == 1 and "reads on but the lights hours say off" in cards[0]["message"]
+    assert _writes(fake) == [] and [d for d, s, x in fake.calls if d == "light"] == []  # never switched
+
+
+def test_a_room_with_no_grow_light_mapped_reads_none(room):
+    c, fake, _calls = room
+    _publish_plan(fake, held=False)
+    c.loop_once(_Clock.now())
+    assert not [d for d in _plan_cards(fake) if "lights_entity" in d["notification_id"]]

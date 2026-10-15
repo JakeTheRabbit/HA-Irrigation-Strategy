@@ -1716,6 +1716,7 @@ class Controller:
             room.zone_names = self._zone_names(attrs)  # display only; a rename needs no adoption
             room.room_name = self._room_name(attrs)
             room.substrate = self._substrate(attrs)  # read like the names: needs no adoption
+            room.light_entity = str(attrs.get("light_entity") or "").strip()  # checked, never actuated
             room.tank = tank_level.mapping(attrs)  # read only, never actuated: needs no adoption
             saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_setup")
             another_room = self._is_another_room(room, attrs, saved)
@@ -5648,6 +5649,11 @@ class Controller:
         rt["lights_bad_since"] = None if source == "integration" else (rt.get("lights_bad_since") or now)
         if attrs.get("degraded_kind") != rt.get("degraded_kind"):  # since when, as this controller first saw it
             rt["degraded_kind"], rt["degraded_since"] = attrs.get("degraded_kind"), now
+        light = getattr(room, "light_entity", "")  # the room's grow light, when setup maps one
+        light_state = ha_get(light)[0] if light else None
+        light_state = light_state if light_state in ("on", "off") else None
+        disagrees = light_state is not None and (light_state == "on") != lights_on
+        rt["light_since"] = (rt.get("light_since") or now) if disagrees else None
         zones = {}
         for z in room.zones:
             st, p = room.state[z], params.get(z)
@@ -5665,7 +5671,8 @@ class Controller:
             preview=rt["preview"], natives=rt["natives"],
             steering={z: "vegetative" if self._veg(room, z) else "generative" for z in room.zones} if active else {},
             zones=zones, titles={z: self._zone_title(room, z) for z in room.zones},
-            lights_bad_since=rt["lights_bad_since"], slug=room.slug)
+            lights_bad_since=rt["lights_bad_since"], light_state=light_state, light_since=rt["light_since"],
+            slug=room.slug)
 
     def _watch_plan(self, room, now, lights_on, params):
         """Plan adherence, every pass under every brain: the drifts code finds (plan_adherence.detect), one CS-713
