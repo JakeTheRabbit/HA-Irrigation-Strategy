@@ -345,12 +345,13 @@ def _never_ask_the_hourly_judge(monkeypatch):
     monkeypatch.setattr(asr.controller.jev_policy, "call", boom)
 
 
-def test_the_learner_never_writes_the_judges_levers_even_to_keep_its_ladder(ramp_clock, monkeypatch):
+def test_the_learner_never_writes_the_judges_levers_nor_the_rescue_level(ramp_clock, monkeypatch):
     _never_ask_the_hourly_judge(monkeypatch)
     c, fake, room = _zone_2(numbers={**Z2, "number.crop_steering_zone_1_p3_emergency_vwc_threshold": ("26", {})})
     _day(c, fake, room, p2_passes=150)  # well over an hour of P2, where the old hourly judge moved the shot
     assert _sent(fake, THRESHOLD) == [] and _sent(fake, SHOT) == []  # its band wanted 57.3: not its lever
-    assert _sent(fake, "p3_emergency_vwc_threshold") == [24.5]  # the floor goes 3 under the JUDGE's 27.5
+    assert _sent(fake, "p3_emergency_vwc_threshold") == []  # the rescue level is the operator's, even 1.5 under
+    # the judge's 27.5
     assert fake.sets["sensor.crop_steering_zone_1_auto_setpoints"][1]["jev"] == "disabled"
 
 
@@ -374,7 +375,7 @@ def test_the_published_attributes_say_which_writer_owns_which_lever(ramp_clock):
     # the zone's own highest readings set these two, not the learner (6 Oct 2026)
     assert owners[number + "p1_target_vwc"] == "the zone's highest reading of the grow-day before"
     assert owners[number + "field_capacity"] == "the zone's highest reading of this grow-day or the one before"
-    assert owners[number + "p3_emergency_vwc_threshold"].startswith("Auto setpoints learner, only to keep it")
+    assert owners[number + "p3_emergency_vwc_threshold"] == "moves with field capacity; the learner never moves it"
     # without the judge the learner owns the threshold too, and the shot size is nobody's
     c, fake, room = asr._rig()
     asr._flat_ramp(c, fake, room)

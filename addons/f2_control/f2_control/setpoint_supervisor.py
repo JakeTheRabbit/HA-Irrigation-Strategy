@@ -77,8 +77,20 @@ def desired(model, recipe, plan, steer, ctx, ec_seen_max):
     }
 
 
+def in_order(ladder):
+    """The engine's VWC ladder: rescue + 3 <= re-water threshold < P1 target <= field capacity."""
+    return (ladder["p3_emergency_vwc_threshold"] + 3 <= ladder["p2_vwc_threshold"]
+            < ladder["p1_target_vwc"] <= ladder["field_capacity"])
+
+
 def writes(current, want):
     """current + desired -> [(suffix, value, why)], clamped to the engine's bounds, big moves taken in steps."""
+    out = proposed(current, want)
+    return out if in_order(dict(current, **{s: v for s, v, _w in out})) else []  # never an inverted ladder
+
+
+def proposed(current, want):
+    """writes() before the ladder check."""
     out = []
     for suffix, target in want.items():
         cur = current.get(suffix)
@@ -91,10 +103,7 @@ def writes(current, want):
         target = round(target, 1)
         if cur is None or abs(target - cur) >= 0.05:
             out.append((suffix, target, f"{suffix} {cur} -> {target}"))
-    merged = dict(current, **{s: v for s, v, _w in out})
-    ok = (merged["p3_emergency_vwc_threshold"] + 3 <= merged["p2_vwc_threshold"]
-          < merged["p1_target_vwc"] <= merged["field_capacity"])
-    return out if ok else []  # never hand the engine an inverted VWC ladder
+    return out
 
 
 def evidence(model, recipe, plan, steer, ctx, ec_trend_24h=None, light_note=None):

@@ -2202,6 +2202,7 @@ class Controller:
         if judged:
             jev = "disabled"
         writes = enabled and not planned
+        stall = None
         was = learn["outcome"]
         outcome = auto_setpoints.ramp_outcome(learn, st["phase"])
         if outcome != was:
@@ -2261,16 +2262,16 @@ class Controller:
                 want = auto_setpoints.wanted(learn, current, snap.vwc, st["phase"], ctx, others=judged)
                 for suffix in ("p1_target_vwc", "field_capacity"):  # the zone's highest readings set these
                     want.pop(suffix, None)
+                stall = auto_setpoints.stalled(current, want)
                 for suffix, value, _why in setpoint_supervisor.writes(current, want):
                     self._auto_write(room, zone, suffix, current[suffix], value, learn, now)
-        state, attrs = auto_setpoints.status(learn, enabled)
+        state, attrs = auto_setpoints.status(learn, enabled, stall)
         if enabled and planned:
             state, attrs["frozen_reason"] = "frozen", "an armed grow plan owns this room's targets"
         who = dict.fromkeys(auto_setpoints.MANAGED, "Auto setpoints learner")
         who["p1_target_vwc"] = "the zone's highest reading of the grow-day before"
         who["field_capacity"] = "the zone's highest reading of this grow-day or the one before"
-        who["p3_emergency_vwc_threshold"] += (", only to keep it 3 points under the re-water threshold; "
-                                              "moves with field capacity")
+        who["p3_emergency_vwc_threshold"] = "moves with field capacity; the learner never moves it"
         who.update(dict.fromkeys(judged, "Jev's Setpoints judge, one notch a night"))
         if jev != "disabled":  # the old per-hour judge, which only ever runs without the Setpoints judge
             who.update(dict.fromkeys(auto_setpoints.JEV_MANAGED, "Jev's hourly P2 check"))
