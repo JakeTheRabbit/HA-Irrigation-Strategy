@@ -13,7 +13,7 @@ arch:
   - aarch64
   - armv7
 init: false
-boot: manual
+boot: auto
 startup: application
 # Seconds the Supervisor waits after SIGTERM before it kills the app (10 by default): the shot in
 # flight is closed first, then dosing switches off what it has running (docs/DOSING.md).
