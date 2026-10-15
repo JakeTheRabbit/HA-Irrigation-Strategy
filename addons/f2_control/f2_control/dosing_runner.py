@@ -52,6 +52,13 @@ REPUBLISH_S = 60.0  # an unchanged status is published again this often (with a 
 HISTORY = 20
 OUTBOX = 50  # alerts waiting for Home Assistant, at most
 DEAD = ("", "unknown", "unavailable", "none")
+# The refill reminder (CS-906): a room's batch tank level is read this often, and said once it has read
+# at or under the room's reminder level REMIND_READS times in a row (one bad echo is not a low tank),
+# again each day it stays there, and taken down once it reads REMIND_CLEAR_PCT points above it.
+REMIND_CHECK_S = 60.0
+REMIND_READS = 3
+REMIND_EVERY_S = 86400.0
+REMIND_CLEAR_PCT = 5.0
 _RUNNING = {"dose": "dosing", "batch": "making a batch"}  # handled_result until it ends
 _PUT_BACK = ("name", "volume_entity", "dosing_entity", "dosing_prefix", "power_entity")
 
@@ -347,6 +354,64 @@ class DosingRunner:
                 self._take(room, config, request, busy)
         # A running job keeps the setup it read when one read of it fails: still dosing, not unavailable.
         self._show(room, job.config if config is False and job is not None else config)
+        if config and job is None:
+            self._remind(room, config["batch"])
+
+    def _remind(self, room, batch):
+        """The refill reminder (CS-906, docs/DOSING.md): nothing refills a batch tank by itself, so once its
+        level has read at or under the room's remind_pct for REMIND_READS reads in a row, a person is told
+        to refill it, again each day it stays there (kept across a restart), and the notification goes
+        once the level reads REMIND_CLEAR_PCT above it. Never while a dose or batch runs in the room; a
+        level that reads nothing changes nothing."""
+        live, now = self._live_of(room), self._mono()
+        if live["remind_read"] is not None and now - live["remind_read"] < REMIND_CHECK_S:
+            return
+        live["remind_read"] = now
+        remind, entity = batch.get("remind_pct"), batch.get("level_entity")
+        if not entity or isinstance(remind, bool) or not isinstance(remind, (int, float)) or remind <= 0:
+            live["remind_low"] = 0
+            self._end_reminder(room)
+            return
+        try:
+            pct = float(self._state(entity, quick=True))
+        except (TypeError, ValueError):
+            return
+        if not math.isfinite(pct):
+            return
+        if pct > remind:
+            live["remind_low"] = 0
+            if pct >= remind + REMIND_CLEAR_PCT:
+                self._end_reminder(room)
+            return
+        live["remind_low"] += 1
+        when = self._now()
+        with self._lock:
+            block = self._block(room)
+            last = _aware(block.get("reminded_at"))
+            if live["remind_low"] < REMIND_READS or (
+                last is not None and 0 <= (when - last).total_seconds() < REMIND_EVERY_S
+            ):
+                return
+            block["reminded_at"] = when.isoformat()
+        self._alert(room.slug, "CS-906", f"batch tank down to {pct:g}%, refill it",
+                    f"The batch tank reads {pct:g}%, at or under its refill reminder ({remind:g}%): refill "
+                    "it, by hand or by making a batch. Nothing refills it by itself. This comes again each "
+                    f"day it stays at or under {remind:g}%, and goes once it reads "
+                    f"{remind + REMIND_CLEAR_PCT:g}%.", "remind")
+
+    def _end_reminder(self, room):
+        """Take the refill reminder down (one waiting for Home Assistant too), so it is said again the
+        next time the tank runs low. Kept up until Home Assistant has dismissed it."""
+        with self._lock:
+            block = self._doc["rooms"].get(room.slug)
+            if not isinstance(block, dict) or block.get("reminded_at") is None:
+                return
+            self._doc["outbox"] = [a for a in self._doc["outbox"]
+                                   if (a.get("slug"), a.get("code")) != (room.slug, "CS-906")]
+        if self.c._dosing_dismiss(room, "CS-906", "remind"):
+            with self._lock:
+                block["reminded_at"] = None
+                self._write()
 
     def _safely(self, work):
         try:
@@ -1460,7 +1525,7 @@ class DosingRunner:
         with self._lock:
             return self._live.setdefault(room.slug, {
                 "readings": {}, "refreshed": None, "revision": None, "published": None,
-                "published_at": None,
+                "published_at": None, "remind_read": None, "remind_low": 0,
                 "batch": {"step": "idle", "pump": None, "started_at": None, "step_started_at": None,
                           "steps": [], "result": None, "ended_at": None},
             })

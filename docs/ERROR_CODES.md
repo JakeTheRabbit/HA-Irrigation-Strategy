@@ -27,6 +27,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | CS-6xx | **Repairs cards**: Raised by the integration, under Settings → Repairs. |
 | CS-7xx | **Jev**: Jev's judgements about a zone (advice, a probe it set aside), and how Jev itself is doing: its calls running low, a judge on the stricter gate (docs/JEV.md). |
 | CS-8xx | **Dosing**: Batch-tank dosing: a dose or a batch that did not end as it should (docs/DOSING.md). |
+| CS-9xx | **Reservoir and feed**: The batch tank and the feed: a tank to refill (docs/DOSING.md). |
 
 ## All codes
 
@@ -86,6 +87,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-805](#cs-805) | The mixing pump did not start | Warning | Notification |
 | [CS-806](#cs-806) | Dosing was stopped, or needs a check | Warning | Notification |
 | [CS-807](#cs-807) | A dose was not taken off its stock tank | Warning | Notification |
+| [CS-906](#cs-906) | Batch tank low, refill it | Information | Notification |
 
 ## Sensors (CS-1xx)
 
@@ -1250,3 +1252,24 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Set the tank's level in Stock tanks (Set level) to what is in it.
 - Check the pump's stock tank in the dosing setup.
+
+## Reservoir and feed (CS-9xx)
+
+<a id="cs-906"></a>
+
+### CS-906: Batch tank low, refill it
+
+*Information · Notification*
+
+**What it means.** The room's batch tank has read at or under its refill reminder level (remind_pct in the dosing setup) on three reads a minute apart. Nothing refills the tank by itself, so a person has to: by hand, or by making a batch. The notification gives the level it read.
+
+**Watering meanwhile.** Carries on as normal.
+
+**Likely causes**
+
+- The room's shots have drawn the batch tank down since it was last filled.
+
+**Suggested fixes**
+
+- Refill the tank by hand, or make a batch. The reminder goes once the level reads 5 points above its reminder level; it comes again each day the level stays at or under it.
+- To stop these reminders, set the refill reminder to 0% in the dosing setup.

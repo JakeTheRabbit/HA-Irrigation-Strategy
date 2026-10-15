@@ -2923,7 +2923,7 @@ class Controller:
         event (a dose, a batch, a restart) has its own notification: a second one within 30 minutes
         is never swallowed by the first. The runner paces an event's repeats itself (and a repeat
         replaces its card)."""
-        key = f"dosing_{getattr(room, 'slug', 'gone')}_{code[3:]}" + (f"_{event}" if event else "")
+        key = self._dosing_key(room, code, event)
         if code == "CS-801":
             return self._alert(key, "CS-801", title, message, room=room, quiet=False)
         if code == "CS-802":
@@ -2938,8 +2938,22 @@ class Controller:
             return self._alert(key, "CS-806", title, message, room=room, quiet=False)
         if code == "CS-807":
             return self._alert(key, "CS-807", title, message, room=room, quiet=False)
+        if code == "CS-906":
+            return self._alert(key, "CS-906", title, message, room=room, quiet=False)
         log("dosing alert refused: not in the error-code list", code)
         return True  # never deliverable: not kept
+
+    @staticmethod
+    def _dosing_key(room, code, event=None):
+        return f"dosing_{getattr(room, 'slug', 'gone')}_{code[3:]}" + (f"_{event}" if event else "")
+
+    def _dosing_dismiss(self, room, code, event=None):
+        """Take down an alert the dosing runner raised (the refill reminder, once the tank is refilled)
+        -> True once Home Assistant has dismissed it."""
+        key = self._dosing_key(room, code, event)
+        self._alerted.pop(key, None)
+        self._alert_codes.pop(key, None)
+        return ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
 
     def _dosing_hold(self, room):
         """Why dosing holds this room's watering ("making a batch", or "dosing hardware still on: ..."
