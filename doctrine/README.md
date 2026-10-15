@@ -253,9 +253,10 @@ These were stale or wrong in the advisor notes or in earlier drafts. The doctrin
    the brain did not write, the learner's included (BR-5, H-11, ACT-07). Under the switch `over_saturated` marks
    each new high (CT-14), so the Over-water row and SYM-07 do not count it, and PRB-14 tells the brain to raise a
    field capacity and floor walking with a drifting probe for a person.
-18. **Notches persist.** A setpoint notch is written to the zone's own number and stays; only the rescue-shot
-   revert, a person's edit or a learner move replaces it (BRN-04). Phase calls, EC modes and set-asides are
-   directives that expire. The notch is off while a grow plan owns the room (BR-5).
+18. **Notches run out.** A setpoint notch is written to the zone's own number as an overlay that goes back to the
+   operator's own value at the lights-on that ends the grow-day it is for; the rescue-shot revert, a person's
+   edit, Keep or Undo, or a learner move ends it sooner (BRN-04). Phase calls, EC modes and set-asides are
+   directives that expire too. The notch is off while a grow plan owns the room (BR-5).
 19. **Shots the maximum-EC block stops.** At maximum EC with a non-dilutive feed or a backed-up table, `decide()`
    blocks or holds before every other rule, so on that tick the P3 emergency, the watchdog and the floor do not
    fire either (IR-2). The dusk and night rows say so.
