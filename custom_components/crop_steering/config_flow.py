@@ -392,6 +392,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     room_prefix=f"{slug}_",
                     config_method="manual",
                     setup_revision=1,
+                    commissioning={
+                        "done": False
+                    },  # the setup wizard checks it before switch-on
                 )
                 data[CONF_P0_ADDITIONAL_DRYBACK] = NEW_ROOM_P0_ADDITIONAL_DRYBACK
                 data["enable_flag"] = (
@@ -568,6 +571,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
         data["setup_revision"] = 1
         data[CONF_P0_ADDITIONAL_DRYBACK] = NEW_ROOM_P0_ADDITIONAL_DRYBACK
+        data["commissioning"] = {
+            "done": False
+        }  # the setup wizard checks it before switch-on
         return self.async_create_entry(title=data["name"], data=data)
 
     @staticmethod

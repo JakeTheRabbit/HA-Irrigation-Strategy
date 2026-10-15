@@ -53,6 +53,7 @@ CHANGES = {
     "setup_create": {},
     "setup_save": {},
     "setup_remove": {},
+    "setup_commission": {},
     "test_shot": {"room_id": ROOM, "zone": 1},
     "overlay_keep": {"room_id": ROOM, "entity_id": "number.crop_steering_zone_1_p2_shot_size"},
     "overlay_undo": {"room_id": ROOM, "entity_id": "number.crop_steering_zone_1_p2_shot_size"},

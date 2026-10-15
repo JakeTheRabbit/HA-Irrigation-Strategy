@@ -28,6 +28,9 @@ NEW_DRAINAGE = "select.crop_steering_tent_drainage"
 NEW_THRESHOLD = "number.crop_steering_tent_sump_power_threshold_w"
 SUMP = "sensor.sump_pump_power"
 F_38 = "entry_3_8_learned_tent.json"
+# A new room has a slug: the wizard's "Tent" is tent_.
+NEW_DRAINAGE = "select.crop_steering_tent_drainage"
+NEW_THRESHOLD = "number.crop_steering_tent_sump_power_threshold_w"
 
 
 async def _wizard(hass, first_page):

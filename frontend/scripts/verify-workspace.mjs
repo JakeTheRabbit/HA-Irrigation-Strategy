@@ -615,6 +615,48 @@ try {
     },
   );
   await check(
+    "The setup wizard walks a new room to Switch on, which waits for every safety check and names it",
+    async () => {
+      await fresh("setup");
+      await visible(page.locator("#room-name"));
+      await page.getByRole("button", { name: "Add room", exact: true }).first().click();
+      await page.locator("#room-name").fill("Wizard room");
+      await page.getByRole("button", { name: "Map Zone 1 valve", exact: true }).click();
+      await page
+        .getByRole("textbox", { name: "Search Zone 1 valve entities" })
+        .fill("switch.demo_spare_4");
+      await page.locator(".mapping-result").filter({ hasText: "switch.demo_spare_4" }).click();
+      await page.locator("#room-plumbing").selectOption("valves_only");
+      await saveSetup();
+      const wizard = page.getByRole("region", { name: "Setup wizard" });
+      await visible(wizard);
+      const switchOn = wizard.getByRole("button", { name: "Switch on", exact: true });
+      await visible(wizard.getByText("Waiting for Probes: Zone 1: map a moisture probe"));
+      assert.ok(await switchOn.isDisabled(), "Switch on must wait for a moisture probe");
+
+      await page.getByRole("button", { name: "Map Zone 1 VWC probes", exact: true }).click();
+      await page
+        .getByRole("textbox", { name: "Search Zone 1 VWC probes entities" })
+        .fill("vwc_zone_1");
+      await page.locator(".mapping-result").first().click();
+      await page.keyboard.press("Escape");
+      await saveSetup();
+      await visible(wizard.getByText("Waiting for Test shot: Zone 1: run a test shot"));
+      assert.ok(await switchOn.isDisabled(), "Switch on must wait for a test shot");
+
+      await wizard.getByRole("button", { name: "Test shot · Zone 1", exact: true }).click();
+      await visible(wizard.getByText(/Watch a dripper on Zone 1/));
+      assert.ok(await switchOn.isDisabled(), "Switch on must wait for water to be seen");
+      await wizard.getByRole("button", { name: "Yes", exact: true }).click();
+      await visible(wizard.getByText("Water seen.", { exact: true }));
+      assert.ok(!(await switchOn.isDisabled()), "Every safety check passed: Switch on is enabled");
+      await switchOn.click();
+      await wizard.waitFor({ state: "hidden" });
+      await visible(page.getByText(/This room is set up/));
+      await noOverflow();
+    },
+  );
+  await check(
     "Sizing units: gallons and GPH are typed and shown, litres and L/h are saved, and the choice is remembered",
     async () => {
       await fresh("setup");

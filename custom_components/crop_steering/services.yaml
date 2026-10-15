@@ -128,6 +128,31 @@ setup_save:
       selector:
         object:
 
+setup_commission:
+  name: Save setup wizard progress
+  description: Record which zones' test shots a person saw water from, confirm the room's sizing, or mark the room set up once every safety check passes. Does not change the setup revision or switch anything on.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 2147483647
+          mode: box
+    water_seen:
+      selector:
+        object:
+    sizing_confirmed:
+      selector:
+        boolean:
+    done:
+      selector:
+        boolean:
+
 setup_remove:
   name: Archive room
   description: Archive the explicitly selected room after verified OFF checks. Preserves entry IDs, mappings and controller counters for restoration.
