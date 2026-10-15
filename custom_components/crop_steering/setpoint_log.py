@@ -34,7 +34,8 @@ class SetpointLog:
         self.room_id = "room:" + room_prefix(entry)
         self._store = store
         self._lock = asyncio.Lock()
-        self._claims = {}  # entity_id -> (value, who, monotonic seconds)
+        # entity_id -> (value, who, monotonic seconds, expires or None)
+        self._claims = {}
         self.changes = []
         self.error = None
 
@@ -65,31 +66,34 @@ class SetpointLog:
         except (KeyError, TypeError, ValueError):
             return
         if isinstance(entity_id, str) and who in CONTROLLER_WRITERS:
-            self._claims[entity_id] = (value, who, time.monotonic())
+            # `expires`: a brain write that is an overlay going back by itself then (overlays.py).
+            expires = data.get("expires")
+            self._claims[entity_id] = (value, who, time.monotonic(), expires)
 
     async def who(self, entity_id, value, context):
+        """-> (who, the expiry the controller named with its write, or None)."""
         claim = self._claims.pop(entity_id, None)
         if (
             claim is not None
             and abs(claim[0] - float(value)) < 1e-6
             and time.monotonic() - claim[2] <= CLAIM_S
         ):
-            return claim[1]
+            return claim[1], claim[3]
         user_id = getattr(context, "user_id", None)
         user = await self.hass.auth.async_get_user(user_id) if user_id else None
         return (
             "operator"
             if user is not None and not user.system_generated
             else "home_assistant"
-        )
+        ), None
 
     async def record(self, entity_id, field, zone, old, new, context):
-        """Append one change. A log that could not be loaded is never overwritten."""
+        """Append one change -> (who, expires) as who(). A log that could not be loaded is never overwritten."""
         from homeassistant.util import dt as dt_util
 
-        who = await self.who(entity_id, new, context)
+        who, expires = await self.who(entity_id, new, context)
         if self.error is not None or old == new:
-            return
+            return who, expires
         async with self._lock:
             self.changes.append(
                 {
@@ -104,6 +108,7 @@ class SetpointLog:
             )
             del self.changes[:-MAX_CHANGES]
             await self._store.async_save({"changes": self.changes})
+        return who, expires
 
     def response(self):
         return {

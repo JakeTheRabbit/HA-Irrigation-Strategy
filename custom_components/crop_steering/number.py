@@ -13,7 +13,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
-from . import setpoint_log
+from . import overlays, setpoint_log
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .sizing import SIZING_KEYS, configured_sizing, prefer_setup_value
 
@@ -773,7 +773,7 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             )
 
     async def async_set_native_value(self, value: float) -> None:
-        """Update the value, and append who moved it from what to the room's change log."""
+        """Update the value, append who moved it from what to the room's change log, and open or end an AI overlay."""
         old = self._attr_native_value
         self._attr_native_value = value
         self.async_write_ha_state()
@@ -782,9 +782,14 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             field = self.entity_description.key
             if self._zone_num is not None:
                 field = field.removeprefix(f"zone_{self._zone_num}_")
-            await log.record(
+            who, expires = await log.record(
                 self.entity_id, field, self._zone_num, old, value, self._context
             )
+            held = overlays.overlays_for(self.hass, self._entry.entry_id)
+            if held is not None:
+                await held.written(
+                    self.entity_id, field, self._zone_num, old, value, who, expires
+                )
 
     @property
     def available(self) -> bool:

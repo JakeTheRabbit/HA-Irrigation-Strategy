@@ -238,6 +238,40 @@ setpoint_log_get:
       required: true
       selector:
         text:
+overlay_get:
+  name: Read AI overlays
+  description: Read the settings the AI brain has changed in this room that will go back to your own value by themselves, with when. Does not change anything.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+overlay_keep:
+  name: Keep an AI change
+  description: Keep the value the AI brain set on one setting as your own, so it no longer goes back. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          domain: number
+overlay_undo:
+  name: Undo an AI change
+  description: Put your own value back now on one setting the AI brain changed. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          domain: number
 runs_save:
   name: Save run record
   description: Register a run with current reference metadata, or edit its dates and name while preserving the original reference. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
