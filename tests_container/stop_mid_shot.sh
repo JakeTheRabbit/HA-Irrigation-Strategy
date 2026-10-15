@@ -44,8 +44,8 @@ docker create --name "$HA" --network "$RUN" -e SEED="$SEED" -e DELAY="$DELAY" -e
   --entrypoint python3 "$IMG" -u /fake_ha_server.py >/dev/null
 tar -C "$HERE" -cf - fake_ha_server.py | docker cp - "$HA:/"
 docker start "$HA" >/dev/null
-# HA_URL makes this a standalone container to the controller, whose stop budget is then 75 s; the
-# app's is 25 s, so it is set to that here.
+# HA_URL makes this a standalone container to the controller. With no F2_RUNTIME=container its stop
+# budget stays the app's 25 s; it is set here all the same.
 docker run -d --name "$CTL" --network "$RUN" -e HA_URL="http://$HA:8123/api" -e HA_TOKEN=test \
   -e F2_STOP_BUDGET_S=25 -v "$VOL:/data" "$IMG" >/dev/null
 echo "image $IMG, S6_CMD_RECEIVE_SIGNALS=$(docker inspect "$IMG" --format '{{range .Config.Env}}{{println .}}{{end}}' \

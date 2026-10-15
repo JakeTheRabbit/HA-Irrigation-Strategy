@@ -10,8 +10,9 @@
 #                  (profile -> Security -> Long-lived access tokens). It is mounted as a Docker
 #                  secret, because `docker inspect` shows environment values to anyone who can run it.
 #   .env           with:
-#     HA_URL=http://homeassistant.local:8123   # Home Assistant's OWN address and port, not a
-#                                              # reverse proxy, tunnel or public URL
+#     HA_URL=http://<home-assistant-ip>:8123   # Home Assistant's OWN address and port, not a
+#                                              # reverse proxy, tunnel or public URL; an IP, as a
+#                                              # .local name rarely resolves inside a container
 #     TZ=                            # optional; empty = follow Home Assistant's time zone
 #     CONTROLLER_VERSION=<X.Y.Z>     # REQUIRED: your Crop Steering integration's version
 #
@@ -41,10 +42,9 @@ services:
     stop_signal: SIGTERM
 
     # Do NOT set `init: true`: the image's own init must be PID 1.
-    # Do NOT use network_mode: host: it would put the internal dashboard port on your LAN.
 
     environment:
-      HA_URL: ${HA_URL:?set HA_URL in .env, e.g. http://homeassistant.local:8123}
+      HA_URL: ${HA_URL:?set HA_URL in .env, e.g. http://<home-assistant-ip>:8123}
       HA_TOKEN_FILE: /run/secrets/ha_token
       # Empty or unset = adopt Home Assistant's time zone. If set, it must be a real zone name
       # (e.g. Europe/Berlin) and MUST match Home Assistant's, or the whole grow-day shifts.

@@ -599,6 +599,8 @@ def read_setup(hass):
             "plumbing": True,
         },
         "limits": {"max_zones": MAX_ZONES},
+        # What a new zone's sizing starts at: the one defaults table, as the HA wizard offers it.
+        "sizing_defaults": dict(SIZING_DEFAULTS),
         "rooms": [
             setup_room(hass, e) for e in hass.config_entries.async_entries(DOMAIN)
         ],
@@ -631,8 +633,10 @@ def _selected(hass, payload):
     return entry
 
 
-def _update(hass, entry, data):
-    data["setup_revision"] = int(effective(entry).get("setup_revision", 0)) + 1
+def _update(hass, entry, data, new_revision=True):
+    data["setup_revision"] = int(effective(entry).get("setup_revision", 0)) + (
+        1 if new_revision else 0
+    )
     # Old installations may have setup fields in options; remove only shadowing
     # fields we just updated, while retaining every unrelated option.
     options = {
@@ -678,11 +682,14 @@ async def save_setup(hass, payload):
     entry = _selected(hass, payload)
     old = effective(entry)
     data = prepare_setup(hass, payload, old, entry.entry_id)
-    # Choosing which probes count and which leads, and nothing else, can be done while watering.
-    blockers = [] if _choice_only(payload, old) else safety_blockers(hass, entry, data)
+    # Choosing which probes count and which leads, and nothing else, can be done while watering. It
+    # keeps the setup revision: a new one is a setup the controller takes on only with the engine
+    # switched off, and the room would stop watering until someone did.
+    choice = _choice_only(payload, old)
+    blockers = [] if choice else safety_blockers(hass, entry, data)
     if blockers:
         raise ValueError("; ".join(blockers))
-    _update(hass, entry, data)
+    _update(hass, entry, data, new_revision=not choice)
     return setup_room(hass, entry)
 
 
