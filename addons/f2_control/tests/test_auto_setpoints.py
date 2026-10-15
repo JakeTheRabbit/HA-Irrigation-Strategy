@@ -6,6 +6,8 @@ Numbers mirror F2 Zone 1 as measured 2026-09-19: the probe saturates near 36 %, 
 """
 import json
 
+import pytest
+
 import auto_setpoints as au
 
 T0 = 1_800_000_000.0
@@ -167,9 +169,16 @@ def test_wanted_keeps_the_vwc_ladder_attainable_and_in_order():
     assert want["p1_target_vwc"] == 33.9
     assert want["field_capacity"] == 40.0  # target + 2, held at the engine's lower bound
     assert want["p2_vwc_threshold"] == round(33.9 - learn["gain"] * 3.0, 1)  # one maintenance shot under the peak
-    assert "p3_emergency_vwc_threshold" not in want  # 22 already sits 3 below the threshold: not ours to touch
+    assert "p3_emergency_vwc_threshold" not in want  # the rescue level is the operator's, never ours
+    # A rescue level crowding the trigger stays where it is: the trigger keeps the ladder over it.
     crowded = au.wanted(learn, dict(CURRENT, p3_emergency_vwc_threshold=31.5), vwc=33.8, phase="P2", plan_ctx=None)
-    assert crowded["p3_emergency_vwc_threshold"] == round(crowded["p2_vwc_threshold"] - 3.0, 1)
+    assert "p3_emergency_vwc_threshold" not in crowded
+    assert crowded["p2_vwc_threshold"] == 34.5  # 31.5 + 3
+    assert "p3_emergency_vwc_threshold" not in au.MANAGED
+    # With the judge owning the trigger, nothing is wanted for either.
+    judged = au.wanted(learn, dict(CURRENT, p3_emergency_vwc_threshold=31.5), vwc=33.8, phase="P2", plan_ctx=None,
+                       others=("p2_vwc_threshold",))
+    assert not {"p2_vwc_threshold", "p3_emergency_vwc_threshold"} & set(judged)
 
 
 def test_with_a_complete_model_the_p2_threshold_is_scheduled_through_the_day():
@@ -199,6 +208,27 @@ def test_status_tells_the_operator_what_it_is_doing():
     au.ramp_outcome(learn, "P1")
     state, attrs = au.status(learn, enabled=True)
     assert state == "frozen" and attrs["p1_outcome"] == "suspect" and attrs["learned_peak"] is None
+
+
+def test_a_rescue_level_with_no_room_under_the_p1_target_holds_the_writes_and_says_why():
+    """With the rescue level fixed, a trigger clamped to rescue + 3 can reach the P1 target: setpoint_supervisor
+    drops the whole batch, so nothing is written again until the operator moves a number. The zone says why
+    instead of "tracking"."""
+    import setpoint_supervisor as ss
+
+    learn = dict(au.fresh(), peak=36.0, gain=0.6, day_rate=0.72, night_rate=0.37,
+                 day_n=au.MIN_RATE_DAYS, night_n=au.MIN_RATE_DAYS, outcome="reached", hold_days=2)
+    assert au.status(learn, True) == au.status(learn, True, au.stalled(CURRENT, {"p2_vwc_threshold": 34.2}))
+    assert au.status(learn, True)[0] == "tracking"
+    current = dict(CURRENT, p1_target_vwc=36.0, p2_vwc_threshold=32.0, p3_emergency_vwc_threshold=33.5)
+    want = au.wanted(learn, current, vwc=35.0, phase="P2", plan_ctx=None)
+    want = {"p2_vwc_threshold": want["p2_vwc_threshold"]}  # the controller writes only the trigger
+    assert want == {"p2_vwc_threshold": 36.5} and ss.writes(current, want) == []
+    stall = au.stalled(current, want)
+    assert stall.startswith("the 33.5% rescue level leaves no room under the 36% P1 target")
+    state, attrs = au.status(learn, True, stall)
+    assert state == "frozen" and attrs["frozen_reason"] == stall
+    assert au.stalled(current, {}) is None  # nothing wanted: nothing held
 
 
 def test_the_overnight_threshold_sits_under_where_the_dryback_target_ends_so_p0_still_runs():
@@ -240,3 +270,37 @@ def test_the_overnight_threshold_sits_under_where_the_dryback_target_ends_so_p0_
 
     assert p0_tick(62.2) == "P1"  # skipped, as it was
     assert p0_tick(night["p2_vwc_threshold"]) == "P0"  # P0 runs: its additional dryback first
+
+
+def test_a_dryback_target_under_the_rescue_level_is_planned_only_as_deep_as_the_rescue_lets_it_go():
+    """A real day: a zone peaking at 84.8% with a 45% dryback target (a hold at 46.6%) and a 50% rescue level.
+    Auto setpoints stopped maintenance shots half-way through the day for the full 45%, stepped the trigger down
+    to 44.5% and, to keep the ladder, dragged the rescue level down to 41.5%. The rescue is the operator's
+    emergency floor: it stays at 50%, the dryback is planned only as deep as it lets the zone go (a hold 5 points
+    over it, the trigger 3 over it), so maintenance shots run on later."""
+    import setpoint_supervisor as ss
+
+    learn = dict(au.fresh(), peak=84.8, gain=0.6, day_rate=3.0, night_rate=2.0,
+                 day_n=au.MIN_RATE_DAYS, night_n=au.MIN_RATE_DAYS, outcome="reached", hold_days=2)
+    current = dict(p1_target_vwc=84.8, field_capacity=86.8, p2_vwc_threshold=79.5,
+                   p3_emergency_vwc_threshold=50.0, p2_shot_size=3.0)
+    ctx = dict(lights_on_h=7, lights_off_h=20, shots_today=5, dryback_pct=45.0, p0_wait_min=60,
+               p1_shot_pct=3.0, p1_gap_min=15, start_vwc=67.0)
+    assert au.rescue_allows(84.8, 50.0) == pytest.approx((1 - 55.0 / 84.8) * 100)  # about 35%: a hold at 55%
+    assert au.rescue_allows(84.8, 40.0) > 45.0 and au.rescue_allows(50.0, 46.0) == 0.0
+    night = au.wanted(learn, current, vwc=69.1, phase="P3", plan_ctx=dict(ctx, minutes_since_lights_on=None))
+    assert "p3_emergency_vwc_threshold" not in night
+    assert night["p2_vwc_threshold"] == 53.0  # 3 over the rescue level, 2 under the 55% hold
+    # The supervisor writes it, the ladder in order, and never the rescue level.
+    assert [suffix for suffix, _value, _why in ss.writes(current, night)] == ["p2_vwc_threshold"]
+    assert au.stalled(current, night) is None
+    # Mid-afternoon: under a 40% rescue the full 45% stops maintenance shots already; under 50% they run on.
+    band = round(84.8 - 0.6 * 3.0, 1)
+    noon = dict(ctx, minutes_since_lights_on=540)  # 16:00
+    full = au.wanted(learn, dict(current, p3_emergency_vwc_threshold=40.0), vwc=80.0, phase="P2", plan_ctx=noon)
+    held = au.wanted(learn, current, vwc=80.0, phase="P2", plan_ctx=noon)
+    assert full["p2_vwc_threshold"] < band and held["p2_vwc_threshold"] == band
+    # A rescue level well under the target's hold leaves the target alone.
+    low = au.wanted(learn, dict(current, p3_emergency_vwc_threshold=30.0), vwc=69.1, phase="P3",
+                    plan_ctx=dict(ctx, minutes_since_lights_on=None))
+    assert low["p2_vwc_threshold"] == round(84.8 * 0.55 - 2.0, 1)
