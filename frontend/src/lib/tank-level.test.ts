@@ -2,11 +2,18 @@ import { describe, expect, it } from "vitest";
 import type { TimelineRow, TimelineRows } from "./day-timeline";
 import { createDemo } from "./demo";
 import { buildRoom, discoverRooms } from "./model";
+import { dosingConfigId } from "./dosing";
+import { tankLevelId } from "./reservoir";
+import { rangeTicks } from "./tank-history";
 import {
+  DEFAULT_LEVEL_HOURS,
+  LEVEL_RANGES,
   levelAt,
+  levelLines,
   levelSteps,
   recordedFills,
   recordWindows,
+  shotGap,
   shotMarks,
   tankEntities,
   tankRecord,
@@ -101,6 +108,21 @@ describe("the requests a range is read in", () => {
       expect(windows.every((window) => window.end - window.start <= 26 * HOUR)).toBe(true);
     }
     expect(recordWindows(10, 22, 168, now)).toHaveLength(8);
+  });
+  it("offers 12 h, 24 h, 3 days and 7 days, opening on 24 h", () => {
+    expect(LEVEL_RANGES.map((range) => range.hours)).toEqual([12, 24, 72, 168]);
+    expect(DEFAULT_LEVEL_HOURS).toBe(24);
+    // Half a day reads only the grow-days it reaches into.
+    expect(recordWindows(10, 22, 12, now)).toEqual([
+      { start: local(2, 10), end: local(3, 10) },
+      { start: local(3, 10), end: now },
+    ]);
+    expect(recordWindows(10, 22, 4, now)).toEqual([{ start: local(3, 10), end: now }]);
+  });
+  it("marks half a day every three hours", () => {
+    expect(rangeTicks(local(3, 4), local(3, 16), 12)).toEqual(
+      [6, 9, 12, 15].map((hour) => local(3, hour)),
+    );
   });
   it("is calendar days without a lights schedule", () => {
     expect(recordWindows(null, 22, 24, now)).toEqual([
@@ -274,6 +296,48 @@ describe("a range of the tank's record", () => {
     // With no level recorded, a shot sits on none.
     expect(shotMarks(record.shots, [], 60_000).map((each) => each.level)).toEqual([null, null]);
   });
+  it("lines each marker up with the history event it stands for, over half a day", () => {
+    const record = tankRecord(rows, ids, at(50), at(62));
+    // The valve opening times, the pump's and the filling's own on and off, the fill's time.
+    expect(record.shots.map((shot) => [shot.zone, shot.start, shot.end])).toEqual([
+      [1, at(56), at(56.05)],
+      [2, at(56.08), at(56.13)],
+    ]);
+    expect(record.pump).toEqual([{ start: at(55.99), end: at(56.15), open: false }]);
+    expect(record.filling).toEqual([{ start: at(53.5), end: at(54), open: false }]);
+    expect(record.fills).toEqual([at(54)]);
+    expect(record.level).toEqual([
+      { value: 30, start: at(50), end: at(54) },
+      { value: 95, start: at(54), end: at(56.15) },
+      { value: 90, start: at(56.15), end: at(62) },
+    ]);
+    // Each shot's mark sits where its valve opened, on the level then in force.
+    expect(shotMarks(record.shots, record.level, 60_000)).toMatchObject([
+      { time: at(56), level: 95 },
+      { time: at(56.08), level: 95 },
+    ]);
+    // Half a day with nothing in it keeps only the level carried in.
+    expect(tankRecord(rows, ids, at(60), at(72))).toEqual({
+      level: [{ value: 90, start: at(60), end: at(72) }],
+      shots: [],
+      pump: [],
+      filling: [],
+      fills: [],
+    });
+  });
+  it("groups a week's shots by the hour, and nearer ranges only as close as the chart can tell", () => {
+    expect(shotGap(168, 60_000)).toBe(HOUR);
+    expect(shotGap(168, 2 * HOUR)).toBe(2 * HOUR);
+    expect(shotGap(72, 60_000)).toBe(60_000);
+    expect(shotGap(12, 60_000)).toBe(60_000);
+    const week = tankRecord(rows, ids, at(0), at(72));
+    const marks = shotMarks(week.shots, week.level, shotGap(168, 60_000));
+    expect(marks.map((mark) => [mark.time, mark.shots.length])).toEqual([
+      [at(8), 2],
+      [at(32), 2],
+      [at(56), 2],
+    ]);
+  });
   it("draws nothing it has no record or mapping for, without failing", () => {
     const empty = { level: [], shots: [], pump: [], filling: [], fills: [] };
     expect(tankRecord({}, ids, at(0), at(72))).toEqual(empty);
@@ -292,5 +356,40 @@ describe("a range of the tank's record", () => {
       [1, null],
       [2, null],
     ]);
+  });
+});
+
+describe("the minimum and refill reminder lines", () => {
+  const states = createDemo(Date.parse("2026-09-28T04:00:00Z"));
+  it("draws the controller's minimum in a room whose tank level it reads", () => {
+    expect(levelLines(states, "", "sensor.demo_tank_level")).toEqual([
+      expect.objectContaining({ key: "minimum", value: 8, label: "Minimum 8 %" }),
+    ]);
+    // With no minimum published, the controller's own 8 %.
+    const bare = structuredClone(states);
+    delete bare[tankLevelId("")].attributes.minimum_pct;
+    expect(levelLines(bare, "", null).map((line) => line.value)).toEqual([8]);
+  });
+  it("draws the refill reminder where the dosing setup reads it on the level charted", () => {
+    // Flower 1: no level for the controller's minimum, a person reminded to refill at 20 %.
+    expect(levelLines(states, "f1_", "sensor.demo_f1_tank_level")).toEqual([
+      expect.objectContaining({ key: "remind", value: 20, label: "Refill reminder 20 %" }),
+    ]);
+    // Read on another entity, or switched off, the reminder is not this line.
+    expect(levelLines(states, "f1_", "sensor.another_level")).toEqual([]);
+    const off = structuredClone(states);
+    (off[dosingConfigId("f1_")].attributes.batch as Record<string, unknown>).remind_pct = 0;
+    expect(levelLines(off, "f1_", "sensor.demo_f1_tank_level")).toEqual([]);
+  });
+  it("draws neither in a room with nothing set, nor from a dosing setup from before them", () => {
+    expect(levelLines({}, "", "sensor.tank_level")).toEqual([]);
+    const old: States = {
+      [dosingConfigId("")]: {
+        entity_id: dosingConfigId(""),
+        state: "1",
+        attributes: { batch: { fill_valve: null, recipe: [] } },
+      },
+    };
+    expect(levelLines(old, "", "sensor.tank_level")).toEqual([]);
   });
 });

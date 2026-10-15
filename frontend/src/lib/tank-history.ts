@@ -236,24 +236,25 @@ export function describeLine(name: string, unit: string, line: TankLine | null):
   return `${name} latest ${show(line.latest)}, lowest ${show(line.lowest)}, highest ${show(line.highest)}${unit}`;
 }
 
-/** Local-time ticks: every six hours across a day, daily across a week, every five days across a
- * month. */
+/** Local-time ticks: every three hours across half a day, every six across a day, daily across a
+ * week, every five days across a month. */
 export function rangeTicks(start: number, end: number, hours: number): number[] {
   const days = hours <= 24 ? 0 : hours <= 168 ? 1 : 5;
+  const step = hours <= 12 ? 3 : 6;
   const at = new Date(start);
   at.setMinutes(0, 0, 0);
-  at.setHours(days ? 0 : Math.floor(at.getHours() / 6) * 6);
+  at.setHours(days ? 0 : Math.floor(at.getHours() / step) * step);
   // The first tick is the first boundary inside the window; calendar stepping keeps date ticks
   // on local midnight across daylight-saving changes.
   if (at.getTime() < start) {
     if (days) at.setDate(at.getDate() + 1);
-    else at.setHours(at.getHours() + 6);
+    else at.setHours(at.getHours() + step);
   }
   const ticks: number[] = [];
   while (at.getTime() <= end) {
     ticks.push(at.getTime());
     if (days) at.setDate(at.getDate() + days);
-    else at.setHours(at.getHours() + 6);
+    else at.setHours(at.getHours() + step);
   }
   return ticks;
 }
