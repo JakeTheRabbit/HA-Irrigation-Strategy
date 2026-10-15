@@ -110,6 +110,11 @@ class ZoneParams:
     p0_additional_dryback: float = 0.0  # P0 ends once VWC is this % below the highest reading since lights-on,
     #                                     the small extra dryback before the first shot. 0 = off: P0 waits for
     #                                     dryback_target, as before.
+    p2_time_between_min: float = 0.0  # min minutes from the last shot to a P2 top-up, so a shot soaks down to the
+    #                                   probe before moisture is judged again. Without it a zone still reading under
+    #                                   the re-water threshold got another top-up every pass (60 s) until the water
+    #                                   arrived. Only the top-up waits: the EC corrections keep p2_min_interval_min.
+    #                                   0 = off (as before).
 
 
 @dataclass
@@ -373,7 +378,7 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
                 fire, size, ir, kind = True, p.p2_shot_size * 1.5, f"P2 rescue flush EC {ec:.1f}", "p2_rescue"
             elif ec_known and p.ec_target_p2 > 0 and ec / p.ec_target_p2 > 1.2 and dilutive and ec_gap_ok:
                 fire, size, ir, kind = True, p.p2_shot_size * 1.5, f"P2 dilute EC {ec:.1f}", "p2_dilute"
-            elif s.vwc < p2_thr:
+            elif s.vwc < p2_thr and s.minutes_since_shot >= p.p2_time_between_min:
                 fire, size, ir, kind = True, ec_adjust(p.p2_shot_size, ec, p.ec_target_p2), f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}", "p2_topup"
     p3_gap = p.p3_time_between_min or 0.0
     if not fire and phase == "P3" and s.vwc < p.p3_emergency_floor and s.minutes_since_shot >= p3_gap:
@@ -471,7 +476,9 @@ def waiting_for(s: ZoneSnapshot, p: ZoneParams) -> list:
         add("p1_max_shots", to="P2", shots_left=max(0, p.p1_max_shots - s.shot_count))
     elif s.phase == "P2":
         if not s.steering_held:
-            add("p2_topup", shot=True, metric="vwc", op="<", value=p.p2_threshold, now=s.vwc)
+            gap = p.p2_time_between_min
+            add("p2_topup", shot=True, metric="vwc", op="<", value=p.p2_threshold, now=s.vwc,
+                in_min=gap - s.minutes_since_shot if gap > 0 else None)
             if ec_known and p.ec_target_p2 > 0:
                 add("p2_dilute", shot=True, metric="ec", op=">", value=p.ec_target_p2 * 1.2, now=ec)
         add("lights_off", to="P3", in_min=s.hours_to_lights_off * 60.0)
@@ -575,6 +582,7 @@ _PARAM_BOUNDS = {
     "drown_ceiling": (50.0, 100.0), "min_floor_finish_h": (0.0, 12.0),
     "p1_rise_pts": (0.1, 5.0), "p1_max_extra_shots": (1.0, 10.0),
     "p0_additional_dryback": (0.0, 40.0),
+    "p2_time_between_min": (0.0, 120.0),
 }
 
 

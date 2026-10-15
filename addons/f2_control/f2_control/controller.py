@@ -2123,6 +2123,9 @@ class Controller:
             ec_target_p2=self._zone_num(room, zone, f"ec_target_{sfx}_p2", FALLBACK[f"ec_target_{sfx}_p2"]),
             p3_emergency_floor=efloor,
             p3_emergency_shot=self._zone_num(room, zone, "p3_emergency_shot_size", FALLBACK["p3_emergency_shot_size"]),
+            p2_time_between_min=self._zone_num(
+                room, zone, "p2_time_between_shots", FALLBACK["p2_time_between_shots"], optional=True
+            ),
             p3_time_between_min=self._zone_num(
                 room, zone, "p3_time_between_shots", FALLBACK["p3_time_between_shots"], optional=True
             ),

@@ -268,6 +268,19 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
     ),
+    # Minutes from the last shot before a P2 top-up may go, so a shot reaches the probe
+    # before moisture is judged again. 0 (the default) turns the gap off; the controller
+    # falls back to the same 0 when an older integration has no such entity.
+    NumberEntityDescription(
+        key="p2_time_between_shots",
+        name="P2 Time Between Shots",
+        icon="mdi:timer-outline",
+        native_min_value=0.0,
+        native_max_value=60.0,
+        native_step=1.0,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        mode="box",
+    ),
     NumberEntityDescription(
         key="p2_ec_high_threshold",
         name="P2 EC High (ratio x target)",
@@ -504,6 +517,7 @@ PER_ZONE_STEERING_KEYS = [
     "p1_maximum_extra_shots",
     "p2_vwc_threshold",
     "p2_shot_size",
+    "p2_time_between_shots",
     "p3_emergency_vwc_threshold",
     "p3_emergency_shot_size",
     "p3_time_between_shots",

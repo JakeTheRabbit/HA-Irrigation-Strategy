@@ -55,6 +55,7 @@ ENTITY_DEFAULTS_12C6D1A = {
     "p1_maximum_shots": 6.0,
     "p1_minimum_shots": 3.0,
     "p2_shot_size": 5.0,
+    "p2_time_between_shots": 0.0,  # added after it: off, as top-ups always went
     "p2_ec_high_threshold": 1.2,
     "p2_ec_low_threshold": 0.8,
     "p3_emergency_vwc_threshold": 40.0,
@@ -93,6 +94,7 @@ CONTROLLER_FALLBACKS_12C6D1A = {
     "field_capacity": 70,
     "p3_emergency_vwc_threshold": 40,
     "p2_shot_size": 5,
+    "p2_time_between_shots": 0.0,  # added after it: off, as top-ups always went
     "p1_initial_shot_size": 2,
     "p1_shot_size_increment": 0.5,
     "p1_maximum_shots": 12,

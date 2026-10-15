@@ -73,6 +73,8 @@ DEFAULTS = {
     # P2
     "p2_vwc_threshold": (60.0, 45),
     "p2_shot_size": (5.0, 5),
+    # Minutes from the last shot before a P2 top-up may go: 0 is off, as top-ups always went.
+    "p2_time_between_shots": (0.0, 0.0),
     "p2_ec_high_threshold": (1.2, None),
     "p2_ec_low_threshold": (0.8, None),
     # P3
