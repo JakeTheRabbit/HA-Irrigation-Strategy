@@ -592,6 +592,16 @@ def _on_since_shot(history, started):
 # daily budget) still applies to them.
 PLAN_HOLD_EXEMPT = frozenset({"p3_emergency", "watchdog", "min_daily", "blind_fallback", "blind_copy_rescue"})
 
+# A setting (a room's number) unreadable for fewer than this many passes is still loading: while Home Assistant
+# starts or the integration reloads, its numbers are missing for a moment, and a shot sized on a guess is no shot.
+# Every shot kind waits that long, as long as CS-402 waits before it says a setting is missing. After it, a
+# setting runs on the last value read since the controller started, else on its built-in value (CS-402).
+SETTINGS_WAIT_PASSES = 3
+# The settings that size a zone's water. One never read since the controller started holds that zone, its
+# rescues included (_settings_hold): a built-in plant count or daily limit is a guess at how much water goes in.
+# Every other zone, and every other missing setting, carries on.
+WATER_SIZING = ("substrate_volume", "plant_count", "drippers_per_plant", "dripper_flow_rate", "max_daily_volume")
+
 # Who gets which phone push is the integration's, for the whole site (docs/NOTIFICATIONS.md): it publishes how
 # many phones are set up, and the watering-stopped threshold, here. Read at most once a minute.
 NOTIFY_CONFIG = "sensor.crop_steering_notify_config"
@@ -1707,12 +1717,15 @@ class Controller:
             return float(override)
         per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
         v, _, _ = ha_get(per)
+        seen = self.__dict__.setdefault("_settings_seen", {})  # entity -> the last value read since start
         if v not in (None, "unknown", "unavailable", ""):
-            return self._num(per, default)
+            seen[per] = self._num(per, default)
+            return seen[per]
         glob = f"number.crop_steering_{room.prefix}{suffix}"
         gv, _, _ = ha_get(glob)
         if gv not in (None, "unknown", "unavailable", ""):
-            return self._num(glob, default)
+            seen[glob] = self._num(glob, default)
+            return seen[glob]
         # Neither the per-zone NOR the global setpoint entity exists → the engine is silently
         # running its built-in default. On a healthy install the integration creates the global,
         # so this only trips on a real misconfig (renamed/removed entity). Record it so
@@ -1720,6 +1733,10 @@ class Controller:
         # deliberately doesn't create (optional=True): those default by design, never alert.
         if not optional:
             self._defaulted_this_loop.add(glob)
+            room.__dict__.setdefault("_settings_missing", set()).add(glob)
+            last = seen.get(per, seen.get(glob))
+            if last is not None:  # read earlier in this run: a real value, not a guess
+                return last
         return float(default)
 
     def _room_duration_cap(self, room):
@@ -2712,6 +2729,9 @@ class Controller:
         for f in self.hold_entities:
             if self._on(f, False):
                 return f"external hold ({f.split('.')[-1]})"
+        settings = self._settings_hold(room, zone)
+        if settings:
+            return settings
         # Source-water EC gate — only when a feed-EC sensor is configured. With no feed sensor
         # the gate is disabled (the dosing/fill holds above still apply) so the add-on is safe
         # out of the box on installs without a reservoir probe.
@@ -4419,6 +4439,33 @@ class Controller:
             zone=zone,
         )
 
+    def _settings_hold(self, room, zone):
+        """Why the zone waits for its settings, or None. First, every shot kind: a setting this pass could not
+        read, missing for fewer than SETTINGS_WAIT_PASSES passes, is still loading. Then a setting that sizes
+        this zone's water (WATER_SIZING) not read once since the controller started holds this zone, its
+        rescues included. Any other missing setting runs on its last value read, else its built-in value."""
+        seen = self.__dict__.setdefault("_settings_seen", {})
+        unread = []
+        for suffix in WATER_SIZING:
+            if parameter_override(getattr(room, "strategy_snapshot", None), zone, suffix) is not None:
+                continue
+            self._zone_num(room, zone, suffix, 0)  # a read is remembered; a miss is noted for CS-402
+            per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
+            glob = f"number.crop_steering_{room.prefix}{suffix}"
+            if per not in seen and glob not in seen:
+                unread.append(glob)
+        waiting = sorted(
+            e for e in getattr(room, "_settings_missing", ())
+            if self._defaulted.get(e, 0) < SETTINGS_WAIT_PASSES
+        )
+        if waiting:
+            more = f" and {len(waiting) - 2} more" if len(waiting) > 2 else ""
+            return f"waiting for its settings to load ({', '.join(waiting[:2])}{more})"
+        if unread:
+            return (f"not watering: {', '.join(unread)} not read since the controller started, and it sizes "
+                    "this zone's water (CS-402)")
+        return None
+
     def _check_defaulted_setpoints(self):
         """Turn the per-loop 'setpoint entity missing' set into a rate-limited alert once an
         entity has been missing for >=3 consecutive loops (ignores one-off read blips). Clears
@@ -4433,16 +4480,20 @@ class Controller:
         self._n_defaulted = len(persistent)
         if persistent:
             # Name the ones that size how much water a zone gets, when they are among them.
-            key = [what for part, what in (("max_daily_volume", "the daily water limit"),
-                                           ("plant_count", "the plant count"))
-                   if any(part in e for e in persistent)]
+            key = [what for part, what in (("substrate_volume", "the pot size"),
+                                           ("plant_count", "the plant count"),
+                                           ("drippers_per_plant", "the drippers per plant"),
+                                           ("dripper_flow_rate", "the dripper flow"),
+                                           ("max_daily_volume", "the daily water limit"))
+                   if any(e.endswith(part) for e in persistent)]
             self._alert(
                 "defaulted_setpoints",
                 "CS-402",
                 "settings missing, running on built-in values",
-                "These settings can't be read in Home Assistant, so the engine uses its built-in "
-                "values for them"
-                + (f", {' and '.join(key)} included. Keep the engine off until they are back"
+                "These settings can't be read in Home Assistant, so the engine uses the last value it "
+                "read since it started, else its built-in value"
+                + (f". {' and '.join(key).capitalize()} size a zone's water: a zone that has not read "
+                   "one since the controller started is not watered, its rescues included, until it is back"
                    if key else ". Check those values suit this room")
                 + ": reload the integration, and if Repairs lists settings that are not where the "
                 "controller looks, follow code CS-605.\n\n"
@@ -4660,6 +4711,7 @@ class Controller:
             log(f"[{room.slug}] no other controller seen for {DUPLICATE_HOLD_S // 60} min: carrying on")
             ha_call("persistent_notification", "dismiss", notification_id=f"f2_duplicate_{room.slug}")
             del self._alerted[f"duplicate_{room.slug}"]
+        room._settings_missing = set()  # what this pass could not read (_zone_num)
         active, was = self._room_active(room), getattr(room, "_was_room_active", None)
         room._was_room_active = active
         if not active:

@@ -8,6 +8,9 @@ import controller
 import fake_ha
 
 
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
+
 class Clock:
     def __init__(self):
         self.seconds = 0.0

@@ -665,9 +665,9 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 *Critical · Notification*
 
-**What it means.** Settings the controller reads by their exact entity ids can't be read in Home Assistant (missing, or not a number for three loops running), so it uses its built-in values for them. The notification lists them, and says when the daily water limit or plant count is among them.
+**What it means.** Settings the controller reads by their exact entity ids can't be read in Home Assistant (missing, or not a number for three loops running), so it uses the last value it read since it started, else its built-in value. The notification lists them, and says when one that sizes a zone's water (pot size, plant count, drippers per plant, dripper flow or the daily water limit) is among them.
 
-**Watering meanwhile.** Carries on, on built-in values, which may not suit the room. If the daily water limit or plant count is among them, keep the engine off until they are back.
+**Watering meanwhile.** Every shot waits for three loops while a setting is missing. Then watering carries on, on the last value read or the built-in value, which may not suit the room, except in a zone whose pot size, plant count, drippers per plant, dripper flow or daily water limit has not been read once since the controller started: that zone is not watered, its rescues included, until the setting is back.
 
 **Likely causes**
 

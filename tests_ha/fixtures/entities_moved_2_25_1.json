@@ -1,0 +1,10 @@
+{
+  "_about": "F-605: an install whose entity ids moved (CS-605). The recorded upstream 2.25.1 room 'from' names, with the ids in 'moved' registered elsewhere, as an id edited in Settings or a room created while Home Assistant still ran an older integration leaves them: the room's P2 re-water threshold (room-wide and both zones', so neither the zone's own nor the room's can be read) and zone 2's daily water limit. Derived from that snapshot by moving these ids, not recorded separately.",
+  "from": "entry_2_25_1_pumped_room.json",
+  "moved": {
+    "number.crop_steering_p2_vwc_threshold": "number.crop_steering_p2_vwc_threshold_2",
+    "number.crop_steering_zone_1_p2_vwc_threshold": "number.crop_steering_zone_1_p2_vwc_threshold_2",
+    "number.crop_steering_zone_2_p2_vwc_threshold": "number.crop_steering_zone_2_p2_vwc_threshold_2",
+    "number.crop_steering_zone_2_max_daily_volume": "number.crop_steering_zone_2_max_daily_volume_2"
+  }
+}

@@ -15,6 +15,9 @@ import pytest
 import controller
 from test_room_status import _room
 
+
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
 VWC = "sensor.crop_steering_vwc_zone_1"
 STATUS = "sensor.crop_steering_zone_1_status_app"
 

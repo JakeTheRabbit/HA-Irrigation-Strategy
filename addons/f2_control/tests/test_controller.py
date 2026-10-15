@@ -17,8 +17,11 @@ import tempfile
 from datetime import datetime
 
 import fake_ha
+import pytest
 
 import controller
+
+pytestmark = pytest.mark.usefixtures("settings_built_in")
 
 
 def _build(options, states=None):

@@ -50,6 +50,17 @@ def no_blind_grace(monkeypatch):
     monkeypatch.setattr(controller, "BLIND_GRACE_MIN", 0)
 
 
+@pytest.fixture
+def settings_built_in(monkeypatch):
+    """For tests whose fake Home Assistant leaves a room's settings out: they run on built-in values at once,
+    as they did before the settings wait. The wait, and the zone held on a never-read water-sizing setting
+    (controller.SETTINGS_WAIT_PASSES, controller.WATER_SIZING), are tested in test_settings_wait.py."""
+    import controller
+
+    monkeypatch.setattr(controller, "SETTINGS_WAIT_PASSES", 0)
+    monkeypatch.setattr(controller, "WATER_SIZING", ())
+
+
 @pytest.fixture(autouse=True)
 def _no_real_history(monkeypatch):
     """Never let a test ask a real Home Assistant for history: none is recorded unless a rig says so."""

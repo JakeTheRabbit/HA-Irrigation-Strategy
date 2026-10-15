@@ -15,6 +15,9 @@ import pytest
 import controller
 from test_controller import _build, _desc
 
+
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
 KILL = "input_boolean.kill"
 ZONE = "switch.crop_steering_zone_1_enabled"
 OVERRIDE = "switch.crop_steering_zone_1_manual_override"

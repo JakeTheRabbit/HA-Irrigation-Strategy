@@ -20,8 +20,12 @@ import json
 from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 
+import pytest
+
 import controller
 from test_plan_hold_never_stops_rescues import Clock, probe, rig  # noqa: F401 (rig: a pytest fixture)
+
+pytestmark = pytest.mark.usefixtures("settings_built_in")
 
 LADDER = ("field_capacity", "p1_target_vwc", "p2_vwc_threshold", "p3_emergency_vwc_threshold")
 
