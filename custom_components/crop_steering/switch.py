@@ -84,6 +84,16 @@ def create_zone_switch_descriptions(num_zones: int) -> list[SwitchEntityDescript
             )
         )
 
+        # Opt-in, OFF on new and updated rooms. ON lets P3 hold the overnight dryback at its
+        # target with rescue-sized shots, instead of letting a fast night dry on to the rescue level.
+        zone_switches.append(
+            SwitchEntityDescription(
+                key=f"zone_{zone_num}_p3_dryback_hold",
+                name=f"Zone {zone_num} P3 Dryback Hold",
+                icon="mdi:weather-night",
+            )
+        )
+
     return zone_switches
 
 
