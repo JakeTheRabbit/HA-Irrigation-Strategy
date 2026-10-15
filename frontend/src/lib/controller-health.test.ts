@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildRoom, discoverRooms, leadingNotices, roomStatus } from "./model";
-import { ageText, ageTone, parseControllerTime, readHeartbeat } from "./controller-health";
+import { buildRoom, discoverRooms, leadingNotices, roomStatus, staleBanner } from "./model";
+import {
+  ageText,
+  ageTone,
+  parseControllerTime,
+  readHeartbeat,
+  updatedText,
+} from "./controller-health";
 import { createDemo, demoBeat } from "./demo";
 import type { EntityState, Notice, States } from "./types";
 
@@ -108,7 +114,12 @@ describe("controller heartbeat", () => {
     });
     expect(status(fixture([stopped])).detail).toMatch(/^The controller app stopped 3 min ago\. /);
     // Long after it stopped it still says stopped, not "data old".
-    const long = entity(HEARTBEAT, "stopped", { stopped_at: ago(3 * 3_600_000) }, ago(3 * 3_600_000));
+    const long = entity(
+      HEARTBEAT,
+      "stopped",
+      { stopped_at: ago(3 * 3_600_000) },
+      ago(3 * 3_600_000),
+    );
     expect(view(fixture([long])).alerts[0].title).toBe("Controller stopped");
     expect(status(fixture([long])).detail).toMatch(/^The controller app stopped 3 h ago\. /);
   });
@@ -136,7 +147,12 @@ describe("controller heartbeat", () => {
           enable_flag: "input_boolean.f2_control_enabled",
           valves: { "1": VALVE, "2": "switch.zone_2_valve" },
         }),
-        entity(HEARTBEAT, "healthy", { enable_flag: "input_boolean.f2_control_enabled" }, ago(12 * 60_000)),
+        entity(
+          HEARTBEAT,
+          "healthy",
+          { enable_flag: "input_boolean.f2_control_enabled" },
+          ago(12 * 60_000),
+        ),
         { ...entity(VALVE, "on", {}, ago(opened)), last_changed: ago(opened) },
         entity("switch.zone_2_valve", "off"),
         ...extra,
@@ -453,6 +469,28 @@ describe("room status line", () => {
       text: "Data 14 min old",
       reportedAt: NOW - 14 * 60_000,
     });
+  });
+  it("puts a band under the header once the controller stops reporting, and only then", () => {
+    const banner = (states: States) => staleBanner(states, discoverRooms(states)[0], NOW);
+    expect(banner(fixture())).toBeNull();
+    expect(banner(fixture([entity(HEARTBEAT, "healthy", {}, ago(14 * 60_000))]))).toBe(
+      "The controller has not reported for 14 min. Moisture and phases below are its last report, not live. Watering is held by the controller's own safety rules.",
+    );
+    const missing = fixture();
+    delete missing[HEARTBEAT];
+    expect(banner(missing)).toBe(
+      "The controller is not running. Start the controller app and check its log. Moisture and phases below are its last report, not live.",
+    );
+    const off = fixture([
+      entity(HEARTBEAT, "healthy", {}, ago(14 * 60_000)),
+      entity("switch.crop_steering_room_active", "off"),
+    ]);
+    expect(banner(off)).toBeNull();
+  });
+  it("says how long ago the header's data was updated", () => {
+    expect(updatedText(20_000)).toBe("Updated 20 s ago");
+    expect(updatedText(3 * 60_000 + 5_000)).toBe("Updated 3 min ago");
+    expect(updatedText(-5_000)).toBe("Updated 0 s ago");
   });
   it("says Room off for a room with nothing growing", () => {
     const states = fixture([entity("switch.crop_steering_room_active", "off")]);

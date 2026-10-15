@@ -843,6 +843,18 @@ const stoppedText = (beat: { at: number | null }, now: number) =>
 
 /** One line per room from what the controller publishes: watering, holding and why, not watering
  * and what to do, or how old the data is once the controller has stopped reporting. */
+/** The band under the header while the room's controller is not reporting: what that means for
+ * the numbers on every page. Null while it reports, while a shot holds its loop, and for a room
+ * that is off. */
+export function staleBanner(states: States, room: Room, now = Date.now()): string | null {
+  const status = roomStatus(states, room, now);
+  if (status.tone === "stale")
+    return `The controller has not reported for ${ageText(now - status.reportedAt!)}. Moisture and phases below are its last report, not live. Watering is held by the controller's own safety rules.`;
+  const beat = readHeartbeat(resolve(states, room, "sensor", "ai_heartbeat"), now);
+  return status.tone === "stopped" && beat.health !== "fresh"
+    ? `${status.detail} Moisture and phases below are its last report, not live.`
+    : null;
+}
 export function roomStatus(states: States, room: Room, now = Date.now()): RoomStatus {
   const beat = readHeartbeat(resolve(states, room, "sensor", "ai_heartbeat"), now);
   const say = (

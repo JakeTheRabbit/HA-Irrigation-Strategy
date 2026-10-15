@@ -1315,6 +1315,33 @@ try {
           apiCalls.find((c) => c.action === "setup_save").data.entry_id,
           "fixture-room-b-entry",
         );
+        // A controller silent past its 10 min heartbeat: one band under the header, in words, on
+        // a phone too, linking to the probes; the labelled header keeps both switches in words.
+        states["sensor.crop_steering_f1_ai_heartbeat"].last_updated = new Date(
+          Date.now() - 14 * 60_000,
+        ).toISOString();
+        await navigate("Today", lp);
+        await lp.getByRole("button", { name: "Refresh controller data" }).click();
+        await lp.setViewportSize({ width: 390, height: 844 });
+        const band = lp.locator(".stale-banner");
+        await visible(band);
+        assert.equal(
+          await band.locator("p").innerText(),
+          "The controller has not reported for 14 min. Moisture and phases below are its last report, not live. Watering is held by the controller's own safety rules.",
+        );
+        assert.equal(await lp.locator(".today-stopped").count(), 0, "the band, not a second line");
+        assert.equal(await lp.locator(".data-age").innerText(), "Updated 14 min ago");
+        // The fixture has no room switch: watering is the one switch, in words.
+        assert.deepEqual(await lp.locator(".safety-switch-text").allInnerTexts(), ["Watering off"]);
+        assert.ok(
+          await lp.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+          "The stale band and the header fit 390 px",
+        );
+        await lp.screenshot({ path: out + "workspace-stale-banner-390.png", fullPage: true });
+        await band.getByRole("button", { name: "Probes" }).click();
+        await visible(lp.getByRole("heading", { name: "Probes", exact: true }));
+        await visible(band);
+        await lp.setViewportSize({ width: 1440, height: 1000 });
       } finally {
         await live.close();
       }

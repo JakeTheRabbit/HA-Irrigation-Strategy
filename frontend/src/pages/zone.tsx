@@ -121,15 +121,6 @@ export function ZonePage({
             Scheduling paused
           </Pill>
         )}
-        {zone.stale && (
-          <Pill
-            dot
-            tone="warn"
-            title="The controller is not reporting: phase and status are its last report, not live."
-          >
-            Stale
-          </Pill>
-        )}
         {steering && (
           <span className="zone-steering" data-steering={steering}>
             {capital(steering)}

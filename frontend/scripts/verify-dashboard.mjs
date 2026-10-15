@@ -306,7 +306,9 @@ try {
       const chip = (id) => page.locator(`.room-chip[data-room="${id}"]`);
       assert.equal(await chip("room:").getAttribute("aria-pressed"), "true");
       assert.match(await chip("room:").innerText(), /Room A\s+Watering/);
-      assert.match(await page.locator(".data-age").innerText(), /old|<1 min/);
+      assert.match(await page.locator(".data-age").innerText(), /^Updated \d+ (s|min) ago$/);
+      await expectVisible(page.getByRole("button", { name: "Recent activity" }));
+      assert.equal(await page.locator(".stale-banner").count(), 0, "a reporting room has no band");
       const switches = page.getByRole("group", { name: "Room A safety switches" });
       await expectVisible(
         switches.getByRole("button", { name: "Watering on: switch watering off…", exact: true }),
@@ -2175,6 +2177,12 @@ try {
   await check("mobile navigation and every page fit 390px", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await go("today");
+    // The phone header in words: the room and the data's age, then both switches labelled.
+    assert.match(await page.locator(".data-age").innerText(), /^Updated \d+ (s|min) ago$/);
+    assert.deepEqual(await page.locator(".safety-switch-text").allInnerTexts(), [
+      "Watering on",
+      "Room on",
+    ]);
     await page.getByRole("button", { name: "Open navigation" }).click();
     await axe("mobile navigation");
     const mobileMenu = page.getByRole("dialog");

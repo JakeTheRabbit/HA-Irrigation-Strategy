@@ -38,7 +38,7 @@ import {
   type Page,
   type Route,
 } from "@/lib/routes";
-import { AppHeader } from "@/components/app-header";
+import { AppHeader, StaleBanner } from "@/components/app-header";
 import { PageTabs, pageLabel, SECTION_LABELS } from "@/components/page-tabs";
 import { WaterViewProvider } from "@/lib/water-view";
 import { WhatsNewOnUpdate } from "@/components/whats-new";
@@ -296,6 +296,7 @@ export default function App() {
           refresh={() => void refresh()}
           refreshing={refreshing}
         />
+        <StaleBanner controller={controller} openProbes={() => navigate("equipment/probes")} />
         <main id="main-content" tabIndex={-1}>
           <div className="main-inner">
             {(controller.connection === "offline" || controller.error || refreshError) && (
