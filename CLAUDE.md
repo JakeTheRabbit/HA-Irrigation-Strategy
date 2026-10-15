@@ -109,7 +109,9 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
 
 - **Dependencies:** integration = pure HA + voluptuous (no external deps). Engine
   (`crop-steering-engine`) = pure Python, no scipy/numpy; the f2-control add-on image
-  installs `requests` and its pinned, hashed dependencies from `addons/f2_control/requirements.txt`.
+  installs `requests` and its pinned, hashed dependencies from `addons/f2_control/requirements.txt`,
+  plus the Anthropic SDK and its pinned, hashed dependencies from `requirements-brain.txt`, except
+  on armv7.
 - **Testing:** see `docs/TESTING.md`; run `bash tests/run_ci.sh` (mirrors CI). Anything that touches the
   config flow, entity ids/platforms or the integration-controller contract must be proven in `tests_ha/`
   (a real Home Assistant), not only against the stubs in `tests/`: the stubs cannot see a schema HA
