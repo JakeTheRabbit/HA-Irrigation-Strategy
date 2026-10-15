@@ -568,6 +568,23 @@
       ]
     },
     {
+      "code": "CS-502",
+      "title": "Too few probes agree for Lowest or Highest",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The zone's moisture or EC is set to steer on its lowest or highest probe, which needs three probes that agree. Fewer do, so the zone steers on their median instead. A probe far from the others is left out of the reading.",
+      "watering": "Carries on, steered by the median of the probes that are left.",
+      "causes": [
+        "A probe pulled out of its cube, or sitting in a puddle, reads far from the others.",
+        "A probe is offline or not reporting.",
+        "The zone has only one or two probes."
+      ],
+      "fixes": [
+        "Check the probes the zone's reading leaves out, under the zone's Probes.",
+        "With fewer than three probes, choose Median for the zone (its \"From Probes\" setting)."
+      ]
+    },
+    {
       "code": "CS-601",
       "title": "Kill switch helper missing",
       "source": "repairs",

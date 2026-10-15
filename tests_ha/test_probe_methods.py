@@ -115,3 +115,23 @@ async def test_what_the_probes_taught_the_zone_survives_a_restart(hass, freezer)
         float(state.state) == 43.0
     )  # 40, a three-point step, without the remembered offsets
     assert state.attributes["offsets_learned"] == learned
+
+
+async def test_the_controller_says_when_lowest_has_too_few_probes_and_steers_on_the_median(
+    hass, freezer, controller_for
+):
+    from datetime import datetime
+
+    await _install(hass, [A, B])
+    await _choose(hass, VWC_METHOD, "Lowest")
+    await _read(hass, freezer, **{A: "40", B: "46"})
+    c, fake, _clock = controller_for({"enable_flag": "switch.crop_steering_engine_enabled"})
+    assert c._read_sensor(c._fused_id("", "vwc", 1), lo=0, hi=100) == 43.0
+    c.loop_once(datetime(2026, 9, 21, 14, 0, 0))
+    raised = [
+        data["title"]
+        for domain, service, data in fake.calls
+        if (domain, service) == ("persistent_notification", "create")
+        and data["notification_id"] == "f2_probe_method_default_z1_vwc"
+    ]
+    assert len(raised) == 1 and raised[0].endswith("(CS-502)"), raised
