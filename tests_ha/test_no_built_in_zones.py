@@ -66,7 +66,7 @@ async def test_an_env_era_room_runs_on_its_integration_lights_not_the_app_option
     c._refresh_lights(room)
     assert (room.lights_on_hour, room.lights_off_hour) == (7.0, 19.0)
     assert _lights_logs(capsys.readouterr().out) == [
-        "[f2-control] config: lights 7:00-19:00 (source: integration)"
+        "[Crop Steering Controller] config: lights 7:00-19:00 (source: integration)"
     ]
 
 
@@ -106,7 +106,7 @@ async def test_a_lights_number_unreadable_at_start_uses_the_option_until_it_read
     c._refresh_lights(room)
     assert (room.lights_on_hour, room.lights_off_hour) == (10.0, 22.0)
     assert _lights_logs(capsys.readouterr().out) == [
-        "[f2-control] config: lights 10:00-22:00 (source: add-on option (integration entity missing))"
+        "[Crop Steering Controller] config: lights 10:00-22:00 (source: add-on option (integration entity missing))"
     ]
 
     fake.set_state(ON, "6")

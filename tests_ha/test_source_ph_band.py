@@ -8,7 +8,7 @@ running on, and a dead mapped probe still holds the water.
 """
 
 import pytest
-from conftest import fixture
+from conftest import fixture, room_of
 from test_setup_entry import _install
 from test_upgrade_in_place import JEV_3_11_1, UPSTREAM_2_25_1, _upgrade
 
@@ -16,29 +16,36 @@ PH_MIN = "number.crop_steering_irrigation_ph_min"
 PH_MAX = "number.crop_steering_irrigation_ph_max"
 TANK_PH = "sensor.tank_ph"
 KILL = "switch.crop_steering_engine_enabled"
-ARMED = (
-    KILL,
-    "switch.crop_steering_system_enabled",
-    "switch.crop_steering_auto_irrigation_enabled",
-    "switch.crop_steering_zone_1_enabled",
-)
+NEW = "tent_"  # every new room has a slug: the wizard's "Tent" (an updated room keeps no prefix)
+
+
+def _armed(prefix=""):
+    return tuple(
+        f"switch.crop_steering_{prefix}{name}_enabled"
+        for name in ("engine", "system", "auto_irrigation", "zone_1")
+    )
+
+
 # What both older lineages created the two numbers with, and so what Home Assistant restores on a
 # room where nobody changed them (number.py DEFAULT_VALUES in 2.25.1 and in 3.11.1).
 OLD_BAND = {PH_MIN: "5.8", PH_MAX: "6.2"}
 
 
-def _band(hass):
-    return float(hass.states.get(PH_MIN).state), float(hass.states.get(PH_MAX).state)
+def _band(hass, prefix=""):
+    return tuple(
+        float(hass.states.get(f"number.crop_steering_{prefix}irrigation_ph_{end}").state)
+        for end in ("min", "max")
+    )
 
 
-def _arm(fake):
-    for switch in ARMED:
+def _arm(fake, prefix=""):
+    for switch in _armed(prefix):
         fake.set_state(switch, "on")
 
 
 async def test_a_new_room_starts_on_a_5_5_to_6_5_band(hass):
     await _install(hass)
-    assert _band(hass) == (5.5, 6.5)
+    assert _band(hass, NEW) == (5.5, 6.5)
 
 
 @pytest.mark.parametrize("name", [UPSTREAM_2_25_1, JEV_3_11_1])
@@ -54,9 +61,9 @@ async def test_a_new_room_with_a_ph_probe_waters_inside_5_5_to_6_5_and_holds_out
     hass.states.async_set(TANK_PH, "6.4", {"unit_of_measurement": "pH"})
     await _install(hass, {"feed_ph_sensor": TANK_PH})
     c, fake, _clock = controller_for({"enable_flag": KILL})
-    room = c.rooms[0]
+    room = room_of(c, NEW)
     assert room.feed_ph_sensor == TANK_PH  # from the room's setup, no app option
-    _arm(fake)
+    _arm(fake, NEW)
 
     fake.set_state(TANK_PH, "unavailable")  # no good reading yet: fail closed
     assert "pH probe dead" in (c._blocked(room, 1) or "")
@@ -69,9 +76,9 @@ async def test_a_new_room_with_a_ph_probe_waters_inside_5_5_to_6_5_and_holds_out
 async def test_a_new_room_with_no_ph_probe_has_no_ph_check(hass, controller_for):
     await _install(hass)
     c, fake, _clock = controller_for({"enable_flag": KILL})
-    room = c.rooms[0]
+    room = room_of(c, NEW)
     assert room.feed_ph_sensor == ""
-    _arm(fake)
+    _arm(fake, NEW)
     assert c._blocked(room, 1) is None
 
 
@@ -83,7 +90,7 @@ async def test_an_updated_room_still_holds_on_its_own_band_and_on_a_dead_probe(
     seed = fixture(UPSTREAM_2_25_1)
     await _upgrade(hass, UPSTREAM_2_25_1, registry_ids=seed["registry"], restored=OLD_BAND)
     c, fake, _clock = controller_for(seed["addon_options"], saved_state=seed["controller_saved"])
-    room = c.rooms[0]
+    room = room_of(c, "")
     assert room.feed_ph_sensor == "sensor.feed_ph"
     _arm(fake)
 

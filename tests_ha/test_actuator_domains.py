@@ -14,7 +14,7 @@ tests_ha/fixtures/actuator_calls_3_11_1.json.
 """
 
 import pytest
-from conftest import fixture
+from conftest import fixture, room_of
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from test_install_to_controller import ARMED, KILL
 from test_real_flow import ZONES, _to_zones_step
@@ -97,7 +97,7 @@ async def _install_valve_room(hass):
 async def _armed_valve_room(hass, controller_for):
     await _install_valve_room(hass)
     c, fake, _clock = controller_for({"enable_flag": KILL})
-    room = c.rooms[0]
+    room = room_of(c)
     assert room.hw["valves"] == {1: VALVE} and room.hw["pump"] == PUMP
     assert room._setup_pending is None  # the valve reads closed and the relay off: adopted
     for switch in ARMED:

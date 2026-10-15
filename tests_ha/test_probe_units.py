@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import controller
 import pytest
-from conftest import fixture
+from conftest import fixture, room_of
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 from test_probe_fusion import A, ZONE
 from test_probe_fusion import _install as _install_probes
@@ -127,7 +127,7 @@ async def test_a_zone_whose_only_probe_reports_in_an_unknown_unit_names_it(
 
     monkeypatch.setattr(controller, "BLIND_GRACE_MIN", 0)
     c, fake, _clock = controller_for()
-    room = c.rooms[0]
+    room = room_of(c)
     monkeypatch.setattr(c, "_act_zone", lambda *args: None)
     c._loop_room(room, datetime.now())
     assert 1 in room._blind_zones  # the dead-probe path: watered on the timer or a sibling's shots

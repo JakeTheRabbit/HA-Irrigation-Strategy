@@ -7,7 +7,7 @@ names the switch the room really stops on.
 """
 
 import pytest
-from conftest import fixture, switch_calls
+from conftest import fixture, room_of, switch_calls
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from test_kill_switch_repair import _health_check_fires, _report, _shipped_options, checks  # noqa: F401
@@ -22,7 +22,7 @@ WATERING = (
     "switch.crop_steering_auto_irrigation_enabled",
     "switch.crop_steering_zone_1_enabled",
 )
-HELD = "f2-control disabled (kill switch off)"
+HELD = "Crop Steering Controller disabled (kill switch off)"
 
 
 async def _f2251(hass, controller_for, *, helper, switch):
@@ -31,7 +31,7 @@ async def _f2251(hass, controller_for, *, helper, switch):
     hass.states.async_set(OWN, switch)
     hass.states.async_set(LEGACY, helper)  # the app option still names it; the setup does not
     c, fake, clock = controller_for(seed["addon_options"], saved_state=seed["controller_saved"])
-    room = c.rooms[0]
+    room = room_of(c, "")
     assert room._setup_pending is None  # resumed after the update: no disarm cycle
     for entity in WATERING:
         fake.set_state(entity, "on")
@@ -42,7 +42,7 @@ async def _env_era(hass, controller_for, *, helper):
     await _upgrade(hass, "entry_env_era.json")
     hass.states.async_set(LEGACY, helper)
     c, fake, clock = controller_for(_shipped_options())
-    room = c.rooms[0]
+    room = room_of(c, "")
     for entity in WATERING:
         fake.set_state(entity, "on")
     return c, fake, clock, room
@@ -78,11 +78,12 @@ async def test_a_fresh_install_waters_with_no_helper(hass, controller_for):
 
     await _install(hass)
     c, fake, _clock = controller_for(_shipped_options())  # the shipped option names the helper
-    room = c.rooms[0]
+    room = room_of(c)  # a new room has a slug: its own switches are tent_ ones
+    own = OWN.replace("crop_steering_", "crop_steering_tent_")
     assert hass.states.get(LEGACY) is None
-    assert controller.room_gate(room) == OWN
-    for entity in (OWN, *WATERING):  # the room's own switch on, as the operator does after setup
-        fake.set_state(entity, "on")
+    assert controller.room_gate(room) == own
+    for entity in (own, *(w.replace("crop_steering_", "crop_steering_tent_") for w in WATERING)):
+        fake.set_state(entity, "on")  # the room's own switch on, as the operator does after setup
     assert c._blocked(room, 1) is None
 
 
@@ -138,7 +139,7 @@ async def test_a_2_25_1_room_is_never_told_its_engine_switch_does_not_stop_water
     hass, controller_for, checks  # noqa: F811
 ):
     c, fake, _clock, _room = await _f2251(hass, controller_for, helper="on", switch="off")
-    assert _report(hass, c, fake)["enable_flag"] == OWN
+    assert _report(hass, c, fake, "")["enable_flag"] == OWN
     hass.states.async_remove(LEGACY)  # the helper it no longer uses can go
     await _health_check_fires(hass, checks)
     assert _card(hass) is None and _not_gate(hass) is None
@@ -160,7 +161,7 @@ async def test_a_room_on_its_helper_is_told_its_engine_switch_does_not_stop_wate
     assert _card(hass) is None  # its gate is there and ON: the room waters
     assert _not_gate(hass) is None  # no heartbeat yet: only the running controller knows its gate
 
-    assert _report(hass, c, fake)["enable_flag"] == LEGACY
+    assert _report(hass, c, fake, "")["enable_flag"] == LEGACY
     await _health_check_fires(hass, checks)
     assert _card(hass) is None  # the gate is there: no kill-switch card
     # ...and still the operator is told, while the room waters, that Engine Enabled is not it.

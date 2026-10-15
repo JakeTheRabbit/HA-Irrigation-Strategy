@@ -26,6 +26,7 @@ from test_setup_entry import _install
 from test_upgrade_in_place import JEV_3_11_1, UPSTREAM_2_25_1, _upgrade
 
 GENERIC = sorted(SIZING_DEFAULTS)
+NEW = "tent_"  # every new room has a slug: the wizard's "Tent"
 
 
 def _defaults(schema):
@@ -65,15 +66,15 @@ async def test_setup_offers_a_new_room_the_sizing_its_numbers_start_at(hass):
 async def test_a_new_room_left_on_the_generic_sizing_is_marked_until_it_is_changed(hass):
     entry = await _install(hass)
     for key in ("substrate_volume", "dripper_flow_rate", "drippers_per_plant"):
-        state = hass.states.get(f"number.crop_steering_{key}")
+        state = hass.states.get(f"number.crop_steering_{NEW}{key}")
         assert float(state.state) == SIZING_DEFAULTS[key], key
-    assert float(hass.states.get("number.crop_steering_zone_1_plant_count").state) == 4
+    assert float(hass.states.get(f"number.crop_steering_{NEW}zone_1_plant_count").state) == 4
     assert _generic(hass, entry) == GENERIC
 
     await hass.services.async_call(
         "number",
         "set_value",
-        {"entity_id": "number.crop_steering_substrate_volume", "value": 6.5},
+        {"entity_id": f"number.crop_steering_{NEW}substrate_volume", "value": 6.5},
         blocking=True,
     )
     assert _generic(hass, entry) == [k for k in GENERIC if k != "substrate_volume"]
@@ -91,7 +92,7 @@ async def test_every_number_on_a_new_room_starts_at_its_entity_default(hass):
     await _install(hass)
     seen = 0
     for state in hass.states.async_all("number"):
-        key = re.sub(r"^number\.crop_steering_(zone_\d+_)?", "", state.entity_id)
+        key = re.sub(rf"^number\.crop_steering_{NEW}(zone_\d+_)?", "", state.entity_id)
         if key in ENTITY_DEFAULTS:
             assert float(state.state) == float(ENTITY_DEFAULTS[key]), state.entity_id
             seen += 1

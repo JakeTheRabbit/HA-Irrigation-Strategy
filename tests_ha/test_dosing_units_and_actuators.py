@@ -69,7 +69,13 @@ async def test_a_3_11_1_dosing_store_doses_with_the_calls_3_11_1_sent(
     for entity_id, state in DOSER.items():
         hass.states.async_set(entity_id, state)
     asked = await _call(
-        hass, hass_admin_user, "dosing_request", action="dose", pump="part_a", ml=22
+        hass,
+        hass_admin_user,
+        "dosing_request",
+        room_id="room:",  # the upgraded room keeps its un-prefixed ids
+        action="dose",
+        pump="part_a",
+        ml=22,
     )
     assert asked["error"] is None
     await hass.async_block_till_done()
