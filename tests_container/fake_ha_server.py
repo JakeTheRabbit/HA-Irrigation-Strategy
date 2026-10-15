@@ -59,17 +59,20 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"message": "API running."})
         if path == "/api/config":
             return self._send(200, {"time_zone": os.environ.get("HA_TIME_ZONE", "UTC")})
+        # The answer is taken under the lock and sent after it, so one slow answer never holds up another.
         with LOCK:
             if path == "/api/states":
-                return self._send(200, list(STATES.values()))
-            if path.startswith("/api/states/"):
+                code, answer = 200, list(STATES.values())
+            elif path.startswith("/api/states/"):
                 found = STATES.get(path[len("/api/states/"):])
-                return self._send(200, found) if found else self._send(404, {"message": "Entity not found."})
-            if path.startswith("/api/history/period/"):
+                code, answer = (200, found) if found else (404, {"message": "Entity not found."})
+            elif path.startswith("/api/history/period/"):
                 found = STATES.get(parse_qs(url.query).get("filter_entity_id", [""])[0])
                 rows = [{"state": found["state"], "last_changed": found["last_changed"]}] if found else []
-                return self._send(200, [rows] if rows else [])
-        return self._send(404, {"message": "Not found."})
+                code, answer = 200, [rows] if rows else []
+            else:
+                code, answer = 404, {"message": "Not found."}
+        return self._send(code, answer)
 
     def do_POST(self):
         path = urlparse(self.path).path
@@ -78,7 +81,8 @@ class Handler(BaseHTTPRequestHandler):
             entity = path[len("/api/states/"):]
             with LOCK:
                 put(entity, body.get("state"), body.get("attributes") or {})
-                return self._send(200, STATES[entity])
+                answer = STATES[entity]
+            return self._send(200, answer)
         if path.startswith("/api/services/"):
             domain, service = path[len("/api/services/"):].split("/", 1)
             entity = body.get("entity_id")

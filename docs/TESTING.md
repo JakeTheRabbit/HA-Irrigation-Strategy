@@ -203,6 +203,12 @@ Home Assistant late, and stops the container in the middle of the shot with `doc
 It passes when the valve is switched off after the stop and the container exits 0 inside the 30 s.
 Run it after any change to the Dockerfile, `run.sh` or the controller's stop path.
 
+The stop's time budget itself (25 s, or `F2_STOP_BUDGET_S`) is tested without Docker, on a test
+clock: `addons/f2_control/tests/test_stop_budget.py` (one or two rooms with shots recorded, with and
+without dosing records, against a Home Assistant that answers each call a set time after it is made,
+or never; a call whose timeout is shorter fails, as a real one does) and
+`tests_ha/test_stop_budget.py` (a shot stopped mid-way on a seeded 2.25.1 and Jev 3.11.1 room).
+
 ## Dashboard checks
 
 From the repository root:

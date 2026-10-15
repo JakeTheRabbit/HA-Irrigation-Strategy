@@ -34,6 +34,7 @@ import auto_setpoints
 import dosing_runner
 import jev_bridge
 import jev_policy
+import runtime_env
 import setpoint_supervisor
 import zone_history
 from strategy_runtime import parse_snapshot, parameter_override, strategy_block
@@ -281,6 +282,83 @@ _CANCELLED_SHOT_CLEANUP = (
 CONFIRM_FIRST_READ_S, CONFIRM_POLL_S, CONFIRM_TIMEOUT_S = 1.0, 0.5, 6.0
 CONFIRM_RETRY_S = 10.0  # a second read-back, after OFF is sent again to what still reads on
 
+# The safe-off on SIGTERM (Controller._safe_exit) runs inside runtime_env.stop_budget(). Dosing keeps
+# STOP_DOSING_S of it (a fifth at most) for its own offs while a dose or batch has anything recorded.
+# Each room with a shot recorded gets an equal share of the rest (see _Stop).
+STOP_DOSING_S = 5.0
+
+
+class _Stop:
+    """A part of the stop's budget: it ends at `until` on the monotonic clock. A read inside it waits only
+    as long as leaves time for the `keep` switch-offs it may prove, each as long as the slowest Home
+    Assistant call of this stop so far (`slowest`, shared by every part of one stop), and the second's
+    pause after a valve's off; a read that could not come back in what that leaves is not made. So a
+    slow Home Assistant costs reads, never the offs they prove, and a call is never cut shorter than
+    Home Assistant is answering."""
+
+    def __init__(self, until, slowest=None, keep=0):
+        self.until, self.keep = until, keep
+        self.slowest = [0.0] if slowest is None else slowest
+
+    def keeping(self, keep):
+        """This part, keeping time for `keep` offs after each read."""
+        return _Stop(self.until, self.slowest, keep)
+
+    def timeout(self, default, keep=None):
+        """A read's timeout, or None when it would not come back in time (it is not made)."""
+        keep = self.keep if keep is None else keep
+        left, took = self.until - time.monotonic(), self.slowest[0]
+        # Nothing timed yet: this read and the offs after it share what is left equally.
+        free = (left - keep * took - (1.0 if keep > 1 else 0.0)) if took else left / (keep + 1)
+        timeout = min(default, free)
+        return timeout if timeout > 0 and timeout >= took else None
+
+    def off_timeout(self, default, keep):
+        """An off's timeout: as a read's, keeping time for the `keep` offs after it, else all that is left
+        (the valve's off comes before the main line's, and that before the pump's); None when none is."""
+        timeout = self.timeout(default, keep)
+        if timeout is None:
+            left = self.until - time.monotonic()
+            timeout = min(default, left) if left > 0 else None
+        return timeout
+
+    def timed(self, call, *args, **kwargs):
+        began = time.monotonic()
+        try:
+            return call(*args, **kwargs)
+        finally:
+            self.slowest[0] = max(self.slowest[0], time.monotonic() - began)
+
+
+def _read(entity, deadline=None):
+    """hw_get, inside the stop's `deadline` (a _Stop) when there is one: a read that no longer fits is
+    not made and reads as unknown."""
+    if deadline is None:
+        return hw_get(entity)
+    timeout = deadline.timeout(8)
+    return HAState() if timeout is None else deadline.timed(hw_get, entity, timeout=timeout)
+
+
+def _switch_off(entity, deadline=None, keep=0):
+    """A switch's (or valve's) off, inside the stop's `deadline` when there is one, keeping time for `keep`
+    offs after it -> whether Home Assistant took it. One that no longer fits is not sent."""
+    if deadline is None:
+        return hw_call(entity, False)
+    timeout = deadline.off_timeout(12, keep)
+    return timeout is not None and deadline.timed(hw_call, entity, False, timeout=timeout)
+
+
+def _history(entity, since, deadline=None):
+    if deadline is None:
+        return hw_history(entity, since)
+    timeout = deadline.timeout(12)
+    return None if timeout is None else deadline.timed(hw_history, entity, since, timeout=timeout)
+
+
+def _pause(seconds, deadline=None):
+    time.sleep(seconds if deadline is None else max(0.0, min(seconds, deadline.until - time.monotonic())))
+
+
 # The shortest shot the controller runs, in seconds (a shot sized shorter is lengthened to this).
 MIN_SHOT_S = 5
 
@@ -307,12 +385,12 @@ ACTUATORS = {
 }
 
 
-def hw_call(entity, on):
+def hw_call(entity, on, timeout=12):
     """Open (on=True) or close one zone valve, main line or pump -> whether Home Assistant took it.
     One whose domain is not in ACTUATORS is not sent anything, and that is a failure."""
     domain = entity.split(".", 1)[0]
     row = ACTUATORS.get(domain)
-    return bool(row) and ha_call(domain, row[0] if on else row[1], entity_id=entity)
+    return bool(row) and ha_call(domain, row[0] if on else row[1], entity_id=entity, timeout=timeout)
 
 
 def hw_state(entity, state):
@@ -328,9 +406,9 @@ def hw_get(entity, timeout=8):
     return HAState(hw_state(entity, read[0]), read[1], read[2], getattr(read, "last_changed", None))
 
 
-def hw_history(entity, since):
+def hw_history(entity, since, timeout=12):
     """ha_history for a zone valve, main line or pump, each state in on/off words (hw_state)."""
-    rows = ha_history(entity, since)
+    rows = ha_history(entity, since, timeout=timeout)
     return rows and [(hw_state(entity, state), stamp) for state, stamp in rows]
 
 
@@ -3346,7 +3424,7 @@ class Controller:
             return
         self._clear_inflight(room, f"{tag}: closed and read back OFF - record closed")
 
-    def _inflight_plan(self, room, rec, reads):
+    def _inflight_plan(self, room, rec, reads, deadline=None):
         """Which of a recorded shot's switches are provably its own -> (close, left, unsure, why).
 
         Walks valve -> main line -> pump. A switch is the shot's own while it has been ON since the shot
@@ -3356,7 +3434,9 @@ class Controller:
         switched since, or that was on before, is theirs (`left`, with everything upstream of it), and so
         are the main line and pump while another valve on the line is open, and the pump while a hold is
         on. One that cannot be read, has no change time, or has no readable history stops it too
-        (`unsure`): whose it is cannot be told."""
+        (`unsure`): whose it is cannot be told. Inside the stop's `deadline` (a _Stop), so does a read
+        it needed that was not made in time or not answered (a hold or another valve it could not read
+        may be on); each read keeps time for the offs of what it would prove and of what is proven."""
         order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
         started = _aware(rec.get("started"))
         lo, hi = INFLIGHT_OPEN_WINDOW_S
@@ -3368,44 +3448,72 @@ class Controller:
             changed = _aware(getattr(read, "last_changed", None))
             if read[0] != "on" or changed is None or started is None:
                 return close, [], order[i:], ""
+            part = None if deadline is None else deadline.keeping(len(close) + 1)
             if not lo <= (changed - started).total_seconds() <= hi:
                 # A Home Assistant restart or the switch reconnecting also moves last_changed: ask the
                 # recorder whether anyone switched it since the shot opened it.
-                own = _on_since_shot(hw_history(ent, started + timedelta(seconds=lo)), started)
+                own = _on_since_shot(_history(ent, started + timedelta(seconds=lo), part), started)
                 if own is None:
                     return close, [], order[i:], ""
                 if not own:
                     return close, order[i:], [], f"{ent} changed at {changed.isoformat()}, not when the shot opened it"
             if ent != rec.get("valve"):
                 if line_in_use is None:
-                    line_in_use = self._line_in_use(room, rec)
+                    line_in_use = self._line_in_use(room, rec, part)
+                    if line_in_use is None:
+                        return close, [], order[i:], ""
                 if line_in_use:
                     return close, order[i:], [], "another valve on this line is open"
-            if ent == rec.get("pump") and any(self._on(f, False) for f in self.hold_entities):
-                return close, order[i:], [], "a hold (dosing / fill / flush / circulation) is on"
+            if ent == rec.get("pump"):
+                hold = self._hold_on(part)
+                if hold is None:
+                    return close, [], order[i:], ""
+                if hold:
+                    return close, order[i:], [], "a hold (dosing / fill / flush / circulation) is on"
             close.append(ent)
         return close, [], [], ""
 
-    def _switch_off_confirmed(self, entities):
-        """Switch these off, the valve first and then back up the line as after a normal shot, and
-        report whether every one reads back OFF."""
-        ok = hw_call(entities[0], False)
-        if len(entities) > 1:
-            time.sleep(1)
-        for ent in entities[1:]:
-            ok = hw_call(ent, False) and ok
-        return ok and self._confirm_switches(entities, "off")
+    def _hold_on(self, deadline=None):
+        """A hold (hold_entities) is on. Inside the stop's `deadline` (a _Stop), None when one was not read
+        in time or not answered and none read is on: it may be on."""
+        if deadline is None:
+            return any(self._on(f, False) for f in self.hold_entities)
+        unread = False
+        for entity in self.hold_entities:
+            v = _read(entity, deadline)[0]
+            if v is None:
+                unread = True
+            elif v not in ("unknown", "unavailable", "") and str(v).lower() in ON_STATES:
+                return True
+        return None if unread else False
 
-    def _line_in_use(self, room, rec):
-        """Another valve fed by this shot's main line or pump is open: someone is watering through it."""
+    def _switch_off_confirmed(self, entities, deadline=None):
+        """Switch these off, the valve first and then back up the line as after a normal shot, and
+        report whether every one reads back OFF (inside the stop's `deadline`, a _Stop, when given)."""
+        ok = _switch_off(entities[0], deadline, len(entities) - 1)
+        if len(entities) > 1:
+            _pause(1, deadline)
+        for i, ent in enumerate(entities[1:], 2):
+            ok = _switch_off(ent, deadline, len(entities) - i) and ok
+        return ok and self._confirm_switches(entities, "off", deadline)
+
+    def _line_in_use(self, room, rec, deadline=None):
+        """Another valve fed by this shot's main line or pump is open: someone is watering through it.
+        Inside the stop's `deadline` (a _Stop), None when one was not read in time or not answered and
+        none read is open: it may be."""
         line = {rec.get("mainline"), rec.get("pump")} - {None}
+        unread = False
         for other in self.rooms:
             if other is not room and not line & {other.hw.get("mainline"), other.hw.get("pump")}:
                 continue
             for valve in other.hw.get("valves", {}).values():
-                if valve and valve != rec.get("valve") and hw_get(valve)[0] == "on":
+                if not valve or valve == rec.get("valve"):
+                    continue
+                v = _read(valve, deadline)[0]
+                if v == "on":
                     return True
-        return False
+                unread = unread or (deadline is not None and v is None)
+        return None if unread else False
 
     def _clear_inflight(self, room, message):
         room.shot_inflight = None
@@ -3520,38 +3628,43 @@ class Controller:
         return open_s
 
     @staticmethod
-    def _confirm_switches(entities, want):
+    def _confirm_switches(entities, want, deadline=None):
         """True only when every switch reads back `want`.
 
         Zigbee/MQTT plugs accept a command at once but report the new state later
         (a pump's OFF report: usually under 1 s; 1.6 s on 15 Sep and about 10 s on 28 Sep 2026 on a
         live install). A read-back that gives up too early latches a false hardware hold; one that
         waits too long stalls every room (this loop is synchronous) before a real stuck-open is caught.
+        On the way out (SIGTERM) it gives up when the stop's `deadline` (a _Stop) runs out.
         """
 
         def settled(window, first):
-            deadline = time.monotonic() + window
-            time.sleep(first)
+            end = time.monotonic() + window
+            if deadline is not None:
+                end = min(end, deadline.until)
+            _pause(first, deadline)
             while True:
-                if all(hw_get(ent)[0] == want for ent in entities):
+                if deadline is not None and deadline.timeout(8) is None:
+                    return False  # no read-back fits in what is left of the stop
+                if all(_read(ent, deadline)[0] == want for ent in entities):
                     return True
-                if time.monotonic() >= deadline:
+                if time.monotonic() >= end:
                     return False
-                time.sleep(CONFIRM_POLL_S)
+                _pause(CONFIRM_POLL_S, deadline)
 
         # First read at 1 s, exactly as before, so a plug that reports promptly costs nothing extra.
         # A late report is then re-read every 0.5 s up to 6 s. The pump has already been commanded
         # OFF by the time this runs.
         if settled(CONFIRM_TIMEOUT_S, CONFIRM_FIRST_READ_S):
             return True
-        if want != "off":
+        if want != "off" or (deadline is not None and deadline.timeout(8) is None):
             return False
         # Whatever still does not read OFF is sent OFF again (a plug may have missed the first) and
         # read back for 10 s more: 16 s in all, still inside the minute's loop for a genuinely
         # stuck-open valve.
         for ent in entities:
-            if hw_get(ent)[0] != "off":
-                hw_call(ent, False)
+            if _read(ent, deadline)[0] != "off":
+                _switch_off(ent, deadline)
         return settled(CONFIRM_RETRY_S, CONFIRM_POLL_S)
 
     def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None, plan_exempt=False):
@@ -3759,7 +3872,7 @@ class Controller:
                 self._busy = False
                 self._shot_room = None
 
-    def _safe_off(self):
+    def _safe_off(self, deadline=None):
         """Stopping (SIGTERM: the app stopped, updated or restarted): close only what this controller has
         in flight, by the reconciler's rules (_inflight_plan), and nothing else.
 
@@ -3767,47 +3880,85 @@ class Controller:
         heat it and zones are hand-watered with the valves and main line open, and stopping the app must
         end neither. The shot running NOW is closed whatever its kill switch reads (it is this process's
         own); an older interrupted shot is left to the operator while its kill switch is not ON, as in the
-        loop. Anything that cannot be closed and read back OFF stays recorded for the next start."""
-        for room in self.rooms:
-            rec = getattr(room, "shot_inflight", None)
-            if not rec:
-                continue
-            order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
-            reads = {e: hw_get(e) for e in order}
-            if all(read[0] == "off" for read in reads.values()):
-                room.shot_inflight = None
-                continue
-            if room is not getattr(self, "_shot_room", None) and ha_get(room_gate(room))[0] != "on":
-                continue
-            close, left, unsure, why = self._inflight_plan(room, rec, reads)
-            if close and not self._switch_off_confirmed(close):
-                log(f"[{room.slug}] stopping: {', '.join(close)} not confirmed OFF - left recorded for the next start")
-                continue
-            if close:
-                log(f"[{room.slug}] stopping: switched off {', '.join(close)} (the shot in flight)")
-            if left:
-                log(f"[{room.slug}] stopping: left {', '.join(left)} alone ({why})")
-            if not unsure:
-                room.shot_inflight = None
+        loop. Anything that cannot be closed and read back OFF stays recorded for the next start.
+
+        With a `deadline` (the monotonic clock) every room with a shot recorded gets an equal share of the
+        time left, the room whose shot is running now first, so a slow room never takes the next one's
+        time. What no longer fits is not read or sent, and stays recorded (see _Stop)."""
+        shot_room = getattr(self, "_shot_room", None)
+        rooms = [room for room in self.rooms if getattr(room, "shot_inflight", None)]
+        rooms.sort(key=lambda room: room is not shot_room)
+        slowest = [0.0]  # how slow Home Assistant is answering, carried from room to room
+        for i, room in enumerate(rooms):
+            stop = None
+            if deadline is not None:
+                now = time.monotonic()
+                stop = _Stop(now + max(0.0, deadline - now) / (len(rooms) - i), slowest)
+            self._safe_off_room(room, room is shot_room, stop)
+
+    def _safe_off_room(self, room, running, stop):
+        rec = room.shot_inflight
+        order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
+        # Each read keeps time for its own switch's off and those of the switches read before it.
+        reads = {e: _read(e, stop and stop.keeping(i)) for i, e in enumerate(order, 1)}
+        if all(read[0] == "off" for read in reads.values()):
+            room.shot_inflight = None
+            return
+        if not running and _read(room_gate(room), stop and stop.keeping(1))[0] != "on":
+            return
+        close, left, unsure, why = self._inflight_plan(room, rec, reads, stop)
+        if running and unsure[:1] == [rec.get("valve")]:
+            # The valve of the shot running now is this process's own: when whose it is could not be told
+            # (no time left, or no read), it is switched off all the same. What is upstream stays recorded.
+            close, unsure = unsure[:1], unsure[1:]
+        if close and not self._switch_off_confirmed(close, stop):
+            log(f"[{room.slug}] stopping: {', '.join(close)} not confirmed OFF - left recorded for the next start")
+            return
+        if close:
+            log(f"[{room.slug}] stopping: switched off {', '.join(close)} (the shot in flight)")
+        if left:
+            log(f"[{room.slug}] stopping: left {', '.join(left)} alone ({why})")
+        if not unsure:
+            room.shot_inflight = None
 
     def _safe_exit(self, *_):
-        log("SIGTERM — closing what is in flight, saving state, exiting")
+        budget = runtime_env.stop_budget(os.environ)
+        deadline = time.monotonic() + budget
+        log(f"SIGTERM — closing what is in flight within {budget:g} s, saving state, exiting")
         try:
-            # The shot in flight first: it is water running now, and dosing's way out waits on its thread.
-            self._safe_off()
-            self._exit_dosing()
-            self._save_state()
+            try:
+                # Dosing starts nothing from here on. Then the shot in flight: it is water running now.
+                # Dosing's way out waits on its thread, so it goes last, in the time the stop keeps for it.
+                self._stop_dosing_starts()
+                reserve = min(STOP_DOSING_S, budget / 5) if self._dosing_recorded() else 0.0
+                self._safe_off(deadline - reserve)
+                self._exit_dosing(deadline)
+            finally:
+                self._save_state()
         finally:
             sys.exit(0)
 
-    def _exit_dosing(self):
-        """Stopping: no dosing switch-on starts from here, the dosing thread switches its own job off,
-        and what a dose or batch has recorded is switched off again, each off with a short timeout
-        (dosing_runner.exit). Its record stays in dosing_state.json, so the next start reads it back
-        OFF and raises CS-803."""
+    def _stop_dosing_starts(self):
         try:
             if self.dosing is not None:
-                self.dosing.exit()
+                self.dosing.stop_starting()
+        except Exception as e:
+            log("dosing: could not be stopped from starting on the way out:", e)
+
+    def _dosing_recorded(self):
+        try:
+            return self.dosing is not None and self.dosing.recorded()
+        except Exception:
+            return True  # whether it has anything to switch off can't be told: keep it its time
+
+    def _exit_dosing(self, deadline=None):
+        """Stopping: no dosing switch-on starts from here, the dosing thread switches its own job off,
+        and what a dose or batch has recorded is switched off again, each off with a short timeout
+        (dosing_runner.exit), all before the stop's `deadline` (the monotonic clock) when given. Its
+        record stays in dosing_state.json, so the next start reads it back OFF and raises CS-803."""
+        try:
+            if self.dosing is not None:
+                self.dosing.exit(None if deadline is None else max(0.0, deadline - time.monotonic()))
         except Exception as e:
             log("dosing: could not switch off on the way out:", e)
 

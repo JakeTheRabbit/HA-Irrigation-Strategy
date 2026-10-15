@@ -239,13 +239,31 @@ class DosingRunner:
         self._release_stuck()
         return True
 
-    def exit(self):
+    def recorded(self):
+        """Whether a dose or batch has anything recorded: what exit() switches off again."""
+        with self._lock:
+            return any(isinstance(block, dict) and isinstance(block.get("inflight"), dict)
+                       for block in self._doc["rooms"].values())
+
+    def stop_starting(self):
+        """The app is stopping (SIGTERM, before the irrigation's own safe-off): no dose, batch or
+        switch-on starts from here on. One already on its way lands; exit() waits for it."""
+        with self._lock:
+            self._exiting = True
+
+    def exit(self, within=None):
         """The app is stopping (SIGTERM, after the irrigation's own safe-off): no switch-on starts
         from here on (one in flight lands first, EXIT_GATE_S at most), the thread gets EXIT_JOIN_S to
         switch its own job's hardware off, and then everything recorded is switched off again, each
         off with a QUICK_S timeout and no read-back. The records stay, and a batch's hold stays on,
-        so the next start reads it all back off (recover) and raises CS-803."""
-        got = self._gate.acquire(timeout=EXIT_GATE_S)
+        so the next start reads it all back off (recover) and raises CS-803. With `within` (seconds)
+        every wait and every off is cut to fit inside it, and an off that no longer fits is not sent."""
+        end = None if within is None else self._mono() + within
+
+        def fits(seconds):
+            return seconds if end is None else max(0.0, min(seconds, end - self._mono()))
+
+        got = self._gate.acquire(timeout=fits(EXIT_GATE_S))
         try:
             with self._lock:
                 self._exiting = True
@@ -254,16 +272,23 @@ class DosingRunner:
             if got:
                 self._gate.release()
         if thread is not None and thread is not threading.current_thread() and thread.is_alive():
-            thread.join(EXIT_JOIN_S)
+            thread.join(fits(EXIT_JOIN_S))
         with self._lock:
             records = [
                 dict(block["inflight"]) for block in self._doc["rooms"].values()
                 if isinstance(block, dict) and isinstance(block.get("inflight"), dict)
             ]
+        unsent = []
         for record in records:
             for entity in record.get("off") or []:
                 if isinstance(entity, str) and "." in entity:
-                    self._send_off(entity)
+                    timeout = fits(QUICK_S)
+                    if timeout > 0:
+                        self._send_off(entity, timeout)
+                    else:
+                        unsent.append(entity)
+        if unsent:
+            self._log("dosing: no time left to switch off " + ", ".join(unsent) + "; recorded for the next start")
 
     # ------------------------------------------------------------------ the thread
     def _run(self):
@@ -1603,9 +1628,9 @@ class DosingRunner:
             self._call(_domain(e), self._actuator(e)[1], entity_id=e)
         return self._confirm(stuck, "off")
 
-    def _send_off(self, entity):
+    def _send_off(self, entity, timeout=QUICK_S):
         """An off with a QUICK_S timeout and no read-back -> whether Home Assistant took it."""
-        return self._call(_domain(entity), self._actuator(entity)[1], entity_id=entity, timeout=QUICK_S)
+        return self._call(_domain(entity), self._actuator(entity)[1], entity_id=entity, timeout=timeout)
 
     def _confirm(self, entities, want, timeout=None):
         """Read these back until each reads `want` ("on" or "off", _hw_state): first at 1 s, then every
