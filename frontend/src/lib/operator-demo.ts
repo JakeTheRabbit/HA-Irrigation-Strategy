@@ -431,6 +431,12 @@ export class OperatorDemo {
     if (action === "setpoint_log_get")
       return { schema_version: 1, room_id: data.room_id, changes: [], error: null } as T;
     if (action.startsWith("overlay_")) return this.overlay(action, data) as T;
+    if (action === "brain_ask")
+      // The demo has no AI assistant: the question is taken and never answered.
+      return {
+        question: { id: `demo-${Date.now()}`, question: data.question, zone: data.zone ?? null },
+        error: null,
+      } as T;
     if (action.startsWith("runs_")) {
       this.runDemo ||= new RunDemo(this.getStates);
       return this.runDemo.call(action, data) as T;

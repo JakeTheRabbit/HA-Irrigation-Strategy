@@ -212,6 +212,7 @@ export class HaClient {
       "notify_test",
       "whats_new_get",
       "whats_new_seen",
+      "brain_ask",
     ];
     if (!allowed.includes(action)) throw new Error("Unsupported workspace action.");
     // Keep and Undo answer nothing: asking them for a response is refused.

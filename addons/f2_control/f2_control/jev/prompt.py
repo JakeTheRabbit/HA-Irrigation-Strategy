@@ -184,7 +184,7 @@ class Prompt:
             if kind == "yes_no":
                 out += [f"<yes>{neutral(scrub(str(crit.get('true', ''))))}</yes>",
                         f"<no>{neutral(scrub(str(crit.get('false', ''))))}</no>"]
-            elif kind != "report" and isinstance(crit, dict):
+            elif kind != "report" and isinstance(crit, dict) and crit:  # a why task has no keys to choose from
                 out += ["<allowed>"] + [f"- {k}: {neutral(scrub(str(m)))}" for k, m in crit.items()] + ["</allowed>"]
             out.append("</question>")
         out += ["</questions>", "Answer each question above with one tool call."]

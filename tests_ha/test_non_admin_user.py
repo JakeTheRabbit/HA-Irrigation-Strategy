@@ -46,6 +46,8 @@ CHANGES = {
     "dosing_request": {"room_id": ROOM, "action": "dose", "pump": "balance", "ml": 5},
     # A push to the phones: the controller app's, as Home Assistant's administrator Supervisor user.
     "notify": {"key": "k", "title": "t", "message": "m"},
+    # An ask spends the room's AI budget.
+    "brain_ask": {"room_id": ROOM, "question": "why?"},
     "save_recipe": {"recipe": {}},
     "apply_recipe": {},
     "set_manual_override": {"zone": 1},

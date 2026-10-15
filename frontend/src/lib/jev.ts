@@ -343,6 +343,7 @@ export function parseJevZone(
 }
 
 export const jevIds = (prefix: string) => ({
+  answers: `sensor.crop_steering_${prefix}brain_answers`,
   log: `sensor.crop_steering_${prefix}jev_log`,
   room: `sensor.crop_steering_${prefix}jev`,
   zone: (zone: number) => `sensor.crop_steering_${prefix}zone_${zone}_jev`,
@@ -351,6 +352,48 @@ export const jevIds = (prefix: string) => ({
 export function readJev(states: States, prefix: string) {
   const ids = jevIds(prefix);
   return { log: parseJevLog(states[ids.log]), room: parseJevRoom(states[ids.room]) };
+}
+
+/** One answer to a grower's "why" (sensor.crop_steering_<prefix>brain_answers, jev_bridge.why_task). */
+export interface BrainAnswer {
+  id: string;
+  question: string;
+  zone: number | null;
+  answeredAt: number | null;
+  answer: string;
+  cannotAnswer: boolean;
+}
+
+/** The room's answers to "why", newest first, and how many questions are still with the brain. Null without the
+ * sensor (a controller from before Ask why); an entry without an id or a question is left out. */
+export function parseBrainAnswers(entity: EntityState | undefined): {
+  answers: BrainAnswer[];
+  pending: number;
+  askedToday: number | null;
+  limit: number | null;
+} | null {
+  if (!entity) return null;
+  const a = entity.attributes ?? {};
+  const answers = (Array.isArray(a.answers) ? a.answers : [])
+    .filter(
+      (item): item is Record<string, unknown> =>
+        !!item && typeof item === "object" && !!text(item.id) && !!text(item.question),
+    )
+    .map((item) => ({
+      id: text(item.id),
+      question: text(item.question),
+      zone: finite(item.zone),
+      answeredAt: parseControllerTime(item.answered_at),
+      answer: text(item.answer),
+      cannotAnswer: item.cannot_answer === true,
+    }))
+    .reverse();
+  return {
+    answers,
+    pending: Array.isArray(a.pending) ? a.pending.length : 0,
+    askedToday: finite(a.asked_today),
+    limit: finite(a.daily_limit),
+  };
 }
 
 /** Workers AI input at $0.042 per million tokens; output is free (docs/JEV.md). The legacy route only: the Claude

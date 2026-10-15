@@ -413,6 +413,14 @@ def validate_answer(block, snap_id, lane):
     if name == "write_report":
         qid = next((q for q, v in lane.items() if isinstance(v, dict) and v.get("type") == "report"), None)
         return None if qid is None else _report(qid, args)
+    if name == "answer_why":  # the why task's one question: no question id, no confidence
+        qid = next((k for k, v in lane.items() if isinstance(v, dict) and v.get("type") == "why"), None)
+        grounded = args.get("grounded_in")
+        if qid is None or not isinstance(args.get("answer"), str) or not isinstance(args.get("cannot_answer"), bool):
+            return None
+        return qid, {"type": "why", "answer": _clean(args["answer"]), "cannot_answer": args["cannot_answer"],
+                     "grounded_in": [_clean(g)[:80] for g in grounded if isinstance(g, str)][:10]
+                     if isinstance(grounded, list) else []}
     qid = args.get("question_id")
     variant = lane.get(qid) if isinstance(qid, str) else None
     conf = args.get("confidence")
