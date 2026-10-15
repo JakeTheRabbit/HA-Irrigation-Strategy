@@ -220,6 +220,8 @@ def test_a_site_with_no_store_answers_with_an_empty_setup_and_its_phones():
             "friendly_name": "Crop Steering notifications",
             "recipients": 0,
             "idle_hours": 3,
+            # And that it puts Keep and Undo on a push about the AI's settings.
+            "overlay_actions": True,
         },
     )
 
@@ -494,6 +496,24 @@ def test_every_push_carries_its_key_as_the_tag_and_emergencies_go_high_priority(
     # `data` goes to mobile_app services only; this one asked for no high priority anyway.
     assert payloads[GROUP] == {"title": "T", "message": "M"}
     assert notify_api.push_data(GROUP, "k", True) is None
+
+
+def test_a_push_about_the_ais_settings_carries_keep_and_undo_on_a_phone():
+    ids = [
+        "number.crop_steering_zone_1_p2_shot_size",
+        "number.crop_steering_zone_2_p2_shot_size",
+    ]
+    data = notify_api.push_data(PHONE_A, "jev_setpoint_default", False, ids)
+    assert data == {
+        "tag": "jev_setpoint_default",
+        **LINK,
+        "actions": [
+            {"action": "CROP_STEERING_KEEP:" + ",".join(ids), "title": "Keep"},
+            {"action": "CROP_STEERING_UNDO:" + ",".join(ids), "title": "Undo"},
+        ],
+    }
+    assert "actions" not in notify_api.push_data(PHONE_A, "k", False, [])
+    assert notify_api.push_data(GROUP, "k", False, ids) is None
 
 
 def test_a_phone_that_fails_never_stops_the_others(monkeypatch):

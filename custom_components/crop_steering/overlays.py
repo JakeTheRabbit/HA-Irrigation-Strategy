@@ -6,7 +6,10 @@ ends the grow-day it is for. Until then the number holds the AI's value (`new`);
 value is the operator's (`old`), and a further AI move on the same setting keeps that `old`. When it
 runs out the operator's value is put back. Any other write to the number meanwhile (the operator, an
 automation, the learner, the safety put-back) ends the overlay and that value stands. Keep ends it
-with the AI's value kept as the operator's; Undo puts the operator's value back now.
+with the AI's value kept as the operator's; Undo puts the operator's value back now. Both are also on the
+phone: the push about the AI's move carries Keep and Undo (notify_api.py), and a tap comes back as the
+mobile_app app's `mobile_app_notification_action` event, as the phone's own user, who must be an
+administrator here as on the page.
 
 One Home Assistant store per room. A room that has never had one (a fresh install, or one updated
 from a version without overlays) reads as none, and nothing is written until the brain moves a
@@ -17,12 +20,18 @@ from __future__ import annotations
 
 from datetime import timedelta
 from functools import partial
+import logging
 
 from . import setpoint_log
 from .const import DOMAIN
+from .notify_api import KEEP, UNDO
 from .room import room_prefix
 
+_LOGGER = logging.getLogger(__name__)
+
 SERVICES = ("overlay_get", "overlay_keep", "overlay_undo")
+TAPPED = "mobile_app_notification_action"
+ACTIONS = {KEEP: "overlay_keep", UNDO: "overlay_undo"}
 
 
 def _when(value):
@@ -216,6 +225,43 @@ async def async_setup_overlays(hass, entry):
     hass.services.async_register(DOMAIN, "overlay_keep", keep, schema=each)
     hass.services.async_register(DOMAIN, "overlay_undo", undo, schema=each)
 
+    async def tapped(event):
+        """Keep or Undo tapped on a phone: each setting it names, through the same service as the page,
+        as the phone's user. One that has run out or ended meanwhile has nothing left to do.
+        """
+        head, _, ids = str(event.data.get("action", "")).partition(":")
+        if head not in ACTIONS:
+            return
+        for entity_id in filter(None, ids.split(",")):
+            held = next(
+                (item for item in rooms.values() if entity_id in item.rows), None
+            )
+            if held is None:
+                _LOGGER.info(
+                    "Crop Steering: %s from a phone: no AI overlay on %s now",
+                    head,
+                    entity_id,
+                )
+                continue
+            try:
+                await hass.services.async_call(
+                    DOMAIN,
+                    ACTIONS[head],
+                    {"room_id": held.room_id, "entity_id": entity_id},
+                    blocking=True,
+                    context=event.context,
+                )
+            except Exception as error:  # a refused tap changes nothing
+                _LOGGER.warning(
+                    "Crop Steering: %s from a phone not done on %s: %s",
+                    head,
+                    entity_id,
+                    error,
+                )
+
+    if "_overlay_taps" not in hass.data[DOMAIN]:
+        hass.data[DOMAIN]["_overlay_taps"] = hass.bus.async_listen(TAPPED, tapped)
+
 
 async def async_unload_overlays(hass, entry):
     rooms = hass.data.get(DOMAIN, {}).get("_overlays", {})
@@ -225,3 +271,6 @@ async def async_unload_overlays(hass, entry):
     if not rooms:
         for service in SERVICES:
             hass.services.async_remove(DOMAIN, service)
+        stop = hass.data.get(DOMAIN, {}).pop("_overlay_taps", None)
+        if stop is not None:
+            stop()

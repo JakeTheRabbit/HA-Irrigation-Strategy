@@ -555,6 +555,11 @@ notify:
       default: false
       selector:
         boolean:
+    overlays:
+      required: false
+      example: '["number.crop_steering_zone_1_p2_shot_size"]'
+      selector:
+        object:
 whats_new_get:
   name: Read what's new
   description: The release highlights shipped with this integration, the installed version and the last release the dashboard's What's new window showed. Changes nothing.

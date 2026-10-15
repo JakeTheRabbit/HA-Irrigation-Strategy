@@ -976,6 +976,10 @@
         "urgent": {
           "name": "Urgent",
           "description": "A critical alert: a phone whose row asks for it gets it as a high-priority push."
+        },
+        "overlays": {
+          "name": "AI changes",
+          "description": "The settings the AI brain just moved, by entity id: the push gets Keep and Undo buttons on a phone with the Home Assistant app."
         }
       }
     }
