@@ -141,10 +141,14 @@ class DosingStore:
                 return self.response("revision", can_edit)
             if self.pending() or self.running():
                 return self.response("busy", can_edit)
+            batch = data.get("batch")
+            if isinstance(batch, dict) and "name" not in batch:
+                # A page from before recipe names keeps the stored one.
+                batch = {**batch, "name": self.data["batch"].get("name")}
             try:
                 pumps, batch = dosing.clean(
                     data.get("pumps"),
-                    data.get("batch"),
+                    batch,
                     self._exists,
                     self._stock_tanks(),
                 )

@@ -393,3 +393,14 @@ def test_the_services_find_the_room_and_record_who_asked(services):
         services.call("dosing_get", room_id="f1")
     asyncio.run(dosing_api.async_unload_dosing(services.hass, services.entry))
     assert services.hass.services.registered == {}
+
+
+def test_a_recipe_name_is_kept_by_a_save_from_a_page_that_does_not_know_it():
+    _, store = rig()
+    named = {**copy.deepcopy(BATCH), "name": "Week 3"}
+    assert save(store, batch=named)["error"] is None
+    assert store.data["batch"]["name"] == "Week 3"
+    assert save(store)["error"] is None  # BATCH has no name key: an older page
+    assert store.data["batch"]["name"] == "Week 3"
+    assert save(store, batch={**copy.deepcopy(BATCH), "name": ""})["error"] is None
+    assert store.data["batch"]["name"] == ""

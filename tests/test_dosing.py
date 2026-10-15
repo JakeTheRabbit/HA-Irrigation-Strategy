@@ -340,3 +340,12 @@ def test_a_request_waits_until_it_is_handled_or_too_old_to_act_on():
     assert not dosing.pending(None, None, NOW)
     assert not dosing.pending({"id": "abc", "at": "yesterday"}, None, NOW)
     assert not dosing.pending({"id": "abc", "at": "2026-09-28T12:00:00"}, None, NOW)
+
+
+def test_a_recipe_may_be_named_and_a_setup_from_before_names_has_none():
+    # BATCH has no name, as every setup saved before names.
+    assert clean()[1]["name"] == ""
+    assert clean(batch=batch(name="  Week 3  "))[1]["name"] == "Week 3"
+    assert clean(batch=batch(name="x" * 40))[1]["name"] == "x" * 40
+    with pytest.raises(dosing.DosingError, match="at most 40 characters"):
+        clean(batch=batch(name="x" * 41))

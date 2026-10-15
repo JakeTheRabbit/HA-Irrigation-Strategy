@@ -63,6 +63,7 @@ def empty_batch() -> dict:
         "close_entities": [],
         "hold_entity": None,
         "filled_at_entity": None,
+        "name": "",
         "recipe": [],
     }
 
@@ -251,6 +252,9 @@ def _batch(raw, pumps: dict, exists) -> dict:
     mix_min_w = _number(
         raw.get("mix_min_w"), 0, 100000, "mix pump minimum power (W)", 0
     )
+    name = str(raw.get("name") or "").strip()
+    if len(name) > 40:
+        raise DosingError("the recipe's name must be at most 40 characters")
     if mix_min_w > 0 and not mix_power_sensor:
         # Without it the controller could not check the power, and would mix unchecked.
         raise DosingError(
@@ -290,6 +294,7 @@ def _batch(raw, pumps: dict, exists) -> dict:
             exists,
             optional=True,
         ),
+        "name": name,
         "recipe": _recipe(raw.get("recipe"), pumps, exists),
     }
 
