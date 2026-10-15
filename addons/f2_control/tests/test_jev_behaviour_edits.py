@@ -16,6 +16,7 @@ TOPICS = {  # each judge's with_doctrine(...) call, as written at its call site
     "ramp": ("ramp", "probe", "ec"), "salt": ("ec", "closed_loop", "stage", "maintenance"),
     "setpoints": ("maintenance", "ec"), "shot": ("probe", "maintenance", "ramp"),
     "stage": ("stage", "ripening", "dryback", "ec", "closed_loop"), "zones": ("probe", "maintenance", "slab"),
+    "balance": ("maintenance", "slab"),
 }
 
 
