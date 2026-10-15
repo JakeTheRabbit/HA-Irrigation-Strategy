@@ -159,3 +159,19 @@ def test_with_nothing_to_compare_the_state_is_restored_never_thrown_away():
     assert (
         _ours(created=_at(1), written=_at(3, aware=False)) is True
     )  # naive against aware
+
+
+def test_the_light_entity_is_in_the_descriptor_only_when_mapped():
+    """A room without a grow light mapped publishes the descriptor it always did, key for key and value for value,
+    so the controller's saved setup fingerprint still matches and an update needs no disarm cycle.
+    """
+    before = room.build_engine_config("veg_", "veg", 2, _ZONES, _HW)
+    assert "light_entity" not in before
+    blank = room.build_engine_config(
+        "veg_", "veg", 2, _ZONES, {**_HW, "light_entity": ""}
+    )
+    assert blank == before
+    mapped = room.build_engine_config(
+        "veg_", "veg", 2, _ZONES, {**_HW, "light_entity": "light.veg_lights"}
+    )
+    assert mapped == {**before, "light_entity": "light.veg_lights"}

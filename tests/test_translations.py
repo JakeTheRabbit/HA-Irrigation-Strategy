@@ -145,7 +145,6 @@ def test_a_field_nothing_reads_does_not_promise_that_something_will():
     """
     promised = {
         "waste_switch": ("forced closed", "closed during a shot"),
-        "light_entity": ("knows day", "day vs night"),
         "notification_service": ("where alerts go",),
         "humidity_sensor": ("analytics",),
         "vpd_sensor": (),
@@ -164,6 +163,14 @@ def test_a_field_nothing_reads_does_not_promise_that_something_will():
                 ), f"{flow}.{step}.{key} still claims '{claim}'"
     waste = strings["config"]["step"]["hardware"]["data_description"]["waste_switch"]
     assert "does NOT operate" in waste
+    # The grow light is read now (the engine descriptor; the controller checks it against the hours): its tooltip
+    # says that, and that day and night still come from the hours.
+    for flow, step in (("config", "hardware"), ("options", "edit_zones_map")):
+        light = strings[flow]["step"][step]["data_description"]["light_entity"]
+        assert (
+            "come from the lights-on and lights-off hours" in light
+            and "checks it" in light
+        )
 
 
 def test_the_plumbing_question_says_what_it_commits_you_to_and_the_pump_tooltip_defers_to_it():

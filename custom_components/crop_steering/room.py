@@ -162,6 +162,10 @@ def build_engine_config(
     declared.update(
         {k: hw[k] for k in ("tank_distance_sensor", "tank_low_float") if hw.get(k)}
     )
+    # The room's light, likewise only when mapped: the controller checks it against the lights hours.
+    declared.update(
+        {"light_entity": hw["light_entity"]} if hw.get("light_entity") else {}
+    )
     if setup.get("tank_level") and (
         hw.get("tank_distance_sensor") or hw.get("tank_low_float")
     ):
