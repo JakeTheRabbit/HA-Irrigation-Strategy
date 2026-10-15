@@ -734,11 +734,13 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - An old controller app build without time zone data.
 - Home Assistant's time zone was changed after the app started.
+- A controller container whose TZ setting is not Home Assistant's time zone.
 
 **Suggested fixes**
 
 - Update, or rebuild, the controller app, then restart it.
 - Check Home Assistant's time zone under Settings → System → General.
+- Controller container: set TZ in your compose file to Home Assistant's time zone, or remove it to follow Home Assistant, then restart the container.
 
 ## Checks across zones (CS-5xx)
 
@@ -819,10 +821,12 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - The controller app isn't installed, isn't started, or has stopped.
 - The app can't reach Home Assistant.
+- A controller container is stopped, or Home Assistant refuses its token.
 
 **Suggested fixes**
 
 - Start the controller app and read its log.
+- With Home Assistant Container or Core: start the controller container, or check the controller container's log.
 - If you only water by hand, ignore this.
 
 <a id="cs-603"></a>

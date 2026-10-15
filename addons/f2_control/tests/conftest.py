@@ -28,6 +28,19 @@ def _hermetic_state_file(tmp_path, monkeypatch):
     monkeypatch.setenv("F2_STATE_PATH", str(tmp_path / "constructor-state.json"))
 
 
+@pytest.fixture(autouse=True)
+def _runs_as_the_app(monkeypatch):
+    """The suite runs as the Home Assistant app, which is what the Supervisor gives it
+    (runtime_env.runtime() is "addon"); a machine's own environment never decides it. A test of a
+    standalone container hands runtime_env its own environment."""
+    monkeypatch.setenv("F2_RUNTIME", "addon")
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "test-supervisor-token")
+    monkeypatch.delenv("HA_URL", raising=False)
+    import controller
+
+    monkeypatch.setattr(controller, "_GATE", controller._AuthGate())  # decided now, as the app
+
+
 @pytest.fixture
 def no_blind_grace(monkeypatch):
     """For tests of what happens once a probe is dead: it counts as dead at once. How long a probe

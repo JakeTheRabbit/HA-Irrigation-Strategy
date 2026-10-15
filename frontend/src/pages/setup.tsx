@@ -474,6 +474,16 @@ export function Setup({
                 Add controller repository <ExternalLink size={15} />
               </a>
             </Button>
+            <p>
+              Home Assistant Container or Core: run the controller container instead.{" "}
+              <a
+                href="https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md#home-assistant-container-or-core"
+                target="_blank"
+                rel="noreferrer"
+              >
+                How to run it <ExternalLink size={13} />
+              </a>
+            </p>
           </div>
         </li>
         <li>
