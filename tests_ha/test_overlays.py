@@ -172,3 +172,75 @@ async def test_the_numbers_3_11_1s_brain_wrote_load_as_plain_values(
     later = (dt_util.utcnow() + timedelta(days=3)).isoformat()
     await _run_until(hass, later)
     assert {s.entity_id: s.state for s in hass.states.async_all("number")} == numbers
+
+
+async def test_keep_and_undo_tapped_on_a_phone_reach_the_overlay(
+    hass, controller_for, hass_admin_user, monkeypatch
+):
+    """The push about the AI's move carries Keep and Undo to a phone with the Home Assistant app, and a
+    tap comes back as that app's mobile_app_notification_action event, as the phone's user: Keep keeps
+    the AI's value, Undo puts the operator's back, and a phone whose user is no administrator changes
+    nothing, as on the page."""
+    import controller
+    from test_notify import _call as _notify_call
+    from test_notify import _phones, _staff
+
+    seed = fixture(JEV_3_11_1)
+    await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
+    staff = await _staff(hass)
+    received = _phones(hass, [("Grower phone", hass_admin_user), ("Staff phone", staff)])
+    doc = await _notify_call(hass, hass_admin_user, "notify_get")
+    await _notify_call(
+        hass,
+        hass_admin_user,
+        "notify_save",
+        expected_revision=doc["config"]["revision"],
+        recipients=[
+            {"service": "notify.mobile_app_grower_phone", "kinds": ["jev"]},
+            {"service": "notify.mobile_app_staff_phone", "kinds": ["jev"]},
+        ],
+    )
+    await hass.async_block_till_done()
+    c, fake, _clock = controller_for({"enable_flag": KILL})
+    room = c.rooms[0]
+    c._refresh_lights(room)
+    fake.events.clear()
+    fake.calls.clear()
+    asked = []
+    monkeypatch.setattr(
+        controller,
+        "ha_service_response",
+        lambda domain, service, data, timeout=12: asked.append(dict(data))
+        or (200, {"sent_to": ["notify.mobile_app_grower_phone"], "error": None}),
+    )
+
+    async def move(value):
+        old = await _write(hass, c, fake, room, SHOT, value)
+        c._notify_event("jev_setpoint", room, 1, f"P2 shot {old:g} -> {value:g}", "Smaller shots.", SHOT)
+        c._send_events()
+        await hass.services.async_call(DOMAIN, "notify", asked.pop(), blocking=True)
+        actions = received["notify.mobile_app_grower_phone"][-1]["data"]["actions"]
+        return old, {a["title"]: a["action"] for a in actions}
+
+    async def tap(action, user):
+        hass.bus.async_fire(
+            "mobile_app_notification_action", {"action": action}, context=Context(user_id=user.id)
+        )
+        await hass.async_block_till_done()
+
+    old, actions = await move(_value(hass, SHOT) + 1)
+    assert actions == {"Keep": f"CROP_STEERING_KEEP:{SHOT}", "Undo": f"CROP_STEERING_UNDO:{SHOT}"}
+    await tap(actions["Undo"], staff)  # not an administrator: nothing changes
+    assert _value(hass, SHOT) == old + 1 and len(await _overlays(hass)) == 1
+    await tap(actions["Undo"], hass_admin_user)
+    assert _value(hass, SHOT) == old and await _overlays(hass) == []
+    assert (await _log(hass))[-1] == ("operator", old + 1, old)
+
+    old, actions = await move(old + 2)  # not old + 1: the controller would not write that again so soon
+    [row] = await _overlays(hass)
+    await tap(actions["Keep"], hass_admin_user)
+    assert await _overlays(hass) == []
+    await _run_until(hass, row["expires"])
+    assert _value(hass, SHOT) == old + 2
+    await tap(actions["Undo"], hass_admin_user)  # nothing left to undo: nothing changes
+    assert _value(hass, SHOT) == old + 2

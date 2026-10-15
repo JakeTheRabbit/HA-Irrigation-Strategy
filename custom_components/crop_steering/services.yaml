@@ -568,6 +568,11 @@ notify:
       default: false
       selector:
         boolean:
+    overlays:
+      required: false
+      example: '["number.crop_steering_zone_1_p2_shot_size"]'
+      selector:
+        object:
 test_shot:
   name: Test a zone's watering
   description: Ask the controller app for a 10-second test shot in one zone, as the zone's Test Shot button does, to check that watering works. It passes every check a shot passes except a held irrigation strategy's, and its water counts toward the day's. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.

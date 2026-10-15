@@ -317,16 +317,18 @@ def apply_setpoint(c, room, zone, d, ctx, now):
     mem = c.jev.setpoints
     rec = mem.zone(room.slug, zone)
     learn = room.state[zone].get("learn") if isinstance(room.state[zone].get("learn"), dict) else {}
-    c._auto_write(room, zone, v["suffix"], float(v["from"]), float(v["to"]), learn, now, by="Jev")
+    wrote = c._auto_write(room, zone, v["suffix"], float(v["from"]), float(v["to"]), learn, now, by="Jev")
     rec["written"][v["suffix"]] = float(v["to"])
     rec["pending"] = _pending(v["suffix"], float(v["from"]), float(v["to"]), "Jev", now)
     rec["last"] = {"suffix": v["suffix"], "from": float(v["from"]), "to": float(v["to"]),
                    "at": now.isoformat(timespec="seconds"), "day": (ctx.setpoints or {}).get("day"),
                    "words": v["words"], "choice": v["choice"], "reverted": False}
     mem.save()
-    # For the phones that tick Jev (docs/NOTIFICATIONS.md): no card, a push only.
+    # For the phones that tick Jev (docs/NOTIFICATIONS.md): no card, a push only, with Keep and Undo for the
+    # number written (an AI overlay in the integration).
     c._notify_event("jev_setpoint", room, zone, v["words"],
-                    f"{CHOICES.get(v['choice'], v['choice'])} Jev's Setpoints judge, {d.why}.")
+                    f"{CHOICES.get(v['choice'], v['choice'])} Jev's Setpoints judge, {d.why}.",
+                    *([f"number.crop_steering_{room.prefix}zone_{zone}_{v['suffix']}"] if wrote else []))
 
 
 def guard_setpoints(c, room, zone, now):

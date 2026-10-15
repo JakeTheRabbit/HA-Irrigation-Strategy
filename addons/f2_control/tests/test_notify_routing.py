@@ -328,6 +328,25 @@ def test_a_setting_jev_moved_goes_to_the_phones_that_ask_and_a_failure_is_droppe
     assert len(routed.calls) == 2  # and never sent again
 
 
+def test_a_setting_jev_moved_names_its_number_for_keep_and_undo_only_to_an_integration_that_takes_it(router):
+    """An integration with AI overlays says so on its sensor and puts Keep and Undo on the push; an older one
+    would refuse a push naming them, so it never gets one."""
+    shot = "number.crop_steering_zone_1_p2_shot_size"
+    for overlay_actions, expected in ((True, [shot]), (None, None)):
+        c, fake = _setup()
+        attrs = {"recipients": 1, "idle_hours": 3}
+        if overlay_actions:
+            attrs["overlay_actions"] = True
+        fake.set_state(CONFIG, "1", attrs)
+        routed = router()
+        c._notify_config(refresh=True)
+        c._notify_event("jev_setpoint", c.rooms[0], 1, "P2 shot 5% -> 4.5%", "Smaller shots.", shot)
+        c._send_events()
+        [sent] = routed.sent
+        assert sent.get("overlays") == expected
+        assert sent["title"] == "Zone 1: Jev changed P2 shot 5% -> 4.5%"
+
+
 # ------------------------------------------------------------------ CS-209, no watering for a while
 def _idle_room(**options):
     """A zone in P2 since 10:30, lights on 10-22, last watered yesterday, and watering switched off."""

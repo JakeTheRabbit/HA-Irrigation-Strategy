@@ -72,6 +72,10 @@ SERVICE_ID = re.compile(r"notify\.[a-z0-9_]+")
 # A room prefix: "" (the default room) or "<slug>_".
 ROOM = re.compile(r"(?:[a-z0-9_]*_)?")
 UNNAMED = ("default", "crop steering", "crop steering system")
+# A push about settings the AI brain just moved (`overlays`, their numbers' entity ids) carries two buttons on a
+# mobile_app phone: Keep the AI's values, or Undo them now. A tap comes back as the app's
+# mobile_app_notification_action event, which overlays.py takes (overlay_keep / overlay_undo).
+KEEP, UNDO = "CROP_STEERING_KEEP", "CROP_STEERING_UNDO"
 
 
 class NotifyError(ValueError):
@@ -272,14 +276,21 @@ def route(recipients, kinds, room) -> list[dict]:
     return rows
 
 
-def push_data(service, key, urgent) -> dict | None:
+def push_data(service, key, urgent, overlays=()) -> dict | None:
     """A push's `data`, for a mobile_app service only (another notify service may refuse keys it does not
     know): the tag, so a repeat replaces the earlier push on the phone, the link that opens the Crop Steering
-    panel when the push is tapped, and the high-priority keys.
+    panel when the push is tapped, the high-priority keys, and Keep and Undo for the AI's `overlays`.
     """
     if not service.startswith("notify.mobile_app_"):
         return None
-    return {"tag": key, **LINK, **(deepcopy(URGENT) if urgent else {})}
+    data = {"tag": key, **LINK, **(deepcopy(URGENT) if urgent else {})}
+    if overlays:
+        ids = ",".join(overlays)
+        data["actions"] = [
+            {"action": f"{KEEP}:{ids}", "title": "Keep"},
+            {"action": f"{UNDO}:{ids}", "title": "Undo"},
+        ]
+    return data
 
 
 def _valid(value) -> dict:
@@ -365,6 +376,8 @@ class Notifier:
             "mutes"
         ]:  # {room prefix: until}: nothing but emergencies is pushed for those rooms
             attributes["muted"] = dict(self.data["mutes"])
+        # The controller app names the AI's overlays on a push only to an integration that takes them.
+        attributes["overlay_actions"] = True
         self.hass.states.async_set(SENSOR, str(self.data["revision"]), attributes)
 
     async def phones(self) -> list[dict]:
@@ -577,6 +590,7 @@ class Notifier:
                     data["message"],
                     data["key"],
                     urgent and row["urgent_high_priority"],
+                    data.get("overlays", ()),
                 )
                 for row in rows
             )
@@ -628,10 +642,12 @@ class Notifier:
                     "Crop Steering digest to %s not delivered: %s", service, error
                 )
 
-    async def _deliver(self, service, title, message, key, urgent) -> str | None:
+    async def _deliver(
+        self, service, title, message, key, urgent, overlays=()
+    ) -> str | None:
         """Send one push -> None, or why it failed. A phone that fails never stops the others."""
         payload = {"title": title, "message": message}
-        data = push_data(service, key, urgent)
+        data = push_data(service, key, urgent, overlays)
         if data is not None:
             payload["data"] = data
         domain, name = service.split(".", 1)
@@ -833,6 +849,7 @@ async def async_setup_notify(hass, entry) -> None:
             vol.Required("title"): str,
             vol.Required("message"): str,
             vol.Optional("urgent", default=False): bool,
+            vol.Optional("overlays"): [str],
         },
     }
     for service in SERVICES:

@@ -44,7 +44,14 @@ docs/error-codes.json is in no kind at all.
 - **Phase change** (`event: "phase"`): the controller sends one when a zone's phase changes, with the room,
   zone, from and to (for example "F2 · Zone 2: P1 → P2, ramp target reached"). No card; a push only.
 - **Jev setting change** (`event: "jev_setpoint"`): when Jev moves a zone's P2 shot size or re-water point
-  (docs/JEV.md). No card; a push only.
+  (docs/JEV.md). No card; a push only. The move is an AI overlay that goes back to your own value by itself
+  at lights-on, and on a phone with the Home Assistant app the push carries two buttons: **Keep** keeps the
+  AI's value as your own, **Undo** puts your own value back now. The controller names the numbers it wrote
+  (`overlays`, their entity ids) and the integration adds the buttons; a tap comes back as the app's
+  `mobile_app_notification_action` event, as the phone's own user, and goes through `overlay_keep` or
+  `overlay_undo` exactly as the page does, so it needs a Home Assistant administrator. A setting whose
+  overlay has already run out or ended has nothing left to keep or undo. The controller names them only
+  to an integration whose `sensor.crop_steering_notify_config` says `overlay_actions: true`.
 - **Vitals** (`event: "vitals"`): the controller's report on every zone, every `notify_min` minutes, key
   `vitals`, title "<name> vitals". Under each zone, while the room's `notify_predictions` switch is on (it
   is until someone switches it off), a "Next:" line says what the zone does next, in the words of the
