@@ -457,6 +457,10 @@ dosing_save:
       required: false
       selector:
         object:
+    profile:
+      required: false
+      selector:
+        object:
 dosing_request:
   fields:
     room_id:

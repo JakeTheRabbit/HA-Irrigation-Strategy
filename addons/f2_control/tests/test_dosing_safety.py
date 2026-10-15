@@ -558,7 +558,7 @@ def test_an_error_in_the_middle_of_a_single_dose_cuts_the_pump_and_settles_it(ri
 def test_an_error_before_a_single_dose_starts_is_settled_too(rig, monkeypatch):
     r = rig()
     r.config()
-    monkeypatch.setattr(r.runner, "_dose_check", lambda pump, ml: 1 / 0)
+    monkeypatch.setattr(r.runner, "_dose_check", lambda pump, ml, profile: 1 / 0)
     r.ask(ml=50)
     r.poll()
     assert r.status()[1]["handled_result"] == "stopped: an error in the controller"

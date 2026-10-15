@@ -45,6 +45,10 @@ VOLUME_TOLERANCE_ML = 0.5
 MIN_FLOW_ML_S = 0.05  # a flow below this is no calibration: a dose would be expected to take hours
 MAX_DOSE_S = 1200.0  # no dose may be expected to take longer than 20 min
 DOSE_CAP_S = MAX_DOSE_S + 60.0  # and none is left running past this, whatever its expected time
+# A room's dosing hardware profile (docs/DOSING.md, Hardware profile) sets these per room; each default
+# is the constant above, the value every room used before it could be set.
+PROFILE = {"hold_wait_s": HOLD_WAIT_S, "fill_open_s": FILL_OPEN_S, "full_blind_s": FULL_BLIND_S,
+           "mix_power_s": MIX_POWER_S, "min_flow_ml_s": MIN_FLOW_ML_S, "max_dose_s": MAX_DOSE_S}
 REFRESH_S = 30.0  # the pumps' flow and state are read this often
 CHORES_S = 30.0  # while a dose or batch runs, stock draws, alerts and volume put-backs wait this long
 QUICK_S = 2.0  # the Home Assistant timeout for those chores, for re-sent offs and for the way out
@@ -99,6 +103,20 @@ def _dead(state):
     return state is None or str(state).strip().lower() in DEAD
 
 
+def _profile(config):
+    """The room's hardware profile: each value its dosing_config publishes as a positive number, else
+    the default (an integration from before the profile publishes none)."""
+    given = config.get("profile") if isinstance(config, dict) else None
+    given = given if isinstance(given, dict) else {}
+    out = {}
+    for key, default in PROFILE.items():
+        value = given.get(key)
+        usable = (isinstance(value, (int, float)) and not isinstance(value, bool)
+                  and math.isfinite(value) and value > 0)
+        out[key] = float(value) if usable else default
+    return out
+
+
 def _does(items):
     """"X does" / "X, Y do"."""
     return f"{', '.join(items)} {'does' if len(items) == 1 else 'do'}"
@@ -127,6 +145,7 @@ class _Job:
 
     def __init__(self, room, config, request, kind):
         self.room, self.config, self.request, self.kind = room, config, request, kind
+        self.profile = _profile(config)  # the room's hardware profile: its times and limits
         self.stopped = False  # a stop request for this room arrived
         self.stopped_by = None
         self.deadline = None  # a batch's watchdog, on the runner's clock
@@ -606,7 +625,7 @@ class DosingRunner:
         "ran past its time", "not confirmed" or "stopped" ("stopped: an error in the controller"), or
         "refused: why" when nothing was pressed. job.left: what its end left not reading off."""
         job.left, job.pressed, job.cut_at = [], None, None
-        why, flow = self._dose_check(pump, ml)
+        why, flow = self._dose_check(pump, ml, job.profile)
         if why:
             return f"refused: {why}"
         volume = pump["volume_entity"]
@@ -792,31 +811,31 @@ class DosingRunner:
                                      if (r.get("pump"), r.get("at")) != (dose.get("pump"), dose.get("at"))]
                 self._write()
 
-    def _uncalibrated(self, pump):
-        """Why the pump's flow can't be used, or None: it must read a number of at least
-        MIN_FLOW_ML_S (a firmware that divides by a zero flow runs its motor for ever, and a tiny one
+    def _uncalibrated(self, pump, profile=PROFILE):
+        """Why the pump's flow can't be used, or None: it must read a number of at least the profile's
+        min_flow_ml_s (a firmware that divides by a zero flow runs its motor for ever, and a tiny one
         would put every time limit hours away)."""
         flow, reading, _unit = self._device(pump["flow_entity"], "flow")
-        if flow is not None and flow >= MIN_FLOW_ML_S:
+        if flow is not None and flow >= profile["min_flow_ml_s"]:
             return None
         return f"{pump['name']} is not calibrated (flow {'missing' if reading is None else reading})"
 
     @staticmethod
-    def _too_long(pump, ml, flow):
+    def _too_long(pump, ml, flow, profile=PROFILE):
         return (f"{_fmt(ml)} mL of {pump['name']} would take {ml / flow / 60:.1f} min at "
-                f"{_fmt(flow)} mL/s, more than {MAX_DOSE_S / 60:g} min")
+                f"{_fmt(flow)} mL/s, more than {profile['max_dose_s'] / 60:g} min")
 
-    def _dose_check(self, pump, ml):
+    def _dose_check(self, pump, ml, profile=PROFILE):
         """Why this dose must not start (docs/DOSING.md, One dose, step 1) and the pump's flow."""
-        why = self._uncalibrated(pump)
+        why = self._uncalibrated(pump, profile)
         if why:
             return why, None
         flow = self._device(pump["flow_entity"], "flow")[0]
         if (isinstance(ml, bool) or not isinstance(ml, (int, float)) or not math.isfinite(ml)
                 or not 0 < ml <= float(pump.get("max_ml") or 0)):
             return f"{_fmt(ml)} mL is not more than 0 and at most {_fmt(pump.get('max_ml'))} mL", None
-        if ml / flow > MAX_DOSE_S:
-            return self._too_long(pump, ml, flow), None
+        if ml / flow > profile["max_dose_s"]:
+            return self._too_long(pump, ml, flow, profile), None
         dosing = self._dosing(pump)[0]
         if dosing is True:
             return f"{pump['name']} already reads dosing", None
@@ -839,7 +858,7 @@ class DosingRunner:
         except _Ended:  # a stop, or the batch's watchdog, came first: nothing was pressed
             return "stopped"
         job.pressed = pressed
-        deadline = pressed + min(expected * 1.25 + 20, DOSE_CAP_S)
+        deadline = pressed + min(expected * 1.25 + 20, job.profile["max_dose_s"] + 60)
         confirm_by = pressed + expected + 15
         batch = " The batch stops here." if job.kind == "batch" else ""
         seen = blind = False
@@ -969,7 +988,7 @@ class DosingRunner:
             self._job = job
         stuck, hold_left, told = [], [], True
         try:
-            job.deadline = self._mono() + self._watchdog(batch, plan)
+            job.deadline = self._mono() + self._watchdog(batch, plan, job.profile)
             with self._lock:
                 self._live_of(room)["batch"] = {
                     "step": "idle", "pump": None, "name": batch.get("name") or "",
@@ -1057,12 +1076,12 @@ class DosingRunner:
                 continue
             if ml > float(pump.get("max_ml") or 0):
                 return f"{_fmt(ml)} mL of {pump['name']} is more than its {_fmt(pump['max_ml'])} mL", None
-            why = self._uncalibrated(pump)
+            why = self._uncalibrated(pump, job.profile)
             if why:
                 return why, None
             flow = self._device(pump["flow_entity"], "flow")[0]
-            if ml / flow > MAX_DOSE_S:
-                return self._too_long(pump, ml, flow), None
+            if ml / flow > job.profile["max_dose_s"]:
+                return self._too_long(pump, ml, flow, job.profile), None
             plan.append((pump, ml, flow))
         return None, plan
 
@@ -1082,12 +1101,13 @@ class DosingRunner:
         return held
 
     @staticmethod
-    def _watchdog(batch, plan):
+    def _watchdog(batch, plan, profile=PROFILE):
         """The hold's wait for a shot + fill timeout + premix + postmix + every dose's capped deadline
-        + 10 min, in seconds."""
-        minutes = (HOLD_WAIT_S / 60 + float(batch.get("fill_timeout_min") or 20)
+        + 10 min, in seconds, with the room's hardware profile."""
+        cap = profile["max_dose_s"] + 60
+        minutes = (profile["hold_wait_s"] / 60 + float(batch.get("fill_timeout_min") or 20)
                    + float(batch.get("premix_min") or 0) + float(batch.get("postmix_min") or 0) + 10)
-        return minutes * 60 + sum(min(ml / flow * 1.25 + 20, DOSE_CAP_S) for _pump, ml, flow in plan)
+        return minutes * 60 + sum(min(ml / flow * 1.25 + 20, cap) for _pump, ml, flow in plan)
 
     def _hold(self, job, held):
         self._begin(job, "hold")
@@ -1102,8 +1122,8 @@ class DosingRunner:
         waited = self._mono()
         while self.c._shot_running(held):
             self._check(job)
-            if self._mono() - waited >= HOLD_WAIT_S:
-                raise _Ended("a shot was still running after 10 minutes")
+            if self._mono() - waited >= job.profile["hold_wait_s"]:
+                raise _Ended(f"a shot was still running after {job.profile['hold_wait_s'] / 60:g} minutes")
             yield POLL_S
         self._done(job)
 
@@ -1137,13 +1157,14 @@ class DosingRunner:
                              f"{sensor} can't be read, so the fill valve was not opened.")
             raise _Ended("the tank's full sensor can't be read")
         minutes = float(batch.get("fill_timeout_min") or 20)
+        open_s, blind_s = job.profile["fill_open_s"], job.profile["full_blind_s"]
         self._on(job, valve)
         began = self._mono()
-        if self._confirm([valve], "on", FILL_OPEN_S):
+        if self._confirm([valve], "on", open_s):
             stuck = self._switch_off([valve])
             self._fill_alert(job, "the batch tank could not be filled",
                              f"the fill valve ({valve}) did not open: it did not read on within "
-                             f"{FILL_OPEN_S:.0f} seconds. It was switched off"
+                             f"{open_s:.0f} seconds. It was switched off"
                              + (", but it still does not read off: close it by hand now." if stuck else "."))
             raise _Ended("the fill valve did not open")
         filled, blind, why = False, None, None
@@ -1155,7 +1176,7 @@ class DosingRunner:
                 break
             if state is None:
                 blind = now if blind is None else blind
-                if now - blind >= FULL_BLIND_S:
+                if now - blind >= blind_s:
                     why = "the full sensor stopped reporting"
                     break
             else:
@@ -1171,7 +1192,7 @@ class DosingRunner:
         if why == "the full sensor stopped reporting":
             self._fill_alert(job, "the batch tank could not be filled",
                              f"the full sensor stopped reporting: {sensor} read nothing usable for "
-                             f"{FULL_BLIND_S:.0f} seconds while the fill valve ({valve}) was open. {closed}")
+                             f"{blind_s:.0f} seconds while the fill valve ({valve}) was open. {closed}")
             raise _Ended(why)
         if not filled:
             self._fill_alert(job, "the batch tank did not fill in time",
@@ -1215,16 +1236,16 @@ class DosingRunner:
             raise _Ended(f"the mix pump ({pump}) did not read on")
         watts, sensor = float(batch.get("mix_min_w") or 0), batch.get("mix_power_sensor")
         if watts > 0 and sensor:
-            began = self._mono()
+            began, within = self._mono(), job.profile["mix_power_s"]
             while True:
                 drawn, reading, unit = self._device(sensor, "power")
                 if drawn is not None and drawn >= watts:
                     break
-                if self._mono() - began >= MIX_POWER_S:
+                if self._mono() - began >= within:
                     self._mix_alert(job, pump, f"The mix pump ({pump}) was switched on, but {sensor} did not "
-                                    f"read {watts:g} W within {MIX_POWER_S:.0f} seconds (it reads "
+                                    f"read {watts:g} W within {within:.0f} seconds (it reads "
                                     f"{reading}{f' {unit}' if unit else ''})")
-                    raise _Ended(f"the mix pump did not draw {watts:g} W within {MIX_POWER_S:.0f} s")
+                    raise _Ended(f"the mix pump did not draw {watts:g} W within {within:.0f} s")
                 self._check(job)
                 yield READ_S
         self._done(job)
@@ -1780,7 +1801,7 @@ class DosingRunner:
     def _config(self, room):
         """The room's dosing setup as the integration publishes it: None with no dosing_config at all
         (an integration from before dosing), False when it can't be read (never acted on), else
-        {"revision", "pumps", "batch", "request"}."""
+        {"revision", "pumps", "batch", "request", "profile"}."""
         state, attributes, _updated = self._get(f"sensor.crop_steering_{room.prefix}dosing_config")
         if state is None:
             return None
@@ -1790,7 +1811,8 @@ class DosingRunner:
         if not (isinstance(pumps, list) and all(self._pump_readable(p) for p in pumps)
                 and isinstance(batch, dict) and self._batch_readable(batch)):
             return False
-        return {"revision": state, "pumps": pumps, "batch": batch, "request": attributes.get("request")}
+        return {"revision": state, "pumps": pumps, "batch": batch, "request": attributes.get("request"),
+                "profile": attributes.get("profile")}
 
     @staticmethod
     def _pump_readable(pump):

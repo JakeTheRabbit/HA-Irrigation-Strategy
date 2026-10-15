@@ -55,6 +55,18 @@ LEVEL = ("sensor", "number", "input_number")
 # that does not know them never switches the reminder off (dosing_api.py).
 REMINDER = ("level_entity", "remind_pct")
 
+# The room's dosing hardware profile (docs/DOSING.md, Hardware profile): the times and limits the
+# controller app works to, as key: (default, low, high, label). Each default is the value every room
+# used before it could be set, so a setup stored without a profile runs exactly as before.
+PROFILE = {
+    "hold_wait_s": (600, 60, 3600, "wait for a shot in flight (s)"),
+    "fill_open_s": (10, 2, 120, "fill valve open read-back (s)"),
+    "full_blind_s": (15, 5, 300, "full sensor silence (s)"),
+    "mix_power_s": (20, 5, 300, "mix pump power read-back (s)"),
+    "min_flow_ml_s": (0.05, 0.01, 100, "lowest calibrated flow (mL/s)"),
+    "max_dose_s": (1200, 60, 3600, "longest dose (s)"),
+}
+
 _ID = re.compile(r"^[a-z0-9_]{1,24}$")
 _OBJECT = re.compile(r"^[a-z0-9_]+$")
 
@@ -95,12 +107,17 @@ def empty_feed() -> dict:
     }
 
 
+def empty_profile() -> dict:
+    return {key: spec[0] for key, spec in PROFILE.items()}
+
+
 def empty() -> dict:
     return {
         "revision": 0,
         "pumps": [],
         "batch": empty_batch(),
         "feed": empty_feed(),
+        "profile": empty_profile(),
         "request": None,
         "updated_at": None,
     }
@@ -555,6 +572,19 @@ def feed_now(feed: dict, today: date) -> dict:
         "start": schedule.get("start"),
         "held_until": holding,
         "source": source,
+    }
+
+
+def clean_profile(raw) -> dict:
+    """The operator's hardware profile -> what is stored: every key, each a number in its range; a key
+    left out (or no profile at all) takes its default."""
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise DosingError("the hardware profile must be an object")
+    return {
+        key: _number(raw.get(key), low, high, f"hardware profile: {label}", default)
+        for key, (default, low, high, label) in PROFILE.items()
     }
 
 

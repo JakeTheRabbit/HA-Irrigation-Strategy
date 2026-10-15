@@ -906,6 +906,10 @@
         "feed": {
           "name": "Feed schedule",
           "description": "Named feed recipes, the recipe each week of the grow uses from the day the first week starts, and the recipe picked by hand. Left out, the stored feed schedule is kept."
+        },
+        "profile": {
+          "name": "Hardware profile",
+          "description": "This room's dosing times and limits: the wait for a shot in flight, the fill valve and mix pump read-backs, the full sensor silence, the lowest calibrated flow and the longest dose. Each one left out takes its default; with no profile the stored one is kept."
         }
       }
     },

@@ -51,6 +51,8 @@ def _valid(value) -> dict:
         value.get("pumps", []), value.get("batch")
     )
     data["feed"] = dosing.clean_feed(value.get("feed"), data["pumps"])
+    # A setup stored before the hardware profile has none: it takes the defaults, today's timings.
+    data["profile"] = dosing.clean_profile(value.get("profile"))
     request = value.get("request")
     data["request"] = (
         request if isinstance(request, dict) and request.get("id") else None
@@ -149,8 +151,8 @@ class DosingStore:
 
     def sensor(self) -> tuple:
         """sensor.crop_steering_<prefix>dosing_config as (state, attributes): the setup's revision,
-        and its pumps, batch (its recipe the one in use today) and request, and `feed`: which recipe
-        that is and why (dosing.feed_now). Unknown while the stored setup cannot be read, so the
+        and its pumps, batch (its recipe the one in use today), hardware profile and request, and `feed`:
+        which recipe that is and why (dosing.feed_now). Unknown while the stored setup cannot be read, so the
         controller acts on nothing it cannot read."""
         if self.error:
             return None, {"error": self.error}
@@ -159,6 +161,7 @@ class DosingStore:
         return self.data["revision"], {
             "pumps": deepcopy(self.data["pumps"]),
             "batch": batch,
+            "profile": deepcopy(self.data["profile"]),
             "request": deepcopy(self.data["request"]),
             "feed": dosing.feed_now(self.data["feed"], _today()),
         }
@@ -195,6 +198,10 @@ class DosingStore:
                 feed = dosing.clean_feed(
                     stored if sent is None else sent, pumps, self._exists
                 )
+                # A save that sends no profile keeps the stored one.
+                profile = dosing.clean_profile(
+                    data.get("profile", self.data["profile"])
+                )
             except dosing.DosingError as error:
                 return self.response(str(error), can_edit)
             if sent is not None and feed["stage"] != stored["stage"]:
@@ -207,6 +214,7 @@ class DosingStore:
                 pumps=pumps,
                 batch=batch,
                 feed=feed,
+                profile=profile,
                 updated_at=_now().isoformat(),
             )
             await self._commit(draft)
@@ -341,6 +349,7 @@ async def async_setup_dosing(hass, entry):
             vol.Required("pumps"): list,
             vol.Required("batch"): dict,
             vol.Optional("feed"): dict,
+            vol.Optional("profile"): dict,
         },
         "dosing_request": {
             vol.Required("room_id"): str,
